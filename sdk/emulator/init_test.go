@@ -7,18 +7,15 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/sdk/abi/values"
-
-	"github.com/dapperlabs/flow-go/sdk/keys"
-
-	"github.com/dapperlabs/flow-go/sdk/emulator/types"
-
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/emulator"
-
-	"github.com/dapperlabs/flow-go/sdk/emulator/storage/badger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
+	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/emulator/storage/badger"
+	"github.com/dapperlabs/flow-go/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 func TestInitialization(t *testing.T) {
@@ -47,14 +44,17 @@ func TestInitialization(t *testing.T) {
 
 		// Submit a transaction adds some ledger state and event state
 		script := `
-			event MyEvent(x: Int)
-			
-			pub fun main(acct: Account) {
-				emit MyEvent(x: 1)
+            event MyEvent(x: Int)
+            
+            transaction {
+              prepare(acct: Account) {
+                emit MyEvent(x: 1)
 
-				acct.storage[Int] = 1
-			}
-		`
+                acct.storage[Int] = 1
+              }
+              execute {}
+            }
+        `
 
 		tx := flow.Transaction{
 			Script:         []byte(script),
@@ -111,10 +111,10 @@ func TestInitialization(t *testing.T) {
 
 		t.Run("should be able to read ledger state", func(t *testing.T) {
 			readScript := fmt.Sprintf(`
-				pub fun main(): Int {
-					return getAccount("%s").storage[Int] ?? 0
-				}
-			`, b.RootAccountAddress())
+                pub fun main(): Int {
+                    return getAccount(0x%s).storage[Int] ?? 0
+                }
+            `, b.RootAccountAddress())
 
 			res, _, err := b.ExecuteScript([]byte(readScript))
 			assert.NoError(t, err)

@@ -46,6 +46,7 @@ type Checker struct {
 	functionActivations     *FunctionActivations
 	GlobalValues            map[string]*Variable
 	GlobalTypes             map[string]*Variable
+	TransactionTypes        []*TransactionType
 	inCondition             bool
 	Occurrences             *Occurrences
 	variableOrigins         map[*Variable]*Origin

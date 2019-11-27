@@ -213,7 +213,12 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 	t.Run("TooManyAccountsForScript", func(t *testing.T) {
 		// script only supports one account
-		script := []byte("pub fun main(account: Account) {}")
+		script := []byte(`
+		  transaction {
+		    prepare(signer: Account) {}
+ 		    execute {}
+		  }
+		`)
 
 		// create transaction with two accounts
 		tx := flow.Transaction{
@@ -240,7 +245,12 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 	t.Run("NotEnoughAccountsForScript", func(t *testing.T) {
 		// script requires two accounts
-		script := []byte("pub fun main(accountA: Account, accountB: Account) {}")
+		script := []byte(`
+		  transaction {
+		    prepare(signerA: Account, signerB: Account) {}
+ 		    execute {}
+		  }
+		`)
 
 		// create transaction with two accounts
 		tx := flow.Transaction{
@@ -354,7 +364,12 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		accountAddressA, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyA, publicKeyB}, nil, getNonce())
 		assert.NoError(t, err)
 
-		script := []byte("pub fun main(account: Account) {}")
+		script := []byte(`
+		  transaction {
+		    prepare(signer: Account) {}
+ 		    execute {}
+		  }
+		`)
 
 		tx := flow.Transaction{
 			Script:             script,
@@ -437,10 +452,13 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		assert.NoError(t, err)
 
 		multipleAccountScript := []byte(`
-			pub fun main(accountA: Account, accountB: Account) {
-				log(accountA.address)
-				log(accountB.address)
-			}
+		  transaction {
+		    prepare(signerA: Account, signerB: Account) {
+		      log(signerA.address)
+			  log(signerB.address)
+		    }
+ 		    execute {}
+		  }
 		`)
 
 		tx := flow.Transaction{
@@ -464,8 +482,8 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		err = b.SubmitTransaction(tx)
 		assert.NoError(t, err)
 
-		assert.Contains(t, loggedMessages, fmt.Sprintf(`"%x"`, accountAddressA.Bytes()))
-		assert.Contains(t, loggedMessages, fmt.Sprintf(`"%x"`, accountAddressB.Bytes()))
+		assert.Contains(t, loggedMessages, fmt.Sprintf("%x", accountAddressA.Bytes()))
+		assert.Contains(t, loggedMessages, fmt.Sprintf("%x", accountAddressB.Bytes()))
 	})
 }
 
@@ -485,17 +503,18 @@ func TestGetTransaction(t *testing.T) {
 	eventsScript := `
 		event MyEvent(x: Int)
 
-		pub fun main(account: Account) {
-			emit MyEvent(x: 1)	
+		transaction {
+		  execute {
+		    emit MyEvent(x: 1)	
+		  }
 		}
 	`
 
 	tx := flow.Transaction{
-		Script:         []byte(eventsScript),
-		Nonce:          getNonce(),
-		ComputeLimit:   10,
-		PayerAccount:   b.RootAccountAddress(),
-		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
+		Script:       []byte(eventsScript),
+		Nonce:        getNonce(),
+		ComputeLimit: 10,
+		PayerAccount: b.RootAccountAddress(),
 	}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
@@ -516,7 +535,7 @@ func TestGetTransaction(t *testing.T) {
 
 	t.Run("ValidHash", func(t *testing.T) {
 		resTx, err := b.GetTransaction(tx.Hash())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, resTx.Status, flow.TransactionFinalized)
 		assert.Len(t, resTx.Events, 1)
@@ -524,7 +543,7 @@ func TestGetTransaction(t *testing.T) {
 		actualEvent := resTx.Events[0]
 
 		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
 

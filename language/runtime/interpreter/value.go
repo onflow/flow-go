@@ -2223,6 +2223,10 @@ func (v AddressValue) Copy() Value {
 	return v
 }
 
+func (v AddressValue) String() string {
+	return fmt.Sprintf("%x", [AddressLength]byte(v))
+}
+
 func (AddressValue) GetOwner() string {
 	// value is never owned
 	return ""

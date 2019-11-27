@@ -1,4 +1,4 @@
-package tests
+package interpreter_test
 
 import (
 	"fmt"

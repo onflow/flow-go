@@ -131,6 +131,7 @@ type Interpreter struct {
 	CompositeFunctions  map[string]map[string]FunctionValue
 	DestructorFunctions map[string]*InterpretedFunctionValue
 	SubInterpreters     map[ast.LocationID]*Interpreter
+	Transactions        []*HostFunctionValue
 	onEventEmitted      OnEventEmittedFunc
 	onStatement         OnStatementFunc
 	storageReadHandler  StorageReadHandlerFunc
@@ -428,7 +429,7 @@ func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
 	interpreter.Globals[name] = interpreter.findVariable(name)
 }
 
-func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []interface{}) (trampoline Trampoline, err error) {
+func (interpreter *Interpreter) prepareInvokeVariable(functionName string, arguments []interface{}) (trampoline Trampoline, err error) {
 	variable, ok := interpreter.Globals[functionName]
 	if !ok {
 		return nil, &NotDeclaredError{
@@ -439,20 +440,12 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 
 	variableValue := variable.Value
 
-	function, ok := variableValue.(FunctionValue)
+	functionValue, ok := variableValue.(FunctionValue)
 	if !ok {
 		return nil, &NotInvokableError{
 			Value: variableValue,
 		}
 	}
-
-	var argumentValues []Value
-	argumentValues, err = ToValues(arguments)
-	if err != nil {
-		return nil, err
-	}
-
-	// ensures the invocation's argument count matches the function's parameter count
 
 	ty := interpreter.Checker.GlobalValues[functionName].Type
 
@@ -465,6 +458,39 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 	}
 
 	functionType := invokableType.InvocationFunctionType()
+
+	return interpreter.prepareInvoke(functionValue, functionType, arguments)
+}
+
+func (interpreter *Interpreter) prepareInvokeTransaction(
+	index int,
+	arguments []interface{},
+) (trampoline Trampoline, err error) {
+	if index >= len(interpreter.Transactions) {
+		return nil, &TransactionNotDeclaredError{Index: index}
+	}
+
+	functionValue := interpreter.Transactions[index]
+
+	transactionType := interpreter.Checker.TransactionTypes[index]
+	functionType := transactionType.Prepare.InvocationFunctionType()
+
+	return interpreter.prepareInvoke(functionValue, functionType, arguments)
+}
+
+func (interpreter *Interpreter) prepareInvoke(
+	functionValue FunctionValue,
+	functionType *sema.FunctionType,
+	arguments []interface{},
+) (trampoline Trampoline, err error) {
+
+	var argumentValues []Value
+	argumentValues, err = ToValues(arguments)
+	if err != nil {
+		return nil, err
+	}
+
+	// ensures the invocation's argument count matches the function's parameter count
 
 	parameterTypeAnnotations := functionType.ParameterTypeAnnotations
 	parameterCount := len(parameterTypeAnnotations)
@@ -488,34 +514,24 @@ func (interpreter *Interpreter) prepareInvoke(functionName string, arguments []i
 		// TODO: value type is not known – only used for Any boxing right now, so reject for now
 		if parameterType.Equal(&sema.AnyType{}) {
 			return nil, &NotInvokableError{
-				Value: variableValue,
+				Value: functionValue,
 			}
 		}
+
 		preparedArguments[i] = interpreter.convertAndBox(argument, nil, parameterType)
 	}
 
-	trampoline = function.invoke(preparedArguments, LocationPosition{})
+	trampoline = functionValue.invoke(preparedArguments, LocationPosition{})
 	return trampoline, nil
 }
 
 func (interpreter *Interpreter) Invoke(functionName string, arguments ...interface{}) (value Value, err error) {
 	// recover internal panics and return them as an error
-	defer func() {
-		if r := recover(); r != nil {
-			var ok bool
-			// don't recover Go errors
-			err, ok = r.(goRuntime.Error)
-			if ok {
-				panic(err)
-			}
-			err, ok = r.(error)
-			if !ok {
-				err = fmt.Errorf("%v", r)
-			}
-		}
-	}()
+	defer recoverErrors(func(internalErr error) {
+		err = internalErr
+	})
 
-	trampoline, err := interpreter.prepareInvoke(functionName, arguments)
+	trampoline, err := interpreter.prepareInvokeVariable(functionName, arguments)
 	if err != nil {
 		return nil, err
 	}
@@ -524,6 +540,40 @@ func (interpreter *Interpreter) Invoke(functionName string, arguments ...interfa
 		return nil, nil
 	}
 	return result.(Value), nil
+}
+
+func (interpreter *Interpreter) InvokeTransaction(index int, arguments ...interface{}) (err error) {
+	// recover internal panics and return them as an error
+	defer recoverErrors(func(internalErr error) {
+		err = internalErr
+	})
+
+	trampoline, err := interpreter.prepareInvokeTransaction(index, arguments)
+	if err != nil {
+		return err
+	}
+
+	_ = interpreter.runAllStatements(trampoline)
+
+	return nil
+}
+
+func recoverErrors(onError func(error)) {
+	if r := recover(); r != nil {
+		var ok bool
+		// don't recover Go errors
+		goErr, ok := r.(goRuntime.Error)
+		if ok {
+			panic(goErr)
+		}
+
+		err, ok := r.(error)
+		if !ok {
+			err = fmt.Errorf("%v", r)
+		}
+
+		onError(err)
+	}
 }
 
 func (interpreter *Interpreter) VisitProgram(program *ast.Program) ast.Repr {
@@ -618,7 +668,7 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 	interpreter.activations.PushCurrent()
 
 	beforeStatements, rewrittenPostConditions :=
-		interpreter.rewritePostConditions(functionBlock)
+		interpreter.rewritePostConditions(functionBlock.PostConditions)
 
 	return interpreter.visitStatements(beforeStatements).
 		FlatMap(func(_ interface{}) Trampoline {
@@ -655,15 +705,15 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 		})
 }
 
-func (interpreter *Interpreter) rewritePostConditions(functionBlock *ast.FunctionBlock) (
+func (interpreter *Interpreter) rewritePostConditions(postConditions []*ast.Condition) (
 	beforeStatements []ast.Statement,
 	rewrittenPostConditions []*ast.Condition,
 ) {
 	beforeExtractor := NewBeforeExtractor()
 
-	rewrittenPostConditions = make([]*ast.Condition, len(functionBlock.PostConditions))
+	rewrittenPostConditions = make([]*ast.Condition, len(postConditions))
 
-	for i, postCondition := range functionBlock.PostConditions {
+	for i, postCondition := range postConditions {
 
 		// copy condition and set expression to rewritten one
 		newPostCondition := *postCondition
@@ -1604,7 +1654,6 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 	function InterpretedFunctionValue,
 	arguments []Value,
 ) Trampoline {
-
 	interpreter.bindFunctionInvocationParameters(function, arguments)
 
 	functionBlockTrampoline := interpreter.visitFunctionBlock(
@@ -2228,8 +2277,84 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 }
 
 func (interpreter *Interpreter) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
-	// TODO: implement transaction interpretation
-	panic(" not implemented")
+	interpreter.declareTransactionEntrypoint(declaration)
+
+	// NOTE: no result, so it does *not* act like a return-statement
+	return Done{}
+}
+
+func (interpreter *Interpreter) declareTransactionEntrypoint(declaration *ast.TransactionDeclaration) {
+	transactionType := interpreter.Checker.Elaboration.TransactionDeclarationTypes[declaration]
+
+	lexicalScope := interpreter.activations.CurrentOrNew()
+
+	var prepareFunction *ast.FunctionExpression
+	var prepareFunctionType *sema.FunctionType
+	if declaration.Prepare != nil {
+		prepareFunction = declaration.Prepare.FunctionDeclaration.ToExpression()
+		prepareFunctionType = transactionType.Prepare.FunctionType
+	}
+
+	executeFunction := declaration.Execute.FunctionDeclaration.ToExpression()
+	executeFunctionType := &sema.FunctionType{
+		ReturnTypeAnnotation: sema.NewTypeAnnotation(&sema.VoidType{}),
+	}
+
+	beforeStatements, rewrittenPostConditions :=
+		interpreter.rewritePostConditions(declaration.PostConditions)
+
+	self := &CompositeValue{
+		Location: interpreter.Checker.Location,
+		Fields:   map[string]Value{},
+	}
+
+	transactionFunction := NewHostFunctionValue(
+		func(arguments []Value, location LocationPosition) Trampoline {
+			interpreter.activations.Push(lexicalScope)
+
+			interpreter.declareVariable(sema.SelfIdentifier, self)
+
+			transactionScope := interpreter.activations.CurrentOrNew()
+
+			var entryPoint Trampoline
+
+			if prepareFunction != nil {
+				prepare := newInterpretedFunction(
+					interpreter,
+					prepareFunction,
+					prepareFunctionType,
+					transactionScope,
+				)
+
+				entryPoint = prepare.invoke(arguments, location)
+			} else {
+				entryPoint = interpreter.visitStatements(beforeStatements)
+			}
+
+			execute := newInterpretedFunction(
+				interpreter,
+				executeFunction,
+				executeFunctionType,
+				transactionScope,
+			)
+
+			return entryPoint.
+				FlatMap(func(_ interface{}) Trampoline {
+					return interpreter.visitConditions(declaration.PreConditions)
+				}).
+				FlatMap(func(_ interface{}) Trampoline {
+					return execute.invoke(nil, location)
+				}).
+				FlatMap(func(_ interface{}) Trampoline {
+					return interpreter.visitConditions(rewrittenPostConditions)
+				}).
+				Then(func(_ interface{}) {
+					interpreter.activations.Pop()
+				})
+		},
+	)
+
+	interpreter.Transactions = append(interpreter.Transactions, &transactionFunction)
 }
 
 func (interpreter *Interpreter) VisitEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
