@@ -1457,7 +1457,7 @@ func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpres
 				copies[i] = interpreter.copyAndConvert(argument, argumentType, elementType)
 			}
 
-			return Done{Result: NewArrayValueNonCopying(copies...)}
+			return Done{Result: NewArrayValueUnownedNonCopying(copies...)}
 		})
 }
 
@@ -1468,7 +1468,7 @@ func (interpreter *Interpreter) VisitDictionaryExpression(expression *ast.Dictio
 			entryTypes := interpreter.Checker.Elaboration.DictionaryExpressionEntryTypes[expression]
 			dictionaryType := interpreter.Checker.Elaboration.DictionaryExpressionType[expression]
 
-			newDictionary := NewDictionaryValue()
+			newDictionary := NewDictionaryValueUnownedNonCopying()
 			for i, dictionaryEntryValues := range result.([]DictionaryEntryValues) {
 				entryType := entryTypes[i]
 
@@ -1517,7 +1517,7 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 			resultValue := value.GetMember(interpreter, locationRange, expression.Identifier.Identifier)
 
 			if expression.Optional {
-				return &SomeValue{Value: resultValue}
+				return NewSomeValueOwningNonCopying(resultValue)
 			}
 			return resultValue
 		})
@@ -1683,7 +1683,7 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 }
 
 func (interpreter *Interpreter) visitExpressionsNonCopying(expressions []ast.Expression) Trampoline {
-	var trampoline Trampoline = Done{Result: NewArrayValueNonCopying()}
+	var trampoline Trampoline = Done{Result: NewArrayValueUnownedNonCopying()}
 
 	for _, expression := range expressions {
 		// NOTE: important: rebind expression, because it is captured in the closure below
@@ -1699,7 +1699,7 @@ func (interpreter *Interpreter) visitExpressionsNonCopying(expressions []ast.Exp
 					value := result.(Value)
 
 					newValues := append(array.Values, value)
-					return Done{Result: NewArrayValueNonCopying(newValues...)}
+					return Done{Result: NewArrayValueUnownedNonCopying(newValues...)}
 				})
 		})
 	}
@@ -1804,6 +1804,8 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 				Fields:     map[string]Value{},
 				Functions:  functions,
 				Destructor: destructorFunction,
+				// NOTE: new value has no owner
+				Owner: "",
 			}
 
 			var initializationTrampoline Trampoline = Done{}
@@ -2137,7 +2139,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 				Type: &sema.NeverType{},
 			}
 		} else {
-			value = &SomeValue{Value: value}
+			value = NewSomeValueOwningNonCopying(value)
 			valueType = &sema.OptionalType{
 				Type: valueType,
 			}
@@ -2156,23 +2158,20 @@ func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.T
 		if _, ok := value.(*AnyValue); ok {
 			return value
 		}
-		return &AnyValue{
-			Value: value,
-			Type:  valueType,
-		}
+		return NewAnyValueOwningNonCopying(value, valueType)
 
 	case *sema.OptionalType:
 		if _, ok := value.(NilValue); ok {
 			return value
 		}
 		some := value.(*SomeValue)
-		return &SomeValue{
-			Value: interpreter.boxAny(
+		return NewSomeValueOwningNonCopying(
+			interpreter.boxAny(
 				some.Value,
 				valueType.(*sema.OptionalType).Type,
 				targetType.Type,
 			),
-		}
+		)
 
 	// TODO: support more types, e.g. arrays, dictionaries
 	default:
@@ -2424,7 +2423,7 @@ func (interpreter *Interpreter) VisitCastingExpression(expression *ast.CastingEx
 					return NilValue{}
 				}
 
-				return &SomeValue{Value: anyValue.Value}
+				return NewSomeValueOwningNonCopying(anyValue.Value)
 
 			case ast.OperationCast:
 				staticValueType := interpreter.Checker.Elaboration.CastingStaticValueTypes[expression]
@@ -2467,6 +2466,8 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 			referenceValue := &ReferenceValue{
 				TargetStorageIdentifier: storage.Identifier,
 				TargetKey:               key,
+				// NOTE: new value has no owner
+				Owner: "",
 			}
 
 			return Done{Result: referenceValue}

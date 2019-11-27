@@ -23,6 +23,8 @@ import (
 type Value interface {
 	isValue()
 	Copy() Value
+	GetOwner() string
+	SetOwner(owner string)
 }
 
 type ExportableValue interface {
@@ -82,6 +84,15 @@ func (v VoidValue) Copy() Value {
 	return v
 }
 
+func (VoidValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (VoidValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
+
 func (VoidValue) Export() values.Value {
 	return values.Void{}
 }
@@ -102,6 +113,15 @@ func (BoolValue) isValue() {}
 
 func (v BoolValue) Copy() Value {
 	return v
+}
+
+func (BoolValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (BoolValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
 }
 
 func (v BoolValue) Export() values.Value {
@@ -142,6 +162,15 @@ func (*StringValue) isValue() {}
 
 func (v *StringValue) Copy() Value {
 	return &StringValue{Str: v.Str}
+}
+
+func (*StringValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (*StringValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
 }
 
 func (v *StringValue) Export() values.Value {
@@ -258,14 +287,25 @@ func (*StringValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value
 
 type ArrayValue struct {
 	Values []Value
+	Owner  string
 }
 
 func init() {
 	gob.Register(&ArrayValue{})
 }
 
-func NewArrayValueNonCopying(values ...Value) *ArrayValue {
-	return &ArrayValue{Values: values}
+func NewArrayValueUnownedNonCopying(values ...Value) *ArrayValue {
+	// NOTE: new value has no owner
+	const noOwner = ""
+
+	for _, value := range values {
+		value.SetOwner(noOwner)
+	}
+
+	return &ArrayValue{
+		Values: values,
+		Owner:  noOwner,
+	}
 }
 
 func (*ArrayValue) isValue() {}
@@ -276,7 +316,23 @@ func (v *ArrayValue) Copy() Value {
 	for i, value := range v.Values {
 		copies[i] = value.Copy()
 	}
-	return NewArrayValueNonCopying(copies...)
+	return NewArrayValueUnownedNonCopying(copies...)
+}
+
+func (v *ArrayValue) GetOwner() string {
+	return v.Owner
+}
+
+func (v *ArrayValue) SetOwner(owner string) {
+	if v.Owner == owner {
+		return
+	}
+
+	v.Owner = owner
+
+	for _, value := range v.Values {
+		value.SetOwner(owner)
+	}
 }
 
 func (v *ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
@@ -327,7 +383,7 @@ func (v *ArrayValue) GobDecode(buf []byte) error {
 func (v *ArrayValue) Concat(other ConcatenatableValue) Value {
 	otherArray := other.(*ArrayValue)
 	concatenated := append(v.Copy().(*ArrayValue).Values, otherArray.Values...)
-	return NewArrayValueNonCopying(concatenated...)
+	return NewArrayValueUnownedNonCopying(concatenated...)
 }
 
 func (v *ArrayValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
@@ -336,6 +392,8 @@ func (v *ArrayValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
 }
 
 func (v *ArrayValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value) {
+	value.SetOwner(v.Owner)
+
 	integerKey := key.(IntegerValue).IntValue()
 	v.Values[integerKey] = value
 }
@@ -354,13 +412,16 @@ func (v *ArrayValue) String() string {
 }
 
 func (v *ArrayValue) Append(element Value) {
+	element.SetOwner(v.Owner)
 	v.Values = append(v.Values, element)
 }
 
 func (v *ArrayValue) Insert(i int, element Value) {
+	element.SetOwner(v.Owner)
 	v.Values = append(v.Values[:i], append([]Value{element}, v.Values[i:]...)...)
 }
 
+// TODO: unset owner?
 func (v *ArrayValue) Remove(i int) Value {
 	result := v.Values[i]
 
@@ -375,12 +436,14 @@ func (v *ArrayValue) Remove(i int) Value {
 	return result
 }
 
+// TODO: unset owner?
 func (v *ArrayValue) RemoveFirst() Value {
 	var firstElement Value
 	firstElement, v.Values = v.Values[0], v.Values[1:]
 	return firstElement
 }
 
+// TODO: unset owner?
 func (v *ArrayValue) RemoveLast() Value {
 	var lastElement Value
 	lastIndex := len(v.Values) - 1
@@ -523,6 +586,15 @@ func (v IntValue) Copy() Value {
 	return IntValue{big.NewInt(0).Set(v.Int)}
 }
 
+func (IntValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (IntValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v IntValue) Export() values.Value {
 	return values.NewIntFromBig(big.NewInt(0).Set(v.Int))
 }
@@ -608,6 +680,15 @@ func (v Int8Value) Copy() Value {
 	return v
 }
 
+func (Int8Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Int8Value) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v Int8Value) String() string {
 	return strconv.FormatInt(int64(v), 10)
 }
@@ -684,6 +765,15 @@ func (Int16Value) isValue() {}
 
 func (v Int16Value) Copy() Value {
 	return v
+}
+
+func (Int16Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Int16Value) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
 }
 
 func (v Int16Value) String() string {
@@ -764,6 +854,15 @@ func (v Int32Value) Copy() Value {
 	return v
 }
 
+func (Int32Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Int32Value) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v Int32Value) String() string {
 	return strconv.FormatInt(int64(v), 10)
 }
@@ -840,6 +939,15 @@ func (Int64Value) isValue() {}
 
 func (v Int64Value) Copy() Value {
 	return v
+}
+
+func (Int64Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Int64Value) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
 }
 
 func (v Int64Value) String() string {
@@ -920,6 +1028,15 @@ func (v UInt8Value) Copy() Value {
 	return v
 }
 
+func (UInt8Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (UInt8Value) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v UInt8Value) String() string {
 	return strconv.FormatUint(uint64(v), 10)
 }
@@ -997,6 +1114,14 @@ func (UInt16Value) isValue() {}
 func (v UInt16Value) Copy() Value {
 	return v
 }
+func (UInt16Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (UInt16Value) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
 
 func (v UInt16Value) String() string {
 	return strconv.FormatUint(uint64(v), 10)
@@ -1073,6 +1198,15 @@ func (UInt32Value) isValue() {}
 
 func (v UInt32Value) Copy() Value {
 	return v
+}
+
+func (UInt32Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (UInt32Value) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
 }
 
 func (v UInt32Value) String() string {
@@ -1153,6 +1287,15 @@ func (v UInt64Value) Copy() Value {
 	return v
 }
 
+func (UInt64Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (UInt64Value) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v UInt64Value) String() string {
 	return strconv.FormatUint(uint64(v), 10)
 }
@@ -1226,6 +1369,7 @@ type CompositeValue struct {
 	Fields     map[string]Value
 	Functions  map[string]FunctionValue
 	Destructor *InterpretedFunctionValue
+	Owner      string
 }
 
 func init() {
@@ -1269,6 +1413,24 @@ func (v *CompositeValue) Copy() Value {
 		Fields:     newFields,
 		Functions:  v.Functions,
 		Destructor: v.Destructor,
+		// NOTE: new value has no owner
+		Owner: "",
+	}
+}
+
+func (v *CompositeValue) GetOwner() string {
+	return v.Owner
+}
+
+func (v *CompositeValue) SetOwner(owner string) {
+	if v.Owner == owner {
+		return
+	}
+
+	v.Owner = owner
+
+	for _, value := range v.Fields {
+		value.SetOwner(owner)
 	}
 }
 
@@ -1314,6 +1476,8 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 }
 
 func (v *CompositeValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
+	value.SetOwner(v.Owner)
+
 	v.Fields[name] = value
 }
 
@@ -1384,17 +1548,20 @@ func (v *CompositeValue) GetField(name string) Value {
 type DictionaryValue struct {
 	Keys    *ArrayValue
 	Entries map[string]Value
+	Owner   string
 }
 
-func NewDictionaryValue(keysAndValues ...Value) *DictionaryValue {
+func NewDictionaryValueUnownedNonCopying(keysAndValues ...Value) *DictionaryValue {
 	keysAndValuesCount := len(keysAndValues)
 	if keysAndValuesCount%2 != 0 {
 		panic("uneven number of keys and values")
 	}
 
 	result := &DictionaryValue{
-		Keys:    NewArrayValueNonCopying(),
+		Keys:    NewArrayValueUnownedNonCopying(),
 		Entries: make(map[string]Value, keysAndValuesCount/2),
+		// NOTE: new value has no owner
+		Owner: "",
 	}
 
 	for i := 0; i < keysAndValuesCount; i += 2 {
@@ -1421,6 +1588,26 @@ func (v *DictionaryValue) Copy() Value {
 	return &DictionaryValue{
 		Keys:    newKeys,
 		Entries: newEntries,
+		// NOTE: new value has no owner
+		Owner: "",
+	}
+}
+
+func (v *DictionaryValue) GetOwner() string {
+	return v.Owner
+}
+
+func (v *DictionaryValue) SetOwner(owner string) {
+	if v.Owner == owner {
+		return
+	}
+
+	v.Owner = owner
+
+	v.Keys.SetOwner(owner)
+
+	for _, value := range v.Entries {
+		value.SetOwner(owner)
 	}
 }
 
@@ -1474,7 +1661,7 @@ func (v *DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) V
 	if !ok {
 		return NilValue{}
 	}
-	return &SomeValue{Value: value}
+	return NewSomeValueOwningNonCopying(value)
 }
 
 func dictionaryKey(keyValue Value) string {
@@ -1525,19 +1712,20 @@ func (v *DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string
 	case "length":
 		return NewIntValue(int64(v.Count()))
 
+	// TODO: is returning copies correct?
 	case "keys":
 		return v.Keys.Copy()
 
+	// TODO: is returning copies correct?
 	case "values":
 		values := make([]Value, v.Count())
 		i := 0
 		for _, keyValue := range v.Keys.Values {
 			key := dictionaryKey(keyValue)
-			// TODO: copy
-			values[i] = v.Entries[key]
+			values[i] = v.Entries[key].Copy()
 			i++
 		}
-		return NewArrayValueNonCopying(values...)
+		return NewArrayValueUnownedNonCopying(values...)
 
 	case "remove":
 		return NewHostFunctionValue(
@@ -1550,7 +1738,7 @@ func (v *DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string
 				if existingValue == nil {
 					returnValue = NilValue{}
 				} else {
-					returnValue = &SomeValue{Value: existingValue}
+					returnValue = NewSomeValueOwningNonCopying(existingValue)
 				}
 
 				return trampoline.Done{
@@ -1571,7 +1759,7 @@ func (v *DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string
 				if existingValue == nil {
 					returnValue = NilValue{}
 				} else {
-					returnValue = &SomeValue{Value: existingValue}
+					returnValue = NewSomeValueOwningNonCopying(existingValue)
 				}
 
 				return trampoline.Done{
@@ -1594,6 +1782,7 @@ func (v *DictionaryValue) Count() int {
 	return v.Keys.Count()
 }
 
+// TODO: unset owner?
 func (v *DictionaryValue) Remove(keyValue Value) (existingValue Value) {
 	key := dictionaryKey(keyValue)
 	existingValue, exists := v.Entries[key]
@@ -1622,6 +1811,9 @@ func (v *DictionaryValue) Insert(keyValue Value, value Value) (existingValue Val
 	if !existed {
 		v.Keys.Append(keyValue)
 	}
+
+	value.SetOwner(v.Owner)
+
 	v.Entries[key] = value
 
 	if !existed {
@@ -1673,6 +1865,15 @@ func (v EventValue) Copy() Value {
 		Fields:     fields,
 		Location:   v.Location,
 	}
+}
+
+func (EventValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (EventValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
 }
 
 func (v EventValue) String() string {
@@ -1775,6 +1976,15 @@ func (v NilValue) Copy() Value {
 	return v
 }
 
+func (NilValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (NilValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v NilValue) Destroy(_ *Interpreter, _ LocationPosition) trampoline.Trampoline {
 	return trampoline.Done{}
 }
@@ -1791,10 +2001,18 @@ func (v NilValue) Export() values.Value {
 
 type SomeValue struct {
 	Value Value
+	Owner string
 }
 
 func init() {
 	gob.Register(&SomeValue{})
+}
+
+func NewSomeValueOwningNonCopying(value Value) *SomeValue {
+	return &SomeValue{
+		Value: value,
+		Owner: value.GetOwner(),
+	}
 }
 
 func (*SomeValue) isValue() {}
@@ -1804,7 +2022,23 @@ func (*SomeValue) isOptionalValue() {}
 func (v *SomeValue) Copy() Value {
 	return &SomeValue{
 		Value: v.Value.Copy(),
+		// NOTE: new value has no owner
+		Owner: "",
 	}
+}
+
+func (v *SomeValue) GetOwner() string {
+	return v.Owner
+}
+
+func (v *SomeValue) SetOwner(owner string) {
+	if v.Owner == owner {
+		return
+	}
+
+	v.Owner = owner
+
+	v.Value.SetOwner(owner)
 }
 
 func (v *SomeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
@@ -1820,7 +2054,16 @@ func (v *SomeValue) String() string {
 type AnyValue struct {
 	Value Value
 	// TODO: don't store
-	Type sema.Type
+	Type  sema.Type
+	Owner string
+}
+
+func NewAnyValueOwningNonCopying(value Value, ty sema.Type) *AnyValue {
+	return &AnyValue{
+		Value: value,
+		Type:  ty,
+		Owner: value.GetOwner(),
+	}
 }
 
 func init() {
@@ -1833,7 +2076,23 @@ func (v *AnyValue) Copy() Value {
 	return &AnyValue{
 		Value: v.Value.Copy(),
 		Type:  v.Type,
+		// NOTE: new value has no owner
+		Owner: "",
 	}
+}
+
+func (v *AnyValue) GetOwner() string {
+	return v.Owner
+}
+
+func (v *AnyValue) SetOwner(owner string) {
+	if v.Owner == owner {
+		return
+	}
+
+	v.Owner = owner
+
+	v.Value.SetOwner(owner)
 }
 
 func (v *AnyValue) String() string {
@@ -1854,11 +2113,20 @@ func (v StorageValue) Copy() Value {
 	}
 }
 
+func (v StorageValue) GetOwner() string {
+	return v.Identifier
+}
+
+func (StorageValue) SetOwner(owner string) {
+	// NO-OP: ownership cannot be changed
+}
+
 // ReferenceValue
 
 type ReferenceValue struct {
 	TargetStorageIdentifier string
 	TargetKey               string
+	Owner                   string
 }
 
 func init() {
@@ -1871,7 +2139,17 @@ func (v *ReferenceValue) Copy() Value {
 	return &ReferenceValue{
 		TargetStorageIdentifier: v.TargetStorageIdentifier,
 		TargetKey:               v.TargetKey,
+		// NOTE: new value has no owner
+		Owner: "",
 	}
+}
+
+func (v *ReferenceValue) GetOwner() string {
+	return v.Owner
+}
+
+func (v *ReferenceValue) SetOwner(owner string) {
+	v.Owner = owner
 }
 
 func (v *ReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
@@ -1947,4 +2225,13 @@ func (v AddressValue) Copy() Value {
 
 func (v AddressValue) String() string {
 	return fmt.Sprintf("%x", [AddressLength]byte(v))
+}
+
+func (AddressValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (AddressValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
 }
