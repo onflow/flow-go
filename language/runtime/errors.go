@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/language/runtime/sema"
 )
 
 // Error is the containing type for all errors produced by the runtime.
@@ -60,3 +61,16 @@ func (e InvalidTransactionParameterCountError) Error() string {
 	)
 }
 
+// InvalidTransactionParameterTypeError
+
+type InvalidTransactionParameterTypeError struct {
+	Actual sema.Type
+}
+
+func (e InvalidTransactionParameterTypeError) Error() string {
+	return fmt.Sprintf(
+		"parameter type mismatch for transaction: expected `%s`, got `%s`",
+		&sema.AccountType{},
+		e.Actual,
+	)
+}

@@ -145,12 +145,9 @@ func (r *interpreterRuntime) ExecuteTransaction(
 		parameterType := parameterTypeAnnotation.Type
 
 		if !parameterType.Equal(&sema.AccountType{}) {
-			err := fmt.Errorf(
-				"parameter type mismatch for transaction `prepare` function: expected `%s`, got `%s`",
-				&sema.AccountType{},
-				parameterType,
-			)
-			return err
+			return newError(InvalidTransactionParameterTypeError{
+				Actual: parameterType,
+			})
 		}
 	}
 
