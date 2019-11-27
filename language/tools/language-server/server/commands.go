@@ -134,7 +134,7 @@ func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (int
 			})
 			conn.LogMessage(&protocol.LogMessageParams{
 				Type:    protocol.Warning,
-				Message: fmt.Sprintf("Failed to submit transaction error: %s", grpcErr.Message()),
+				Message: fmt.Sprintf("Failed to submit transaction: %s", grpcErr.Message()),
 			})
 			return nil, nil
 		}
