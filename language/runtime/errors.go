@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
@@ -25,4 +26,21 @@ func (e Error) Error() string {
 	sb.WriteString(errors.UnrollChildErrors(e.Err))
 	sb.WriteString("\n")
 	return sb.String()
+}
+
+// InvalidTransactionCountError
+
+type InvalidTransactionCountError struct {
+	Count int
+}
+
+func (e InvalidTransactionCountError) Error() string {
+	if e.Count == 0 {
+		return "no transaction declared: expected 1, got 0"
+	}
+
+	return fmt.Sprintf(
+		"multiple transactions declared: expected 1, got %d",
+		e.Count,
+	)
 }
