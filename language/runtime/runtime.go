@@ -124,24 +124,24 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	}
 
 	transactionType := transactions[0]
-	transactionPrepareFunctionType := transactionType.Prepare.InvocationFunctionType()
+	transactionFunctionType := transactionType.EntryPointFunctionType()
 
 	signingAccountAddresses := runtimeInterface.GetSigningAccounts()
 
 	// check parameter count
 
 	signingAccountsCount := len(signingAccountAddresses)
-	prepareFunctionParameterCount := len(transactionPrepareFunctionType.ParameterTypeAnnotations)
-	if signingAccountsCount != prepareFunctionParameterCount {
+	transactionFunctionParameterCount := len(transactionFunctionType.ParameterTypeAnnotations)
+	if signingAccountsCount != transactionFunctionParameterCount {
 		return newError(InvalidTransactionParameterCountError{
-			Expected: prepareFunctionParameterCount,
+			Expected: transactionFunctionParameterCount,
 			Actual:   signingAccountsCount,
 		})
 	}
 
 	// check parameter types
 
-	for _, parameterTypeAnnotation := range transactionPrepareFunctionType.ParameterTypeAnnotations {
+	for _, parameterTypeAnnotation := range transactionFunctionType.ParameterTypeAnnotations {
 		parameterType := parameterTypeAnnotation.Type
 
 		if !parameterType.Equal(&sema.AccountType{}) {
