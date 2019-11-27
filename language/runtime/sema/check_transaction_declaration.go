@@ -112,7 +112,7 @@ func (checker *Checker) visitTransactionPrepareFunction(
 
 	initializationInfo := NewInitializationInfo(transactionType, fieldMembers)
 
-	prepareFunctionType := transactionType.Prepare
+	prepareFunctionType := transactionType.PrepareFunctionType()
 
 	checker.checkFunction(
 		prepareFunction.ParameterList,
@@ -167,9 +167,15 @@ func (checker *Checker) visitTransactionExecuteFunction(
 	checker.enterValueScope()
 	defer checker.leaveValueScope(true)
 
-	checker.visitFunctionBlock(
+	executeFunctionType := transactionType.PrepareFunctionType()
+
+	checker.checkFunction(
+		&ast.ParameterList{},
+		ast.Position{},
+		executeFunctionType.FunctionType,
 		executeFunction.FunctionBlock,
-		NewTypeAnnotation(&VoidType{}),
+		true,
+		nil,
 		true,
 	)
 }
@@ -200,15 +206,8 @@ func (checker *Checker) declareTransactionDeclaration(declaration *ast.Transacti
 		prepareParameterTypeAnnotations = checker.parameterTypeAnnotations(declaration.Prepare.ParameterList)
 	}
 
-	prepareFunctionType := &SpecialFunctionType{
-		FunctionType: &FunctionType{
-			ParameterTypeAnnotations: prepareParameterTypeAnnotations,
-			ReturnTypeAnnotation:     NewTypeAnnotation(&VoidType{}),
-		},
-	}
-
 	transactionType.Members = members
-	transactionType.Prepare = prepareFunctionType
+	transactionType.prepareParameterTypeAnnotations = prepareParameterTypeAnnotations
 
 	checker.Elaboration.TransactionDeclarationTypes[declaration] = transactionType
 	checker.TransactionTypes = append(checker.TransactionTypes, transactionType)

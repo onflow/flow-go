@@ -473,7 +473,7 @@ func (interpreter *Interpreter) prepareInvokeTransaction(
 	functionValue := interpreter.Transactions[index]
 
 	transactionType := interpreter.Checker.TransactionTypes[index]
-	functionType := transactionType.Prepare.InvocationFunctionType()
+	functionType := transactionType.PrepareFunctionType().InvocationFunctionType()
 
 	return interpreter.prepareInvoke(functionValue, functionType, arguments)
 }
@@ -2244,13 +2244,11 @@ func (interpreter *Interpreter) declareTransactionEntrypoint(declaration *ast.Tr
 	var prepareFunctionType *sema.FunctionType
 	if declaration.Prepare != nil {
 		prepareFunction = declaration.Prepare.FunctionDeclaration.ToExpression()
-		prepareFunctionType = transactionType.Prepare.FunctionType
+		prepareFunctionType = transactionType.PrepareFunctionType().FunctionType
 	}
 
 	executeFunction := declaration.Execute.FunctionDeclaration.ToExpression()
-	executeFunctionType := &sema.FunctionType{
-		ReturnTypeAnnotation: sema.NewTypeAnnotation(&sema.VoidType{}),
-	}
+	executeFunctionType := transactionType.ExecuteFunctionType().FunctionType
 
 	beforeStatements, rewrittenPostConditions :=
 		interpreter.rewritePostConditions(declaration.PostConditions)
