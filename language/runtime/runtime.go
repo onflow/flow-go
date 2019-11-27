@@ -4,7 +4,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	runtimeErrors "github.com/dapperlabs/flow-go/language/runtime/errors"
@@ -44,20 +43,6 @@ type Interface interface {
 	EmitEvent(values.Event)
 }
 
-type Error struct {
-	Errors []error
-}
-
-func (e Error) Error() string {
-	var sb strings.Builder
-	sb.WriteString("Execution failed:\n")
-	for _, err := range e.Errors {
-		sb.WriteString(runtimeErrors.UnrollChildErrors(err))
-		sb.WriteString("\n")
-	}
-	return sb.String()
-}
-
 // Runtime is a runtime capable of executing the Flow programming language.
 type Runtime interface {
 	// ExecuteScript executes the given script.
@@ -95,7 +80,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 
 	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
 	if err != nil {
-		return nil, Error{[]error{err}}
+		return nil, newError(err)
 	}
 
 	_, ok := checker.GlobalValues["main"]
@@ -108,16 +93,16 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 
 	inter, err := r.newInterpreter(checker, functions, runtimeInterface, runtimeStorage)
 	if err != nil {
-		return nil, err
+		return nil, newError(err)
 	}
 
 	if err := inter.Interpret(); err != nil {
-		return nil, err
+		return nil, newError(err)
 	}
 
 	value, err := inter.Invoke("main")
 	if err != nil {
-		return nil, err
+		return nil, newError(err)
 	}
 
 	// Write back all stored values, which were actually just cached, back into storage
@@ -135,7 +120,7 @@ func (r *interpreterRuntime) ExecuteTransaction(
 
 	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
 	if err != nil {
-		return Error{[]error{err}}
+		return newError(err)
 	}
 
 	transactions := checker.TransactionTypes
@@ -181,11 +166,11 @@ func (r *interpreterRuntime) ExecuteTransaction(
 
 	inter, err := r.newInterpreter(checker, functions, runtimeInterface, runtimeStorage)
 	if err != nil {
-		return err
+		return newError(err)
 	}
 
 	if err := inter.Interpret(); err != nil {
-		return err
+		return newError(err)
 	}
 
 	signingAccounts := make([]interface{}, signingAccountsCount)
@@ -196,7 +181,7 @@ func (r *interpreterRuntime) ExecuteTransaction(
 
 	err = inter.InvokeTransaction(0, signingAccounts...)
 	if err != nil {
-		return err
+		return newError(err)
 	}
 
 	// Write back all stored values, which were actually just cached, back into storage
@@ -207,9 +192,12 @@ func (r *interpreterRuntime) ExecuteTransaction(
 
 func (r *interpreterRuntime) ParseAndCheckProgram(script []byte, runtimeInterface Interface, location Location) error {
 	functions := r.standardLibraryFunctions(runtimeInterface)
-
 	_, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
-	return err
+	if err != nil {
+		return newError(err)
+	}
+
+	return nil
 }
 
 func (r *interpreterRuntime) parseAndCheckProgram(
@@ -494,27 +482,6 @@ func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpre
 		runtimeInterface.Log(fmt.Sprint(arguments[0]))
 		return trampoline.Done{Result: &interpreter.VoidValue{}}
 	}
-}
-
-func (r *interpreterRuntime) getOwnerControllerKey(
-	arguments []interpreter.Value,
-) (
-	controller []byte, owner []byte, key []byte,
-) {
-	var err error
-	owner, err = toBytes(arguments[0])
-	if err != nil {
-		panic(fmt.Sprintf("setValue requires the first parameter to be an array"))
-	}
-	controller, err = toBytes(arguments[1])
-	if err != nil {
-		panic(fmt.Sprintf("setValue requires the second parameter to be an array"))
-	}
-	key, err = toBytes(arguments[2])
-	if err != nil {
-		panic(fmt.Sprintf("setValue requires the third parameter to be an array"))
-	}
-	return
 }
 
 func toBytes(value interpreter.Value) (values.Bytes, error) {
