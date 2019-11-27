@@ -1,4 +1,4 @@
-// Package store defines the interface and implementations for interacting with
+// Package storage defines the interface and implementations for interacting with
 // persistent chain state.
 package storage
 

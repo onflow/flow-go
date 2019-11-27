@@ -59,5 +59,13 @@ func (checker *Checker) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
 		}
 	}
 
+	if leftType.IsResourceType() {
+		checker.elaboratePotentialResourceStorageMove(swap.Left)
+	}
+
+	if rightType.IsResourceType() {
+		checker.elaboratePotentialResourceStorageMove(swap.Right)
+	}
+
 	return nil
 }
