@@ -41,6 +41,8 @@ type ValueIndexableType interface {
 type TypeIndexableType interface {
 	Type
 	isTypeIndexableType()
+	IsAssignable() bool
+	IsValidIndexingType(indexingType Type) (isValid bool, expectedType Type)
 	ElementType(indexingType Type, isAssignment bool) Type
 }
 
@@ -1806,9 +1808,69 @@ func (t *StorageType) IsInvalidType() bool {
 
 func (t *StorageType) isTypeIndexableType() {}
 
+func (t *StorageType) IsValidIndexingType(indexingType Type) (isValid bool, expectedType Type) {
+	// TODO: restrict to resource types
+	return true, nil
+}
+
+func (t *StorageType) IsAssignable() bool {
+	return true
+}
+
 func (t *StorageType) ElementType(indexingType Type, isAssignment bool) Type {
 	// NOTE: like dictionary
 	return &OptionalType{Type: indexingType}
+}
+
+// ReferencesType
+
+type ReferencesType struct {
+	Assignable bool
+}
+
+func (t *ReferencesType) isType() {}
+
+func (t *ReferencesType) String() string {
+	return "References"
+}
+
+func (t *ReferencesType) ID() string {
+	return "References"
+}
+
+func (t *ReferencesType) Equal(other Type) bool {
+	otherReferences, ok := other.(*ReferencesType)
+	if !ok {
+		return false
+	}
+	return t.Assignable && otherReferences.Assignable
+}
+
+func (t *ReferencesType) IsResourceType() bool {
+	return false
+}
+
+func (t *ReferencesType) IsInvalidType() bool {
+	return false
+}
+
+func (t *ReferencesType) isTypeIndexableType() {}
+
+func (t *ReferencesType) ElementType(indexingType Type, isAssignment bool) Type {
+	// NOTE: like dictionary
+	return &OptionalType{Type: indexingType}
+}
+
+func (t *ReferencesType) IsAssignable() bool {
+	return t.Assignable
+}
+
+func (t *ReferencesType) IsValidIndexingType(indexingType Type) (isValid bool, expectedType Type) {
+	if _, isReferenceType := indexingType.(*ReferenceType); !isReferenceType {
+		return false, &ReferenceType{}
+	}
+
+	return true, nil
 }
 
 // EventType

@@ -38,7 +38,7 @@ type Elaboration struct {
 	IndexExpressionIndexingTypes           map[*ast.IndexExpression]Type
 	SwapStatementLeftTypes                 map[*ast.SwapStatement]Type
 	SwapStatementRightTypes                map[*ast.SwapStatement]Type
-	IsStorageIndexExpression               map[*ast.IndexExpression]bool
+	IsTypeIndexExpression                  map[*ast.IndexExpression]bool
 	IsResourceMovingStorageIndexExpression map[*ast.IndexExpression]bool
 }
 
@@ -71,7 +71,7 @@ func NewElaboration() *Elaboration {
 		IndexExpressionIndexingTypes:           map[*ast.IndexExpression]Type{},
 		SwapStatementLeftTypes:                 map[*ast.SwapStatement]Type{},
 		SwapStatementRightTypes:                map[*ast.SwapStatement]Type{},
-		IsStorageIndexExpression:               map[*ast.IndexExpression]bool{},
+		IsTypeIndexExpression:                  map[*ast.IndexExpression]bool{},
 		IsResourceMovingStorageIndexExpression: map[*ast.IndexExpression]bool{},
 	}
 }

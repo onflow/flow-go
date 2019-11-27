@@ -1768,3 +1768,15 @@ func (e *InvalidFailableResourceDowncastOutsideOptionalBindingError) Error() str
 }
 
 func (*InvalidFailableResourceDowncastOutsideOptionalBindingError) isSemanticError() {}
+
+// ReadOnlyTargetAssignmentError
+
+type ReadOnlyTargetAssignmentError struct {
+	ast.Range
+}
+
+func (e *ReadOnlyTargetAssignmentError) Error() string {
+	return "cannot assign to read-only target"
+}
+
+func (*ReadOnlyTargetAssignmentError) isSemanticError() {}

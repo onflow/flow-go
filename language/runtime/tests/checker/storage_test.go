@@ -12,21 +12,21 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-var storageValueDeclaration = map[string]sema.ValueDeclaration{
-	"storage": stdlib.StandardLibraryValue{
-		Name:       "storage",
-		Type:       &sema.StorageType{},
-		Kind:       common.DeclarationKindConstant,
-		IsConstant: true,
-	},
+var storageValueDeclaration = stdlib.StandardLibraryValue{
+	Name:       "storage",
+	Type:       &sema.StorageType{},
+	Kind:       common.DeclarationKindConstant,
+	IsConstant: true,
 }
 
-func ParseAndCheckWithStorage(t *testing.T, code string) (*sema.Checker, error) {
+func ParseAndCheckStorage(t *testing.T, code string) (*sema.Checker, error) {
 	return ParseAndCheckWithOptions(t,
 		code,
 		ParseAndCheckOptions{
 			Options: []sema.Option{
-				sema.WithPredeclaredValues(storageValueDeclaration),
+				sema.WithPredeclaredValues(map[string]sema.ValueDeclaration{
+					"storage": storageValueDeclaration,
+				}),
 				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
@@ -35,7 +35,7 @@ func ParseAndCheckWithStorage(t *testing.T, code string) (*sema.Checker, error) 
 
 func TestCheckStorageIndexing(t *testing.T) {
 
-	checker, err := ParseAndCheckWithStorage(t,
+	checker, err := ParseAndCheckStorage(t,
 		`
           let a = storage[Int]
           let b = storage[Bool]
@@ -82,7 +82,7 @@ func TestCheckStorageIndexing(t *testing.T) {
 
 func TestCheckStorageIndexingAssignment(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           fun test() {
               storage[Int] = 1
@@ -96,7 +96,7 @@ func TestCheckStorageIndexingAssignment(t *testing.T) {
 
 func TestCheckInvalidStorageIndexingAssignment(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           fun test() {
               storage[Int] = "1"
@@ -113,7 +113,7 @@ func TestCheckInvalidStorageIndexingAssignment(t *testing.T) {
 
 func TestCheckInvalidStorageIndexingAssignmentWithExpression(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           fun test() {
               storage["1"] = "1"
@@ -128,7 +128,7 @@ func TestCheckInvalidStorageIndexingAssignmentWithExpression(t *testing.T) {
 
 func TestCheckInvalidStorageIndexingWithExpression(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           let x = storage["1"]
         `,
@@ -141,7 +141,7 @@ func TestCheckInvalidStorageIndexingWithExpression(t *testing.T) {
 
 func TestCheckStorageIndexingWithResourceTypeInVariableDeclaration(t *testing.T) {
 
-	checker, err := ParseAndCheckWithStorage(t,
+	checker, err := ParseAndCheckStorage(t,
 		`
           resource R {}
 
@@ -159,7 +159,7 @@ func TestCheckStorageIndexingWithResourceTypeInVariableDeclaration(t *testing.T)
 
 func TestCheckStorageIndexingWithResourceTypeInSwap(t *testing.T) {
 
-	checker, err := ParseAndCheckWithStorage(t,
+	checker, err := ParseAndCheckStorage(t,
 		`
           resource R {}
 
@@ -178,7 +178,7 @@ func TestCheckStorageIndexingWithResourceTypeInSwap(t *testing.T) {
 
 func TestCheckInvalid(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
       resource R {}
 
       fun test() {

@@ -202,7 +202,7 @@ func (checker *Checker) elaboratePotentialResourceStorageMove(expression ast.Exp
 		return
 	}
 
-	if !checker.Elaboration.IsStorageIndexExpression[indexExpression] {
+	if !checker.Elaboration.IsTypeIndexExpression[indexExpression] {
 		return
 	}
 
