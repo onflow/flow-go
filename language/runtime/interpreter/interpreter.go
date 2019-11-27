@@ -730,7 +730,7 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 
 				return messageTrampoline.
 					Then(func(result interface{}) {
-						message := result.(StringValue).StrValue()
+						message := result.(*StringValue).Str
 
 						panic(&ConditionError{
 							ConditionKind: condition.Kind,
@@ -817,8 +817,12 @@ func (interpreter *Interpreter) visitIfStatementWithVariableDeclaration(
 	return declaration.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
-			if someValue, ok := result.(SomeValue); ok {
-				unwrappedValueCopy := someValue.Value.Copy()
+			if someValue, ok := result.(*SomeValue); ok {
+
+				targetType := interpreter.Checker.Elaboration.VariableDeclarationTargetTypes[declaration]
+				valueType := interpreter.Checker.Elaboration.VariableDeclarationValueTypes[declaration]
+				unwrappedValueCopy := interpreter.copyAndConvert(someValue.Value, valueType, targetType)
+
 				interpreter.activations.PushCurrent()
 				interpreter.declareVariable(
 					declaration.Identifier.Identifier,
@@ -960,6 +964,10 @@ func (interpreter *Interpreter) visitAssignment(
 }
 
 func (interpreter *Interpreter) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
+
+	leftType := interpreter.Checker.Elaboration.SwapStatementLeftTypes[swap]
+	rightType := interpreter.Checker.Elaboration.SwapStatementRightTypes[swap]
+
 	// Evaluate the left expression
 	return interpreter.assignmentGetterSetter(swap.Left).
 		FlatMap(func(result interface{}) Trampoline {
@@ -980,8 +988,12 @@ func (interpreter *Interpreter) VisitSwapStatement(swap *ast.SwapStatement) ast.
 
 					// Assign right value to left target
 					// and left value to right target
-					leftGetterSetter.set(rightValue)
-					rightGetterSetter.set(leftValue)
+
+					rightValueCopy := interpreter.copyAndConvert(rightValue.(Value), rightType, leftType)
+					leftValueCopy := interpreter.copyAndConvert(leftValue.(Value), leftType, rightType)
+
+					leftGetterSetter.set(rightValueCopy)
+					rightGetterSetter.set(leftValueCopy)
 				})
 		})
 }
@@ -1268,7 +1280,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 						})
 				}
 
-				value := left.(SomeValue).Value
+				value := left.(*SomeValue).Value
 				return Done{Result: value}
 			})
 
@@ -1296,30 +1308,19 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 	// TODO: add support for arrays and dictionaries
 
 	switch left := left.(type) {
-	case IntegerValue:
+	case EquatableValue:
 		// NOTE: might be NilValue
-		right, ok := right.(IntegerValue)
+		right, ok := right.(EquatableValue)
 		if !ok {
 			return false
 		}
 		return left.Equal(right)
-
-	case BoolValue:
-		return left == right
 
 	case NilValue:
 		_, ok := right.(NilValue)
 		return BoolValue(ok)
 
-	case StringValue:
-		// NOTE: might be NilValue
-		right, ok := right.(StringValue)
-		if !ok {
-			return false
-		}
-		return left.Equal(right)
-
-	case CompositeValue:
+	case *CompositeValue:
 		// TODO: call `equals` if RHS is composite
 		return false
 	}
@@ -1393,20 +1394,20 @@ func (interpreter *Interpreter) VisitStringExpression(expression *ast.StringExpr
 }
 
 func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpression) ast.Repr {
-	return interpreter.visitExpressions(expression.Values).
+	return interpreter.visitExpressionsNonCopying(expression.Values).
 		FlatMap(func(result interface{}) Trampoline {
-			values := result.(ArrayValue)
+			values := result.(*ArrayValue)
 
 			argumentTypes := interpreter.Checker.Elaboration.ArrayExpressionArgumentTypes[expression]
 			elementType := interpreter.Checker.Elaboration.ArrayExpressionElementType[expression]
 
-			copies := make([]Value, len(*values.Values))
-			for i, argument := range *values.Values {
+			copies := make([]Value, len(values.Values))
+			for i, argument := range values.Values {
 				argumentType := argumentTypes[i]
 				copies[i] = interpreter.copyAndConvert(argument, argumentType, elementType)
 			}
 
-			return Done{Result: NewArrayValue(copies...)}
+			return Done{Result: NewArrayValueNonCopying(copies...)}
 		})
 }
 
@@ -1453,7 +1454,7 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 				case NilValue:
 					return typedResult
 
-				case SomeValue:
+				case *SomeValue:
 					result = typedResult.Value
 
 				default:
@@ -1466,7 +1467,7 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 			resultValue := value.GetMember(interpreter, locationRange, expression.Identifier.Identifier)
 
 			if expression.Optional {
-				return SomeValue{Value: resultValue}
+				return &SomeValue{Value: resultValue}
 			}
 			return resultValue
 		})
@@ -1530,7 +1531,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 				case NilValue:
 					return Done{Result: typedResult}
 
-				case SomeValue:
+				case *SomeValue:
 					result = typedResult.Value
 
 				default:
@@ -1546,17 +1547,17 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 				argumentExpressions[i] = argument.Expression
 			}
 
-			return interpreter.visitExpressions(argumentExpressions).
+			return interpreter.visitExpressionsNonCopying(argumentExpressions).
 				FlatMap(func(result interface{}) Trampoline {
-					arguments := result.(ArrayValue)
+					arguments := result.(*ArrayValue)
 
 					argumentTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression]
 					parameterTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression]
 
-					argumentCopies := make([]Value, len(*arguments.Values))
-					for i, argument := range *arguments.Values {
+					argumentCopies := make([]Value, len(arguments.Values))
+					for i, argument := range arguments.Values {
 						argumentType := argumentTypes[i]
 						parameterType := parameterTypes[i]
 						argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
@@ -1578,7 +1579,7 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 					}
 
 					return invocation.Map(func(result interface{}) interface{} {
-						return SomeValue{Value: result.(Value)}
+						return &SomeValue{Value: result.(Value)}
 					})
 				})
 		})
@@ -1632,8 +1633,8 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 	}
 }
 
-func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression) Trampoline {
-	var trampoline Trampoline = Done{Result: NewArrayValue()}
+func (interpreter *Interpreter) visitExpressionsNonCopying(expressions []ast.Expression) Trampoline {
+	var trampoline Trampoline = Done{Result: NewArrayValueNonCopying()}
 
 	for _, expression := range expressions {
 		// NOTE: important: rebind expression, because it is captured in the closure below
@@ -1641,15 +1642,15 @@ func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression) T
 
 		// append the evaluation of this expression
 		trampoline = trampoline.FlatMap(func(result interface{}) Trampoline {
-			array := result.(ArrayValue)
+			array := result.(*ArrayValue)
 
 			// evaluate the expression
 			return expression.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
 					value := result.(Value)
 
-					newValues := append(*array.Values, value)
-					return Done{Result: NewArrayValue(newValues...)}
+					newValues := append(array.Values, value)
+					return Done{Result: NewArrayValueNonCopying(newValues...)}
 				})
 		})
 	}
@@ -1747,11 +1748,12 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	variable.Value = NewHostFunctionValue(
 		func(arguments []Value, location LocationPosition) Trampoline {
 
-			value := CompositeValue{
+			value := &CompositeValue{
 				Location:   interpreter.Checker.Location,
 				Identifier: identifier,
-				Fields:     &map[string]Value{},
-				Functions:  &functions,
+				Kind:       declaration.CompositeKind,
+				Fields:     map[string]Value{},
+				Functions:  functions,
 				Destructor: destructorFunction,
 			}
 
@@ -1776,7 +1778,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 //
 func (interpreter *Interpreter) bindSelf(
 	function InterpretedFunctionValue,
-	structure CompositeValue,
+	structure *CompositeValue,
 ) FunctionValue {
 	return NewHostFunctionValue(func(arguments []Value, location LocationPosition) Trampoline {
 		// start a new activation record
@@ -2018,10 +2020,7 @@ func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaratio
 }
 
 func (interpreter *Interpreter) copyAndConvert(value Value, valueType, targetType sema.Type) Value {
-	if valueType == nil || !valueType.IsResourceType() {
-		value = value.Copy()
-	}
-	return interpreter.convertAndBox(value, valueType, targetType)
+	return interpreter.convertAndBox(value.Copy(), valueType, targetType)
 }
 
 // convertAndBox converts a value to a target type, and boxes in optionals and any value, if necessary
@@ -2081,7 +2080,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 			break
 		}
 
-		if some, ok := inner.(SomeValue); ok {
+		if some, ok := inner.(*SomeValue); ok {
 			inner = some.Value
 		} else if _, ok := inner.(NilValue); ok {
 			// NOTE: nested nil will be unboxed!
@@ -2089,7 +2088,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 				Type: &sema.NeverType{},
 			}
 		} else {
-			value = SomeValue{Value: value}
+			value = &SomeValue{Value: value}
 			valueType = &sema.OptionalType{
 				Type: valueType,
 			}
@@ -2105,10 +2104,10 @@ func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.T
 	switch targetType := targetType.(type) {
 	case *sema.AnyType:
 		// no need to convert already boxed value
-		if _, ok := value.(AnyValue); ok {
+		if _, ok := value.(*AnyValue); ok {
 			return value
 		}
-		return AnyValue{
+		return &AnyValue{
 			Value: value,
 			Type:  valueType,
 		}
@@ -2117,8 +2116,8 @@ func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.T
 		if _, ok := value.(NilValue); ok {
 			return value
 		}
-		some := value.(SomeValue)
-		return SomeValue{
+		some := value.(*SomeValue)
+		return &SomeValue{
 			Value: interpreter.boxAny(
 				some.Value,
 				valueType.(*sema.OptionalType).Type,
@@ -2134,7 +2133,7 @@ func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.T
 
 func (interpreter *Interpreter) unbox(value Value) Value {
 	for {
-		some, ok := value.(SomeValue)
+		some, ok := value.(*SomeValue)
 		if !ok {
 			return value
 		}
@@ -2294,13 +2293,13 @@ func (interpreter *Interpreter) VisitCastingExpression(expression *ast.CastingEx
 
 			switch expression.Operation {
 			case ast.OperationFailableCast:
-				anyValue := value.(AnyValue)
+				anyValue := value.(*AnyValue)
 
 				if !sema.IsSubType(anyValue.Type, expectedType) {
 					return NilValue{}
 				}
 
-				return SomeValue{Value: anyValue.Value}
+				return &SomeValue{Value: anyValue.Value}
 
 			case ast.OperationCast:
 				staticValueType := interpreter.Checker.Elaboration.CastingStaticValueTypes[expression]
@@ -2340,9 +2339,9 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 			indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
 			key := interpreter.storageKeyHandler(interpreter, storage.Identifier, indexingType)
 
-			referenceValue := ReferenceValue{
-				StorageIdentifier: storage.Identifier,
-				Key:               key,
+			referenceValue := &ReferenceValue{
+				TargetStorageIdentifier: storage.Identifier,
+				TargetKey:               key,
 			}
 
 			return Done{Result: referenceValue}
