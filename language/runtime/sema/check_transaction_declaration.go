@@ -112,12 +112,12 @@ func (checker *Checker) visitTransactionPrepareFunction(
 
 	initializationInfo := NewInitializationInfo(transactionType, fieldMembers)
 
-	prepareFunctionType := transactionType.PrepareFunctionType()
+	prepareFunctionType := transactionType.PrepareFunctionType().InvocationFunctionType()
 
 	checker.checkFunction(
 		prepareFunction.ParameterList,
 		ast.Position{},
-		prepareFunctionType.FunctionType,
+		prepareFunctionType,
 		prepareFunction.FunctionBlock,
 		true,
 		initializationInfo,
@@ -167,12 +167,12 @@ func (checker *Checker) visitTransactionExecuteFunction(
 	checker.enterValueScope()
 	defer checker.leaveValueScope(true)
 
-	executeFunctionType := transactionType.PrepareFunctionType()
+	executeFunctionType := transactionType.PrepareFunctionType().InvocationFunctionType()
 
 	checker.checkFunction(
 		&ast.ParameterList{},
 		ast.Position{},
-		executeFunctionType.FunctionType,
+		executeFunctionType,
 		executeFunction.FunctionBlock,
 		true,
 		nil,

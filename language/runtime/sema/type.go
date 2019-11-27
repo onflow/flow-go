@@ -2277,6 +2277,10 @@ type TransactionType struct {
 	prepareParameterTypeAnnotations []*TypeAnnotation
 }
 
+func (t *TransactionType) EntryPointFunctionType() *FunctionType {
+	return t.PrepareFunctionType().InvocationFunctionType()
+}
+
 func (t *TransactionType) PrepareFunctionType() *SpecialFunctionType {
 	return &SpecialFunctionType{
 		FunctionType: &FunctionType{
