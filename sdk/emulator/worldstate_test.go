@@ -85,7 +85,6 @@ func TestWorldStates(t *testing.T) {
 	// Submit tx1
 	err = b.SubmitTransaction(tx1)
 	assert.NoError(t, err)
-	fmt.Println(err)
 
 	ws2 := b.pendingWorldState.Hash()
 	t.Logf("world state after tx1: %x\n", ws2)
