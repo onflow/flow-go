@@ -5,7 +5,6 @@ import (
 	"encoding/gob"
 
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
-
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 )
 
