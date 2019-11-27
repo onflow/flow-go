@@ -125,20 +125,20 @@ func NewEmulatorServer(logger *log.Logger, store badger.Store, conf *Config) *Em
 //
 // This function starts a gRPC server to listen for requests and process incoming transactions.
 // By default, the Flow Emulator server automatically mines a block every BlockInterval.
-func (b *EmulatorServer) Start(ctx context.Context) {
+func (e *EmulatorServer) Start(ctx context.Context) {
 	// Start gRPC server in a separate goroutine to continually listen for requests
-	go b.startGrpcServer()
+	go e.startGrpcServer()
 
-	ticker := time.NewTicker(b.config.BlockInterval)
+	ticker := time.NewTicker(e.config.BlockInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			block, err := b.backend.blockchain.CommitBlock()
+			block, err := e.backend.blockchain.CommitBlock()
 			if err != nil {
-				b.logger.WithError(err).Error("Failed to commit block")
+				e.logger.WithError(err).Error("Failed to commit block")
 			} else {
-				b.logger.WithFields(log.Fields{
+				e.logger.WithFields(log.Fields{
 					"blockNum":  block.Number,
 					"blockHash": block.Hash().Hex(),
 					"blockSize": len(block.TransactionHashes),
@@ -151,15 +151,15 @@ func (b *EmulatorServer) Start(ctx context.Context) {
 	}
 }
 
-func (b *EmulatorServer) startGrpcServer() {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", b.config.Port))
+func (e *EmulatorServer) startGrpcServer() {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", e.config.Port))
 	if err != nil {
-		b.logger.WithError(err).Fatal("☠️  Failed to start Emulator Server")
+		e.logger.WithError(err).Fatal("☠️  Failed to start Emulator Server")
 	}
 
-	err = b.grpcServer.Serve(lis)
+	err = e.grpcServer.Serve(lis)
 	if err != nil {
-		b.logger.WithError(err).Fatal("☠️  Failed to serve GRPC Service")
+		e.logger.WithError(err).Fatal("☠️  Failed to serve GRPC Service")
 	}
 }
 

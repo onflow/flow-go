@@ -226,32 +226,30 @@ func (s Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([
 
 	var actions []*protocol.CodeLens
 
-	// Search for relevant function declarations
-	for declaration := range checker.Elaboration.FunctionDeclarationFunctionTypes {
-		if declaration.Identifier.String() == "main" {
-			if len(declaration.ParameterList.Parameters) == 0 {
-				// this is a script
-				actions = append(actions, &protocol.CodeLens{
-					Range: astToProtocolRange(declaration.StartPosition(), declaration.StartPosition()),
-					Command: &protocol.Command{
-						Title:     "execute script",
-						Command:   CommandExecuteScript,
-						Arguments: []interface{}{params.TextDocument.URI},
-					},
-				})
-			}
-			if len(declaration.ParameterList.Parameters) == 1 {
-				// this is transaction
-				actions = append(actions, &protocol.CodeLens{
-					Range: astToProtocolRange(declaration.StartPosition(), declaration.StartPosition()),
-					Command: &protocol.Command{
-						Title:     "submit transaction",
-						Command:   CommandSubmitTransaction,
-						Arguments: []interface{}{params.TextDocument.URI},
-					},
-				})
-			}
+	// Search for main functions with no arguments. These are interpreted
+	// as scripts.
+	for functionDeclaration := range checker.Elaboration.FunctionDeclarationFunctionTypes {
+		if functionDeclaration.Identifier.String() == "main" && len(functionDeclaration.ParameterList.Parameters) == 0 {
+			actions = append(actions, &protocol.CodeLens{
+				Range: astToProtocolRange(functionDeclaration.StartPosition(), functionDeclaration.StartPosition()),
+				Command: &protocol.Command{
+					Title:     "execute script",
+					Command:   CommandExecuteScript,
+					Arguments: []interface{}{params.TextDocument.URI},
+				},
+			})
 		}
+	}
+	// Search for transaction declarations.
+	for txDeclaration := range checker.Elaboration.TransactionDeclarationTypes {
+		actions = append(actions, &protocol.CodeLens{
+			Range: astToProtocolRange(txDeclaration.StartPosition(), txDeclaration.StartPosition()),
+			Command: &protocol.Command{
+				Title:     "submit transaction",
+				Command:   CommandSubmitTransaction,
+				Arguments: []interface{}{params.TextDocument.URI},
+			},
+		})
 	}
 
 	return actions, nil
