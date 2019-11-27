@@ -187,7 +187,7 @@ func (s *Server) executeScript(conn protocol.Conn, args ...interface{}) (interfa
 			})
 			conn.LogMessage(&protocol.LogMessageParams{
 				Type:    protocol.Warning,
-				Message: fmt.Sprintf("Failed to execute script error: %s", grpcErr.Message()),
+				Message: fmt.Sprintf("Failed to execute script: %s", grpcErr.Message()),
 			})
 			return nil, nil
 		}
