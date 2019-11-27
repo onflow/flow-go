@@ -164,9 +164,6 @@ func (checker *Checker) visitTransactionExecuteFunction(
 		return
 	}
 
-	checker.enterValueScope()
-	defer checker.leaveValueScope(true)
-
 	executeFunctionType := transactionType.ExecuteFunctionType().InvocationFunctionType()
 
 	checker.checkFunction(
