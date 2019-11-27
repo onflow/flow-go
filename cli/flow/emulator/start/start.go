@@ -22,6 +22,7 @@ type Config struct {
 	RootKey       string        `flag:"root-key" info:"root account key"`
 	Init          bool          `default:"false" flag:"init" info:"whether to initialize a new account profile"`
 	GRPCDebug     bool          `default:"false" flag:"grpc-debug" info:"enable gRPC server reflection for debugging with grpc_cli"`
+	DBPath        string        `default:"./flowdb" flag:"db-path" info:"where Flow chain data will be stored"`
 }
 
 var (
@@ -59,6 +60,7 @@ var Cmd = &cobra.Command{
 			BlockInterval:  conf.BlockInterval,
 			RootAccountKey: &rootAcct.PrivateKey,
 			GRPCDebug:      conf.GRPCDebug,
+			DBPath:         conf.DBPath,
 		}
 
 		server.StartServer(log, serverConf)

@@ -44,9 +44,11 @@ func randomKey() flow.AccountPrivateKey {
 
 // newEmulator returns a emulator object for testing
 func newEmulator() *emulator.EmulatedBlockchain {
-	return emulator.NewEmulatedBlockchain(emulator.EmulatedBlockchainOptions{
-		OnLogMessage: func(msg string) {},
-	})
+	b, err := emulator.NewEmulatedBlockchain()
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
 
 // SignAndSubmit signs a transaction with an array of signers and adds their signatures to the transaction
@@ -59,7 +61,7 @@ func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testi
 	// add array of signers to transaction
 	for i := 0; i < len(signingAddresses); i++ {
 		sig, err := keys.SignTransaction(tx, signingKeys[i])
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(signingAddresses[i], sig)
 	}
@@ -72,9 +74,10 @@ func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testi
 			assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
 		}
 	} else {
-		if !assert.Nil(t, err) {
+		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
-		b.CommitBlock()
+		_, err = b.CommitBlock()
+		assert.NoError(t, err)
 	}
 }

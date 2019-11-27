@@ -256,6 +256,10 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 		checker.declareEventDeclaration(declaration)
 	}
 
+	for _, declaration := range program.TransactionDeclarations() {
+		checker.declareTransactionDeclaration(declaration)
+	}
+
 	// check all declarations
 
 	for _, declaration := range program.Declarations {
@@ -776,17 +780,27 @@ func (checker *Checker) recordResourceInvalidation(
 		return
 	}
 
-	identifierExpression, ok := expression.(*ast.IdentifierExpression)
-	if !ok {
-		return
-	}
+	switch typedExpression := expression.(type) {
+	case *ast.IdentifierExpression:
 
-	variable := checker.findAndCheckVariable(identifierExpression.Identifier, false)
-	if variable == nil {
-		return
-	}
+		variable := checker.findAndCheckVariable(typedExpression.Identifier, false)
+		if variable == nil {
+			return
+		}
 
-	checker.resources.AddInvalidation(variable, invalidation)
+		checker.resources.AddInvalidation(variable, invalidation)
+
+	case *ast.CreateExpression:
+	case *ast.InvocationExpression:
+	case *ast.ArrayExpression:
+	case *ast.DictionaryExpression:
+	case *ast.NilExpression:
+	case *ast.CastingExpression:
+	case *ast.BinaryExpression:
+		// (nil-coalescing)
+	default:
+		panic(errors.NewUnreachableError())
+	}
 }
 
 func (checker *Checker) checkWithResources(

@@ -4792,8 +4792,6 @@ var storageValueDeclaration = map[string]sema.ValueDeclaration{
 	},
 }
 
-type storageIdentifier struct{}
-
 func TestInterpretStorage(t *testing.T) {
 
 	storedValues := map[string]interpreter.OptionalValue{}
@@ -5898,5 +5896,312 @@ func TestInterpretOptionalChainingFunctionCall(t *testing.T) {
 			Value: interpreter.NewIntValue(42),
 		},
 		inter.Globals["x2"].Value,
+	)
+}
+
+// TestInterpretStorageResourceMoveRemovalInSwap tests that reading but also
+// resource moving from storage results in a deletion from storage,
+// when the storage index expression is located in a swap statement
+//
+func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
+
+	allStoredValues := map[string]map[string]interpreter.OptionalValue{}
+
+	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+	getter := func(_ *interpreter.Interpreter, id string, key string) interpreter.OptionalValue {
+		storedValues := allStoredValues[id]
+		if storedValues == nil {
+			storedValues = map[string]interpreter.OptionalValue{}
+			allStoredValues[id] = storedValues
+		}
+
+		value, ok := storedValues[key]
+		if !ok {
+			return interpreter.NilValue{}
+		}
+		return value
+	}
+
+	setter := func(_ *interpreter.Interpreter, id string, key string, value interpreter.OptionalValue) {
+		storedValues := allStoredValues[id]
+		if storedValues == nil {
+			storedValues = map[string]interpreter.OptionalValue{}
+			allStoredValues[id] = storedValues
+		}
+
+		storedValues[key] = value
+	}
+
+	storageIdentifier1 := "storage1"
+	storageValue1 := interpreter.StorageValue{
+		Identifier: storageIdentifier1,
+	}
+
+	storageIdentifier2 := "storage2"
+	storageValue2 := interpreter.StorageValue{
+		Identifier: storageIdentifier2,
+	}
+
+	inter := parseCheckAndInterpretWithOptions(t, `
+          pub resource R {}
+
+          pub fun test() {
+              var r: <-R? <- nil
+              storage1[R] <-> r
+              storage2[R] <-> r
+              // there was no old value, but it must be discarded
+              destroy r
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(
+					map[string]sema.ValueDeclaration{
+						"storage1": stdlib.StandardLibraryValue{
+							Name:       "storage1",
+							Type:       &sema.StorageType{},
+							Kind:       common.DeclarationKindConstant,
+							IsConstant: true,
+						},
+						"storage2": stdlib.StandardLibraryValue{
+							Name:       "storage2",
+							Type:       &sema.StorageType{},
+							Kind:       common.DeclarationKindConstant,
+							IsConstant: true,
+						},
+					},
+				),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage1": storageValue1,
+					"storage2": storageValue2,
+				}),
+				interpreter.WithStorageReadHandler(getter),
+				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+						return indexingType.String()
+					},
+				),
+			},
+		},
+	)
+
+	const rTypeIdentifier = "R"
+
+	rValue := &interpreter.SomeValue{
+		Value: &interpreter.CompositeValue{
+			Identifier: rTypeIdentifier,
+			Fields:     map[string]interpreter.Value{},
+		},
+	}
+	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
+		rTypeIdentifier: rValue,
+	}
+
+	_, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NilValue{},
+		allStoredValues[storageIdentifier1][rTypeIdentifier],
+	)
+
+	assert.Equal(t,
+		rValue,
+		allStoredValues[storageIdentifier2][rTypeIdentifier],
+	)
+}
+
+// TestInterpretStorageResourceMoveRemovalInVariableDeclaration tests that reading but also
+// resource moving from storage results in a deletion from storage,
+// when the storage index expression is located in a variable declaration
+//
+func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) {
+
+	allStoredValues := map[string]map[string]interpreter.OptionalValue{}
+
+	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+	getter := func(_ *interpreter.Interpreter, id string, key string) interpreter.OptionalValue {
+		storedValues := allStoredValues[id]
+		if storedValues == nil {
+			storedValues = map[string]interpreter.OptionalValue{}
+			allStoredValues[id] = storedValues
+		}
+
+		value, ok := storedValues[key]
+		if !ok {
+			return interpreter.NilValue{}
+		}
+		return value
+	}
+
+	setter := func(_ *interpreter.Interpreter, id string, key string, value interpreter.OptionalValue) {
+		storedValues := allStoredValues[id]
+		if storedValues == nil {
+			storedValues = map[string]interpreter.OptionalValue{}
+			allStoredValues[id] = storedValues
+		}
+
+		storedValues[key] = value
+	}
+
+	storageIdentifier1 := "storage1"
+	storageValue1 := interpreter.StorageValue{
+		Identifier: storageIdentifier1,
+	}
+
+	storageIdentifier2 := "storage2"
+	storageValue2 := interpreter.StorageValue{
+		Identifier: storageIdentifier2,
+	}
+
+	inter := parseCheckAndInterpretWithOptions(t, `
+          pub resource R {}
+
+          pub fun test() {
+              let r <- storage1[R] <- nil
+              let r2 <- storage2[R] <- r
+              // there was no old value, but it must be discarded
+              destroy r2
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(
+					map[string]sema.ValueDeclaration{
+						"storage1": stdlib.StandardLibraryValue{
+							Name:       "storage1",
+							Type:       &sema.StorageType{},
+							Kind:       common.DeclarationKindConstant,
+							IsConstant: true,
+						},
+						"storage2": stdlib.StandardLibraryValue{
+							Name:       "storage2",
+							Type:       &sema.StorageType{},
+							Kind:       common.DeclarationKindConstant,
+							IsConstant: true,
+						},
+					},
+				),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage1": storageValue1,
+					"storage2": storageValue2,
+				}),
+				interpreter.WithStorageReadHandler(getter),
+				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+						return indexingType.String()
+					},
+				),
+			},
+		},
+	)
+
+	const rTypeIdentifier = "R"
+
+	rValue := &interpreter.SomeValue{
+		Value: &interpreter.CompositeValue{
+			Identifier: rTypeIdentifier,
+			Fields:     map[string]interpreter.Value{},
+		},
+	}
+	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
+		rTypeIdentifier: rValue,
+	}
+
+	_, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NilValue{},
+		allStoredValues[storageIdentifier1][rTypeIdentifier],
+	)
+
+	assert.Equal(t,
+		rValue,
+		allStoredValues[storageIdentifier2][rTypeIdentifier],
+	)
+}
+
+func TestInterpretOptionalChainingFieldReadAndNilCoalescing(t *testing.T) {
+
+	standardLibraryFunctions :=
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}
+
+	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
+	predefinedValues := standardLibraryFunctions.ToValues
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+          struct Test {
+              let x: Int
+
+              init(x: Int) {
+                  self.x = x
+              }
+          }
+
+          let test: Test? = Test(x: 42)
+          let x = test?.x ?? panic("nil")
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(valueDeclarations),
+				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(predefinedValues()),
+			},
+		},
+	)
+
+	assert.Equal(t,
+		inter.Globals["x"].Value,
+		interpreter.NewIntValue(42),
+	)
+}
+
+func TestInterpretOptionalChainingFunctionCallAndNilCoalescing(t *testing.T) {
+
+	standardLibraryFunctions :=
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}
+
+	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
+	predefinedValues := standardLibraryFunctions.ToValues
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+          struct Test {
+              fun x(): Int {
+                  return 42
+              }
+          }
+
+          let test: Test? = Test()
+          let x = test?.x() ?? panic("nil")
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(valueDeclarations),
+				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(predefinedValues()),
+			},
+		},
+	)
+
+	assert.Equal(t,
+		inter.Globals["x"].Value,
+		interpreter.NewIntValue(42),
 	)
 }

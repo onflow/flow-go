@@ -1,17 +1,19 @@
-// A GRPC implementation of the Underlay interface.
+// Package protocols is a GRPC implementation of the Underlay interface.
 package protocols
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dapperlabs/flow-go/network/gossip"
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"io"
+	"net"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/encoding/gzip"
 	"google.golang.org/grpc/peer"
-	"io"
-	"net"
+
+	"github.com/dapperlabs/flow-go/network/gossip"
+	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 )
 
 // Compile time verification that GRPCUnderlay implements the two interfaces
@@ -69,10 +71,10 @@ func (u *GRPCUnderlay) Start(address string) error {
 func (u *GRPCUnderlay) Stop() error {
 	if u.grpcServer == nil {
 		return errors.New(" GRPC Server set to nil ")
-	} else {
-		u.grpcServer.GracefulStop()
-		return nil
 	}
+
+	u.grpcServer.GracefulStop()
+	return nil
 }
 
 // QueueService is invoked remotely using the gRPC stub,
