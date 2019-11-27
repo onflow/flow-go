@@ -2,14 +2,17 @@ package emulator_test
 
 // addTwoScript runs a script that adds 2 to a value.
 const addTwoScript = `
-	pub fun main(account: Account) {
-		account.storage[Int] = (account.storage[Int] ?? 0) + 2
+	transaction {
+	  prepare(signer: Account) {
+		signer.storage[Int] = (signer.storage[Int] ?? 0) + 2
+	  }
+	  execute {}
 	}
 `
 
 const sampleCall = `
 	pub fun main(): Int {
-		return getAccount("%s").storage[Int] ?? 0
+		return getAccount(0x%s).storage[Int] ?? 0
 	}
 `
 

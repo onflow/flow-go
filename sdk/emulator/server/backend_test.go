@@ -90,7 +90,7 @@ func TestBackend(t *testing.T) {
 		}
 		response, err := backend.GetAccount(context.Background(), &request)
 
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		assert.Equal(t, account.Address.Bytes(), response.Account.Address)
 		assert.Equal(t, account.Balance, response.Account.Balance)

@@ -14,10 +14,15 @@ func GenerateCreateMinterScript(nftAddr flow.Address, initialID, specialMod int)
 	template := `
 		import GreatNFTMinter from 0x%s
 
-		pub fun main(acct: Account) {
+		transaction {
+		  prepare(acct: Account) {
 			let minter = GreatNFTMinter(firstID: %d, specialMod: %d)
 			acct.storage[GreatNFTMinter] = minter
-		}`
+		  }
+		  execute {}
+		}
+	`
+
 	return []byte(fmt.Sprintf(template, nftAddr, initialID, specialMod))
 }
 
@@ -27,13 +32,17 @@ func GenerateMintScript(nftCodeAddr flow.Address) []byte {
 	template := `
 		import GreatNFTMinter, GreatNFT from 0x%s
 
-		pub fun main(acct: Account) {
+		transaction {
+		  prepare(acct: Account) {
 			let minter = acct.storage[GreatNFTMinter] ?? panic("missing minter")
 			let nft = minter.mint()
 
 			acct.storage[GreatNFT] = nft
 			acct.storage[GreatNFTMinter] = minter
-		}`
+		  }
+		  execute {}
+		}
+	`
 
 	return []byte(fmt.Sprintf(template, nftCodeAddr.String()))
 }
@@ -45,15 +54,16 @@ func GenerateInspectNFTScript(nftCodeAddr, userAddr flow.Address, expectedID int
 		import GreatNFT from 0x%s
 
 		pub fun main() {
-			let acct = getAccount("%s")
-			let nft = acct.storage[GreatNFT] ?? panic("missing nft")
-			if nft.id() != %d {
-				panic("incorrect id")
-			}
-			if nft.isSpecial() != %t {
-				panic("incorrect specialness")
-			}
-		}`
+		  let acct = getAccount(0x%s)
+		  let nft = acct.storage[GreatNFT] ?? panic("missing nft")
+		  if nft.id() != %d {
+			panic("incorrect id")
+		  }
+		  if nft.isSpecial() != %t {
+			panic("incorrect specialness")
+		  }
+		}
+	`
 
 	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, expectedID, expectedIsSpecial))
 }
@@ -64,9 +74,11 @@ func GenerateNFTIDScript(nftCodeAddr, userAddr flow.Address) []byte {
 		import GreatNFT from 0x%s
 
 		pub fun main(): Int {
-			let acct = getAccount("%s")
-			let nft = acct.storage[GreatNFT] ?? panic("missing nft")
-			return nft.id()
-		}`
+		  let acct = getAccount(0x%s)
+		  let nft = acct.storage[GreatNFT] ?? panic("missing nft")
+		  return nft.id()
+		}
+	`
+
 	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr))
 }

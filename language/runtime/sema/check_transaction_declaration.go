@@ -8,6 +8,11 @@ import (
 func (checker *Checker) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
 	transactionType := checker.Elaboration.TransactionDeclarationTypes[declaration]
 
+	checker.containerTypes[transactionType] = true
+	defer func() {
+		checker.containerTypes[transactionType] = false
+	}()
+
 	fieldMembers := map[*Member]*ast.FieldDeclaration{}
 
 	for _, field := range declaration.Fields {
@@ -133,10 +138,14 @@ func (checker *Checker) checkTransactionPrepareFunctionParameters(
 	for i, parameter := range parameterList.Parameters {
 		parameterTypeAnnotation := parameterTypeAnnotations[i]
 
-		_ = parameter
-		_ = parameterTypeAnnotation
+		t := parameterTypeAnnotation.Type
 
-		// TODO: only allow Account type
+		if !IsSubType(t, &AccountType{}) {
+			checker.report(&InvalidTransactionPrepareParameterType{
+				Type:  t,
+				Range: ast.NewRangeFromPositioned(parameter.TypeAnnotation),
+			})
+		}
 	}
 
 }
@@ -202,4 +211,5 @@ func (checker *Checker) declareTransactionDeclaration(declaration *ast.Transacti
 	transactionType.Prepare = prepareFunctionType
 
 	checker.Elaboration.TransactionDeclarationTypes[declaration] = transactionType
+	checker.TransactionTypes = append(checker.TransactionTypes, transactionType)
 }
