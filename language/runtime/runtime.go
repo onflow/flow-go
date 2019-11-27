@@ -133,11 +133,10 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	signingAccountsCount := len(signingAccountAddresses)
 	prepareFunctionParameterCount := len(transactionPrepareFunctionType.ParameterTypeAnnotations)
 	if signingAccountsCount != prepareFunctionParameterCount {
-		return fmt.Errorf(
-			"parameter count mismatch for transaction `prepare` function: expected %d, got %d",
-			prepareFunctionParameterCount,
-			signingAccountsCount,
-		)
+		return newError(InvalidTransactionParameterCountError{
+			Expected: prepareFunctionParameterCount,
+			Actual:   signingAccountsCount,
+		})
 	}
 
 	// check parameter types

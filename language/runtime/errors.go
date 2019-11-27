@@ -44,3 +44,19 @@ func (e InvalidTransactionCountError) Error() string {
 		e.Count,
 	)
 }
+
+// InvalidTransactionParameterCountError
+
+type InvalidTransactionParameterCountError struct {
+	Expected int
+	Actual   int
+}
+
+func (e InvalidTransactionParameterCountError) Error() string {
+	return fmt.Sprintf(
+		"parameter count mismatch for transaction: expected %d, got %d",
+		e.Expected,
+		e.Actual,
+	)
+}
+
