@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"encoding/gob"
 	"errors"
 	"fmt"
 
@@ -12,13 +11,8 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
-
-func init() {
-	gob.Register(flow.Address{})
-}
 
 type Interface interface {
 	// ResolveImport resolves an import of a program.
