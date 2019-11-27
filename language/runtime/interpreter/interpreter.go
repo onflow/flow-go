@@ -473,7 +473,7 @@ func (interpreter *Interpreter) prepareInvokeTransaction(
 	functionValue := interpreter.Transactions[index]
 
 	transactionType := interpreter.Checker.TransactionTypes[index]
-	functionType := transactionType.Prepare.InvocationFunctionType()
+	functionType := transactionType.EntryPointFunctionType()
 
 	return interpreter.prepareInvoke(functionValue, functionType, arguments)
 }
@@ -2277,13 +2277,13 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 }
 
 func (interpreter *Interpreter) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
-	interpreter.declareTransactionEntrypoint(declaration)
+	interpreter.declareTransactionEntryPoint(declaration)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-func (interpreter *Interpreter) declareTransactionEntrypoint(declaration *ast.TransactionDeclaration) {
+func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.TransactionDeclaration) {
 	transactionType := interpreter.Checker.Elaboration.TransactionDeclarationTypes[declaration]
 
 	lexicalScope := interpreter.activations.CurrentOrNew()
@@ -2292,13 +2292,11 @@ func (interpreter *Interpreter) declareTransactionEntrypoint(declaration *ast.Tr
 	var prepareFunctionType *sema.FunctionType
 	if declaration.Prepare != nil {
 		prepareFunction = declaration.Prepare.FunctionDeclaration.ToExpression()
-		prepareFunctionType = transactionType.Prepare.FunctionType
+		prepareFunctionType = transactionType.PrepareFunctionType().InvocationFunctionType()
 	}
 
 	executeFunction := declaration.Execute.FunctionDeclaration.ToExpression()
-	executeFunctionType := &sema.FunctionType{
-		ReturnTypeAnnotation: sema.NewTypeAnnotation(&sema.VoidType{}),
-	}
+	executeFunctionType := transactionType.ExecuteFunctionType().InvocationFunctionType()
 
 	beforeStatements, rewrittenPostConditions :=
 		interpreter.rewritePostConditions(declaration.PostConditions)

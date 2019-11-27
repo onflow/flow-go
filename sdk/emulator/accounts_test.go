@@ -645,7 +645,7 @@ func TestImportAccountCode(t *testing.T) {
 
 		transaction {
 		  execute {
-			pub let answer = answer()
+			let answer = answer()
 			if answer != 42 {
 				panic("?!")
 			}
