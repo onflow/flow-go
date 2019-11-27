@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
@@ -199,9 +200,10 @@ func TestCheckInvalidVariableDeclarationSecondValueNotDeclared(t *testing.T) {
        let z = y = x
    `)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+	assert.IsType(t, &sema.NonResourceTypeError{}, errs[0])
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
 }
 
 func TestCheckInvalidVariableDeclarationSecondValueCopyTransfers(t *testing.T) {
@@ -359,7 +361,7 @@ func TestCheckVariableDeclarationSecondValueDictionary(t *testing.T) {
      let r <- ys.remove(key: "r")
    `)
 
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	assert.IsType(t,
 		&sema.CompositeType{},
@@ -380,4 +382,20 @@ func TestCheckVariableDeclarationSecondValueDictionary(t *testing.T) {
 		&sema.OptionalType{},
 		checker.GlobalValues["r"].Type,
 	)
+}
+
+func TestCheckVariableDeclarationSecondValueNil(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource R {}
+
+     fun test() {
+         var x: <-R? <- create R()
+         let y <- x <- nil
+         destroy x
+         destroy y
+     }
+   `)
+
+	assert.Nil(t, err)
 }

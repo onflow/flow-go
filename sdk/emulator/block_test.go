@@ -3,6 +3,8 @@ package emulator_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -11,7 +13,8 @@ import (
 )
 
 func TestCommitBlock(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b, err := emulator.NewEmulatedBlockchain()
+	require.NoError(t, err)
 
 	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
@@ -60,13 +63,16 @@ func TestCommitBlock(t *testing.T) {
 	assert.Equal(t, flow.TransactionReverted, tx.Status)
 
 	// Commit tx1 and tx2 into new block
-	b.CommitBlock()
+	_, err = b.CommitBlock()
+	assert.NoError(t, err)
 
 	// tx1 status becomes TransactionSealed
-	tx, _ = b.GetTransaction(tx1.Hash())
+	tx, err = b.GetTransaction(tx1.Hash())
+	require.Nil(t, err)
 	assert.Equal(t, flow.TransactionSealed, tx.Status)
 
 	// tx2 status stays TransactionReverted
-	tx, _ = b.GetTransaction(tx2.Hash())
+	tx, err = b.GetTransaction(tx2.Hash())
+	require.Nil(t, err)
 	assert.Equal(t, flow.TransactionReverted, tx.Status)
 }

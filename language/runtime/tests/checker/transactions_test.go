@@ -95,10 +95,9 @@ func TestCheckTransactions(t *testing.T) {
 	}
 
 	invalidPrepareParameters := test{
-		"InvalidPrepareIdentifier",
+		"InvalidPrepareParameters",
 		`
 		  transaction {
-
 		    prepare(x: Int, y: Int) {}
 
 		    execute {}

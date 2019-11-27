@@ -112,3 +112,16 @@ type ErrInvalidStateVersion struct {
 func (e *ErrInvalidStateVersion) Error() string {
 	return fmt.Sprintf("World State with version hash %x is invalid", e.Version)
 }
+
+// ErrStorage indicates that an error occurred in the storage provider.
+type ErrStorage struct {
+	inner error
+}
+
+func (e *ErrStorage) Error() string {
+	return fmt.Sprintf("storage failure: %v", e.inner)
+}
+
+func (e *ErrStorage) Unwrap() error {
+	return e.inner
+}

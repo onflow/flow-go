@@ -3,8 +3,10 @@
 package flow
 
 import (
+	"encoding/gob"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 )
 
 const (
@@ -12,11 +14,18 @@ const (
 	AddressLength = 20
 )
 
+func init() {
+	gob.Register(Address{})
+}
+
 // Address represents the 20 byte address of an account.
 type Address [AddressLength]byte
 
-// ZeroAddress represents the "zero address" (account that no one owns).
-var ZeroAddress = Address{}
+var (
+	// ZeroAddress represents the "zero address" (account that no one owns).
+	ZeroAddress = Address{}
+	RootAddress = BytesToAddress(big.NewInt(1).Bytes())
+)
 
 // BytesToAddress returns Address with value b.
 //
