@@ -730,7 +730,7 @@ func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Tra
 
 				return messageTrampoline.
 					Then(func(result interface{}) {
-						message := result.(StringValue).StrValue()
+						message := result.(*StringValue).Str
 
 						panic(&ConditionError{
 							ConditionKind: condition.Kind,
@@ -765,7 +765,7 @@ func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatem
 			valueType := interpreter.Checker.Elaboration.ReturnStatementValueTypes[statement]
 			returnType := interpreter.Checker.Elaboration.ReturnStatementReturnTypes[statement]
 
-			value = interpreter.convertAndBox(value, valueType, returnType)
+			value = interpreter.copyAndConvert(value, valueType, returnType)
 
 			return functionReturn{value}
 		})
@@ -817,8 +817,12 @@ func (interpreter *Interpreter) visitIfStatementWithVariableDeclaration(
 	return declaration.Value.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
-			if someValue, ok := result.(SomeValue); ok {
-				unwrappedValueCopy := someValue.Value.Copy()
+			if someValue, ok := result.(*SomeValue); ok {
+
+				targetType := interpreter.Checker.Elaboration.VariableDeclarationTargetTypes[declaration]
+				valueType := interpreter.Checker.Elaboration.VariableDeclarationValueTypes[declaration]
+				unwrappedValueCopy := interpreter.copyAndConvert(someValue.Value, valueType, targetType)
+
 				interpreter.activations.PushCurrent()
 				interpreter.declareVariable(
 					declaration.Identifier.Identifier,
@@ -864,6 +868,21 @@ func (interpreter *Interpreter) VisitWhileStatement(statement *ast.WhileStatemen
 		})
 }
 
+func (interpreter *Interpreter) visitPotentialStorageRemoval(expression ast.Expression) Trampoline {
+	movingStorageIndexExpression := interpreter.movingStorageIndexExpression(expression)
+	if movingStorageIndexExpression == nil {
+		return expression.Accept(interpreter).(Trampoline)
+	}
+
+	return interpreter.indexExpressionGetterSetter(movingStorageIndexExpression).
+		Map(func(result interface{}) interface{} {
+			getterSetter := result.(getterSetter)
+			value := getterSetter.get()
+			getterSetter.set(NilValue{})
+			return value
+		})
+}
+
 // VisitVariableDeclaration first visits the declaration's value,
 // then declares the variable with the name bound to the value
 func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.VariableDeclaration) ast.Repr {
@@ -872,8 +891,9 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 	valueType := interpreter.Checker.Elaboration.VariableDeclarationValueTypes[declaration]
 	secondValueType := interpreter.Checker.Elaboration.VariableDeclarationSecondValueTypes[declaration]
 
-	return declaration.Value.Accept(interpreter).(Trampoline).
+	return interpreter.visitPotentialStorageRemoval(declaration.Value).
 		FlatMap(func(result interface{}) Trampoline {
+
 			valueCopy := interpreter.copyAndConvert(result.(Value), valueType, targetType)
 
 			interpreter.declareVariable(
@@ -893,6 +913,15 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 				secondValueType,
 			)
 		})
+}
+
+func (interpreter *Interpreter) movingStorageIndexExpression(expression ast.Expression) *ast.IndexExpression {
+	indexExpression, ok := expression.(*ast.IndexExpression)
+	if !ok || !interpreter.Checker.Elaboration.IsResourceMovingStorageIndexExpression[indexExpression] {
+		return nil
+	}
+
+	return indexExpression
 }
 
 func (interpreter *Interpreter) declareVariable(identifier string, value Value) *Variable {
@@ -935,22 +964,36 @@ func (interpreter *Interpreter) visitAssignment(
 }
 
 func (interpreter *Interpreter) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
+
+	leftType := interpreter.Checker.Elaboration.SwapStatementLeftTypes[swap]
+	rightType := interpreter.Checker.Elaboration.SwapStatementRightTypes[swap]
+
 	// Evaluate the left expression
 	return interpreter.assignmentGetterSetter(swap.Left).
 		FlatMap(func(result interface{}) Trampoline {
 			leftGetterSetter := result.(getterSetter)
 			leftValue := leftGetterSetter.get()
+			if interpreter.movingStorageIndexExpression(swap.Left) != nil {
+				leftGetterSetter.set(NilValue{})
+			}
 
 			// Evaluate the right expression
 			return interpreter.assignmentGetterSetter(swap.Right).
 				Then(func(result interface{}) {
 					rightGetterSetter := result.(getterSetter)
 					rightValue := rightGetterSetter.get()
+					if interpreter.movingStorageIndexExpression(swap.Right) != nil {
+						rightGetterSetter.set(NilValue{})
+					}
 
 					// Assign right value to left target
 					// and left value to right target
-					leftGetterSetter.set(rightValue)
-					rightGetterSetter.set(leftValue)
+
+					rightValueCopy := interpreter.copyAndConvert(rightValue.(Value), rightType, leftType)
+					leftValueCopy := interpreter.copyAndConvert(leftValue.(Value), leftType, rightType)
+
+					leftGetterSetter.set(rightValueCopy)
+					rightGetterSetter.set(leftValueCopy)
 				})
 		})
 }
@@ -976,8 +1019,8 @@ func (interpreter *Interpreter) assignmentGetterSetter(target ast.Expression) Tr
 // identifierExpressionGetterSetter returns a getter/setter function pair
 // for the target identifier expression, wrapped in a trampoline
 //
-func (interpreter *Interpreter) identifierExpressionGetterSetter(target *ast.IdentifierExpression) Trampoline {
-	variable := interpreter.findVariable(target.Identifier.Identifier)
+func (interpreter *Interpreter) identifierExpressionGetterSetter(identifierExpression *ast.IdentifierExpression) Trampoline {
+	variable := interpreter.findVariable(identifierExpression.Identifier.Identifier)
 	return Done{
 		Result: getterSetter{
 			get: func() Value {
@@ -993,15 +1036,15 @@ func (interpreter *Interpreter) identifierExpressionGetterSetter(target *ast.Ide
 // indexExpressionGetterSetter returns a getter/setter function pair
 // for the target index expression, wrapped in a trampoline
 //
-func (interpreter *Interpreter) indexExpressionGetterSetter(target *ast.IndexExpression) Trampoline {
-	return target.TargetExpression.Accept(interpreter).(Trampoline).
+func (interpreter *Interpreter) indexExpressionGetterSetter(indexExpression *ast.IndexExpression) Trampoline {
+	return indexExpression.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			switch typedResult := result.(type) {
 			case ValueIndexableValue:
-				return target.IndexingExpression.Accept(interpreter).(Trampoline).
+				return indexExpression.IndexingExpression.Accept(interpreter).(Trampoline).
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
-						locationRange := interpreter.locationRange(target)
+						locationRange := interpreter.locationRange(indexExpression)
 						return Done{
 							Result: getterSetter{
 								get: func() Value {
@@ -1015,7 +1058,7 @@ func (interpreter *Interpreter) indexExpressionGetterSetter(target *ast.IndexExp
 					})
 
 			case StorageValue:
-				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[target]
+				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
 				key := interpreter.storageKeyHandler(interpreter, typedResult.Identifier, indexingType)
 				return Done{
 					Result: getterSetter{
@@ -1037,12 +1080,12 @@ func (interpreter *Interpreter) indexExpressionGetterSetter(target *ast.IndexExp
 // memberExpressionGetterSetter returns a getter/setter function pair
 // for the target member expression, wrapped in a trampoline
 //
-func (interpreter *Interpreter) memberExpressionGetterSetter(target *ast.MemberExpression) Trampoline {
-	return target.Expression.Accept(interpreter).(Trampoline).
+func (interpreter *Interpreter) memberExpressionGetterSetter(memberExpression *ast.MemberExpression) Trampoline {
+	return memberExpression.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			structure := result.(MemberAccessibleValue)
-			locationRange := interpreter.locationRange(target)
-			identifier := target.Identifier.Identifier
+			locationRange := interpreter.locationRange(memberExpression)
+			identifier := memberExpression.Identifier.Identifier
 			return Done{
 				Result: getterSetter{
 					get: func() Value {
@@ -1237,7 +1280,7 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 						})
 				}
 
-				value := left.(SomeValue).Value
+				value := left.(*SomeValue).Value
 				return Done{Result: value}
 			})
 
@@ -1265,30 +1308,19 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 	// TODO: add support for arrays and dictionaries
 
 	switch left := left.(type) {
-	case IntegerValue:
+	case EquatableValue:
 		// NOTE: might be NilValue
-		right, ok := right.(IntegerValue)
+		right, ok := right.(EquatableValue)
 		if !ok {
 			return false
 		}
 		return left.Equal(right)
-
-	case BoolValue:
-		return left == right
 
 	case NilValue:
 		_, ok := right.(NilValue)
 		return BoolValue(ok)
 
-	case StringValue:
-		// NOTE: might be NilValue
-		right, ok := right.(StringValue)
-		if !ok {
-			return false
-		}
-		return left.Equal(right)
-
-	case CompositeValue:
+	case *CompositeValue:
 		// TODO: call `equals` if RHS is composite
 		return false
 	}
@@ -1362,20 +1394,20 @@ func (interpreter *Interpreter) VisitStringExpression(expression *ast.StringExpr
 }
 
 func (interpreter *Interpreter) VisitArrayExpression(expression *ast.ArrayExpression) ast.Repr {
-	return interpreter.visitExpressions(expression.Values).
+	return interpreter.visitExpressionsNonCopying(expression.Values).
 		FlatMap(func(result interface{}) Trampoline {
-			values := result.(ArrayValue)
+			values := result.(*ArrayValue)
 
 			argumentTypes := interpreter.Checker.Elaboration.ArrayExpressionArgumentTypes[expression]
 			elementType := interpreter.Checker.Elaboration.ArrayExpressionElementType[expression]
 
-			copies := make([]Value, len(*values.Values))
-			for i, argument := range *values.Values {
+			copies := make([]Value, len(values.Values))
+			for i, argument := range values.Values {
 				argumentType := argumentTypes[i]
 				copies[i] = interpreter.copyAndConvert(argument, argumentType, elementType)
 			}
 
-			return Done{Result: NewArrayValue(copies...)}
+			return Done{Result: NewArrayValueNonCopying(copies...)}
 		})
 }
 
@@ -1422,7 +1454,7 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 				case NilValue:
 					return typedResult
 
-				case SomeValue:
+				case *SomeValue:
 					result = typedResult.Value
 
 				default:
@@ -1435,7 +1467,7 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 			resultValue := value.GetMember(interpreter, locationRange, expression.Identifier.Identifier)
 
 			if expression.Optional {
-				return SomeValue{Value: resultValue}
+				return &SomeValue{Value: resultValue}
 			}
 			return resultValue
 		})
@@ -1483,16 +1515,23 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 	return invocationExpression.InvokedExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
-			// Handle optional chaining on member expression, if any
+			// Handle optional chaining on member expression, if any:
+			// - If the member expression is nil, finish execution
+			// - If the member expression is some value, the wrapped value
+			//   is the function value that should be invoked
+
+			isOptionalChaining := false
 
 			if invokedMemberExpression, ok :=
 				invocationExpression.InvokedExpression.(*ast.MemberExpression); ok && invokedMemberExpression.Optional {
+
+				isOptionalChaining = true
 
 				switch typedResult := result.(type) {
 				case NilValue:
 					return Done{Result: typedResult}
 
-				case SomeValue:
+				case *SomeValue:
 					result = typedResult.Value
 
 				default:
@@ -1508,17 +1547,17 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 				argumentExpressions[i] = argument.Expression
 			}
 
-			return interpreter.visitExpressions(argumentExpressions).
+			return interpreter.visitExpressionsNonCopying(argumentExpressions).
 				FlatMap(func(result interface{}) Trampoline {
-					arguments := result.(ArrayValue)
+					arguments := result.(*ArrayValue)
 
 					argumentTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression]
 					parameterTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression]
 
-					argumentCopies := make([]Value, len(*arguments.Values))
-					for i, argument := range *arguments.Values {
+					argumentCopies := make([]Value, len(arguments.Values))
+					for i, argument := range arguments.Values {
 						argumentType := argumentTypes[i]
 						parameterType := parameterTypes[i]
 						argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
@@ -1529,7 +1568,19 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 						Position: invocationExpression.StartPosition(),
 						Location: interpreter.Checker.Location,
 					}
-					return function.invoke(argumentCopies, location)
+
+					invocation := function.invoke(argumentCopies, location)
+
+					// If this is invocation is optional chaining, wrap the result
+					// as an optional, as the result is expected to be an optional
+
+					if !isOptionalChaining {
+						return invocation
+					}
+
+					return invocation.Map(func(result interface{}) interface{} {
+						return &SomeValue{Value: result.(Value)}
+					})
 				})
 		})
 }
@@ -1582,8 +1633,8 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 	}
 }
 
-func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression) Trampoline {
-	var trampoline Trampoline = Done{Result: NewArrayValue()}
+func (interpreter *Interpreter) visitExpressionsNonCopying(expressions []ast.Expression) Trampoline {
+	var trampoline Trampoline = Done{Result: NewArrayValueNonCopying()}
 
 	for _, expression := range expressions {
 		// NOTE: important: rebind expression, because it is captured in the closure below
@@ -1591,15 +1642,15 @@ func (interpreter *Interpreter) visitExpressions(expressions []ast.Expression) T
 
 		// append the evaluation of this expression
 		trampoline = trampoline.FlatMap(func(result interface{}) Trampoline {
-			array := result.(ArrayValue)
+			array := result.(*ArrayValue)
 
 			// evaluate the expression
 			return expression.Accept(interpreter).(Trampoline).
 				FlatMap(func(result interface{}) Trampoline {
 					value := result.(Value)
 
-					newValues := append(*array.Values, value)
-					return Done{Result: NewArrayValue(newValues...)}
+					newValues := append(array.Values, value)
+					return Done{Result: NewArrayValueNonCopying(newValues...)}
 				})
 		})
 	}
@@ -1697,11 +1748,12 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	variable.Value = NewHostFunctionValue(
 		func(arguments []Value, location LocationPosition) Trampoline {
 
-			value := CompositeValue{
+			value := &CompositeValue{
 				Location:   interpreter.Checker.Location,
 				Identifier: identifier,
-				Fields:     &map[string]Value{},
-				Functions:  &functions,
+				Kind:       declaration.CompositeKind,
+				Fields:     map[string]Value{},
+				Functions:  functions,
 				Destructor: destructorFunction,
 			}
 
@@ -1726,7 +1778,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 //
 func (interpreter *Interpreter) bindSelf(
 	function InterpretedFunctionValue,
-	structure CompositeValue,
+	structure *CompositeValue,
 ) FunctionValue {
 	return NewHostFunctionValue(func(arguments []Value, location LocationPosition) Trampoline {
 		// start a new activation record
@@ -1968,10 +2020,7 @@ func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaratio
 }
 
 func (interpreter *Interpreter) copyAndConvert(value Value, valueType, targetType sema.Type) Value {
-	if valueType == nil || !valueType.IsResourceType() {
-		value = value.Copy()
-	}
-	return interpreter.convertAndBox(value, valueType, targetType)
+	return interpreter.convertAndBox(value.Copy(), valueType, targetType)
 }
 
 // convertAndBox converts a value to a target type, and boxes in optionals and any value, if necessary
@@ -2031,7 +2080,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 			break
 		}
 
-		if some, ok := inner.(SomeValue); ok {
+		if some, ok := inner.(*SomeValue); ok {
 			inner = some.Value
 		} else if _, ok := inner.(NilValue); ok {
 			// NOTE: nested nil will be unboxed!
@@ -2039,7 +2088,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 				Type: &sema.NeverType{},
 			}
 		} else {
-			value = SomeValue{Value: value}
+			value = &SomeValue{Value: value}
 			valueType = &sema.OptionalType{
 				Type: valueType,
 			}
@@ -2055,10 +2104,10 @@ func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.T
 	switch targetType := targetType.(type) {
 	case *sema.AnyType:
 		// no need to convert already boxed value
-		if _, ok := value.(AnyValue); ok {
+		if _, ok := value.(*AnyValue); ok {
 			return value
 		}
-		return AnyValue{
+		return &AnyValue{
 			Value: value,
 			Type:  valueType,
 		}
@@ -2067,8 +2116,8 @@ func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.T
 		if _, ok := value.(NilValue); ok {
 			return value
 		}
-		some := value.(SomeValue)
-		return SomeValue{
+		some := value.(*SomeValue)
+		return &SomeValue{
 			Value: interpreter.boxAny(
 				some.Value,
 				valueType.(*sema.OptionalType).Type,
@@ -2084,7 +2133,7 @@ func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.T
 
 func (interpreter *Interpreter) unbox(value Value) Value {
 	for {
-		some, ok := value.(SomeValue)
+		some, ok := value.(*SomeValue)
 		if !ok {
 			return value
 		}
@@ -2244,13 +2293,13 @@ func (interpreter *Interpreter) VisitCastingExpression(expression *ast.CastingEx
 
 			switch expression.Operation {
 			case ast.OperationFailableCast:
-				anyValue := value.(AnyValue)
+				anyValue := value.(*AnyValue)
 
 				if !sema.IsSubType(anyValue.Type, expectedType) {
 					return NilValue{}
 				}
 
-				return SomeValue{Value: anyValue.Value}
+				return &SomeValue{Value: anyValue.Value}
 
 			case ast.OperationCast:
 				staticValueType := interpreter.Checker.Elaboration.CastingStaticValueTypes[expression]
@@ -2290,9 +2339,9 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 			indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
 			key := interpreter.storageKeyHandler(interpreter, storage.Identifier, indexingType)
 
-			referenceValue := ReferenceValue{
-				StorageIdentifier: storage.Identifier,
-				Key:               key,
+			referenceValue := &ReferenceValue{
+				TargetStorageIdentifier: storage.Identifier,
+				TargetKey:               key,
 			}
 
 			return Done{Result: referenceValue}

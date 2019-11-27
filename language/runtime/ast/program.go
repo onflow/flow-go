@@ -4,14 +4,15 @@ import "fmt"
 
 type Program struct {
 	// all declarations, in the order they are defined
-	Declarations          []Declaration
-	importDeclarations    []*ImportDeclaration
-	interfaceDeclarations []*InterfaceDeclaration
-	compositeDeclarations []*CompositeDeclaration
-	functionDeclarations  []*FunctionDeclaration
-	eventDeclarations     []*EventDeclaration
-	importedPrograms      map[LocationID]*Program
-	importLocations       []Location
+	Declarations            []Declaration
+	importDeclarations      []*ImportDeclaration
+	interfaceDeclarations   []*InterfaceDeclaration
+	compositeDeclarations   []*CompositeDeclaration
+	functionDeclarations    []*FunctionDeclaration
+	eventDeclarations       []*EventDeclaration
+	transactionDeclarations []*TransactionDeclaration
+	importedPrograms        map[LocationID]*Program
+	importLocations         []Location
 }
 
 func (p *Program) StartPosition() Position {
@@ -93,6 +94,18 @@ func (p *Program) EventDeclarations() []*EventDeclaration {
 		}
 	}
 	return p.eventDeclarations
+}
+
+func (p *Program) TransactionDeclarations() []*TransactionDeclaration {
+	if p.transactionDeclarations == nil {
+		p.transactionDeclarations = make([]*TransactionDeclaration, 0)
+		for _, declaration := range p.Declarations {
+			if transactionDeclaration, ok := declaration.(*TransactionDeclaration); ok {
+				p.transactionDeclarations = append(p.transactionDeclarations, transactionDeclaration)
+			}
+		}
+	}
+	return p.transactionDeclarations
 }
 
 // ImportedPrograms returns the sub-programs imported by this program, indexed by location ID.

@@ -1,7 +1,6 @@
 package runtime
 
 import (
-	"encoding/gob"
 	"errors"
 	"fmt"
 	"strings"
@@ -16,10 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
-
-func init() {
-	gob.Register(flow.Address{})
-}
 
 type Interface interface {
 	// ResolveImport resolves an import of a program.
@@ -320,9 +315,9 @@ func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface
 func accountValue(address values.Address) interpreter.Value {
 	addressHex := fmt.Sprintf("%x", address)
 
-	return interpreter.CompositeValue{
+	return &interpreter.CompositeValue{
 		Identifier: stdlib.AccountType.Name,
-		Fields: &map[string]interpreter.Value{
+		Fields: map[string]interpreter.Value{
 			"address": interpreter.NewStringValue(addressHex),
 			"storage": interpreter.StorageValue{Identifier: addressHex},
 		},
@@ -331,12 +326,12 @@ func accountValue(address values.Address) interpreter.Value {
 
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		pkArray, ok := arguments[0].(interpreter.ArrayValue)
+		pkArray, ok := arguments[0].(*interpreter.ArrayValue)
 		if !ok {
 			panic(fmt.Sprintf("createAccount requires the first parameter to be an array"))
 		}
 
-		pkValues := *pkArray.Values
+		pkValues := pkArray.Values
 		publicKeys := make([]values.Bytes, len(pkValues))
 
 		for i, pkVal := range pkValues {
@@ -370,7 +365,7 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("addAccountKey requires 2 parameters"))
 		}
 
-		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		accountAddressStr, ok := arguments[0].(*interpreter.StringValue)
 		if !ok {
 			panic(fmt.Sprintf("addAccountKey requires the first parameter to be a string"))
 		}
@@ -381,7 +376,7 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 		}
 
 		// TODO: convert directly to values.Address
-		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
+		accountAddress := flow.HexToAddress(accountAddressStr.Str)
 		accountAddressValue := values.Address(accountAddress)
 
 		err = runtimeInterface.AddAccountKey(accountAddressValue, publicKey)
@@ -402,7 +397,7 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 			panic(fmt.Sprintf("removeAccountKey requires 2 parameters"))
 		}
 
-		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		accountAddressStr, ok := arguments[0].(*interpreter.StringValue)
 		if !ok {
 			panic(fmt.Sprintf("removeAccountKey requires the first parameter to be a string"))
 		}
@@ -414,7 +409,7 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 		}
 
 		// TODO: convert directly to values.Address
-		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
+		accountAddress := flow.HexToAddress(accountAddressStr.Str)
 		accountAddressValue := values.Address(accountAddress)
 
 		indexValue := index.Export().(values.Int)
@@ -437,7 +432,7 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 			panic(fmt.Sprintf("updateAccountCode requires 2 parameters"))
 		}
 
-		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		accountAddressStr, ok := arguments[0].(*interpreter.StringValue)
 		if !ok {
 			panic(fmt.Sprintf("updateAccountCode requires the first parameter to be a string"))
 		}
@@ -448,7 +443,7 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 		}
 
 		// TODO: convert directly to values.Address
-		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
+		accountAddress := flow.HexToAddress(accountAddressStr.Str)
 		accountAddressValue := values.Address(accountAddress)
 
 		err = runtimeInterface.UpdateAccountCode(accountAddressValue, code)
@@ -469,13 +464,13 @@ func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("getAccount requires 1 parameter"))
 		}
 
-		accountAddressStr, ok := arguments[0].(interpreter.StringValue)
+		accountAddressStr, ok := arguments[0].(*interpreter.StringValue)
 		if !ok {
 			panic(fmt.Sprintf("getAccount requires the first parameter to be a string"))
 		}
 
 		// TODO: convert directly to values.Address
-		accountAddress := flow.HexToAddress(accountAddressStr.StrValue())
+		accountAddress := flow.HexToAddress(accountAddressStr.Str)
 		accountAddressValue := values.Address(accountAddress)
 
 		account := accountValue(accountAddressValue)
@@ -518,18 +513,18 @@ func toBytes(value interpreter.Value) (values.Bytes, error) {
 		return nil, nil
 	}
 
-	someValue, ok := value.(interpreter.SomeValue)
+	someValue, ok := value.(*interpreter.SomeValue)
 	if ok {
 		value = someValue.Value
 	}
 
-	array, ok := value.(interpreter.ArrayValue)
+	array, ok := value.(*interpreter.ArrayValue)
 	if !ok {
 		return nil, errors.New("value is not an array")
 	}
 
-	result := make([]byte, len(*array.Values))
-	for i, arrayValue := range *array.Values {
+	result := make([]byte, len(array.Values))
+	for i, arrayValue := range array.Values {
 		intValue, ok := arrayValue.(interpreter.IntValue)
 		if !ok {
 			return nil, errors.New("array value is not an Int")

@@ -1442,7 +1442,7 @@ type ResourceFieldNotInvalidatedError struct {
 
 func (e *ResourceFieldNotInvalidatedError) Error() string {
 	return fmt.Sprintf(
-		"field `%s` of resource type `%s` is not invalidated (moved or destroyed)",
+		"field `%s` of type `%s` is not invalidated (moved or destroyed)",
 		e.FieldName,
 		e.TypeName,
 	)
@@ -1768,3 +1768,91 @@ func (e *InvalidFailableResourceDowncastOutsideOptionalBindingError) Error() str
 }
 
 func (*InvalidFailableResourceDowncastOutsideOptionalBindingError) isSemanticError() {}
+
+// InvalidTransactionBlockError
+
+type InvalidTransactionBlockError struct {
+	Name string
+	Pos  ast.Position
+}
+
+func (e *InvalidTransactionBlockError) Error() string {
+	return fmt.Sprintf(
+		"invalid transaction block: expected `prepare` or `execute`, got `%s`",
+		e.Name,
+	)
+}
+
+func (*InvalidTransactionBlockError) isSemanticError() {}
+
+func (e *InvalidTransactionBlockError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidTransactionBlockError) EndPosition() ast.Position {
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
+}
+
+// TransactionMissingExecuteError
+
+type TransactionMissingExecuteError struct {
+	ast.Range
+}
+
+func (e *TransactionMissingExecuteError) Error() string {
+	return "transaction missing an execute block"
+}
+
+func (*TransactionMissingExecuteError) isSemanticError() {}
+
+// TransactionMissingPrepareError
+
+type TransactionMissingPrepareError struct {
+	FirstFieldName string
+	FirstFieldPos  ast.Position
+}
+
+func (e *TransactionMissingPrepareError) Error() string {
+	return fmt.Sprintf(
+		"transaction missing prepare function for field `%s`",
+		e.FirstFieldName,
+	)
+}
+
+func (*TransactionMissingPrepareError) isSemanticError() {}
+
+func (e *TransactionMissingPrepareError) StartPosition() ast.Position {
+	return e.FirstFieldPos
+}
+
+func (e *TransactionMissingPrepareError) EndPosition() ast.Position {
+	length := len(e.FirstFieldName)
+	return e.FirstFieldPos.Shifted(length - 1)
+}
+
+// InvalidTransactionFieldAccessModifierError
+
+type InvalidTransactionFieldAccessModifierError struct {
+	Name   string
+	Access string
+	Pos    ast.Position
+}
+
+func (e *InvalidTransactionFieldAccessModifierError) Error() string {
+	return fmt.Sprintf(
+		"access modifier not allowed for transaction field `%s`",
+		e.Name,
+	)
+}
+
+func (*InvalidTransactionFieldAccessModifierError) isSemanticError() {}
+
+func (e *InvalidTransactionFieldAccessModifierError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidTransactionFieldAccessModifierError) EndPosition() ast.Position {
+	length := len(e.Access)
+	return e.Pos.Shifted(length - 1)
+}

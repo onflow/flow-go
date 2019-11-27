@@ -18,8 +18,9 @@ func TestDeployment(t *testing.T) {
 	// Should be able to deploy a contract as a new account with no keys.
 	nftCode := ReadFile(greatTokenContractFile)
 	_, err := b.CreateAccount(nil, nftCode, GetNonce())
-	assert.Nil(t, err)
-	b.CommitBlock()
+	assert.NoError(t, err)
+	_, err = b.CommitBlock()
+	assert.NoError(t, err)
 }
 
 func TestCreateMinter(t *testing.T) {
@@ -28,7 +29,7 @@ func TestCreateMinter(t *testing.T) {
 	// First, deploy the contract
 	nftCode := ReadFile(greatTokenContractFile)
 	contractAddr, err := b.CreateAccount(nil, nftCode, GetNonce())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// GreatNFTMinter must be instantiated with initialID > 0 and
 	// specialMod > 1
@@ -75,7 +76,7 @@ func TestMinting(t *testing.T) {
 	// First, deploy the contract
 	nftCode := ReadFile(greatTokenContractFile)
 	contractAddr, err := b.CreateAccount(nil, nftCode, GetNonce())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// Next, instantiate the minter
 	createMinterTx := flow.Transaction{
@@ -100,8 +101,8 @@ func TestMinting(t *testing.T) {
 	SignAndSubmit(mintTx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 	// Assert that ID/specialness are correct
-	_, err = b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 1, false))
-	assert.Nil(t, err)
+	_, _, err = b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 1, false))
+	assert.NoError(t, err)
 
 	// Mint a second NF
 	mintTx2 := flow.Transaction{
@@ -115,6 +116,6 @@ func TestMinting(t *testing.T) {
 	SignAndSubmit(mintTx2, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 	// Assert that ID/specialness are correct
-	_, err = b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 2, true))
-	assert.Nil(t, err)
+	_, _, err = b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 2, true))
+	assert.NoError(t, err)
 }

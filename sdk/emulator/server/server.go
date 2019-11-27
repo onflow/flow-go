@@ -6,17 +6,21 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
-	"github.com/improbable-eng/grpc-web/go/grpcweb"
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/events"
+	"github.com/dapperlabs/flow-go/sdk/emulator/storage/badger"
+	grpcprometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -28,6 +32,10 @@ type EmulatorServer struct {
 	grpcServer *grpc.Server
 	config     *Config
 	logger     *log.Logger
+	store      badger.Store
+
+	// Wraps the cleanup function to ensure we only run cleanup once
+	cleanupOnce sync.Once
 }
 
 const (
@@ -43,32 +51,23 @@ type Config struct {
 	BlockInterval  time.Duration
 	RootAccountKey *flow.AccountPrivateKey
 	GRPCDebug      bool
+	// DBPath is the path to the Badger database on disk
+	DBPath string
 }
 
 // NewEmulatorServer creates a new instance of a Flow Emulator server.
-func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
-	options := emulator.DefaultOptions
+func NewEmulatorServer(logger *log.Logger, store badger.Store, conf *Config) *EmulatorServer {
 
-	if conf.RootAccountKey != nil {
-		options.RootAccountKey = conf.RootAccountKey
-	}
-
-	options.OnLogMessage = func(msg string) {
+	messageLogger := func(msg string) {
 		logger.Debug(msg)
 	}
 
-	eventStore := events.NewMemStore()
-
-	options.OnEventEmitted = func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
-		logger.
-			WithField("eventType", event.Type).
-			Infof("🔔  Event emitted: %s", event)
-
-		ctx := context.Background()
-		err := eventStore.Add(ctx, blockNumber, event)
-		if err != nil {
-			logger.WithError(err).Errorf("Failed to save event %s", event.Type)
-		}
+	options := []emulator.Option{
+		emulator.WithRuntimeLogger(messageLogger),
+		emulator.WithStore(store),
+	}
+	if conf.RootAccountKey != nil {
+		options = append(options, emulator.WithRootAccountKey(*conf.RootAccountKey))
 	}
 
 	if conf.BlockInterval == 0 {
@@ -83,16 +82,25 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		conf.HTTPPort = defaultHTTPPort
 	}
 
-	grpcServer := grpc.NewServer()
+	blockchain, err := emulator.NewEmulatedBlockchain(options...)
+	if err != nil {
+		logger.WithError(err).Fatal("Failed to initialize blockchain")
+	}
+
+	grpcServer := grpc.NewServer(
+		grpc.StreamInterceptor(grpcprometheus.StreamServerInterceptor),
+		grpc.UnaryInterceptor(grpcprometheus.UnaryServerInterceptor),
+	)
+
 	server := &EmulatorServer{
 		backend: &Backend{
-			blockchain: emulator.NewEmulatedBlockchain(options),
+			blockchain: blockchain,
 			logger:     logger,
-			eventStore: eventStore,
 		},
 		grpcServer: grpcServer,
 		config:     conf,
 		logger:     logger,
+		store:      store,
 	}
 
 	if conf.GRPCDebug {
@@ -109,6 +117,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 	}).Infof("⚙️   Using root account 0x%s", address.Hex())
 
 	observation.RegisterObserveServiceServer(server.grpcServer, server.backend)
+	grpcprometheus.Register(server.grpcServer)
 	return server
 }
 
@@ -116,22 +125,25 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 //
 // This function starts a gRPC server to listen for requests and process incoming transactions.
 // By default, the Flow Emulator server automatically mines a block every BlockInterval.
-func (b *EmulatorServer) Start(ctx context.Context) {
+func (e *EmulatorServer) Start(ctx context.Context) {
 	// Start gRPC server in a separate goroutine to continually listen for requests
-	go b.startGrpcServer()
+	go e.startGrpcServer()
 
-	ticker := time.NewTicker(b.config.BlockInterval)
+	ticker := time.NewTicker(e.config.BlockInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			block := b.backend.blockchain.CommitBlock()
-
-			b.logger.WithFields(log.Fields{
-				"blockNum":  block.Number,
-				"blockHash": block.Hash().Hex(),
-				"blockSize": len(block.TransactionHashes),
-			}).Debugf("⛏  Block #%d mined", block.Number)
+			block, err := e.backend.blockchain.CommitBlock()
+			if err != nil {
+				e.logger.WithError(err).Error("Failed to commit block")
+			} else {
+				e.logger.WithFields(log.Fields{
+					"blockNum":  block.Number,
+					"blockHash": block.Hash().Hex(),
+					"blockSize": len(block.TransactionHashes),
+				}).Debugf("⛏  Block #%d mined", block.Number)
+			}
 
 		case <-ctx.Done():
 			return
@@ -139,15 +151,15 @@ func (b *EmulatorServer) Start(ctx context.Context) {
 	}
 }
 
-func (b *EmulatorServer) startGrpcServer() {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", b.config.Port))
+func (e *EmulatorServer) startGrpcServer() {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", e.config.Port))
 	if err != nil {
-		b.logger.WithError(err).Fatal("☠️  Failed to start Emulator Server")
+		e.logger.WithError(err).Fatal("☠️  Failed to start Emulator Server")
 	}
 
-	err = b.grpcServer.Serve(lis)
+	err = e.grpcServer.Serve(lis)
 	if err != nil {
-		b.logger.WithError(err).Fatal("☠️  Failed to serve GRPC Service")
+		e.logger.WithError(err).Fatal("☠️  Failed to serve GRPC Service")
 	}
 }
 
@@ -156,7 +168,14 @@ func StartServer(logger *log.Logger, config *Config) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	emulatorServer := NewEmulatorServer(logger, config)
+	store, err := badger.New(config.DBPath)
+	if err != nil {
+		logger.WithError(err).Fatal("☠️  Failed to set up Emulator server")
+	}
+
+	emulatorServer := NewEmulatorServer(logger, store, config)
+	defer emulatorServer.cleanup()
+	go emulatorServer.handleSIGTERM()
 
 	logger.
 		WithField("port", config.Port).
@@ -169,9 +188,14 @@ func StartServer(logger *log.Logger, config *Config) {
 		grpcweb.WithOriginFunc(func(origin string) bool { return true }),
 	)
 
+	// Add /metrics endponit
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/", http.HandlerFunc(wrappedServer.ServeHTTP))
+
 	httpServer := http.Server{
 		Addr:    fmt.Sprintf(":%d", config.HTTPPort),
-		Handler: http.HandlerFunc(wrappedServer.ServeHTTP),
+		Handler: mux,
 	}
 
 	logger.
@@ -181,4 +205,23 @@ func StartServer(logger *log.Logger, config *Config) {
 	if err := httpServer.ListenAndServe(); err != nil {
 		logger.WithError(err).Fatal("☠️  Failed to start HTTP Server")
 	}
+}
+
+// cleanup cleans up the server.
+// This MUST be called before the server process terminates.
+func (e *EmulatorServer) cleanup() {
+	e.cleanupOnce.Do(func() {
+		if err := e.store.Close(); err != nil {
+			e.logger.WithError(err).Error("Cleanup failed: could not close store")
+		}
+	})
+}
+
+// handleSIGTERM waits for a SIGTERM, then cleans up the server's resources.
+// This should be run as a goroutine.
+func (e *EmulatorServer) handleSIGTERM() {
+	c := make(chan os.Signal)
+	signal.Notify(c, syscall.SIGTERM)
+	<-c
+	e.cleanup()
 }
