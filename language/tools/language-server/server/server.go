@@ -7,11 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dapperlabs/flow-go/language/runtime"
+
 	"github.com/dapperlabs/flow-go/sdk/client"
 
 	"github.com/dapperlabs/flow-go/language/tools/language-server/config"
 
-	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
@@ -307,24 +308,12 @@ func (s Server) getDiagnostics(conn protocol.Conn, uri protocol.DocumentUri, tex
 	// If there were parsing errors, convert each one to a diagnostic and exit
 	// without checking.
 	if err != nil {
-		if parserError, ok := err.(parser.Error); ok {
-			for _, err := range parserError.Errors {
-				parseError, ok := err.(parser.ParseError)
-				if !ok {
-					conn.LogMessage(&protocol.LogMessageParams{
-						Type:    protocol.Warning,
-						Message: fmt.Sprintf("Unable to convert non ParseError for diagnostic: %s", err.Error()),
-					})
-					continue
-				}
-
-				diagnostic := convertError(parseError)
-				diagnostics = append(diagnostics, diagnostic)
-			}
-		} else {
-			return nil, err
+		if parentErr, ok := err.(errors.ParentError); ok {
+			parserDiagnostics := getDiagnosticsForParentError(conn, parentErr)
+			diagnostics = append(diagnostics, parserDiagnostics...)
+			return diagnostics, nil
 		}
-		return diagnostics, nil
+		return nil, err
 	}
 
 	// There were no parser errors. Proceed to resolving imports and
@@ -357,16 +346,37 @@ func (s Server) getDiagnostics(conn protocol.Conn, uri protocol.DocumentUri, tex
 
 	s.checkers[uri] = checker
 
-	if checkerError, ok := err.(*sema.CheckerError); ok && checkerError != nil {
-		for _, err := range checkerError.Errors {
-			if semanticError, ok := err.(sema.SemanticError); ok {
-				diagnostic := convertError(semanticError)
-				diagnostics = append(diagnostics, diagnostic)
-			}
+	if err != nil {
+		if parentErr, ok := err.(errors.ParentError); ok {
+			checkerDiagnostics := getDiagnosticsForParentError(conn, parentErr)
+			diagnostics = append(diagnostics, checkerDiagnostics...)
+		} else {
+			return nil, err
 		}
 	}
 
 	return diagnostics, nil
+}
+
+// getDiagnosticsForParentError unpacks all child errors and converts each to
+// a diagnostic. Both parser and checker errors can be unpacked.
+//
+// Logs any conversion failures to the client.
+func getDiagnosticsForParentError(conn protocol.Conn, err errors.ParentError) (diagnostics []protocol.Diagnostic) {
+	for _, childErr := range err.ChildErrors() {
+		convertibleErr, ok := childErr.(convertibleError)
+		if !ok {
+			conn.LogMessage(&protocol.LogMessageParams{
+				Type:    protocol.Warning,
+				Message: fmt.Sprintf("Unable to convert non-convertable error: %s", err.Error()),
+			})
+			continue
+		}
+		diagnostic := convertError(convertibleErr)
+		diagnostics = append(diagnostics, diagnostic)
+	}
+
+	return
 }
 
 // parse parses the given code and returns the resultant program.
