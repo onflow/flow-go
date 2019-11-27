@@ -165,7 +165,7 @@ func (s *Server) executeScript(conn protocol.Conn, args ...interface{}) (interfa
 	if err == nil {
 		conn.LogMessage(&protocol.LogMessageParams{
 			Type:    protocol.Info,
-			Message: fmt.Sprintf("Executed Script with result: %v", res),
+			Message: fmt.Sprintf("Executed script with result: %v", res),
 		})
 		return res, nil
 	}
