@@ -1,7 +1,6 @@
 package interpreter
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,8 +8,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
-	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 func TestInterpretTransactions(t *testing.T) {
@@ -201,8 +198,12 @@ func TestInterpretTransactions(t *testing.T) {
           }
         `)
 
-		signer1 := accountValue(flow.HexToAddress("0x01"))
-		signer2 := accountValue(flow.HexToAddress("0x02"))
+		signer1 := interpreter.NewAccountValue(
+			interpreter.AddressValue{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+		)
+		signer2 := interpreter.NewAccountValue(
+			interpreter.AddressValue{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2},
+		)
 
 		// first transaction
 		err := inter.InvokeTransaction(0, signer1)
@@ -212,16 +213,4 @@ func TestInterpretTransactions(t *testing.T) {
 		err = inter.InvokeTransaction(0, signer1, signer2)
 		assert.IsType(t, &interpreter.ArgumentCountError{}, err)
 	})
-}
-
-// TODO: consolidate this with the function defined in runtime.go
-func accountValue(address flow.Address) interpreter.Value {
-	addressHex := fmt.Sprintf("%x", address)
-
-	return interpreter.CompositeValue{
-		Identifier: (&sema.AccountType{}).ID(),
-		Fields: &map[string]interpreter.Value{
-			"address": interpreter.NewStringValue(addressHex),
-		},
-	}
 }
