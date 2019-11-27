@@ -167,7 +167,7 @@ func (checker *Checker) visitTransactionExecuteFunction(
 	checker.enterValueScope()
 	defer checker.leaveValueScope(true)
 
-	executeFunctionType := transactionType.PrepareFunctionType().InvocationFunctionType()
+	executeFunctionType := transactionType.ExecuteFunctionType().InvocationFunctionType()
 
 	checker.checkFunction(
 		&ast.ParameterList{},
