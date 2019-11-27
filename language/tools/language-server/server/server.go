@@ -86,8 +86,9 @@ func (s Server) Initialize(
 
 	// TODO remove
 	conn.LogMessage(&protocol.LogMessageParams{
-		Type:    protocol.Info,
-		Message: fmt.Sprintf("Successfully loaded config emu_addr: %s acct_addr: %s", conf.EmulatorAddr, conf.AccountAddr.String()),
+		Type: protocol.Info,
+		Message: fmt.Sprintf("Successfully loaded config emu_addr: %s acct_addr: %s",
+			conf.EmulatorAddr, conf.AccountAddr.String()),
 	})
 
 	// after initialization, indicate to the client which commands we support
@@ -201,7 +202,7 @@ func (s Server) Hover(
 
 	occurrence := checker.Occurrences.Find(protocolToSemaPosition(params.Position))
 
-	if occurrence == nil {
+	if occurrence == nil || occurrence.Origin == nil {
 		return nil, nil
 	}
 

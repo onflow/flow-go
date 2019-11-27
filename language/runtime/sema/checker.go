@@ -46,6 +46,7 @@ type Checker struct {
 	functionActivations     *FunctionActivations
 	GlobalValues            map[string]*Variable
 	GlobalTypes             map[string]*Variable
+	TransactionTypes        []*TransactionType
 	inCondition             bool
 	Occurrences             *Occurrences
 	variableOrigins         map[*Variable]*Origin
@@ -254,6 +255,10 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 	for _, declaration := range program.EventDeclarations() {
 		checker.declareEventDeclaration(declaration)
+	}
+
+	for _, declaration := range program.TransactionDeclarations() {
+		checker.declareTransactionDeclaration(declaration)
 	}
 
 	// check all declarations

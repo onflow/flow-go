@@ -29,7 +29,7 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, nil)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -40,12 +40,12 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		account := b.LastCreatedAccount()
 
@@ -73,7 +73,7 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKeyA, publicKeyB}, nil)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -84,12 +84,12 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		account := b.LastCreatedAccount()
 
@@ -120,7 +120,7 @@ func TestCreateAccount(t *testing.T) {
 		code := []byte("pub fun main() {}")
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKeyA, publicKeyB}, code)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -131,12 +131,12 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		account := b.LastCreatedAccount()
 
@@ -153,7 +153,7 @@ func TestCreateAccount(t *testing.T) {
 		code := []byte("pub fun main() {}")
 
 		createAccountScript, err := templates.CreateAccount(nil, code)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -164,12 +164,12 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		account := b.LastCreatedAccount()
 
@@ -197,7 +197,7 @@ func TestCreateAccount(t *testing.T) {
 		code := []byte("pub fun main() {}")
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, code)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -208,21 +208,21 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		require.Equal(t, flow.EventAccountCreated, lastEvent.Type)
 
 		accountCreatedEvent, err := flow.DecodeAccountCreatedEvent(lastEvent.Payload)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		accountAddress := accountCreatedEvent.Address()
 		account, err := b.GetAccount(accountAddress)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		assert.Equal(t, uint64(0), account.Balance)
 		require.Len(t, account.Keys, 1)
@@ -244,7 +244,7 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, nil)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -255,7 +255,7 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
@@ -275,7 +275,7 @@ func TestCreateAccount(t *testing.T) {
 		code := []byte("not a valid script")
 
 		createAccountScript, err := templates.CreateAccount(nil, code)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -286,7 +286,7 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
@@ -308,7 +308,7 @@ func TestAddAccountKey(t *testing.T) {
 		publicKey := privateKey.PublicKey(keys.PublicKeyWeightThreshold)
 
 		addKeyScript, err := templates.AddAccountKey(publicKey)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx1 := flow.Transaction{
 			Script:             addKeyScript,
@@ -320,13 +320,13 @@ func TestAddAccountKey(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx1, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx1.AddSignature(b.RootAccountAddress(), sig)
 		err = b.SubmitTransaction(tx1)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
-		script := []byte("pub fun main(account: Account) {}")
+		script := []byte("transaction { execute {} }")
 
 		tx2 := flow.Transaction{
 			Script:             script,
@@ -334,16 +334,15 @@ func TestAddAccountKey(t *testing.T) {
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-			ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 		}
 
 		sig, err = keys.SignTransaction(tx2, privateKey)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx2.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx2)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("InvalidKeyHashingAlgorithm", func(t *testing.T) {
@@ -358,7 +357,7 @@ func TestAddAccountKey(t *testing.T) {
 		}
 
 		addKeyScript, err := templates.AddAccountKey(publicKey)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             addKeyScript,
@@ -370,7 +369,7 @@ func TestAddAccountKey(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
@@ -387,7 +386,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	publicKey := privateKey.PublicKey(keys.PublicKeyWeightThreshold)
 
 	addKeyScript, err := templates.AddAccountKey(publicKey)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx1 := flow.Transaction{
 		Script:             addKeyScript,
@@ -399,15 +398,15 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx1)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	account, err := b.GetAccount(b.RootAccountAddress())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Len(t, account.Keys, 2)
 
@@ -421,15 +420,15 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx2.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx2)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	account, err = b.GetAccount(b.RootAccountAddress())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Len(t, account.Keys, 1)
 
@@ -443,7 +442,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 
 	sig, err = keys.SignTransaction(tx3, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx3.AddSignature(b.RootAccountAddress(), sig)
 
@@ -451,7 +450,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	assert.NotNil(t, err)
 
 	account, err = b.GetAccount(b.RootAccountAddress())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Len(t, account.Keys, 1)
 
@@ -465,15 +464,15 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 
 	sig, err = keys.SignTransaction(tx4, privateKey)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx4.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx4)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	account, err = b.GetAccount(b.RootAccountAddress())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Empty(t, account.Keys)
 }
@@ -493,10 +492,10 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		accountAddressA := b.RootAccountAddress()
 		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, codeA, getNonce())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, codeA, account.Code)
 
@@ -510,19 +509,19 @@ func TestUpdateAccountCode(t *testing.T) {
 		}
 
 		sigA, err := keys.SignTransaction(tx, privateKeyA)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		sigB, err := keys.SignTransaction(tx, privateKeyB)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(accountAddressA, sigA)
 		tx.AddSignature(accountAddressB, sigB)
 
 		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		account, err = b.GetAccount(accountAddressB)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		assert.Equal(t, codeB, account.Code)
 	})
@@ -534,11 +533,11 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		accountAddressA := b.RootAccountAddress()
 		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, codeA, getNonce())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
 
-		require.Nil(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, codeA, account.Code)
 
 		tx := flow.Transaction{
@@ -551,7 +550,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, privateKeyA)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(accountAddressA, sig)
 
@@ -559,7 +558,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		assert.IsType(t, &emulator.ErrMissingSignature{}, err)
 
 		account, err = b.GetAccount(accountAddressB)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// code should not be updated
 		assert.Equal(t, codeA, account.Code)
@@ -572,16 +571,20 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		accountAddressA := b.RootAccountAddress()
 		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, codeA, getNonce())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
 
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, codeA, account.Code)
 
 		unauthorizedUpdateAccountCodeScript := []byte(fmt.Sprintf(`
-			pub fun main(account: Account) {
+			transaction {
+			  prepare(account: Account) {
 				updateAccountCode(%s, nil)
+			  }
+			  
+			  execute {}
 			}
 		`, accountAddressB.Hex()))
 
@@ -595,7 +598,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, privateKeyA)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(accountAddressA, sig)
 
@@ -605,7 +608,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		account, err = b.GetAccount(accountAddressB)
 
 		// code should not be updated
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, codeA, account.Code)
 	})
 }
@@ -622,16 +625,18 @@ func TestImportAccountCode(t *testing.T) {
 	publicKey := b.RootKey().PublicKey(keys.PublicKeyWeightThreshold)
 
 	address, err := b.CreateAccount([]flow.AccountPublicKey{publicKey}, accountScript, getNonce())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	script := []byte(fmt.Sprintf(`
 		import 0x%s
 
-		pub fun main(account: Account) {
-			let answer = answer()
+		transaction {
+		  execute {
+			pub let answer = answer()
 			if answer != 42 {
 				panic("?!")
 			}
+		  }
 		}
 	`, address.Hex()))
 
@@ -641,14 +646,13 @@ func TestImportAccountCode(t *testing.T) {
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }

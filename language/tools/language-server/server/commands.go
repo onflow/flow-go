@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/keys"
@@ -26,7 +27,7 @@ type CommandHandler func(conn protocol.Conn, args ...interface{}) (interface{}, 
 // https://stackoverflow.com/questions/43328582/how-to-implement-quickfix-via-a-language-server
 func (s Server) registerCommands(conn protocol.Conn) {
 	// Send a message to the client indicating which commands we support
-	err := conn.RegisterCapability(&protocol.RegistrationParams{
+	registration := protocol.RegistrationParams{
 		Registrations: []protocol.Registration{
 			{
 				ID:     "registerCommand",
@@ -41,12 +42,26 @@ func (s Server) registerCommands(conn protocol.Conn) {
 				},
 			},
 		},
-	})
-	if err != nil {
+	}
+
+	// We have occasionally observed the client failing to recognize this
+	// method if the request is sent too soon after the extension loads.
+	// Retrying with a backoff avoids this problem.
+	retryAfter := time.Millisecond * 100
+	nRetries := 10
+	for i := 0; i < nRetries; i++ {
+		err := conn.RegisterCapability(&registration)
+		if err == nil {
+			break
+		}
 		conn.LogMessage(&protocol.LogMessageParams{
-			Type:    protocol.Warning,
-			Message: fmt.Sprintf("Failed to register command: %s", err.Error()),
+			Type: protocol.Warning,
+			Message: fmt.Sprintf(
+				"Failed to register command. Will retry %d more times... err: %s",
+				nRetries-1-i, err.Error()),
 		})
+		time.Sleep(retryAfter)
+		retryAfter *= 2
 	}
 
 	// Register each command handler function in the server
