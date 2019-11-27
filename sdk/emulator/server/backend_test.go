@@ -34,7 +34,7 @@ func TestPing(t *testing.T) {
 	server := server.NewBackend(b, events.NewMemStore(), log.New())
 
 	res, err := server.Ping(ctx, &observation.PingRequest{})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, res.GetAddress(), []byte("pong!"))
 }
 
@@ -77,10 +77,10 @@ func TestGetEvents(t *testing.T) {
 	)
 
 	err := eventStore.Add(ctx, 1, ev1)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	err = eventStore.Add(ctx, 3, ev2)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	t.Run("should return error for invalid query", func(t *testing.T) {
 		// End block cannot be less than start block
@@ -96,7 +96,7 @@ func TestGetEvents(t *testing.T) {
 			StartBlock: 2,
 			EndBlock:   2,
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Len(t, res.GetEvents(), 0)
 	})
 
@@ -106,7 +106,7 @@ func TestGetEvents(t *testing.T) {
 			StartBlock: 1,
 			EndBlock:   3,
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		resEvents := res.GetEvents()
 
@@ -114,7 +114,7 @@ func TestGetEvents(t *testing.T) {
 		assert.Equal(t, transferType, resEvents[0].GetType())
 
 		value, err := encoding.Decode(transferEventType, resEvents[0].GetPayload())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		event := value.(values.Event)
 		assert.Equal(t, toAddress, event.Fields[0])
@@ -125,7 +125,7 @@ func TestGetEvents(t *testing.T) {
 			StartBlock: 1,
 			EndBlock:   3,
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// Should get both events
 		assert.Len(t, res.GetEvents(), 2)
@@ -136,7 +136,7 @@ func TestGetEvents(t *testing.T) {
 			StartBlock: 1,
 			EndBlock:   3,
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		resEvents := res.GetEvents()
 		assert.Len(t, resEvents, 2)
@@ -200,7 +200,7 @@ func TestBackend(t *testing.T) {
 		}
 		response, err := backend.GetAccount(context.Background(), &request)
 
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		assert.Equal(t, account.Address.Bytes(), response.Account.Address)
 		assert.Equal(t, account.Balance, response.Account.Balance)

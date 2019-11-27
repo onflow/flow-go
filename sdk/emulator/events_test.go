@@ -44,8 +44,10 @@ func TestEventEmitted(t *testing.T) {
 		script := []byte(`
 			event MyEvent(x: Int, y: Int)
 			
-			pub fun main() {
-			  emit MyEvent(x: 1, y: 2)
+			transaction {
+		  	  execute {
+			  	emit MyEvent(x: 1, y: 2)
+			  }
 			}
 		`)
 
@@ -58,19 +60,19 @@ func TestEventEmitted(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		require.Len(t, events, 1)
 
 		actualEvent := events[0]
 
 		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
 
@@ -101,14 +103,14 @@ func TestEventEmitted(t *testing.T) {
 		`)
 
 		_, err := b.ExecuteScript(script)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		require.Len(t, events, 1)
 
 		actualEvent := events[0]
 
 		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
 
@@ -141,13 +143,15 @@ func TestEventEmitted(t *testing.T) {
 		publicKey := b.RootKey().PublicKey(keys.PublicKeyWeightThreshold)
 
 		address, err := b.CreateAccount([]flow.AccountPublicKey{publicKey}, accountScript, getNonce())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		script := []byte(fmt.Sprintf(`
 			import 0x%s
 			
-			pub fun main() {
-				emitMyEvent(x: 1, y: 2)
+			transaction {
+				execute {
+				  emitMyEvent(x: 1, y: 2)
+				}
 			}
 		`, address.Hex()))
 
@@ -160,12 +164,12 @@ func TestEventEmitted(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		require.Len(t, events, 2)
 
@@ -173,7 +177,7 @@ func TestEventEmitted(t *testing.T) {
 		actualEvent := events[1]
 
 		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
 

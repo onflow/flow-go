@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -73,19 +72,19 @@ func TestRuntimeImport(t *testing.T) {
 
 	importedScript := []byte(`
       pub fun answer(): Int {
-          return 42
+	    return 42
       }
 	`)
 
 	script := []byte(`
-       import "imported"
+	  import "imported"
 
-       pub fun main(): Int {
-           let answer = answer()
-           if answer != 42 {
-               panic("?!")
-           }
-           return answer
+	  pub fun main(): Int {
+	  	let answer = answer()
+		  if answer != 42 {
+			panic("?!")
+		  }
+		  return answer
 		}
 	`)
 
@@ -101,18 +100,18 @@ func TestRuntimeImport(t *testing.T) {
 	}
 
 	value, err := runtime.ExecuteScript(script, runtimeInterface, nil)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, values.NewInt(42), value)
 }
 
-func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
-
+func TestRuntimeInvalidTransactionArgumentAccount(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
-       pub fun main(): Int {
-           return 42
-		}
+	  transaction {
+	    prepare() {}
+	    execute {}
+	  }
 	`)
 
 	runtimeInterface := &testRuntimeInterface{
@@ -121,19 +120,20 @@ func TestRuntimeInvalidMainMissingAccount(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
+	err := runtime.ExecuteTransaction(script, runtimeInterface, nil)
 	assert.Error(t, err)
 }
 
-func TestRuntimeMainWithAccount(t *testing.T) {
-
+func TestRuntimeTransactionWithAccount(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
-      pub fun main(account: Account): Int {
-          log(account.address)
-          return 42
-      }
+	  transaction {
+	    prepare(signer: Account) {
+		  log(signer.address)
+		}
+	    execute {}
+	  }
 	`)
 
 	var loggedMessage string
@@ -153,30 +153,31 @@ func TestRuntimeMainWithAccount(t *testing.T) {
 		},
 	}
 
-	value, err := runtime.ExecuteScript(script, runtimeInterface, nil)
+	err := runtime.ExecuteTransaction(script, runtimeInterface, nil)
 
-	assert.Nil(t, err)
-	assert.Equal(t, values.NewInt(42), value)
-	assert.Equal(t, `"2a00000000000000000000000000000000000000"`, loggedMessage)
+	assert.NoError(t, err)
+	assert.Equal(t, "2a00000000000000000000000000000000000000", loggedMessage)
 }
 
 func TestRuntimeStorage(t *testing.T) {
-
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
-       pub fun main(account: Account) {
-           log(account.storage[Int])
+	  transaction {
+	    prepare(signer: Account) {
+		  log(signer.storage[Int])
 
-           account.storage[Int] = 42
-           log(account.storage[Int])
+		  signer.storage[Int] = 42
+		  log(signer.storage[Int])
 
-           account.storage[[Int]] = [1, 2, 3]
-           log(account.storage[[Int]])
+		  signer.storage[[Int]] = [1, 2, 3]
+		  log(signer.storage[[Int]])
 
-           account.storage[String] = "xyz"
-           log(account.storage[String])
-       }
+		  signer.storage[String] = "xyz"
+		  log(signer.storage[String])
+		}
+	    execute {}
+	  }
 	`)
 
 	storedValues := map[string][]byte{}
@@ -199,29 +200,33 @@ func TestRuntimeStorage(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
-
-	require.Nil(t, err)
+	err := runtime.ExecuteTransaction(script, runtimeInterface, nil)
+	require.NoError(t, err)
 
 	assert.Equal(t, []string{"nil", "42", "[1, 2, 3]", `"xyz"`}, loggedMessages)
 }
 
 func TestRuntimeStorageMultipleTransactionsArray(t *testing.T) {
-
 	runtime := NewInterpreterRuntime()
 
 	script1 := []byte(`
-       pub fun main(account: Account) {
-           log(account.storage[[String]])
-           account.storage[[String]] = []
-       }
+	  transaction {
+	    prepare(signer: Account) {
+		  log(signer.storage[[String]])
+		  signer.storage[[String]] = []
+		}
+	    execute {}
+	  }
 	`)
 
 	script2 := []byte(`
-       pub fun main(account: Account) {
-           log(account.storage[[String]])
-           account.storage[[String]] = ["A", "B"]
-       }
+	  transaction {
+	    prepare(signer: Account) {
+		  log(signer.storage[[String]])
+		  signer.storage[[String]] = ["A", "B"]
+		}
+	    execute {}
+	  }
 	`)
 
 	var loggedMessages []string
@@ -243,37 +248,42 @@ func TestRuntimeStorageMultipleTransactionsArray(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
-	require.Nil(t, err)
+	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
+	require.NoError(t, err)
 
-	_, err = runtime.ExecuteScript(script1, runtimeInterface, nil)
-	require.Nil(t, err)
+	err = runtime.ExecuteTransaction(script1, runtimeInterface, nil)
+	require.NoError(t, err)
 
-	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
-	require.Nil(t, err)
+	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
+	require.NoError(t, err)
 
-	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
-	require.Nil(t, err)
+	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
+	require.NoError(t, err)
 
 	assert.Equal(t, []string{"nil", `[]`, `[]`, `["A", "B"]`}, loggedMessages)
 }
 
 func TestRuntimeStorageMultipleTransactionsDictionary(t *testing.T) {
-
 	runtime := NewInterpreterRuntime()
 
 	script1 := []byte(`
-       pub fun main(account: Account) {
-           log(account.storage[{String: Int}])
-           account.storage[{String: Int}] = {}
-       }
+	  transaction {
+	    prepare(signer: Account) {
+		  log(signer.storage[{String: Int}])
+		  signer.storage[{String: Int}] = {}
+		}
+	    execute {}
+	  }
 	`)
 
 	script2 := []byte(`
-       pub fun main(account: Account) {
-           log(account.storage[{String: Int}])
-           account.storage[{String: Int}] = {"A": 1, "B": 2}
-       }
+	  transaction {
+	    prepare(signer: Account) {
+		  log(signer.storage[{String: Int}])
+		  signer.storage[{String: Int}] = {"A": 1, "B": 2}
+		}
+	    execute {}
+	  }
 	`)
 
 	var loggedMessages []string
@@ -295,17 +305,17 @@ func TestRuntimeStorageMultipleTransactionsDictionary(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
-	require.Nil(t, err)
+	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
+	require.NoError(t, err)
 
-	_, err = runtime.ExecuteScript(script1, runtimeInterface, nil)
-	require.Nil(t, err)
+	err = runtime.ExecuteTransaction(script1, runtimeInterface, nil)
+	require.NoError(t, err)
 
-	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
-	require.Nil(t, err)
+	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
+	require.NoError(t, err)
 
-	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
-	require.Nil(t, err)
+	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
+	require.NoError(t, err)
 
 	// Assertion is a bit more complex, because dictionary order is not deterministic
 	require.Len(t, loggedMessages, 4)
@@ -314,58 +324,63 @@ func TestRuntimeStorageMultipleTransactionsDictionary(t *testing.T) {
 }
 
 func TestRuntimeStorageMultipleTransactionsStructureAndArray(t *testing.T) {
-
 	runtime := NewInterpreterRuntime()
 
 	container := []byte(`
-       pub resource Container {
-           pub let values: [Int]
+	  pub resource Container {
+		pub let values: [Int]
 
-           init() {
-               self.values = []
-           }
-       }
+		init() {
+		  self.values = []
+		}
+	  }
 
-       pub fun createContainer(): <-Container {
-           return <-create Container()
-       }
+	  pub fun createContainer(): <-Container {
+		return <-create Container()
+	  }
 	`)
 
 	script1 := []byte(`
-	   import "container"
+	  import "container"
 
-       pub fun main(account: Account): Int {
-           var container: <-Container? <- createContainer()
-           account.storage[Container] <-> container
-           destroy container
-           let ref = &account.storage[Container] as Container
-           account.storage[&Container] = ref
-           return ref.values.length
-       }
+	  transaction {
+	    prepare(signer: Account) {
+		  var container: <-Container? <- createContainer()
+		  signer.storage[Container] <-> container
+		  destroy container
+		  let ref = &signer.storage[Container] as Container
+		  signer.storage[&Container] = ref
+		}
+		execute {}
+	  }
 	`)
 
 	script2 := []byte(`
-	   import "container"
+	  import "container"
 
-       pub fun main(account: Account): [Int] {
-          let ref = account.storage[&Container] ?? panic("no container")
+	  transaction {
+	    prepare(signer: Account) {
+          let ref = signer.storage[&Container] ?? panic("no container")
           let length = ref.values.length
           ref.values.append(1)
           let length2 = ref.values.length
-          return [length, length2]
-       }
+		}
+		execute {}
+	  }
 	`)
 
 	script3 := []byte(`
-	   import "container"
+	  import "container"
 
-       pub fun main(account: Account): [Int] {
-          let ref = account.storage[&Container] ?? panic("no container")
+	  transaction {
+	    prepare(signer: Account) {
+          let ref = signer.storage[&Container] ?? panic("no container")
           let length = ref.values.length
           ref.values.append(2)
           let length2 = ref.values.length
-          return [length, length2]
-       }
+		}
+		execute {}
+	  }
 	`)
 
 	var loggedMessages []string
@@ -395,53 +410,59 @@ func TestRuntimeStorageMultipleTransactionsStructureAndArray(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
-	require.Nil(t, err)
+	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
+	require.NoError(t, err)
 
-	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
-	require.Nil(t, err)
+	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
+	require.NoError(t, err)
 
-	_, err = runtime.ExecuteScript(script3, runtimeInterface, nil)
-	require.Nil(t, err)
+	err = runtime.ExecuteTransaction(script3, runtimeInterface, nil)
+	require.NoError(t, err)
 }
 
 // TestRuntimeStorageMultipleTransactionsStructures tests a function call
 // of a stored structure declared in an imported program
 //
 func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
-
 	runtime := NewInterpreterRuntime()
 
 	deepThought := []byte(`
-       pub struct DeepThought {
+	  pub struct DeepThought {
 
-           pub fun answer(): Int {
-               return 42
-           }
-       }
+		pub fun answer(): Int {
+		  return 42
+		}
+	  }
 	`)
 
 	script1 := []byte(`
-	   import "deep-thought"
+	  import "deep-thought"
 
-       pub fun main(account: Account) {
-           account.storage[DeepThought] = DeepThought()
+	  transaction {
+	    prepare(signer: Account) {
+		  signer.storage[DeepThought] = DeepThought()
 
-           log(account.storage[DeepThought])
-       }
+		  log(signer.storage[DeepThought])
+		}
+		execute {}
+	  }
 	`)
 
 	script2 := []byte(`
-	   import "deep-thought"
+	  import "deep-thought"
 
-       pub fun main(account: Account): Int {
-           log(account.storage[DeepThought])
+	  transaction {
+	    prepare(signer: Account) {
+		  log(signer.storage[DeepThought])
 
-           let computer = account.storage[DeepThought]
-               ?? panic("missing computer")
+		  let computer = signer.storage[DeepThought]
+		    ?? panic("missing computer")
 
-           return computer.answer()
-       }
+		  let answer = computer.answer()
+		  log(answer)
+		}
+		execute {}
+	  }
 	`)
 
 	var loggedMessages []string
@@ -471,27 +492,34 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
-	assert.Nil(t, err)
+	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
+	assert.NoError(t, err)
 
-	answer, err := runtime.ExecuteScript(script2, runtimeInterface, nil)
-	assert.Nil(t, err)
-	assert.Equal(t, values.NewInt(42), answer)
+	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
+	assert.NoError(t, err)
+
+	assert.Contains(t, loggedMessages, "42")
 }
 
 func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
-
 	runtime := NewInterpreterRuntime()
 
 	script1 := []byte(`
-	  pub fun main(account: Account) {
-	      account.storage[Int] = 42
+	  transaction {
+	    prepare(signer: Account) {
+	      signer.storage[Int] = 42
+		}
+		execute {}
 	  }
 	`)
 
 	script2 := []byte(`
-	  pub fun main(account: Account): Int {
-	      return account.storage[Int] ?? panic("stored value is nil")
+	  transaction {
+	    prepare(signer: Account) {
+	      let x = signer.storage[Int] ?? panic("stored value is nil")
+		  log(x)
+		}
+		execute {}
 	  }
 	`)
 
@@ -514,12 +542,13 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
-	assert.Nil(t, err)
+	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
+	assert.NoError(t, err)
 
-	result, err := runtime.ExecuteScript(script2, runtimeInterface, nil)
-	assert.Equal(t, values.NewInt(42), result)
-	assert.Nil(t, err)
+	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
+	assert.NoError(t, err)
+
+	assert.Contains(t, loggedMessages, "42")
 }
 
 // TestRuntimeCompositeFunctionInvocationFromImportingProgram checks
@@ -527,7 +556,6 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 // See https://github.com/dapperlabs/flow-go/issues/838
 //
 func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
-
 	runtime := NewInterpreterRuntime()
 
 	imported := []byte(`
@@ -536,27 +564,33 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 
       // invocation must be in composite
       pub struct Y {
-          pub fun x() {
-              x(x: 1)
-          }
+	    pub fun x() {
+		  x(x: 1)
+		}
       }
     `)
 
 	script1 := []byte(`
       import Y from "imported"
 
-      pub fun main(account: Account) {
-	      account.storage[Y] = Y()
+	  transaction {
+	    prepare(signer: Account) {
+	      signer.storage[Y] = Y()
+		}
+		execute {}
 	  }
     `)
 
 	script2 := []byte(`
       import Y from "imported"
 
-      pub fun main(account: Account) {
-          let y = account.storage[Y] ?? panic("stored value is nil")
+	  transaction {
+	    prepare(signer: Account) {
+          let y = signer.storage[Y] ?? panic("stored value is nil")
           y.x()
-      }
+		}
+		execute {}
+	  }
     `)
 
 	storedValues := map[string]values.Bytes{}
@@ -582,49 +616,54 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
-	assert.Nil(t, err)
+	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
+	assert.NoError(t, err)
 
-	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
-	assert.Nil(t, err)
+	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
+	assert.NoError(t, err)
 }
 
 func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
-
 	runtime := NewInterpreterRuntime()
 
 	imported := []byte(`
       pub resource R {
-          pub fun x() {
-              log("x!")
-          }
+		pub fun x() {
+		  log("x!")
+		}
       }
 
       pub fun createR(): <-R {
-          return <- create R()
+		return <- create R()
       }
     `)
 
 	script1 := []byte(`
       import R, createR from "imported"
 
-      pub fun main(account: Account) {
+	  transaction {
+	    prepare(signer: Account) {
           var r: <-R? <- createR()
-	      account.storage[R] <-> r
+	      signer.storage[R] <-> r
           if r != nil {
              panic("already initialized")
           }
           destroy r
+		}
+		execute {}
 	  }
     `)
 
 	script2 := []byte(`
       import R from "imported"
 
-      pub fun main(account: Account) {
-          let ref = &account.storage[R] as R
+	  transaction {
+	    prepare(signer: Account) {
+          let ref = &signer.storage[R] as R
           ref.x()
-      }
+		}
+		execute {}
+	  }
     `)
 
 	storedValues := map[string][]byte{}
@@ -655,56 +694,57 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
-	if !assert.Nil(t, err) {
-		assert.FailNow(t, errors.UnrollChildErrors(err))
-	}
+	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
+	assert.NoError(t, err)
 
-	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
-	if !assert.Nil(t, err) {
-		assert.FailNow(t, errors.UnrollChildErrors(err))
-	}
+	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
+	assert.NoError(t, err)
 
 	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
 }
 
 func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
-
 	runtime := NewInterpreterRuntime()
 
 	imported := []byte(`
       pub resource R {
-          pub fun x() {
-              log("x!")
-          }
+		pub fun x() {
+		  log("x!")
+		}
       }
 
       pub fun createR(): <-R {
-          return <- create R()
+  		return <- create R()
       }
     `)
 
 	script1 := []byte(`
       import R, createR from "imported"
 
-      pub fun main(account: Account) {
+	  transaction {
+	    prepare(signer: Account) {
           var r: <-R? <- createR()
-	      account.storage[R] <-> r
+	      signer.storage[R] <-> r
           if r != nil {
-             panic("already initialized")
+ 			panic("already initialized")
           }
           destroy r
 
-          account.storage[&R] = &account.storage[R] as R
+          signer.storage[&R] = &signer.storage[R] as R
+		}
+		execute {}
 	  }
     `)
 
 	script2 := []byte(`
 	  import R from "imported"
 
-	  pub fun main(account: Account) {
-	      let ref = account.storage[&R] ?? panic("no R ref")
+	  transaction {
+	    prepare(signer: Account) {
+	      let ref = signer.storage[&R] ?? panic("no R ref")
 	      ref.x()
+		}
+		execute {}
 	  }
 	`)
 
@@ -736,26 +776,21 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
-	if !assert.Nil(t, err) {
-		assert.FailNow(t, errors.UnrollChildErrors(err))
-	}
+	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
+	assert.NoError(t, err)
 
-	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
-	if !assert.Nil(t, err) {
-		assert.FailNow(t, errors.UnrollChildErrors(err))
-	}
+	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
+	assert.NoError(t, err)
 
 	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
 }
 
 func TestRuntimeResourceContractWithInterface(t *testing.T) {
-
 	runtime := NewInterpreterRuntime()
 
 	imported1 := []byte(`
       pub resource interface RI {
-          pub fun x()
+		pub fun x()
       }
     `)
 
@@ -763,13 +798,13 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
       import RI from "imported1"
 
       pub resource R: RI {
-          pub fun x() {
-              log("x!")
-          }
+		pub fun x() {
+		  log("x!")
+		}
       }
 
       pub fun createR(): <-R {
-          return <- create R()
+		return <- create R()
       }
     `)
 
@@ -777,15 +812,18 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 	  import RI from "imported1"
       import R, createR from "imported2"
 
-      pub fun main(account: Account) {
+	  transaction {
+	    prepare(signer: Account) {
           var r: <-R? <- createR()
-	      account.storage[R] <-> r
+	      signer.storage[R] <-> r
           if r != nil {
-             panic("already initialized")
+			panic("already initialized")
           }
           destroy r
 
-          account.storage[&RI] = &account.storage[R] as RI
+          signer.storage[&RI] = &signer.storage[R] as RI
+		}
+		execute {}
 	  }
     `)
 
@@ -797,9 +835,12 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 	  import RI from "imported1"
       import R from "imported2"
 
-	  pub fun main(account: Account) {
-	      let ref = account.storage[&RI] ?? panic("no RI ref")
+	  transaction {
+	    prepare(signer: Account) {
+	      let ref = signer.storage[&RI] ?? panic("no RI ref")
 	      ref.x()
+		}
+		execute {}
 	  }
 	`)
 
@@ -833,15 +874,11 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
-	if !assert.Nil(t, err) {
-		assert.FailNow(t, errors.UnrollChildErrors(err))
-	}
+	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
+	assert.NoError(t, err)
 
-	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
-	if !assert.Nil(t, err) {
-		assert.FailNow(t, errors.UnrollChildErrors(err))
-	}
+	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
+	assert.NoError(t, err)
 
 	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
 }
@@ -854,7 +891,7 @@ func TestParseAndCheckProgram(t *testing.T) {
 		runtimeInterface := &testRuntimeInterface{}
 
 		err := runtime.ParseAndCheckProgram(script, runtimeInterface, nil)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("InvalidSyntax", func(t *testing.T) {
@@ -879,12 +916,11 @@ func TestParseAndCheckProgram(t *testing.T) {
 }
 
 func TestRuntimeSyntaxError(t *testing.T) {
-
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
-      pub fun main(account: Account): String {
-          return "Hello World!
+      pub fun main(): String {
+	  	return "Hello World!
       }
 	`)
 
@@ -895,47 +931,51 @@ func TestRuntimeSyntaxError(t *testing.T) {
 	}
 
 	_, err := runtime.ExecuteScript(script, runtimeInterface, nil)
-
 	assert.Error(t, err)
 }
 
 func TestRuntimeStorageChanges(t *testing.T) {
-
 	runtime := NewInterpreterRuntime()
 
 	imported := []byte(`
       pub resource X {
-          pub(set) var x: Int
-
-          init() {
-              self.x = 0
-          }
+	    pub(set) var x: Int
+	
+	    init() {
+		  self.x = 0
+	    }
       }
 
       pub fun createX(): <-X {
-          return <-create X()
+	  	return <-create X()
       }
     `)
 
 	script1 := []byte(`
 	  import X, createX from "imported"
 
-      pub fun main(account: Account) {
+	  transaction {
+	    prepare(signer: Account) {
           var x: <-X? <- createX()
-          account.storage[X] <-> x
+          signer.storage[X] <-> x
           destroy x
 
-          let ref = &account.storage[X] as X
+          let ref = &signer.storage[X] as X
           ref.x = 1
+		}
+		execute {}
 	  }
     `)
 
 	script2 := []byte(`
 	  import X from "imported"
 
-	  pub fun main(account: Account) {
-	      let ref = &account.storage[X] as X
+	  transaction {
+	    prepare(signer: Account) {
+	      let ref = &signer.storage[X] as X
           log(ref.x)
+		}
+		execute {}
 	  }
 	`)
 
@@ -967,15 +1007,11 @@ func TestRuntimeStorageChanges(t *testing.T) {
 		},
 	}
 
-	_, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
-	if !assert.Nil(t, err) {
-		assert.FailNow(t, errors.UnrollChildErrors(err))
-	}
+	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
+	assert.NoError(t, err)
 
-	_, err = runtime.ExecuteScript(script2, runtimeInterface, nil)
-	if !assert.Nil(t, err) {
-		assert.FailNow(t, errors.UnrollChildErrors(err))
-	}
+	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
+	assert.NoError(t, err)
 
 	assert.Equal(t, []string{"1"}, loggedMessages)
 }
