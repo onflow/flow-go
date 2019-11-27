@@ -52,9 +52,7 @@ func (s *interpreterRuntimeStorage) readValue(
 			return interpreter.NilValue{}
 		}
 
-		return &interpreter.SomeValue{
-			Value: cachedValue,
-		}
+		return interpreter.NewSomeValueOwningNonCopying(cachedValue)
 	}
 
 	// Cache miss: Load and deserialize the stored value (if any)
@@ -79,9 +77,7 @@ func (s *interpreterRuntimeStorage) readValue(
 	}
 
 	s.cache[storageKey] = storedValue
-	return &interpreter.SomeValue{
-		Value: storedValue,
-	}
+	return interpreter.NewSomeValueOwningNonCopying(storedValue)
 }
 
 // writeValue is the StorageWriteHandlerFunc for the interpreter.
