@@ -138,10 +138,14 @@ func (checker *Checker) checkTransactionPrepareFunctionParameters(
 	for i, parameter := range parameterList.Parameters {
 		parameterTypeAnnotation := parameterTypeAnnotations[i]
 
-		_ = parameter
-		_ = parameterTypeAnnotation
+		t := parameterTypeAnnotation.Type
 
-		// TODO: only allow Account type
+		if !IsSubType(t, &AccountType{}) {
+			checker.report(&InvalidTransactionPrepareParameterType{
+				Type:  t,
+				Range: ast.NewRangeFromPositioned(parameter.TypeAnnotation),
+			})
+		}
 	}
 
 }

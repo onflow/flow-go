@@ -2304,9 +2304,9 @@ func (interpreter *Interpreter) declareTransactionEntrypoint(declaration *ast.Tr
 	beforeStatements, rewrittenPostConditions :=
 		interpreter.rewritePostConditions(declaration.PostConditions)
 
-	self := CompositeValue{
+	self := &CompositeValue{
 		Location: interpreter.Checker.Location,
-		Fields:   &map[string]Value{},
+		Fields:   map[string]Value{},
 	}
 
 	transactionFunction := NewHostFunctionValue(

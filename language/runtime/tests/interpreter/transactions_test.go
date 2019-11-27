@@ -218,10 +218,11 @@ func TestInterpretTransactions(t *testing.T) {
 func accountValue(address flow.Address) interpreter.Value {
 	addressHex := fmt.Sprintf("%x", address)
 
-	return interpreter.CompositeValue{
+	return &interpreter.CompositeValue{
 		Identifier: (&sema.AccountType{}).ID(),
-		Fields: &map[string]interpreter.Value{
-			"address": interpreter.NewStringValue(addressHex),
+		Fields: map[string]interpreter.Value{
+			"address": interpreter.AddressValue(address),
+			"storage": interpreter.StorageValue{Identifier: addressHex},
 		},
 	}
 }
