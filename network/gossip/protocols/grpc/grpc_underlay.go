@@ -1,6 +1,5 @@
+// Package protocols is a GRPC implementation of the Underlay interface.
 package protocols
-
-// A GRPC implementation of the Underlay interface.
 
 import (
 	"context"

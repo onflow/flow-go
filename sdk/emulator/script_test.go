@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
@@ -13,7 +14,8 @@ import (
 )
 
 func TestExecuteScript(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b, err := emulator.NewEmulatedBlockchain()
+	require.NoError(t, err)
 
 	accountAddress := b.RootAccountAddress()
 
@@ -27,23 +29,28 @@ func TestExecuteScript(t *testing.T) {
 	}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx.AddSignature(accountAddress, sig)
 
 	callScript := fmt.Sprintf(sampleCall, accountAddress)
 
 	// Sample call (value is 0)
-	value, err := b.ExecuteScript([]byte(callScript))
-	assert.Nil(t, err)
+	value, _, err := b.ExecuteScript([]byte(callScript))
+	assert.NoError(t, err)
 	assert.Equal(t, values.NewInt(0), value)
 
 	// Submit tx1 (script adds 2)
 	err = b.SubmitTransaction(tx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	// Sample call (value is 2)
-	value, err = b.ExecuteScript([]byte(callScript))
-	assert.Nil(t, err)
+	value, _, err = b.ExecuteScript([]byte(callScript))
+	assert.NoError(t, err)
 	assert.Equal(t, values.NewInt(2), value)
+}
+
+func TestExecuteScriptAtBlockNumber(t *testing.T) {
+	// TODO
+	// Test that scripts can be executed at different block heights
 }

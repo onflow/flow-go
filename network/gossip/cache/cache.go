@@ -4,7 +4,6 @@ import (
 	"sync"
 )
 
-
 // MemHashCache implements an on-memory cache of hashes.
 // Note: as both underlying fields of memoryHashCache are thread-safe, the memoryHashCache itself does
 // not require a mutex lock

@@ -13,8 +13,11 @@ node_modules
 .DS_Store
 
 flow.json
+flowdb
 
 # IDE related files
 .idea
 .vscode
 git
+language/tools/vscode-extension/cadence-*.vsix
+language/tools/vscode-extension/out/*
