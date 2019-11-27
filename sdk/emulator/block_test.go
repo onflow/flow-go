@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
@@ -12,6 +13,11 @@ import (
 
 func TestCommitBlock(t *testing.T) {
 	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+
+	counterAddress, err := b.CreateAccount(nil, []byte(counterScript), getNonce())
+	require.NoError(t, err)
+
+	addTwoScript := generateAddTwoToCounterScript(counterAddress)
 
 	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
