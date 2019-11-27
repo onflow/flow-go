@@ -47,7 +47,7 @@ pub resource NFTCollection: INFTCollection {
     pub var ownedNFTs: <-{Int: NFT}
 
     init () {
-        self.ownedNFTs = {}
+        self.ownedNFTs <- {}
     }
 
     // withdraw removes an NFT from the collection and moves it to the caller
