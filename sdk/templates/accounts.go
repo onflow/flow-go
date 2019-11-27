@@ -26,8 +26,8 @@ func CreateAccount(accountKeys []flow.AccountPublicKey, code []byte) ([]byte, er
 	script := fmt.Sprintf(`
         transaction {
           execute {
-            priv let publicKeys: [[Int]] = %s
-            priv let code: [Int]? = %s
+            let publicKeys: [[Int]] = %s
+            let code: [Int]? = %s
             createAccount(publicKeys, code)
           }
         }
