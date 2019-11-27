@@ -1,3 +1,50 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: flow-emulator
+  namespace: flow
+  annotations:
+    kubernetes.io/ingress.class: traefik
+
+    # Whitelisting the office IP only for now
+    traefik.ingress.kubernetes.io/whitelist-source-range: "208.98.206.170/32"
+    ingress.kubernetes.io/ssl-redirect: "true"
+
+    # Security headers - sensible defaults and tunable examples
+
+    # Enforce TLS
+    ingress.kubernetes.io/hsts-max-age: "2592000" # 30d
+    ingress.kubernetes.io/hsts-include-subdomains: "true"
+
+    # Force non-SSL over
+    ingress.kubernetes.io/force-hsts: "true"
+
+    # Tell browsers to block several XSS methods
+    ingress.kubernetes.io/browser-xss-filter: "true"
+
+    # Prevent browsers from mistaking the response content type
+    ingress.kubernetes.io/content-type-nosniff: "true"
+
+    # Indicate we don't want to be in an iframe (stop clickjacking attacks):
+    # DENY -> ever; SAMEORIGIN -> unless it's a site in our own domain doing it
+    ingress.kubernetes.io/custom-frame-options-value: "DENY"
+
+    # Control Referrer information leaks to other origins
+    ingress.kubernetes.io/referrer-policy: "strict-origin-when-cross-origin"
+  labels:
+    app: flow-emulator
+    env: staging
+    owner: Kan
+spec:
+  rules:
+    - host: staging.emulator.grpc.withflow.org
+      http:
+        paths:
+          - backend:
+              serviceName: flow-emulator-v1
+              servicePort: grpc
+---
+
 apiVersion: v1
 kind: Service
 
