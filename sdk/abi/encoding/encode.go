@@ -89,8 +89,6 @@ func (e *Encoder) Encode(v values.Value) error {
 	default:
 		return fmt.Errorf("unsupported value: %T, %v", v, v)
 	}
-
-	return nil
 }
 
 // EncodeVoid writes the XDR-encoded representation of a void value.
