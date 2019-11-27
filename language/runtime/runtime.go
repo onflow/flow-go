@@ -323,12 +323,12 @@ func (r *interpreterRuntime) emitAccountEvent(
 
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		pkArray, ok := arguments[0].(interpreter.ArrayValue)
+		pkArray, ok := arguments[0].(*interpreter.ArrayValue)
 		if !ok {
 			panic(fmt.Sprintf("createAccount requires the first parameter to be an array"))
 		}
 
-		pkValues := *pkArray.Values
+		pkValues := pkArray.Values
 		publicKeys := make([]values.Bytes, len(pkValues))
 
 		for i, pkVal := range pkValues {
@@ -479,18 +479,18 @@ func toBytes(value interpreter.Value) (values.Bytes, error) {
 		return nil, nil
 	}
 
-	someValue, ok := value.(interpreter.SomeValue)
+	someValue, ok := value.(*interpreter.SomeValue)
 	if ok {
 		value = someValue.Value
 	}
 
-	array, ok := value.(interpreter.ArrayValue)
+	array, ok := value.(*interpreter.ArrayValue)
 	if !ok {
 		return nil, errors.New("value is not an array")
 	}
 
-	result := make([]byte, len(*array.Values))
-	for i, arrayValue := range *array.Values {
+	result := make([]byte, len(array.Values))
+	for i, arrayValue := range array.Values {
 		intValue, ok := arrayValue.(interpreter.IntValue)
 		if !ok {
 			return nil, errors.New("array value is not an Int")
