@@ -17,7 +17,7 @@ type Block struct {
 }
 
 // Hash returns the hash of this block.
-func (b *Block) Hash() crypto.Hash {
+func (b Block) Hash() crypto.Hash {
 	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
 
 	d, _ := rlp.EncodeToBytes([]interface{}{

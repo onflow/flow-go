@@ -84,7 +84,7 @@ var getAccountFunctionType = sema.FunctionType{
 		&sema.StringType{},
 	),
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.AccountType{},
+		AccountType.Type,
 	),
 }
 
