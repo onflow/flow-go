@@ -1,4 +1,4 @@
-package interpreter
+package interpreter_test
 
 import (
 	"testing"

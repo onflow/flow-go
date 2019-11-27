@@ -2276,6 +2276,10 @@ func (v AddressValue) Copy() Value {
 	return v
 }
 
+func (v AddressValue) String() string {
+	return fmt.Sprintf("%x", [AddressLength]byte(v))
+}
+
 func (AddressValue) GetOwner() string {
 	// value is never owned
 	return ""
@@ -2283,10 +2287,6 @@ func (AddressValue) GetOwner() string {
 
 func (AddressValue) SetOwner(owner string) {
 	// NO-OP: value cannot be owned
-}
-
-func (v AddressValue) String() string {
-	return fmt.Sprintf("%x", [AddressLength]byte(v))
 }
 
 func (v AddressValue) Equal(other Value) BoolValue {
@@ -2299,12 +2299,10 @@ func (v AddressValue) Equal(other Value) BoolValue {
 
 // AccountValue
 
-type AccountValue = CompositeValue
-
-func NewAccountValue(address AddressValue) *AccountValue {
+func NewAccountValue(address AddressValue) *CompositeValue {
 	addressHex := fmt.Sprintf("%x", address)
 
-	return &AccountValue{
+	return &CompositeValue{
 		Identifier: (&sema.AccountType{}).ID(),
 		Fields: map[string]Value{
 			"address": address,

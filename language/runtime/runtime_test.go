@@ -159,6 +159,45 @@ func TestRuntimeTransactionWithAccount(t *testing.T) {
 	assert.Equal(t, "2a00000000000000000000000000000000000000", loggedMessage)
 }
 
+func TestRuntimeProgramWithNoTransaction(t *testing.T) {
+	runtime := NewInterpreterRuntime()
+
+	script := []byte(`
+	  pub fun main() {}
+	`)
+
+	runtimeInterface := &testRuntimeInterface{}
+
+	err := runtime.ExecuteTransaction(script, runtimeInterface, nil)
+
+	if assert.IsType(t, Error{}, err) {
+		err := err.(Error)
+		assert.IsType(t, InvalidTransactionCountError{}, err.Unwrap())
+	}
+}
+
+func TestRuntimeProgramWithMultipleTransaction(t *testing.T) {
+	runtime := NewInterpreterRuntime()
+
+	script := []byte(`
+	  transaction {
+	    execute {}
+	  }
+	  transaction {
+	    execute {}
+	  }
+	`)
+
+	runtimeInterface := &testRuntimeInterface{}
+
+	err := runtime.ExecuteTransaction(script, runtimeInterface, nil)
+
+	if assert.IsType(t, Error{}, err) {
+		err := err.(Error)
+		assert.IsType(t, InvalidTransactionCountError{}, err.Unwrap())
+	}
+}
+
 func TestRuntimeStorage(t *testing.T) {
 
 	tests := map[string]string{

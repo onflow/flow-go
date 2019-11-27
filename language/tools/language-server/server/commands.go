@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 
@@ -106,11 +109,38 @@ func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (int
 	tx.AddSignature(s.config.AccountAddr, sig)
 
 	err = s.flowClient.SendTransaction(context.Background(), tx)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		conn.LogMessage(&protocol.LogMessageParams{
+			Type:    protocol.Info,
+			Message: fmt.Sprintf("Submitted transaction nonce=%d\thash=%s", tx.Nonce, tx.Hash().Hex()),
+		})
+		return nil, nil
 	}
 
-	return nil, nil
+	grpcErr, ok := status.FromError(err)
+	if ok {
+		if grpcErr.Code() == codes.Unavailable {
+			// The emulator server isn't running
+			conn.ShowMessage(&protocol.ShowMessageParams{
+				Type:    protocol.Warning,
+				Message: "The emulator server is unavailable. Please start the emulator (`cadence.runEmulator`) first.",
+			})
+			return nil, nil
+		} else if grpcErr.Code() == codes.InvalidArgument {
+			// The request was invalid
+			conn.ShowMessage(&protocol.ShowMessageParams{
+				Type:    protocol.Warning,
+				Message: "The transaction could not be submitted.",
+			})
+			conn.LogMessage(&protocol.LogMessageParams{
+				Type:    protocol.Warning,
+				Message: fmt.Sprintf("Failed to submit transaction: %s", grpcErr.Message()),
+			})
+			return nil, nil
+		}
+	}
+
+	return nil, err
 }
 
 // executeScript handles executing a script defined in the source document in
@@ -132,13 +162,36 @@ func (s *Server) executeScript(conn protocol.Conn, args ...interface{}) (interfa
 
 	script := []byte(documentText)
 	res, err := s.flowClient.ExecuteScript(context.Background(), script)
-	if err != nil {
-		return nil, err
+	if err == nil {
+		conn.LogMessage(&protocol.LogMessageParams{
+			Type:    protocol.Info,
+			Message: fmt.Sprintf("Executed script with result: %v", res),
+		})
+		return res, nil
 	}
 
-	conn.LogMessage(&protocol.LogMessageParams{
-		Type:    protocol.Info,
-		Message: fmt.Sprintf("Executed Script with result: %v", res),
-	})
-	return res, nil
+	grpcErr, ok := status.FromError(err)
+	if ok {
+		if grpcErr.Code() == codes.Unavailable {
+			// The emulator server isn't running
+			conn.ShowMessage(&protocol.ShowMessageParams{
+				Type:    protocol.Warning,
+				Message: "The emulator server is unavailable. Please start the emulator (`cadence.runEmulator`) first.",
+			})
+			return nil, nil
+		} else if grpcErr.Code() == codes.InvalidArgument {
+			// The request was invalid
+			conn.ShowMessage(&protocol.ShowMessageParams{
+				Type:    protocol.Warning,
+				Message: "The script could not be executed.",
+			})
+			conn.LogMessage(&protocol.LogMessageParams{
+				Type:    protocol.Warning,
+				Message: fmt.Sprintf("Failed to execute script: %s", grpcErr.Message()),
+			})
+			return nil, nil
+		}
+	}
+
+	return nil, err
 }

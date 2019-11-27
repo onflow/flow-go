@@ -53,6 +53,7 @@ func (conn *connection) RegisterCapability(params *RegistrationParams) error {
 // Handler defines the subset of the Language Server Protocol we support.
 type Handler interface {
 	Initialize(conn Conn, params *InitializeParams) (*InitializeResult, error)
+	DidOpenTextDocument(conn Conn, params *DidOpenTextDocumentParams) error
 	DidChangeTextDocument(conn Conn, params *DidChangeTextDocumentParams) error
 	Hover(conn Conn, params *TextDocumentPositionParams) (*Hover, error)
 	Definition(conn Conn, params *TextDocumentPositionParams) (*Location, error)
@@ -78,6 +79,9 @@ func NewServer(handler Handler) *Server {
 
 	jsonrpc2Server.Methods["initialize"] =
 		server.handleInitialize
+
+	jsonrpc2Server.Methods["textDocument/didOpen"] =
+		server.handleDidOpenTextDocument
 
 	jsonrpc2Server.Methods["textDocument/didChange"] =
 		server.handleDidChangeTextDocument

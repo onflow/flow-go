@@ -14,22 +14,19 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/events"
 )
 
 // Backend wraps an emulated blockchain and implements the RPC handlers
 // required by the Observation API.
 type Backend struct {
 	blockchain emulator.EmulatedBlockchainAPI
-	eventStore events.Store
 	logger     *log.Logger
 }
 
 // NewBackend returns a new backend.
-func NewBackend(blockchain emulator.EmulatedBlockchainAPI, eventStore events.Store, logger *log.Logger) *Backend {
+func NewBackend(blockchain emulator.EmulatedBlockchainAPI, logger *log.Logger) *Backend {
 	return &Backend{
 		blockchain: blockchain,
-		eventStore: eventStore,
 		logger:     logger,
 	}
 }
@@ -84,7 +81,10 @@ func (b *Backend) SendTransaction(ctx context.Context, req *observation.SendTran
 
 // GetLatestBlock gets the latest sealed block.
 func (b *Backend) GetLatestBlock(ctx context.Context, req *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
-	block := b.blockchain.GetLatestBlock()
+	block, err := b.blockchain.GetLatestBlock()
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 
 	// create block header for block
 	blockHeader := flow.BlockHeader{
@@ -166,7 +166,7 @@ func (b *Backend) GetAccount(ctx context.Context, req *observation.GetAccountReq
 // ExecuteScript performs a call.
 func (b *Backend) ExecuteScript(ctx context.Context, req *observation.ExecuteScriptRequest) (*observation.ExecuteScriptResponse, error) {
 	script := req.GetScript()
-	value, err := b.blockchain.ExecuteScript(script)
+	value, events, err := b.blockchain.ExecuteScript(script)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -176,6 +176,10 @@ func (b *Backend) ExecuteScript(ctx context.Context, req *observation.ExecuteScr
 	}
 
 	b.logger.Debugf("📞  Contract script called")
+
+	for _, event := range events {
+		b.logger.Debugf("🔔  Event emitted: %s", event.String())
+	}
 
 	valueBytes, err := encoding.Encode(value)
 	if err != nil {
@@ -196,7 +200,7 @@ func (b *Backend) GetEvents(ctx context.Context, req *observation.GetEventsReque
 		return nil, status.Error(codes.InvalidArgument, "invalid query: start block must be <= end block")
 	}
 
-	events, err := b.eventStore.Query(ctx, req.Type, req.StartBlock, req.EndBlock)
+	events, err := b.blockchain.GetEvents(req.GetType(), req.GetStartBlock(), req.GetEndBlock())
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

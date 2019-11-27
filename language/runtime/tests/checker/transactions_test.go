@@ -95,10 +95,9 @@ func TestCheckTransactions(t *testing.T) {
 	}
 
 	invalidPrepareParameters := test{
-		"InvalidPrepareIdentifier",
+		"InvalidPrepareParameters",
 		`
 		  transaction {
-
 		    prepare(x: Int, y: Int) {}
 
 		    execute {}
@@ -343,4 +342,23 @@ func TestCheckTransactions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCheckTransactionExecuteScope(t *testing.T) {
+	// non-global variable declarations do not require access modifiers
+	// execute block should be treated like function block
+	code := `
+	  transaction {
+		execute {
+		  let code: Int = 1
+		}
+	  }
+	`
+
+	_, err := ParseAndCheckWithOptions(t, code, ParseAndCheckOptions{
+		Options: []sema.Option{
+			sema.WithAccessCheckMode(sema.AccessCheckModeStrict),
+		},
+	})
+	assert.NoError(t, err)
 }

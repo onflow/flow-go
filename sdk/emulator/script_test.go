@@ -13,7 +13,8 @@ import (
 )
 
 func TestExecuteScript(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b, err := emulator.NewEmulatedBlockchain()
+	require.NoError(t, err)
 
 	counterAddress, err := b.CreateAccount(nil, []byte(counterScript), getNonce())
 	require.NoError(t, err)
@@ -39,7 +40,7 @@ func TestExecuteScript(t *testing.T) {
 	callScript := generateGetCounterCountScript(counterAddress, accountAddress)
 
 	// Sample call (value is 0)
-	value, err := b.ExecuteScript([]byte(callScript))
+	value, _, err := b.ExecuteScript([]byte(callScript))
 	require.NoError(t, err)
 	assert.Equal(t, values.NewInt(0), value)
 
@@ -48,7 +49,12 @@ func TestExecuteScript(t *testing.T) {
 	require.NoError(t, err)
 
 	// Sample call (value is 2)
-	value, err = b.ExecuteScript([]byte(callScript))
+	value, _, err = b.ExecuteScript([]byte(callScript))
 	require.NoError(t, err)
 	assert.Equal(t, values.NewInt(2), value)
+}
+
+func TestExecuteScriptAtBlockNumber(t *testing.T) {
+	// TODO
+	// Test that scripts can be executed at different block heights
 }
