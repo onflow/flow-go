@@ -118,10 +118,9 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	}
 
 	transactions := checker.TransactionTypes
-	if len(transactions) < 1 {
-		return fmt.Errorf("no transaction declared")
-	} else if len(transactions) > 1 {
-		return fmt.Errorf("more than one transaction declared")
+	transactionCount := len(transactions)
+	if transactionCount != 1 {
+		return newError(InvalidTransactionCountError{Count: transactionCount})
 	}
 
 	transactionType := transactions[0]
