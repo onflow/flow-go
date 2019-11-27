@@ -160,170 +160,108 @@ func TestRuntimeTransactionWithAccount(t *testing.T) {
 }
 
 func TestRuntimeStorage(t *testing.T) {
-	runtime := NewInterpreterRuntime()
 
-	script := []byte(`
-	  transaction {
-	    prepare(signer: Account) {
-		  log(signer.storage[Int])
+	tests := map[string]string{
+		"resource": `
+          let r <- signer.storage[R] <- createR()
+          log(r == nil)
+          destroy r
 
-		  signer.storage[Int] = 42
-		  log(signer.storage[Int])
+          let r2 <- signer.storage[R] <- nil
+		  log(r2 != nil)
+          destroy r2
+        `,
+		"reference": `
+          log(signer.storage[&R] == nil)
 
-		  signer.storage[[Int]] = [1, 2, 3]
-		  log(signer.storage[[Int]])
+          let oldR <- signer.storage[R] <- createR()
+          destroy oldR
 
-		  signer.storage[String] = "xyz"
-		  log(signer.storage[String])
-		}
-	    execute {}
-	  }
-	`)
+          signer.storage[&R] = &signer.storage[R] as R
+		  log(signer.storage[&R] != nil)
+        `,
+		"resource array": `
+          let rs <- signer.storage[[R]] <- [<-createR()]
+          log(rs == nil)
+          destroy rs
 
-	storedValues := map[string][]byte{}
+          let rs2 <- signer.storage[[R]] <- nil
+		  log(rs2 != nil)
+          destroy rs2
+        `,
+		"resource dictionary": `
+          let rs <- signer.storage[{String: R}] <- {"r": <-createR()}
+          log(rs == nil)
+          destroy rs
 
-	var loggedMessages []string
-
-	runtimeInterface := &testRuntimeInterface{
-		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
-			return storedValues[string(key)], nil
-		},
-		setValue: func(controller, owner, key, value values.Bytes) (err error) {
-			storedValues[string(key)] = value
-			return nil
-		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{[20]byte{42}}
-		},
-		log: func(message string) {
-			loggedMessages = append(loggedMessages, message)
-		},
+          let rs2 <- signer.storage[{String: R}] <- nil
+		  log(rs2 != nil)
+          destroy rs2
+        `,
 	}
 
-	err := runtime.ExecuteTransaction(script, runtimeInterface, nil)
-	require.NoError(t, err)
+	for name, code := range tests {
+		t.Run(name, func(t *testing.T) {
+			runtime := NewInterpreterRuntime()
 
-	assert.Equal(t, []string{"nil", "42", "[1, 2, 3]", `"xyz"`}, loggedMessages)
-}
+			imported := []byte(`
+              pub resource R {}
 
-func TestRuntimeStorageMultipleTransactionsArray(t *testing.T) {
-	runtime := NewInterpreterRuntime()
+              pub fun createR(): <-R {
+                return <-create R()
+              }
+            `)
 
-	script1 := []byte(`
-	  transaction {
-	    prepare(signer: Account) {
-		  log(signer.storage[[String]])
-		  signer.storage[[String]] = []
-		}
-	    execute {}
-	  }
-	`)
+			script := []byte(fmt.Sprintf(`
+                  import "imported"
 
-	script2 := []byte(`
-	  transaction {
-	    prepare(signer: Account) {
-		  log(signer.storage[[String]])
-		  signer.storage[[String]] = ["A", "B"]
-		}
-	    execute {}
-	  }
-	`)
+	              transaction {
+	                prepare(signer: Account) {
+                      %s
+	            	}
+	                execute {}
+	              }
+	            `,
+				code,
+			))
 
-	var loggedMessages []string
-	storedValues := map[string]values.Bytes{}
+			storedValues := map[string][]byte{}
 
-	runtimeInterface := &testRuntimeInterface{
-		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
-			return storedValues[string(key)], nil
-		},
-		setValue: func(controller, owner, key, value values.Bytes) (err error) {
-			storedValues[string(key)] = value
-			return nil
-		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{[20]byte{42}}
-		},
-		log: func(message string) {
-			loggedMessages = append(loggedMessages, message)
-		},
+			var loggedMessages []string
+
+			runtimeInterface := &testRuntimeInterface{
+				resolveImport: func(location Location) (bytes values.Bytes, err error) {
+					switch location {
+					case StringLocation("imported"):
+						return imported, nil
+					default:
+						return nil, fmt.Errorf("unknown import location: %s", location)
+					}
+				},
+				getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+					return storedValues[string(key)], nil
+				},
+				setValue: func(controller, owner, key, value values.Bytes) (err error) {
+					storedValues[string(key)] = value
+					return nil
+				},
+				getSigningAccounts: func() []values.Address {
+					return []values.Address{[20]byte{42}}
+				},
+				log: func(message string) {
+					loggedMessages = append(loggedMessages, message)
+				},
+			}
+
+			err := runtime.ExecuteTransaction(script, runtimeInterface, nil)
+			require.NoError(t, err)
+
+			assert.Equal(t, []string{"true", "true"}, loggedMessages)
+		})
 	}
-
-	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	require.NoError(t, err)
-
-	err = runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	require.NoError(t, err)
-
-	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	require.NoError(t, err)
-
-	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	require.NoError(t, err)
-
-	assert.Equal(t, []string{"nil", `[]`, `[]`, `["A", "B"]`}, loggedMessages)
 }
 
-func TestRuntimeStorageMultipleTransactionsDictionary(t *testing.T) {
-	runtime := NewInterpreterRuntime()
-
-	script1 := []byte(`
-	  transaction {
-	    prepare(signer: Account) {
-		  log(signer.storage[{String: Int}])
-		  signer.storage[{String: Int}] = {}
-		}
-	    execute {}
-	  }
-	`)
-
-	script2 := []byte(`
-	  transaction {
-	    prepare(signer: Account) {
-		  log(signer.storage[{String: Int}])
-		  signer.storage[{String: Int}] = {"A": 1, "B": 2}
-		}
-	    execute {}
-	  }
-	`)
-
-	var loggedMessages []string
-	storedValues := map[string]values.Bytes{}
-
-	runtimeInterface := &testRuntimeInterface{
-		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
-			return storedValues[string(key)], nil
-		},
-		setValue: func(controller, owner, key, value values.Bytes) (err error) {
-			storedValues[string(key)] = value
-			return nil
-		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{[20]byte{42}}
-		},
-		log: func(message string) {
-			loggedMessages = append(loggedMessages, message)
-		},
-	}
-
-	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	require.NoError(t, err)
-
-	err = runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	require.NoError(t, err)
-
-	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	require.NoError(t, err)
-
-	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	require.NoError(t, err)
-
-	// Assertion is a bit more complex, because dictionary order is not deterministic
-	require.Len(t, loggedMessages, 4)
-	assert.Equal(t, []string{"nil", `{}`, `{}`}, loggedMessages[:3])
-	assert.Contains(t, []string{`{"A": 1, "B": 2}`, `{"B": 2, "A": 1}`}, loggedMessages[3])
-}
-
-func TestRuntimeStorageMultipleTransactionsStructureAndArray(t *testing.T) {
+func TestRuntimeStorageMultipleTransactionsResourceWithArray(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	container := []byte(`
@@ -420,30 +358,38 @@ func TestRuntimeStorageMultipleTransactionsStructureAndArray(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// TestRuntimeStorageMultipleTransactionsStructures tests a function call
-// of a stored structure declared in an imported program
+// TestRuntimeStorageMultipleTransactionsResourceFunction tests a function call
+// of a stored resource declared in an imported program
 //
-func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
+func TestRuntimeStorageMultipleTransactionsResourceFunction(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	deepThought := []byte(`
-	  pub struct DeepThought {
+	  pub resource DeepThought {
 
 		pub fun answer(): Int {
 		  return 42
 		}
 	  }
+
+      pub fun createDeepThought(): <-DeepThought {
+        return <-create DeepThought()
+      }
 	`)
 
 	script1 := []byte(`
 	  import "deep-thought"
 
 	  transaction {
-	    prepare(signer: Account) {
-		  signer.storage[DeepThought] = DeepThought()
 
-		  log(signer.storage[DeepThought])
-		}
+	    prepare(signer: Account) {
+		  let existing <- signer.storage[DeepThought] <- createDeepThought()
+          if existing != nil {
+             panic("already initialized")
+          }
+          destroy existing
+	    }
+
 		execute {}
 	  }
 	`)
@@ -453,13 +399,8 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 
 	  transaction {
 	    prepare(signer: Account) {
-		  log(signer.storage[DeepThought])
-
-		  let computer = signer.storage[DeepThought]
-		    ?? panic("missing computer")
-
-		  let answer = computer.answer()
-		  log(answer)
+		  let answer = signer.storage[DeepThought]?.answer()
+		  log(answer ?? 0)
 		}
 		execute {}
 	  }
@@ -501,23 +442,50 @@ func TestRuntimeStorageMultipleTransactionsStructures(t *testing.T) {
 	assert.Contains(t, loggedMessages, "42")
 }
 
-func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
+// TestRuntimeStorageMultipleTransactionsResourceField tests reading a field
+// of a stored resource declared in an imported program
+//
+func TestRuntimeStorageMultipleTransactionsResourceField(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
+	imported := []byte(`
+      pub resource Number {
+        pub(set) var n: Int
+        init(_ n: Int) {
+          self.n = n
+        }
+      }
+
+      pub fun createNumber(_ n: Int): <-Number {
+        return <-create Number(n)
+      }
+    `)
+
 	script1 := []byte(`
+      import "imported"
+
 	  transaction {
 	    prepare(signer: Account) {
-	      signer.storage[Int] = 42
+	      let oldNumber <- signer.storage[Number] <- createNumber(42)
+          if oldNumber != nil {
+             panic("already initialized")
+          }
+          destroy oldNumber
+
 		}
 		execute {}
 	  }
 	`)
 
 	script2 := []byte(`
+      import "imported"
+
 	  transaction {
 	    prepare(signer: Account) {
-	      let x = signer.storage[Int] ?? panic("stored value is nil")
-		  log(x)
+	      if let number <- signer.storage[Number] <- nil {
+		    log(number.n)
+            destroy number
+          }
 		}
 		execute {}
 	  }
@@ -527,6 +495,14 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
+			switch location {
+			case StringLocation("imported"):
+				return imported, nil
+			default:
+				return nil, fmt.Errorf("unknown import location: %s", location)
+			}
+		},
 		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
 			return storedValues[string(key)], nil
 		},
@@ -543,10 +519,10 @@ func TestRuntimeStorageMultipleTransactionsInt(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Contains(t, loggedMessages, "42")
 }
@@ -563,19 +539,24 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
       pub fun x(x: Int) {}
 
       // invocation must be in composite
-      pub struct Y {
+      pub resource Y {
 	    pub fun x() {
 		  x(x: 1)
 		}
       }
+
+      pub fun createY(): <-Y {
+        return <-create Y()
+      }
     `)
 
 	script1 := []byte(`
-      import Y from "imported"
+      import Y, createY from "imported"
 
 	  transaction {
 	    prepare(signer: Account) {
-	      signer.storage[Y] = Y()
+	      let oldY <- signer.storage[Y] <- createY()
+          destroy oldY
 		}
 		execute {}
 	  }
@@ -586,8 +567,9 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 
 	  transaction {
 	    prepare(signer: Account) {
-          let y = signer.storage[Y] ?? panic("stored value is nil")
-          y.x()
+          let y <- signer.storage[Y] <- nil
+          y?.x()
+          destroy y
 		}
 		execute {}
 	  }
@@ -642,14 +624,15 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
       import R, createR from "imported"
 
 	  transaction {
+
 	    prepare(signer: Account) {
-          var r: <-R? <- createR()
-	      signer.storage[R] <-> r
+          let r <- signer.storage[R] <- createR()
           if r != nil {
              panic("already initialized")
           }
           destroy r
 		}
+
 		execute {}
 	  }
     `)
@@ -658,10 +641,12 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
       import R from "imported"
 
 	  transaction {
+
 	    prepare(signer: Account) {
           let ref = &signer.storage[R] as R
           ref.x()
 		}
+
 		execute {}
 	  }
     `)
@@ -722,9 +707,9 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
       import R, createR from "imported"
 
 	  transaction {
+
 	    prepare(signer: Account) {
-          var r: <-R? <- createR()
-	      signer.storage[R] <-> r
+          let r <- signer.storage[R] <- createR()
           if r != nil {
  			panic("already initialized")
           }
@@ -732,6 +717,7 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 
           signer.storage[&R] = &signer.storage[R] as R
 		}
+
 		execute {}
 	  }
     `)
