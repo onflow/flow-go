@@ -185,7 +185,7 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	signingAccounts := make([]interface{}, signingAccountsCount)
 
 	for i, address := range signingAccountAddresses {
-		signingAccounts[i] = accountValue(address)
+		signingAccounts[i] = interpreter.NewAccountValue(interpreter.AddressValue(address))
 	}
 
 	err = inter.InvokeTransaction(0, signingAccounts...)
@@ -338,18 +338,6 @@ func (r *interpreterRuntime) emitAccountEvent(
 	runtimeInterface.EmitEvent(event)
 }
 
-func accountValue(address values.Address) interpreter.Value {
-	addressHex := fmt.Sprintf("%x", address)
-
-	return &interpreter.CompositeValue{
-		Identifier: (&sema.AccountType{}).ID(),
-		Fields: map[string]interpreter.Value{
-			"address": interpreter.AddressValue(address),
-			"storage": interpreter.StorageValue{Identifier: addressHex},
-		},
-	}
-}
-
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
 		pkArray, ok := arguments[0].(*interpreter.ArrayValue)
@@ -489,9 +477,7 @@ func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) i
 			panic(fmt.Sprintf("getAccount requires the first parameter to be an address"))
 		}
 
-		accountAddressValue := accountAddress.Export().(values.Address)
-
-		account := accountValue(accountAddressValue)
+		account := interpreter.NewAccountValue(accountAddress)
 
 		return trampoline.Done{Result: account}
 	}

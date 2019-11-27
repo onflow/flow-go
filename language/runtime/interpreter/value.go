@@ -2235,3 +2235,17 @@ func (AddressValue) GetOwner() string {
 func (AddressValue) SetOwner(owner string) {
 	// NO-OP: value cannot be owned
 }
+
+// AccountValue
+
+func NewAccountValue(address AddressValue) *CompositeValue {
+	addressHex := fmt.Sprintf("%x", address)
+
+	return &CompositeValue{
+		Identifier: (&sema.AccountType{}).ID(),
+		Fields: map[string]Value{
+			"address": address,
+			"storage": StorageValue{Identifier: addressHex},
+		},
+	}
+}
