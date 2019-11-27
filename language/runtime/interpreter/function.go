@@ -32,6 +32,15 @@ func (f InterpretedFunctionValue) Copy() Value {
 	return f
 }
 
+func (InterpretedFunctionValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (InterpretedFunctionValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
+
 func (InterpretedFunctionValue) isFunctionValue() {}
 
 func newInterpretedFunction(
@@ -64,6 +73,15 @@ func (HostFunctionValue) isValue() {}
 
 func (f HostFunctionValue) Copy() Value {
 	return f
+}
+
+func (HostFunctionValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (HostFunctionValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
 }
 
 func (HostFunctionValue) isFunctionValue() {}
