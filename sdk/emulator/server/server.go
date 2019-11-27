@@ -8,15 +8,16 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/improbable-eng/grpc-web/go/grpcweb"
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/events"
+	grpcprometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -83,7 +84,10 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 		conf.HTTPPort = defaultHTTPPort
 	}
 
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(
+		grpc.StreamInterceptor(grpcprometheus.StreamServerInterceptor),
+		grpc.UnaryInterceptor(grpcprometheus.UnaryServerInterceptor),
+	)
 	server := &EmulatorServer{
 		backend: &Backend{
 			blockchain: emulator.NewEmulatedBlockchain(options),
@@ -109,6 +113,7 @@ func NewEmulatorServer(logger *log.Logger, conf *Config) *EmulatorServer {
 	}).Infof("⚙️   Using root account 0x%s", address.Hex())
 
 	observation.RegisterObserveServiceServer(server.grpcServer, server.backend)
+	grpcprometheus.Register(server.grpcServer)
 	return server
 }
 
@@ -169,9 +174,14 @@ func StartServer(logger *log.Logger, config *Config) {
 		grpcweb.WithOriginFunc(func(origin string) bool { return true }),
 	)
 
+	// Add /metrics endponit
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/", http.HandlerFunc(wrappedServer.ServeHTTP))
+
 	httpServer := http.Server{
 		Addr:    fmt.Sprintf(":%d", config.HTTPPort),
-		Handler: http.HandlerFunc(wrappedServer.ServeHTTP),
+		Handler: mux,
 	}
 
 	logger.
