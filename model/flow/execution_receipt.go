@@ -13,7 +13,7 @@ type ExecutionReceipt struct {
 	PreviousReceiptHash       crypto.Hash
 	BlockHash                 crypto.Hash
 	Signatures                []crypto.Signature
-	InitialRegisters          Registers
+	InitialRegisters          Ledger
 	IntermediateRegistersList []IntermediateRegisters
 }
 

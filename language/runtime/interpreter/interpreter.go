@@ -765,7 +765,7 @@ func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatem
 			valueType := interpreter.Checker.Elaboration.ReturnStatementValueTypes[statement]
 			returnType := interpreter.Checker.Elaboration.ReturnStatementReturnTypes[statement]
 
-			value = interpreter.convertAndBox(value, valueType, returnType)
+			value = interpreter.copyAndConvert(value, valueType, returnType)
 
 			return functionReturn{value}
 		})
@@ -868,6 +868,21 @@ func (interpreter *Interpreter) VisitWhileStatement(statement *ast.WhileStatemen
 		})
 }
 
+func (interpreter *Interpreter) visitPotentialStorageRemoval(expression ast.Expression) Trampoline {
+	movingStorageIndexExpression := interpreter.movingStorageIndexExpression(expression)
+	if movingStorageIndexExpression == nil {
+		return expression.Accept(interpreter).(Trampoline)
+	}
+
+	return interpreter.indexExpressionGetterSetter(movingStorageIndexExpression).
+		Map(func(result interface{}) interface{} {
+			getterSetter := result.(getterSetter)
+			value := getterSetter.get()
+			getterSetter.set(NilValue{})
+			return value
+		})
+}
+
 // VisitVariableDeclaration first visits the declaration's value,
 // then declares the variable with the name bound to the value
 func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.VariableDeclaration) ast.Repr {
@@ -876,8 +891,9 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 	valueType := interpreter.Checker.Elaboration.VariableDeclarationValueTypes[declaration]
 	secondValueType := interpreter.Checker.Elaboration.VariableDeclarationSecondValueTypes[declaration]
 
-	return declaration.Value.Accept(interpreter).(Trampoline).
+	return interpreter.visitPotentialStorageRemoval(declaration.Value).
 		FlatMap(func(result interface{}) Trampoline {
+
 			valueCopy := interpreter.copyAndConvert(result.(Value), valueType, targetType)
 
 			interpreter.declareVariable(
@@ -897,6 +913,15 @@ func (interpreter *Interpreter) VisitVariableDeclaration(declaration *ast.Variab
 				secondValueType,
 			)
 		})
+}
+
+func (interpreter *Interpreter) movingStorageIndexExpression(expression ast.Expression) *ast.IndexExpression {
+	indexExpression, ok := expression.(*ast.IndexExpression)
+	if !ok || !interpreter.Checker.Elaboration.IsResourceMovingStorageIndexExpression[indexExpression] {
+		return nil
+	}
+
+	return indexExpression
 }
 
 func (interpreter *Interpreter) declareVariable(identifier string, value Value) *Variable {
@@ -948,12 +973,18 @@ func (interpreter *Interpreter) VisitSwapStatement(swap *ast.SwapStatement) ast.
 		FlatMap(func(result interface{}) Trampoline {
 			leftGetterSetter := result.(getterSetter)
 			leftValue := leftGetterSetter.get()
+			if interpreter.movingStorageIndexExpression(swap.Left) != nil {
+				leftGetterSetter.set(NilValue{})
+			}
 
 			// Evaluate the right expression
 			return interpreter.assignmentGetterSetter(swap.Right).
 				Then(func(result interface{}) {
 					rightGetterSetter := result.(getterSetter)
 					rightValue := rightGetterSetter.get()
+					if interpreter.movingStorageIndexExpression(swap.Right) != nil {
+						rightGetterSetter.set(NilValue{})
+					}
 
 					// Assign right value to left target
 					// and left value to right target
@@ -988,8 +1019,8 @@ func (interpreter *Interpreter) assignmentGetterSetter(target ast.Expression) Tr
 // identifierExpressionGetterSetter returns a getter/setter function pair
 // for the target identifier expression, wrapped in a trampoline
 //
-func (interpreter *Interpreter) identifierExpressionGetterSetter(target *ast.IdentifierExpression) Trampoline {
-	variable := interpreter.findVariable(target.Identifier.Identifier)
+func (interpreter *Interpreter) identifierExpressionGetterSetter(identifierExpression *ast.IdentifierExpression) Trampoline {
+	variable := interpreter.findVariable(identifierExpression.Identifier.Identifier)
 	return Done{
 		Result: getterSetter{
 			get: func() Value {
@@ -1005,15 +1036,15 @@ func (interpreter *Interpreter) identifierExpressionGetterSetter(target *ast.Ide
 // indexExpressionGetterSetter returns a getter/setter function pair
 // for the target index expression, wrapped in a trampoline
 //
-func (interpreter *Interpreter) indexExpressionGetterSetter(target *ast.IndexExpression) Trampoline {
-	return target.TargetExpression.Accept(interpreter).(Trampoline).
+func (interpreter *Interpreter) indexExpressionGetterSetter(indexExpression *ast.IndexExpression) Trampoline {
+	return indexExpression.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			switch typedResult := result.(type) {
 			case ValueIndexableValue:
-				return target.IndexingExpression.Accept(interpreter).(Trampoline).
+				return indexExpression.IndexingExpression.Accept(interpreter).(Trampoline).
 					FlatMap(func(result interface{}) Trampoline {
 						indexingValue := result.(Value)
-						locationRange := interpreter.locationRange(target)
+						locationRange := interpreter.locationRange(indexExpression)
 						return Done{
 							Result: getterSetter{
 								get: func() Value {
@@ -1027,7 +1058,7 @@ func (interpreter *Interpreter) indexExpressionGetterSetter(target *ast.IndexExp
 					})
 
 			case StorageValue:
-				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[target]
+				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
 				key := interpreter.storageKeyHandler(interpreter, typedResult.Identifier, indexingType)
 				return Done{
 					Result: getterSetter{
@@ -1049,12 +1080,12 @@ func (interpreter *Interpreter) indexExpressionGetterSetter(target *ast.IndexExp
 // memberExpressionGetterSetter returns a getter/setter function pair
 // for the target member expression, wrapped in a trampoline
 //
-func (interpreter *Interpreter) memberExpressionGetterSetter(target *ast.MemberExpression) Trampoline {
-	return target.Expression.Accept(interpreter).(Trampoline).
+func (interpreter *Interpreter) memberExpressionGetterSetter(memberExpression *ast.MemberExpression) Trampoline {
+	return memberExpression.Expression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 			structure := result.(MemberAccessibleValue)
-			locationRange := interpreter.locationRange(target)
-			identifier := target.Identifier.Identifier
+			locationRange := interpreter.locationRange(memberExpression)
+			identifier := memberExpression.Identifier.Identifier
 			return Done{
 				Result: getterSetter{
 					get: func() Value {
@@ -1484,10 +1515,17 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 	return invocationExpression.InvokedExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
 
-			// Handle optional chaining on member expression, if any
+			// Handle optional chaining on member expression, if any:
+			// - If the member expression is nil, finish execution
+			// - If the member expression is some value, the wrapped value
+			//   is the function value that should be invoked
+
+			isOptionalChaining := false
 
 			if invokedMemberExpression, ok :=
 				invocationExpression.InvokedExpression.(*ast.MemberExpression); ok && invokedMemberExpression.Optional {
+
+				isOptionalChaining = true
 
 				switch typedResult := result.(type) {
 				case NilValue:
@@ -1530,7 +1568,19 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 						Position: invocationExpression.StartPosition(),
 						Location: interpreter.Checker.Location,
 					}
-					return function.invoke(argumentCopies, location)
+
+					invocation := function.invoke(argumentCopies, location)
+
+					// If this is invocation is optional chaining, wrap the result
+					// as an optional, as the result is expected to be an optional
+
+					if !isOptionalChaining {
+						return invocation
+					}
+
+					return invocation.Map(func(result interface{}) interface{} {
+						return &SomeValue{Value: result.(Value)}
+					})
 				})
 		})
 }

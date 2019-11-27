@@ -31,6 +31,8 @@ const (
 	DeclarationKindSelf
 	DeclarationKindResult
 	DeclarationKindTransaction
+	DeclarationKindPrepare
+	DeclarationKindExecute
 )
 
 func (k DeclarationKind) Name() string {
@@ -77,6 +79,10 @@ func (k DeclarationKind) Name() string {
 		return "result"
 	case DeclarationKindTransaction:
 		return "transaction"
+	case DeclarationKindPrepare:
+		return "prepare"
+	case DeclarationKindExecute:
+		return "execute"
 	}
 
 	panic(errors.NewUnreachableError())
@@ -116,6 +122,10 @@ func (k DeclarationKind) Keywords() string {
 		return "result"
 	case DeclarationKindTransaction:
 		return "transaction"
+	case DeclarationKindPrepare:
+		return "prepare"
+	case DeclarationKindExecute:
+		return "execute"
 	}
 
 	panic(errors.NewUnreachableError())
