@@ -1947,12 +1947,10 @@ func (v AddressValue) String() string {
 
 // AccountValue
 
-type AccountValue = CompositeValue
-
-func NewAccountValue(address AddressValue) AccountValue {
+func NewAccountValue(address AddressValue) CompositeValue {
 	addressHex := fmt.Sprintf("%x", address)
 
-	return AccountValue{
+	return CompositeValue{
 		Identifier: (&sema.AccountType{}).ID(),
 		Fields: &map[string]Value{
 			"address": address,
