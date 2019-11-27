@@ -311,15 +311,15 @@ func (s Server) getDiagnostics(conn protocol.Conn, uri protocol.DocumentUri, tex
 			for _, err := range parserError.Errors {
 				parseError, ok := err.(parser.ParseError)
 				if !ok {
+					conn.LogMessage(&protocol.LogMessageParams{
+						Type:    protocol.Warning,
+						Message: fmt.Sprintf("Unable to convert non ParseError for diagnostic: %s", err.Error()),
+					})
 					continue
 				}
 
 				diagnostic := convertError(parseError)
-				if diagnostic == nil {
-					continue
-				}
-
-				diagnostics = append(diagnostics, *diagnostic)
+				diagnostics = append(diagnostics, diagnostic)
 			}
 		} else {
 			return nil, err
@@ -361,9 +361,7 @@ func (s Server) getDiagnostics(conn protocol.Conn, uri protocol.DocumentUri, tex
 		for _, err := range checkerError.Errors {
 			if semanticError, ok := err.(sema.SemanticError); ok {
 				diagnostic := convertError(semanticError)
-				if diagnostic != nil {
-					diagnostics = append(diagnostics, *diagnostic)
-				}
+				diagnostics = append(diagnostics, diagnostic)
 			}
 		}
 	}
@@ -411,15 +409,16 @@ func resolveImport(
 	return program, nil
 }
 
-// convertError converts a checker error to a diagnostic.
-func convertError(err error) *protocol.Diagnostic {
-	positionedError, ok := err.(ast.HasPosition)
-	if !ok {
-		return nil
-	}
+// convertibleError is an error that can be converted to LSP diagnostic.
+type convertibleError interface {
+	error
+	ast.HasPosition
+}
 
-	startPosition := positionedError.StartPosition()
-	endPosition := positionedError.EndPosition()
+// convertError converts a checker error to a diagnostic.
+func convertError(err convertibleError) protocol.Diagnostic {
+	startPosition := err.StartPosition()
+	endPosition := err.EndPosition()
 
 	var message strings.Builder
 	message.WriteString(err.Error())
@@ -429,7 +428,7 @@ func convertError(err error) *protocol.Diagnostic {
 		message.WriteString(secondaryError.SecondaryError())
 	}
 
-	return &protocol.Diagnostic{
+	return protocol.Diagnostic{
 		Message: message.String(),
 		Code:    protocol.SeverityError,
 		Range: protocol.Range{
