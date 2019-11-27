@@ -51,8 +51,8 @@ func TestCheckTransactions(t *testing.T) {
 		nil,
 	}
 
-	invalidPrepareIdentifier := test{
-		"InvalidPrepareIdentifier",
+	invalidPrepareBlock := test{
+		"InvalidPrepareBlock",
 		`
 		  transaction {
 
@@ -66,8 +66,8 @@ func TestCheckTransactions(t *testing.T) {
 		},
 	}
 
-	invalidExecuteIdentifier := test{
-		"InvalidExecuteIdentifier",
+	invalidExecuteBlock := test{
+		"InvalidExecuteBlock",
 		`
 		  transaction {
 
@@ -85,7 +85,6 @@ func TestCheckTransactions(t *testing.T) {
 		"ValidPrepareParameters",
 		`
 		  transaction {
-
 		    prepare(x: Account, y: Account) {}
 
 		    execute {}
@@ -98,16 +97,12 @@ func TestCheckTransactions(t *testing.T) {
 		"InvalidPrepareIdentifier",
 		`
 		  transaction {
-
 		    prepare(x: Int, y: Int) {}
 
 		    execute {}
 		  }
 		`,
-		[]error{
-			&sema.InvalidTransactionPrepareParameterType{},
-			&sema.InvalidTransactionPrepareParameterType{},
-		},
+		nil,
 	}
 
 	fieldAccessSpecified := test{
@@ -314,8 +309,8 @@ func TestCheckTransactions(t *testing.T) {
 		emptyTx,
 		noopTx,
 		simpleTx,
-		invalidPrepareIdentifier,
-		invalidExecuteIdentifier,
+		invalidPrepareBlock,
+		invalidExecuteBlock,
 		validPrepareParameters,
 		invalidPrepareParameters,
 		fieldAccessSpecified,

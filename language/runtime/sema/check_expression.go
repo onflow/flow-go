@@ -157,6 +157,10 @@ func (checker *Checker) visitIndexExpression(
 	targetExpression := indexExpression.TargetExpression
 	targetType = targetExpression.Accept(checker).(Type)
 
+	if _, ok := targetType.(*StorageType); ok {
+		checker.Elaboration.IsStorageIndexExpression[indexExpression] = true
+	}
+
 	// NOTE: check indexed type first for UX reasons
 
 	// check indexed expression's type is indexable

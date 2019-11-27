@@ -1301,7 +1301,6 @@ func init() {
 		&UInt32Type{},
 		&UInt64Type{},
 		&AddressType{},
-		&AccountType{},
 	}
 
 	for _, ty := range types {
@@ -1483,64 +1482,6 @@ func (t *CompositeType) IsResourceType() bool {
 func (t *CompositeType) IsInvalidType() bool {
 	// TODO: maybe if any member has an invalid type?
 	return false
-}
-
-// AccountType
-
-type AccountType struct{}
-
-func (*AccountType) isType() {}
-
-func (*AccountType) String() string {
-	return "Account"
-}
-
-func (*AccountType) ID() string {
-	return "Account"
-}
-
-func (*AccountType) Equal(other Type) bool {
-	_, ok := other.(*AccountType)
-	return ok
-}
-
-func (*AccountType) IsResourceType() bool {
-	return false
-}
-
-func (*AccountType) IsInvalidType() bool {
-	return false
-}
-
-func (*AccountType) HasMembers() bool {
-	return true
-}
-
-func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
-	switch identifier {
-	case "address":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &AddressType{},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
-
-	case "storage":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &StorageType{},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
-
-	default:
-		return nil
-	}
 }
 
 // Member

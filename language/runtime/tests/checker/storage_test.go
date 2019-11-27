@@ -138,3 +138,58 @@ func TestCheckInvalidStorageIndexingWithExpression(t *testing.T) {
 
 	assert.IsType(t, &sema.InvalidTypeIndexingError{}, errs[0])
 }
+
+func TestCheckStorageIndexingWithResourceTypeInVariableDeclaration(t *testing.T) {
+
+	checker, err := ParseAndCheckWithStorage(t,
+		`
+          resource R {}
+
+          fun test() {
+              let r <- storage[R] <- create R()
+              destroy r
+          }
+        `,
+	)
+
+	require.Nil(t, err)
+
+	assert.Len(t, checker.Elaboration.IsResourceMovingStorageIndexExpression, 1)
+}
+
+func TestCheckStorageIndexingWithResourceTypeInSwap(t *testing.T) {
+
+	checker, err := ParseAndCheckWithStorage(t,
+		`
+          resource R {}
+
+          fun test() {
+              var r: <-R? <- create R()
+              storage[R] <-> r
+              destroy r
+          }
+        `,
+	)
+
+	require.Nil(t, err)
+
+	assert.Len(t, checker.Elaboration.IsResourceMovingStorageIndexExpression, 1)
+}
+
+func TestCheckInvalid(t *testing.T) {
+
+	_, err := ParseAndCheckWithStorage(t, `
+      resource R {}
+
+      fun test() {
+          consume(<-storage[R])
+      }
+
+      fun consume(_ r: <-R?) {
+          destroy r
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+}

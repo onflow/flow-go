@@ -101,7 +101,7 @@ func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 		),
@@ -679,7 +679,7 @@ func TestInterpretConcatOperator(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
@@ -1680,7 +1680,7 @@ func TestInterpretStructureDeclaration(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 }
@@ -1706,7 +1706,7 @@ func TestInterpretStructureDeclarationWithInitializer(t *testing.T) {
 	value, err := inter.Invoke("test", newValue)
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 
@@ -1767,14 +1767,14 @@ func TestInterpretStructureConstructorReferenceInInitializerAndFunction(t *testi
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 
 	value, err = inter.Invoke("test2")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 }
@@ -1935,7 +1935,7 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
       }
     `)
 
-	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).
+	actual := inter.Globals["test"].Value.(*interpreter.CompositeValue).
 		GetMember(inter, interpreter.LocationRange{}, "foo")
 	assert.Equal(t,
 		interpreter.NewIntValue(1),
@@ -1949,7 +1949,7 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
 		value,
 	)
 
-	actual = inter.Globals["test"].Value.(interpreter.CompositeValue).
+	actual = inter.Globals["test"].Value.(*interpreter.CompositeValue).
 		GetMember(inter, interpreter.LocationRange{}, "foo")
 	assert.Equal(t,
 		interpreter.NewIntValue(3),
@@ -1971,7 +1971,7 @@ func TestInterpretStructureInitializesConstant(t *testing.T) {
       let test = Test()
     `)
 
-	actual := inter.Globals["test"].Value.(interpreter.CompositeValue).
+	actual := inter.Globals["test"].Value.(*interpreter.CompositeValue).
 		GetMember(inter, interpreter.LocationRange{}, "foo")
 	assert.Equal(t,
 		interpreter.NewIntValue(42),
@@ -2295,7 +2295,7 @@ func TestInterpretStructCopyOnDeclaration(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.BoolValue(false),
 			interpreter.BoolValue(true),
 		),
@@ -2329,7 +2329,7 @@ func TestInterpretStructCopyOnDeclarationModifiedWithStructFunction(t *testing.T
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.BoolValue(false),
 			interpreter.BoolValue(true),
 		),
@@ -2360,7 +2360,7 @@ func TestInterpretStructCopyOnIdentifierAssignment(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.BoolValue(false),
 			interpreter.BoolValue(true),
 		),
@@ -2391,7 +2391,7 @@ func TestInterpretStructCopyOnIndexingAssignment(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.BoolValue(false),
 			interpreter.BoolValue(true),
 		),
@@ -2429,7 +2429,7 @@ func TestInterpretStructCopyOnMemberAssignment(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.BoolValue(false),
 			interpreter.BoolValue(true),
 		),
@@ -2489,7 +2489,7 @@ func TestInterpretArrayCopy(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(0),
 			interpreter.NewIntValue(1),
 		),
@@ -2519,7 +2519,7 @@ func TestInterpretStructCopyInArray(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
 			interpreter.NewIntValue(1),
@@ -2587,7 +2587,7 @@ func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 
@@ -2599,7 +2599,7 @@ func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
 	value, err = inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 
@@ -2616,8 +2616,8 @@ func TestInterpretOptionalVariableDeclaration(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
-			Value: interpreter.SomeValue{
+		&interpreter.SomeValue{
+			Value: &interpreter.SomeValue{
 				Value: interpreter.NewIntValue(2),
 			},
 		},
@@ -2636,8 +2636,8 @@ func TestInterpretOptionalParameterInvokedExternal(t *testing.T) {
 	value, err := inter.Invoke("test", big.NewInt(2))
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.SomeValue{
-			Value: interpreter.SomeValue{
+		&interpreter.SomeValue{
+			Value: &interpreter.SomeValue{
 				Value: interpreter.NewIntValue(2),
 			},
 		},
@@ -2658,10 +2658,11 @@ func TestInterpretOptionalParameterInvokedInternal(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	assert.Nil(t, err)
+	require.Nil(t, err)
+
 	assert.Equal(t,
-		interpreter.SomeValue{
-			Value: interpreter.SomeValue{
+		&interpreter.SomeValue{
+			Value: &interpreter.SomeValue{
 				Value: interpreter.NewIntValue(2),
 			},
 		},
@@ -2678,10 +2679,11 @@ func TestInterpretOptionalReturn(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test", big.NewInt(2))
-	assert.Nil(t, err)
+	require.Nil(t, err)
+
 	assert.Equal(t,
-		interpreter.SomeValue{
-			Value: interpreter.SomeValue{
+		&interpreter.SomeValue{
+			Value: &interpreter.SomeValue{
 				Value: interpreter.NewIntValue(2),
 			},
 		},
@@ -2700,15 +2702,16 @@ func TestInterpretOptionalAssignment(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	assert.Nil(t, err)
+	require.Nil(t, err)
+
 	assert.Equal(t,
 		interpreter.VoidValue{},
 		value,
 	)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
-			Value: interpreter.SomeValue{
+		&interpreter.SomeValue{
+			Value: &interpreter.SomeValue{
 				Value: interpreter.NewIntValue(2),
 			},
 		},
@@ -2749,7 +2752,8 @@ func TestInterpretNilReturnValue(t *testing.T) {
    `)
 
 	value, err := inter.Invoke("test")
-	assert.Nil(t, err)
+	require.Nil(t, err)
+
 	assert.Equal(t,
 		interpreter.NilValue{},
 		value,
@@ -2766,9 +2770,10 @@ func TestInterpretSomeReturnValue(t *testing.T) {
    `)
 
 	value, err := inter.Invoke("test")
-	assert.Nil(t, err)
+	require.Nil(t, err)
+
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
 		value,
@@ -2785,9 +2790,10 @@ func TestInterpretSomeReturnValueFromDictionary(t *testing.T) {
    `)
 
 	value, err := inter.Invoke("test")
-	assert.Nil(t, err)
+	require.Nil(t, err)
+
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
 		value,
@@ -2803,7 +2809,7 @@ func TestInterpretNilCoalescingNilIntToOptional(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
 		inter.Globals["x"].Value,
@@ -2819,7 +2825,7 @@ func TestInterpretNilCoalescingNilIntToOptionals(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
 		inter.Globals["x"].Value,
@@ -2834,7 +2840,7 @@ func TestInterpretNilCoalescingNilIntToOptionalNilLiteral(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
 		inter.Globals["x"].Value,
@@ -2958,7 +2964,7 @@ func TestInterpretNilCoalescingOptionalAnyNil(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.AnyValue{
+		&interpreter.AnyValue{
 			Type:  &sema.BoolType{},
 			Value: interpreter.BoolValue(true),
 		},
@@ -2974,7 +2980,7 @@ func TestInterpretNilCoalescingOptionalAnySome(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.AnyValue{
+		&interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(2),
 		},
@@ -2991,7 +2997,7 @@ func TestInterpretNilCoalescingOptionalRightHandSide(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
 		inter.Globals["z"].Value,
@@ -3007,7 +3013,7 @@ func TestInterpretNilCoalescingBothOptional(t *testing.T) {
    `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
 		inter.Globals["z"].Value,
@@ -3023,7 +3029,7 @@ func TestInterpretNilCoalescingBothOptionalLeftNil(t *testing.T) {
    `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(2),
 		},
 		inter.Globals["z"].Value,
@@ -3294,7 +3300,7 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
 		value, err := inter.Invoke("test", big.NewInt(2))
 		require.Nil(t, err)
 		assert.Equal(t,
-			interpreter.SomeValue{
+			&interpreter.SomeValue{
 				Value: interpreter.NewIntValue(2),
 			},
 			value,
@@ -3309,7 +3315,7 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
 		value, err := inter.Invoke("test", nil)
 		assert.Nil(t, err)
 		assert.Equal(t,
-			interpreter.SomeValue{
+			&interpreter.SomeValue{
 				Value: interpreter.NewIntValue(0),
 			},
 			value,
@@ -3341,7 +3347,7 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 		value, err := inter.Invoke("test", big.NewInt(2))
 		require.Nil(t, err)
 		assert.Equal(t,
-			interpreter.SomeValue{
+			&interpreter.SomeValue{
 				Value: interpreter.NewIntValue(2),
 			},
 			value,
@@ -3357,7 +3363,7 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 		value, err := inter.Invoke("test", nil)
 		require.Nil(t, err)
 		assert.Equal(t,
-			interpreter.SomeValue{
+			&interpreter.SomeValue{
 				Value: interpreter.NewIntValue(0),
 			},
 			value,
@@ -3396,7 +3402,7 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 			))
 
 			assert.IsType(t,
-				interpreter.CompositeValue{},
+				&interpreter.CompositeValue{},
 				inter.Globals["test"].Value,
 			)
 		})
@@ -3602,7 +3608,7 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 			value, err := inter.Invoke("test", big.NewInt(1))
 			assert.Nil(t, err)
 			assert.IsType(t,
-				interpreter.CompositeValue{},
+				&interpreter.CompositeValue{},
 				value,
 			)
 
@@ -3765,14 +3771,14 @@ func TestInterpretDictionaryIndexingString(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
 		inter.Globals["a"].Value,
 	)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(2),
 		},
 		inter.Globals["b"].Value,
@@ -3793,14 +3799,14 @@ func TestInterpretDictionaryIndexingBool(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
 		inter.Globals["a"].Value,
 	)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(2),
 		},
 		inter.Globals["b"].Value,
@@ -3817,14 +3823,14 @@ func TestInterpretDictionaryIndexingInt(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewStringValue("a"),
 		},
 		inter.Globals["a"].Value,
 	)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewStringValue("b"),
 		},
 		inter.Globals["b"].Value,
@@ -3853,8 +3859,8 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.SomeValue{Value: interpreter.NewIntValue(23)},
-		inter.Globals["x"].Value.(interpreter.DictionaryValue).
+		&interpreter.SomeValue{Value: interpreter.NewIntValue(23)},
+		inter.Globals["x"].Value.(*interpreter.DictionaryValue).
 			Get(inter, interpreter.LocationRange{}, interpreter.NewStringValue("abc")),
 	)
 }
@@ -3867,7 +3873,7 @@ func TestInterpretFailableCastingAnySuccess(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.AnyValue{
+		&interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(42),
 		},
@@ -3875,7 +3881,7 @@ func TestInterpretFailableCastingAnySuccess(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(42),
 		},
 		inter.Globals["y"].Value,
@@ -3902,8 +3908,8 @@ func TestInterpretOptionalAny(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
-			Value: interpreter.AnyValue{
+		&interpreter.SomeValue{
+			Value: &interpreter.AnyValue{
 				Type:  &sema.IntType{},
 				Value: interpreter.NewIntValue(42),
 			},
@@ -3920,8 +3926,8 @@ func TestInterpretOptionalAnyFailableCasting(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
-			Value: interpreter.AnyValue{
+		&interpreter.SomeValue{
+			Value: &interpreter.AnyValue{
 				Type:  &sema.IntType{},
 				Value: interpreter.NewIntValue(42),
 			},
@@ -3930,7 +3936,7 @@ func TestInterpretOptionalAnyFailableCasting(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(42),
 		},
 		inter.Globals["y"].Value,
@@ -3946,8 +3952,8 @@ func TestInterpretOptionalAnyFailableCastingInt(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
-			Value: interpreter.AnyValue{
+		&interpreter.SomeValue{
+			Value: &interpreter.AnyValue{
 				Type:  &sema.IntType{},
 				Value: interpreter.NewIntValue(23),
 			},
@@ -3956,7 +3962,7 @@ func TestInterpretOptionalAnyFailableCastingInt(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.AnyValue{
+		&interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(23),
 		},
@@ -3964,7 +3970,7 @@ func TestInterpretOptionalAnyFailableCastingInt(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(23),
 		},
 		inter.Globals["z"].Value,
@@ -3985,7 +3991,7 @@ func TestInterpretOptionalAnyFailableCastingNil(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.AnyValue{
+		&interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(42),
 		},
@@ -3993,7 +3999,7 @@ func TestInterpretOptionalAnyFailableCastingNil(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(42),
 		},
 		inter.Globals["z"].Value,
@@ -4041,7 +4047,7 @@ func TestInterpretStructureFunctionBindingInside(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 }
@@ -4065,7 +4071,7 @@ func TestInterpretStructureFunctionBindingOutside(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		value,
 	)
 }
@@ -4083,7 +4089,7 @@ func TestInterpretArrayAppend(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
@@ -4107,7 +4113,7 @@ func TestInterpretArrayAppendBound(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
@@ -4129,7 +4135,7 @@ func TestInterpretArrayConcat(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
@@ -4152,7 +4158,7 @@ func TestInterpretArrayConcatBound(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
@@ -4175,7 +4181,7 @@ func TestInterpretArrayInsert(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(4),
 			interpreter.NewIntValue(2),
@@ -4193,7 +4199,7 @@ func TestInterpretArrayRemove(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(3),
 		),
@@ -4214,7 +4220,7 @@ func TestInterpretArrayRemoveFirst(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(3),
 		),
@@ -4235,7 +4241,7 @@ func TestInterpretArrayRemoveLast(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 		),
@@ -4335,7 +4341,7 @@ func TestInterpretDictionaryRemove(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
 		inter.Globals["removed"].Value,
@@ -4366,7 +4372,7 @@ func TestInterpretDictionaryInsert(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(1),
 		},
 		inter.Globals["inserted"].Value,
@@ -4387,7 +4393,7 @@ func TestInterpretDictionaryKeys(t *testing.T) {
 	require.Nil(t, err)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewStringValue("def"),
 			interpreter.NewStringValue("abc"),
 			interpreter.NewStringValue("a"),
@@ -4410,7 +4416,7 @@ func TestInterpretDictionaryValues(t *testing.T) {
 	require.Nil(t, err)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(3),
@@ -4438,7 +4444,7 @@ func TestInterpretIntegerLiteralTypeConversionInVariableDeclarationOptional(t *t
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.Int8Value(1),
 		},
 		inter.Globals["x"].Value,
@@ -4478,7 +4484,7 @@ func TestInterpretIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T)
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.Int8Value(1),
 		},
 		inter.Globals["x"].Value,
@@ -4488,7 +4494,7 @@ func TestInterpretIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T)
 	assert.Nil(t, err)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.Int8Value(2),
 		},
 		inter.Globals["x"].Value,
@@ -4520,7 +4526,7 @@ func TestInterpretIntegerLiteralTypeConversionInFunctionCallArgumentOptional(t *
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.Int8Value(1),
 		},
 		inter.Globals["x"].Value,
@@ -4554,7 +4560,7 @@ func TestInterpretIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.Int8Value(1),
 		},
 		value,
@@ -4786,8 +4792,6 @@ var storageValueDeclaration = map[string]sema.ValueDeclaration{
 	},
 }
 
-type storageIdentifier struct{}
-
 func TestInterpretStorage(t *testing.T) {
 
 	storedValues := map[string]interpreter.OptionalValue{}
@@ -4838,7 +4842,7 @@ func TestInterpretStorage(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(42),
 		},
 		value,
@@ -4859,7 +4863,7 @@ func TestInterpretSwapVariables(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(3),
 			interpreter.NewIntValue(2),
 		),
@@ -4889,7 +4893,7 @@ func TestInterpretSwapArrayAndField(t *testing.T) {
 	value, err := inter.Invoke("test")
 	assert.Nil(t, err)
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(1),
 		),
@@ -5287,21 +5291,21 @@ func TestInterpretSwapResourceDictionaryElementReturnDictionary(t *testing.T) {
 	assert.Nil(t, err)
 
 	require.IsType(t,
-		interpreter.DictionaryValue{},
+		&interpreter.DictionaryValue{},
 		value,
 	)
 
-	foo := value.(interpreter.DictionaryValue).
+	foo := value.(*interpreter.DictionaryValue).
 		Get(inter, interpreter.LocationRange{}, interpreter.NewStringValue("foo"))
 
 	require.IsType(t,
-		interpreter.SomeValue{},
+		&interpreter.SomeValue{},
 		foo,
 	)
 
 	assert.IsType(t,
-		interpreter.CompositeValue{},
-		foo.(interpreter.SomeValue).Value,
+		&interpreter.CompositeValue{},
+		foo.(*interpreter.SomeValue).Value,
 	)
 }
 
@@ -5323,13 +5327,13 @@ func TestInterpretSwapResourceDictionaryElementRemoveUsingNil(t *testing.T) {
 	assert.Nil(t, err)
 
 	require.IsType(t,
-		interpreter.SomeValue{},
+		&interpreter.SomeValue{},
 		value,
 	)
 
 	assert.IsType(t,
-		interpreter.CompositeValue{},
-		value.(interpreter.SomeValue).Value,
+		&interpreter.CompositeValue{},
+		value.(*interpreter.SomeValue).Value,
 	)
 }
 
@@ -5365,17 +5369,17 @@ func TestInterpretReferenceExpression(t *testing.T) {
 	require.Nil(t, err)
 
 	require.IsType(t,
-		interpreter.ReferenceValue{},
+		&interpreter.ReferenceValue{},
 		value,
 	)
 
 	rType := inter.Checker.GlobalTypes["R"].Type
 
 	require.Equal(t,
-		interpreter.ReferenceValue{
-			StorageIdentifier: storageValue.Identifier,
+		&interpreter.ReferenceValue{
+			TargetStorageIdentifier: storageValue.Identifier,
 			// TODO: improve
-			Key: rType.String(),
+			TargetKey: rType.String(),
 		},
 		value,
 	)
@@ -5462,7 +5466,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 	require.Nil(t, err)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
 			interpreter.NewIntValue(2),
@@ -5549,7 +5553,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 	require.Nil(t, err)
 
 	assert.Equal(t,
-		interpreter.NewArrayValue(
+		interpreter.NewArrayValueNonCopying(
 			interpreter.NewIntValue(0),
 			interpreter.NewIntValue(1),
 			interpreter.NewIntValue(2),
@@ -5669,25 +5673,25 @@ func TestInterpretVariableDeclarationSecondValue(t *testing.T) {
 	require.Nil(t, err)
 
 	require.IsType(t,
-		interpreter.ArrayValue{},
+		&interpreter.ArrayValue{},
 		value,
 	)
 
-	values := *value.(interpreter.ArrayValue).Values
+	values := value.(*interpreter.ArrayValue).Values
 
 	require.IsType(t,
-		interpreter.SomeValue{},
+		&interpreter.SomeValue{},
 		values[0],
 	)
 
-	firstValue := values[0].(interpreter.SomeValue).Value
+	firstValue := values[0].(*interpreter.SomeValue).Value
 
 	require.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		firstValue,
 	)
 
-	firstResource := firstValue.(interpreter.CompositeValue)
+	firstResource := firstValue.(*interpreter.CompositeValue)
 
 	assert.Equal(t,
 		firstResource.GetField("id"),
@@ -5695,18 +5699,18 @@ func TestInterpretVariableDeclarationSecondValue(t *testing.T) {
 	)
 
 	require.IsType(t,
-		interpreter.SomeValue{},
+		&interpreter.SomeValue{},
 		values[1],
 	)
 
-	secondValue := values[1].(interpreter.SomeValue).Value
+	secondValue := values[1].(*interpreter.SomeValue).Value
 
 	require.IsType(t,
-		interpreter.CompositeValue{},
+		&interpreter.CompositeValue{},
 		secondValue,
 	)
 
-	secondResource := secondValue.(interpreter.CompositeValue)
+	secondResource := secondValue.(*interpreter.CompositeValue)
 
 	assert.Equal(t,
 		secondResource.GetField("id"),
@@ -5775,7 +5779,7 @@ func TestInterpretCastingIntLiteralToAny(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.AnyValue{
+		&interpreter.AnyValue{
 			Type:  &sema.IntType{},
 			Value: interpreter.NewIntValue(42),
 		},
@@ -5790,7 +5794,7 @@ func TestInterpretCastingIntLiteralToOptional(t *testing.T) {
     `)
 
 	assert.Equal(t,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(42),
 		},
 		inter.Globals["x"].Value,
@@ -5818,15 +5822,15 @@ func TestInterpretOptionalChainingFieldRead(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		inter.Globals["x1"].Value,
 		interpreter.NilValue{},
+		inter.Globals["x1"].Value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["x2"].Value,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(42),
 		},
+		inter.Globals["x2"].Value,
 	)
 }
 
@@ -5849,18 +5853,18 @@ func TestInterpretOptionalChainingFunctionRead(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		inter.Globals["x1"].Value,
 		interpreter.NilValue{},
+		inter.Globals["x1"].Value,
 	)
 
 	require.IsType(t,
+		&interpreter.SomeValue{},
 		inter.Globals["x2"].Value,
-		interpreter.SomeValue{},
 	)
 
 	assert.IsType(t,
-		inter.Globals["x2"].Value.(interpreter.SomeValue).Value,
 		interpreter.HostFunctionValue{},
+		inter.Globals["x2"].Value.(*interpreter.SomeValue).Value,
 	)
 }
 
@@ -5883,14 +5887,321 @@ func TestInterpretOptionalChainingFunctionCall(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		inter.Globals["x1"].Value,
 		interpreter.NilValue{},
+		inter.Globals["x1"].Value,
 	)
 
 	assert.Equal(t,
-		inter.Globals["x2"].Value,
-		interpreter.SomeValue{
+		&interpreter.SomeValue{
 			Value: interpreter.NewIntValue(42),
 		},
+		inter.Globals["x2"].Value,
+	)
+}
+
+// TestInterpretStorageResourceMoveRemovalInSwap tests that reading but also
+// resource moving from storage results in a deletion from storage,
+// when the storage index expression is located in a swap statement
+//
+func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
+
+	allStoredValues := map[string]map[string]interpreter.OptionalValue{}
+
+	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+	getter := func(_ *interpreter.Interpreter, id string, key string) interpreter.OptionalValue {
+		storedValues := allStoredValues[id]
+		if storedValues == nil {
+			storedValues = map[string]interpreter.OptionalValue{}
+			allStoredValues[id] = storedValues
+		}
+
+		value, ok := storedValues[key]
+		if !ok {
+			return interpreter.NilValue{}
+		}
+		return value
+	}
+
+	setter := func(_ *interpreter.Interpreter, id string, key string, value interpreter.OptionalValue) {
+		storedValues := allStoredValues[id]
+		if storedValues == nil {
+			storedValues = map[string]interpreter.OptionalValue{}
+			allStoredValues[id] = storedValues
+		}
+
+		storedValues[key] = value
+	}
+
+	storageIdentifier1 := "storage1"
+	storageValue1 := interpreter.StorageValue{
+		Identifier: storageIdentifier1,
+	}
+
+	storageIdentifier2 := "storage2"
+	storageValue2 := interpreter.StorageValue{
+		Identifier: storageIdentifier2,
+	}
+
+	inter := parseCheckAndInterpretWithOptions(t, `
+          pub resource R {}
+
+          pub fun test() {
+              var r: <-R? <- nil
+              storage1[R] <-> r
+              storage2[R] <-> r
+              // there was no old value, but it must be discarded
+              destroy r
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(
+					map[string]sema.ValueDeclaration{
+						"storage1": stdlib.StandardLibraryValue{
+							Name:       "storage1",
+							Type:       &sema.StorageType{},
+							Kind:       common.DeclarationKindConstant,
+							IsConstant: true,
+						},
+						"storage2": stdlib.StandardLibraryValue{
+							Name:       "storage2",
+							Type:       &sema.StorageType{},
+							Kind:       common.DeclarationKindConstant,
+							IsConstant: true,
+						},
+					},
+				),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage1": storageValue1,
+					"storage2": storageValue2,
+				}),
+				interpreter.WithStorageReadHandler(getter),
+				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+						return indexingType.String()
+					},
+				),
+			},
+		},
+	)
+
+	const rTypeIdentifier = "R"
+
+	rValue := &interpreter.SomeValue{
+		Value: &interpreter.CompositeValue{
+			Identifier: rTypeIdentifier,
+			Fields:     map[string]interpreter.Value{},
+		},
+	}
+	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
+		rTypeIdentifier: rValue,
+	}
+
+	_, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NilValue{},
+		allStoredValues[storageIdentifier1][rTypeIdentifier],
+	)
+
+	assert.Equal(t,
+		rValue,
+		allStoredValues[storageIdentifier2][rTypeIdentifier],
+	)
+}
+
+// TestInterpretStorageResourceMoveRemovalInVariableDeclaration tests that reading but also
+// resource moving from storage results in a deletion from storage,
+// when the storage index expression is located in a variable declaration
+//
+func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) {
+
+	allStoredValues := map[string]map[string]interpreter.OptionalValue{}
+
+	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+	getter := func(_ *interpreter.Interpreter, id string, key string) interpreter.OptionalValue {
+		storedValues := allStoredValues[id]
+		if storedValues == nil {
+			storedValues = map[string]interpreter.OptionalValue{}
+			allStoredValues[id] = storedValues
+		}
+
+		value, ok := storedValues[key]
+		if !ok {
+			return interpreter.NilValue{}
+		}
+		return value
+	}
+
+	setter := func(_ *interpreter.Interpreter, id string, key string, value interpreter.OptionalValue) {
+		storedValues := allStoredValues[id]
+		if storedValues == nil {
+			storedValues = map[string]interpreter.OptionalValue{}
+			allStoredValues[id] = storedValues
+		}
+
+		storedValues[key] = value
+	}
+
+	storageIdentifier1 := "storage1"
+	storageValue1 := interpreter.StorageValue{
+		Identifier: storageIdentifier1,
+	}
+
+	storageIdentifier2 := "storage2"
+	storageValue2 := interpreter.StorageValue{
+		Identifier: storageIdentifier2,
+	}
+
+	inter := parseCheckAndInterpretWithOptions(t, `
+          pub resource R {}
+
+          pub fun test() {
+              let r <- storage1[R] <- nil
+              let r2 <- storage2[R] <- r
+              // there was no old value, but it must be discarded
+              destroy r2
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(
+					map[string]sema.ValueDeclaration{
+						"storage1": stdlib.StandardLibraryValue{
+							Name:       "storage1",
+							Type:       &sema.StorageType{},
+							Kind:       common.DeclarationKindConstant,
+							IsConstant: true,
+						},
+						"storage2": stdlib.StandardLibraryValue{
+							Name:       "storage2",
+							Type:       &sema.StorageType{},
+							Kind:       common.DeclarationKindConstant,
+							IsConstant: true,
+						},
+					},
+				),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage1": storageValue1,
+					"storage2": storageValue2,
+				}),
+				interpreter.WithStorageReadHandler(getter),
+				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandlerFunc(
+					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+						return indexingType.String()
+					},
+				),
+			},
+		},
+	)
+
+	const rTypeIdentifier = "R"
+
+	rValue := &interpreter.SomeValue{
+		Value: &interpreter.CompositeValue{
+			Identifier: rTypeIdentifier,
+			Fields:     map[string]interpreter.Value{},
+		},
+	}
+	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
+		rTypeIdentifier: rValue,
+	}
+
+	_, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NilValue{},
+		allStoredValues[storageIdentifier1][rTypeIdentifier],
+	)
+
+	assert.Equal(t,
+		rValue,
+		allStoredValues[storageIdentifier2][rTypeIdentifier],
+	)
+}
+
+func TestInterpretOptionalChainingFieldReadAndNilCoalescing(t *testing.T) {
+
+	standardLibraryFunctions :=
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}
+
+	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
+	predefinedValues := standardLibraryFunctions.ToValues
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+          struct Test {
+              let x: Int
+
+              init(x: Int) {
+                  self.x = x
+              }
+          }
+
+          let test: Test? = Test(x: 42)
+          let x = test?.x ?? panic("nil")
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(valueDeclarations),
+				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(predefinedValues()),
+			},
+		},
+	)
+
+	assert.Equal(t,
+		inter.Globals["x"].Value,
+		interpreter.NewIntValue(42),
+	)
+}
+
+func TestInterpretOptionalChainingFunctionCallAndNilCoalescing(t *testing.T) {
+
+	standardLibraryFunctions :=
+		stdlib.StandardLibraryFunctions{
+			stdlib.PanicFunction,
+		}
+
+	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
+	predefinedValues := standardLibraryFunctions.ToValues
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+          struct Test {
+              fun x(): Int {
+                  return 42
+              }
+          }
+
+          let test: Test? = Test()
+          let x = test?.x() ?? panic("nil")
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(valueDeclarations),
+				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(predefinedValues()),
+			},
+		},
+	)
+
+	assert.Equal(t,
+		inter.Globals["x"].Value,
+		interpreter.NewIntValue(42),
 	)
 }
