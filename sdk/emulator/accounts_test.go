@@ -30,7 +30,7 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, nil)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -249,7 +249,7 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, nil)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -333,7 +333,7 @@ func TestAddAccountKey(t *testing.T) {
 		err = b.SubmitTransaction(tx1)
 		assert.NoError(t, err)
 
-		script := []byte("pub fun main(account: Account) {}")
+		script := []byte("transaction { execute {} }")
 
 		tx2 := flow.Transaction{
 			Script:             script,
@@ -341,7 +341,6 @@ func TestAddAccountKey(t *testing.T) {
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-			ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 		}
 
 		sig, err = keys.SignTransaction(tx2, privateKey)
@@ -503,10 +502,10 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		accountAddressA := b.RootAccountAddress()
 		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, codeA, getNonce())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, codeA, account.Code)
 
@@ -545,10 +544,11 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		accountAddressA := b.RootAccountAddress()
 		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, codeA, getNonce())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
-		require.Nil(t, err)
+		require.NoError(t, err)
+
 		assert.Equal(t, codeA, account.Code)
 
 		tx := flow.Transaction{
@@ -591,8 +591,12 @@ func TestUpdateAccountCode(t *testing.T) {
 		assert.Equal(t, codeA, account.Code)
 
 		unauthorizedUpdateAccountCodeScript := []byte(fmt.Sprintf(`
-			pub fun main(account: Account) {
+			transaction {
+			  prepare(account: Account) {
 				updateAccountCode(%s, nil)
+			  }
+			  
+			  execute {}
 			}
 		`, accountAddressB.Hex()))
 
@@ -639,11 +643,13 @@ func TestImportAccountCode(t *testing.T) {
 	script := []byte(fmt.Sprintf(`
 		import 0x%s
 
-		pub fun main(account: Account) {
+		transaction {
+		  execute {
 			let answer = answer()
 			if answer != 42 {
 				panic("?!")
 			}
+		  }
 		}
 	`, address.Hex()))
 
@@ -653,7 +659,6 @@ func TestImportAccountCode(t *testing.T) {
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())

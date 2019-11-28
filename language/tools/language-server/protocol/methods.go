@@ -11,6 +11,16 @@ func (server *Server) handleInitialize(req *json.RawMessage) (interface{}, error
 	return server.Handler.Initialize(server.conn, &params)
 }
 
+func (server *Server) handleDidOpenTextDocument(req *json.RawMessage) (interface{}, error) {
+	var params DidOpenTextDocumentParams
+	if err := json.Unmarshal(*req, &params); err != nil {
+		return nil, err
+	}
+
+	err := server.Handler.DidOpenTextDocument(server.conn, &params)
+	return nil, err
+}
+
 func (server *Server) handleDidChangeTextDocument(req *json.RawMessage) (interface{}, error) {
 	var params DidChangeTextDocumentParams
 	if err := json.Unmarshal(*req, &params); err != nil {

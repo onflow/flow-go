@@ -1769,6 +1769,18 @@ func (e *InvalidFailableResourceDowncastOutsideOptionalBindingError) Error() str
 
 func (*InvalidFailableResourceDowncastOutsideOptionalBindingError) isSemanticError() {}
 
+// ReadOnlyTargetAssignmentError
+
+type ReadOnlyTargetAssignmentError struct {
+	ast.Range
+}
+
+func (e *ReadOnlyTargetAssignmentError) Error() string {
+	return "cannot assign to read-only target"
+}
+
+func (*ReadOnlyTargetAssignmentError) isSemanticError() {}
+
 // InvalidTransactionBlockError
 
 type InvalidTransactionBlockError struct {
@@ -1856,3 +1868,20 @@ func (e *InvalidTransactionFieldAccessModifierError) EndPosition() ast.Position 
 	length := len(e.Access)
 	return e.Pos.Shifted(length - 1)
 }
+
+// InvalidTransactionPrepareParameterType
+
+type InvalidTransactionPrepareParameterType struct {
+	Type  Type
+	Range ast.Range
+}
+
+func (e *InvalidTransactionPrepareParameterType) Error() string {
+	return fmt.Sprintf(
+		"prepare parameter must be of type `%s`, not `%s`",
+		&AccountType{},
+		e.Type,
+	)
+}
+
+func (*InvalidTransactionPrepareParameterType) isSemanticError() {}

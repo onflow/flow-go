@@ -43,7 +43,7 @@ func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transacti
 
 	location := runtime.TransactionLocation(tx.Hash())
 
-	_, err := c.runtime.ExecuteScript(tx.Script, runtimeContext, location)
+	err := c.runtime.ExecuteTransaction(tx.Script, runtimeContext, location)
 	if err != nil {
 		return nil, err
 	}

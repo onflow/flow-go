@@ -186,6 +186,8 @@ func (checker *Checker) visitIndexExpression(
 	switch indexedType := targetType.(type) {
 	case TypeIndexableType:
 
+		checker.Elaboration.IsTypeIndexExpression[indexExpression] = true
+
 		indexingType := indexExpression.IndexingType
 
 		// indexing into type-indexable using expression?
@@ -295,6 +297,25 @@ func (checker *Checker) visitTypeIndexingExpression(
 	}
 
 	checker.Elaboration.IndexExpressionIndexingTypes[indexExpression] = keyType
+
+	if isAssignment && !indexedType.IsAssignable() {
+		checker.report(
+			&ReadOnlyTargetAssignmentError{
+				Range: ast.NewRangeFromPositioned(indexExpression.TargetExpression),
+			},
+		)
+	}
+
+	isValid, expectedType := indexedType.IsValidIndexingType(keyType)
+	if !isValid {
+		checker.report(
+			&TypeMismatchError{
+				ExpectedType: expectedType,
+				ActualType:   keyType,
+				Range:        ast.NewRangeFromPositioned(indexingType),
+			},
+		)
+	}
 
 	return indexedType.ElementType(keyType, isAssignment)
 }

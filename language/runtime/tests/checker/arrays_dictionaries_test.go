@@ -696,7 +696,7 @@ func TestCheckInvalidArrayElements(t *testing.T) {
 
 func TestCheckInvalidArrayIndexingWithType(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           let x = ["xyz"][String?]
 	    `,
@@ -709,7 +709,7 @@ func TestCheckInvalidArrayIndexingWithType(t *testing.T) {
 
 func TestCheckInvalidArrayIndexingAssignmentWithType(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           fun test() {
               let stuff = ["abc"]
@@ -725,7 +725,7 @@ func TestCheckInvalidArrayIndexingAssignmentWithType(t *testing.T) {
 
 func TestCheckInvalidDictionaryIndexingWithType(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           let x = {"a": 1}[String?]
 	    `,
@@ -738,7 +738,7 @@ func TestCheckInvalidDictionaryIndexingWithType(t *testing.T) {
 
 func TestCheckInvalidDictionaryIndexingAssignmentWithType(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           fun test() {
               let stuff = {"a": 1}

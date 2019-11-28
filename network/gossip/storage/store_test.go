@@ -14,7 +14,6 @@ func TestDatabase(t *testing.T) {
 	assert := assert.New(t)
 	mmd := NewMemMsgStore()
 
-
 	initKeys := []string{
 		"exists",
 		"found",
