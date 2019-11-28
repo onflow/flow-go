@@ -109,6 +109,11 @@ spec:
   strategy:
     type: Recreate
 
+  # How long should we wait (max) for deployment to be up, when checking rollout status
+  progressDeadlineSeconds: 60
+  # Minimum number of seconds that the deployment should be ready, to be considered available
+  minReadySeconds: 1
+
   template:
     metadata:
       annotations:
