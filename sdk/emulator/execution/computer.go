@@ -83,7 +83,7 @@ func convertEvents(values []values.Event, txHash crypto.Hash) []flow.Event {
 		}
 
 		events[i] = flow.Event{
-			// Type:    value.Identifier,
+			Type:    value.Type().ID(),
 			TxHash:  txHash,
 			Index:   uint(i),
 			Payload: payload,
