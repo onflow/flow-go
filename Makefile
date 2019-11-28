@@ -33,7 +33,9 @@ test:
 
 .PHONY: coverage
 coverage:
-	go tool cover -html=$(COVER_PROFILE) -o index.html
+	# file has to be called index.html
+	gocov convert $(COVER_PROFILE) | gocov-html > index.html
+	# coverage.zip will automatically be picked up by teamcity
 	zip coverage.zip index.html
 
 .PHONY: generate
