@@ -5,6 +5,8 @@ COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
 VERSION := $(shell git describe --tags --abbrev=0 --exact-match)
 
+VSCODE_DIR := "language/tools/vscode-extension"
+
 crypto/relic:
 	rm -rf crypto/relic
 	git submodule update --init --recursive
@@ -58,7 +60,6 @@ generate-mocks:
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/emulated_blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator EmulatedBlockchainAPI
 
-
 .PHONY: check-generated-code
 check-generated-code:
 	./utils/scripts/check-generated-code.sh
@@ -95,3 +96,16 @@ docker-push-emulator:
 .PHONY: docker-build-consensus
 docker-build-consensus:
 	docker build -f cmd/consensus/Dockerfile -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" .
+
+# Builds the VS Code extension
+.PHONY: build-vscode-extension
+build-vscode-extension:
+	cd $(VSCODE_DIR) && npm run package;
+
+# Builds and promotes the VS Code extension. Promoting here means re-generating
+# the embedded extension binary used in the CLI for installation.
+.PHONY: promote-vscode-extension
+promote-vscode-extension: build-vscode-extension
+	cp $(VSCODE_DIR)/cadence-*.vsix ./cli/flow/cadence/vscode/cadence.vsix;
+	go generate cli/flow/cadence;
+
