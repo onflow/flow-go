@@ -69,7 +69,7 @@ func TestEncodeBytes(t *testing.T) {
 }
 
 func TestEncodeAddress(t *testing.T) {
-	testEncode(t, types.Address{}, values.NewAddress([]byte{1, 2, 3, 4, 5}))
+	testEncode(t, types.Address{}, values.NewAddress([20]byte{1, 2, 3, 4, 5}))
 }
 
 func TestEncodeInt(t *testing.T) {
@@ -510,7 +510,6 @@ func TestEncodeEvent(t *testing.T) {
 	simpleEvent := encodeTest{
 		"SimpleEvent",
 		types.Event{
-			Identifier: "Test",
 			FieldTypes: []types.EventField{
 				{
 					Identifier: "x",
@@ -531,7 +530,6 @@ func TestEncodeEvent(t *testing.T) {
 	compositeEvent := encodeTest{
 		"CompositeEvent",
 		types.Event{
-			Identifier: "Test",
 			FieldTypes: []types.EventField{
 				{
 					Identifier: "x",
