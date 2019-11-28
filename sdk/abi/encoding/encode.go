@@ -103,7 +103,7 @@ func (e *Encoder) EncodeVoid() error {
 //  RFC Section 4.4 - Boolean
 //  Represented as an XDR encoded enumeration where 0 is false and 1 is true
 func (e *Encoder) EncodeBool(v values.Bool) error {
-	_, err := e.enc.EncodeBool(bool(v))
+	_, err := e.enc.EncodeBool(v.Bool())
 	return err
 }
 
@@ -113,7 +113,7 @@ func (e *Encoder) EncodeBool(v values.Bool) error {
 //  RFC Section 4.11 - String
 //  Unsigned integer length followed by bytes zero-padded to a multiple of four
 func (e *Encoder) EncodeString(v values.String) error {
-	_, err := e.enc.EncodeString(string(v))
+	_, err := e.enc.EncodeString(v.String())
 	return err
 }
 
@@ -123,7 +123,7 @@ func (e *Encoder) EncodeString(v values.String) error {
 //  RFC Section 4.10 - Variable-Length Opaque Data
 //  Unsigned integer length followed by fixed opaque data of that length
 func (e *Encoder) EncodeBytes(v values.Bytes) error {
-	_, err := e.enc.EncodeOpaque(v)
+	_, err := e.enc.EncodeOpaque(v.Bytes())
 	return err
 }
 
@@ -133,7 +133,7 @@ func (e *Encoder) EncodeBytes(v values.Bytes) error {
 //  RFC Section 4.9 - Fixed-Length Opaque Data
 //  Fixed-length uninterpreted data zero-padded to a multiple of four
 func (e *Encoder) EncodeAddress(v values.Address) error {
-	_, err := e.enc.EncodeFixedOpaque(v[:])
+	_, err := e.enc.EncodeFixedOpaque(v.Bytes())
 	return err
 }
 
@@ -148,7 +148,9 @@ func (e *Encoder) EncodeAddress(v values.Address) error {
 //  RFC Section 4.10 - Variable-Length Opaque Data
 //  Unsigned integer length followed by fixed opaque data of that length
 func (e *Encoder) EncodeInt(v values.Int) error {
-	isPositive := v.Int.Cmp(big.NewInt(0)) >= 0
+	val := v.Big()
+
+	isPositive := val.Cmp(big.NewInt(0)) >= 0
 
 	var b []byte
 
@@ -158,7 +160,7 @@ func (e *Encoder) EncodeInt(v values.Int) error {
 		b = []byte{0}
 	}
 
-	b = append(b, v.Int.Bytes()...)
+	b = append(b, val.Bytes()...)
 
 	_, err := e.enc.EncodeOpaque(b)
 	return err
@@ -170,7 +172,7 @@ func (e *Encoder) EncodeInt(v values.Int) error {
 //  RFC Section 4.1 - Integer
 //  32-bit big-endian signed integer in range [-2147483648, 2147483647]
 func (e *Encoder) EncodeInt8(v values.Int8) error {
-	_, err := e.enc.EncodeInt(int32(v))
+	_, err := e.enc.EncodeInt(int32(v.Int8()))
 	return err
 }
 
@@ -180,7 +182,7 @@ func (e *Encoder) EncodeInt8(v values.Int8) error {
 //  RFC Section 4.1 - Integer
 //  32-bit big-endian signed integer in range [-2147483648, 2147483647]
 func (e *Encoder) EncodeInt16(v values.Int16) error {
-	_, err := e.enc.EncodeInt(int32(v))
+	_, err := e.enc.EncodeInt(int32(v.Int16()))
 	return err
 }
 
@@ -190,7 +192,7 @@ func (e *Encoder) EncodeInt16(v values.Int16) error {
 //  RFC Section 4.1 - Integer
 //  32-bit big-endian signed integer in range [-2147483648, 2147483647]
 func (e *Encoder) EncodeInt32(v values.Int32) error {
-	_, err := e.enc.EncodeInt(int32(v))
+	_, err := e.enc.EncodeInt(int32(v.Int32()))
 	return err
 }
 
@@ -200,7 +202,7 @@ func (e *Encoder) EncodeInt32(v values.Int32) error {
 //  RFC Section 4.5 - Hyper Integer
 //  64-bit big-endian signed integer in range [-9223372036854775808, 9223372036854775807]
 func (e *Encoder) EncodeInt64(v values.Int64) error {
-	_, err := e.enc.EncodeHyper(int64(v))
+	_, err := e.enc.EncodeHyper(int64(v.Int64()))
 	return err
 }
 
@@ -210,7 +212,7 @@ func (e *Encoder) EncodeInt64(v values.Int64) error {
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
 func (e *Encoder) EncodeUint8(v values.Uint8) error {
-	_, err := e.enc.EncodeUint(uint32(v))
+	_, err := e.enc.EncodeUint(uint32(v.Uint8()))
 	return err
 }
 
@@ -220,7 +222,7 @@ func (e *Encoder) EncodeUint8(v values.Uint8) error {
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
 func (e *Encoder) EncodeUint16(v values.Uint16) error {
-	_, err := e.enc.EncodeUint(uint32(v))
+	_, err := e.enc.EncodeUint(uint32(v.Uint16()))
 	return err
 }
 
@@ -230,7 +232,7 @@ func (e *Encoder) EncodeUint16(v values.Uint16) error {
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
 func (e *Encoder) EncodeUint32(v values.Uint32) error {
-	_, err := e.enc.EncodeUint(uint32(v))
+	_, err := e.enc.EncodeUint(uint32(v.Uint32()))
 	return err
 }
 
@@ -240,7 +242,7 @@ func (e *Encoder) EncodeUint32(v values.Uint32) error {
 //  RFC Section 4.5 - Unsigned Hyper Integer
 //  64-bit big-endian unsigned integer in range [0, 18446744073709551615]
 func (e *Encoder) EncodeUint64(v values.Uint64) error {
-	_, err := e.enc.EncodeUhyper(uint64(v))
+	_, err := e.enc.EncodeUhyper(uint64(v.Uint64()))
 	return err
 }
 
@@ -251,14 +253,16 @@ func (e *Encoder) EncodeUint64(v values.Uint64) error {
 //  RFC Section 4.13 - Variable-Length Array
 //  Unsigned integer length followed by individually XDR-encoded array elements
 func (e *Encoder) EncodeVariableSizedArray(v values.VariableSizedArray) error {
-	size := uint32(len(v))
+	vals := v.Values()
+
+	size := uint32(len(vals))
 
 	_, err := e.enc.EncodeUint(size)
 	if err != nil {
 		return err
 	}
 
-	return e.EncodeConstantSizedArray(values.ConstantSizedArray(v))
+	return e.encodeArray(vals)
 }
 
 // EncodeConstantSizedArray writes the XDR-encoded representation of a
@@ -268,7 +272,7 @@ func (e *Encoder) EncodeVariableSizedArray(v values.VariableSizedArray) error {
 //  RFC Section 4.12 - Fixed-Length Array
 //  Individually XDR-encoded array elements
 func (e *Encoder) EncodeConstantSizedArray(v values.ConstantSizedArray) error {
-	return e.encodeArray(v)
+	return e.encodeArray(v.Values())
 }
 
 // encodeArray writes the XDR-encoded representation of a constant-sized array.
@@ -292,7 +296,9 @@ func (e *Encoder) encodeArray(v []values.Value) error {
 // the dictionary keys, then elements, each represented as individually
 // XDR-encoded array elements.
 func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
-	size := uint32(len(v))
+	pairs := v.Pairs()
+
+	size := uint32(len(pairs))
 
 	// size is encoded as an unsigned integer
 	_, err := e.enc.EncodeUint(size)
@@ -304,7 +310,7 @@ func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
 	keys := make([]values.Value, size)
 	elements := make([]values.Value, size)
 
-	for i, pair := range v {
+	for i, pair := range pairs {
 		keys[i] = pair.Key
 		elements[i] = pair.Value
 	}
@@ -322,12 +328,12 @@ func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
 //
 // A composite is encoded as a fixed-length array of its field values.
 func (e *Encoder) EncodeComposite(v values.Composite) error {
-	return e.encodeArray(v.Fields)
+	return e.encodeArray(v.Fields())
 }
 
 // EncodeEvent writes the XDR-encoded representation of an event.
 //
 // An event is encoded as a fixed-length array of its field values.
 func (e *Encoder) EncodeEvent(v values.Event) error {
-	return e.encodeArray(v.Fields)
+	return e.encodeArray(v.Fields())
 }
