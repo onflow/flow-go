@@ -33,10 +33,12 @@ test:
 
 .PHONY: coverage
 coverage:
+ifeq ($(COVER), true)
 	# file has to be called index.html
 	gocov convert $(COVER_PROFILE) | gocov-html > index.html
 	# coverage.zip will automatically be picked up by teamcity
 	zip coverage.zip index.html
+endif
 
 .PHONY: generate
 generate: generate-godoc generate-proto generate-registries generate-mocks
@@ -79,7 +81,7 @@ ci: install-tools generate check-generated-code lint test coverage
 
 .PHONY: docker-ci
 docker-ci:
-	docker run -v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.2 make ci
+	docker run --env COVER=$(COVER) -v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.2 make ci
 
 .PHONY: install-cli
 install-cli: crypto/relic/build
