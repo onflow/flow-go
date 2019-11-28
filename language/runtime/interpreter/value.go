@@ -2164,6 +2164,28 @@ func (StorageValue) SetOwner(owner string) {
 	// NO-OP: ownership cannot be changed
 }
 
+// PublishedValue
+
+type PublishedValue struct {
+	Identifier string
+}
+
+func (PublishedValue) isValue() {}
+
+func (v PublishedValue) Copy() Value {
+	return PublishedValue{
+		Identifier: v.Identifier,
+	}
+}
+
+func (v PublishedValue) GetOwner() string {
+	return v.Identifier
+}
+
+func (PublishedValue) SetOwner(owner string) {
+	// NO-OP: ownership cannot be changed
+}
+
 // ReferenceValue
 
 type ReferenceValue struct {
@@ -2249,6 +2271,12 @@ func init() {
 	gob.Register(AddressValue{})
 }
 
+func NewAddressValueFromBytes(b []byte) AddressValue {
+	result := AddressValue{}
+	copy(result[AddressLength-len(b):], b)
+	return result
+}
+
 func ConvertAddress(value Value) Value {
 	result := AddressValue{}
 	if intValue, ok := value.(IntValue); ok {
@@ -2297,16 +2325,35 @@ func (v AddressValue) Equal(other Value) BoolValue {
 	return [AddressLength]byte(v) == [AddressLength]byte(otherAddress)
 }
 
+func (v AddressValue) StorageIdentifier() string {
+	return fmt.Sprintf("%x", v)
+}
+
 // AccountValue
 
 func NewAccountValue(address AddressValue) *CompositeValue {
-	addressHex := fmt.Sprintf("%x", address)
+	addressHex := address.StorageIdentifier()
 
 	return &CompositeValue{
 		Identifier: (&sema.AccountType{}).ID(),
 		Fields: map[string]Value{
-			"address": address,
-			"storage": StorageValue{Identifier: addressHex},
+			"address":   address,
+			"storage":   StorageValue{Identifier: addressHex},
+			"published": PublishedValue{Identifier: addressHex},
+		},
+	}
+}
+
+// PublicAccountValue
+
+func NewPublicAccountValue(address AddressValue) *CompositeValue {
+	addressHex := address.StorageIdentifier()
+
+	return &CompositeValue{
+		Identifier: (&sema.PublicAccountType{}).ID(),
+		Fields: map[string]Value{
+			"address":   address,
+			"published": PublishedValue{Identifier: addressHex},
 		},
 	}
 }

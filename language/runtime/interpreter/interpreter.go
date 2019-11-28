@@ -1121,6 +1121,21 @@ func (interpreter *Interpreter) indexExpressionGetterSetter(indexExpression *ast
 					},
 				}
 
+			case PublishedValue:
+				// TODO:
+				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
+				key := interpreter.storageKeyHandler(interpreter, typedResult.Identifier, indexingType)
+				return Done{
+					Result: getterSetter{
+						get: func() Value {
+							return interpreter.readStored(typedResult.Identifier, key)
+						},
+						set: func(value Value) {
+							interpreter.writeStored(typedResult.Identifier, key, value.(OptionalValue))
+						},
+					},
+				}
+
 			default:
 				panic(errors.NewUnreachableError())
 			}
@@ -1542,6 +1557,13 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 					})
 
 			case StorageValue:
+				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[expression]
+				key := interpreter.storageKeyHandler(interpreter, typedResult.Identifier, indexingType)
+				result := interpreter.readStored(typedResult.Identifier, key)
+				return Done{Result: result}
+
+				// TODO:
+			case PublishedValue:
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[expression]
 				key := interpreter.storageKeyHandler(interpreter, typedResult.Identifier, indexingType)
 				result := interpreter.readStored(typedResult.Identifier, key)
