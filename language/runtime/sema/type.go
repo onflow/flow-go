@@ -1881,7 +1881,8 @@ func (t *StorageType) ElementType(indexingType Type, isAssignment bool) Type {
 	return &OptionalType{Type: indexingType}
 }
 
-// ReferencesType
+// ReferencesType is the heterogeneous dictionary that
+// is indexed by reference types and has references as values
 
 type ReferencesType struct {
 	Assignable bool
