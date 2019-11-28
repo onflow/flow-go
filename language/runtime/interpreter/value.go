@@ -2218,8 +2218,9 @@ func (v *ReferenceValue) SetOwner(owner string) {
 }
 
 func (v *ReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
-	switch referenced :=
-		interpreter.readStored(v.TargetStorageIdentifier, v.TargetKey).(type) {
+	key := PrefixedStorageKey(v.TargetKey, AccessLevelPrivate)
+
+	switch referenced := interpreter.readStored(v.TargetStorageIdentifier, key).(type) {
 	case *SomeValue:
 		return referenced.Value
 	case NilValue:

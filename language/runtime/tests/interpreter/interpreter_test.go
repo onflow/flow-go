@@ -5459,8 +5459,6 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 
 	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
 	getter := func(_ *interpreter.Interpreter, id string, key string) interpreter.OptionalValue {
-		assert.Equal(t, storageIdentifier, id)
-
 		value, ok := storedValues[key]
 		if !ok {
 			return interpreter.NilValue{}
@@ -5469,8 +5467,6 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 	}
 
 	setter := func(_ *interpreter.Interpreter, id string, key string, value interpreter.OptionalValue) {
-		assert.Equal(t, storageIdentifier, id)
-
 		storedValues[key] = value
 	}
 
@@ -5964,6 +5960,8 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 
 	const rTypeIdentifier = "R"
 
+	storageKey := interpreter.PrefixedStorageKey(rTypeIdentifier, interpreter.AccessLevelPrivate)
+
 	originalValue := &interpreter.CompositeValue{
 		Identifier: rTypeIdentifier,
 		Kind:       common.CompositeKindResource,
@@ -5972,7 +5970,7 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 	}
 
 	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
-		rTypeIdentifier: interpreter.NewSomeValueOwningNonCopying(
+		storageKey: interpreter.NewSomeValueOwningNonCopying(
 			originalValue,
 		),
 	}
@@ -5989,7 +5987,7 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 
 	// Assert the resource was removed from storage of account 1
 
-	storedValue1 := allStoredValues[storageIdentifier1][rTypeIdentifier]
+	storedValue1 := allStoredValues[storageIdentifier1][storageKey]
 
 	assert.Equal(t,
 		interpreter.NilValue{},
@@ -5998,12 +5996,7 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 
 	// Assert the resource was moved into storage of account 2
 
-	storedValue2 := allStoredValues[storageIdentifier2][rTypeIdentifier]
-
-	assert.Equal(t,
-		storageIdentifier2,
-		storedValue2.(*interpreter.SomeValue).Value.GetOwner(),
-	)
+	storedValue2 := allStoredValues[storageIdentifier2][storageKey]
 
 	require.IsType(t,
 		&interpreter.SomeValue{},
@@ -6106,6 +6099,8 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 
 	const rTypeIdentifier = "R"
 
+	storageKey := interpreter.PrefixedStorageKey(rTypeIdentifier, interpreter.AccessLevelPrivate)
+
 	originalValue := &interpreter.CompositeValue{
 		Identifier: rTypeIdentifier,
 		Kind:       common.CompositeKindResource,
@@ -6114,7 +6109,7 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 	}
 
 	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
-		rTypeIdentifier: interpreter.NewSomeValueOwningNonCopying(
+		storageKey: interpreter.NewSomeValueOwningNonCopying(
 			originalValue,
 		),
 	}
@@ -6131,7 +6126,7 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 
 	// Assert the resource was removed from storage of account 1
 
-	storedValue1 := allStoredValues[storageIdentifier1][rTypeIdentifier]
+	storedValue1 := allStoredValues[storageIdentifier1][storageKey]
 
 	assert.Equal(t,
 		interpreter.NilValue{},
@@ -6140,12 +6135,7 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 
 	// Assert the resource was moved into storage of account 2
 
-	storedValue2 := allStoredValues[storageIdentifier2][rTypeIdentifier]
-
-	assert.Equal(t,
-		storageIdentifier2,
-		storedValue2.(*interpreter.SomeValue).Value.GetOwner(),
-	)
+	storedValue2 := allStoredValues[storageIdentifier2][storageKey]
 
 	require.IsType(t,
 		&interpreter.SomeValue{},

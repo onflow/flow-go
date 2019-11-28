@@ -1108,10 +1108,10 @@ func (interpreter *Interpreter) indexExpressionGetterSetter(indexExpression *ast
 					})
 
 			case StorageValue:
-				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Identifier)
+				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Identifier, AccessLevelPrivate)
 
 			case PublishedValue:
-				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Identifier)
+				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Identifier, AccessLevelPublic)
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -1122,9 +1122,11 @@ func (interpreter *Interpreter) indexExpressionGetterSetter(indexExpression *ast
 func (interpreter *Interpreter) visitStorageIndexExpression(
 	indexExpression *ast.IndexExpression,
 	storageIdentifier string,
+	accessLevel AccessLevel,
 ) Trampoline {
 	indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
-	key := interpreter.storageKeyHandler(interpreter, storageIdentifier, indexingType)
+	rawKey := interpreter.storageKeyHandler(interpreter, storageIdentifier, indexingType)
+	key := PrefixedStorageKey(rawKey, accessLevel)
 	return Done{
 		Result: getterSetter{
 			get: func() Value {
@@ -1140,8 +1142,9 @@ func (interpreter *Interpreter) visitStorageIndexExpression(
 func (interpreter *Interpreter) visitReadStorageIndexExpression(
 	expression *ast.IndexExpression,
 	storageIdentifier string,
+	accessLevel AccessLevel,
 ) Trampoline {
-	return interpreter.visitStorageIndexExpression(expression, storageIdentifier).
+	return interpreter.visitStorageIndexExpression(expression, storageIdentifier, accessLevel).
 		Map(func(result interface{}) interface{} {
 			getterSetter := result.(getterSetter)
 			return getterSetter.get()
@@ -1549,6 +1552,15 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 		})
 }
 
+// PrefixedStorageKey returns the storage identifier with the proper prefix
+// based on the given access level.
+//
+// \x1F = Information Separator One
+//
+func PrefixedStorageKey(key string, accessLevel AccessLevel) string {
+	return fmt.Sprintf("%s\x1F%s", accessLevel.Prefix(), key)
+}
+
 func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
 	return expression.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
@@ -1563,10 +1575,18 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 					})
 
 			case StorageValue:
-				return interpreter.visitReadStorageIndexExpression(expression, typedResult.Identifier)
+				return interpreter.visitReadStorageIndexExpression(
+					expression,
+					typedResult.Identifier,
+					AccessLevelPrivate,
+				)
 
 			case PublishedValue:
-				return interpreter.visitReadStorageIndexExpression(expression, typedResult.Identifier)
+				return interpreter.visitReadStorageIndexExpression(
+					expression,
+					typedResult.Identifier,
+					AccessLevelPublic,
+				)
 
 			default:
 				panic(errors.NewUnreachableError())

@@ -39,7 +39,7 @@ func generateAddTwoToCounterScript(counterAddress flow.Address) string {
     	            destroy existing
                     signer.published[&Counter] = &signer.storage[Counter] as Counter
     	        }
-				signer.storage[&Counter]?.add(2)
+				signer.published[&Counter]?.add(2)
 			  }
 
 			  execute {}
