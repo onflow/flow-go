@@ -15,6 +15,9 @@ func (checker *Checker) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
 	leftType := swap.Left.Accept(checker).(Type)
 	rightType := swap.Right.Accept(checker).(Type)
 
+	checker.Elaboration.SwapStatementLeftTypes[swap] = leftType
+	checker.Elaboration.SwapStatementRightTypes[swap] = rightType
+
 	// Both sides must be a target expression (e.g. identifier expression,
 	// indexing expression, or member access expression)
 
@@ -57,6 +60,14 @@ func (checker *Checker) VisitSwapStatement(swap *ast.SwapStatement) ast.Repr {
 		if checkRight {
 			checker.visitAssignmentValueType(swap.Right, swap.Left, leftType)
 		}
+	}
+
+	if leftType.IsResourceType() {
+		checker.elaboratePotentialResourceStorageMove(swap.Left)
+	}
+
+	if rightType.IsResourceType() {
+		checker.elaboratePotentialResourceStorageMove(swap.Right)
 	}
 
 	return nil

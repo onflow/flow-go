@@ -7,7 +7,7 @@ import (
 func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
 	eventType := checker.Elaboration.EventDeclarationTypes[declaration]
 
-	constructorFunctionType := eventType.ConstructorFunctionType()
+	constructorFunctionType := eventType.ConstructorFunctionType().InvocationFunctionType()
 
 	checker.checkFunction(
 		declaration.ParameterList,

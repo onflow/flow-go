@@ -7,11 +7,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dapperlabs/flow-go/language/runtime"
+
 	"github.com/dapperlabs/flow-go/sdk/client"
 
 	"github.com/dapperlabs/flow-go/language/tools/language-server/config"
 
-	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
@@ -97,90 +98,50 @@ func (s Server) Initialize(
 	return result, nil
 }
 
+// DidOpenTextDocument is called whenever a new file is opened.
+// We parse and check the text and publish diagnostics about the document.
+func (s Server) DidOpenTextDocument(conn protocol.Conn, params *protocol.DidOpenTextDocumentParams) error {
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: "DidOpenTextDoc",
+	})
+
+	uri := params.TextDocument.URI
+	text := params.TextDocument.Text
+	s.documents[uri] = text
+
+	diagnostics, err := s.getDiagnostics(conn, uri, text)
+	if err != nil {
+		return err
+	}
+	conn.PublishDiagnostics(&protocol.PublishDiagnosticsParams{
+		URI:         uri,
+		Diagnostics: diagnostics,
+	})
+
+	return nil
+}
+
 // DidChangeTextDocument is called whenever the current document changes.
-// We parse and check the new text and indicate any syntax or semantic errors
-// by publishing "diagnostics".
+// We parse and check the text and publish diagnostics about the document.
 func (s Server) DidChangeTextDocument(
 	conn protocol.Conn,
 	params *protocol.DidChangeTextDocumentParams,
 ) error {
 	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Log,
-		Message: "DidChangeText",
+		Message: fmt.Sprintf("DidChangeText changes: %d", len(params.ContentChanges)),
 	})
 	uri := params.TextDocument.URI
-	code := params.ContentChanges[0].Text
-	s.documents[uri] = code
+	text := params.ContentChanges[0].Text
+	s.documents[uri] = text
 
-	program, err := parse(conn, code, string(uri))
-
-	diagnostics := []protocol.Diagnostic{}
-
+	diagnostics, err := s.getDiagnostics(conn, uri, text)
 	if err != nil {
-
-		if parserError, ok := err.(parser.Error); ok {
-			for _, err := range parserError.Errors {
-				parseError, ok := err.(parser.ParseError)
-				if !ok {
-					continue
-				}
-
-				diagnostic := convertError(parseError)
-				if diagnostic == nil {
-					continue
-				}
-
-				diagnostics = append(diagnostics, *diagnostic)
-			}
-		}
-	} else {
-		// no parsing errors
-
-		// resolve imports
-
-		mainPath := strings.TrimPrefix(string(uri), "file://")
-
-		_ = program.ResolveImports(func(location ast.Location) (program *ast.Program, err error) {
-			return resolveImport(mainPath, location)
-		})
-
-		// check program
-
-		checker, err := sema.NewChecker(
-			program,
-			runtime.FileLocation(string(uri)),
-			sema.WithPredeclaredValues(valueDeclarations),
-			sema.WithPredeclaredTypes(typeDeclarations),
-		)
-		if err != nil {
-			panic(err)
-		}
-
-		start := time.Now()
-		err = checker.Check()
-		elapsed := time.Since(start)
-
-		conn.LogMessage(&protocol.LogMessageParams{
-			Type:    protocol.Info,
-			Message: fmt.Sprintf("checking took %s", elapsed),
-		})
-
-		s.checkers[uri] = checker
-
-		if checkerError, ok := err.(*sema.CheckerError); ok && checkerError != nil {
-			for _, err := range checkerError.Errors {
-				if semanticError, ok := err.(sema.SemanticError); ok {
-					diagnostic := convertError(semanticError)
-					if diagnostic != nil {
-						diagnostics = append(diagnostics, *diagnostic)
-					}
-				}
-			}
-		}
+		return err
 	}
-
 	conn.PublishDiagnostics(&protocol.PublishDiagnosticsParams{
-		URI:         params.TextDocument.URI,
+		URI:         uri,
 		Diagnostics: diagnostics,
 	})
 
@@ -266,32 +227,30 @@ func (s Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([
 
 	var actions []*protocol.CodeLens
 
-	// Search for relevant function declarations
-	for declaration := range checker.Elaboration.FunctionDeclarationFunctionTypes {
-		if declaration.Identifier.String() == "main" {
-			if len(declaration.ParameterList.Parameters) == 0 {
-				// this is a script
-				actions = append(actions, &protocol.CodeLens{
-					Range: astToProtocolRange(declaration.StartPosition(), declaration.StartPosition()),
-					Command: &protocol.Command{
-						Title:     "execute script",
-						Command:   CommandExecuteScript,
-						Arguments: []interface{}{params.TextDocument.URI},
-					},
-				})
-			}
-			if len(declaration.ParameterList.Parameters) == 1 {
-				// this is transaction
-				actions = append(actions, &protocol.CodeLens{
-					Range: astToProtocolRange(declaration.StartPosition(), declaration.StartPosition()),
-					Command: &protocol.Command{
-						Title:     "submit transaction",
-						Command:   CommandSubmitTransaction,
-						Arguments: []interface{}{params.TextDocument.URI},
-					},
-				})
-			}
+	// Search for main functions with no arguments. These are interpreted
+	// as scripts.
+	for functionDeclaration := range checker.Elaboration.FunctionDeclarationFunctionTypes {
+		if functionDeclaration.Identifier.String() == "main" && len(functionDeclaration.ParameterList.Parameters) == 0 {
+			actions = append(actions, &protocol.CodeLens{
+				Range: astToProtocolRange(functionDeclaration.StartPosition(), functionDeclaration.StartPosition()),
+				Command: &protocol.Command{
+					Title:     "execute script",
+					Command:   CommandExecuteScript,
+					Arguments: []interface{}{params.TextDocument.URI},
+				},
+			})
 		}
+	}
+	// Search for transaction declarations.
+	for txDeclaration := range checker.Elaboration.TransactionDeclarationTypes {
+		actions = append(actions, &protocol.CodeLens{
+			Range: astToProtocolRange(txDeclaration.StartPosition(), txDeclaration.StartPosition()),
+			Command: &protocol.Command{
+				Title:     "submit transaction",
+				Command:   CommandSubmitTransaction,
+				Arguments: []interface{}{params.TextDocument.URI},
+			},
+		})
 	}
 
 	return actions, nil
@@ -337,6 +296,89 @@ func (s *Server) getNextNonce() uint64 {
 	return s.nonce
 }
 
+// getDiagnostics parses and checks the given file and generates diagnostics
+// indicating each syntax or semantic error. Returns a list of diagnostics
+// that the caller is responsible for publishing to the client.
+//
+// Returns an error if an unexpected error occurred.
+func (s Server) getDiagnostics(conn protocol.Conn, uri protocol.DocumentUri, text string) ([]protocol.Diagnostic, error) {
+	diagnostics := make([]protocol.Diagnostic, 0)
+	program, err := parse(conn, text, string(uri))
+
+	// If there were parsing errors, convert each one to a diagnostic and exit
+	// without checking.
+	if err != nil {
+		if parentErr, ok := err.(errors.ParentError); ok {
+			parserDiagnostics := getDiagnosticsForParentError(conn, parentErr)
+			diagnostics = append(diagnostics, parserDiagnostics...)
+			return diagnostics, nil
+		}
+		return nil, err
+	}
+
+	// There were no parser errors. Proceed to resolving imports and
+	// checking the parsed program.
+	mainPath := strings.TrimPrefix(string(uri), "file://")
+
+	_ = program.ResolveImports(func(location ast.Location) (program *ast.Program, err error) {
+		return resolveImport(mainPath, location)
+	})
+
+	checker, err := sema.NewChecker(
+		program,
+		runtime.FileLocation(string(uri)),
+		sema.WithPredeclaredValues(valueDeclarations),
+		sema.WithPredeclaredTypes(typeDeclarations),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	start := time.Now()
+	err = checker.Check()
+	elapsed := time.Since(start)
+
+	// Log how long it took to check the file
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("checking %s took %s", string(uri), elapsed),
+	})
+
+	s.checkers[uri] = checker
+
+	if err != nil {
+		if parentErr, ok := err.(errors.ParentError); ok {
+			checkerDiagnostics := getDiagnosticsForParentError(conn, parentErr)
+			diagnostics = append(diagnostics, checkerDiagnostics...)
+		} else {
+			return nil, err
+		}
+	}
+
+	return diagnostics, nil
+}
+
+// getDiagnosticsForParentError unpacks all child errors and converts each to
+// a diagnostic. Both parser and checker errors can be unpacked.
+//
+// Logs any conversion failures to the client.
+func getDiagnosticsForParentError(conn protocol.Conn, err errors.ParentError) (diagnostics []protocol.Diagnostic) {
+	for _, childErr := range err.ChildErrors() {
+		convertibleErr, ok := childErr.(convertibleError)
+		if !ok {
+			conn.LogMessage(&protocol.LogMessageParams{
+				Type:    protocol.Warning,
+				Message: fmt.Sprintf("Unable to convert non-convertable error: %s", err.Error()),
+			})
+			continue
+		}
+		diagnostic := convertError(convertibleErr)
+		diagnostics = append(diagnostics, diagnostic)
+	}
+
+	return
+}
+
 // parse parses the given code and returns the resultant program.
 func parse(conn protocol.Conn, code, location string) (*ast.Program, error) {
 	start := time.Now()
@@ -377,15 +419,16 @@ func resolveImport(
 	return program, nil
 }
 
-// convertError converts a checker error to a diagnostic.
-func convertError(err error) *protocol.Diagnostic {
-	positionedError, ok := err.(ast.HasPosition)
-	if !ok {
-		return nil
-	}
+// convertibleError is an error that can be converted to LSP diagnostic.
+type convertibleError interface {
+	error
+	ast.HasPosition
+}
 
-	startPosition := positionedError.StartPosition()
-	endPosition := positionedError.EndPosition()
+// convertError converts a checker error to a diagnostic.
+func convertError(err convertibleError) protocol.Diagnostic {
+	startPosition := err.StartPosition()
+	endPosition := err.EndPosition()
 
 	var message strings.Builder
 	message.WriteString(err.Error())
@@ -395,7 +438,7 @@ func convertError(err error) *protocol.Diagnostic {
 		message.WriteString(secondaryError.SecondaryError())
 	}
 
-	return &protocol.Diagnostic{
+	return protocol.Diagnostic{
 		Message: message.String(),
 		Code:    protocol.SeverityError,
 		Range: protocol.Range{

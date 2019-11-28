@@ -152,19 +152,14 @@ func Test_exportability(t *testing.T) {
 		program := &ast.Program{
 			Declarations: []ast.Declaration{
 				&ast.CompositeDeclaration{
-					Access:        0,
-					CompositeKind: 0,
 					Identifier: ast.Identifier{
 						Identifier: identifier, Pos: position,
 					},
-					Conformances: nil,
 					Members: &ast.Members{
-						Fields: nil,
 						SpecialFunctions: []*ast.SpecialFunctionDeclaration{
 							{
 								DeclarationKind: common.DeclarationKindInitializer,
 								FunctionDeclaration: &ast.FunctionDeclaration{
-									Access:     0,
 									Identifier: ast.Identifier{},
 									ParameterList: &ast.ParameterList{
 										Parameters: []*ast.Parameter{
@@ -174,23 +169,12 @@ func Test_exportability(t *testing.T) {
 													Identifier: "fieldA",
 													Pos:        ast.Position{},
 												},
-												TypeAnnotation: &ast.TypeAnnotation{
-													Move: false,
-													Type: nil,
-												},
-												Range: ast.Range{},
 											},
 										},
-										Range: ast.Range{},
 									},
-									ReturnTypeAnnotation: nil,
-									FunctionBlock:        nil,
-									StartPos:             ast.Position{},
 								},
 							},
 						},
-						Functions:             nil,
-						CompositeDeclarations: nil,
 					},
 					Range: ast.Range{},
 				},
@@ -200,11 +184,6 @@ func Test_exportability(t *testing.T) {
 		variable := &Variable{
 			Identifier:      identifier,
 			DeclarationKind: common.DeclarationKindStructure,
-			Type:            nil,
-			Access:          0,
-			IsConstant:      false,
-			Depth:           0,
-			ArgumentLabels:  nil,
 			Pos:             &position,
 		}
 
@@ -237,7 +216,6 @@ func Test_exportability(t *testing.T) {
 		}
 
 		ty := &EventType{
-			Location:   nil,
 			Identifier: "MagicEvent",
 			Fields: []EventFieldType{
 				{
@@ -249,7 +227,6 @@ func Test_exportability(t *testing.T) {
 					Type:       &IntType{},
 				},
 			},
-			ConstructorParameterTypeAnnotations: nil,
 		}
 
 		program := &ast.Program{
@@ -280,14 +257,8 @@ func Test_exportability(t *testing.T) {
 		}
 
 		variable := Variable{
-			Identifier:      "MagicEvent",
-			DeclarationKind: 0,
-			Type:            nil,
-			Access:          0,
-			IsConstant:      false,
-			Depth:           0,
-			ArgumentLabels:  nil,
-			Pos:             &position,
+			Identifier: "MagicEvent",
+			Pos:        &position,
 		}
 
 		ex := ty.Export(program, &variable)

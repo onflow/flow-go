@@ -55,6 +55,8 @@ type ValueIndexableType interface {
 type TypeIndexableType interface {
 	Type
 	isTypeIndexableType()
+	IsAssignable() bool
+	IsValidIndexingType(indexingType Type) (isValid bool, expectedType Type)
 	ElementType(indexingType Type, isAssignment bool) Type
 }
 
@@ -1361,6 +1363,7 @@ func init() {
 		&UInt32Type{},
 		&UInt64Type{},
 		&AddressType{},
+		&AccountType{},
 	}
 
 	for _, ty := range types {
@@ -1620,6 +1623,64 @@ func (t *CompositeType) IsResourceType() bool {
 func (t *CompositeType) IsInvalidType() bool {
 	// TODO: maybe if any member has an invalid type?
 	return false
+}
+
+// AccountType
+
+type AccountType struct{}
+
+func (*AccountType) isType() {}
+
+func (*AccountType) String() string {
+	return "Account"
+}
+
+func (*AccountType) ID() string {
+	return "Account"
+}
+
+func (*AccountType) Equal(other Type) bool {
+	_, ok := other.(*AccountType)
+	return ok
+}
+
+func (*AccountType) IsResourceType() bool {
+	return false
+}
+
+func (*AccountType) IsInvalidType() bool {
+	return false
+}
+
+func (*AccountType) HasMembers() bool {
+	return true
+}
+
+func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	switch identifier {
+	case "address":
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			Type:            &AddressType{},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+		})
+
+	case "storage":
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			Type:            &StorageType{},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+		})
+
+	default:
+		return nil
+	}
 }
 
 // Member
@@ -1951,9 +2012,70 @@ func (t *StorageType) IsInvalidType() bool {
 
 func (t *StorageType) isTypeIndexableType() {}
 
+func (t *StorageType) IsValidIndexingType(indexingType Type) (isValid bool, expectedType Type) {
+	// TODO: restrict to resource types
+	return true, nil
+}
+
+func (t *StorageType) IsAssignable() bool {
+	return true
+}
+
 func (t *StorageType) ElementType(indexingType Type, isAssignment bool) Type {
 	// NOTE: like dictionary
 	return &OptionalType{Type: indexingType}
+}
+
+// ReferencesType is the heterogeneous dictionary that
+// is indexed by reference types and has references as values
+
+type ReferencesType struct {
+	Assignable bool
+}
+
+func (t *ReferencesType) isType() {}
+
+func (t *ReferencesType) String() string {
+	return "References"
+}
+
+func (t *ReferencesType) ID() string {
+	return "References"
+}
+
+func (t *ReferencesType) Equal(other Type) bool {
+	otherReferences, ok := other.(*ReferencesType)
+	if !ok {
+		return false
+	}
+	return t.Assignable && otherReferences.Assignable
+}
+
+func (t *ReferencesType) IsResourceType() bool {
+	return false
+}
+
+func (t *ReferencesType) IsInvalidType() bool {
+	return false
+}
+
+func (t *ReferencesType) isTypeIndexableType() {}
+
+func (t *ReferencesType) ElementType(indexingType Type, isAssignment bool) Type {
+	// NOTE: like dictionary
+	return &OptionalType{Type: indexingType}
+}
+
+func (t *ReferencesType) IsAssignable() bool {
+	return t.Assignable
+}
+
+func (t *ReferencesType) IsValidIndexingType(indexingType Type) (isValid bool, expectedType Type) {
+	if _, isReferenceType := indexingType.(*ReferenceType); !isReferenceType {
+		return false, &ReferenceType{}
+	}
+
+	return true, nil
 }
 
 // EventType
@@ -2043,10 +2165,12 @@ func (t *EventType) Equal(other Type) bool {
 	return true
 }
 
-func (t *EventType) ConstructorFunctionType() *FunctionType {
-	return &FunctionType{
-		ParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
-		ReturnTypeAnnotation:     NewTypeAnnotation(t),
+func (t *EventType) ConstructorFunctionType() *SpecialFunctionType {
+	return &SpecialFunctionType{
+		&FunctionType{
+			ParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
+			ReturnTypeAnnotation:     NewTypeAnnotation(t),
+		},
 	}
 }
 
@@ -2372,8 +2496,30 @@ func IsNilType(ty Type) bool {
 }
 
 type TransactionType struct {
-	Members map[string]*Member
-	Prepare *SpecialFunctionType
+	Members                         map[string]*Member
+	prepareParameterTypeAnnotations []*TypeAnnotation
+}
+
+func (t *TransactionType) EntryPointFunctionType() *FunctionType {
+	return t.PrepareFunctionType().InvocationFunctionType()
+}
+
+func (t *TransactionType) PrepareFunctionType() *SpecialFunctionType {
+	return &SpecialFunctionType{
+		FunctionType: &FunctionType{
+			ParameterTypeAnnotations: t.prepareParameterTypeAnnotations,
+			ReturnTypeAnnotation:     NewTypeAnnotation(&VoidType{}),
+		},
+	}
+}
+
+func (*TransactionType) ExecuteFunctionType() *SpecialFunctionType {
+	return &SpecialFunctionType{
+		FunctionType: &FunctionType{
+			ParameterTypeAnnotations: []*TypeAnnotation{},
+			ReturnTypeAnnotation:     NewTypeAnnotation(&VoidType{}),
+		},
+	}
 }
 
 func (*TransactionType) isType() {}

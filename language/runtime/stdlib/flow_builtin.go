@@ -35,7 +35,7 @@ var createAccountFunctionType = sema.FunctionType{
 var addAccountKeyFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// address
-		&sema.StringType{},
+		&sema.AddressType{},
 		// key
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
@@ -51,7 +51,7 @@ var addAccountKeyFunctionType = sema.FunctionType{
 var removeAccountKeyFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// address
-		&sema.StringType{},
+		&sema.AddressType{},
 		// index
 		&sema.IntType{},
 	),
@@ -65,7 +65,7 @@ var removeAccountKeyFunctionType = sema.FunctionType{
 var updateAccountCodeFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// address
-		&sema.StringType{},
+		&sema.AddressType{},
 		// code
 		&sema.VariableSizedType{
 			Type: &sema.IntType{},
@@ -79,12 +79,11 @@ var updateAccountCodeFunctionType = sema.FunctionType{
 
 var getAccountFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// TODO:
 		// address
-		&sema.StringType{},
+		&sema.AddressType{},
 	),
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		AccountType.Type,
+		&sema.AccountType{},
 	),
 }
 

@@ -67,13 +67,13 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 	case types.Int64:
 		return e.DecodeInt64()
 	case types.UInt8:
-		return e.DecodeUint8()
+		return e.DecodeUInt8()
 	case types.UInt16:
-		return e.DecodeUint16()
+		return e.DecodeUInt16()
 	case types.UInt32:
-		return e.DecodeUint32()
+		return e.DecodeUInt32()
 	case types.UInt64:
-		return e.DecodeUint64()
+		return e.DecodeUInt64()
 	case types.VariableSizedArray:
 		return e.DecodeVariableSizedArray(x)
 	case types.ConstantSizedArray:
@@ -242,12 +242,12 @@ func (e *Decoder) DecodeInt64() (values.Int64, error) {
 	return values.Int64(i), nil
 }
 
-// DecodeUint8 reads the XDR-encoded representation of a uint-8 value.
+// DecodeUInt8 reads the XDR-encoded representation of a uint-8 value.
 //
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Decoder) DecodeUint8() (values.Uint8, error) {
+func (e *Decoder) DecodeUInt8() (values.Uint8, error) {
 	i, _, err := e.dec.DecodeUint()
 	if err != nil {
 		return 0, err
@@ -256,12 +256,12 @@ func (e *Decoder) DecodeUint8() (values.Uint8, error) {
 	return values.Uint8(i), nil
 }
 
-// DecodeUint16 reads the XDR-encoded representation of a uint-16 value.
+// DecodeUInt16 reads the XDR-encoded representation of a uint-16 value.
 //
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Decoder) DecodeUint16() (values.Uint16, error) {
+func (e *Decoder) DecodeUInt16() (values.Uint16, error) {
 	i, _, err := e.dec.DecodeUint()
 	if err != nil {
 		return 0, err
@@ -270,12 +270,12 @@ func (e *Decoder) DecodeUint16() (values.Uint16, error) {
 	return values.Uint16(i), nil
 }
 
-// DecodeUint32 reads the XDR-encoded representation of a uint-32 value.
+// DecodeUInt32 reads the XDR-encoded representation of a uint-32 value.
 //
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Decoder) DecodeUint32() (values.Uint32, error) {
+func (e *Decoder) DecodeUInt32() (values.Uint32, error) {
 	i, _, err := e.dec.DecodeUint()
 	if err != nil {
 		return 0, err
@@ -284,12 +284,12 @@ func (e *Decoder) DecodeUint32() (values.Uint32, error) {
 	return values.Uint32(i), nil
 }
 
-// DecodeUint64 reads the XDR-encoded representation of a uint-64 value.
+// DecodeUInt64 reads the XDR-encoded representation of a uint-64 value.
 //
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.5
 //  RFC Section 4.5 - Unsigned Hyper Integer
 //  64-bit big-endian unsigned integer in range [0, 18446744073709551615]
-func (e *Decoder) DecodeUint64() (values.Uint64, error) {
+func (e *Decoder) DecodeUInt64() (values.Uint64, error) {
 	i, _, err := e.dec.DecodeUhyper()
 	if err != nil {
 		return 0, err
@@ -394,26 +394,22 @@ func (e *Decoder) DecodeDictionary(t types.Dictionary) (values.Dictionary, error
 //
 // A composite is encoded as a fixed-length array of its field values.
 func (e *Decoder) DecodeComposite(t types.Composite) (values.Composite, error) {
-	fields := make([]values.Value, len(t.Fields))
+	fields := make([]values.Value, 0, len(t.Fields))
 
-	k := 0
-	keys := make([]string, len(t.Fields))
+	keys := make([]string, 0, len(t.Fields))
 	for key := range t.Fields {
-		keys[k] = key
-		k++
+		keys = append(keys, key)
 	}
 
-	EncodingOrder(keys)
+	SortInEncodingOrder(keys)
 
-	i := 0
 	for _, key := range keys {
 		value, err := e.Decode(t.Fields[key].Type)
 		if err != nil {
 			return values.Composite{}, err
 		}
 
-		fields[i] = value
-		i++
+		fields = append(fields, value)
 	}
 
 	return values.Composite{Fields: fields}, nil

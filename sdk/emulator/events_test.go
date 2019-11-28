@@ -42,8 +42,10 @@ func TestEventEmitted(t *testing.T) {
 		script := []byte(`
 			event MyEvent(x: Int, y: Int)
 			
-			pub fun main() {
-			  emit MyEvent(x: 1, y: 2)
+			transaction {
+		  	  execute {
+			  	emit MyEvent(x: 1, y: 2)
+			  }
 			}
 		`)
 
@@ -73,7 +75,7 @@ func TestEventEmitted(t *testing.T) {
 		actualEvent := events[0]
 
 		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
 
@@ -107,7 +109,7 @@ func TestEventEmitted(t *testing.T) {
 		actualEvent := events[0]
 
 		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
 
@@ -139,8 +141,10 @@ func TestEventEmitted(t *testing.T) {
 		script := []byte(fmt.Sprintf(`
 			import 0x%s
 			
-			pub fun main() {
-				emitMyEvent(x: 1, y: 2)
+			transaction {
+				execute {
+				  emitMyEvent(x: 1, y: 2)
+				}
 			}
 		`, address.Hex()))
 
@@ -171,7 +175,7 @@ func TestEventEmitted(t *testing.T) {
 		actualEvent := events[0]
 
 		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
 

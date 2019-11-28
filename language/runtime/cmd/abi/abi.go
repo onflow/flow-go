@@ -2,6 +2,7 @@ package abi
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 
 	"github.com/dapperlabs/flow-go/language/runtime/cmd"
@@ -10,23 +11,18 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/types/encoding"
 )
 
-/*
- Generates ABIs from provided Cadence file
-*/
-func GenerateABI(args []string, pretty bool) {
+// GenerateABI generates ABIs from provided Cadence file
+func GenerateABI(args []string, pretty bool) error {
 
 	if len(args) < 1 {
-		cmd.ExitWithError("no input file")
+		return errors.New("no input file given")
 	}
 
 	jsonData := GetABIForFile(args[0], pretty)
 
 	_, err := os.Stdout.Write(jsonData)
 
-	if err != nil {
-		panic(err)
-	}
-
+	return err
 }
 
 func GetABIForFile(filename string, pretty bool) []byte {
@@ -51,14 +47,14 @@ func GetABIForFile(filename string, pretty bool) []byte {
 		encoder.Encode(name, typ)
 	}
 
-	marshall := func() ([]byte, error) {
+	marshal := func() ([]byte, error) {
 		if pretty {
 			return json.MarshalIndent(encoder.Get(), "", "  ")
 		}
 		return json.Marshal(encoder.Get())
 	}
 
-	jsonData, err := marshall()
+	jsonData, err := marshal()
 
 	if err != nil {
 		panic(err)

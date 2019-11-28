@@ -8,6 +8,11 @@ import (
 func (checker *Checker) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
 	transactionType := checker.Elaboration.TransactionDeclarationTypes[declaration]
 
+	checker.containerTypes[transactionType] = true
+	defer func() {
+		checker.containerTypes[transactionType] = false
+	}()
+
 	fieldMembers := map[*Member]*ast.FieldDeclaration{}
 
 	for _, field := range declaration.Fields {
@@ -107,12 +112,12 @@ func (checker *Checker) visitTransactionPrepareFunction(
 
 	initializationInfo := NewInitializationInfo(transactionType, fieldMembers)
 
-	prepareFunctionType := transactionType.Prepare
+	prepareFunctionType := transactionType.PrepareFunctionType().InvocationFunctionType()
 
 	checker.checkFunction(
 		prepareFunction.ParameterList,
 		ast.Position{},
-		prepareFunctionType.FunctionType,
+		prepareFunctionType,
 		prepareFunction.FunctionBlock,
 		true,
 		initializationInfo,
@@ -133,10 +138,14 @@ func (checker *Checker) checkTransactionPrepareFunctionParameters(
 	for i, parameter := range parameterList.Parameters {
 		parameterTypeAnnotation := parameterTypeAnnotations[i]
 
-		_ = parameter
-		_ = parameterTypeAnnotation
+		t := parameterTypeAnnotation.Type
 
-		// TODO: only allow Account type
+		if !IsSubType(t, &AccountType{}) {
+			checker.report(&InvalidTransactionPrepareParameterType{
+				Type:  t,
+				Range: ast.NewRangeFromPositioned(parameter.TypeAnnotation),
+			})
+		}
 	}
 
 }
@@ -155,12 +164,15 @@ func (checker *Checker) visitTransactionExecuteFunction(
 		return
 	}
 
-	checker.enterValueScope()
-	defer checker.leaveValueScope(true)
+	executeFunctionType := transactionType.ExecuteFunctionType().InvocationFunctionType()
 
-	checker.visitFunctionBlock(
+	checker.checkFunction(
+		&ast.ParameterList{},
+		ast.Position{},
+		executeFunctionType,
 		executeFunction.FunctionBlock,
-		NewTypeAnnotation(&VoidType{}),
+		true,
+		nil,
 		true,
 	)
 }
@@ -191,15 +203,9 @@ func (checker *Checker) declareTransactionDeclaration(declaration *ast.Transacti
 		prepareParameterTypeAnnotations = checker.parameterTypeAnnotations(declaration.Prepare.ParameterList)
 	}
 
-	prepareFunctionType := &SpecialFunctionType{
-		FunctionType: &FunctionType{
-			ParameterTypeAnnotations: prepareParameterTypeAnnotations,
-			ReturnTypeAnnotation:     NewTypeAnnotation(&VoidType{}),
-		},
-	}
-
 	transactionType.Members = members
-	transactionType.Prepare = prepareFunctionType
+	transactionType.prepareParameterTypeAnnotations = prepareParameterTypeAnnotations
 
 	checker.Elaboration.TransactionDeclarationTypes[declaration] = transactionType
+	checker.TransactionTypes = append(checker.TransactionTypes, transactionType)
 }

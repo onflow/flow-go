@@ -66,13 +66,13 @@ func TestGenerateNewFileName(t *testing.T) {
 		{filename: "messages.pb.go", newFilename: "messages_registry.gen.go"},
 		{filename: "./long/path/to/somewhere/messages.pb.go", newFilename: filepath.FromSlash("long/path/to/somewhere/messages_registry.gen.go")},
 		{filename: "/root/messages.pb.go", newFilename: filepath.FromSlash("/root/messages_registry.gen.go")},
-		{filename: "interface", newFilename: "registry.gen.go"}, //filepath's base does not end with .pb.go
+		{filename: "interface", newFilename: "registry.gen.go"},    //filepath's base does not end with .pb.go
 		{filename: "interface.go", newFilename: "registry.gen.go"}, //filepath's base does not end with .pb.go
-		{filename: "interface", newFilename: "registry.gen.go"}, //filepath's base does not end with .pb.go
+		{filename: "interface", newFilename: "registry.gen.go"},    //filepath's base does not end with .pb.go
 		//Windows paths
 		{filename: "C:\\myfolder\\project\\interface.pb.go", newFilename: "C:\\myfolder\\project\\interface_registry.gen.go"},
 		{filename: "C:\\Users\\Me\\project\\invalidInterface.go", newFilename: "registry.gen.go"}, //filepath's base does not end with .pb.go
-		{filename: "C:\\Users\\Me\\project\\invalidInterface", newFilename: "registry.gen.go"}, //filepath's base does not end with .pb.go
+		{filename: "C:\\Users\\Me\\project\\invalidInterface", newFilename: "registry.gen.go"},    //filepath's base does not end with .pb.go
 	}
 
 	for _, tc := range tt {
@@ -108,5 +108,3 @@ func TestLowerInitials(t *testing.T) {
 		}
 	}
 }
-
-

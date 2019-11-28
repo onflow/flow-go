@@ -132,6 +132,28 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 		} else {
 			// The assignment is valid (i.e. to a target expression)
 
+			// NOTE: Check that the *first* value type is a resource type –
+			// The assignment check below will also ensure that the second value type
+			// is a resource.
+			//
+			// The first value is checked instead of the second value,
+			// so that second value types that are standalone not considered resource typed
+			// are still admitted if they are type compatible (e.g. `nil`).
+
+			valueIsResource := valueType != nil && valueType.IsResourceType()
+
+			if valueType != nil &&
+				!valueType.IsInvalidType() &&
+				!valueIsResource {
+
+				checker.report(
+					&NonResourceTypeError{
+						ActualType: valueType,
+						Range:      ast.NewRangeFromPositioned(declaration.Value),
+					},
+				)
+			}
+
 			// Check the assignment of the second value to the first expression
 
 			// The check of the assignment of the second value to the first also:
@@ -140,6 +162,8 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 			// - Checks the second value type is a subtype of value type
 			// etc.
 
+			// NOTE: already performs resource invalidation
+
 			_, secondValueType := checker.checkAssignment(
 				declaration.Value,
 				declaration.SecondValue,
@@ -147,20 +171,11 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 				true,
 			)
 
-			// Check that the second value type is a resource type
-
-			if !secondValueType.IsInvalidType() &&
-				!secondValueType.IsResourceType() {
-
-				checker.report(
-					&NonResourceTypeError{
-						ActualType: secondValueType,
-						Range:      ast.NewRangeFromPositioned(declaration.SecondValue),
-					},
-				)
-			}
-
 			checker.Elaboration.VariableDeclarationSecondValueTypes[declaration] = secondValueType
+
+			if valueIsResource {
+				checker.elaboratePotentialResourceStorageMove(declaration.Value)
+			}
 		}
 	}
 
@@ -179,4 +194,17 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 	)
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(identifier, variable)
+}
+
+func (checker *Checker) elaboratePotentialResourceStorageMove(expression ast.Expression) {
+	indexExpression, ok := expression.(*ast.IndexExpression)
+	if !ok {
+		return
+	}
+
+	if !checker.Elaboration.IsTypeIndexExpression[indexExpression] {
+		return
+	}
+
+	checker.Elaboration.IsResourceMovingStorageIndexExpression[indexExpression] = true
 }

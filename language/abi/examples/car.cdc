@@ -12,6 +12,8 @@ pub struct Car {
     }
 
 /*
+    // Multiple constructors are not supported yet!
+
     init(params: [String;3]) {
         self.model = params[0]
         self.make = params[1]

@@ -42,15 +42,11 @@ func TestExamples(t *testing.T) {
 
 					options := jsondiff.DefaultConsoleOptions()
 					diff, s := jsondiff.Compare(generatedAbi, abiBytes, &options)
-					//assert.Equal(t, string(abiBytes), string(generatedAbi))
 
 					assert.Equal(t, diff, jsondiff.FullMatch)
 
-					//println(diff)
 					println(s)
 				})
-			} else {
-				println("skipping", abiFile)
 			}
 		}
 	}

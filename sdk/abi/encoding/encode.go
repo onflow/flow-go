@@ -17,8 +17,8 @@ type Encoder struct {
 	enc *xdr.Encoder
 }
 
-//Central point to keep ordering for encoding the same
-func EncodingOrder(names []string) {
+// EncodingOrder is a central point to keep ordering for encoding the same.
+func SortInEncodingOrder(names []string) {
 	sort.Strings(names)
 }
 
