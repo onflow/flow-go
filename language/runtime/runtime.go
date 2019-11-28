@@ -234,8 +234,8 @@ func (r *interpreterRuntime) newInterpreter(
 	return interpreter.NewInterpreter(
 		checker,
 		interpreter.WithPredefinedValues(functions.ToValues()),
-		interpreter.WithOnEventEmittedHandler(func(_ *interpreter.Interpreter, eventValue interpreter.EventValue) {
-			r.emitEvent(eventValue, runtimeInterface)
+		interpreter.WithOnEventEmittedHandler(func(_ *interpreter.Interpreter, event values.Event) {
+			r.emitEvent(event, runtimeInterface)
 		}),
 		interpreter.WithStorageReadHandler(runtimeStorage.readValue),
 		interpreter.WithStorageWriteHandler(runtimeStorage.writeValue),
@@ -284,8 +284,7 @@ func (r *interpreterRuntime) parse(script []byte) (program *ast.Program, err err
 }
 
 // emitEvent converts an event value to native Go types and emits it to the runtime interface.
-func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtimeInterface Interface) {
-	event := eventValue.Export().(values.Event)
+func (r *interpreterRuntime) emitEvent(event values.Event, runtimeInterface Interface) {
 	// TODO:
 	// var identifier string
 	//
@@ -311,10 +310,8 @@ func (r *interpreterRuntime) emitAccountEvent(
 	runtimeInterface Interface,
 	fields ...values.Value,
 ) {
-	// TODO:
-	// identifier := fmt.Sprintf("flow.%s", eventType.Identifier)
-
-	event := values.NewEvent(fields)
+	t := eventType.Export()
+	event := values.NewEvent(fields).WithType(t)
 
 	runtimeInterface.EmitEvent(event)
 }

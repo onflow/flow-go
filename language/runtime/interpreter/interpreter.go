@@ -11,6 +11,8 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
+
 	//revive:disable
 	. "github.com/dapperlabs/flow-go/language/runtime/trampoline"
 	//revive:enable
@@ -87,7 +89,7 @@ func (m StatementTrampoline) Continue() Trampoline {
 //
 type OnEventEmittedFunc func(
 	interpreter *Interpreter,
-	event EventValue,
+	event values.Event,
 )
 
 // OnStatementFunc is a function that is triggered when a statement is about to be executed.
@@ -2399,7 +2401,13 @@ func (interpreter *Interpreter) VisitEmitStatement(statement *ast.EmitStatement)
 		FlatMap(func(result interface{}) Trampoline {
 			event := result.(EventValue)
 
-			interpreter.onEventEmitted(interpreter, event)
+			functionType := interpreter.Checker.GlobalValues[event.Identifier].Type.(*sema.FunctionType)
+			eventType := functionType.ReturnTypeAnnotation.Type.(*sema.EventType).Export()
+
+			eventValue := event.Export().(values.Event)
+			eventValue = eventValue.WithType(eventType)
+
+			interpreter.onEventEmitted(interpreter, eventValue)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}

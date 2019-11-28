@@ -1,12 +1,17 @@
 package stdlib
 
 import (
+	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
 )
 
 // This file defines functions built in to the Flow runtime.
+
+var flowLocation = ast.StringLocation("flow")
+
+// built-in function types
 
 // TODO: improve types
 var createAccountFunctionType = sema.FunctionType{
@@ -148,4 +153,110 @@ func FlowBuiltInFunctions(impls FlowBuiltinImpls) StandardLibraryFunctions {
 			nil,
 		),
 	}
+}
+
+// built-in event types
+
+var AccountCreatedEventType = sema.EventType{
+	Location:   flowLocation,
+	Identifier: "AccountCreated",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+	},
+}
+
+var AccountKeyAddedEventType = sema.EventType{
+	Location:   flowLocation,
+	Identifier: "AccountKeyAdded",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+		{
+			Identifier: "publicKey",
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+		{
+			Move: false,
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+}
+
+var AccountKeyRemovedEventType = sema.EventType{
+	Location:   flowLocation,
+	Identifier: "AccountKeyRemoved",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+		{
+			Identifier: "publicKey",
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+		{
+			Move: false,
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+}
+
+var AccountCodeUpdatedEventType = sema.EventType{
+	Location:   flowLocation,
+	Identifier: "AccountCodeUpdated",
+	Fields: []sema.EventFieldType{
+		{
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+		{
+			Identifier: "codeHash",
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
+	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+		{
+			Move: false,
+			Type: &sema.StringType{},
+		},
+		{
+			Move: false,
+			Type: &sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		},
+	},
 }

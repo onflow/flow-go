@@ -317,8 +317,7 @@ func (e *Decoder) DecodeVariableSizedArray(t types.VariableSizedArray) (v values
 		return v, err
 	}
 
-	v = values.NewVariableSizedArray(vals)
-	v.SetType(t)
+	v = values.NewVariableSizedArray(vals).WithType(t)
 
 	return v, nil
 }
@@ -335,8 +334,7 @@ func (e *Decoder) DecodeConstantSizedArray(t types.ConstantSizedArray) (v values
 		return v, err
 	}
 
-	v = values.NewConstantSizedArray(vals)
-	v.SetType(t)
+	v = values.NewConstantSizedArray(vals).WithType(t)
 
 	return v, nil
 }
@@ -394,8 +392,7 @@ func (e *Decoder) DecodeDictionary(t types.Dictionary) (v values.Dictionary, err
 		}
 	}
 
-	v = values.NewDictionary(pairs)
-	v.SetType(t)
+	v = values.NewDictionary(pairs).WithType(t)
 
 	return v, nil
 }
@@ -415,8 +412,7 @@ func (e *Decoder) DecodeComposite(t types.Composite) (v values.Composite, err er
 		fields[i] = value
 	}
 
-	v = values.NewComposite(fields)
-	v.SetType(t)
+	v = values.NewComposite(fields).WithType(t)
 
 	return v, nil
 }
@@ -436,8 +432,7 @@ func (e *Decoder) DecodeEvent(t types.Event) (v values.Event, err error) {
 		fields[i] = value
 	}
 
-	v = values.NewEvent(fields)
-	v.SetType(t)
+	v = values.NewEvent(fields).WithType(t)
 
 	return v, nil
 }
