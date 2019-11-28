@@ -20,7 +20,9 @@ install-tools: crypto/relic/build
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
 	GO111MODULE=on go get github.com/mgechev/revive@master; \
-	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@master
+	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@master; \
+	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
+	GO111MODULE=on go get github.com/jteeuwen/go-bindata@3.0.7;
 
 .PHONY: test
 test:
