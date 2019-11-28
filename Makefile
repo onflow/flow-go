@@ -20,7 +20,9 @@ install-tools: crypto/relic/build
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
 	GO111MODULE=on go get github.com/mgechev/revive@master; \
-	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@master
+	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@master; \
+	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
+	GO111MODULE=on go get github.com/jteeuwen/go-bindata@v3.0.7;
 
 .PHONY: test
 test:
@@ -56,14 +58,13 @@ generate-mocks:
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/emulated_blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator EmulatedBlockchainAPI
 
-
 .PHONY: check-generated-code
 check-generated-code:
 	./utils/scripts/check-generated-code.sh
 
 .PHONY: lint
 lint:
-	GO111MODULE=on revive -config revive.toml -exclude cli/flow/cadence/vscode/cadence.go ./...
+	GO111MODULE=on revive -config revive.toml -exclude cli/flow/cadence/vscode/cadence_bin.go ./...
 
 .PHONY: ci
 ci: install-tools generate check-generated-code lint test
@@ -93,3 +94,16 @@ docker-push-emulator:
 .PHONY: docker-build-consensus
 docker-build-consensus:
 	docker build -f cmd/consensus/Dockerfile -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" .
+
+# Builds the VS Code extension
+.PHONY: build-vscode-extension
+build-vscode-extension:
+	cd language/tools/vscode-extension && npm run package;
+
+# Builds and promotes the VS Code extension. Promoting here means re-generating
+# the embedded extension binary used in the CLI for installation.
+.PHONY: promote-vscode-extension
+promote-vscode-extension: build-vscode-extension
+	cp language/tools/vscode-extension/cadence-*.vsix ./cli/flow/cadence/vscode/cadence.vsix;
+	go generate ./cli/flow/cadence/vscode;
+
