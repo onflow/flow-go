@@ -11,7 +11,7 @@ import (
 
 // TODO: add support for nested composite declarations
 
-func TestCheckInvalidNestedCompositeDeclarations(t *testing.T) {
+func TestCheckNestedCompositeDeclarations(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       contract TestContract {
@@ -19,23 +19,33 @@ func TestCheckInvalidNestedCompositeDeclarations(t *testing.T) {
       }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 1)
 
 	// TODO: add support for contracts
 
 	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-	// TODO: add support for nested composite declarations
-
-	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-
 }
 
-func TestCheckInvalidNestedInterfaceDeclarations(t *testing.T) {
+func TestCheckNestedCompositeInterfaceDeclarations(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       contract interface TestContract {
           resource TestResource {}
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	// TODO: add support for contracts
+
+	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidNestedCompositeDeclarationInComposite(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      contract interface TestContract {
+          contract NestedContract {}
       }
     `)
 
@@ -45,7 +55,31 @@ func TestCheckInvalidNestedInterfaceDeclarations(t *testing.T) {
 
 	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 
-	// TODO: add support for nested composite declarations
+	assert.IsType(t, &sema.InvalidNestedDeclarationError{}, errs[1])
+}
 
-	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+func TestCheckInvalidNestedCompositeDeclarations(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource TestContract {
+          resource TestResource {}
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidNestedDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidNestedInterfaceDeclarations(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource interface TestContract {
+          resource TestResource {}
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidNestedDeclarationError{}, errs[0])
 }

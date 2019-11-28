@@ -22,10 +22,6 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		false,
 	)
 
-	// TODO: also check nested composite members
-
-	// TODO: also check nested composite members' identifiers
-
 	// NOTE: functions are checked separately
 	checker.checkFieldsAccessModifier(declaration.Members.Fields)
 
@@ -83,32 +79,17 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		interfaceType.CompositeKind,
 	)
 
-	// TODO: support non-structure / non-resource interfaces, such as contract interfaces
+	checker.checkCompositeDeclarationSupport(
+		declaration.CompositeKind,
+		declaration.DeclarationKind(),
+		declaration.Identifier,
+	)
 
-	if declaration.CompositeKind != common.CompositeKindStructure &&
-		declaration.CompositeKind != common.CompositeKindResource {
-
-		checker.report(
-			&UnsupportedDeclarationError{
-				DeclarationKind: declaration.DeclarationKind(),
-				Range:           ast.NewRangeFromPositioned(declaration.Identifier),
-			},
-		)
-	}
-
-	// TODO: support nested declarations for contracts and contract interfaces
-
-	// report error for first nested composite declaration, if any
-	if len(declaration.Members.CompositeDeclarations) > 0 {
-		firstNestedCompositeDeclaration := declaration.Members.CompositeDeclarations[0]
-
-		checker.report(
-			&UnsupportedDeclarationError{
-				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
-				Range:           ast.NewRangeFromPositioned(firstNestedCompositeDeclaration.Identifier),
-			},
-		)
-	}
+	checker.checkCompositeNesting(
+		declaration.CompositeKind,
+		declaration.DeclarationKind(),
+		declaration.Members,
+	)
 
 	return nil
 }
