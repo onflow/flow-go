@@ -246,9 +246,7 @@ func TestGetEvents(t *testing.T) {
 	from := values.Address(flow.ZeroAddress)
 	amount := values.NewInt(42)
 
-	mockEventValue := values.Event{
-		Fields: []values.Value{to, from, amount},
-	}.WithType(mockEventType)
+	mockEventValue := values.NewEvent([]values.Value{to, from, amount}).WithType(mockEventType)
 
 	// encode event payload from mock value
 	eventPayload, _ := encoding.Encode(mockEventValue)
