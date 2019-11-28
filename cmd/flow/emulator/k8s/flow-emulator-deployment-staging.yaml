@@ -136,6 +136,7 @@ spec:
         - name: gcr
       containers:
         - name: flow-emulator
+          # No tag, will be attached by teamcity
           image: gcr.io/dl-flow/emulator
           # args: ["emulator", "start", "-v"]
 
@@ -176,7 +177,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /live
-              port: web
+              port: http
             initialDelaySeconds: 5
             successThreshold: 1
           
@@ -184,7 +185,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /live
-              port: web
+              port: http
             initialDelaySeconds: 30
             periodSeconds: 30
             successThreshold: 1
