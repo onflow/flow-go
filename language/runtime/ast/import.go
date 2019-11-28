@@ -97,7 +97,7 @@ func (l AddressLocation) ID() LocationID {
 }
 
 func (l AddressLocation) String() string {
-	return hex.EncodeToString([]byte(l))
+	return hex.EncodeToString(l)
 }
 
 func init() {
