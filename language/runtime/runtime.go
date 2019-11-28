@@ -234,8 +234,8 @@ func (r *interpreterRuntime) newInterpreter(
 	return interpreter.NewInterpreter(
 		checker,
 		interpreter.WithPredefinedValues(functions.ToValues()),
-		interpreter.WithOnEventEmittedHandler(func(_ *interpreter.Interpreter, event values.Event) {
-			r.emitEvent(event, runtimeInterface)
+		interpreter.WithOnEventEmittedHandler(func(inter *interpreter.Interpreter, event interpreter.EventValue) {
+			r.emitEvent(inter, runtimeInterface, event)
 		}),
 		interpreter.WithStorageReadHandler(runtimeStorage.readValue),
 		interpreter.WithStorageWriteHandler(runtimeStorage.writeValue),
@@ -284,25 +284,18 @@ func (r *interpreterRuntime) parse(script []byte) (program *ast.Program, err err
 }
 
 // emitEvent converts an event value to native Go types and emits it to the runtime interface.
-func (r *interpreterRuntime) emitEvent(event values.Event, runtimeInterface Interface) {
-	// TODO:
-	// var identifier string
-	//
-	// // TODO: can this be generalized for all types?
-	// switch location := eventValue.Location.(type) {
-	// case ast.AddressLocation:
-	// 	identifier = fmt.Sprintf("account.%s.%s", location, eventValue.Identifier)
-	// case TransactionLocation:
-	// 	identifier = fmt.Sprintf("tx.%s.%s", location, eventValue.Identifier)
-	// case ScriptLocation:
-	// 	identifier = fmt.Sprintf("script.%s.%s", location, eventValue.Identifier)
-	// default:
-	// 	panic(fmt.Sprintf("event definition from unsupported location: %s", location))
-	// }
-	//
-	// // event.Identifier = identifier
+func (r *interpreterRuntime) emitEvent(
+	inter *interpreter.Interpreter,
+	runtimeInterface Interface,
+	event interpreter.EventValue,
+) {
+	functionType := inter.Checker.GlobalValues[event.Identifier].Type.(*sema.FunctionType)
+	eventType := functionType.ReturnTypeAnnotation.Type.(*sema.EventType).Export()
 
-	runtimeInterface.EmitEvent(event)
+	eventValue := event.Export().(values.Event)
+	eventValue = eventValue.WithType(eventType)
+
+	runtimeInterface.EmitEvent(eventValue)
 }
 
 func (r *interpreterRuntime) emitAccountEvent(
