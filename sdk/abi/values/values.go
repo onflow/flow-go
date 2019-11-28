@@ -11,16 +11,6 @@ type Value interface {
 	Type() types.Type
 }
 
-type typeAssignableValue struct {
-	typ types.Type
-}
-
-func (typeAssignableValue) isValue() {}
-
-func (v typeAssignableValue) Type() types.Type {
-	return v.typ
-}
-
 type Void struct{}
 
 func NewVoid() Void {
@@ -258,7 +248,7 @@ func (Uint64) Type() types.Type {
 func (v Uint64) WithType(types.Type) Value { return v }
 
 type VariableSizedArray struct {
-	typeAssignableValue
+	typ    types.Type
 	Values []Value
 }
 
@@ -266,13 +256,17 @@ func NewVariableSizedArray(values []Value) VariableSizedArray {
 	return VariableSizedArray{Values: values}
 }
 
+func (v VariableSizedArray) isValue() {}
+
+func (v VariableSizedArray) Type() types.Type { return v.typ }
+
 func (v VariableSizedArray) WithType(typ types.Type) VariableSizedArray {
 	v.typ = typ
 	return v
 }
 
 type ConstantSizedArray struct {
-	typeAssignableValue
+	typ    types.Type
 	Values []Value
 }
 
@@ -280,19 +274,27 @@ func NewConstantSizedArray(values []Value) ConstantSizedArray {
 	return ConstantSizedArray{Values: values}
 }
 
+func (v ConstantSizedArray) isValue() {}
+
+func (v ConstantSizedArray) Type() types.Type { return v.typ }
+
 func (v ConstantSizedArray) WithType(typ types.Type) ConstantSizedArray {
 	v.typ = typ
 	return v
 }
 
 type Dictionary struct {
-	typeAssignableValue
+	typ   types.Type
 	Pairs []KeyValuePair
 }
 
 func NewDictionary(pairs []KeyValuePair) Dictionary {
 	return Dictionary{Pairs: pairs}
 }
+
+func (v Dictionary) isValue() {}
+
+func (v Dictionary) Type() types.Type { return v.typ }
 
 func (v Dictionary) WithType(typ types.Type) Dictionary {
 	v.typ = typ
@@ -304,22 +306,8 @@ type KeyValuePair struct {
 	Value Value
 }
 
-type Event struct {
-	typeAssignableValue
-	Fields []Value
-}
-
-func NewEvent(fields []Value) Event {
-	return Event{Fields: fields}
-}
-
-func (v Event) WithType(typ types.Type) Event {
-	v.typ = typ
-	return v
-}
-
 type Composite struct {
-	typeAssignableValue
+	typ    types.Type
 	Fields []Value
 }
 
@@ -327,7 +315,29 @@ func NewComposite(fields []Value) Composite {
 	return Composite{Fields: fields}
 }
 
+func (v Composite) isValue() {}
+
+func (v Composite) Type() types.Type { return v.typ }
+
 func (v Composite) WithType(typ types.Type) Composite {
+	v.typ = typ
+	return v
+}
+
+type Event struct {
+	typ    types.Type
+	Fields []Value
+}
+
+func NewEvent(fields []Value) Event {
+	return Event{Fields: fields}
+}
+
+func (v Event) isValue() {}
+
+func (v Event) Type() types.Type { return v.typ }
+
+func (v Event) WithType(typ types.Type) Event {
 	v.typ = typ
 	return v
 }
