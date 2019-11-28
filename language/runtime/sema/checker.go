@@ -234,6 +234,7 @@ func (checker *Checker) report(err error) {
 
 //TODO Once we have a flag which allows us to distinguish builtin from user defined
 // types we can remove this silly list
+// See https://github.com/dapperlabs/flow-go/issues/1627
 var blacklist = map[string]interface{}{
 	"Int":     nil,
 	"Int8":    nil,
@@ -253,14 +254,14 @@ func (checker *Checker) UserDefinedValues() map[string]*Variable {
 		if _, ok := blacklist[key]; ok == true {
 			continue
 		}
-		if _, ok := checker.PredeclaredValues[key]; ok == true {
+		if _, ok := checker.PredeclaredValues[key]; ok {
 			continue
 		}
 
-		if _, ok := checker.PredeclaredTypes[key]; ok == true {
+		if _, ok := checker.PredeclaredTypes[key]; ok {
 			continue
 		}
-		if typeValue, ok := checker.GlobalTypes[key]; ok == true {
+		if typeValue, ok := checker.GlobalTypes[key]; ok {
 			ret[key] = typeValue
 			continue
 		}

@@ -22,7 +22,11 @@ var Cmd = &cobra.Command{
 	Use:   "abi",
 	Short: "Generates JSON ABI from given Cadence file",
 	Run: func(cmd *cobra.Command, args []string) {
-		abi.GenerateABI(args, conf.Pretty)
+		err := abi.GenerateABI(args, conf.Pretty)
+
+		if err != nil {
+			cli.Exitf(1, "Failed to generate ABI from JSON file: %v", err)
+		}
 	},
 }
 

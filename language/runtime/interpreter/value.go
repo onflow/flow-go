@@ -1272,14 +1272,12 @@ func (v CompositeValue) Export() values.Value {
 
 	fields := make([]values.Value, 0)
 
-	keys := make([]string, len(v.Fields))
-	i := 0
+	keys := make([]string, 0, len(v.Fields))
 	for key := range v.Fields {
-		keys[i] = key
-		i++
+		keys = append(keys, key)
 	}
 
-	encoding.EncodingOrder(keys)
+	encoding.SortInEncodingOrder(keys)
 
 	for _, key := range keys {
 		fields = append(fields, v.Fields[key].(ExportableValue).Export())

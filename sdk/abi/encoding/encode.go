@@ -18,7 +18,7 @@ type Encoder struct {
 }
 
 //Central point to keep ordering for encoding the same
-func EncodingOrder(names []string) {
+func SortInEncodingOrder(names []string) {
 	sort.Strings(names)
 }
 
