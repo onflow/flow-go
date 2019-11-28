@@ -38,7 +38,7 @@ func newPersonFromValue(v values.Value) Person {
 }
 
 func (p person) FullName() string {
-	return string(p.value.Fields[0].(values.String))
+	return p.value.Fields()[0].(values.String).String()
 }
 
 func (p person) Value() values.Value {
