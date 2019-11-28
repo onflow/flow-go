@@ -3,7 +3,6 @@ package emulator_test
 import (
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"os"
 	"testing"
 
@@ -119,7 +118,7 @@ func TestInitialization(t *testing.T) {
 			res, _, err := b.ExecuteScript([]byte(readScript))
 			assert.NoError(t, err)
 
-			assert.Equal(t, values.Int{big.NewInt(1)}, res)
+			assert.Equal(t, values.NewInt(1), res)
 		})
 	})
 }
