@@ -1,9 +1,7 @@
 import {
     ExtensionContext,
-    commands,
-    workspace,
     window,
-    ColorPresentation, Terminal
+    Terminal
 } from "vscode";
 import {LanguageClient} from "vscode-languageclient";
 import {getConfig, handleConfigChanges, Config} from "./config";
