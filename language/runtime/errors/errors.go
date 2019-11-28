@@ -46,6 +46,7 @@ type ErrorNote interface {
 
 // ParentError is an error that contains one or more child errors.
 type ParentError interface {
+	error
 	ChildErrors() []error
 }
 

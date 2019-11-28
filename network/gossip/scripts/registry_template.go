@@ -8,8 +8,6 @@ import (
 
 var registryTemplate = template.Must(template.New("registry").Parse(registryTmplText))
 
-
-
 // registryTmplText contains the template structure to be used
 const registryTmplText = `package {{ .Package }}
 
@@ -78,5 +76,3 @@ func ({{ .InterfaceShort }}r *{{ .InterfaceLong }}Registry) MessageTypes() map[r
 }
 {{- end}}
 `
-
-

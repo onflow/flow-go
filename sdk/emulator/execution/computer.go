@@ -28,12 +28,12 @@ func NewComputer(
 
 // ExecuteTransaction executes the provided transaction in the runtime.
 //
-// This function initializes a new runtime context using the provided registers view, as well as
+// This function initializes a new runtime context using the provided ledger view, as well as
 // the accounts that authorized the transaction.
 //
 // An error is returned if the transaction script cannot be parsed or reverts during execution.
-func (c *Computer) ExecuteTransaction(registers *flow.RegistersView, tx flow.Transaction) ([]flow.Event, error) {
-	runtimeContext := NewRuntimeContext(registers)
+func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transaction) ([]flow.Event, error) {
+	runtimeContext := NewRuntimeContext(ledger)
 
 	runtimeContext.SetLogger(c.onLogMessage)
 	runtimeContext.SetChecker(func(code []byte, location runtime.Location) error {
@@ -43,7 +43,7 @@ func (c *Computer) ExecuteTransaction(registers *flow.RegistersView, tx flow.Tra
 
 	location := runtime.TransactionLocation(tx.Hash())
 
-	_, err := c.runtime.ExecuteScript(tx.Script, runtimeContext, location)
+	err := c.runtime.ExecuteTransaction(tx.Script, runtimeContext, location)
 	if err != nil {
 		return nil, err
 	}
@@ -55,9 +55,10 @@ func (c *Computer) ExecuteTransaction(registers *flow.RegistersView, tx flow.Tra
 
 // ExecuteScript executes a plain script in the runtime.
 //
+
 // This function initializes a new runtime context using the provided registers view.
-func (c *Computer) ExecuteScript(registers *flow.RegistersView, script []byte) (values.Value, []flow.Event, error) {
-	runtimeContext := NewRuntimeContext(registers)
+func (c *Computer) ExecuteScript(view *flow.LedgerView, script []byte) (values.Value, []flow.Event, error) {
+	runtimeContext := NewRuntimeContext(view)
 	runtimeContext.SetLogger(c.onLogMessage)
 
 	location := runtime.ScriptLocation(ScriptHash(script))

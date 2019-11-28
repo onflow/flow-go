@@ -28,6 +28,10 @@ func (e Error) Error() string {
 	return sb.String()
 }
 
+func (e Error) ChildErrors() []error {
+	return e.Errors
+}
+
 // ParserError
 
 type ParseError interface {

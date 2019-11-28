@@ -1303,6 +1303,7 @@ func init() {
 		&UInt32Type{},
 		&UInt64Type{},
 		&AddressType{},
+		&AccountType{},
 	}
 
 	for _, ty := range types {
@@ -1484,6 +1485,64 @@ func (t *CompositeType) IsResourceType() bool {
 func (t *CompositeType) IsInvalidType() bool {
 	// TODO: maybe if any member has an invalid type?
 	return false
+}
+
+// AccountType
+
+type AccountType struct{}
+
+func (*AccountType) isType() {}
+
+func (*AccountType) String() string {
+	return "Account"
+}
+
+func (*AccountType) ID() string {
+	return "Account"
+}
+
+func (*AccountType) Equal(other Type) bool {
+	_, ok := other.(*AccountType)
+	return ok
+}
+
+func (*AccountType) IsResourceType() bool {
+	return false
+}
+
+func (*AccountType) IsInvalidType() bool {
+	return false
+}
+
+func (*AccountType) HasMembers() bool {
+	return true
+}
+
+func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	switch identifier {
+	case "address":
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			Type:            &AddressType{},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+		})
+
+	case "storage":
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			Type:            &StorageType{},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+		})
+
+	default:
+		return nil
+	}
 }
 
 // Member
@@ -2273,4 +2332,62 @@ func IsNilType(ty Type) bool {
 	}
 
 	return true
+}
+
+type TransactionType struct {
+	Members                         map[string]*Member
+	prepareParameterTypeAnnotations []*TypeAnnotation
+}
+
+func (t *TransactionType) EntryPointFunctionType() *FunctionType {
+	return t.PrepareFunctionType().InvocationFunctionType()
+}
+
+func (t *TransactionType) PrepareFunctionType() *SpecialFunctionType {
+	return &SpecialFunctionType{
+		FunctionType: &FunctionType{
+			ParameterTypeAnnotations: t.prepareParameterTypeAnnotations,
+			ReturnTypeAnnotation:     NewTypeAnnotation(&VoidType{}),
+		},
+	}
+}
+
+func (*TransactionType) ExecuteFunctionType() *SpecialFunctionType {
+	return &SpecialFunctionType{
+		FunctionType: &FunctionType{
+			ParameterTypeAnnotations: []*TypeAnnotation{},
+			ReturnTypeAnnotation:     NewTypeAnnotation(&VoidType{}),
+		},
+	}
+}
+
+func (*TransactionType) isType() {}
+
+func (*TransactionType) String() string {
+	return "Transaction"
+}
+
+func (*TransactionType) ID() string {
+	return "Transaction"
+}
+
+func (*TransactionType) Equal(other Type) bool {
+	// transaction types are not equatable
+	return false
+}
+
+func (*TransactionType) IsResourceType() bool {
+	return false
+}
+
+func (*TransactionType) IsInvalidType() bool {
+	return false
+}
+
+func (t *TransactionType) HasMembers() bool {
+	return true
+}
+
+func (t *TransactionType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	return t.Members[identifier]
 }

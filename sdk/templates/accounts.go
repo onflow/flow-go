@@ -24,12 +24,14 @@ func CreateAccount(accountKeys []flow.AccountPublicKey, code []byte) ([]byte, er
 	codeStr := languageEncodeBytes(code)
 
 	script := fmt.Sprintf(`
-		pub fun main() {
-			let publicKeys: [[Int]] = %s
-			let code: [Int]? = %s
-			createAccount(publicKeys, code)
-		}
-	`, publicKeysStr, codeStr)
+        transaction {
+          execute {
+            let publicKeys: [[Int]] = %s
+            let code: [Int]? = %s
+            createAccount(publicKeys, code)
+          }
+        }
+    `, publicKeysStr, codeStr)
 
 	return []byte(script), nil
 }
@@ -39,11 +41,14 @@ func UpdateAccountCode(code []byte) []byte {
 	codeStr := languageEncodeBytes(code)
 
 	script := fmt.Sprintf(`
-		pub fun main(account: Account) {
-			let code = %s
-			updateAccountCode(account.address, code)
-		}
-	`, codeStr)
+        transaction {
+          prepare(signer: Account) {
+            let code = %s
+            updateAccountCode(signer.address, code)
+          }
+          execute {}
+        }
+    `, codeStr)
 
 	return []byte(script)
 }
@@ -58,11 +63,14 @@ func AddAccountKey(accountKey flow.AccountPublicKey) ([]byte, error) {
 	publicKeyStr := languageEncodeBytes(accountKeyBytes)
 
 	script := fmt.Sprintf(`
-		pub fun main(account: Account) {
-			let key = %s
-			addAccountKey(account.address, key)
-		}
-	`, publicKeyStr)
+        transaction {
+          prepare(signer: Account) {
+            let key = %s
+            addAccountKey(signer.address, key)
+          }
+          execute {}
+        }
+   	`, publicKeyStr)
 
 	return []byte(script), nil
 }
@@ -70,11 +78,14 @@ func AddAccountKey(accountKey flow.AccountPublicKey) ([]byte, error) {
 // RemoveAccountKey generates a script that removes a key from an account.
 func RemoveAccountKey(index int) []byte {
 	script := fmt.Sprintf(`
-		pub fun main(account: Account) {
-			let index = %d
-			removeAccountKey(account.address, index)
-		}
-	`, index)
+        transaction {
+          prepare(signer: Account) {
+            let index = %d
+            removeAccountKey(signer.address, index)
+          }
+          execute {}
+        }
+    `, index)
 
 	return []byte(script)
 }

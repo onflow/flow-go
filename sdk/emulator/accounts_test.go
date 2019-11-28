@@ -19,7 +19,8 @@ func TestCreateAccount(t *testing.T) {
 	publicKeys := unittest.PublicKeyFixtures()
 
 	t.Run("SingleKey", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		publicKey := flow.AccountPublicKey{
 			PublicKey: publicKeys[0],
@@ -29,7 +30,7 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, nil)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -40,12 +41,12 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		account := b.LastCreatedAccount()
 
@@ -56,7 +57,8 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("MultipleKeys", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		publicKeyA := flow.AccountPublicKey{
 			PublicKey: publicKeys[0],
@@ -73,7 +75,7 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKeyA, publicKeyB}, nil)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -84,12 +86,12 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		account := b.LastCreatedAccount()
 
@@ -101,7 +103,8 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("KeysAndCode", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		publicKeyA := flow.AccountPublicKey{
 			PublicKey: publicKeys[0],
@@ -120,7 +123,7 @@ func TestCreateAccount(t *testing.T) {
 		code := []byte("pub fun main() {}")
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKeyA, publicKeyB}, code)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -131,12 +134,12 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		account := b.LastCreatedAccount()
 
@@ -148,12 +151,13 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("CodeAndNoKeys", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		code := []byte("pub fun main() {}")
 
 		createAccountScript, err := templates.CreateAccount(nil, code)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -164,12 +168,12 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		account := b.LastCreatedAccount()
 
@@ -179,13 +183,8 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("EventEmitted", func(t *testing.T) {
-		var lastEvent flow.Event
-
-		b := emulator.NewEmulatedBlockchain(emulator.EmulatedBlockchainOptions{
-			OnEventEmitted: func(event flow.Event, blockNumber uint64, txHash crypto.Hash) {
-				lastEvent = event
-			},
-		})
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		publicKey := flow.AccountPublicKey{
 			PublicKey: publicKeys[0],
@@ -197,7 +196,7 @@ func TestCreateAccount(t *testing.T) {
 		code := []byte("pub fun main() {}")
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, code)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -208,21 +207,26 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx)
+		require.NoError(t, err)
+
+		block, err := b.CommitBlock()
+		require.NoError(t, err)
+
+		events, err := b.GetEvents(flow.EventAccountCreated, block.Number, block.Number)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		accountCreatedEvent, err := flow.DecodeAccountCreatedEvent(events[0].Payload)
 		assert.Nil(t, err)
-
-		require.Equal(t, flow.EventAccountCreated, lastEvent.Type)
-
-		accountCreatedEvent, err := flow.DecodeAccountCreatedEvent(lastEvent.Payload)
-		assert.Nil(t, err)
-
 		accountAddress := accountCreatedEvent.Address()
+
 		account, err := b.GetAccount(accountAddress)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		assert.Equal(t, uint64(0), account.Balance)
 		require.Len(t, account.Keys, 1)
@@ -231,7 +235,8 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("InvalidKeyHashingAlgorithm", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		lastAccount := b.LastCreatedAccount()
 
@@ -244,7 +249,7 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, nil)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -255,7 +260,7 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
@@ -268,14 +273,15 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("InvalidCode", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		lastAccount := b.LastCreatedAccount()
 
 		code := []byte("not a valid script")
 
 		createAccountScript, err := templates.CreateAccount(nil, code)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             createAccountScript,
@@ -286,7 +292,7 @@ func TestCreateAccount(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
@@ -301,14 +307,15 @@ func TestCreateAccount(t *testing.T) {
 
 func TestAddAccountKey(t *testing.T) {
 	t.Run("ValidKey", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
 			[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
 		publicKey := privateKey.PublicKey(keys.PublicKeyWeightThreshold)
 
 		addKeyScript, err := templates.AddAccountKey(publicKey)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx1 := flow.Transaction{
 			Script:             addKeyScript,
@@ -320,13 +327,13 @@ func TestAddAccountKey(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx1, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx1.AddSignature(b.RootAccountAddress(), sig)
 		err = b.SubmitTransaction(tx1)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
-		script := []byte("pub fun main(account: Account) {}")
+		script := []byte("transaction { execute {} }")
 
 		tx2 := flow.Transaction{
 			Script:             script,
@@ -334,20 +341,20 @@ func TestAddAccountKey(t *testing.T) {
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-			ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 		}
 
 		sig, err = keys.SignTransaction(tx2, privateKey)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx2.AddSignature(b.RootAccountAddress(), sig)
 
 		err = b.SubmitTransaction(tx2)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("InvalidKeyHashingAlgorithm", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		publicKey := flow.AccountPublicKey{
 			PublicKey: unittest.PublicKeyFixtures()[0],
@@ -358,7 +365,7 @@ func TestAddAccountKey(t *testing.T) {
 		}
 
 		addKeyScript, err := templates.AddAccountKey(publicKey)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx := flow.Transaction{
 			Script:             addKeyScript,
@@ -370,7 +377,7 @@ func TestAddAccountKey(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
@@ -380,14 +387,15 @@ func TestAddAccountKey(t *testing.T) {
 }
 
 func TestRemoveAccountKey(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b, err := emulator.NewEmulatedBlockchain()
+	require.NoError(t, err)
 
 	privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
 		[]byte("pineapple elephant ears space cowboy octopus rodeo potato cannon"))
 	publicKey := privateKey.PublicKey(keys.PublicKeyWeightThreshold)
 
 	addKeyScript, err := templates.AddAccountKey(publicKey)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx1 := flow.Transaction{
 		Script:             addKeyScript,
@@ -399,15 +407,15 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx1)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	account, err := b.GetAccount(b.RootAccountAddress())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Len(t, account.Keys, 2)
 
@@ -421,15 +429,15 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx2.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx2)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	account, err = b.GetAccount(b.RootAccountAddress())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Len(t, account.Keys, 1)
 
@@ -443,7 +451,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 
 	sig, err = keys.SignTransaction(tx3, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx3.AddSignature(b.RootAccountAddress(), sig)
 
@@ -451,7 +459,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	assert.NotNil(t, err)
 
 	account, err = b.GetAccount(b.RootAccountAddress())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Len(t, account.Keys, 1)
 
@@ -465,15 +473,15 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 
 	sig, err = keys.SignTransaction(tx4, privateKey)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx4.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx4)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	account, err = b.GetAccount(b.RootAccountAddress())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Empty(t, account.Keys)
 }
@@ -487,16 +495,17 @@ func TestUpdateAccountCode(t *testing.T) {
 	publicKeyB := privateKeyB.PublicKey(keys.PublicKeyWeightThreshold)
 
 	t.Run("ValidSignature", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
 		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, codeA, getNonce())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t, codeA, account.Code)
 
@@ -510,35 +519,36 @@ func TestUpdateAccountCode(t *testing.T) {
 		}
 
 		sigA, err := keys.SignTransaction(tx, privateKeyA)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		sigB, err := keys.SignTransaction(tx, privateKeyB)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(accountAddressA, sigA)
 		tx.AddSignature(accountAddressB, sigB)
 
 		err = b.SubmitTransaction(tx)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		account, err = b.GetAccount(accountAddressB)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		assert.Equal(t, codeB, account.Code)
 	})
 
 	t.Run("InvalidSignature", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
 		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, codeA, getNonce())
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
+		require.NoError(t, err)
 
-		require.Nil(t, err)
 		assert.Equal(t, codeA, account.Code)
 
 		tx := flow.Transaction{
@@ -551,7 +561,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, privateKeyA)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(accountAddressA, sig)
 
@@ -559,29 +569,34 @@ func TestUpdateAccountCode(t *testing.T) {
 		assert.IsType(t, &emulator.ErrMissingSignature{}, err)
 
 		account, err = b.GetAccount(accountAddressB)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// code should not be updated
 		assert.Equal(t, codeA, account.Code)
 	})
 
 	t.Run("UnauthorizedAccount", func(t *testing.T) {
-		b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		privateKeyA := b.RootKey()
 
 		accountAddressA := b.RootAccountAddress()
 		accountAddressB, err := b.CreateAccount([]flow.AccountPublicKey{publicKeyB}, codeA, getNonce())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		account, err := b.GetAccount(accountAddressB)
 
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, codeA, account.Code)
 
 		unauthorizedUpdateAccountCodeScript := []byte(fmt.Sprintf(`
-			pub fun main(account: Account) {
+			transaction {
+			  prepare(account: Account) {
 				updateAccountCode(%s, nil)
+			  }
+			  
+			  execute {}
 			}
 		`, accountAddressB.Hex()))
 
@@ -595,7 +610,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		}
 
 		sig, err := keys.SignTransaction(tx, privateKeyA)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		tx.AddSignature(accountAddressA, sig)
 
@@ -605,13 +620,14 @@ func TestUpdateAccountCode(t *testing.T) {
 		account, err = b.GetAccount(accountAddressB)
 
 		// code should not be updated
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, codeA, account.Code)
 	})
 }
 
 func TestImportAccountCode(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b, err := emulator.NewEmulatedBlockchain()
+	require.NoError(t, err)
 
 	accountScript := []byte(`
 		pub fun answer(): Int {
@@ -622,16 +638,18 @@ func TestImportAccountCode(t *testing.T) {
 	publicKey := b.RootKey().PublicKey(keys.PublicKeyWeightThreshold)
 
 	address, err := b.CreateAccount([]flow.AccountPublicKey{publicKey}, accountScript, getNonce())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	script := []byte(fmt.Sprintf(`
 		import 0x%s
 
-		pub fun main(account: Account) {
+		transaction {
+		  execute {
 			let answer = answer()
 			if answer != 42 {
 				panic("?!")
 			}
+		  }
 		}
 	`, address.Hex()))
 
@@ -641,14 +659,13 @@ func TestImportAccountCode(t *testing.T) {
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	tx.AddSignature(b.RootAccountAddress(), sig)
 
 	err = b.SubmitTransaction(tx)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }

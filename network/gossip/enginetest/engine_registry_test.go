@@ -9,10 +9,9 @@ import (
 
 	"github.com/dapperlabs/flow-go/network/gossip"
 	"github.com/dapperlabs/flow-go/network/gossip/peerstable"
-	"github.com/dapperlabs/flow-go/network/gossip/testnet"
-
-	"github.com/dapperlabs/flow-go/network/mock"
 	protocols "github.com/dapperlabs/flow-go/network/gossip/protocols/grpc"
+	"github.com/dapperlabs/flow-go/network/gossip/testnet"
+	"github.com/dapperlabs/flow-go/network/mock"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -74,11 +73,11 @@ func TestConduit(t *testing.T) {
 
 	mockCodec := &mock.Codec{}
 
-	mockCodec.On("Encode","Hello!").Return([]byte("Hello!"),nil)
-	mockCodec.On("Encode","Hey").Return([]byte("Hey"),nil)
+	mockCodec.On("Encode", "Hello!").Return([]byte("Hello!"), nil)
+	mockCodec.On("Encode", "Hey").Return([]byte("Hey"), nil)
 
-	mockCodec.On("Decode",[]byte("Hello!")).Return("Hello!",nil)
-	mockCodec.On("Decode",[]byte("Hey")).Return("Hey",nil)
+	mockCodec.On("Decode", []byte("Hello!")).Return("Hello!", nil)
+	mockCodec.On("Decode", []byte("Hey")).Return("Hey", nil)
 
 	opts := []gossip.Option{
 		gossip.WithLogger(zerolog.New(ioutil.Discard)),

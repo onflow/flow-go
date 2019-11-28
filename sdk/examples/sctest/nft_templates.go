@@ -16,7 +16,8 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int) []byte {
 	template := `
 		import NFT, NFTCollection, createNFT, createCollection from 0x%s
 
-		pub fun main(acct: Account) {
+		transaction {
+		  prepare(acct: Account) {
 			let tokenA <- createNFT(id: %d)
 
 			let collection: <-NFTCollection <- createCollection()
@@ -31,8 +32,11 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int) []byte {
 			destroy oldCollection
 
 			acct.storage[&NFTCollection] = &acct.storage[NFTCollection] as NFTCollection
+		  }
+		  execute {}
+		}
+	`
 
-		}`
 	return []byte(fmt.Sprintf(template, tokenAddr, id, id))
 }
 
@@ -42,8 +46,9 @@ func GenerateDepositScript(tokenCodeAddr flow.Address, receiverAddr flow.Address
 	template := `
 		import NFT, NFTCollection from 0x%s
 
-		pub fun main(acct: Account) {
-			let recipient = getAccount("%s")
+		transaction {
+		  prepare(acct: Account) {
+			let recipient = getAccount(0x%s)
 
 			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing NFT collection reference")
 			let depositRef = recipient.storage[&NFTCollection] ?? panic("missing deposit reference")
@@ -51,7 +56,10 @@ func GenerateDepositScript(tokenCodeAddr flow.Address, receiverAddr flow.Address
 			let nft <- collectionRef.withdraw(tokenID: %d)
 
 			depositRef.deposit(token: <-nft)
-		}`
+		  }
+		  execute {}
+		}
+	`
 
 	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), receiverAddr.String(), transferNFTID))
 }
@@ -62,14 +70,18 @@ func GenerateTransferScript(tokenCodeAddr flow.Address, receiverAddr flow.Addres
 	template := `
 		import NFT, NFTCollection from 0x%s
 
-		pub fun main(acct: Account) {
-			let recipient = getAccount("%s")
+		transaction {
+		  prepare(acct: Account) {
+			let recipient = getAccount(0x%s)
 
 			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing NFT collection reference")
 			let depositRef = recipient.storage[&NFTCollection] ?? panic("missing deposit reference")
 
 			collectionRef.transfer(recipient: depositRef, tokenID: %d)
-		}`
+		  }
+		  execute {}
+		}
+	`
 
 	return []byte(fmt.Sprintf(template, tokenCodeAddr.String(), receiverAddr.String(), transferNFTID))
 }
@@ -82,13 +94,14 @@ func GenerateInspectCollectionScript(nftCodeAddr, userAddr flow.Address, nftID i
 		import NFT, NFTCollection from 0x%s
 
 		pub fun main() {
-			let acct = getAccount("%s")
-			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection reference")
-
-			if collectionRef.idExists(tokenID: %d) != %v {
-				panic("Token ID doesn't exist!")
-			}
-		}`
+		  let acct = getAccount(0x%s)
+		  let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection reference")
+		
+		  if collectionRef.idExists(tokenID: %d) != %v {
+			panic("Token ID doesn't exist!")
+		  }
+		}
+	`
 
 	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, nftID, shouldExist))
 }
@@ -101,15 +114,16 @@ func GenerateInspectKeysScript(nftCodeAddr, userAddr flow.Address, id1, id2 int)
 		import NFT, NFTCollection from 0x%s
 
 		pub fun main() {
-			let acct = getAccount("%s")
-			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection reference")
-
-			let array = collectionRef.getIDs() 
-			
-			if array[0] != %d || array[1] != %d {
-				panic("Keys array is incorrect!")
-			}
-		}`
+		  let acct = getAccount(0x%s)
+		  let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection reference")
+		
+		  let array = collectionRef.getIDs() 
+		 
+		  if array[0] != %d || array[1] != %d {
+			panic("Keys array is incorrect!")
+		  }
+		}
+	`
 
 	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, id1, id2))
 }

@@ -38,7 +38,7 @@ apply-staging-files:
 	kconfig=$$(uuidgen); \
 	echo "$$KUBECONFIG_STAGING" > $$kconfig; \
 	files=$$(find ${K8S_YAMLS_LOCATION} -type f \( -name "*.yml" -or -name "*.yaml" \) | grep staging); \
-	echo "$$files" | xargs -I {} kubectl --kubeconfig=$$kconfig apply -f {} --dry-run
+	echo "$$files" | xargs -I {} kubectl --kubeconfig=$$kconfig apply -f {}
 
 # Production YAMLs must have 'production' in their name.
 .PHONY: apply-prod-files
