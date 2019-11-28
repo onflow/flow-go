@@ -67,10 +67,13 @@ const updateAccountCode = (ext: Extension) => async () => {
         return;
     }
 
-    ext.client.sendRequest("workspace/executeCommand", {
-        command: UPDATE_ACCOUNT_CODE_SERVER,
-        arguments: [activeEditor.document.uri.toString()],
-    })
-        .then((res) => console.log("excom1", res))
-        .then((res) => console.log("excom2", res));
+    try {
+        ext.client.sendRequest("workspace/executeCommand", {
+            command: UPDATE_ACCOUNT_CODE_SERVER,
+            arguments: [activeEditor.document.uri.toString()],
+        });
+    } catch (err) {
+        window.showWarningMessage("Failed to update account code");
+        console.error(err);
+    }
 };
