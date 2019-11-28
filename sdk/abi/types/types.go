@@ -69,21 +69,15 @@ type ConstantSizedArray struct {
 	ElementType Type
 }
 
-type Composite struct {
-	baseType
-	FieldTypes []Type
-}
-
 type Dictionary struct {
 	baseType
 	KeyType     Type
 	ElementType Type
 }
 
-type Function struct {
+type Composite struct {
 	baseType
-	ParameterTypeAnnotations []Annotation
-	ReturnTypeAnnotation     Annotation
+	FieldTypes []Type
 }
 
 type Event struct {
@@ -96,6 +90,12 @@ type EventField struct {
 	baseType
 	Identifier string
 	Type       Type
+}
+
+type Function struct {
+	baseType
+	ParameterTypeAnnotations []Annotation
+	ReturnTypeAnnotation     Annotation
 }
 
 type Address struct{ baseType }

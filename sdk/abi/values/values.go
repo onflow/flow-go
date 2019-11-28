@@ -1,118 +1,285 @@
 package values
 
-import "math/big"
+import (
+	"math/big"
+
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
+)
 
 type Value interface {
 	isValue()
+	Type() types.Type
+	setType(p types.Type)
 }
 
-type Void struct{}
+// WithType annotates a value with a type.
+func WithType(t types.Type, v Value) Value {
+	v.setType(t)
+	return v
+}
 
-func (Void) isValue() {}
+type baseValue struct {
+	valueType types.Type
+}
 
-type Nil struct{}
+func (baseValue) isValue() {}
 
-func (Nil) isValue() {}
+func (v baseValue) Type() types.Type { return v.valueType }
+func (v baseValue) setType(t types.Type) {
+	v.valueType = t
+}
 
-type Bool bool
+type Void struct{ baseValue }
 
-func (Bool) isValue() {}
+type Nil struct{ baseValue }
 
-type String string
+type Bool struct {
+	baseValue
+	val bool
+}
 
-func (String) isValue() {}
+func NewBool(b bool) Bool {
+	return Bool{val: b}
+}
 
-type Bytes []byte
+func (v Bool) Bool() bool {
+	return v.val
+}
 
-func (Bytes) isValue() {}
+type String struct {
+	baseValue
+	val string
+}
+
+func NewString(s string) String {
+	return String{val: s}
+}
+
+func (v String) String() string {
+	return v.val
+}
+
+type Bytes struct {
+	baseValue
+	val []byte
+}
+
+func NewBytes(b []byte) Bytes {
+	return Bytes{val: b}
+}
+
+func (v Bytes) Bytes() []byte {
+	return v.val
+}
 
 type Int struct {
-	Int *big.Int
+	baseValue
+	val *big.Int
 }
 
-func NewInt(v int) Int {
-	return Int{big.NewInt(int64(v))}
+func NewInt(i int) Int {
+	return Int{
+		val: big.NewInt(int64(i)),
+	}
 }
 
-func NewIntFromBig(v *big.Int) Int {
-	return Int{v}
+func NewIntFromBig(i *big.Int) Int {
+	return Int{val: i}
 }
 
-func (v Int) ToInt() int {
-	return int(v.Int.Int64())
+func (v Int) Int() int {
+	return int(v.val.Int64())
 }
 
-func (Int) isValue() {}
+func (v Int) Big() *big.Int {
+	return v.val
+}
 
-type Int8 int8
+type Int8 struct {
+	baseValue
+	val int8
+}
 
-func (Int8) isValue() {}
+func NewInt8(i int8) Int8 {
+	return Int8{val: i}
+}
 
-type Int16 int16
+func (v Int8) Int8() int8 {
+	return v.val
+}
 
-func (Int16) isValue() {}
+type Int16 struct {
+	baseValue
+	val int16
+}
 
-type Int32 int32
+func NewInt16(i int16) Int16 {
+	return Int16{val: i}
+}
 
-func (Int32) isValue() {}
+func (v Int16) Int16() int16 {
+	return v.val
+}
 
-type Int64 int64
+type Int32 struct {
+	baseValue
+	val int32
+}
 
-func (Int64) isValue() {}
+func NewInt32(i int32) Int32 {
+	return Int32{val: i}
+}
 
-type Uint8 uint8
+func (v Int32) Int32() int32 {
+	return v.val
+}
 
-func (Uint8) isValue() {}
+type Int64 struct {
+	baseValue
+	val int64
+}
 
-type Uint16 uint16
+func NewInt64(i int64) Int64 {
+	return Int64{val: i}
+}
 
-func (Uint16) isValue() {}
+func (v Int64) Int64() int64 {
+	return v.val
+}
 
-type Uint32 uint32
+type Uint8 struct {
+	baseValue
+	val uint8
+}
 
-func (Uint32) isValue() {}
+func NewUint8(i uint8) Uint8 {
+	return Uint8{val: i}
+}
 
-type Uint64 uint64
+func (v Uint8) Uint8() uint8 {
+	return v.val
+}
 
-func (Uint64) isValue() {}
+type Uint16 struct {
+	baseValue
+	val uint16
+}
 
-type VariableSizedArray []Value
+func NewUint16(i uint16) Uint16 {
+	return Uint16{val: i}
+}
 
-func (VariableSizedArray) isValue() {}
+func (v Uint16) Uint16() uint16 {
+	return v.val
+}
 
-type ConstantSizedArray []Value
+type Uint32 struct {
+	baseValue
+	val uint32
+}
 
-func (ConstantSizedArray) isValue() {}
+func NewUint32(i uint32) Uint32 {
+	return Uint32{val: i}
+}
 
-type Dictionary []KeyValuePair
+func (v Uint32) Uint32() uint32 {
+	return v.val
+}
 
-func (Dictionary) isValue() {}
+type Uint64 struct {
+	baseValue
+	val uint64
+}
+
+func NewUint64(i uint64) Uint64 {
+	return Uint64{val: i}
+}
+
+func (v Uint64) Uint64() uint64 {
+	return v.val
+}
+
+type VariableSizedArray struct {
+	baseValue
+	val []Value
+}
+
+func NewVariableSizedArray(values []Value) VariableSizedArray {
+	return VariableSizedArray{val: values}
+}
+
+func (v VariableSizedArray) Values() []Value {
+	return v.val
+}
+
+type ConstantSizedArray struct {
+	baseValue
+	val []Value
+}
+
+func NewConstantSizedArray(values []Value) ConstantSizedArray {
+	return ConstantSizedArray{val: values}
+}
+
+func (v ConstantSizedArray) Values() []Value {
+	return v.val
+}
+
+type Dictionary struct {
+	baseValue
+	pairs []KeyValuePair
+}
+
+func NewDictionary(pairs []KeyValuePair) Dictionary {
+	return Dictionary{pairs: pairs}
+}
+
+func (v Dictionary) Pairs() []KeyValuePair {
+	return v.pairs
+}
 
 type KeyValuePair struct {
 	Key   Value
 	Value Value
 }
 
-type Event struct {
-	// TODO: is the Identifier field needed here?
-	Identifier string
-	Fields     []Value
-}
-
 type Composite struct {
-	Fields []Value
+	baseValue
+	fields []Value
 }
 
-func (Composite) isValue() {}
+func NewComposite(fields []Value) Composite {
+	return Composite{fields: fields}
+}
 
-func (Event) isValue() {}
+func (v Composite) Fields() []Value {
+	return v.fields
+}
 
-type Address [20]byte
+type Event struct {
+	baseValue
+	fields []Value
+}
 
-func (Address) isValue() {}
+func NewEvent(fields []Value) Event {
+	return Event{fields: fields}
+}
 
-func BytesToAddress(b []byte) Address {
-	var a Address
+func (v Event) Fields() []Value {
+	return v.fields
+}
+
+type Address struct {
+	baseValue
+	val [20]byte
+}
+
+func (v Address) Bytes() []byte {
+	return v.val[:]
+}
+
+func NewAddress(b []byte) Address {
+	var a [20]byte
 	copy(a[:], b)
-	return a
+	return Address{val: a}
 }
