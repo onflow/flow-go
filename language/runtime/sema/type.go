@@ -143,7 +143,7 @@ type VoidType struct{}
 
 func (*VoidType) isType() {}
 
-func (t *VoidType) Export() types.Type {
+func (*VoidType) Export() types.Type {
 	return types.Void{}
 }
 
@@ -239,7 +239,7 @@ type BoolType struct{}
 
 func (*BoolType) isType() {}
 
-func (t *BoolType) Export() types.Type {
+func (*BoolType) Export() types.Type {
 	return types.Bool{}
 }
 
@@ -296,7 +296,7 @@ type StringType struct{}
 
 func (*StringType) isType() {}
 
-func (t *StringType) Export() types.Type {
+func (*StringType) Export() types.Type {
 	return types.String{}
 }
 
@@ -436,7 +436,7 @@ type IntType struct{}
 
 func (*IntType) isType() {}
 
-func (t *IntType) Export() types.Type {
+func (*IntType) Export() types.Type {
 	return types.Int{}
 }
 
@@ -475,7 +475,7 @@ type Int8Type struct{}
 
 func (*Int8Type) isType() {}
 
-func (t *Int8Type) Export() types.Type {
+func (*Int8Type) Export() types.Type {
 	return types.Int8{}
 }
 
@@ -516,7 +516,7 @@ type Int16Type struct{}
 
 func (*Int16Type) isType() {}
 
-func (t *Int16Type) Export() types.Type {
+func (*Int16Type) Export() types.Type {
 	return types.Int16{}
 }
 
@@ -557,7 +557,7 @@ type Int32Type struct{}
 
 func (*Int32Type) isType() {}
 
-func (t *Int32Type) Export() types.Type {
+func (*Int32Type) Export() types.Type {
 	return types.Int32{}
 }
 
@@ -598,7 +598,7 @@ type Int64Type struct{}
 
 func (*Int64Type) isType() {}
 
-func (t *Int64Type) Export() types.Type {
+func (*Int64Type) Export() types.Type {
 	return types.Int64{}
 }
 
@@ -639,7 +639,7 @@ type UInt8Type struct{}
 
 func (*UInt8Type) isType() {}
 
-func (t *UInt8Type) Export() types.Type {
+func (*UInt8Type) Export() types.Type {
 	return types.Uint8{}
 }
 
@@ -680,7 +680,7 @@ type UInt16Type struct{}
 
 func (*UInt16Type) isType() {}
 
-func (t *UInt16Type) Export() types.Type {
+func (*UInt16Type) Export() types.Type {
 	return types.Uint16{}
 }
 
@@ -721,7 +721,7 @@ type UInt32Type struct{}
 
 func (*UInt32Type) isType() {}
 
-func (t *UInt32Type) Export() types.Type {
+func (*UInt32Type) Export() types.Type {
 	return types.Uint32{}
 }
 
@@ -762,7 +762,7 @@ type UInt64Type struct{}
 
 func (*UInt64Type) isType() {}
 
-func (t *UInt64Type) Export() types.Type {
+func (*UInt64Type) Export() types.Type {
 	return types.Uint64{}
 }
 
