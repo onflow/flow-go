@@ -107,45 +107,82 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 }
 
 func (checker *Checker) checkCompositeNesting(
-	compositeKind common.CompositeKind,
-	declarationKind common.DeclarationKind,
+	containerCompositeKind common.CompositeKind,
+	containerDeclarationKind common.DeclarationKind,
 	members *ast.Members,
 ) {
 
 	// Only contracts and contract interfaces support nested composite declarations
-	if compositeKind != common.CompositeKindContract {
+	if containerCompositeKind != common.CompositeKindContract {
 
-		if len(members.CompositeDeclarations) > 0 {
-			firstNestedCompositeDeclaration := members.CompositeDeclarations[0]
-
+		reportInvalidNesting := func(nestedDeclarationKind common.DeclarationKind, identifier ast.Identifier) {
 			checker.report(
 				&InvalidNestedDeclarationError{
-					DeclarationKind:          firstNestedCompositeDeclaration.DeclarationKind(),
-					ContainerDeclarationKind: declarationKind,
-					Range:                    ast.NewRangeFromPositioned(firstNestedCompositeDeclaration.Identifier),
+					NestedDeclarationKind:    nestedDeclarationKind,
+					ContainerDeclarationKind: containerDeclarationKind,
+					Range:                    ast.NewRangeFromPositioned(identifier),
 				},
+			)
+		}
+
+		if len(members.CompositeDeclarations) > 0 {
+
+			firstNestedCompositeDeclaration := members.CompositeDeclarations[0]
+
+			reportInvalidNesting(
+				firstNestedCompositeDeclaration.DeclarationKind(),
+				firstNestedCompositeDeclaration.Identifier,
+			)
+
+		} else if len(members.InterfaceDeclarations) > 0 {
+
+			firstNestedInterfaceDeclaration := members.InterfaceDeclarations[0]
+
+			reportInvalidNesting(
+				firstNestedInterfaceDeclaration.DeclarationKind(),
+				firstNestedInterfaceDeclaration.Identifier,
 			)
 		}
 
 		return
 	}
 
-	// Check contract's nested composite declarations are
-	// a resource (interface) or a struct (interface)
+	// Check contract's nested composite declarations and interface declarations
+	// are a resource (interface) or a struct (interface)
 
-	for _, member := range members.CompositeDeclarations {
+	checkNestedDeclaration := func(
+		nestedCompositeKind common.CompositeKind,
+		nestedDeclarationKind common.DeclarationKind,
+		identifier ast.Identifier,
+	) {
 
-		if member.CompositeKind != common.CompositeKindResource &&
-			member.CompositeKind != common.CompositeKindStructure {
+		if nestedCompositeKind != common.CompositeKindResource &&
+			nestedCompositeKind != common.CompositeKindStructure {
 
 			checker.report(
 				&InvalidNestedDeclarationError{
-					DeclarationKind:          member.DeclarationKind(),
-					ContainerDeclarationKind: declarationKind,
-					Range:                    ast.NewRangeFromPositioned(member.Identifier),
+					NestedDeclarationKind:    nestedDeclarationKind,
+					ContainerDeclarationKind: containerDeclarationKind,
+					Range:                    ast.NewRangeFromPositioned(identifier),
 				},
 			)
 		}
+	}
+
+	for _, member := range members.CompositeDeclarations {
+		checkNestedDeclaration(
+			member.CompositeKind,
+			member.DeclarationKind(),
+			member.Identifier,
+		)
+	}
+
+	for _, member := range members.InterfaceDeclarations {
+		checkNestedDeclaration(
+			member.CompositeKind,
+			member.DeclarationKind(),
+			member.Identifier,
+		)
 	}
 }
 
@@ -155,10 +192,8 @@ func (checker *Checker) checkCompositeDeclarationSupport(
 	identifier ast.Identifier,
 ) {
 	switch compositeKind {
-	case common.CompositeKindStructure:
-		return
-	case common.CompositeKindResource:
-		return
+	case common.CompositeKindStructure, common.CompositeKindResource:
+		break
 	default:
 		// TODO: support non-structure / non-resources composites, such as contracts
 

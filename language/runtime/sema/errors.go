@@ -1889,7 +1889,7 @@ func (*InvalidTransactionPrepareParameterType) isSemanticError() {}
 // InvalidNestedDeclarationError
 
 type InvalidNestedDeclarationError struct {
-	DeclarationKind          common.DeclarationKind
+	NestedDeclarationKind    common.DeclarationKind
 	ContainerDeclarationKind common.DeclarationKind
 	ast.Range
 }
@@ -1897,7 +1897,7 @@ type InvalidNestedDeclarationError struct {
 func (e *InvalidNestedDeclarationError) Error() string {
 	return fmt.Sprintf(
 		"%s declarations cannot be nested inside %s declarations",
-		e.DeclarationKind.Name(),
+		e.NestedDeclarationKind.Name(),
 		e.ContainerDeclarationKind.Name(),
 	)
 }
