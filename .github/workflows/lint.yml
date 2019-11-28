@@ -1,11 +1,6 @@
 name: Lint
 
-on:
-  push:
-    paths:
-      - '**.go'
-      - 'revive.toml'
-      - '.github/workflows/lint.yml'
+on: push
 
 jobs:
   lint:

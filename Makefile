@@ -4,6 +4,8 @@ SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
 VERSION := $(shell git describe --tags --abbrev=0 --exact-match)
+# Name of the cover profile
+COVER_PROFILE := cover.out
 
 crypto/relic:
 	rm -rf crypto/relic
@@ -27,9 +29,18 @@ install-tools: crypto/relic/build
 .PHONY: test
 test:
 	# test all packages with Relic library enabled
-	GO111MODULE=on go test --tags relic ./...
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -json --tags relic ./...
 	# test SDK package with Relic library disabled
 	GO111MODULE=on go test -count 1 ./sdk/...
+
+.PHONY: coverage
+coverage:
+ifeq ($(COVER), true)
+	# file has to be called index.html
+	gocov convert $(COVER_PROFILE) | gocov-html > index.html
+	# coverage.zip will automatically be picked up by teamcity
+	zip coverage.zip index.html
+endif
 
 .PHONY: generate
 generate: generate-godoc generate-proto generate-registries generate-mocks
@@ -67,11 +78,11 @@ lint:
 	GO111MODULE=on revive -config revive.toml -exclude cli/flow/cadence/vscode/cadence_bin.go ./...
 
 .PHONY: ci
-ci: install-tools generate check-generated-code lint test
+ci: install-tools generate check-generated-code lint test coverage
 
 .PHONY: docker-ci
 docker-ci:
-	docker run -v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -w "/go/flow" gcr.io/dl-flow/golang-cmake:latest make ci
+	docker run --env COVER=$(COVER) -v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.2 make ci
 
 .PHONY: install-cli
 install-cli: crypto/relic/build
