@@ -547,7 +547,7 @@ func TestGetTransaction(t *testing.T) {
 
 		decodedEvent := eventValue.(values.Event)
 
-		eventType := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
+		eventType := fmt.Sprintf("T.%x.MyEvent", tx.Hash())
 
 		assert.Equal(t, tx.Hash(), actualEvent.TxHash)
 		assert.Equal(t, eventType, actualEvent.Type)

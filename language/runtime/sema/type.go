@@ -1443,20 +1443,7 @@ func (t *CompositeType) String() string {
 }
 
 func (t *CompositeType) ID() string {
-	return fmt.Sprintf("%c.%s.%s", t.idPrefix(), t.Location.ID(), t.Identifier)
-}
-
-func (t *CompositeType) idPrefix() rune {
-	switch t.Kind {
-	case common.CompositeKindStructure:
-		return 'S'
-	case common.CompositeKindResource:
-		return 'R'
-	case common.CompositeKindContract:
-		return 'C'
-	default:
-		panic(errors.NewUnreachableError())
-	}
+	return fmt.Sprintf("%s.%s", t.Location.ID(), t.Identifier)
 }
 
 func (t *CompositeType) Equal(other Type) bool {
@@ -1624,20 +1611,7 @@ func (t *InterfaceType) String() string {
 }
 
 func (t *InterfaceType) ID() string {
-	return fmt.Sprintf("%s.%s.%s", t.idPrefix(), t.Location.ID(), t.Identifier)
-}
-
-func (t *InterfaceType) idPrefix() string {
-	switch t.CompositeKind {
-	case common.CompositeKindStructure:
-		return "SI"
-	case common.CompositeKindResource:
-		return "RI"
-	case common.CompositeKindContract:
-		return "CI"
-	default:
-		panic(errors.NewUnreachableError())
-	}
+	return fmt.Sprintf("%s.%s", t.Location.ID(), t.Identifier)
 }
 
 func (t *InterfaceType) Equal(other Type) bool {
@@ -1880,8 +1854,6 @@ type EventType struct {
 	ConstructorParameterTypeAnnotations []*TypeAnnotation
 }
 
-const EventTypeIDPrefix = 'E'
-
 func (*EventType) isType() {}
 
 func (t *EventType) Export() types.Type {
@@ -1913,12 +1885,7 @@ func (t *EventType) String() string {
 }
 
 func (t *EventType) ID() string {
-	return fmt.Sprintf(
-		"%c.%s.%s",
-		EventTypeIDPrefix,
-		t.Location,
-		t.Identifier,
-	)
+	return fmt.Sprintf("%s.%s", t.Location.ID(), t.Identifier)
 }
 
 func (t *EventType) Equal(other Type) bool {

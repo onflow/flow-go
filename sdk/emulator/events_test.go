@@ -75,7 +75,7 @@ func TestEventEmitted(t *testing.T) {
 
 		decodedEvent := eventValue.(values.Event)
 
-		expectedType := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
+		expectedType := fmt.Sprintf("T.%s.MyEvent", tx.Hash().Hex())
 		expectedID := flow.Event{TxHash: tx.Hash(), Index: 0}.ID()
 
 		assert.Equal(t, expectedType, actualEvent.Type)
@@ -109,7 +109,7 @@ func TestEventEmitted(t *testing.T) {
 
 		decodedEvent := eventValue.(values.Event)
 
-		expectedType := fmt.Sprintf("script.%s.MyEvent", execution.ScriptHash(script).Hex())
+		expectedType := fmt.Sprintf("S.%s.MyEvent", execution.ScriptHash(script).Hex())
 		// NOTE: ID is undefined for events emitted from scripts
 
 		assert.Equal(t, expectedType, actualEvent.Type)
@@ -163,7 +163,7 @@ func TestEventEmitted(t *testing.T) {
 		block, err := b.CommitBlock()
 		require.NoError(t, err)
 
-		expectedType := fmt.Sprintf("account.%s.MyEvent", address.Hex())
+		expectedType := fmt.Sprintf("A.%s.MyEvent", address.Hex())
 		events, err := b.GetEvents(expectedType, block.Number, block.Number)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
