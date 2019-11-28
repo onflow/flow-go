@@ -1540,6 +1540,16 @@ func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *
 			VariableKind:    ast.VariableKindConstant,
 		})
 
+	case "published":
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			Type:            &ReferencesType{Assignable: true},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+		})
+
 	default:
 		return nil
 	}
