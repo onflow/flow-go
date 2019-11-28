@@ -1555,6 +1555,64 @@ func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *
 	}
 }
 
+// PublicAccountType
+
+type PublicAccountType struct{}
+
+func (*PublicAccountType) isType() {}
+
+func (*PublicAccountType) String() string {
+	return "PublicAccount"
+}
+
+func (*PublicAccountType) ID() string {
+	return "PublicAccount"
+}
+
+func (*PublicAccountType) Equal(other Type) bool {
+	_, ok := other.(*PublicAccountType)
+	return ok
+}
+
+func (*PublicAccountType) IsResourceType() bool {
+	return false
+}
+
+func (*PublicAccountType) IsInvalidType() bool {
+	return false
+}
+
+func (*PublicAccountType) HasMembers() bool {
+	return true
+}
+
+func (t *PublicAccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	switch identifier {
+	case "address":
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			Type:            &AddressType{},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+		})
+
+	case "published":
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			Type:            &ReferencesType{Assignable: false},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+		})
+
+	default:
+		return nil
+	}
+}
+
 // Member
 
 type Member struct {
