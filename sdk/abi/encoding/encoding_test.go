@@ -581,8 +581,8 @@ func testEncode(t *testing.T, typ types.Type, val values.Value) {
 		assert.Equal(t, b1, b2)
 	}
 
-	val2, err := encoding.Decode(typ, b1)
+	decodedVal, err := encoding.Decode(typ, b1)
 	require.NoError(t, err)
 
-	assert.Equal(t, val, val2)
+	assert.Equal(t, val, decodedVal)
 }
