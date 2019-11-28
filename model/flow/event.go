@@ -15,8 +15,8 @@ import (
 
 // List of built-in account event types.
 const (
-	EventAccountCreated string = "E.flow.AccountCreated"
-	EventAccountUpdated string = "E.flow.AccountUpdated"
+	EventAccountCreated string = "flow.AccountCreated"
+	EventAccountUpdated string = "flow.AccountUpdated"
 )
 
 type Event struct {

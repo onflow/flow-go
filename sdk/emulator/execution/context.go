@@ -106,7 +106,6 @@ func (r *RuntimeContext) CreateAccount(publicKeys []values.Bytes, code values.By
 
 	// prevent invalid code from being deployed to account
 	if err := r.checkProgram(code, accountID); err != nil {
-		panic(err)
 		return values.Address{}, err
 	}
 

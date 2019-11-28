@@ -3,6 +3,7 @@ package ast
 import (
 	"encoding/gob"
 	"encoding/hex"
+	"fmt"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 )
@@ -93,7 +94,7 @@ func init() {
 type AddressLocation []byte
 
 func (l AddressLocation) ID() LocationID {
-	return LocationID(l.String())
+	return LocationID(fmt.Sprintf("A.%s", l))
 }
 
 func (l AddressLocation) String() string {
