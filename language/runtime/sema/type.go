@@ -1956,7 +1956,8 @@ func (t *StorageType) ElementType(indexingType Type, isAssignment bool) Type {
 	return &OptionalType{Type: indexingType}
 }
 
-// ReferencesType
+// ReferencesType is the heterogeneous dictionary that
+// is indexed by reference types and has references as values
 
 type ReferencesType struct {
 	Assignable bool
@@ -2081,10 +2082,12 @@ func (t *EventType) Equal(other Type) bool {
 	return true
 }
 
-func (t *EventType) ConstructorFunctionType() *FunctionType {
-	return &FunctionType{
-		ParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
-		ReturnTypeAnnotation:     NewTypeAnnotation(t),
+func (t *EventType) ConstructorFunctionType() *SpecialFunctionType {
+	return &SpecialFunctionType{
+		&FunctionType{
+			ParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
+			ReturnTypeAnnotation:     NewTypeAnnotation(t),
+		},
 	}
 }
 

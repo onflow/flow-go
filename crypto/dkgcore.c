@@ -9,9 +9,9 @@
 
 // computes P(x) = a_0 + a_1*x + .. + a_n x^n (mod r)
 // r being the order of G1
-// writes P(x) in out and P(x).g2 in y
+// writes P(x) in out and P(x).g2 in y if y is non NULL
 // x being a small integer
-void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, const int x){
+void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, const byte x){
     bn_st r;
     bn_new(&r); 
     g2_get_ord(&r);
@@ -47,7 +47,7 @@ void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, 
     bn_write_bin(out, out_size, &acc); 
 
     // compute y = P(x).g2
-    g2_mul_gen(y, &acc);
+    if (y) g2_mul_gen(y, &acc);
 
     bn_free(&acc)
     bn_free(&mult);
@@ -60,7 +60,7 @@ void Zr_polynomialImage(byte* out, ep2_st* y, const bn_st* a, const int a_size, 
 // and stores the point in y
 // r is the order of G2, u is the barett constant associated to r
 static void G2_polynomialImage(ep2_st* y, const ep2_st* A, const int len_A,
-         const int x, const bn_st* r, const bn_st* u){
+         const byte x, const bn_st* r, const bn_st* u){
     // powers of x
     bn_st bn_x;         // maximum is |n|+|r| --> 264 bits
     bn_new(&bn_x);
@@ -92,7 +92,6 @@ static void G2_polynomialImage(ep2_st* y, const ep2_st* A, const int len_A,
 // compute the nodes public keys from the verification vector
 // y[i] = Q(i+1) for all nodes i, with:
 // Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
-// for small x
 void G2_polynomialImages(ep2_st* y, const int len_y, const ep2_st* A, const int len_A) {
     // order r
     bn_st r;
@@ -103,7 +102,7 @@ void G2_polynomialImages(ep2_st* y, const int len_y, const ep2_st* A, const int 
     bn_st u;
     bn_new(&u)
     bn_mod_pre_barrt(&u, &r);
-    for (int i=0; i<len_y; i++) {
+    for (byte i=0; i<len_y; i++) {
         //y[i] = Q(i+1)
         G2_polynomialImage(y+i , A, len_A, i+1, &r, &u);
     }
@@ -133,6 +132,8 @@ void ep2_vector_read_bin(ep2_st* A, const byte* src, const int len){
     }
 }
 
+// returns 1 if g2^x = y, where g2 is the generatot of G2
+// returns 0 otherwise
 int verifyshare(const bn_st* x, const ep2_st* y) {
     ep2_st res;
     ep2_new(res);
@@ -140,4 +141,28 @@ int verifyshare(const bn_st* x, const ep2_st* y) {
     return (ep2_cmp(&res, (ep2_st*)y) == RLC_EQ);
 }
 
+// computes the sum of the array elements x and writes the sum in jointx
+// the sum is computed in Zr
+void sumScalarVector(bn_st* jointx, bn_st* x, int len) {
+    bn_st r;
+    bn_new(&r); 
+    g2_get_ord(&r);
+    bn_set_dig(jointx, 0);
+    bn_new_size(jointx, BITS_TO_DIGITS(Fr_BITS+1));
+    for (int i=0; i<len; i++) {
+        bn_add(jointx, jointx, &x[i]);
+        if (bn_cmp(jointx, &r) == RLC_GT) 
+            bn_sub(jointx, jointx, &r);
+    }
+    bn_free(&r);
+}
 
+// computes the sum of the array elements y and writes the sum in jointy
+// the sum is computed in G2
+void sumPointG2Vector(ep2_st* jointy, ep2_st* y, int len){
+    ep2_set_infty(jointy);
+    for (int i=0; i<len; i++){
+        ep2_add_projc(jointy, jointy, &y[i]);
+    }
+    ep2_norm(jointy, jointy);
+}
