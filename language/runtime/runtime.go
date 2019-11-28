@@ -16,11 +16,11 @@ import (
 
 type Interface interface {
 	// ResolveImport resolves an import of a program.
-	ResolveImport(Location) (values.Bytes, error)
+	ResolveImport(Location) ([]byte, error)
 	// GetValue gets a value for the given key in the storage, controlled and owned by the given accounts.
-	GetValue(owner, controller, key values.Bytes) (value values.Bytes, err error)
+	GetValue(owner, controller, key []byte) (value []byte, err error)
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
-	SetValue(owner, controller, key, value values.Bytes) (err error)
+	SetValue(owner, controller, key, value []byte) (err error)
 	// CreateAccount creates a new account with the given public keys and code.
 	CreateAccount(publicKeys []values.Bytes, code values.Bytes) (address values.Address, err error)
 	// AddAccountKey appends a key to an account.
@@ -286,22 +286,22 @@ func (r *interpreterRuntime) parse(script []byte) (program *ast.Program, err err
 // emitEvent converts an event value to native Go types and emits it to the runtime interface.
 func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtimeInterface Interface) {
 	event := eventValue.Export().(values.Event)
-
-	var identifier string
-
-	// TODO: can this be generalized for all types?
-	switch location := eventValue.Location.(type) {
-	case ast.AddressLocation:
-		identifier = fmt.Sprintf("account.%s.%s", location, eventValue.Identifier)
-	case TransactionLocation:
-		identifier = fmt.Sprintf("tx.%s.%s", location, eventValue.Identifier)
-	case ScriptLocation:
-		identifier = fmt.Sprintf("script.%s.%s", location, eventValue.Identifier)
-	default:
-		panic(fmt.Sprintf("event definition from unsupported location: %s", location))
-	}
-
-	event.Identifier = identifier
+	// TODO:
+	// var identifier string
+	//
+	// // TODO: can this be generalized for all types?
+	// switch location := eventValue.Location.(type) {
+	// case ast.AddressLocation:
+	// 	identifier = fmt.Sprintf("account.%s.%s", location, eventValue.Identifier)
+	// case TransactionLocation:
+	// 	identifier = fmt.Sprintf("tx.%s.%s", location, eventValue.Identifier)
+	// case ScriptLocation:
+	// 	identifier = fmt.Sprintf("script.%s.%s", location, eventValue.Identifier)
+	// default:
+	// 	panic(fmt.Sprintf("event definition from unsupported location: %s", location))
+	// }
+	//
+	// // event.Identifier = identifier
 
 	runtimeInterface.EmitEvent(event)
 }
@@ -311,12 +311,10 @@ func (r *interpreterRuntime) emitAccountEvent(
 	runtimeInterface Interface,
 	fields ...values.Value,
 ) {
-	identifier := fmt.Sprintf("flow.%s", eventType.Identifier)
+	// TODO:
+	// identifier := fmt.Sprintf("flow.%s", eventType.Identifier)
 
-	event := values.Event{
-		Identifier: identifier,
-		Fields:     fields,
-	}
+	event := values.NewEvent(fields)
 
 	runtimeInterface.EmitEvent(event)
 }
@@ -476,7 +474,7 @@ func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpre
 func toBytes(value interpreter.Value) (values.Bytes, error) {
 	_, isNil := value.(interpreter.NilValue)
 	if isNil {
-		return nil, nil
+		return values.Bytes{}, nil
 	}
 
 	someValue, ok := value.(*interpreter.SomeValue)
