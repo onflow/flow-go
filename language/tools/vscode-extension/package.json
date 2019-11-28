@@ -32,6 +32,10 @@
         "command": "cadence.stopEmulator",
         "category": "Cadence",
         "title": "Stop emulator"
+      }, {
+        "command": "cadence.updateAccountCode",
+        "category": "Cadence",
+        "title": "Update account code"
       }
     ],
     "configuration": {

@@ -27,11 +27,19 @@ var valueDeclarations = append(
 ).ToValueDeclarations()
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
+// document represents an open document on the client. It contains all cached
+// information about each document that is used to support CodeLens,
+// transaction submission, and script execution.
+type document struct {
+	text          string
+	latestVersion float64
+	hasErrors     bool
+}
+
 type Server struct {
-	config   config.Config
-	checkers map[protocol.DocumentUri]*sema.Checker
-	// map of document URI to the document text
-	documents map[protocol.DocumentUri]string
+	config    config.Config
+	checkers  map[protocol.DocumentUri]*sema.Checker
+	documents map[protocol.DocumentUri]document
 	// registry of custom commands we support
 	commands   map[string]CommandHandler
 	flowClient *client.Client
@@ -42,7 +50,7 @@ type Server struct {
 func NewServer() Server {
 	return Server{
 		checkers:  make(map[protocol.DocumentUri]*sema.Checker),
-		documents: make(map[protocol.DocumentUri]string),
+		documents: make(map[protocol.DocumentUri]document),
 		commands:  make(map[string]CommandHandler),
 	}
 }
@@ -108,7 +116,6 @@ func (s Server) DidOpenTextDocument(conn protocol.Conn, params *protocol.DidOpen
 
 	uri := params.TextDocument.URI
 	text := params.TextDocument.Text
-	s.documents[uri] = text
 
 	diagnostics, err := s.getDiagnostics(conn, uri, text)
 	if err != nil {
@@ -118,6 +125,12 @@ func (s Server) DidOpenTextDocument(conn protocol.Conn, params *protocol.DidOpen
 		URI:         uri,
 		Diagnostics: diagnostics,
 	})
+
+	s.documents[uri] = document{
+		text:          text,
+		latestVersion: params.TextDocument.Version,
+		hasErrors:     len(diagnostics) > 0,
+	}
 
 	return nil
 }
@@ -134,7 +147,6 @@ func (s Server) DidChangeTextDocument(
 	})
 	uri := params.TextDocument.URI
 	text := params.ContentChanges[0].Text
-	s.documents[uri] = text
 
 	diagnostics, err := s.getDiagnostics(conn, uri, text)
 	if err != nil {
@@ -144,6 +156,12 @@ func (s Server) DidChangeTextDocument(
 		URI:         uri,
 		Diagnostics: diagnostics,
 	})
+
+	s.documents[uri] = document{
+		text:          text,
+		latestVersion: params.TextDocument.Version,
+		hasErrors:     len(diagnostics) > 0,
+	}
 
 	return nil
 }
@@ -219,7 +237,8 @@ func (s Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([
 		Message: "code lens called" + string(params.TextDocument.URI),
 	})
 
-	checker, ok := s.checkers[params.TextDocument.URI]
+	uri := params.TextDocument.URI
+	checker, ok := s.checkers[uri]
 	if !ok {
 		// Can we ensure this doesn't happen?
 		return []*protocol.CodeLens{}, nil
@@ -236,7 +255,7 @@ func (s Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([
 				Command: &protocol.Command{
 					Title:     "execute script",
 					Command:   CommandExecuteScript,
-					Arguments: []interface{}{params.TextDocument.URI},
+					Arguments: []interface{}{uri},
 				},
 			})
 		}
@@ -248,7 +267,7 @@ func (s Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([
 			Command: &protocol.Command{
 				Title:     "submit transaction",
 				Command:   CommandSubmitTransaction,
-				Arguments: []interface{}{params.TextDocument.URI},
+				Arguments: []interface{}{uri},
 			},
 		})
 	}
