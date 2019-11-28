@@ -2,7 +2,6 @@ import {commands, ExtensionContext, window, workspace} from "vscode";
 import {Extension} from "./extension";
 import {startServer} from "./language-server";
 import {createTerminal, resetStorage} from "./terminal";
-import {LanguageClient} from "vscode-languageclient";
 
 // Command identifiers
 const RESTART_SERVER = "cadence.restartServer";
