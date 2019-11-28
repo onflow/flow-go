@@ -376,6 +376,7 @@ func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
 		SpecialFunctions:      specialFunctions,
 		Functions:             functions,
 		CompositeDeclarations: compositeDeclarations,
+		InterfaceDeclarations: interfaceDeclarations,
 	}
 }
 
