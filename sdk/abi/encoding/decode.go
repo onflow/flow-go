@@ -158,7 +158,7 @@ func (e *Decoder) DecodeAddress(t types.Address) (v values.Address, err error) {
 		return v, err
 	}
 
-	return values.NewAddress(b), nil
+	return values.NewAddressFromBytes(b), nil
 }
 
 // DecodeInt reads the XDR-encoded representation of an arbitrary-precision
@@ -312,17 +312,15 @@ func (e *Decoder) DecodeVariableSizedArray(t types.VariableSizedArray) (v values
 		return v, err
 	}
 
-	constantType := types.ConstantSizedArray{
-		Size:        int(size),
-		ElementType: t.ElementType,
-	}
-
-	array, err := e.DecodeConstantSizedArray(constantType)
+	vals, err := e.decodeArray(t.ElementType, int(size))
 	if err != nil {
 		return v, err
 	}
 
-	return values.VariableSizedArray(array), nil
+	v = values.NewVariableSizedArray(vals)
+	v.SetType(t)
+
+	return v, nil
 }
 
 // DecodeConstantSizedArray reads the XDR-encoded representation of a
@@ -337,7 +335,10 @@ func (e *Decoder) DecodeConstantSizedArray(t types.ConstantSizedArray) (v values
 		return v, err
 	}
 
-	return values.NewConstantSizedArray(vals), nil
+	v = values.NewConstantSizedArray(vals)
+	v.SetType(t)
+
+	return v, nil
 }
 
 // decodeArray reads the XDR-encoded representation of a constant-sized array.
@@ -393,7 +394,10 @@ func (e *Decoder) DecodeDictionary(t types.Dictionary) (v values.Dictionary, err
 		}
 	}
 
-	return values.NewDictionary(pairs), nil
+	v = values.NewDictionary(pairs)
+	v.SetType(t)
+
+	return v, nil
 }
 
 // DecodeComposite reads the XDR-encoded representation of a composite value.
@@ -411,7 +415,10 @@ func (e *Decoder) DecodeComposite(t types.Composite) (v values.Composite, err er
 		fields[i] = value
 	}
 
-	return values.NewComposite(fields), nil
+	v = values.NewComposite(fields)
+	v.SetType(t)
+
+	return v, nil
 }
 
 // DecodeEvent reads the XDR-encoded representation of an event.
@@ -429,5 +436,8 @@ func (e *Decoder) DecodeEvent(t types.Event) (v values.Event, err error) {
 		fields[i] = value
 	}
 
-	return values.NewEvent(fields), nil
+	v = values.NewEvent(fields)
+	v.SetType(t)
+
+	return v, nil
 }
