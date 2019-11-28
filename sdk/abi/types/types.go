@@ -4,83 +4,98 @@ package types
 
 type Type interface {
 	isType()
+	ID() string
+	setID(string)
 }
 
 // revive:enable
 
-type isAType struct{}
+type baseType struct {
+	id string
+}
 
-func (isAType) isType() {}
+func (baseType) isType() {}
+
+func (t baseType) ID() string { return t.id }
+func (t baseType) setID(id string) {
+	t.id = id
+}
+
+// WithID annotates a type with an ID.
+func WithID(id string, t Type) Type {
+	t.setID(id)
+	return t
+}
 
 type Annotation struct {
 	IsMove bool
 	Type   Type
 }
 
-type Void struct{ isAType }
+type Void struct{ baseType }
 
-type Bool struct{ isAType }
+type Bool struct{ baseType }
 
-type String struct{ isAType }
+type String struct{ baseType }
 
-type Bytes struct{ isAType }
+type Bytes struct{ baseType }
 
-type Int struct{ isAType }
+type Int struct{ baseType }
 
-type Int8 struct{ isAType }
+type Int8 struct{ baseType }
 
-type Int16 struct{ isAType }
+type Int16 struct{ baseType }
 
-type Int32 struct{ isAType }
+type Int32 struct{ baseType }
 
-type Int64 struct{ isAType }
+type Int64 struct{ baseType }
 
-type Uint8 struct{ isAType }
+type Uint8 struct{ baseType }
 
-type Uint16 struct{ isAType }
+type Uint16 struct{ baseType }
 
-type Uint32 struct{ isAType }
+type Uint32 struct{ baseType }
 
-type Uint64 struct{ isAType }
+type Uint64 struct{ baseType }
 
 type VariableSizedArray struct {
-	isAType
+	baseType
 	ElementType Type
 }
 
 type ConstantSizedArray struct {
-	isAType
+	baseType
 	Size        int
 	ElementType Type
 }
 
 type Composite struct {
-	isAType
+	baseType
 	FieldTypes []Type
 }
 
 type Dictionary struct {
-	isAType
+	baseType
 	KeyType     Type
 	ElementType Type
 }
 
 type Function struct {
-	isAType
+	baseType
 	ParameterTypeAnnotations []Annotation
 	ReturnTypeAnnotation     Annotation
 }
 
 type Event struct {
-	isAType
+	baseType
 	Identifier string
 	FieldTypes []EventField
 }
 
 type EventField struct {
-	isAType
+	baseType
 	Identifier string
 	Type       Type
 }
 
-type Address struct{ isAType }
+type Address struct{ baseType }
