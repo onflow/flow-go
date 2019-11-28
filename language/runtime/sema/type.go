@@ -2007,10 +2007,12 @@ func (t *EventType) Equal(other Type) bool {
 	return true
 }
 
-func (t *EventType) ConstructorFunctionType() *FunctionType {
-	return &FunctionType{
-		ParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
-		ReturnTypeAnnotation:     NewTypeAnnotation(t),
+func (t *EventType) ConstructorFunctionType() *SpecialFunctionType {
+	return &SpecialFunctionType{
+		&FunctionType{
+			ParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
+			ReturnTypeAnnotation:     NewTypeAnnotation(t),
+		},
 	}
 }
 
