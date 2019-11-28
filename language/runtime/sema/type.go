@@ -144,7 +144,7 @@ type VoidType struct{}
 func (*VoidType) isType() {}
 
 func (t *VoidType) Export() types.Type {
-	return types.WithID(t.ID(), types.Void{})
+	return types.Void{}
 }
 
 func (*VoidType) String() string {
@@ -240,7 +240,7 @@ type BoolType struct{}
 func (*BoolType) isType() {}
 
 func (t *BoolType) Export() types.Type {
-	return types.WithID(t.ID(), types.Bool{})
+	return types.Bool{}
 }
 
 func (*BoolType) String() string {
@@ -297,7 +297,7 @@ type StringType struct{}
 func (*StringType) isType() {}
 
 func (t *StringType) Export() types.Type {
-	return types.WithID(t.ID(), types.String{})
+	return types.String{}
 }
 
 func (*StringType) String() string {
@@ -437,7 +437,7 @@ type IntType struct{}
 func (*IntType) isType() {}
 
 func (t *IntType) Export() types.Type {
-	return types.WithID(t.ID(), types.Int{})
+	return types.Int{}
 }
 
 func (*IntType) String() string {
@@ -476,7 +476,7 @@ type Int8Type struct{}
 func (*Int8Type) isType() {}
 
 func (t *Int8Type) Export() types.Type {
-	return types.WithID(t.ID(), types.Int8{})
+	return types.Int8{}
 }
 
 func (*Int8Type) String() string {
@@ -517,7 +517,7 @@ type Int16Type struct{}
 func (*Int16Type) isType() {}
 
 func (t *Int16Type) Export() types.Type {
-	return types.WithID(t.ID(), types.Int16{})
+	return types.Int16{}
 }
 
 func (*Int16Type) String() string {
@@ -558,7 +558,7 @@ type Int32Type struct{}
 func (*Int32Type) isType() {}
 
 func (t *Int32Type) Export() types.Type {
-	return types.WithID(t.ID(), types.Int32{})
+	return types.Int32{}
 }
 
 func (*Int32Type) String() string {
@@ -599,7 +599,7 @@ type Int64Type struct{}
 func (*Int64Type) isType() {}
 
 func (t *Int64Type) Export() types.Type {
-	return types.WithID(t.ID(), types.Int64{})
+	return types.Int64{}
 }
 
 func (*Int64Type) String() string {
@@ -640,7 +640,7 @@ type UInt8Type struct{}
 func (*UInt8Type) isType() {}
 
 func (t *UInt8Type) Export() types.Type {
-	return types.WithID(t.ID(), types.Uint8{})
+	return types.Uint8{}
 }
 
 func (*UInt8Type) String() string {
@@ -681,7 +681,7 @@ type UInt16Type struct{}
 func (*UInt16Type) isType() {}
 
 func (t *UInt16Type) Export() types.Type {
-	return types.WithID(t.ID(), types.Uint16{})
+	return types.Uint16{}
 }
 
 func (*UInt16Type) String() string {
@@ -722,7 +722,7 @@ type UInt32Type struct{}
 func (*UInt32Type) isType() {}
 
 func (t *UInt32Type) Export() types.Type {
-	return types.WithID(t.ID(), types.Uint32{})
+	return types.Uint32{}
 }
 
 func (*UInt32Type) String() string {
@@ -763,7 +763,7 @@ type UInt64Type struct{}
 func (*UInt64Type) isType() {}
 
 func (t *UInt64Type) Export() types.Type {
-	return types.WithID(t.ID(), types.Uint64{})
+	return types.Uint64{}
 }
 
 func (*UInt64Type) String() string {
@@ -1040,9 +1040,9 @@ func (*VariableSizedType) isType()      {}
 func (*VariableSizedType) isArrayType() {}
 
 func (t *VariableSizedType) Export() types.Type {
-	return types.WithID(t.ID(), types.VariableSizedArray{
+	return types.VariableSizedArray{
 		ElementType: t.Type.(ExportableType).Export(),
-	})
+	}
 }
 
 func (t *VariableSizedType) String() string {
@@ -1171,10 +1171,11 @@ func (t *FunctionType) Export() types.Type {
 		parameterTypeAnnotations[i] = annotation.Export()
 	}
 
-	return types.WithID(t.ID(), types.Function{
+	return types.Function{
+		TypeID:                   t.ID(),
 		ParameterTypeAnnotations: parameterTypeAnnotations,
 		ReturnTypeAnnotation:     t.ReturnTypeAnnotation.Export(),
-	})
+	}
 }
 
 func (t *FunctionType) InvocationFunctionType() *FunctionType {
@@ -1893,10 +1894,10 @@ func (t *EventType) Export() types.Type {
 		}
 	}
 
-	return types.WithID(t.ID(), types.Event{
-		Identifier: t.Identifier,
+	return types.Event{
+		TypeID:     t.ID(),
 		FieldTypes: fieldTypes,
-	})
+	}
 }
 
 func (t *EventType) String() string {
