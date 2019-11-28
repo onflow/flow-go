@@ -17,7 +17,7 @@ func TestCheckIfStatementTest(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckIfStatementScoping(t *testing.T) {
@@ -76,7 +76,7 @@ func TestCheckIfStatementTestWithDeclaration(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidIfStatementTestWithDeclarationReferenceInElse(t *testing.T) {
@@ -108,7 +108,7 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
      }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t *testing.T) {
@@ -123,7 +123,7 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t 
      }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidIfStatementTestWithDeclarationNonOptional(t *testing.T) {

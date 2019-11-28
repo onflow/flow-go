@@ -17,7 +17,7 @@ func TestCheckConditionalExpressionTest(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidConditionalExpressionTest(t *testing.T) {

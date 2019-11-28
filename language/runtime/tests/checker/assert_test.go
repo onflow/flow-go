@@ -29,7 +29,7 @@ func TestCheckAssertWithoutMessage(t *testing.T) {
 		},
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckAssertWithMessage(t *testing.T) {
@@ -51,5 +51,5 @@ func TestCheckAssertWithMessage(t *testing.T) {
 		},
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }

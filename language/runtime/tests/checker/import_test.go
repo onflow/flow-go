@@ -51,7 +51,7 @@ func TestCheckImportAll(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`
@@ -66,7 +66,7 @@ func TestCheckImportAll(t *testing.T) {
 		},
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidImportUnexported(t *testing.T) {
@@ -75,7 +75,7 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
        pub let x = 1
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`
@@ -105,7 +105,7 @@ func TestCheckImportSome(t *testing.T) {
       pub let x = 1
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`
@@ -120,7 +120,7 @@ func TestCheckImportSome(t *testing.T) {
 		},
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidImportedError(t *testing.T) {
@@ -132,7 +132,7 @@ func TestCheckInvalidImportedError(t *testing.T) {
        let x: Bool = 1
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`
@@ -167,7 +167,7 @@ func TestCheckImportTypes(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 2)
@@ -201,7 +201,7 @@ func TestCheckImportTypes(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)

@@ -31,5 +31,5 @@ func TestCheckFunctionExpressionsAndScope(t *testing.T) {
        let y = (fun (x: Int): Int { return x })(42)
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }

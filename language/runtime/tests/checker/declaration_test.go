@@ -18,7 +18,7 @@ func TestCheckConstantAndVariableDeclarations(t *testing.T) {
         var y = 1
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.IsType(t,
 		&sema.IntType{},
@@ -324,7 +324,7 @@ func TestCheckVariableDeclarationSecondValue(t *testing.T) {
      let r <- y
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.IsType(t,
 		&sema.CompositeType{},
@@ -397,5 +397,5 @@ func TestCheckVariableDeclarationSecondValueNil(t *testing.T) {
      }
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }

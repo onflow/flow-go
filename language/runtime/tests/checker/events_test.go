@@ -18,7 +18,7 @@ func TestCheckEventDeclaration(t *testing.T) {
 			event Transfer(to: Int, from: Int)
 		`)
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("InvalidEventNonPrimitiveType", func(t *testing.T) {
@@ -61,7 +61,7 @@ func TestCheckEmitEvent(t *testing.T) {
 			}
 		`)
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("MissingEmitStatement", func(t *testing.T) {

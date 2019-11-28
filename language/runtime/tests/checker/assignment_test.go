@@ -45,7 +45,7 @@ func TestCheckAssignment(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidGlobalConstantAssignment(t *testing.T) {
@@ -74,7 +74,7 @@ func TestCheckGlobalVariableAssignment(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidAssignmentToParameter(t *testing.T) {

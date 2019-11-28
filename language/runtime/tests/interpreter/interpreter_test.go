@@ -49,7 +49,7 @@ func parseCheckAndInterpretWithOptions(
 	if options.HandleCheckerError != nil {
 		options.HandleCheckerError(err)
 	} else {
-		if !assert.Nil(t, err) {
+		if !require.NoError(t, err) {
 			assert.FailNow(t, errors.UnrollChildErrors(err))
 			return nil
 		}

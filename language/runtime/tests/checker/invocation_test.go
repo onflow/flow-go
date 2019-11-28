@@ -38,7 +38,7 @@ func TestCheckFunctionCallWithArgumentLabel(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckFunctionCallWithoutArgumentLabel(t *testing.T) {
@@ -53,7 +53,7 @@ func TestCheckFunctionCallWithoutArgumentLabel(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidFunctionCallWithNotRequiredArgumentLabel(t *testing.T) {
@@ -86,7 +86,7 @@ func TestCheckIndirectFunctionCallWithoutArgumentLabel(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckFunctionCallMissingArgumentLabel(t *testing.T) {
@@ -215,7 +215,7 @@ func TestCheckInvocationOfFunctionFromStructFunction(t *testing.T) {
         }
       }
     `)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidStructFunctionInvocation(t *testing.T) {
@@ -245,7 +245,7 @@ func TestCheckInvocationOfFunctionFromStructFunctionWithSameName(t *testing.T) {
         }
       }
     `)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckIntricateIntegerBinaryExpression(t *testing.T) {
@@ -254,5 +254,5 @@ func TestCheckIntricateIntegerBinaryExpression(t *testing.T) {
       let x: Int8 = 100
       let y = (Int8(90) + Int8(10)) == x
     `)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }

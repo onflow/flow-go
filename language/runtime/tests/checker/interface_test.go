@@ -45,7 +45,7 @@ func TestCheckInterfaceWithFunction(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -75,7 +75,7 @@ func TestCheckInterfaceWithFunctionImplementationAndConditions(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -163,7 +163,7 @@ func TestCheckInterfaceWithInitializer(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -224,7 +224,7 @@ func TestCheckInterfaceWithInitializerImplementationAndConditions(t *testing.T) 
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -265,7 +265,7 @@ func TestCheckInterfaceUse(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -298,7 +298,7 @@ func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 2)
@@ -461,7 +461,7 @@ func TestCheckInterfaceFieldUse(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 2)
@@ -548,7 +548,7 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 2)
@@ -945,7 +945,7 @@ func TestCheckInterfaceConformanceFieldMorePermissiveAccessModifier(t *testing.T
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 2)
@@ -1219,7 +1219,7 @@ func TestCheckInterfaceWithFieldHavingStructType(t *testing.T) {
 
 					assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[0])
 				} else {
-					assert.Nil(t, err)
+					require.NoError(t, err)
 				}
 			})
 		}
@@ -1265,7 +1265,7 @@ func TestCheckInterfaceWithFunctionHavingStructType(t *testing.T) {
 					firstKind.Annotation(),
 				))
 
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			})
 		}
 	}
@@ -1281,7 +1281,7 @@ func TestCheckInterfaceUseCompositeInInitializer(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInterfaceSelfUse(t *testing.T) {
@@ -1325,7 +1325,7 @@ func TestCheckInterfaceSelfUse(t *testing.T) {
 
 				switch compositeKind {
 				case common.CompositeKindResource, common.CompositeKindStructure:
-					assert.Nil(t, err)
+					require.NoError(t, err)
 
 				default:
 					errs := ExpectCheckerErrors(t, err, 1)

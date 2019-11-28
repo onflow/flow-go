@@ -18,7 +18,7 @@ func TestCheckArrayIndexingWithInteger(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNestedArrayIndexingWithInteger(t *testing.T) {
@@ -30,7 +30,7 @@ func TestCheckNestedArrayIndexingWithInteger(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayIndexingWithBool(t *testing.T) {
@@ -96,7 +96,7 @@ func TestCheckArrayIndexingAssignmentWithInteger(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayIndexingAssignmentWithWrongType(t *testing.T) {

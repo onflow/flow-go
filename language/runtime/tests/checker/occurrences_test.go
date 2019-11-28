@@ -20,7 +20,7 @@ func TestCheckOccurrencesVariableDeclarations(t *testing.T) {
         var y = x
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	occurrences := checker.Occurrences.All()
 
@@ -83,7 +83,7 @@ func TestCheckOccurrencesFunction(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	occurrences := checker.Occurrences.All()
 
@@ -215,7 +215,7 @@ func TestCheckOccurrencesStructAndInterface(t *testing.T) {
 	    }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	occurrences := checker.Occurrences.All()
 

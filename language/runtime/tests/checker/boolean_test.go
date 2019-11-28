@@ -15,7 +15,7 @@ func TestCheckBoolean(t *testing.T) {
         let x = true
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.BoolType{},

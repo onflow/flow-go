@@ -16,7 +16,7 @@ func TestCheckFailableCastingAny(t *testing.T) {
       let y: Int? = x as? Int
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.NotEmpty(t, checker.Elaboration.CastingTargetTypes)
 }
@@ -98,7 +98,7 @@ func TestCheckOptionalAnyFailableCastingNil(t *testing.T) {
       let z = y as? Int
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.OptionalType{Type: &sema.AnyType{}},

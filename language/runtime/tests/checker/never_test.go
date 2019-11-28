@@ -29,5 +29,5 @@ func TestCheckNever(t *testing.T) {
 		},
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
