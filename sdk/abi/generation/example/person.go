@@ -58,7 +58,7 @@ func NewPersonConstructor(firstName string, lastName string) (PersonConstructor,
 
 var personType = types.Composite{
 	Fields: map[string]*types.Field{
-		"FullName": {
+		"FullName": &types.Field{
 			Type:       types.String{},
 			Identifier: "FullName",
 		},

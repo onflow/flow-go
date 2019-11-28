@@ -9,8 +9,8 @@ import (
 
 func main() {
 
-	if len(os.Args) != 2 {
-		panic("use filename as one and only argument")
+	if len(os.Args) != 3 {
+		panic("use input_file output_file")
 	}
 
 	//abiFilename := os.Args[1]
@@ -45,6 +45,6 @@ func main() {
 		},
 	}
 
-	code.GenerateGo("examples", types)
+	code.GenerateGo("example", types)
 
 }
