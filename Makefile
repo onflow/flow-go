@@ -5,8 +5,6 @@ COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
 VERSION := $(shell git describe --tags --abbrev=0 --exact-match)
 
-VSCODE_DIR := "language/tools/vscode-extension"
-
 crypto/relic:
 	rm -rf crypto/relic
 	git submodule update --init --recursive
@@ -24,7 +22,7 @@ install-tools: crypto/relic/build
 	GO111MODULE=on go get github.com/mgechev/revive@master; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@master; \
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
-	GO111MODULE=on go get github.com/jteeuwen/go-bindata@3.0.7;
+	GO111MODULE=on go get github.com/jteeuwen/go-bindata@v3.0.7;
 
 .PHONY: test
 test:
@@ -100,12 +98,12 @@ docker-build-consensus:
 # Builds the VS Code extension
 .PHONY: build-vscode-extension
 build-vscode-extension:
-	cd $(VSCODE_DIR) && npm run package;
+	cd language/tools/vscode-extension && npm run package;
 
 # Builds and promotes the VS Code extension. Promoting here means re-generating
 # the embedded extension binary used in the CLI for installation.
 .PHONY: promote-vscode-extension
 promote-vscode-extension: build-vscode-extension
-	cp $(VSCODE_DIR)/cadence-*.vsix ./cli/flow/cadence/vscode/cadence.vsix;
-	go generate cli/flow/cadence;
+	cp language/tools/vscode-extension/cadence-*.vsix ./cli/flow/cadence/vscode/cadence.vsix;
+	go generate ./cli/flow/cadence/vscode;
 
