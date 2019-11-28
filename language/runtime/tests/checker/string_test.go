@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -15,7 +16,7 @@ func TestCheckCharacter(t *testing.T) {
         let x: Character = "x"
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.CharacterType{},
@@ -29,7 +30,7 @@ func TestCheckCharacterUnicodeScalar(t *testing.T) {
         let x: Character = "\u{1F1FA}\u{1F1F8}"
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.CharacterType{},
@@ -43,7 +44,7 @@ func TestCheckString(t *testing.T) {
         let x = "x"
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.StringType{},
@@ -62,7 +63,7 @@ func TestCheckStringConcat(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidStringConcat(t *testing.T) {
@@ -92,7 +93,7 @@ func TestCheckStringConcatBound(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckStringSlice(t *testing.T) {
@@ -104,7 +105,7 @@ func TestCheckStringSlice(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidStringSlice(t *testing.T) {
@@ -157,7 +158,7 @@ func TestCheckStringSliceBound(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 // TODO: prevent invalid character literals
@@ -198,7 +199,7 @@ func TestCheckStringIndexing(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckStringIndexingAssignment(t *testing.T) {
@@ -211,7 +212,7 @@ func TestCheckStringIndexingAssignment(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckStringIndexingAssignmentWithCharacterLiteral(t *testing.T) {
@@ -223,5 +224,5 @@ func TestCheckStringIndexingAssignmentWithCharacterLiteral(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }

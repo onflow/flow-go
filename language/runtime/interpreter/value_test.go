@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
@@ -16,7 +17,7 @@ func TestToExpression(t *testing.T) {
 
 	testValue := func(expected Value) func(actual Value, err error) {
 		return func(actual Value, err error) {
-			assert.Nil(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, expected, actual)
 		}
 	}

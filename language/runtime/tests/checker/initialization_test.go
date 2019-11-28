@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -40,7 +41,7 @@ func TestCheckFieldInitializationFromArgument(t *testing.T) {
        }
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckFieldInitializationWithFunctionCallAfterAllFieldsInitialized(t *testing.T) {
@@ -58,7 +59,7 @@ func TestCheckFieldInitializationWithFunctionCallAfterAllFieldsInitialized(t *te
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidFieldInitializationWithFunctionCallBeforeAllFieldsInitialized(t *testing.T) {
@@ -115,7 +116,7 @@ func TestCheckConstantFieldInitialization(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidRepeatedConstantFieldInitialization(t *testing.T) {
@@ -153,7 +154,7 @@ func TestCheckFieldInitializationInIfStatement(t *testing.T) {
            }
        `)
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("InvalidIfStatement", func(t *testing.T) {
@@ -210,7 +211,7 @@ func TestCheckFieldInitializationFromField(t *testing.T) {
            }
        `)
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("FromUninitializedField", func(t *testing.T) {
@@ -249,7 +250,7 @@ func TestCheckFieldInitializationUsages(t *testing.T) {
            }
        `)
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 	})
 
@@ -358,7 +359,7 @@ func TestCheckFieldInitializationUsages(t *testing.T) {
            }
        `)
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	})
 }
 

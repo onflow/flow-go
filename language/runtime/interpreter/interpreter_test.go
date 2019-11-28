@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 )
@@ -11,7 +12,7 @@ import (
 func TestInterpreterOptionalBoxing(t *testing.T) {
 
 	inter, err := NewInterpreter(nil)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	value, newType := inter.boxOptional(
 		BoolValue(true),
@@ -91,7 +92,7 @@ func TestInterpreterOptionalBoxing(t *testing.T) {
 func TestInterpreterAnyBoxing(t *testing.T) {
 
 	inter, err := NewInterpreter(nil)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		NewAnyValueOwningNonCopying(
@@ -140,7 +141,7 @@ func TestInterpreterAnyBoxing(t *testing.T) {
 func TestInterpreterBoxing(t *testing.T) {
 
 	inter, err := NewInterpreter(nil)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		NewSomeValueOwningNonCopying(

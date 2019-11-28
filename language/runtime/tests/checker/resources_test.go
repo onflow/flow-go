@@ -82,7 +82,7 @@ func TestCheckFunctionDeclarationParameterWithMoveAnnotation(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			case common.CompositeKindContract:
 
@@ -134,7 +134,7 @@ func TestCheckFunctionDeclarationParameterWithoutMoveAnnotation(t *testing.T) {
 
 			case common.CompositeKindStructure:
 
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -158,7 +158,7 @@ func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			case common.CompositeKindContract:
 				// TODO: add support for contracts
@@ -207,7 +207,7 @@ func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 
 			case common.CompositeKindStructure:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -229,7 +229,7 @@ func TestCheckVariableDeclarationWithMoveAnnotation(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			case common.CompositeKindContract:
 
@@ -281,7 +281,7 @@ func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
 
 			case common.CompositeKindStructure:
 
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -320,7 +320,7 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			case common.CompositeKindContract:
 				// TODO: add support for contracts
@@ -395,7 +395,7 @@ func TestCheckFieldDeclarationWithoutMoveAnnotation(t *testing.T) {
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 
 			case common.CompositeKindStructure:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -418,7 +418,7 @@ func TestCheckFunctionExpressionParameterWithMoveAnnotation(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			case common.CompositeKindContract:
 
@@ -472,7 +472,7 @@ func TestCheckFunctionExpressionParameterWithoutMoveAnnotation(t *testing.T) {
 
 			case common.CompositeKindStructure:
 
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -496,7 +496,7 @@ func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			case common.CompositeKindContract:
 
@@ -548,7 +548,7 @@ func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 
 			case common.CompositeKindStructure:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -571,7 +571,7 @@ func TestCheckFunctionTypeParameterWithMoveAnnotation(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			case common.CompositeKindContract:
 
@@ -621,7 +621,7 @@ func TestCheckFunctionTypeParameterWithoutMoveAnnotation(t *testing.T) {
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 
 			case common.CompositeKindStructure:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -645,7 +645,7 @@ func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			case common.CompositeKindContract:
 
@@ -698,7 +698,7 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
 
 			case common.CompositeKindStructure:
 
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -768,7 +768,7 @@ func TestCheckUnaryMove(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 }
 
@@ -782,7 +782,7 @@ func TestCheckImmediateDestroy(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckIndirectDestroy(t *testing.T) {
@@ -796,7 +796,7 @@ func TestCheckIndirectDestroy(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceCreationWithoutCreate(t *testing.T) {
@@ -839,7 +839,7 @@ func TestCheckUnaryCreateAndDestroy(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckUnaryCreateAndDestroyWithInitializer(t *testing.T) {
@@ -858,7 +858,7 @@ func TestCheckUnaryCreateAndDestroyWithInitializer(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidUnaryCreateAndDestroyWithWrongInitializerArguments(t *testing.T) {
@@ -1036,7 +1036,7 @@ func TestCheckResourceReturn(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceReturnMissingMove(t *testing.T) {
@@ -1099,7 +1099,7 @@ func TestCheckResourceArgument(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceArgumentMissingMove(t *testing.T) {
@@ -1165,7 +1165,7 @@ func TestCheckResourceVariableDeclarationTransfer(t *testing.T) {
       let y <- x
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceVariableDeclarationIncorrectTransfer(t *testing.T) {
@@ -1311,7 +1311,7 @@ func TestCheckResourceMoveThroughReturn(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckResourceMoveThroughArgumentPassing(t *testing.T) {
@@ -1329,7 +1329,7 @@ func TestCheckResourceMoveThroughArgumentPassing(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceUseAfterMoveToFunction(t *testing.T) {
@@ -1444,7 +1444,7 @@ func TestCheckResourceUseInIfStatement(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckResourceUseInNestedIfStatement(t *testing.T) {
@@ -1468,7 +1468,7 @@ func TestCheckResourceUseInNestedIfStatement(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 ////
@@ -1566,7 +1566,7 @@ func TestCheckResourceMoveIntoArray(t *testing.T) {
       let xs <- [<-x]
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceMoveIntoArrayMissingMoveOperation(t *testing.T) {
@@ -1620,7 +1620,7 @@ func TestCheckResourceMoveIntoDictionary(t *testing.T) {
       let xs <- {"x": <-x}
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceMoveIntoDictionaryMissingMoveOperation(t *testing.T) {
@@ -1722,7 +1722,7 @@ func TestCheckResourceUseInWhileStatement(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceUseInWhileStatementAfterDestroy(t *testing.T) {
@@ -1848,7 +1848,7 @@ func TestCheckResourceUseInNestedWhileStatement(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceLossThroughReturn(t *testing.T) {
@@ -1935,7 +1935,7 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenAndDestroyInElse(t *test
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckResourceWithMoveAndReturnInIfStatementThenBranch(t *testing.T) {
@@ -1957,7 +1957,7 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenBranch(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckResourceNesting(t *testing.T) {
@@ -2072,14 +2072,14 @@ func testResourceNesting(
 	case common.CompositeKindStructure:
 		switch innerCompositeKind {
 		case common.CompositeKindStructure:
-			assert.Nil(t, err)
+			require.NoError(t, err)
 		case common.CompositeKindResource:
 			errs := ExpectCheckerErrors(t, err, 1)
 			assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[0])
 		}
 
 	case common.CompositeKindResource:
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	}
 }
 
@@ -2098,7 +2098,7 @@ func TestCheckResourceInterfaceConformance(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 // TestCheckInvalidResourceInterfaceConformance tests the check
@@ -2133,7 +2133,7 @@ func TestCheckResourceInterfaceUseAsType(t *testing.T) {
       let x: <-X <- create Y()
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckResourceArrayIndexing(t *testing.T) {
@@ -2155,7 +2155,7 @@ func TestCheckResourceArrayIndexing(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceLossReturnResourceAndMemberAccess(t *testing.T) {
@@ -2247,7 +2247,7 @@ func TestCheckResourceInterfaceDestruction(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 // TestCheckInvalidResourceFieldMoveThroughVariableDeclaration tests if resources nested
@@ -2341,7 +2341,7 @@ func TestCheckResourceArrayAppend(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckResourceArrayInsert(t *testing.T) {
@@ -2356,7 +2356,7 @@ func TestCheckResourceArrayInsert(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckResourceArrayRemove(t *testing.T) {
@@ -2372,7 +2372,7 @@ func TestCheckResourceArrayRemove(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceArrayRemoveResourceLoss(t *testing.T) {
@@ -2405,7 +2405,7 @@ func TestCheckResourceArrayRemoveFirst(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckResourceArrayRemoveLast(t *testing.T) {
@@ -2421,7 +2421,7 @@ func TestCheckResourceArrayRemoveLast(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceArrayContains(t *testing.T) {
@@ -2455,7 +2455,7 @@ func TestCheckResourceArrayLength(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceArrayConcat(t *testing.T) {
@@ -2490,7 +2490,7 @@ func TestCheckResourceDictionaryRemove(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceDictionaryRemoveResourceLoss(t *testing.T) {
@@ -2523,7 +2523,7 @@ func TestCheckResourceDictionaryInsert(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceDictionaryInsertResourceLoss(t *testing.T) {
@@ -2556,7 +2556,7 @@ func TestCheckResourceDictionaryLength(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceDictionaryKeys(t *testing.T) {
@@ -2694,7 +2694,7 @@ func TestCheckResourceVariableResourceFieldSwap(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceFieldDestroy(t *testing.T) {
@@ -2781,7 +2781,7 @@ func TestCheckResourceParameterInInterfaceNoResourceLossError(t *testing.T) {
 
 					switch compositeKind {
 					case common.CompositeKindResource, common.CompositeKindStructure:
-						assert.Nil(t, err)
+						require.NoError(t, err)
 
 					default:
 						errs := ExpectCheckerErrors(t, err, 1)
@@ -2821,7 +2821,7 @@ func TestCheckResourceFieldUseAndDestruction(t *testing.T) {
      }
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceMethodBinding(t *testing.T) {
@@ -2854,7 +2854,7 @@ func TestCheckInvalidResourceMethodCall(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckResourceOptionalBinding(t *testing.T) {
@@ -2872,7 +2872,7 @@ func TestCheckResourceOptionalBinding(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceOptionalBindingResourceLossInThen(t *testing.T) {
