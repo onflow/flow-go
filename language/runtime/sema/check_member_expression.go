@@ -123,12 +123,14 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *M
 		} else {
 			// Optional chaining was used on a non-optional type, report an error
 
-			checker.report(
-				&InvalidOptionalChainingError{
-					Type:  expressionType,
-					Range: ast.NewRangeFromPositioned(expression),
-				},
-			)
+			if !expressionType.IsInvalidType() {
+				checker.report(
+					&InvalidOptionalChainingError{
+						Type:  expressionType,
+						Range: ast.NewRangeFromPositioned(expression),
+					},
+				)
+			}
 
 			// NOTE: still try to get member for non-optional expression
 			// to avoid spurious error that member does not exist,
