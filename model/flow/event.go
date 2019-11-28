@@ -15,8 +15,8 @@ import (
 
 // List of built-in account event types.
 const (
-	EventAccountCreated string = "flow.AccountCreated"
-	EventAccountUpdated string = "flow.AccountUpdated"
+	EventAccountCreated string = "E.flow.AccountCreated"
+	EventAccountUpdated string = "E.flow.AccountUpdated"
 )
 
 type Event struct {
@@ -66,7 +66,7 @@ type AccountCreatedEvent interface {
 }
 
 var AccountCreatedEventType types.Type = types.Event{
-	Identifier: EventAccountCreated,
+	TypeID: EventAccountCreated,
 	FieldTypes: []types.EventField{
 		{
 			Identifier: "address",
