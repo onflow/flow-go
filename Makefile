@@ -4,6 +4,8 @@ SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
 VERSION := $(shell git describe --tags --abbrev=0 --exact-match)
+# Name of the cover profile
+COVER_PROFILE := cover.out
 
 crypto/relic:
 	rm -rf crypto/relic
@@ -25,9 +27,14 @@ install-tools: crypto/relic/build
 .PHONY: test
 test:
 	# test all packages with Relic library enabled
-	GO111MODULE=on go test -coverprofile=cover.out -json --tags relic ./...
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -json --tags relic ./...
 	# test SDK package with Relic library disabled
 	GO111MODULE=on go test -count 1 ./sdk/...
+
+.PHONY: coverage
+coverage:
+	go tool cover -html=$(COVER_PROFILE) -o index.html
+	zip coverage.zip index.html
 
 .PHONY: generate
 generate: generate-godoc generate-proto generate-registries generate-mocks
@@ -66,7 +73,7 @@ lint:
 	GO111MODULE=on revive -config revive.toml -exclude cli/flow/cadence/vscode/cadence.go ./...
 
 .PHONY: ci
-ci: install-tools generate check-generated-code lint test
+ci: install-tools generate check-generated-code lint test coverage
 
 .PHONY: docker-ci
 docker-ci:
