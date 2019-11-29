@@ -2337,14 +2337,14 @@ func (v AddressValue) StorageIdentifier() string {
 // AccountValue
 
 func NewAccountValue(address AddressValue) *CompositeValue {
-	addressHex := address.StorageIdentifier()
+	storageIdentifier := address.StorageIdentifier()
 
 	return &CompositeValue{
 		Identifier: (&sema.AccountType{}).ID(),
 		Fields: map[string]Value{
 			"address":   address,
-			"storage":   StorageValue{Identifier: addressHex},
-			"published": PublishedValue{Identifier: addressHex},
+			"storage":   StorageValue{Identifier: storageIdentifier},
+			"published": PublishedValue{Identifier: storageIdentifier},
 		},
 	}
 }
@@ -2352,13 +2352,13 @@ func NewAccountValue(address AddressValue) *CompositeValue {
 // PublicAccountValue
 
 func NewPublicAccountValue(address AddressValue) *CompositeValue {
-	addressHex := address.StorageIdentifier()
+	storageIdentifier := address.StorageIdentifier()
 
 	return &CompositeValue{
 		Identifier: (&sema.PublicAccountType{}).ID(),
 		Fields: map[string]Value{
 			"address":   address,
-			"published": PublishedValue{Identifier: addressHex},
+			"published": PublishedValue{Identifier: storageIdentifier},
 		},
 	}
 }
