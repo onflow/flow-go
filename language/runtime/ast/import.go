@@ -104,7 +104,6 @@ func (l AddressLocation) String() string {
 
 func (l AddressLocation) ToAddress() (addr flow.Address) {
 	return flow.BytesToAddress(l)
-	return
 }
 
 func init() {
