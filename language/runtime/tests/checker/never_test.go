@@ -3,7 +3,7 @@ package checker
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	require "github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
@@ -29,5 +29,5 @@ func TestCheckNever(t *testing.T) {
 		},
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }

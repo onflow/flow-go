@@ -195,7 +195,11 @@ func (v *StringValue) Equal(other Value) BoolValue {
 	if !ok {
 		return false
 	}
-	return norm.NFC.String(v.Str) == norm.NFC.String(otherString.Str)
+	return v.NormalForm() == otherString.NormalForm()
+}
+
+func (v *StringValue) NormalForm() string {
+	return norm.NFC.String(v.Str)
 }
 
 func (v *StringValue) Concat(other ConcatenatableValue) Value {

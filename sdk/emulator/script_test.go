@@ -16,10 +16,7 @@ func TestExecuteScript(t *testing.T) {
 	b, err := emulator.NewEmulatedBlockchain()
 	require.NoError(t, err)
 
-	counterAddress, err := b.CreateAccount(nil, []byte(counterScript), getNonce())
-	require.NoError(t, err)
-
-	addTwoScript := generateAddTwoToCounterScript(counterAddress)
+	addTwoScript, counterAddress := deployAndGenerateAddTwoScript(t, b)
 
 	accountAddress := b.RootAccountAddress()
 

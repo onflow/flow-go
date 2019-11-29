@@ -1,11 +1,6 @@
 name: Lint
 
-on:
-  push:
-    paths:
-      - '**.go'
-      - 'revive.toml'
-      - '.github/workflows/lint.yml'
+on: push
 
 jobs:
   lint:
@@ -23,7 +18,7 @@ jobs:
       uses: morphy2k/revive-action@v1
       with:
         config: revive.toml
-        exclude: "cli/flow/cadence/vscode/cadence.go"
+        exclude: "cli/flow/cadence/vscode/cadence_bin.go"
         path: "./..."
       env:
         # GitHub token for annotations

@@ -20,7 +20,7 @@ func TestParseReplInput(t *testing.T) {
         struct X {}; let x = X(); x
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	require.IsType(t, []interface{}{}, actual)
 
 	require.Len(t, actual, 3)
@@ -124,7 +124,7 @@ func TestParseNames(t *testing.T) {
 
 		if validExpected {
 			assert.NotNil(t, actual)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 		} else {
 			assert.Nil(t, actual)
@@ -198,7 +198,7 @@ func TestParseBoolExpression(t *testing.T) {
 	    let a = true
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -233,7 +233,7 @@ func TestParseIdentifierExpression(t *testing.T) {
 	    let b = a
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	b := &VariableDeclaration{
 		IsConstant: true,
@@ -267,7 +267,7 @@ func TestParseArrayExpression(t *testing.T) {
 	    let a = [1, 2]
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -318,7 +318,7 @@ func TestParseDictionaryExpression(t *testing.T) {
 	    let x = {"a": 1, "b": 2}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	x := &VariableDeclaration{
 		IsConstant: true,
@@ -387,7 +387,7 @@ func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 	    let a = b(1, 2)
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -448,7 +448,7 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 	    let a = b(x: 1, y: 2)
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -513,7 +513,7 @@ func TestParseMemberExpression(t *testing.T) {
 	    let a = b.c
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -553,7 +553,7 @@ func TestParseOptionalMemberExpression(t *testing.T) {
 	    let a = b?.c
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -594,7 +594,7 @@ func TestParseIndexExpression(t *testing.T) {
 	    let a = b[1]
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -642,7 +642,7 @@ func TestParseUnaryExpression(t *testing.T) {
 	    let foo = -boo
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -683,7 +683,7 @@ func TestParseOrExpression(t *testing.T) {
         let a = false || true
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -728,7 +728,7 @@ func TestParseAndExpression(t *testing.T) {
         let a = false && true
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -773,7 +773,7 @@ func TestParseEqualityExpression(t *testing.T) {
         let a = false == true
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -818,7 +818,7 @@ func TestParseRelationalExpression(t *testing.T) {
         let a = 1 < 2
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -865,7 +865,7 @@ func TestParseAdditiveExpression(t *testing.T) {
         let a = 1 + 2
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -912,7 +912,7 @@ func TestParseMultiplicativeExpression(t *testing.T) {
         let a = 1 * 2
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -959,7 +959,7 @@ func TestParseConcatenatingExpression(t *testing.T) {
         let a = [1, 2] & [3, 4]
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -1038,7 +1038,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 	    let test = fun (): Int { return 1 }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -1109,7 +1109,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 	    fun test() { return }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1164,7 +1164,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 	    fun test(x: Int) { }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1234,7 +1234,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 	    fun test(x y: Int) { }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1313,7 +1313,7 @@ func TestParseIfStatement(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1456,7 +1456,7 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	ifStatement := &IfStatement{
 		Then: &Block{
@@ -1572,7 +1572,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1652,7 +1652,7 @@ func TestParseWhileStatement(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1743,7 +1743,7 @@ func TestParseAssignment(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1814,7 +1814,7 @@ func TestParseAccessAssignment(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1929,7 +1929,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 	    fun test() { x.foo.bar[0][1].baz }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -2032,7 +2032,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 		pub fun test(a: Int32, b: [Int32; 2], c: [[Int32; 3]]): [[Int64]] {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessPublic,
@@ -2173,7 +2173,7 @@ func TestParseDictionaryType(t *testing.T) {
 	    let x: {String: Int} = {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	x := &VariableDeclaration{
 		IsConstant: true,
@@ -2231,7 +2231,7 @@ func TestParseIntegerLiterals(t *testing.T) {
         let decimal = 1234567890
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	octal := &VariableDeclaration{
 		IsConstant: true,
@@ -2333,7 +2333,7 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
         let decimal = 1_234_567_890
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	octal := &VariableDeclaration{
 		IsConstant: true,
@@ -2487,7 +2487,7 @@ func TestParseIntegerLiteralWithLeadingZeros(t *testing.T) {
         let decimal = 0123
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	decimal := &VariableDeclaration{
 		IsConstant: true,
@@ -2776,7 +2776,7 @@ func TestParseDecimalIntegerLiteralWithLeadingZeros(t *testing.T) {
 		let decimal = 00123
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -2812,7 +2812,7 @@ func TestParseBinaryIntegerLiteralWithLeadingZeros(t *testing.T) {
 		let binary = 0b001000
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -2855,7 +2855,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		let h: UInt64 = 8
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3112,7 +3112,7 @@ func TestParseFunctionType(t *testing.T) {
 		let add: ((Int8, Int16): Int32) = nothing
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	add := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3188,7 +3188,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 		let test: [((Int8): Int16); 2] = []
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3262,7 +3262,7 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 		let test: ((Int8): [Int16; 2]) = nothing
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3336,7 +3336,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 		let test: ((Int8): ((Int16): Int32)) = nothing
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3424,7 +3424,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 		let test: ((Int8): ((Int16): Int32)) = nothing
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3514,7 +3514,7 @@ func TestParseMissingReturnType(t *testing.T) {
             fun () { return }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	noop := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3597,7 +3597,7 @@ func TestParseLeftAssociativity(t *testing.T) {
         let a = 1 + 2 + 3
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -3698,7 +3698,7 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
           : 3 > 2 ? 1 : 2
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -3802,7 +3802,7 @@ func TestParseStructure(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindStructure,
@@ -3985,7 +3985,7 @@ func TestParseStructureWithConformances(t *testing.T) {
         struct Test: Foo, Bar {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindStructure,
@@ -4036,7 +4036,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -4187,7 +4187,7 @@ func TestParseExpression(t *testing.T) {
         before(x + before(y)) + z
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &BinaryExpression{
 		Operation: OperationPlus,
@@ -4255,7 +4255,7 @@ func TestParseString(t *testing.T) {
        "test \0\n\r\t\"\'\\ xyz"
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &StringExpression{
 		Value: "test \x00\n\r\t\"'\\ xyz",
@@ -4274,7 +4274,7 @@ func TestParseStringWithUnicode(t *testing.T) {
       "this is a test \t\\new line and race car:\n\u{1F3CE}\u{FE0F}"
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &StringExpression{
 		Value: "this is a test \t\\new line and race car:\n\U0001F3CE\uFE0F",
@@ -4298,7 +4298,7 @@ func TestParseConditionMessage(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -4412,7 +4412,7 @@ func TestParseOptionalType(t *testing.T) {
        let x: Int?? = 1
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -4464,7 +4464,7 @@ func TestParseNilCoalescing(t *testing.T) {
        let x = nil ?? 1
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -4507,7 +4507,7 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
        let x = 1 ?? 2 ?? 3
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -4565,7 +4565,7 @@ func TestParseFailableCasting(t *testing.T) {
        let x = 0 as? Int
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	failableDowncast := &CastingExpression{
 		Expression: &IntExpression{
@@ -4627,7 +4627,7 @@ func TestParseInterface(t *testing.T) {
             }
 	    `, kind.Keyword()))
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		// only compare AST for one kind: structs
 
@@ -4756,7 +4756,7 @@ func TestParseImportWithString(t *testing.T) {
         import "test.bpl"
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &ImportDeclaration{
 		Identifiers: []Identifier{},
@@ -4799,7 +4799,7 @@ func TestParseImportWithAddress(t *testing.T) {
         import 0x1234
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &ImportDeclaration{
 		Identifiers: []Identifier{},
@@ -4842,7 +4842,7 @@ func TestParseImportWithIdentifiers(t *testing.T) {
         import A, b from 0x0
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &ImportDeclaration{
 		Identifiers: []Identifier{
@@ -4878,7 +4878,7 @@ func TestParseFieldWithFromIdentifier(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestParseFunctionWithFromIdentifier(t *testing.T) {
@@ -4887,7 +4887,7 @@ func TestParseFunctionWithFromIdentifier(t *testing.T) {
         fun send(from: String, to: String) {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestParseImportWithFromIdentifier(t *testing.T) {
@@ -4896,7 +4896,7 @@ func TestParseImportWithFromIdentifier(t *testing.T) {
         import from from 0x0
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestParseSemicolonsBetweenDeclarations(t *testing.T) {
@@ -4906,7 +4906,7 @@ func TestParseSemicolonsBetweenDeclarations(t *testing.T) {
         fun foo() {};
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestParseInvalidMultipleSemicolonsBetweenDeclarations(t *testing.T) {
@@ -4961,7 +4961,7 @@ func TestParseResource(t *testing.T) {
         resource Test {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindResource,
@@ -5124,7 +5124,7 @@ func TestParseMoveReturnType(t *testing.T) {
         fun test(): <-X {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Identifier: Identifier{
@@ -5171,7 +5171,7 @@ func TestParseMovingVariableDeclaration(t *testing.T) {
         let x <- y
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -5207,7 +5207,7 @@ func TestParseMoveStatement(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Identifier: Identifier{
@@ -5274,7 +5274,7 @@ func TestParseMoveOperator(t *testing.T) {
       let x = foo(<-y)
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -5331,7 +5331,7 @@ func TestParseMoveParameterType(t *testing.T) {
         fun test(x: <-X) {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Identifier: Identifier{
@@ -5401,7 +5401,7 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
         let x: <-R <- y
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -5445,7 +5445,7 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
         struct X { x: <-R }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindStructure,
@@ -5499,7 +5499,7 @@ func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
         let f: ((): <-R) = g
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -5554,7 +5554,7 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
         let f = fun (): <-R { return X }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -5623,7 +5623,7 @@ func TestParseFailableCastingMoveTypeAnnotation(t *testing.T) {
         let y = x as? <-R
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	failableDowncast := &CastingExpression{
 		Expression: &IdentifierExpression{
@@ -5674,7 +5674,7 @@ func TestParseCasting(t *testing.T) {
         let y = x as Y
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	cast := &CastingExpression{
 		Expression: &IdentifierExpression{
@@ -5727,7 +5727,7 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -5842,7 +5842,7 @@ func TestParseIdentifiers(t *testing.T) {
           let %s = 1
 	    `, name))
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	}
 }
 
@@ -5858,7 +5858,7 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -5928,7 +5928,7 @@ func TestParseSwapStatement(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Identifier: Identifier{
@@ -6016,7 +6016,7 @@ func TestParseDestructor(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindResource,
@@ -6072,7 +6072,7 @@ func TestParseReferenceType(t *testing.T) {
        let x: &[&R] = 1
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -6141,7 +6141,7 @@ func TestParseReference(t *testing.T) {
        let x = &account.storage[R] as R
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -6203,7 +6203,7 @@ func TestParseCompositeDeclarationWithSemicolonSeparatedMembers(t *testing.T) {
         struct Kitty { let id: Int ; init(id: Int) { self.id = id } }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -6379,7 +6379,7 @@ func TestParseAccessModifiers(t *testing.T) {
 				program := fmt.Sprintf(declaration.code, access.Keyword())
 				_, _, err := parser.ParseProgram(program)
 
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			})
 		}
 	}
