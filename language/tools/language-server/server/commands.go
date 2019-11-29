@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dapperlabs/flow-go/sdk/templates"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -16,8 +18,9 @@ import (
 )
 
 const (
-	CommandSubmitTransaction = "cadence.submitTransaction"
-	CommandExecuteScript     = "cadence.executeScript"
+	CommandSubmitTransaction = "cadence.server.submitTransaction"
+	CommandExecuteScript     = "cadence.server.executeScript"
+	CommandUpdateAccountCode = "cadence.server.updateAccountCode"
 )
 
 // CommandHandler represents the form of functions that handle commands
@@ -40,6 +43,7 @@ func (s Server) registerCommands(conn protocol.Conn) {
 						Commands: []string{
 							CommandSubmitTransaction,
 							CommandExecuteScript,
+							CommandUpdateAccountCode,
 						},
 					},
 				},
@@ -70,6 +74,7 @@ func (s Server) registerCommands(conn protocol.Conn) {
 	// Register each command handler function in the server
 	s.commands[CommandSubmitTransaction] = s.submitTransaction
 	s.commands[CommandExecuteScript] = s.executeScript
+	s.commands[CommandUpdateAccountCode] = s.updateAccountCode
 }
 
 // submitTransaction handles submitting a transaction defined in the
@@ -84,63 +89,20 @@ func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (int
 	if !ok {
 		return nil, errors.New("invalid uri argument")
 	}
-	documentText, ok := s.documents[protocol.DocumentUri(uri)]
+	doc, ok := s.documents[protocol.DocumentUri(uri)]
 	if !ok {
 		return nil, fmt.Errorf("could not find document for URI %s", uri)
 	}
 
 	tx := flow.Transaction{
-		Script:         []byte(documentText),
+		Script:         []byte(doc.text),
 		Nonce:          s.getNextNonce(),
 		ComputeLimit:   10,
 		PayerAccount:   s.config.AccountAddr,
 		ScriptAccounts: []flow.Address{s.config.AccountAddr},
 	}
 
-	conn.LogMessage(&protocol.LogMessageParams{
-		Type:    protocol.Info,
-		Message: fmt.Sprintf("submitting transaction %d", tx.Nonce),
-	})
-
-	sig, err := keys.SignTransaction(tx, s.config.AccountKey)
-	if err != nil {
-		return nil, err
-	}
-	tx.AddSignature(s.config.AccountAddr, sig)
-
-	err = s.flowClient.SendTransaction(context.Background(), tx)
-	if err == nil {
-		conn.LogMessage(&protocol.LogMessageParams{
-			Type:    protocol.Info,
-			Message: fmt.Sprintf("Submitted transaction nonce=%d\thash=%s", tx.Nonce, tx.Hash().Hex()),
-		})
-		return nil, nil
-	}
-
-	grpcErr, ok := status.FromError(err)
-	if ok {
-		if grpcErr.Code() == codes.Unavailable {
-			// The emulator server isn't running
-			conn.ShowMessage(&protocol.ShowMessageParams{
-				Type:    protocol.Warning,
-				Message: "The emulator server is unavailable. Please start the emulator (`cadence.runEmulator`) first.",
-			})
-			return nil, nil
-		} else if grpcErr.Code() == codes.InvalidArgument {
-			// The request was invalid
-			conn.ShowMessage(&protocol.ShowMessageParams{
-				Type:    protocol.Warning,
-				Message: "The transaction could not be submitted.",
-			})
-			conn.LogMessage(&protocol.LogMessageParams{
-				Type:    protocol.Warning,
-				Message: fmt.Sprintf("Failed to submit transaction: %s", grpcErr.Message()),
-			})
-			return nil, nil
-		}
-	}
-
-	return nil, err
+	return nil, s.sendTransaction(conn, tx)
 }
 
 // executeScript handles executing a script defined in the source document in
@@ -155,12 +117,12 @@ func (s *Server) executeScript(conn protocol.Conn, args ...interface{}) (interfa
 	if !ok {
 		return nil, errors.New("invalid uri argument")
 	}
-	documentText, ok := s.documents[protocol.DocumentUri(uri)]
+	doc, ok := s.documents[protocol.DocumentUri(uri)]
 	if !ok {
 		return nil, fmt.Errorf("could not find document for URI %s", uri)
 	}
 
-	script := []byte(documentText)
+	script := []byte(doc.text)
 	res, err := s.flowClient.ExecuteScript(context.Background(), script)
 	if err == nil {
 		conn.LogMessage(&protocol.LogMessageParams{
@@ -194,4 +156,91 @@ func (s *Server) executeScript(conn protocol.Conn, args ...interface{}) (interfa
 	}
 
 	return nil, err
+}
+
+// updateAccountCode updates the configured account with the code of the given
+// file.
+//
+// There should be exactly 1 argument, the DocumentURI of the file to submit.
+func (s *Server) updateAccountCode(conn protocol.Conn, args ...interface{}) (interface{}, error) {
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: fmt.Sprintf("update acct code args: %v", args),
+	})
+	if len(args) != 1 {
+		return nil, errors.New("missing argument")
+	}
+	uri, ok := args[0].(string)
+	if !ok {
+		return nil, errors.New("invalid uri argument")
+	}
+
+	doc, ok := s.documents[protocol.DocumentUri(uri)]
+	if !ok {
+		return nil, fmt.Errorf("could not find document for URI %s", uri)
+	}
+
+	accountCode := []byte(doc.text)
+	script := templates.UpdateAccountCode(accountCode)
+
+	tx := flow.Transaction{
+		Script:         script,
+		Nonce:          s.getNextNonce(),
+		ComputeLimit:   10,
+		PayerAccount:   s.config.AccountAddr,
+		ScriptAccounts: []flow.Address{s.config.AccountAddr},
+	}
+
+	return nil, s.sendTransaction(conn, tx)
+}
+
+// sendTransaction sends the given transaction.
+//
+// If an error occurs, attempts to show an appropriate message (either via logs
+// or UI popups in the client).
+func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) error {
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("submitting transaction %d", tx.Nonce),
+	})
+
+	sig, err := keys.SignTransaction(tx, s.config.AccountKey)
+	if err != nil {
+		return err
+	}
+	tx.AddSignature(s.config.AccountAddr, sig)
+
+	err = s.flowClient.SendTransaction(context.Background(), tx)
+	if err == nil {
+		conn.LogMessage(&protocol.LogMessageParams{
+			Type:    protocol.Info,
+			Message: fmt.Sprintf("Submitted transaction nonce=%d\thash=%s", tx.Nonce, tx.Hash().Hex()),
+		})
+		return nil
+	}
+
+	grpcErr, ok := status.FromError(err)
+	if ok {
+		if grpcErr.Code() == codes.Unavailable {
+			// The emulator server isn't running
+			conn.ShowMessage(&protocol.ShowMessageParams{
+				Type:    protocol.Warning,
+				Message: "The emulator server is unavailable. Please start the emulator (`cadence.runEmulator`) first.",
+			})
+			return nil
+		} else if grpcErr.Code() == codes.InvalidArgument {
+			// The request was invalid
+			conn.ShowMessage(&protocol.ShowMessageParams{
+				Type:    protocol.Warning,
+				Message: "The transaction could not be submitted.",
+			})
+			conn.LogMessage(&protocol.LogMessageParams{
+				Type:    protocol.Warning,
+				Message: fmt.Sprintf("Failed to submit transaction: %s", grpcErr.Message()),
+			})
+			return nil
+		}
+	}
+
+	return err
 }

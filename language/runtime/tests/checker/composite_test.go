@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
@@ -63,7 +64,7 @@ func TestCheckComposite(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -89,7 +90,7 @@ func TestCheckInitializerName(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -120,7 +121,7 @@ func TestCheckDestructor(t *testing.T) {
 				assert.IsType(t, &sema.InvalidDestructorError{}, errs[0])
 
 			case common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 2)
@@ -424,7 +425,7 @@ func TestCheckCompositeFieldsAndFunctions(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -660,7 +661,7 @@ func TestCheckCompositeFunctionSelfReference(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -762,7 +763,7 @@ func TestCheckResourceWithDestructor(t *testing.T) {
        }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceFieldWithMissingMoveAnnotation(t *testing.T) {
@@ -840,7 +841,7 @@ func TestCheckCompositeFieldAccess(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -927,7 +928,7 @@ func TestCheckCompositeFieldAssignment(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			case common.CompositeKindContract:
 				// TODO: add support for contract declarations
@@ -1168,7 +1169,7 @@ func TestCheckCompositeFunctionCall(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -1291,7 +1292,7 @@ func TestCheckCompositeInstantiation(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1550,7 +1551,7 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -1583,7 +1584,7 @@ func TestCheckCompositeInitializerWithArgumentLabel(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -1653,7 +1654,7 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -1739,7 +1740,7 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 				testType := checker.FindType("Test")
 
@@ -1825,7 +1826,7 @@ func TestCheckCompositeFunction(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -1863,7 +1864,7 @@ func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -1966,7 +1967,7 @@ func TestCheckResourceWithDestructorAndStructField(t *testing.T) {
        }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceDestructorMoveInvalidation(t *testing.T) {

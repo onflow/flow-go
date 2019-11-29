@@ -12,7 +12,7 @@ import (
 
 func TestCheckReferenceTypeSubTyping(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource interface RI {}
 
           resource R: RI {}
@@ -27,7 +27,7 @@ func TestCheckReferenceTypeSubTyping(t *testing.T) {
 
 func TestCheckInvalidReferenceTypeSubTyping(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource interface RI {}
 
           // NOTE: R does not conform to RI
@@ -50,7 +50,7 @@ func TestCheckReferenceTypeOuter(t *testing.T) {
       fun test(r: &[R]) {}
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckReferenceTypeInner(t *testing.T) {
@@ -61,7 +61,7 @@ func TestCheckReferenceTypeInner(t *testing.T) {
       fun test(r: [&R]) {}
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNestedReferenceType(t *testing.T) {
@@ -72,7 +72,7 @@ func TestCheckNestedReferenceType(t *testing.T) {
       fun test(r: &[&R]) {}
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidReferenceType(t *testing.T) {
@@ -88,7 +88,7 @@ func TestCheckInvalidReferenceType(t *testing.T) {
 
 func TestCheckReferenceExpressionWithResourceResultType(t *testing.T) {
 
-	checker, err := ParseAndCheckWithStorage(t, `
+	checker, err := ParseAndCheckStorage(t, `
           resource R {}
 
           let ref = &storage[R] as R
@@ -112,7 +112,7 @@ func TestCheckReferenceExpressionWithResourceResultType(t *testing.T) {
 
 func TestCheckReferenceExpressionWithResourceInterfaceResultType(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource interface T {}
           resource R: T {}
 
@@ -120,12 +120,12 @@ func TestCheckReferenceExpressionWithResourceInterfaceResultType(t *testing.T) {
         `,
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidReferenceExpressionType(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource R {}
 
           let ref = &storage[R] as X
@@ -139,7 +139,7 @@ func TestCheckInvalidReferenceExpressionType(t *testing.T) {
 
 func TestCheckInvalidReferenceExpressionStorageIndexType(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource R {}
 
           let ref = &storage[X] as R
@@ -153,7 +153,7 @@ func TestCheckInvalidReferenceExpressionStorageIndexType(t *testing.T) {
 
 func TestCheckInvalidReferenceExpressionNonResourceReferencedType(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           struct R {}
           resource T {}
 
@@ -169,7 +169,7 @@ func TestCheckInvalidReferenceExpressionNonResourceReferencedType(t *testing.T) 
 
 func TestCheckInvalidReferenceExpressionNonResourceResultType(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource R {}
           struct T {}
 
@@ -185,7 +185,7 @@ func TestCheckInvalidReferenceExpressionNonResourceResultType(t *testing.T) {
 
 func TestCheckInvalidReferenceExpressionNonResourceTypes(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           struct R {}
           struct T {}
 
@@ -202,7 +202,7 @@ func TestCheckInvalidReferenceExpressionNonResourceTypes(t *testing.T) {
 
 func TestCheckInvalidReferenceExpressionTypeMismatch(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource R {}
           resource T {}
 
@@ -217,7 +217,7 @@ func TestCheckInvalidReferenceExpressionTypeMismatch(t *testing.T) {
 
 func TestCheckInvalidReferenceToNonIndex(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource R {}
 
           let r <- create R()
@@ -232,7 +232,7 @@ func TestCheckInvalidReferenceToNonIndex(t *testing.T) {
 
 func TestCheckInvalidReferenceToNonStorage(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource R {}
 
           let rs <- [<-create R()]
@@ -247,7 +247,7 @@ func TestCheckInvalidReferenceToNonStorage(t *testing.T) {
 
 func TestCheckReferenceUse(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource R {
               var x: Int
 
@@ -276,12 +276,12 @@ func TestCheckReferenceUse(t *testing.T) {
         `,
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckReferenceUseArray(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource R {
               var x: Int
 
@@ -310,12 +310,12 @@ func TestCheckReferenceUseArray(t *testing.T) {
         `,
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckReferenceIndexingIfReferencedIndexable(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource R {}
 
           fun test() {
@@ -332,12 +332,12 @@ func TestCheckReferenceIndexingIfReferencedIndexable(t *testing.T) {
         `,
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidReferenceResourceLoss(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource R {}
 
           fun test() {
@@ -359,7 +359,7 @@ func TestCheckInvalidReferenceResourceLoss(t *testing.T) {
 
 func TestCheckInvalidReferenceIndexingIfReferencedNotIndexable(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource R {}
 
           fun test() {
@@ -381,7 +381,7 @@ func TestCheckInvalidReferenceIndexingIfReferencedNotIndexable(t *testing.T) {
 
 func TestCheckResourceInterfaceReferenceFunctionCall(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource interface I {
               fun foo()
           }
@@ -402,12 +402,12 @@ func TestCheckResourceInterfaceReferenceFunctionCall(t *testing.T) {
         `,
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceInterfaceReferenceFunctionCall(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t, `
+	_, err := ParseAndCheckStorage(t, `
           resource interface I {}
 
           resource R: I {

@@ -157,10 +157,6 @@ func (checker *Checker) visitIndexExpression(
 	targetExpression := indexExpression.TargetExpression
 	targetType = targetExpression.Accept(checker).(Type)
 
-	if _, ok := targetType.(*StorageType); ok {
-		checker.Elaboration.IsStorageIndexExpression[indexExpression] = true
-	}
-
 	// NOTE: check indexed type first for UX reasons
 
 	// check indexed expression's type is indexable
@@ -189,6 +185,8 @@ func (checker *Checker) visitIndexExpression(
 
 	switch indexedType := targetType.(type) {
 	case TypeIndexableType:
+
+		checker.Elaboration.IsTypeIndexExpression[indexExpression] = true
 
 		indexingType := indexExpression.IndexingType
 
@@ -299,6 +297,25 @@ func (checker *Checker) visitTypeIndexingExpression(
 	}
 
 	checker.Elaboration.IndexExpressionIndexingTypes[indexExpression] = keyType
+
+	if isAssignment && !indexedType.IsAssignable() {
+		checker.report(
+			&ReadOnlyTargetAssignmentError{
+				Range: ast.NewRangeFromPositioned(indexExpression.TargetExpression),
+			},
+		)
+	}
+
+	isValid, expectedType := indexedType.IsValidIndexingType(keyType)
+	if !isValid {
+		checker.report(
+			&TypeMismatchError{
+				ExpectedType: expectedType,
+				ActualType:   keyType,
+				Range:        ast.NewRangeFromPositioned(indexingType),
+			},
+		)
+	}
 
 	return indexedType.ElementType(keyType, isAssignment)
 }

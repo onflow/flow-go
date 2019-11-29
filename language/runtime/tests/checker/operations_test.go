@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
@@ -29,7 +30,7 @@ func TestCheckUnaryBooleanNegation(t *testing.T) {
       let a = !true
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidUnaryIntegerNegationOfBoolean(t *testing.T) {
@@ -49,7 +50,7 @@ func TestCheckUnaryIntegerNegation(t *testing.T) {
       let a = -1
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 type operationTest struct {

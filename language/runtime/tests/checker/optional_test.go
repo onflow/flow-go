@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
@@ -17,7 +18,7 @@ func TestCheckOptional(t *testing.T) {
       let x: Int? = 1
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidOptional(t *testing.T) {
@@ -37,7 +38,7 @@ func TestCheckOptionalNesting(t *testing.T) {
       let x: Int?? = 1
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNil(t *testing.T) {
@@ -46,7 +47,7 @@ func TestCheckNil(t *testing.T) {
      let x: Int? = nil
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckOptionalNestingNil(t *testing.T) {
@@ -55,7 +56,7 @@ func TestCheckOptionalNestingNil(t *testing.T) {
      let x: Int?? = nil
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNilReturnValue(t *testing.T) {
@@ -66,7 +67,7 @@ func TestCheckNilReturnValue(t *testing.T) {
      }
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidNonOptionalNil(t *testing.T) {
@@ -86,7 +87,7 @@ func TestCheckNilsComparison(t *testing.T) {
      let x = nil == nil
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckOptionalNilComparison(t *testing.T) {
@@ -96,7 +97,7 @@ func TestCheckOptionalNilComparison(t *testing.T) {
      let y = x == nil
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNonOptionalNilComparison(t *testing.T) {
@@ -106,7 +107,7 @@ func TestCheckNonOptionalNilComparison(t *testing.T) {
      let y = x == nil
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNonOptionalNilComparisonSwapped(t *testing.T) {
@@ -117,7 +118,7 @@ func TestCheckNonOptionalNilComparisonSwapped(t *testing.T) {
      let z = x == nil
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckOptionalNilComparisonSwapped(t *testing.T) {
@@ -127,7 +128,7 @@ func TestCheckOptionalNilComparisonSwapped(t *testing.T) {
      let y = nil == x
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNestedOptionalNilComparisonSwapped(t *testing.T) {
@@ -137,7 +138,7 @@ func TestCheckNestedOptionalNilComparisonSwapped(t *testing.T) {
      let y = nil == x
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNestedOptionalComparison(t *testing.T) {
@@ -148,7 +149,7 @@ func TestCheckNestedOptionalComparison(t *testing.T) {
      let z = x == y
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidNestedOptionalComparison(t *testing.T) {
@@ -186,7 +187,7 @@ func TestCheckCompositeNilEquality(t *testing.T) {
 			kind.ConstructionKeyword(),
 		))
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	}
 }
 

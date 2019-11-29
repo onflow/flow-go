@@ -15,7 +15,7 @@ import (
 )
 
 func expectSuccess(t *testing.T, err error) {
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func expectConformanceError(t *testing.T, err error) {
@@ -118,7 +118,7 @@ func TestCheckAccessModifierCompositeFunctionDeclaration(t *testing.T) {
 					))
 
 					if expectSuccess {
-						assert.Nil(t, err)
+						assert.NoError(t, err)
 					} else {
 						errs := ExpectCheckerErrors(t, err, 1)
 
@@ -181,7 +181,7 @@ func TestCheckAccessModifierCompositeConstantFieldDeclaration(t *testing.T) {
 					))
 
 					if expectSuccess {
-						assert.Nil(t, err)
+						assert.NoError(t, err)
 					} else {
 						errs := ExpectCheckerErrors(t, err, 1)
 
@@ -233,7 +233,7 @@ func TestCheckAccessModifierCompositeVariableFieldDeclaration(t *testing.T) {
 						initializer,
 					))
 
-					assert.Nil(t, err)
+					assert.NoError(t, err)
 				})
 			}
 		}
@@ -263,7 +263,7 @@ func TestCheckAccessModifierGlobalFunctionDeclaration(t *testing.T) {
 			))
 
 			if expectSuccess {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			} else {
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -296,7 +296,7 @@ func TestCheckAccessModifierGlobalVariableDeclaration(t *testing.T) {
 			))
 
 			if expectSuccess {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			} else {
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -329,7 +329,7 @@ func TestCheckAccessModifierGlobalConstantDeclaration(t *testing.T) {
 			))
 
 			if expectSuccess {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			} else {
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -373,7 +373,7 @@ func TestCheckAccessModifierLocalVariableDeclaration(t *testing.T) {
 				))
 
 				if expectSuccess {
-					assert.Nil(t, err)
+					assert.NoError(t, err)
 				} else {
 					errs := ExpectCheckerErrors(t, err, 1)
 
@@ -410,7 +410,7 @@ func TestCheckAccessModifierLocalOptionalBinding(t *testing.T) {
 			))
 
 			if expectSuccess {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			} else {
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -445,7 +445,7 @@ func TestCheckAccessModifierLocalFunctionDeclaration(t *testing.T) {
 			))
 
 			if expectSuccess {
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			} else {
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -499,7 +499,7 @@ func TestCheckAccessModifierGlobalCompositeDeclaration(t *testing.T) {
 					))
 
 					if expectSuccess {
-						assert.Nil(t, err)
+						assert.NoError(t, err)
 					} else {
 						errs := ExpectCheckerErrors(t, err, 1)
 

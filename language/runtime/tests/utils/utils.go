@@ -42,7 +42,7 @@ func ParseAndCheckWithOptions(
 ) (*sema.Checker, error) {
 	program, _, err := parser.ParseProgram(code)
 
-	if !assert.Nil(t, err) {
+	if !assert.NoError(t, err) {
 		assert.FailNow(t, errors.UnrollChildErrors(err))
 		return nil, err
 	}
