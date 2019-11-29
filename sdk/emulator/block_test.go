@@ -16,10 +16,7 @@ func TestCommitBlock(t *testing.T) {
 	b, err := emulator.NewEmulatedBlockchain()
 	require.NoError(t, err)
 
-	counterAddress, err := b.CreateAccount(nil, []byte(counterScript), getNonce())
-	require.NoError(t, err)
-
-	addTwoScript := generateAddTwoToCounterScript(counterAddress)
+	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
 
 	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
