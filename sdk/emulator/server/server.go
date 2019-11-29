@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/proto/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/storage/badger"
+	"github.com/dapperlabs/flow-go/utils/liveness"
 	grpcprometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -28,20 +29,22 @@ import (
 //
 // The server wraps an EmulatedBlockchain instance with the Observation gRPC interface.
 type EmulatorServer struct {
-	backend    *Backend
-	grpcServer *grpc.Server
-	config     *Config
-	logger     *log.Logger
-	store      badger.Store
+	backend       *Backend
+	grpcServer    *grpc.Server
+	config        *Config
+	logger        *log.Logger
+	store         badger.Store
+	livenessCheck *liveness.CheckCollector
 
 	// Wraps the cleanup function to ensure we only run cleanup once
 	cleanupOnce sync.Once
 }
 
 const (
-	defaultBlockInterval = 5 * time.Second
-	defaultPort          = 3569
-	defaultHTTPPort      = 8080
+	defaultBlockInterval          = 5 * time.Second
+	defaultLivenessCheckTolerance = time.Second
+	defaultPort                   = 3569
+	defaultHTTPPort               = 8080
 )
 
 // Config is the configuration for an emulator server.
@@ -53,6 +56,9 @@ type Config struct {
 	GRPCDebug      bool
 	// DBPath is the path to the Badger database on disk
 	DBPath string
+	// LivenessCheckTolerance is the tolerence level of the liveness check
+	// e.g. how long we can go without answering before being considered not alive
+	LivenessCheckTolerance time.Duration
 }
 
 // NewEmulatorServer creates a new instance of a Flow Emulator server.
@@ -72,6 +78,10 @@ func NewEmulatorServer(logger *log.Logger, store badger.Store, conf *Config) *Em
 
 	if conf.BlockInterval == 0 {
 		conf.BlockInterval = defaultBlockInterval
+	}
+
+	if conf.LivenessCheckTolerance == 0 {
+		conf.LivenessCheckTolerance = defaultLivenessCheckTolerance
 	}
 
 	if conf.Port == 0 {
@@ -97,10 +107,11 @@ func NewEmulatorServer(logger *log.Logger, store badger.Store, conf *Config) *Em
 			blockchain: blockchain,
 			logger:     logger,
 		},
-		grpcServer: grpcServer,
-		config:     conf,
-		logger:     logger,
-		store:      store,
+		grpcServer:    grpcServer,
+		config:        conf,
+		logger:        logger,
+		store:         store,
+		livenessCheck: liveness.NewCheckCollector(conf.LivenessCheckTolerance),
 	}
 
 	if conf.GRPCDebug {
@@ -130,7 +141,10 @@ func (e *EmulatorServer) Start(ctx context.Context) {
 	go e.startGrpcServer()
 
 	ticker := time.NewTicker(e.config.BlockInterval)
+	livenessTicker := time.NewTicker(e.config.LivenessCheckTolerance / 2)
+	checker := e.livenessCheck.NewCheck()
 	defer ticker.Stop()
+	defer livenessTicker.Stop()
 	for {
 		select {
 		case <-ticker.C:
@@ -144,7 +158,8 @@ func (e *EmulatorServer) Start(ctx context.Context) {
 					"blockSize": len(block.TransactionHashes),
 				}).Debugf("⛏  Block #%d mined", block.Number)
 			}
-
+		case <-livenessTicker.C:
+			checker.CheckIn()
 		case <-ctx.Done():
 			return
 		}
@@ -191,6 +206,7 @@ func StartServer(logger *log.Logger, config *Config) {
 	// Add /metrics endponit
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/live", emulatorServer.livenessCheck)
 	mux.Handle("/", http.HandlerFunc(wrappedServer.ServeHTTP))
 
 	httpServer := http.Server{
