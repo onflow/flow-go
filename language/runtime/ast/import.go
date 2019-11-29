@@ -103,7 +103,7 @@ func (l AddressLocation) String() string {
 }
 
 func (l AddressLocation) ToAddress() (addr flow.Address) {
-	copy(addr[:], l)
+	return flow.BytesToAddress(l)
 	return
 }
 
