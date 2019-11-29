@@ -64,4 +64,4 @@ update-deployment-image:
 monitor-rollout:
 	kconfig=$$(uuidgen); \
 	echo "$$KUBECONFIG_STAGING" > $$kconfig; \
-	kubectl --kubeconfig=$$kconfig rollout status deployment/${DEPLOYMENT_NAME}
+	kubectl --kubeconfig=$$kconfig rollout status deployments.apps ${DEPLOYMENT_NAME}
