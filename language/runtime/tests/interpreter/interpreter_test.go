@@ -4780,9 +4780,14 @@ func TestInterpretStorage(t *testing.T) {
 
 	inter := parseCheckAndInterpretWithOptions(t,
 		`
-          pub fun test(): Int? {
-              storage[Int] = 42
-              return storage[Int]
+          pub resource R {}
+
+          pub fun test(): <-R? {
+              let oldR <- storage[R] <- create R()
+              destroy oldR
+
+              let storedR <- storage[R] <- nil
+              return <-storedR
           }
         `,
 		ParseCheckAndInterpretOptions{
@@ -4807,11 +4812,14 @@ func TestInterpretStorage(t *testing.T) {
 	value, err := inter.Invoke("test")
 	require.Nil(t, err)
 
-	assert.Equal(t,
-		interpreter.NewSomeValueOwningNonCopying(
-			interpreter.NewIntValue(42),
-		),
+	require.IsType(t,
+		&interpreter.SomeValue{},
 		value,
+	)
+
+	assert.IsType(t,
+		&interpreter.CompositeValue{},
+		value.(*interpreter.SomeValue).Value,
 	)
 }
 

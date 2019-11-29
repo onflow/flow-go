@@ -161,10 +161,11 @@ func TestCheckInvalidReferenceExpressionNonResourceReferencedType(t *testing.T) 
         `,
 	)
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 3)
 
-	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[0])
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
+	assert.IsType(t, &sema.TypeMismatchWithDescriptionError{}, errs[0])
+	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[1])
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[2])
 }
 
 func TestCheckInvalidReferenceExpressionNonResourceResultType(t *testing.T) {
@@ -193,11 +194,12 @@ func TestCheckInvalidReferenceExpressionNonResourceTypes(t *testing.T) {
         `,
 	)
 
-	errs := ExpectCheckerErrors(t, err, 3)
+	errs := ExpectCheckerErrors(t, err, 4)
 
-	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[0])
+	assert.IsType(t, &sema.TypeMismatchWithDescriptionError{}, errs[0])
 	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[1])
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[2])
+	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[2])
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[3])
 }
 
 func TestCheckInvalidReferenceExpressionTypeMismatch(t *testing.T) {

@@ -18,7 +18,8 @@ func (checker *Checker) VisitDestroyExpression(expression *ast.DestroyExpression
 	// destruction of any resource type (even compound resource types) is allowed:
 	// the destructor of the resource type will be invoked
 
-	if !valueType.IsResourceType() {
+	if !valueType.IsInvalidType() &&
+		!valueType.IsResourceType() {
 
 		checker.report(
 			&InvalidDestructionError{

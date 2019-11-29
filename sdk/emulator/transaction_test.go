@@ -20,6 +20,8 @@ func TestSubmitTransaction(t *testing.T) {
 	b, err := emulator.NewEmulatedBlockchain()
 	require.NoError(t, err)
 
+	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
+
 	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
@@ -44,10 +46,19 @@ func TestSubmitTransaction(t *testing.T) {
 	assert.Equal(t, flow.TransactionFinalized, tx2.Status)
 }
 
+func deployAndGenerateAddTwoScript(t *testing.T, b *emulator.EmulatedBlockchain) (string, flow.Address) {
+	counterAddress, err := b.CreateAccount(nil, []byte(counterScript), getNonce())
+	require.NoError(t, err)
+
+	return generateAddTwoToCounterScript(counterAddress), counterAddress
+}
+
 // TODO: Add test case for missing ReferenceBlockHash
 func TestSubmitInvalidTransaction(t *testing.T) {
 	b, err := emulator.NewEmulatedBlockchain()
 	require.NoError(t, err)
+
+	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
 
 	t.Run("EmptyTransaction", func(t *testing.T) {
 		// Create empty transaction (no required fields)
@@ -144,6 +155,8 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	b, err := emulator.NewEmulatedBlockchain()
 	require.NoError(t, err)
 
+	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
+
 	accountAddress := b.RootAccountAddress()
 
 	tx := flow.Transaction{
@@ -216,7 +229,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 		script := []byte(`
 		  transaction {
 		    prepare(signer: Account) {}
- 		    execute {}
+		    execute {}
 		  }
 		`)
 
@@ -277,6 +290,8 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		b, err := emulator.NewEmulatedBlockchain()
 		require.NoError(t, err)
 
+		addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
+
 		addressA := flow.HexToAddress("0000000000000000000000000000000000000002")
 
 		tx := flow.Transaction{
@@ -305,7 +320,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		invalidAddress := flow.HexToAddress("0000000000000000000000000000000000000002")
 
 		tx := flow.Transaction{
-			Script:             []byte(addTwoScript),
+			Script:             []byte(`transaction { execute { } }`),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
@@ -326,6 +341,8 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	t.Run("InvalidKeyPair", func(t *testing.T) {
 		b, err := emulator.NewEmulatedBlockchain()
 		require.NoError(t, err)
+
+		addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
 
 		// use key-pair that does not exist on root account
 		invalidKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
@@ -367,7 +384,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		script := []byte(`
 		  transaction {
 		    prepare(signer: Account) {}
- 		    execute {}
+		    execute {}
 		  }
 		`)
 
@@ -412,6 +429,8 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		require.NoError(t, err)
 
 		addressA := flow.HexToAddress("0000000000000000000000000000000000000002")
+
+		addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
 
 		tx := flow.Transaction{
 			Script:             []byte(addTwoScript),
@@ -505,7 +524,7 @@ func TestGetTransaction(t *testing.T) {
 
 		transaction {
 		  execute {
-		    emit MyEvent(x: 1)	
+		    emit MyEvent(x: 1)
 		  }
 		}
 	`
