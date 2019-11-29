@@ -23,12 +23,6 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		false,
 	)
 
-	// TODO: also check nested composite members
-
-	// TODO: also check nested composite members' identifiers
-
-	// TODO: also check nested composite fields' type annotations
-
 	// NOTE: functions are checked separately
 	checker.checkFieldsAccessModifier(declaration.Members.Fields)
 
@@ -97,34 +91,119 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		ContainerKindComposite,
 	)
 
-	// TODO: support non-structure / non-resources composites, such as contracts
+	checker.checkCompositeDeclarationSupport(
+		declaration.CompositeKind,
+		declaration.DeclarationKind(),
+		declaration.Identifier,
+	)
 
-	if declaration.CompositeKind != common.CompositeKindStructure &&
-		declaration.CompositeKind != common.CompositeKindResource {
-
-		checker.report(
-			&UnsupportedDeclarationError{
-				DeclarationKind: declaration.DeclarationKind(),
-				Range:           ast.NewRangeFromPositioned(declaration.Identifier),
-			},
-		)
-	}
-
-	// TODO: support nested declarations for contracts and contract interfaces
-
-	// report error for first nested composite declaration, if any
-	if len(declaration.Members.CompositeDeclarations) > 0 {
-		firstNestedCompositeDeclaration := declaration.Members.CompositeDeclarations[0]
-
-		checker.report(
-			&UnsupportedDeclarationError{
-				DeclarationKind: firstNestedCompositeDeclaration.DeclarationKind(),
-				Range:           ast.NewRangeFromPositioned(firstNestedCompositeDeclaration.Identifier),
-			},
-		)
-	}
+	checker.checkCompositeNesting(
+		declaration.CompositeKind,
+		declaration.DeclarationKind(),
+		declaration.Members,
+	)
 
 	return nil
+}
+
+func (checker *Checker) checkCompositeNesting(
+	containerCompositeKind common.CompositeKind,
+	containerDeclarationKind common.DeclarationKind,
+	members *ast.Members,
+) {
+
+	// Only contracts and contract interfaces support nested composite declarations
+	if containerCompositeKind != common.CompositeKindContract {
+
+		reportInvalidNesting := func(nestedDeclarationKind common.DeclarationKind, identifier ast.Identifier) {
+			checker.report(
+				&InvalidNestedDeclarationError{
+					NestedDeclarationKind:    nestedDeclarationKind,
+					ContainerDeclarationKind: containerDeclarationKind,
+					Range:                    ast.NewRangeFromPositioned(identifier),
+				},
+			)
+		}
+
+		if len(members.CompositeDeclarations) > 0 {
+
+			firstNestedCompositeDeclaration := members.CompositeDeclarations[0]
+
+			reportInvalidNesting(
+				firstNestedCompositeDeclaration.DeclarationKind(),
+				firstNestedCompositeDeclaration.Identifier,
+			)
+
+		} else if len(members.InterfaceDeclarations) > 0 {
+
+			firstNestedInterfaceDeclaration := members.InterfaceDeclarations[0]
+
+			reportInvalidNesting(
+				firstNestedInterfaceDeclaration.DeclarationKind(),
+				firstNestedInterfaceDeclaration.Identifier,
+			)
+		}
+
+		return
+	}
+
+	// Check contract's nested composite declarations and interface declarations
+	// are a resource (interface) or a struct (interface)
+
+	checkNestedDeclaration := func(
+		nestedCompositeKind common.CompositeKind,
+		nestedDeclarationKind common.DeclarationKind,
+		identifier ast.Identifier,
+	) {
+
+		if nestedCompositeKind != common.CompositeKindResource &&
+			nestedCompositeKind != common.CompositeKindStructure {
+
+			checker.report(
+				&InvalidNestedDeclarationError{
+					NestedDeclarationKind:    nestedDeclarationKind,
+					ContainerDeclarationKind: containerDeclarationKind,
+					Range:                    ast.NewRangeFromPositioned(identifier),
+				},
+			)
+		}
+	}
+
+	for _, member := range members.CompositeDeclarations {
+		checkNestedDeclaration(
+			member.CompositeKind,
+			member.DeclarationKind(),
+			member.Identifier,
+		)
+	}
+
+	for _, member := range members.InterfaceDeclarations {
+		checkNestedDeclaration(
+			member.CompositeKind,
+			member.DeclarationKind(),
+			member.Identifier,
+		)
+	}
+}
+
+func (checker *Checker) checkCompositeDeclarationSupport(
+	compositeKind common.CompositeKind,
+	declarationKind common.DeclarationKind,
+	identifier ast.Identifier,
+) {
+	switch compositeKind {
+	case common.CompositeKindStructure, common.CompositeKindResource:
+		break
+	default:
+		// TODO: support non-structure / non-resources composites, such as contracts
+
+		checker.report(
+			&UnsupportedDeclarationError{
+				DeclarationKind: declarationKind,
+				Range:           ast.NewRangeFromPositioned(identifier),
+			},
+		)
+	}
 }
 
 func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDeclaration) {

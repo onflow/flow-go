@@ -1373,6 +1373,11 @@ func (interpreter *Interpreter) testEqual(left, right Value) BoolValue {
 	case *CompositeValue:
 		// TODO: call `equals` if RHS is composite
 		return false
+
+	case *ArrayValue,
+		*DictionaryValue:
+		// TODO:
+		return false
 	}
 
 	panic(errors.NewUnreachableError())

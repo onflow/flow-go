@@ -41,19 +41,33 @@ func TestInitialization(t *testing.T) {
 	t.Run("should restore state when initialized with non-empty store", func(t *testing.T) {
 		b, _ := emulator.NewEmulatedBlockchain(emulator.WithStore(store))
 
+		counterAddress, err := b.CreateAccount(nil, []byte(counterScript), getNonce())
+		require.NoError(t, err)
+
 		// Submit a transaction adds some ledger state and event state
-		script := `
+		script := fmt.Sprintf(`
+            import 0x%s
+
             event MyEvent(x: Int)
             
             transaction {
+
               prepare(acct: Account) {
                 emit MyEvent(x: 1)
 
-                acct.storage[Int] = 1
+                let counter <- createCounter()
+                counter.add(1)
+
+                let existing <- acct.storage[Counter] <- counter
+                destroy existing
+                acct.storage[&Counter] = &acct.storage[Counter] as Counter
               }
+
               execute {}
             }
-        `
+        `,
+			counterAddress,
+		)
 
 		tx := flow.Transaction{
 			Script:         []byte(script),
@@ -110,10 +124,15 @@ func TestInitialization(t *testing.T) {
 
 		t.Run("should be able to read ledger state", func(t *testing.T) {
 			readScript := fmt.Sprintf(`
+                import 0x%s
+
                 pub fun main(): Int {
-                    return getAccount(0x%s).storage[Int] ?? 0
+                    return getAccount(0x%s).storage[&Counter]?.count ?? 0
                 }
-            `, b.RootAccountAddress())
+            `,
+				counterAddress,
+				b.RootAccountAddress(),
+			)
 
 			res, _, err := b.ExecuteScript([]byte(readScript))
 			assert.NoError(t, err)

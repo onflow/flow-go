@@ -306,13 +306,13 @@ func (checker *Checker) visitTypeIndexingExpression(
 		)
 	}
 
-	isValid, expectedType := indexedType.IsValidIndexingType(keyType)
+	isValid, expectedTypeDescription := indexedType.IsValidIndexingType(keyType)
 	if !isValid {
 		checker.report(
-			&TypeMismatchError{
-				ExpectedType: expectedType,
-				ActualType:   keyType,
-				Range:        ast.NewRangeFromPositioned(indexingType),
+			&TypeMismatchWithDescriptionError{
+				ExpectedTypeDescription: expectedTypeDescription,
+				ActualType:              keyType,
+				Range:                   ast.NewRangeFromPositioned(indexingType),
 			},
 		)
 	}
