@@ -289,7 +289,7 @@ func (r *interpreterRuntime) emitEvent(
 	runtimeInterface Interface,
 	event interpreter.EventValue,
 ) {
-	functionType := inter.Checker.GlobalValues[event.Identifier].Type.(*sema.FunctionType)
+	functionType := inter.Checker.GlobalValues[event.Identifier].Type.(*sema.SpecialFunctionType)
 	eventType := functionType.ReturnTypeAnnotation.Type.(*sema.EventType).Export()
 
 	eventValue := event.Export().(values.Event)
@@ -304,9 +304,9 @@ func (r *interpreterRuntime) emitAccountEvent(
 	fields ...values.Value,
 ) {
 	t := eventType.Export()
-	event := values.NewEvent(fields).WithType(t)
+	eventValue := values.NewEvent(fields).WithType(t)
 
-	runtimeInterface.EmitEvent(event)
+	runtimeInterface.EmitEvent(eventValue)
 }
 
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
