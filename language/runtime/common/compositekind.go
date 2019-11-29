@@ -52,23 +52,20 @@ func (k CompositeKind) DeclarationKind(isInterface bool) DeclarationKind {
 	case CompositeKindStructure:
 		if isInterface {
 			return DeclarationKindStructureInterface
-		} else {
-			return DeclarationKindStructure
 		}
+		return DeclarationKindStructure
 
 	case CompositeKindResource:
 		if isInterface {
 			return DeclarationKindResourceInterface
-		} else {
-			return DeclarationKindResource
 		}
+		return DeclarationKindResource
 
 	case CompositeKindContract:
 		if isInterface {
 			return DeclarationKindContractInterface
-		} else {
-			return DeclarationKindContract
 		}
+		return DeclarationKindContract
 	}
 
 	panic(errors.NewUnreachableError())
