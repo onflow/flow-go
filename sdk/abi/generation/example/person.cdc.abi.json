@@ -18,6 +18,9 @@
           ]
         ]
       }
+    },
+    "BigName": {
+      "variable": "String"
     }
   }
 }

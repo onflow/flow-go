@@ -1,42 +1,41 @@
 package main
 
 import (
-	"os"
-
 	"github.com/dapperlabs/flow-go/sdk/abi/generation/code"
-	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	types2 "github.com/dapperlabs/flow-go/sdk/abi/types"
 )
 
 func main() {
 
-	if len(os.Args) != 3 {
-		panic("use input_file output_file")
-	}
+	//TODO fix for final push
+	//if len(os.Args) != 3 {
+	//	panic("use input_file output_file")
+	//}
 
 	//abiFilename := os.Args[1]
 
-	types := map[string]*types.Composite{
+	types := map[string]*types2.Composite{
 		"Car": {
-			Fields: map[string]*types.Field{
+			Fields: map[string]*types2.Field{
 				"fullName": {
 					Identifier: "fullName",
-					Type:       types.String{},
+					Type:       types2.String{},
 				},
 			},
 			Identifier: "Car",
-			Initializers: [][]*types.Parameter{
+			Initializers: [][]*types2.Parameter{
 				{
-					&types.Parameter{
-						Field: types.Field{
+					&types2.Parameter{
+						Field: types2.Field{
 							Identifier: "model",
-							Type:       types.String{},
+							Type:       types2.String{},
 						},
 						Label: "",
 					},
-					&types.Parameter{
-						Field: types.Field{
+					&types2.Parameter{
+						Field: types2.Field{
 							Identifier: "make",
-							Type:       types.String{},
+							Type:       types2.String{},
 						},
 						Label: "",
 					},

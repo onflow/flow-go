@@ -7,8 +7,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/cmd"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/sdk/abi/types"
-	"github.com/dapperlabs/flow-go/sdk/abi/types/encoding"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding/types"
+	types2 "github.com/dapperlabs/flow-go/sdk/abi/types"
 )
 
 // GenerateABI generates ABIs from provided Cadence file
@@ -29,7 +29,7 @@ func GetABIForFile(filename string, pretty bool) []byte {
 
 	_, checker, _ := cmd.PrepareInterpreter(filename)
 
-	exportedTypes := map[string]types.Type{}
+	exportedTypes := map[string]types2.Type{}
 
 	values := checker.UserDefinedValues()
 	for _, variable := range values {
@@ -41,7 +41,7 @@ func GetABIForFile(filename string, pretty bool) []byte {
 		}
 	}
 
-	encoder := encoding.NewEncoder()
+	encoder := types.NewEncoder()
 
 	for name, typ := range exportedTypes {
 		encoder.Encode(name, typ)
@@ -61,4 +61,9 @@ func GetABIForFile(filename string, pretty bool) []byte {
 	}
 
 	return jsonData
+}
+
+func GetABIFromFile(filename string) (map[string]types2.Type, error) {
+
+	return nil, nil
 }

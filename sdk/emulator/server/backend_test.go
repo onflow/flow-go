@@ -16,8 +16,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/proto/sdk/entities"
 	"github.com/dapperlabs/flow-go/proto/services/observation"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
-	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	values2 "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
+	types2 "github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
@@ -70,7 +70,7 @@ func TestBackend(t *testing.T) {
 		response, err := backend.ExecuteScript(context.Background(), &executionScriptRequest)
 		assert.NoError(t, err)
 
-		value, err := encoding.Decode(types.Int{}, response.GetValue())
+		value, err := values2.Decode(types2.Int{}, response.GetValue())
 		assert.NoError(t, err)
 
 		assert.Equal(t, values.NewInt(2137), value)

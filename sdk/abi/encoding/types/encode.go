@@ -1,4 +1,4 @@
-package encoding
+package types
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ func (encoder *Encoder) Encode(name string, t types.Type) {
 }
 
 func (encoder *Encoder) Get() interface{} {
-	return abiObject{
+	return AbiObject{
 		encoder.definitions,
 		"", //Once we setup schema, probably on withflow.org
 	}
@@ -27,7 +27,7 @@ func (encoder *Encoder) Get() interface{} {
 
 //region JSON Structures
 
-type abiObject struct {
+type AbiObject struct {
 	Definitions map[string]interface{} `json:"definitions"`
 	Schema      string                 `json:"schema,omitempty"`
 }
@@ -35,15 +35,16 @@ type abiObject struct {
 type arrayObject struct {
 	Array array `json:"array"`
 }
+
 type array struct {
 	Of   interface{} `json:"of"`
 	Size uint        `json:"size,omitempty"`
 }
 
 type structObject struct {
-	Struct structData `json:"struct"`
+	Struct StructData `json:"struct"`
 }
-type structData struct {
+type StructData struct {
 	Fields       map[string]interface{} `json:"fields"`
 	Initializers [][]parameter          `json:"initializers"`
 }
@@ -88,7 +89,7 @@ type dictionaryObject struct {
 }
 
 type resourceObject struct {
-	Resource structData `json:"resource"`
+	Resource StructData `json:"resource"`
 }
 
 type resourcePointer struct {
@@ -199,7 +200,7 @@ func (encoder *Encoder) encode(t types.Type) interface{} {
 
 	case types.Struct:
 		return structObject{
-			Struct: structData{
+			Struct: StructData{
 				Fields:       encoder.mapFields(v.Fields),
 				Initializers: encoder.mapNestedParameters(v.Initializers),
 			},
@@ -240,7 +241,7 @@ func (encoder *Encoder) encode(t types.Type) interface{} {
 		}
 	case types.Resource:
 		return resourceObject{
-			structData{
+			StructData{
 				Fields:       encoder.mapFields(v.Fields),
 				Initializers: encoder.mapNestedParameters(v.Initializers),
 			},

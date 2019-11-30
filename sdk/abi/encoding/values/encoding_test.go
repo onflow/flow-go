@@ -1,4 +1,4 @@
-package encoding_test
+package values_test
 
 import (
 	"math"
@@ -8,31 +8,30 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
-	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	types2 "github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 type encodeTest struct {
 	name string
-	typ  types.Type
+	typ  types2.Type
 	val  values.Value
 }
 
 func TestEncodeVoid(t *testing.T) {
-	testEncode(t, types.Void{}, values.Void{})
+	testEncode(t, types2.Void{}, values.Void{})
 }
 
 func TestEncodeString(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"EmptyString",
-			types.String{},
+			types2.String{},
 			values.String(""),
 		},
 		{
 			"SimpleString",
-			types.String{},
+			types2.String{},
 			values.String("abcdefg"),
 		},
 	}...)
@@ -42,12 +41,12 @@ func TestEncodeBool(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"True",
-			types.Bool{},
+			types2.Bool{},
 			values.Bool(true),
 		},
 		{
 			"False",
-			types.Bool{},
+			types2.Bool{},
 			values.Bool(false),
 		},
 	}...)
@@ -57,19 +56,19 @@ func TestEncodeBytes(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"EmptyBytes",
-			types.Bytes{},
+			types2.Bytes{},
 			values.Bytes{},
 		},
 		{
 			"SimpleBytes",
-			types.Bytes{},
+			types2.Bytes{},
 			values.Bytes{1, 2, 3, 4, 5},
 		},
 	}...)
 }
 
 func TestEncodeAddress(t *testing.T) {
-	testEncode(t, types.Address{}, values.BytesToAddress([]byte{1, 2, 3, 4, 5}))
+	testEncode(t, types2.Address{}, values.BytesToAddress([]byte{1, 2, 3, 4, 5}))
 }
 
 func TestEncodeInt(t *testing.T) {
@@ -78,24 +77,24 @@ func TestEncodeInt(t *testing.T) {
 
 	largerThanMaxUint64 := encodeTest{
 		"LargerThanMaxUint64",
-		types.Int{},
+		types2.Int{},
 		values.NewIntFromBig(x),
 	}
 
 	testAllEncode(t, []encodeTest{
 		{
 			"Negative",
-			types.Int{},
+			types2.Int{},
 			values.NewInt(-42),
 		},
 		{
 			"Zero",
-			types.Int{},
+			types2.Int{},
 			values.NewInt(0),
 		},
 		{
 			"Positive",
-			types.Int{},
+			types2.Int{},
 			values.NewInt(42),
 		},
 		largerThanMaxUint64,
@@ -106,17 +105,17 @@ func TestEncodeInt8(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Min",
-			types.Int8{},
+			types2.Int8{},
 			values.Int8(math.MinInt8),
 		},
 		{
 			"Zero",
-			types.Int8{},
+			types2.Int8{},
 			values.Int8(0),
 		},
 		{
 			"Max",
-			types.Int8{},
+			types2.Int8{},
 			values.Int8(math.MaxInt8),
 		},
 	}...)
@@ -126,17 +125,17 @@ func TestEncodeInt16(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Min",
-			types.Int16{},
+			types2.Int16{},
 			values.Int16(math.MinInt16),
 		},
 		{
 			"Zero",
-			types.Int16{},
+			types2.Int16{},
 			values.Int16(0),
 		},
 		{
 			"Max",
-			types.Int16{},
+			types2.Int16{},
 			values.Int16(math.MaxInt16),
 		},
 	}...)
@@ -146,17 +145,17 @@ func TestEncodeInt32(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Min",
-			types.Int32{},
+			types2.Int32{},
 			values.Int32(math.MinInt32),
 		},
 		{
 			"Zero",
-			types.Int32{},
+			types2.Int32{},
 			values.Int32(0),
 		},
 		{
 			"Max",
-			types.Int32{},
+			types2.Int32{},
 			values.Int32(math.MaxInt32),
 		},
 	}...)
@@ -166,17 +165,17 @@ func TestEncodeInt64(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Min",
-			types.Int64{},
+			types2.Int64{},
 			values.Int64(math.MinInt64),
 		},
 		{
 			"Zero",
-			types.Int64{},
+			types2.Int64{},
 			values.Int64(0),
 		},
 		{
 			"Max",
-			types.Int64{},
+			types2.Int64{},
 			values.Int64(math.MaxInt64),
 		},
 	}...)
@@ -186,12 +185,12 @@ func TestEncodeUint8(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Zero",
-			types.UInt8{},
+			types2.UInt8{},
 			values.Uint8(0),
 		},
 		{
 			"Max",
-			types.UInt8{},
+			types2.UInt8{},
 			values.Uint8(math.MaxUint8),
 		},
 	}...)
@@ -201,12 +200,12 @@ func TestEncodeUint16(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Zero",
-			types.UInt16{},
+			types2.UInt16{},
 			values.Uint16(0),
 		},
 		{
 			"Max",
-			types.UInt16{},
+			types2.UInt16{},
 			values.Uint16(math.MaxUint8),
 		},
 	}...)
@@ -216,12 +215,12 @@ func TestEncodeUint32(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Zero",
-			types.UInt32{},
+			types2.UInt32{},
 			values.Uint32(0),
 		},
 		{
 			"Max",
-			types.UInt32{},
+			types2.UInt32{},
 			values.Uint32(math.MaxUint32),
 		},
 	}...)
@@ -231,12 +230,12 @@ func TestEncodeUint64(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Zero",
-			types.UInt64{},
+			types2.UInt64{},
 			values.Uint64(0),
 		},
 		{
 			"Max",
-			types.UInt64{},
+			types2.UInt64{},
 			values.Uint64(math.MaxUint64),
 		},
 	}...)
@@ -245,16 +244,16 @@ func TestEncodeUint64(t *testing.T) {
 func TestEncodeVariableSizedArray(t *testing.T) {
 	emptyArray := encodeTest{
 		"EmptyArray",
-		types.VariableSizedArray{
-			ElementType: types.Int{},
+		types2.VariableSizedArray{
+			ElementType: types2.Int{},
 		},
 		values.VariableSizedArray{},
 	}
 
 	intArray := encodeTest{
 		"IntArray",
-		types.VariableSizedArray{
-			ElementType: types.Int{},
+		types2.VariableSizedArray{
+			ElementType: types2.Int{},
 		},
 		values.VariableSizedArray{
 			values.NewInt(1),
@@ -265,15 +264,15 @@ func TestEncodeVariableSizedArray(t *testing.T) {
 
 	compositeArray := encodeTest{
 		"CompositeArray",
-		types.VariableSizedArray{
-			ElementType: types.Composite{
-				Fields: map[string]*types.Field{
+		types2.VariableSizedArray{
+			ElementType: types2.Composite{
+				Fields: map[string]*types2.Field{
 					"a": {
-						Type:       types.String{},
+						Type:       types2.String{},
 						Identifier: "a",
 					},
 					"b": {
-						Type:       types.Int{},
+						Type:       types2.Int{},
 						Identifier: "b",
 					},
 				},
@@ -312,17 +311,17 @@ func TestEncodeConstantSizedArray(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"EmptyArray",
-			types.ConstantSizedArray{
+			types2.ConstantSizedArray{
 				Size:        0,
-				ElementType: types.Int{},
+				ElementType: types2.Int{},
 			},
 			values.ConstantSizedArray{},
 		},
 		{
 			"IntArray",
-			types.ConstantSizedArray{
+			types2.ConstantSizedArray{
 				Size:        3,
-				ElementType: types.Int{},
+				ElementType: types2.Int{},
 			},
 			values.ConstantSizedArray{
 				values.NewInt(1),
@@ -336,9 +335,9 @@ func TestEncodeConstantSizedArray(t *testing.T) {
 func TestEncodeDictionary(t *testing.T) {
 	simpleDict := encodeTest{
 		"SimpleDict",
-		types.Dictionary{
-			KeyType:     types.String{},
-			ElementType: types.Int{},
+		types2.Dictionary{
+			KeyType:     types2.String{},
+			ElementType: types2.Int{},
 		},
 		values.Dictionary{
 			values.KeyValuePair{
@@ -358,11 +357,11 @@ func TestEncodeDictionary(t *testing.T) {
 
 	nestedDict := encodeTest{
 		"NestedDict",
-		types.Dictionary{
-			KeyType: types.String{},
-			ElementType: types.Dictionary{
-				KeyType:     types.String{},
-				ElementType: types.Int{},
+		types2.Dictionary{
+			KeyType: types2.String{},
+			ElementType: types2.Dictionary{
+				KeyType:     types2.String{},
+				ElementType: types2.Int{},
 			},
 		},
 		values.Dictionary{
@@ -398,15 +397,15 @@ func TestEncodeDictionary(t *testing.T) {
 
 	compositeDict := encodeTest{
 		"CompositeDict",
-		types.Dictionary{
-			KeyType: types.String{},
-			ElementType: types.Composite{
-				Fields: map[string]*types.Field{
+		types2.Dictionary{
+			KeyType: types2.String{},
+			ElementType: types2.Composite{
+				Fields: map[string]*types2.Field{
 					"a": {
-						Type: types.String{},
+						Type: types2.String{},
 					},
 					"b": {
-						Type: types.Int{},
+						Type: types2.Int{},
 					},
 				},
 			},
@@ -452,13 +451,13 @@ func TestEncodeDictionary(t *testing.T) {
 func TestEncodeComposite(t *testing.T) {
 	simpleComp := encodeTest{
 		"SimpleComposite",
-		types.Composite{
-			Fields: map[string]*types.Field{
+		types2.Composite{
+			Fields: map[string]*types2.Field{
 				"a": {
-					Type: types.String{},
+					Type: types2.String{},
 				},
 				"b": {
-					Type: types.String{},
+					Type: types2.String{},
 				},
 			},
 		},
@@ -472,16 +471,16 @@ func TestEncodeComposite(t *testing.T) {
 
 	multiTypeComp := encodeTest{
 		"MultiTypeComposite",
-		types.Composite{
-			Fields: map[string]*types.Field{
+		types2.Composite{
+			Fields: map[string]*types2.Field{
 				"a": {
-					Type: types.String{},
+					Type: types2.String{},
 				},
 				"b": {
-					Type: types.Int{},
+					Type: types2.Int{},
 				},
 				"c": {
-					Type: types.Bool{},
+					Type: types2.Bool{},
 				},
 			},
 		},
@@ -496,11 +495,11 @@ func TestEncodeComposite(t *testing.T) {
 
 	arrayComp := encodeTest{
 		"ArrayComposite",
-		types.Composite{
-			Fields: map[string]*types.Field{
+		types2.Composite{
+			Fields: map[string]*types2.Field{
 				"a": {
-					Type: types.VariableSizedArray{
-						ElementType: types.Int{},
+					Type: types2.VariableSizedArray{
+						ElementType: types2.Int{},
 					},
 				},
 			},
@@ -520,17 +519,17 @@ func TestEncodeComposite(t *testing.T) {
 
 	nestedComp := encodeTest{
 		"NestedComposite",
-		types.Composite{
-			Fields: map[string]*types.Field{
+		types2.Composite{
+			Fields: map[string]*types2.Field{
 
 				"a": {
-					Type: types.String{},
+					Type: types2.String{},
 				},
 				"b": {
-					Type: types.Composite{
-						Fields: map[string]*types.Field{
+					Type: types2.Composite{
+						Fields: map[string]*types2.Field{
 							"a": {
-								Type: types.Int{},
+								Type: types2.Int{},
 							},
 						},
 					},
@@ -560,19 +559,19 @@ func TestEncodeComposite(t *testing.T) {
 func TestEncodeEvent(t *testing.T) {
 	simpleEvent := encodeTest{
 		"SimpleEvent",
-		types.Event{
+		types2.Event{
 			Identifier: "Test",
-			Fields: []*types.Parameter{
+			Fields: []*types2.Parameter{
 				{
-					Field: types.Field{
+					Field: types2.Field{
 						Identifier: "x",
-						Type:       types.Int{},
+						Type:       types2.Int{},
 					},
 				},
 				{
-					Field: types.Field{
+					Field: types2.Field{
 						Identifier: "y",
-						Type:       types.String{},
+						Type:       types2.String{},
 					},
 				},
 			},
@@ -588,25 +587,25 @@ func TestEncodeEvent(t *testing.T) {
 
 	compositeEvent := encodeTest{
 		"CompositeEvent",
-		types.Event{
+		types2.Event{
 			Identifier: "Test",
-			Fields: []*types.Parameter{
+			Fields: []*types2.Parameter{
 				{
-					Field: types.Field{
+					Field: types2.Field{
 						Identifier: "x",
-						Type:       types.String{},
+						Type:       types2.String{},
 					},
 				},
 				{
-					Field: types.Field{
+					Field: types2.Field{
 						Identifier: "y",
-						Type: types.Composite{
-							Fields: map[string]*types.Field{
+						Type: types2.Composite{
+							Fields: map[string]*types2.Field{
 								"a": {
-									Type: types.String{},
+									Type: types2.String{},
 								},
 								"b": {
-									Type: types.Int{},
+									Type: types2.Int{},
 								},
 							},
 						},
@@ -641,20 +640,20 @@ func testAllEncode(t *testing.T, tests ...encodeTest) {
 
 const numTrials = 50
 
-func testEncode(t *testing.T, typ types.Type, val values.Value) {
-	b1, err := encoding.Encode(val)
+func testEncode(t *testing.T, typ types2.Type, val values.Value) {
+	b1, err := values2.Encode(val)
 	require.NoError(t, err)
 
 	t.Logf("Encoded value: %x", b1)
 
 	// encoding should be deterministic, repeat to confirm
 	for i := 0; i < numTrials; i++ {
-		b2, err := encoding.Encode(val)
+		b2, err := values2.Encode(val)
 		require.NoError(t, err)
 		assert.Equal(t, b1, b2)
 	}
 
-	val2, err := encoding.Decode(typ, b1)
+	val2, err := values2.Decode(typ, b1)
 	require.NoError(t, err)
 
 	assert.Equal(t, val, val2)

@@ -1,62 +1,149 @@
 package types
 
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+)
+
 // revive:disable:redefines-builtin-id
 
 type Type interface {
 	isType()
+	//UnmarshalJSON(data []byte) error
 }
 
 // revive:enable
 
-type isAType struct{}
+func GetOnlyEntry(m map[string]json.RawMessage) (string, json.RawMessage, error) {
+	if len(m) > 1 {
+		return "", nil, errors.New(fmt.Sprintf("more then one entry in %v", m))
 
-func (isAType) isType() {}
+	}
+	for k, v := range m {
+		return k, v, nil
+	}
+	return "", nil, errors.New(fmt.Sprintf("no entires, but one required in %v", m))
+}
+
+type IsAType struct {
+	Type
+}
+
+func (IsAType) isType() {}
+
+//
+//func (t *IsAType) UnmarshalJSON(data []byte) error {
+//	var typeCheck interface{}
+//	err := json.Unmarshal(data, &typeCheck)
+//	if err != nil {
+//		return err
+//	}
+//
+//	switch v := typeCheck.(type) {
+//	case string:
+//		var newType Type
+//		switch v {
+//		case "Void": newType = &Void{}
+//		case "Int": newType = &Int{}
+//		case "String": newType = &String{}
+//		}
+//
+//		err := json.Unmarshal(data, &t)
+//		if err != nil {
+//			return err
+//		}
+//		*t = IsAType{newType}
+//
+//	case map[string]interface{}:
+//
+//		var d map[string]json.RawMessage
+//
+//		err := json.Unmarshal(data, &d)
+//		if err != nil {
+//			return err
+//		}
+//
+//		key, value, err := GetOnlyEntry(d)
+//		if err != nil {
+//			return err
+//		}
+//		var newType Type
+//
+//		var typeCheck interface{}
+//
+//		err = json.Unmarshal(value, &typeCheck)
+//		if err != nil {
+//			return err
+//		}
+//
+//		if s, ok := typeCheck.(string); ok {
+//			switch key {
+//			case "struct": newType = &StructPointer{TypeName:s}
+//			}
+//
+//		} else {
+//			switch key {
+//			case "struct":
+//				newType = &Struct{}
+//			}
+//			err = json.Unmarshal(value, &newType)
+//			if err != nil {
+//				return err
+//			}
+//		}
+//
+//		*t = IsAType{newType}
+//	}
+//
+//	return nil
+//}
 
 type Annotation struct {
 	IsMove bool
 	Type   Type
 }
 
-type Void struct{ isAType }
+type Void struct{ IsAType }
 
-type Bool struct{ isAType }
+type Bool struct{ IsAType }
 
-type String struct{ isAType }
+type String struct{ IsAType }
 
-type Bytes struct{ isAType }
+type Bytes struct{ IsAType }
 
-type Any struct{ isAType }
+type Any struct{ IsAType }
 
-type Int struct{ isAType }
+type Int struct{ IsAType }
 
-type Int8 struct{ isAType }
+type Int8 struct{ IsAType }
 
-type Int16 struct{ isAType }
+type Int16 struct{ IsAType }
 
-type Int32 struct{ isAType }
+type Int32 struct{ IsAType }
 
-type Int64 struct{ isAType }
+type Int64 struct{ IsAType }
 
-type UInt8 struct{ isAType }
+type UInt8 struct{ IsAType }
 
-type UInt16 struct{ isAType }
+type UInt16 struct{ IsAType }
 
-type UInt32 struct{ isAType }
+type UInt32 struct{ IsAType }
 
-type UInt64 struct{ isAType }
+type UInt64 struct{ IsAType }
 
 type Variable struct {
-	isAType
+	IsAType
 	Type Type
 }
 
 type VariableSizedArray struct {
-	isAType
+	IsAType
 	ElementType Type
 }
 
 type ConstantSizedArray struct {
-	isAType
+	IsAType
 	Size        uint
 	ElementType Type
 }
@@ -67,67 +154,94 @@ type Parameter struct {
 }
 
 type Composite struct {
-	isAType
+	IsAType
 	Fields       map[string]*Field
 	Identifier   string
 	Initializers [][]*Parameter
 }
 
+//func (c *Composite) UnmarshalJSON(data []byte) error {
+//
+//}
+
 type Struct struct {
-	isAType
+	IsAType
 	Composite
 }
 
+//func (c *Struct) UnmarshalJSON(data []byte) error {
+//	return json.Unmarshal(data, &c)
+//}
+
 type Resource struct {
-	isAType
+	IsAType
 	Composite
 }
 
 type Dictionary struct {
-	isAType
+	IsAType
 	KeyType     Type
 	ElementType Type
 }
 
 type Function struct {
-	isAType
+	IsAType
 	Parameters []*Parameter
 	ReturnType Type
 }
 
 // A type representing anonymous function (aka without named arguments)
 type FunctionType struct {
-	isAType
+	IsAType
 	ParameterTypes []Type
 	ReturnType     Type
 }
 
 type Event struct {
-	isAType
+	IsAType
 	Fields     []*Parameter
 	Identifier string
 }
 
 type Field struct {
-	isAType
+	IsAType
 	Identifier string
 	Type       Type
 }
 
+//func (c *Field) UnmarshalJSON(data []byte) error {
+//	type fieldRaw struct {
+//		Identifier string
+//		Type IsAType
+//	}
+//	var raw fieldRaw
+//	err := json.Unmarshal(data, &raw)
+//	if err != nil {
+//		return err
+//	}
+//
+//	*c = Field{
+//		IsAType:    IsAType{},
+//		Identifier: raw.Identifier,
+//		Type:       raw.Type.Type,
+//	}
+//	return nil
+//}
+
 type Optional struct {
-	isAType
+	IsAType
 	Of Type
 }
 
 //Pointers are simply pointers to already existing types, to prevent circular references
 type ResourcePointer struct {
-	isAType
+	IsAType
 	TypeName string
 }
 
 type StructPointer struct {
-	isAType
+	IsAType
 	TypeName string
 }
 
-type Address struct{ isAType }
+type Address struct{ IsAType }

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"unicode"
 
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
-	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
+	types2 "github.com/dapperlabs/flow-go/sdk/abi/types"
 
 	"github.com/dave/jennifer/jen"
 )
@@ -31,9 +31,9 @@ func wrap(s *jen.Statement) *abiAwareStatement {
 	return &abiAwareStatement{s}
 }
 
-func (a *abiAwareStatement) Type(t types.Type) *abiAwareStatement {
+func (a *abiAwareStatement) Type(t types2.Type) *abiAwareStatement {
 	switch t.(type) {
-	case types.String:
+	case types2.String:
 		return wrap(a.String())
 	}
 
@@ -46,11 +46,11 @@ const (
 	valuesImportPath   = "github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
-func (a *abiAwareStatement) SelfType(t types.Type) *abiAwareStatement {
+func (a *abiAwareStatement) SelfType(t types2.Type) *abiAwareStatement {
 	switch v := t.(type) {
-	case types.String:
+	case types2.String:
 		return wrap(a.Statement.Qual(typesImportPath, "String").Values())
-	case types.Composite:
+	case types2.Composite:
 		mappedFields := jen.Dict{}
 		for key, field := range v.Fields {
 			mappedFields[jen.Lit(key)] = Empty().SelfType(*field)
@@ -68,12 +68,12 @@ func (a *abiAwareStatement) SelfType(t types.Type) *abiAwareStatement {
 			Id("Fields"):       jen.Map(jen.String()).Op("*").Qual(typesImportPath, "Field").Values(mappedFields),
 			Id("Initializers"): jen.Index().Index().Op("*").Qual(typesImportPath, "Parameter").Values(mappedInitializers...),
 		}))
-	case types.Field:
+	case types2.Field:
 		return wrap(a.Statement.Values(jen.Dict{
 			Id("Type"):       Empty().SelfType(v.Type),
 			Id("Identifier"): jen.Lit(v.Identifier),
 		}))
-	case types.Parameter:
+	case types2.Parameter:
 		return wrap(a.Statement.Values(jen.Dict{
 			Id("Field"): Qual(typesImportPath, "Field").SelfType(v.Field),
 			Id("Label"): jen.Lit(v.Label),
@@ -129,10 +129,10 @@ func Var() *abiAwareStatement {
 	return wrap(jen.Var())
 }
 
-func ValueConstructor(t types.Type) *abiAwareStatement {
+func ValueConstructor(t types2.Type) *abiAwareStatement {
 
 	switch t.(type) {
-	case types.String:
+	case types2.String:
 		return Qual(valuesImportPath, "String")
 	}
 
@@ -140,7 +140,7 @@ func ValueConstructor(t types.Type) *abiAwareStatement {
 
 }
 
-func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite) ([]byte, error) {
+func GenerateGo(pkg string, typesToGenerate map[string]*types2.Composite) ([]byte, error) {
 
 	f := jen.NewFile(pkg)
 
@@ -160,7 +160,7 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite) ([]byte
 		for _, field := range typ.Fields {
 			fieldNames = append(fieldNames, field.Identifier)
 		}
-		encoding.EncodingOrder(fieldNames)
+		values.SortInEncodingOrder(fieldNames)
 		fieldEncodingOrder := map[string]uint{}
 		for i, field := range fieldNames {
 			fieldEncodingOrder[field] = uint(i)
