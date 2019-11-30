@@ -424,7 +424,7 @@ func (interpreter *Interpreter) visitGlobalDeclaration(declaration ast.Declarati
 }
 
 func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
-	name := declaration.DeclarationName()
+	name := declaration.DeclarationIdentifier().Identifier
 	// NOTE: semantic analysis already checked possible invalid redeclaration
 	interpreter.Globals[name] = interpreter.findVariable(name)
 }

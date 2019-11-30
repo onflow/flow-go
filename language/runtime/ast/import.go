@@ -44,12 +44,16 @@ func (v *ImportDeclaration) Accept(visitor Visitor) Repr {
 	return visitor.VisitImportDeclaration(v)
 }
 
-func (v *ImportDeclaration) DeclarationName() string {
-	return ""
+func (v *ImportDeclaration) DeclarationIdentifier() Identifier {
+	return Identifier{}
 }
 
 func (v *ImportDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindImport
+}
+
+func (v *ImportDeclaration) DeclarationAccess() Access {
+	return AccessNotSpecified
 }
 
 // Location describes the origin of a Cadence script.

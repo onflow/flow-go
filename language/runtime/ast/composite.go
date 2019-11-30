@@ -27,8 +27,8 @@ func (*CompositeDeclaration) isDeclaration() {}
 //
 func (*CompositeDeclaration) isStatement() {}
 
-func (d *CompositeDeclaration) DeclarationName() string {
-	return d.Identifier.Identifier
+func (d *CompositeDeclaration) DeclarationIdentifier() Identifier {
+	return d.Identifier
 }
 
 func (d *CompositeDeclaration) DeclarationKind() common.DeclarationKind {
@@ -42,6 +42,10 @@ func (d *CompositeDeclaration) DeclarationKind() common.DeclarationKind {
 	}
 
 	panic(errors.NewUnreachableError())
+}
+
+func (d *CompositeDeclaration) DeclarationAccess() Access {
+	return d.Access
 }
 
 // FieldDeclaration
@@ -60,10 +64,14 @@ func (f *FieldDeclaration) Accept(visitor Visitor) Repr {
 
 func (*FieldDeclaration) isDeclaration() {}
 
-func (f *FieldDeclaration) DeclarationName() string {
-	return f.Identifier.Identifier
+func (f *FieldDeclaration) DeclarationIdentifier() Identifier {
+	return f.Identifier
 }
 
 func (f *FieldDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindField
+}
+
+func (f *FieldDeclaration) DeclarationAccess() Access {
+	return f.Access
 }
