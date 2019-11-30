@@ -7,22 +7,26 @@ import (
 )
 
 // GenerateCreateSaleScript creates a cadence transaction that creates a Sale collection
-// and stores in in the callers account storage
+// and stores in in the callers account published
 func GenerateCreateSaleScript(tokenAddr flow.Address, marketAddr flow.Address) []byte {
 	template := `
 		import Receiver from 0x%s
-		import SaleCollection, createCollection from 0x%s
+		import SaleCollection, createSaleCollection from 0x%s
 
-		pub fun main(acct: Account) {
+		transaction {
+			prepare(acct: Account) {
 
-			let ownerVault = acct.storage[&Receiver] ?? panic("No receiver reference!")
+				let ownerVault = acct.published[&Receiver] ?? panic("No receiver reference!")
 
-			let collection: <-SaleCollection <- createCollection(ownerVault: ownerVault)
-			
-			let oldCollection <- acct.storage[SaleCollection] <- collection
-			destroy oldCollection
+				let collection: <-SaleCollection <- createSaleCollection(ownerVault: ownerVault)
+				
+				let oldCollection <- acct.storage[SaleCollection] <- collection
+				destroy oldCollection
 
-			acct.storage[&SaleCollection] = &acct.storage[SaleCollection] as SaleCollection
+				acct.published[&SaleCollection] = &acct.storage[SaleCollection] as SaleCollection
+
+			}
+			execute {}
 
 		}`
 	return []byte(fmt.Sprintf(template, tokenAddr, marketAddr))
@@ -33,20 +37,19 @@ func GenerateCreateSaleScript(tokenAddr flow.Address, marketAddr flow.Address) [
 func GenerateStartSaleScript(nftAddr flow.Address, marketAddr flow.Address, id, price int) []byte {
 	template := `
 		import NFT, NFTCollection from 0x%s
-		import SaleCollection, createCollection from 0x%s
+		import SaleCollection, createSaleCollection from 0x%s
 
-		pub fun main(acct: Account) {
+		transaction {
+			prepare(acct: Account) {
 
-			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection!")
+				let token <- acct.published[&NFTCollection]?.withdraw(tokenID: %d) ?? panic("missing token!")
+
+				let saleRef = acct.published[&SaleCollection] ?? panic("no sale collection reference!")
 			
-			let token <- collectionRef.withdraw(tokenID: %d)
+				saleRef.listForSale(token: <-token, price: %d)
 
-			// why doesn't this work?
-			// let token <- acct.storage[&NFTCollection]?.withdraw(tokenID: ) ?? panic("missing token!")
-
-			let saleRef = acct.storage[&SaleCollection] ?? panic("no sale collection reference!")
-		
-			saleRef.listForSale(token: <-token, price: %d)
+			}
+			execute {}
 
 		}`
 	return []byte(fmt.Sprintf(template, nftAddr, marketAddr, id, price))
@@ -58,19 +61,23 @@ func GenerateBuySaleScript(tokenAddr, nftAddr, marketAddr, userAddr flow.Address
 	template := `
 		import Receiver, Provider, Vault from 0x%s
 		import NFT, NFTCollection from 0x%s
-		import SaleCollection, createCollection from 0x%s
+		import SaleCollection, createSaleCollection from 0x%s
 
-		pub fun main(acct: Account) {
-			let seller = getAccount("%s")
+		transaction {
+			prepare(acct: Account) {
+				let seller = getAccount(0x%s)
 
-			let collectionRef = acct.storage[&NFTCollection] ?? panic("missing collection!")
-			let providerRef = acct.storage[&Provider] ?? panic("missing Provider!")
+				let collectionRef = acct.published[&NFTCollection] ?? panic("missing collection!")
+				let providerRef = acct.published[&Provider] ?? panic("missing Provider!")
+				
+				let tokens <- providerRef.withdraw(amount: %d)
+
+				let saleRef = seller.published[&SaleCollection] ?? panic("no sale collection reference!")
 			
-			let tokens <- providerRef.withdraw(amount: %d)
+				saleRef.purchase(tokenID: %d, recipient: collectionRef, buyTokens: <-tokens)
 
-			let saleRef = seller.storage[&SaleCollection] ?? panic("no sale collection reference!")
-		
-			saleRef.purchase(tokenID: %d, recipient: collectionRef, buyTokens: <-tokens)
+			}
+			execute {}
 
 		}`
 	return []byte(fmt.Sprintf(template, tokenAddr, nftAddr, marketAddr, userAddr, amount, id))

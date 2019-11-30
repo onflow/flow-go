@@ -73,7 +73,9 @@ func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testi
 			assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
 		}
 	} else {
-		assert.NoError(t, err)
+		if !assert.NoError(t, err) {
+			t.Log(err.Error())
+		}
 
 		_, err = b.CommitBlock()
 		assert.NoError(t, err)

@@ -5,7 +5,6 @@ import INFT, NFT, INFTCollection, NFTCollection from 0x0000000000000000000000000
 // import Receiver, Provider, Vault, createVault from "fungible-token.cdc"
 
 // import NFT, NFTCollection, createNFT, createCollection from "nft.cdc"
-// importing from nft.cdc isn't working for some reason
 
 // Marketplace is where users can put their NFTs up for sale with a price
 // if another user sees an NFT that they want to buy,
@@ -40,7 +39,7 @@ pub resource SaleCollection {
     pub let ownerVault: &Receiver
 
     init (vault: &Receiver) {
-        self.forSale = {}
+        self.forSale <- {}
         self.ownerVault = vault
         self.prices = {}
     }
@@ -108,7 +107,7 @@ pub resource SaleCollection {
 }
 
 // createCollection returns a new collection resource to the caller
-pub fun createCollection(ownerVault: &Receiver): <-SaleCollection {
+pub fun createSaleCollection(ownerVault: &Receiver): <-SaleCollection {
     return <- create SaleCollection(vault: ownerVault)
 }
 
