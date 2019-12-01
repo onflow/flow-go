@@ -28,15 +28,17 @@ func TestCheckCompositeDeclarationNesting(t *testing.T) {
 
 					t.Run(testName, func(t *testing.T) {
 
-						code := fmt.Sprintf(`
-                              %s Outer {
-                                  %s Inner {}
-                              }
-                            `,
-							outer.Keywords(),
-							inner.Keywords(),
+						_, err := ParseAndCheck(t,
+							fmt.Sprintf(
+								`
+                                  %s Outer {
+                                      %s Inner {}
+                                  }
+                                `,
+								outer.Keywords(),
+								inner.Keywords(),
+							),
 						)
-						_, err := ParseAndCheck(t, code)
 
 						switch outerComposite {
 						case common.CompositeKindContract:
@@ -87,7 +89,7 @@ func TestCheckCompositeDeclarationNesting(t *testing.T) {
 
 func TestCheckCompositeDeclarationNestedStructUse(t *testing.T) {
 
-	code := `
+	_, err := ParseAndCheck(t, `
       contract Test {
 
           struct X {}
@@ -98,15 +100,14 @@ func TestCheckCompositeDeclarationNestedStructUse(t *testing.T) {
               self.x = x
           }
       }
-    `
-	_, err := ParseAndCheck(t, code)
+    `)
 
 	assert.NoError(t, err)
 }
 
 func TestCheckCompositeDeclarationNestedStructInterfaceUse(t *testing.T) {
 
-	code := `
+	_, err := ParseAndCheck(t, `
       contract Test {
 
           struct interface XI {}
@@ -123,15 +124,14 @@ func TestCheckCompositeDeclarationNestedStructInterfaceUse(t *testing.T) {
               Test(xi: X())
           }
       }
-    `
-	_, err := ParseAndCheck(t, code)
+    `)
 
 	assert.NoError(t, err)
 }
 
 func TestCheckCompositeDeclarationNestedTypeScopingInsideNestedOuter(t *testing.T) {
 
-	code := `
+	_, err := ParseAndCheck(t, `
       contract Test {
 
           struct X {
@@ -141,15 +141,14 @@ func TestCheckCompositeDeclarationNestedTypeScopingInsideNestedOuter(t *testing.
               }
           }
       }
-   `
-	_, err := ParseAndCheck(t, code)
+   `)
 
 	assert.NoError(t, err)
 }
 
 func TestCheckCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) {
 
-	code := `
+	_, err := ParseAndCheck(t, `
       contract Test {
 
           struct X {}
@@ -158,27 +157,54 @@ func TestCheckCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) {
              return X()
           }
       }
-    `
-
-	_, err := ParseAndCheck(t, code)
+    `)
 
 	assert.NoError(t, err)
 }
 
 func TestCheckInvalidCompositeDeclarationNestedTypeScopingAfterInner(t *testing.T) {
 
-	code := `
+	_, err := ParseAndCheck(t, `
       contract Test {
 
           struct X {}
       }
 
       let x: X = X()
-    `
-	_, err := ParseAndCheck(t, code)
+    `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
+}
+
+func TestCheckInvalidCompositeDeclarationNestedDuplicateNames(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      contract Test {
+
+          struct X {}
+
+          fun X() {}
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
+}
+
+func TestCheckCompositeDeclarationNestedConstructor(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      contract Test {
+
+          struct X {}
+      }
+
+      let x = Test.X()
+    `)
+
+	assert.NoError(t, err)
 }
