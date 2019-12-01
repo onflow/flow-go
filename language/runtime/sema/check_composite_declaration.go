@@ -120,7 +120,8 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 func (checker *Checker) visitNestedDeclarations(
 	containerCompositeKind common.CompositeKind,
 	containerDeclarationKind common.DeclarationKind,
-	members *ast.Members,
+	nestedCompositeDeclarations []*ast.CompositeDeclaration,
+	nestedInterfaceDeclarations []*ast.InterfaceDeclaration,
 ) (
 	nestedDeclarations map[string]ast.Declaration,
 	nestedInterfaceTypes []*InterfaceType,
@@ -141,18 +142,18 @@ func (checker *Checker) visitNestedDeclarations(
 			)
 		}
 
-		if len(members.CompositeDeclarations) > 0 {
+		if len(nestedCompositeDeclarations) > 0 {
 
-			firstNestedCompositeDeclaration := members.CompositeDeclarations[0]
+			firstNestedCompositeDeclaration := nestedCompositeDeclarations[0]
 
 			reportInvalidNesting(
 				firstNestedCompositeDeclaration.DeclarationKind(),
 				firstNestedCompositeDeclaration.Identifier,
 			)
 
-		} else if len(members.InterfaceDeclarations) > 0 {
+		} else if len(nestedInterfaceDeclarations) > 0 {
 
-			firstNestedInterfaceDeclaration := members.InterfaceDeclarations[0]
+			firstNestedInterfaceDeclaration := nestedInterfaceDeclarations[0]
 
 			reportInvalidNesting(
 				firstNestedInterfaceDeclaration.DeclarationKind(),
@@ -189,7 +190,7 @@ func (checker *Checker) visitNestedDeclarations(
 		return true
 	}
 
-	for _, nestedDeclaration := range members.InterfaceDeclarations {
+	for _, nestedDeclaration := range nestedInterfaceDeclarations {
 		if !checkNestedDeclaration(
 			nestedDeclaration.CompositeKind,
 			nestedDeclaration.DeclarationKind(),
@@ -207,7 +208,7 @@ func (checker *Checker) visitNestedDeclarations(
 		nestedInterfaceTypes = append(nestedInterfaceTypes, nestedInterfaceType)
 	}
 
-	for _, nestedDeclaration := range members.CompositeDeclarations {
+	for _, nestedDeclaration := range nestedCompositeDeclarations {
 		if !checkNestedDeclaration(
 			nestedDeclaration.CompositeKind,
 			nestedDeclaration.DeclarationKind(),
@@ -297,7 +298,8 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		checker.visitNestedDeclarations(
 			declaration.CompositeKind,
 			declaration.DeclarationKind(),
-			declaration.Members,
+			declaration.CompositeDeclarations,
+			declaration.InterfaceDeclarations,
 		)
 
 	checker.Elaboration.CompositeNestedDeclarations[declaration] = nestedDeclarations

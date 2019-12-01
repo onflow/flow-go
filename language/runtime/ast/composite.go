@@ -8,11 +8,13 @@ import (
 // CompositeDeclaration
 
 type CompositeDeclaration struct {
-	Access        Access
-	CompositeKind common.CompositeKind
-	Identifier    Identifier
-	Conformances  []*NominalType
-	Members       *Members
+	Access                Access
+	CompositeKind         common.CompositeKind
+	Identifier            Identifier
+	Conformances          []*NominalType
+	Members               *Members
+	CompositeDeclarations []*CompositeDeclaration
+	InterfaceDeclarations []*InterfaceDeclaration
 	Range
 }
 

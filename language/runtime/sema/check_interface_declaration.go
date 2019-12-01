@@ -184,7 +184,8 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		checker.visitNestedDeclarations(
 			declaration.CompositeKind,
 			declaration.DeclarationKind(),
-			declaration.Members,
+			declaration.CompositeDeclarations,
+			declaration.InterfaceDeclarations,
 		)
 
 	checker.Elaboration.InterfaceNestedDeclarations[declaration] = nestedDeclarations

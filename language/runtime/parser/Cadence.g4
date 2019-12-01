@@ -113,7 +113,8 @@ access
     ;
 
 compositeDeclaration
-    : access compositeKind identifier conformances '{' members '}'
+    : access compositeKind identifier conformances
+      '{' membersAndNestedDeclarations '}'
     ;
 
 conformances
@@ -134,14 +135,14 @@ fields
     ;
 
 interfaceDeclaration
-    : access compositeKind Interface identifier '{' members '}'
+    : access compositeKind Interface identifier '{' membersAndNestedDeclarations '}'
     ;
 
-members
-    : (member ';'?)*
+membersAndNestedDeclarations
+    : (memberOrNestedDeclaration ';'?)*
     ;
 
-member
+memberOrNestedDeclaration
     : field
     | specialFunctionDeclaration
     | functionDeclaration

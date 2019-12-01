@@ -309,16 +309,18 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 	conformances := ctx.Conformances().Accept(v).([]*ast.NominalType)
-	members := ctx.Members().Accept(v).(*ast.Members)
+	membersAndNestedDeclarations := ctx.MembersAndNestedDeclarations().Accept(v).(membersAndNestedDeclarations)
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.CompositeDeclaration{
-		Access:        access,
-		CompositeKind: kind,
-		Identifier:    identifier,
-		Conformances:  conformances,
-		Members:       members,
+		Access:                access,
+		CompositeKind:         kind,
+		Identifier:            identifier,
+		Conformances:          conformances,
+		Members:               membersAndNestedDeclarations.Members,
+		InterfaceDeclarations: membersAndNestedDeclarations.InterfaceDeclarations,
+		CompositeDeclarations: membersAndNestedDeclarations.CompositeDeclarations,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
@@ -338,11 +340,11 @@ func (v *ProgramVisitor) VisitConformances(ctx *ConformancesContext) interface{}
 	return conformances
 }
 
-func (v *ProgramVisitor) VisitMember(ctx *MemberContext) interface{} {
+func (v *ProgramVisitor) VisitMemberOrNestedDeclaration(ctx *MemberOrNestedDeclarationContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
-func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
+func (v *ProgramVisitor) VisitMembersAndNestedDeclarations(ctx *MembersAndNestedDeclarationsContext) interface{} {
 
 	var fields []*ast.FieldDeclaration
 	var specialFunctions []*ast.SpecialFunctionDeclaration
@@ -350,34 +352,44 @@ func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
 	var compositeDeclarations []*ast.CompositeDeclaration
 	var interfaceDeclarations []*ast.InterfaceDeclaration
 
-	for _, memberCtx := range ctx.AllMember() {
-		member := memberCtx.Accept(v)
+	for _, memberOrNestedDeclarationContext := range ctx.AllMemberOrNestedDeclaration() {
+		memberOrNestedDeclaration := memberOrNestedDeclarationContext.Accept(v)
 
-		switch member := member.(type) {
+		switch memberOrNestedDeclaration := memberOrNestedDeclaration.(type) {
 		case *ast.FieldDeclaration:
-			fields = append(fields, member)
+			fields = append(fields, memberOrNestedDeclaration)
 
 		case *ast.SpecialFunctionDeclaration:
-			specialFunctions = append(specialFunctions, member)
+			specialFunctions = append(specialFunctions, memberOrNestedDeclaration)
 
 		case *ast.FunctionDeclaration:
-			functions = append(functions, member)
+			functions = append(functions, memberOrNestedDeclaration)
 
 		case *ast.CompositeDeclaration:
-			compositeDeclarations = append(compositeDeclarations, member)
+			compositeDeclarations = append(compositeDeclarations, memberOrNestedDeclaration)
 
 		case *ast.InterfaceDeclaration:
-			interfaceDeclarations = append(interfaceDeclarations, member)
+			interfaceDeclarations = append(interfaceDeclarations, memberOrNestedDeclaration)
 		}
 	}
 
-	return &ast.Members{
-		Fields:                fields,
-		SpecialFunctions:      specialFunctions,
-		Functions:             functions,
+	members := &ast.Members{
+		Fields:           fields,
+		SpecialFunctions: specialFunctions,
+		Functions:        functions,
+	}
+
+	return membersAndNestedDeclarations{
 		CompositeDeclarations: compositeDeclarations,
 		InterfaceDeclarations: interfaceDeclarations,
+		Members:               members,
 	}
+}
+
+type membersAndNestedDeclarations struct {
+	CompositeDeclarations []*ast.CompositeDeclaration
+	InterfaceDeclarations []*ast.InterfaceDeclaration
+	Members               *ast.Members
 }
 
 func (v *ProgramVisitor) VisitFields(ctx *FieldsContext) interface{} {
@@ -463,14 +475,16 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 	access := ctx.Access().Accept(v).(ast.Access)
 	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
-	members := ctx.Members().Accept(v).(*ast.Members)
+	membersAndNestedDeclarations := ctx.MembersAndNestedDeclarations().Accept(v).(membersAndNestedDeclarations)
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.InterfaceDeclaration{
-		Access:        access,
-		CompositeKind: kind,
-		Identifier:    identifier,
-		Members:       members,
+		Access:                access,
+		CompositeKind:         kind,
+		Identifier:            identifier,
+		Members:               membersAndNestedDeclarations.Members,
+		InterfaceDeclarations: membersAndNestedDeclarations.InterfaceDeclarations,
+		CompositeDeclarations: membersAndNestedDeclarations.CompositeDeclarations,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
