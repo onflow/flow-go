@@ -46,8 +46,8 @@ func TestCheckCompositeDeclarationNesting(t *testing.T) {
 								if outerIsInterface {
 									errs := ExpectCheckerErrors(t, err, 2)
 
-									assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-									assert.IsType(t, &sema.InvalidNestedDeclarationError{}, errs[1])
+									assert.IsType(t, &sema.InvalidNestedDeclarationError{}, errs[0])
+									assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
 
 								} else if !innerIsInterface {
 									errs := ExpectCheckerErrors(t, err, 1)
@@ -83,4 +83,48 @@ func TestCheckCompositeDeclarationNesting(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestCheckCompositeDeclarationNestedStructUse(t *testing.T) {
+
+	code := `
+      contract Test {
+
+          struct X {}
+
+          var x: X
+
+          init(x: X) {
+              self.x = x
+          }
+      }
+    `
+	_, err := ParseAndCheck(t, code)
+
+	require.NoError(t, err)
+}
+
+func TestCheckCompositeDeclarationNestedStructInterfaceUse(t *testing.T) {
+
+	code := `
+      contract Test {
+
+          struct interface XI {}
+
+          struct X: XI {}
+
+          var xi: XI
+
+          init(xi: XI) {
+              self.xi = xi
+          }
+
+          fun test() {
+              Test(xi: X())
+          }
+      }
+    `
+	_, err := ParseAndCheck(t, code)
+
+	require.NoError(t, err)
 }
