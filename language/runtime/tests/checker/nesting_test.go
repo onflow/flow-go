@@ -101,7 +101,7 @@ func TestCheckCompositeDeclarationNestedStructUse(t *testing.T) {
     `
 	_, err := ParseAndCheck(t, code)
 
-	require.NoError(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckCompositeDeclarationNestedStructInterfaceUse(t *testing.T) {
@@ -126,5 +126,59 @@ func TestCheckCompositeDeclarationNestedStructInterfaceUse(t *testing.T) {
     `
 	_, err := ParseAndCheck(t, code)
 
-	require.NoError(t, err)
+	assert.NoError(t, err)
+}
+
+func TestCheckCompositeDeclarationNestedTypeScopingInsideNestedOuter(t *testing.T) {
+
+	code := `
+      contract Test {
+
+          struct X {
+
+              fun test(): Test {
+                  return Test()
+              }
+          }
+      }
+   `
+	_, err := ParseAndCheck(t, code)
+
+	assert.NoError(t, err)
+}
+
+func TestCheckCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) {
+
+	code := `
+      contract Test {
+
+          struct X {}
+
+          fun x(): X {
+             return X()
+          }
+      }
+    `
+
+	_, err := ParseAndCheck(t, code)
+
+	assert.NoError(t, err)
+}
+
+func TestCheckInvalidCompositeDeclarationNestedTypeScopingAfterInner(t *testing.T) {
+
+	code := `
+      contract Test {
+
+          struct X {}
+      }
+
+      let x: X = X()
+    `
+	_, err := ParseAndCheck(t, code)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
 }
