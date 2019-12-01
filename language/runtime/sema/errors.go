@@ -1925,3 +1925,27 @@ func (e *InvalidNestedDeclarationError) Error() string {
 }
 
 func (*InvalidNestedDeclarationError) isSemanticError() {}
+
+// InvalidNestedTypeError
+
+type InvalidNestedTypeError struct {
+	Type *ast.NominalType
+}
+
+func (e *InvalidNestedTypeError) Error() string {
+	return fmt.Sprintf("type has no nested types: `%s`", e.Type)
+}
+
+func (*InvalidNestedTypeError) isSemanticError() {}
+
+func (e *InvalidNestedTypeError) SecondaryError() string {
+	return "not found in this scope"
+}
+
+func (e *InvalidNestedTypeError) StartPosition() ast.Position {
+	return e.Type.StartPosition()
+}
+
+func (e *InvalidNestedTypeError) EndPosition() ast.Position {
+	return e.Type.EndPosition()
+}

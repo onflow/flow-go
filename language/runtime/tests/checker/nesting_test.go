@@ -195,7 +195,7 @@ func TestCheckInvalidCompositeDeclarationNestedDuplicateNames(t *testing.T) {
 	assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 }
 
-func TestCheckCompositeDeclarationNestedConstructor(t *testing.T) {
+func TestCheckCompositeDeclarationNestedConstructorAndType(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       contract Test {
@@ -203,8 +203,36 @@ func TestCheckCompositeDeclarationNestedConstructor(t *testing.T) {
           struct X {}
       }
 
-      let x = Test.X()
+      let x: Test.X = Test.X()
     `)
 
 	assert.NoError(t, err)
+}
+
+func TestCheckInvalidCompositeDeclarationNestedType(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      contract Test {
+
+          fun X() {}
+      }
+
+      let x: Test.X = Test.X()
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
+}
+
+func TestCheckInvalidNestedType(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      let x: Int.X = 1
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidNestedTypeError{}, errs[0])
 }
