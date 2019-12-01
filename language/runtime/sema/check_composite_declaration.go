@@ -330,14 +330,12 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 
 	checker.memberOrigins[compositeType] = origins
 
-	constructorParameterTypeAnnotations :=
+	compositeType.ConstructorParameterTypeAnnotations =
 		checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())
 
-	compositeType.ConstructorParameterTypeAnnotations = constructorParameterTypeAnnotations
+	checker.declareCompositeConstructor(declaration, compositeType)
 
 	checker.Elaboration.CompositeDeclarationTypes[declaration] = compositeType
-
-	checker.declareCompositeConstructor(declaration, compositeType, constructorParameterTypeAnnotations)
 
 	return compositeType
 }
@@ -519,7 +517,6 @@ func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member
 func (checker *Checker) declareCompositeConstructor(
 	compositeDeclaration *ast.CompositeDeclaration,
 	compositeType *CompositeType,
-	parameterTypeAnnotations []*TypeAnnotation,
 ) {
 	functionType := &SpecialFunctionType{
 		&FunctionType{
@@ -541,7 +538,7 @@ func (checker *Checker) declareCompositeConstructor(
 
 		functionType = &SpecialFunctionType{
 			FunctionType: &FunctionType{
-				ParameterTypeAnnotations: parameterTypeAnnotations,
+				ParameterTypeAnnotations: compositeType.ConstructorParameterTypeAnnotations,
 				ReturnTypeAnnotation:     NewTypeAnnotation(compositeType),
 			},
 		}
