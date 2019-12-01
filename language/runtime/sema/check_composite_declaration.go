@@ -39,8 +39,10 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 	checker.valueActivations.Enter()
 	defer checker.valueActivations.Leave()
 
+	nestedDeclarations := checker.Elaboration.CompositeNestedDeclarations[declaration]
+
 	for name, nestedType := range compositeType.NestedTypes {
-		nestedDeclaration := checker.Elaboration.CompositeNestedDeclarations[declaration][name]
+		nestedDeclaration := nestedDeclarations[name]
 
 		_, err := checker.typeActivations.DeclareType(
 			nestedDeclaration.DeclarationIdentifier(),
@@ -129,10 +131,9 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		declaration.Identifier,
 	)
 
-	//// TODO: visit nested declarations. at end?
-	//for _, nestedDeclaration := range nestedDeclarations {
-	//	nestedDeclaration.Accept(checker)
-	//}
+	for _, nestedDeclaration := range nestedDeclarations {
+		nestedDeclaration.Accept(checker)
+	}
 
 	return nil
 }
