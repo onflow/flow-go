@@ -437,7 +437,7 @@ func (checker *Checker) conformances(declaration *ast.CompositeDeclaration) []*I
 			checker.report(
 				&InvalidConformanceError{
 					Type: convertedType,
-					Pos:  conformance.Pos,
+					Pos:  conformance.StartPosition(),
 				},
 			)
 		}

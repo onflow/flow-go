@@ -517,7 +517,7 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 				&NotDeclaredError{
 					ExpectedKind: common.DeclarationKindType,
 					Name:         identifier,
-					Pos:          t.Pos,
+					Pos:          t.StartPosition(),
 				},
 			)
 			return &InvalidType{}
