@@ -4587,12 +4587,17 @@ struct interface Account {
 
 All accounts have a `storage` object which contains the stored values of the account.
 
+All accounts also have a `published` object with contains the published references
+in an account. This will be covered later.
+
 Account storage is a key-value store where the **keys are types**.
 The stored value must be a subtype of the type it is keyed by.
 This means that if the type `Vault` is used as a key,
 the value must be a value that has the type `Vault` or is a subtype of `Vault`.
 
 The index operator `[]` is used for both reading and writing stored values.
+
+Only the account owner is allowed to read and write to and from the `storage` object.
 
 ```cadence,file=account-storage.cdc
 // Declare a resource named `Counter`.
@@ -4631,7 +4636,7 @@ call fields and methods of stored values without having to move or call the fiel
 and methods on the storage location directly.
 
 References are **copied**, i.e. they are value types.  Any number of references to 
-a storage location can be created and used, but only by the account that owns
+a storage location can be created, but only by the account that owns
 the location being referenced.
 
 Note that references are **not** referencing stored values – 
@@ -4709,7 +4714,8 @@ it can be stored as an interface so that only the fields and methods that the in
 specifies are able to be called by those who have a reference.  
 
 Based on the above example, a user could use an interface to restrict access to only
-the `count` field.
+the `count` field.  Often, other accounts will have functions that take specific references
+as parameters, so this method can be used to create those valid references.
 
 ```cadence,file=storage-access-control.cdc
 
@@ -4742,6 +4748,80 @@ limitedReference.count  // is `43`
 //
 limitedReference.increment()
 ```
+
+## Publishing References
+
+Users will often want to make it so anyone in the network can access certain fields
+and methods of an object.  This can be done by publishing a reference to that object.
+
+Publishing a reference is done by storing the reference in the account's `published`
+object.  `published` is a key-value store where the keys are restricted
+to be only reference types.  
+
+Like account storage, only the account owner can write to
+the `published` object, but unlike storage, anyone in the network can read from an
+account's `published` object.  
+
+To continue the example above:
+
+```cadence,file=published-writing.cdc
+resource interface HasCount {
+    // Require implementations of the interface to provide
+    // a field named `count` which can be publicly read.
+    //
+    pub var count: Int
+}
+
+// Create another reference to the storage location `account.storage[Counter]`
+// and only allow access to it as the type `HasCount`.
+//
+let limitedReference: &HasCount = &account.storage[Counter] as HasCount
+
+// Store the reference in the `published` object.
+//
+account.published[&HasCount] = limitedReference
+
+// Invalid: Cannot store non-reference types in the `published` object.
+//
+account.published[Counter] <- account.storage[Counter]
+
+```
+
+When an account gets another account's object, they only have access to
+the `published` object.  They can read or copy any of the references that are
+stored within.  
+
+Imagine that the next example is from a different account as before.
+
+```cadence,file=published-reading
+
+// Get the account object for the account that published the reference.
+//
+let acct = getAccount(0x72)
+
+// Read the `&HasCount` reference from their published object.
+//
+let countRef = acct.published[&HasCount] ?? panic("missing Count reference!")
+
+// Read one of the exposed fields in the reference.
+//
+countRef.count  // is `43`
+
+// Invalid: The `increment` function is not accessible for the reference,
+// because the reference has the type `&HasCount`.
+//
+countRef.increment()
+
+// Invalid: Cannot access the account.storage object
+// from the public account object.
+//
+let countObj = acct.storage[Counter]
+
+```
+
+
+
+
 
 
 ## Events
@@ -5001,7 +5081,7 @@ resource ExampleToken: FungibleToken {
 // Declare a function that lets any user create an example token
 // with an initial empty balance.
 //
-fun newEmptyExampleToken(): <-ExampleToken {
+pub fun newEmptyExampleToken(): <-ExampleToken {
     return <-create ExampleToken(balance: 0)
 }
 ```
@@ -5032,24 +5112,31 @@ transaction {
         // Create a new token as an optional.
         var tokenA: <-ExampleToken? <- newEmptyExampleToken()
 		
-        // Store the new token in storage by swapping it with whatever
+        // Store the new token in storage by replacing whatever
         // is in the existing location.
-        signer.storage[ExampleToken] <-> tokenA
+        let oldToken <- signer.storage[ExampleToken] <- tokenA
+        // destroy the empty old resource.
+        destroy oldToken
 
         // create references to the stored `ExampleToken`.
         // `Receiver` is for external calls.
         // `Provider` is for internal calls by the owner.
-        signer.storage[&Receiver] = &signer.storage[ExampleToken] as Receiver
-        signer.storage[&Provider] = &signer.storage[ExampleToken] as Provider
+        // The `Receiver` references is stored in the `published` object
+        // because an account will usually want anyone to be able to read
+        // their balance and call their deposit function
+        // 
+        signer.published[&Receiver] = &signer.storage[ExampleToken] as Receiver
 
-        // destroy the empty swapped resource
-        destroy tokenA
+        // The `Provider` reference is stored in account storage
+        // because an account will not want to expose its withdraw method
+        // to the public
+        signer.storage[&Provider] = &signer.storage[ExampleToken] as Provider
     }
 }
 ```
 
 Now, the resource type `ExampleToken` is stored in the account
-and its `Receiver` interface is available so that anyone can
+and its `Receiver` interface is available via the `published` object so that anyone can
 interact with it by importing it from the account.
 
 Once an account is prepared in such a way, transactions can be run that deposit
@@ -5101,7 +5188,7 @@ transaction {
         // If the recipient's account has no receiver reference stored in it,
         // or it is not published, abort the transaction.
         //
-        let receiverRef = recipient.storage[&Receiver] ?? panic("Recipient has no receiver")
+        let receiverRef = recipient.published[&Receiver] ?? panic("Recipient has no receiver")
 
         // Call the provider's transfer function which withdraws 5 tokens 
         // from their account and deposits it to the receiver's account 
