@@ -358,6 +358,7 @@ The types are independent types, i.e. not subtypes of each other.
 - **`Int16`**: -32768 through 32767
 - **`Int32`**: -2147483648 through 2147483647
 - **`Int64`**: -9223372036854775808 through 9223372036854775807
+- **`UInt8`**: 0 through 255
 - **`UInt16`**: 0 through 65535
 - **`UInt32`**: 0 through 4294967295
 - **`UInt64`**: 0 through 18446744073709551615
@@ -867,7 +868,8 @@ Array literals start with an opening square bracket `[` and end with a closing s
 Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.
 
 Fixed-size arrays have the form `[T; N]`, where `T` is the element type,
-and `N` is the size of the array.
+and `N` is the size of the array.  `N` has to be statically known, meaning
+that it needs to be an integer literal.
 For example, a fixed-size array of 3 `Int8` elements has the type `[Int8; 3]`.
 
 Variable-size arrays have the form `[T]`, where `T` is the element type.
@@ -880,6 +882,10 @@ when used as function argument,
 or when returned from a function call.
 
 ```cadence,file=array-types.cdc
+let size = 2
+//Invalid: Array-size must be an integer literal
+let numbers: [Int; size] = []
+
 // Declare a fixed-sized array of integers
 // which always contains exactly two elements.
 //
@@ -1303,6 +1309,34 @@ booleans[0] = true
 
     // `oneHundred` is `nil`
     // `numbers` is `{"twentyThree": 23}`
+    ```
+
+- `keys: [K]`:
+  Returns an array of the keys in the dictionary.  This does not
+  modify the dictionary, just returns a copy of the keys as an array.
+
+    ```cadence,file=dictionary-keys-field.cdc
+    // Declare a dictionary mapping strings to integers.
+    let numbers = {"fortyTwo": 42, "twentyThree": 23}
+
+    // Find the keys of the dictionary.
+    let keys = numbers.keys
+
+    // `keys` has type [String] and is `["fortyTwo","twentyThree"]`
+    ```
+
+- `values: [V]`:
+  Returns an array of the values in the dictionary.  This does not
+  modify the dictionary, just returns a copy of the values as an array.
+
+    ```cadence,file=dictionary-values-field.cdc
+    // Declare a dictionary mapping strings to integers.
+    let numbers = {"fortyTwo": 42, "twentyThree": 23}
+
+    // Find the values of the dictionary.
+    let values = numbers.values
+
+    // `values` has type [Int] and is `[42, 23]`
     ```
 
 #### Dictionary Keys
@@ -2807,9 +2841,6 @@ struct GetterExample {
     //
     pub var balance: Int {
         get {
-           post {
-               result >= 0
-           }
 
            if self.balance < 0 {
                return 0
@@ -3100,6 +3131,70 @@ b.value = 1
 
 b.increment()
 // `b.value` is 2, `a.value` is `0`
+```
+
+#### Accessing Fields and Methods of Composite Data Types Using Optional Chaining
+
+If an optional composite type like a struct has fields or methods defined in it,
+optional chaining can be used to get those values or call the methods without 
+having to get the value of the optional first.  
+
+Optional chaining is used by adding a `?` before the `.` access operator for fields or
+methods of an optional composite type.
+
+When getting a field value or calling a method with a return value, the access returns 
+the value as an optional. If the object doesn't exist, the value will always be `nil`
+
+When calling a method on an optional like this, if the object doesn't exist,
+nothing will happen and the execution will continue.
+
+It is still invalid to access a field of an optional that isn't defined in the Type
+
+```cadence,file=optional-chaining.cdc
+// declare a struct with a field and method
+pub struct Value {
+    pub var number: Int
+
+    init() {
+        self.number = 2
+    }
+
+    pub fun set(new: Int) {
+        self.number = new
+    }
+
+    pub fun setAndReturn(new: Int): Int {
+        self.number = new
+        return new
+    }
+}
+
+// create a new instance of the struct as an optional
+let value: Value? = new Value()
+let noValue: Value? = nil
+
+// Access the `number` field using optional chaining
+let twoOpt = value?.number
+// Because `value` is an optional, `twoOpt` has type `Int?`
+let two = zeroOpt ?? 0
+// `two` is 2
+
+// Try to Access the `number` field of noValue, which has type Value?
+// This still returns an `Int?`
+let nilValue = noValue?.number
+// This time, since `noValue` is nil, `nilValue` will also be nil
+
+// Call the `set` method of the struct
+// whether or not the object exists, this will not fail
+value?.set(new: 4)
+noValue?.set(new: 4)
+
+// Call the setAndReturn method, which returns an Int
+// Because `value` is an optional, the return value is type `Int?`
+let sixOpt = value?.setAndReturn(new: 6)
+let six = sixOpt ?? 0
+// `six` is 6
+
 ```
 
 #### Resources
@@ -3852,13 +3947,7 @@ resource interface FungibleToken {
         set(newBalance) {
             pre {
                 newBalance >= 0:
-                    "Balances are always non-negative"
-            }
-        }
-        get {
-            post {
-                result >= 0:
-                    "Balances are always non-negative"
+                    "Balances are always set as non-negative numbers"
             }
         }
     }
@@ -4790,13 +4879,7 @@ pub resource interface FungibleToken: Provider, Receiver {
         set(newBalance) {
             post {
                 newBalance >= 0:
-                    "Balances are always non-negative"
-            }
-        }
-        get {
-            post {
-                result >= 0:
-                    "Balances are always non-negative"
+                    "Balances are always set as non-negative numbers"
             }
         }
     }
