@@ -883,7 +883,7 @@ or when returned from a function call.
 
 ```cadence,file=array-types.cdc
 let size = 2
-//Invalid: Array-size must be an integer literal
+// Invalid: Array-size must be an integer literal
 let numbers: [Int; size] = []
 
 // Declare a fixed-sized array of integers
@@ -1314,6 +1314,7 @@ booleans[0] = true
 - `keys: [K]`:
   Returns an array of the keys in the dictionary.  This does not
   modify the dictionary, just returns a copy of the keys as an array.
+  If the dictionary is empty, this returns an empty array.
 
     ```cadence,file=dictionary-keys-field.cdc
     // Declare a dictionary mapping strings to integers.
@@ -1328,6 +1329,7 @@ booleans[0] = true
 - `values: [V]`:
   Returns an array of the values in the dictionary.  This does not
   modify the dictionary, just returns a copy of the values as an array.
+  If the dictionary is empty, this returns an empty array.
 
     ```cadence,file=dictionary-values-field.cdc
     // Declare a dictionary mapping strings to integers.
@@ -3135,7 +3137,7 @@ b.increment()
 
 #### Accessing Fields and Methods of Composite Data Types Using Optional Chaining
 
-If an optional composite type like a struct has fields or methods defined in it,
+If a struct with fields and methods is stored as an optional,
 optional chaining can be used to get those values or call the methods without 
 having to get the value of the optional first.  
 
@@ -3171,6 +3173,7 @@ pub struct Value {
 
 // create a new instance of the struct as an optional
 let value: Value? = new Value()
+// create another optional with the same type, but nil
 let noValue: Value? = nil
 
 // Access the `number` field using optional chaining
