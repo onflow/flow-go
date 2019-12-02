@@ -58,6 +58,12 @@ pub resource Decals {
     }
 }
 
+pub resource PartCollection {
+    pub fun store(part: <-Part) {
+        destroy part
+    }
+}
+
 pub resource Vehicle {
 
     pub var wheels: <-[Wheel]
@@ -90,35 +96,36 @@ pub resource Vehicle {
             wheelNum < self.wheels.length:
                 "Wheel doesn't exist!"
         }
-        self.collection.store(<-self.wheels.remove(at: wheelNum))
+        self.collection.store(part: <-self.wheels.remove(at: wheelNum))
     }
 
     pub fun addFrame(newFrame: <-Frame) {
         let oldFrame <- self.frame <- newFrame
-        if oldFrame != nil {
-            self.collection.store(<-oldFrame)
+        if let frame <- oldFrame {
+            self.collection.store(part: <-frame)
         } else {
             destroy oldFrame
         }
     }
 
     pub fun removeFrame() {
-        if self.frame != nil {
-            self.collection.store(<-self.frame)
+        if let frame <- self.frame {
+            self.collection.store(part: <-frame)
         }
     }
 
     pub fun addEngine(newEngine: <-Engine) {
         let oldEngine <- self.engine <- newEngine
-        if oldEngine != nil {
-            self.collection.store(oldEngine)
+        if let engine <- oldEngine {
+            self.collection.store(part: <-engine)
+        } else {
+            destroy oldEngine
         }
-        destroy oldEngine
     }
 
     pub fun removeEngine() {
-        if self.engine != nil {
-            self.collection.store(<-self.engine)
+        if let engine <- self.engine {
+            self.collection.store(part: <-engine)
         }
     }
 
