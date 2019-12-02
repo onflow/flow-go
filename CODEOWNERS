@@ -1,43 +1,37 @@
-# Default Owners
-* @dapperlabs/flow-engineers
-
-# Streams
-
 # Collection Stream
-/internal/roles/collect @psiemens
-/proto/services/collect @psiemens
-/grpc/services/collect @psiemens
-/cmd/collect @psiemens
+/cmd/collection/** @jordanschalm
+/engine/collection/** @jordanschalm
+/proto/services/collection/** @jordanschalm
 
 # Consensus Stream
-/internal/roles/consensus @AlexHentschel @awishformore
-/proto/services/consensus @AlexHentschel @awishformore
-/grpc/services/consensus @AlexHentschel @awishformore
-/cmd/consensus @AlexHentschel @awishformore
+/cmd/consensus/** @AlexHentschel @awishformore @zhangchiqing
+/engine/consensus/** @AlexHentschel @awishformore @zhangchiqing
 
 # Execution Stream
-/internal/roles/execute @turbolent
-/proto/services/execute @turbolent
-/grpc/services/execute @turbolent
-/cmd/execute @turbolent
+/cmd/execution/** @turbolent @psiemens
+/engine/execution/** @turbolent @psiemens
 
 # Observation Stream
-/internal/roles/observe @psiemens
-/proto/services/observe @psiemens
-/grpc/services/observe @psiemens
-/cmd/observe @psiemens
+/cmd/observation/** @psiemens
+/engine/observation/** @psiemens
+/proto/services/observation/** @psiemens
+
+# Verification Stream
+/cmd/verification/** @ramtinms
+/engine/verification/** @ramtinms
+/module/chunking/** @ramtinms
 
 # Networking Stream
-/pkg/network @yhassanzadeh
+/network/** @yhassanzadeh @vishalchangraniaxiom
 
 # Cryptography Stream
-/pkg/crypto @tarakby
+/crypto/** @tarakby
 
 # Emulator Stream
-/sdk/emulator @mrbrianhobo @psiemens @jordanschalm
+/sdk/emulator/** @mrbrianhobo @psiemens @jordanschalm
 
 # SDK Stream
-/sdk @mrbrianhobo @psiemens
+/sdk/** @mrbrianhobo @psiemens @jordanschalm
 
 # Language Stream
-/pkg/language @turbolent
+/language/** @turbolent

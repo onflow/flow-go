@@ -3,63 +3,82 @@ package emulator_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 func TestCommitBlock(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+	b, err := emulator.NewEmulatedBlockchain()
+	require.NoError(t, err)
 
-	tx1 := &types.Transaction{
+	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
+
+	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
-	tx1.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err := keys.SignTransaction(tx1, b.RootKey())
+	assert.NoError(t, err)
+
+	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	// Submit tx1
-	err := b.SubmitTransaction(tx1)
-	tx, _ := b.GetTransaction(tx1.Hash())
-	assert.Nil(t, err)
-	assert.Equal(t, types.TransactionFinalized, tx.Status)
+	err = b.SubmitTransaction(tx1)
+	assert.NoError(t, err)
+
+	tx, err := b.GetTransaction(tx1.Hash())
+	assert.NoError(t, err)
 
 	// Commit tx1 into new block
-	b.CommitBlock()
+	_, err = b.CommitBlock()
+	assert.NoError(t, err)
 
-	tx2 := &types.Transaction{
+	assert.Equal(t, flow.TransactionFinalized, tx.Status)
+
+	tx2 := flow.Transaction{
 		Script:             []byte("invalid script"),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
-	tx2.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err = keys.SignTransaction(tx2, b.RootKey())
+	assert.NoError(t, err)
+
+	tx2.AddSignature(b.RootAccountAddress(), sig)
 
 	// Submit invalid tx2
 	err = b.SubmitTransaction(tx2)
 	assert.NotNil(t, err)
 
 	tx, err = b.GetTransaction(tx2.Hash())
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
-	assert.Equal(t, types.TransactionReverted, tx.Status)
+	assert.Equal(t, flow.TransactionReverted, tx.Status)
 
 	// Commit tx2 into new block
-	b.CommitBlock()
+	_, err = b.CommitBlock()
+	assert.NoError(t, err)
 
 	// tx1 status becomes TransactionSealed
-	tx, _ = b.GetTransaction(tx1.Hash())
-	assert.Equal(t, types.TransactionSealed, tx.Status)
+	tx, err = b.GetTransaction(tx1.Hash())
+	require.Nil(t, err)
+	assert.Equal(t, flow.TransactionSealed, tx.Status)
 
 	// tx2 status stays TransactionReverted
-	tx, _ = b.GetTransaction(tx2.Hash())
-	assert.Equal(t, types.TransactionReverted, tx.Status)
+	tx, err = b.GetTransaction(tx2.Hash())
+	require.Nil(t, err)
+	assert.Equal(t, flow.TransactionReverted, tx.Status)
 }

@@ -1,40 +1,57 @@
 package emulator_test
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/pkg/types"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
-func TestCallScript(t *testing.T) {
-	b := emulator.NewEmulatedBlockchain(emulator.DefaultOptions)
+func TestExecuteScript(t *testing.T) {
+	b, err := emulator.NewEmulatedBlockchain()
+	require.NoError(t, err)
 
-	tx := &types.Transaction{
+	addTwoScript, counterAddress := deployAndGenerateAddTwoScript(t, b)
+
+	accountAddress := b.RootAccountAddress()
+
+	tx := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
-		PayerAccount:       b.RootAccountAddress(),
-		ScriptAccounts:     []types.Address{b.RootAccountAddress()},
+		PayerAccount:       accountAddress,
+		ScriptAccounts:     []flow.Address{accountAddress},
 	}
 
-	tx.AddSignature(b.RootAccountAddress(), b.RootKey())
+	sig, err := keys.SignTransaction(tx, b.RootKey())
+	assert.NoError(t, err)
+
+	tx.AddSignature(accountAddress, sig)
+
+	callScript := generateGetCounterCountScript(counterAddress, accountAddress)
 
 	// Sample call (value is 0)
-	value, err := b.CallScript([]byte(sampleCall))
-	assert.Nil(t, err)
-	assert.Equal(t, big.NewInt(0), value)
+	value, _, err := b.ExecuteScript([]byte(callScript))
+	require.NoError(t, err)
+	assert.Equal(t, values.NewInt(0), value)
 
 	// Submit tx1 (script adds 2)
 	err = b.SubmitTransaction(tx)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	// Sample call (value is 2)
-	value, err = b.CallScript([]byte(sampleCall))
-	assert.Nil(t, err)
-	assert.Equal(t, big.NewInt(2), value)
+	value, _, err = b.ExecuteScript([]byte(callScript))
+	require.NoError(t, err)
+	assert.Equal(t, values.NewInt(2), value)
+}
+
+func TestExecuteScriptAtBlockNumber(t *testing.T) {
+	// TODO
+	// Test that scripts can be executed at different block heights
 }

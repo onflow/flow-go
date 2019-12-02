@@ -1,4 +1,5 @@
 /cmd/consensus/consensus
+/cmd/flow/flow
 
 # Test binary, build with `go test -c`
 *.test
@@ -6,14 +7,21 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# Coverage artifacts
+coverage.zip
+index.html
+
 # Since we have tooling that uses node
 node_modules
 
 .DS_Store
 
 flow.json
+flowdb
 
 # IDE related files
 .idea
 .vscode
 git
+language/tools/vscode-extension/cadence-*.vsix
+language/tools/vscode-extension/out/*

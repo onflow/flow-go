@@ -11,19 +11,19 @@ import (
 func TestRuntimeLogger(t *testing.T) {
 	loggedMessages := make([]string, 0)
 
-	b := emulator.NewEmulatedBlockchain(emulator.EmulatedBlockchainOptions{
-		OnLogMessage: func(msg string) {
+	b, _ := emulator.NewEmulatedBlockchain(emulator.WithRuntimeLogger(
+		func(msg string) {
 			loggedMessages = append(loggedMessages, msg)
 		},
-	})
+	))
 
 	script := []byte(`
-		fun main() {
+		pub fun main() {
 			log("elephant ears")
 		}
 	`)
 
-	_, err := b.CallScript(script)
-	assert.Nil(t, err)
+	_, _, err := b.ExecuteScript(script)
+	assert.NoError(t, err)
 	assert.Equal(t, []string{`"elephant ears"`}, loggedMessages)
 }

@@ -2,18 +2,17 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/pkg/crypto"
-	"github.com/dapperlabs/flow-go/pkg/grpc/services/observe"
-	"github.com/dapperlabs/flow-go/pkg/types"
-	"github.com/dapperlabs/flow-go/pkg/types/proto"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/proto/services/observation"
+	"github.com/dapperlabs/flow-go/sdk/convert"
 )
 
 // RPCClient is an RPC client compatible with the Flow Observation API.
-type RPCClient observe.ObserveServiceClient
+type RPCClient observation.ObserveServiceClient
 
 // Client is a Flow user agent client.
 type Client struct {
@@ -30,7 +29,7 @@ func New(addr string) (*Client, error) {
 		return nil, err
 	}
 
-	grpcClient := observe.NewObserveServiceClient(conn)
+	grpcClient := observation.NewObserveServiceClient(conn)
 
 	return &Client{
 		rpcClient: grpcClient,
@@ -51,79 +50,87 @@ func (c *Client) Close() error {
 	return c.close()
 }
 
+// Ping tests the connection to the Observation API.
+func (c *Client) Ping(ctx context.Context) error {
+	_, err := c.rpcClient.Ping(ctx, &observation.PingRequest{})
+	return err
+}
+
 // SendTransaction submits a transaction to the network.
-func (c *Client) SendTransaction(ctx context.Context, tx types.Transaction) error {
-	txMsg := proto.TransactionToMessage(tx)
+func (c *Client) SendTransaction(ctx context.Context, tx flow.Transaction) error {
+	txMsg := convert.TransactionToMessage(tx)
 
 	_, err := c.rpcClient.SendTransaction(
 		ctx,
-		&observe.SendTransactionRequest{Transaction: txMsg},
+		&observation.SendTransactionRequest{Transaction: txMsg},
 	)
 
 	return err
 }
 
 // GetLatestBlock gets the header of the latest sealed or unsealed block.
-func (c *Client) GetLatestBlock(ctx context.Context, isSealed bool) (*types.BlockHeader, error) {
+func (c *Client) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.BlockHeader, error) {
 	res, err := c.rpcClient.GetLatestBlock(
 		ctx,
-		&observe.GetLatestBlockRequest{IsSealed: isSealed},
+		&observation.GetLatestBlockRequest{IsSealed: isSealed},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	blockHeader := proto.MessageToBlockHeader(res.GetBlock())
+	blockHeader := convert.MessageToBlockHeader(res.GetBlock())
 
 	return &blockHeader, nil
 }
 
-// CallScript executes a script against the current world state.
-func (c *Client) CallScript(ctx context.Context, script []byte) (interface{}, error) {
-	res, err := c.rpcClient.CallScript(ctx, &observe.CallScriptRequest{Script: script})
+// ExecuteScript executes a script against the latest sealed world state.
+func (c *Client) ExecuteScript(ctx context.Context, script []byte) ([]byte, error) {
+	res, err := c.rpcClient.ExecuteScript(ctx, &observation.ExecuteScriptRequest{Script: script})
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: change to production encoding format
-	var value interface{}
-	err = json.Unmarshal(res.GetValue(), &value)
-	if err != nil {
-		return nil, err
-	}
-
-	return value, nil
+	return res.GetValue(), nil
 }
 
 // GetTransaction fetches a transaction by hash.
-func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*types.Transaction, error) {
+func (c *Client) GetTransaction(ctx context.Context, h crypto.Hash) (*flow.Transaction, error) {
 	res, err := c.rpcClient.GetTransaction(
 		ctx,
-		&observe.GetTransactionRequest{Hash: h},
+		&observation.GetTransactionRequest{Hash: h},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	tx, err := proto.MessageToTransaction(res.GetTransaction())
+	tx, err := convert.MessageToTransaction(res.GetTransaction())
 	if err != nil {
 		return nil, err
 	}
+
+	eventMessages := res.GetEvents()
+	events := make([]flow.Event, len(eventMessages))
+
+	for i, m := range eventMessages {
+		events[i] = convert.MessageToEvent(m)
+	}
+
+	tx.Events = events
 
 	return &tx, nil
 }
 
 // GetAccount fetches an account by address.
-func (c *Client) GetAccount(ctx context.Context, address types.Address) (*types.Account, error) {
+func (c *Client) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
 	res, err := c.rpcClient.GetAccount(
 		ctx,
-		&observe.GetAccountRequest{Address: address.Bytes()},
+		&observation.GetAccountRequest{Address: address.Bytes()},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	account, err := proto.MessageToAccount(res.GetAccount())
+	account, err := convert.MessageToAccount(res.GetAccount())
 	if err != nil {
 		return nil, err
 	}
@@ -131,20 +138,34 @@ func (c *Client) GetAccount(ctx context.Context, address types.Address) (*types.
 	return &account, nil
 }
 
+// EventQuery defines a query for Flow events.
+type EventQuery struct {
+	// The event type to search for. If empty, no filtering by type is done.
+	Type string
+	// The block to begin looking for events
+	StartBlock uint64
+	// The block to end looking for events (inclusive)
+	EndBlock uint64
+}
+
 // GetEvents queries the Observation API for events and returns the results.
-func (c *Client) GetEvents(ctx context.Context, query *types.EventQuery) ([]*types.Event, error) {
-	res, err := c.rpcClient.GetEvents(
-		ctx,
-		proto.EventQueryToMessage(query),
-	)
+func (c *Client) GetEvents(ctx context.Context, query EventQuery) ([]flow.Event, error) {
+	req := &observation.GetEventsRequest{
+		Type:       query.Type,
+		StartBlock: query.StartBlock,
+		EndBlock:   query.EndBlock,
+	}
+
+	res, err := c.rpcClient.GetEvents(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 
-	// Events are sent over the wire JSON-encoded.
-	var events []*types.Event
-	if err = json.Unmarshal(res.GetEventsJson(), &events); err != nil {
-		return nil, err
+	eventMessages := res.GetEvents()
+	events := make([]flow.Event, len(eventMessages))
+
+	for i, m := range eventMessages {
+		events[i] = convert.MessageToEvent(m)
 	}
 
 	return events, nil
