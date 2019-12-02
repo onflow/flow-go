@@ -39,11 +39,11 @@ func TestCommitBlock(t *testing.T) {
 	tx, err := b.GetTransaction(tx1.Hash())
 	assert.NoError(t, err)
 
+	assert.Equal(t, flow.TransactionFinalized, tx.Status)
+
 	// Commit tx1 into new block
 	_, err = b.CommitBlock()
 	assert.NoError(t, err)
-
-	assert.Equal(t, flow.TransactionFinalized, tx.Status)
 
 	tx2 := flow.Transaction{
 		Script:             []byte("invalid script"),

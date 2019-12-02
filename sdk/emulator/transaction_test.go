@@ -177,8 +177,8 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	err = b.SubmitTransaction(tx)
 	assert.NoError(t, err)
 
-	err = b.CommitBlock()
-	assert.Nil(t, err)
+	_, err = b.CommitBlock()
+	assert.NoError(t, err)
 
 	// Submit tx1 again (errors)
 	err = b.SubmitTransaction(tx)
@@ -257,6 +257,9 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 		err = b.SubmitTransaction(tx)
 		assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
+
+		_, err = b.CommitBlock()
+		assert.NoError(t, err)
 	})
 
 	t.Run("NotEnoughAccountsForScript", func(t *testing.T) {
@@ -285,6 +288,9 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 		err = b.SubmitTransaction(tx)
 		assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
+
+		_, err = b.CommitBlock()
+		assert.NoError(t, err)
 	})
 }
 
