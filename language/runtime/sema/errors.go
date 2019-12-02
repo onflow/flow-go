@@ -842,22 +842,6 @@ func (e *UnsupportedTypeError) Error() string {
 
 func (*UnsupportedTypeError) isSemanticError() {}
 
-// UnsupportedDeclarationError
-
-type UnsupportedDeclarationError struct {
-	DeclarationKind common.DeclarationKind
-	ast.Range
-}
-
-func (e *UnsupportedDeclarationError) Error() string {
-	return fmt.Sprintf(
-		"%s declarations are not supported yet",
-		e.DeclarationKind.Name(),
-	)
-}
-
-func (*UnsupportedDeclarationError) isSemanticError() {}
-
 // UnsupportedOverloadingError
 
 type UnsupportedOverloadingError struct {

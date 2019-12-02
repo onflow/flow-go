@@ -70,11 +70,6 @@ func TestCheckAccessModifierCompositeFunctionDeclaration(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
 		isAuthAllowed := compositeKind == common.CompositeKindResource
 
 		tests := map[ast.Access]bool{
@@ -144,12 +139,6 @@ func TestCheckAccessModifierCompositeConstantFieldDeclaration(t *testing.T) {
 
 	for access, expectSuccess := range tests {
 		for _, compositeKind := range common.CompositeKinds {
-
-			// TODO: add support for contracts
-			if compositeKind == common.CompositeKindContract {
-				continue
-			}
-
 			for _, isInterface := range []bool{true, false} {
 
 				interfaceKeyword := ""
@@ -197,12 +186,6 @@ func TestCheckAccessModifierCompositeVariableFieldDeclaration(t *testing.T) {
 
 	for _, access := range ast.Accesses {
 		for _, compositeKind := range common.CompositeKinds {
-
-			// TODO: add support for contracts
-			if compositeKind == common.CompositeKindContract {
-				continue
-			}
-
 			for _, isInterface := range []bool{true, false} {
 
 				interfaceKeyword := ""
@@ -469,12 +452,6 @@ func TestCheckAccessModifierGlobalCompositeDeclaration(t *testing.T) {
 
 	for access, expectSuccess := range tests {
 		for _, compositeKind := range common.CompositeKinds {
-
-			// TODO: add support for contracts
-			if compositeKind == common.CompositeKindContract {
-				continue
-			}
-
 			for _, isInterface := range []bool{true, false} {
 
 				interfaceKeyword := ""
@@ -667,12 +644,6 @@ func TestCheckAccessImportGlobalType(t *testing.T) {
 	}
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
 		for checkMode, check := range checkModeTests {
 
 			testName := fmt.Sprintf("%s/%s",
@@ -725,11 +696,6 @@ func TestCheckAccessImportGlobalType(t *testing.T) {
 func TestCheckAccessCompositeFunction(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
 
 		isAuthAllowed := compositeKind == common.CompositeKindResource
 		authExpectation := expectSuccess
@@ -826,11 +792,6 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
 func TestCheckAccessInterfaceFunction(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
 
 		isAuthAllowed := compositeKind == common.CompositeKindResource
 		authExpectation := expectSuccess
@@ -963,12 +924,6 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
 	}
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
 
@@ -1062,12 +1017,6 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 	}
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
 
@@ -1165,12 +1114,6 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 	}
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
 
@@ -1277,12 +1220,6 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 	}
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
 

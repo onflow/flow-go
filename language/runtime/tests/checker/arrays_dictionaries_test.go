@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
-	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
@@ -610,20 +609,7 @@ func TestCheckArraySubtyping(t *testing.T) {
 				kind.TransferOperator(),
 			))
 
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			case common.CompositeKindContract:
-				// TODO: add support for contract interface declarations
-
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-			default:
-				panic(errors.NewUnreachableError())
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -659,19 +645,7 @@ func TestCheckDictionarySubtyping(t *testing.T) {
 				),
 			)
 
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			case common.CompositeKindContract:
-				// TODO: add support contract interface declarations
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-			default:
-				panic(errors.NewUnreachableError())
-			}
+			require.NoError(t, err)
 		})
 	}
 }

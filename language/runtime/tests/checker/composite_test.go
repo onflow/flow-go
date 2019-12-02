@@ -144,29 +144,9 @@ func TestCheckInvalidUnknownSpecialFunction(t *testing.T) {
 					interfaceKeyword,
 				))
 
-				switch kind {
-				case common.CompositeKindStructure, common.CompositeKindResource:
-					errs := ExpectCheckerErrors(t, err, 1)
+				errs := ExpectCheckerErrors(t, err, 1)
 
-					assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
-
-				case common.CompositeKindContract:
-					// TODO: add support for contract interface declarations
-
-					if isInterface {
-						errs := ExpectCheckerErrors(t, err, 2)
-
-						assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
-						assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-					} else {
-						errs := ExpectCheckerErrors(t, err, 1)
-
-						assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
-					}
-
-				default:
-					panic(errors.NewUnreachableError())
-				}
+				assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
 			})
 		}
 	}
@@ -201,45 +181,17 @@ func TestCheckInvalidCompositeFieldNames(t *testing.T) {
 					),
 				)
 
-				switch kind {
-				case common.CompositeKindStructure,
-					common.CompositeKindResource:
+				if isInterface {
+					errs := ExpectCheckerErrors(t, err, 2)
 
-					if isInterface {
-						errs := ExpectCheckerErrors(t, err, 2)
+					assert.IsType(t, &sema.InvalidNameError{}, errs[0])
+					assert.IsType(t, &sema.InvalidNameError{}, errs[1])
+				} else {
+					errs := ExpectCheckerErrors(t, err, 3)
 
-						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-					} else {
-						errs := ExpectCheckerErrors(t, err, 3)
-
-						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-						assert.IsType(t, &sema.MissingInitializerError{}, errs[2])
-					}
-
-				case common.CompositeKindContract:
-
-					if isInterface {
-						errs := ExpectCheckerErrors(t, err, 3)
-
-						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-
-						// TODO: add support for contract interface declarations
-
-						assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-
-					} else {
-						errs := ExpectCheckerErrors(t, err, 3)
-
-						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-						assert.IsType(t, &sema.MissingInitializerError{}, errs[2])
-					}
-
-				default:
-					panic(errors.NewUnreachableError())
+					assert.IsType(t, &sema.InvalidNameError{}, errs[0])
+					assert.IsType(t, &sema.InvalidNameError{}, errs[1])
+					assert.IsType(t, &sema.MissingInitializerError{}, errs[2])
 				}
 			})
 		}
@@ -281,33 +233,10 @@ func TestCheckInvalidCompositeFunctionNames(t *testing.T) {
 					),
 				)
 
-				switch kind {
-				case common.CompositeKindStructure, common.CompositeKindResource:
-					errs := ExpectCheckerErrors(t, err, 2)
+				errs := ExpectCheckerErrors(t, err, 2)
 
-					assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-					assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-
-				case common.CompositeKindContract:
-					if isInterface {
-						errs := ExpectCheckerErrors(t, err, 3)
-
-						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-
-						// TODO: add support for contract interface declarations
-
-						assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-					} else {
-						errs := ExpectCheckerErrors(t, err, 2)
-
-						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-					}
-
-				default:
-					panic(errors.NewUnreachableError())
-				}
+				assert.IsType(t, &sema.InvalidNameError{}, errs[0])
+				assert.IsType(t, &sema.InvalidNameError{}, errs[1])
 			})
 		}
 	}
@@ -1187,20 +1116,6 @@ func TestCheckInvalidDifferentCompositeRedeclaration(t *testing.T) {
 				continue
 			}
 
-			// TODO: add support for contract declarations
-
-			if firstKind != common.CompositeKindStructure &&
-				firstKind != common.CompositeKindResource {
-
-				continue
-			}
-
-			if secondKind != common.CompositeKindStructure &&
-				secondKind != common.CompositeKindResource {
-
-				continue
-			}
-
 			testName := fmt.Sprintf(
 				"%s/%s",
 				firstKind.Keyword(),
@@ -1248,20 +1163,6 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 
 	for _, firstKind := range common.CompositeKinds {
 		for _, secondKind := range common.CompositeKinds {
-
-			// TODO: add support for contract declarations
-
-			if firstKind != common.CompositeKindStructure &&
-				firstKind != common.CompositeKindResource {
-
-				continue
-			}
-
-			if secondKind != common.CompositeKindStructure &&
-				secondKind != common.CompositeKindResource {
-
-				continue
-			}
 
 			testName := fmt.Sprintf(
 				"%s/%s",
