@@ -71,9 +71,9 @@ pub resource SaleCollection {
     // purchase lets a user send tokens to purchase an NFT that is for sale
     pub fun purchase(tokenID: Int, recipient: &NFTCollection, buyTokens: <-Receiver) {
         pre {
-            self.forSale[tokenID] != nil:
+            self.forSale[tokenID] != nil && self.prices[tokenID] != nil:
                 "No token matching this ID for sale!"
-            buyTokens.balance >= (self.prices[tokenID] ?? panic("missing price!")):
+            buyTokens.balance >= (self.prices[tokenID] ?? 0):
                 "Not enough tokens to by the NFT!"
         }
 
@@ -86,8 +86,8 @@ pub resource SaleCollection {
     }
 
     // idPrice returns the price of a specific token in the sale
-    pub fun idPrice(tokenID: Int): Int {
-        let price = self.prices[tokenID] ?? panic("no price!")
+    pub fun idPrice(tokenID: Int): Int? {
+        let price = self.prices[tokenID]
         return price
     }
 
@@ -111,6 +111,10 @@ pub fun createSaleCollection(ownerVault: &Receiver): <-SaleCollection {
     return <- create SaleCollection(vault: ownerVault)
 }
 
+
+// Marketplace would be the central contract where people can post their sale
+// references so that anyone can access them
+// It is just an example and hasn't been tested so don't take it seriously
 pub resource Marketplace {
     // Data structure to store active sales
     pub var tokensForSale: [&SaleCollection]
