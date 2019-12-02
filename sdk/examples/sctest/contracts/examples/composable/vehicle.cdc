@@ -1,3 +1,6 @@
+// This is not meant to be real working code, this is just an example 
+// showing how a composable resource could be created
+
 // In this example, there are different types of resources that 
 // represent different types of vehicle parts
 // The parts can have different types and materials, represented by 
@@ -65,13 +68,17 @@ pub resource Vehicle {
 
     pub var decals: <-[Decals]
 
+    // PartCollection isn't defined, but here we just assume
+    // that it is similar to the NFTCollection resource defined in the NFT 
+    // example nft.cdc
     pub var collection: &PartCollection
 
-    init() {
+    init(collection: &PartCollection) {
         self.wheels <- []
         self.frame <- nil
         self.engine <- nil
         self.decals <- []
+        self.collection = collection
     }
 
     pub fun addWheel(newWheel: <-Wheel) {
@@ -90,8 +97,9 @@ pub resource Vehicle {
         let oldFrame <- self.frame <- newFrame
         if oldFrame != nil {
             self.collection.store(<-oldFrame)
+        } else {
+            destroy oldFrame
         }
-        destroy oldFrame
     }
 
     pub fun removeFrame() {
