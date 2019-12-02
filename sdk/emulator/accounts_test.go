@@ -333,7 +333,7 @@ func TestAddAccountKey(t *testing.T) {
 		err = b.SubmitTransaction(tx1)
 		assert.NoError(t, err)
 
-		err = b.CommitBlock()
+		_, err = b.CommitBlock()
 		assert.NoError(t, err)
 
 		script := []byte("transaction { execute {} }")
@@ -354,7 +354,7 @@ func TestAddAccountKey(t *testing.T) {
 		err = b.SubmitTransaction(tx2)
 		assert.NoError(t, err)
 
-		err = b.CommitBlock()
+		_, err = b.CommitBlock()
 		assert.NoError(t, err)
 	})
 
@@ -420,8 +420,8 @@ func TestRemoveAccountKey(t *testing.T) {
 	err = b.SubmitTransaction(tx1)
 	assert.NoError(t, err)
 
-	err = b.CommitBlock()
-	assert.Nil(t, err)
+	_, err = b.CommitBlock()
+	assert.NoError(t, err)
 
 	account, err := b.GetAccount(b.RootAccountAddress())
 	assert.NoError(t, err)
@@ -445,8 +445,8 @@ func TestRemoveAccountKey(t *testing.T) {
 	err = b.SubmitTransaction(tx2)
 	assert.NoError(t, err)
 
-	err = b.CommitBlock()
-	assert.Nil(t, err)
+	_, err = b.CommitBlock()
+	assert.NoError(t, err)
 
 	account, err = b.GetAccount(b.RootAccountAddress())
 	assert.NoError(t, err)
@@ -470,8 +470,8 @@ func TestRemoveAccountKey(t *testing.T) {
 	err = b.SubmitTransaction(tx3)
 	assert.NotNil(t, err)
 
-	err = b.CommitBlock()
-	assert.Nil(t, err)
+	_, err = b.CommitBlock()
+	assert.NoError(t, err)
 
 	account, err = b.GetAccount(b.RootAccountAddress())
 	assert.NoError(t, err)
@@ -495,8 +495,8 @@ func TestRemoveAccountKey(t *testing.T) {
 	err = b.SubmitTransaction(tx4)
 	assert.NoError(t, err)
 
-	err = b.CommitBlock()
-	assert.Nil(t, err)
+	_, err = b.CommitBlock()
+	assert.NoError(t, err)
 
 	account, err = b.GetAccount(b.RootAccountAddress())
 	assert.NoError(t, err)
