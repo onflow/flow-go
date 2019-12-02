@@ -109,7 +109,7 @@ pub resource Vehicle {
     }
 
     pub fun removeFrame() {
-        if let frame <- self.frame {
+        if let frame <- self.frame <- nil {
             self.collection.store(part: <-frame)
         }
     }
@@ -124,7 +124,7 @@ pub resource Vehicle {
     }
 
     pub fun removeEngine() {
-        if let engine <- self.engine {
+        if let engine <- self.engine <- nil {
             self.collection.store(part: <-engine)
         }
     }
