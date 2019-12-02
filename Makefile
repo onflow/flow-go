@@ -24,10 +24,10 @@ install-tools: crypto/relic/build
 	GO111MODULE=on go get github.com/mgechev/revive@master; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@master; \
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
-	GO111MODULE=on go get github.com/jteeuwen/go-bindata@v3.0.7;
+	GO111MODULE=on go get github.com/kevinburke/go-bindata/...@v3.11.0;
 
 .PHONY: test
-test:
+test: generate-bindata
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -json --tags relic ./...
 	# test SDK package with Relic library disabled
@@ -43,7 +43,7 @@ ifeq ($(COVER), true)
 endif
 
 .PHONY: generate
-generate: generate-godoc generate-proto generate-registries generate-mocks
+generate: generate-godoc generate-proto generate-registries generate-mocks generate-bindata
 
 .PHONY: generate-godoc
 generate-godoc:
@@ -68,6 +68,10 @@ generate-mocks:
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/emulated_blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator EmulatedBlockchainAPI
+
+.PHONY: generate-bindata
+generate-bindata:
+	go generate ./language/abi;
 
 .PHONY: check-generated-code
 check-generated-code:

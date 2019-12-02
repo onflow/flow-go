@@ -1,8 +1,6 @@
 package abi
 
 import (
-	"io/ioutil"
-	"os"
 	"strings"
 	"testing"
 
@@ -13,35 +11,26 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/cmd/abi"
 )
 
-func fileExists(filename string) bool {
-	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir()
-}
-
 func TestExamples(t *testing.T) {
 
-	files, err := ioutil.ReadDir("examples/")
+	for _, assetName := range AssetNames() {
+		if strings.HasSuffix(assetName, ".cdc") {
 
-	require.NoError(t, err)
+			abiAssetName := assetName + ".abi.json"
 
-	for _, file := range files {
-		if strings.HasSuffix(file.Name(), ".cdc") {
-			abiFile := "examples/" + file.Name() + ".abi.json"
+			abiAsset, _ := Asset(abiAssetName)
 
-			if fileExists(abiFile) {
+			if abiAsset != nil {
 
-				t.Run(file.Name(), func(t *testing.T) {
-					abiBytes, err := ioutil.ReadFile(abiFile)
+				t.Run(assetName, func(t *testing.T) {
 
+					assetBytes, err := Asset(assetName)
 					require.NoError(t, err)
 
-					generatedAbi := abi.GetABIForFile("examples/"+file.Name(), false)
+					generatedAbi := abi.GetABIForBytes(assetBytes, false, assetName)
 
 					options := jsondiff.DefaultConsoleOptions()
-					diff, s := jsondiff.Compare(generatedAbi, abiBytes, &options)
+					diff, s := jsondiff.Compare(generatedAbi, abiAsset, &options)
 
 					assert.Equal(t, diff, jsondiff.FullMatch)
 
