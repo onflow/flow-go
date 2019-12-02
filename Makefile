@@ -5,6 +5,8 @@ COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
 VERSION := $(shell git describe --tags --abbrev=0 --exact-match)
 
+export FLOW_ABI_EXAMPLES_DIR := $(CURDIR)/language/abi/examples/
+
 crypto/relic:
 	rm -rf crypto/relic
 	git submodule update --init --recursive

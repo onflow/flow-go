@@ -1,4 +1,4 @@
-package abi
+package abi_test
 
 import (
 	"io/ioutil"
@@ -10,6 +10,7 @@ import (
 	"github.com/nsf/jsondiff"
 	"github.com/stretchr/testify/require"
 
+	languageAbi "github.com/dapperlabs/flow-go/language/abi"
 	"github.com/dapperlabs/flow-go/language/runtime/cmd/abi"
 )
 
@@ -23,20 +24,16 @@ func fileExists(filename string) bool {
 
 func TestExamples(t *testing.T) {
 
-	files, err := ioutil.ReadDir("examples/")
+	for _, assetName := range languageAbi.AssetNames() {
 
-	require.NoError(t, err)
+		if strings.HasSuffix(assetName, ".cdc") {
 
-	for _, file := range files {
-		if strings.HasSuffix(file.Name(), ".cdc") {
-			abiFile := "examples/" + file.Name() + ".abi.json"
+			abiAssetName := assetName + ".abi.json"
+			abiAsset, _ := languageAbi.Asset(abiAssetName)
 
-			if fileExists(abiFile) {
+			if abiAsset != nil {
 
-				t.Run(file.Name(), func(t *testing.T) {
-					abiBytes, err := ioutil.ReadFile(abiFile)
-
-					require.NoError(t, err)
+				t.Run(assetName, func(t *testing.T) {
 
 					generatedAbi := abi.GetABIForFile("examples/"+file.Name(), false)
 

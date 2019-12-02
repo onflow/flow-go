@@ -9,9 +9,10 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 )
 
-type DefinitionEntry struct {
-	types.Type
-}
+//
+//type DefinitionEntry struct {
+//	types.Type
+//}
 
 //func unmarshalStruct(data json.RawMessage) types.Struct {
 //
@@ -77,9 +78,9 @@ type DefinitionEntry struct {
 //	}, nil
 //}
 
-type structRaw struct {
-	Fields map[string]field
-}
+//type structRaw struct {
+//	Fields map[string]field
+//}
 
 //func (de DefinitionEntry) Decode() (types.Type, error) {
 //	for typ, data := range de {
@@ -89,26 +90,26 @@ type structRaw struct {
 //	}
 //}
 
-func decodeByStringType(t string, data interface{}) types.Type {
-	switch t {
-	case "struct":
+//func decodeByStringType(t string, data interface{}) types.Type {
+//	switch t {
+//	case "struct":
+//
+//	}
+//
+//	return nil
+//}
+//
+//const (
+//	Struct   StructType = "struct"
+//	Variable StructType = "variable"
+//	Function StructType = "function"
+//	Resource StructType = "resource"
+//	Event    StructType = "event"
+//)
 
-	}
+//type StructType string
 
-	return nil
-}
-
-const (
-	Struct   StructType = "struct"
-	Variable StructType = "variable"
-	Function StructType = "function"
-	Resource StructType = "resource"
-	Event    StructType = "event"
-)
-
-type StructType string
-
-type TypedStruct map[string]interface{}
+//type TypedStruct map[string]interface{}
 
 func GetOnlyEntry(m map[string]interface{}) (string, interface{}, error) {
 	if len(m) > 1 {
@@ -425,39 +426,39 @@ func toType(data interface{}, name string) (types.Type, error) {
 	return nil, errors.New(fmt.Sprintf("unsupported data chunk %v", data))
 }
 
-func decodeDefinition(data map[string]interface{}, name string) (types.Type, error) {
+//func decodeDefinition(data map[string]interface{}, name string) (types.Type, error) {
+//
+//	key, value, err := GetOnlyEntry(data)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	switch v := value.(type) {
+//	case map[string]interface{}:
+//		switch key {
+//		case "struct":
+//			return toStruct(v, name)
+//
+//		case "variable":
+//			typ, err := toType(value, name)
+//			if err != nil {
+//				return nil, err
+//			}
+//			return &types.Variable{
+//				Type: typ,
+//			}, nil
+//		default:
+//			return nil, errors.New(fmt.Sprintf("unsupported definition type %v named %s", value, key))
+//
+//		}
+//
+//	default:
+//		return nil, errors.New(fmt.Sprintf("unsupported definition type %v", data))
+//	}
+//
+//}
 
-	key, value, err := GetOnlyEntry(data)
-	if err != nil {
-		return nil, err
-	}
-
-	switch v := value.(type) {
-	case map[string]interface{}:
-		switch key {
-		case "struct":
-			return toStruct(v, name)
-
-		case "variable":
-			typ, err := toType(value, name)
-			if err != nil {
-				return nil, err
-			}
-			return &types.Variable{
-				Type: typ,
-			}, nil
-		default:
-			return nil, errors.New(fmt.Sprintf("unsupported definition type %v named %s", value, key))
-
-		}
-
-	default:
-		return nil, errors.New(fmt.Sprintf("unsupported definition type %v", data))
-	}
-
-}
-
-type JsonContainer struct {
+type jsonContainer struct {
 	Definitions map[string]map[string]interface{}
 }
 
@@ -469,7 +470,7 @@ func Decode() (map[string]types.Type, error) {
 		panic(err)
 	}
 
-	jsonRoot := JsonContainer{}
+	jsonRoot := jsonContainer{}
 
 	err = json.Unmarshal(bytes, &jsonRoot)
 

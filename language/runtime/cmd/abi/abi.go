@@ -25,6 +25,10 @@ func GenerateABI(args []string, pretty bool) error {
 	return err
 }
 
+func GetABIForData(data []byte, pretty bool) []byte {
+
+}
+
 func GetABIForFile(filename string, pretty bool) []byte {
 
 	_, checker, _ := cmd.PrepareInterpreter(filename)
