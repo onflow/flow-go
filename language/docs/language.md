@@ -1312,7 +1312,7 @@ booleans[0] = true
     ```
 
 - `keys: [K]`:
-  Returns an array of the keys in the dictionary.  This does not
+  Returns an array of the keys of type `K` in the dictionary.  This does not
   modify the dictionary, just returns a copy of the keys as an array.
   If the dictionary is empty, this returns an empty array.
 
@@ -1323,13 +1323,15 @@ booleans[0] = true
     // Find the keys of the dictionary.
     let keys = numbers.keys
 
-    // `keys` has type [String] and is `["fortyTwo","twentyThree"]`
+    // `keys` has type `[String]` and is `["fortyTwo","twentyThree"]`
     ```
 
 - `values: [V]`:
-  Returns an array of the values in the dictionary.  This does not
+  Returns an array of the values of type `V` in the dictionary.  This does not
   modify the dictionary, just returns a copy of the values as an array.
   If the dictionary is empty, this returns an empty array.
+
+  This field is not available if `V` is a resource type.
 
     ```cadence,file=dictionary-values-field.cdc
     // Declare a dictionary mapping strings to integers.
@@ -3135,25 +3137,25 @@ b.increment()
 // `b.value` is 2, `a.value` is `0`
 ```
 
-#### Accessing Fields and Methods of Composite Data Types Using Optional Chaining
+#### Accessing Fields and Functions of Composite Data Types Using Optional Chaining
 
-If a struct with fields and methods is stored as an optional,
-optional chaining can be used to get those values or call the methods without 
+If a composite data type with fields and functions is wrapped in an optional,
+optional chaining can be used to get those values or call the function without 
 having to get the value of the optional first.  
 
 Optional chaining is used by adding a `?` before the `.` access operator for fields or
-methods of an optional composite type.
+functions of an optional composite type.
 
-When getting a field value or calling a method with a return value, the access returns 
+When getting a field value or calling a function with a return value, the access returns 
 the value as an optional. If the object doesn't exist, the value will always be `nil`
 
-When calling a method on an optional like this, if the object doesn't exist,
+When calling a function on an optional like this, if the object doesn't exist,
 nothing will happen and the execution will continue.
 
-It is still invalid to access a field of an optional that isn't defined in the Type
+It is still invalid to access a field of an optional composite type that is not declared.
 
 ```cadence,file=optional-chaining.cdc
-// declare a struct with a field and method
+// Declare a struct with a field and method.
 pub struct Value {
     pub var number: Int
 
@@ -3172,7 +3174,7 @@ pub struct Value {
 }
 
 // create a new instance of the struct as an optional
-let value: Value? = new Value()
+let value: Value? = Value()
 // create another optional with the same type, but nil
 let noValue: Value? = nil
 
@@ -3180,23 +3182,23 @@ let noValue: Value? = nil
 let twoOpt = value?.number
 // Because `value` is an optional, `twoOpt` has type `Int?`
 let two = zeroOpt ?? 0
-// `two` is 2
+// `two` is `2`
 
-// Try to Access the `number` field of noValue, which has type Value?
+// Try to access the `number` field of `noValue`, which has type `Value?`
 // This still returns an `Int?`
 let nilValue = noValue?.number
-// This time, since `noValue` is nil, `nilValue` will also be nil
+// This time, since `noValue` is `nil`, `nilValue` will also be `nil`
 
-// Call the `set` method of the struct
+// Call the `set` function of the struct
 // whether or not the object exists, this will not fail
 value?.set(new: 4)
 noValue?.set(new: 4)
 
-// Call the setAndReturn method, which returns an Int
+// Call the `setAndReturn` function, which returns an `Int`
 // Because `value` is an optional, the return value is type `Int?`
 let sixOpt = value?.setAndReturn(new: 6)
 let six = sixOpt ?? 0
-// `six` is 6
+// `six` is `6`
 
 ```
 
@@ -4597,8 +4599,6 @@ the value must be a value that has the type `Vault` or is a subtype of `Vault`.
 
 The index operator `[]` is used for both reading and writing stored values.
 
-Only the account owner is allowed to read and write to and from the `storage` object.
-
 ```cadence,file=account-storage.cdc
 // Declare a resource named `Counter`.
 //
@@ -4751,16 +4751,12 @@ limitedReference.increment()
 
 ## Publishing References
 
-Users will often want to make it so anyone in the network can access certain fields
+Users will often want to make it so anyone can access certain fields
 and methods of an object.  This can be done by publishing a reference to that object.
 
 Publishing a reference is done by storing the reference in the account's `published`
 object.  `published` is a key-value store where the keys are restricted
 to be only reference types.  
-
-Like account storage, only the account owner can write to
-the `published` object, but unlike storage, anyone in the network can read from an
-account's `published` object.  
 
 To continue the example above:
 
@@ -4787,15 +4783,16 @@ account.published[Counter] <- account.storage[Counter]
 
 ```
 
-When an account gets another account's object, they only have access to
-the `published` object.  They can read or copy any of the references that are
-stored within.  
+To get the published portion of an account, the `getAccount` function can be used.
+
+The public account object only has the `published` object, which is read-only, 
+and can be used to access all published references of the account.
 
 Imagine that the next example is from a different account as before.
 
 ```cadence,file=published-reading
 
-// Get the account object for the account that published the reference.
+// Get the public account object for the account that published the reference.
 //
 let acct = getAccount(0x72)
 
@@ -4818,10 +4815,6 @@ countRef.increment()
 let countObj = acct.storage[Counter]
 
 ```
-
-
-
-
 
 
 ## Events
