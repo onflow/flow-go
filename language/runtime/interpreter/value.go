@@ -134,7 +134,11 @@ func (v BoolValue) Negate() BoolValue {
 }
 
 func (v BoolValue) Equal(other Value) BoolValue {
-	return bool(v) == bool(other.(BoolValue))
+	otherBool, ok := other.(BoolValue)
+	if !ok {
+		return false
+	}
+	return bool(v) == bool(otherBool)
 }
 
 func (v BoolValue) String() string {
@@ -188,8 +192,15 @@ func (v *StringValue) KeyString() string {
 }
 
 func (v *StringValue) Equal(other Value) BoolValue {
-	otherString := other.(*StringValue)
-	return norm.NFC.String(v.Str) == norm.NFC.String(otherString.Str)
+	otherString, ok := other.(*StringValue)
+	if !ok {
+		return false
+	}
+	return v.NormalForm() == otherString.NormalForm()
+}
+
+func (v *StringValue) NormalForm() string {
+	return norm.NFC.String(v.Str)
 }
 
 func (v *StringValue) Concat(other ConcatenatableValue) Value {
@@ -663,7 +674,11 @@ func (v IntValue) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v IntValue) Equal(other Value) BoolValue {
-	cmp := v.Int.Cmp(other.(IntValue).Int)
+	otherInt, ok := other.(IntValue)
+	if !ok {
+		return false
+	}
+	cmp := v.Int.Cmp(otherInt.Int)
 	return BoolValue(cmp == 0)
 }
 
@@ -747,7 +762,11 @@ func (v Int8Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v Int8Value) Equal(other Value) BoolValue {
-	return v == other.(Int8Value)
+	otherInt8, ok := other.(Int8Value)
+	if !ok {
+		return false
+	}
+	return v == otherInt8
 }
 
 func ConvertInt8(value Value) Value {
@@ -834,7 +853,11 @@ func (v Int16Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v Int16Value) Equal(other Value) BoolValue {
-	return v == other.(Int16Value)
+	otherInt16, ok := other.(Int16Value)
+	if !ok {
+		return false
+	}
+	return v == otherInt16
 }
 
 func ConvertInt16(value Value) Value {
@@ -921,7 +944,11 @@ func (v Int32Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v Int32Value) Equal(other Value) BoolValue {
-	return v == other.(Int32Value)
+	otherInt32, ok := other.(Int32Value)
+	if !ok {
+		return false
+	}
+	return v == otherInt32
 }
 
 func ConvertInt32(value Value) Value {
@@ -1008,7 +1035,11 @@ func (v Int64Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v Int64Value) Equal(other Value) BoolValue {
-	return v == other.(Int64Value)
+	otherInt64, ok := other.(Int64Value)
+	if !ok {
+		return false
+	}
+	return v == otherInt64
 }
 
 func ConvertInt64(value Value) Value {
@@ -1095,7 +1126,11 @@ func (v UInt8Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v UInt8Value) Equal(other Value) BoolValue {
-	return v == other.(UInt8Value)
+	otherUInt8, ok := other.(UInt8Value)
+	if !ok {
+		return false
+	}
+	return v == otherUInt8
 }
 
 func ConvertUInt8(value Value) Value {
@@ -1180,7 +1215,11 @@ func (v UInt16Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v UInt16Value) Equal(other Value) BoolValue {
-	return v == other.(UInt16Value)
+	otherUInt16, ok := other.(UInt16Value)
+	if !ok {
+		return false
+	}
+	return v == otherUInt16
 }
 
 func ConvertUInt16(value Value) Value {
@@ -1267,7 +1306,11 @@ func (v UInt32Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v UInt32Value) Equal(other Value) BoolValue {
-	return v == other.(UInt32Value)
+	otherUInt32, ok := other.(UInt32Value)
+	if !ok {
+		return false
+	}
+	return v == otherUInt32
 }
 
 func ConvertUInt32(value Value) Value {
@@ -1354,7 +1397,11 @@ func (v UInt64Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v UInt64Value) Equal(other Value) BoolValue {
-	return v == other.(UInt64Value)
+	otherUInt64, ok := other.(UInt64Value)
+	if !ok {
+		return false
+	}
+	return v == otherUInt64
 }
 
 func ConvertUInt64(value Value) Value {
@@ -2129,6 +2176,28 @@ func (StorageValue) SetOwner(owner string) {
 	// NO-OP: ownership cannot be changed
 }
 
+// PublishedValue
+
+type PublishedValue struct {
+	Identifier string
+}
+
+func (PublishedValue) isValue() {}
+
+func (v PublishedValue) Copy() Value {
+	return PublishedValue{
+		Identifier: v.Identifier,
+	}
+}
+
+func (v PublishedValue) GetOwner() string {
+	return v.Identifier
+}
+
+func (PublishedValue) SetOwner(owner string) {
+	// NO-OP: ownership cannot be changed
+}
+
 // ReferenceValue
 
 type ReferenceValue struct {
@@ -2161,8 +2230,9 @@ func (v *ReferenceValue) SetOwner(owner string) {
 }
 
 func (v *ReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
-	switch referenced :=
-		interpreter.readStored(v.TargetStorageIdentifier, v.TargetKey).(type) {
+	key := PrefixedStorageKey(v.TargetKey, AccessLevelPrivate)
+
+	switch referenced := interpreter.readStored(v.TargetStorageIdentifier, key).(type) {
 	case *SomeValue:
 		return referenced.Value
 	case NilValue:
@@ -2194,6 +2264,16 @@ func (v *ReferenceValue) Set(interpreter *Interpreter, locationRange LocationRan
 		Set(interpreter, locationRange, key, value)
 }
 
+func (v *ReferenceValue) Equal(other Value) BoolValue {
+	otherReference, ok := other.(*ReferenceValue)
+	if !ok {
+		return false
+	}
+
+	return v.TargetStorageIdentifier == otherReference.TargetStorageIdentifier &&
+		v.TargetKey == otherReference.TargetKey
+}
+
 // AddressValue
 
 const AddressLength = 20
@@ -2202,6 +2282,12 @@ type AddressValue [AddressLength]byte
 
 func init() {
 	gob.Register(AddressValue{})
+}
+
+func NewAddressValueFromBytes(b []byte) AddressValue {
+	result := AddressValue{}
+	copy(result[AddressLength-len(b):], b)
+	return result
 }
 
 func ConvertAddress(value Value) Value {
@@ -2244,16 +2330,43 @@ func (AddressValue) SetOwner(owner string) {
 	// NO-OP: value cannot be owned
 }
 
+func (v AddressValue) Equal(other Value) BoolValue {
+	otherAddress, ok := other.(AddressValue)
+	if !ok {
+		return false
+	}
+	return [AddressLength]byte(v) == [AddressLength]byte(otherAddress)
+}
+
+func (v AddressValue) StorageIdentifier() string {
+	return fmt.Sprintf("%x", v)
+}
+
 // AccountValue
 
 func NewAccountValue(address AddressValue) *CompositeValue {
-	addressHex := fmt.Sprintf("%x", address)
+	storageIdentifier := address.StorageIdentifier()
 
 	return &CompositeValue{
 		Identifier: (&sema.AccountType{}).ID(),
 		Fields: map[string]Value{
-			"address": address,
-			"storage": StorageValue{Identifier: addressHex},
+			"address":   address,
+			"storage":   StorageValue{Identifier: storageIdentifier},
+			"published": PublishedValue{Identifier: storageIdentifier},
+		},
+	}
+}
+
+// PublicAccountValue
+
+func NewPublicAccountValue(address AddressValue) *CompositeValue {
+	storageIdentifier := address.StorageIdentifier()
+
+	return &CompositeValue{
+		Identifier: (&sema.PublicAccountType{}).ID(),
+		Fields: map[string]Value{
+			"address":   address,
+			"published": PublishedValue{Identifier: storageIdentifier},
 		},
 	}
 }

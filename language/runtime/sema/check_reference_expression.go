@@ -28,12 +28,14 @@ func (checker *Checker) VisitReferenceExpression(referenceExpression *ast.Refere
 
 		// Check that the index expression's target expression is a storage type
 
-		if _, isStorageType := targetType.(*StorageType); !isStorageType {
-			checker.report(
-				&NonStorageReferenceError{
-					Range: ast.NewRangeFromPositioned(indexExpression.TargetExpression),
-				},
-			)
+		if !targetType.IsInvalidType() {
+			if _, isStorageType := targetType.(*StorageType); !isStorageType {
+				checker.report(
+					&NonStorageReferenceError{
+						Range: ast.NewRangeFromPositioned(indexExpression.TargetExpression),
+					},
+				)
+			}
 		}
 	} else {
 		checker.report(

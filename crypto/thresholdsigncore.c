@@ -5,7 +5,7 @@
 
 // Computes the Lagrange coefficient L(i+1) at 0 with regards to the range [signers(0)+1..signers(t)+1]
 // and stores it in res, where t is the degree of the polynomial P
-static void Zr_lagrangeCoefficientAtZero(bn_st* res, const int i, const uint32_t* signers, const int len){
+static void Zr_lagrangeCoefficientAtZero(bn_st* res, const int i, const uint8_t* signers, const int len){
     // r is the order of G1 and G2
     bn_st r, r_2;
     bn_new(&r);
@@ -69,7 +69,7 @@ static void Zr_lagrangeCoefficientAtZero(bn_st* res, const int i, const uint32_t
 // Computes the Langrange interpolation at zero LI(0) with regards to the points [signers(1)+1..signers(t+1)+1] 
 // and their images [shares(1)..shares(t+1)], and stores the result in dest
 // len is the polynomial degree 
-void G1_lagrangeInterpolateAtZero(byte* dest, const byte* shares, const uint32_t* signers, const int len) {
+void G1_lagrangeInterpolateAtZero(byte* dest, const byte* shares, const uint8_t* signers, const int len) {
     // computes Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
     // powers of x
     bn_st bn_lagr_coef;

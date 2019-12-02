@@ -12,6 +12,7 @@ endif
 #----------------------------------------------------------------------
 SERVICE_SHORT_NAME=emulator
 SERVICE_LONG_NAME=dl-flow/${SERVICE_SHORT_NAME}
+DEPLOYMENT_NAME=flow-emulator-v1
 
 # Build information
 #----------------------------------------------------------------------
@@ -27,7 +28,7 @@ K8S_YAMLS_LOCATION=./k8s
 #----------------------------------------------------------------------
 
 .PHONY: deploy-staging
-deploy-staging: update-deployment-image apply-staging-files
+deploy-staging: update-deployment-image apply-staging-files monitor-rollout
 
 .PHONY: deploy-production
 deploy-production: update-deployment-image apply-prod-files
@@ -58,3 +59,9 @@ update-deployment-image:
 		kubectl patch -f $$i -p '{"spec":{"template":{"spec":{"containers":[{"name":"${CONTAINER}","image":"${IMAGE_URL}:${IMAGE_TAG}"}]}}}}' --local -o yaml > $$patched; \
 		mv -f $$patched $$i; \
 	done
+
+.PHONY: monitor-rollout
+monitor-rollout:
+	kconfig=$$(uuidgen); \
+	echo "$$KUBECONFIG_STAGING" > $$kconfig; \
+	kubectl --kubeconfig=$$kconfig rollout status deployments.apps ${DEPLOYMENT_NAME}

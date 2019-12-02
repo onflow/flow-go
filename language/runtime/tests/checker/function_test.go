@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -17,7 +18,7 @@ func TestCheckReferenceInFunction(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckParameterNameWithFunctionName(t *testing.T) {
@@ -28,7 +29,7 @@ func TestCheckParameterNameWithFunctionName(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckMutuallyRecursiveFunctions(t *testing.T) {
@@ -49,7 +50,7 @@ func TestCheckMutuallyRecursiveFunctions(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckMutuallyRecursiveScoping(t *testing.T) {
@@ -67,7 +68,7 @@ func TestCheckMutuallyRecursiveScoping(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidFunctionDeclarations(t *testing.T) {
@@ -92,7 +93,7 @@ func TestCheckFunctionRedeclaration(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckFunctionAccess(t *testing.T) {
@@ -101,7 +102,7 @@ func TestCheckFunctionAccess(t *testing.T) {
        pub fun test() {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidFunctionAccess(t *testing.T) {
@@ -123,7 +124,7 @@ func TestCheckReturnWithoutExpression(t *testing.T) {
        }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckAnyReturnType(t *testing.T) {
@@ -134,7 +135,7 @@ func TestCheckAnyReturnType(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidParameterTypes(t *testing.T) {
@@ -170,7 +171,7 @@ func TestCheckParameterRedeclaration(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidParameterAssignment(t *testing.T) {
@@ -203,7 +204,7 @@ func TestCheckArgumentLabelRedeclaration(t *testing.T) {
       fun test(_ a: Int, _ b: Int) {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidFunctionDeclarationReturnValue(t *testing.T) {

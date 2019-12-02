@@ -1,4 +1,4 @@
-pub struct interface NFT {
+pub resource interface NFT {
   pub fun id(): Int {
     post {
       result > 0
@@ -6,7 +6,7 @@ pub struct interface NFT {
   } 
 }
 
-pub struct GreatNFT: NFT {
+pub resource GreatNFT: NFT {
   priv let _id: Int
   priv let _special: Bool
 
@@ -27,15 +27,15 @@ pub struct GreatNFT: NFT {
   }
 }
 
-pub struct GreatNFTMinter {
+pub resource GreatNFTMinter {
   pub var nextID: Int
   pub let specialMod: Int
 
-  pub fun mint(): GreatNFT {
+  pub fun mint(): <-GreatNFT {
     var isSpecial = self.nextID % self.specialMod == 0
-    let nft = GreatNFT(id: self.nextID, isSpecial: isSpecial)
+    let nft <- create GreatNFT(id: self.nextID, isSpecial: isSpecial)
     self.nextID = self.nextID + 1
-    return nft
+    return <-nft
   }
 
   init(firstID: Int, specialMod: Int) {
@@ -46,4 +46,8 @@ pub struct GreatNFTMinter {
     self.nextID = firstID
     self.specialMod = specialMod
   }
+}
+
+pub fun createGreatNFTMinter(firstID: Int, specialMod: Int): <-GreatNFTMinter {
+  return <-create GreatNFTMinter(firstID: firstID, specialMod: specialMod)
 }

@@ -155,6 +155,28 @@ func (e *TypeMismatchError) SecondaryError() string {
 	)
 }
 
+// TypeMismatchWithDescriptionError
+
+type TypeMismatchWithDescriptionError struct {
+	ExpectedTypeDescription string
+	ActualType              Type
+	ast.Range
+}
+
+func (e *TypeMismatchWithDescriptionError) Error() string {
+	return "mismatched types"
+}
+
+func (*TypeMismatchWithDescriptionError) isSemanticError() {}
+
+func (e *TypeMismatchWithDescriptionError) SecondaryError() string {
+	return fmt.Sprintf(
+		"expected %s, got `%s`",
+		e.ExpectedTypeDescription,
+		e.ActualType,
+	)
+}
+
 // NotIndexableTypeError
 
 type NotIndexableTypeError struct {
@@ -1885,3 +1907,21 @@ func (e *InvalidTransactionPrepareParameterType) Error() string {
 }
 
 func (*InvalidTransactionPrepareParameterType) isSemanticError() {}
+
+// InvalidNestedDeclarationError
+
+type InvalidNestedDeclarationError struct {
+	NestedDeclarationKind    common.DeclarationKind
+	ContainerDeclarationKind common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidNestedDeclarationError) Error() string {
+	return fmt.Sprintf(
+		"%s declarations cannot be nested inside %s declarations",
+		e.NestedDeclarationKind.Name(),
+		e.ContainerDeclarationKind.Name(),
+	)
+}
+
+func (*InvalidNestedDeclarationError) isSemanticError() {}

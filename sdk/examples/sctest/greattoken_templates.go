@@ -6,19 +6,24 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// GenerateCreateMinterScript Creates a script that instantiates a new GreatNFTMinter instance
-// and stores it in memory.
+// GenerateCreateMinterScript Creates a script that instantiates
+// a new GreatNFTMinter instance and stores it in memory.
 // Initial ID and special mod are arguments to the GreatNFTMinter constructor.
 // The GreatNFTMinter must have been deployed already.
 func GenerateCreateMinterScript(nftAddr flow.Address, initialID, specialMod int) []byte {
 	template := `
-		import GreatNFTMinter from 0x%s
+		import 0x%s
 
 		transaction {
+
 		  prepare(acct: Account) {
-			let minter = GreatNFTMinter(firstID: %d, specialMod: %d)
-			acct.storage[GreatNFTMinter] = minter
+			let existing <- acct.storage[GreatNFTMinter] <- createGreatNFTMinter(firstID: %d, specialMod: %d)
+			assert(existing == nil, message: "existed")
+			destroy existing
+
+			acct.storage[&GreatNFTMinter] = &acct.storage[GreatNFTMinter] as GreatNFTMinter
 		  }
+
 		  execute {}
 		}
 	`
@@ -33,13 +38,14 @@ func GenerateMintScript(nftCodeAddr flow.Address) []byte {
 		import GreatNFTMinter, GreatNFT from 0x%s
 
 		transaction {
-		  prepare(acct: Account) {
-			let minter = acct.storage[GreatNFTMinter] ?? panic("missing minter")
-			let nft = minter.mint()
 
-			acct.storage[GreatNFT] = nft
-			acct.storage[GreatNFTMinter] = minter
+		  prepare(acct: Account) {
+			let minter = acct.storage[&GreatNFTMinter] ?? panic("missing minter")
+			let existing <- acct.storage[GreatNFT] <- minter.mint()
+			destroy existing
+            acct.published[&GreatNFT] = &acct.storage[GreatNFT] as GreatNFT
 		  }
+
 		  execute {}
 		}
 	`
@@ -47,38 +53,26 @@ func GenerateMintScript(nftCodeAddr flow.Address) []byte {
 	return []byte(fmt.Sprintf(template, nftCodeAddr.String()))
 }
 
-// GenerateInspectNFTScript Creates a script that retrieves an NFT from storage and makes assertions
-// about its properties. If these assertions fail, the script panics.
+// GenerateInspectNFTScript Creates a script that retrieves an NFT
+// from storage and makes assertions about its properties.
+// If these assertions fail, the script panics.
 func GenerateInspectNFTScript(nftCodeAddr, userAddr flow.Address, expectedID int, expectedIsSpecial bool) []byte {
 	template := `
 		import GreatNFT from 0x%s
 
 		pub fun main() {
 		  let acct = getAccount(0x%s)
-		  let nft = acct.storage[GreatNFT] ?? panic("missing nft")
-		  if nft.id() != %d {
-			panic("incorrect id")
-		  }
-		  if nft.isSpecial() != %t {
-			panic("incorrect specialness")
-		  }
+		  let nft = acct.published[&GreatNFT] ?? panic("missing nft")
+		  assert(
+              nft.id() == %d,
+              message: "incorrect id"
+          )
+		  assert(
+              nft.isSpecial() == %t,
+              message: "incorrect specialness"
+          )
 		}
 	`
 
 	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr, expectedID, expectedIsSpecial))
-}
-
-// GenerateNFTIDScript Creates a script that retrieves the id of the NFT that you own
-func GenerateNFTIDScript(nftCodeAddr, userAddr flow.Address) []byte {
-	template := `
-		import GreatNFT from 0x%s
-
-		pub fun main(): Int {
-		  let acct = getAccount(0x%s)
-		  let nft = acct.storage[GreatNFT] ?? panic("missing nft")
-		  return nft.id()
-		}
-	`
-
-	return []byte(fmt.Sprintf(template, nftCodeAddr, userAddr))
 }

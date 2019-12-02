@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -31,5 +32,5 @@ func TestCheckFunctionExpressionsAndScope(t *testing.T) {
        let y = (fun (x: Int): Int { return x })(42)
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }

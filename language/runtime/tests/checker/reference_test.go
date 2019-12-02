@@ -50,7 +50,7 @@ func TestCheckReferenceTypeOuter(t *testing.T) {
       fun test(r: &[R]) {}
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckReferenceTypeInner(t *testing.T) {
@@ -61,7 +61,7 @@ func TestCheckReferenceTypeInner(t *testing.T) {
       fun test(r: [&R]) {}
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNestedReferenceType(t *testing.T) {
@@ -72,7 +72,7 @@ func TestCheckNestedReferenceType(t *testing.T) {
       fun test(r: &[&R]) {}
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidReferenceType(t *testing.T) {
@@ -120,7 +120,7 @@ func TestCheckReferenceExpressionWithResourceInterfaceResultType(t *testing.T) {
         `,
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidReferenceExpressionType(t *testing.T) {
@@ -161,10 +161,11 @@ func TestCheckInvalidReferenceExpressionNonResourceReferencedType(t *testing.T) 
         `,
 	)
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 3)
 
-	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[0])
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
+	assert.IsType(t, &sema.TypeMismatchWithDescriptionError{}, errs[0])
+	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[1])
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[2])
 }
 
 func TestCheckInvalidReferenceExpressionNonResourceResultType(t *testing.T) {
@@ -193,11 +194,12 @@ func TestCheckInvalidReferenceExpressionNonResourceTypes(t *testing.T) {
         `,
 	)
 
-	errs := ExpectCheckerErrors(t, err, 3)
+	errs := ExpectCheckerErrors(t, err, 4)
 
-	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[0])
+	assert.IsType(t, &sema.TypeMismatchWithDescriptionError{}, errs[0])
 	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[1])
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[2])
+	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[2])
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[3])
 }
 
 func TestCheckInvalidReferenceExpressionTypeMismatch(t *testing.T) {
@@ -276,7 +278,7 @@ func TestCheckReferenceUse(t *testing.T) {
         `,
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckReferenceUseArray(t *testing.T) {
@@ -310,7 +312,7 @@ func TestCheckReferenceUseArray(t *testing.T) {
         `,
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckReferenceIndexingIfReferencedIndexable(t *testing.T) {
@@ -332,7 +334,7 @@ func TestCheckReferenceIndexingIfReferencedIndexable(t *testing.T) {
         `,
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidReferenceResourceLoss(t *testing.T) {
@@ -402,7 +404,7 @@ func TestCheckResourceInterfaceReferenceFunctionCall(t *testing.T) {
         `,
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidResourceInterfaceReferenceFunctionCall(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProgram_ResolveImports(t *testing.T) {
@@ -34,7 +35,7 @@ func TestProgram_ResolveImports(t *testing.T) {
 		}
 	})
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	importsA := a.ImportedPrograms()
 

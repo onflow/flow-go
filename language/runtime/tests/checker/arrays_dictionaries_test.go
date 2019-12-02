@@ -18,7 +18,7 @@ func TestCheckDictionary(t *testing.T) {
       let z = {"a": 1, "b": 2}
 	`)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckDictionaryType(t *testing.T) {
@@ -27,7 +27,7 @@ func TestCheckDictionaryType(t *testing.T) {
       let z: {String: Int} = {"a": 1, "b": 2}
 	`)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckInvalidDictionaryTypeKey(t *testing.T) {
@@ -107,7 +107,7 @@ func TestCheckDictionaryIndexingBool(t *testing.T) {
       let y = x[true]
 	`)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckInvalidDictionaryIndexing(t *testing.T) {
@@ -131,7 +131,7 @@ func TestCheckDictionaryIndexingAssignment(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidDictionaryIndexingAssignment(t *testing.T) {
@@ -157,7 +157,7 @@ func TestCheckDictionaryRemove(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidDictionaryRemove(t *testing.T) {
@@ -183,7 +183,7 @@ func TestCheckDictionaryInsert(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidDictionaryInsert(t *testing.T) {
@@ -235,7 +235,7 @@ func TestCheckLength(t *testing.T) {
       let y = [1, 2, 3].length
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckArrayAppend(t *testing.T) {
@@ -248,7 +248,7 @@ func TestCheckArrayAppend(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayAppend(t *testing.T) {
@@ -277,7 +277,7 @@ func TestCheckArrayAppendBound(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayAppendToConstantSize(t *testing.T) {
@@ -306,7 +306,7 @@ func TestCheckArrayConcat(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayConcat(t *testing.T) {
@@ -352,7 +352,7 @@ func TestCheckArrayConcatBound(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckArrayInsert(t *testing.T) {
@@ -365,7 +365,7 @@ func TestCheckArrayInsert(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayInsert(t *testing.T) {
@@ -408,7 +408,7 @@ func TestCheckArrayRemove(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayRemove(t *testing.T) {
@@ -451,7 +451,7 @@ func TestCheckArrayRemoveFirst(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayRemoveFirst(t *testing.T) {
@@ -494,7 +494,7 @@ func TestCheckArrayRemoveLast(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayRemoveLastFromConstantSized(t *testing.T) {
@@ -521,7 +521,7 @@ func TestCheckArrayContains(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayContains(t *testing.T) {
@@ -558,7 +558,7 @@ func TestCheckEmptyArray(t *testing.T) {
       let xs: [Int] = []
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckEmptyArrayCall(t *testing.T) {
@@ -569,7 +569,7 @@ func TestCheckEmptyArrayCall(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckEmptyDictionary(t *testing.T) {
@@ -578,7 +578,7 @@ func TestCheckEmptyDictionary(t *testing.T) {
       let xs: {String: Int} = {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckEmptyDictionaryCall(t *testing.T) {
@@ -589,7 +589,7 @@ func TestCheckEmptyDictionaryCall(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckArraySubtyping(t *testing.T) {
@@ -613,7 +613,7 @@ func TestCheckArraySubtyping(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 2)
@@ -658,7 +658,7 @@ func TestCheckDictionarySubtyping(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+				require.NoError(t, err)
 
 			default:
 				errs := ExpectCheckerErrors(t, err, 2)
@@ -760,7 +760,7 @@ func TestCheckConstantSizedArrayDeclaration(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
@@ -800,7 +800,7 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 				code,
 			))
 
-			assert.Nil(t, err)
+			require.NoError(t, err)
 		})
 	}
 

@@ -26,7 +26,10 @@ func testSignVerify(t *testing.T, halg Hasher, sk PrivateKey, input []byte) {
 }
 
 func benchSign(b *testing.B, algo SigningAlgorithm, halg Hasher) {
-	seed := []byte("keyseed")
+	seed := make([]byte, 40)
+	for j := 0; j < len(seed); j++ {
+		seed[j] = byte(j)
+	}
 	sk, _ := GeneratePrivateKey(algo, seed)
 
 	input := []byte("Bench input")
@@ -39,7 +42,10 @@ func benchSign(b *testing.B, algo SigningAlgorithm, halg Hasher) {
 }
 
 func benchVerify(b *testing.B, algo SigningAlgorithm, halg Hasher) {
-	seed := []byte("keyseed")
+	seed := make([]byte, 40)
+	for j := 0; j < len(seed); j++ {
+		seed[j] = byte(j)
+	}
 	sk, _ := GeneratePrivateKey(algo, seed)
 	pk := sk.PublicKey()
 

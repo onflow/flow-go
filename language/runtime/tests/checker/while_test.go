@@ -30,7 +30,7 @@ func TestCheckWhileTest(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckInvalidWhileBlock(t *testing.T) {
@@ -56,7 +56,7 @@ func TestCheckBreakStatement(t *testing.T) {
        }
     `)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckInvalidBreakStatement(t *testing.T) {
@@ -86,7 +86,7 @@ func TestCheckContinueStatement(t *testing.T) {
        }
     `)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckInvalidContinueStatement(t *testing.T) {

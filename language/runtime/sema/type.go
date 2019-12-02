@@ -56,7 +56,7 @@ type TypeIndexableType interface {
 	Type
 	isTypeIndexableType()
 	IsAssignable() bool
-	IsValidIndexingType(indexingType Type) (isValid bool, expectedType Type)
+	IsValidIndexingType(indexingType Type) (isValid bool, expectedTypeDescription string)
 	ElementType(indexingType Type, isAssignment bool) Type
 }
 
@@ -1678,6 +1678,74 @@ func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *
 			VariableKind:    ast.VariableKindConstant,
 		})
 
+	case "published":
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			Type:            &ReferencesType{Assignable: true},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+		})
+
+	default:
+		return nil
+	}
+}
+
+// PublicAccountType
+
+type PublicAccountType struct{}
+
+func (*PublicAccountType) isType() {}
+
+func (*PublicAccountType) String() string {
+	return "PublicAccount"
+}
+
+func (*PublicAccountType) ID() string {
+	return "PublicAccount"
+}
+
+func (*PublicAccountType) Equal(other Type) bool {
+	_, ok := other.(*PublicAccountType)
+	return ok
+}
+
+func (*PublicAccountType) IsResourceType() bool {
+	return false
+}
+
+func (*PublicAccountType) IsInvalidType() bool {
+	return false
+}
+
+func (*PublicAccountType) HasMembers() bool {
+	return true
+}
+
+func (t *PublicAccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	switch identifier {
+	case "address":
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			Type:            &AddressType{},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+		})
+
+	case "published":
+		return NewCheckedMember(&Member{
+			ContainerType:   t,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: identifier},
+			Type:            &ReferencesType{Assignable: false},
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+		})
+
 	default:
 		return nil
 	}
@@ -2012,9 +2080,16 @@ func (t *StorageType) IsInvalidType() bool {
 
 func (t *StorageType) isTypeIndexableType() {}
 
-func (t *StorageType) IsValidIndexingType(indexingType Type) (isValid bool, expectedType Type) {
-	// TODO: restrict to resource types
-	return true, nil
+func (t *StorageType) IsValidIndexingType(indexingType Type) (isValid bool, expectedTypeDescription string) {
+	if _, ok := indexingType.(*ReferenceType); ok {
+		return true, ""
+	}
+
+	if indexingType.IsResourceType() {
+		return true, ""
+	}
+
+	return false, "resource or reference"
 }
 
 func (t *StorageType) IsAssignable() bool {
@@ -2070,12 +2145,12 @@ func (t *ReferencesType) IsAssignable() bool {
 	return t.Assignable
 }
 
-func (t *ReferencesType) IsValidIndexingType(indexingType Type) (isValid bool, expectedType Type) {
+func (t *ReferencesType) IsValidIndexingType(indexingType Type) (isValid bool, expectedTypeDescription string) {
 	if _, isReferenceType := indexingType.(*ReferenceType); !isReferenceType {
-		return false, &ReferenceType{}
+		return false, "reference"
 	}
 
-	return true, nil
+	return true, ""
 }
 
 // EventType
@@ -2432,7 +2507,9 @@ func IsEquatableType(ty Type) bool {
 
 	if IsSubType(ty, &StringType{}) ||
 		IsSubType(ty, &BoolType{}) ||
-		IsSubType(ty, &IntegerType{}) {
+		IsSubType(ty, &IntegerType{}) ||
+		IsSubType(ty, &ReferenceType{}) ||
+		IsSubType(ty, &AddressType{}) {
 
 		return true
 	}
