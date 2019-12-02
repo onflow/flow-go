@@ -7,6 +7,8 @@ import {createTerminal, resetStorage} from "./terminal";
 const RESTART_SERVER = "cadence.restartServer";
 const START_EMULATOR = "cadence.runEmulator";
 const STOP_EMULATOR = "cadence.stopEmulator";
+const UPDATE_ACCOUNT_CODE = "cadence.updateAccountCode";
+const UPDATE_ACCOUNT_CODE_SERVER = "cadence.server.updateAccountCode";
 
 // Registers a command with VS Code so it can be invoked by the user.
 function registerCommand(ctx: ExtensionContext, command: string, callback: (...args: any[]) => any) {
@@ -17,6 +19,7 @@ export function registerCommands(ext: Extension) {
     registerCommand(ext.ctx, RESTART_SERVER, restartServer(ext));
     registerCommand(ext.ctx, START_EMULATOR, startEmulator(ext));
     registerCommand(ext.ctx, STOP_EMULATOR, stopEmulator(ext));
+    registerCommand(ext.ctx, UPDATE_ACCOUNT_CODE, updateAccountCode(ext));
 }
 
 // Restarts the language server, updating the client in the extension object.
@@ -51,4 +54,26 @@ const stopEmulator = (ext: Extension) => async () => {
 
     terminal.dispose();
     ext.terminal = createTerminal(ext);
+};
+
+// Submits a transaction that updates the configured account's code the
+// code defined in the active document.
+const updateAccountCode = (ext: Extension) => async () => {
+    const activeEditor = window.activeTextEditor
+    if (!activeEditor) {
+        return;
+    }
+    if (!ext.client) {
+        return;
+    }
+
+    try {
+        ext.client.sendRequest("workspace/executeCommand", {
+            command: UPDATE_ACCOUNT_CODE_SERVER,
+            arguments: [activeEditor.document.uri.toString()],
+        });
+    } catch (err) {
+        window.showWarningMessage("Failed to update account code");
+        console.error(err);
+    }
 };

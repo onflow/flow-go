@@ -16,6 +16,8 @@ func TestCommitBlock(t *testing.T) {
 	b, err := emulator.NewEmulatedBlockchain()
 	require.NoError(t, err)
 
+	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
+
 	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,

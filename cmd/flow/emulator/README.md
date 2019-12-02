@@ -42,3 +42,46 @@ docker run gcr.io/dl-flow/emulator keys generate
 
 ## Building
 To build the container locally, use `make docker-build-emulator`.
+
+Images are automatically built and pushed to `gcr.io/dl-flow/emulator` via [Team City](https://ci.eng.dapperlabs.com/project/Flow_FlowGo_FlowEmulator) on any push to master, i.e. Pull Request merge
+
+## Deployment
+Currently, the emulator is being deployed via [Team City](https://ci.eng.dapperlabs.com/project/Flow_FlowGo_FlowEmulator)
+All commands relating to the deployment process live in the `Makefile` in this directory
+
+The deployment has a persistent volume and should keep state persistent. 
+The deployment file for the Ingress/Service/Deployment combo, and the
+Persistent Volume Claim are located in the k8s folder.
+
+### Accessing the deployment
+
+#### Web Address
+*This is only available from the office currently*
+
+It should be available publically via `https://grpc.emulator.staging.withflow.org/`
+
+#### Port Forwarding
+If you have direct access to the cluster, you can use `kubectl` to access the emulator
+```bash
+export EMULATOR_POD_NAME=$(kubectl get pod -n flow -l app=flow-emulator -o jsonpath="{.items[0].metadata.name}")
+kubectl port-forward -n flow $EMULATOR_POD_NAME 3569:3569
+```
+
+#### From a Kubernetes Pod
+If you are in the same namespace (flow), you can simply access the service via it's service name, e.g. `flow-emulator-v1`.
+If you are in a different namespace, you will need to use a [Service without selectors](https://kubernetes.io/docs/concepts/services-networking/service/#services-without-selectors)
+e.g.
+```yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: flow-emulator-v1
+  namespace: YOUR_NAMESPACE
+spec:
+  type: ExternalName
+  externalName: flow-emulator-v1.flow.svc.cluster.local
+  ports:
+      protocol: TCP
+      port: 3569
+      targetPort: 3569
+```

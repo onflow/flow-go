@@ -1,3 +1,3 @@
 package abi
 
-//go:generate go-bindata -o ./files_gen_bin.go --prefix "examples" --pkg abi examples/
+//go:generate go-bindata -o ./examples_bin.go --nometadata --pkg abi --prefix "examples" ./examples/

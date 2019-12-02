@@ -1,7 +1,6 @@
 package emulator_test
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,6 +15,8 @@ import (
 func TestExecuteScript(t *testing.T) {
 	b, err := emulator.NewEmulatedBlockchain()
 	require.NoError(t, err)
+
+	addTwoScript, counterAddress := deployAndGenerateAddTwoScript(t, b)
 
 	accountAddress := b.RootAccountAddress()
 
@@ -33,20 +34,20 @@ func TestExecuteScript(t *testing.T) {
 
 	tx.AddSignature(accountAddress, sig)
 
-	callScript := fmt.Sprintf(sampleCall, accountAddress)
+	callScript := generateGetCounterCountScript(counterAddress, accountAddress)
 
 	// Sample call (value is 0)
 	value, _, err := b.ExecuteScript([]byte(callScript))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, values.NewInt(0), value)
 
 	// Submit tx1 (script adds 2)
 	err = b.SubmitTransaction(tx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Sample call (value is 2)
 	value, _, err = b.ExecuteScript([]byte(callScript))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, values.NewInt(2), value)
 }
 

@@ -64,7 +64,7 @@ func TestCheckSwap(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckInvalidTypesSwap(t *testing.T) {
@@ -161,7 +161,7 @@ func TestCheckSwapOptional(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckSwapResourceArrayElementAndVariable(t *testing.T) {
@@ -178,7 +178,7 @@ func TestCheckSwapResourceArrayElementAndVariable(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckSwapResourceArrayElements(t *testing.T) {
@@ -193,7 +193,7 @@ func TestCheckSwapResourceArrayElements(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckSwapResourceFields(t *testing.T) {
@@ -222,7 +222,7 @@ func TestCheckSwapResourceFields(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 // TestCheckInvalidSwapConstantResourceFields tests that it is invalid
@@ -304,7 +304,7 @@ func TestCheckSwapResourceDictionaryElement(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckInvalidSwapResourceDictionaryElement(t *testing.T) {
@@ -339,5 +339,5 @@ func TestCheckSwapStorage(t *testing.T) {
         `,
 	)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }

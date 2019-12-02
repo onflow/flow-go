@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
@@ -15,9 +16,8 @@ func TestBeforeExtractor(t *testing.T) {
         before(x + before(y)) + z
     `)
 
-	assert.True(t, inputIsComplete)
-
-	assert.Nil(t, err)
+	require.True(t, inputIsComplete)
+	require.NoError(t, err)
 
 	extractor := NewBeforeExtractor()
 

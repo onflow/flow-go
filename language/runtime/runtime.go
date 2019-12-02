@@ -323,11 +323,7 @@ func (r *interpreterRuntime) emitAccountEvent(
 
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		pkArray, ok := arguments[0].(*interpreter.ArrayValue)
-		if !ok {
-			panic(fmt.Sprintf("createAccount requires the first parameter to be an array"))
-		}
-
+		pkArray := arguments[0].(*interpreter.ArrayValue)
 		pkValues := pkArray.Values
 		publicKeys := make([]values.Bytes, len(pkValues))
 
@@ -358,15 +354,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 
 func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		if len(arguments) != 2 {
-			panic(fmt.Sprintf("addAccountKey requires 2 parameters"))
-		}
-
-		accountAddress, ok := arguments[0].(interpreter.AddressValue)
-		if !ok {
-			panic(fmt.Sprintf("addAccountKey requires the first parameter to be an address"))
-		}
-
+		accountAddress := arguments[0].(interpreter.AddressValue)
 		publicKey, err := toBytes(arguments[1])
 		if err != nil {
 			panic(fmt.Sprintf("addAccountKey requires the second parameter to be an array"))
@@ -388,20 +376,8 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 
 func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		if len(arguments) != 2 {
-			panic(fmt.Sprintf("removeAccountKey requires 2 parameters"))
-		}
-
-		accountAddress, ok := arguments[0].(interpreter.AddressValue)
-		if !ok {
-			panic(fmt.Sprintf("removeAccountKey requires the first parameter to be an address"))
-		}
-
-		index, ok := arguments[1].(interpreter.IntValue)
-		if !ok {
-			panic(fmt.Sprintf("removeAccountKey requires the second parameter to be an integer"))
-
-		}
+		accountAddress := arguments[0].(interpreter.AddressValue)
+		index := arguments[1].(interpreter.IntValue)
 
 		accountAddressValue := accountAddress.Export().(values.Address)
 
@@ -421,14 +397,7 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 
 func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		if len(arguments) != 2 {
-			panic(fmt.Sprintf("updateAccountCode requires 2 parameters"))
-		}
-
-		accountAddress, ok := arguments[0].(interpreter.AddressValue)
-		if !ok {
-			panic(fmt.Sprintf("updateAccountCode requires the first parameter to be an address"))
-		}
+		accountAddress := arguments[0].(interpreter.AddressValue)
 
 		code, err := toBytes(arguments[1])
 		if err != nil {
@@ -451,18 +420,9 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 
 func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		if len(arguments) != 1 {
-			panic(fmt.Sprintf("getAccount requires 1 parameter"))
-		}
-
-		accountAddress, ok := arguments[0].(interpreter.AddressValue)
-		if !ok {
-			panic(fmt.Sprintf("getAccount requires the first parameter to be an address"))
-		}
-
-		account := interpreter.NewAccountValue(accountAddress)
-
-		return trampoline.Done{Result: account}
+		accountAddress := arguments[0].(interpreter.AddressValue)
+		publicAccount := interpreter.NewPublicAccountValue(accountAddress)
+		return trampoline.Done{Result: publicAccount}
 	}
 }
 

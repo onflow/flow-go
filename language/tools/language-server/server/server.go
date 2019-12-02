@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
@@ -27,11 +28,19 @@ var valueDeclarations = append(
 ).ToValueDeclarations()
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
+// document represents an open document on the client. It contains all cached
+// information about each document that is used to support CodeLens,
+// transaction submission, and script execution.
+type document struct {
+	text          string
+	latestVersion float64
+	hasErrors     bool
+}
+
 type Server struct {
-	config   config.Config
-	checkers map[protocol.DocumentUri]*sema.Checker
-	// map of document URI to the document text
-	documents map[protocol.DocumentUri]string
+	config    config.Config
+	checkers  map[protocol.DocumentUri]*sema.Checker
+	documents map[protocol.DocumentUri]document
 	// registry of custom commands we support
 	commands   map[string]CommandHandler
 	flowClient *client.Client
@@ -39,19 +48,19 @@ type Server struct {
 	nonce uint64
 }
 
-func NewServer() Server {
-	return Server{
+func NewServer() *Server {
+	return &Server{
 		checkers:  make(map[protocol.DocumentUri]*sema.Checker),
-		documents: make(map[protocol.DocumentUri]string),
+		documents: make(map[protocol.DocumentUri]document),
 		commands:  make(map[string]CommandHandler),
 	}
 }
 
-func (s Server) Start() {
+func (s *Server) Start() {
 	<-protocol.NewServer(s).Start()
 }
 
-func (s Server) Initialize(
+func (s *Server) Initialize(
 	conn protocol.Conn,
 	params *protocol.InitializeParams,
 ) (
@@ -100,7 +109,7 @@ func (s Server) Initialize(
 
 // DidOpenTextDocument is called whenever a new file is opened.
 // We parse and check the text and publish diagnostics about the document.
-func (s Server) DidOpenTextDocument(conn protocol.Conn, params *protocol.DidOpenTextDocumentParams) error {
+func (s *Server) DidOpenTextDocument(conn protocol.Conn, params *protocol.DidOpenTextDocumentParams) error {
 	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Log,
 		Message: "DidOpenTextDoc",
@@ -108,7 +117,6 @@ func (s Server) DidOpenTextDocument(conn protocol.Conn, params *protocol.DidOpen
 
 	uri := params.TextDocument.URI
 	text := params.TextDocument.Text
-	s.documents[uri] = text
 
 	diagnostics, err := s.getDiagnostics(conn, uri, text)
 	if err != nil {
@@ -119,12 +127,18 @@ func (s Server) DidOpenTextDocument(conn protocol.Conn, params *protocol.DidOpen
 		Diagnostics: diagnostics,
 	})
 
+	s.documents[uri] = document{
+		text:          text,
+		latestVersion: params.TextDocument.Version,
+		hasErrors:     len(diagnostics) > 0,
+	}
+
 	return nil
 }
 
 // DidChangeTextDocument is called whenever the current document changes.
 // We parse and check the text and publish diagnostics about the document.
-func (s Server) DidChangeTextDocument(
+func (s *Server) DidChangeTextDocument(
 	conn protocol.Conn,
 	params *protocol.DidChangeTextDocumentParams,
 ) error {
@@ -134,7 +148,6 @@ func (s Server) DidChangeTextDocument(
 	})
 	uri := params.TextDocument.URI
 	text := params.ContentChanges[0].Text
-	s.documents[uri] = text
 
 	diagnostics, err := s.getDiagnostics(conn, uri, text)
 	if err != nil {
@@ -145,12 +158,18 @@ func (s Server) DidChangeTextDocument(
 		Diagnostics: diagnostics,
 	})
 
+	s.documents[uri] = document{
+		text:          text,
+		latestVersion: params.TextDocument.Version,
+		hasErrors:     len(diagnostics) > 0,
+	}
+
 	return nil
 }
 
 // Hover returns contextual type information about the variable at the given
 // location.
-func (s Server) Hover(
+func (s *Server) Hover(
 	conn protocol.Conn,
 	params *protocol.TextDocumentPositionParams,
 ) (*protocol.Hover, error) {
@@ -175,7 +194,7 @@ func (s Server) Hover(
 }
 
 // Definition finds the definition of the type at the given location.
-func (s Server) Definition(
+func (s *Server) Definition(
 	conn protocol.Conn,
 	params *protocol.TextDocumentPositionParams,
 ) (*protocol.Location, error) {
@@ -204,7 +223,7 @@ func (s Server) Definition(
 }
 
 // TODO
-func (s Server) SignatureHelp(
+func (s *Server) SignatureHelp(
 	conn protocol.Conn,
 	params *protocol.TextDocumentPositionParams,
 ) (*protocol.SignatureHelp, error) {
@@ -213,13 +232,14 @@ func (s Server) SignatureHelp(
 
 // CodeLens is called every time the document contents change and returns a
 // list of actions to be injected into the source as inline buttons.
-func (s Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([]*protocol.CodeLens, error) {
+func (s *Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([]*protocol.CodeLens, error) {
 	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Info,
 		Message: "code lens called" + string(params.TextDocument.URI),
 	})
 
-	checker, ok := s.checkers[params.TextDocument.URI]
+	uri := params.TextDocument.URI
+	checker, ok := s.checkers[uri]
 	if !ok {
 		// Can we ensure this doesn't happen?
 		return []*protocol.CodeLens{}, nil
@@ -236,7 +256,7 @@ func (s Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([
 				Command: &protocol.Command{
 					Title:     "execute script",
 					Command:   CommandExecuteScript,
-					Arguments: []interface{}{params.TextDocument.URI},
+					Arguments: []interface{}{uri},
 				},
 			})
 		}
@@ -248,7 +268,7 @@ func (s Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([
 			Command: &protocol.Command{
 				Title:     "submit transaction",
 				Command:   CommandSubmitTransaction,
-				Arguments: []interface{}{params.TextDocument.URI},
+				Arguments: []interface{}{uri},
 			},
 		})
 	}
@@ -260,7 +280,7 @@ func (s Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([
 //
 // We register all the commands we support in registerCommands and populate
 // their corresponding handler at server initialization.
-func (s Server) ExecuteCommand(conn protocol.Conn, params *protocol.ExecuteCommandParams) (interface{}, error) {
+func (s *Server) ExecuteCommand(conn protocol.Conn, params *protocol.ExecuteCommandParams) (interface{}, error) {
 	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Log,
 		Message: "called execute command: " + params.Command,
@@ -275,7 +295,7 @@ func (s Server) ExecuteCommand(conn protocol.Conn, params *protocol.ExecuteComma
 
 // Shutdown tells the server to stop accepting any new requests. This can only
 // be followed by a call to Exit, which exits the process.
-func (Server) Shutdown(conn protocol.Conn) error {
+func (*Server) Shutdown(conn protocol.Conn) error {
 	conn.ShowMessage(&protocol.ShowMessageParams{
 		Type:    protocol.Warning,
 		Message: "Cadence language server is shutting down",
@@ -284,7 +304,7 @@ func (Server) Shutdown(conn protocol.Conn) error {
 }
 
 // Exit exits the process.
-func (Server) Exit(_ protocol.Conn) error {
+func (*Server) Exit(_ protocol.Conn) error {
 	os.Exit(0)
 	return nil
 }
@@ -301,7 +321,7 @@ func (s *Server) getNextNonce() uint64 {
 // that the caller is responsible for publishing to the client.
 //
 // Returns an error if an unexpected error occurred.
-func (s Server) getDiagnostics(conn protocol.Conn, uri protocol.DocumentUri, text string) ([]protocol.Diagnostic, error) {
+func (s *Server) getDiagnostics(conn protocol.Conn, uri protocol.DocumentUri, text string) ([]protocol.Diagnostic, error) {
 	diagnostics := make([]protocol.Diagnostic, 0)
 	program, err := parse(conn, text, string(uri))
 
@@ -321,7 +341,7 @@ func (s Server) getDiagnostics(conn protocol.Conn, uri protocol.DocumentUri, tex
 	mainPath := strings.TrimPrefix(string(uri), "file://")
 
 	_ = program.ResolveImports(func(location ast.Location) (program *ast.Program, err error) {
-		return resolveImport(mainPath, location)
+		return s.resolveImport(conn, mainPath, location)
 	})
 
 	checker, err := sema.NewChecker(
@@ -393,27 +413,50 @@ func parse(conn protocol.Conn, code, location string) (*ast.Program, error) {
 	return program, err
 }
 
-func resolveImport(
+func (s *Server) resolveImport(
+	conn protocol.Conn,
 	mainPath string,
 	location ast.Location,
 ) (*ast.Program, error) {
-	stringLocation, ok := location.(ast.StringLocation)
-	// TODO: publish diagnostic type is not supported?
-	if !ok {
-		return nil, nil
+	switch loc := location.(type) {
+	case ast.StringLocation:
+		return s.resolveFileImport(mainPath, loc)
+	case ast.AddressLocation:
+		return s.resolveAccountImport(conn, loc)
+	default:
+		return nil, fmt.Errorf("unresolvable import location %s", loc.ID())
 	}
+}
 
-	filename := path.Join(path.Dir(mainPath), string(stringLocation))
+func (s *Server) resolveFileImport(mainPath string, location ast.StringLocation) (*ast.Program, error) {
+	filename := path.Join(path.Dir(mainPath), string(location))
 
-	// TODO: publish diagnostic import is self?
 	if filename == mainPath {
-		return nil, nil
+		return nil, fmt.Errorf("cannot import current file: %s", filename)
 	}
 
 	program, _, _, err := parser.ParseProgramFromFile(filename)
-	// TODO: publish diagnostic file does not exist?
 	if err != nil {
-		return nil, nil
+		return nil, fmt.Errorf("cannot find imported file: %s", filename)
+	}
+
+	return program, nil
+}
+
+func (s *Server) resolveAccountImport(conn protocol.Conn, location ast.AddressLocation) (*ast.Program, error) {
+	accountAddr := location.ToAddress()
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: fmt.Sprintf("resolving loc:%s   addr:%s   client:%v", location.String(), accountAddr.String(), s.flowClient),
+	})
+	acct, err := s.flowClient.GetAccount(context.Background(), accountAddr)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get account with address %s err: %w", accountAddr, err)
+	}
+
+	program, _, err := parser.ParseProgram(string(acct.Code))
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse code at adddress %s err: %w", accountAddr, err)
 	}
 
 	return program, nil

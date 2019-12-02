@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -18,7 +19,7 @@ func TestCheckArrayIndexingWithInteger(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNestedArrayIndexingWithInteger(t *testing.T) {
@@ -30,7 +31,7 @@ func TestCheckNestedArrayIndexingWithInteger(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayIndexingWithBool(t *testing.T) {
@@ -96,7 +97,7 @@ func TestCheckArrayIndexingAssignmentWithInteger(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayIndexingAssignmentWithWrongType(t *testing.T) {

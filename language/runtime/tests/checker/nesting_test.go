@@ -1,51 +1,77 @@
 package checker
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
 // TODO: add support for nested composite declarations
 
-func TestCheckInvalidNestedCompositeDeclarations(t *testing.T) {
+func TestCheckCompositeDeclarationNesting(t *testing.T) {
 
-	_, err := ParseAndCheck(t, `
-      contract TestContract {
-          resource TestResource {}
-      }
-    `)
+	interfacePossibilities := []bool{true, false}
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	for _, outerComposite := range common.CompositeKinds {
+		for _, outerIsInterface := range interfacePossibilities {
+			for _, innerComposite := range common.CompositeKinds {
+				for _, innerIsInterface := range interfacePossibilities {
 
-	// TODO: add support for contracts
+					outer := outerComposite.DeclarationKind(outerIsInterface)
+					inner := innerComposite.DeclarationKind(innerIsInterface)
 
-	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+					testName := fmt.Sprintf("%s/%s", outer, inner)
 
-	// TODO: add support for nested composite declarations
+					t.Run(testName, func(t *testing.T) {
 
-	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+						code := fmt.Sprintf(`
+                              %s Outer {
+                                  %s Inner {}
+                              }
+                            `,
+							outer.Keywords(),
+							inner.Keywords(),
+						)
+						_, err := ParseAndCheck(t, code)
 
-}
+						switch outerComposite {
+						case common.CompositeKindContract:
 
-func TestCheckInvalidNestedInterfaceDeclarations(t *testing.T) {
+							switch innerComposite {
+							case common.CompositeKindContract:
+								errs := ExpectCheckerErrors(t, err, 2)
 
-	_, err := ParseAndCheck(t, `
-      contract interface TestContract {
-          resource TestResource {}
-      }
-    `)
+								// TODO: add support for contracts
+								assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 
-	errs := ExpectCheckerErrors(t, err, 2)
+								assert.IsType(t, &sema.InvalidNestedDeclarationError{}, errs[1])
 
-	// TODO: add support for contracts
+							case common.CompositeKindResource, common.CompositeKindStructure:
+								errs := ExpectCheckerErrors(t, err, 1)
 
-	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+								// TODO: add support for contracts
+								assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 
-	// TODO: add support for nested composite declarations
+							default:
+								t.Errorf("unknown outer composite kind %s", outerComposite)
+							}
 
-	assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+						case common.CompositeKindResource, common.CompositeKindStructure:
+							errs := ExpectCheckerErrors(t, err, 1)
+
+							assert.IsType(t, &sema.InvalidNestedDeclarationError{}, errs[0])
+
+						default:
+							t.Errorf("unknown outer composite kind %s", outerComposite)
+						}
+					})
+				}
+			}
+		}
+	}
 }

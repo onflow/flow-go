@@ -112,5 +112,5 @@ func TestCheckInvalidReferencesIndexingAssignmentNonReference(t *testing.T) {
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	assert.IsType(t, &sema.TypeMismatchWithDescriptionError{}, errs[0])
 }

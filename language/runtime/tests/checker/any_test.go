@@ -15,5 +15,5 @@ func TestCheckAny(t *testing.T) {
       let b: Any = true
     `)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }

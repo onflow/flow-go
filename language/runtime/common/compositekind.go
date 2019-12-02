@@ -47,13 +47,24 @@ func (k CompositeKind) Keyword() string {
 	panic(errors.NewUnreachableError())
 }
 
-func (k CompositeKind) DeclarationKind() DeclarationKind {
+func (k CompositeKind) DeclarationKind(isInterface bool) DeclarationKind {
 	switch k {
 	case CompositeKindStructure:
+		if isInterface {
+			return DeclarationKindStructureInterface
+		}
 		return DeclarationKindStructure
+
 	case CompositeKindResource:
+		if isInterface {
+			return DeclarationKindResourceInterface
+		}
 		return DeclarationKindResource
+
 	case CompositeKindContract:
+		if isInterface {
+			return DeclarationKindContractInterface
+		}
 		return DeclarationKindContract
 	}
 

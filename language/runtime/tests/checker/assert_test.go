@@ -3,7 +3,7 @@ package checker
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
@@ -29,7 +29,7 @@ func TestCheckAssertWithoutMessage(t *testing.T) {
 		},
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckAssertWithMessage(t *testing.T) {
@@ -51,5 +51,5 @@ func TestCheckAssertWithMessage(t *testing.T) {
 		},
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }

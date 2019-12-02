@@ -7,8 +7,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/cmd"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding/types"
-	types2 "github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/types/encoding"
 )
 
 // GenerateABI generates ABIs from provided Cadence file
@@ -25,15 +25,8 @@ func GenerateABI(args []string, pretty bool) error {
 	return err
 }
 
-func GetABIForData(data []byte, pretty bool) []byte {
-
-}
-
-func GetABIForFile(filename string, pretty bool) []byte {
-
-	_, checker, _ := cmd.PrepareInterpreter(filename)
-
-	exportedTypes := map[string]types2.Type{}
+func exportTypesFromChecker(checker *sema.Checker) map[string]types.Type {
+	exportedTypes := map[string]types.Type{}
 
 	values := checker.UserDefinedValues()
 	for _, variable := range values {
@@ -45,20 +38,43 @@ func GetABIForFile(filename string, pretty bool) []byte {
 		}
 	}
 
-	encoder := types.NewEncoder()
+	return exportedTypes
+}
 
-	for name, typ := range exportedTypes {
+func encodeTypesAsJson(types map[string]types.Type, pretty bool) ([]byte, error) {
+	encoder := encoding.NewEncoder()
+
+	for name, typ := range types {
 		encoder.Encode(name, typ)
 	}
 
-	marshal := func() ([]byte, error) {
-		if pretty {
-			return json.MarshalIndent(encoder.Get(), "", "  ")
-		}
-		return json.Marshal(encoder.Get())
+	if pretty {
+		return json.MarshalIndent(encoder.Get(), "", "  ")
+	}
+	return json.Marshal(encoder.Get())
+}
+
+func GetABIForBytes(code []byte, pretty bool, filename string) []byte {
+	checker, _ := cmd.PrepareChecker(string(code), filename)
+
+	exportedTypes := exportTypesFromChecker(checker)
+
+	jsonData, err := encodeTypesAsJson(exportedTypes, pretty)
+
+	if err != nil {
+		panic(err)
 	}
 
-	jsonData, err := marshal()
+	return jsonData
+}
+
+func GetABIForFile(filename string, pretty bool) []byte {
+
+	_, checker, _ := cmd.PrepareInterpreter(filename)
+
+	exportedTypes := exportTypesFromChecker(checker)
+
+	jsonData, err := encodeTypesAsJson(exportedTypes, pretty)
 
 	if err != nil {
 		panic(err)

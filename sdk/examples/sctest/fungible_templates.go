@@ -15,16 +15,18 @@ func GenerateCreateTokenScript(tokenAddr flow.Address, initialBalance int) []byt
 		import Vault, createVault, Receiver, Provider from 0x%s
 
 		transaction {
+
 		  prepare(acct: Account) {
 			var vaultA: <-Vault? <- createVault(initialBalance: %d)
 			
 			acct.storage[Vault] <-> vaultA
 
-			acct.storage[&Receiver] = &acct.storage[Vault] as Receiver
-			acct.storage[&Provider] = &acct.storage[Vault] as Provider
+			acct.published[&Receiver] = &acct.storage[Vault] as Receiver
+			acct.published[&Provider] = &acct.storage[Vault] as Provider
 
 			destroy vaultA
 		  }
+
 		  execute {}
 		}
 	`
@@ -40,6 +42,7 @@ func GenerateCreateThreeTokensArrayScript(tokenAddr flow.Address, initialBalance
 		import Vault, createVault from 0x%s
 
 		transaction {
+
 		  prepare(acct: Account) {
 			let vaultA: <-Vault <- createVault(initialBalance: %d)
     		let vaultB: <-Vault <- createVault(initialBalance: %d)
@@ -51,9 +54,11 @@ func GenerateCreateThreeTokensArrayScript(tokenAddr flow.Address, initialBalance
 			
 			var storedVaults: <-[Vault]? <- vaultArray
 			acct.storage[[Vault]] <-> storedVaults
+            acct.published[&[Vault]] = &acct.storage[[Vault]] as [Vault] 
 
 			destroy storedVaults
 		  }
+
 		  execute {}
 		}
 	`
@@ -122,13 +127,14 @@ func GenerateDepositVaultScript(tokenCodeAddr flow.Address, receiverAddr flow.Ad
 		  prepare(acct: Account) {
 			let recipient = getAccount(0x%s)
 
-			let providerRef = acct.storage[&Provider] ?? panic("missing Vault Provider reference")
-			let receiverRef = recipient.storage[&Receiver] ?? panic("missing Vault receiver reference")
+			let providerRef = acct.published[&Provider] ?? panic("missing Vault Provider reference")
+			let receiverRef = recipient.published[&Receiver] ?? panic("missing Vault receiver reference")
 
 			let tokens <- providerRef.withdraw(amount: %d)
 
 			receiverRef.deposit(from: <-tokens)
 		  }
+
 		  execute {}
 		}
 	`
@@ -143,14 +149,16 @@ func GenerateTransferVaultScript(tokenCodeAddr flow.Address, receiverAddr flow.A
 		import Vault, Provider, Receiver from 0x%s
 
 		transaction {
+
 		  prepare(acct: Account) {
 			let recipient = getAccount(0x%s)
 
-			let providerRef = acct.storage[&Provider] ?? panic("missing Vault Provider reference")
-			let receiverRef = recipient.storage[&Receiver] ?? panic("missing Vault receiver reference")
+			let providerRef = acct.published[&Provider] ?? panic("missing Vault Provider reference")
+			let receiverRef = recipient.published[&Receiver] ?? panic("missing Vault receiver reference")
 
 			providerRef.transfer(to: receiverRef, amount: %d)
 		  }
+
 		  execute {}
 		}
 	`
@@ -167,11 +175,12 @@ func GenerateInvalidTransferSenderScript(tokenCodeAddr flow.Address, receiverAdd
 		  prepare(acct: Account) {
 			let recipient = getAccount(0x%s)
 
-			let providerRef = acct.storage[&Provider] ?? panic("missing Vault Provider reference")
-			let receiverRef = recipient.storage[&Receiver] ?? panic("missing Vault receiver reference")
+			let providerRef = acct.published[&Provider] ?? panic("missing Vault Provider reference")
+			let receiverRef = recipient.published[&Receiver] ?? panic("missing Vault receiver reference")
 
 			receiverRef.transfer(to: receiverRef, amount: %d)
 		  }
+
 		  execute {}
 		}
 	`
@@ -185,14 +194,16 @@ func GenerateInvalidTransferReceiverScript(tokenCodeAddr flow.Address, receiverA
 		import Vault, Provider, Receiver from 0x%s
 
 		transaction {
+
 		  prepare(acct: Account) {
 			let recipient = getAccount(0x%s)
 
-			let providerRef = acct.storage[&Provider] ?? panic("missing Vault Provider reference")
-			let receiverRef = recipient.storage[&Receiver] ?? panic("missing Vault receiver reference")
+			let providerRef = acct.published[&Provider] ?? panic("missing Vault Provider reference")
+			let receiverRef = recipient.published[&Receiver] ?? panic("missing Vault receiver reference")
 
 			providerRef.transfer(to: providerRef, amount: %d)
 		  }
+
 		  execute {}
 		}
 	`
@@ -201,7 +212,7 @@ func GenerateInvalidTransferReceiverScript(tokenCodeAddr flow.Address, receiverA
 }
 
 // GenerateInspectVaultScript creates a script that retrieves a
-// Vault from the array in storage and makes assertionsabout
+// Vault from the array in storage and makes assertions about
 // its balance. If these assertions fail, the script panics.
 func GenerateInspectVaultScript(tokenCodeAddr, userAddr flow.Address, expectedBalance int) []byte {
 	template := `
@@ -209,17 +220,19 @@ func GenerateInspectVaultScript(tokenCodeAddr, userAddr flow.Address, expectedBa
 
 		pub fun main() {
 			let acct = getAccount(0x%s)
-			let vaultRef = acct.storage[&Receiver] ?? panic("missing Receiver reference")
-			if vaultRef.balance != %d {
-				panic("incorrect Balance!")
-			}
-		}`
+			let vaultRef = acct.published[&Receiver] ?? panic("missing Receiver reference")
+			assert(
+                vaultRef.balance == %d,
+                message: "incorrect Balance!"
+            )
+		}
+    `
 
 	return []byte(fmt.Sprintf(template, tokenCodeAddr, userAddr, expectedBalance))
 }
 
 // GenerateInspectVaultArrayScript creates a script that retrieves a
-// Vault from the array in storage and makes assertionsabout
+// Vault from the array in storage and makes assertions about
 // its balance. If these assertions fail, the script panics.
 func GenerateInspectVaultArrayScript(tokenCodeAddr, userAddr flow.Address, vaultNumber int, expectedBalance int) []byte {
 	template := `
@@ -227,16 +240,13 @@ func GenerateInspectVaultArrayScript(tokenCodeAddr, userAddr flow.Address, vault
 
 		pub fun main() {
 			let acct = getAccount(0x%s)
-			let vaultArray <- acct.storage[[Vault]] ?? panic("missing vault")
-			if vaultArray[%d].balance != %d {
-				panic("incorrect Balance!")
-			}
-
-			var storedVaults: <-[Vault]? <- vaultArray
-			acct.storage[[Vault]] <-> storedVaults
-			
-			destroy storedVaults
-		}`
+			let vaultArray = acct.published[&[Vault]] ?? panic("missing vault")
+			assert(
+                vaultArray[%d].balance == %d,
+                message: "incorrect Balance!"
+            )
+        }
+	`
 
 	return []byte(fmt.Sprintf(template, tokenCodeAddr, userAddr, vaultNumber, expectedBalance))
 }

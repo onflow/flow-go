@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/dapperlabs/flow-go/language/runtime"
@@ -47,21 +48,30 @@ func PrettyPrintError(err error, filename string, codes map[string]string) {
 	}
 }
 
-func PrepareInterpreter(filename string) (*interpreter.Interpreter, *sema.Checker, func(error)) {
+func must(err error, filename string, codes map[string]string) {
+	if err == nil {
+		return
+	}
+	PrettyPrintError(err, filename, codes)
+	os.Exit(1)
+}
 
+func mustClosure(filename string, codes map[string]string) func(error) {
+	return func(e error) {
+		must(e, filename, codes)
+	}
+}
+
+//PrepareChecker prepares and initializes Checked with a given code as a string
+//and dummyFilename which is used fore pretty prints if there are errors while processing
+func PrepareChecker(code string, dummyFilename string) (*sema.Checker, func(error)) {
 	codes := map[string]string{}
 
-	must := func(err error, filename string) {
-		if err == nil {
-			return
-		}
-		PrettyPrintError(err, filename, codes)
-		os.Exit(1)
-	}
+	must := mustClosure(dummyFilename, codes)
 
-	program, _, code, err := parser.ParseProgramFromFile(filename)
-	codes[filename] = code
-	must(err, filename)
+	program, _, err := parser.ParseProgram(code)
+	codes[dummyFilename] = code
+	must(err)
 
 	err = program.ResolveImports(func(location ast.Location) (program *ast.Program, err error) {
 		switch location := location.(type) {
@@ -69,42 +79,55 @@ func PrepareInterpreter(filename string) (*interpreter.Interpreter, *sema.Checke
 			filename := string(location)
 			imported, _, code, err := parser.ParseProgramFromFile(filename)
 			codes[filename] = code
-			must(err, filename)
+			must(err)
 			return imported, nil
 
 		default:
 			return nil, fmt.Errorf("cannot import `%s`. only files are supported", location)
 		}
 	})
-	must(err, filename)
+	must(err)
 
-	standardLibraryFunctions := append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...)
+	standardLibraryFunctions := standardLibraryFunctions()
 	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
 	typeDeclarations := stdlib.BuiltinTypes.ToTypeDeclarations()
 
-	location := runtime.FileLocation(filename)
+	location := runtime.FileLocation(dummyFilename)
 	checker, err := sema.NewChecker(
 		program,
 		location,
 		sema.WithPredeclaredValues(valueDeclarations),
 		sema.WithPredeclaredTypes(typeDeclarations),
 	)
-	must(err, filename)
+	must(err)
 
-	must(checker.Check(), filename)
+	must(checker.Check())
 
-	values := standardLibraryFunctions.ToValues()
+	return checker, must
+}
+
+func standardLibraryFunctions() stdlib.StandardLibraryFunctions {
+	return append(stdlib.BuiltinFunctions, stdlib.HelperFunctions...)
+}
+
+func PrepareInterpreter(filename string) (*interpreter.Interpreter, *sema.Checker, func(error)) {
+
+	codeBytes, err := ioutil.ReadFile(filename)
+
+	checker, must := PrepareChecker(string(codeBytes), filename)
+
+	values := standardLibraryFunctions().ToValues()
 
 	inter, err := interpreter.NewInterpreter(
 		checker,
 		interpreter.WithPredefinedValues(values),
 	)
-	must(err, filename)
+	must(err)
 
-	must(inter.Interpret(), filename)
+	must(inter.Interpret())
 
 	return inter, checker, func(err error) {
-		must(err, filename)
+		must(err)
 	}
 }
 

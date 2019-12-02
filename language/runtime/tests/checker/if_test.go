@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -17,7 +18,7 @@ func TestCheckIfStatementTest(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckIfStatementScoping(t *testing.T) {
@@ -76,7 +77,7 @@ func TestCheckIfStatementTestWithDeclaration(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidIfStatementTestWithDeclarationReferenceInElse(t *testing.T) {
@@ -108,7 +109,7 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
      }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t *testing.T) {
@@ -123,7 +124,7 @@ func TestCheckIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotation(t 
      }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidIfStatementTestWithDeclarationNonOptional(t *testing.T) {

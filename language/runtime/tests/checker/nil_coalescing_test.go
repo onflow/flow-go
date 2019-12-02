@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
@@ -18,7 +19,7 @@ func TestCheckNilCoalescingNilIntToOptional(t *testing.T) {
       let x: Int? = none ?? one
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNilCoalescingNilIntToOptionals(t *testing.T) {
@@ -29,7 +30,7 @@ func TestCheckNilCoalescingNilIntToOptionals(t *testing.T) {
       let x: Int? = none ?? one
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNilCoalescingNilIntToOptionalNilLiteral(t *testing.T) {
@@ -39,7 +40,7 @@ func TestCheckNilCoalescingNilIntToOptionalNilLiteral(t *testing.T) {
       let x: Int? = nil ?? one
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidNilCoalescingMismatch(t *testing.T) {
@@ -59,7 +60,7 @@ func TestCheckNilCoalescingRightSubtype(t *testing.T) {
       let x: Int? = nil ?? nil
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNilCoalescingNilInt(t *testing.T) {
@@ -70,7 +71,7 @@ func TestCheckNilCoalescingNilInt(t *testing.T) {
       let x: Int = none ?? one
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidNilCoalescingOptionalsInt(t *testing.T) {
@@ -93,7 +94,7 @@ func TestCheckNilCoalescingNilLiteralInt(t *testing.T) {
      let x: Int = nil ?? one
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidNilCoalescingMismatchNonOptional(t *testing.T) {
@@ -137,7 +138,7 @@ func TestCheckNilCoalescingAny(t *testing.T) {
      let y = x ?? false
   `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckNilCoalescingOptionalRightHandSide(t *testing.T) {
@@ -148,7 +149,7 @@ func TestCheckNilCoalescingOptionalRightHandSide(t *testing.T) {
      let z = x ?? y
   `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.IsType(t, &sema.OptionalType{Type: &sema.IntType{}}, checker.GlobalValues["z"].Type)
 }
@@ -161,7 +162,7 @@ func TestCheckNilCoalescingBothOptional(t *testing.T) {
      let z = x ?? y
   `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.IsType(t, &sema.OptionalType{Type: &sema.IntType{}}, checker.GlobalValues["z"].Type)
 }
@@ -184,5 +185,5 @@ func TestCheckNilCoalescingWithNever(t *testing.T) {
 		},
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }

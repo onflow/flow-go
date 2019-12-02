@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
@@ -34,7 +35,7 @@ func TestCheckMissingReturnStatementInterfaceFunction(t *testing.T) {
         }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidMissingReturnStatementStructFunction(t *testing.T) {
@@ -82,7 +83,7 @@ func testExits(t *testing.T, tests []exitTest) {
 			)
 
 			if test.exits {
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			} else {
 				errs := ExpectCheckerErrors(t, err, 1)
 

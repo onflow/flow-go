@@ -3,7 +3,7 @@
   "displayName": "Cadence",
   "publisher": "dapperlabs",
   "description": "",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/dapperlabs/flow-go.git"
@@ -24,14 +24,20 @@
         "command": "cadence.restartServer",
         "category": "Cadence",
         "title": "Restart language server"
-      }, {
+      },
+      {
         "command": "cadence.runEmulator",
         "category": "Cadence",
         "title": "Run emulator"
-      }, {
+      },
+      {
         "command": "cadence.stopEmulator",
         "category": "Cadence",
         "title": "Stop emulator"
+      }, {
+        "command": "cadence.updateAccountCode",
+        "category": "Cadence",
+        "title": "Update account code"
       }
     ],
     "configuration": {
@@ -100,7 +106,8 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "postinstall": "node ./node_modules/vscode/bin/install",
-    "test": "npm run compile && node ./node_modules/vscode/bin/test"
+    "test": "npm run compile && node ./node_modules/vscode/bin/test",
+    "package": "./node_modules/.bin/vsce package"
   },
   "devDependencies": {
     "typescript": "^3.3.1",
@@ -110,6 +117,7 @@
     "@types/mocha": "^2.2.42"
   },
   "dependencies": {
+    "vsce": "^1.69.0",
     "vscode-languageclient": "~4.4.0"
   }
 }
