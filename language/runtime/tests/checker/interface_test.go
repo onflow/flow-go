@@ -1106,3 +1106,42 @@ func TestCheckInvalidContractInterfaceConformanceMissingTypeRequirement(t *testi
 	assert.IsType(t, &sema.ConformanceError{}, errs[0])
 }
 
+func TestCheckInvalidContractInterfaceConformanceTypeRequirementKindMismatch(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
+              struct Nested {}
+          }
+
+          contract TestImpl: Test {
+              // expected struct, not struct interface
+              struct interface Nested {}
+          }
+	    `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.DeclarationKindMismatchError{}, errs[0])
+}
+
+func TestCheckInvalidContractInterfaceConformanceTypeRequirementMismatch(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+         contract interface Test {
+             struct Nested {}
+         }
+
+         contract TestImpl: Test {
+             // expected struct
+             resource Nested {}
+         }
+	    `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.CompositeKindMismatchError{}, errs[0])
+}
