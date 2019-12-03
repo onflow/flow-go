@@ -1435,6 +1435,8 @@ type CompositeType struct {
 	Members      map[string]*Member
 	// TODO: add support for overloaded initializers
 	ConstructorParameterTypeAnnotations []*TypeAnnotation
+	NestedTypes                         map[string]Type
+	ContainerType                       Type
 }
 
 func (*CompositeType) isType() {}
@@ -1684,6 +1686,8 @@ type InterfaceType struct {
 	Members       map[string]*Member
 	// TODO: add support for overloaded initializers
 	InitializerParameterTypeAnnotations []*TypeAnnotation
+	ContainerType                       Type
+	NestedTypes                         map[string]Type
 }
 
 func (*InterfaceType) isType() {}

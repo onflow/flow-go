@@ -425,7 +425,8 @@ func (checker *Checker) checkRange(value, min, max *big.Int) bool {
 }
 
 func (checker *Checker) declareGlobalDeclaration(declaration ast.Declaration) {
-	name := declaration.DeclarationName()
+	identifier := declaration.DeclarationIdentifier()
+	name := identifier.Identifier
 	if name == "" {
 		return
 	}

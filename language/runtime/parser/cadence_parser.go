@@ -428,8 +428,8 @@ var ruleNames = []string{
 	"program", "replInput", "replElement", "replStatement", "replDeclaration",
 	"declaration", "transactionDeclaration", "prepare", "execute", "importDeclaration",
 	"access", "compositeDeclaration", "conformances", "variableKind", "field",
-	"fields", "interfaceDeclaration", "members", "member", "compositeKind",
-	"specialFunctionDeclaration", "functionDeclaration", "eventDeclaration",
+	"fields", "interfaceDeclaration", "membersAndNestedDeclarations", "memberOrNestedDeclaration",
+	"compositeKind", "specialFunctionDeclaration", "functionDeclaration", "eventDeclaration",
 	"parameterList", "parameter", "typeAnnotation", "fullType", "baseType",
 	"nominalType", "functionType", "variableSizedType", "constantSizedType",
 	"dictionaryType", "block", "functionBlock", "preConditions", "postConditions",
@@ -592,102 +592,102 @@ const (
 
 // CadenceParser rules.
 const (
-	CadenceParserRULE_program                    = 0
-	CadenceParserRULE_replInput                  = 1
-	CadenceParserRULE_replElement                = 2
-	CadenceParserRULE_replStatement              = 3
-	CadenceParserRULE_replDeclaration            = 4
-	CadenceParserRULE_declaration                = 5
-	CadenceParserRULE_transactionDeclaration     = 6
-	CadenceParserRULE_prepare                    = 7
-	CadenceParserRULE_execute                    = 8
-	CadenceParserRULE_importDeclaration          = 9
-	CadenceParserRULE_access                     = 10
-	CadenceParserRULE_compositeDeclaration       = 11
-	CadenceParserRULE_conformances               = 12
-	CadenceParserRULE_variableKind               = 13
-	CadenceParserRULE_field                      = 14
-	CadenceParserRULE_fields                     = 15
-	CadenceParserRULE_interfaceDeclaration       = 16
-	CadenceParserRULE_members                    = 17
-	CadenceParserRULE_member                     = 18
-	CadenceParserRULE_compositeKind              = 19
-	CadenceParserRULE_specialFunctionDeclaration = 20
-	CadenceParserRULE_functionDeclaration        = 21
-	CadenceParserRULE_eventDeclaration           = 22
-	CadenceParserRULE_parameterList              = 23
-	CadenceParserRULE_parameter                  = 24
-	CadenceParserRULE_typeAnnotation             = 25
-	CadenceParserRULE_fullType                   = 26
-	CadenceParserRULE_baseType                   = 27
-	CadenceParserRULE_nominalType                = 28
-	CadenceParserRULE_functionType               = 29
-	CadenceParserRULE_variableSizedType          = 30
-	CadenceParserRULE_constantSizedType          = 31
-	CadenceParserRULE_dictionaryType             = 32
-	CadenceParserRULE_block                      = 33
-	CadenceParserRULE_functionBlock              = 34
-	CadenceParserRULE_preConditions              = 35
-	CadenceParserRULE_postConditions             = 36
-	CadenceParserRULE_conditions                 = 37
-	CadenceParserRULE_condition                  = 38
-	CadenceParserRULE_statements                 = 39
-	CadenceParserRULE_statement                  = 40
-	CadenceParserRULE_returnStatement            = 41
-	CadenceParserRULE_breakStatement             = 42
-	CadenceParserRULE_continueStatement          = 43
-	CadenceParserRULE_ifStatement                = 44
-	CadenceParserRULE_whileStatement             = 45
-	CadenceParserRULE_emitStatement              = 46
-	CadenceParserRULE_variableDeclaration        = 47
-	CadenceParserRULE_assignment                 = 48
-	CadenceParserRULE_swap                       = 49
-	CadenceParserRULE_transfer                   = 50
-	CadenceParserRULE_expression                 = 51
-	CadenceParserRULE_conditionalExpression      = 52
-	CadenceParserRULE_orExpression               = 53
-	CadenceParserRULE_andExpression              = 54
-	CadenceParserRULE_equalityExpression         = 55
-	CadenceParserRULE_relationalExpression       = 56
-	CadenceParserRULE_nilCoalescingExpression    = 57
-	CadenceParserRULE_castingExpression          = 58
-	CadenceParserRULE_concatenatingExpression    = 59
-	CadenceParserRULE_additiveExpression         = 60
-	CadenceParserRULE_multiplicativeExpression   = 61
-	CadenceParserRULE_unaryExpression            = 62
-	CadenceParserRULE_primaryExpression          = 63
-	CadenceParserRULE_composedExpression         = 64
-	CadenceParserRULE_primaryExpressionSuffix    = 65
-	CadenceParserRULE_equalityOp                 = 66
-	CadenceParserRULE_relationalOp               = 67
-	CadenceParserRULE_additiveOp                 = 68
-	CadenceParserRULE_multiplicativeOp           = 69
-	CadenceParserRULE_unaryOp                    = 70
-	CadenceParserRULE_castingOp                  = 71
-	CadenceParserRULE_primaryExpressionStart     = 72
-	CadenceParserRULE_createExpression           = 73
-	CadenceParserRULE_destroyExpression          = 74
-	CadenceParserRULE_referenceExpression        = 75
-	CadenceParserRULE_identifierExpression       = 76
-	CadenceParserRULE_literalExpression          = 77
-	CadenceParserRULE_functionExpression         = 78
-	CadenceParserRULE_nestedExpression           = 79
-	CadenceParserRULE_expressionAccess           = 80
-	CadenceParserRULE_memberAccess               = 81
-	CadenceParserRULE_bracketExpression          = 82
-	CadenceParserRULE_invocation                 = 83
-	CadenceParserRULE_argument                   = 84
-	CadenceParserRULE_literal                    = 85
-	CadenceParserRULE_booleanLiteral             = 86
-	CadenceParserRULE_nilLiteral                 = 87
-	CadenceParserRULE_stringLiteral              = 88
-	CadenceParserRULE_integerLiteral             = 89
-	CadenceParserRULE_positiveIntegerLiteral     = 90
-	CadenceParserRULE_arrayLiteral               = 91
-	CadenceParserRULE_dictionaryLiteral          = 92
-	CadenceParserRULE_dictionaryEntry            = 93
-	CadenceParserRULE_identifier                 = 94
-	CadenceParserRULE_eos                        = 95
+	CadenceParserRULE_program                      = 0
+	CadenceParserRULE_replInput                    = 1
+	CadenceParserRULE_replElement                  = 2
+	CadenceParserRULE_replStatement                = 3
+	CadenceParserRULE_replDeclaration              = 4
+	CadenceParserRULE_declaration                  = 5
+	CadenceParserRULE_transactionDeclaration       = 6
+	CadenceParserRULE_prepare                      = 7
+	CadenceParserRULE_execute                      = 8
+	CadenceParserRULE_importDeclaration            = 9
+	CadenceParserRULE_access                       = 10
+	CadenceParserRULE_compositeDeclaration         = 11
+	CadenceParserRULE_conformances                 = 12
+	CadenceParserRULE_variableKind                 = 13
+	CadenceParserRULE_field                        = 14
+	CadenceParserRULE_fields                       = 15
+	CadenceParserRULE_interfaceDeclaration         = 16
+	CadenceParserRULE_membersAndNestedDeclarations = 17
+	CadenceParserRULE_memberOrNestedDeclaration    = 18
+	CadenceParserRULE_compositeKind                = 19
+	CadenceParserRULE_specialFunctionDeclaration   = 20
+	CadenceParserRULE_functionDeclaration          = 21
+	CadenceParserRULE_eventDeclaration             = 22
+	CadenceParserRULE_parameterList                = 23
+	CadenceParserRULE_parameter                    = 24
+	CadenceParserRULE_typeAnnotation               = 25
+	CadenceParserRULE_fullType                     = 26
+	CadenceParserRULE_baseType                     = 27
+	CadenceParserRULE_nominalType                  = 28
+	CadenceParserRULE_functionType                 = 29
+	CadenceParserRULE_variableSizedType            = 30
+	CadenceParserRULE_constantSizedType            = 31
+	CadenceParserRULE_dictionaryType               = 32
+	CadenceParserRULE_block                        = 33
+	CadenceParserRULE_functionBlock                = 34
+	CadenceParserRULE_preConditions                = 35
+	CadenceParserRULE_postConditions               = 36
+	CadenceParserRULE_conditions                   = 37
+	CadenceParserRULE_condition                    = 38
+	CadenceParserRULE_statements                   = 39
+	CadenceParserRULE_statement                    = 40
+	CadenceParserRULE_returnStatement              = 41
+	CadenceParserRULE_breakStatement               = 42
+	CadenceParserRULE_continueStatement            = 43
+	CadenceParserRULE_ifStatement                  = 44
+	CadenceParserRULE_whileStatement               = 45
+	CadenceParserRULE_emitStatement                = 46
+	CadenceParserRULE_variableDeclaration          = 47
+	CadenceParserRULE_assignment                   = 48
+	CadenceParserRULE_swap                         = 49
+	CadenceParserRULE_transfer                     = 50
+	CadenceParserRULE_expression                   = 51
+	CadenceParserRULE_conditionalExpression        = 52
+	CadenceParserRULE_orExpression                 = 53
+	CadenceParserRULE_andExpression                = 54
+	CadenceParserRULE_equalityExpression           = 55
+	CadenceParserRULE_relationalExpression         = 56
+	CadenceParserRULE_nilCoalescingExpression      = 57
+	CadenceParserRULE_castingExpression            = 58
+	CadenceParserRULE_concatenatingExpression      = 59
+	CadenceParserRULE_additiveExpression           = 60
+	CadenceParserRULE_multiplicativeExpression     = 61
+	CadenceParserRULE_unaryExpression              = 62
+	CadenceParserRULE_primaryExpression            = 63
+	CadenceParserRULE_composedExpression           = 64
+	CadenceParserRULE_primaryExpressionSuffix      = 65
+	CadenceParserRULE_equalityOp                   = 66
+	CadenceParserRULE_relationalOp                 = 67
+	CadenceParserRULE_additiveOp                   = 68
+	CadenceParserRULE_multiplicativeOp             = 69
+	CadenceParserRULE_unaryOp                      = 70
+	CadenceParserRULE_castingOp                    = 71
+	CadenceParserRULE_primaryExpressionStart       = 72
+	CadenceParserRULE_createExpression             = 73
+	CadenceParserRULE_destroyExpression            = 74
+	CadenceParserRULE_referenceExpression          = 75
+	CadenceParserRULE_identifierExpression         = 76
+	CadenceParserRULE_literalExpression            = 77
+	CadenceParserRULE_functionExpression           = 78
+	CadenceParserRULE_nestedExpression             = 79
+	CadenceParserRULE_expressionAccess             = 80
+	CadenceParserRULE_memberAccess                 = 81
+	CadenceParserRULE_bracketExpression            = 82
+	CadenceParserRULE_invocation                   = 83
+	CadenceParserRULE_argument                     = 84
+	CadenceParserRULE_literal                      = 85
+	CadenceParserRULE_booleanLiteral               = 86
+	CadenceParserRULE_nilLiteral                   = 87
+	CadenceParserRULE_stringLiteral                = 88
+	CadenceParserRULE_integerLiteral               = 89
+	CadenceParserRULE_positiveIntegerLiteral       = 90
+	CadenceParserRULE_arrayLiteral                 = 91
+	CadenceParserRULE_dictionaryLiteral            = 92
+	CadenceParserRULE_dictionaryEntry              = 93
+	CadenceParserRULE_identifier                   = 94
+	CadenceParserRULE_eos                          = 95
 )
 
 // IProgramContext is an interface to support dynamic dispatch.
@@ -2459,14 +2459,14 @@ func (s *CompositeDeclarationContext) Conformances() IConformancesContext {
 	return t.(IConformancesContext)
 }
 
-func (s *CompositeDeclarationContext) Members() IMembersContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMembersContext)(nil)).Elem(), 0)
+func (s *CompositeDeclarationContext) MembersAndNestedDeclarations() IMembersAndNestedDeclarationsContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMembersAndNestedDeclarationsContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
 	}
 
-	return t.(IMembersContext)
+	return t.(IMembersAndNestedDeclarationsContext)
 }
 
 func (s *CompositeDeclarationContext) GetRuleContext() antlr.RuleContext {
@@ -2542,7 +2542,7 @@ func (p *CadenceParser) CompositeDeclaration() (localctx ICompositeDeclarationCo
 	}
 	{
 		p.SetState(293)
-		p.Members()
+		p.MembersAndNestedDeclarations()
 	}
 	{
 		p.SetState(294)
@@ -3194,14 +3194,14 @@ func (s *InterfaceDeclarationContext) Identifier() IIdentifierContext {
 	return t.(IIdentifierContext)
 }
 
-func (s *InterfaceDeclarationContext) Members() IMembersContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMembersContext)(nil)).Elem(), 0)
+func (s *InterfaceDeclarationContext) MembersAndNestedDeclarations() IMembersAndNestedDeclarationsContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMembersAndNestedDeclarationsContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
 	}
 
-	return t.(IMembersContext)
+	return t.(IMembersAndNestedDeclarationsContext)
 }
 
 func (s *InterfaceDeclarationContext) GetRuleContext() antlr.RuleContext {
@@ -3277,7 +3277,7 @@ func (p *CadenceParser) InterfaceDeclaration() (localctx IInterfaceDeclarationCo
 	}
 	{
 		p.SetState(331)
-		p.Members()
+		p.MembersAndNestedDeclarations()
 	}
 	{
 		p.SetState(332)
@@ -3287,100 +3287,100 @@ func (p *CadenceParser) InterfaceDeclaration() (localctx IInterfaceDeclarationCo
 	return localctx
 }
 
-// IMembersContext is an interface to support dynamic dispatch.
-type IMembersContext interface {
+// IMembersAndNestedDeclarationsContext is an interface to support dynamic dispatch.
+type IMembersAndNestedDeclarationsContext interface {
 	antlr.ParserRuleContext
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
-	// IsMembersContext differentiates from other interfaces.
-	IsMembersContext()
+	// IsMembersAndNestedDeclarationsContext differentiates from other interfaces.
+	IsMembersAndNestedDeclarationsContext()
 }
 
-type MembersContext struct {
+type MembersAndNestedDeclarationsContext struct {
 	*antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
-func NewEmptyMembersContext() *MembersContext {
-	var p = new(MembersContext)
+func NewEmptyMembersAndNestedDeclarationsContext() *MembersAndNestedDeclarationsContext {
+	var p = new(MembersAndNestedDeclarationsContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = CadenceParserRULE_members
+	p.RuleIndex = CadenceParserRULE_membersAndNestedDeclarations
 	return p
 }
 
-func (*MembersContext) IsMembersContext() {}
+func (*MembersAndNestedDeclarationsContext) IsMembersAndNestedDeclarationsContext() {}
 
-func NewMembersContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MembersContext {
-	var p = new(MembersContext)
+func NewMembersAndNestedDeclarationsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MembersAndNestedDeclarationsContext {
+	var p = new(MembersAndNestedDeclarationsContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CadenceParserRULE_members
+	p.RuleIndex = CadenceParserRULE_membersAndNestedDeclarations
 
 	return p
 }
 
-func (s *MembersContext) GetParser() antlr.Parser { return s.parser }
+func (s *MembersAndNestedDeclarationsContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *MembersContext) AllMember() []IMemberContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IMemberContext)(nil)).Elem())
-	var tst = make([]IMemberContext, len(ts))
+func (s *MembersAndNestedDeclarationsContext) AllMemberOrNestedDeclaration() []IMemberOrNestedDeclarationContext {
+	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IMemberOrNestedDeclarationContext)(nil)).Elem())
+	var tst = make([]IMemberOrNestedDeclarationContext, len(ts))
 
 	for i, t := range ts {
 		if t != nil {
-			tst[i] = t.(IMemberContext)
+			tst[i] = t.(IMemberOrNestedDeclarationContext)
 		}
 	}
 
 	return tst
 }
 
-func (s *MembersContext) Member(i int) IMemberContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMemberContext)(nil)).Elem(), i)
+func (s *MembersAndNestedDeclarationsContext) MemberOrNestedDeclaration(i int) IMemberOrNestedDeclarationContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*IMemberOrNestedDeclarationContext)(nil)).Elem(), i)
 
 	if t == nil {
 		return nil
 	}
 
-	return t.(IMemberContext)
+	return t.(IMemberOrNestedDeclarationContext)
 }
 
-func (s *MembersContext) GetRuleContext() antlr.RuleContext {
+func (s *MembersAndNestedDeclarationsContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
 
-func (s *MembersContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+func (s *MembersAndNestedDeclarationsContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MembersContext) EnterRule(listener antlr.ParseTreeListener) {
+func (s *MembersAndNestedDeclarationsContext) EnterRule(listener antlr.ParseTreeListener) {
 	if listenerT, ok := listener.(CadenceListener); ok {
-		listenerT.EnterMembers(s)
+		listenerT.EnterMembersAndNestedDeclarations(s)
 	}
 }
 
-func (s *MembersContext) ExitRule(listener antlr.ParseTreeListener) {
+func (s *MembersAndNestedDeclarationsContext) ExitRule(listener antlr.ParseTreeListener) {
 	if listenerT, ok := listener.(CadenceListener); ok {
-		listenerT.ExitMembers(s)
+		listenerT.ExitMembersAndNestedDeclarations(s)
 	}
 }
 
-func (s *MembersContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+func (s *MembersAndNestedDeclarationsContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case CadenceVisitor:
-		return t.VisitMembers(s)
+		return t.VisitMembersAndNestedDeclarations(s)
 
 	default:
 		return t.VisitChildren(s)
 	}
 }
 
-func (p *CadenceParser) Members() (localctx IMembersContext) {
-	localctx = NewMembersContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 34, CadenceParserRULE_members)
+func (p *CadenceParser) MembersAndNestedDeclarations() (localctx IMembersAndNestedDeclarationsContext) {
+	localctx = NewMembersAndNestedDeclarationsContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 34, CadenceParserRULE_membersAndNestedDeclarations)
 	var _la int
 
 	defer func() {
@@ -3407,7 +3407,7 @@ func (p *CadenceParser) Members() (localctx IMembersContext) {
 	for ((_la-34)&-(0x1f+1)) == 0 && ((1<<uint((_la-34)))&((1<<(CadenceParserStruct-34))|(1<<(CadenceParserResource-34))|(1<<(CadenceParserContract-34))|(1<<(CadenceParserFun-34))|(1<<(CadenceParserPriv-34))|(1<<(CadenceParserAuth-34))|(1<<(CadenceParserPub-34))|(1<<(CadenceParserPubSet-34))|(1<<(CadenceParserLet-34))|(1<<(CadenceParserVar-34))|(1<<(CadenceParserFrom-34))|(1<<(CadenceParserCreate-34))|(1<<(CadenceParserDestroy-34))|(1<<(CadenceParserIdentifier-34)))) != 0 {
 		{
 			p.SetState(334)
-			p.Member()
+			p.MemberOrNestedDeclaration()
 		}
 		p.SetState(336)
 		p.GetErrorHandler().Sync(p)
@@ -3429,45 +3429,45 @@ func (p *CadenceParser) Members() (localctx IMembersContext) {
 	return localctx
 }
 
-// IMemberContext is an interface to support dynamic dispatch.
-type IMemberContext interface {
+// IMemberOrNestedDeclarationContext is an interface to support dynamic dispatch.
+type IMemberOrNestedDeclarationContext interface {
 	antlr.ParserRuleContext
 
 	// GetParser returns the parser.
 	GetParser() antlr.Parser
 
-	// IsMemberContext differentiates from other interfaces.
-	IsMemberContext()
+	// IsMemberOrNestedDeclarationContext differentiates from other interfaces.
+	IsMemberOrNestedDeclarationContext()
 }
 
-type MemberContext struct {
+type MemberOrNestedDeclarationContext struct {
 	*antlr.BaseParserRuleContext
 	parser antlr.Parser
 }
 
-func NewEmptyMemberContext() *MemberContext {
-	var p = new(MemberContext)
+func NewEmptyMemberOrNestedDeclarationContext() *MemberOrNestedDeclarationContext {
+	var p = new(MemberOrNestedDeclarationContext)
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
-	p.RuleIndex = CadenceParserRULE_member
+	p.RuleIndex = CadenceParserRULE_memberOrNestedDeclaration
 	return p
 }
 
-func (*MemberContext) IsMemberContext() {}
+func (*MemberOrNestedDeclarationContext) IsMemberOrNestedDeclarationContext() {}
 
-func NewMemberContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MemberContext {
-	var p = new(MemberContext)
+func NewMemberOrNestedDeclarationContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MemberOrNestedDeclarationContext {
+	var p = new(MemberOrNestedDeclarationContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
 
 	p.parser = parser
-	p.RuleIndex = CadenceParserRULE_member
+	p.RuleIndex = CadenceParserRULE_memberOrNestedDeclaration
 
 	return p
 }
 
-func (s *MemberContext) GetParser() antlr.Parser { return s.parser }
+func (s *MemberOrNestedDeclarationContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *MemberContext) Field() IFieldContext {
+func (s *MemberOrNestedDeclarationContext) Field() IFieldContext {
 	var t = s.GetTypedRuleContext(reflect.TypeOf((*IFieldContext)(nil)).Elem(), 0)
 
 	if t == nil {
@@ -3477,7 +3477,7 @@ func (s *MemberContext) Field() IFieldContext {
 	return t.(IFieldContext)
 }
 
-func (s *MemberContext) SpecialFunctionDeclaration() ISpecialFunctionDeclarationContext {
+func (s *MemberOrNestedDeclarationContext) SpecialFunctionDeclaration() ISpecialFunctionDeclarationContext {
 	var t = s.GetTypedRuleContext(reflect.TypeOf((*ISpecialFunctionDeclarationContext)(nil)).Elem(), 0)
 
 	if t == nil {
@@ -3487,7 +3487,7 @@ func (s *MemberContext) SpecialFunctionDeclaration() ISpecialFunctionDeclaration
 	return t.(ISpecialFunctionDeclarationContext)
 }
 
-func (s *MemberContext) FunctionDeclaration() IFunctionDeclarationContext {
+func (s *MemberOrNestedDeclarationContext) FunctionDeclaration() IFunctionDeclarationContext {
 	var t = s.GetTypedRuleContext(reflect.TypeOf((*IFunctionDeclarationContext)(nil)).Elem(), 0)
 
 	if t == nil {
@@ -3497,7 +3497,7 @@ func (s *MemberContext) FunctionDeclaration() IFunctionDeclarationContext {
 	return t.(IFunctionDeclarationContext)
 }
 
-func (s *MemberContext) InterfaceDeclaration() IInterfaceDeclarationContext {
+func (s *MemberOrNestedDeclarationContext) InterfaceDeclaration() IInterfaceDeclarationContext {
 	var t = s.GetTypedRuleContext(reflect.TypeOf((*IInterfaceDeclarationContext)(nil)).Elem(), 0)
 
 	if t == nil {
@@ -3507,7 +3507,7 @@ func (s *MemberContext) InterfaceDeclaration() IInterfaceDeclarationContext {
 	return t.(IInterfaceDeclarationContext)
 }
 
-func (s *MemberContext) CompositeDeclaration() ICompositeDeclarationContext {
+func (s *MemberOrNestedDeclarationContext) CompositeDeclaration() ICompositeDeclarationContext {
 	var t = s.GetTypedRuleContext(reflect.TypeOf((*ICompositeDeclarationContext)(nil)).Elem(), 0)
 
 	if t == nil {
@@ -3517,39 +3517,39 @@ func (s *MemberContext) CompositeDeclaration() ICompositeDeclarationContext {
 	return t.(ICompositeDeclarationContext)
 }
 
-func (s *MemberContext) GetRuleContext() antlr.RuleContext {
+func (s *MemberOrNestedDeclarationContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
 
-func (s *MemberContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+func (s *MemberOrNestedDeclarationContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
 	return antlr.TreesStringTree(s, ruleNames, recog)
 }
 
-func (s *MemberContext) EnterRule(listener antlr.ParseTreeListener) {
+func (s *MemberOrNestedDeclarationContext) EnterRule(listener antlr.ParseTreeListener) {
 	if listenerT, ok := listener.(CadenceListener); ok {
-		listenerT.EnterMember(s)
+		listenerT.EnterMemberOrNestedDeclaration(s)
 	}
 }
 
-func (s *MemberContext) ExitRule(listener antlr.ParseTreeListener) {
+func (s *MemberOrNestedDeclarationContext) ExitRule(listener antlr.ParseTreeListener) {
 	if listenerT, ok := listener.(CadenceListener); ok {
-		listenerT.ExitMember(s)
+		listenerT.ExitMemberOrNestedDeclaration(s)
 	}
 }
 
-func (s *MemberContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
+func (s *MemberOrNestedDeclarationContext) Accept(visitor antlr.ParseTreeVisitor) interface{} {
 	switch t := visitor.(type) {
 	case CadenceVisitor:
-		return t.VisitMember(s)
+		return t.VisitMemberOrNestedDeclaration(s)
 
 	default:
 		return t.VisitChildren(s)
 	}
 }
 
-func (p *CadenceParser) Member() (localctx IMemberContext) {
-	localctx = NewMemberContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 36, CadenceParserRULE_member)
+func (p *CadenceParser) MemberOrNestedDeclaration() (localctx IMemberOrNestedDeclarationContext) {
+	localctx = NewMemberOrNestedDeclarationContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 36, CadenceParserRULE_memberOrNestedDeclaration)
 
 	defer func() {
 		p.ExitRule()

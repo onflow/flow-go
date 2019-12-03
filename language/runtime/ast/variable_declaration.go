@@ -15,12 +15,12 @@ type VariableDeclaration struct {
 	ParentIfStatement *IfStatement
 }
 
-func (v *VariableDeclaration) StartPosition() Position {
-	return v.StartPos
+func (d *VariableDeclaration) StartPosition() Position {
+	return d.StartPos
 }
 
-func (v *VariableDeclaration) EndPosition() Position {
-	return v.Value.EndPosition()
+func (d *VariableDeclaration) EndPosition() Position {
+	return d.Value.EndPosition()
 }
 
 func (*VariableDeclaration) isIfStatementTest() {}
@@ -29,17 +29,21 @@ func (*VariableDeclaration) isDeclaration() {}
 
 func (*VariableDeclaration) isStatement() {}
 
-func (v *VariableDeclaration) Accept(visitor Visitor) Repr {
-	return visitor.VisitVariableDeclaration(v)
+func (d *VariableDeclaration) Accept(visitor Visitor) Repr {
+	return visitor.VisitVariableDeclaration(d)
 }
 
-func (v *VariableDeclaration) DeclarationName() string {
-	return v.Identifier.Identifier
+func (d *VariableDeclaration) DeclarationIdentifier() Identifier {
+	return d.Identifier
 }
 
-func (v *VariableDeclaration) DeclarationKind() common.DeclarationKind {
-	if v.IsConstant {
+func (d *VariableDeclaration) DeclarationKind() common.DeclarationKind {
+	if d.IsConstant {
 		return common.DeclarationKindConstant
 	}
 	return common.DeclarationKindVariable
+}
+
+func (d *VariableDeclaration) DeclarationAccess() Access {
+	return d.Access
 }

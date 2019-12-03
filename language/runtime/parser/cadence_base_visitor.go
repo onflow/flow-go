@@ -75,11 +75,11 @@ func (v *BaseCadenceVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclaration
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseCadenceVisitor) VisitMembers(ctx *MembersContext) interface{} {
+func (v *BaseCadenceVisitor) VisitMembersAndNestedDeclarations(ctx *MembersAndNestedDeclarationsContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
-func (v *BaseCadenceVisitor) VisitMember(ctx *MemberContext) interface{} {
+func (v *BaseCadenceVisitor) VisitMemberOrNestedDeclaration(ctx *MemberOrNestedDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

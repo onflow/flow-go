@@ -166,8 +166,8 @@ variableKind
 field
 fields
 interfaceDeclaration
-members
-member
+membersAndNestedDeclarations
+memberOrNestedDeclaration
 compositeKind
 specialFunctionDeclaration
 functionDeclaration
