@@ -12,6 +12,11 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 	return nil
 }
 
+// visitCompositeDeclaration checks a previously declared composite declaration.
+// Checking behaviour depends on `kind`, i.e. if the composite declaration declares
+// a composite (`kind` is `ContainerKindComposite`), or the composite declaration is
+// nested in an interface and so acts as a type requirement (`kind` is `ContainerKindInterface`).
+//
 func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDeclaration, kind ContainerKind) {
 
 	compositeType := checker.Elaboration.CompositeDeclarationTypes[declaration]
@@ -131,18 +136,32 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 		compositeType.Kind,
 	)
 
-	if kind == ContainerKindComposite {
-		// check composite conforms to interfaces.
-		// NOTE: perform after completing composite type (e.g. setting constructor parameter types)
+	// Check conformances
+	// NOTE: perform after completing composite type (e.g. setting constructor parameter types)
 
-		for _, interfaceType := range compositeType.Conformances {
+	// If the composite declaration is declaring a composite (`kind` is `ContainerKindComposite`),
+	// rather than a type requirement (`kind` is `ContainerKindInterface`), check that the composite
+	// conforms to all interfaces the composite declared it conforms to, i.e. all members match,
+	// and no members are missing.
 
-			checker.checkCompositeConformance(
-				declaration,
-				compositeType,
-				interfaceType,
-			)
-		}
+	// If the composite declaration is a type requirement (`kind` is `ContainerKindInterface`),
+	// DON'T check that the composite conforms to all interfaces the composite declared it
+	// conforms to – these are requirements that the composite declaration of the implementation
+	// of the containing interface must conform to.
+	//
+	// Thus, missing members are valid, but sill check that members that are declared as requirements
+	// match the members of the conformances (members in the interface)
+
+	checkMissingMembers := kind != ContainerKindInterface
+
+	for _, interfaceType := range compositeType.Conformances {
+
+		checker.checkCompositeConformance(
+			declaration,
+			compositeType,
+			interfaceType,
+			checkMissingMembers,
+		)
 	}
 
 	// NOTE: check destructors after initializer and functions
@@ -157,8 +176,15 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 		kind,
 	)
 
-	for _, nestedDeclaration := range nestedDeclarations {
-		nestedDeclaration.Accept(checker)
+	// NOTE: visit interfaces first
+	// DON'T use `nestedDeclarations`, because of non-deterministic order
+
+	for _, nestedInterface := range declaration.InterfaceDeclarations {
+		nestedInterface.Accept(checker)
+	}
+
+	for _, nestedComposite := range declaration.CompositeDeclarations {
+		nestedComposite.Accept(checker)
 	}
 }
 
@@ -462,6 +488,7 @@ func (checker *Checker) checkCompositeConformance(
 	compositeDeclaration *ast.CompositeDeclaration,
 	compositeType *CompositeType,
 	interfaceType *InterfaceType,
+	checkMissingMembers bool,
 ) {
 	var missingMembers []*Member
 	var memberMismatches []MemberMismatch
@@ -505,13 +532,15 @@ func (checker *Checker) checkCompositeConformance(
 		}
 	}
 
-	// Determine missing members
+	// Determine missing members and member conformance
 
 	for name, interfaceMember := range interfaceType.Members {
 
 		compositeMember, ok := compositeType.Members[name]
 		if !ok {
-			missingMembers = append(missingMembers, interfaceMember)
+			if checkMissingMembers {
+				missingMembers = append(missingMembers, interfaceMember)
+			}
 			continue
 		}
 
@@ -664,10 +693,12 @@ func (checker *Checker) checkTypeRequirement(
 		panic(errors.NewUnreachableError())
 	}
 
+	interfaceType := requiredCompositeType.InterfaceDeclaration()
 	checker.checkCompositeConformance(
 		compositeDeclaration,
 		declaredCompositeType,
-		requiredCompositeType.InterfaceDeclaration(),
+		interfaceType,
+		true,
 	)
 }
 
