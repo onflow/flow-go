@@ -80,10 +80,12 @@ func (s Server) registerCommands(conn protocol.Conn) {
 // submitTransaction handles submitting a transaction defined in the
 // source document in VS Code.
 //
-// There should be exactly 1 argument, the DocumentURI of the file to submit.
+// There should be exactly 2 arguments:
+//   * the DocumentURI of the file to submit
+//   * the address of the account to sign with
 func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, errors.New("missing argument")
+	if len(args) != 2 {
+		return nil, fmt.Errorf("must have 2 args, got: %d", len(args))
 	}
 	uri, ok := args[0].(string)
 	if !ok {
@@ -93,22 +95,20 @@ func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (int
 	if !ok {
 		return nil, fmt.Errorf("could not find document for URI %s", uri)
 	}
-
-	tx := flow.Transaction{
-		Script:         []byte(doc.text),
-		Nonce:          s.getNextNonce(),
-		ComputeLimit:   10,
-		PayerAccount:   s.config.AccountAddr,
-		ScriptAccounts: []flow.Address{s.config.AccountAddr},
+	addrHex, ok := args[1].(string)
+	if !ok {
+		return nil, errors.New("invalid uri argument")
 	}
+	addr := flow.HexToAddress(addrHex)
 
-	return nil, s.sendTransaction(conn, tx)
+	return nil, s.sendTransaction(conn, []byte(doc.text), addr)
 }
 
 // executeScript handles executing a script defined in the source document in
 // VS Code.
 //
-// There should be exactly 1 argument, the DocumentURI of the file to submit.
+// There should be exactly 1 argument:
+//   * the DocumentURI of the file to submit
 func (s *Server) executeScript(conn protocol.Conn, args ...interface{}) (interface{}, error) {
 	if len(args) != 1 {
 		return nil, errors.New("missing argument")
@@ -158,57 +158,93 @@ func (s *Server) executeScript(conn protocol.Conn, args ...interface{}) (interfa
 	return nil, err
 }
 
+// createAccount creates a new account with the given
+//func (s *Server) createAccount(conn protocol.Conn, args ...interface{}) (interface{}, error) {
+//	conn.LogMessage(&protocol.LogMessageParams{
+//		Type:    protocol.Log,
+//		Message: fmt.Sprintf("create acct args: %v", args),
+//	})
+//
+//	if len(args) != 0 {
+//		return nil, errors.New("missing argument")
+//	}
+//
+//	tx := flow.Transaction{
+//		Script:             templates.CreateAccount(),
+//		ReferenceBlockHash: nil,
+//		Nonce:              0,
+//		ComputeLimit:       0,
+//		PayerAccount:       flow.Address{},
+//		ScriptAccounts:     nil,
+//		Signatures:         nil,
+//		Status:             0,
+//		Events:             nil,
+//	}
+//}
+
 // updateAccountCode updates the configured account with the code of the given
 // file.
 //
-// There should be exactly 1 argument, the DocumentURI of the file to submit.
+// There should be exactly 2 arguments:
+//   * the DocumentURI of the file to submit
+//   * the address of the account to sign with
 func (s *Server) updateAccountCode(conn protocol.Conn, args ...interface{}) (interface{}, error) {
 	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Log,
 		Message: fmt.Sprintf("update acct code args: %v", args),
 	})
-	if len(args) != 1 {
-		return nil, errors.New("missing argument")
+	if len(args) != 2 {
+		return nil, fmt.Errorf("must have 2 args, got: %d", len(args))
 	}
 	uri, ok := args[0].(string)
 	if !ok {
 		return nil, errors.New("invalid uri argument")
 	}
-
 	doc, ok := s.documents[protocol.DocumentUri(uri)]
 	if !ok {
 		return nil, fmt.Errorf("could not find document for URI %s", uri)
 	}
+	addrHex, ok := args[1].(string)
+	if !ok {
+		return nil, errors.New("invalid uri argument")
+	}
+	addr := flow.HexToAddress(addrHex)
 
 	accountCode := []byte(doc.text)
 	script := templates.UpdateAccountCode(accountCode)
+
+	return nil, s.sendTransaction(conn, script, addr)
+}
+
+// sendTransaction sends a transaction with the given script, from the given
+// address. Returns an error if we do not have the private key for the address.
+//
+// If an error occurs, attempts to show an appropriate message (either via logs
+// or UI popups in the client).
+func (s *Server) sendTransaction(conn protocol.Conn, script []byte, addr flow.Address) error {
+	key, ok := s.accounts[addr]
+	if !ok {
+		return fmt.Errorf("cannot sign transaction for account with unknown address %s", addr)
+	}
 
 	tx := flow.Transaction{
 		Script:         script,
 		Nonce:          s.getNextNonce(),
 		ComputeLimit:   10,
-		PayerAccount:   s.config.AccountAddr,
-		ScriptAccounts: []flow.Address{s.config.AccountAddr},
+		PayerAccount:   addr,
+		ScriptAccounts: []flow.Address{addr},
 	}
 
-	return nil, s.sendTransaction(conn, tx)
-}
-
-// sendTransaction sends the given transaction.
-//
-// If an error occurs, attempts to show an appropriate message (either via logs
-// or UI popups in the client).
-func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) error {
 	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Info,
 		Message: fmt.Sprintf("submitting transaction %d", tx.Nonce),
 	})
 
-	sig, err := keys.SignTransaction(tx, s.config.AccountKey)
+	sig, err := keys.SignTransaction(tx, key)
 	if err != nil {
 		return err
 	}
-	tx.AddSignature(s.config.AccountAddr, sig)
+	tx.AddSignature(addr, sig)
 
 	err = s.flowClient.SendTransaction(context.Background(), tx)
 	if err == nil {

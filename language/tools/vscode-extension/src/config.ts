@@ -19,7 +19,7 @@ export type Config = {
     // Set of created accounts for which we can submit transactions.
     // Mapping from account address to account object.
     accounts: {[key: string]: Account},
-    // Address of the current
+    // Address of the currently active account.
     activeAccount: string
 };
 

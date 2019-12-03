@@ -11,9 +11,8 @@ import (
 // Config defines configuration for the Language Server. These options are
 // determined by the client and passed to the server at initialization.
 type Config struct {
-	// The key and address of the account to use when sending transactions.
-	AccountKey  flow.AccountPrivateKey `json:"accountKey"`
-	AccountAddr flow.Address           `json:"accountAddress"`
+	// The key of the root account.
+	RootAccountKey flow.AccountPrivateKey `json:"rootAccountKey"`
 	// The address where the emulator is running.
 	EmulatorAddr string `json:"emulatorAddress"`
 }
@@ -28,24 +27,19 @@ func FromInitializationOptions(opts interface{}) (conf Config, err error) {
 		return Config{}, errors.New("")
 	}
 
-	accountKeyHex, ok := optsMap["accountKey"].(string)
+	rootAccountKeyHex, ok := optsMap["rootAccountKey"].(string)
 	if !ok {
 		return Config{}, errors.New("missing accountKey field")
-	}
-	accountAddrHex, ok := optsMap["accountAddress"].(string)
-	if !ok {
-		return Config{}, errors.New("missing accountAddress field")
 	}
 	emulatorAddr, ok := optsMap["emulatorAddress"].(string)
 	if !ok {
 		return Config{}, errors.New("missing emulatorAddress field")
 	}
 
-	conf.AccountKey, err = keys.DecodePrivateKeyHex(accountKeyHex)
+	conf.RootAccountKey, err = keys.DecodePrivateKeyHex(rootAccountKeyHex)
 	if err != nil {
 		return
 	}
-	conf.AccountAddr = flow.HexToAddress(accountAddrHex)
 	conf.EmulatorAddr = emulatorAddr
 
 	return

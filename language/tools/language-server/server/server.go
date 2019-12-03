@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dapperlabs/flow-go/model/flow"
+
 	"github.com/dapperlabs/flow-go/language/runtime"
 
 	"github.com/dapperlabs/flow-go/sdk/client"
@@ -44,6 +46,8 @@ type Server struct {
 	// registry of custom commands we support
 	commands   map[string]CommandHandler
 	flowClient *client.Client
+	// set of created accounts we can submit transactions for
+	accounts map[flow.Address]flow.AccountPrivateKey
 	// the nonce to use when submitting transactions
 	nonce uint64
 }
@@ -53,6 +57,7 @@ func NewServer() *Server {
 		checkers:  make(map[protocol.DocumentUri]*sema.Checker),
 		documents: make(map[protocol.DocumentUri]document),
 		commands:  make(map[string]CommandHandler),
+		accounts:  make(map[flow.Address]flow.AccountPrivateKey),
 	}
 }
 
@@ -89,6 +94,9 @@ func (s *Server) Initialize(
 	}
 	s.config = conf
 
+	// add the root account as a usable account
+	s.accounts[flow.RootAddress] = conf.RootAccountKey
+
 	s.flowClient, err = client.New(s.config.EmulatorAddr)
 	if err != nil {
 		return nil, err
@@ -96,9 +104,8 @@ func (s *Server) Initialize(
 
 	// TODO remove
 	conn.LogMessage(&protocol.LogMessageParams{
-		Type: protocol.Info,
-		Message: fmt.Sprintf("Successfully loaded config emu_addr: %s acct_addr: %s",
-			conf.EmulatorAddr, conf.AccountAddr.String()),
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("Successfully loaded config emu_addr: %s", conf.EmulatorAddr),
 	})
 
 	// after initialization, indicate to the client which commands we support
