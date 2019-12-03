@@ -183,7 +183,10 @@ func StartServer(logger *log.Logger, config *Config) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	store, err := badger.New(config.DBPath)
+	store, err := badger.New(
+		badger.WithPath(config.DBPath),
+		badger.WithLogger(logger),
+		badger.WithTruncate(true))
 	if err != nil {
 		logger.WithError(err).Fatal("☠️  Failed to set up Emulator server")
 	}
