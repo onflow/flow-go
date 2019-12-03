@@ -468,7 +468,7 @@ func (checker *Checker) conformances(declaration *ast.CompositeDeclaration) []*I
 			)
 		}
 
-		conformanceIdentifier := conformance.Identifier.Identifier
+		conformanceIdentifier := conformance.String()
 
 		if seenConformances[conformanceIdentifier] {
 			checker.report(

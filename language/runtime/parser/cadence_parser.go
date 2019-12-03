@@ -189,8 +189,8 @@ var parserATN = []uint16{
 	2, 288, 287, 3, 2, 2, 2, 289, 23, 3, 2, 2, 2, 290, 291, 5, 22, 12, 2, 291,
 	292, 5, 40, 21, 2, 292, 293, 5, 190, 96, 2, 293, 294, 5, 26, 14, 2, 294,
 	295, 7, 4, 2, 2, 295, 296, 5, 36, 19, 2, 296, 297, 7, 5, 2, 2, 297, 25,
-	3, 2, 2, 2, 298, 299, 7, 7, 2, 2, 299, 304, 5, 190, 96, 2, 300, 301, 7,
-	6, 2, 2, 301, 303, 5, 190, 96, 2, 302, 300, 3, 2, 2, 2, 303, 306, 3, 2,
+	3, 2, 2, 2, 298, 299, 7, 7, 2, 2, 299, 304, 5, 58, 30, 2, 300, 301, 7,
+	6, 2, 2, 301, 303, 5, 58, 30, 2, 302, 300, 3, 2, 2, 2, 303, 306, 3, 2,
 	2, 2, 304, 302, 3, 2, 2, 2, 304, 305, 3, 2, 2, 2, 305, 308, 3, 2, 2, 2,
 	306, 304, 3, 2, 2, 2, 307, 298, 3, 2, 2, 2, 307, 308, 3, 2, 2, 2, 308,
 	27, 3, 2, 2, 2, 309, 310, 9, 2, 2, 2, 310, 29, 3, 2, 2, 2, 311, 313, 5,
@@ -2593,27 +2593,27 @@ func NewConformancesContext(parser antlr.Parser, parent antlr.ParserRuleContext,
 
 func (s *ConformancesContext) GetParser() antlr.Parser { return s.parser }
 
-func (s *ConformancesContext) AllIdentifier() []IIdentifierContext {
-	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*IIdentifierContext)(nil)).Elem())
-	var tst = make([]IIdentifierContext, len(ts))
+func (s *ConformancesContext) AllNominalType() []INominalTypeContext {
+	var ts = s.GetTypedRuleContexts(reflect.TypeOf((*INominalTypeContext)(nil)).Elem())
+	var tst = make([]INominalTypeContext, len(ts))
 
 	for i, t := range ts {
 		if t != nil {
-			tst[i] = t.(IIdentifierContext)
+			tst[i] = t.(INominalTypeContext)
 		}
 	}
 
 	return tst
 }
 
-func (s *ConformancesContext) Identifier(i int) IIdentifierContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IIdentifierContext)(nil)).Elem(), i)
+func (s *ConformancesContext) NominalType(i int) INominalTypeContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*INominalTypeContext)(nil)).Elem(), i)
 
 	if t == nil {
 		return nil
 	}
 
-	return t.(IIdentifierContext)
+	return t.(INominalTypeContext)
 }
 
 func (s *ConformancesContext) GetRuleContext() antlr.RuleContext {
@@ -2679,7 +2679,7 @@ func (p *CadenceParser) Conformances() (localctx IConformancesContext) {
 		}
 		{
 			p.SetState(297)
-			p.Identifier()
+			p.NominalType()
 		}
 		p.SetState(302)
 		p.GetErrorHandler().Sync(p)
@@ -2692,7 +2692,7 @@ func (p *CadenceParser) Conformances() (localctx IConformancesContext) {
 			}
 			{
 				p.SetState(299)
-				p.Identifier()
+				p.NominalType()
 			}
 
 			p.SetState(304)

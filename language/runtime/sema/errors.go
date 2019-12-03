@@ -730,7 +730,7 @@ func (e *DuplicateConformanceError) Error() string {
 	return fmt.Sprintf(
 		"structure `%s` repeats conformance for interface `%s`",
 		e.CompositeIdentifier,
-		e.Conformance.Identifier.Identifier,
+		e.Conformance,
 	)
 }
 
