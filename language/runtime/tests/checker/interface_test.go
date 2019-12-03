@@ -1086,3 +1086,23 @@ func TestCheckInterfaceSelfUse(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckInvalidContractInterfaceConformanceMissingTypeRequirement(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
+              struct Nested {}
+          }
+
+          contract TestImpl: Test {
+              // missing 'Nested'
+          }
+	    `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ConformanceError{}, errs[0])
+}
+

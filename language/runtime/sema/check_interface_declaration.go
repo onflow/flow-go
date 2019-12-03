@@ -102,6 +102,12 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		interfaceType.CompositeKind,
 	)
 
+	nestedDeclarations := checker.Elaboration.InterfaceNestedDeclarations[declaration]
+
+	for _, nestedDeclaration := range nestedDeclarations {
+		nestedDeclaration.Accept(checker)
+	}
+
 	return nil
 }
 

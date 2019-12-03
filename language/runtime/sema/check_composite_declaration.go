@@ -436,9 +436,10 @@ func (checker *Checker) checkCompositeConformance(
 ) {
 	var missingMembers []*Member
 	var memberMismatches []MemberMismatch
+	var missingNestedCompositeTypes []*CompositeType
 	var initializerMismatch *InitializerMismatch
 
-	// ensure the composite kinds match, e.g. a structure shouldn't be able
+	// Ensure the composite kinds match, e.g. a structure shouldn't be able
 	// to conform to a resource interface
 
 	if interfaceType.CompositeKind != compositeType.Kind {
@@ -450,6 +451,8 @@ func (checker *Checker) checkCompositeConformance(
 			},
 		)
 	}
+
+	// Check initializer requirement
 
 	// TODO: add support for overloaded initializers
 
@@ -473,6 +476,8 @@ func (checker *Checker) checkCompositeConformance(
 		}
 	}
 
+	// Determine missing members
+
 	for name, interfaceMember := range interfaceType.Members {
 
 		compositeMember, ok := compositeType.Members[name]
@@ -491,18 +496,40 @@ func (checker *Checker) checkCompositeConformance(
 		}
 	}
 
+	// Determine missing nested composite type definitions
+
+	for name, typeRequirement := range interfaceType.NestedTypes {
+
+		requiredCompositeType, ok := typeRequirement.(*CompositeType)
+		if !ok {
+			continue
+		}
+
+		nestedCompositeType, ok := compositeType.NestedTypes[name]
+		if !ok {
+			missingNestedCompositeTypes = append(missingNestedCompositeTypes, requiredCompositeType)
+			continue
+		}
+
+		// TODO: check nestedCompositeType
+
+		_ = nestedCompositeType
+	}
+
 	if len(missingMembers) > 0 ||
 		len(memberMismatches) > 0 ||
+		len(missingNestedCompositeTypes) > 0 ||
 		initializerMismatch != nil {
 
 		checker.report(
 			&ConformanceError{
-				CompositeType:       compositeType,
-				InterfaceType:       interfaceType,
-				Pos:                 compositeIdentifierPos,
-				InitializerMismatch: initializerMismatch,
-				MissingMembers:      missingMembers,
-				MemberMismatches:    memberMismatches,
+				CompositeType:               compositeType,
+				InterfaceType:               interfaceType,
+				Pos:                         compositeIdentifierPos,
+				InitializerMismatch:         initializerMismatch,
+				MissingMembers:              missingMembers,
+				MemberMismatches:            memberMismatches,
+				MissingNestedCompositeTypes: missingNestedCompositeTypes,
 			},
 		)
 	}

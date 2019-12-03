@@ -690,12 +690,13 @@ type InitializerMismatch struct {
 //  use `InitializerMismatch`, `MissingMembers`, `MemberMismatches`, etc
 
 type ConformanceError struct {
-	CompositeType       *CompositeType
-	InterfaceType       *InterfaceType
-	InitializerMismatch *InitializerMismatch
-	MissingMembers      []*Member
-	MemberMismatches    []MemberMismatch
-	Pos                 ast.Position
+	CompositeType               *CompositeType
+	InterfaceType               *InterfaceType
+	InitializerMismatch         *InitializerMismatch
+	MissingMembers              []*Member
+	MemberMismatches            []MemberMismatch
+	MissingNestedCompositeTypes []*CompositeType
+	Pos                         ast.Position
 }
 
 func (e *ConformanceError) Error() string {
