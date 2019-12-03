@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
@@ -17,26 +18,21 @@ func TestCheckInvalidCompositeRedeclaringType(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Int {}
-            `, kind.Keyword()))
-
-			// TODO: add support for non-structure / non-resource declarations
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Int {}
+                    `,
+					kind.Keyword(),
+				),
+			)
 
 			// NOTE: two redeclaration errors: one for type, one for function
 
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				errs := ExpectCheckerErrors(t, err, 2)
-				assert.IsType(t, &sema.RedeclarationError{}, errs[0])
-				assert.IsType(t, &sema.RedeclarationError{}, errs[1])
+			errs := ExpectCheckerErrors(t, err, 2)
 
-			default:
-				errs := ExpectCheckerErrors(t, err, 3)
-				assert.IsType(t, &sema.RedeclarationError{}, errs[0])
-				assert.IsType(t, &sema.RedeclarationError{}, errs[1])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-			}
+			assert.IsType(t, &sema.RedeclarationError{}, errs[0])
+			assert.IsType(t, &sema.RedeclarationError{}, errs[1])
 		})
 	}
 }
@@ -46,31 +42,26 @@ func TestCheckComposite(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  pub(set) var foo: Int
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          pub(set) var foo: Int
 
-                  init(foo: Int) {
-                      self.foo = foo
-                  }
+                          init(foo: Int) {
+                              self.foo = foo
+                          }
 
-                  pub fun getFoo(): Int {
-                      return self.foo
-                  }
-              }
-            `, kind.Keyword()))
+                          pub fun getFoo(): Int {
+                              return self.foo
+                          }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -80,23 +71,18 @@ func TestCheckInitializerName(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  init() {}
-              }
-            `, kind.Keyword()))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          init() {}
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -106,16 +92,19 @@ func TestCheckDestructor(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  destroy() {}
-              }
-            `, kind.Keyword()))
-
-			// TODO: add support for non-structure / non-resource declarations
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          destroy() {}
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
 			switch kind {
-			case common.CompositeKindStructure:
+			case common.CompositeKindStructure, common.CompositeKindContract:
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidDestructorError{}, errs[0])
@@ -124,10 +113,7 @@ func TestCheckDestructor(t *testing.T) {
 				require.NoError(t, err)
 
 			default:
-				errs := ExpectCheckerErrors(t, err, 2)
-
-				assert.IsType(t, &sema.InvalidDestructorError{}, errs[0])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+				panic(errors.NewUnreachableError())
 			}
 		})
 	}
@@ -158,19 +144,28 @@ func TestCheckInvalidUnknownSpecialFunction(t *testing.T) {
 					interfaceKeyword,
 				))
 
-				// TODO: add support for non-structure / non-resource declarations
-
 				switch kind {
 				case common.CompositeKindStructure, common.CompositeKindResource:
 					errs := ExpectCheckerErrors(t, err, 1)
 
 					assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
 
-				default:
-					errs := ExpectCheckerErrors(t, err, 2)
+				case common.CompositeKindContract:
+					// TODO: add support for contract interface declarations
 
-					assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
-					assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+					if isInterface {
+						errs := ExpectCheckerErrors(t, err, 2)
+
+						assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
+						assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+					} else {
+						errs := ExpectCheckerErrors(t, err, 1)
+
+						assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
+					}
+
+				default:
+					panic(errors.NewUnreachableError())
 				}
 			})
 		}
@@ -193,17 +188,18 @@ func TestCheckInvalidCompositeFieldNames(t *testing.T) {
 
 			t.Run(testName, func(t *testing.T) {
 
-				_, err := ParseAndCheck(t, fmt.Sprintf(`
-                      %[1]s %[2]s Test {
-                          let init: Int
-                          let destroy: Bool
-                      }
-                    `,
-					kind.Keyword(),
-					interfaceKeyword,
-				))
-
-				// TODO: add support for non-structure / non-resource declarations
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          %[1]s %[2]s Test {
+                              let init: Int
+                              let destroy: Bool
+                          }
+                        `,
+						kind.Keyword(),
+						interfaceKeyword,
+					),
+				)
 
 				switch kind {
 				case common.CompositeKindStructure,
@@ -222,24 +218,28 @@ func TestCheckInvalidCompositeFieldNames(t *testing.T) {
 						assert.IsType(t, &sema.MissingInitializerError{}, errs[2])
 					}
 
-				default:
+				case common.CompositeKindContract:
 
 					if isInterface {
 						errs := ExpectCheckerErrors(t, err, 3)
 
 						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
 						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
+
+						// TODO: add support for contract interface declarations
+
 						assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
 
 					} else {
-						errs := ExpectCheckerErrors(t, err, 4)
+						errs := ExpectCheckerErrors(t, err, 3)
 
 						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
 						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
 						assert.IsType(t, &sema.MissingInitializerError{}, errs[2])
-						assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[3])
-
 					}
+
+				default:
+					panic(errors.NewUnreachableError())
 				}
 			})
 		}
@@ -267,18 +267,19 @@ func TestCheckInvalidCompositeFunctionNames(t *testing.T) {
 
 			t.Run(testName, func(t *testing.T) {
 
-				_, err := ParseAndCheck(t, fmt.Sprintf(`
-                      %[1]s %[2]s Test {
-                          fun init() %[3]s
-                          fun destroy() %[3]s
-                      }
-                    `,
-					kind.Keyword(),
-					interfaceKeyword,
-					body,
-				))
-
-				// TODO: add support for non-structure / non-resource declarations
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          %[1]s %[2]s Test {
+                              fun init() %[3]s
+                              fun destroy() %[3]s
+                          }
+                        `,
+						kind.Keyword(),
+						interfaceKeyword,
+						body,
+					),
+				)
 
 				switch kind {
 				case common.CompositeKindStructure, common.CompositeKindResource:
@@ -287,13 +288,25 @@ func TestCheckInvalidCompositeFunctionNames(t *testing.T) {
 					assert.IsType(t, &sema.InvalidNameError{}, errs[0])
 					assert.IsType(t, &sema.InvalidNameError{}, errs[1])
 
+				case common.CompositeKindContract:
+					if isInterface {
+						errs := ExpectCheckerErrors(t, err, 3)
+
+						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
+						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
+
+						// TODO: add support for contract interface declarations
+
+						assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
+					} else {
+						errs := ExpectCheckerErrors(t, err, 2)
+
+						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
+						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
+					}
+
 				default:
-					errs := ExpectCheckerErrors(t, err, 3)
-
-					assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-					assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-					assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-
+					panic(errors.NewUnreachableError())
 				}
 			})
 		}
@@ -305,32 +318,22 @@ func TestCheckInvalidCompositeRedeclaringFields(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  let x: Int
-                  let x: Int
-              }
-            `, kind.Keyword()))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          let x: Int
+                          let x: Int
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 2
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 2)
 
 			assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 			assert.IsType(t, &sema.MissingInitializerError{}, errs[1])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-			}
 		})
 	}
 }
@@ -340,31 +343,21 @@ func TestCheckInvalidCompositeRedeclaringFunctions(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  fun x() {}
-                  fun x() {}
-              }
-            `, kind.Keyword()))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          fun x() {}
+                          fun x() {}
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 1
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.RedeclarationError{}, errs[0])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-			}
 		})
 	}
 }
@@ -374,32 +367,22 @@ func TestCheckInvalidCompositeRedeclaringFieldsAndFunctions(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  let x: Int
-                  fun x() {}
-              }
-            `, kind.Keyword()))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          let x: Int
+                          fun x() {}
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 2
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 2)
 
 			assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 			assert.IsType(t, &sema.MissingInitializerError{}, errs[1])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-			}
 		})
 	}
 }
@@ -409,28 +392,24 @@ func TestCheckCompositeFieldsAndFunctions(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  let x: Int
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          let x: Int
 
-                  init() {
-                      self.x = 1
-                  }
+                          init() {
+                              self.x = 1
+                          }
 
-                  fun y() {}
-              }
-            `, kind.Keyword()))
+                          fun y() {}
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-			default:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -440,31 +419,21 @@ func TestCheckInvalidCompositeFieldType(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  let x: X
-              }
-            `, kind.Keyword()))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          let x: X
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 2
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 2)
 			assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 
 			assert.IsType(t, &sema.MissingInitializerError{}, errs[1])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-			}
 		})
 	}
 }
@@ -474,30 +443,20 @@ func TestCheckInvalidCompositeInitializerParameterType(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  init(x: X) {}
-              }
-            `, kind.Keyword()))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          init(x: X) {}
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 1
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-			}
 		})
 	}
 }
@@ -507,30 +466,20 @@ func TestCheckInvalidCompositeInitializerParameters(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  init(x: Int, x: Int) {}
-              }
-            `, kind.Keyword()))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          init(x: Int, x: Int) {}
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 1
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.RedeclarationError{}, errs[0])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-			}
 		})
 	}
 }
@@ -540,17 +489,20 @@ func TestCheckInvalidCompositeSpecialFunction(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  init() { X }
-                  destroy() { Y }
-              }
-            `, kind.Keyword()))
-
-			// TODO: add support for non-structure / non-resource declarations
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          init() { X }
+                          destroy() { Y }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
 			switch kind {
-			case common.CompositeKindStructure:
+			case common.CompositeKindStructure, common.CompositeKindContract:
 				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
@@ -564,12 +516,7 @@ func TestCheckInvalidCompositeSpecialFunction(t *testing.T) {
 				assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
 
 			default:
-				errs := ExpectCheckerErrors(t, err, 3)
-
-				assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-				assert.IsType(t, &sema.InvalidDestructorError{}, errs[1])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-
+				panic(errors.NewUnreachableError())
 			}
 		})
 	}
@@ -580,30 +527,20 @@ func TestCheckInvalidCompositeFunction(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  fun test() { X }
-              }
-            `, kind.Keyword()))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          fun test() { X }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 1
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-			}
 		})
 	}
 }
@@ -613,17 +550,20 @@ func TestCheckCompositeInitializerSelfReference(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  init() { self }
-                  destroy() { self }
-              }
-            `, kind.Keyword()))
-
-			// TODO: add support for non-structure / non-resource declarations
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          init() { self }
+                          destroy() { self }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
 			switch kind {
-			case common.CompositeKindStructure:
+			case common.CompositeKindStructure, common.CompositeKindContract:
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidDestructorError{}, errs[0])
@@ -636,11 +576,8 @@ func TestCheckCompositeInitializerSelfReference(t *testing.T) {
 				assert.IsType(t, &sema.ResourceLossError{}, errs[0])
 				assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 
-			case common.CompositeKindContract:
-				errs := ExpectCheckerErrors(t, err, 2)
-
-				assert.IsType(t, &sema.InvalidDestructorError{}, errs[0])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+			default:
+				panic(errors.NewUnreachableError())
 			}
 		})
 	}
@@ -651,16 +588,19 @@ func TestCheckCompositeFunctionSelfReference(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  fun test() { self }
-              }
-            `, kind.Keyword()))
-
-			// TODO: add support for non-structure / non-resource declarations
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          fun test() { self }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
 			switch kind {
-			case common.CompositeKindStructure:
+			case common.CompositeKindStructure, common.CompositeKindContract:
 				require.NoError(t, err)
 
 			case common.CompositeKindResource:
@@ -670,10 +610,8 @@ func TestCheckCompositeFunctionSelfReference(t *testing.T) {
 
 				assert.IsType(t, &sema.ResourceLossError{}, errs[0])
 
-			case common.CompositeKindContract:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+			default:
+				panic(errors.NewUnreachableError())
 
 			}
 		})
@@ -685,11 +623,16 @@ func TestCheckInvalidLocalComposite(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              fun test() {
-                  %s Test {}
-              }
-            `, kind.Keyword()))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      fun test() {
+                          %s Test {}
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
 			errs := ExpectCheckerErrors(t, err, 1)
 
@@ -703,30 +646,20 @@ func TestCheckInvalidCompositeMissingInitializer(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-               %s Test {
-                   let foo: Int
-               }
-            `, kind.Keyword()))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                       %s Test {
+                           let foo: Int
+                       }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 1
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.MissingInitializerError{}, errs[0])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-			}
 		})
 	}
 }
@@ -823,31 +756,25 @@ func TestCheckCompositeFieldAccess(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  let foo: Int
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+                      %s Test {
+                          let foo: Int
 
-                  init() {
-                      self.foo = 1
-                  }
+                          init() {
+                              self.foo = 1
+                          }
 
-                  fun test() {
-                      self.foo
-                  }
-              }
-            `, kind.Keyword()))
+                          fun test() {
+                              self.foo
+                          }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -857,45 +784,44 @@ func TestCheckInvalidCompositeFieldAccess(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  init() {
-                      self.foo
-                  }
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          init() {
+                              self.foo
+                          }
 
-                  fun test() {
-                      self.bar
-                  }
-              }
-            `, kind.Keyword()))
-
-			// TODO: add support for non-structure / non-resource declarations
+                          fun test() {
+                              self.bar
+                          }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
 			expectedErrorCount := 2
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
 
 			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
 
-			assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
+			require.IsType(t,
+				&sema.NotDeclaredMemberError{},
+				errs[0],
+			)
 			assert.Equal(t,
 				"foo",
 				errs[0].(*sema.NotDeclaredMemberError).Name,
 			)
-			assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[1])
+
+			require.IsType(t,
+				&sema.NotDeclaredMemberError{},
+				errs[1],
+			)
 			assert.Equal(t,
 				"bar",
 				errs[1].(*sema.NotDeclaredMemberError).Name,
 			)
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-			}
 		})
 	}
 }
@@ -905,37 +831,33 @@ func TestCheckCompositeFieldAssignment(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s Test {
-                  var foo: Int
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s Test {
+                          var foo: Int
 
-                  init() {
-                      self.foo = 1
-                      let alsoSelf %[2]s self
-                      alsoSelf.foo = 2
-                  }
+                          init() {
+                              self.foo = 1
+                              let alsoSelf %[2]s self
+                              alsoSelf.foo = 2
+                          }
 
-                  fun test() {
-                      self.foo = 3
-                      let alsoSelf %[2]s self
-                      alsoSelf.foo = 4
-                  }
-              }
-            `,
-				kind.Keyword(),
-				kind.TransferOperator(),
-			))
+                          fun test() {
+                              self.foo = 3
+                              let alsoSelf %[2]s self
+                              alsoSelf.foo = 4
+                          }
+                      }
+                    `,
+					kind.Keyword(),
+					kind.TransferOperator(),
+				),
+			)
 
 			switch kind {
-			case common.CompositeKindStructure:
+			case common.CompositeKindStructure, common.CompositeKindContract:
 				require.NoError(t, err)
-
-			case common.CompositeKindContract:
-				// TODO: add support for contract declarations
-
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 
 			case common.CompositeKindResource:
 
@@ -945,6 +867,9 @@ func TestCheckCompositeFieldAssignment(t *testing.T) {
 
 				assert.IsType(t, &sema.ResourceLossError{}, errs[0])
 				assert.IsType(t, &sema.ResourceLossError{}, errs[1])
+
+			default:
+				panic(errors.NewUnreachableError())
 			}
 		})
 	}
@@ -952,49 +877,32 @@ func TestCheckCompositeFieldAssignment(t *testing.T) {
 
 func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
 
-	type testCase struct {
-		compositeKind common.CompositeKind
-		check         func(error)
-	}
+	tests := map[common.CompositeKind]func(error){
+		common.CompositeKindStructure: func(err error) {
+			errs := ExpectCheckerErrors(t, err, 2)
 
-	// TODO: add support for non-structure / non-resource declarations
-
-	testCases := []testCase{
-		{
-			compositeKind: common.CompositeKindStructure,
-			check: func(err error) {
-				errs := ExpectCheckerErrors(t, err, 2)
-
-				assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
-				assert.IsType(t, &sema.AssignmentToConstantError{}, errs[1])
-			},
+			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
+			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[1])
 		},
-		{
-			compositeKind: common.CompositeKindResource,
-			check: func(err error) {
-				errs := ExpectCheckerErrors(t, err, 4)
+		common.CompositeKindResource: func(err error) {
+			errs := ExpectCheckerErrors(t, err, 4)
 
-				assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
-				assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[1])
-				assert.IsType(t, &sema.AssignmentToConstantError{}, errs[2])
-				assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[3])
-			},
+			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
+			assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[1])
+			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[2])
+			assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[3])
 		},
-		{
-			compositeKind: common.CompositeKindContract,
-			check: func(err error) {
-				errs := ExpectCheckerErrors(t, err, 3)
+		common.CompositeKindContract: func(err error) {
+			errs := ExpectCheckerErrors(t, err, 2)
 
-				assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
-				assert.IsType(t, &sema.AssignmentToConstantError{}, errs[1])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-			},
+			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
+			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[1])
 		},
 	}
 
-	for _, testCase := range testCases {
+	for compositeKind, check := range tests {
 
-		t.Run(testCase.compositeKind.Keyword(), func(t *testing.T) {
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t, fmt.Sprintf(`
               %[1]s Test {
@@ -1007,12 +915,12 @@ func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
                   }
               }
             `,
-				testCase.compositeKind.Keyword(),
-				testCase.compositeKind.TransferOperator(),
-				testCase.compositeKind.ConstructionKeyword(),
+				compositeKind.Keyword(),
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
 			))
 
-			testCase.check(err)
+			check(err)
 		})
 	}
 }
@@ -1022,45 +930,36 @@ func TestCheckInvalidCompositeFieldAssignment(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  init() {
-                      self.foo = 1
-                  }
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          init() {
+                              self.foo = 1
+                          }
 
-                  fun test() {
-                      self.bar = 2
-                  }
-              }
-            `, kind.Keyword()))
+                          fun test() {
+                              self.bar = 2
+                          }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
+			errs := ExpectCheckerErrors(t, err, 2)
 
-			expectedErrorCount := 2
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
-			assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
+			require.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
 			assert.Equal(t,
 				"foo",
 				errs[0].(*sema.NotDeclaredMemberError).Name,
 			)
 
-			assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[1])
+			require.IsType(t, &sema.NotDeclaredMemberError{}, errs[1])
 			assert.Equal(t,
 				"bar",
 				errs[1].(*sema.NotDeclaredMemberError).Name,
 			)
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-			}
 		})
 	}
 }
@@ -1070,39 +969,29 @@ func TestCheckInvalidCompositeFieldAssignmentWrongType(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  var foo: Int
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          var foo: Int
 
-                  init() {
-                      self.foo = true
-                  }
+                          init() {
+                              self.foo = true
+                          }
 
-                  fun test() {
-                      self.foo = false
-                  }
-              }
-            `, kind.Keyword()))
+                          fun test() {
+                              self.foo = false
+                          }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
+			errs := ExpectCheckerErrors(t, err, 2)
 
-			expectedErrorCount := 2
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
 			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-
 			assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-			}
 		})
 	}
 }
@@ -1112,40 +1001,30 @@ func TestCheckInvalidCompositeFieldConstantAssignment(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  let foo: Int
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          let foo: Int
 
-                  init() {
-                      // initialization is fine
-                      self.foo = 1
-                  }
+                          init() {
+                              // initialization is fine
+                              self.foo = 1
+                          }
 
-                  fun test() {
-                      // assignment is invalid
-                      self.foo = 2
-                  }
-              }
-            `, kind.Keyword()))
+                          fun test() {
+                              // assignment is invalid
+                              self.foo = 2
+                          }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 1
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[0])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-			}
 		})
 	}
 }
@@ -1155,27 +1034,22 @@ func TestCheckCompositeFunctionCall(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  fun foo() {}
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          fun foo() {}
 
-                  fun bar() {
-                      self.foo()
-                  }
-              }
-            `, kind.Keyword()))
+                          fun bar() {
+                              self.foo()
+                          }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -1185,34 +1059,24 @@ func TestCheckInvalidCompositeFunctionCall(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  fun foo() {}
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          fun foo() {}
 
-                  fun bar() {
-                      self.baz()
-                  }
-              }
-            `, kind.Keyword()))
+                          fun bar() {
+                              self.baz()
+                          }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 1
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-			}
 		})
 	}
 }
@@ -1222,40 +1086,30 @@ func TestCheckInvalidCompositeFunctionAssignment(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Test {
-                  fun foo() {}
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Test {
+                          fun foo() {}
 
-                  fun bar() {
-                      self.foo = 2
-                  }
-              }
-            `, kind.Keyword()))
+                          fun bar() {
+                              self.foo = 2
+                          }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 2
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 2)
 
 			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 
-			assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[1])
+			require.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[1])
 			assert.Equal(t,
 				"foo",
 				errs[1].(*sema.AssignmentToConstantMemberError).Name,
 			)
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-			}
 		})
 	}
 }
@@ -1265,39 +1119,33 @@ func TestCheckCompositeInstantiation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s Test {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s Test {
 
-                  init(x: Int) {
-                      let test: %[2]sTest %[3]s %[4]s Test(x: 1)
-                      %[5]s test
-                  }
+                          init(x: Int) {
+                              let test: %[2]sTest %[3]s %[4]s Test(x: 1)
+                              %[5]s test
+                          }
 
-                  fun test() {
-                      let test: %[2]sTest %[3]s %[4]s Test(x: 2)
-                      %[5]s test
-                  }
-              }
+                          fun test() {
+                              let test: %[2]sTest %[3]s %[4]s Test(x: 2)
+                              %[5]s test
+                          }
+                      }
 
-              let test: %[2]sTest %[3]s %[4]s Test(x: 3)
-            `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-				kind.DestructionKeyword(),
-			))
+                      let test: %[2]sTest %[3]s %[4]s Test(x: 3)
+                    `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+					kind.DestructionKeyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-			default:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -1307,35 +1155,24 @@ func TestCheckInvalidSameCompositeRedeclaration(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              let x = 1
-              %[1]s Foo {}
-              %[1]s Foo {}
-            `, kind.Keyword()))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      let x = 1
+                      %[1]s Foo {}
+                      %[1]s Foo {}
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 2
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount += 2
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 2)
 
 			// NOTE: two errors: one because type is redeclared,
 			// the other because the global is redeclared
 
 			assert.IsType(t, &sema.RedeclarationError{}, errs[0])
 			assert.IsType(t, &sema.RedeclarationError{}, errs[1])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[3])
-			}
 		})
 	}
 }
@@ -1350,7 +1187,7 @@ func TestCheckInvalidDifferentCompositeRedeclaration(t *testing.T) {
 				continue
 			}
 
-			// TODO: add support for non-structure / non-resource declarations
+			// TODO: add support for contract declarations
 
 			if firstKind != common.CompositeKindStructure &&
 				firstKind != common.CompositeKindResource {
@@ -1412,7 +1249,7 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 	for _, firstKind := range common.CompositeKinds {
 		for _, secondKind := range common.CompositeKinds {
 
-			// TODO: add support for non-structure / non-resource declarations
+			// TODO: add support for contract declarations
 
 			if firstKind != common.CompositeKindStructure &&
 				firstKind != common.CompositeKindResource {
@@ -1434,23 +1271,25 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 
 			t.Run(testName, func(t *testing.T) {
 
-				_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  %[1]s Foo {
-                      init() {}
-                  }
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(`
+                          %[1]s Foo {
+                              init() {}
+                          }
 
-                  %[2]s Bar {
-                      init() {}
-                  }
+                          %[2]s Bar {
+                              init() {}
+                          }
 
-                  let foo: %[3]sFoo %[4]s %[5]s Bar()
-                `,
-					firstKind.Keyword(),
-					secondKind.Keyword(),
-					firstKind.Annotation(),
-					firstKind.TransferOperator(),
-					secondKind.ConstructionKeyword(),
-				))
+                          let foo: %[3]sFoo %[4]s %[5]s Bar()
+                        `,
+						firstKind.Keyword(),
+						secondKind.Keyword(),
+						firstKind.Annotation(),
+						firstKind.TransferOperator(),
+						secondKind.ConstructionKeyword(),
+					),
+				)
 
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1465,30 +1304,20 @@ func TestCheckInvalidCompositeFunctionWithSelfParameter(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Foo {
-                  fun test(self: Int) {}
-              }
-            `, kind.Keyword()))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Foo {
+                          fun test(self: Int) {}
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 1
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.RedeclarationError{}, errs[0])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-			}
 		})
 	}
 }
@@ -1498,30 +1327,20 @@ func TestCheckInvalidCompositeInitializerWithSelfParameter(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s Foo {
-                  init(self: Int) {}
-              }
-            `, kind.Keyword()))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s Foo {
+                          init(self: Int) {}
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			expectedErrorCount := 1
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				expectedErrorCount++
-			}
-
-			errs := ExpectCheckerErrors(t, err, expectedErrorCount)
+			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.RedeclarationError{}, errs[0])
-
-			if kind != common.CompositeKindStructure &&
-				kind != common.CompositeKindResource {
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-			}
 		})
 	}
 }
@@ -1531,33 +1350,26 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s Test {
-                  let foo: Int
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s Test {
+                          let foo: Int
 
-                  init() {
-                      self.foo = 42
-                  }
-              }
+                          init() {
+                              self.foo = 42
+                          }
+                      }
 
-              let test %[2]s %[3]s Test()
-            `,
-				kind.Keyword(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			))
+                      let test %[2]s %[3]s Test()
+                    `,
+					kind.Keyword(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -1567,30 +1379,23 @@ func TestCheckCompositeInitializerWithArgumentLabel(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s Test {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s Test {
 
-                  init(x: Int) {}
-              }
+                          init(x: Int) {}
+                      }
 
-              let test %[2]s %[3]s Test(x: 1)
-            `,
-				kind.Keyword(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			))
+                      let test %[2]s %[3]s Test(x: 1)
+                    `,
+					kind.Keyword(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -1600,33 +1405,25 @@ func TestCheckInvalidCompositeInitializerCallWithMissingArgumentLabel(t *testing
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s Test {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s Test {
 
-                  init(x: Int) {}
-              }
+                          init(x: Int) {}
+                      }
 
-              let test %[2]s %[3]s Test(1)
-            `,
-				kind.Keyword(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			))
+                      let test %[2]s %[3]s Test(1)
+                    `,
+					kind.Keyword(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
+			errs := ExpectCheckerErrors(t, err, 1)
 
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.MissingArgumentLabelError{}, errs[0])
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 2)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-				assert.IsType(t, &sema.MissingArgumentLabelError{}, errs[1])
-			}
+			assert.IsType(t, &sema.MissingArgumentLabelError{}, errs[0])
 		})
 	}
 }
@@ -1636,31 +1433,24 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s Test {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s Test {
 
-                  fun test(x: Int) {}
-              }
+                          fun test(x: Int) {}
+                      }
 
-              let test %[2]s %[3]s Test()
-              let void = test.test(x: 1)
-            `,
-				kind.Keyword(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			))
+                      let test %[2]s %[3]s Test()
+                      let void = test.test(x: 1)
+                    `,
+					kind.Keyword(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -1670,33 +1460,26 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s Test {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s Test {
 
-                  fun test(x: Int) {}
-              }
+                          fun test(x: Int) {}
+                      }
 
-              let test %[2]s %[3]s Test()
-              let void = test.test(1)
-            `,
-				kind.Keyword(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			))
+                      let test %[2]s %[3]s Test()
+                      let void = test.test(1)
+                    `,
+					kind.Keyword(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
+			errs := ExpectCheckerErrors(t, err, 1)
 
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.MissingArgumentLabelError{}, errs[0])
-			default:
-				errs := ExpectCheckerErrors(t, err, 2)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-				assert.IsType(t, &sema.MissingArgumentLabelError{}, errs[1])
-			}
+			assert.IsType(t, &sema.MissingArgumentLabelError{}, errs[0])
 		})
 	}
 }
@@ -1706,67 +1489,61 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			checker, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s Test {
+			checker, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s Test {
 
-                  init() {
-                      Test
-                  }
+                          init() {
+                              Test
+                          }
 
-                  fun test(): %[2]sTest {
-                      return %[2]s%[3]s Test()
-                  }
-              }
+                          fun test(): %[2]sTest {
+                              return %[2]s%[3]s Test()
+                          }
+                      }
 
-              fun test(): %[2]sTest {
-                  return %[2]s%[3]s Test()
-              }
+                      fun test(): %[2]sTest {
+                          return %[2]s%[3]s Test()
+                      }
 
-              fun test2(): %[2]sTest {
-                  let test %[4]s %[3]s Test()
-                  let res %[4]s test.test()
-                  %[5]s test
-                  return %[2]sres
-              }
-            `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.ConstructionKeyword(),
-				kind.TransferOperator(),
-				kind.DestructionKeyword(),
-			))
+                      fun test2(): %[2]sTest {
+                          let test %[4]s %[3]s Test()
+                          let res %[4]s test.test()
+                          %[5]s test
+                          return %[2]sres
+                      }
+                    `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.ConstructionKeyword(),
+					kind.TransferOperator(),
+					kind.DestructionKeyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
+			require.NoError(t, err)
 
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
+			testType := checker.FindType("Test")
 
-				testType := checker.FindType("Test")
+			assert.IsType(t, &sema.CompositeType{}, testType)
 
-				assert.IsType(t, &sema.CompositeType{}, testType)
+			structureType := testType.(*sema.CompositeType)
 
-				structureType := testType.(*sema.CompositeType)
+			assert.Equal(t,
+				"Test",
+				structureType.Identifier,
+			)
 
-				assert.Equal(t,
-					"Test",
-					structureType.Identifier,
-				)
+			testFunctionMember := structureType.Members["test"]
 
-				testFunctionMember := structureType.Members["test"]
+			assert.IsType(t, &sema.FunctionType{}, testFunctionMember.Type)
 
-				assert.IsType(t, &sema.FunctionType{}, testFunctionMember.Type)
+			testFunctionType := testFunctionMember.Type.(*sema.FunctionType)
 
-				testFunctionType := testFunctionMember.Type.(*sema.FunctionType)
-
-				actual := testFunctionType.ReturnTypeAnnotation.Type
-				if actual != structureType {
-					assert.Fail(t, "not structureType", actual)
-				}
-			default:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+			actual := testFunctionType.ReturnTypeAnnotation.Type
+			if actual != structureType {
+				assert.Fail(t, "not structureType", actual)
 			}
 		})
 	}
@@ -1777,30 +1554,24 @@ func TestCheckInvalidCompositeFieldMissingVariableKind(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s X {
-                  x: Int
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s X {
+                          x: Int
 
-                  init(x: Int) {
-                      self.x = x
-                  }
-              }
-            `, kind.Keyword()))
+                          init(x: Int) {
+                              self.x = x
+                          }
+                      }
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
+			errs := ExpectCheckerErrors(t, err, 1)
 
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.InvalidVariableKindError{}, errs[0])
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 2)
-
-				assert.IsType(t, &sema.InvalidVariableKindError{}, errs[0])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-			}
+			assert.IsType(t, &sema.InvalidVariableKindError{}, errs[0])
 		})
 	}
 }
@@ -1822,17 +1593,7 @@ func TestCheckCompositeFunction(t *testing.T) {
               }
             `, kind.Keyword(), kind.Annotation()))
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -1842,35 +1603,28 @@ func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              var tests = 0
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      var tests = 0
 
-              fun test(): %[1]sTest {
-                  return %[1]s %[2]s Test()
-              }
+                      fun test(): %[1]sTest {
+                          return %[1]s %[2]s Test()
+                      }
 
-              %[3]s Test {
-                 init() {
-                     tests = tests + 1
-                 }
-              }
-            `,
-				kind.Annotation(),
-				kind.ConstructionKeyword(),
-				kind.Keyword(),
-			))
+                      %[3]s Test {
+                         init() {
+                             tests = tests + 1
+                         }
+                      }
+                    `,
+					kind.Annotation(),
+					kind.ConstructionKeyword(),
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-			}
+			require.NoError(t, err)
 		})
 	}
 }

@@ -73,9 +73,38 @@ func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testi
 			assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
 		}
 	} else {
-		assert.NoError(t, err)
+		if !assert.NoError(t, err) {
+			t.Log(err.Error())
+		}
 
 		_, err = b.CommitBlock()
 		assert.NoError(t, err)
+	}
+}
+
+// setupUsersTokens sets up two accounts with 30 Fungible Tokens each
+// and a NFT collection with 1 NFT each
+func setupUsersTokens(t *testing.T, b *emulator.EmulatedBlockchain, tokenAddr flow.Address, nftAddr flow.Address, signingKeys []flow.AccountPrivateKey, signingAddresses []flow.Address) {
+
+	// add array of signers to transaction
+	for i := 0; i < len(signingAddresses); i++ {
+		tx := flow.Transaction{
+			Script:         GenerateCreateTokenScript(tokenAddr, 30),
+			Nonce:          GetNonce(),
+			ComputeLimit:   20,
+			PayerAccount:   b.RootAccountAddress(),
+			ScriptAccounts: []flow.Address{signingAddresses[i]},
+		}
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), signingKeys[i]}, []flow.Address{b.RootAccountAddress(), signingAddresses[i]}, false)
+
+		// then deploy a NFT to the accounts
+		tx = flow.Transaction{
+			Script:         GenerateCreateNFTScript(nftAddr, i+1),
+			Nonce:          GetNonce(),
+			ComputeLimit:   20,
+			PayerAccount:   b.RootAccountAddress(),
+			ScriptAccounts: []flow.Address{signingAddresses[i]},
+		}
+		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), signingKeys[i]}, []flow.Address{b.RootAccountAddress(), signingAddresses[i]}, false)
 	}
 }
