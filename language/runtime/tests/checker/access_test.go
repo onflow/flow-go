@@ -101,16 +101,19 @@ func TestCheckAccessModifierCompositeFunctionDeclaration(t *testing.T) {
 
 				t.Run(testName, func(t *testing.T) {
 
-					_, err := ParseAndCheck(t, fmt.Sprintf(`
-                          %[1]s %[2]s Test {
-                              %[3]s fun test() %[4]s
-                          }
-	                    `,
-						compositeKind.Keyword(),
-						interfaceKeyword,
-						access.Keyword(),
-						body,
-					))
+					_, err := ParseAndCheck(t,
+						fmt.Sprintf(
+							`
+                              %[1]s %[2]s Test {
+                                  %[3]s fun test() %[4]s
+                              }
+	                        `,
+							compositeKind.Keyword(),
+							interfaceKeyword,
+							access.Keyword(),
+							body,
+						),
+					)
 
 					if expectSuccess {
 						assert.NoError(t, err)
@@ -157,17 +160,20 @@ func TestCheckAccessModifierCompositeConstantFieldDeclaration(t *testing.T) {
 
 				t.Run(testName, func(t *testing.T) {
 
-					_, err := ParseAndCheck(t, fmt.Sprintf(`
-                          %[1]s %[2]s Test {
-                              %[3]s let test: Int
-                              %[4]s
-                          }
-	                    `,
-						compositeKind.Keyword(),
-						interfaceKeyword,
-						access.Keyword(),
-						initializer,
-					))
+					_, err := ParseAndCheck(t,
+						fmt.Sprintf(
+							`
+                              %[1]s %[2]s Test {
+                                  %[3]s let test: Int
+                                  %[4]s
+                              }
+	                        `,
+							compositeKind.Keyword(),
+							interfaceKeyword,
+							access.Keyword(),
+							initializer,
+						),
+					)
 
 					if expectSuccess {
 						assert.NoError(t, err)
@@ -204,17 +210,20 @@ func TestCheckAccessModifierCompositeVariableFieldDeclaration(t *testing.T) {
 
 				t.Run(testName, func(t *testing.T) {
 
-					_, err := ParseAndCheck(t, fmt.Sprintf(`
-                          %[1]s %[2]s Test {
-                              %[3]s var test: Int
-                              %[4]s
-                          }
-	                    `,
-						compositeKind.Keyword(),
-						interfaceKeyword,
-						access.Keyword(),
-						initializer,
-					))
+					_, err := ParseAndCheck(t,
+						fmt.Sprintf(
+							`
+                              %[1]s %[2]s Test {
+                                  %[3]s var test: Int
+                                  %[4]s
+                              }
+	                        `,
+							compositeKind.Keyword(),
+							interfaceKeyword,
+							access.Keyword(),
+							initializer,
+						),
+					)
 
 					assert.NoError(t, err)
 				})
@@ -239,11 +248,14 @@ func TestCheckAccessModifierGlobalFunctionDeclaration(t *testing.T) {
 
 		t.Run(access.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  %s fun test() {}
-	            `,
-				access.Keyword(),
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s fun test() {}
+	                `,
+					access.Keyword(),
+				),
+			)
 
 			if expectSuccess {
 				assert.NoError(t, err)
@@ -272,11 +284,14 @@ func TestCheckAccessModifierGlobalVariableDeclaration(t *testing.T) {
 
 		t.Run(access.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  %s var test = 1
-	            `,
-				access.Keyword(),
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s var test = 1
+	                `,
+					access.Keyword(),
+				),
+			)
 
 			if expectSuccess {
 				assert.NoError(t, err)
@@ -305,11 +320,14 @@ func TestCheckAccessModifierGlobalConstantDeclaration(t *testing.T) {
 
 		t.Run(access.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  %s let test = 1
-	            `,
-				access.Keyword(),
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s let test = 1
+	                `,
+					access.Keyword(),
+				),
+			)
 
 			if expectSuccess {
 				assert.NoError(t, err)
@@ -346,14 +364,17 @@ func TestCheckAccessModifierLocalVariableDeclaration(t *testing.T) {
 
 			t.Run(testName, func(t *testing.T) {
 
-				_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  fun test() {
-                      %s %s foo = 1
-                  }
-	            `,
-					access.Keyword(),
-					variableKind.Keyword(),
-				))
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          fun test() {
+                              %s %s foo = 1
+                          }
+	                    `,
+						access.Keyword(),
+						variableKind.Keyword(),
+					),
+				)
 
 				if expectSuccess {
 					assert.NoError(t, err)
@@ -383,14 +404,17 @@ func TestCheckAccessModifierLocalOptionalBinding(t *testing.T) {
 
 		t.Run(access.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  fun test() {
-                      let opt: Int? = 1
-                      if %s let value = opt { }
-                  }
-	            `,
-				access.Keyword(),
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      fun test() {
+                          let opt: Int? = 1
+                          if %s let value = opt { }
+                      }
+	                `,
+					access.Keyword(),
+				),
+			)
 
 			if expectSuccess {
 				assert.NoError(t, err)
@@ -419,13 +443,16 @@ func TestCheckAccessModifierLocalFunctionDeclaration(t *testing.T) {
 
 		t.Run(access.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  fun test() {
-                      %s fun foo() {}
-                  }
-	            `,
-				access.Keyword(),
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      fun test() {
+                          %s fun foo() {}
+                      }
+	                `,
+					access.Keyword(),
+				),
+			)
 
 			if expectSuccess {
 				assert.NoError(t, err)
@@ -467,13 +494,16 @@ func TestCheckAccessModifierGlobalCompositeDeclaration(t *testing.T) {
 
 				t.Run(testName, func(t *testing.T) {
 
-					_, err := ParseAndCheck(t, fmt.Sprintf(`
-                          %[1]s %[2]s %[3]s Test {}
-	                    `,
-						access.Keyword(),
-						compositeKind.Keyword(),
-						interfaceKeyword,
-					))
+					_, err := ParseAndCheck(t,
+						fmt.Sprintf(
+							`
+                              %[1]s %[2]s %[3]s Test {}
+	                        `,
+							access.Keyword(),
+							compositeKind.Keyword(),
+							interfaceKeyword,
+						),
+					)
 
 					if expectSuccess {
 						assert.NoError(t, err)
@@ -1036,7 +1066,8 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
-						fmt.Sprintf(`
+						fmt.Sprintf(
+							`
                               pub %[1]s interface Test {
                                   %[2]s var test: Int
                               }
@@ -1133,7 +1164,8 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
-						fmt.Sprintf(`
+						fmt.Sprintf(
+							`
                               pub %[1]s Test {
                                   %[2]s var test: Int
 
@@ -1239,7 +1271,8 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
-						fmt.Sprintf(`
+						fmt.Sprintf(
+							`
                               pub %[1]s interface Test {
                                   %[2]s var test: Int
                               }
@@ -1338,7 +1371,8 @@ func TestCheckAccessCompositeFieldVariableDeclarationWithSecondValue(t *testing.
 			t.Run(testName, func(t *testing.T) {
 
 				_, err := ParseAndCheckWithOptions(t,
-					fmt.Sprintf(`
+					fmt.Sprintf(
+						`
                           pub resource A {}
 
                           pub resource B {
@@ -1439,7 +1473,8 @@ func TestCheckAccessInterfaceFieldVariableDeclarationWithSecondValue(t *testing.
 			t.Run(testName, func(t *testing.T) {
 
 				_, err := ParseAndCheckWithOptions(t,
-					fmt.Sprintf(`
+					fmt.Sprintf(
+						`
                           pub resource A {}
 
                           pub resource interface B {
@@ -1641,13 +1676,15 @@ func TestCheckAccessImportGlobalValueAssignmentAndSwap(t *testing.T) {
 			}
 
 			imported, _, err := parser.ParseProgram(
-				fmt.Sprintf(`
-                   priv var a = 1
-                   pub var b = 2
-                   %s var c = 3
-                `,
+				fmt.Sprintf(
+					`
+                       priv var a = 1
+                       pub var b = 2
+                       %s var c = 3
+                    `,
 					lastAccessModifier,
-				))
+				),
+			)
 
 			require.Nil(t, err)
 

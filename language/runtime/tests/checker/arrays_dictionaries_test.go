@@ -597,17 +597,20 @@ func TestCheckArraySubtyping(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s interface I {}
-              %[1]s S: I {}
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface I {}
+                      %[1]s S: I {}
 
-              let xs: %[2]s[S] %[3]s []
-              let ys: %[2]s[I] %[3]s xs
-	        `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-			))
+                      let xs: %[2]s[S] %[3]s []
+                      let ys: %[2]s[I] %[3]s xs
+	                `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.TransferOperator(),
+				),
+			)
 
 			require.NoError(t, err)
 		})
@@ -632,7 +635,8 @@ func TestCheckDictionarySubtyping(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
-				fmt.Sprintf(`
+				fmt.Sprintf(
+					`
                       %[1]s interface I {}
                       %[1]s S: I {}
 
@@ -772,12 +776,15 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 	} {
 		t.Run("valid", func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s
-              let xs = {k: "x"}
-            `,
-				code,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s
+                      let xs = {k: "x"}
+                    `,
+					code,
+				),
+			)
 
 			require.NoError(t, err)
 		})
@@ -793,12 +800,15 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 	} {
 		t.Run("invalid", func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s
-              let xs = {k: "x"}
-            `,
-				code,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s
+                      let xs = {k: "x"}
+                    `,
+					code,
+				),
+			)
 
 			errs := ExpectCheckerErrors(t, err, 1)
 

@@ -615,7 +615,8 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
-				fmt.Sprintf(`
+				fmt.Sprintf(
+					`
                       %[1]s T {}
 
                       let test: ((): T) = fun (): T {

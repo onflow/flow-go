@@ -223,19 +223,22 @@ func TestCheckInvalidCompositeEquality(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 
-		_, err := ParseAndCheck(t, fmt.Sprintf(`
-          %[1]s X {}
+		_, err := ParseAndCheck(t,
+			fmt.Sprintf(
+				`
+                  %[1]s X {}
 
-          let x1: %[2]sX %[3]s %[4]s X()
-          let x2: %[2]sX %[3]s %[4]s X()
+                  let x1: %[2]sX %[3]s %[4]s X()
+                  let x2: %[2]sX %[3]s %[4]s X()
 
-          let a = x1 == x2
-        `,
-			kind.Keyword(),
-			kind.Annotation(),
-			kind.TransferOperator(),
-			kind.ConstructionKeyword(),
-		))
+                  let a = x1 == x2
+                `,
+				kind.Keyword(),
+				kind.Annotation(),
+				kind.TransferOperator(),
+				kind.ConstructionKeyword(),
+			),
+		)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 

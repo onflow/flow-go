@@ -33,16 +33,19 @@ func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
 
 			t.Run(testName, func(t *testing.T) {
 
-				_, err := ParseAndCheck(t, fmt.Sprintf(`
-                      %[1]s %[2]s X {
-                          init() %[3]s
-                          init(y: Int) %[3]s
-                      }
-                    `,
-					kind.Keyword(),
-					interfaceKeyword,
-					body,
-				))
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          %[1]s %[2]s X {
+                              init() %[3]s
+                              init(y: Int) %[3]s
+                          }
+                        `,
+						kind.Keyword(),
+						interfaceKeyword,
+						body,
+					),
+				)
 
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -68,15 +71,18 @@ func TestCheckInvalidResourceDestructorOverloading(t *testing.T) {
 
 		t.Run(interfaceKeyword, func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  resource %[1]s X {
-                      destroy() %[2]s
-                      destroy(y: Int) %[2]s
-                  }
-                `,
-				interfaceKeyword,
-				body,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      resource %[1]s X {
+                          destroy() %[2]s
+                          destroy(y: Int) %[2]s
+                      }
+                    `,
+					interfaceKeyword,
+					body,
+				),
+			)
 
 			errs := ExpectCheckerErrors(t, err, 1)
 
