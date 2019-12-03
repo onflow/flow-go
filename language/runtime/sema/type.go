@@ -1262,6 +1262,15 @@ func (t *FunctionType) IsInvalidType() bool {
 
 type SpecialFunctionType struct {
 	*FunctionType
+	Members map[string]*Member
+}
+
+func (t *SpecialFunctionType) HasMembers() bool {
+	return true
+}
+
+func (t *SpecialFunctionType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	return t.Members[identifier]
 }
 
 // CheckedFunctionType is the the type representing a function that checks the arguments,
@@ -2088,7 +2097,7 @@ func (t *EventType) Equal(other Type) bool {
 
 func (t *EventType) ConstructorFunctionType() *SpecialFunctionType {
 	return &SpecialFunctionType{
-		&FunctionType{
+		FunctionType: &FunctionType{
 			ParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
 			ReturnTypeAnnotation:     NewTypeAnnotation(t),
 		},

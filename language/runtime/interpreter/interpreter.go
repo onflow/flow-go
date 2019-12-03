@@ -1808,7 +1808,7 @@ func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.Compo
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	_ = interpreter.declareCompositeConstructor(declaration, lexicalScope)
+	_, _ = interpreter.declareCompositeConstructor(declaration, lexicalScope)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
@@ -1827,7 +1827,10 @@ func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.Compo
 func (interpreter *Interpreter) declareCompositeConstructor(
 	declaration *ast.CompositeDeclaration,
 	lexicalScope hamt.Map,
-) hamt.Map {
+) (
+	scope hamt.Map,
+	function HostFunctionValue,
+) {
 
 	identifier := declaration.Identifier.Identifier
 	variable := interpreter.findOrDeclareVariable(identifier)
@@ -1839,6 +1842,8 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 	// Evaluate nested declarations in a new scope, so constructors
 	// of nested declarations won't be visible after the containing declaration
 
+	members := map[string]Value{}
+
 	(func() {
 		interpreter.activations.PushCurrent()
 		defer interpreter.activations.Pop()
@@ -1849,7 +1854,11 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 			// to the nested declarations so they can refer to it, and update the lexical scope
 			// so the container's functions can refer to the nested constructors
 
-			lexicalScope = interpreter.declareCompositeConstructor(nestedCompositeDeclaration, lexicalScope)
+			var nestedConstructor FunctionValue
+			lexicalScope, nestedConstructor =
+				interpreter.declareCompositeConstructor(nestedCompositeDeclaration, lexicalScope)
+
+			members[nestedCompositeDeclaration.Identifier.Identifier] = nestedConstructor
 		}
 	})()
 
@@ -1861,7 +1870,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 	functions := interpreter.compositeFunctions(declaration, lexicalScope)
 	interpreter.CompositeFunctions[identifier] = functions
 
-	variable.Value = NewHostFunctionValue(
+	function = NewHostFunctionValue(
 		func(arguments []Value, location LocationPosition) Trampoline {
 
 			value := &CompositeValue{
@@ -1890,8 +1899,10 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 				})
 		},
 	)
+	function.Members = members
+	variable.Value = function
 
-	return lexicalScope
+	return lexicalScope, function
 }
 
 // bindSelf returns a function which binds `self` to the structure

@@ -6247,7 +6247,7 @@ func TestInterpretOptionalChainingFunctionCallAndNilCoalescing(t *testing.T) {
 
 func TestInterpretCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) {
 
-	code := `
+	inter := parseCheckAndInterpret(t, `
       contract Test {
 
           struct X {
@@ -6264,9 +6264,7 @@ func TestInterpretCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) 
 
       let x1 = Test().x()
       let x2 = x1.test().x()
-    `
-
-	inter := parseCheckAndInterpret(t, code)
+    `)
 
 	x1 := inter.Globals["x1"].Value
 	x2 := inter.Globals["x2"].Value
@@ -6289,5 +6287,29 @@ func TestInterpretCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) 
 	assert.Equal(t,
 		"X",
 		x2.(*interpreter.CompositeValue).Identifier,
+	)
+}
+
+func TestInterpretCompositeDeclarationNestedConstructor(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      contract Test {
+
+          struct X {}
+      }
+
+      let x = Test.X()
+    `)
+
+	x := inter.Globals["x"].Value
+
+	require.IsType(t,
+		&interpreter.CompositeValue{},
+		x,
+	)
+
+	assert.Equal(t,
+		"X",
+		x.(*interpreter.CompositeValue).Identifier,
 	)
 }

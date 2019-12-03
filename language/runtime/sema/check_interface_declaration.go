@@ -25,9 +25,11 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 	// NOTE: functions are checked separately
 	checker.checkFieldsAccessModifier(declaration.Members.Fields)
 
-	checker.checkMemberIdentifiers(
+	checker.checkNestedIdentifiers(
 		declaration.Members.Fields,
 		declaration.Members.Functions,
+		declaration.InterfaceDeclarations,
+		declaration.CompositeDeclarations,
 	)
 
 	// Activate new scope for nested types
@@ -173,32 +175,38 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(identifier.Identifier, variable)
 
-	// Activate new scope for nested declarations
+	(func() {
+		// Activate new scope for nested declarations
 
-	checker.typeActivations.Enter()
-	defer checker.typeActivations.Leave()
+		checker.typeActivations.Enter()
+		defer checker.typeActivations.Leave()
 
-	// Check and declare nested types
+		checker.valueActivations.Enter()
+		defer checker.valueActivations.Leave()
 
-	nestedDeclarations, nestedInterfaceTypes, nestedCompositeTypes :=
-		checker.visitNestedDeclarations(
-			declaration.CompositeKind,
-			declaration.DeclarationKind(),
-			declaration.CompositeDeclarations,
-			declaration.InterfaceDeclarations,
-		)
+		// Check and declare nested types
 
-	checker.Elaboration.InterfaceNestedDeclarations[declaration] = nestedDeclarations
+		nestedDeclarations, nestedInterfaceTypes, nestedCompositeTypes :=
+			checker.visitNestedDeclarations(
+				declaration.CompositeKind,
+				declaration.DeclarationKind(),
+				declaration.CompositeDeclarations,
+				declaration.InterfaceDeclarations,
+			)
 
-	for _, nestedInterfaceType := range nestedInterfaceTypes {
-		interfaceType.NestedTypes[nestedInterfaceType.Identifier] = nestedInterfaceType
-		nestedInterfaceType.ContainerType = interfaceType
-	}
+		checker.Elaboration.InterfaceNestedDeclarations[declaration] = nestedDeclarations
 
-	for _, nestedCompositeType := range nestedCompositeTypes {
-		interfaceType.NestedTypes[nestedCompositeType.Identifier] = nestedCompositeType
-		nestedCompositeType.ContainerType = interfaceType
-	}
+		for _, nestedInterfaceType := range nestedInterfaceTypes {
+			interfaceType.NestedTypes[nestedInterfaceType.Identifier] = nestedInterfaceType
+			nestedInterfaceType.ContainerType = interfaceType
+		}
+
+		for _, nestedCompositeType := range nestedCompositeTypes {
+			interfaceType.NestedTypes[nestedCompositeType.Identifier] = nestedCompositeType
+			nestedCompositeType.ContainerType = interfaceType
+		}
+
+	})()
 
 	// NOTE: interface type's `InitializerParameterTypeAnnotations` and  `members` fields
 	// are added in `VisitInterfaceDeclaration`.

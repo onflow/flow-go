@@ -26,9 +26,11 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 	// NOTE: functions are checked separately
 	checker.checkFieldsAccessModifier(declaration.Members.Fields)
 
-	checker.checkMemberIdentifiers(
+	checker.checkNestedIdentifiers(
 		declaration.Members.Fields,
 		declaration.Members.Functions,
+		declaration.InterfaceDeclarations,
+		declaration.CompositeDeclarations,
 	)
 
 	// Declare nested types
@@ -304,6 +306,8 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		variable,
 	)
 
+	constructorMembers := map[string]*Member{}
+
 	(func() {
 		// Activate new scopes for nested types
 
@@ -333,6 +337,31 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		for _, nestedCompositeType := range nestedCompositeTypes {
 			compositeType.NestedTypes[nestedCompositeType.Identifier] = nestedCompositeType
 			nestedCompositeType.ContainerType = compositeType
+
+		}
+
+		// Declare nested composites' constructors as members of the containing composite
+
+		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+			identifier := nestedCompositeDeclaration.Identifier
+
+			// Find the constructor declaration
+			nestedCompositeDeclarationVariable :=
+				checker.valueActivations.Find(identifier.Identifier)
+
+			// skip illegal declarations, e.g. due to invalid nesting
+			if nestedCompositeDeclarationVariable == nil {
+				continue
+			}
+
+			constructorMembers[nestedCompositeDeclarationVariable.Identifier] = &Member{
+				Identifier:      identifier,
+				Access:          nestedCompositeDeclaration.Access,
+				ContainerType:   compositeType,
+				Type:            nestedCompositeDeclarationVariable.Type,
+				DeclarationKind: nestedCompositeDeclarationVariable.DeclarationKind,
+				VariableKind:    ast.VariableKindConstant,
+			}
 		}
 
 		// Check conformances and members
@@ -360,7 +389,8 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 
 	// Declare constructor after the nested scope, so it is visible after the declaration
 
-	checker.declareCompositeConstructor(declaration, compositeType)
+	constructorFunction := checker.declareCompositeConstructor(declaration, compositeType)
+	constructorFunction.Members = constructorMembers
 
 	checker.Elaboration.CompositeDeclarationTypes[declaration] = compositeType
 
@@ -544,12 +574,11 @@ func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member
 func (checker *Checker) declareCompositeConstructor(
 	compositeDeclaration *ast.CompositeDeclaration,
 	compositeType *CompositeType,
-) {
+) *SpecialFunctionType {
+
 	functionType := &SpecialFunctionType{
-		&FunctionType{
-			ReturnTypeAnnotation: NewTypeAnnotation(
-				compositeType,
-			),
+		FunctionType: &FunctionType{
+			ReturnTypeAnnotation: NewTypeAnnotation(compositeType),
 		},
 	}
 
@@ -557,18 +586,13 @@ func (checker *Checker) declareCompositeConstructor(
 
 	// TODO: support multiple overloaded initializers
 
-	initializers := compositeDeclaration.Members.Initializers
-	if len(initializers()) > 0 {
-		firstInitializer := initializers()[0]
+	initializers := compositeDeclaration.Members.Initializers()
+	if len(initializers) > 0 {
+		firstInitializer := initializers[0]
 
 		argumentLabels = firstInitializer.ParameterList.ArgumentLabels()
 
-		functionType = &SpecialFunctionType{
-			FunctionType: &FunctionType{
-				ParameterTypeAnnotations: compositeType.ConstructorParameterTypeAnnotations,
-				ReturnTypeAnnotation:     NewTypeAnnotation(compositeType),
-			},
-		}
+		functionType.ParameterTypeAnnotations = compositeType.ConstructorParameterTypeAnnotations
 
 		checker.Elaboration.SpecialFunctionTypes[firstInitializer] = functionType
 	}
@@ -580,6 +604,8 @@ func (checker *Checker) declareCompositeConstructor(
 		argumentLabels,
 	)
 	checker.report(err)
+
+	return functionType
 }
 
 func (checker *Checker) membersAndOrigins(
@@ -825,17 +851,19 @@ func (checker *Checker) declareSelfValue(selfType Type) {
 	checker.recordVariableDeclarationOccurrence(SelfIdentifier, self)
 }
 
-// checkMemberIdentifiers checks the fields and functions are unique and aren't named `init`
+// checkNestedIdentifiers checks that nested identifiers, i.e. fields, functions,
+// and nested interfaces and composites, are unique and aren't named `init` or `destroy`
 //
-func (checker *Checker) checkMemberIdentifiers(
+func (checker *Checker) checkNestedIdentifiers(
 	fields []*ast.FieldDeclaration,
 	functions []*ast.FunctionDeclaration,
+	nestedInterfaceDeclarations []*ast.InterfaceDeclaration,
+	nestedCompositeDeclarations []*ast.CompositeDeclaration,
 ) {
-
 	positions := map[string]ast.Position{}
 
 	for _, field := range fields {
-		checker.checkMemberIdentifier(
+		checker.checkNestedIdentifier(
 			field.Identifier,
 			common.DeclarationKindField,
 			positions,
@@ -843,15 +871,34 @@ func (checker *Checker) checkMemberIdentifiers(
 	}
 
 	for _, function := range functions {
-		checker.checkMemberIdentifier(
+		checker.checkNestedIdentifier(
 			function.Identifier,
 			common.DeclarationKindFunction,
 			positions,
 		)
 	}
+
+	for _, interfaceDeclaration := range nestedInterfaceDeclarations {
+		checker.checkNestedIdentifier(
+			interfaceDeclaration.Identifier,
+			interfaceDeclaration.DeclarationKind(),
+			positions,
+		)
+	}
+
+	for _, compositeDeclaration := range nestedCompositeDeclarations {
+		checker.checkNestedIdentifier(
+			compositeDeclaration.Identifier,
+			compositeDeclaration.DeclarationKind(),
+			positions,
+		)
+	}
 }
 
-func (checker *Checker) checkMemberIdentifier(
+// checkNestedIdentifier checks that the nested identifier is unique
+// and isn't named `init` or `destroy`
+//
+func (checker *Checker) checkNestedIdentifier(
 	identifier ast.Identifier,
 	kind common.DeclarationKind,
 	positions map[string]ast.Position,
