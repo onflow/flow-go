@@ -1179,3 +1179,49 @@ func TestCheckInvalidContractInterfaceTypeRequirementFunctionImplementation(t *t
 
 	assert.IsType(t, &sema.InvalidImplementationError{}, errs[0])
 }
+
+func TestCheckInvalidContractInterfaceTypeRequirementMissingFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
+              struct Nested {
+                  fun test(): Int
+              }
+          }
+
+          contract TestImpl: Test {
+             struct Nested {
+                 // missing function 'test'
+             }
+          }
+	    `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ConformanceError{}, errs[0])
+}
+
+func TestCheckContractInterfaceTypeRequirementWithFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
+              struct Nested {
+                  fun test(): Int
+              }
+          }
+
+          contract TestImpl: Test {
+             struct Nested {
+                  fun test(): Int {
+                      return 1
+                  }
+             }
+          }
+	    `,
+	)
+
+	require.NoError(t, err)
+}
