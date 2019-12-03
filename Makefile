@@ -3,7 +3,7 @@ SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 # The Git commit hash
 COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
-VERSION := $(shell git describe --tags --abbrev=0 --exact-match)
+VERSION := $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
 # Name of the cover profile
 COVER_PROFILE := cover.out
 
