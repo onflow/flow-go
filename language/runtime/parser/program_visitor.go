@@ -590,9 +590,14 @@ func (v *ProgramVisitor) VisitNominalType(ctx *NominalTypeContext) interface{} {
 		panic(errors.NewUnreachableError())
 	}
 
+	var nestedIdentifiers []ast.Identifier
+	if len(identifiers) > 1 {
+		nestedIdentifiers = identifiers[1:]
+	}
+
 	return &ast.NominalType{
 		Identifier:        identifiers[0],
-		NestedIdentifiers: identifiers[1:],
+		NestedIdentifiers: nestedIdentifiers,
 	}
 }
 
