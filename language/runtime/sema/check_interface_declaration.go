@@ -7,6 +7,8 @@ import (
 
 func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDeclaration) ast.Repr {
 
+	const kind = ContainerKindInterface
+
 	interfaceType := checker.Elaboration.InterfaceDeclarationTypes[declaration]
 
 	checker.containerTypes[interfaceType] = true
@@ -76,7 +78,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.DeclarationKind(),
 		declaration.Identifier.Identifier,
 		interfaceType.InitializerParameterTypeAnnotations,
-		ContainerKindInterface,
+		kind,
 		nil,
 	)
 
@@ -102,7 +104,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		interfaceType,
 		declaration.DeclarationKind(),
 		declaration.Identifier.Identifier,
-		ContainerKindInterface,
+		kind,
 	)
 
 	for _, nestedDeclaration := range nestedDeclarations {
@@ -115,7 +117,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 			// Composite declarations nested in interface declarations are type requirements,
 			// i.e. they should be checked like interfaces
 
-			checker.visitCompositeDeclaration(typedNestedDeclaration, ContainerKindInterface)
+			checker.visitCompositeDeclaration(typedNestedDeclaration, kind)
 		}
 	}
 
@@ -200,6 +202,7 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 
 		nestedDeclarations, nestedInterfaceTypes, nestedCompositeTypes :=
 			checker.visitNestedDeclarations(
+				ContainerKindInterface,
 				declaration.CompositeKind,
 				declaration.DeclarationKind(),
 				declaration.CompositeDeclarations,

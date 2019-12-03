@@ -163,6 +163,7 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 }
 
 func (checker *Checker) visitNestedDeclarations(
+	containerKind ContainerKind,
 	containerCompositeKind common.CompositeKind,
 	containerDeclarationKind common.DeclarationKind,
 	nestedCompositeDeclarations []*ast.CompositeDeclaration,
@@ -267,14 +268,14 @@ func (checker *Checker) visitNestedDeclarations(
 		}
 
 		// pre-declare composite
-		nestedCompositeType := checker.declareCompositeDeclaration(nestedDeclaration)
+		nestedCompositeType := checker.declareCompositeDeclaration(nestedDeclaration, containerKind)
 		nestedCompositeTypes = append(nestedCompositeTypes, nestedCompositeType)
 	}
 
 	return
 }
 
-func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDeclaration) *CompositeType {
+func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDeclaration, kind ContainerKind) *CompositeType {
 
 	identifier := declaration.Identifier
 
@@ -319,6 +320,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 
 		nestedDeclarations, nestedInterfaceTypes, nestedCompositeTypes :=
 			checker.visitNestedDeclarations(
+				kind,
 				declaration.CompositeKind,
 				declaration.DeclarationKind(),
 				declaration.CompositeDeclarations,
@@ -370,7 +372,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 			compositeType,
 			declaration.Members.Fields,
 			declaration.Members.Functions,
-			true,
+			kind != ContainerKindInterface,
 		)
 
 		compositeType.Members = members

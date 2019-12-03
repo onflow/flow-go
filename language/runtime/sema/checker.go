@@ -246,7 +246,7 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 	}
 
 	for _, declaration := range program.CompositeDeclarations() {
-		checker.declareCompositeDeclaration(declaration)
+		checker.declareCompositeDeclaration(declaration, ContainerKindComposite)
 	}
 
 	for _, declaration := range program.FunctionDeclarations() {
