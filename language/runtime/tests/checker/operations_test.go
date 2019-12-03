@@ -222,10 +222,6 @@ func TestCheckConcatenatingExpression(t *testing.T) {
 func TestCheckInvalidCompositeEquality(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for contracts
-		if kind == common.CompositeKindContract {
-			continue
-		}
 
 		_, err := ParseAndCheck(t, fmt.Sprintf(`
           %[1]s X {}

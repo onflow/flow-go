@@ -195,7 +195,11 @@ func (checker *Checker) checkCompositeDeclarationSupport(
 	case common.CompositeKindStructure, common.CompositeKindResource:
 		break
 	default:
-		// TODO: support non-structure / non-resources composites, such as contracts
+		if declarationKind != common.DeclarationKindContractInterface {
+			return
+		}
+
+		// TODO: add support for contract interfaces
 
 		checker.report(
 			&UnsupportedDeclarationError{

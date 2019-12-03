@@ -5,13 +5,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
-
-// TODO: add support for nested composite declarations
 
 func TestCheckCompositeDeclarationNesting(t *testing.T) {
 
@@ -44,18 +43,28 @@ func TestCheckCompositeDeclarationNesting(t *testing.T) {
 
 							switch innerComposite {
 							case common.CompositeKindContract:
-								errs := ExpectCheckerErrors(t, err, 2)
+								if outerIsInterface {
+									errs := ExpectCheckerErrors(t, err, 2)
 
-								// TODO: add support for contracts
-								assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+									assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+									assert.IsType(t, &sema.InvalidNestedDeclarationError{}, errs[1])
 
-								assert.IsType(t, &sema.InvalidNestedDeclarationError{}, errs[1])
+								} else if !innerIsInterface {
+									errs := ExpectCheckerErrors(t, err, 1)
+
+									assert.IsType(t, &sema.InvalidNestedDeclarationError{}, errs[0])
+								}
 
 							case common.CompositeKindResource, common.CompositeKindStructure:
-								errs := ExpectCheckerErrors(t, err, 1)
+								// TODO: add support for contract interfaces
 
-								// TODO: add support for contracts
-								assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+								if outerIsInterface {
+									errs := ExpectCheckerErrors(t, err, 1)
+
+									assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
+								} else {
+									require.NoError(t, err)
+								}
 
 							default:
 								t.Errorf("unknown outer composite kind %s", outerComposite)
