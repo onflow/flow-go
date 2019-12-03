@@ -89,9 +89,9 @@ const updateAccountCode = (ext: Extension) => async () => {
 };
 
 const createAccount = (ext: Extension) => async () => {
-    const nextAddr = ROOT_ADDR.slice(0, -1) + (Object.keys(ext.config.accounts).length + 1)
+    const nextAddr = ROOT_ADDR.slice(0, -1) + (Object.keys(ext.config.accounts).length + 1);
     ext.config.accounts[nextAddr] = { address: nextAddr };
-    window.showInformationMessage(`Created new account: ${nextAddr}`)
+    window.showInformationMessage(`Created new account: ${nextAddr}`);
 };
 
 const switchActiveAccount = (ext: Extension) => async () => {
