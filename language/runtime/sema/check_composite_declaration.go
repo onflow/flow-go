@@ -693,7 +693,7 @@ func (checker *Checker) checkTypeRequirement(
 		panic(errors.NewUnreachableError())
 	}
 
-	interfaceType := requiredCompositeType.InterfaceDeclaration()
+	interfaceType := requiredCompositeType.InterfaceType()
 	checker.checkCompositeConformance(
 		compositeDeclaration,
 		declaredCompositeType,
