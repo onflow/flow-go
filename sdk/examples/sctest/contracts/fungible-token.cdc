@@ -29,7 +29,7 @@ pub resource interface Receiver {
         }
     }
 
-    pub fun deposit(from: <-Vault) {
+    pub fun deposit(from: <-Receiver) {
         pre {
             from.balance > 0:
                 "Deposit balance needs to be positive!"
@@ -73,7 +73,7 @@ pub resource Vault: Provider, Receiver {
     // deposit takes a vault object as a parameter and adds
     // its balance to the balance of the Account's vault, then
     // destroys the sent vault because its balance has been consumed
-    pub fun deposit(from: <-Vault) {
+    pub fun deposit(from: <-Receiver) {
         self.balance = self.balance + from.balance
         destroy from
     }
