@@ -7,6 +7,12 @@ import (
 )
 
 func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDeclaration) ast.Repr {
+	checker.visitCompositeDeclaration(declaration, ContainerKindComposite)
+
+	return nil
+}
+
+func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDeclaration, kind ContainerKind) {
 
 	compositeType := checker.Elaboration.CompositeDeclarationTypes[declaration]
 
@@ -33,13 +39,17 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		declaration.CompositeDeclarations,
 	)
 
-	// Declare nested types
+	// Activate new scopes for nested types
 
 	checker.typeActivations.Enter()
 	defer checker.typeActivations.Leave()
 
-	checker.valueActivations.Enter()
-	defer checker.valueActivations.Leave()
+	if kind == ContainerKindComposite {
+		checker.valueActivations.Enter()
+		defer checker.valueActivations.Leave()
+	}
+
+	// Declare nested types
 
 	nestedDeclarations := checker.Elaboration.CompositeNestedDeclarations[declaration]
 
@@ -54,31 +64,37 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		)
 		checker.report(err)
 
-		// NOTE: Re-declare the constructor for the nested composite declaration:
-		// The constructor was already declared before in `declareCompositeDeclaration`
-		// for this nested declaration, but the value activation for it was only temporary,
-		// so that the constructor wouldn't be visible outside of the containing declaration
+		if kind == ContainerKindComposite {
+			// NOTE: Re-declare the constructor for the nested composite declaration:
+			// The constructor was already declared before in `declareCompositeDeclaration`
+			// for this nested declaration, but the value activation for it was only temporary,
+			// so that the constructor wouldn't be visible outside of the containing declaration
 
-		if nestedCompositeDeclaration, isCompositeDeclaration :=
-			nestedDeclaration.(*ast.CompositeDeclaration); isCompositeDeclaration {
+			if nestedCompositeDeclaration, isCompositeDeclaration :=
+				nestedDeclaration.(*ast.CompositeDeclaration); isCompositeDeclaration {
 
-			nestedCompositeType := nestedType.(*CompositeType)
-			checker.declareCompositeConstructor(nestedCompositeDeclaration, nestedCompositeType)
+				nestedCompositeType := nestedType.(*CompositeType)
+				checker.declareCompositeConstructor(nestedCompositeDeclaration, nestedCompositeType)
+			}
 		}
 	}
 
-	// The initializer must initialize all members that are fields,
-	// e.g. not composite functions (which are by definition constant and "initialized")
+	var initializationInfo *InitializationInfo
 
-	fieldMembers := map[*Member]*ast.FieldDeclaration{}
+	if kind == ContainerKindComposite {
+		// The initializer must initialize all members that are fields,
+		// e.g. not composite functions (which are by definition constant and "initialized")
 
-	for _, field := range declaration.Members.Fields {
-		fieldName := field.Identifier.Identifier
-		member := compositeType.Members[fieldName]
-		fieldMembers[member] = field
+		fieldMembers := map[*Member]*ast.FieldDeclaration{}
+
+		for _, field := range declaration.Members.Fields {
+			fieldName := field.Identifier.Identifier
+			member := compositeType.Members[fieldName]
+			fieldMembers[member] = field
+		}
+
+		initializationInfo = NewInitializationInfo(compositeType, fieldMembers)
 	}
-
-	initializationInfo := NewInitializationInfo(compositeType, fieldMembers)
 
 	checker.checkInitializers(
 		declaration.Members.Initializers(),
@@ -87,13 +103,27 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		declaration.DeclarationKind(),
 		declaration.Identifier.Identifier,
 		compositeType.ConstructorParameterTypeAnnotations,
-		ContainerKindComposite,
+		kind,
 		initializationInfo,
 	)
 
 	checker.checkUnknownSpecialFunctions(declaration.Members.SpecialFunctions)
 
-	checker.checkCompositeFunctions(declaration.Members.Functions, compositeType)
+	switch kind {
+	case ContainerKindComposite:
+		checker.checkCompositeFunctions(declaration.Members.Functions, compositeType)
+
+	case ContainerKindInterface:
+		checker.checkInterfaceFunctions(
+			declaration.Members.Functions,
+			compositeType,
+			declaration.CompositeKind,
+			declaration.DeclarationKind(),
+		)
+
+	default:
+		panic(errors.NewUnreachableError())
+	}
 
 	checker.checkResourceFieldNesting(
 		declaration.Members.FieldsByIdentifier(),
@@ -101,17 +131,19 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		compositeType.Kind,
 	)
 
-	// check composite conforms to interfaces.
-	// NOTE: perform after completing composite type (e.g. setting constructor parameter types)
+	if kind == ContainerKindComposite {
+		// check composite conforms to interfaces.
+		// NOTE: perform after completing composite type (e.g. setting constructor parameter types)
 
-	for _, interfaceType := range compositeType.Conformances {
+		for _, interfaceType := range compositeType.Conformances {
 
-		checker.checkCompositeConformance(
-			compositeType,
-			interfaceType,
-			declaration.CompositeDeclarations,
-			declaration.Identifier,
-		)
+			checker.checkCompositeConformance(
+				compositeType,
+				interfaceType,
+				declaration.CompositeDeclarations,
+				declaration.Identifier,
+			)
+		}
 	}
 
 	// NOTE: check destructors after initializer and functions
@@ -123,14 +155,12 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		compositeType,
 		declaration.DeclarationKind(),
 		declaration.Identifier.Identifier,
-		ContainerKindComposite,
+		kind,
 	)
 
 	for _, nestedDeclaration := range nestedDeclarations {
 		nestedDeclaration.Accept(checker)
 	}
-
-	return nil
 }
 
 func (checker *Checker) visitNestedDeclarations(
