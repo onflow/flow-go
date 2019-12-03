@@ -4,6 +4,8 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 
+	"github.com/dapperlabs/flow-go/model/flow"
+
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 )
 
@@ -102,6 +104,10 @@ func (l AddressLocation) ID() LocationID {
 
 func (l AddressLocation) String() string {
 	return hex.EncodeToString([]byte(l))
+}
+
+func (l AddressLocation) ToAddress() (addr flow.Address) {
+	return flow.BytesToAddress(l)
 }
 
 func init() {
