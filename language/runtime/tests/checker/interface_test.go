@@ -1225,3 +1225,38 @@ func TestCheckContractInterfaceTypeRequirementWithFunction(t *testing.T) {
 
 	require.NoError(t, err)
 }
+
+func TestCheckContractInterfaceFungibleToken(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      pub contract interface FungibleToken {
+
+          pub resource interface Provider {
+
+              pub fun withdraw(amount: Int): <-Vault
+          }
+
+          pub resource interface Receiver {
+
+              pub fun deposit(vault: <-Vault)
+          }
+
+          pub resource Vault: Provider, Receiver {
+
+              pub balance: Int
+
+              init(balance: Int)
+
+              pub fun withdraw(amount: Int): <-Vault
+
+              pub fun deposit(vault: <-Vault)
+          }
+
+          pub fun absorb(vault: <-Vault)
+
+          pub fun sprout(): <-Vault
+      }
+    `)
+
+	require.NoError(t, err)
+}
