@@ -203,7 +203,7 @@ baseType
     ;
 
 nominalType
-    : identifier
+    : identifier ('.' identifier)*
     ;
 
 functionType

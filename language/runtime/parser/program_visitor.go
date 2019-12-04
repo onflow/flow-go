@@ -580,10 +580,24 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitNominalType(ctx *NominalTypeContext) interface{} {
-	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+	var identifiers []ast.Identifier
+	for _, identifierContext := range ctx.AllIdentifier() {
+		identifier := identifierContext.Accept(v).(ast.Identifier)
+		identifiers = append(identifiers, identifier)
+	}
+
+	if identifiers == nil {
+		panic(errors.NewUnreachableError())
+	}
+
+	var nestedIdentifiers []ast.Identifier
+	if len(identifiers) > 1 {
+		nestedIdentifiers = identifiers[1:]
+	}
 
 	return &ast.NominalType{
-		Identifier: identifier,
+		Identifier:        identifiers[0],
+		NestedIdentifiers: nestedIdentifiers,
 	}
 }
 
