@@ -8,7 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
-	types2 "github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
 )
 
 func TestConstantSizedType_String(t *testing.T) {
@@ -189,15 +189,15 @@ func Test_exportability(t *testing.T) {
 
 		ex := ty.Export(program, variable)
 
-		assert.IsType(t, types2.Struct{}, ex)
-		s := ex.(types2.Struct)
+		assert.IsType(t, &types.Struct{}, ex)
+		s := ex.(*types.Struct)
 
 		assert.Equal(t, identifier, s.Identifier)
 		require.Len(t, s.Fields, 1)
 
 		require.Contains(t, s.Fields, "fieldA")
 
-		assert.IsType(t, types2.Int{}, s.Fields["fieldA"].Type)
+		assert.IsType(t, &types.Int{}, s.Fields["fieldA"].Type)
 	})
 
 	t.Run("string", func(t *testing.T) {
@@ -206,7 +206,7 @@ func Test_exportability(t *testing.T) {
 
 		ex := ty.Export(nil, nil)
 
-		assert.IsType(t, types2.String{}, ex)
+		assert.IsType(t, &types.String{}, ex)
 	})
 
 	t.Run("events", func(t *testing.T) {
@@ -263,9 +263,9 @@ func Test_exportability(t *testing.T) {
 
 		ex := ty.Export(program, &variable)
 
-		assert.IsType(t, types2.Event{}, ex)
+		assert.IsType(t, &types.Event{}, ex)
 
-		event := ex.(types2.Event)
+		event := ex.(*types.Event)
 
 		require.Len(t, event.Fields, 2)
 

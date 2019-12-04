@@ -1,4 +1,4 @@
-package abi_test
+package abi
 
 import (
 	"strings"
@@ -27,7 +27,7 @@ func TestExamples(t *testing.T) {
 					assetBytes, err := Asset(assetName)
 					require.NoError(t, err)
 
-					generatedAbi := abi.GetABIForBytes(assetBytes, false, assetName)
+					generatedAbi := abi.GetABIJSONFromCadenceCode(string(assetBytes), false, assetName)
 
 					options := jsondiff.DefaultConsoleOptions()
 					diff, s := jsondiff.Compare(generatedAbi, abiAsset, &options)

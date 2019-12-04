@@ -7,8 +7,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/cmd"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	typesEncoding "github.com/dapperlabs/flow-go/sdk/abi/encoding/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
-	"github.com/dapperlabs/flow-go/sdk/abi/types/encoding"
 )
 
 // GenerateABI generates ABIs from provided Cadence file
@@ -18,7 +18,7 @@ func GenerateABI(args []string, pretty bool) error {
 		return errors.New("no input file given")
 	}
 
-	jsonData := GetABIForFile(args[0], pretty)
+	jsonData := GetABIJSONFromCadenceFile(args[0], pretty)
 
 	_, err := os.Stdout.Write(jsonData)
 
@@ -42,7 +42,7 @@ func exportTypesFromChecker(checker *sema.Checker) map[string]types.Type {
 }
 
 func encodeTypesAsJson(types map[string]types.Type, pretty bool) ([]byte, error) {
-	encoder := encoding.NewEncoder()
+	encoder := typesEncoding.NewEncoder()
 
 	for name, typ := range types {
 		encoder.Encode(name, typ)
@@ -54,8 +54,8 @@ func encodeTypesAsJson(types map[string]types.Type, pretty bool) ([]byte, error)
 	return json.Marshal(encoder.Get())
 }
 
-func GetABIForBytes(code []byte, pretty bool, filename string) []byte {
-	checker, _ := cmd.PrepareChecker(string(code), filename)
+func GetABIJSONFromCadenceCode(code string, pretty bool, filename string) []byte {
+	checker, _ := cmd.PrepareChecker(code, filename)
 
 	exportedTypes := exportTypesFromChecker(checker)
 
@@ -68,9 +68,9 @@ func GetABIForBytes(code []byte, pretty bool, filename string) []byte {
 	return jsonData
 }
 
-func GetABIForFile(filename string, pretty bool) []byte {
+func GetABIJSONFromCadenceFile(filename string, pretty bool) []byte {
 
-	_, checker, _ := cmd.PrepareInterpreter(filename)
+	checker, _ := cmd.PrepareCheckerFromFile(filename)
 
 	exportedTypes := exportTypesFromChecker(checker)
 
@@ -83,7 +83,24 @@ func GetABIForFile(filename string, pretty bool) []byte {
 	return jsonData
 }
 
-func GetABIFromFile(filename string) (map[string]types2.Type, error) {
+func GetTypesFromCadenceFile(filename string) map[string]types.Type {
 
-	return nil, nil
+	checker, _ := cmd.PrepareCheckerFromFile(filename)
+
+	exportedTypes := exportTypesFromChecker(checker)
+
+	return exportedTypes
+}
+
+func GetTypesFromCadenceCode(code string, filename string) map[string]types.Type {
+
+	checker, _ := cmd.PrepareChecker(code, filename)
+
+	exportedTypes := exportTypesFromChecker(checker)
+
+	return exportedTypes
+}
+
+func GetTypesFromABIJSONBytes(bytes []byte) (map[string]types.Type, error) {
+	return typesEncoding.Decode(bytes)
 }

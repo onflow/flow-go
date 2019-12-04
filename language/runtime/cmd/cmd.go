@@ -62,6 +62,15 @@ func mustClosure(filename string, codes map[string]string) func(error) {
 	}
 }
 
+func PrepareCheckerFromFile(filename string) (*sema.Checker, func(error)) {
+	codeBytes, err := ioutil.ReadFile(filename)
+
+	checker, must := PrepareChecker(string(codeBytes), filename)
+	must(err)
+
+	return checker, must
+}
+
 //PrepareChecker prepares and initializes Checked with a given code as a string
 //and dummyFilename which is used fore pretty prints if there are errors while processing
 func PrepareChecker(code string, dummyFilename string) (*sema.Checker, func(error)) {
@@ -115,6 +124,7 @@ func PrepareInterpreter(filename string) (*interpreter.Interpreter, *sema.Checke
 	codeBytes, err := ioutil.ReadFile(filename)
 
 	checker, must := PrepareChecker(string(codeBytes), filename)
+	must(err)
 
 	values := standardLibraryFunctions().ToValues()
 

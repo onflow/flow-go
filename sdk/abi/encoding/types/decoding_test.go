@@ -1,57 +1,42 @@
 package types_test
 
 import (
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/nsf/jsondiff"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	abiExamples "github.com/dapperlabs/flow-go/language/abi"
 	"github.com/dapperlabs/flow-go/language/runtime/cmd/abi"
 )
 
-func fileExists(filename string) bool {
-	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir()
-}
-
 func TestExamples(t *testing.T) {
 
-	abiExamplesDir := os.Getenv("FLOW_ABI_EXAMPLES_DIR")
+	for _, abiName := range abiExamples.AssetNames() {
+		suffix := ".abi.json"
+		if strings.HasSuffix(abiName, suffix) {
 
-	require.NotEmpty(t, abiExamplesDir, "Set FLOW_ABI_EXAMPLES_DIR env variable to point to directory with Flow ABI example files or use `make test`")
+			cdcName := abiName[:len(abiName)-len(suffix)]
 
-	files, err := ioutil.ReadDir(abiExamplesDir)
+			cdcAsset, _ := abiExamples.Asset(cdcName)
 
-	require.NoError(t, err)
+			if cdcAsset != nil {
 
-	for _, file := range files {
+				t.Run(abiName, func(t *testing.T) {
 
-		fullFilepath := filepath.Join(abiExamplesDir, file.Name())
+					abiAsset, err := abiExamples.Asset(abiName)
+					require.NoError(t, err)
 
-		if strings.HasSuffix(file.Name(), ".abi.json") {
+					typesFromABI, err := abi.GetTypesFromABIJSONBytes(abiAsset)
 
-			t.Run(file.Name(), func(t *testing.T) {
-				abiBytes, err := ioutil.ReadFile(fullFilepath)
+					assert.NoError(t, err)
 
-				require.NoError(t, err)
+					typesFromCadence := abi.GetTypesFromCadenceCode(string(cdcAsset), cdcName)
 
-				generatedAbi := abi.GetABIForFile("examples/"+file.Name(), false)
-
-				options := jsondiff.DefaultConsoleOptions()
-				diff, s := jsondiff.Compare(generatedAbi, abiBytes, &options)
-
-				assert.Equal(t, diff, jsondiff.FullMatch)
-
-				println(s)
-			})
+					assert.Equal(t, typesFromCadence, typesFromABI)
+				})
+			}
 		}
 	}
 }

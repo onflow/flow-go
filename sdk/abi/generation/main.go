@@ -1,49 +1,63 @@
 package main
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
+
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/generation/code"
-	types2 "github.com/dapperlabs/flow-go/sdk/abi/types"
+	abiTypes "github.com/dapperlabs/flow-go/sdk/abi/types"
 )
+
+func check(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
 
 func main() {
 
-	//TODO fix for final push
-	//if len(os.Args) != 3 {
-	//	panic("use input_file output_file")
-	//}
-
-	//abiFilename := os.Args[1]
-
-	types := map[string]*types2.Composite{
-		"Car": {
-			Fields: map[string]*types2.Field{
-				"fullName": {
-					Identifier: "fullName",
-					Type:       types2.String{},
-				},
-			},
-			Identifier: "Car",
-			Initializers: [][]*types2.Parameter{
-				{
-					&types2.Parameter{
-						Field: types2.Field{
-							Identifier: "model",
-							Type:       types2.String{},
-						},
-						Label: "",
-					},
-					&types2.Parameter{
-						Field: types2.Field{
-							Identifier: "make",
-							Type:       types2.String{},
-						},
-						Label: "",
-					},
-				},
-			},
-		},
+	if len(os.Args) != 4 {
+		println("use package_name input_file output_file")
+		os.Exit(1)
 	}
 
-	code.GenerateGo("example", types)
+	pkg := os.Args[1]
+	inputFile := os.Args[2]
+	outputFile := os.Args[3]
 
+	data, err := ioutil.ReadFile(inputFile)
+	check(err)
+
+	allTypes, err := types.Decode(data)
+
+	compositeTypes := map[string]*abiTypes.Composite{}
+
+	for name, typ := range allTypes {
+
+		switch composite := typ.(type) {
+		case *abiTypes.Resource:
+			compositeTypes[name] = &composite.Composite
+		case *abiTypes.Struct:
+			compositeTypes[name] = &composite.Composite
+		default:
+			_, err := fmt.Fprintf(os.Stderr, "Definition %s of type %T is not supported, skipping\n", name, typ)
+			check(err)
+		}
+
+		if composite, ok := typ.(*abiTypes.Composite); ok {
+			compositeTypes[name] = composite
+		} else {
+
+		}
+	}
+
+	file, err := os.Create(outputFile)
+	defer file.Close()
+
+	check(err)
+
+	err = code.GenerateGo(pkg, compositeTypes, file)
+	check(err)
 }

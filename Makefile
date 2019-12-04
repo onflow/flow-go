@@ -96,6 +96,12 @@ cmd/flow/flow: crypto/*.go $(shell find  cli/ -name '*.go') $(shell find cmd -na
 	    "-X github.com/dapperlabs/flow-go/cli/flow/version.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/cli/flow/version.version=$(VERSION)" \
 	    -o ./cmd/flow/flow ./cmd/flow
 
+sdk/abi/generation/generation: $(shell find sdk -name '*.go')
+	GO111MODULE=on go build \
+    	    -ldflags \
+    	    "-X github.com/dapperlabs/flow-go/cli/flow/version.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/cli/flow/version.version=$(VERSION)" \
+    	    -o ./sdk/abi/generation/generation ./sdk/abi/generation
+
 .PHONY: install-cli
 install-cli: cmd/flow/flow
 	cp cmd/flow/flow $$GOPATH/bin/
