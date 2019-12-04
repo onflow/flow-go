@@ -160,7 +160,7 @@ func (encoder *Encoder) encodeReturnType(returnType types.Type) interface{} {
 	return encoder.encode(returnType)
 }
 
-var typeToJson = map[types.Type]string{
+var typeToJSON = map[types.Type]string{
 	&types.Any{}:    "Any",
 	&types.Bool{}:   "Bool",
 	&types.Void{}:   "Void",
@@ -180,7 +180,7 @@ const jsonTypeVariable = "variable"
 
 func (encoder *Encoder) encode(t types.Type) interface{} {
 
-	if s, ok := typeToJson[t]; ok {
+	if s, ok := typeToJSON[t]; ok {
 		return s
 	}
 

@@ -63,42 +63,42 @@ func (a *abiAwareStatement) SelfType(t types.Type) *abiAwareStatement {
 	case *types.Composite:
 		mappedFields := jen.Dict{}
 		for key, field := range v.Fields {
-			mappedFields[jen.Lit(key)] = Empty().SelfType(field)
+			mappedFields[jen.Lit(key)] = empty().SelfType(field)
 		}
 		mappedInitializers := make([]jen.Code, len(v.Initializers))
 		for i, initializer := range v.Initializers {
 			params := make([]jen.Code, len(initializer))
 			for i, param := range v.Initializers[i] {
-				params[i] = Op("&").Qual(typesImportPath, "Parameter").SelfType(param)
+				params[i] = op("&").Qual(typesImportPath, "Parameter").SelfType(param)
 			}
 
 			mappedInitializers[i] = jen.Values(params...)
 		}
 		return wrap(a.Statement.Qual(typesImportPath, "Composite").Values(jen.Dict{
-			Id("Fields"):       jen.Map(jen.String()).Op("*").Qual(typesImportPath, "Field").Values(mappedFields),
-			Id("Initializers"): jen.Index().Index().Op("*").Qual(typesImportPath, "Parameter").Values(mappedInitializers...),
+			id("Fields"):       jen.Map(jen.String()).Op("*").Qual(typesImportPath, "Field").Values(mappedFields),
+			id("Initializers"): jen.Index().Index().Op("*").Qual(typesImportPath, "Parameter").Values(mappedInitializers...),
 		}))
 	case *types.Field:
 		return wrap(a.Statement.Values(jen.Dict{
-			Id("Type"):       Empty().SelfType(v.Type),
-			Id("Identifier"): jen.Lit(v.Identifier),
+			id("Type"):       empty().SelfType(v.Type),
+			id("Identifier"): jen.Lit(v.Identifier),
 		}))
 	case *types.Parameter:
 		return wrap(a.Statement.Values(jen.Dict{
-			Id("Field"): Qual(typesImportPath, "Field").SelfType(&v.Field),
-			Id("Label"): jen.Lit(v.Label),
+			id("Field"): qual(typesImportPath, "Field").SelfType(&v.Field),
+			id("Label"): jen.Lit(v.Label),
 		}))
 	case *types.VariableSizedArray:
 		return wrap(a.Statement.Qual(typesImportPath, "VariableSizedArray").Values(jen.Dict{
-			Id("ElementType"): Empty().SelfType(v.ElementType),
+			id("ElementType"): empty().SelfType(v.ElementType),
 		}))
 	case *types.StructPointer:
 		return wrap(a.Statement.Qual(typesImportPath, "StructPointer").Values(jen.Dict{
-			Id("TypeName"): jen.Lit(v.TypeName),
+			id("TypeName"): jen.Lit(v.TypeName),
 		}))
 	case *types.Optional:
 		return wrap(a.Statement.Qual(typesImportPath, "Optional").Values(jen.Dict{
-			Id("Of"): Empty().SelfType(v.Of),
+			id("Of"): empty().SelfType(v.Of),
 		}))
 	}
 
@@ -125,41 +125,41 @@ func (a *abiAwareStatement) Qual(path, name string) *abiAwareStatement {
 	return wrap(a.Statement.Qual(path, name))
 }
 
-func Qual(path, name string) *abiAwareStatement {
+func qual(path, name string) *abiAwareStatement {
 	return wrap(jen.Qual(path, name))
 }
 
-func Op(op string) *abiAwareStatement {
+func op(op string) *abiAwareStatement {
 	return wrap(jen.Op(op))
 }
 
-func Id(name string) *abiAwareStatement {
+func id(name string) *abiAwareStatement {
 	return wrap(jen.Id(name))
 }
 
-func Empty() *abiAwareStatement {
+func empty() *abiAwareStatement {
 	return wrap(jen.Empty())
 }
 
-func Func() *abiAwareStatement {
+func function() *abiAwareStatement {
 	return &abiAwareStatement{
 		jen.Func(),
 	}
 }
 
-func Var() *abiAwareStatement {
+func variable() *abiAwareStatement {
 	return wrap(jen.Var())
 }
 
-func ValueConstructor(t types.Type, fieldExpr *jen.Statement) *abiAwareStatement {
+func valueConstructor(t types.Type, fieldExpr *jen.Statement) *abiAwareStatement {
 
 	switch v := t.(type) {
 	case *types.String:
-		return Qual(valuesImportPath, "String").Call(fieldExpr)
+		return qual(valuesImportPath, "String").Call(fieldExpr)
 	case *types.StructPointer:
 		return wrap(fieldExpr.Dot("toValue").Call())
 	case *types.Optional:
-		return ValueConstructor(v.Of, fieldExpr)
+		return valueConstructor(v.Of, fieldExpr)
 	}
 
 	panic(fmt.Errorf("not supported type %T", t))
@@ -213,17 +213,17 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 			viewInterfaceMethodName := startUpper(field.Identifier)
 			viewStructFieldName := _lower(field.Identifier)
 
-			interfaceMethods = append(interfaceMethods, Id(viewInterfaceMethodName).Params().Type(field.Type))
-			viewStructFields = append(viewStructFields, Id(viewStructFieldName).Type(field.Type))
+			interfaceMethods = append(interfaceMethods, id(viewInterfaceMethodName).Params().Type(field.Type))
+			viewStructFields = append(viewStructFields, id(viewStructFieldName).Type(field.Type))
 
-			viewInterfaceMethodsImpls = append(viewInterfaceMethodsImpls, Func().Params(Id("t").Op("*").Id(viewStructName)).
+			viewInterfaceMethodsImpls = append(viewInterfaceMethodsImpls, function().Params(id("t").Op("*").Id(viewStructName)).
 				Id(viewInterfaceMethodName).Params().Type(field.Type).Block(
 				jen.Return(jen.Id("t").Dot(viewStructFieldName)),
 			))
 
-			decodeFunctionFields[Id(viewStructFieldName)] =
-				Id("v").Dot("Fields").Index(jen.Lit(fieldEncodingOrder[field.Identifier])).
-					Dot("ToGoValue").Call().Assert(Empty().Type(field.Type))
+			decodeFunctionFields[id(viewStructFieldName)] =
+				id("v").Dot("Fields").Index(jen.Lit(fieldEncodingOrder[field.Identifier])).
+					Dot("ToGoValue").Call().Assert(empty().Type(field.Type))
 		}
 
 		// Main view interface
@@ -239,20 +239,20 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 		//f.Add(viewInterfaceMethodsImpls...)
 
 		//Main view decoding function
-		f.Func().Id("Decode"+viewInterfaceName).Params(Id("b").Index().Byte()).Params(Id(viewInterfaceName), jen.Error()).Block(
+		f.Func().Id("Decode"+viewInterfaceName).Params(id("b").Index().Byte()).Params(id(viewInterfaceName), jen.Error()).Block(
 			//r := bytes.NewReader(b)
-			Id("r").Op(":=").Qual("bytes", "NewReader").Call(Id("b")),
+			id("r").Op(":=").Qual("bytes", "NewReader").Call(id("b")),
 
 			//	dec := encoding.NewDecoder(r)
-			Id("dec").Op(":=").Qual(valuesEncodingImportPath, "NewDecoder").Call(Id("r")),
+			id("dec").Op(":=").Qual(valuesEncodingImportPath, "NewDecoder").Call(id("r")),
 
 			//v, err := dec.DecodeComposite(carType)
 			//if err != nil {
 			//	return nil, err
 			// }
-			jen.List(Id("v"), Id("err")).Op(":=").Id("dec").Dot("DecodeComposite").Call(Id(typeName)),
-			jen.If(Id("err").Op("!=").Nil()).Block(
-				jen.Return(jen.List(jen.Nil(), Id("err"))),
+			jen.List(id("v"), id("err")).Op(":=").Id("dec").Dot("DecodeComposite").Call(id(typeName)),
+			jen.If(id("err").Op("!=").Nil()).Block(
+				jen.Return(jen.List(jen.Nil(), id("err"))),
 			),
 
 			//return &<Object>View{_<field>>: v.Fields[uint(0x0)].ToGoValue().(string)}, nil
@@ -262,7 +262,7 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 		)
 
 		//Object type structure
-		f.Add(Var().Id(typeVariableName).Op("=").SelfType(typ))
+		f.Add(variable().Id(typeVariableName).Op("=").SelfType(typ))
 
 		//Generating constructors
 		//TODO multiple contructors supported
@@ -281,17 +281,17 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 			if label == "" {
 				label = param.Identifier
 			}
-			constructorStructFields[i] = Id(param.Identifier).Type(param.Type)
+			constructorStructFields[i] = id(param.Identifier).Type(param.Type)
 
-			encodedConstructorFields[i] = ValueConstructor(param.Type, Id("p").Dot(param.Identifier))
+			encodedConstructorFields[i] = valueConstructor(param.Type, id("p").Dot(param.Identifier))
 
-			constructorFields[i] = Id(label).Type(param.Type)
+			constructorFields[i] = id(label).Type(param.Type)
 
-			constructorObjectParams[Id(param.Identifier)] = Id(label)
+			constructorObjectParams[id(param.Identifier)] = id(label)
 		}
 
 		//Constructor interface
-		constructorEncodeFunction := Id("Encode").Params().Params(jen.Index().Byte(), jen.Error())
+		constructorEncodeFunction := id("Encode").Params().Params(jen.Index().Byte(), jen.Error())
 		f.Type().Id(constructorInterfaceName).Interface(
 			constructorEncodeFunction,
 		)
@@ -299,33 +299,33 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 		//Constructor struct
 		f.Type().Id(constructorStructName).Struct(constructorStructFields...)
 
-		f.Func().Params(Id("p").Id(constructorStructName)).Id("toValue").Params().Qual(valuesImportPath, "ConstantSizedArray").Block(
-			jen.Return(Qual(valuesImportPath, "ConstantSizedArray").Values(encodedConstructorFields...)),
+		f.Func().Params(id("p").Id(constructorStructName)).Id("toValue").Params().Qual(valuesImportPath, "ConstantSizedArray").Block(
+			jen.Return(qual(valuesImportPath, "ConstantSizedArray").Values(encodedConstructorFields...)),
 		)
 
 		// Constructor encoding function
-		f.Func().Params(Id("p").Id(constructorStructName)).Add(constructorEncodeFunction).Block(
+		f.Func().Params(id("p").Id(constructorStructName)).Add(constructorEncodeFunction).Block(
 			//	var w bytes.Buffer
-			Var().Id("w").Qual("bytes", "Buffer"),
+			variable().Id("w").Qual("bytes", "Buffer"),
 
 			// encoder := encoding.NewEncoder(&w)
-			Id("encoder").Op(":=").Qual(valuesEncodingImportPath, "NewEncoder").Call(Op("&").Id("w")),
+			id("encoder").Op(":=").Qual(valuesEncodingImportPath, "NewEncoder").Call(op("&").Id("w")),
 
 			//err := encoder.EncodeConstantSizedArray(
-			Id("err").Op(":=").Id("encoder").Dot("EncodeConstantSizedArray").Call(
-				Id("p").Dot("toValue").Call(),
+			id("err").Op(":=").Id("encoder").Dot("EncodeConstantSizedArray").Call(
+				id("p").Dot("toValue").Call(),
 			),
 
-			jen.If(Id("err").Op("!=").Nil()).Block(
-				jen.Return(jen.List(jen.Nil(), Id("err"))),
+			jen.If(id("err").Op("!=").Nil()).Block(
+				jen.Return(jen.List(jen.Nil(), id("err"))),
 			),
 
-			jen.Return(Id("w").Dot("Bytes").Call(), jen.Nil()),
+			jen.Return(id("w").Dot("Bytes").Call(), jen.Nil()),
 		)
 
 		//Constructor creator
-		f.Func().Id(newConstructorName).Params(constructorFields...).Params(Id(constructorInterfaceName), jen.Error()).Block(
-			jen.Return(Id(constructorStructName).Values(constructorObjectParams), jen.Nil()),
+		f.Func().Id(newConstructorName).Params(constructorFields...).Params(id(constructorInterfaceName), jen.Error()).Block(
+			jen.Return(id(constructorStructName).Values(constructorObjectParams), jen.Nil()),
 		)
 	}
 

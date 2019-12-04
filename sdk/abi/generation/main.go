@@ -48,8 +48,6 @@ func main() {
 
 		if composite, ok := typ.(*abiTypes.Composite); ok {
 			compositeTypes[name] = composite
-		} else {
-
 		}
 	}
 

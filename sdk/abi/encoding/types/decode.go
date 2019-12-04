@@ -2,7 +2,6 @@ package types
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
@@ -10,13 +9,13 @@ import (
 
 func getOnlyEntry(m map[string]interface{}) (string, interface{}, error) {
 	if len(m) > 1 {
-		return "", nil, errors.New(fmt.Sprintf("more then one entry in %v", m))
+		return "", nil, fmt.Errorf("more then one entry in %v", m)
 
 	}
 	for k, v := range m {
 		return k, v, nil
 	}
-	return "", nil, errors.New(fmt.Sprintf("no entires, but one required in %v", m))
+	return "", nil, fmt.Errorf("no entires, but one required in %v", m)
 }
 
 func getString(m map[string]interface{}, key string) (string, error) {
@@ -29,7 +28,7 @@ func getString(m map[string]interface{}, key string) (string, error) {
 		return s, nil
 	}
 
-	return "", errors.New(fmt.Sprintf("Value for key  %s it is not a string in %v", key, m))
+	return "", fmt.Errorf("Value for key  %s it is not a string in %v", key, m)
 }
 
 func getUInt(m map[string]interface{}, key string) (uint, error) {
@@ -44,7 +43,7 @@ func getUInt(m map[string]interface{}, key string) (uint, error) {
 		}
 	}
 
-	return 0, errors.New(fmt.Sprintf("Value for key  %s it is not an uint in %v", key, m))
+	return 0, fmt.Errorf("Value for key  %s it is not an uint in %v", key, m)
 }
 
 func getArray(m map[string]interface{}, key string) ([]interface{}, error) {
@@ -57,7 +56,7 @@ func getArray(m map[string]interface{}, key string) ([]interface{}, error) {
 		return s, nil
 	}
 
-	return nil, errors.New(fmt.Sprintf("Value for key  %s it is not an array in %v", key, m))
+	return nil, fmt.Errorf("Value for key  %s it is not an array in %v", key, m)
 }
 
 func getMap(m map[string]interface{}, key string) (map[string]interface{}, error) {
@@ -70,13 +69,13 @@ func getMap(m map[string]interface{}, key string) (map[string]interface{}, error
 		return s, nil
 	}
 
-	return nil, errors.New(fmt.Sprintf("Value for key  %s it is not a map in %v", key, m))
+	return nil, fmt.Errorf("Value for key  %s it is not a map in %v", key, m)
 
 }
 
 func getIndex(a []interface{}, index int) (interface{}, error) {
 	if len(a) <= index || index < 0 {
-		return nil, errors.New(fmt.Sprintf("Index %d doesn't exist in array in %v", index, a))
+		return nil, fmt.Errorf("Index %d doesn't exist in array in %v", index, a)
 
 	}
 	return a[index], nil
@@ -89,7 +88,7 @@ func getObject(data map[string]interface{}, key string) (interface{}, error) {
 		return v, nil
 	}
 
-	return nil, errors.New(fmt.Sprintf("Key %s doesn't exist  in %v", key, data))
+	return nil, fmt.Errorf("Key %s doesn't exist  in %v", key, data)
 }
 
 func toField(data interface{}, name string) (*types.Field, error) {
@@ -137,14 +136,14 @@ func toParameter(data map[string]interface{}) (*types.Parameter, error) {
 func interfaceToListOfMaps(input interface{}) ([]map[string]interface{}, error) {
 	array, ok := input.([]interface{})
 	if !ok {
-		return nil, errors.New(fmt.Sprintf("%v is not of expected type []interface{}", input))
+		return nil, fmt.Errorf("%v is not of expected type []interface{}", input)
 	}
 
 	ret := make([]map[string]interface{}, len(array))
 	for i, a := range array {
 		ret[i], ok = a.(map[string]interface{})
 		if !ok {
-			return nil, errors.New(fmt.Sprintf("%v is not of expected type map[string]interface{}", a))
+			return nil, fmt.Errorf("%v is not of expected type map[string]interface{}", a)
 		}
 	}
 	return ret, nil
@@ -344,11 +343,10 @@ func toArray(data map[string]interface{}) (types.Type, error) {
 			Size:        size,
 			ElementType: of,
 		}, nil
-	} else {
-		return &types.VariableSizedArray{
-			ElementType: of,
-		}, nil
 	}
+	return &types.VariableSizedArray{
+		ElementType: of,
+	}, nil
 }
 
 func toDictionary(data map[string]interface{}) (types.Type, error) {
@@ -388,12 +386,12 @@ func toType(data interface{}, name string) (types.Type, error) {
 	//Simple string cases - "Int"
 	case string:
 
-		for typ, jsonString := range typeToJson {
+		for typ, jsonString := range typeToJSON {
 			if v == jsonString {
 				return typ, nil
 			}
 		}
-		return nil, errors.New(fmt.Sprintf("unsupported name %s for simple string type", v))
+		return nil, fmt.Errorf("unsupported name %s for simple string type", v)
 
 	//If object with key as type descriptor - <{ "<function>": XX }>
 	case map[string]interface{}:
@@ -463,7 +461,7 @@ func toType(data interface{}, name string) (types.Type, error) {
 
 	}
 
-	return nil, errors.New(fmt.Sprintf("unsupported data chunk %v", data))
+	return nil, fmt.Errorf("unsupported data chunk %v", data)
 }
 
 type jsonContainer struct {
