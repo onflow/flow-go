@@ -109,9 +109,12 @@ func (a *abiAwareStatement) Params(params ...jen.Code) *abiAwareStatement {
 	return &abiAwareStatement{a.Statement.Params(params...)}
 }
 
+//revive:disable:var-naming We want to keep it called like this
 func (a *abiAwareStatement) Id(name string) *abiAwareStatement {
 	return &abiAwareStatement{a.Statement.Id(name)}
 }
+
+//revive:enable:var-naming
 
 func (a *abiAwareStatement) Call(params ...jen.Code) *abiAwareStatement {
 	return &abiAwareStatement{a.Statement.Call(params...)}

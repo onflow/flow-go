@@ -28,7 +28,7 @@ func getString(m map[string]interface{}, key string) (string, error) {
 		return s, nil
 	}
 
-	return "", fmt.Errorf("Value for key  %s it is not a string in %v", key, m)
+	return "", fmt.Errorf("value for key  %s it is not a string in %v", key, m)
 }
 
 func getUInt(m map[string]interface{}, key string) (uint, error) {
@@ -43,7 +43,7 @@ func getUInt(m map[string]interface{}, key string) (uint, error) {
 		}
 	}
 
-	return 0, fmt.Errorf("Value for key  %s it is not an uint in %v", key, m)
+	return 0, fmt.Errorf("value for key  %s it is not an uint in %v", key, m)
 }
 
 func getArray(m map[string]interface{}, key string) ([]interface{}, error) {
@@ -56,7 +56,7 @@ func getArray(m map[string]interface{}, key string) ([]interface{}, error) {
 		return s, nil
 	}
 
-	return nil, fmt.Errorf("Value for key  %s it is not an array in %v", key, m)
+	return nil, fmt.Errorf("value for key  %s it is not an array in %v", key, m)
 }
 
 func getMap(m map[string]interface{}, key string) (map[string]interface{}, error) {
@@ -69,13 +69,13 @@ func getMap(m map[string]interface{}, key string) (map[string]interface{}, error
 		return s, nil
 	}
 
-	return nil, fmt.Errorf("Value for key  %s it is not a map in %v", key, m)
+	return nil, fmt.Errorf("value for key  %s it is not a map in %v", key, m)
 
 }
 
 func getIndex(a []interface{}, index int) (interface{}, error) {
 	if len(a) <= index || index < 0 {
-		return nil, fmt.Errorf("Index %d doesn't exist in array in %v", index, a)
+		return nil, fmt.Errorf("index %d doesn't exist in array in %v", index, a)
 
 	}
 	return a[index], nil
@@ -88,7 +88,7 @@ func getObject(data map[string]interface{}, key string) (interface{}, error) {
 		return v, nil
 	}
 
-	return nil, fmt.Errorf("Key %s doesn't exist  in %v", key, data)
+	return nil, fmt.Errorf("key %s doesn't exist  in %v", key, data)
 }
 
 func toField(data interface{}, name string) (*types.Field, error) {
