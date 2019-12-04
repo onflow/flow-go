@@ -21,12 +21,12 @@ func TestGRPCUnderlay_Start_Twice(t *testing.T) {
 	address := ":0"
 	listener, _ := net.Listen("tcp4", address)
 	go func() {
-		require.NoError(t, protocol.StartWithListener(&listener))
+		require.NoError(t, protocol.StartWithListener(listener))
 	}()
 	time.Sleep(time.Duration(1))
 	defer protocol.Stop()
 	checkClientConnection(t, listener.Addr().String())
-	assert.Error(t, protocol.StartWithListener(&listener))
+	assert.Error(t, protocol.StartWithListener(listener))
 }
 
 func TestGRPCUnderlay_Start_Stop(t *testing.T) {
@@ -36,7 +36,7 @@ func TestGRPCUnderlay_Start_Stop(t *testing.T) {
 	address := ":0"
 	listener, _ := net.Listen("tcp4", address)
 	go func() {
-		require.NoError(t, protocol.StartWithListener(&listener))
+		require.NoError(t, protocol.StartWithListener(listener))
 	}()
 	checkClientConnection(t, listener.Addr().String())
 	assert.NoError(t, protocol.Stop())
@@ -56,7 +56,7 @@ func TestGRPCUnderlay_Handle(t *testing.T) {
 	address := ":0"
 	listener, _ := net.Listen("tcp4", address)
 	go func() {
-		require.NoError(t, protocol.StartWithListener(&listener))
+		require.NoError(t, protocol.StartWithListener(listener))
 	}()
 	checkClientConnection(t, listener.Addr().String())
 	defer protocol.Stop()

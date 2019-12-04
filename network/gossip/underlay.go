@@ -16,7 +16,7 @@ type Underlay interface {
 	// For instance: "198.51.100.1:80"
 	Start(address string) error
 	// StartWithListener starts the server with the given TCP listener.
-	StartWithListener(listener *net.Listener) error
+	StartWithListener(listener net.Listener) error
 	// Stop stops the server and drops all connections
 	Stop() error
 

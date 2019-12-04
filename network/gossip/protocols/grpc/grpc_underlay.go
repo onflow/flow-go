@@ -49,10 +49,10 @@ func (u *GRPCUnderlay) Start(address string) error {
 	if err != nil {
 		return fmt.Errorf("invalid address %s: %v", address, err)
 	}
-	return u.StartWithListener(&listener)
+	return u.StartWithListener(listener)
 }
 
-func (u *GRPCUnderlay) StartWithListener(listener *net.Listener) error {
+func (u *GRPCUnderlay) StartWithListener(listener net.Listener) error {
 	if u.grpcServer != nil {
 		return fmt.Errorf("GRPC server already started")
 	}
@@ -65,7 +65,7 @@ func (u *GRPCUnderlay) StartWithListener(listener *net.Listener) error {
 	u.grpcServer = grpcServer
 
 	// Blocking call
-	if err := grpcServer.Serve(*listener); err != nil {
+	if err := grpcServer.Serve(listener); err != nil {
 		return fmt.Errorf("failed to serve: %v", err)
 	}
 

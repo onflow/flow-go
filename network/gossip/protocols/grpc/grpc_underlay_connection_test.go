@@ -18,7 +18,7 @@ func TestGRPCUnderlayConnection_Send(t *testing.T) {
 	listener, err := net.Listen("tcp4", address)
 	// Start the Server
 	go func() {
-		require.NoError(t, underlay.StartWithListener(&listener))
+		require.NoError(t, underlay.StartWithListener(listener))
 	}()
 	// Setup the call back function
 	ch := make(chan []byte)
@@ -53,7 +53,7 @@ func TestGRPCUnderlayConnection_OnClosed(t *testing.T) {
 
 	// Start the Server
 	go func() {
-		require.NoError(t, underlay.StartWithListener(&listener))
+		require.NoError(t, underlay.StartWithListener(listener))
 	}()
 
 	// Stop Server at the end
