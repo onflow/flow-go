@@ -2,6 +2,11 @@ package protocols
 
 import (
 	"context"
+	"fmt"
+	"github.com/stretchr/testify/require"
+	"math/rand"
+	"net"
+
 	"testing"
 	"time"
 
@@ -11,7 +16,7 @@ import (
 
 func TestGRPCUnderlayConnection_Send(t *testing.T) {
 	var underlay gossip.Underlay = &GRPCUnderlay{}
-	address := "127.0.0.1:50000"
+	address := findPort()
 	// Start the Server
 	go func() {
 		assert.NoError(t, underlay.Start(address))
@@ -44,11 +49,13 @@ func TestGRPCUnderlayConnection_OnClosed(t *testing.T) {
 		ch <- msg
 	}
 	assert.NoError(t, underlay.Handle(callbackfunc))
-	address := "127.0.0.1:50000"
+	address := findPort()
+
 	// Start the Server
 	go func() {
-		assert.NoError(t, underlay.Start(address))
+		require.NoError(t, underlay.Start(address))
 	}()
+
 	// Stop Server at the end
 	defer underlay.Stop()
 	// Start the Client
@@ -75,4 +82,21 @@ func TestGRPCUnderlayConnection_OnClosed(t *testing.T) {
 		assert.Fail(t, "Callback on the client not called")
 	}
 	assert.Error(t, clientConnection.Send(context.Background(), []byte(message)))
+}
+
+func findPort() (address string) {
+	var attempt = 10
+	for attempt > 0 {
+		//generate random port, range: 1000-61000
+		port := 1000 + rand.Intn(60000)
+		address := fmt.Sprintf("127.0.0.1:%v", port)
+		ln, err := net.Listen("tcp", address)
+		if err == nil {
+			ln.Close()
+			ln = nil
+			return address
+		}
+		attempt--
+	}
+	return  ""
 }
