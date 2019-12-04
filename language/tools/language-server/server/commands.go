@@ -89,8 +89,14 @@ func (s Server) registerCommands(conn protocol.Conn) {
 // There should be exactly 1 argument:
 //   * the DocumentURI of the file to submit
 func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, fmt.Errorf("must have 1 args, got: %d", len(args))
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: fmt.Sprintf("submit transaction args: %v", args),
+	})
+
+	expectedArgCount := 1
+	if len(args) != expectedArgCount {
+		return nil, fmt.Errorf("expecting %d arguments, got %d", expectedArgCount, len(args))
 	}
 	uri, ok := args[0].(string)
 	if !ok {
@@ -119,8 +125,14 @@ func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (int
 // There should be exactly 1 argument:
 //   * the DocumentURI of the file to submit
 func (s *Server) executeScript(conn protocol.Conn, args ...interface{}) (interface{}, error) {
-	if len(args) != 1 {
-		return nil, errors.New("missing argument")
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: fmt.Sprintf("execute script args: %v", args),
+	})
+
+	expectedArgCount := 1
+	if len(args) != expectedArgCount {
+		return nil, fmt.Errorf("expecting %d arguments, got %d", expectedArgCount, len(args))
 	}
 	uri, ok := args[0].(string)
 	if !ok {
@@ -178,8 +190,9 @@ func (s *Server) switchActiveAccount(conn protocol.Conn, args ...interface{}) (i
 		Message: fmt.Sprintf("set active acct %v", args),
 	})
 
-	if len(args) != 1 {
-		return nil, fmt.Errorf("requires 1 argument, got %d", len(args))
+	expectedArgCount := 1
+	if len(args) != expectedArgCount {
+		return nil, fmt.Errorf("expecting %d arguments, got %d", expectedArgCount, len(args))
 	}
 	addrHex, ok := args[0].(string)
 	if !ok {
@@ -203,8 +216,9 @@ func (s *Server) createAccount(conn protocol.Conn, args ...interface{}) (interfa
 		Message: fmt.Sprintf("create acct args: %v", args),
 	})
 
-	if len(args) != 0 {
-		return nil, fmt.Errorf("expecting 0 args got: %d", len(args))
+	expectedArgCount := 0
+	if len(args) != expectedArgCount {
+		return nil, fmt.Errorf("expecting %d args got: %d", expectedArgCount, len(args))
 	}
 
 	accountKey := flow.AccountPublicKey{
@@ -262,8 +276,10 @@ func (s *Server) updateAccountCode(conn protocol.Conn, args ...interface{}) (int
 		Type:    protocol.Log,
 		Message: fmt.Sprintf("update acct code args: %v", args),
 	})
-	if len(args) != 1 {
-		return nil, fmt.Errorf("must have 1 args, got: %d", len(args))
+
+	expectedArgCount := 1
+	if len(args) != expectedArgCount {
+		return nil, fmt.Errorf("must have %d args, got: %d", expectedArgCount, len(args))
 	}
 	uri, ok := args[0].(string)
 	if !ok {
