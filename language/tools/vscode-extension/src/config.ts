@@ -1,4 +1,4 @@
-import {commands, window, workspace} from "vscode";
+import {commands, window, workspace, WorkspaceConfiguration} from "vscode";
 
 export const ROOT_ADDR: string = "0000000000000000000000000000000000000001";
 
@@ -10,6 +10,8 @@ const CONFIG_EMULATOR_ADDRESS = "emulatorAddress";
 type Account = {
     address: string
 };
+
+type AccountSet = {[key: string]: Account};
 
 // The config used by the extension
 export type Config = {

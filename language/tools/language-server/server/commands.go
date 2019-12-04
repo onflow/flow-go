@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 
@@ -18,9 +19,11 @@ import (
 )
 
 const (
-	CommandSubmitTransaction = "cadence.server.submitTransaction"
-	CommandExecuteScript     = "cadence.server.executeScript"
-	CommandUpdateAccountCode = "cadence.server.updateAccountCode"
+	CommandSubmitTransaction   = "cadence.server.submitTransaction"
+	CommandExecuteScript       = "cadence.server.executeScript"
+	CommandUpdateAccountCode   = "cadence.server.updateAccountCode"
+	CommandCreateAccount       = "cadence.server.createAccount"
+	CommandSwitchActiveAccount = "cadence.server.switchActiveAccount"
 )
 
 // CommandHandler represents the form of functions that handle commands
@@ -44,6 +47,8 @@ func (s Server) registerCommands(conn protocol.Conn) {
 							CommandSubmitTransaction,
 							CommandExecuteScript,
 							CommandUpdateAccountCode,
+							CommandCreateAccount,
+							CommandSwitchActiveAccount,
 						},
 					},
 				},
@@ -75,17 +80,18 @@ func (s Server) registerCommands(conn protocol.Conn) {
 	s.commands[CommandSubmitTransaction] = s.submitTransaction
 	s.commands[CommandExecuteScript] = s.executeScript
 	s.commands[CommandUpdateAccountCode] = s.updateAccountCode
+	s.commands[CommandSwitchActiveAccount] = s.switchActiveAccount
+	s.commands[CommandCreateAccount] = s.createAccount
 }
 
 // submitTransaction handles submitting a transaction defined in the
 // source document in VS Code.
 //
-// There should be exactly 2 arguments:
+// There should be exactly 1 argument:
 //   * the DocumentURI of the file to submit
-//   * the address of the account to sign with
 func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (interface{}, error) {
-	if len(args) != 2 {
-		return nil, fmt.Errorf("must have 2 args, got: %d", len(args))
+	if len(args) != 1 {
+		return nil, fmt.Errorf("must have 1 args, got: %d", len(args))
 	}
 	uri, ok := args[0].(string)
 	if !ok {
@@ -95,13 +101,17 @@ func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (int
 	if !ok {
 		return nil, fmt.Errorf("could not find document for URI %s", uri)
 	}
-	addrHex, ok := args[1].(string)
-	if !ok {
-		return nil, errors.New("invalid uri argument")
-	}
-	addr := flow.HexToAddress(addrHex)
 
-	return nil, s.sendTransaction(conn, []byte(doc.text), addr)
+	tx := flow.Transaction{
+		Script:         []byte(doc.text),
+		Nonce:          s.getNextNonce(),
+		ComputeLimit:   10,
+		PayerAccount:   s.activeAccount,
+		ScriptAccounts: []flow.Address{s.activeAccount},
+	}
+
+	_, err := s.sendTransaction(conn, tx)
+	return nil, err
 }
 
 // executeScript handles executing a script defined in the source document in
@@ -158,29 +168,86 @@ func (s *Server) executeScript(conn protocol.Conn, args ...interface{}) (interfa
 	return nil, err
 }
 
-// createAccount creates a new account with the given
-//func (s *Server) createAccount(conn protocol.Conn, args ...interface{}) (interface{}, error) {
-//	conn.LogMessage(&protocol.LogMessageParams{
-//		Type:    protocol.Log,
-//		Message: fmt.Sprintf("create acct args: %v", args),
-//	})
-//
-//	if len(args) != 0 {
-//		return nil, errors.New("missing argument")
-//	}
-//
-//	tx := flow.Transaction{
-//		Script:             templates.CreateAccount(),
-//		ReferenceBlockHash: nil,
-//		Nonce:              0,
-//		ComputeLimit:       0,
-//		PayerAccount:       flow.Address{},
-//		ScriptAccounts:     nil,
-//		Signatures:         nil,
-//		Status:             0,
-//		Events:             nil,
-//	}
-//}
+// switchActiveAccount sets the account that is currently active and should be
+// used when submitting transactions.
+func (s *Server) switchActiveAccount(conn protocol.Conn, args ...interface{}) (interface{}, error) {
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: fmt.Sprintf("set active acct %v", args),
+	})
+
+	if len(args) != 1 {
+		return nil, fmt.Errorf("requires 1 argument, got %d", len(args))
+	}
+	addrHex, ok := args[0].(string)
+	if !ok {
+		return nil, errors.New("invalid argument")
+	}
+	addr := flow.HexToAddress(addrHex)
+
+	_, ok = s.accounts[addr]
+	if !ok {
+		return nil, errors.New("cannot set active account that does not exist")
+	}
+
+	s.activeAccount = addr
+	return nil, nil
+}
+
+// createAccount creates a new account and returns its address.
+func (s *Server) createAccount(conn protocol.Conn, args ...interface{}) (interface{}, error) {
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: fmt.Sprintf("create acct args: %v", args),
+	})
+
+	if len(args) != 0 {
+		return nil, fmt.Errorf("expecting 0 args got: %d", len(args))
+	}
+
+	accountKey := flow.AccountPublicKey{
+		PublicKey: s.config.RootAccountKey.PrivateKey.PublicKey(),
+		SignAlgo:  s.config.RootAccountKey.SignAlgo,
+		HashAlgo:  s.config.RootAccountKey.HashAlgo,
+		Weight:    keys.PublicKeyWeightThreshold,
+	}
+	script, err := templates.CreateAccount([]flow.AccountPublicKey{accountKey}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate account creation script: %w", err)
+	}
+
+	tx := flow.Transaction{
+		Script:         script,
+		Nonce:          s.getNextNonce(),
+		ComputeLimit:   10,
+		PayerAccount:   s.activeAccount,
+		ScriptAccounts: []flow.Address{},
+	}
+
+	txHash, err := s.sendTransaction(conn, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	minedTx, err := s.flowClient.GetTransaction(context.Background(), txHash)
+	if err != nil {
+		return nil, err
+	}
+	if !(minedTx.Status == flow.TransactionFinalized || minedTx.Status == flow.TransactionSealed) {
+		return nil, fmt.Errorf("failed to get account address for transaction with status %s", tx.Status)
+	}
+	if len(minedTx.Events) != 1 {
+		return nil, fmt.Errorf("failed to get new account address for tx %s", txHash.Hex())
+	}
+	accountCreatedEvent, err := flow.DecodeAccountCreatedEvent(minedTx.Events[0].Payload)
+	if err != nil {
+		return nil, err
+	}
+	addr := accountCreatedEvent.Address()
+
+	s.accounts[addr] = s.config.RootAccountKey
+	return addr, nil
+}
 
 // updateAccountCode updates the configured account with the code of the given
 // file.
@@ -193,8 +260,8 @@ func (s *Server) updateAccountCode(conn protocol.Conn, args ...interface{}) (int
 		Type:    protocol.Log,
 		Message: fmt.Sprintf("update acct code args: %v", args),
 	})
-	if len(args) != 2 {
-		return nil, fmt.Errorf("must have 2 args, got: %d", len(args))
+	if len(args) != 1 {
+		return nil, fmt.Errorf("must have 1 args, got: %d", len(args))
 	}
 	uri, ok := args[0].(string)
 	if !ok {
@@ -204,35 +271,32 @@ func (s *Server) updateAccountCode(conn protocol.Conn, args ...interface{}) (int
 	if !ok {
 		return nil, fmt.Errorf("could not find document for URI %s", uri)
 	}
-	addrHex, ok := args[1].(string)
-	if !ok {
-		return nil, errors.New("invalid uri argument")
-	}
-	addr := flow.HexToAddress(addrHex)
 
 	accountCode := []byte(doc.text)
 	script := templates.UpdateAccountCode(accountCode)
-
-	return nil, s.sendTransaction(conn, script, addr)
-}
-
-// sendTransaction sends a transaction with the given script, from the given
-// address. Returns an error if we do not have the private key for the address.
-//
-// If an error occurs, attempts to show an appropriate message (either via logs
-// or UI popups in the client).
-func (s *Server) sendTransaction(conn protocol.Conn, script []byte, addr flow.Address) error {
-	key, ok := s.accounts[addr]
-	if !ok {
-		return fmt.Errorf("cannot sign transaction for account with unknown address %s", addr)
-	}
 
 	tx := flow.Transaction{
 		Script:         script,
 		Nonce:          s.getNextNonce(),
 		ComputeLimit:   10,
-		PayerAccount:   addr,
-		ScriptAccounts: []flow.Address{addr},
+		PayerAccount:   s.activeAccount,
+		ScriptAccounts: []flow.Address{s.activeAccount},
+	}
+
+	_, err := s.sendTransaction(conn, tx)
+	return nil, err
+}
+
+// sendTransaction sends a transaction with the given script, from the
+// currently active account. Returns the hash of the transaction if it is
+// successfully submitted.
+//
+// If an error occurs, attempts to show an appropriate message (either via logs
+// or UI popups in the client).
+func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) (crypto.Hash, error) {
+	key, ok := s.accounts[s.activeAccount]
+	if !ok {
+		return nil, fmt.Errorf("cannot sign transaction for account with unknown address %s", s.activeAccount)
 	}
 
 	conn.LogMessage(&protocol.LogMessageParams{
@@ -242,9 +306,9 @@ func (s *Server) sendTransaction(conn protocol.Conn, script []byte, addr flow.Ad
 
 	sig, err := keys.SignTransaction(tx, key)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	tx.AddSignature(addr, sig)
+	tx.AddSignature(s.activeAccount, sig)
 
 	err = s.flowClient.SendTransaction(context.Background(), tx)
 	if err == nil {
@@ -252,7 +316,7 @@ func (s *Server) sendTransaction(conn protocol.Conn, script []byte, addr flow.Ad
 			Type:    protocol.Info,
 			Message: fmt.Sprintf("Submitted transaction nonce=%d\thash=%s", tx.Nonce, tx.Hash().Hex()),
 		})
-		return nil
+		return tx.Hash(), nil
 	}
 
 	grpcErr, ok := status.FromError(err)
@@ -263,7 +327,7 @@ func (s *Server) sendTransaction(conn protocol.Conn, script []byte, addr flow.Ad
 				Type:    protocol.Warning,
 				Message: "The emulator server is unavailable. Please start the emulator (`cadence.runEmulator`) first.",
 			})
-			return nil
+			return nil, nil
 		} else if grpcErr.Code() == codes.InvalidArgument {
 			// The request was invalid
 			conn.ShowMessage(&protocol.ShowMessageParams{
@@ -274,9 +338,9 @@ func (s *Server) sendTransaction(conn protocol.Conn, script []byte, addr flow.Ad
 				Type:    protocol.Warning,
 				Message: fmt.Sprintf("Failed to submit transaction: %s", grpcErr.Message()),
 			})
-			return nil
+			return nil, nil
 		}
 	}
 
-	return err
+	return nil, err
 }

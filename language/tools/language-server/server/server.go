@@ -47,7 +47,8 @@ type Server struct {
 	commands   map[string]CommandHandler
 	flowClient *client.Client
 	// set of created accounts we can submit transactions for
-	accounts map[flow.Address]flow.AccountPrivateKey
+	accounts      map[flow.Address]flow.AccountPrivateKey
+	activeAccount flow.Address
 	// the nonce to use when submitting transactions
 	nonce uint64
 }
@@ -96,6 +97,7 @@ func (s *Server) Initialize(
 
 	// add the root account as a usable account
 	s.accounts[flow.RootAddress] = conf.RootAccountKey
+	s.activeAccount = flow.RootAddress
 
 	s.flowClient, err = client.New(s.config.EmulatorAddr)
 	if err != nil {
