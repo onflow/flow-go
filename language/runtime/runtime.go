@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	runtimeErrors "github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
@@ -63,6 +64,8 @@ var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 type ImportResolver = func(astLocation ast.Location) (program *ast.Program, e error)
 
+const contractKey = "contract"
+
 // interpreterRuntime is a interpreter-based version of the Flow runtime.
 type interpreterRuntime struct{}
 
@@ -72,7 +75,9 @@ func NewInterpreterRuntime() Runtime {
 }
 
 func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (values.Value, error) {
-	functions := r.standardLibraryFunctions(runtimeInterface)
+	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
+
+	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
 
 	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
 	if err != nil {
@@ -85,26 +90,54 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		return nil, nil
 	}
 
-	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
-
-	inter, err := r.newInterpreter(checker, functions, runtimeInterface, runtimeStorage)
+	value, err := r.interpret(
+		runtimeInterface,
+		runtimeStorage,
+		checker,
+		functions,
+		func(inter *interpreter.Interpreter) (interpreter.Value, error) {
+			return inter.Invoke("main")
+		},
+	)
 	if err != nil {
 		return nil, newError(err)
 	}
 
-	if err := inter.Interpret(); err != nil {
-		return nil, newError(err)
-	}
+	// Write back all stored values, which were actually just cached, back into storage.
 
-	value, err := inter.Invoke("main")
-	if err != nil {
-		return nil, newError(err)
-	}
+	// Even though this function is `ExecuteScript`, that doesn't imply the changes
+	// to storage will be actually persisted
 
-	// Write back all stored values, which were actually just cached, back into storage
 	runtimeStorage.writeCached()
 
 	return value.(interpreter.ExportableValue).Export(), nil
+}
+
+func (r *interpreterRuntime) interpret(
+	runtimeInterface Interface,
+	runtimeStorage *interpreterRuntimeStorage,
+	checker *sema.Checker,
+	functions stdlib.StandardLibraryFunctions,
+	f func(inter *interpreter.Interpreter) (interpreter.Value, error),
+) (
+	interpreter.Value,
+	error,
+) {
+	inter, err := r.newInterpreter(checker, functions, runtimeInterface, runtimeStorage)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := inter.Interpret(); err != nil {
+		return nil, err
+	}
+
+	value, err := f(inter)
+	if err != nil {
+		return nil, err
+	}
+
+	return value, nil
 }
 
 func (r *interpreterRuntime) ExecuteTransaction(
@@ -112,7 +145,9 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	runtimeInterface Interface,
 	location Location,
 ) error {
-	functions := r.standardLibraryFunctions(runtimeInterface)
+	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
+
+	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
 
 	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
 	if err != nil {
@@ -153,24 +188,22 @@ func (r *interpreterRuntime) ExecuteTransaction(
 		}
 	}
 
-	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
-
-	inter, err := r.newInterpreter(checker, functions, runtimeInterface, runtimeStorage)
-	if err != nil {
-		return newError(err)
-	}
-
-	if err := inter.Interpret(); err != nil {
-		return newError(err)
-	}
-
 	signingAccounts := make([]interface{}, signingAccountsCount)
 
 	for i, address := range signingAccountAddresses {
 		signingAccounts[i] = interpreter.NewAccountValue(interpreter.AddressValue(address))
 	}
 
-	err = inter.InvokeTransaction(0, signingAccounts...)
+	_, err = r.interpret(
+		runtimeInterface,
+		runtimeStorage,
+		checker,
+		functions,
+		func(inter *interpreter.Interpreter) (interpreter.Value, error) {
+			err := inter.InvokeTransaction(0, signingAccounts...)
+			return nil, err
+		},
+	)
 	if err != nil {
 		return newError(err)
 	}
@@ -182,7 +215,9 @@ func (r *interpreterRuntime) ExecuteTransaction(
 }
 
 func (r *interpreterRuntime) ParseAndCheckProgram(script []byte, runtimeInterface Interface, location Location) error {
-	functions := r.standardLibraryFunctions(runtimeInterface)
+	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
+	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
+
 	_, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
 	if err != nil {
 		return newError(err)
@@ -259,15 +294,19 @@ func (r *interpreterRuntime) newInterpreter(
 	)
 }
 
-func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface) stdlib.StandardLibraryFunctions {
+func (r *interpreterRuntime) standardLibraryFunctions(
+	runtimeInterface Interface,
+	runtimeStorage *interpreterRuntimeStorage,
+) stdlib.StandardLibraryFunctions {
 	return append(
 		stdlib.FlowBuiltInFunctions(stdlib.FlowBuiltinImpls{
-			CreateAccount:     r.newCreateAccountFunction(runtimeInterface),
-			AddAccountKey:     r.addAccountKeyFunction(runtimeInterface),
-			RemoveAccountKey:  r.removeAccountKeyFunction(runtimeInterface),
-			UpdateAccountCode: r.newUpdateAccountCodeFunction(runtimeInterface),
-			GetAccount:        r.newGetAccountFunction(runtimeInterface),
-			Log:               r.newLogFunction(runtimeInterface),
+			CreateAccount:         r.newCreateAccountFunction(runtimeInterface),
+			AddAccountKey:         r.addAccountKeyFunction(runtimeInterface),
+			RemoveAccountKey:      r.removeAccountKeyFunction(runtimeInterface),
+			UpdateAccountCode:     r.newUpdateAccountCodeFunction(runtimeInterface),
+			UpdateAccountContract: r.newUpdateAccountContractFunction(runtimeInterface, runtimeStorage),
+			GetAccount:            r.newGetAccountFunction(runtimeInterface),
+			Log:                   r.newLogFunction(runtimeInterface),
 		}),
 		stdlib.BuiltinFunctions...,
 	)
@@ -435,6 +474,165 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
 	}
+}
+
+func (r *interpreterRuntime) newUpdateAccountContractFunction(
+	runtimeInterface Interface,
+	runtimeStorage *interpreterRuntimeStorage,
+) interpreter.HostFunction {
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		const requiredArgumentCount = 2
+
+		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
+
+		code, err := toBytes(invocation.Arguments[1])
+		if err != nil {
+			panic(fmt.Sprintf("updateAccountContract requires the second parameter to be an array"))
+		}
+
+		accountAddressValue := accountAddress.Export().(values.Address)
+
+		location := AddressLocation(accountAddressValue[:])
+
+		functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
+		checker, err := r.parseAndCheckProgram(code, runtimeInterface, location, functions)
+		if err != nil {
+			panic(err)
+		}
+
+		var contractTypes []*sema.CompositeType
+
+		for _, variable := range checker.GlobalTypes {
+			if variable.DeclarationKind == common.DeclarationKindContract {
+				contractType := variable.Type.(*sema.CompositeType)
+				contractTypes = append(contractTypes, contractType)
+			}
+		}
+
+		if len(contractTypes) > 1 {
+			panic(fmt.Sprintf("updateAccountContract: code declares more than one contract"))
+		}
+
+		// If the code declares a contract, instantiate it and store it
+
+		var contractValue interpreter.OptionalValue = interpreter.NilValue{}
+
+		if len(contractTypes) > 0 {
+			contractType := contractTypes[0]
+
+			constructorArguments := invocation.Arguments[requiredArgumentCount:]
+			constructorArgumentTypes := invocation.ArgumentTypes[requiredArgumentCount:]
+
+			contract, err := r.instantiateContract(
+				contractType,
+				constructorArguments,
+				constructorArgumentTypes,
+				runtimeInterface,
+				runtimeStorage,
+				checker,
+				functions,
+				invocation.Location.Position,
+			)
+
+			if err != nil {
+				panic(err)
+			}
+
+			contractValue = interpreter.NewSomeValueOwningNonCopying(contract)
+		}
+
+		contractValue.SetOwner(accountAddress.StorageIdentifier())
+
+		// NOTE: only update account code if contract instantiation succeeded
+
+		err = runtimeInterface.UpdateAccountCode(accountAddressValue, code)
+		if err != nil {
+			panic(err)
+		}
+
+		runtimeStorage.writeValue(
+			accountAddress.StorageIdentifier(),
+			// TODO: what key should we use for the contract?
+			contractKey,
+			contractValue,
+		)
+
+		// TODO: new event type?
+		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, accountAddressValue, code)
+
+		result := interpreter.VoidValue{}
+		return trampoline.Done{Result: result}
+	}
+}
+
+func (r *interpreterRuntime) instantiateContract(
+	contractType *sema.CompositeType,
+	constructorArguments []interpreter.Value,
+	argumentTypes []sema.Type,
+	runtimeInterface Interface,
+	runtimeStorage *interpreterRuntimeStorage,
+	checker *sema.Checker,
+	functions stdlib.StandardLibraryFunctions,
+	invocationPos ast.Position,
+) (
+	interpreter.Value,
+	error,
+) {
+	parameterTypes := make([]sema.Type, len(contractType.ConstructorParameterTypeAnnotations))
+
+	for i, constructorParameterTypeAnnotation := range contractType.ConstructorParameterTypeAnnotations {
+		parameterTypes[i] = constructorParameterTypeAnnotation.Type
+	}
+
+	// Check argument count
+
+	argumentCount := len(argumentTypes)
+	parameterCount := len(parameterTypes)
+
+	if argumentCount != parameterCount {
+		return nil, fmt.Errorf("invalid argument count: expected %d, got %d", parameterCount, argumentCount)
+	}
+
+	// Check arguments match parameter
+
+	for i := 0; i < argumentCount; i++ {
+		argumentType := argumentTypes[i]
+		parameterTye := parameterTypes[i]
+		if !sema.IsSubType(argumentType, parameterTye) {
+			return nil, fmt.Errorf(
+				"invalid argument %d: expected type `%s`, got `%s`",
+				i,
+				parameterTye,
+				argumentType,
+			)
+		}
+	}
+
+	return r.interpret(
+		runtimeInterface,
+		runtimeStorage,
+		checker,
+		functions,
+		func(inter *interpreter.Interpreter) (value interpreter.Value, err error) {
+			variable := inter.Globals[contractType.Identifier]
+			if variable == nil {
+				return nil, fmt.Errorf("missing contract constructor: `%s`", contractType.Identifier)
+			}
+
+			constructor, ok := variable.Value.(interpreter.FunctionValue)
+			if !ok {
+				return nil, fmt.Errorf("invalid contract constructor: `%s`", contractType.Identifier)
+			}
+
+			return inter.InvokeFunctionValue(
+				constructor,
+				constructorArguments,
+				argumentTypes,
+				parameterTypes,
+				invocationPos,
+			)
+		},
+	)
 }
 
 func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
