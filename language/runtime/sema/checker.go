@@ -1026,6 +1026,8 @@ func (checker *Checker) checkDeclarationAccessModifier(
 		}
 	} else {
 
+		isTypeDeclaration := declarationKind.IsTypeDeclaration()
+
 		switch access {
 		case ast.AccessPublicSettable:
 			// Public settable access for a constant is not sensible
@@ -1040,7 +1042,35 @@ func (checker *Checker) checkDeclarationAccessModifier(
 				)
 			}
 
+		case ast.AccessPrivate:
+			// Type declarations cannot be private for now
+
+			if isTypeDeclaration {
+
+				checker.report(
+					&InvalidAccessModifierError{
+						Access:          access,
+						DeclarationKind: declarationKind,
+						Pos:             startPos,
+					},
+				)
+			}
+
 		case ast.AccessNotSpecified:
+
+			// Type declarations cannot be effectively private for now
+
+			if isTypeDeclaration &&
+				checker.AccessCheckMode == AccessCheckModeNotSpecifiedRestricted {
+
+				checker.report(
+					&MissingAccessModifierError{
+						DeclarationKind: declarationKind,
+						Pos:             startPos,
+					},
+				)
+			}
+
 			// In strict mode, access modifiers must be given
 
 			if checker.AccessCheckMode == AccessCheckModeStrict {
