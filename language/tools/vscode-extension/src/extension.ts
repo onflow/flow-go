@@ -1,7 +1,7 @@
 import {
     ExtensionContext,
     window,
-    Terminal
+    Terminal, QuickPickOptions
 } from "vscode";
 import {LanguageClient} from "vscode-languageclient";
 import {getConfig, handleConfigChanges, Config} from "./config";
@@ -20,22 +20,26 @@ export type Extension = {
 // Called when the extension starts up. Reads config, starts the language
 // server, and registers command handlers.
 export function activate(ctx: ExtensionContext) {
-    const maybeConfig: Config | undefined = getConfig();
-    if (!maybeConfig) {
-        window.showWarningMessage("Missing required config");
+    let config: Config;
+    let terminal: Terminal;
+    let client: LanguageClient;
+
+    try {
+        config = getConfig();
+        terminal = createTerminal(ctx);
+        client = startServer(ctx, config);
+    } catch (err) {
+        window.showErrorMessage("Failed to activate extension: ", err.msg);
+        return;
     }
-    const config = maybeConfig as Config;
     handleConfigChanges();
 
     const ext: Extension = {
         config: config,
         ctx: ctx,
+        client: client,
+        terminal: terminal,
     };
-
-    ext.client = startServer(ext);
-    ext.terminal = createTerminal(ext);
-
-
     registerCommands(ext);
 }
 

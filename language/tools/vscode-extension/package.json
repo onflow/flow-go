@@ -37,7 +37,15 @@
       }, {
         "command": "cadence.updateAccountCode",
         "category": "Cadence",
-        "title": "Update account code"
+        "title": "Update code for the current account"
+      }, {
+        "command": "cadence.createAccount",
+        "category": "Cadence",
+        "title": "Create account"
+      }, {
+        "command": "cadence.switchActiveAccount",
+        "category": "Cadence",
+        "title": "Switch account"
       }
     ],
     "configuration": {
@@ -50,16 +58,10 @@
           "description": "The command to invoke the Flow CLI",
           "scope": "resource"
         },
-        "cadence.accountKey": {
+        "cadence.rootAccountKey": {
           "type": "string",
           "default": "f87db87930770201010420c2e6c8cb9e8c9b9a7afe1df8ae431e68317ff7a9f42f8982b7877a9da76b28a7a00a06082a8648ce3d030107a14403420004c2c482bf01344a085af036f9413dd17a0d98a5b6fb4915c3ad4c3cb574e03ea5e2d47608093a26081c165722621bf9d8ff4b880cac0e7c586af3d86c0818a4af0203",
-          "description": "The encoded private key of the account to use when submitting transactions",
-          "scope": "resource"
-        },
-        "cadence.accountAddress": {
-          "type": "string",
-          "default": "0000000000000000000000000000000000000001",
-          "description": "The address of the account to use when submitting transactions",
+          "description": "The encoded private key of the root account to use when submitting transactions",
           "scope": "resource"
         },
         "cadence.emulatorAddress": {

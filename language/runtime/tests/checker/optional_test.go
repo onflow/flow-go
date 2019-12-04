@@ -168,24 +168,23 @@ func TestCheckInvalidNestedOptionalComparison(t *testing.T) {
 func TestCheckCompositeNilEquality(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for contracts
-		if kind == common.CompositeKindContract {
-			continue
-		}
 
-		_, err := ParseAndCheck(t, fmt.Sprintf(`
-          %[1]s X {}
+		_, err := ParseAndCheck(t,
+			fmt.Sprintf(
+				`
+                  %[1]s X {}
 
-          let x: %[2]sX? %[3]s %[4]s X()
+                  let x: %[2]sX? %[3]s %[4]s X()
 
-          let a = x == nil
-          let b = nil == x
-        `,
-			kind.Keyword(),
-			kind.Annotation(),
-			kind.TransferOperator(),
-			kind.ConstructionKeyword(),
-		))
+                  let a = x == nil
+                  let b = nil == x
+                `,
+				kind.Keyword(),
+				kind.Annotation(),
+				kind.TransferOperator(),
+				kind.ConstructionKeyword(),
+			),
+		)
 
 		require.NoError(t, err)
 	}
@@ -194,24 +193,23 @@ func TestCheckCompositeNilEquality(t *testing.T) {
 func TestCheckInvalidCompositeNilEquality(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for contracts
-		if kind == common.CompositeKindContract {
-			continue
-		}
 
-		_, err := ParseAndCheck(t, fmt.Sprintf(`
-          %[1]s X {}
+		_, err := ParseAndCheck(t,
+			fmt.Sprintf(
+				`
+                  %[1]s X {}
 
-          let x: %[2]sX? %[3]s %[4]s X()
-          let y: %[2]sX? %[3]s nil
+                  let x: %[2]sX? %[3]s %[4]s X()
+                  let y: %[2]sX? %[3]s nil
 
-          let a = x == y
-        `,
-			kind.Keyword(),
-			kind.Annotation(),
-			kind.TransferOperator(),
-			kind.ConstructionKeyword(),
-		))
+                  let a = x == y
+                `,
+				kind.Keyword(),
+				kind.Annotation(),
+				kind.TransferOperator(),
+				kind.ConstructionKeyword(),
+			),
+		)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 

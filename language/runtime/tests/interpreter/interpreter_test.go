@@ -1578,58 +1578,78 @@ func TestInterpretHostFunction(t *testing.T) {
 	)
 }
 
-func TestInterpretStructureDeclaration(t *testing.T) {
+func TestInterpretCompositeDeclaration(t *testing.T) {
 
-	inter := parseCheckAndInterpret(t, `
-       struct Test {}
+	for _, compositeKind := range common.CompositeKinds {
 
-       fun test(): Test {
-           return Test()
-       }
-    `)
+		inter := parseCheckAndInterpret(t,
+			fmt.Sprintf(
+				`
+                   %[1]s Test {}
 
-	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+                   fun test(): %[2]sTest {
+                       return %[2]s %[3]s Test()
+                   }
+                `,
+				compositeKind.Keyword(),
+				compositeKind.Annotation(),
+				compositeKind.ConstructionKeyword(),
+			),
+		)
 
-	assert.IsType(t,
-		&interpreter.CompositeValue{},
-		value,
-	)
+		value, err := inter.Invoke("test")
+		require.Nil(t, err)
+
+		assert.IsType(t,
+			&interpreter.CompositeValue{},
+			value,
+		)
+	}
 }
 
-func TestInterpretStructureDeclarationWithInitializer(t *testing.T) {
+func TestInterpretCompositeDeclarationWithInitializer(t *testing.T) {
 
-	inter := parseCheckAndInterpret(t, `
-       var value = 0
+	for _, compositeKind := range common.CompositeKinds {
 
-       struct Test {
-           init(_ newValue: Int) {
-               value = newValue
-           }
-       }
+		inter := parseCheckAndInterpret(t,
+			fmt.Sprintf(
+				`
+                   var value = 0
 
-       fun test(newValue: Int): Test {
-           return Test(newValue)
-       }
-    `)
+                   %[1]s Test {
+                       init(_ newValue: Int) {
+                           value = newValue
+                       }
+                   }
 
-	newValue := big.NewInt(42)
+                   fun test(newValue: Int): %[2]sTest {
+                       return %[2]s %[3]s Test(newValue)
+                   }
+                `,
+				compositeKind.Keyword(),
+				compositeKind.Annotation(),
+				compositeKind.ConstructionKeyword(),
+			),
+		)
 
-	value, err := inter.Invoke("test", newValue)
-	require.Nil(t, err)
+		newValue := big.NewInt(42)
 
-	assert.IsType(t,
-		&interpreter.CompositeValue{},
-		value,
-	)
+		value, err := inter.Invoke("test", newValue)
+		require.Nil(t, err)
 
-	assert.Equal(t,
-		interpreter.IntValue{Int: newValue},
-		inter.Globals["value"].Value,
-	)
+		assert.IsType(t,
+			&interpreter.CompositeValue{},
+			value,
+		)
+
+		assert.Equal(t,
+			interpreter.IntValue{Int: newValue},
+			inter.Globals["value"].Value,
+		)
+	}
 }
 
-func TestInterpretStructureSelfReferenceInInitializer(t *testing.T) {
+func TestInterpretStructureSelfUseInInitializer(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
 
@@ -1654,7 +1674,7 @@ func TestInterpretStructureSelfReferenceInInitializer(t *testing.T) {
 	)
 }
 
-func TestInterpretStructureConstructorReferenceInInitializerAndFunction(t *testing.T) {
+func TestInterpretStructureConstructorUseInInitializerAndFunction(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
 
@@ -1695,7 +1715,7 @@ func TestInterpretStructureConstructorReferenceInInitializerAndFunction(t *testi
 	)
 }
 
-func TestInterpretStructureSelfReferenceInFunction(t *testing.T) {
+func TestInterpretStructureSelfUseInFunction(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
 
@@ -1720,7 +1740,7 @@ func TestInterpretStructureSelfReferenceInFunction(t *testing.T) {
 	)
 }
 
-func TestInterpretStructureConstructorReferenceInFunction(t *testing.T) {
+func TestInterpretStructureConstructorUseInFunction(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
 
@@ -2502,7 +2522,7 @@ func TestInterpretMutuallyRecursiveFunctions(t *testing.T) {
 	)
 }
 
-func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
+func TestInterpretUseBeforeDeclaration(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       var tests = 0
@@ -3106,23 +3126,22 @@ func TestInterpretNestedOptionalComparisonMixed(t *testing.T) {
 func TestInterpretCompositeNilEquality(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for contracts
-		if kind == common.CompositeKindContract {
-			continue
-		}
 
-		inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-          %[1]s X {}
+		inter := parseCheckAndInterpret(t,
+			fmt.Sprintf(
+				`
+                  %[1]s X {}
 
-          let x: %[2]sX? %[3]s %[4]s X()
-          let y = x == nil
-          let z = nil == x
-        `,
-			kind.Keyword(),
-			kind.Annotation(),
-			kind.TransferOperator(),
-			kind.ConstructionKeyword(),
-		))
+                  let x: %[2]sX? %[3]s %[4]s X()
+                  let y = x == nil
+                  let z = nil == x
+                `,
+				kind.Keyword(),
+				kind.Annotation(),
+				kind.TransferOperator(),
+				kind.ConstructionKeyword(),
+			),
+		)
 
 		assert.Equal(t,
 			interpreter.BoolValue(false),
@@ -6223,5 +6242,74 @@ func TestInterpretOptionalChainingFunctionCallAndNilCoalescing(t *testing.T) {
 	assert.Equal(t,
 		inter.Globals["x"].Value,
 		interpreter.NewIntValue(42),
+	)
+}
+
+func TestInterpretCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      contract Test {
+
+          struct X {
+
+              fun test(): Test {
+                 return Test()
+              }
+          }
+
+          fun x(): X {
+             return X()
+          }
+      }
+
+      let x1 = Test().x()
+      let x2 = x1.test().x()
+    `)
+
+	x1 := inter.Globals["x1"].Value
+	x2 := inter.Globals["x2"].Value
+
+	require.IsType(t,
+		&interpreter.CompositeValue{},
+		x1,
+	)
+
+	assert.Equal(t,
+		"X",
+		x1.(*interpreter.CompositeValue).Identifier,
+	)
+
+	require.IsType(t,
+		&interpreter.CompositeValue{},
+		x2,
+	)
+
+	assert.Equal(t,
+		"X",
+		x2.(*interpreter.CompositeValue).Identifier,
+	)
+}
+
+func TestInterpretCompositeDeclarationNestedConstructor(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      contract Test {
+
+          struct X {}
+      }
+
+      let x = Test.X()
+    `)
+
+	x := inter.Globals["x"].Value
+
+	require.IsType(t,
+		&interpreter.CompositeValue{},
+		x,
+	)
+
+	assert.Equal(t,
+		"X",
+		x.(*interpreter.CompositeValue).Identifier,
 	)
 }

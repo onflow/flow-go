@@ -300,7 +300,8 @@ func (checker *Checker) checkInvocationArguments(
 func (checker *Checker) checkInvocationArgument(argument *ast.Argument, parameterType Type) Type {
 	argumentType := argument.Expression.Accept(checker).(Type)
 
-	if !parameterType.IsInvalidType() &&
+	if !argumentType.IsInvalidType() &&
+		!parameterType.IsInvalidType() &&
 		!checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {
 
 		checker.report(

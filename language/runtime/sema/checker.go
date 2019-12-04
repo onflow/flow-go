@@ -463,7 +463,8 @@ func (checker *Checker) checkRange(value, min, max *big.Int) bool {
 }
 
 func (checker *Checker) declareGlobalDeclaration(declaration ast.Declaration) {
-	name := declaration.DeclarationName()
+	identifier := declaration.DeclarationIdentifier()
+	name := identifier.Identifier
 	if name == "" {
 		return
 	}
@@ -554,11 +555,52 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 				&NotDeclaredError{
 					ExpectedKind: common.DeclarationKindType,
 					Name:         identifier,
-					Pos:          t.Pos,
+					Pos:          t.StartPosition(),
 				},
 			)
 			return &InvalidType{}
 		}
+
+		var resolvedIdentifiers []ast.Identifier
+
+		for _, identifier := range t.NestedIdentifiers {
+			switch typedResult := result.(type) {
+			case *CompositeType:
+				result = typedResult.NestedTypes[identifier.Identifier]
+
+			case *InterfaceType:
+				result = typedResult.NestedTypes[identifier.Identifier]
+
+			default:
+				checker.report(
+					&InvalidNestedTypeError{
+						Type: &ast.NominalType{
+							Identifier:        t.Identifier,
+							NestedIdentifiers: resolvedIdentifiers,
+						},
+					},
+				)
+				return &InvalidType{}
+			}
+
+			resolvedIdentifiers = append(resolvedIdentifiers, identifier)
+
+			if result == nil {
+				nonExistentType := &ast.NominalType{
+					Identifier:        t.Identifier,
+					NestedIdentifiers: resolvedIdentifiers,
+				}
+				checker.report(
+					&NotDeclaredError{
+						ExpectedKind: common.DeclarationKindType,
+						Name:         nonExistentType.String(),
+						Pos:          t.StartPosition(),
+					},
+				)
+				return &InvalidType{}
+			}
+		}
+
 		return result
 
 	case *ast.VariableSizedType:

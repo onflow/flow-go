@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
@@ -609,17 +610,19 @@ func TestCheckArraySubtyping(t *testing.T) {
 				kind.TransferOperator(),
 			))
 
-			// TODO: add support for non-structure / non-resource declarations
-
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
 				require.NoError(t, err)
 
-			default:
-				errs := ExpectCheckerErrors(t, err, 2)
+			case common.CompositeKindContract:
+				// TODO: add support for contract interface declarations
+
+				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+
+			default:
+				panic(errors.NewUnreachableError())
 			}
 		})
 	}
@@ -642,30 +645,32 @@ func TestCheckDictionarySubtyping(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s interface I {}
-              %[1]s S: I {}
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+                      %[1]s interface I {}
+                      %[1]s S: I {}
 
-              let xs: %[2]s{String: S} %[3]s {}
-              let ys: %[2]s{String: I} %[3]s xs
-	        `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-			))
-
-			// TODO: add support for non-structure / non-resource declarations
+                      let xs: %[2]s{String: S} %[3]s {}
+                      let ys: %[2]s{String: I} %[3]s xs
+	                `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.TransferOperator(),
+				),
+			)
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
 				require.NoError(t, err)
 
-			default:
-				errs := ExpectCheckerErrors(t, err, 2)
+			case common.CompositeKindContract:
+				// TODO: add support contract interface declarations
+				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
 
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+			default:
+				panic(errors.NewUnreachableError())
 			}
 		})
 	}

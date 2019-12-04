@@ -1,50 +1,64 @@
 import {commands, window, workspace} from "vscode";
 
+export const ROOT_ADDR: string = "0000000000000000000000000000000000000001";
+
+const CONFIG_FLOW_COMMAND = "flowCommand";
+const CONFIG_ROOT_ACCOUNT_KEY = "rootAccountKey";
+const CONFIG_EMULATOR_ADDRESS = "emulatorAddress";
+
+// A created account that we can submit transactions for.
+type Account = {
+    address: string
+};
+
 // The config used by the extension
 export type Config = {
+    // The name of the flow CLI executable
     flowCommand: string
     serverConfig: ServerConfig
+    // Set of created accounts for which we can submit transactions.
+    // Mapping from account address to account object.
+    accounts: {[key: string]: Account},
+    // Address of the current
+    activeAccount: string
 };
 
 // The subset of extension configuration used by the language server.
 type ServerConfig = {
-    accountKey: string
-    accountAddress: string
+    rootAccountKey: string
     emulatorAddress: string
 };
 
 // Retrieves config from the workspace.
-export function getConfig(): Config | undefined {
+export function getConfig(): Config {
     const cadenceConfig = workspace
         .getConfiguration("cadence");
 
-    const flowCommand: string | undefined = cadenceConfig.get("flowCommand")
+    const flowCommand: string | undefined = cadenceConfig.get(CONFIG_FLOW_COMMAND)
     if (!flowCommand) {
-        return;
+        throw new Error(`Missing ${CONFIG_FLOW_COMMAND} config`);
     }
 
-    const accountKey : string | undefined = cadenceConfig.get("accountKey");
-    if (!accountKey) {
-        return;
+    const rootAccountKey : string | undefined = cadenceConfig.get(CONFIG_ROOT_ACCOUNT_KEY);
+    if (!rootAccountKey) {
+        throw new Error(`Missing ${CONFIG_ROOT_ACCOUNT_KEY} config`);
     }
 
-    const accountAddress: string | undefined = cadenceConfig.get("accountAddress");
-    if (!accountAddress) {
-        return;
-    }
-
-    const emulatorAddress: string | undefined = cadenceConfig.get("emulatorAddress");
+    const emulatorAddress: string | undefined = cadenceConfig.get(CONFIG_EMULATOR_ADDRESS);
     if (!emulatorAddress) {
-        return;
+        throw new Error(`Missing ${CONFIG_EMULATOR_ADDRESS} config`);
     }
 
     return {
         flowCommand: flowCommand,
         serverConfig: {
-            accountKey: accountKey,
-            accountAddress: accountAddress,
+            rootAccountKey: rootAccountKey,
             emulatorAddress: emulatorAddress,
         },
+        accounts: {
+            [ROOT_ADDR]: {address: ROOT_ADDR}
+        },
+        activeAccount: ROOT_ADDR,
     };
 }
 

@@ -38,13 +38,37 @@ type Type interface {
 
 // revive:enable
 
-// NominalType represents a base type (e.g. boolean, integer, etc.)
+// NominalType represents a named type
 
 type NominalType struct {
-	Identifier
+	Identifier        Identifier
+	NestedIdentifiers []Identifier
 }
 
 func (*NominalType) isType() {}
+
+func (t *NominalType) String() string {
+	var sb strings.Builder
+	sb.WriteString(t.Identifier.String())
+	for _, identifier := range t.NestedIdentifiers {
+		sb.WriteRune('.')
+		sb.WriteString(identifier.String())
+	}
+	return sb.String()
+}
+
+func (t *NominalType) StartPosition() Position {
+	return t.Identifier.StartPosition()
+}
+
+func (t *NominalType) EndPosition() Position {
+	nestedCount := len(t.NestedIdentifiers)
+	if nestedCount == 0 {
+		return t.Identifier.EndPosition()
+	}
+	lastIdentifier := t.NestedIdentifiers[nestedCount-1]
+	return lastIdentifier.EndPosition()
+}
 
 // OptionalType represents am optional variant of another type
 

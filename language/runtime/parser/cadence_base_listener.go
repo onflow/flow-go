@@ -122,17 +122,19 @@ func (s *BaseCadenceListener) EnterInterfaceDeclaration(ctx *InterfaceDeclaratio
 // ExitInterfaceDeclaration is called when production interfaceDeclaration is exited.
 func (s *BaseCadenceListener) ExitInterfaceDeclaration(ctx *InterfaceDeclarationContext) {}
 
-// EnterMembers is called when production members is entered.
-func (s *BaseCadenceListener) EnterMembers(ctx *MembersContext) {}
+// EnterMembersAndNestedDeclarations is called when production membersAndNestedDeclarations is entered.
+func (s *BaseCadenceListener) EnterMembersAndNestedDeclarations(ctx *MembersAndNestedDeclarationsContext) {
+}
 
-// ExitMembers is called when production members is exited.
-func (s *BaseCadenceListener) ExitMembers(ctx *MembersContext) {}
+// ExitMembersAndNestedDeclarations is called when production membersAndNestedDeclarations is exited.
+func (s *BaseCadenceListener) ExitMembersAndNestedDeclarations(ctx *MembersAndNestedDeclarationsContext) {
+}
 
-// EnterMember is called when production member is entered.
-func (s *BaseCadenceListener) EnterMember(ctx *MemberContext) {}
+// EnterMemberOrNestedDeclaration is called when production memberOrNestedDeclaration is entered.
+func (s *BaseCadenceListener) EnterMemberOrNestedDeclaration(ctx *MemberOrNestedDeclarationContext) {}
 
-// ExitMember is called when production member is exited.
-func (s *BaseCadenceListener) ExitMember(ctx *MemberContext) {}
+// ExitMemberOrNestedDeclaration is called when production memberOrNestedDeclaration is exited.
+func (s *BaseCadenceListener) ExitMemberOrNestedDeclaration(ctx *MemberOrNestedDeclarationContext) {}
 
 // EnterCompositeKind is called when production compositeKind is entered.
 func (s *BaseCadenceListener) EnterCompositeKind(ctx *CompositeKindContext) {}

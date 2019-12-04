@@ -1322,6 +1322,15 @@ func (t *FunctionType) IsInvalidType() bool {
 
 type SpecialFunctionType struct {
 	*FunctionType
+	Members map[string]*Member
+}
+
+func (t *SpecialFunctionType) HasMembers() bool {
+	return true
+}
+
+func (t *SpecialFunctionType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	return t.Members[identifier]
 }
 
 // CheckedFunctionType is the the type representing a function that checks the arguments,
@@ -1495,6 +1504,8 @@ type CompositeType struct {
 	Members      map[string]*Member
 	// TODO: add support for overloaded initializers
 	ConstructorParameterTypeAnnotations []*TypeAnnotation
+	NestedTypes                         map[string]Type
+	ContainerType                       Type
 }
 
 func (*CompositeType) isType() {}
@@ -1822,6 +1833,8 @@ type InterfaceType struct {
 	Members       map[string]*Member
 	// TODO: add support for overloaded initializers
 	InitializerParameterTypeAnnotations []*TypeAnnotation
+	ContainerType                       Type
+	NestedTypes                         map[string]Type
 }
 
 func (*InterfaceType) isType() {}
@@ -2242,7 +2255,7 @@ func (t *EventType) Equal(other Type) bool {
 
 func (t *EventType) ConstructorFunctionType() *SpecialFunctionType {
 	return &SpecialFunctionType{
-		&FunctionType{
+		FunctionType: &FunctionType{
 			ParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
 			ReturnTypeAnnotation:     NewTypeAnnotation(t),
 		},
