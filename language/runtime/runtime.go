@@ -27,6 +27,8 @@ type Interface interface {
 	AddAccountKey(address values.Address, publicKey values.Bytes) error
 	// RemoveAccountKey removes a key from an account by index.
 	RemoveAccountKey(address values.Address, index values.Int) (publicKey values.Bytes, err error)
+	// CheckCode checks the validity of the code.
+	CheckCode(address values.Address, code values.Bytes) (err error)
 	// UpdateAccountCode updates the code associated with an account.
 	UpdateAccountCode(address values.Address, code values.Bytes) (err error)
 	// GetSigningAccounts returns the signing accounts.
@@ -405,6 +407,11 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 		}
 
 		accountAddressValue := accountAddress.Export().(values.Address)
+
+		err = runtimeInterface.CheckCode(accountAddressValue, code)
+		if err != nil {
+			panic(err)
+		}
 
 		err = runtimeInterface.UpdateAccountCode(accountAddressValue, code)
 		if err != nil {
