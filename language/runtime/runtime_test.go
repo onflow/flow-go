@@ -106,7 +106,8 @@ func TestRuntimeImport(t *testing.T) {
 	}
 
 	value, err := runtime.ExecuteScript(script, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
+
 	assert.Equal(t, values.NewInt(42), value)
 }
 
@@ -160,8 +161,8 @@ func TestRuntimeTransactionWithAccount(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script, runtimeInterface, nil)
+	require.NoError(t, err)
 
-	assert.NoError(t, err)
 	assert.Equal(t, "2a00000000000000000000000000000000000000", loggedMessage)
 }
 
@@ -481,10 +482,10 @@ func TestRuntimeStorageMultipleTransactionsResourceFunction(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Contains(t, loggedMessages, "42")
 }
@@ -646,10 +647,10 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
@@ -727,10 +728,10 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
 }
@@ -810,10 +811,10 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
 }
@@ -908,10 +909,10 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
 }
@@ -1041,10 +1042,10 @@ func TestRuntimeStorageChanges(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, []string{"1"}, loggedMessages)
 }
