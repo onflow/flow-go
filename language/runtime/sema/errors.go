@@ -1933,7 +1933,7 @@ type InvalidNestedTypeError struct {
 }
 
 func (e *InvalidNestedTypeError) Error() string {
-	return fmt.Sprintf("type has no nested types: `%s`", e.Type)
+	return fmt.Sprintf("type does not support nested types: `%s`", e.Type)
 }
 
 func (*InvalidNestedTypeError) isSemanticError() {}
