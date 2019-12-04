@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"encoding/gob"
 	"encoding/hex"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
@@ -16,12 +17,16 @@ func (l StringLocation) ID() ast.LocationID {
 
 type AddressLocation ast.AddressLocation
 
+func init() {
+	gob.Register(AddressLocation{})
+}
+
 func (l AddressLocation) ID() ast.LocationID {
 	return ast.LocationID(l.String())
 }
 
 func (l AddressLocation) String() string {
-	return hex.EncodeToString([]byte(l))
+	return hex.EncodeToString(l)
 }
 
 type TransactionLocation []byte
@@ -31,7 +36,7 @@ func (l TransactionLocation) ID() ast.LocationID {
 }
 
 func (l TransactionLocation) String() string {
-	return hex.EncodeToString([]byte(l))
+	return hex.EncodeToString(l)
 }
 
 type ScriptLocation []byte
@@ -41,7 +46,7 @@ func (l ScriptLocation) ID() ast.LocationID {
 }
 
 func (l ScriptLocation) String() string {
-	return hex.EncodeToString([]byte(l))
+	return hex.EncodeToString(l)
 }
 
 type FileLocation string
