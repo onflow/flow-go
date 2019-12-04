@@ -424,7 +424,7 @@ func (interpreter *Interpreter) visitGlobalDeclaration(declaration ast.Declarati
 }
 
 func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
-	name := declaration.DeclarationName()
+	name := declaration.DeclarationIdentifier().Identifier
 	// NOTE: semantic analysis already checked possible invalid redeclaration
 	interpreter.Globals[name] = interpreter.findVariable(name)
 }
@@ -1802,9 +1802,13 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 	return Done{Result: function}
 }
 
+// NOTE: only called for top-level composite declarations
 func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.CompositeDeclaration) ast.Repr {
 
-	interpreter.declareCompositeConstructor(declaration)
+	// lexical scope: variables in functions are bound to what is visible at declaration time
+	lexicalScope := interpreter.activations.CurrentOrNew()
+
+	_, _ = interpreter.declareCompositeConstructor(declaration, lexicalScope)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
@@ -1820,17 +1824,43 @@ func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.Compo
 // Inside the initializer and all functions, `self` is bound to
 // the new composite value, and the constructor itself is bound
 //
-func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.CompositeDeclaration) {
-
-	// lexical scope: variables in functions are bound to what is visible at declaration time
-	lexicalScope := interpreter.activations.CurrentOrNew()
+func (interpreter *Interpreter) declareCompositeConstructor(
+	declaration *ast.CompositeDeclaration,
+	lexicalScope hamt.Map,
+) (
+	scope hamt.Map,
+	function HostFunctionValue,
+) {
 
 	identifier := declaration.Identifier.Identifier
 	variable := interpreter.findOrDeclareVariable(identifier)
 
-	// make the constructor available in the initializer
+	// Make the constructor available in the initializer
 	lexicalScope = lexicalScope.
 		Insert(common.StringEntry(identifier), variable)
+
+	// Evaluate nested declarations in a new scope, so constructors
+	// of nested declarations won't be visible after the containing declaration
+
+	members := map[string]Value{}
+
+	(func() {
+		interpreter.activations.PushCurrent()
+		defer interpreter.activations.Pop()
+
+		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+
+			// Pass the lexical scope, which has the containing composite's constructor declared,
+			// to the nested declarations so they can refer to it, and update the lexical scope
+			// so the container's functions can refer to the nested constructors
+
+			var nestedConstructor FunctionValue
+			lexicalScope, nestedConstructor =
+				interpreter.declareCompositeConstructor(nestedCompositeDeclaration, lexicalScope)
+
+			members[nestedCompositeDeclaration.Identifier.Identifier] = nestedConstructor
+		}
+	})()
 
 	initializerFunction := interpreter.initializerFunction(declaration, lexicalScope)
 
@@ -1840,7 +1870,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	functions := interpreter.compositeFunctions(declaration, lexicalScope)
 	interpreter.CompositeFunctions[identifier] = functions
 
-	variable.Value = NewHostFunctionValue(
+	function = NewHostFunctionValue(
 		func(arguments []Value, location LocationPosition) Trampoline {
 
 			value := &CompositeValue{
@@ -1869,6 +1899,10 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 				})
 		},
 	)
+	function.Members = members
+	variable.Value = function
+
+	return lexicalScope, function
 }
 
 // bindSelf returns a function which binds `self` to the structure

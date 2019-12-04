@@ -11,17 +11,21 @@ type TransactionDeclaration struct {
 	Range
 }
 
-func (e *TransactionDeclaration) Accept(visitor Visitor) Repr {
-	return visitor.VisitTransactionDeclaration(e)
+func (d *TransactionDeclaration) Accept(visitor Visitor) Repr {
+	return visitor.VisitTransactionDeclaration(d)
 }
 
 func (*TransactionDeclaration) isDeclaration() {}
 func (*TransactionDeclaration) isStatement()   {}
 
-func (e *TransactionDeclaration) DeclarationName() string {
-	return ""
+func (d *TransactionDeclaration) DeclarationIdentifier() Identifier {
+	return Identifier{}
 }
 
-func (e *TransactionDeclaration) DeclarationKind() common.DeclarationKind {
+func (d *TransactionDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindTransaction
+}
+
+func (d *TransactionDeclaration) DeclarationAccess() Access {
+	return AccessNotSpecified
 }

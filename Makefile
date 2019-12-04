@@ -24,12 +24,12 @@ install-tools: crypto/relic/build
 	GO111MODULE=on go get github.com/mgechev/revive@master; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@master; \
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
-	GO111MODULE=on go get github.com/jteeuwen/go-bindata@v3.0.7;
+	GO111MODULE=on go get github.com/kevinburke/go-bindata/...@v3.11.0;
 
 .PHONY: test
-test:
+test: generate-bindata
 	# test all packages with Relic library enabled
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -json --tags relic ./...
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	# test SDK package with Relic library disabled
 	GO111MODULE=on go test -count 1 ./sdk/...
 
@@ -43,7 +43,7 @@ ifeq ($(COVER), true)
 endif
 
 .PHONY: generate
-generate: generate-godoc generate-proto generate-registries generate-mocks
+generate: generate-godoc generate-proto generate-registries generate-mocks generate-bindata
 
 .PHONY: generate-godoc
 generate-godoc:
@@ -69,6 +69,10 @@ generate-mocks:
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/emulated_blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator EmulatedBlockchainAPI
 
+.PHONY: generate-bindata
+generate-bindata:
+	go generate ./language/abi;
+
 .PHONY: check-generated-code
 check-generated-code:
 	./utils/scripts/check-generated-code.sh
@@ -82,7 +86,7 @@ ci: install-tools generate check-generated-code lint test coverage
 
 .PHONY: docker-ci
 docker-ci:
-	docker run --env COVER=$(COVER) -v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.2 make ci
+	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) -v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.2 make ci
 
 cmd/flow/flow: crypto/*.go $(shell find  cli/ -name '*.go') $(shell find cmd -name '*.go') $(shell find model -name '*.go') $(shell find proto -name '*.go') $(shell find sdk -name '*.go')
 	GO111MODULE=on go build \
