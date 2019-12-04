@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
 )
 
@@ -80,8 +81,8 @@ func (c *Connection) Receive() (interface{}, error) {
 // Process will start one background routine to handle receiving messages and
 // onde background routine to handle sending messages, so that the actual
 // middleware layer can function without blocking.
-func (c *Connection) Process(connID string) {
-	c.log = c.log.With().Str("conn_id", connID).Logger()
+func (c *Connection) Process(nodeID flow.Identifier) {
+	c.log = c.log.With().Hex("node_id", nodeID[:]).Logger()
 	go c.recv()
 	go c.send()
 }

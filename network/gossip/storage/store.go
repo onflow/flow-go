@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 // MemMsgStore implements a thread safe on memory storage

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/proto/services/observation"
+	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/liveness"

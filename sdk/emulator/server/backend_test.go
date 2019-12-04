@@ -14,8 +14,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/proto/sdk/entities"
-	"github.com/dapperlabs/flow-go/proto/services/observation"
+	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
+	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
