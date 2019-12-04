@@ -322,8 +322,8 @@ func (r *interpreterRuntime) emitAccountEvent(
 }
 
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		pkArray := arguments[0].(*interpreter.ArrayValue)
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		pkArray := invocation.Arguments[0].(*interpreter.ArrayValue)
 		pkValues := pkArray.Values
 		publicKeys := make([]values.Bytes, len(pkValues))
 
@@ -335,7 +335,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 			publicKeys[i] = publicKey
 		}
 
-		code, err := toBytes(arguments[1])
+		code, err := toBytes(invocation.Arguments[1])
 		if err != nil {
 			panic(fmt.Sprintf("createAccount requires the third parameter to be an array"))
 		}
@@ -353,9 +353,9 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 }
 
 func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		accountAddress := arguments[0].(interpreter.AddressValue)
-		publicKey, err := toBytes(arguments[1])
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
+		publicKey, err := toBytes(invocation.Arguments[1])
 		if err != nil {
 			panic(fmt.Sprintf("addAccountKey requires the second parameter to be an array"))
 		}
@@ -369,15 +369,15 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 
 		r.emitAccountEvent(stdlib.AccountKeyAddedEventType, runtimeInterface, accountAddressValue, publicKey)
 
-		result := &interpreter.VoidValue{}
+		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
 	}
 }
 
 func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		accountAddress := arguments[0].(interpreter.AddressValue)
-		index := arguments[1].(interpreter.IntValue)
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
+		index := invocation.Arguments[1].(interpreter.IntValue)
 
 		accountAddressValue := accountAddress.Export().(values.Address)
 
@@ -390,16 +390,16 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 
 		r.emitAccountEvent(stdlib.AccountKeyRemovedEventType, runtimeInterface, accountAddressValue, publicKey)
 
-		result := &interpreter.VoidValue{}
+		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
 	}
 }
 
 func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		accountAddress := arguments[0].(interpreter.AddressValue)
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
 
-		code, err := toBytes(arguments[1])
+		code, err := toBytes(invocation.Arguments[1])
 		if err != nil {
 			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
 		}
@@ -413,23 +413,24 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 
 		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, accountAddressValue, code)
 
-		result := &interpreter.VoidValue{}
+		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
 	}
 }
 
 func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		accountAddress := arguments[0].(interpreter.AddressValue)
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
 		publicAccount := interpreter.NewPublicAccountValue(accountAddress)
 		return trampoline.Done{Result: publicAccount}
 	}
 }
 
 func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		runtimeInterface.Log(fmt.Sprint(arguments[0]))
-		return trampoline.Done{Result: &interpreter.VoidValue{}}
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		runtimeInterface.Log(fmt.Sprint(invocation.Arguments[0]))
+		result := interpreter.VoidValue{}
+		return trampoline.Done{Result: result}
 	}
 }
 

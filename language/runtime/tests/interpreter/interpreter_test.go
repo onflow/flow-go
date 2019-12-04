@@ -1541,9 +1541,9 @@ func TestInterpretHostFunction(t *testing.T) {
 				&sema.IntType{},
 			),
 		},
-		func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-			a := arguments[0].(interpreter.IntValue).Int
-			b := arguments[1].(interpreter.IntValue).Int
+		func(invocation interpreter.Invocation) trampoline.Trampoline {
+			a := invocation.Arguments[0].(interpreter.IntValue).Int
+			b := invocation.Arguments[1].(interpreter.IntValue).Int
 			value := big.NewInt(0).Add(a, b)
 			result := interpreter.IntValue{Int: value}
 			return trampoline.Done{Result: result}
