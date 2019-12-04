@@ -87,10 +87,6 @@ const updateAccountCode = (ext: Extension) => async () => {
 // Creates a new account by requesting that the Language Server submit
 // a "create account" transaction from the currently active account.
 const createAccount = (ext: Extension) => async () => {
-    // const nextAddr = ROOT_ADDR.slice(0, -1) + (Object.keys(ext.config.accounts).length + 1);
-    // ext.config.accounts[nextAddr] = { address: nextAddr };
-    // window.showInformationMessage(`Created new account: ${nextAddr}`);
-
     try {
         const addr = await ext.api.createAccount();
         ext.config.accounts[addr] = {address: addr};

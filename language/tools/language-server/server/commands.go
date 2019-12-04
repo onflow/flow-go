@@ -169,6 +169,9 @@ func (s *Server) executeScript(conn protocol.Conn, args ...interface{}) (interfa
 
 // switchActiveAccount sets the account that is currently active and should be
 // used when submitting transactions.
+//
+// There should be exactly 1 argument:
+//   * the address of the new active account
 func (s *Server) switchActiveAccount(conn protocol.Conn, args ...interface{}) (interface{}, error) {
 	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Log,
