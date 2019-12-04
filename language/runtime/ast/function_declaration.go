@@ -32,12 +32,16 @@ func (f *FunctionDeclaration) Accept(visitor Visitor) Repr {
 func (*FunctionDeclaration) isDeclaration() {}
 func (*FunctionDeclaration) isStatement()   {}
 
-func (f *FunctionDeclaration) DeclarationName() string {
-	return f.Identifier.Identifier
+func (f *FunctionDeclaration) DeclarationIdentifier() Identifier {
+	return f.Identifier
 }
 
 func (f *FunctionDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindFunction
+}
+
+func (f *FunctionDeclaration) DeclarationAccess() Access {
+	return f.Access
 }
 
 func (f *FunctionDeclaration) ToExpression() *FunctionExpression {

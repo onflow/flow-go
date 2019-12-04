@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -156,25 +157,30 @@ func TestCheckImportTypes(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			checker, err := ParseAndCheck(t, fmt.Sprintf(`
-               pub %[1]s Test {}
+			checker, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                       pub %[1]s Test {}
 
-               pub %[1]s interface TestInterface {}
-            `,
-				kind.Keyword(),
-			))
-
-			// TODO: add support for non-structure / non-resource declarations
+                       pub %[1]s interface TestInterface {}
+                    `,
+					kind.Keyword(),
+				),
+			)
 
 			switch kind {
 			case common.CompositeKindStructure, common.CompositeKindResource:
 				require.NoError(t, err)
 
-			default:
-				errs := ExpectCheckerErrors(t, err, 2)
+			case common.CompositeKindContract:
+				// TODO: add support for contract interfaces
+
+				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+
+			default:
+				panic(errors.NewUnreachableError())
 			}
 
 			_, err = ParseAndCheckWithOptions(t,
@@ -198,8 +204,6 @@ func TestCheckImportTypes(t *testing.T) {
 				},
 			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
 			switch kind {
 			case common.CompositeKindStructure:
 				require.NoError(t, err)
@@ -209,14 +213,16 @@ func TestCheckImportTypes(t *testing.T) {
 
 				assert.IsType(t, &sema.CreateImportedResourceError{}, errs[0])
 
-			default:
-				errs := ExpectCheckerErrors(t, err, 5)
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 4)
 
 				assert.IsType(t, &sema.ImportedProgramError{}, errs[0])
 				assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
+				assert.IsType(t, &sema.NotDeclaredError{}, errs[2])
 				assert.IsType(t, &sema.NotDeclaredError{}, errs[3])
-				assert.IsType(t, &sema.NotDeclaredError{}, errs[4])
+
+			default:
+				panic(errors.NewUnreachableError())
 			}
 		})
 	}

@@ -30,9 +30,7 @@ func exportTypesFromChecker(checker *sema.Checker) map[string]types.Type {
 
 	values := checker.UserDefinedValues()
 	for _, variable := range values {
-		exportable, ok := variable.Type.(sema.ExportableType)
-
-		if ok {
+		if exportable, ok := variable.Type.(sema.ExportableType); ok {
 			exportedType := exportable.Export(checker.Program, variable)
 			exportedTypes[variable.Identifier] = exportedType
 		}
@@ -41,7 +39,7 @@ func exportTypesFromChecker(checker *sema.Checker) map[string]types.Type {
 	return exportedTypes
 }
 
-func encodeTypesAsJson(types map[string]types.Type, pretty bool) ([]byte, error) {
+func encodeTypesAsJSON(types map[string]types.Type, pretty bool) ([]byte, error) {
 	encoder := typesEncoding.NewEncoder()
 
 	for name, typ := range types {
@@ -59,7 +57,7 @@ func GetABIJSONFromCadenceCode(code string, pretty bool, filename string) []byte
 
 	exportedTypes := exportTypesFromChecker(checker)
 
-	jsonData, err := encodeTypesAsJson(exportedTypes, pretty)
+	jsonData, err := encodeTypesAsJSON(exportedTypes, pretty)
 
 	if err != nil {
 		panic(err)
@@ -74,7 +72,7 @@ func GetABIJSONFromCadenceFile(filename string, pretty bool) []byte {
 
 	exportedTypes := exportTypesFromChecker(checker)
 
-	jsonData, err := encodeTypesAsJson(exportedTypes, pretty)
+	jsonData, err := encodeTypesAsJSON(exportedTypes, pretty)
 
 	if err != nil {
 		panic(err)

@@ -62,11 +62,11 @@ type CadenceVisitor interface {
 	// Visit a parse tree produced by CadenceParser#interfaceDeclaration.
 	VisitInterfaceDeclaration(ctx *InterfaceDeclarationContext) interface{}
 
-	// Visit a parse tree produced by CadenceParser#members.
-	VisitMembers(ctx *MembersContext) interface{}
+	// Visit a parse tree produced by CadenceParser#membersAndNestedDeclarations.
+	VisitMembersAndNestedDeclarations(ctx *MembersAndNestedDeclarationsContext) interface{}
 
-	// Visit a parse tree produced by CadenceParser#member.
-	VisitMember(ctx *MemberContext) interface{}
+	// Visit a parse tree produced by CadenceParser#memberOrNestedDeclaration.
+	VisitMemberOrNestedDeclaration(ctx *MemberOrNestedDeclarationContext) interface{}
 
 	// Visit a parse tree produced by CadenceParser#compositeKind.
 	VisitCompositeKind(ctx *CompositeKindContext) interface{}
