@@ -98,5 +98,5 @@ func findPort() (address string) {
 		}
 		attempt--
 	}
-	return  ""
+	return ""
 }
