@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 
@@ -110,7 +109,7 @@ func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (int
 		ScriptAccounts: []flow.Address{s.activeAccount},
 	}
 
-	_, err := s.sendTransaction(conn, tx)
+	err := s.sendTransaction(conn, tx)
 	return nil, err
 }
 
@@ -224,12 +223,12 @@ func (s *Server) createAccount(conn protocol.Conn, args ...interface{}) (interfa
 		ScriptAccounts: []flow.Address{},
 	}
 
-	txHash, err := s.sendTransaction(conn, tx)
+	err = s.sendTransaction(conn, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	minedTx, err := s.flowClient.GetTransaction(context.Background(), txHash)
+	minedTx, err := s.flowClient.GetTransaction(context.Background(), tx.Hash())
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +236,7 @@ func (s *Server) createAccount(conn protocol.Conn, args ...interface{}) (interfa
 		return nil, fmt.Errorf("failed to get account address for transaction with status %s", tx.Status)
 	}
 	if len(minedTx.Events) != 1 {
-		return nil, fmt.Errorf("failed to get new account address for tx %s", txHash.Hex())
+		return nil, fmt.Errorf("failed to get new account address for tx %s", tx.Hash().Hex())
 	}
 	accountCreatedEvent, err := flow.DecodeAccountCreatedEvent(minedTx.Events[0].Payload)
 	if err != nil {
@@ -283,7 +282,7 @@ func (s *Server) updateAccountCode(conn protocol.Conn, args ...interface{}) (int
 		ScriptAccounts: []flow.Address{s.activeAccount},
 	}
 
-	_, err := s.sendTransaction(conn, tx)
+	err := s.sendTransaction(conn, tx)
 	return nil, err
 }
 
@@ -293,10 +292,10 @@ func (s *Server) updateAccountCode(conn protocol.Conn, args ...interface{}) (int
 //
 // If an error occurs, attempts to show an appropriate message (either via logs
 // or UI popups in the client).
-func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) (crypto.Hash, error) {
+func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) error {
 	key, ok := s.accounts[s.activeAccount]
 	if !ok {
-		return nil, fmt.Errorf("cannot sign transaction for account with unknown address %s", s.activeAccount)
+		return fmt.Errorf("cannot sign transaction for account with unknown address %s", s.activeAccount)
 	}
 
 	conn.LogMessage(&protocol.LogMessageParams{
@@ -306,7 +305,7 @@ func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) (crypt
 
 	sig, err := keys.SignTransaction(tx, key)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	tx.AddSignature(s.activeAccount, sig)
 
@@ -316,7 +315,7 @@ func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) (crypt
 			Type:    protocol.Info,
 			Message: fmt.Sprintf("Submitted transaction nonce=%d\thash=%s", tx.Nonce, tx.Hash().Hex()),
 		})
-		return tx.Hash(), nil
+		return nil
 	}
 
 	grpcErr, ok := status.FromError(err)
@@ -327,7 +326,7 @@ func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) (crypt
 				Type:    protocol.Warning,
 				Message: "The emulator server is unavailable. Please start the emulator (`cadence.runEmulator`) first.",
 			})
-			return nil, nil
+			return nil
 		} else if grpcErr.Code() == codes.InvalidArgument {
 			// The request was invalid
 			conn.ShowMessage(&protocol.ShowMessageParams{
@@ -338,9 +337,9 @@ func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) (crypt
 				Type:    protocol.Warning,
 				Message: fmt.Sprintf("Failed to submit transaction: %s", grpcErr.Message()),
 			})
-			return nil, nil
+			return nil
 		}
 	}
 
-	return nil, err
+	return err
 }
