@@ -13,6 +13,12 @@ type Account = {
 
 type AccountSet = {[key: string]: Account};
 
+// The subset of extension configuration used by the language server.
+type ServerConfig = {
+    rootAccountKey: string
+    emulatorAddress: string
+};
+
 // The config used by the extension
 export type Config = {
     // The name of the flow CLI executable
@@ -20,15 +26,9 @@ export type Config = {
     serverConfig: ServerConfig
     // Set of created accounts for which we can submit transactions.
     // Mapping from account address to account object.
-    accounts: {[key: string]: Account},
+    accounts: AccountSet,
     // Address of the currently active account.
     activeAccount: string
-};
-
-// The subset of extension configuration used by the language server.
-type ServerConfig = {
-    rootAccountKey: string
-    emulatorAddress: string
 };
 
 // Retrieves config from the workspace.
