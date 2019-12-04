@@ -424,7 +424,7 @@ func (interpreter *Interpreter) visitGlobalDeclaration(declaration ast.Declarati
 }
 
 func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
-	name := declaration.DeclarationName()
+	name := declaration.DeclarationIdentifier().Identifier
 	// NOTE: semantic analysis already checked possible invalid redeclaration
 	interpreter.Globals[name] = interpreter.findVariable(name)
 }
@@ -1108,22 +1108,46 @@ func (interpreter *Interpreter) indexExpressionGetterSetter(indexExpression *ast
 					})
 
 			case StorageValue:
-				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
-				key := interpreter.storageKeyHandler(interpreter, typedResult.Identifier, indexingType)
-				return Done{
-					Result: getterSetter{
-						get: func() Value {
-							return interpreter.readStored(typedResult.Identifier, key)
-						},
-						set: func(value Value) {
-							interpreter.writeStored(typedResult.Identifier, key, value.(OptionalValue))
-						},
-					},
-				}
+				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Identifier, AccessLevelPrivate)
+
+			case PublishedValue:
+				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Identifier, AccessLevelPublic)
 
 			default:
 				panic(errors.NewUnreachableError())
 			}
+		})
+}
+
+func (interpreter *Interpreter) visitStorageIndexExpression(
+	indexExpression *ast.IndexExpression,
+	storageIdentifier string,
+	accessLevel AccessLevel,
+) Trampoline {
+	indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
+	rawKey := interpreter.storageKeyHandler(interpreter, storageIdentifier, indexingType)
+	key := PrefixedStorageKey(rawKey, accessLevel)
+	return Done{
+		Result: getterSetter{
+			get: func() Value {
+				return interpreter.readStored(storageIdentifier, key)
+			},
+			set: func(value Value) {
+				interpreter.writeStored(storageIdentifier, key, value.(OptionalValue))
+			},
+		},
+	}
+}
+
+func (interpreter *Interpreter) visitReadStorageIndexExpression(
+	expression *ast.IndexExpression,
+	storageIdentifier string,
+	accessLevel AccessLevel,
+) Trampoline {
+	return interpreter.visitStorageIndexExpression(expression, storageIdentifier, accessLevel).
+		Map(func(result interface{}) interface{} {
+			getterSetter := result.(getterSetter)
+			return getterSetter.get()
 		})
 }
 
@@ -1528,6 +1552,15 @@ func (interpreter *Interpreter) VisitMemberExpression(expression *ast.MemberExpr
 		})
 }
 
+// PrefixedStorageKey returns the storage identifier with the proper prefix
+// based on the given access level.
+//
+// \x1F = Information Separator One
+//
+func PrefixedStorageKey(key string, accessLevel AccessLevel) string {
+	return fmt.Sprintf("%s\x1F%s", accessLevel.Prefix(), key)
+}
+
 func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpression) ast.Repr {
 	return expression.TargetExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
@@ -1542,10 +1575,18 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 					})
 
 			case StorageValue:
-				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[expression]
-				key := interpreter.storageKeyHandler(interpreter, typedResult.Identifier, indexingType)
-				result := interpreter.readStored(typedResult.Identifier, key)
-				return Done{Result: result}
+				return interpreter.visitReadStorageIndexExpression(
+					expression,
+					typedResult.Identifier,
+					AccessLevelPrivate,
+				)
+
+			case PublishedValue:
+				return interpreter.visitReadStorageIndexExpression(
+					expression,
+					typedResult.Identifier,
+					AccessLevelPublic,
+				)
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -1761,9 +1802,13 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 	return Done{Result: function}
 }
 
+// NOTE: only called for top-level composite declarations
 func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.CompositeDeclaration) ast.Repr {
 
-	interpreter.declareCompositeConstructor(declaration)
+	// lexical scope: variables in functions are bound to what is visible at declaration time
+	lexicalScope := interpreter.activations.CurrentOrNew()
+
+	_, _ = interpreter.declareCompositeConstructor(declaration, lexicalScope)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
@@ -1779,17 +1824,43 @@ func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.Compo
 // Inside the initializer and all functions, `self` is bound to
 // the new composite value, and the constructor itself is bound
 //
-func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.CompositeDeclaration) {
-
-	// lexical scope: variables in functions are bound to what is visible at declaration time
-	lexicalScope := interpreter.activations.CurrentOrNew()
+func (interpreter *Interpreter) declareCompositeConstructor(
+	declaration *ast.CompositeDeclaration,
+	lexicalScope hamt.Map,
+) (
+	scope hamt.Map,
+	function HostFunctionValue,
+) {
 
 	identifier := declaration.Identifier.Identifier
 	variable := interpreter.findOrDeclareVariable(identifier)
 
-	// make the constructor available in the initializer
+	// Make the constructor available in the initializer
 	lexicalScope = lexicalScope.
 		Insert(common.StringEntry(identifier), variable)
+
+	// Evaluate nested declarations in a new scope, so constructors
+	// of nested declarations won't be visible after the containing declaration
+
+	members := map[string]Value{}
+
+	(func() {
+		interpreter.activations.PushCurrent()
+		defer interpreter.activations.Pop()
+
+		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+
+			// Pass the lexical scope, which has the containing composite's constructor declared,
+			// to the nested declarations so they can refer to it, and update the lexical scope
+			// so the container's functions can refer to the nested constructors
+
+			var nestedConstructor FunctionValue
+			lexicalScope, nestedConstructor =
+				interpreter.declareCompositeConstructor(nestedCompositeDeclaration, lexicalScope)
+
+			members[nestedCompositeDeclaration.Identifier.Identifier] = nestedConstructor
+		}
+	})()
 
 	initializerFunction := interpreter.initializerFunction(declaration, lexicalScope)
 
@@ -1799,7 +1870,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 	functions := interpreter.compositeFunctions(declaration, lexicalScope)
 	interpreter.CompositeFunctions[identifier] = functions
 
-	variable.Value = NewHostFunctionValue(
+	function = NewHostFunctionValue(
 		func(arguments []Value, location LocationPosition) Trampoline {
 
 			value := &CompositeValue{
@@ -1828,6 +1899,10 @@ func (interpreter *Interpreter) declareCompositeConstructor(declaration *ast.Com
 				})
 		},
 	)
+	function.Members = members
+	variable.Value = function
+
+	return lexicalScope, function
 }
 
 // bindSelf returns a function which binds `self` to the structure

@@ -88,7 +88,7 @@ var getAccountFunctionType = sema.FunctionType{
 		&sema.AddressType{},
 	),
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.AccountType{},
+		&sema.PublicAccountType{},
 	),
 }
 

@@ -1,16 +1,16 @@
-let bools = {
+pub let bools = {
     0: false,
     1: true
 }
 
-fun forEach(d: {String: String}, f: ((String,String):Any?)): [Any?] {
+pub fun forEach(d: {String: String}, f: ((String,String):Any?)): [Any?] {
     return []
 }
 
-fun transpose(d: {String: String}): {String: String} {
+pub fun transpose(d: {String: String}): {String: String} {
     return {}
 }
 
-fun call(d: {Int: ((Int):[String?])}): {Int: [String?]} {
+pub fun call(d: {Int: ((Int):[String?])}): {Int: [String?]} {
     return {}
 }

@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/model/flow"
+
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 )
 
@@ -45,12 +47,16 @@ func (v *ImportDeclaration) Accept(visitor Visitor) Repr {
 	return visitor.VisitImportDeclaration(v)
 }
 
-func (v *ImportDeclaration) DeclarationName() string {
-	return ""
+func (v *ImportDeclaration) DeclarationIdentifier() Identifier {
+	return Identifier{}
 }
 
 func (v *ImportDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindImport
+}
+
+func (v *ImportDeclaration) DeclarationAccess() Access {
+	return AccessNotSpecified
 }
 
 // Location describes the origin of a Cadence script.
@@ -99,6 +105,10 @@ func (l AddressLocation) ID() LocationID {
 
 func (l AddressLocation) String() string {
 	return hex.EncodeToString(l)
+}
+
+func (l AddressLocation) ToAddress() (addr flow.Address) {
+	return flow.BytesToAddress(l)
 }
 
 func init() {

@@ -225,17 +225,17 @@ func TestGetEvents(t *testing.T) {
 
 	// declare event type used for decoding event payloads
 	mockEventType := types.Event{
-		TypeID: "Transfer",
-		FieldTypes: []types.EventField{
-			{
+		Identifier: "Transfer",
+		Fields: map[string]types.Field{
+			"to": {
 				Identifier: "to",
 				Type:       types.Address{},
 			},
-			{
+			"from": {
 				Identifier: "from",
 				Type:       types.Address{},
 			},
-			{
+			"amount": {
 				Identifier: "amount",
 				Type:       types.Int{},
 			},

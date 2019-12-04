@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/raviqqe/hamt"
 	// revive:disable:dot-imports
@@ -67,6 +68,15 @@ type HostFunction func(arguments []Value, location LocationPosition) Trampoline
 
 type HostFunctionValue struct {
 	Function HostFunction
+	Members  map[string]Value
+}
+
+func NewHostFunctionValue(
+	function HostFunction,
+) HostFunctionValue {
+	return HostFunctionValue{
+		Function: function,
+	}
 }
 
 func (HostFunctionValue) isValue() {}
@@ -90,10 +100,10 @@ func (f HostFunctionValue) invoke(arguments []Value, location LocationPosition) 
 	return f.Function(arguments, location)
 }
 
-func NewHostFunctionValue(
-	function HostFunction,
-) HostFunctionValue {
-	return HostFunctionValue{
-		Function: function,
-	}
+func (f HostFunctionValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+	return f.Members[name]
+}
+
+func (f HostFunctionValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
+	panic(errors.NewUnreachableError())
 }

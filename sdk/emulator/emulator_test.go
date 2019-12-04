@@ -37,9 +37,9 @@ func generateAddTwoToCounterScript(counterAddress flow.Address) string {
     	        if signer.storage[Counter] == nil {
     	            let existing <- signer.storage[Counter] <- createCounter()
     	            destroy existing
-                    signer.storage[&Counter] = &signer.storage[Counter] as Counter
+                    signer.published[&Counter] = &signer.storage[Counter] as Counter
     	        }
-				signer.storage[&Counter]?.add(2)
+				signer.published[&Counter]?.add(2)
 			  }
 
 			  execute {}
@@ -55,7 +55,7 @@ func generateGetCounterCountScript(counterAddress flow.Address, accountAddress f
 		    import 0x%s
 
 			pub fun main(): Int {
-                return getAccount(0x%s).storage[&Counter]?.count ?? 0
+                return getAccount(0x%s).published[&Counter]?.count ?? 0
 			}
 		`,
 		counterAddress,

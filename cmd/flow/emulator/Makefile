@@ -3,7 +3,7 @@ SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 # The Git commit hash
 COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
-VERSION := $(shell git describe --tags --abbrev=0 --exact-match)
+VERSION := $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
 IMAGE_TAG := ${VERSION}
 ifeq (${IMAGE_TAG},)
 IMAGE_TAG := ${SHORT_COMMIT}
@@ -64,4 +64,4 @@ update-deployment-image:
 monitor-rollout:
 	kconfig=$$(uuidgen); \
 	echo "$$KUBECONFIG_STAGING" > $$kconfig; \
-	kubectl --kubeconfig=$$kconfig rollout status deployment/${DEPLOYMENT_NAME}
+	kubectl --kubeconfig=$$kconfig rollout status deployments.apps ${DEPLOYMENT_NAME}

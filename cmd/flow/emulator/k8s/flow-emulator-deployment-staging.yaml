@@ -37,7 +37,7 @@ metadata:
     owner: Kan
 spec:
   rules:
-    - host: staging.emulator.grpc.withflow.org
+    - host: grpc.emulator.staging.withflow.org
       http:
         paths:
           - backend:
@@ -136,8 +136,9 @@ spec:
         - name: gcr
       containers:
         - name: flow-emulator
-          image: gcr.io/dl-flow/emulator:emulator-storage
-          # args: ["emulator", "start", "-v"]
+          # No tag, will be attached by teamcity
+          image: gcr.io/dl-flow/emulator
+          args: ["emulator", "start", "--init", "-v"]
 
           # Ports exposed can be named so other resources can reference
           # them by name and not have to hard code numbers
@@ -172,22 +173,22 @@ spec:
           volumeMounts:
             - name: badger-volume
               mountPath: /flowdb
-          # # Readiness Probe
-          # readinessProbe:
-          #   httpGet:
-          #     path: /live
-          #     port: web
-          #   initialDelaySeconds: 5
-          #   successThreshold: 1
+          # Readiness Probe
+          readinessProbe:
+            httpGet:
+              path: /live
+              port: http
+            initialDelaySeconds: 5
+            successThreshold: 1
           
-          # # Liveness Probe
-          # livenessProbe:
-          #   httpGet:
-          #     path: /live
-          #     port: web
-          #   initialDelaySeconds: 30
-          #   periodSeconds: 30
-          #   successThreshold: 1
+          # Liveness Probe
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            successThreshold: 1
       volumes:
         - name: badger-volume
           persistentVolumeClaim:

@@ -186,12 +186,12 @@ func TestEncodeUint8(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Zero",
-			types.Uint8{},
+			types.UInt8{},
 			values.NewUint8(0),
 		},
 		{
 			"Max",
-			types.Uint8{},
+			types.UInt8{},
 			values.NewUint8(math.MaxUint8),
 		},
 	}...)
@@ -201,12 +201,12 @@ func TestEncodeUint16(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Zero",
-			types.Uint16{},
+			types.UInt16{},
 			values.NewUint16(0),
 		},
 		{
 			"Max",
-			types.Uint16{},
+			types.UInt16{},
 			values.NewUint16(math.MaxUint8),
 		},
 	}...)
@@ -216,12 +216,12 @@ func TestEncodeUint32(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Zero",
-			types.Uint32{},
+			types.UInt32{},
 			values.NewUint32(0),
 		},
 		{
 			"Max",
-			types.Uint32{},
+			types.UInt32{},
 			values.NewUint32(math.MaxUint32),
 		},
 	}...)
@@ -231,12 +231,12 @@ func TestEncodeUint64(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{
 			"Zero",
-			types.Uint64{},
+			types.UInt64{},
 			values.NewUint64(0),
 		},
 		{
 			"Max",
-			types.Uint64{},
+			types.UInt64{},
 			values.NewUint64(math.MaxUint64),
 		},
 	}...)
@@ -267,9 +267,15 @@ func TestEncodeVariableSizedArray(t *testing.T) {
 		"CompositeArray",
 		types.VariableSizedArray{
 			ElementType: types.Composite{
-				FieldTypes: []types.Type{
-					types.String{},
-					types.Int{},
+				Fields: map[string]types.Field{
+					"a": {
+						Type:       types.String{},
+						Identifier: "a",
+					},
+					"b": {
+						Type:       types.Int{},
+						Identifier: "b",
+					},
 				},
 			},
 		},
@@ -389,9 +395,13 @@ func TestEncodeDictionary(t *testing.T) {
 		types.Dictionary{
 			KeyType: types.String{},
 			ElementType: types.Composite{
-				FieldTypes: []types.Type{
-					types.String{},
-					types.Int{},
+				Fields: map[string]types.Field{
+					"a": {
+						Type: types.String{},
+					},
+					"b": {
+						Type: types.Int{},
+					},
 				},
 			},
 		},
@@ -431,9 +441,13 @@ func TestEncodeComposite(t *testing.T) {
 	simpleComp := encodeTest{
 		"SimpleComposite",
 		types.Composite{
-			FieldTypes: []types.Type{
-				types.String{},
-				types.String{},
+			Fields: map[string]types.Field{
+				"a": {
+					Type: types.String{},
+				},
+				"b": {
+					Type: types.String{},
+				},
 			},
 		},
 		values.NewComposite([]values.Value{
@@ -445,10 +459,16 @@ func TestEncodeComposite(t *testing.T) {
 	multiTypeComp := encodeTest{
 		"MultiTypeComposite",
 		types.Composite{
-			FieldTypes: []types.Type{
-				types.String{},
-				types.Int{},
-				types.Bool{},
+			Fields: map[string]types.Field{
+				"a": {
+					Type: types.String{},
+				},
+				"b": {
+					Type: types.Int{},
+				},
+				"c": {
+					Type: types.Bool{},
+				},
 			},
 		},
 		values.NewComposite([]values.Value{
@@ -461,9 +481,11 @@ func TestEncodeComposite(t *testing.T) {
 	arrayComp := encodeTest{
 		"ArrayComposite",
 		types.Composite{
-			FieldTypes: []types.Type{
-				types.VariableSizedArray{
-					ElementType: types.Int{},
+			Fields: map[string]types.Field{
+				"a": {
+					Type: types.VariableSizedArray{
+						ElementType: types.Int{},
+					},
 				},
 			},
 		},
@@ -481,11 +503,17 @@ func TestEncodeComposite(t *testing.T) {
 	nestedComp := encodeTest{
 		"NestedComposite",
 		types.Composite{
-			FieldTypes: []types.Type{
-				types.String{},
-				types.Composite{
-					FieldTypes: []types.Type{
-						types.Int{},
+			Fields: map[string]types.Field{
+				"a": {
+					Type: types.String{},
+				},
+				"b": {
+					Type: types.Composite{
+						Fields: map[string]types.Field{
+							"a": {
+								Type: types.Int{},
+							},
+						},
 					},
 				},
 			},
@@ -510,12 +538,12 @@ func TestEncodeEvent(t *testing.T) {
 	simpleEvent := encodeTest{
 		"SimpleEvent",
 		types.Event{
-			FieldTypes: []types.EventField{
-				{
+			Fields: map[string]types.Field{
+				"x": {
 					Identifier: "x",
 					Type:       types.Int{},
 				},
-				{
+				"y": {
 					Identifier: "y",
 					Type:       types.String{},
 				},
@@ -530,17 +558,21 @@ func TestEncodeEvent(t *testing.T) {
 	compositeEvent := encodeTest{
 		"CompositeEvent",
 		types.Event{
-			FieldTypes: []types.EventField{
-				{
+			Fields: map[string]types.Field{
+				"x": {
 					Identifier: "x",
 					Type:       types.String{},
 				},
-				{
+				"y": {
 					Identifier: "y",
 					Type: types.Composite{
-						FieldTypes: []types.Type{
-							types.String{},
-							types.Int{},
+						Fields: map[string]types.Field{
+							"a": {
+								Type: types.String{},
+							},
+							"b": {
+								Type: types.Int{},
+							},
 						},
 					},
 				},

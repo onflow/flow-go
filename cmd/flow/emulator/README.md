@@ -58,7 +58,7 @@ Persistent Volume Claim are located in the k8s folder.
 #### Web Address
 *This is only available from the office currently*
 
-It should be available publically via `https://staging.emulator.grpc.withflow.org/`
+It should be available publically via `https://grpc.emulator.staging.withflow.org/`
 
 #### Port Forwarding
 If you have direct access to the cluster, you can use `kubectl` to access the emulator

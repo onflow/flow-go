@@ -1,6 +1,8 @@
 package types
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // revive:disable:redefines-builtin-id
 
@@ -15,10 +17,24 @@ type isAType struct{}
 
 func (isAType) isType() {}
 
-type Annotation struct {
-	IsMove bool
-	Type   Type
+type Any struct{ isAType }
+
+func (Any) ID() string { return "Any" }
+
+type Optional struct {
+	isAType
+	Type Type
 }
+
+func (t Optional) ID() string { return fmt.Sprintf("%s?", t.Type) }
+
+type Variable struct {
+	isAType
+	Type Type
+}
+
+// TODO:
+func (Variable) ID() string { return "NOT IMPLEMENTED" }
 
 type Void struct{ isAType }
 
@@ -60,21 +76,21 @@ type Int64 struct{ isAType }
 
 func (Int64) ID() string { return "Int64" }
 
-type Uint8 struct{ isAType }
+type UInt8 struct{ isAType }
 
-func (Uint8) ID() string { return "Uint8" }
+func (UInt8) ID() string { return "UInt8" }
 
-type Uint16 struct{ isAType }
+type UInt16 struct{ isAType }
 
-func (Uint16) ID() string { return "Uint16" }
+func (UInt16) ID() string { return "UInt16" }
 
-type Uint32 struct{ isAType }
+type UInt32 struct{ isAType }
 
-func (Uint32) ID() string { return "Uint32" }
+func (UInt32) ID() string { return "UInt32" }
 
-type Uint64 struct{ isAType }
+type UInt64 struct{ isAType }
 
-func (Uint64) ID() string { return "Uint64" }
+func (UInt64) ID() string { return "UInt64" }
 
 type VariableSizedArray struct {
 	isAType
@@ -87,7 +103,7 @@ func (t VariableSizedArray) ID() string {
 
 type ConstantSizedArray struct {
 	isAType
-	Size        int
+	Size        uint
 	ElementType Type
 }
 
@@ -109,39 +125,87 @@ func (t Dictionary) ID() string {
 	)
 }
 
+type Parameter struct {
+	Label      string
+	Identifier string
+	Type       Type
+}
+
+type Field struct {
+	Identifier string
+	Type       Type
+}
+
 type Composite struct {
 	isAType
-	TypeID     string
-	FieldTypes []Type
+	TypeID       string
+	Identifier   string
+	Fields       map[string]Field
+	Initializers [][]Parameter
 }
 
 func (t Composite) ID() string {
 	return t.TypeID
 }
 
-type Event struct {
+type Struct struct {
+	isAType
+	Composite
+}
+
+type Resource struct {
+	isAType
+	Composite
+}
+
+type Function struct {
 	isAType
 	TypeID     string
-	FieldTypes []EventField
+	Identifier string
+	Parameters []Parameter
+	ReturnType Type
+}
+
+// TODO:
+func (t Function) ID() string { return t.TypeID }
+
+// A type representing anonymous function (aka without named arguments)
+type FunctionType struct {
+	isAType
+	ParameterTypes []Type
+	ReturnType     Type
+}
+
+// TODO:
+func (t FunctionType) ID() string { return "NOT IMPLEMENTED" }
+
+type Event struct {
+	isAType
+	TypeID      string
+	Identifier  string
+	Fields      map[string]Field
+	Initializer []Parameter
 }
 
 func (t Event) ID() string {
 	return t.TypeID
 }
 
-type EventField struct {
+// Pointers are simply pointers to already existing types, to prevent circular references
+type ResourcePointer struct {
 	isAType
 	Identifier string
-	Type       Type
 }
 
-type Function struct {
+func (t ResourcePointer) ID() string {
+	return t.Identifier
+}
+
+type StructPointer struct {
 	isAType
-	TypeID                   string
-	ParameterTypeAnnotations []Annotation
-	ReturnTypeAnnotation     Annotation
+	Identifier string
 }
 
-func (t Function) ID() string {
-	return t.TypeID
+func (t StructPointer) ID() string {
+	return t.Identifier
 }
