@@ -204,7 +204,7 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		// Check and declare nested types
 
 		nestedDeclarations, nestedInterfaceTypes, nestedCompositeTypes :=
-			checker.visitNestedDeclarations(
+			checker.declareNestedDeclarations(
 				ContainerKindInterface,
 				declaration.CompositeKind,
 				declaration.DeclarationKind(),

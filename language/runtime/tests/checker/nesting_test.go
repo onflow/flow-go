@@ -13,7 +13,6 @@ import (
 )
 
 func TestCheckCompositeDeclarationNesting(t *testing.T) {
-
 	interfacePossibilities := []bool{true, false}
 
 	for _, outerComposite := range common.CompositeKinds {

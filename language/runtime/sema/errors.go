@@ -701,8 +701,10 @@ type ConformanceError struct {
 
 func (e *ConformanceError) Error() string {
 	return fmt.Sprintf(
-		"structure `%s` does not conform to interface `%s`",
+		"%s `%s` does not conform to %s `%s`",
+		e.CompositeType.Kind.Name(),
 		e.CompositeType.Identifier,
+		e.InterfaceType.CompositeKind.DeclarationKind(true).Name(),
 		e.InterfaceType.Identifier,
 	)
 }
@@ -722,27 +724,42 @@ func (e *ConformanceError) EndPosition() ast.Position {
 // TODO: just make this a warning?
 
 type DuplicateConformanceError struct {
-	CompositeIdentifier string
-	Conformance         *ast.NominalType
+	CompositeType *CompositeType
+	InterfaceType *InterfaceType
+	ast.Range
 }
 
 func (e *DuplicateConformanceError) Error() string {
 	return fmt.Sprintf(
-		"structure `%s` repeats conformance for interface `%s`",
-		e.CompositeIdentifier,
-		e.Conformance,
+		"%s `%s` repeats conformance to %s `%s`",
+		e.CompositeType.Kind.Name(),
+		e.CompositeType.Identifier,
+		e.InterfaceType.CompositeKind.DeclarationKind(true).Name(),
+		e.InterfaceType.Identifier,
 	)
 }
 
 func (*DuplicateConformanceError) isSemanticError() {}
 
-func (e *DuplicateConformanceError) StartPosition() ast.Position {
-	return e.Conformance.StartPosition()
+// MissingConformanceError
+
+type MissingConformanceError struct {
+	CompositeType *CompositeType
+	InterfaceType *InterfaceType
+	ast.Range
 }
 
-func (e *DuplicateConformanceError) EndPosition() ast.Position {
-	return e.Conformance.EndPosition()
+func (e *MissingConformanceError) Error() string {
+	return fmt.Sprintf(
+		"%s `%s` is missing a declaration to required conformance to %s `%s`",
+		e.CompositeType.Kind.Name(),
+		e.CompositeType.Identifier,
+		e.InterfaceType.CompositeKind.DeclarationKind(true).Name(),
+		e.InterfaceType.Identifier,
+	)
 }
+
+func (*MissingConformanceError) isSemanticError() {}
 
 // UnresolvedImportError
 
@@ -1952,7 +1969,7 @@ func (*DeclarationKindMismatchError) isSemanticError() {}
 func (e *DeclarationKindMismatchError) SecondaryError() string {
 	return fmt.Sprintf(
 		"expected `%s`, got `%s`",
-		e.ExpectedDeclarationKind,
-		e.ActualDeclarationKind,
+		e.ExpectedDeclarationKind.Name(),
+		e.ActualDeclarationKind.Name(),
 	)
 }

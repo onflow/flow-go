@@ -191,7 +191,7 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 	}
 }
 
-func (checker *Checker) visitNestedDeclarations(
+func (checker *Checker) declareNestedDeclarations(
 	containerKind ContainerKind,
 	containerCompositeKind common.CompositeKind,
 	containerDeclarationKind common.DeclarationKind,
@@ -236,62 +236,65 @@ func (checker *Checker) visitNestedDeclarations(
 			)
 		}
 
-		return
-	}
+		// NOTE: don't return, so nested declarations / types are still declared
+	} else {
 
-	// Check contract's nested composite declarations and interface declarations
-	// are a resource (interface) or a struct (interface)
+		// Check contract's nested composite declarations and interface declarations
+		// are a resource (interface) or a struct (interface)
 
-	checkNestedDeclaration := func(
-		nestedCompositeKind common.CompositeKind,
-		nestedDeclarationKind common.DeclarationKind,
-		identifier ast.Identifier,
-	) bool {
+		checkNestedDeclaration := func(
+			nestedCompositeKind common.CompositeKind,
+			nestedDeclarationKind common.DeclarationKind,
+			identifier ast.Identifier,
+		) {
 
-		if nestedCompositeKind != common.CompositeKindResource &&
-			nestedCompositeKind != common.CompositeKindStructure {
+			if nestedCompositeKind != common.CompositeKindResource &&
+				nestedCompositeKind != common.CompositeKindStructure {
 
-			checker.report(
-				&InvalidNestedDeclarationError{
-					NestedDeclarationKind:    nestedDeclarationKind,
-					ContainerDeclarationKind: containerDeclarationKind,
-					Range:                    ast.NewRangeFromPositioned(identifier),
-				},
-			)
+				checker.report(
+					&InvalidNestedDeclarationError{
+						NestedDeclarationKind:    nestedDeclarationKind,
+						ContainerDeclarationKind: containerDeclarationKind,
+						Range:                    ast.NewRangeFromPositioned(identifier),
+					},
+				)
 
-			return false
+			}
 		}
 
-		return true
+		for _, nestedDeclaration := range nestedInterfaceDeclarations {
+			checkNestedDeclaration(
+				nestedDeclaration.CompositeKind,
+				nestedDeclaration.DeclarationKind(),
+				nestedDeclaration.Identifier,
+			)
+		}
+
+		for _, nestedDeclaration := range nestedCompositeDeclarations {
+			checkNestedDeclaration(
+				nestedDeclaration.CompositeKind,
+				nestedDeclaration.DeclarationKind(),
+				nestedDeclaration.Identifier,
+			)
+		}
+
+		// NOTE: don't return, so nested declarations / types are still declared
 	}
+
+	// Declare nested interfaces
 
 	for _, nestedDeclaration := range nestedInterfaceDeclarations {
-		if !checkNestedDeclaration(
-			nestedDeclaration.CompositeKind,
-			nestedDeclaration.DeclarationKind(),
-			nestedDeclaration.Identifier,
-		) {
-			continue
-		}
-
 		if _, exists := nestedDeclarations[nestedDeclaration.Identifier.Identifier]; !exists {
 			nestedDeclarations[nestedDeclaration.Identifier.Identifier] = nestedDeclaration
 		}
 
-		// pre-declare interface
 		nestedInterfaceType := checker.declareInterfaceDeclaration(nestedDeclaration)
 		nestedInterfaceTypes = append(nestedInterfaceTypes, nestedInterfaceType)
 	}
 
-	for _, nestedDeclaration := range nestedCompositeDeclarations {
-		if !checkNestedDeclaration(
-			nestedDeclaration.CompositeKind,
-			nestedDeclaration.DeclarationKind(),
-			nestedDeclaration.Identifier,
-		) {
-			continue
-		}
+	// Declare nested composites
 
+	for _, nestedDeclaration := range nestedCompositeDeclarations {
 		if _, exists := nestedDeclarations[nestedDeclaration.Identifier.Identifier]; !exists {
 			nestedDeclarations[nestedDeclaration.Identifier.Identifier] = nestedDeclaration
 		}
@@ -348,7 +351,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		// Check and declare nested types before checking members
 
 		nestedDeclarations, nestedInterfaceTypes, nestedCompositeTypes :=
-			checker.visitNestedDeclarations(
+			checker.declareNestedDeclarations(
 				kind,
 				declaration.CompositeKind,
 				declaration.DeclarationKind(),
@@ -395,7 +398,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 
 		// Check conformances and members
 
-		conformances := checker.conformances(declaration)
+		conformances := checker.conformances(declaration, compositeType)
 
 		members, origins := checker.membersAndOrigins(
 			compositeType,
@@ -449,18 +452,30 @@ func (checker *Checker) initializerParameterTypeAnnotations(initializers []*ast.
 	return parameterTypeAnnotations
 }
 
-func (checker *Checker) conformances(declaration *ast.CompositeDeclaration) []*InterfaceType {
+func (checker *Checker) conformances(declaration *ast.CompositeDeclaration, compositeType *CompositeType) []*InterfaceType {
 
 	var interfaceTypes []*InterfaceType
 	seenConformances := map[string]bool{}
-
-	compositeIdentifier := declaration.Identifier.Identifier
 
 	for _, conformance := range declaration.Conformances {
 		convertedType := checker.ConvertType(conformance)
 
 		if interfaceType, ok := convertedType.(*InterfaceType); ok {
 			interfaceTypes = append(interfaceTypes, interfaceType)
+
+			conformanceIdentifier := conformance.String()
+
+			if seenConformances[conformanceIdentifier] {
+				checker.report(
+					&DuplicateConformanceError{
+						CompositeType: compositeType,
+						InterfaceType: interfaceType,
+						Range:         ast.NewRangeFromPositioned(conformance.Identifier),
+					},
+				)
+			}
+
+			seenConformances[conformanceIdentifier] = true
 
 		} else if !convertedType.IsInvalidType() {
 			checker.report(
@@ -470,20 +485,8 @@ func (checker *Checker) conformances(declaration *ast.CompositeDeclaration) []*I
 				},
 			)
 		}
-
-		conformanceIdentifier := conformance.String()
-
-		if seenConformances[conformanceIdentifier] {
-			checker.report(
-				&DuplicateConformanceError{
-					CompositeIdentifier: compositeIdentifier,
-					Conformance:         conformance,
-				},
-			)
-
-		}
-		seenConformances[conformanceIdentifier] = true
 	}
+
 	return interfaceTypes
 }
 
@@ -696,7 +699,31 @@ func (checker *Checker) checkTypeRequirement(
 		panic(errors.NewUnreachableError())
 	}
 
+	// Check that the composite declaration declares at least the conformances
+	// that the type requirement stated
+
+	for _, requiredConformance := range requiredCompositeType.Conformances {
+		found := false
+		for _, conformance := range declaredCompositeType.Conformances {
+			if conformance == requiredConformance {
+				found = true
+				break
+			}
+		}
+		if !found {
+			checker.report(&MissingConformanceError{
+				CompositeType: declaredCompositeType,
+				InterfaceType: requiredConformance,
+				Range:         ast.NewRangeFromPositioned(compositeDeclaration.Identifier),
+			})
+		}
+	}
+
+	// Check the conformance of the composite to the type requirement
+	// like a top-level composite declaration to an interface type
+
 	interfaceType := requiredCompositeType.InterfaceType()
+
 	checker.checkCompositeConformance(
 		compositeDeclaration,
 		declaredCompositeType,
