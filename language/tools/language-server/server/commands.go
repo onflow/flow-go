@@ -245,13 +245,21 @@ func (s *Server) createAccount(conn protocol.Conn, args ...interface{}) (interfa
 		return nil, err
 	}
 
-	minedTx, err := s.flowClient.GetTransaction(context.Background(), tx.Hash())
-	if err != nil {
-		return nil, err
+	// TODO: replace this for loop with a synchronous GetTransaction in SDK
+	// that handles waiting for it to be mined
+	var minedTx *flow.Transaction
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	for {
+		minedTx, err = s.flowClient.GetTransaction(ctx, tx.Hash())
+		if err != nil {
+			return nil, err
+		}
+		if minedTx.Status == flow.TransactionFinalized || minedTx.Status == flow.TransactionSealed {
+			break
+		}
 	}
-	if !(minedTx.Status == flow.TransactionFinalized || minedTx.Status == flow.TransactionSealed) {
-		return nil, fmt.Errorf("failed to get account address for transaction with status %s", tx.Status)
-	}
+
 	if len(minedTx.Events) != 1 {
 		return nil, fmt.Errorf("failed to get new account address for tx %s", tx.Hash().Hex())
 	}
