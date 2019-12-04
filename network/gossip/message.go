@@ -1,6 +1,8 @@
 package gossip
 
-import "github.com/dapperlabs/flow-go/proto/gossip/messages"
+import (
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
+)
 
 // generateGossipMessage initializes a new gossip message made from the given inputs
 // payloadBytes: payloads of gossip message

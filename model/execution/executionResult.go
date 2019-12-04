@@ -4,12 +4,13 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/hash"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 type ExecutionResult struct {
 	PreviousExecutionResultHash crypto.Hash
 	BlockHash                   crypto.Hash
-	FinalStateCommitment        StateCommitment
+	FinalStateCommitment        storage.StateCommitment
 	Chunks                      []Chunk
 	Signatures                  []crypto.Signature
 }
@@ -28,7 +29,7 @@ func (er *ExecutionResult) Encode() []byte {
 type ExecutionResultWrapper struct {
 	PreviousExecutionResultHash crypto.Hash
 	BlockHash                   crypto.Hash
-	FinalStateCommitment        StateCommitment
+	FinalStateCommitment        storage.StateCommitment
 	Chunks                      []chunkWrapper
 }
 
