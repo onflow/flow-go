@@ -43,13 +43,10 @@ export class LanguageServerAPI {
 
     // Sends a request to update the account code of the currently active
     // account.
-    async updateAccountCode(documentUri: Uri, accountAddr: string) {
+    async updateAccountCode(documentUri: Uri) {
         return this.client.sendRequest("workspace/executeCommand", {
             command: UPDATE_ACCOUNT_CODE_SERVER,
-            arguments: [
-                documentUri.toString(),
-                accountAddr,
-            ],
+            arguments: [documentUri.toString()],
         });
     }
 

@@ -64,7 +64,7 @@ const updateAccountCode = (ext: Extension) => async () => {
     const activeDocumentUri = activeEditor.document.uri;
 
     try {
-        ext.api.updateAccountCode(activeDocumentUri, ext.config.activeAccount);
+        ext.api.updateAccountCode(activeDocumentUri);
     } catch (err) {
         window.showWarningMessage("Failed to update account code");
         console.error(err);
