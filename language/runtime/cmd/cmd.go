@@ -62,8 +62,8 @@ func mustClosure(filename string, codes map[string]string) func(error) {
 	}
 }
 
-//PrepareChecker prepares and initializes Checked with a given code as a string
-//and dummyFilename which is used fore pretty prints if there are errors while processing
+//PrepareChecker prepares and initializes a Checker with a given code as a string
+//and dummyFilename which is used for pretty-printing errors, if any
 func PrepareChecker(code string, dummyFilename string) (*sema.Checker, func(error)) {
 	codes := map[string]string{}
 
