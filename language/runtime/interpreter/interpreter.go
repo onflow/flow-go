@@ -1848,6 +1848,10 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 		interpreter.activations.PushCurrent()
 		defer interpreter.activations.Pop()
 
+		for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
+			interpreter.declareInterface(nestedInterfaceDeclaration)
+		}
+
 		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
 
 			// Pass the lexical scope, which has the containing composite's constructor declared,
@@ -2284,6 +2288,10 @@ func (interpreter *Interpreter) VisitInterfaceDeclaration(declaration *ast.Inter
 func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDeclaration) {
 	interfaceType := interpreter.Checker.Elaboration.InterfaceDeclarationTypes[declaration]
 	interpreter.InterfaceDeclarations[interfaceType] = declaration
+
+	for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
+		interpreter.declareInterface(nestedInterfaceDeclaration)
+	}
 }
 
 func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
