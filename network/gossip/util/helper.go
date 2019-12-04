@@ -5,7 +5,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 // extractHashMsgInfo receives the bytes of a HashMessage instance,

@@ -1,7 +1,7 @@
 import {commands, ExtensionContext, window, workspace} from "vscode";
 import {Extension} from "./extension";
-import {startServer} from "./language-server";
-import {createTerminal, resetStorage} from "./terminal";
+import {LanguageServerAPI} from "./language-server";
+import {createTerminal} from "./terminal";
 import {ROOT_ADDR} from "./config";
 
 // Command identifiers for locally handled commands
@@ -13,8 +13,9 @@ const CREATE_ACCOUNT = "cadence.createAccount";
 const SWITCH_ACCOUNT = "cadence.switchActiveAccount";
 
 // Command identifies for commands handled by the Language server
-const UPDATE_ACCOUNT_CODE_SERVER = "cadence.server.updateAccountCode";
-const CREATE_ACCOUNT_SERVER = "cadence.server.createAccount";
+export const UPDATE_ACCOUNT_CODE_SERVER = "cadence.server.updateAccountCode";
+export const CREATE_ACCOUNT_SERVER = "cadence.server.createAccount";
+export const SWITCH_ACCOUNT_SERVER = "cadence.server.switchActiveAccount";
 
 // Registers a command with VS Code so it can be invoked by the user.
 function registerCommand(ctx: ExtensionContext, command: string, callback: (...args: any[]) => any) {
@@ -34,35 +35,22 @@ export function registerCommands(ext: Extension) {
 
 // Restarts the language server, updating the client in the extension object.
 const restartServer = (ext: Extension) => async () => {
-    if (!ext.client) {
-        return;
-    }
-    await ext.client.stop();
-    ext.client = startServer(ext.ctx, ext.config);
+    await ext.api.client.stop();
+    ext.api = new LanguageServerAPI(ext.ctx, ext.config);
 };
 
 // Starts the emulator in a terminal window.
 const startEmulator = (ext: Extension) => async () => {
-    const terminal = ext.terminal;
-    if (!terminal) {
-        return;
-    }
-
     // Start the emulator with the root key we gave to the language server.
     const rootKey = ext.config.serverConfig.rootAccountKey;
 
-    terminal.sendText(`${ext.config.flowCommand} emulator start --init --verbose --root-key ${rootKey}`);
-    terminal.show();
+    ext.terminal.sendText(`${ext.config.flowCommand} emulator start --init --verbose --root-key ${rootKey}`);
+    ext.terminal.show();
 };
 
 // Stops emulator, exits the terminal, and removes all config/db files.
 const stopEmulator = (ext: Extension) => async () => {
-    let terminal = ext.terminal;
-    if (!terminal) {
-        return;
-    }
-
-    terminal.dispose();
+    ext.terminal.dispose();
     ext.terminal = createTerminal(ext.ctx);
 };
 
@@ -73,32 +61,38 @@ const updateAccountCode = (ext: Extension) => async () => {
     if (!activeEditor) {
         return;
     }
-    if (!ext.client) {
-        return;
-    }
+    const activeDocumentUri = activeEditor.document.uri;
 
     try {
-        ext.client.sendRequest("workspace/executeCommand", {
-            command: UPDATE_ACCOUNT_CODE_SERVER,
-            arguments: [activeEditor.document.uri.toString()],
-        });
+        ext.api.updateAccountCode(activeDocumentUri);
     } catch (err) {
         window.showWarningMessage("Failed to update account code");
         console.error(err);
     }
 };
 
+// Creates a new account by requesting that the Language Server submit
+// a "create account" transaction from the currently active account.
 const createAccount = (ext: Extension) => async () => {
-    const nextAddr = ROOT_ADDR.slice(0, -1) + (Object.keys(ext.config.accounts).length + 1);
-    ext.config.accounts[nextAddr] = { address: nextAddr };
-    window.showInformationMessage(`Created new account: ${nextAddr}`);
+    try {
+        const addr = await ext.api.createAccount();
+        ext.config.accounts[addr] = {address: addr};
+    } catch (err) {
+        window.showErrorMessage("Failed to create account: " + err);
+        return;
+    }
 };
 
+// Switches the active account to the option selected by the user. The selection
+// is propagated to the Language Server.
 const switchActiveAccount = (ext: Extension) => async () => {
+    // Suffix to indicate which account is active
+    const activeSuffix = "(active)";
     // Create the options (mark the active account with an 'active' prefix)
     const accountOptions = Object
         .keys(ext.config.accounts)
-        .map(addr => addr === ext.config.activeAccount ? `* ${addr}` : addr);
+        // Mark the active account with a `*` in the dialog
+        .map(addr => addr === ext.config.activeAccount ? `${addr} ${activeSuffix}` : addr);
 
     window.showQuickPick(accountOptions)
         .then(selected => {
@@ -107,7 +101,20 @@ const switchActiveAccount = (ext: Extension) => async () => {
             if (selected === undefined) {
                 return;
             }
+            // If the user selected the active account, remove the `*` prefix
+            if (selected.endsWith(activeSuffix)) {
+                selected = selected.slice(0, -activeSuffix.length).trim();
+            }
             if (!ext.config.accounts[selected]) {
+                console.error('Switched to invalid account: ', selected);
+                return;
+            }
+
+            try {
+                ext.api.switchActiveAccount(selected);
+            } catch (err) {
+                window.showWarningMessage("Failed to switch active account");
+                console.error(err);
                 return;
             }
             ext.config.activeAccount = selected;

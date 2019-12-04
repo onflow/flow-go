@@ -1,4 +1,4 @@
-import {commands, window, workspace} from "vscode";
+import {commands, window, workspace, WorkspaceConfiguration} from "vscode";
 
 export const ROOT_ADDR: string = "0000000000000000000000000000000000000001";
 
@@ -11,6 +11,14 @@ type Account = {
     address: string
 };
 
+type AccountSet = {[key: string]: Account};
+
+// The subset of extension configuration used by the language server.
+type ServerConfig = {
+    rootAccountKey: string
+    emulatorAddress: string
+};
+
 // The config used by the extension
 export type Config = {
     // The name of the flow CLI executable
@@ -18,15 +26,9 @@ export type Config = {
     serverConfig: ServerConfig
     // Set of created accounts for which we can submit transactions.
     // Mapping from account address to account object.
-    accounts: {[key: string]: Account},
-    // Address of the current
+    accounts: AccountSet,
+    // Address of the currently active account.
     activeAccount: string
-};
-
-// The subset of extension configuration used by the language server.
-type ServerConfig = {
-    rootAccountKey: string
-    emulatorAddress: string
 };
 
 // Retrieves config from the workspace.

@@ -11,20 +11,21 @@ identities=()
 while [ $i -lt $num ]
 do
   role=consensus
-  identity=consensus$((i+1))
-  identities+=($identity)
-  address=localhost:$((i+7297))
-  entry=$role'-'$identity'@'$address
+  nodeid=$(hexdump -n 32 -e '8/4 "%08x"' /dev/urandom)
+  nodeids+=($nodeid)
+  address=localhost:313$((i+1))
+  stake='1000'
+  entry=$role'-'$nodeid'@'$address'='$stake
   entries+=','$entry
   ((i++))
 done
-
 # launch nodes and save process ids
 pids=()
 entries=${entries:1}
-for identity in ${identities[@]}
+for nodeid in ${nodeids[@]}
 do
-  ./consensus --identity $identity --entries $entries --connections $conns &
+  datadir=$(mktemp -d -t flow-data-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX)
+  ./consensus --nodeid $nodeid --entries $entries --connections $conns --datadir $datadir &
   pids+=($!)
 done
 

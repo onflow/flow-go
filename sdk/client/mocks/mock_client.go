@@ -6,7 +6,7 @@ package mocks
 
 import (
 	context "context"
-	observation "github.com/dapperlabs/flow-go/proto/services/observation"
+	observation "github.com/dapperlabs/flow-go/protobuf/services/observation"
 	gomock "github.com/golang/mock/gomock"
 	grpc "google.golang.org/grpc"
 	reflect "reflect"

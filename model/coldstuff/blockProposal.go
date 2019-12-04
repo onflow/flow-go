@@ -2,7 +2,11 @@
 
 package coldstuff
 
+import (
+	"github.com/dapperlabs/flow-go/model/flow"
+)
+
 // BlockProposal is a coldstuff consensus event to propose a block.
 type BlockProposal struct {
-	Header *BlockHeader
+	Block *flow.Block
 }
