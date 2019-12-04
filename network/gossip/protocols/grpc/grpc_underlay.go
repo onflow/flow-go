@@ -45,6 +45,14 @@ func (u *GRPCUnderlay) Dial(address string) (gossip.Connection, error) {
 }
 
 func (u *GRPCUnderlay) Start(address string) error {
+	listener, err := net.Listen("tcp4", address)
+	if err != nil {
+		return fmt.Errorf("invalid address %s: %v", address, err)
+	}
+	return u.StartWithListener(&listener)
+}
+
+func (u *GRPCUnderlay) StartWithListener(listener *net.Listener) error {
 	if u.grpcServer != nil {
 		return fmt.Errorf("GRPC server already started")
 	}
@@ -53,15 +61,11 @@ func (u *GRPCUnderlay) Start(address string) error {
 	}
 	grpcServer := grpc.NewServer()
 	messages.RegisterMessageReceiverServer(grpcServer, u)
-	listener, err := net.Listen("tcp4", address)
-	if err != nil {
-		return fmt.Errorf("invalid address %s: %v", address, err)
-	}
 
 	u.grpcServer = grpcServer
 
 	// Blocking call
-	if err := grpcServer.Serve(listener); err != nil {
+	if err := grpcServer.Serve(*listener); err != nil {
 		return fmt.Errorf("failed to serve: %v", err)
 	}
 

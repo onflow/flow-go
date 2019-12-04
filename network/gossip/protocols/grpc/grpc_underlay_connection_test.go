@@ -2,13 +2,11 @@ package protocols
 
 import (
 	"context"
-	"fmt"
-	"github.com/stretchr/testify/require"
-	"math/rand"
 	"net"
-
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/network/gossip"
 	"github.com/stretchr/testify/assert"
@@ -16,10 +14,11 @@ import (
 
 func TestGRPCUnderlayConnection_Send(t *testing.T) {
 	var underlay gossip.Underlay = &GRPCUnderlay{}
-	address := findPort()
+	address := ":0"
+	listener, err := net.Listen("tcp4", address)
 	// Start the Server
 	go func() {
-		assert.NoError(t, underlay.Start(address))
+		require.NoError(t, underlay.StartWithListener(&listener))
 	}()
 	// Setup the call back function
 	ch := make(chan []byte)
@@ -30,7 +29,7 @@ func TestGRPCUnderlayConnection_Send(t *testing.T) {
 	// Stop Server at the end
 	defer underlay.Stop()
 	// Start the Client
-	clientConnection, err := underlay.Dial(address)
+	clientConnection, err := underlay.Dial(listener.Addr().String())
 	assert.NotNil(t, clientConnection)
 	assert.NoError(t, err)
 	message := "hello from client"
@@ -49,17 +48,18 @@ func TestGRPCUnderlayConnection_OnClosed(t *testing.T) {
 		ch <- msg
 	}
 	assert.NoError(t, underlay.Handle(callbackfunc))
-	address := findPort()
+	address := ":0"
+	listener, err := net.Listen("tcp4", address)
 
 	// Start the Server
 	go func() {
-		require.NoError(t, underlay.Start(address))
+		require.NoError(t, underlay.StartWithListener(&listener))
 	}()
 
 	// Stop Server at the end
 	defer underlay.Stop()
 	// Start the Client
-	clientConnection, err := underlay.Dial(address)
+	clientConnection, err := underlay.Dial(listener.Addr().String())
 	assert.NotNil(t, clientConnection)
 	assert.NoError(t, err)
 	// Setup the client OnClose function
@@ -82,21 +82,4 @@ func TestGRPCUnderlayConnection_OnClosed(t *testing.T) {
 		assert.Fail(t, "Callback on the client not called")
 	}
 	assert.Error(t, clientConnection.Send(context.Background(), []byte(message)))
-}
-
-func findPort() (address string) {
-	var attempt = 10
-	for attempt > 0 {
-		//generate random port, range: 1000-61000
-		port := 1000 + rand.Intn(60000)
-		address := fmt.Sprintf("127.0.0.1:%v", port)
-		ln, err := net.Listen("tcp", address)
-		if err == nil {
-			ln.Close()
-			ln = nil
-			return address
-		}
-		attempt--
-	}
-	return ""
 }

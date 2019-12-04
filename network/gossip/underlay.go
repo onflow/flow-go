@@ -2,6 +2,7 @@ package gossip
 
 import (
 	"context"
+	"net"
 )
 
 // Underlay represents the layer that provides the network implementation for establishing
@@ -14,6 +15,8 @@ type Underlay interface {
 	// Start starts the server with a given address. The address should contain the port info.
 	// For instance: "198.51.100.1:80"
 	Start(address string) error
+	// StartWithListener starts the server with the given TCP listener.
+	StartWithListener(listener *net.Listener) error
 	// Stop stops the server and drops all connections
 	Stop() error
 
