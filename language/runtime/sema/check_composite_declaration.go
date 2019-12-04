@@ -20,6 +20,9 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDeclaration, kind ContainerKind) {
 
 	compositeType := checker.Elaboration.CompositeDeclarationTypes[declaration]
+	if compositeType == nil {
+		panic(errors.NewUnreachableError())
+	}
 
 	checker.containerTypes[compositeType] = true
 	defer func() {

@@ -3,13 +3,16 @@ package sema
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
 func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDeclaration) ast.Repr {
-
 	const kind = ContainerKindInterface
 
 	interfaceType := checker.Elaboration.InterfaceDeclarationTypes[declaration]
+	if interfaceType == nil {
+		panic(errors.NewUnreachableError())
+	}
 
 	checker.containerTypes[interfaceType] = true
 	defer func() {
