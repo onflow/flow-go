@@ -28,7 +28,7 @@ export function activate(ctx: ExtensionContext) {
         terminal = createTerminal(ctx);
         api = new LanguageServerAPI(ctx, config);
     } catch (err) {
-        window.showErrorMessage("Failed to activate extension: ", err.msg);
+        window.showErrorMessage("Failed to activate extension: ", err);
         return;
     }
     handleConfigChanges();

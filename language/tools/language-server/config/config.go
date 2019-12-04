@@ -29,7 +29,7 @@ func FromInitializationOptions(opts interface{}) (conf Config, err error) {
 
 	rootAccountKeyHex, ok := optsMap["rootAccountKey"].(string)
 	if !ok {
-		return Config{}, errors.New("missing accountKey field")
+		return Config{}, errors.New("missing rootAccountKey field")
 	}
 	emulatorAddr, ok := optsMap["emulatorAddress"].(string)
 	if !ok {

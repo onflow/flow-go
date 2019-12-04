@@ -46,10 +46,11 @@ export function resetStorage(ctx: ExtensionContext) {
 // Returns a path to a directory that can be used for persistent storage.
 // Creates the directory if it doesn't already exist.
 function getStoragePath(ctx: ExtensionContext): string | undefined {
-    const storagePath = ctx.storagePath;
+     let storagePath = ctx.storagePath;
     if (!storagePath) {
-        return;
+        storagePath = ctx.globalStoragePath;
     }
+    console.log("Storage path: ", storagePath);
     if (!existsSync(storagePath)) {
         try {
             mkdirSync(storagePath);
