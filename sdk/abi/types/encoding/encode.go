@@ -105,7 +105,7 @@ type variableObject struct {
 
 //endregion
 
-func (encoder *Encoder) mapFields(m map[string]*types.Field) map[string]interface{} {
+func (encoder *Encoder) mapFields(m map[string]types.Field) map[string]interface{} {
 	ret := map[string]interface{}{}
 
 	for k, v := range m {
@@ -115,7 +115,7 @@ func (encoder *Encoder) mapFields(m map[string]*types.Field) map[string]interfac
 	return ret
 }
 
-func (encoder *Encoder) mapParameters(p []*types.Parameter) []parameter {
+func (encoder *Encoder) mapParameters(p []types.Parameter) []parameter {
 	ret := make([]parameter, len(p))
 
 	for i := range p {
@@ -131,7 +131,7 @@ func (encoder *Encoder) mapParameters(p []*types.Parameter) []parameter {
 	return ret
 }
 
-func (encoder *Encoder) mapNestedParameters(p [][]*types.Parameter) [][]parameter {
+func (encoder *Encoder) mapNestedParameters(p [][]types.Parameter) [][]parameter {
 
 	ret := make([][]parameter, len(p))
 	for i := range ret {
@@ -195,7 +195,7 @@ func (encoder *Encoder) encode(t types.Type) interface{} {
 		return arrayObject{array{Of: encoder.encode(v.ElementType), Size: v.Size}}
 
 	case types.Optional:
-		return optionalObject{Optional: encoder.encode(v.Of)}
+		return optionalObject{Optional: encoder.encode(v.Type)}
 
 	case types.Struct:
 		return structObject{
@@ -206,15 +206,15 @@ func (encoder *Encoder) encode(t types.Type) interface{} {
 		}
 	case types.StructPointer:
 		return structPointer{
-			v.TypeName,
+			v.Identifier,
 		}
 	case types.ResourcePointer:
 		return resourcePointer{
-			v.TypeName,
+			v.Identifier,
 		}
 	case types.Event:
 		return eventObject{
-			Event: encoder.mapParameters(v.Fields),
+			Event: encoder.mapParameters(v.Initializer),
 		}
 	case types.Function:
 		return functionObject{

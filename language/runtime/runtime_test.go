@@ -1159,7 +1159,7 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
 	storedValues := map[string]values.Bytes{}
 
 	runtimeInterface := &testRuntimeInterface{
-		resolveImport: func(location Location) (bytes values.Bytes, err error) {
+		resolveImport: func(location Location) ([]byte, error) {
 			switch location {
 			case StringLocation("imported"):
 				return imported, nil
@@ -1167,10 +1167,10 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+		getValue: func(controller, owner, key []byte) ([]byte, error) {
 			return storedValues[string(key)], nil
 		},
-		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+		setValue: func(controller, owner, key, value []byte) (err error) {
 			storedValues[string(key)] = value
 			return nil
 		},

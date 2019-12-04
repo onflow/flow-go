@@ -19,18 +19,14 @@ import (
 func TestEventEmitted(t *testing.T) {
 	// event type definition that is reused in tests
 	myEventType := types.Event{
-		Fields: []*types.Parameter{
-			{
-				Field: types.Field{
-					Identifier: "x",
-					Type:       types.Int{},
-				},
+		Fields: map[string]types.Field{
+			"x": {
+				Identifier: "x",
+				Type:       types.Int{},
 			},
-			{
-				Field: types.Field{
-					Identifier: "y",
-					Type:       types.Int{},
-				},
+			"y": {
+				Identifier: "y",
+				Type:       types.Int{},
 			},
 		},
 	}

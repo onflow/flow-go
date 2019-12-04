@@ -36,10 +36,10 @@ func (p personConstructor) Encode() ([]byte, error) {
 	encoder := encoding.NewEncoder(&w)
 
 	err := encoder.EncodeConstantSizedArray(
-		values.ConstantSizedArray{
-			values.String(p.firstName),
-			values.String(p.lastName),
-		},
+		values.NewConstantSizedArray([]values.Value{
+			values.NewString(p.firstName),
+			values.NewString(p.lastName),
+		}),
 	)
 
 	if err != nil {
@@ -57,25 +57,21 @@ func NewPersonConstructor(firstName string, lastName string) (PersonConstructor,
 }
 
 var personType = types.Composite{
-	Fields: map[string]*types.Field{
+	Fields: map[string]types.Field{
 		"FullName": {
 			Type:       types.String{},
 			Identifier: "FullName",
 		},
 	},
-	Initializers: [][]*types.Parameter{
+	Initializers: [][]types.Parameter{
 		{
-			&types.Parameter{
-				Field: types.Field{
-					Identifier: "firstName",
-					Type:       types.String{},
-				},
+			types.Parameter{
+				Identifier: "firstName",
+				Type:       types.String{},
 			},
-			&types.Parameter{
-				Field: types.Field{
-					Identifier: "lastName",
-					Type:       types.String{},
-				},
+			types.Parameter{
+				Identifier: "lastName",
+				Type:       types.String{},
 			},
 		},
 	},

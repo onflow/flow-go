@@ -200,7 +200,7 @@ func NewUint8(i uint8) Uint8 {
 func (Uint8) isValue() {}
 
 func (Uint8) Type() types.Type {
-	return types.Uint8{}
+	return types.UInt8{}
 }
 
 func (v Uint8) WithType(types.Type) Value { return v }
@@ -214,7 +214,7 @@ func NewUint16(i uint16) Uint16 {
 func (Uint16) isValue() {}
 
 func (Uint16) Type() types.Type {
-	return types.Uint16{}
+	return types.UInt16{}
 }
 
 func (v Uint16) WithType(types.Type) Value { return v }
@@ -228,7 +228,7 @@ func NewUint32(i uint32) Uint32 {
 func (Uint32) isValue() {}
 
 func (Uint32) Type() types.Type {
-	return types.Uint32{}
+	return types.UInt32{}
 }
 
 func (v Uint32) WithType(types.Type) Value { return v }
@@ -242,7 +242,7 @@ func NewUint64(i uint64) Uint64 {
 func (Uint64) isValue() {}
 
 func (Uint64) Type() types.Type {
-	return types.Uint64{}
+	return types.UInt64{}
 }
 
 func (v Uint64) WithType(types.Type) Value { return v }

@@ -114,7 +114,7 @@ func TestIsResourceType_StructNestedInDictionary(t *testing.T) {
 	assert.False(t, ty.IsResourceType())
 }
 
-func Test_exportability(t *testing.T) {
+func TestExportability(t *testing.T) {
 
 	t.Run("structs", func(t *testing.T) {
 		position := ast.Position{
@@ -269,9 +269,11 @@ func Test_exportability(t *testing.T) {
 
 		require.Len(t, event.Fields, 2)
 
-		// for fields in event, order matters
-		assert.Equal(t, "where", event.Fields[1].Identifier)
-		assert.Equal(t, "magic_place", event.Fields[1].Label)
-	})
+		assert.Equal(t, "who", event.Fields["who"].Identifier)
+		assert.Equal(t, "where", event.Fields["where"].Identifier)
 
+		require.Len(t, event.Initializer, 2)
+		assert.Equal(t, "magic_caster", event.Initializer[0].Label)
+		assert.Equal(t, "magic_place", event.Initializer[1].Label)
+	})
 }

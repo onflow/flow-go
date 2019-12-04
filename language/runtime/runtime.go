@@ -290,7 +290,7 @@ func (r *interpreterRuntime) emitEvent(
 	event interpreter.EventValue,
 ) {
 	functionType := inter.Checker.GlobalValues[event.Identifier].Type.(*sema.SpecialFunctionType)
-	eventType := functionType.ReturnTypeAnnotation.Type.(*sema.EventType).Export()
+	eventType := functionType.ReturnTypeAnnotation.Type.(*sema.EventType).Export(nil, nil)
 
 	eventValue := event.Export().(values.Event)
 	eventValue = eventValue.WithType(eventType)
@@ -301,10 +301,10 @@ func (r *interpreterRuntime) emitEvent(
 func (r *interpreterRuntime) emitAccountEvent(
 	eventType sema.EventType,
 	runtimeInterface Interface,
-	fields ...values.Value,
+	eventFields ...values.Value,
 ) {
-	t := eventType.Export()
-	eventValue := values.NewEvent(fields).WithType(t)
+	t := eventType.Export(nil, nil)
+	eventValue := values.NewEvent(eventFields).WithType(t)
 
 	runtimeInterface.EmitEvent(eventValue)
 }
