@@ -70,7 +70,6 @@ export class LanguageServerAPI {
             command: CREATE_ACCOUNT_SERVER,
             arguments: [],
         });
-        console.log(res);
         return res as string;
     }
 }
