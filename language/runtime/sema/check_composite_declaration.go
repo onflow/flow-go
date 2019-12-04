@@ -381,11 +381,6 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 			nestedCompositeDeclarationVariable :=
 				checker.valueActivations.Find(identifier.Identifier)
 
-			// skip illegal declarations, e.g. due to invalid nesting
-			if nestedCompositeDeclarationVariable == nil {
-				continue
-			}
-
 			constructorMembers[nestedCompositeDeclarationVariable.Identifier] = &Member{
 				Identifier:      identifier,
 				Access:          nestedCompositeDeclaration.Access,
