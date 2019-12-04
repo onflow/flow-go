@@ -1656,33 +1656,20 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 
 			return interpreter.visitExpressionsNonCopying(argumentExpressions).
 				FlatMap(func(result interface{}) Trampoline {
-					arguments := result.(*ArrayValue)
+					arguments := result.(*ArrayValue).Values
 
 					argumentTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression]
 					parameterTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression]
 
-					argumentCopies := make([]Value, len(arguments.Values))
-					for i, argument := range arguments.Values {
-						argumentType := argumentTypes[i]
-						parameterType := parameterTypes[i]
-						argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
-					}
-
-					// TODO: optimize: only potentially used by host-functions
-
-					location := LocationPosition{
-						Position: invocationExpression.StartPosition(),
-						Location: interpreter.Checker.Location,
-					}
-
-					invocation := function.invoke(Invocation{
-						Arguments:     argumentCopies,
-						ArgumentTypes: argumentTypes,
-						Location:      location,
-						Interpreter:   interpreter,
-					})
+					invocation := interpreter.functionValueInvocationTrampoline(
+						function,
+						arguments,
+						argumentTypes,
+						parameterTypes,
+						invocationExpression.StartPosition(),
+					)
 
 					// If this is invocation is optional chaining, wrap the result
 					// as an optional, as the result is expected to be an optional
@@ -1696,6 +1683,69 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 					})
 				})
 		})
+}
+
+func (interpreter *Interpreter) InvokeFunctionValue(
+	function FunctionValue,
+	arguments []Value,
+	argumentTypes []sema.Type,
+	parameterTypes []sema.Type,
+	pos ast.Position,
+) (value Value, err error) {
+	// recover internal panics and return them as an error
+	defer recoverErrors(func(internalErr error) {
+		err = internalErr
+	})
+
+	trampoline := interpreter.functionValueInvocationTrampoline(
+		function,
+		arguments,
+		argumentTypes,
+		parameterTypes,
+		pos,
+	)
+
+	result := interpreter.runAllStatements(trampoline)
+	if result == nil {
+		return nil, nil
+	}
+	return result.(Value), nil
+}
+
+func (interpreter *Interpreter) functionValueInvocationTrampoline(
+	function FunctionValue,
+	arguments []Value,
+	argumentTypes []sema.Type,
+	parameterTypes []sema.Type,
+	pos ast.Position,
+) Trampoline {
+
+	parameterTypeCount := len(parameterTypes)
+	argumentCopies := make([]Value, len(arguments))
+
+	for i, argument := range arguments {
+		argumentType := argumentTypes[i]
+		if i < parameterTypeCount {
+			parameterType := parameterTypes[i]
+			argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
+		} else {
+			argumentCopies[i] = argument.Copy()
+		}
+	}
+
+	// TODO: optimize: only potentially used by host-functions
+
+	location := LocationPosition{
+		Position: pos,
+		Location: interpreter.Checker.Location,
+	}
+
+	return function.invoke(Invocation{
+		Arguments:     argumentCopies,
+		ArgumentTypes: argumentTypes,
+		Location:      location,
+		Interpreter:   interpreter,
+	})
 }
 
 func (interpreter *Interpreter) invokeInterpretedFunction(
