@@ -152,7 +152,7 @@ func FlowBuiltInFunctions(impls FlowBuiltinImpls) StandardLibraryFunctions {
 			nil,
 		),
 		NewStandardLibraryFunction(
-			"updateAccountCode",
+			"updateAccountContract",
 			updateAccountContractFunctionType,
 			impls.UpdateAccountContract,
 			nil,
