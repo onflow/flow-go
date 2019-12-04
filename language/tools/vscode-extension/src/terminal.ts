@@ -1,6 +1,5 @@
-import {Terminal, window} from "vscode";
+import {ExtensionContext, Terminal, window} from "vscode";
 import {existsSync, mkdirSync, unlinkSync} from "fs";
-import {Extension} from "./extension";
 import {join} from "path";
 
 // Name of all Flow files stored on-disk.
@@ -8,15 +7,14 @@ const FLOW_CONFIG_FILENAME = "flow.json";
 const FLOW_DB_FILENAME = "flowdb";
 
 // Creates a terminal within VS Code.
-export function createTerminal(ext: Extension): Terminal | undefined {
-    const storagePath = getStoragePath(ext);
+export function createTerminal(ctx: ExtensionContext): Terminal {
+    const storagePath = getStoragePath(ctx);
     if (!storagePath) {
-        window.showWarningMessage("Failed to start emulator: missing extension storage");
-        return;
+        throw new Error("Missing extension storage path");
     }
 
     // By default, reset all files on each load.
-    resetStorage(ext);
+    resetStorage(ctx);
 
     return window.createTerminal({
         name: "Flow Emulator",
@@ -26,8 +24,10 @@ export function createTerminal(ext: Extension): Terminal | undefined {
 }
 
 // Deletes all Flow files from extension storage.
-export function resetStorage(ext: Extension) {
-    const storagePath = ext.ctx.storagePath;
+// TODO: This doesn't work right now due to permissions issue
+// REF: https://github.com/dapperlabs/flow-go/issues/1726
+export function resetStorage(ctx: ExtensionContext) {
+    const storagePath = ctx.storagePath;
     if (!storagePath) {
         return;
     }
@@ -45,8 +45,8 @@ export function resetStorage(ext: Extension) {
 
 // Returns a path to a directory that can be used for persistent storage.
 // Creates the directory if it doesn't already exist.
-function getStoragePath(ext: Extension): string | undefined {
-    const storagePath = ext.ctx.storagePath;
+function getStoragePath(ctx: ExtensionContext): string | undefined {
+    const storagePath = ctx.storagePath;
     if (!storagePath) {
         return;
     }

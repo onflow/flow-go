@@ -1,17 +1,17 @@
 import {LanguageClient} from "vscode-languageclient";
-import {window} from "vscode";
-import {Extension} from "./extension";
+import {ExtensionContext, window} from "vscode";
+import {Config} from "./config";
 
 // The args to pass to the Flow CLI to start the language server.
 const START_LANGUAGE_SERVER_ARGS = ["cadence", "language-server"];
 
 // Starts the language server and returns a client object.
-export function startServer(ext: Extension): LanguageClient | undefined {
+export function startServer(ctx: ExtensionContext, config: Config): LanguageClient {
     const client = new LanguageClient(
         "cadence",
         "Cadence",
         {
-            command: ext.config.flowCommand,
+            command: config.flowCommand,
             args: START_LANGUAGE_SERVER_ARGS,
         },
         {
@@ -19,7 +19,7 @@ export function startServer(ext: Extension): LanguageClient | undefined {
             synchronize: {
                 configurationSection: "cadence"
             },
-            initializationOptions: ext.config.serverConfig,
+            initializationOptions: config.serverConfig,
         }
     );
 
@@ -34,8 +34,8 @@ export function startServer(ext: Extension): LanguageClient | undefined {
             );
         });
 
-    let languageServerDisposable = client.start();
-    ext.ctx.subscriptions.push(languageServerDisposable);
+    const clientDisposable = client.start();
+    ctx.subscriptions.push(clientDisposable);
 
     return client;
 }
