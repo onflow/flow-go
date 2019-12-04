@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"encoding/gob"
 	"encoding/hex"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
@@ -32,6 +33,10 @@ func (l TransactionLocation) ID() ast.LocationID {
 
 func (l TransactionLocation) String() string {
 	return hex.EncodeToString([]byte(l))
+}
+
+func init() {
+	gob.Register(TransactionLocation{})
 }
 
 type ScriptLocation []byte
