@@ -6294,3 +6294,97 @@ func TestInterpretCompositeDeclarationNestedConstructor(t *testing.T) {
 		x.(*interpreter.CompositeValue).Identifier,
 	)
 }
+
+const fungibleTokenContract = `
+  pub contract interface FungibleToken {
+
+      pub resource interface Provider {
+
+          pub fun withdraw(amount: Int): <-Vault
+      }
+
+      pub resource interface Receiver {
+
+          pub fun deposit(vault: <-Vault)
+      }
+
+      pub resource Vault: Provider, Receiver {
+
+          pub balance: Int
+
+          init(balance: Int)
+      }
+
+      pub fun absorb(vault: <-Vault)
+
+      pub fun sprout(): <-Vault
+  }
+
+  pub contract ExampleToken: FungibleToken {
+
+     pub resource Vault: FungibleToken.Receiver, FungibleToken.Provider {
+
+         pub var balance: Int
+
+         init(balance: Int) {
+             self.balance = balance
+         }
+
+         pub fun withdraw(amount: Int): <-Vault {
+             self.balance = self.balance - amount
+             return <-create Vault(balance: amount)
+         }
+
+         pub fun deposit(from: <-Vault) {
+            self.balance = self.balance + from.balance
+            destroy from
+         }
+     }
+
+     pub fun absorb(vault: <-Vault) {
+         destroy vault
+     }
+
+     pub fun sprout(): <-Vault {
+         return <-create Vault(balance: 0)
+     }
+  }
+`
+
+func TestInterpretFungibleTokenContract(t *testing.T) {
+
+	code := fungibleTokenContract + "\n" + `
+
+      fun test(): [Int; 2] {
+          let contract = ExampleToken()
+
+          // valid, because code is in the same location
+          let publisher <- create ExampleToken.Vault(balance: 100)
+
+          let receiver <- contract.sprout()
+
+          let withdrawn <- publisher.withdraw(amount: 60)
+          receiver.deposit(from: <-withdrawn)
+
+          let publisherBalance = publisher.balance
+          let receiverBalance = receiver.balance
+
+          destroy publisher
+          destroy receiver
+
+          return [publisherBalance, receiverBalance]
+      }
+    `
+	inter := parseCheckAndInterpret(t, code)
+
+	value, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	assert.Equal(t,
+		interpreter.NewArrayValueUnownedNonCopying(
+			interpreter.NewIntValue(40),
+			interpreter.NewIntValue(60),
+		),
+		value,
+	)
+}
