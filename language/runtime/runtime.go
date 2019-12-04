@@ -236,14 +236,26 @@ func (r *interpreterRuntime) newInterpreter(
 	return interpreter.NewInterpreter(
 		checker,
 		interpreter.WithPredefinedValues(functions.ToValues()),
-		interpreter.WithOnEventEmittedHandler(func(_ *interpreter.Interpreter, eventValue interpreter.EventValue) {
-			r.emitEvent(eventValue, runtimeInterface)
-		}),
-		interpreter.WithStorageReadHandler(runtimeStorage.readValue),
-		interpreter.WithStorageWriteHandler(runtimeStorage.writeValue),
-		interpreter.WithStorageKeyHandlerFunc(func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-			return indexingType.String()
-		}),
+		interpreter.WithOnEventEmittedHandler(
+			func(_ *interpreter.Interpreter, eventValue interpreter.EventValue) {
+				r.emitEvent(eventValue, runtimeInterface)
+			},
+		),
+		interpreter.WithStorageReadHandler(
+			func(_ *interpreter.Interpreter, storageIdentifier string, key string) interpreter.OptionalValue {
+				return runtimeStorage.readValue(storageIdentifier, key)
+			},
+		),
+		interpreter.WithStorageWriteHandler(
+			func(_ *interpreter.Interpreter, storageIdentifier string, key string, value interpreter.OptionalValue) {
+				runtimeStorage.writeValue(storageIdentifier, key, value)
+			},
+		),
+		interpreter.WithStorageKeyHandlerFunc(
+			func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+				return indexingType.String()
+			},
+		),
 	)
 }
 
