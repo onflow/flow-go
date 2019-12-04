@@ -35,35 +35,22 @@ export function registerCommands(ext: Extension) {
 
 // Restarts the language server, updating the client in the extension object.
 const restartServer = (ext: Extension) => async () => {
-    if (!ext.api) {
-        return;
-    }
     await ext.api.client.stop();
     ext.api = new LanguageServerAPI(ext.ctx, ext.config);
 };
 
 // Starts the emulator in a terminal window.
 const startEmulator = (ext: Extension) => async () => {
-    const terminal = ext.terminal;
-    if (!terminal) {
-        return;
-    }
-
     // Start the emulator with the root key we gave to the language server.
     const rootKey = ext.config.serverConfig.rootAccountKey;
 
-    terminal.sendText(`${ext.config.flowCommand} emulator start --init --verbose --root-key ${rootKey}`);
-    terminal.show();
+    ext.terminal.sendText(`${ext.config.flowCommand} emulator start --init --verbose --root-key ${rootKey}`);
+    ext.terminal.show();
 };
 
 // Stops emulator, exits the terminal, and removes all config/db files.
 const stopEmulator = (ext: Extension) => async () => {
-    let terminal = ext.terminal;
-    if (!terminal) {
-        return;
-    }
-
-    terminal.dispose();
+    ext.terminal.dispose();
     ext.terminal = createTerminal(ext.ctx);
 };
 
@@ -99,10 +86,13 @@ const createAccount = (ext: Extension) => async () => {
 // Switches the active account to the option selected by the user. The selection
 // is propagated to the Language Server.
 const switchActiveAccount = (ext: Extension) => async () => {
+    // Suffix to indicate which account is active
+    const activeSuffix = "(active)";
     // Create the options (mark the active account with an 'active' prefix)
     const accountOptions = Object
         .keys(ext.config.accounts)
-        .map(addr => addr === ext.config.activeAccount ? `${addr}` : addr);
+        // Mark the active account with a `*` in the dialog
+        .map(addr => addr === ext.config.activeAccount ? `${addr} ${activeSuffix}` : addr);
 
     window.showQuickPick(accountOptions)
         .then(selected => {
@@ -111,7 +101,12 @@ const switchActiveAccount = (ext: Extension) => async () => {
             if (selected === undefined) {
                 return;
             }
+            // If the user selected the active account, remove the `*` prefix
+            if (selected.endsWith(activeSuffix)) {
+                selected = selected.slice(0, -activeSuffix.length).trim();
+            }
             if (!ext.config.accounts[selected]) {
+                console.error('Switched to invalid account: ', selected);
                 return;
             }
 
