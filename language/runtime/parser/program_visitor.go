@@ -1448,7 +1448,17 @@ func (v *ProgramVisitor) VisitPrimaryExpressionStart(ctx *PrimaryExpressionStart
 
 func (v *ProgramVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {
 	invocation := ctx.Invocation().Accept(v).(*ast.InvocationExpression)
-	invocation.InvokedExpression = ctx.Expression().Accept(v).(ast.Expression)
+	ty := ctx.NominalType().Accept(v).(*ast.NominalType)
+	invocation.InvokedExpression = &ast.IdentifierExpression{
+		Identifier: ty.Identifier,
+	}
+
+	for _, nestedIdentifier := range ty.NestedIdentifiers {
+		invocation.InvokedExpression = &ast.MemberExpression{
+			Expression: invocation.InvokedExpression,
+			Identifier: nestedIdentifier,
+		}
+	}
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
