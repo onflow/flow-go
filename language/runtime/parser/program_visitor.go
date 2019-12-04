@@ -1447,12 +1447,8 @@ func (v *ProgramVisitor) VisitPrimaryExpressionStart(ctx *PrimaryExpressionStart
 }
 
 func (v *ProgramVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {
-	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 	invocation := ctx.Invocation().Accept(v).(*ast.InvocationExpression)
-	invocation.InvokedExpression =
-		&ast.IdentifierExpression{
-			Identifier: identifier,
-		}
+	invocation.InvokedExpression = ctx.Expression().Accept(v).(ast.Expression)
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 

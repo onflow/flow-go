@@ -477,7 +477,7 @@ primaryExpressionStart
     ;
 
 createExpression
-    : Create identifier invocation
+    : Create expression invocation
     ;
 
 destroyExpression
@@ -625,6 +625,7 @@ identifier
     | From
     | Create
     | Destroy
+    | Contract
     ;
 
 Identifier
