@@ -166,7 +166,6 @@ type Function struct {
 	ReturnType Type
 }
 
-// TODO:
 func (t Function) ID() string { return t.TypeID }
 
 // A type representing anonymous function (aka without named arguments)
@@ -194,18 +193,18 @@ func (t Event) ID() string {
 // Pointers are simply pointers to already existing types, to prevent circular references
 type ResourcePointer struct {
 	isAType
-	Identifier string
+	TypeName string
 }
 
 func (t ResourcePointer) ID() string {
-	return t.Identifier
+	return t.TypeName
 }
 
 type StructPointer struct {
 	isAType
-	Identifier string
+	TypeName string
 }
 
 func (t StructPointer) ID() string {
-	return t.Identifier
+	return t.TypeName
 }

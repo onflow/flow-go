@@ -206,11 +206,11 @@ func (encoder *Encoder) encode(t types.Type) interface{} {
 		}
 	case types.StructPointer:
 		return structPointer{
-			v.Identifier,
+			v.TypeName,
 		}
 	case types.ResourcePointer:
 		return resourcePointer{
-			v.Identifier,
+			v.TypeName,
 		}
 	case types.Event:
 		return eventObject{

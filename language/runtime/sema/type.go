@@ -1530,9 +1530,9 @@ func (t *CompositeType) Equal(other Type) bool {
 func (t *CompositeType) exportAsPointer() types.Type {
 	switch t.Kind {
 	case common.CompositeKindStructure:
-		return types.StructPointer{Identifier: t.Identifier}
+		return types.StructPointer{TypeName: t.Identifier}
 	case common.CompositeKindResource:
-		return types.ResourcePointer{Identifier: t.Identifier}
+		return types.ResourcePointer{TypeName: t.Identifier}
 	}
 	panic(fmt.Sprintf("cannot convert type %v of unknown kind %v", t, t.Kind))
 }
