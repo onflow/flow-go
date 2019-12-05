@@ -270,7 +270,10 @@ func (s *Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) (
 			})
 		}
 	}
-	// Search for transaction declarations.
+	// If there is not exactly one transaction, exit early.
+	if len(checker.Elaboration.TransactionDeclarationTypes) != 1 {
+		return actions, nil
+	}
 	for txDeclaration := range checker.Elaboration.TransactionDeclarationTypes {
 		actions = append(actions, &protocol.CodeLens{
 			Range: astToProtocolRange(txDeclaration.StartPosition(), txDeclaration.StartPosition()),
