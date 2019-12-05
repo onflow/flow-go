@@ -244,7 +244,7 @@ func (s *Server) SignatureHelp(
 func (s *Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([]*protocol.CodeLens, error) {
 	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Info,
-		Message: "code lens called" + string(params.TextDocument.URI),
+		Message: "code lens called uri:" + string(params.TextDocument.URI) + " acct:" + s.activeAccount.String(),
 	})
 
 	uri := params.TextDocument.URI
@@ -269,6 +269,16 @@ func (s *Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) (
 				},
 			})
 		}
+	}
+	if len(checker.Elaboration.TransactionDeclarationTypes) == 0 {
+		actions = append(actions, &protocol.CodeLens{
+			Range: firstLineRange(),
+			Command: &protocol.Command{
+				Title:     fmt.Sprintf("deploy code to account 0x%s", s.activeAccount.Short()),
+				Command:   CommandUpdateAccountCode,
+				Arguments: []interface{}{uri},
+			},
+		})
 	}
 	// If there is not exactly one transaction, exit early.
 	if len(checker.Elaboration.TransactionDeclarationTypes) != 1 {
@@ -457,10 +467,6 @@ func (s *Server) resolveFileImport(mainPath string, location ast.StringLocation)
 
 func (s *Server) resolveAccountImport(conn protocol.Conn, location ast.AddressLocation) (*ast.Program, error) {
 	accountAddr := location.ToAddress()
-	conn.LogMessage(&protocol.LogMessageParams{
-		Type:    protocol.Log,
-		Message: fmt.Sprintf("resolving loc:%s   addr:%s   client:%v", location.String(), accountAddr.String(), s.flowClient),
-	})
 	acct, err := s.flowClient.GetAccount(context.Background(), accountAddr)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get account with address %s err: %w", accountAddr, err)
@@ -534,5 +540,20 @@ func astToProtocolRange(startPos, endPos ast.Position) protocol.Range {
 	return protocol.Range{
 		Start: astToProtocolPosition(startPos),
 		End:   astToProtocolPosition(endPos.Shifted(1)),
+	}
+}
+
+// firstLine returns a range mapping to the first character of the first
+// line of the document.
+func firstLineRange() protocol.Range {
+	return protocol.Range{
+		Start: protocol.Position{
+			Line:      0,
+			Character: 0,
+		},
+		End: protocol.Position{
+			Line:      0,
+			Character: 0,
+		},
 	}
 }

@@ -33,7 +33,7 @@ type CommandHandler func(conn protocol.Conn, args ...interface{}) (interface{}, 
 //
 // The best reference I've found for how this works is:
 // https://stackoverflow.com/questions/43328582/how-to-implement-quickfix-via-a-language-server
-func (s Server) registerCommands(conn protocol.Conn) {
+func (s *Server) registerCommands(conn protocol.Conn) {
 	// Send a message to the client indicating which commands we support
 	registration := protocol.RegistrationParams{
 		Registrations: []protocol.Registration{
