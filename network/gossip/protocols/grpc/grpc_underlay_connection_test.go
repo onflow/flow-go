@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// TestGRPCUnderlayConnection_Send tests if a message can be sent using the GRPC underlay
 func TestGRPCUnderlayConnection_Send(t *testing.T) {
 	var underlay gossip.Underlay = &GRPCUnderlay{}
 	address := ":0"
@@ -41,6 +42,7 @@ func TestGRPCUnderlayConnection_Send(t *testing.T) {
 	assert.NoError(t, clientConnection.Close())
 }
 
+// TestGRPCUnderlayConnection_OnClosed tests if the onclosed callback gets called
 func TestGRPCUnderlayConnection_OnClosed(t *testing.T) {
 	var underlay gossip.Underlay = &GRPCUnderlay{}
 	// Setup the server call back function

@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// TestGRPCUnderlay_Start_Twice tests if the GRPCUnderlay doesn't allow starting it twice
 func TestGRPCUnderlay_Start_Twice(t *testing.T) {
 	var protocol gossip.Underlay = &GRPCUnderlay{}
 	require.NotNil(t, protocol, "Protocol is nil")
@@ -30,6 +31,7 @@ func TestGRPCUnderlay_Start_Twice(t *testing.T) {
 	assert.Error(t, protocol.StartWithListener(listener))
 }
 
+// TestGRPCUnderlay_Start_Stop tests starting and stopping of the GRPC underlay
 func TestGRPCUnderlay_Start_Stop(t *testing.T) {
 	var protocol gossip.Underlay = &GRPCUnderlay{}
 	require.NotNil(t, protocol, "Protocol is nil")
@@ -44,6 +46,7 @@ func TestGRPCUnderlay_Start_Stop(t *testing.T) {
 	assert.NoError(t, protocol.Stop())
 }
 
+// TestGRPCUnderlay_Handle tests if callback handler is called
 func TestGRPCUnderlay_Handle(t *testing.T) {
 	var protocol gossip.Underlay = &GRPCUnderlay{}
 	type Tuple struct {
