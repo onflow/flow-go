@@ -15,7 +15,7 @@ jobs:
       with:
         fetch-depth: 1
     - name: Run Revive Action
-      uses: morphy2k/revive-action@v1
+      uses: morphy2k/revive-action@v1.3.0
       with:
         config: revive.toml
         exclude: "cli/flow/cadence/vscode/cadence_bin.go"
