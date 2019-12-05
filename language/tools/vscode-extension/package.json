@@ -37,7 +37,7 @@
       }, {
         "command": "cadence.updateAccountCode",
         "category": "Cadence",
-        "title": "Update code for the current account"
+        "title": "Update account code"
       }, {
         "command": "cadence.createAccount",
         "category": "Cadence",
@@ -50,7 +50,7 @@
     ],
     "configuration": {
       "type": "object",
-      "title": "Cadence configuration",
+      "title": "Cadence",
       "properties": {
         "cadence.flowCommand": {
           "type": "string",
