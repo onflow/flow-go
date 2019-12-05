@@ -17,6 +17,8 @@ const english = require('retext-english')
 const indefiniteArticle = require('retext-indefinite-article')
 const repeatedWords = require('retext-repeated-words')
 
+const stringify = require('remark-stringify')
+
 const remark2rehype = require('remark-rehype')
 const doc = require('rehype-document')
 const format = require('rehype-format')
@@ -26,41 +28,67 @@ const addClasses = require('rehype-add-classes')
 const puppeteer = require('puppeteer')
 const path = require('path')
 
-const processor = unified()
-  .use(markdown)
-  .use(toc)
-  .use(slug)
-  .use(autolink)
-  .use(validateLinks)
-  .use(styleGuide)
-  .use(highlight, {
-    languageScopes: {'cadence': 'source.cadence'},
-    grammarPaths: ['../tools/vscode-extension/syntaxes/cadence.tmGrammar.json'],
-    themePath: './light_vs.json'
-  })
-  .use(
-    remark2retext,
-    unified()
-      .use(english)
-      .use(indefiniteArticle)
-      .use(repeatedWords)
-  )
-  .use(sectionize)
-  .use(remark2rehype)
-  .use(doc, {
-    title: 'Cadence Programming Language',
-    css: ['style.css', "https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/3.0.1/github-markdown.css"]
-  })
-  .use(addClasses, {
-    body: 'markdown-body'
-  })
-  .use(format)
-  .use(html)
+
+// - target:
+//   - 'html': generate HTML
+//   - 'markdown': generate Markdown
+function buildPipeline(target) {
+
+  const base = unified()
+    .use(markdown)
+    .use(toc)
+    .use(slug)
+    .use(autolink)
+    .use(validateLinks)
+    .use(styleGuide)
+    .use(highlight, {
+      languageScopes: {'cadence': 'source.cadence'},
+      grammarPaths: ['../tools/vscode-extension/syntaxes/cadence.tmGrammar.json'],
+      themePath: './light_vs.json',
+      target: target,
+    })
+    .use(
+      remark2retext,
+      unified()
+        .use(english)
+        .use(indefiniteArticle)
+        .use(repeatedWords)
+    )
+
+  switch (target) {
+  case 'html':
+    return base
+      .use(sectionize)
+      .use(remark2rehype)
+      .use(doc, {
+        title: 'Cadence Programming Language',
+        css: ['style.css', "https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/3.0.1/github-markdown.css"]
+      })
+      .use(addClasses, {
+        body: 'markdown-body'
+      })
+      .use(format)
+      .use(html)
+
+  case 'markdown':
+    return base
+      .use(stringify, {
+        entities: 'escape'
+      })
+  }
+}
 
 async function writeHTML(file) {
   file.extname = '.html'
   await vfile.write(file)
 }
+
+async function writeMarkdown(file) {
+  file.extname = '.md'
+  file.stem += '.generated'
+  await vfile.write(file)
+}
+
 
 async function writePDF(file) {
   file.extname = '.html'
@@ -86,10 +114,17 @@ async function writePDF(file) {
   await browser.close()
 }
 
-processor.process(vfile.readSync('language.md'), async (err, file) => {
+buildPipeline('html').process(vfile.readSync('language.md'), async (err, file) => {
   if (err)
     throw err;
   console.error(report(file))
   await writeHTML(file)
   await writePDF(file)
+})
+
+buildPipeline('markdown').process(vfile.readSync('language.md'), async (err, file) => {
+  if (err)
+    throw err;
+  console.error(report(file))
+  await writeMarkdown(file)
 })

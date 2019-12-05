@@ -1,0 +1,5311 @@
+# [](#cadence-programming-language)Cadence Programming Language
+
+## [](#table-of-contents)Table of Contents
+
+-   [Introduction](#introduction)
+
+-   [Terminology](#terminology)
+
+-   [Syntax and Behavior](#syntax-and-behavior)
+
+-   [Comments](#comments)
+
+-   [Constants and Variable Declarations](#constants-and-variable-declarations)
+
+-   [Type Annotations](#type-annotations)
+
+-   [Naming](#naming)
+
+    -   [Conventions](#conventions)
+
+-   [Semicolons](#semicolons)
+
+-   [Values and Types](#values-and-types)
+
+    -   [Booleans](#booleans)
+
+    -   [Numeric Literals](#numeric-literals)
+
+    -   [Integers](#integers)
+
+    -   [Floating-Point Numbers](#floating-point-numbers)
+
+    -   [Addresses](#addresses)
+
+    -   [Any](#any)
+
+    -   [Optionals](#optionals)
+
+        -   [Nil-Coalescing Operator](#nil-coalescing-operator)
+        -   [Conditional Downcasting Operator](#conditional-downcasting-operator)
+
+    -   [Never](#never)
+
+    -   [Strings and Characters](#strings-and-characters)
+
+        -   [String Fields and Functions](#string-fields-and-functions)
+
+    -   [Arrays](#arrays)
+
+        -   [Array Types](#array-types)
+
+        -   [Array Indexing](#array-indexing)
+
+        -   [Array Fields and Functions](#array-fields-and-functions)
+
+            -   [Variable-size Array Functions](#variable-size-array-functions)
+
+    -   [Dictionaries](#dictionaries)
+
+        -   [Dictionary Types](#dictionary-types)
+        -   [Dictionary Access](#dictionary-access)
+        -   [Dictionary Fields and Functions](#dictionary-fields-and-functions)
+        -   [Dictionary Keys](#dictionary-keys)
+
+-   [Operators](#operators)
+
+    -   [Negation](#negation)
+    -   [Assignment](#assignment)
+    -   [Swapping](#swapping)
+    -   [Arithmetic](#arithmetic)
+    -   [Logical Operators](#logical-operators)
+    -   [Comparison operators](#comparison-operators)
+    -   [Ternary Conditional Operator](#ternary-conditional-operator)
+    -   [Precedence and Associativity](#precedence-and-associativity)
+
+-   [Functions](#functions)
+
+    -   [Function Declarations](#function-declarations)
+    -   [Function overloading](#function-overloading)
+    -   [Function Expressions](#function-expressions)
+    -   [Function Calls](#function-calls)
+    -   [Function Types](#function-types)
+    -   [Closures](#closures)
+    -   [Argument Passing Behavior](#argument-passing-behavior)
+    -   [Function Preconditions and Postconditions](#function-preconditions-and-postconditions)
+
+-   [Control flow](#control-flow)
+
+    -   [Conditional branching: if-statement](#conditional-branching-if-statement)
+    -   [Optional Binding](#optional-binding)
+    -   [Looping: while-statement](#looping-while-statement)
+    -   [Immediate function return: return-statement](#immediate-function-return-return-statement)
+
+-   [Scope](#scope)
+
+-   [Type Safety](#type-safety)
+
+-   [Type Inference](#type-inference)
+
+-   [Composite Data Types](#composite-data-types)
+
+    -   [Composite Data Type Declaration and Creation](#composite-data-type-declaration-and-creation)
+
+    -   [Composite Data Type Fields](#composite-data-type-fields)
+
+    -   [Composite Data Type Field Getters and Setters](#composite-data-type-field-getters-and-setters)
+
+    -   [Synthetic Composite Data Type Fields](#synthetic-composite-data-type-fields)
+
+    -   [Composite Data Type Functions](#composite-data-type-functions)
+
+    -   [Composite Data Type Subtyping](#composite-data-type-subtyping)
+
+    -   [Composite Data Type Behaviour](#composite-data-type-behaviour)
+
+        -   [Structures](#structures)
+        -   [Accessing Fields and Functions of Composite Data Types Using Optional Chaining](#accessing-fields-and-functions-of-composite-data-types-using-optional-chaining)
+        -   [Resources](#resources)
+        -   [Resource variables](#resource-variables)
+        -   [Resource Destructors](#resource-destructors)
+        -   [Nested Resources](#nested-resources)
+        -   [Resources in Closures](#resources-in-closures)
+        -   [Resources in Arrays and Dictionaries](#resources-in-arrays-and-dictionaries)
+
+    -   [Unbound References / Nulls](#unbound-references--nulls)
+
+    -   [Inheritance and Abstract Types](#inheritance-and-abstract-types)
+
+-   [Access control](#access-control)
+
+-   [Interfaces](#interfaces)
+
+    -   [Interface Declaration](#interface-declaration)
+    -   [Interface Implementation](#interface-implementation)
+    -   [Interface Type](#interface-type)
+    -   [Interface Implementation Requirements](#interface-implementation-requirements)
+    -   [Interface Nesting](#interface-nesting)
+    -   [Nested Type Requirements](#nested-type-requirements)
+    -   [`Equatable` Interface](#equatable-interface)
+    -   [`Hashable` Interface](#hashable-interface)
+
+-   [Imports](#imports)
+
+-   [Attestations](#attestations)
+
+-   [Accounts](#accounts)
+
+-   [Account Storage](#account-storage)
+
+-   [Storage References](#storage-references)
+
+    -   [Reference-Based Access Control](#reference-based-access-control)
+
+-   [Publishing References](#publishing-references)
+
+-   [Events](#events)
+
+    -   [Emitting events](#emitting-events)
+
+-   [Transactions](#transactions)
+
+    -   [Deploying Code](#deploying-code)
+
+-   [Built-in Functions](#built-in-functions)
+
+    -   [Transaction information](#transaction-information)
+
+    -   [`panic`](#panic)
+
+        -   [Example](#example)
+
+    -   [`assert`](#assert)
+
+## [](#introduction)Introduction
+
+The Cadence Programming Language is a new high-level programming language intended for smart contract development.
+
+The language&#x27;s goals are, in order of importance:
+
+-   **Safety and security**: Provide a strong static type system, design by contract (preconditions and postconditions), and resources (inspired by linear types).
+-   **Auditability**: Focus on readability: make it easy to verify what the code is doing, and make intentions explicit, at a small cost of verbosity.
+-   **Simplicity**: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
+
+## [](#terminology)Terminology
+
+In this document, the following terminology is used to describe syntax or behavior that is not allowed in the language:
+
+-   `Invalid` means that the invalid program will not even be allowed to run.
+    The program error is detected and reported statically by the type checker.
+
+-   `Run-time error` means that the erroneous program will run,
+    but bad behavior will result in the execution of the program being aborted.
+
+## [](#syntax-and-behavior)Syntax and Behavior
+
+Much of the language&#x27;s syntax is inspired by Swift, Kotlin, and TypeScript.
+
+Much of the syntax, types, and standard library is inspired by Swift,
+which popularized e.g. optionals, argument labels,
+and provides safe handling of integers and strings.
+
+Resources are based on liner types which were popularized by Rust.
+
+Events are inspired by Solidity.
+
+## [](#comments)Comments
+
+Comments can be used to document code.
+A comment is text that is not executed.
+
+_Single-line comments_ start with two slashes (`//`).
+These comments can go on a line by themselves or they can go directly after a line of code.
+
+<code><pre><span style="color: #008000">// This is a comment on a single line.</span><span>
+</span><span style="color: #008000">// Another comment line that is not executed.</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// Here is another comment after a line of code.</span><span>
+</span></pre></code>
+
+_Multi-line comments_ start with a slash and an asterisk (`/*`)
+and end with an asterisk and a slash (`*/`):
+
+<code><pre><span style="color: #008000">/* This is a comment which</span><span>
+</span><span style="color: #008000">spans multiple lines. */</span><span>
+</span></pre></code>
+
+Comments may be nested.
+
+<code><pre><span style="color: #008000">/* /* this */ is a valid comment */</span><span>
+</span></pre></code>
+
+Mutli-line comments are balanced.
+
+<code><pre><span style="color: #008000">/* this is a // comment up to here */</span><span style="color: #000000"> this is not part of the comment </span><span style="color: #CD3131">*/</span><span>
+</span></pre></code>
+
+## [](#constants-and-variable-declarations)Constants and Variable Declarations
+
+Constants and variables are declarations that bind 
+a value and [type](#type-safety) to an identifier.
+Constants are initialized with a value and cannot be reassigned afterwards.
+Variables are initialized with a value and can be reassigned later.
+Declarations can be created in any scope, including the global scope.
+
+Constant means that the _identifier&#x27;s_ association is constant, 
+not the _value_ itself –
+the value may still be changed if is mutable. 
+
+Constants are declared using the `let` keyword. Variables are declared 
+using the `var` keyword.
+The keywords are followed by the identifier, 
+an optional [type annotation](#type-annotations), an equals sign `=`, 
+and the initial value.
+
+<code><pre><span style="color: #008000">// Declare a constant named `a`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: re-assigning to a constant.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">a = </span><span style="color: #09885A">2</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a variable named `b`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">3</span><span>
+</span><span>
+</span><span style="color: #008000">// Assign a new value to the variable named `b`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">b = </span><span style="color: #09885A">4</span><span>
+</span></pre></code>
+
+Variables and constants **must** be initialized.
+
+<code><pre><span style="color: #008000">// Invalid: the constant has no initial value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a</span><span>
+</span></pre></code>
+
+The names of the variable or constant 
+declarations in each scope must be unique. 
+Declaring another variable or constant with a name that is already 
+declared in the current scope is invalid, regardless of kind or type.
+
+<code><pre><span style="color: #008000">// Declare a constant named `a`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot re-declare a constant with name `a`,</span><span>
+</span><span style="color: #008000">// as it is already used in this scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">2</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a variable named `b`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">3</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot re-declare a variable with name `b`,</span><span>
+</span><span style="color: #008000">// as it is already used in this scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">4</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot declare a variable with the name `a`,</span><span>
+</span><span style="color: #008000">// as it is already used in this scope,</span><span>
+</span><span style="color: #008000">// and it is declared as a constant.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">5</span><span>
+</span></pre></code>
+
+However, variables can be redeclared in sub-scopes.
+
+<code><pre><span style="color: #008000">// Declare a constant named `a`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">true</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a constant with the same name `a`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// This is valid because it is in a sub-scope.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// This variable is not visible to the outer scope.</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `a` is `1`</span><span>
+</span></pre></code>
+
+A variable cannot be used as its own initial value.
+
+<code><pre><span style="color: #008000">// Invalid: Use of variable in its own initial value.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = a</span><span>
+</span></pre></code>
+
+## [](#type-annotations)Type Annotations
+
+When declaring a constant or variable, 
+an optional _type annotation_ can be provided,
+to make it explicit what type the declaration has.
+
+If no type annotation is provided, the type of the declaration is 
+[inferred from the initial value](#type-inference).
+
+<code><pre><span style="color: #008000">// Declare a variable named `boolVarWithAnnotation`, which has an explicit type annotation.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// `Bool` is the type of booleans.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> boolVarWithAnnotation: </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> = </span><span style="color: #0000FF">false</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant named `integerWithoutAnnotation`, which has no type annotation</span><span>
+</span><span style="color: #008000">// and for which the type is inferred to be `Int`, the type of arbitrary-precision integers.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// This is based on the initial value which is an integer literal.</span><span>
+</span><span style="color: #008000">// Integer literals are always inferred to be of type `Int`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> integerWithoutAnnotation = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant named `smallIntegerWithAnnotation`, which has an explicit type annotation.</span><span>
+</span><span style="color: #008000">// Because of the explicit type annotation, the type is not inferred.</span><span>
+</span><span style="color: #008000">// This declaration is valid because the integer literal `1` fits into the range of the type `Int8`,</span><span>
+</span><span style="color: #008000">// the type of 8-bit signed integers.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> smallIntegerWithAnnotation: Int8 = </span><span style="color: #09885A">1</span><span>
+</span></pre></code>
+
+If a type annotation is provided, the initial value must be of this type.
+All new values assigned to variables must match its type.
+This type safety is explained in more detail in a [separate section](#type-safety).
+
+<code><pre><span style="color: #008000">// Invalid: declare a variable with an explicit type `Bool`,</span><span>
+</span><span style="color: #008000">// but the initial value has type `Int`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> booleanConstant: </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a variable that has the inferred type `Bool`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> booleanVariable = </span><span style="color: #0000FF">false</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: assign a value with type `Int` to a variable which has the inferred type `Bool`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">booleanVariable = </span><span style="color: #09885A">1</span><span>
+</span></pre></code>
+
+## [](#naming)Naming
+
+Names may start with any upper or lowercase letter (A-Z, a-z) 
+or an underscore (`_`).
+This may be followed by zero or more upper and lower case letters, 
+underscores, and numbers (0-9).
+Names may not begin with a number.
+
+<code><pre><span style="color: #008000">// Valid: title-case</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">PersonID</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: with underscore</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">token_name</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: leading underscore and characters</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">_balance</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: leading underscore and numbers</span><span>
+</span><span style="color: #000000">_8264</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: characters and number</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">account2</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: leading number</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">1something</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: invalid character #</span><span>
+</span><span style="color: #000000">_#</span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: various invalid characters</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">!@#$%^&#x26;*</span><span>
+</span></pre></code>
+
+### [](#conventions)Conventions
+
+By convention, variables, constants, and functions have lowercase names;
+and types have title-case names.
+
+## [](#semicolons)Semicolons
+
+Semicolons (;) are used as statement separators.
+A semicolon can be placed after any statement,
+but can be omitted if only one statement appears on the line.
+Semicolons must be used to separate multiple statements if they appear on the same line –
+exactly one semicolon between each pair of statements.
+
+<code><pre><span style="color: #008000">// Declare a constant, without a semicolon.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a variable, with a semicolon.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span style="color: #000000">;</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant and a variable on a single line, separated by semicolons.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> d = </span><span style="color: #09885A">1</span><span style="color: #000000">; </span><span style="color: #0000FF">var</span><span style="color: #000000"> e = </span><span style="color: #09885A">2</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Multiple semicolons between statements.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> f = </span><span style="color: #09885A">1</span><span style="color: #000000">;; </span><span style="color: #0000FF">let</span><span style="color: #000000"> g = </span><span style="color: #09885A">2</span><span>
+</span></pre></code>
+
+## [](#values-and-types)Values and Types
+
+Values are objects, like for example booleans, integers, or arrays.
+Values are typed.
+
+### [](#booleans)Booleans
+
+The two boolean values `true` and `false` have the type `Bool`.
+
+### [](#numeric-literals)Numeric Literals
+
+Numbers can be written in various bases. Numbers are assumed to be decimal by default.
+Non-decimal literals have a specific prefix.
+
+| Numeral system  | Prefix | Characters                                                            |
+| :-------------- | :----- | :-------------------------------------------------------------------- |
+| **Decimal**     | _None_ | one or more numbers (`0` to `9`)                                      |
+| **Binary**      | `0b`   | one or more zeros or ones (`0` or `1`)                                |
+| **Octal**       | `0o`   | one or more numbers in the range `0` to `7`                           |
+| **Hexadecimal** | `0x`   | one or more numbers, or characters `a` to `f`, lowercase or uppercase |
+
+<code><pre><span style="color: #008000">// A decimal number</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #09885A">1234567890</span><span style="color: #000000">  </span><span style="color: #008000">// is `1234567890`</span><span>
+</span><span>
+</span><span style="color: #008000">// A binary number</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #09885A">0b101010</span><span style="color: #000000">  </span><span style="color: #008000">// is `42`</span><span>
+</span><span>
+</span><span style="color: #008000">// An octal number</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #09885A">0o12345670</span><span style="color: #000000">  </span><span style="color: #008000">// is `2739128`</span><span>
+</span><span>
+</span><span style="color: #008000">// A hexadecimal number</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #09885A">0x1234567890ABCabc</span><span style="color: #000000">  </span><span style="color: #008000">// is `1311768467294898876`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: unsupported prefix 0z</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">0z0</span><span>
+</span><span>
+</span><span style="color: #008000">// A decimal number with leading zeros. Not an octal number!</span><span>
+</span><span style="color: #09885A">00123</span><span style="color: #000000"> </span><span style="color: #008000">// is `123`</span><span>
+</span><span>
+</span><span style="color: #008000">// A binary number with several trailing zeros.</span><span>
+</span><span style="color: #09885A">0b001000</span><span style="color: #000000">  </span><span style="color: #008000">// is `8`</span><span>
+</span></pre></code>
+
+Decimal numbers may contain underscores (`_`) to logically separate components.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> largeNumber = </span><span style="color: #09885A">1_000_000</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Value is not a number literal, but a variable.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> notNumber = _123</span><span>
+</span></pre></code>
+
+Underscores are allowed for all numeral systems.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> binaryNumber = </span><span style="color: #09885A">0b10_11_01</span><span>
+</span></pre></code>
+
+### [](#integers)Integers
+
+Integers are numbers without a fractional part.
+They are either _signed_ (positive, zero, or negative) 
+or _unsigned_ (positive or zero)
+and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
+
+The names for the integer types follow this naming convention:
+Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix,
+i.e., the integer types are named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
+The types are independent types, i.e. not subtypes of each other.
+
+-   **`Int8`**: -128 through 127
+-   **`Int16`**: -32768 through 32767
+-   **`Int32`**: -2147483648 through 2147483647
+-   **`Int64`**: -9223372036854775808 through 9223372036854775807
+-   **`UInt8`**: 0 through 255
+-   **`UInt16`**: 0 through 65535
+-   **`UInt32`**: 0 through 4294967295
+-   **`UInt64`**: 0 through 18446744073709551615
+
+<code><pre><span style="color: #008000">// Declare a constant that has type `UInt8` and the value 10.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> smallNumber: UInt8 = </span><span style="color: #09885A">10</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Invalid: negative literal cannot be used as an unsigned integer</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> invalidNumber: UInt8 = </span><span style="color: #09885A">-10</span><span>
+</span></pre></code>
+
+In addition, the arbitrary precision integer type `Int` is provided.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> veryLargeNumber: Int = </span><span style="color: #09885A">10000000000000000000000000000000</span><span>
+</span></pre></code>
+
+Integer literals are [inferred](#type-inference) to have type `Int`,
+or if the literal occurs in a position that expects an explicit type,
+e.g. in a variable declaration with an explicit type annotation.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> someNumber = </span><span style="color: #09885A">123</span><span>
+</span><span>
+</span><span style="color: #008000">// `someNumber` has type `Int`</span><span>
+</span></pre></code>
+
+Negative integers are encoded in two&#x27;s complement representation.
+
+Integer types are not converted automatically. Types must be explicitly converted,
+which can be done by calling the constructor of the type with the integer type.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int8 = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int16 = </span><span style="color: #09885A">2</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: the types of the operands, `Int8` and `Int16` are incompatible.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> z = x + y</span><span>
+</span><span>
+</span><span style="color: #008000">// Explicitly convert `x` from `Int8` to `Int16`.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = Int16(x) + y</span><span>
+</span><span>
+</span><span style="color: #008000">// `a` has type `Int16`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The integer literal is expected to be of type `UInt8`,</span><span>
+</span><span style="color: #008000">// but the large integer literal does not fit in the range of `UInt8`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = x + </span><span style="color: #09885A">1000000000000000000000000</span><span>
+</span></pre></code>
+
+### [](#floating-point-numbers)Floating-Point Numbers
+
+There is **no** support for floating point numbers.
+
+Smart Contracts are not intended to work with values with error margins
+and therefore floating point arithmetic is not appropriate here.
+Fixed point numbers should be simulated using integers and a scale factor for now.
+
+### [](#addresses)Addresses
+
+The type `Address` represents an address.
+Addresses are unsigned integers with a size of 160 bits (20 bytes).
+Hexadecimal integer literals can be used to create address values.
+
+<code><pre><span style="color: #008000">// Declare a constant that has type `Address`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> someAddress: </span><span style="color: #0000FF">Address</span><span style="color: #000000"> = </span><span style="color: #09885A">0x06012c8cf97bead5deae237070f9587f8e7a266d</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Initial value is not compatible with type `Address`,</span><span>
+</span><span style="color: #008000">// it is not a number.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> notAnAddress: </span><span style="color: #0000FF">Address</span><span style="color: #000000"> = </span><span style="color: #A31515">""</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Initial value is not compatible with type `Address`.</span><span>
+</span><span style="color: #008000">// The integer literal is valid, however, it is larger than 160 bits.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> alsoNotAnAddress: </span><span style="color: #0000FF">Address</span><span style="color: #000000"> = </span><span style="color: #09885A">0x06012c8cf97bead5deae237070f9587f8e7a266d123456789</span><span>
+</span></pre></code>
+
+Integer literals are not inferred to be an address.
+
+<code><pre><span style="color: #008000">// Declare a number. Even though it happens to be a valid address,</span><span>
+</span><span style="color: #008000">// it is not inferred as it.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> aNumber = </span><span style="color: #09885A">0x06012c8cf97bead5deae237070f9587f8e7a266d</span><span>
+</span><span style="color: #008000">// `aNumber` has type `Int`</span><span>
+</span></pre></code>
+
+### [](#any)Any
+
+`Any` is the top type, i.e., all types are a subtype of it.
+
+<code><pre><span style="color: #008000">// Declare a variable that has the type `Any`.</span><span>
+</span><span style="color: #008000">// Any value can be assigned to it, for example an integer.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> someValue: Any = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Assign a value with a different type, `Bool`.</span><span>
+</span><span style="color: #000000">someValue = </span><span style="color: #0000FF">true</span><span>
+</span></pre></code>
+
+However, using `Any` does not opt-out of type checking.
+It is invalid to access fields and call functions on `Any` typed values,
+as it has no fields and functions.
+
+<code><pre><span style="color: #008000">// Declare a variable that has the type `Any`. The initial value is an integer,</span><span>
+</span><span style="color: #008000">// but the variable  still has the explicit type `Any`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Any = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)</span><span>
+</span><span style="color: #008000">// and an `Int` value (`2`, right-hand side).</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">a + </span><span style="color: #09885A">2</span><span>
+</span></pre></code>
+
+`Any` may be used like any other type, for example, 
+it may be the element type of [arrays](#arrays)
+or be the element type of an [optional type](#optionals).
+
+<code><pre><span style="color: #008000">// Declare a variable that has the type `[Any]`, i.e. an array of elements of any type.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> anyValues: [Any] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #A31515">"2"</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a variable that has the type `Any?`, i.e. an optional type of any type.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> maybeSomething: Any? = </span><span style="color: #09885A">42</span><span>
+</span><span>
+</span><span style="color: #000000">maybeSomething = </span><span style="color: #A31515">"twenty-four"</span><span>
+</span><span>
+</span><span style="color: #000000">maybeSomething = </span><span style="color: #0000FF">nil</span><span>
+</span></pre></code>
+
+`Any` is also the super-type of optional types.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> maybeInt: Int? = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> anything: Any = y</span><span>
+</span></pre></code>
+
+### [](#optionals)Optionals
+
+Optionals are values which can represent the absence of a value. Optionals have two cases:
+either there is a value, or there is nothing.
+
+An optional type is declared using the `?` suffix for another type.
+For example, `Int` is a non-optional integer, and `Int?` is an optional integer,
+i.e. either nothing, or an integer.
+
+The value representing nothing is `nil`.
+
+<code><pre><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
+</span><span style="color: #008000">// with nil as its initial value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant which has an optional integer type,</span><span>
+</span><span style="color: #008000">// with 42 as its initial value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int? = </span><span style="color: #09885A">42</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: `b` has type `Int?`, which does not support arithmetic.</span><span>
+</span><span style="color: #000000">b + </span><span style="color: #09885A">23</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Declare a constant with a non-optional integer type `Int`,</span><span>
+</span><span style="color: #008000">// but the initial value is `nil`, which in this context has type `Int?`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #0000FF">nil</span><span>
+</span></pre></code>
+
+Optionals can be created for any value, not just for literals.
+
+<code><pre><span style="color: #008000">// Declare a constant which has a non-optional integer type,</span><span>
+</span><span style="color: #008000">// with 1 as its initial value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant which has an optional integer type.</span><span>
+</span><span style="color: #008000">// An optional with the value of `x` is created.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int? = x</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a variable which has an optional any type, i.e. the variable</span><span>
+</span><span style="color: #008000">// may be `nil`, or any other value.</span><span>
+</span><span style="color: #008000">// An optional with the value of `x` is created.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> z: Any? = x</span><span>
+</span></pre></code>
+
+A non-optional type is a subtype of its optional type.
+
+<code><pre><span style="color: #0000FF">var</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">a = b</span><span>
+</span><span>
+</span><span style="color: #008000">// `a` is `2`</span><span>
+</span></pre></code>
+
+Optional types may be contained in other types, for example [arrays](#arrays) or even optionals.
+
+<code><pre><span style="color: #008000">// Declare a constant which has an array type of optional integers.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> xs: [Int?] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">nil</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #0000FF">nil</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant which has a double optional type.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> doubleOptional: Int?? = </span><span style="color: #0000FF">nil</span><span>
+</span></pre></code>
+
+#### [](#nil-coalescing-operator)Nil-Coalescing Operator
+
+The nil-coalescing operator `??` returns 
+the value inside an optional if it contains a value,
+or returns an alternative value if the optional has no value, 
+i.e., the optional value is `nil`.
+
+If the left-hand side is non-nil, the right-hand side is not evaluated.
+
+<code><pre><span style="color: #008000">// Declare a constant which has an optional integer type</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant with a non-optional integer type,</span><span>
+</span><span style="color: #008000">// which is initialized to `a` if it is non-nil, or 42 otherwise.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int = a ?? </span><span style="color: #09885A">42</span><span>
+</span><span style="color: #008000">// `b` is 42, as `a` is nil</span><span>
+</span></pre></code>
+
+The nil-coalescing operator can only be applied 
+to values which have an optional type.
+
+<code><pre><span style="color: #008000">// Declare a constant with a non-optional integer type.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: nil-coalescing operator is applied to a value which has a non-optional type</span><span>
+</span><span style="color: #008000">// (a has the non-optional type `Int`).</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a ?? </span><span style="color: #09885A">2</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Invalid: nil-coalescing operator is applied to a value which has a non-optional type</span><span>
+</span><span style="color: #008000">// (the integer literal is of type `Int`).</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> c = </span><span style="color: #09885A">1</span><span style="color: #000000"> ?? </span><span style="color: #09885A">2</span><span>
+</span></pre></code>
+
+The type of the right-hand side of the operator (the alternative value) must be a subtype
+of the type of left-hand side, i.e. the right-hand side of the operator must
+be the non-optional or optional type matching the type of the left-hand side.
+
+<code><pre><span style="color: #008000">// Declare a constant with an optional integer type.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int? = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> c = a ?? b</span><span>
+</span><span style="color: #008000">// `c` is `1` and has type `Int?`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: nil-coalescing operator is applied to a value of type `Int?`,</span><span>
+</span><span style="color: #008000">// but the alternative has type `Bool`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> d = a ?? </span><span style="color: #0000FF">false</span><span>
+</span></pre></code>
+
+#### [](#conditional-downcasting-operator)Conditional Downcasting Operator
+
+> 🚧 Status: The conditional downcasting operator `as?` is implemented,
+> but it only supports values that have the type `Any`.
+
+The conditional downcasting operator `as?` 
+can be used to type cast a value to a type.
+The operator returns an optional.
+If the value has a type that is a subtype 
+of the given type that should be casted to,
+the operator returns the value as the given type,
+otherwise the result is `nil`.
+
+The cast and check is performed at run-time, i.e. when the program is executed,
+not statically, i.e. when the program is checked.
+
+<code><pre><span style="color: #008000">// Declare a constant named `something` which has type `Any`,</span><span>
+</span><span style="color: #008000">// with an initial value which has type `Int`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> something: Any = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Conditionally downcast the value of `something` to `Int`.</span><span>
+</span><span style="color: #008000">// The cast succeeds, because the value has type `Int`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> number = something as? Int</span><span>
+</span><span style="color: #008000">// `number` is `1` and has type `Int?`</span><span>
+</span><span>
+</span><span style="color: #008000">// Conditionally downcast the value of `something` to `Bool`.</span><span>
+</span><span style="color: #008000">// The cast fails, because the value has type `Int`,</span><span>
+</span><span style="color: #008000">// and `Bool` is not a subtype of `Int`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> boolean = something as? Bool</span><span>
+</span><span style="color: #008000">// `boolean` is `nil` and has type `Bool?`</span><span>
+</span></pre></code>
+
+Downcasting works for nested types (e.g. arrays),
+interfaces (if a [resource](#resources) interface not to a concrete resource),
+and optionals.
+
+<code><pre><span style="color: #008000">// Declare a constant named `values` which has type `[Any]`,</span><span>
+</span><span style="color: #008000">// i.e. an array of arbitrarily typed values.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> values: [Any] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> first = values[</span><span style="color: #09885A">0</span><span style="color: #000000">] as? Int</span><span>
+</span><span style="color: #008000">// `first` is `1` and has type `Int?`</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> second = values[</span><span style="color: #09885A">1</span><span style="color: #000000">] as? Bool</span><span>
+</span><span style="color: #008000">// `second` is `true` and has type `Bool?`</span><span>
+</span></pre></code>
+
+### [](#never)Never
+
+`Never` is the bottom type, i.e., it is a subtype of all types.
+There is no value that has type `Never`.
+`Never` can be used as the return type for functions that never return normally.
+For example, it is the return type of the function [`panic`](#panic).
+
+<code><pre><span style="color: #008000">// Declare a function named `crashAndBurn` which will never return,</span><span>
+</span><span style="color: #008000">// because it calls the function named `panic`, which never returns.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> crashAndBurn(): Never {</span><span>
+</span><span style="color: #000000">    panic(</span><span style="color: #A31515">"An unrecoverable error occurred"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Declare a constant with a `Never` type, but the initial value is an integer.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Never = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Declare a function which returns an invalid return value `nil`,</span><span>
+</span><span style="color: #008000">// which is not a value of type `Never`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> returnNever(): Never {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">nil</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+### [](#strings-and-characters)Strings and Characters
+
+> 🚧 Status: Characters are not implemented yet.
+
+Strings are collections of characters.
+Strings have the type `String`, and characters have the type `Character`.
+Strings can be used to work with text in a Unicode-compliant way.
+Strings are immutable.
+
+String and character literals are enclosed in double quotation marks (`"`).
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> someString = </span><span style="color: #A31515">"Hello, world!"</span><span>
+</span></pre></code>
+
+String literals may contain escape sequences. An escape sequence starts with a backslash (`\`):
+
+-   `\0`: Null character
+-   `\\`: Backslash
+-   `\t`: Horizontal tab
+-   `\n`: Line feed
+-   `\r`: Carriage return
+-   `\"`: Double quotation mark
+-   `\'`: Single quotation mark
+-   `\u`: A Unicode scalar value, written as `\u{x}`,
+    where `x` is a 1–8 digit hexadecimal number 
+    which needs to be a valid Unicode scalar value,
+    i.e., in the range 0 to 0xD7FF and 0xE000 to 0x10FFFF inclusive
+
+<code><pre><span style="color: #008000">// Declare a constant which contains two lines of text</span><span>
+</span><span style="color: #008000">// (separated by the line feed character `\n`), and ends</span><span>
+</span><span style="color: #008000">// with a thumbs up emoji, which has code point U+1F44D (0x1F44D).</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> thumbsUpText =</span><span>
+</span><span style="color: #000000">    </span><span style="color: #A31515">"This is the first line.\nThis is the second line with an emoji: \u{1F44D}"</span><span>
+</span></pre></code>
+
+The type `Character` represents a single, human-readable character. Characters are extended grapheme clusters, which consist of one or more Unicode scalars.
+
+For example, the single character `ü` can be represented 
+in several ways in Unicode.
+First, it can be represented by a single Unicode scalar value `ü`
+(&quot;LATIN SMALL LETTER U WITH DIAERESIS&quot;, code point U+00FC).
+Second, the same single character can be represented 
+by two Unicode scalar values:
+`u` (&quot;LATIN SMALL LETTER U&quot;, code point U+0075),
+and &quot;COMBINING DIAERESIS&quot; (code point U+0308).
+The combining Unicode scalar value is applied to the scalar before it,
+which turns a `u` into a `ü`.
+
+Still, both variants represent the same human-readable character `ü`.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> singleScalar: </span><span style="color: #0000FF">Character</span><span style="color: #000000"> = </span><span style="color: #A31515">"\u{FC}"</span><span>
+</span><span style="color: #008000">// `singleScalar` is `ü`</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> twoScalars: </span><span style="color: #0000FF">Character</span><span style="color: #000000"> = </span><span style="color: #A31515">"\u{75}\u{308}"</span><span>
+</span><span style="color: #008000">// `twoScalars` is `ü`</span><span>
+</span></pre></code>
+
+Another example where multiple Unicode scalar values are rendered as a single,
+human-readable character is a flag emoji.
+These emojis consist of two &quot;REGIONAL INDICATOR SYMBOL LETTER&quot; Unicode scalar values.
+
+<code><pre><span style="color: #008000">// Declare a constant for a string with a single character, the emoji</span><span>
+</span><span style="color: #008000">// for the Canadian flag, which consists of two Unicode scalar values:</span><span>
+</span><span style="color: #008000">// - REGIONAL INDICATOR SYMBOL LETTER C (U+1F1E8)</span><span>
+</span><span style="color: #008000">// - REGIONAL INDICATOR SYMBOL LETTER A (U+1F1E6)</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> canadianFlag: </span><span style="color: #0000FF">Character</span><span style="color: #000000"> = </span><span style="color: #A31515">"\u{1F1E8}\u{1F1E6}"</span><span>
+</span><span style="color: #008000">// `canadianFlag` is `🇨🇦`</span><span>
+</span></pre></code>
+
+#### [](#string-fields-and-functions)String Fields and Functions
+
+Strings have multiple built-in functions you can use.
+
+-   `length: Int`: Returns the number of characters in the string as an integer.
+
+    <code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> example = </span><span style="color: #A31515">"hello"</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Find the number of elements of the string.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> length = example.length</span><span>
+    </span><span style="color: #008000">// `length` is `5`</span><span>
+    </span></pre></code>
+
+-   `concat(_ other: String): String`:
+    Concatenates the string `other` to the end of the original string,
+    but does not modify the original string.
+    This function creates a new string whose length is the sum of the lengths
+    of the string the function is called on and the string given as a parameter.
+
+    <code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> example = </span><span style="color: #A31515">"hello"</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> new = </span><span style="color: #A31515">"world"</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Concatenate the new string onto the example string and return the new string.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> helloWorld = example.concat(new)</span><span>
+    </span><span style="color: #008000">// `helloWorld` is now `"helloworld"`</span><span>
+    </span></pre></code>
+
+-   `slice(from: Int, upTo: Int): String`:
+    Returns a string slice of the characters 
+    in the given string from start index `from` up to,
+    but not including, the end index `upTo`.
+    This function creates a new string whose length is `upto - from`.
+    It does not modify the original string.
+    If either of the parameters are out of 
+    the bounds of the string, the function will fail.
+
+    <code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> example = </span><span style="color: #A31515">"helloworld"</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Create a new slice of part of the original string.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> slice = example.slice(from: </span><span style="color: #09885A">3</span><span style="color: #000000">, upTo: </span><span style="color: #09885A">6</span><span style="color: #000000">)</span><span>
+    </span><span style="color: #008000">// `slice` is now `"lowo"`</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Run-time error: Out of bounds index, the program aborts.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> outOfBounds = example.slice(from: </span><span style="color: #09885A">2</span><span style="color: #000000">, upTo: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+    </span></pre></code>
+
+<!--
+
+TODO
+
+#### String Functions
+
+- Document and link to string concatenation operator `&` in operators section
+
+-->
+
+### [](#arrays)Arrays
+
+Arrays are mutable, ordered collections of values.
+All values in an array must have the same type.
+Arrays may contain a value multiple times.
+Array literals start with an opening square bracket `[` and end with a closing square bracket `]`.
+
+<code><pre><span style="color: #008000">// An empty array</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">[]</span><span>
+</span><span>
+</span><span style="color: #008000">// An array with integers</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">[</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #09885A">3</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: mixed types</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">[</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #0000FF">false</span><span style="color: #000000">]</span><span>
+</span></pre></code>
+
+#### [](#array-types)Array Types
+
+Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.
+
+Fixed-size arrays have the form `[T; N]`, where `T` is the element type,
+and `N` is the size of the array.  `N` has to be statically known, meaning
+that it needs to be an integer literal.
+For example, a fixed-size array of 3 `Int8` elements has the type `[Int8; 3]`.
+
+Variable-size arrays have the form `[T]`, where `T` is the element type.
+For example, the type `[Int16]` specifies a variable-size array of elements that have type `Int16`.
+
+It is important to understand that arrays are value types and are only ever copied
+when used as an initial value for a constant or variable,
+when assigning to a variable,
+when used as function argument,
+or when returned from a function call.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> size = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// Invalid: Array-size must be an integer literal</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers: [Int; </span><span style="color: #0000FF">size</span><span style="color: #000000">] = []</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a fixed-sized array of integers</span><span>
+</span><span style="color: #008000">// which always contains exactly two elements.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> array: [Int8; 2] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a fixed-sized array of fixed-sized arrays of integers.</span><span>
+</span><span style="color: #008000">// The inner arrays always contain exactly three elements,</span><span>
+</span><span style="color: #008000">// the outer array always contains two elements.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> arrays: [[Int16; 3]; 2] = [</span><span>
+</span><span style="color: #000000">    [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #09885A">3</span><span style="color: #000000">],</span><span>
+</span><span style="color: #000000">    [</span><span style="color: #09885A">4</span><span style="color: #000000">, </span><span style="color: #09885A">5</span><span style="color: #000000">, </span><span style="color: #09885A">6</span><span style="color: #000000">]</span><span>
+</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a variable length array of integers</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> variableLengthArray: [Int] = []</span><span>
+</span></pre></code>
+
+Array types are covariant in their element types.
+For example, `[Int]` is a subtype of `[Any]`.
+This is safe because arrays are value types and not reference types.
+
+#### [](#array-indexing)Array Indexing
+
+To get the element of an array at a specific index, the indexing syntax can be used:
+The array is followed by an opening square bracket `[`, the indexing value, and ends with a closing square bracket `]`.
+
+Indexes start at 0 for the first element in the array.
+
+Accessing an element which is out of bounds results in a fatal error at run-time and aborts the program.
+
+<code><pre><span style="color: #008000">// Declare an array of integers.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Get the first number of the array.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">numbers[</span><span style="color: #09885A">0</span><span style="color: #000000">] </span><span style="color: #008000">// is `42`</span><span>
+</span><span>
+</span><span style="color: #008000">// Get the second number of the array.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">numbers[</span><span style="color: #09885A">1</span><span style="color: #000000">] </span><span style="color: #008000">// is `23`</span><span>
+</span><span>
+</span><span style="color: #008000">// Run-time error: Index 2 is out of bounds, the program aborts.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">numbers[</span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare an array of arrays of integers, i.e. the type is `[[Int]]`.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> arrays = [[</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">], [</span><span style="color: #09885A">3</span><span style="color: #000000">, </span><span style="color: #09885A">4</span><span style="color: #000000">]]</span><span>
+</span><span>
+</span><span style="color: #008000">// Get the first number of the second array.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">arrays[</span><span style="color: #09885A">1</span><span style="color: #000000">][</span><span style="color: #09885A">0</span><span style="color: #000000">] </span><span style="color: #008000">// is `3`</span><span>
+</span></pre></code>
+
+To set an element of an array at a specific index, the indexing syntax can be used as well.
+
+<code><pre><span style="color: #008000">// Declare an array of integers.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Change the second number in the array.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// NOTE: The declaration `numbers` is constant, which means that</span><span>
+</span><span style="color: #008000">// the *name* is constant, not the *value* – the value, i.e. the array,</span><span>
+</span><span style="color: #008000">// is mutable and can be changed.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">numbers[</span><span style="color: #09885A">1</span><span style="color: #000000">] = </span><span style="color: #09885A">2</span><span>
+</span><span>
+</span><span style="color: #008000">// `numbers` is `[42, 2]`</span><span>
+</span></pre></code>
+
+#### [](#array-fields-and-functions)Array Fields and Functions
+
+Arrays have multiple built-in fields and functions
+that can be used to get information about and manipulate the contents of the array.
+
+The field `length`, and the functions `concat`, and `contains`
+are available for both variable-sized and fixed-sized or variable-sized arrays.
+
+-   `length: Int`:
+    Returns the number of elements in the array.
+
+    <code><pre><span style="color: #008000">// Declare an array of integers.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Find the number of elements of the array.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> length = numbers.length</span><span>
+    </span><span>
+    </span><span style="color: #008000">// `length` is `4`</span><span>
+    </span></pre></code>
+
+-   `concat(_ array: T): T`:
+    Concatenates the parameter `array` to the end 
+    of the array the function is called on,
+    but does not modify that array.
+
+    Both arrays must be the same type `T`.
+
+    This function creates a new array whose length is 
+    the sum of the length of the array
+    the function is called on and the length of the array given as the parameter.
+
+    <code><pre><span style="color: #008000">// Declare two arrays of integers.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> moreNumbers = [</span><span style="color: #09885A">11</span><span style="color: #000000">, </span><span style="color: #09885A">27</span><span style="color: #000000">]</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Concatenate the array `moreNumbers` to the array `numbers`</span><span>
+    </span><span style="color: #008000">// and declare a new variable for the result.</span><span>
+    </span><span style="color: #008000">//</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> allNumbers = numbers.concat(moreNumbers)</span><span>
+    </span><span>
+    </span><span style="color: #008000">// `allNumbers` is `[42, 23, 31, 12, 11, 27]`</span><span>
+    </span><span style="color: #008000">// `numbers` is still `[42, 23, 31, 12]`</span><span>
+    </span><span style="color: #008000">// `moreNumbers` is still `[11, 27]`</span><span>
+    </span></pre></code>
+
+-   `contains(_ element: T): Bool`:
+    Indicates whether the given element of type `T` is in the array.
+
+    <code><pre><span style="color: #008000">// Declare an array of integers.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Check if the array contains 11.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> containsEleven = numbers.contains(</span><span style="color: #09885A">11</span><span style="color: #000000">)</span><span>
+    </span><span style="color: #008000">// `containsEleven` is `false`</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Check if the array contains 12.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> containsTwelve = numbers.contains(</span><span style="color: #09885A">12</span><span style="color: #000000">)</span><span>
+    </span><span style="color: #008000">// `containsTwelve` is `true`</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Invalid: Check if the array contains the string "Kitty".</span><span>
+    </span><span style="color: #008000">// This results in a type error, as the array only contains integers.</span><span>
+    </span><span style="color: #008000">//</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> containsKitty = numbers.contains(</span><span style="color: #A31515">"Kitty"</span><span style="color: #000000">)</span><span>
+    </span></pre></code>
+
+##### [](#variable-size-array-functions)Variable-size Array Functions
+
+The following functions can only be used on variable-sized arrays.
+It is invalid to use one of these functions on a fixed-sized array.
+
+-   `append(_ element: T): Void`:
+    Adds the new element `element` of type `T` to the end of the array.
+
+    The new element must be the same type as all the other elements in the array.
+
+    <code><pre><span style="color: #008000">// Declare an array of integers.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Add a new element to the array.</span><span>
+    </span><span style="color: #000000">numbers.append(</span><span style="color: #09885A">20</span><span style="color: #000000">)</span><span>
+    </span><span style="color: #008000">// `numbers` is now `[42, 23, 31, 12, 20]`</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Invalid: The parameter has the wrong type `String`.</span><span>
+    </span><span style="color: #000000">numbers.append(</span><span style="color: #A31515">"SneakyString"</span><span style="color: #000000">)</span><span>
+    </span></pre></code>
+
+-   `insert(at index: Int, _ element: T): Void`:
+    Inserts the new element `element` of type `T` 
+    at the given `index` of the array.
+
+    The new element must be of the same type as the other elements in the array.
+
+    The `index` must be within the bounds of the array.
+    If the index is outside the bounds, the program aborts.
+
+    The existing element at the supplied index is not overwritten.
+
+    All the elements after the new inserted element 
+    are shifted to the right by one.
+
+    <code><pre><span style="color: #008000">// Declare an array of integers.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Insert a new element at position 1 of the array.</span><span>
+    </span><span style="color: #000000">numbers.insert(at: </span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">20</span><span style="color: #000000">)</span><span>
+    </span><span style="color: #008000">// `numbers` is now `[42, 20, 23, 31, 12]`</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Run-time error: Out of bounds index, the program aborts.</span><span>
+    </span><span style="color: #000000">numbers.insert(at: </span><span style="color: #09885A">12</span><span style="color: #000000">, </span><span style="color: #09885A">39</span><span style="color: #000000">)</span><span>
+    </span></pre></code>
+
+-   `remove(at index: Int): T`:
+    Removes the element at the given `index` from the array and returns it.
+
+    The `index` must be within the bounds of the array.
+    If the index is outside the bounds, the program aborts.
+
+    <code><pre><span style="color: #008000">// Declare an array of integers.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">]</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Remove element at position 1 of the array.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> twentyThree = numbers.remove(at: </span><span style="color: #09885A">1</span><span style="color: #000000">)</span><span>
+    </span><span style="color: #008000">// `numbers` is now `[42, 31]`</span><span>
+    </span><span style="color: #008000">// `twentyThree` is `23`</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Run-time error: Out of bounds index, the program aborts.</span><span>
+    </span><span style="color: #000000">numbers.remove(at: </span><span style="color: #09885A">19</span><span style="color: #000000">)</span><span>
+    </span></pre></code>
+
+-   `removeFirst(): T`:
+    Removes the first element from the array and returns it.
+
+    The array must not be empty.
+    If the array is empty, the program aborts.
+
+    <code><pre><span style="color: #008000">// Declare an array of integers.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Remove the first element of the array.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> fortytwo = numbers.removeFirst()</span><span>
+    </span><span style="color: #008000">// `numbers` is now `[23]`</span><span>
+    </span><span style="color: #008000">// `fortywo` is `42`</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Remove the first element of the array.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> twentyThree = numbers.removeFirst()</span><span>
+    </span><span style="color: #008000">// `numbers` is now `[]`</span><span>
+    </span><span style="color: #008000">// `twentyThree` is `23`</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Run-time error: The array is empty, the program aborts.</span><span>
+    </span><span style="color: #000000">numbers.removeFirst()</span><span>
+    </span></pre></code>
+
+-   `removeLast(): T`:
+    Removes the last element from the array and returns it.
+
+    The array must not be empty.
+    If the array is empty, the program aborts.
+
+    <code><pre><span style="color: #008000">// Declare an array of integers.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">]</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Remove the last element of the array.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> twentyThree = numbers.removeLast()</span><span>
+    </span><span style="color: #008000">// `numbers` is now `[42]`</span><span>
+    </span><span style="color: #008000">// `twentyThree` is `23`</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Remove the last element of the array.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> fortyTwo = numbers.removeLast()</span><span>
+    </span><span style="color: #008000">// `numbers` is now `[]`</span><span>
+    </span><span style="color: #008000">// `fortyTwo` is `42`</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Run-time error: The array is empty, the program aborts.</span><span>
+    </span><span style="color: #000000">numbers.removeLast()</span><span>
+    </span></pre></code>
+
+<!--
+
+TODO
+
+- filter, etc. for all array types
+- Document and link to array concatenation operator `&` in operators section
+
+-->
+
+### [](#dictionaries)Dictionaries
+
+Dictionaries are mutable, unordered collections of key-value associations.
+In a dictionary, all keys must have the same type, 
+and all values must have the same type.
+Dictionaries may contain a key only once and 
+may contain a value multiple times.
+
+Dictionary literals start with an opening brace `{` 
+and end with a closing brace `}`.
+Keys are separated from values by a colon, 
+and key-value associations are separated by commas.
+
+<code><pre><span style="color: #008000">// An empty dictionary</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">{}</span><span>
+</span><span>
+</span><span style="color: #008000">// A dictionary which associates integers with booleans</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">{</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">2</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: mixed types</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">{</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">false</span><span style="color: #000000">: </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+#### [](#dictionary-types)Dictionary Types
+
+Dictionaries have the form `{K: V}`,
+where `K` is the type of the key,
+and `V` is the type of the value.
+For example, a dictionary with `Int` keys and `Bool` 
+values has type `{Int: Bool}`.
+
+<code><pre><span style="color: #008000">// Declare a constant that has type `{Int: Bool}`,</span><span>
+</span><span style="color: #008000">// a dictionary mapping integers to booleans.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">0</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant that has type `{Bool: Int}`,</span><span>
+</span><span style="color: #008000">// a dictionary mapping booleans to integers.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> integers = {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">true</span><span style="color: #000000">: </span><span style="color: #09885A">1</span><span style="color: #000000">,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">false</span><span style="color: #000000">: </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+Dictionary types are covariant in their key and value types.
+For example, `[Int: String]` is a subtype of `[Any: String]` 
+and also a subtype of `[Int: Any]`.
+This is safe because dictionaries are value types and not reference types.
+
+#### [](#dictionary-access)Dictionary Access
+
+To get the value for a specific key from a dictionary, 
+the access syntax can be used: 
+The dictionary is followed by an opening square bracket `[`, the key, 
+and ends with a closing square bracket `]`.
+
+Accessing a key returns an [optional](#optionals):
+If the key is found in the dictionary, the value for the given key is returned,
+and if the key is not found, `nil` is returned.
+
+<code><pre><span style="color: #008000">// Declare a constant that has type `{Bool: Int}`,</span><span>
+</span><span style="color: #008000">// a dictionary mapping integers to booleans.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">0</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// The result of accessing a key has type `Bool?`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">booleans[</span><span style="color: #09885A">1</span><span style="color: #000000">]  </span><span style="color: #008000">// is `true`</span><span>
+</span><span style="color: #000000">booleans[</span><span style="color: #09885A">0</span><span style="color: #000000">]  </span><span style="color: #008000">// is `false`</span><span>
+</span><span style="color: #000000">booleans[</span><span style="color: #09885A">2</span><span style="color: #000000">]  </span><span style="color: #008000">// is `nil`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Accessing a key which does not have type `Int`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">booleans[</span><span style="color: #A31515">"1"</span><span style="color: #000000">]</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare a constant that has type `{Bool: Int}`,</span><span>
+</span><span style="color: #008000">// a dictionary mapping booleans to integers.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> integers = {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">true</span><span style="color: #000000">: </span><span style="color: #09885A">1</span><span style="color: #000000">,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">false</span><span style="color: #000000">: </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// The result of accessing a key has type `Int?`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">integers[</span><span style="color: #0000FF">true</span><span style="color: #000000">] </span><span style="color: #008000">// is `1`</span><span>
+</span><span style="color: #000000">integers[</span><span style="color: #0000FF">false</span><span style="color: #000000">] </span><span style="color: #008000">// is `0`</span><span>
+</span></pre></code>
+
+To set the value for a key of a dictionary, 
+the access syntax can be used as well.
+
+<code><pre><span style="color: #008000">// Declare a constant that has type `{Int: Bool}`,</span><span>
+</span><span style="color: #008000">// a dictionary mapping booleans to integers.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">0</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Assign new values for the keys `1` and `0`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">booleans[</span><span style="color: #09885A">1</span><span style="color: #000000">] = </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #000000">booleans[</span><span style="color: #09885A">0</span><span style="color: #000000">] = </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #008000">// `booleans` is `{1: false, 0: true}`</span><span>
+</span></pre></code>
+
+#### [](#dictionary-fields-and-functions)Dictionary Fields and Functions
+
+-   `length: Int`:
+    Returns the number of entries in the dictionary.
+
+    <code><pre><span style="color: #008000">// Declare a dictionary mapping strings to integers.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = {</span><span style="color: #A31515">"fortyTwo"</span><span style="color: #000000">: </span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #A31515">"twentyThree"</span><span style="color: #000000">: </span><span style="color: #09885A">23</span><span style="color: #000000">}</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Find the number of entries of the dictionary.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> length = numbers.length</span><span>
+    </span><span>
+    </span><span style="color: #008000">// `length` is `2`</span><span>
+    </span></pre></code>
+
+-   `remove(key: K): V?`:
+    Removes the value for the given `key` of type `K` from the dictionary.
+
+    Returns the value of type `V` as an optional 
+    if the dictionary contained the key,
+    otherwise `nil`.
+
+    <code><pre><span style="color: #008000">// Declare a dictionary mapping strings to integers.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = {</span><span style="color: #A31515">"fortyTwo"</span><span style="color: #000000">: </span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #A31515">"twentyThree"</span><span style="color: #000000">: </span><span style="color: #09885A">23</span><span style="color: #000000">}</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Remove the key `"fortyTwo"` from the dictionary.</span><span>
+    </span><span style="color: #008000">// The key exists in the dictionary,</span><span>
+    </span><span style="color: #008000">// so the value associated with the key is returned.</span><span>
+    </span><span style="color: #008000">//</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> fortyTwo = numbers.remove(key: </span><span style="color: #A31515">"fortyTwo"</span><span style="color: #000000">)</span><span>
+    </span><span>
+    </span><span style="color: #008000">// `fortyTwo` is `42`</span><span>
+    </span><span style="color: #008000">// `numbers` is `{"twentyThree": 23}`</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Remove the key `"oneHundred"` from the dictionary.</span><span>
+    </span><span style="color: #008000">// The key does not exist in the dictionary, so `nil` is returned.</span><span>
+    </span><span style="color: #008000">//</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> oneHundred = numbers.remove(key: </span><span style="color: #A31515">"oneHundred"</span><span style="color: #000000">)</span><span>
+    </span><span>
+    </span><span style="color: #008000">// `oneHundred` is `nil`</span><span>
+    </span><span style="color: #008000">// `numbers` is `{"twentyThree": 23}`</span><span>
+    </span></pre></code>
+
+-   `keys: [K]`:
+    Returns an array of the keys of type `K` in the dictionary.  This does not
+    modify the dictionary, just returns a copy of the keys as an array.
+    If the dictionary is empty, this returns an empty array.
+
+    <code><pre><span style="color: #008000">// Declare a dictionary mapping strings to integers.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = {</span><span style="color: #A31515">"fortyTwo"</span><span style="color: #000000">: </span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #A31515">"twentyThree"</span><span style="color: #000000">: </span><span style="color: #09885A">23</span><span style="color: #000000">}</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Find the keys of the dictionary.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> keys = numbers.keys</span><span>
+    </span><span>
+    </span><span style="color: #008000">// `keys` has type `[String]` and is `["fortyTwo","twentyThree"]`</span><span>
+    </span></pre></code>
+
+-   `values: [V]`:
+    Returns an array of the values of type `V` in the dictionary.  This does not
+    modify the dictionary, just returns a copy of the values as an array.
+    If the dictionary is empty, this returns an empty array.
+
+    This field is not available if `V` is a resource type.
+
+    <code><pre><span style="color: #008000">// Declare a dictionary mapping strings to integers.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = {</span><span style="color: #A31515">"fortyTwo"</span><span style="color: #000000">: </span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #A31515">"twentyThree"</span><span style="color: #000000">: </span><span style="color: #09885A">23</span><span style="color: #000000">}</span><span>
+    </span><span>
+    </span><span style="color: #008000">// Find the values of the dictionary.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> values = numbers.values</span><span>
+    </span><span>
+    </span><span style="color: #008000">// `values` has type [Int] and is `[42, 23]`</span><span>
+    </span></pre></code>
+
+#### [](#dictionary-keys)Dictionary Keys
+
+Dictionary keys must be hashable and equatable, 
+i.e., must implement the [`Hashable`](#hashable-interface) 
+and [`Equatable`](#equatable-interface) [interfaces](#interfaces).
+
+Most of the built-in types, like booleans and integers, 
+are hashable and equatable, so can be used as keys in dictionaries.
+
+## [](#operators)Operators
+
+Operators are special symbols that perform a computation 
+for one or more values.
+They are either unary, binary, or ternary.
+
+-   Unary operators perform an operation for a single value.
+    The unary operator symbol appears before the value.
+
+-   Binary operators operate on two values.
+      The binary operator symbol appears between the two values (infix).
+
+-   Ternary operators operate on three values.
+    The first operator symbol appears between the first and second value, 
+    the second operator symbol appears between the second and third value (infix).
+
+### [](#negation)Negation
+
+The `-` unary operator negates an integer:
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">-a  </span><span style="color: #008000">// is `-1`</span><span>
+</span></pre></code>
+
+The `!` unary operator logically negates a boolean:
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #000000">!a  </span><span style="color: #008000">// is `false`</span><span>
+</span></pre></code>
+
+### [](#assignment)Assignment
+
+The binary assignment operator `=` can be used 
+to assign a new value to a variable.
+It is only allowed in a statement and is not allowed in expressions.
+
+<code><pre><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">a = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// `a` is `2`</span><span>
+</span><span>
+</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">3</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> c = </span><span style="color: #09885A">4</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The assignment operation cannot be used in an expression.</span><span>
+</span><span style="color: #000000">a = b = c</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, the intended assignment must be written in multiple statements.</span><span>
+</span><span style="color: #000000">b = c</span><span>
+</span><span style="color: #000000">a = b</span><span>
+</span></pre></code>
+
+Assignments to constants are invalid.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// Invalid: Assignments are only for variables, not constants.</span><span>
+</span><span style="color: #000000">a = </span><span style="color: #09885A">2</span><span>
+</span></pre></code>
+
+The left-hand side of the assignment operand must be an identifier.
+For arrays and dictionaries, this identifier can be followed 
+by one or more index or access expressions.
+
+<code><pre><span style="color: #008000">// Declare an array of integers.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Change the first element of the array.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">numbers[</span><span style="color: #09885A">0</span><span style="color: #000000">] = </span><span style="color: #09885A">3</span><span>
+</span><span>
+</span><span style="color: #008000">// `numbers` is `[3, 2]`</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare an array of arrays of integers.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> arrays = [[</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">], [</span><span style="color: #09885A">3</span><span style="color: #000000">, </span><span style="color: #09885A">4</span><span style="color: #000000">]]</span><span>
+</span><span>
+</span><span style="color: #008000">// Change the first element in the second array</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">arrays[</span><span style="color: #09885A">1</span><span style="color: #000000">][</span><span style="color: #09885A">0</span><span style="color: #000000">] = </span><span style="color: #09885A">5</span><span>
+</span><span>
+</span><span style="color: #008000">// `arrays` is `[[1, 2], [5, 4]]`</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> dictionaries = {</span><span>
+</span><span style="color: #000000">  </span><span style="color: #0000FF">true</span><span style="color: #000000">: {</span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #09885A">2</span><span style="color: #000000">},</span><span>
+</span><span style="color: #000000">  </span><span style="color: #0000FF">false</span><span style="color: #000000">: {</span><span style="color: #09885A">3</span><span style="color: #000000">: </span><span style="color: #09885A">4</span><span style="color: #000000">}</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #000000">dictionaries[</span><span style="color: #0000FF">false</span><span style="color: #000000">][</span><span style="color: #09885A">3</span><span style="color: #000000">] = </span><span style="color: #09885A">0</span><span>
+</span><span>
+</span><span style="color: #008000">// `dictionaries` is `{</span><span>
+</span><span style="color: #008000">//   true: {1: 2},</span><span>
+</span><span style="color: #008000">//   false: {3: 0}</span><span>
+</span><span style="color: #008000">//}`</span><span>
+</span></pre></code>
+
+### [](#swapping)Swapping
+
+The binary swap operator `<->` can be used 
+to exchange the values of two variables.
+It is only allowed in a statement and is not allowed in expressions.
+
+<code><pre><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">a &#x3C;-> b</span><span>
+</span><span style="color: #008000">// `a` is `2`</span><span>
+</span><span style="color: #008000">// `b` is `1`</span><span>
+</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> c = </span><span style="color: #09885A">3</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The swap operation cannot be used in an expression.</span><span>
+</span><span style="color: #000000">a &#x3C;-> b &#x3C;-> c</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, the intended swap must be written in multiple statements.</span><span>
+</span><span style="color: #000000">b &#x3C;-> c</span><span>
+</span><span style="color: #000000">a &#x3C;-> b</span><span>
+</span></pre></code>
+
+Both sides of the swap operation must be variable, 
+assignment to constants is invalid.
+
+<code><pre><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Swapping is only possible for variables, not constants.</span><span>
+</span><span style="color: #000000">a &#x3C;-> b</span><span>
+</span></pre></code>
+
+Both sides of the swap operation must be an identifier,
+followed by one or more index or access expressions.
+
+### [](#arithmetic)Arithmetic
+
+There are four arithmetic operators:
+
+-   Addition: `+`
+-   Subtraction: `-`
+-   Multiplication: `*`
+-   Division: `/`
+-   Remainder: `%`
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span style="color: #000000"> + </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// `a` is `3`</span><span>
+</span></pre></code>
+
+The arguments for the operators need to be of the same type.
+The result is always the same type as the arguments.
+
+Arithmetic operators do not cause values to overflow.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">100</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int8 = </span><span style="color: #09885A">100</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> c = a * b</span><span>
+</span><span style="color: #008000">// `c` is `10000`, and has type `Int`</span><span>
+</span></pre></code>
+
+If overflow behavior is intended, overflowing operators are available, 
+which are prefixed with an `&`:
+
+-   Overflow addition: `&+`
+-   Overflow subtraction: `&-`
+-   Overflow multiplication: `&*`
+
+For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111). 
+Adding 1 results in an overflow, truncation to 8 bits, and the value 0.
+
+<code><pre><span style="color: #008000">//     11111111 = 255</span><span>
+</span><span style="color: #008000">// &#x26;+         1</span><span>
+</span><span style="color: #008000">//  = 100000000 = 0</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> a: UInt8 = </span><span style="color: #09885A">255</span><span>
+</span><span style="color: #000000">a &#x26;+ </span><span style="color: #09885A">1</span><span style="color: #000000"> </span><span style="color: #008000">// is `0`</span><span>
+</span></pre></code>
+
+Similarly, for the minimum value 0, subtracting 1 wraps around and results in the maximum value 255.
+
+<code><pre><span style="color: #008000">//     00000000</span><span>
+</span><span style="color: #008000">// &#x26;-         1</span><span>
+</span><span style="color: #008000">//  =  11111111 = 255</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> b: UInt8 = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">b &#x26;- </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `255`</span><span>
+</span></pre></code>
+
+Signed integers are also affected by overflow. In a signed integer, the first bit is used for the sign. This leaves 7 bits for the actual value for an 8-bit signed integer, i.e., the range of values is -128 (binary 10000000) to 127 (01111111). Subtracting 1 from -128 results in 127.
+
+<code><pre><span style="color: #008000">//    10000000 = -128</span><span>
+</span><span style="color: #008000">// &#x26;-        1</span><span>
+</span><span style="color: #008000">//  = 01111111 = 127</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> c: Int8 = </span><span style="color: #09885A">-128</span><span>
+</span><span style="color: #000000">c &#x26;- </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `127`</span><span>
+</span></pre></code>
+
+Division by zero is a fatal error at run-time and aborts the program.
+
+### [](#logical-operators)Logical Operators
+
+Logical operators work with the boolean values `true` and `false`.
+
+-   Logical AND: `a && b`
+
+    <code><pre><span style="color: #0000FF">true</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span><span>
+    </span><span style="color: #0000FF">true</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">false</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span><span>
+    </span><span style="color: #0000FF">false</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span><span>
+    </span><span style="color: #0000FF">false</span><span style="color: #000000"> &#x26;&#x26; </span><span style="color: #0000FF">false</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span></pre></code>
+
+    If the left-hand side is false, the right-hand side is not evaluated.
+
+-   Logical OR: `a || b`
+
+    <code><pre><span style="color: #0000FF">true</span><span style="color: #000000"> || </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span><span>
+    </span><span style="color: #0000FF">true</span><span style="color: #000000"> || </span><span style="color: #0000FF">false</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span><span>
+    </span><span style="color: #0000FF">false</span><span style="color: #000000"> || </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span><span>
+    </span><span style="color: #0000FF">false</span><span style="color: #000000"> || </span><span style="color: #0000FF">false</span><span style="color: #000000"> </span><span style="color: #008000">// is `false`</span><span>
+    </span></pre></code>
+
+    If the left-hand side is true, the right-hand side is not evaluated.
+
+### [](#comparison-operators)Comparison operators
+
+Comparison operators work with boolean and integer values.
+
+-   Equality: `==`, for booleans and integers
+
+    Both sides of the equality operator may be optional, even of different levels,
+    so it is for example possible to compare a non-optional with a double-optional (`??`).
+
+    <code><pre><span style="color: #09885A">1</span><span style="color: #000000"> == </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span><span>
+    </span><span style="color: #09885A">1</span><span style="color: #000000"> == </span><span style="color: #09885A">2</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span></pre></code>
+
+    <code><pre><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span><span>
+    </span><span style="color: #0000FF">true</span><span style="color: #000000"> == </span><span style="color: #0000FF">false</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span></pre></code>
+
+    <code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">1</span><span>
+    </span><span style="color: #000000">x == </span><span style="color: #0000FF">nil</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span></pre></code>
+
+    <code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #09885A">1</span><span>
+    </span><span style="color: #000000">x == </span><span style="color: #0000FF">nil</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span></pre></code>
+
+    <code><pre><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #0000FF">nil</span><span>
+    </span><span style="color: #000000">x == y  </span><span style="color: #008000">// is `false`</span><span>
+    </span></pre></code>
+
+    <code><pre><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #09885A">2</span><span>
+    </span><span style="color: #000000">x == y  </span><span style="color: #008000">// is `true`</span><span>
+    </span></pre></code>
+
+-   Inequality: `!=`, for booleans and integers (possibly optional)
+
+    Both sides of the inequality operator may be optional, even of different levels,
+    so it is for example possible to compare a non-optional with a double-optional (`??`).
+
+    <code><pre><span style="color: #09885A">1</span><span style="color: #000000"> != </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span><span>
+    </span><span style="color: #09885A">1</span><span style="color: #000000"> != </span><span style="color: #09885A">2</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span></pre></code>
+
+    <code><pre><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">true</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span><span>
+    </span><span style="color: #0000FF">true</span><span style="color: #000000"> != </span><span style="color: #0000FF">false</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span></pre></code>
+
+    <code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">1</span><span>
+    </span><span style="color: #000000">x != </span><span style="color: #0000FF">nil</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span></pre></code>
+
+    <code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int = </span><span style="color: #09885A">1</span><span>
+    </span><span style="color: #000000">x != </span><span style="color: #0000FF">nil</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span></pre></code>
+
+    <code><pre><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #0000FF">nil</span><span>
+    </span><span style="color: #000000">x != y  </span><span style="color: #008000">// is `true`</span><span>
+    </span></pre></code>
+
+    <code><pre><span style="color: #008000">// Comparisons of different levels of optionals are possible.</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> x: Int? = </span><span style="color: #09885A">2</span><span>
+    </span><span style="color: #0000FF">let</span><span style="color: #000000"> y: Int?? = </span><span style="color: #09885A">2</span><span>
+    </span><span style="color: #000000">x != y  </span><span style="color: #008000">// is `false`</span><span>
+    </span></pre></code>
+
+-   Less than: `<`, for integers
+
+    <code><pre><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span><span>
+    </span><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">2</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span><span>
+    </span><span style="color: #09885A">2</span><span style="color: #000000"> &#x3C; </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span></pre></code>
+
+-   Less or equal than: `<=`, for integers
+
+    <code><pre><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span><span>
+    </span><span style="color: #09885A">1</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">2</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span><span>
+    </span><span style="color: #09885A">2</span><span style="color: #000000"> &#x3C;= </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span></pre></code>
+
+-   Greater than: `>`, for integers
+
+    <code><pre><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span><span>
+    </span><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">2</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span><span>
+    </span><span style="color: #09885A">2</span><span style="color: #000000"> > </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span></pre></code>
+
+-   Greater or equal than: `>=`, for integers
+
+    <code><pre><span style="color: #09885A">1</span><span style="color: #000000"> >= </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span><span>
+    </span><span style="color: #09885A">1</span><span style="color: #000000"> >= </span><span style="color: #09885A">2</span><span style="color: #000000">  </span><span style="color: #008000">// is `false`</span><span>
+    </span><span>
+    </span><span style="color: #09885A">2</span><span style="color: #000000"> >= </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `true`</span><span>
+    </span></pre></code>
+
+### [](#ternary-conditional-operator)Ternary Conditional Operator
+
+There is only one ternary conditional operator, the ternary conditional operator (`a ? b : c`).
+
+It behaves like an if-statement, but is an expression:
+If the first operator value is true, the second operator value is returned.
+If the first operator value is false, the third value is returned.
+
+The first value must be a boolean (must have the type `Bool`).
+The second value and third value can be of any type.
+The result type is the least common supertype of the second and third value.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">2</span><span style="color: #000000"> ? </span><span style="color: #09885A">3</span><span style="color: #000000"> : </span><span style="color: #09885A">4</span><span>
+</span><span style="color: #008000">// `x` is `4` and has type `Int`</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> y = </span><span style="color: #09885A">1</span><span style="color: #000000"> > </span><span style="color: #09885A">2</span><span style="color: #000000"> ? </span><span style="color: #0000FF">nil</span><span style="color: #000000"> : </span><span style="color: #09885A">3</span><span>
+</span><span style="color: #008000">// `y` is `3` and has type `Int?`</span><span>
+</span></pre></code>
+
+### [](#precedence-and-associativity)Precedence and Associativity
+
+Operators have the following precedences, highest to lowest:
+
+-   Multiplication precedence: `*`, `&*`, `/`, `%`
+-   Addition precedence: `+`, `&+`, `-`, `&-`
+-   Relational precedence: `<`, `<=`, `>`, `>=`
+-   Equality precedence: `==`, `!=`
+-   Logical conjunction precedence: `&&`
+-   Logical disjunction precedence: `||`
+-   Ternary precedence: `? :`
+
+All operators are left-associative, except for the ternary operator, which is right-associative.
+
+Expressions can be wrapped in parentheses to override precedence conventions, i.e. an alternate order should be indicated, or when the default order should be emphasized, e.g. to avoid confusion. For example, `(2 + 3) * 4` forces addition to precede multiplication, and `5 + (6 * 7)` reinforces the default order.
+
+## [](#functions)Functions
+
+Functions are sequences of statements that perform a specific task. Functions have parameters (inputs) and an optional return value (output). Functions are typed: the function type consists of the parameter types and the return type.
+
+Functions are values, i.e., they can be assigned to constants and variables, and can be passed as arguments to other functions. This behavior is often called &quot;first-class functions&quot;.
+
+### [](#function-declarations)Function Declarations
+
+Functions can be declared by using the `fun` keyword, followed by the name of the declaration, the parameters, the optional return type, and the code that should be executed when the function is called.
+
+The parameters need to be enclosed in parentheses.
+The return type, if any, is separated from the parameters by a colon (`:`).
+The function code needs to be enclosed in opening and closing braces.
+
+Each parameter must have a name, which is the name that the argument value will be available as within the function.
+
+An additional argument label can be provided to require function calls to use the label to provide an argument value for the parameter.
+
+Argument labels make code more explicit and readable.
+For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
+
+Argument labels should be named so they make sense from the perspective of the function call.
+
+Argument labels precede the parameter name.
+The special argument label `_` indicates 
+that a function call can omit the argument label.
+If no argument label is declared in the function declaration,
+the parameter name is the argument label of the function declaration,
+and function calls must use the parameter name as the argument label.
+
+Each parameter needs to have a type annotation, 
+which follows the parameter name after a colon.
+
+Function calls may provide arguments for parameters 
+which are subtypes of the parameter types.
+
+There is **no** support for optional parameters, 
+i.e. default values for parameters,
+and variadic functions, 
+i.e. functions that take an arbitrary amount of arguments.
+
+<code><pre><span style="color: #008000">// Declare a function named `double`, which multiples a number by two.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The special argument label _ is specified for the parameter,</span><span>
+</span><span style="color: #008000">// so no argument label has to be provided in a function call.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Call the function named `double` with the value 4 for the first parameter.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The argument label can be omitted in the function call as the declaration</span><span>
+</span><span style="color: #008000">// specifies the special argument label _ for the parameter.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">double(</span><span style="color: #09885A">2</span><span style="color: #000000">)  </span><span style="color: #008000">// is `4`</span><span>
+</span></pre></code>
+
+It is possible to require argument labels for some parameters,
+and not require argument labels for other parameters.
+
+<code><pre><span style="color: #008000">// Declare a function named `clamp`. The function takes an integer value,</span><span>
+</span><span style="color: #008000">// the lower limit, and the upper limit. It returns an integer between</span><span>
+</span><span style="color: #008000">// the lower and upper limit.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// For the first parameter the special argument label _ is used,</span><span>
+</span><span style="color: #008000">// so no argument label has to be given for it in a function call.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// For the second and third parameter no argument label is given,</span><span>
+</span><span style="color: #008000">// so the parameter names are the argument labels, i.e., the parameter names</span><span>
+</span><span style="color: #008000">// have to be given as argument labels in a function call.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> clamp(_ value: Int, min: Int, max: Int): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> value > max {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> max</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> value &#x3C; min {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> min</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> value</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant which has the result of a call to the function</span><span>
+</span><span style="color: #008000">// named `clamp` as its initial value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// For the first argument no label is given, as it is not required by</span><span>
+</span><span style="color: #008000">// the function declaration (the special argument label `_` is specified).</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// For the second and this argument the labels must be provided,</span><span>
+</span><span style="color: #008000">// as the function declaration does not specify the special argument label `_`</span><span>
+</span><span style="color: #008000">// for these two parameters.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// As the function declaration also does not specify argument labels</span><span>
+</span><span style="color: #008000">// for these parameters, the parameter names must be used as argument labels.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> clamped = clamp(</span><span style="color: #09885A">123</span><span style="color: #000000">, min: </span><span style="color: #09885A">0</span><span style="color: #000000">, max: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// `clamped` is `100`</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare a function named `send`, which transfers an amount</span><span>
+</span><span style="color: #008000">// from one account to another.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The implementation is omitted for brevity.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The first two parameters of the function have the same type, so there is</span><span>
+</span><span style="color: #008000">// a potential that a function call accidentally provides arguments in</span><span>
+</span><span style="color: #008000">// the wrong order.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// While the parameter names `sendingAccount` and `receivingAccount`</span><span>
+</span><span style="color: #008000">// are descriptive inside the function, they might be too verbose</span><span>
+</span><span style="color: #008000">// to require them as argument labels in function calls.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// For this reason the shorter argument labels `from` and `to` are specified,</span><span>
+</span><span style="color: #008000">// which still convey the meaning of the two parameters without being overly</span><span>
+</span><span style="color: #008000">// verbose.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The name of the third parameter, `amount`, is both meaningful inside</span><span>
+</span><span style="color: #008000">// the function and also in a function call, so no argument label is given,</span><span>
+</span><span style="color: #008000">// and the parameter name is required as the argument label in a function call.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> send(from sendingAccount: </span><span style="color: #0000FF">Account</span><span style="color: #000000">, to receivingAccount: </span><span style="color: #0000FF">Account</span><span style="color: #000000">, amount: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The function code is omitted for brevity.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant which refers to the sending account.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The initial value is omitted for brevity.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> sender: </span><span style="color: #0000FF">Account</span><span style="color: #000000"> = </span><span style="color: #008000">// ...</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant which refers to the receiving account.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The initial value is omitted for brevity.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> receiver: </span><span style="color: #0000FF">Account</span><span style="color: #000000"> = </span><span style="color: #008000">// ...</span><span>
+</span><span>
+</span><span style="color: #008000">// Call the function named `send`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The function declaration requires argument labels for all parameters,</span><span>
+</span><span style="color: #008000">// so they need to be provided in the function call.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// This avoids ambiguity. For example, in some languages (like C) it is</span><span>
+</span><span style="color: #008000">// a convention to order the parameters so that the receiver occurs first,</span><span>
+</span><span style="color: #008000">// followed by the sender. In other languages, it is common to have</span><span>
+</span><span style="color: #008000">// the sender be the first parameter, followed by the receiver.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// Here, the order is clear – send an amount from an account to another account.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">send(from: sender, to: receiver, amount: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span></pre></code>
+
+The order of the arguments in a function call must 
+match the order of the parameters in the function declaration.
+
+<code><pre><span style="color: #008000">// Declare a function named `test`, which accepts two parameters, named `first` and `second`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> test(first: Int, second: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: the arguments are provided in the wrong order,</span><span>
+</span><span style="color: #008000">// even though the argument labels are provided correctly.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">test(second: </span><span style="color: #09885A">1</span><span style="color: #000000">, first: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span></pre></code>
+
+Functions can be nested, 
+i.e., the code of a function may declare further functions.
+
+<code><pre><span style="color: #008000">// Declare a function which multiplies a number by two, and adds one.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ x: Int): Int {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a nested function which multiplies a number by two.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> double(x) + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #000000">doubleAndAddOne(</span><span style="color: #09885A">2</span><span style="color: #000000">)  </span><span style="color: #008000">// is `5`</span><span>
+</span></pre></code>
+
+### [](#function-overloading)Function overloading
+
+> 🚧 Status: Function overloading is not implemented.
+
+It is possible to declare functions with the same name, 
+as long as they have different sets of argument labels.
+This is known as function overloading.
+
+<code><pre><span style="color: #008000">// Declare a function named "assert" which requires a test value</span><span>
+</span><span style="color: #008000">// and a message argument.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> assert(_ test: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">, message: </span><span style="color: #0000FF">String</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a function named "assert" which only requires a test value.</span><span>
+</span><span style="color: #008000">// The function calls the `assert` function declared above.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> assert(_ test: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    assert(test, message: </span><span style="color: #A31515">"test is false"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+### [](#function-expressions)Function Expressions
+
+Functions can be also used as expressions.
+The syntax is the same as for function declarations, 
+except that function expressions have no name, i.e., they are anonymous.
+
+<code><pre><span style="color: #008000">// Declare a constant named `double`, which has a function as its value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The function multiplies a number by two when it is called.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// This function's type is `((Int): Int)`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> double =</span><span>
+</span><span style="color: #000000">    fun (_ x: Int): Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span></pre></code>
+
+### [](#function-calls)Function Calls
+
+Functions can be called (invoked). Function calls 
+need to provide exactly as many argument values as the function has parameters.
+
+<code><pre><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: the correct amount of arguments is provided.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">double(</span><span style="color: #09885A">2</span><span style="color: #000000">)  </span><span style="color: #008000">// is `4`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: too many arguments are provided.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">double(</span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: too few arguments are provided.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">double()</span><span>
+</span></pre></code>
+
+### [](#function-types)Function Types
+
+Function types consist of the function&#x27;s parameter types 
+and the function&#x27;s return type.
+
+The parameter types need to be enclosed in parentheses, 
+followed by a colon (`:`), and end with the return type.
+The whole function type needs to be enclosed in parentheses.
+
+<code><pre><span style="color: #008000">// Declare a function named `add`, with the function type `((Int, Int): Int)`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> add(a: Int, b: Int): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare a constant named `add`, with the function type `((Int, Int): Int)`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> add: ((Int, Int): Int) =</span><span>
+</span><span style="color: #000000">    fun (a: Int, b: Int): Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span></pre></code>
+
+If the function has no return type, it implicitly has the return type `Void`.
+
+<code><pre><span style="color: #008000">// Declare a constant named `doNothing`, which is a function</span><span>
+</span><span style="color: #008000">// that takes no parameters and returns nothing.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> doNothing: ((): </span><span style="color: #0000FF">Void</span><span style="color: #000000">) =</span><span>
+</span><span style="color: #000000">    fun () {}</span><span>
+</span></pre></code>
+
+Parentheses also control precedence.
+For example, a function type `((Int): ((): Int))` is the type 
+for a function which accepts one argument with type `Int`,
+and which returns another function, 
+that takes no arguments and returns an `Int`.
+
+The type `[((Int): Int); 2]` specifies an array type of two functions, 
+which accept one integer and return one integer.
+
+Argument labels are not part of the function type.
+This has the advantage that functions with different argument labels, 
+potentially written by different authors are compatible 
+as long as the parameter types and the return type match.
+It has the disadvantage that function calls to plain function values,
+cannot accept argument labels.
+
+<code><pre><span style="color: #008000">// Declare a function which takes one argument that has type `Int`.</span><span>
+</span><span style="color: #008000">// The function has type `((Int): Void)`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> foo1(x: Int) {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Call function `foo1`. This requires an argument label.</span><span>
+</span><span style="color: #000000">foo1(x: </span><span style="color: #09885A">1</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare another function which takes one argument that has type `Int`.</span><span>
+</span><span style="color: #008000">// The function also has type `((Int): Void)`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> foo2(y: Int) {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Call function `foo2`. This requires an argument label.</span><span>
+</span><span style="color: #000000">foo2(y: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a variable which has type `((Int): Void)` and use `foo1`</span><span>
+</span><span style="color: #008000">// as its initial value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> someFoo: ((Int): </span><span style="color: #0000FF">Void</span><span style="color: #000000">) = foo1</span><span>
+</span><span>
+</span><span style="color: #008000">// Call the function assigned to variable `someFoo`.</span><span>
+</span><span style="color: #008000">// This is valid as the function types match.</span><span>
+</span><span style="color: #008000">// This does neither require nor allow argument labels.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">someFoo(</span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Assign function `foo2` to variable `someFoo`.</span><span>
+</span><span style="color: #008000">// This is valid as the function types match.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">someFoo = foo2</span><span>
+</span><span>
+</span><span style="color: #008000">// Call the function assigned to variable `someFoo`.</span><span>
+</span><span style="color: #008000">// This does neither require nor allow argument labels.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">someFoo(</span><span style="color: #09885A">4</span><span style="color: #000000">)</span><span>
+</span></pre></code>
+
+### [](#closures)Closures
+
+A function may refer to variables and constants of its outer scopes 
+in which it is defined.
+It is called a closure, because 
+it is closing over those variables and constants.
+A closure can can read from the variables and constants 
+and assign to the variables it refers to.
+
+<code><pre><span style="color: #008000">// Declare a function named `makeCounter` which returns a function that</span><span>
+</span><span style="color: #008000">// each time when called, returns the next integer, starting at 1.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> makeCounter(): ((): Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> count = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> fun (): Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: read from and assign to the non-local variable</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// `count`, which is declared in the outer function.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        count = count + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> count</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> test = makeCounter()</span><span>
+</span><span style="color: #000000">test()  </span><span style="color: #008000">// is `1`</span><span>
+</span><span style="color: #000000">test()  </span><span style="color: #008000">// is `2`</span><span>
+</span></pre></code>
+
+### [](#argument-passing-behavior)Argument Passing Behavior
+
+When arguments are passed to a function, they are copied.
+Therefore, values that are passed into a function 
+are unchanged in the caller&#x27;s scope when the function returns.
+This behavior is known as [call-by-value](https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&amp;oldid=896280571#Call_by_value).
+
+<code><pre><span style="color: #008000">// Declare a function that changes the first two elements</span><span>
+</span><span style="color: #008000">// of an array of integers.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> change(_ numbers: [Int]) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Change the elements of the passed in array.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The changes are only local, as the array was copied.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    numbers[</span><span style="color: #09885A">0</span><span style="color: #000000">] = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    numbers[</span><span style="color: #09885A">1</span><span style="color: #000000">] = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// `numbers` is `[1, 2]`</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">0</span><span style="color: #000000">, </span><span style="color: #09885A">1</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #000000">change(numbers)</span><span>
+</span><span style="color: #008000">// `numbers` is still `[0, 1]`</span><span>
+</span></pre></code>
+
+Parameters are constant, i.e., it is not allowed to assign to them.
+
+<code><pre><span style="color: #0000FF">fun</span><span style="color: #000000"> test(x: Int) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: cannot assign to a parameter (constant)</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    x = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+### [](#function-preconditions-and-postconditions)Function Preconditions and Postconditions
+
+Functions may have preconditions and may have postconditions. Preconditions and postconditions can be used to restrict the inputs (values for parameters) and output (return value) of a function.
+
+Preconditions must be true right before the execution of the function. Preconditions are part of the function and introduced by the `pre` keyword, followed by the condition block.
+
+Postconditions must be true right after the execution of the function. Postconditions are part of the function and introduced by the `post` keyword, followed by the condition block. Postconditions may only occur after preconditions, if any.
+
+A conditions block consists of one or more conditions. Conditions are expressions evaluating to a boolean. They may not call functions, i.e., they cannot have side-effects and must be pure expressions. Also, conditions may not contain function expressions.
+
+<!--
+
+TODO:
+
+For now, function calls are not allowed in preconditions and postconditions.
+See https://github.com/dapperlabs/flow-go/issues/70
+
+-->
+
+Conditions may be written on separate lines, or multiple conditions can be written on the same line, separated by a semicolon. This syntax follows the syntax for [statements](#semicolons).
+
+Following each condition, an optional description can be provided after a colon.
+The condition description is used as an error message when the condition fails.
+
+In postconditions, the special constant `result` refers to the result of the function.
+
+<code><pre><span style="color: #0000FF">fun</span><span style="color: #000000"> factorial(_ n: Int): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Require the parameter `n` to be greater than or equal to zero.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        n >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">            </span><span style="color: #A31515">"factorial is only defined for integers greater than or equal to zero"</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Ensure the result will be greater than or equal to 1.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        result >= </span><span style="color: #09885A">1</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">            </span><span style="color: #A31515">"the result must be greater than or equal to 1"</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> n &#x3C; </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">       </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> n * factorial(n - </span><span style="color: #09885A">1</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #000000">factorial(</span><span style="color: #09885A">5</span><span style="color: #000000">)  </span><span style="color: #008000">// is `120`</span><span>
+</span><span>
+</span><span style="color: #008000">// Run-time error: The given argument does not satisfy the precondition `n >= 0` of the function, the program aborts.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">factorial(</span><span style="color: #09885A">-2</span><span style="color: #000000">)</span><span>
+</span></pre></code>
+
+In postconditions, the special function `before` can be used to get the value of an expression just before the function is called.
+
+<code><pre><span style="color: #0000FF">var</span><span style="color: #000000"> n = </span><span style="color: #09885A">0</span><span>
+</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> incrementN() {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Require the new value of `n` to be the old value of `n`, plus one.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        n == before(n) + </span><span style="color: #09885A">1</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">            </span><span style="color: #A31515">"n must be incremented by 1"</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    n = n + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+## [](#control-flow)Control flow
+
+Control flow statements control the flow of execution in a function.
+
+### [](#conditional-branching-if-statement)Conditional branching: if-statement
+
+If-statements allow a certain piece of code to be executed only when a given condition is true.
+
+The if-statement starts with the `if` keyword, followed by the condition, 
+and the code that should be executed if the condition is true 
+inside opening and closing braces.
+The condition expression must be Bool
+The braces are required and not optional.
+Parentheses around the condition are optional.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">0</span><span>
+</span><span>
+</span><span style="color: #0000FF">if</span><span style="color: #000000"> a == </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">   b = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Parentheses can be used around the condition, but are not required.</span><span>
+</span><span style="color: #000000">if (a != </span><span style="color: #09885A">0</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">   b = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `b` is `1`</span><span>
+</span></pre></code>
+
+An additional, optional else-clause can be added to execute another piece of code when the condition is false.
+The else-clause is introduced by the `else` keyword followed by braces that contain the code that should be executed.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">0</span><span>
+</span><span>
+</span><span style="color: #0000FF">if</span><span style="color: #000000"> a == </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">   b = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">} </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">   b = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `b` is `2`</span><span>
+</span></pre></code>
+
+The else-clause can contain another if-statement, i.e., if-statements can be chained together.
+In this case the braces can be omitted.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> b = </span><span style="color: #09885A">0</span><span>
+</span><span>
+</span><span style="color: #0000FF">if</span><span style="color: #000000"> a == </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">   b = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">} </span><span style="color: #0000FF">else</span><span style="color: #000000"> </span><span style="color: #0000FF">if</span><span style="color: #000000"> a == </span><span style="color: #09885A">2</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">   b = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">} </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">   b = </span><span style="color: #09885A">3</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `b` is `3`</span><span>
+</span><span>
+</span><span style="color: #0000FF">if</span><span style="color: #000000"> a == </span><span style="color: #09885A">1</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">   b = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">} </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> a == </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        b = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `b` is `2`</span><span>
+</span></pre></code>
+
+### [](#optional-binding)Optional Binding
+
+Optional binding allows getting the value inside an optional.
+It is a variant of the if-statement.
+
+If the optional contains a value, the first branch is executed and a temporary constant or variable is declared and set to the value contained in the optional; otherwise, the else branch (if any) is executed.
+
+Optional bindings are declared using the `if` keyword like an if-statement, but instead of the boolean test value, it is followed by the `let` or `var` keywords, to either introduce a constant or variable, followed by a name, the equal sign (`=`), and the optional value.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> maybeNumber: Int? = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> number = maybeNumber {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// This branch is executed as `maybeNumber` is not `nil`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The constant `number` is `1` and has type `Int`.</span><span>
+</span><span style="color: #000000">} </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// This branch is *not* executed as `maybeNumber` is not `nil`</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> noNumber: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span><span>
+</span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> number = noNumber {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// This branch is *not* executed as `noNumber` is `nil`.</span><span>
+</span><span style="color: #000000">} </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// This branch is executed as `noNumber` is `nil`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The constant `number` is *not* available.</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+### [](#looping-while-statement)Looping: while-statement
+
+While-statements allow a certain piece of code to be executed repeatedly, as long as a condition remains true.
+
+The while-statement starts with the `while` keyword, followed by the condition,
+and the code that should be repeatedly 
+executed if the condition is true inside opening and closing braces.
+The condition must be boolean and the braces are required.
+
+The while-statement will first evaluate the condition.
+If the condition is false, the execution is done.
+If it is true, the piece of code is executed and the evaluation of the condition is repeated.
+Thus, the piece of code is executed zero or more times.
+
+<code><pre><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">while</span><span style="color: #000000"> a &#x3C; </span><span style="color: #09885A">5</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    a = a + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `a` is `5`</span><span>
+</span></pre></code>
+
+The `continue` statement can be used to stop the current iteration of the loop and start the next iteration.
+
+<code><pre><span style="color: #0000FF">var</span><span style="color: #000000"> i = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> x = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">while</span><span style="color: #000000"> i &#x3C; </span><span style="color: #09885A">10</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    i = i + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> i &#x3C; </span><span style="color: #09885A">3</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">continue</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">    x = x + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `x` is `8`</span><span>
+</span></pre></code>
+
+The `break` statement can be used to stop the loop.
+
+<code><pre><span style="color: #0000FF">var</span><span style="color: #000000"> x = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #0000FF">while</span><span style="color: #000000"> x &#x3C; </span><span style="color: #09885A">10</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    x = x + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> x == </span><span style="color: #09885A">5</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">break</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `x` is `5`</span><span>
+</span></pre></code>
+
+### [](#immediate-function-return-return-statement)Immediate function return: return-statement
+
+The return-statement causes a function to return immediately, i.e., any code after the return-statement is not executed. The return-statement starts with the `return` keyword and is followed by an optional expression that should be the return value of the function call.
+
+<!--
+TODO: examples
+
+- in function
+- in while
+- in if
+-->
+
+## [](#scope)Scope
+
+Every function and block (`{` ... `}`) introduces a new scope for declarations. Each function and block can refer to declarations in its scope or any of the outer scopes.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
+</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> y = </span><span style="color: #09885A">10</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x + y</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #000000">f()  </span><span style="color: #008000">// is `20`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: the identifier `y` is not in scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">y</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ n: Int): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> double(n) + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: the identifier `double` is not in scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">double(</span><span style="color: #09885A">1</span><span style="color: #000000">)</span><span>
+</span></pre></code>
+
+Each scope can introduce new declarations, i.e., the outer declaration is shadowed.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
+</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> test(): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">3</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #000000">test()  </span><span style="color: #008000">// is `3`</span><span>
+</span></pre></code>
+
+Scope is lexical, not dynamic.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">10</span><span>
+</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
+</span><span style="color: #000000">   </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> g(): Int {</span><span>
+</span><span style="color: #000000">   </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">20</span><span>
+</span><span style="color: #000000">   </span><span style="color: #0000FF">return</span><span style="color: #000000"> f()</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #000000">g()  </span><span style="color: #008000">// is `10`, not `20`</span><span>
+</span></pre></code>
+
+Declarations are **not** moved to the top of the enclosing function (hoisted).
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">2</span><span>
+</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> f(): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> x == </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> x = </span><span style="color: #09885A">3</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span style="color: #000000">f()  </span><span style="color: #008000">// is `2`</span><span>
+</span></pre></code>
+
+## [](#type-safety)Type Safety
+
+The Cadence programming language is a _type-safe_ language.
+
+When assigning a new value to a variable, the value must be the same type as the variable.
+For example, if a variable has type `Bool`, it can _only_ be assigned a value that has type `Bool`, and not for example a value that has type `Int`.
+
+<code><pre><span style="color: #008000">// Declare a variable that has type `Bool`.</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #0000FF">true</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot assign a value that has type `Int` to a variable which has type `Bool`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">a = </span><span style="color: #09885A">0</span><span>
+</span></pre></code>
+
+When passing arguments to a function, the types of the values must match the function parameters&#x27; types. For example, if a function expects an argument that has type `Bool`, _only_ a value that has type `Bool` can be provided, and not for example a value which has type `Int`.
+
+<code><pre><span style="color: #0000FF">fun</span><span style="color: #000000"> nand(_ a: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">, _ b: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> !(a &#x26;&#x26; b)</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #000000">nand(</span><span style="color: #0000FF">false</span><span style="color: #000000">, </span><span style="color: #0000FF">false</span><span style="color: #000000">)  </span><span style="color: #008000">// is `true`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The arguments of the function calls are integers and have type `Int`,</span><span>
+</span><span style="color: #008000">// but the function expects parameters booleans (type `Bool`).</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">nand(</span><span style="color: #09885A">0</span><span style="color: #000000">, </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span></pre></code>
+
+Types are **not** automatically converted.
+For example, an integer is not automatically converted to a boolean,
+nor is an `Int32` automatically converted to an `Int8`,
+nor is an optional integer `Int?` 
+automatically converted to a non-optional integer `Int`,
+or vice-versa.
+
+<code><pre><span style="color: #0000FF">fun</span><span style="color: #000000"> add(_ a: Int8, _ b: Int8): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// The arguments are not declared with a specific type, but they are inferred</span><span>
+</span><span style="color: #008000">// to be `Int8` since the parameter types of the function `add` are `Int8`.</span><span>
+</span><span style="color: #000000">add(</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">)  </span><span style="color: #008000">// is `3`</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare two constants which have type `Int32`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int32 = </span><span style="color: #09885A">3_000_000_000</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int32 = </span><span style="color: #09885A">3_000_000_000</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot pass arguments which have type `Int32` to parameters which have type `Int8`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">add(a, b)</span><span>
+</span></pre></code>
+
+## [](#type-inference)Type Inference
+
+> 🚧 Status: Only basic type inference is implemented.
+
+If a variable or constant declaration is not annotated explicitly with a type,
+the declaration&#x27;s type is inferred from the initial value.
+
+Integer literals are inferred to type `Int`.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// `a` has type `Int`</span><span>
+</span></pre></code>
+
+Array literals are inferred based on the elements of the literal, and to be variable-size.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> integers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
+</span><span style="color: #008000">// `integers` has type `[Int]`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: mixed types</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> invalidMixed = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #0000FF">true</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">, </span><span style="color: #0000FF">false</span><span style="color: #000000">]</span><span>
+</span></pre></code>
+
+Dictionary literals are inferred based on the keys and values of the literal.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> booleans = {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">2</span><span style="color: #000000">: </span><span style="color: #0000FF">false</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span style="color: #008000">// `booleans` has type `{Int: Bool}`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: mixed types</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> invalidMixed = {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #09885A">1</span><span style="color: #000000">: </span><span style="color: #0000FF">true</span><span style="color: #000000">,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">false</span><span style="color: #000000">: </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+Functions are inferred based on the parameter types and the return type.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> add = (a: Int8, b: Int8): Int {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> a + b</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// `add` has type `((Int8, Int8): Int)`</span><span>
+</span></pre></code>
+
+Type inference is performed for each expression / statement, and not across statements.
+
+There are cases where types cannot be inferred.
+In these cases explicit type annotations are required.
+
+<code><pre><span style="color: #008000">// Invalid: not possible to infer type based on array literal's elements.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> array = []</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, specify the array type and the concrete element type, e.g. `Int`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> arrary: [Int] = []</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Invalid: not possible to infer type based on dictionary literal's keys and values.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> dictionary = {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, specify the dictionary type and the concrete key</span><span>
+</span><span style="color: #008000">// and value types, e.g. `String` and `Int`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> dictionary: {</span><span style="color: #0000FF">String</span><span style="color: #000000">: Int} = {}</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Invalid: not possible to infer type based on nil literal.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> maybeSomething = </span><span style="color: #0000FF">nil</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, specify the optional type and the concrete element type, e.g. `Int`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> maybeSomething: Int? = </span><span style="color: #0000FF">nil</span><span>
+</span></pre></code>
+
+## [](#composite-data-types)Composite Data Types
+
+Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.
+
+There are two kinds of composite data types.
+The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable,
+when the value is assigned to a variable,
+when the value is passed as an argument to a function,
+and when the value is returned from a function:
+
+-   [**Structures**](#structures) are **copied**, i.e. they are value types.
+
+    Structures are useful when copies with independent state are desired.
+
+-   [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
+
+    Resources are useful when it is desired to model ownership (a value exists exactly in one location and it should not be lost).
+
+    Certain constructs in a blockchain represent assets of real, tangible value, as much as a house or car or bank account.
+    We have to worry about literal loss and theft, perhaps even on the scale of millions of dollars.
+
+    Structures are not an ideal way to represent this ownership because they are copied.
+    This would mean that there could be a risk of having multiple copies of certain assets floating around, which breaks the scarcity requirements needed for these assets to have real value.
+
+    A structure is much more useful for representing information that can be grouped together in a logical way, but doesn&#x27;t have value or a need to be able to be owned or transferred.
+
+    A structure could for example be used to contain the information associated with a division of a company, but a resource would be used to represent the assets that have been allocated to that organization for spending.
+
+Nesting of resources is only allowed within other resource types,
+or in data structures like arrays and dictionaries,
+but not in structures, as that would allow resources to be copied.
+
+### [](#composite-data-type-declaration-and-creation)Composite Data Type Declaration and Creation
+
+Structures are declared using the `struct` keyword and resources are declared using the `resource` keyword. The keyword is followed by the name.
+
+<code><pre><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> SomeResource {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+Structures and resources are types.
+
+Structures are created (instantiated) by calling the type like a function.
+
+<code><pre><span style="color: #000000">SomeStruct()</span><span>
+</span></pre></code>
+
+Resource must be created (instantiated) by using the `create` keyword and calling the type like a function.
+
+<code><pre><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
+</span></pre></code>
+
+The constructor function may require parameters
+if the [initializer](#composite-data-type-fields) of the composite data type requires them.
+
+Composite data types can only be declared globally and not locally in functions.
+They can also not be nested.
+
+### [](#composite-data-type-fields)Composite Data Type Fields
+
+Fields are declared like variables and constants.
+However, the initial values for fields are set in the initializer,
+**not** in the field declaration.
+All fields **must** be initialized in the initializer, exactly once.
+
+Having to provide initial values in the initializer might seem restrictive,
+but this ensures that all fields are always initialized in one location, the initializer,
+and the initialization order is clear.
+
+The initialization of all fields is checked statically
+and it is invalid to not initialize all fields in the initializer.
+Also, it is statically checked that a field is definitely initialized before it is used.
+
+The initializer&#x27;s main purpose is to initialize fields, though it may also contain other code.
+Just like a function, it may declare parameters and may contain arbitrary code.
+However, it has no return type, i.e., it is always `Void`.
+
+The initializer is declared using the `init` keyword.
+
+The initializer always follows any fields.
+
+There are three kinds of fields:
+
+-   **Constant fields** are also stored in the composite value,
+    but after they have been initialized with a value 
+    they **cannot** have new values assigned to them afterwards.
+    A constant field must be initialized exactly once.
+
+    Constant fields are declared using the `let` keyword.
+
+-   **Variable fields** are stored in the composite value and can have new values assigned to them.
+
+    Variable fields are declared using the `var` keyword.
+
+-   **Synthetic fields** are **not stored** in the composite value,
+    i.e. they are derived/computed from other values.
+    They can have new values assigned to them.
+
+    Synthetic fields are declared using the `synthetic` keyword.
+
+    Synthetic fields must have a getter and a setter.
+    Getters and setters are explained in the [next section](#composite-data-type-field-getters-and-setters).
+    Synthetic fields are explained in a [separate section](#synthetic-composite-data-type-fields).
+
+| Field Kind          | Stored in memory | Assignable | Keyword     |
+| ------------------- | ---------------- | ---------- | ----------- |
+| **Variable field**  | Yes              | Yes        | `var`       |
+| **Constant field**  | Yes              | **No**     | `let`       |
+| **Synthetic field** | **No**           | Yes        | `synthetic` |
+
+In initializers, the special constant `self` refers to the composite value that is to be initialized.
+
+Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (`.`) and the name of the field.
+
+<code><pre><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
+</span><span style="color: #008000">// named `id` and a variable field named `balance`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// Both fields are initialized through the initializer.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The public access modifier `pub` is used in this example to allow</span><span>
+</span><span style="color: #008000">// the fields to be read in outer scopes. Fields can also be declared</span><span>
+</span><span style="color: #008000">// private so they cannot be accessed in outer scopes.</span><span>
+</span><span style="color: #008000">// Access control will be explained in a later section.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int, balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+Note that it is invalid to provide the initial value for a field in the field declaration.
+
+<code><pre><span style="color: #0000FF">struct</span><span style="color: #000000"> StructureWithConstantField {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: It is invalid to provide an initial value in the field declaration.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The field must be initialized by setting the initial value in the initializer.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+The field access syntax must be used to access fields –  fields are not available as variables.
+
+<code><pre><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(initialID: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Invalid: There is no variable with the name `id` available.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// The field `id` must be initialized by setting `self.id`.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        id = initialID</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+The initializer is **not** automatically derived from the fields, it must be explicitly declared.
+
+<code><pre><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: Missing initializer initializing field `id`.</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+A composite value can be created by calling the constructor and the value&#x27;s fields can be accessed.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> token = Token(id: </span><span style="color: #09885A">42</span><span style="color: #000000">, balance: </span><span style="color: #09885A">1_000_00</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #000000">token.id  </span><span style="color: #008000">// is `42`</span><span>
+</span><span style="color: #000000">token.balance  </span><span style="color: #008000">// is `1_000_000`</span><span>
+</span><span>
+</span><span style="color: #000000">token.balance = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// `token.balance` is `1`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: assignment to constant field</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">token.id = </span><span style="color: #09885A">23</span><span>
+</span></pre></code>
+
+Initializers support overloading. This allows for example providing default values for certain parameters.
+
+<code><pre><span style="color: #008000">// Declare a structure named `Token`, which has a constant field</span><span>
+</span><span style="color: #008000">// named `id` and a variable field named `balance`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The first initializer allows initializing both fields with a given value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// A second initializer is provided for convenience to initialize the `id` field</span><span>
+</span><span style="color: #008000">// with a given value, and the `balance` field with the default value `0`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Token {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int, balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+### [](#composite-data-type-field-getters-and-setters)Composite Data Type Field Getters and Setters
+
+Fields may have an optional getter and an optional setter. 
+Getters are functions that are called when a field is read, 
+and setters are functions that are called when a field is written.  
+Only certain assignments are allowed in getters and setters.
+
+Getters and setters are enclosed in opening and closing braces, after the field&#x27;s type.
+
+Getters are declared using the `get` keyword. 
+Getters have no parameters and their return type is implicitly the type of the field.
+
+<code><pre><span style="color: #0000FF">struct</span><span style="color: #000000"> GetterExample {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a variable field named `balance` with a getter</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// which ensures the read value is always non-negative.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
+</span><span>
+</span><span style="color: #000000">           </span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance &#x3C; </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">               </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">           }</span><span>
+</span><span>
+</span><span style="color: #000000">           </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> example = GetterExample(balance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// `example.balance` is `10`</span><span>
+</span><span>
+</span><span style="color: #000000">example.balance = </span><span style="color: #09885A">-50</span><span>
+</span><span style="color: #008000">// The stored value of the field `example` is `-50` internally,</span><span>
+</span><span style="color: #008000">// though `example.balance` is `0` because the getter for `balance` returns `0` instead.</span><span>
+</span></pre></code>
+
+Setters are declared using the `set` keyword, 
+followed by the name for the new value enclosed in parentheses.
+The parameter has implicitly the type of the field. 
+Another type cannot be specified. Setters have no return type.
+
+The types of values assigned to setters must always match the field&#x27;s type.
+
+<code><pre><span style="color: #0000FF">struct</span><span style="color: #000000"> SetterExample {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a variable field named `balance` with a setter</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// which requires written values to be positive.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">set</span><span style="color: #000000">(newBalance) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                newBalance >= </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = newBalance</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> example = SetterExample(balance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// `example.balance` is `10`</span><span>
+</span><span>
+</span><span style="color: #008000">// Run-time error: The precondition of the setter for the field `balance` fails, the program aborts.</span><span>
+</span><span style="color: #000000">example.balance = </span><span style="color: #09885A">-50</span><span>
+</span></pre></code>
+
+### [](#synthetic-composite-data-type-fields)Synthetic Composite Data Type Fields
+
+Fields which are not stored in the composite value are _synthetic_, 
+i.e., the field value is computed.
+Synthetic can be either read-only, or readable and writable.
+
+Synthetic fields are declared using the `synthetic` keyword.
+
+Synthetic fields are read-only when only a getter is provided.
+
+<code><pre><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a synthetic field named `area`,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// which computes the area based on the `width` and `height` fields.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> synthetic area: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> width * height</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare an initializer which accepts width and height.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// As `area` is synthetic and there is only a getter provided for it,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the `area` field it cannot be assigned a value.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+Synthetic fields are readable and writable when both a getter and a setter is declared.
+
+<code><pre><span style="color: #008000">// Declare a struct named `GoalTracker` which stores a number</span><span>
+</span><span style="color: #008000">// of target goals, a number of completed goals,</span><span>
+</span><span style="color: #008000">// and has a synthetic field to provide the left number of goals.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// NOTE: the tracker only implements some functionality to demonstrate</span><span>
+</span><span style="color: #008000">// synthetic fields, it is incomplete (e.g. assignments to `goal` are not handled properly).</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> GoalTracker {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> goal: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> completed: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a synthetic field which is both readable and writable.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// When the field is read from (in the getter), the number</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// of left goals is computed from the target number of goals</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// and the completed number of goals.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// When the field is written to (in the setter), the number</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// of completed goals is updated, based on the number</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// of target goals and the new remaining number of goals.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> synthetic left: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.goal - </span><span style="color: #0000FF">self</span><span style="color: #000000">.completed</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">set</span><span style="color: #000000">(newLeft) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.completed = </span><span style="color: #0000FF">self</span><span style="color: #000000">.goal - newLeft</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(goal: Int, completed: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.goal = goal</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.completed = completed</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> tracker = GoalTracker(goal: </span><span style="color: #09885A">10</span><span style="color: #000000">, completed: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// `tracker.goal` is `10`</span><span>
+</span><span style="color: #008000">// `tracker.completed` is `0`</span><span>
+</span><span style="color: #008000">// `tracker.left` is `10`</span><span>
+</span><span>
+</span><span style="color: #000000">tracker.completed = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// `tracker.left` is `9`</span><span>
+</span><span>
+</span><span style="color: #000000">tracker.left = </span><span style="color: #09885A">8</span><span>
+</span><span style="color: #008000">// `tracker.completed` is `2`</span><span>
+</span></pre></code>
+
+It is invalid to declare a synthetic field with only a setter.
+
+### [](#composite-data-type-functions)Composite Data Type Functions
+
+Composite data types may contain functions.
+Just like in the initializer, the special constant `self` refers to the composite value that the function is called on.
+
+<code><pre><span style="color: #008000">// Declare a structure named "Rectangle", which represents a rectangle</span><span>
+</span><span style="color: #008000">// and has variable fields for the width and height.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a function named "scale", which scales</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the rectangle by the given factor.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * factor</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = </span><span style="color: #0000FF">self</span><span style="color: #000000">.height * factor</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> rectangle = Rectangle(width: </span><span style="color: #09885A">2</span><span style="color: #000000">, height: </span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">rectangle.scale(factor: </span><span style="color: #09885A">4</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// `rectangle.width` is `8`</span><span>
+</span><span style="color: #008000">// `rectangle.height` is `12`</span><span>
+</span></pre></code>
+
+Functions support overloading.
+
+<code><pre><span style="color: #008000">// Declare a structure named "Rectangle", which represents a rectangle</span><span>
+</span><span style="color: #008000">// and has variable fields for the width and height.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a function named "scale", which independently scales</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the width by a given factor and the height by a given factor.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(widthFactor: Int, heightFactor: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * widthFactor</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = </span><span style="color: #0000FF">self</span><span style="color: #000000">.height * heightFactor</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a another function also named "scale", which scales</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// both width and height by a given factor.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The function calls the `scale` function declared above.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.scale(</span><span>
+</span><span style="color: #000000">            widthFactor: factor,</span><span>
+</span><span style="color: #000000">            heightFactor: factor</span><span>
+</span><span style="color: #000000">        )</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+### [](#composite-data-type-subtyping)Composite Data Type Subtyping
+
+Two composite data types are compatible if and only if they refer to the same declaration by name,
+i.e., nominal typing applies instead of structural typing.
+
+Even if two composite data types declare the same fields and functions,
+the types are only compatible if their names match.
+
+<code><pre><span style="color: #008000">// Declare a structure named `A` which has a function `test`</span><span>
+</span><span style="color: #008000">// which has type `((): Void)`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> A {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> test() {}</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a structure named `B` which has a function `test`</span><span>
+</span><span style="color: #008000">// which has type `((): Void)`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> B {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> test() {}</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a variable named which accepts values of type `A`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> something: </span><span style="color: #0000FF">A</span><span style="color: #000000"> = A()</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Assign a value of type `B` to the variable.</span><span>
+</span><span style="color: #008000">// Even though types `A` and `B` have the same declarations,</span><span>
+</span><span style="color: #008000">// a function with the same name and type, the types' names differ,</span><span>
+</span><span style="color: #008000">// so they are not compatible.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">something = B()</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: Reassign a new value of type `A`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">something = A()</span><span>
+</span></pre></code>
+
+### [](#composite-data-type-behaviour)Composite Data Type Behaviour
+
+#### [](#structures)Structures
+
+Structures are **copied** when 
+used as an initial value for constant or variable,
+when assigned to a different variable,
+when passed as an argument to a function,
+and when returned from a function.
+
+Accessing a field or calling a function of a structure does not copy it.
+
+<code><pre><span style="color: #008000">// Declare a structure named `SomeStruct`, with a variable integer field.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> value: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(value: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.value = value</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> increment() {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.value = </span><span style="color: #0000FF">self</span><span style="color: #000000">.value + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant with value of structure type `SomeStruct`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = SomeStruct(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// *Copy* the structure value into a new constant.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a</span><span>
+</span><span>
+</span><span style="color: #000000">b.value = </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #008000">// NOTE: `b.value` is 1, `a.value` is *`0`*</span><span>
+</span><span>
+</span><span style="color: #000000">b.increment()</span><span>
+</span><span style="color: #008000">// `b.value` is 2, `a.value` is `0`</span><span>
+</span></pre></code>
+
+#### [](#accessing-fields-and-functions-of-composite-data-types-using-optional-chaining)Accessing Fields and Functions of Composite Data Types Using Optional Chaining
+
+If a composite data type with fields and functions is wrapped in an optional,
+optional chaining can be used to get those values or call the function without 
+having to get the value of the optional first.  
+
+Optional chaining is used by adding a `?` 
+before the `.` access operator for fields or
+functions of an optional composite type.
+
+When getting a field value or 
+calling a function with a return value, the access returns 
+the value as an optional. 
+If the object doesn&#x27;t exist, the value will always be `nil`
+
+When calling a function on an optional like this, if the object doesn&#x27;t exist,
+nothing will happen and the execution will continue.
+
+It is still invalid 
+to access a field of an optional composite type that is not declared.
+
+<code><pre><span style="color: #008000">// Declare a struct with a field and method.</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Value {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> number: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">() {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.number = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> set(new: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.number = new</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> setAndReturn(new: Int): Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.number = new</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> new</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// create a new instance of the struct as an optional</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> value: </span><span style="color: #0000FF">Value</span><span style="color: #000000">? = Value()</span><span>
+</span><span style="color: #008000">// create another optional with the same type, but nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> noValue: </span><span style="color: #0000FF">Value</span><span style="color: #000000">? = </span><span style="color: #0000FF">nil</span><span>
+</span><span>
+</span><span style="color: #008000">// Access the `number` field using optional chaining</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> twoOpt = value?.number</span><span>
+</span><span style="color: #008000">// Because `value` is an optional, `twoOpt` has type `Int?`</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> two = zeroOpt ?? </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #008000">// `two` is `2`</span><span>
+</span><span>
+</span><span style="color: #008000">// Try to access the `number` field of `noValue`, which has type `Value?`</span><span>
+</span><span style="color: #008000">// This still returns an `Int?`</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> nilValue = noValue?.number</span><span>
+</span><span style="color: #008000">// This time, since `noValue` is `nil`, `nilValue` will also be `nil`</span><span>
+</span><span>
+</span><span style="color: #008000">// Call the `set` function of the struct</span><span>
+</span><span style="color: #008000">// whether or not the object exists, this will not fail</span><span>
+</span><span style="color: #000000">value?.set(new: </span><span style="color: #09885A">4</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">noValue?.set(new: </span><span style="color: #09885A">4</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Call the `setAndReturn` function, which returns an `Int`</span><span>
+</span><span style="color: #008000">// Because `value` is an optional, the return value is type `Int?`</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> sixOpt = value?.setAndReturn(new: </span><span style="color: #09885A">6</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> six = sixOpt ?? </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #008000">// `six` is `6`</span><span>
+</span><span>
+</span></pre></code>
+
+#### [](#resources)Resources
+
+Resources are types that can only exist in **one** location at a time and **must** be used **exactly once**.
+
+Resources **must** be created (instantiated) by using the `create` keyword.
+
+At the end of a function which has resources (variables, constants, parameters) in scope,
+the resources **must** be either **moved** or **destroyed**.
+
+They are **moved** when used as an initial value for a constant or variable,
+when assigned to a different variable,
+when passed as an argument to a function,
+and when returned from a function.
+
+Resources are **destroyed** using the `destroy` keyword.
+
+Accessing a field or calling a function of a resource does not move or destroy it.
+
+When the resource was moved, the constant or variable 
+that referred to the resource before the move becomes **invalid**.
+An **invalid** resource cannot be used again.
+
+To make the behaviour of resource types explicit, 
+the move prefix `<-` must be used in type annotations 
+of variable or constant declarations, parameters, and return types.
+
+To make moves of resources explicit, the move operator `<-` must be used
+when the resource is the initial value of a constant or variable,
+when it is moved to a different variable,
+when it is moved to a function as an argument,
+and when it is returned from a function.
+
+<code><pre><span style="color: #008000">// Declare a resource named `SomeResource`, with a variable integer field.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> SomeResource {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> value: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(value: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.value = value</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant with value of resource type `SomeResource`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: &#x3C;-SomeResource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// *Move* the resource value to a new constant.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b &#x3C;- a</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot use constant `a` anymore as the resource that it referred to</span><span>
+</span><span style="color: #008000">// was moved to constant `b`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">a.value</span><span>
+</span><span>
+</span><span style="color: #008000">// Constant `b` owns the resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">b.value = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a function which accepts a resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `&#x3C;-`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Call function `use` and move the resource into it.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">use(resource: &#x3C;-b)</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot use constant `b` anymore as the resource</span><span>
+</span><span style="color: #008000">// it referred to was moved into function `foo`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">b.value</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare another, unrelated value of resource type `SomeResource`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> c &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: `c` is not used, but must be; it cannot be lost.</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare another, unrelated value of resource type `SomeResource`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> d &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">20</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Destroy the resource referred to by constant `d`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> d</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot use constant `d` anymore as the resource</span><span>
+</span><span style="color: #008000">// it referred to was destroyed.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">d.value</span><span>
+</span></pre></code>
+
+To make it explicit that the type is moved, 
+it must be prefixed with `<-` in all type annotations,
+e.g. for variable declarations, parameters, or return types.
+
+<code><pre><span style="color: #008000">// Declare a constant with an explicit type annotation.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The constant has a resource type, so the type name must be prefixed with `&#x3C;-`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> someResource: &#x3C;-SomeResource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">5</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a function which consumes a resource and destroys it.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `&#x3C;-`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resource</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a function which returns a resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The return type is a resource type, so the type name must be prefixed with `&#x3C;-`.</span><span>
+</span><span style="color: #008000">// The return statement must also use the `&#x3C;-` operator to make it explicit the resource is moved.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> get(): &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> newResource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-newResource</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+Resources **must** be used exactly once.
+
+<code><pre><span style="color: #008000">// Declare a function which consumes a resource but does not use it.</span><span>
+</span><span style="color: #008000">// This function is invalid, because it would cause a loss of the resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: The resource parameter `resource` is not used, but must be.</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare a constant named `res` which has the resource type `SomeResource`.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> res &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
+</span><span>
+</span><span style="color: #008000">// Call the function `use` and move the resource `res` into it.</span><span>
+</span><span style="color: #000000">use(resource: &#x3C;-res)</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The resource constant `res` cannot be used again,</span><span>
+</span><span style="color: #008000">// as it was moved in the previous function call.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">use(resource: &#x3C;-res)</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The resource constant `res` cannot be used again,</span><span>
+</span><span style="color: #008000">// as it was moved in the previous function call.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">res.value</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare a function which has a resource parameter but does not use it.</span><span>
+</span><span style="color: #008000">// This function is invalid, because it would cause a loss of the resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: The resource parameter `resource` is not used, but must be.</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare a function which has a resource parameter.</span><span>
+</span><span style="color: #008000">// This function is invalid, because it does not always use the resource parameter,</span><span>
+</span><span style="color: #008000">// which would cause a loss of the resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> sometimesDestroy(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">, destroy: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> destroyResource {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resource</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: The resource parameter `resource` is not always used, but must be.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The destroy statement is not always executed, so at the end of this function</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// it might have been destroyed or not.</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare a function which has a resource parameter.</span><span>
+</span><span style="color: #008000">// This function is valid, as it always uses the resource parameter,</span><span>
+</span><span style="color: #008000">// and does not cause a loss of the resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> alwaysUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">, destroyResource: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> destroyResource {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resource</span><span>
+</span><span style="color: #000000">    } </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        use(resource: &#x3C;-resource)</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// At the end of the function the resource parameter was definitely used:</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// It was either destroyed or moved in the call of function `use`.</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare a function which has a resource parameter.</span><span>
+</span><span style="color: #008000">// This function is invalid, because it does not always use the resource parameter,</span><span>
+</span><span style="color: #008000">// which would cause a loss of the resource.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> returnBeforeDestroy(: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> res &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">1</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> move {</span><span>
+</span><span style="color: #000000">        use(resource: &#x3C;-res)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span>
+</span><span style="color: #000000">    } </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Invalid: When this function returns here, the resource variable</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// `res` was not used, but must be.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: the resource variable `res` was potentially moved in the</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// previous if-statement, and both branches definitely return,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// so this statement is unreachable.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> res</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+#### [](#resource-variables)Resource variables
+
+Resource variables cannot be assigned to as that would lead to the loss of the variable&#x27;s current resource value.
+
+Instead, use a swap statement (`<->`) to replace the resource variable with another resource.
+
+<code><pre><span style="color: #0000FF">resource</span><span style="color: #000000"> R {}</span><span>
+</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> x &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> y &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot assign to resource variable `x`,</span><span>
+</span><span style="color: #008000">// as its current resource would be lost</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">x &#x3C;- y</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, use a swap statement.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> replacement &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #000000">x &#x3C;-> replacement</span><span>
+</span><span style="color: #008000">// `x` is the new resource.</span><span>
+</span><span style="color: #008000">// `replacement` is the old resource.</span><span>
+</span></pre></code>
+
+#### [](#resource-destructors)Resource Destructors
+
+Resource may have a destructor, which is executed when the resource is destroyed.
+Destructors have no parameters and no return value and are declared using the `destroy` name.
+A resource may have only one destructor.
+
+<code><pre><span style="color: #0000FF">var</span><span style="color: #000000"> destructorCalled = </span><span style="color: #0000FF">false</span><span>
+</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Resource {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a destructor for the resource, which is executed</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// when the resource is destroyed.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    destroy() {</span><span>
+</span><span style="color: #000000">        destructorCalled = </span><span style="color: #0000FF">true</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> res &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Resource()</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> res</span><span>
+</span><span style="color: #008000">// `destructorCalled` is `true`</span><span>
+</span></pre></code>
+
+#### [](#nested-resources)Nested Resources
+
+Fields in composite data types behave differently when they have a resource type.
+
+If a resource type has fields that have a resource type,
+it **must** declare a destructor,
+which **must** invalidate all resource fields, i.e. move or destroy them.
+
+<code><pre><span style="color: #0000FF">resource</span><span style="color: #000000"> Child {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> name: </span><span style="color: #0000FF">String</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(name: </span><span style="color: #0000FF">String</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.name = name</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a resource with a resource field named `child`.</span><span>
+</span><span style="color: #008000">// The resource *must* declare a destructor</span><span>
+</span><span style="color: #008000">// and the destructor *must* invalidate the resource field.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Parent {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> name: </span><span style="color: #0000FF">String</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> child: &#x3C;-Child</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(name: </span><span style="color: #0000FF">String</span><span style="color: #000000">, child: &#x3C;-</span><span style="color: #0000FF">Child</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.name = name</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.child &#x3C;- child</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a destructor which invalidates the resource field</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// `child` by destroying it.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    destroy() {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.child</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+Accessing a field or calling function on a resource field is valid,
+however moving a resource out of a variable resource field is **not** allowed.
+Instead, use a swap statement to replace the resource with another resource.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> child &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Child(name: </span><span style="color: #A31515">"Child 1"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> parent &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Parent(name: </span><span style="color: #A31515">"Parent"</span><span style="color: #000000">, child: &#x3C;-child)</span><span>
+</span><span>
+</span><span style="color: #000000">child.name  </span><span style="color: #008000">// is "Child"</span><span>
+</span><span style="color: #000000">parent.child.name  </span><span style="color: #008000">// is "Child"</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot move resource out of variable resource field.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> childAgain &#x3C;- parent.child</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, use a swap statement.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> otherChild &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Child(name: </span><span style="color: #A31515">"Child 2"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">parent.child &#x3C;-> otherChild</span><span>
+</span><span style="color: #008000">// `parent.child` is the second child, Child 2.</span><span>
+</span><span style="color: #008000">// `otherChild` is the first child, Child 1.</span><span>
+</span></pre></code>
+
+#### [](#resources-in-closures)Resources in Closures
+
+Resources can not be captured in closures, as that could potentially result in duplications.
+
+<code><pre><span style="color: #0000FF">resource</span><span style="color: #000000"> R {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Declare a function which returns a closure which refers to</span><span>
+</span><span style="color: #008000">// the resource parameter `resource`. Each call to the returned function</span><span>
+</span><span style="color: #008000">// would return the resource, which should not be possible.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> makeCloner(resource: &#x3C;-</span><span style="color: #0000FF">R</span><span style="color: #000000">): ((): &#x3C;-</span><span style="color: #0000FF">R</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> fun (): &#x3C;-R {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-resource</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> test = makeCloner(resource: &#x3C;-create R())</span><span>
+</span></pre></code>
+
+#### [](#resources-in-arrays-and-dictionaries)Resources in Arrays and Dictionaries
+
+Arrays and dictionaries behave differently when they contain resources:
+Indexing into an array to read an element at a certain index or assign to it,
+or indexing into a dictionary to read a value for a certain key or set a value for the key is **not** allowed.
+
+Instead, use a swap statement to replace the accessed resource with another resource.
+
+<code><pre><span style="color: #0000FF">resource</span><span style="color: #000000"> R {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant for an array of resources.</span><span>
+</span><span style="color: #008000">// Create two resources and move them into the array.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [</span><span>
+</span><span style="color: #000000">    &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R(),</span><span>
+</span><span style="color: #000000">    &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Reading an element from a resource array is not allowed.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> firstResource &#x3C;- resources[</span><span style="color: #09885A">0</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Setting an element in a resource array is not allowed,</span><span>
+</span><span style="color: #008000">// as it would result in the loss of the current value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">resources[</span><span style="color: #09885A">0</span><span style="color: #000000">] &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, when attempting to either read an element or update an element</span><span>
+</span><span style="color: #008000">// in a resource array, use a swap statement with a variable to replace</span><span>
+</span><span style="color: #008000">// the accessed element.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> res &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #000000">resources[</span><span style="color: #09885A">0</span><span style="color: #000000">] &#x3C;-> res</span><span>
+</span><span style="color: #008000">// `resources[0]` now contains the new resource.</span><span>
+</span><span style="color: #008000">// `res` now contains the old resource.</span><span>
+</span></pre></code>
+
+The same applies to dictionaries.
+
+<code><pre><span style="color: #008000">// Declare a constant for a dictionary of resources.</span><span>
+</span><span style="color: #008000">// Create three resources and move them into the dictionary.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #A31515">"r1"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R(),</span><span>
+</span><span style="color: #000000">    </span><span style="color: #A31515">"r2"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Reading an element from a resource dictionary is not allowed.</span><span>
+</span><span style="color: #008000">// It's not obvious that an access like this would have to remove</span><span>
+</span><span style="color: #008000">// the key from the dictionary.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> firstResource &#x3C;- resources[</span><span style="color: #A31515">"r1"</span><span style="color: #000000">]</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, make the removal explicit by using the `remove` function.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> firstResource &#x3C;- resources.remove(key: </span><span style="color: #A31515">"r1"</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Setting an element in a resource dictionary is not allowed,</span><span>
+</span><span style="color: #008000">// as it would result in the loss of the current value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">resources[</span><span style="color: #A31515">"r1"</span><span style="color: #000000">] &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span>
+</span><span style="color: #008000">// Instead, when attempting to either read an element or update an element</span><span>
+</span><span style="color: #008000">// in a resource dictionary, use a swap statement with a variable to replace</span><span>
+</span><span style="color: #008000">// the accessed element.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> res &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #000000">resources[</span><span style="color: #A31515">"r1"</span><span style="color: #000000">] &#x3C;-> res</span><span>
+</span><span style="color: #008000">// `resources["r1"]` now contains the new resource.</span><span>
+</span><span style="color: #008000">// `res` now contains the old resource.</span><span>
+</span></pre></code>
+
+Resources cannot be moved into arrays and dictionaries multiple times,
+as that would cause a duplication.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> resource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The resource variable `resource` can only be moved into the array once.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [</span><span>
+</span><span style="color: #000000">    &#x3C;-resource,</span><span>
+</span><span style="color: #000000">    &#x3C;-resource</span><span>
+</span><span style="color: #000000">]</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> resource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The resource variable `resource` can only be moved into the dictionary once.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #A31515">"res1"</span><span style="color: #000000">: &#x3C;-resource,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #A31515">"res2"</span><span style="color: #000000">: &#x3C;-resource</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+Resource arrays and dictionaries can be destroyed.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [</span><span>
+</span><span style="color: #000000">    &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R(),</span><span>
+</span><span style="color: #000000">    &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #000000">]</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resources</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #A31515">"r1"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R(),</span><span>
+</span><span style="color: #000000">    </span><span style="color: #A31515">"r2"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resources</span><span>
+</span></pre></code>
+
+The variable array functions like `append`, `insert`, and `remove` 
+behave like for non-resource arrays.
+Note however, that the result of the `remove` functions must be used.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [&#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()]</span><span>
+</span><span style="color: #008000">// `resources.length` is `1`</span><span>
+</span><span>
+</span><span style="color: #000000">resources.append(&#x3C;-create R())</span><span>
+</span><span style="color: #008000">// `resources.length` is `2`</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> first &#x3C;- resource.remove(at: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// `resources.length` is `1`</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> first</span><span>
+</span><span>
+</span><span style="color: #000000">resources.insert(at: </span><span style="color: #09885A">0</span><span style="color: #000000">, &#x3C;-create R())</span><span>
+</span><span style="color: #008000">// `resources.length` is `2`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The statement ignores the result of the call to `remove`,</span><span>
+</span><span style="color: #008000">// which would result in a loss.</span><span>
+</span><span style="color: #000000">resource.remove(at: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resources</span><span>
+</span></pre></code>
+
+The variable array function `contains` is not available, as it is impossible:
+If the resource can be passed to the `contains` function, 
+it is by definition not in the array.
+
+The variable array function `concat` is not available, 
+as it would result in the duplication of resources.
+
+The dictionary functions like `insert` and `remove` 
+behave like for non-resource dictionaries.
+Note however, that the result of these functions must be used.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span style="color: #A31515">"r1"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()}</span><span>
+</span><span style="color: #008000">// `resources.length` is `1`</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> first &#x3C;- resource.remove(key: </span><span style="color: #A31515">"r1"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #008000">// `resources.length` is `0`</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> first</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> old &#x3C;- resources.insert(key: </span><span style="color: #A31515">"r1"</span><span style="color: #000000">, &#x3C;-create R())</span><span>
+</span><span style="color: #008000">// `old` is nil, as there was no value for the key "r1"</span><span>
+</span><span style="color: #008000">// `resources.length` is `1`</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> old2 &#x3C;- resources.insert(key: </span><span style="color: #A31515">"r1"</span><span style="color: #000000">, &#x3C;-create R())</span><span>
+</span><span style="color: #008000">// `old2` is the old value for the key "r1"</span><span>
+</span><span style="color: #008000">// `resources.length` is `2`</span><span>
+</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> old</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> old2</span><span>
+</span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resources</span><span>
+</span></pre></code>
+
+### [](#unbound-references--nulls)Unbound References / Nulls
+
+There is **no** support for `null`.
+
+### [](#inheritance-and-abstract-types)Inheritance and Abstract Types
+
+There is **no** support for inheritance. 
+Inheritance is a feature common in other programming languages, 
+that allows including the fields and functions of one type in another type.
+
+Instead, follow the &quot;composition over inheritance&quot; principle, 
+the idea of composing functionality from multiple individual parts, 
+rather than building an inheritance tree.
+
+Furthermore, there is also **no** support for abstract types. 
+An abstract type is a feature common in other programming languages, 
+that prevents creating values of the type and only 
+allows the creation of values of a subtype. 
+In addition, abstract types may declare functions, 
+but omit the implementation of them 
+and instead require subtypes to implement them.
+
+Instead, consider using [interfaces](#interfaces).
+
+## [](#access-control)Access control
+
+> 🚧 Status: Access control is not implemented yet.
+
+Access control allows making certain parts of the program accessible/visible 
+and making other parts inaccessible/invisible.
+
+In Flow and Cadence, there are two types of access control
+
+-   1.  Access control between accounts using capability security.  
+        Within Flow, a caller is not able to access an object 
+        unless it owns the object or has a specific reference to that object.  
+        This means that nothing is truly public by default.  
+        Other accounts can not read or write the objects in an account 
+        unless the owner of the account has granted them access 
+        by providing references to the objects.
+-   2.  Access control within programs using `private` and `public` keywords.  
+        Assuming the caller has a valid reference that 
+        satisfies the first type of access control, 
+        these keywords further govern how access is controlled.  
+
+The high-level reference-based security (point 1 above) 
+will be covered in a later section. 
+For now, it is assumed that all callers have complete 
+access to the objects in the descriptions and examples.
+
+Top-level declarations 
+(variables, constants, functions, structures, resources, interfaces) 
+and fields (in structures, and resources) are either private or public.
+
+-   **Private** means the declaration is only accessible/visible 
+    in the current and inner scopes.
+    For example, a private field can only be 
+    accessed by functions of the type is part of,
+    not by code that uses an instance of the type in an outer scope.
+
+-   **Public** means the declaration is accessible/visible in all scopes.
+    This includes the current and inner scopes like for private, 
+    and the outer scopes.
+    For example, a public field in a type can be accessed using the access syntax
+    on an instance of the type in an outer scope.
+    This does not allow the declaration to be publicly writable though.
+
+**By default, everything is private.**
+An element is made public by using the `pub` keyword.
+
+The `(set)` suffix can be used to make variables also publicly writable.
+
+To summarize the behavior for variable declarations, constant declarations, and fields:
+
+| Declaration kind | Access modifier | Read scope        | Write scope       |
+| :--------------- | :-------------- | :---------------- | :---------------- |
+| `let`            |                 | Current and inner | _None_            |
+| `let`            | `pub`           | **All**           | _None_            |
+| `var`            |                 | Current and inner | Current and inner |
+| `var`            | `pub`           | **All**           | Current and inner |
+| `var`            | `pub(set)`      | **All**           | **All**           |
+
+To summarize the behavior for functions, structures, resources, and interfaces:
+
+| Declaration kind                                                      | Access modifier | Access scope      |
+| :-------------------------------------------------------------------- | :-------------- | :---------------- |
+| `fun`, `struct`, `resource`, `struct interface`, `resource interface` |                 | Current and inner |
+| `fun`, `struct`, `resource`, `struct interface`, `resource interface` | `pub`           | **All**           |
+
+<code><pre><span style="color: #008000">// Declare a private constant, inaccessible/invisible in outer scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a public constant, accessible/visible in all scopes.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare a public struct, accessible/visible in all scopes.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeStruct {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a private constant field which is only readable</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// in the current and inner scopes.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a public constant field which is readable in all scopes.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a private variable field which is only readable</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// and writable in the current and inner scopes.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> c: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a public variable field which is not settable,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// so it is only writable in the current and inner scopes,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// and readable in all scopes.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> d: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a public variable field which is settable,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// so it is readable and writable in all scopes.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> e: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The initializer is omitted for brevity.</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a private function which is only callable</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// in the current and inner scopes.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> privateTest() {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a public function which is callable in all scopes.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> privateTest() {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The initializer is omitted for brevity.</span><span>
+</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> some = SomeStruct()</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot read private constant field in outer scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.a</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot set private constant field in outer scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.a = </span><span style="color: #09885A">1</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: can read public constant field in outer scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.b</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot set public constant field in outer scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.b = </span><span style="color: #09885A">2</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot read private variable field in outer scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.c</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot set private variable field in outer scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.c = </span><span style="color: #09885A">3</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: can read public variable field in outer scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.d</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot set public variable field in outer scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.d = </span><span style="color: #09885A">4</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: can read publicly settable variable field in outer scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.e</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: can set publicly settable variable field in outer scope.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">some.e = </span><span style="color: #09885A">5</span><span>
+</span></pre></code>
+
+## [](#interfaces)Interfaces
+
+An interface is an abstract type that specifies the behavior of types 
+that _implement_ the interface.
+Interfaces declare the required functions and fields, 
+the access control for those declarations, 
+and preconditions and postconditions that implementing types need to provide.
+
+There are two kinds of interfaces:
+
+-   **Structure interfaces**: implemented by [structures](#structures)
+-   **Resource interfaces**: implemented by [resources](#resources)
+
+Structure and resource types may implement multiple interfaces.
+
+Interfaces consist of the function and field requirements 
+that a type implementing the interface must provide implementations for.
+Interface requirements, and therefore also their implementations, 
+must always be at least public.
+
+Variable field requirements may be annotated 
+to require them to be publicly settable.
+
+Function requirements consist of the name of the function, parameter types, an optional return type,
+and optional preconditions and postconditions.
+
+Field requirements consist of the name and the type of the field.
+Field requirements may optionally declare a getter requirement and a setter requirement, each with preconditions and postconditions.
+
+Calling functions with preconditions and postconditions on interfaces instead of concrete implementations can improve the security of a program,
+as it ensures that even if implementations change, some aspects of them will always hold.
+
+### [](#interface-declaration)Interface Declaration
+
+Interfaces are declared using the `struct` or `resource` keyword,
+followed by the `interface` keyword,
+the name of the interface,
+and the requirements, which must be enclosed in opening and closing braces.
+
+Field requirements can be annotated to 
+require the implementation to be a variable field, by using the `var` keyword;
+require the implementation to be a constant field, by using the `let` keyword;
+or the field requirement may specify nothing,
+in which case the implementation may either be 
+a variable field, a constant field, or a synthetic field.
+
+Field requirements and function requirements must specify the required level of access.
+The access must be at least be public, so the `pub` keyword must be provided.
+Variable field requirements can be specified to also be publicly settable by using the `pub(set)` keyword.
+
+The special type `Self` can be used to refer to the type implementing the interface.
+
+<code><pre><span style="color: #008000">// Declare a resource interface for a fungible token.</span><span>
+</span><span style="color: #008000">// Only resources can implement this resource interface.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> FungibleToken {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementing type to provide a field for the balance</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// that is readable in all scopes (`pub`).</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Neither the `var` keyword, nor the `let` keyword is used,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// so the field may be implemented as either a variable field,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// a constant field, or a synthetic field.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The read balance must always be positive.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: no requirement is made for the kind of field,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// it can be either variable or constant in the implementation.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> balance: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">set</span><span style="color: #000000">(newBalance) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                newBalance >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"Balances are always set as non-negative numbers"</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementing type to provide an initializer that</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// given the initial balance, must initialize the balance field.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            balance >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"Balances are always non-negative"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == balance:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"the balance must be initialized to the initial balance"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: The declaration contains no implementation code.</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementing type to provide a function that is</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// callable in all scopes, which withdraws an amount from</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// this fungible token and returns the withdrawn amount as</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// a new fungible token.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The given amount must be positive and the function implementation</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// must add the amount to the balance.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The function must return a new fungible token.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: `&#x3C;-Self` is the resource type implementing this interface.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-Self {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be positive"</span><span>
+</span><span style="color: #000000">            amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"insufficient funds: the amount must be smaller or equal to the balance"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) - amount:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be deducted from the balance"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: The declaration contains no implementation code.</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementing type to provide a function that is</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// callable in all scopes, which deposits a fungible token</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// into this fungible token.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The given token must be of the same type – a deposit of another</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// type is not possible.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// No precondition is required to check the given token's balance</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// is positive, as this condition is already ensured by</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the field requirement.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the first parameter has the type `&#x3C;-Self`,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// i.e. the resource type implementing this interface.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: &#x3C;-Self) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + token.balance:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// NOTE: The declaration contains no implementation code.</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+Note that the required initializer and functions do not have any executable code.
+
+Interfaces can only be declared globally, i.e. not inside of functions.
+
+### [](#interface-implementation)Interface Implementation
+
+Declaring that a type implements (conforms) to an interface
+is done in the type declaration of the composite data type (e.g., structure, resource):
+The kind and the name of the composite data type is followed by a colon (`:`)
+and the name of one or more interfaces that the composite data type implements.
+
+This will tell the checker to enforce any requirements from the specified interfaces onto the declared type.
+
+A type implements (conforms to) an interface if it provides field declarations
+for all fields required by the interface and provides implementations for all functions
+required by the interface.
+
+The field declarations in the implementing type must match the field requirements
+in the interface in terms of name, type, and declaration kind (e.g. constant, variable)
+if given. For example, an interface may require a field with a certain name and type,
+but leaves it to the implementation what kind the field is.
+
+The function implementations must match the function requirements in the interface
+in terms of name, parameter argument labels, parameter types, and the return type.
+
+<code><pre><span style="color: #008000">// Declare a resource named `ExampleToken` that has to implement</span><span>
+</span><span style="color: #008000">// the `FungibleToken` interface.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// It has a variable field named `balance`, that can be written</span><span>
+</span><span style="color: #008000">// by functions of the type, but outer scopes can only read it.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> ExampleToken: FungibleToken {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required field `balance` for the `FungibleToken` interface.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The interface does not specify if the field must be variable, constant,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// so in order for this type (`ExampleToken`) to be able to write to the field,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// but limit outer scopes to only read from the field, it is declared variable,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// and only has public access (non-settable).</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required initializer for the `FungibleToken` interface:</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// accept an initial balance and initialize the `balance` field.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// This implementation satisfies the required postcondition.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the postcondition declared in the interface</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// does not have to be repeated here in the implementation.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required function named `withdraw` of the interface</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// `FungibleToken`, that withdraws an amount from the token's balance.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The function must be public.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// This implementation satisfies the required postcondition.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: neither the precondition nor the postcondition declared</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// in the interface have to be repeated here in the implementation.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: amount)</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implement the required function named `deposit` of the interface</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// `FungibleToken`, that deposits the amount from the given token</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// to this token.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The function must be public.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the type of the parameter is `&#x3C;-ExampleToken`,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// i.e., only a token of the same type can be deposited.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// This implementation satisfies the required postconditions.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: neither the precondition nor the postcondition declared</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// in the interface have to be repeated here in the implementation.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + token.balance</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> token</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant which has type `ExampleToken`,</span><span>
+</span><span style="color: #008000">// and is initialized with such an example token.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> token &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Withdraw 10 units from the token.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The amount satisfies the precondition of the `withdraw` function</span><span>
+</span><span style="color: #008000">// in the `FungibleToken` interface.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// Invoking a function of a resource does not destroy the resource,</span><span>
+</span><span style="color: #008000">// so the resource `token` is still valid after the call of `withdraw`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> withdrawn &#x3C;- token.withdraw(amount: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// The postcondition of the `withdraw` function in the `FungibleToken`</span><span>
+</span><span style="color: #008000">// interface ensured the balance field of the token was updated properly.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// `token.balance` is `90`</span><span>
+</span><span style="color: #008000">// `withdrawn.balance` is `10`</span><span>
+</span><span>
+</span><span style="color: #008000">// Deposit the withdrawn token into another one.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> receiver: </span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> &#x3C;- </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">receiver.deposit(&#x3C;-withdrawn)</span><span>
+</span><span>
+</span><span style="color: #008000">// Run-time error: The precondition of function `withdraw` in interface</span><span>
+</span><span style="color: #008000">// `FungibleToken` fails, the program aborts: the parameter `amount`</span><span>
+</span><span style="color: #008000">// is larger than the field `balance` (100 > 90).</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">token.withdraw(amount: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Withdrawing tokens so that the balance is zero does not destroy the resource.</span><span>
+</span><span style="color: #008000">// The resource has to be destroyed explicitly.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">token.withdraw(amount: </span><span style="color: #09885A">90</span><span style="color: #000000">)</span><span>
+</span></pre></code>
+
+The access level for variable fields in an implementation may be less restrictive than the interface requires.
+For example, an interface may require a field to be 
+at least public (i.e. the `pub` keyword is specified),
+and an implementation may provide a variable field which is public,
+ but also publicly settable (the `pub(set)` keyword is specified).
+
+<code><pre><span style="color: #0000FF">struct interface</span><span style="color: #000000"> AnInterface {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementing type to provide a publicly readable</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// field named `a` that has type `Int`. It may be a constant field,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// a variable field, or a synthetic field.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> a: Int</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> AnImplementation: AnInterface {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a publicly settable variable field named `a`that has type `Int`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// This implementation satisfies the requirement for interface `AnInterface`:</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The field is at least publicly readable, but this implementation also</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// allows the field to be written to in all scopes.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> a: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(a: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.a = a</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span></pre></code>
+
+### [](#interface-type)Interface Type
+
+Interfaces are types.
+Values implementing an interface can be used as initial values for constants and variables that have the interface as their type.
+
+<code><pre><span style="color: #008000">// Declare an interface named `Shape`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// Require implementing types to provide a field which returns the area,</span><span>
+</span><span style="color: #008000">// and a function which scales the shape by a given factor.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Shape {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> area: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int)</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a structure named `Square` the implements the `Shape` interface.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Square: Shape {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// In addition to the required fields from the interface,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// the type can also declare additional fields.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> length: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Provided the field `area`  which is required to conform</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// to the interface `Shape`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Since `area` was not declared as a constant, variable,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// field in the interface, it can be declared.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> synthetic area: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.length * </span><span style="color: #0000FF">self</span><span style="color: #000000">.length</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(length: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.length = length</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Provided the implementation of the function `scale`</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// which is required to conform to the interface `Shape`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.length = </span><span style="color: #0000FF">self</span><span style="color: #000000">.length * factor</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a structure named `Rectangle` that also implements the `Shape` interface.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Rectangle: Shape {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> width: Int</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> height: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Provided the field `area  which is required to conform</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// to the interface `Shape`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> synthetic area: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * </span><span style="color: #0000FF">self</span><span style="color: #000000">.height</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(width: Int, height: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = width</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = height</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Provided the implementation of the function `scale`</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// which is required to conform to the interface `Shape`.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> scale(factor: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.width = </span><span style="color: #0000FF">self</span><span style="color: #000000">.width * factor</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.height = </span><span style="color: #0000FF">self</span><span style="color: #000000">.height * factor</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant that has type `Shape`, which has a value that has type `Rectangle`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> shape: </span><span style="color: #0000FF">Shape</span><span style="color: #000000"> = Rectangle(width: </span><span style="color: #09885A">10</span><span style="color: #000000">, height: </span><span style="color: #09885A">20</span><span style="color: #000000">)</span><span>
+</span></pre></code>
+
+Values implementing an interface are assignable to variables that have the interface as their type.
+
+<code><pre><span style="color: #008000">// Assign a value of type `Square` to the variable `shape` that has type `Shape`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">shape = Square(length: </span><span style="color: #09885A">30</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: cannot initialize a constant that has type `Rectangle`.</span><span>
+</span><span style="color: #008000">// with a value that has type `Square`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> rectangle: </span><span style="color: #0000FF">Rectangle</span><span style="color: #000000"> = Square(length: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span></pre></code>
+
+Fields declared in an interface can be accessed and functions declared in an interface can be called on values of a type that implements the interface.
+
+<code><pre><span style="color: #008000">// Declare a constant which has the type `Shape`.</span><span>
+</span><span style="color: #008000">// and is initialized with a value that has type `Rectangle`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> shape: </span><span style="color: #0000FF">Shape</span><span style="color: #000000"> = Rectangle(width: </span><span style="color: #09885A">2</span><span style="color: #000000">, height: </span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Access the field `area` declared in the interface `Shape`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">shape.area  </span><span style="color: #008000">// is `6`</span><span>
+</span><span>
+</span><span style="color: #008000">// Call the function `scale` declared in the interface `Shape`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">shape.scale(factor: </span><span style="color: #09885A">3</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #000000">shape.area  </span><span style="color: #008000">// is `54`</span><span>
+</span></pre></code>
+
+### [](#interface-implementation-requirements)Interface Implementation Requirements
+
+Interfaces can require implementing types 
+to also implement other interfaces of the same kind.
+Interface implementation requirements can be declared 
+by following the interface name with a colon (`:`)
+and one or more names of interfaces of the same kind, separated by commas.
+
+<code><pre><span style="color: #008000">// Declare a structure interface named `Shape`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Shape {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a structure interface named `Polygon`.</span><span>
+</span><span style="color: #008000">// Require implementing types to also implement the structure interface `Shape`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Polygon: Shape {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a structure named `Hexagon` that implements the `Polygon` interface.</span><span>
+</span><span style="color: #008000">// This also is required to implement the `Shape` interface,</span><span>
+</span><span style="color: #008000">// because the `Polygon` interface requires it.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Hexagon: Polygon {}</span><span>
+</span><span>
+</span></pre></code>
+
+### [](#interface-nesting)Interface Nesting
+
+Interfaces can be arbitrarily nested.
+Declaring an interface inside another does not require implementing types of the outer interface to provide an implementation of the inner interfaces.
+
+<code><pre><span style="color: #008000">// Declare a resource interface `OuterInterface`, which declares</span><span>
+</span><span style="color: #008000">// a nested structure interface named `InnerInterface`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// Resources implementing `OuterInterface` do not need to provide</span><span>
+</span><span style="color: #008000">// an implementation of `InnerInterface`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// Structures may just implement `InnerInterface`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> OuterInterface {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">struct interface</span><span style="color: #000000"> InnerInterface {}</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a resource named `SomeOuter` that implements the interface `OuterInterface`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The resource is not required to implement `OuterInterface.InnerInterface`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> SomeOuter: OuterInterface {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a structure named `SomeInner` that implements `InnerInterface`,</span><span>
+</span><span style="color: #008000">// which is nested in interface `OuterInterface`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> SomeInner: OuterInterface.InnerInterface {}</span><span>
+</span><span>
+</span></pre></code>
+
+### [](#nested-type-requirements)Nested Type Requirements
+
+Interfaces can require implementing types to provide concrete nested types.
+For example, a resource interface may require an implementing type to provide a resource type.
+
+<code><pre><span style="color: #008000">// Declare a resource interface named `FungibleToken`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// Require implementing types to provide a resource type named `Vault`</span><span>
+</span><span style="color: #008000">// which must have a field named `balance`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> FungibleToken {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> balance: Int</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a resource named `ExampleToken` that implements the `FungibleToken` interface.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The nested type `Vault` must be provided to conform to the interface.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> ExampleToken: FungibleToken {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span></pre></code>
+
+### [](#equatable-interface)`Equatable` Interface
+
+> 🚧 Status: The `Equatable` interface is not implemented yet.
+
+An equatable type is a type that can be compared for equality. Types are equatable when they  implement the `Equatable` interface.
+
+Equatable types can be compared for equality using the equals operator (`==`) or inequality using the unequals operator (`!=`).
+
+Most of the built-in types are equatable, like booleans and integers. Arrays are equatable when their elements are equatable. Dictionaries are equatable when their values are equatable.
+
+To make a type equatable the `Equatable` interface must be implemented, which requires the implementation of the function `equals`, which accepts another value that the given value should be compared for equality. Note that the parameter type is `Self`, i.e., the other value must have the same type as the implementing type.
+
+<code><pre><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Equatable {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare a struct named `Cat`, which has one field named `id`</span><span>
+</span><span style="color: #008000">// that has type `Int`, i.e., the identifier of the cat.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// `Cat` also will implement the interface `Equatable`</span><span>
+</span><span style="color: #008000">// to allow cats to be compared for equality.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Cat: Equatable {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> id: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(id: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.id = id</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Cats are equal if their identifier matches.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> other.id == </span><span style="color: #0000FF">self</span><span style="color: #000000">.id</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #000000">Cat(</span><span style="color: #09885A">1</span><span style="color: #000000">) == Cat(</span><span style="color: #09885A">2</span><span style="color: #000000">)  </span><span style="color: #008000">// is `false`</span><span>
+</span><span style="color: #000000">Cat(</span><span style="color: #09885A">3</span><span style="color: #000000">) == Cat(</span><span style="color: #09885A">3</span><span style="color: #000000">)  </span><span style="color: #008000">// is `true`</span><span>
+</span></pre></code>
+
+### [](#hashable-interface)`Hashable` Interface
+
+> 🚧 Status: The `Hashable` interface is not implemented yet.
+
+A hashable type is a type that can be hashed to an integer hash value,
+i.e., it is distilled into a value that is used as evidence of inequality.
+Types are hashable when they implement the `Hashable` interface.
+
+Hashable types can be used as keys in dictionaries.
+
+Hashable types must also be equatable, 
+i.e., they must also implement the `Equatable` interface.
+This is because the hash value is only evidence for inequality:
+two values that have different hash values are guaranteed to be unequal.
+However, if the hash values of two values are the same,
+then the two values could still be unequal 
+and just happen to hash to the same hash value.
+In that case equality still needs to be determined through an equality check.
+Without `Equatable`, values could be added to a dictionary,
+but it would not be possible to retrieve them.
+
+Most of the built-in types are hashable, like booleans and integers.
+Arrays are hashable when their elements are hashable.
+Dictionaries are hashable when their values are equatable.
+
+Hashing a value means passing its essential components into a hash function.
+Essential components are those that are used in the type&#x27;s implementation of `Equatable`.
+
+If two values are equal because their `equals` function returns true,
+then the implementation must return the same integer hash value for each of the two values.
+
+The implementation must also consistently return the same integer hash value during the execution of the program when the essential components have not changed.
+The integer hash value must not necessarily be the same across multiple executions.
+
+<code><pre><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Hashable: Equatable {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> hashValue: Int</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+<code><pre><span style="color: #008000">// Declare a structure named `Point` with two fields</span><span>
+</span><span style="color: #008000">// named `x` and `y` that have type `Int`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// `Point` is declared to implement the `Hashable` interface,</span><span>
+</span><span style="color: #008000">// which also means it needs to implement the `Equatable` interface.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">struct</span><span style="color: #000000"> Point: Hashable {</span><span>
+</span><span>
+</span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> x: Int</span><span>
+</span><span style="color: #000000">    pub(set) </span><span style="color: #0000FF">var</span><span style="color: #000000"> y: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(x: Int, y: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.x = x</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.y = y</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implementing the function `equals` will allow points to be compared</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// for equality and satisfies the `Equatable` interface.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> equals(_ other: Self): </span><span style="color: #0000FF">Bool</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Points are equal if their coordinates match.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// The essential components are therefore the fields `x` and `y`,</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// which must be used in the implementation of the field requirement</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// `hashValue` of the `Hashable` interface.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> other.x == </span><span style="color: #0000FF">self</span><span style="color: #000000">.x</span><span>
+</span><span style="color: #000000">            &#x26;&#x26; other.y == </span><span style="color: #0000FF">self</span><span style="color: #000000">.y</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Providing an implementation for the hash value field</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// satisfies the `Hashable` interface.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> synthetic hashValue: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #008000">// Calculate a hash value based on the essential components,</span><span>
+</span><span style="color: #000000">            </span><span style="color: #008000">// the fields `x` and `y`.</span><span>
+</span><span style="color: #000000">            </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">var</span><span style="color: #000000"> hash = </span><span style="color: #09885A">7</span><span>
+</span><span style="color: #000000">            hash = </span><span style="color: #09885A">31</span><span style="color: #000000"> * hash + </span><span style="color: #0000FF">self</span><span style="color: #000000">.x</span><span>
+</span><span style="color: #000000">            hash = </span><span style="color: #09885A">31</span><span style="color: #000000"> * hash + </span><span style="color: #0000FF">self</span><span style="color: #000000">.y</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> hash</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+## [](#imports)Imports
+
+Programs can import declarations (types, functions, variables, etc.) from other programs.
+
+Imports are declared using the `import` keyword.
+
+It can either be followed by a location, which imports all declarations;
+or it can be followed by the names of the declarations that should be imported,
+followed by the `from` keyword, and then followed by the location.
+
+If importing a local file, the location is a string literal, and the path to the file.
+
+If importing an external type, the location is an address literal, and the address
+of the account where the declarations are deployed to and published.
+
+<code><pre><span style="color: #008000">// Import the type `Counter` from a local file.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> Counter </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #A31515">"examples/counter.cdc"</span><span>
+</span><span>
+</span><span style="color: #008000">// Import the type `Counter` from an external account.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> Counter </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x299F20A29311B9248F12</span><span>
+</span></pre></code>
+
+## [](#attestations)Attestations
+
+> 🚧 Status: Attestations are not implemented yet.
+
+Attestations are values that prove ownership without giving any control over it. They can be created for resources to show that they exists.
+
+Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.
+
+As an analogy, a bank statement is a proof of ownership of money.
+However, unlike a bank statement, an attestation is &quot;live&quot;, i.e. it is not just a snapshot at the time it was created,
+but it reflects the current state of the underlying resource.
+
+Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource,
+and can be safely handed to untrusted parties.
+
+An attestation reflects the current state of a resource. The state is read-only, so the resource that is referred to cannot be modified.
+It is not possible to change the ownership of a resource through an attestation, or store an attestation.
+
+Attestations of resources are created using the `@` operator.
+Attestation types have the name of the resource type, prefixed with the `@` symbol.
+
+<code><pre><span style="color: #008000">// Declare a resource named `Token`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Token {}</span><span>
+</span><span>
+</span><span style="color: #008000">// Create a new instance of the resource type `Token`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> token &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Token()</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a constant named `attestation` that has the attestation type `@Token`,</span><span>
+</span><span style="color: #008000">// and has an attestation for the token value as its initial value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> attestation: @</span><span style="color: #0000FF">Token</span><span style="color: #000000"> = @token</span><span>
+</span></pre></code>
+
+Like resources, attestations are associated with an [account](#accounts).
+
+## [](#accounts)Accounts
+
+<code><pre><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Account {</span><span>
+</span><span style="color: #000000">    address: Address</span><span>
+</span><span style="color: #000000">    storage: Storage  </span><span style="color: #008000">// explained below</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+## [](#account-storage)Account Storage
+
+All accounts have a `storage` object which contains the stored values of the account.
+
+All accounts also have a `published` object 
+which contains the published references
+in an account. This will be covered later.
+
+Account storage is a key-value store where the **keys are types**.
+The stored value must be a subtype of the type it is keyed by.
+This means that if the type `Vault` is used as a key,
+the value must be a value that has the type `Vault` or is a subtype of `Vault`.
+
+The index operator `[]` is used for both reading and writing stored values.
+
+<code><pre><span style="color: #008000">// Declare a resource named `Counter`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Counter {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(count: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.count = count</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Create a new instance of the resource type `Counter` and move it</span><span>
+</span><span style="color: #008000">// into the storage of the account.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// In this example the account is available as the constant `account`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The type `Counter` is used as the key to refer to the stored value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// A swap must be used to store the counter, because assignment</span><span>
+</span><span style="color: #008000">// is not available, as it would override a potentially existing counter.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// To perform the swap, the declaration must be variable and have an optional type.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> counter: </span><span style="color: #0000FF">Counter</span><span style="color: #000000">? &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Counter(count: </span><span style="color: #09885A">42</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">account.storage[Counter] &#x3C;-> counter</span><span>
+</span><span>
+</span><span style="color: #008000">// `counter` is now the counter that was potentially stored before.</span><span>
+</span></pre></code>
+
+## [](#storage-references)Storage References
+
+It is possible to create references to **storage locations**.
+References allow access to stored values.  A reference can be used to read or 
+call fields and methods of stored values 
+without having to move or call the fields
+and methods on the storage location directly.
+
+References are **copied**, i.e. they are value types.  
+Any number of references to a storage location can be created, 
+but only by the account that owns the location being referenced.
+
+Note that references are **not** referencing stored values – 
+A reference cannot be used to directly modify a value it references, and
+if the value stored in the references location is moved or removed,
+the reference is not updated and it becomes invalid.
+
+References are created by using the `&` operator, 
+followed by the storage location,the `as` keyword, 
+and the type through which the stored location should be accessed.
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> nameRef: &#x26;</span><span style="color: #0000FF">Name</span><span style="color: #000000"> = &#x26;account.storage[Name] as Name</span><span>
+</span></pre></code>
+
+The storage location must be a subtype of the type given after the `as` keyword.
+
+References are covariant in their base types.
+For example, `&R` is a subtype of `&RI`, 
+if `R` is a resource, `RI` is a resource interface,
+and resource `R` conforms to (implements) resource interface `RI`.
+
+<code><pre><span>
+</span><span style="color: #008000">// Declare a resource named `Counter`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Counter: {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">init</span><span style="color: #000000">(count: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.count = count</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> increment() {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.count = </span><span style="color: #0000FF">self</span><span style="color: #000000">.count + </span><span style="color: #09885A">1</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Create a new instance of the resource type `Counter` and move it</span><span>
+</span><span style="color: #008000">// into the storage of the account.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// In this example the account is available as the constant `account`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The type `Counter` is used as the key to refer to the stored value.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// A swap must be used to store the counter, because assignment</span><span>
+</span><span style="color: #008000">// is not available, as it would override a potentially existing counter.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// To perform the swap, the declaration must be variable and have an optional type.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">var</span><span style="color: #000000"> counter: </span><span style="color: #0000FF">Counter</span><span style="color: #000000">? &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Counter(count: </span><span style="color: #09885A">42</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">account.storage[Counter] &#x3C;-> counter</span><span>
+</span><span>
+</span><span style="color: #008000">// `counter` is now the counter that was potentially stored before.</span><span>
+</span><span>
+</span><span style="color: #008000">// Create a reference to the storage location `account.storage[Counter]`</span><span>
+</span><span style="color: #008000">// and allow access to it as the type `Counter`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> counterReference: &#x26;</span><span style="color: #0000FF">Counter</span><span style="color: #000000"> = &#x26;account.storage[Counter] as Counter</span><span>
+</span><span>
+</span><span style="color: #000000">counterReference.count  </span><span style="color: #008000">// is `42`</span><span>
+</span><span>
+</span><span style="color: #000000">counterReference.increment()</span><span>
+</span><span>
+</span><span style="color: #000000">counterReference.count  </span><span style="color: #008000">// is `43`</span><span>
+</span></pre></code>
+
+### [](#reference-based-access-control)Reference-Based Access Control
+
+As was mentioned before, access to stored objects is governed by the
+tenets of [Capability Security](https://en.wikipedia.org/wiki/Capability-based_security).
+This means that if an account wants to be able to access another account&#x27;s
+stored objects, it must have a valid reference to that object.  
+
+Access to stored objects can be restricted by using interfaces.  When storing a reference,
+it can be stored as an interface so that only the fields and methods that the interface
+specifies are able to be called by those who have a reference.  
+
+Based on the above example, 
+a user could use an interface to restrict access to only the `count` field.  
+Often, other accounts will have functions that take specific references
+as parameters, so this method can be used to create those valid references.
+
+<code><pre><span>
+</span><span style="color: #008000">// Declare a resource interface `HasCount`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> HasCount {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require implementations of the interface to provide</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// a field named `count` which can be publicly read.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Create another reference to the storage location `account.storage[Counter]`</span><span>
+</span><span style="color: #008000">// and only allow access to it as the type `HasCount`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> limitedReference: &#x26;</span><span style="color: #0000FF">HasCount</span><span style="color: #000000"> = &#x26;account.storage[Counter] as HasCount</span><span>
+</span><span>
+</span><span style="color: #008000">// Read the counter's current count through the limited reference.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// This is valid because the `HasCount` resource interface declares</span><span>
+</span><span style="color: #008000">// the field `count`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">limitedReference.count  </span><span style="color: #008000">// is `43`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The `increment` function is not accessible for the reference,</span><span>
+</span><span style="color: #008000">// because the reference has the type `&#x26;HasCount`,</span><span>
+</span><span style="color: #008000">// i.e. only fields and functions of type `HasCount` can be used,</span><span>
+</span><span style="color: #008000">// and `increment` is not declared in it.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">limitedReference.increment()</span><span>
+</span></pre></code>
+
+## [](#publishing-references)Publishing References
+
+Users will often want to make it so anyone can access certain fields
+and methods of an object.  This can be done by publishing a reference to that object.
+
+Publishing a reference is done by storing the reference in the account&#x27;s `published`
+object.  `published` is a key-value store where the keys are restricted
+to be only reference types.  
+
+To continue the example above:
+
+<code><pre><span style="color: #0000FF">resource interface</span><span style="color: #000000"> HasCount {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require implementations of the interface to provide</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// a field named `count` which can be publicly read.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Create another reference to the storage location `account.storage[Counter]`</span><span>
+</span><span style="color: #008000">// and only allow access to it as the type `HasCount`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> limitedReference: &#x26;</span><span style="color: #0000FF">HasCount</span><span style="color: #000000"> = &#x26;account.storage[Counter] as HasCount</span><span>
+</span><span>
+</span><span style="color: #008000">// Store the reference in the `published` object.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">account.published[&#x26;HasCount] = limitedReference</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot store non-reference types in the `published` object.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">account.published[Counter] &#x3C;- account.storage[Counter]</span><span>
+</span><span>
+</span></pre></code>
+
+To get the published portion of an account, the `getAccount` function can be used.
+
+The public account object only has the `published` object, which is read-only, 
+and can be used to access all published references of the account.
+
+Imagine that the next example is from a different account as before.
+
+<code><pre><span>
+</span><span style="color: #008000">// Get the public account object for the account that published the reference.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> acct = getAccount(</span><span style="color: #09885A">0x72</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Read the `&#x26;HasCount` reference from their published object.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> countRef = acct.published[&#x26;HasCount] ?? panic(</span><span style="color: #A31515">"missing Count reference!"</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Read one of the exposed fields in the reference.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">countRef.count  </span><span style="color: #008000">// is `43`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The `increment` function is not accessible for the reference,</span><span>
+</span><span style="color: #008000">// because the reference has the type `&#x26;HasCount`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">countRef.increment()</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot access the account.storage object</span><span>
+</span><span style="color: #008000">// from the public account object.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> countObj = acct.storage[Counter]</span><span>
+</span><span>
+</span></pre></code>
+
+## [](#events)Events
+
+Events are special values that can be emitted during the execution of a program.
+
+An event type can be declared with the `event` keyword:
+
+<code><pre><span style="color: #000000">event FooEvent(x: Int, y: Int)</span><span>
+</span></pre></code>
+
+The syntax of an event declaration is similar to that of a [function declaration](#function-declarations); events contain named parameters, each of which has an optional argument label.
+
+<code><pre><span style="color: #008000">// Event with explicit argument labels</span><span>
+</span><span style="color: #000000">event BarEvent(labelA fieldA: Int, labelB fieldB: Int)</span><span>
+</span></pre></code>
+
+### [](#emitting-events)Emitting events
+
+To emit an event from a program, use the `emit` statement:
+
+<code><pre><span style="color: #000000">event FooEvent(x: Int, y: Int)</span><span>
+</span><span>
+</span><span style="color: #008000">// Event with argument labels</span><span>
+</span><span style="color: #000000">event BarEvent(labelA fieldA: Int, labelB fieldB: Int)</span><span>
+</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> events() {</span><span>
+</span><span style="color: #000000">    emit FooEvent(x: </span><span style="color: #09885A">1</span><span style="color: #000000">, y: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Emit event with explicit argument labels</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Note that the emitted event will only contain the field names, </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// not the argument labels used at the invocation site.</span><span>
+</span><span style="color: #000000">    emit FooEvent(labelA: </span><span style="color: #09885A">1</span><span style="color: #000000">, labelB: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+Restrictions:
+
+-   Events can only be invoked in an `emit` statement. This means events cannot be assigned to variables or used as function parameters.
+-   Events can only be emitted from the location in which they are defined.
+
+## [](#transactions)Transactions
+
+> 🚧 Status: The `transaction` syntax is not implemented yet. For now, declare a function named `main`.
+
+Transactions are objects that are signed by one or more [accounts](#accounts)
+and are sent to the chain to interact with it.
+
+Transactions are structured as such:
+
+First, the transaction can import any number of types from external accounts using the import syntax.
+
+Next is the body of the transaction, which is broken into three main phases:
+Preparation, execution, and postconditions, only in that order.
+Each phase is a block of code that executes sequentially.
+
+-   The **prepare phase** acts like the initializer in a composite data type,
+    i.e., it initializes fields that can then be used in the execution phase.
+    The prepare phase has the permissions to read from and write to the storage 
+    of all the accounts that signed the transaction.
+
+-   The **execute phase** is where interaction with external contracts happens.
+    This usually involves interacting with contracts with public types and functions that are deployed in other accounts.
+
+-   The **postcondition phase** is where the transaction can check that its functionality was executed correctly.
+
+Transactions are declared using the `transaction` keyword.
+
+Within the transaction, but before the prepare phase, any number of constants and/or variables can be declared. These are valid within the entire scope of the transaction.
+
+The prepare phase is declared using the `prepare` keyword 
+and the execution phase can be declared using the `execute` keyword.
+The `post` section can be used to declare postconditions.
+
+<code><pre><span style="color: #008000">// Optional: Importing external types from other accounts using `import`.</span><span>
+</span><span>
+</span><span style="color: #000000">transaction {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Optional: type declarations and fields, which must be initialized in `prepare`.</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The prepare phase needs to have as many account parameters</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// as there are signers for the transaction.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    prepare(signer1: Account) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">execute</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+### [](#deploying-code)Deploying Code
+
+Transactions can deploy contract code to the storage of any of the signing accounts.
+
+Here is an example of a resource interface that will be deployed to an account.
+Imagine it is in a file named `FungibleToken.cdc`.
+
+<code><pre><span style="color: #008000">// Declare resource interfaces for the two parts of a fungible token:</span><span>
+</span><span style="color: #008000">// - A provider, which allows withdrawing tokens</span><span>
+</span><span style="color: #008000">// - A receiver, which allows depositing tokens</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Provider {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">FungibleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"withdrawal amount must be positive"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            result.balance == amount:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"incorrect amount returned"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: Int)</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Receiver {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: &#x3C;-</span><span style="color: #0000FF">FungibleToken</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a resource interface for a fungible token.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// It requires that conforming implementations also implement</span><span>
+</span><span style="color: #008000">// the interfaces `Provider` and `Receiver`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> FungibleToken: Provider, Receiver {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> balance: Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">set</span><span style="color: #000000">(newBalance) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                newBalance >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"Balances are always set as non-negative numbers"</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == balance:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"the balance must be initialized to the initial balance"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-Self {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"insufficient funds: the amount must be smaller or equal to the balance"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) - amount:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"Incorrect amount removed"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: &#x3C;-Self) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + token.balance:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"Insufficient funds"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) - amount:</span><span>
+</span><span style="color: #000000">                </span><span style="color: #A31515">"Incorrect amount removed"</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+The transaction will import the above file to use it in the code.
+Transactions can refer to local code with the `import` keyword,
+followed by the name of the type, the `from` keyword,
+and the string literal for the path of the file which contains the code of the type.
+
+<!-- TODO:
+     move explanation for import statement into separate section?
+     also see below for version referring to deployed code with an address
+-->
+
+<code><pre><span style="color: #008000">// Import the resource interface type `FungibleToken`</span><span>
+</span><span style="color: #008000">// from the local file "FungibleToken.cdc".</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #A31515">"FungibleToken.cdc"</span><span>
+</span><span>
+</span><span style="color: #008000">// Run a transaction which deploys the code for the resource interface</span><span>
+</span><span style="color: #008000">// `FungibleToken` and makes it publicly available by publishing it.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">transaction {</span><span>
+</span><span>
+</span><span style="color: #000000">    prepare(signer: Account) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Store the code for the resource interface type `FungibleToken`</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// in the signing account.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        signer.storage[FungibleToken] = FungibleToken</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+Now, anybody can import the type `FungibleToken` from the signing account
+and concrete fungible token implementations that conform to the interface can be created.
+
+Imagine this declaration below for a concrete fungible token implementation conforming
+to the fungible token interface is in a local file named `ExampleToken.cdc`.
+
+<code><pre><span style="color: #008000">// Import the resource interface type `FungibleToken`,</span><span>
+</span><span style="color: #008000">// which was deployed above, in this example to the account with address 0x23.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x23</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a resource named `ExampleToken`, which is a concrete fungible token,</span><span>
+</span><span style="color: #008000">// i.e. it implements the resource interface `FungibleToken`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">resource</span><span style="color: #000000"> ExampleToken: FungibleToken {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: amount)</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + token.balance</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> token</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The function `transfer` combines the functions `withdraw` and `deposit` </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// into a single function call</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Deposit the tokens that withdraw creates into the </span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// recipient's account using their deposit reference</span><span>
+</span><span style="color: #000000">        to.deposit(from: &#x3C;-</span><span style="color: #0000FF">self</span><span style="color: #000000">.withdraw(amount: amount))</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a function that lets any user create an example token</span><span>
+</span><span style="color: #008000">// with an initial empty balance.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> newEmptyExampleToken(): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+Again, the type must be stored in the owners account.
+
+Once code is deployed, it can be used in other code and in transactions.
+
+In most situations it is important to expose only a subset of the functionality
+of the stored values, because some of the functionality should only be available to the owner.
+
+The following transaction creates an empty token and stores it in the signer&#x27;s account.
+This allows the owner to withdraw and deposit. 
+
+However, the deposit function should be available to anyone. To achieve this,
+an additional reference to the token is created, stored, and published,
+which has the type `Receiver`, i.e. it only exposes the `deposit` function.
+
+<code><pre><span style="color: #008000">// import the `ExampleToken`, `newEmptyExampleToken`, `Receiver`, and `Provider` from the account who created them</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> ExampleToken, newEmptyExampleToken, Receiver, Provider </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+</span><span>
+</span><span style="color: #008000">// Run a transaction which stored the code and an instance for the resource type `ExampleToken`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">transaction {</span><span>
+</span><span>
+</span><span style="color: #000000">    prepare(signer: Account) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Create a new token as an optional.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">var</span><span style="color: #000000"> tokenA: &#x3C;-ExampleToken? &#x3C;- newEmptyExampleToken()</span><span>
+</span><span style="color: #000000">		</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Store the new token in storage by replacing whatever</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// is in the existing location.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> oldToken &#x3C;- signer.storage[ExampleToken] &#x3C;- tokenA</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// destroy the empty old resource.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> oldToken</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// create references to the stored `ExampleToken`.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// `Receiver` is for external calls.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// `Provider` is for internal calls by the owner.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// The `Receiver` references is stored in the `published` object</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// because an account will usually want anyone to be able to read</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// their balance and call their deposit function</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// </span><span>
+</span><span style="color: #000000">        signer.published[&#x26;Receiver] = &#x26;signer.storage[ExampleToken] as Receiver</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// The `Provider` reference is stored in account storage</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// because an account will not want to expose its withdraw method</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// to the public</span><span>
+</span><span style="color: #000000">        signer.storage[&#x26;Provider] = &#x26;signer.storage[ExampleToken] as Provider</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+Now, the resource type `ExampleToken` is stored in the account
+and its `Receiver` interface is available via the `published` object 
+so that anyone can interact with it by importing it from the account.
+
+Once an account is prepared in such a way, transactions can be run that deposit
+tokens into the account.
+
+<code><pre><span style="color: #008000">// Import the resource type `ExampleToken`, `Provider`, and `Receiver`</span><span>
+</span><span style="color: #008000">// in this example deployed to the account with address 0x42.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">import</span><span style="color: #000000"> ExampleToken, Provider, Receiver </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+</span><span>
+</span><span style="color: #008000">// Execute a transaction which sends five coins from one account to another.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// The transaction fails unless there is a `FungibleToken.Provider` available</span><span>
+</span><span style="color: #008000">// for the sending account and there is a public `FungibleToken.Receiver`</span><span>
+</span><span style="color: #008000">// available for the recipient account.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #008000">// Only a signature from the sender is required.</span><span>
+</span><span style="color: #008000">// No signature from the recipient is required, as the receiver reference</span><span>
+</span><span style="color: #008000">// is published/publicly available (if it exists for the recipient).</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">transaction {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> providerRef: &#x26;</span><span style="color: #0000FF">Provider</span><span>
+</span><span>
+</span><span style="color: #000000">    prepare(signer: Account) {</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Get the provider reference from the signer's account storage.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// As the access is performed in the prepare phase of the transaction,</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// the unpublished reference `&#x26;Provider` can be accessed.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// If the signer's account has no provider reference stored in it,</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// or it is not published, abort the transaction.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        providerRef = signer.storage[&#x26;Provider] ?? panic(</span><span style="color: #A31515">"Signer has no provider"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">execute</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Get the recipient's account. In this example it has the address 0x1234.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> recipient = getAccount(</span><span style="color: #09885A">0x1234</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Note that the recipient's account is not a signing account –</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// deposits need no signature, the recipient's receiver is published</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// and can be used by anyone (if set up in this manner).</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Get the receiver reference from the recipient's account storage.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// If the recipient's account has no receiver reference stored in it,</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// or it is not published, abort the transaction.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> receiverRef = recipient.published[&#x26;Receiver] ?? panic(</span><span style="color: #A31515">"Recipient has no receiver"</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Call the provider's transfer function which withdraws 5 tokens </span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// from their account and deposits it to the receiver's account </span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// using the reference to their deposit function.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.providerRef.transfer(to: receiverRef, amount: </span><span style="color: #09885A">5</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></pre></code>
+
+## [](#built-in-functions)Built-in Functions
+
+### [](#transaction-information)Transaction information
+
+There is currently no built-in function that allows getting the address of the signers of a transaction, the current block number, or timestamp.  These are being worked on.
+
+### [](#panic)`panic`
+
+<code><pre><span style="color: #0000FF">fun</span><span style="color: #000000"> panic(_ message: </span><span style="color: #0000FF">String</span><span style="color: #000000">): Never</span><span>
+</span></pre></code>
+
+Terminates the program unconditionally and reports a message which explains why the unrecoverable error occurred.
+
+#### [](#example)Example
+
+<code><pre><span style="color: #0000FF">let</span><span style="color: #000000"> optionalAccount: </span><span style="color: #0000FF">Account</span><span style="color: #000000">? = </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> account = optionalAccount ?? panic(</span><span style="color: #A31515">"missing account"</span><span style="color: #000000">)</span><span>
+</span></pre></code>
+
+### [](#assert)`assert`
+
+<code><pre><span style="color: #0000FF">fun</span><span style="color: #000000"> assert(_ condition: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">, message: </span><span style="color: #0000FF">String</span><span style="color: #000000">)</span><span>
+</span></pre></code>
+
+Terminates the program if the given condition is false, and reports a message which explains how the condition is false. Use this function for internal sanity checks.
+
+The message argument is optional.
