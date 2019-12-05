@@ -34,11 +34,8 @@
         "command": "cadence.stopEmulator",
         "category": "Cadence",
         "title": "Stop emulator"
-      }, {
-        "command": "cadence.updateAccountCode",
-        "category": "Cadence",
-        "title": "Update account code"
-      }, {
+      },
+      {
         "command": "cadence.createAccount",
         "category": "Cadence",
         "title": "Create account"
@@ -49,7 +46,6 @@
       }
     ],
     "configuration": {
-      "type": "object",
       "title": "Cadence",
       "properties": {
         "cadence.flowCommand": {
