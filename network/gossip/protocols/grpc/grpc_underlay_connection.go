@@ -29,7 +29,7 @@ func (grpcUnderlayConnection *GRPCUnderlayConnection) OnClosed(onCloseFunc func(
 	return nil
 }
 
-// Close shuts down the conenction
+// Close shuts down the connection
 func (grpcUnderlayConnection *GRPCUnderlayConnection) Close() error {
 	// Kick off the onClose function if we have one in a separate go routine
 	if grpcUnderlayConnection.onCloseFunc != nil {
