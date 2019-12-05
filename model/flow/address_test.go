@@ -37,11 +37,11 @@ func TestShort(t *testing.T) {
 	cases := []testcase{
 		{
 			addr:     flow.RootAddress,
-			expected: "1",
+			expected: "01",
 		},
 		{
 			addr:     flow.HexToAddress("0000000002"),
-			expected: "2",
+			expected: "02",
 		},
 		{
 			addr:     flow.HexToAddress("1f10"),
@@ -49,7 +49,7 @@ func TestShort(t *testing.T) {
 		},
 		{
 			addr:     flow.HexToAddress("0f10"),
-			expected: "f10",
+			expected: "0f10",
 		},
 	}
 

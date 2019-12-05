@@ -70,7 +70,11 @@ func (a Address) String() string {
 // removed.
 func (a Address) Short() string {
 	hex := a.String()
-	return strings.TrimLeft(hex, "0")
+	trimmed := strings.TrimLeft(hex, "0")
+	if len(trimmed)%2 != 0 {
+		trimmed = "0" + trimmed
+	}
+	return trimmed
 }
 
 func (a Address) MarshalJSON() ([]byte, error) {
