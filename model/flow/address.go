@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"strings"
 )
 
 const (
@@ -63,6 +64,13 @@ func (a Address) Hex() string {
 // String returns the string representation of the address.
 func (a Address) String() string {
 	return a.Hex()
+}
+
+// Short returns the string representation of the address with leading zeros
+// removed.
+func (a Address) Short() string {
+	hex := a.String()
+	return strings.TrimLeft(hex, "0")
 }
 
 func (a Address) MarshalJSON() ([]byte, error) {
