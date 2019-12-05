@@ -1,4 +1,4 @@
-import {commands, ExtensionContext, window, workspace} from "vscode";
+import {commands, ExtensionContext, Position, window, workspace} from "vscode";
 import {Extension} from "./extension";
 import {LanguageServerAPI} from "./language-server";
 import {createTerminal} from "./terminal";
@@ -112,6 +112,17 @@ const switchActiveAccount = (ext: Extension) => async () => {
 
             try {
                 ext.api.switchActiveAccount(selected);
+                window.visibleTextEditors.forEach(editor => {
+                    editor.edit(edit => {
+                        const lineCount = editor.document.lineCount
+                        const lastLine = editor.document.lineAt(editor.document.lineCount-1)
+                        if (lastLine.isEmptyOrWhitespace) {
+                        }
+                        const endOfLastLine = new Position(editor.document.lineCount-1, 1000)
+                        edit.insert(endOfLastLine, '\n');
+                        edit.delete(editor.document.lineAt(lineCount).rangeIncludingLineBreak);
+                    });
+                });
             } catch (err) {
                 window.showWarningMessage("Failed to switch active account");
                 console.error(err);
