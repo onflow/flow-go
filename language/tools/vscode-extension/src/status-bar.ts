@@ -12,7 +12,7 @@ export function createActiveAccountStatusBarItem(): StatusBarItem {
     return statusBarItem
 }
 
-export function updateActiveAccountStatusBarItem(ext: Extension): void {
-    ext.activeAccountStatusBarItem.text = `$(key) Active account: ${ext.config.activeAccount}`
-    ext.activeAccountStatusBarItem.show()
+export function updateActiveAccountStatusBarItem(statusBarItem: StatusBarItem, activeAccount: string): void {
+    statusBarItem.text = `$(key) Active account: ${activeAccount}`
+    statusBarItem.show()
 }
