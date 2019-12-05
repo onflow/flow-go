@@ -17,7 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -1483,17 +1482,10 @@ func (v *CompositeValue) SetOwner(owner string) {
 }
 
 func (v *CompositeValue) Export() values.Value {
-	fields := make([]values.Value, 0)
+	fields := make(map[string]values.Value, len(v.Fields))
 
-	keys := make([]string, 0, len(v.Fields))
-	for key := range v.Fields {
-		keys = append(keys, key)
-	}
-
-	encoding.SortInEncodingOrder(keys)
-
-	for _, key := range keys {
-		fields = append(fields, v.Fields[key].(ExportableValue).Export())
+	for identifier, value := range v.Fields {
+		fields[identifier] = value.(ExportableValue).Export()
 	}
 
 	return values.NewComposite(fields)
@@ -1894,10 +1886,10 @@ type EventValue struct {
 func (EventValue) isValue() {}
 
 func (v EventValue) Export() values.Value {
-	fields := make([]values.Value, len(v.Fields))
+	fields := make(map[string]values.Value, len(v.Fields))
 
-	for i, field := range v.Fields {
-		fields[i] = field.Value.(ExportableValue).Export()
+	for _, field := range v.Fields {
+		fields[field.Identifier] = field.Value.(ExportableValue).Export()
 	}
 
 	return values.NewEvent(fields)

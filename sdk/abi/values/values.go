@@ -308,10 +308,10 @@ type KeyValuePair struct {
 
 type Composite struct {
 	typ    types.Type
-	Fields []Value
+	Fields map[string]Value
 }
 
-func NewComposite(fields []Value) Composite {
+func NewComposite(fields map[string]Value) Composite {
 	return Composite{Fields: fields}
 }
 
@@ -326,10 +326,10 @@ func (v Composite) WithType(typ types.Type) Composite {
 
 type Event struct {
 	typ    types.Type
-	Fields []Value
+	Fields map[string]Value
 }
 
-func NewEvent(fields []Value) Event {
+func NewEvent(fields map[string]Value) Event {
 	return Event{Fields: fields}
 }
 

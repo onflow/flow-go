@@ -301,7 +301,7 @@ func (r *interpreterRuntime) emitEvent(
 func (r *interpreterRuntime) emitAccountEvent(
 	eventType sema.EventType,
 	runtimeInterface Interface,
-	eventFields ...values.Value,
+	eventFields map[string]values.Value,
 ) {
 	t := eventType.Export(nil, nil)
 	eventValue := values.NewEvent(eventFields).WithType(t)
@@ -333,7 +333,11 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 			panic(err)
 		}
 
-		r.emitAccountEvent(stdlib.AccountCreatedEventType, runtimeInterface, accountAddress)
+		fields := map[string]values.Value{
+			"address": accountAddress,
+		}
+
+		r.emitAccountEvent(stdlib.AccountCreatedEventType, runtimeInterface, fields)
 
 		result := interpreter.AddressValue(accountAddress)
 		return trampoline.Done{Result: result}
@@ -355,7 +359,12 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 			panic(err)
 		}
 
-		r.emitAccountEvent(stdlib.AccountKeyAddedEventType, runtimeInterface, accountAddressValue, publicKey)
+		fields := map[string]values.Value{
+			"address":   accountAddressValue,
+			"publicKey": publicKey,
+		}
+
+		r.emitAccountEvent(stdlib.AccountKeyAddedEventType, runtimeInterface, fields)
 
 		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
@@ -376,7 +385,12 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 			panic(err)
 		}
 
-		r.emitAccountEvent(stdlib.AccountKeyRemovedEventType, runtimeInterface, accountAddressValue, publicKey)
+		fields := map[string]values.Value{
+			"address":   accountAddressValue,
+			"publicKey": publicKey,
+		}
+
+		r.emitAccountEvent(stdlib.AccountKeyRemovedEventType, runtimeInterface, fields)
 
 		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
@@ -399,7 +413,12 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 			panic(err)
 		}
 
-		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, accountAddressValue, code)
+		fields := map[string]values.Value{
+			"address":  accountAddressValue,
+			"codeHash": code,
+		}
+
+		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, fields)
 
 		result := &interpreter.VoidValue{}
 		return trampoline.Done{Result: result}

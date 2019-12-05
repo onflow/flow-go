@@ -1556,13 +1556,10 @@ func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.T
 			panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
 		}()
 
-		fieldTypes := map[string]types.Field{}
+		fieldTypes := map[string]types.Type{}
 
 		for name, field := range t.Members {
-			fieldTypes[name] = types.Field{
-				Identifier: name,
-				Type:       field.Type.(ExportableType).Export(program, nil),
-			}
+			fieldTypes[name] = field.Type.(ExportableType).Export(program, nil)
 		}
 
 		parameters := make([]types.Parameter, len(t.ConstructorParameterTypeAnnotations))
@@ -2180,15 +2177,12 @@ func (t *EventType) Export(program *ast.Program, variable *Variable) types.Type 
 		}
 	}
 
-	fields := make(map[string]types.Field, len(t.Fields))
+	fields := make(map[string]types.Type, len(t.Fields))
 	for _, field := range t.Fields {
 		identifier := field.Identifier
 		typ := field.Type.(ExportableType).Export(program, nil)
 
-		fields[identifier] = types.Field{
-			Identifier: identifier,
-			Type:       typ,
-		}
+		fields[identifier] = typ
 	}
 
 	return types.Event{

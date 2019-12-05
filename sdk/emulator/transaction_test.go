@@ -511,11 +511,8 @@ func TestGetTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	myEventType := types.Event{
-		Fields: map[string]types.Field{
-			"x": {
-				Identifier: "x",
-				Type:       types.Int{},
-			},
+		Fields: map[string]types.Type{
+			"x": types.Int{},
 		},
 	}
 
@@ -571,6 +568,6 @@ func TestGetTransaction(t *testing.T) {
 		assert.Equal(t, tx.Hash(), actualEvent.TxHash)
 		assert.Equal(t, eventType, actualEvent.Type)
 		assert.Equal(t, uint(0), actualEvent.Index)
-		assert.Equal(t, values.NewInt(1), decodedEvent.Fields[0])
+		assert.Equal(t, values.NewInt(1), decodedEvent.Fields["x"])
 	})
 }

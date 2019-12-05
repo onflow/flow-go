@@ -131,16 +131,11 @@ type Parameter struct {
 	Type       Type
 }
 
-type Field struct {
-	Identifier string
-	Type       Type
-}
-
 type Composite struct {
 	isAType
 	TypeID       string
 	Identifier   string
-	Fields       map[string]Field
+	Fields       map[string]Type
 	Initializers [][]Parameter
 }
 
@@ -182,7 +177,7 @@ type Event struct {
 	isAType
 	TypeID      string
 	Identifier  string
-	Fields      map[string]Field
+	Fields      map[string]Type
 	Initializer []Parameter
 }
 

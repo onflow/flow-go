@@ -197,7 +197,7 @@ func TestExportability(t *testing.T) {
 
 		require.Contains(t, s.Fields, "fieldA")
 
-		assert.IsType(t, types.Int{}, s.Fields["fieldA"].Type)
+		assert.IsType(t, types.Int{}, s.Fields["fieldA"])
 	})
 
 	t.Run("string", func(t *testing.T) {
@@ -269,8 +269,8 @@ func TestExportability(t *testing.T) {
 
 		require.Len(t, event.Fields, 2)
 
-		assert.Equal(t, "who", event.Fields["who"].Identifier)
-		assert.Equal(t, "where", event.Fields["where"].Identifier)
+		assert.IsType(t, types.String{}, event.Fields["who"])
+		assert.IsType(t, types.Int{}, event.Fields["where"])
 
 		require.Len(t, event.Initializer, 2)
 		assert.Equal(t, "magic_caster", event.Initializer[0].Label)

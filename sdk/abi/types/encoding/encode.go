@@ -21,11 +21,11 @@ func (encoder *Encoder) Encode(name string, t types.Type) {
 func (encoder *Encoder) Get() interface{} {
 	return abiObject{
 		encoder.definitions,
-		"", //Once we setup schema, probably on withflow.org
+		"", // Once we setup schema, probably on withflow.org
 	}
 }
 
-//region JSON Structures
+// region JSON Structures
 
 type abiObject struct {
 	Definitions map[string]interface{} `json:"definitions"`
@@ -103,13 +103,13 @@ type variableObject struct {
 	Variable interface{} `json:"variable"`
 }
 
-//endregion
+// endregion
 
-func (encoder *Encoder) mapFields(m map[string]types.Field) map[string]interface{} {
+func (encoder *Encoder) mapFields(m map[string]types.Type) map[string]interface{} {
 	ret := map[string]interface{}{}
 
-	for k, v := range m {
-		ret[k] = encoder.encode(v.Type)
+	for identifier, typ := range m {
+		ret[identifier] = encoder.encode(typ)
 	}
 
 	return ret

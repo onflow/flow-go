@@ -267,30 +267,24 @@ func TestEncodeVariableSizedArray(t *testing.T) {
 		"CompositeArray",
 		types.VariableSizedArray{
 			ElementType: types.Composite{
-				Fields: map[string]types.Field{
-					"a": {
-						Type:       types.String{},
-						Identifier: "a",
-					},
-					"b": {
-						Type:       types.Int{},
-						Identifier: "b",
-					},
+				Fields: map[string]types.Type{
+					"a": types.String{},
+					"b": types.Int{},
 				},
 			},
 		},
 		values.NewVariableSizedArray([]values.Value{
-			values.NewComposite([]values.Value{
-				values.NewString("a"),
-				values.NewInt(1),
+			values.NewComposite(map[string]values.Value{
+				"a": values.NewString("a"),
+				"b": values.NewInt(1),
 			}),
-			values.NewComposite([]values.Value{
-				values.NewString("b"),
-				values.NewInt(1),
+			values.NewComposite(map[string]values.Value{
+				"a": values.NewString("b"),
+				"b": values.NewInt(1),
 			}),
-			values.NewComposite([]values.Value{
-				values.NewString("c"),
-				values.NewInt(1),
+			values.NewComposite(map[string]values.Value{
+				"a": values.NewString("c"),
+				"b": values.NewInt(1),
 			}),
 		}),
 	}
@@ -395,36 +389,32 @@ func TestEncodeDictionary(t *testing.T) {
 		types.Dictionary{
 			KeyType: types.String{},
 			ElementType: types.Composite{
-				Fields: map[string]types.Field{
-					"a": {
-						Type: types.String{},
-					},
-					"b": {
-						Type: types.Int{},
-					},
+				Fields: map[string]types.Type{
+					"a": types.String{},
+					"b": types.Int{},
 				},
 			},
 		},
 		values.NewDictionary([]values.KeyValuePair{
 			{
 				values.NewString("a"),
-				values.NewComposite([]values.Value{
-					values.NewString("a"),
-					values.NewInt(1),
+				values.NewComposite(map[string]values.Value{
+					"a": values.NewString("a"),
+					"b": values.NewInt(1),
 				}),
 			},
 			{
 				values.NewString("b"),
-				values.NewComposite([]values.Value{
-					values.NewString("b"),
-					values.NewInt(2),
+				values.NewComposite(map[string]values.Value{
+					"a": values.NewString("b"),
+					"b": values.NewInt(2),
 				}),
 			},
 			{
 				values.NewString("c"),
-				values.NewComposite([]values.Value{
-					values.NewString("c"),
-					values.NewInt(3),
+				values.NewComposite(map[string]values.Value{
+					"a": values.NewString("c"),
+					"b": values.NewInt(3),
 				}),
 			},
 		}),
@@ -441,56 +431,44 @@ func TestEncodeComposite(t *testing.T) {
 	simpleComp := encodeTest{
 		"SimpleComposite",
 		types.Composite{
-			Fields: map[string]types.Field{
-				"a": {
-					Type: types.String{},
-				},
-				"b": {
-					Type: types.String{},
-				},
+			Fields: map[string]types.Type{
+				"a": types.String{},
+				"b": types.String{},
 			},
 		},
-		values.NewComposite([]values.Value{
-			values.NewString("foo"),
-			values.NewString("bar"),
+		values.NewComposite(map[string]values.Value{
+			"a": values.NewString("foo"),
+			"b": values.NewString("bar"),
 		}),
 	}
 
 	multiTypeComp := encodeTest{
 		"MultiTypeComposite",
 		types.Composite{
-			Fields: map[string]types.Field{
-				"a": {
-					Type: types.String{},
-				},
-				"b": {
-					Type: types.Int{},
-				},
-				"c": {
-					Type: types.Bool{},
-				},
+			Fields: map[string]types.Type{
+				"a": types.String{},
+				"b": types.Int{},
+				"c": types.Bool{},
 			},
 		},
-		values.NewComposite([]values.Value{
-			values.NewString("foo"),
-			values.NewInt(42),
-			values.NewBool(true),
+		values.NewComposite(map[string]values.Value{
+			"a": values.NewString("foo"),
+			"b": values.NewInt(42),
+			"c": values.NewBool(true),
 		}),
 	}
 
 	arrayComp := encodeTest{
 		"ArrayComposite",
 		types.Composite{
-			Fields: map[string]types.Field{
-				"a": {
-					Type: types.VariableSizedArray{
-						ElementType: types.Int{},
-					},
+			Fields: map[string]types.Type{
+				"a": types.VariableSizedArray{
+					ElementType: types.Int{},
 				},
 			},
 		},
-		values.NewComposite([]values.Value{
-			values.NewVariableSizedArray([]values.Value{
+		values.NewComposite(map[string]values.Value{
+			"a": values.NewVariableSizedArray([]values.Value{
 				values.NewInt(1),
 				values.NewInt(2),
 				values.NewInt(3),
@@ -503,25 +481,19 @@ func TestEncodeComposite(t *testing.T) {
 	nestedComp := encodeTest{
 		"NestedComposite",
 		types.Composite{
-			Fields: map[string]types.Field{
-				"a": {
-					Type: types.String{},
-				},
-				"b": {
-					Type: types.Composite{
-						Fields: map[string]types.Field{
-							"a": {
-								Type: types.Int{},
-							},
-						},
+			Fields: map[string]types.Type{
+				"a": types.String{},
+				"b": types.Composite{
+					Fields: map[string]types.Type{
+						"c": types.Int{},
 					},
 				},
 			},
 		},
-		values.NewComposite([]values.Value{
-			values.NewString("foo"),
-			values.NewComposite([]values.Value{
-				values.NewInt(42),
+		values.NewComposite(map[string]values.Value{
+			"a": values.NewString("foo"),
+			"b": values.NewComposite(map[string]values.Value{
+				"c": values.NewInt(42),
 			}),
 		}),
 	}
@@ -538,51 +510,35 @@ func TestEncodeEvent(t *testing.T) {
 	simpleEvent := encodeTest{
 		"SimpleEvent",
 		types.Event{
-			Fields: map[string]types.Field{
-				"x": {
-					Identifier: "x",
-					Type:       types.Int{},
-				},
-				"y": {
-					Identifier: "y",
-					Type:       types.String{},
-				},
+			Fields: map[string]types.Type{
+				"a": types.Int{},
+				"b": types.String{},
 			},
 		},
-		values.NewEvent([]values.Value{
-			values.NewInt(1),
-			values.NewString("foo"),
+		values.NewEvent(map[string]values.Value{
+			"a": values.NewInt(1),
+			"b": values.NewString("foo"),
 		}),
 	}
 
 	compositeEvent := encodeTest{
 		"CompositeEvent",
 		types.Event{
-			Fields: map[string]types.Field{
-				"x": {
-					Identifier: "x",
-					Type:       types.String{},
-				},
-				"y": {
-					Identifier: "y",
-					Type: types.Composite{
-						Fields: map[string]types.Field{
-							"a": {
-								Type: types.String{},
-							},
-							"b": {
-								Type: types.Int{},
-							},
-						},
+			Fields: map[string]types.Type{
+				"a": types.String{},
+				"b": types.Composite{
+					Fields: map[string]types.Type{
+						"c": types.String{},
+						"d": types.Int{},
 					},
 				},
 			},
 		},
-		values.NewEvent([]values.Value{
-			values.NewString("foo"),
-			values.NewComposite([]values.Value{
-				values.NewString("bar"),
-				values.NewInt(42),
+		values.NewEvent(map[string]values.Value{
+			"a": values.NewString("foo"),
+			"b": values.NewComposite(map[string]values.Value{
+				"c": values.NewString("bar"),
+				"d": values.NewInt(42),
 			}),
 		}),
 	}
@@ -598,7 +554,7 @@ func testAllEncode(t *testing.T, tests ...encodeTest) {
 	}
 }
 
-const numTrials = 50
+const numTrials = 250
 
 func testEncode(t *testing.T, typ types.Type, val values.Value) {
 	b1, err := encoding.Encode(val)

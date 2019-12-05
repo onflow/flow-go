@@ -226,19 +226,10 @@ func TestGetEvents(t *testing.T) {
 	// declare event type used for decoding event payloads
 	mockEventType := types.Event{
 		Identifier: "Transfer",
-		Fields: map[string]types.Field{
-			"to": {
-				Identifier: "to",
-				Type:       types.Address{},
-			},
-			"from": {
-				Identifier: "from",
-				Type:       types.Address{},
-			},
-			"amount": {
-				Identifier: "amount",
-				Type:       types.Int{},
-			},
+		Fields: map[string]types.Type{
+			"to":     types.Address{},
+			"from":   types.Address{},
+			"amount": types.Int{},
 		},
 	}
 
@@ -246,7 +237,9 @@ func TestGetEvents(t *testing.T) {
 	from := values.Address(flow.ZeroAddress)
 	amount := values.NewInt(42)
 
-	mockEventValue := values.NewEvent([]values.Value{to, from, amount}).WithType(mockEventType)
+	mockEventValue := values.
+		NewEvent(map[string]values.Value{"to": to, "from": from, "amount": amount}).
+		WithType(mockEventType)
 
 	// encode event payload from mock value
 	eventPayload, _ := encoding.Encode(mockEventValue)
@@ -279,9 +272,9 @@ func TestGetEvents(t *testing.T) {
 		eventValue := value.(values.Event)
 
 		assert.Equal(t, actualEvent.Type, mockEvent.Type)
-		assert.Equal(t, to, eventValue.Fields[0])
-		assert.Equal(t, from, eventValue.Fields[1])
-		assert.Equal(t, amount, eventValue.Fields[2])
+		assert.Equal(t, to, eventValue.Fields["to"])
+		assert.Equal(t, from, eventValue.Fields["from"])
+		assert.Equal(t, amount, eventValue.Fields["amount"])
 	})
 
 	t.Run("Server error", func(t *testing.T) {
