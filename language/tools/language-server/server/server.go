@@ -278,7 +278,7 @@ func (s *Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) (
 		actions = append(actions, &protocol.CodeLens{
 			Range: astToProtocolRange(txDeclaration.StartPosition(), txDeclaration.StartPosition()),
 			Command: &protocol.Command{
-				Title:     "submit transaction",
+				Title:     fmt.Sprintf("submit transaction with account 0x%s", s.activeAccount.Short()),
 				Command:   CommandSubmitTransaction,
 				Arguments: []interface{}{uri},
 			},
