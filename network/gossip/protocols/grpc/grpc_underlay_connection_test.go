@@ -16,6 +16,7 @@ func TestGRPCUnderlayConnection_Send(t *testing.T) {
 	var underlay gossip.Underlay = &GRPCUnderlay{}
 	address := ":0"
 	listener, err := net.Listen("tcp4", address)
+	require.NoError(t, err)
 	// Start the Server
 	go func() {
 		require.NoError(t, underlay.StartWithListener(listener))
@@ -50,7 +51,7 @@ func TestGRPCUnderlayConnection_OnClosed(t *testing.T) {
 	assert.NoError(t, underlay.Handle(callbackfunc))
 	address := ":0"
 	listener, err := net.Listen("tcp4", address)
-
+	require.NoError(t, err)
 	// Start the Server
 	go func() {
 		require.NoError(t, underlay.StartWithListener(listener))

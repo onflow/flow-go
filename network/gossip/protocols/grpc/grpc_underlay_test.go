@@ -19,7 +19,8 @@ func TestGRPCUnderlay_Start_Twice(t *testing.T) {
 	require.NotNil(t, protocol, "Protocol is nil")
 	protocol.Handle(func(sender string, msg []byte) {})
 	address := ":0"
-	listener, _ := net.Listen("tcp4", address)
+	listener, err := net.Listen("tcp4", address)
+	require.NoError(t, err)
 	go func() {
 		require.NoError(t, protocol.StartWithListener(listener))
 	}()
@@ -34,7 +35,8 @@ func TestGRPCUnderlay_Start_Stop(t *testing.T) {
 	require.NotNil(t, protocol, "Protocol is nil")
 	protocol.Handle(func(sender string, msg []byte) {})
 	address := ":0"
-	listener, _ := net.Listen("tcp4", address)
+	listener, err := net.Listen("tcp4", address)
+	require.NoError(t, err)
 	go func() {
 		require.NoError(t, protocol.StartWithListener(listener))
 	}()
@@ -54,7 +56,8 @@ func TestGRPCUnderlay_Handle(t *testing.T) {
 	}
 	assert.NoError(t, protocol.Handle(callbackfunc))
 	address := ":0"
-	listener, _ := net.Listen("tcp4", address)
+	listener, err := net.Listen("tcp4", address)
+	require.NoError(t, err)
 	go func() {
 		require.NoError(t, protocol.StartWithListener(listener))
 	}()
