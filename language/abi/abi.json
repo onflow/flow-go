@@ -271,6 +271,9 @@
         },
         {
           "$ref": "#/definitions/structReferenceType"
+        },
+        {
+          "$ref": "#/definitions/resourceReferenceType"
         }
       ]
     },

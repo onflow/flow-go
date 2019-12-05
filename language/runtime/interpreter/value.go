@@ -1078,7 +1078,7 @@ func (v UInt8Value) KeyString() string {
 }
 
 func (v UInt8Value) Export() values.Value {
-	return values.Uint8(v)
+	return values.UInt8(v)
 }
 
 func (v UInt8Value) IntValue() int {
@@ -1168,7 +1168,7 @@ func (v UInt16Value) KeyString() string {
 }
 
 func (v UInt16Value) Export() values.Value {
-	return values.Uint16(v)
+	return values.UInt16(v)
 }
 
 func (v UInt16Value) IntValue() int {
@@ -1258,7 +1258,7 @@ func (v UInt32Value) KeyString() string {
 }
 
 func (v UInt32Value) Export() values.Value {
-	return values.Uint32(v)
+	return values.UInt32(v)
 }
 
 func (v UInt32Value) IntValue() int {
@@ -1349,7 +1349,7 @@ func (v UInt64Value) KeyString() string {
 }
 
 func (v UInt64Value) Export() values.Value {
-	return values.Uint64(v)
+	return values.UInt64(v)
 }
 
 func (v UInt64Value) IntValue() int {

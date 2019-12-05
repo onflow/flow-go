@@ -247,13 +247,13 @@ func (e *Decoder) DecodeInt64() (values.Int64, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Decoder) DecodeUInt8() (values.Uint8, error) {
+func (e *Decoder) DecodeUInt8() (values.UInt8, error) {
 	i, _, err := e.dec.DecodeUint()
 	if err != nil {
 		return 0, err
 	}
 
-	return values.Uint8(i), nil
+	return values.UInt8(i), nil
 }
 
 // DecodeUInt16 reads the XDR-encoded representation of a uint-16 value.
@@ -261,13 +261,13 @@ func (e *Decoder) DecodeUInt8() (values.Uint8, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Decoder) DecodeUInt16() (values.Uint16, error) {
+func (e *Decoder) DecodeUInt16() (values.UInt16, error) {
 	i, _, err := e.dec.DecodeUint()
 	if err != nil {
 		return 0, err
 	}
 
-	return values.Uint16(i), nil
+	return values.UInt16(i), nil
 }
 
 // DecodeUInt32 reads the XDR-encoded representation of a uint-32 value.
@@ -275,13 +275,13 @@ func (e *Decoder) DecodeUInt16() (values.Uint16, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Decoder) DecodeUInt32() (values.Uint32, error) {
+func (e *Decoder) DecodeUInt32() (values.UInt32, error) {
 	i, _, err := e.dec.DecodeUint()
 	if err != nil {
 		return 0, err
 	}
 
-	return values.Uint32(i), nil
+	return values.UInt32(i), nil
 }
 
 // DecodeUInt64 reads the XDR-encoded representation of a uint-64 value.
@@ -289,13 +289,13 @@ func (e *Decoder) DecodeUInt32() (values.Uint32, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.5
 //  RFC Section 4.5 - Unsigned Hyper Integer
 //  64-bit big-endian unsigned integer in range [0, 18446744073709551615]
-func (e *Decoder) DecodeUInt64() (values.Uint64, error) {
+func (e *Decoder) DecodeUInt64() (values.UInt64, error) {
 	i, _, err := e.dec.DecodeUhyper()
 	if err != nil {
 		return 0, err
 	}
 
-	return values.Uint64(i), nil
+	return values.UInt64(i), nil
 }
 
 // DecodeVariableSizedArray reads the XDR-encoded representation of a

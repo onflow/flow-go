@@ -95,31 +95,31 @@ func (i Int64) ToGoValue() interface{} {
 	return int64(i)
 }
 
-type Uint8 uint8
+type UInt8 uint8
 
-func (Uint8) isValue() {}
-func (i Uint8) ToGoValue() interface{} {
+func (UInt8) isValue() {}
+func (i UInt8) ToGoValue() interface{} {
 	return uint8(i)
 }
 
-type Uint16 uint16
+type UInt16 uint16
 
-func (Uint16) isValue() {}
-func (i Uint16) ToGoValue() interface{} {
+func (UInt16) isValue() {}
+func (i UInt16) ToGoValue() interface{} {
 	return uint16(i)
 }
 
-type Uint32 uint32
+type UInt32 uint32
 
-func (Uint32) isValue() {}
-func (i Uint32) ToGoValue() interface{} {
+func (UInt32) isValue() {}
+func (i UInt32) ToGoValue() interface{} {
 	return uint32(i)
 }
 
-type Uint64 uint64
+type UInt64 uint64
 
-func (Uint64) isValue() {}
-func (i Uint64) ToGoValue() interface{} {
+func (UInt64) isValue() {}
+func (i UInt64) ToGoValue() interface{} {
 	return uint64(i)
 }
 

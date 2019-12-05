@@ -68,13 +68,13 @@ func (e *Encoder) Encode(v values.Value) error {
 		return e.EncodeInt32(x)
 	case values.Int64:
 		return e.EncodeInt64(x)
-	case values.Uint8:
+	case values.UInt8:
 		return e.EncodeUint8(x)
-	case values.Uint16:
+	case values.UInt16:
 		return e.EncodeUint16(x)
-	case values.Uint32:
+	case values.UInt32:
 		return e.EncodeUint32(x)
-	case values.Uint64:
+	case values.UInt64:
 		return e.EncodeUint64(x)
 	case values.VariableSizedArray:
 		return e.EncodeVariableSizedArray(x)
@@ -213,7 +213,7 @@ func (e *Encoder) EncodeInt64(v values.Int64) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Encoder) EncodeUint8(v values.Uint8) error {
+func (e *Encoder) EncodeUint8(v values.UInt8) error {
 	_, err := e.enc.EncodeUint(uint32(v))
 	return err
 }
@@ -223,7 +223,7 @@ func (e *Encoder) EncodeUint8(v values.Uint8) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Encoder) EncodeUint16(v values.Uint16) error {
+func (e *Encoder) EncodeUint16(v values.UInt16) error {
 	_, err := e.enc.EncodeUint(uint32(v))
 	return err
 }
@@ -233,7 +233,7 @@ func (e *Encoder) EncodeUint16(v values.Uint16) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Encoder) EncodeUint32(v values.Uint32) error {
+func (e *Encoder) EncodeUint32(v values.UInt32) error {
 	_, err := e.enc.EncodeUint(uint32(v))
 	return err
 }
@@ -243,7 +243,7 @@ func (e *Encoder) EncodeUint32(v values.Uint32) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.5
 //  RFC Section 4.5 - Unsigned Hyper Integer
 //  64-bit big-endian unsigned integer in range [0, 18446744073709551615]
-func (e *Encoder) EncodeUint64(v values.Uint64) error {
+func (e *Encoder) EncodeUint64(v values.UInt64) error {
 	_, err := e.enc.EncodeUhyper(uint64(v))
 	return err
 }
