@@ -1,4 +1,4 @@
-import {commands, ExtensionContext, Position, window, workspace} from "vscode";
+import {commands, ExtensionContext, Position, Range, window, workspace} from "vscode";
 import {Extension} from "./extension";
 import {LanguageServerAPI} from "./language-server";
 import {createTerminal} from "./terminal";
@@ -52,6 +52,12 @@ const startEmulator = (ext: Extension) => async () => {
 const stopEmulator = (ext: Extension) => async () => {
     ext.terminal.dispose();
     ext.terminal = createTerminal(ext.ctx);
+
+    // Clear accounts and restart language server to ensure account
+    // state is in sync.
+    ext.config.resetAccounts();
+    await ext.api.client.stop();
+    ext.api = new LanguageServerAPI(ext.ctx, ext.config);
 };
 
 // Submits a transaction that updates the current account's code the
@@ -113,14 +119,14 @@ const switchActiveAccount = (ext: Extension) => async () => {
             try {
                 ext.api.switchActiveAccount(selected);
                 window.visibleTextEditors.forEach(editor => {
+                    console.log(editor.document.uri, editor.document.lineCount);
+                    if (!editor.document.lineCount) {
+                        return;
+                    }
+                    const lastLine = editor.document.lineAt(editor.document.lineCount-1);
                     editor.edit(edit => {
-                        const lineCount = editor.document.lineCount
-                        const lastLine = editor.document.lineAt(editor.document.lineCount-1)
-                        if (lastLine.isEmptyOrWhitespace) {
-                        }
-                        const endOfLastLine = new Position(editor.document.lineCount-1, 1000)
-                        edit.insert(endOfLastLine, '\n');
-                        edit.delete(editor.document.lineAt(lineCount).rangeIncludingLineBreak);
+                        const lineCount = editor.document.lineCount;
+                        edit.insert(new Position(lineCount-1, lastLine.text.length), ' ');
                     });
                 });
             } catch (err) {

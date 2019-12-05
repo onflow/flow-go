@@ -20,16 +20,29 @@ type ServerConfig = {
 };
 
 // The config used by the extension
-export type Config = {
+export class Config {
     // The name of the flow CLI executable
-    flowCommand: string
-    serverConfig: ServerConfig
+    flowCommand: string;
+    serverConfig: ServerConfig;
     // Set of created accounts for which we can submit transactions.
     // Mapping from account address to account object.
-    accounts: AccountSet,
+    accounts: AccountSet;
     // Address of the currently active account.
-    activeAccount: string
-};
+    activeAccount: string;
+
+    constructor(flowCommand: string, serverConfig: ServerConfig) {
+        this.flowCommand = flowCommand;
+        this.serverConfig = serverConfig;
+        this.accounts = {[ROOT_ADDR]: {address: ROOT_ADDR}};
+        this.activeAccount = ROOT_ADDR;
+    }
+
+    // Resets account state
+    resetAccounts() {
+        this.accounts = {[ROOT_ADDR]: {address: ROOT_ADDR}};
+        this.activeAccount = ROOT_ADDR;
+    }
+}
 
 // Retrieves config from the workspace.
 export function getConfig(): Config {
@@ -51,17 +64,9 @@ export function getConfig(): Config {
         throw new Error(`Missing ${CONFIG_EMULATOR_ADDRESS} config`);
     }
 
-    return {
-        flowCommand: flowCommand,
-        serverConfig: {
-            rootAccountKey: rootAccountKey,
-            emulatorAddress: emulatorAddress,
-        },
-        accounts: {
-            [ROOT_ADDR]: {address: ROOT_ADDR}
-        },
-        activeAccount: ROOT_ADDR,
-    };
+    const serverConfig = {rootAccountKey, emulatorAddress};
+
+    return new Config(flowCommand, serverConfig)
 }
 
 // Adds an event handler that prompts the user to reload whenever the config
