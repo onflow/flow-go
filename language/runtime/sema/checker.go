@@ -861,27 +861,17 @@ func (checker *Checker) recordResourceInvalidation(
 		return
 	}
 
-	switch typedExpression := expression.(type) {
-	case *ast.IdentifierExpression:
-
-		variable := checker.findAndCheckVariable(typedExpression.Identifier, false)
-		if variable == nil {
-			return
-		}
-
-		checker.resources.AddInvalidation(variable, invalidation)
-
-	case *ast.CreateExpression:
-	case *ast.InvocationExpression:
-	case *ast.ArrayExpression:
-	case *ast.DictionaryExpression:
-	case *ast.NilExpression:
-	case *ast.CastingExpression:
-	case *ast.BinaryExpression:
-		// (nil-coalescing)
-	default:
-		panic(errors.NewUnreachableError())
+	identifierExpression, ok := expression.(*ast.IdentifierExpression)
+	if !ok {
+		return
 	}
+
+	variable := checker.findAndCheckVariable(identifierExpression.Identifier, false)
+	if variable == nil {
+		return
+	}
+
+	checker.resources.AddInvalidation(variable, invalidation)
 }
 
 func (checker *Checker) checkWithResources(
