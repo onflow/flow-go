@@ -20,11 +20,13 @@ import (
 var _ gossip.Underlay = &GRPCUnderlay{}
 var _ messages.MessageReceiverServer = &GRPCUnderlay{}
 
+// GRPCUnderlay is the GRPC implementation of the Underlay interface
 type GRPCUnderlay struct {
 	grpcServer *grpc.Server
 	onReceive  gossip.OnReceiveCallback
 }
 
+// Handle sets the callback receiver
 func (u *GRPCUnderlay) Handle(onReceive gossip.OnReceiveCallback) error {
 	if u.onReceive != nil {
 		return fmt.Errorf(" Handle call back is already set")
@@ -33,6 +35,7 @@ func (u *GRPCUnderlay) Handle(onReceive gossip.OnReceiveCallback) error {
 	return nil
 }
 
+// Dial connects to the given address
 func (u *GRPCUnderlay) Dial(address string) (gossip.Connection, error) {
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
@@ -44,6 +47,7 @@ func (u *GRPCUnderlay) Dial(address string) (gossip.Connection, error) {
 	return gossipConnection, err
 }
 
+// Start starts a GRPC Server on the given address
 func (u *GRPCUnderlay) Start(address string) error {
 	listener, err := net.Listen("tcp4", address)
 	if err != nil {
@@ -52,6 +56,7 @@ func (u *GRPCUnderlay) Start(address string) error {
 	return u.StartWithListener(listener)
 }
 
+// StartWithListener starts a GRPCServer with the given listener
 func (u *GRPCUnderlay) StartWithListener(listener net.Listener) error {
 	if u.grpcServer != nil {
 		return fmt.Errorf("GRPC server already started")
@@ -72,6 +77,7 @@ func (u *GRPCUnderlay) StartWithListener(listener net.Listener) error {
 	return nil
 }
 
+// Stop stops the GRPC Server
 func (u *GRPCUnderlay) Stop() error {
 	if u.grpcServer == nil {
 		return errors.New(" GRPC Server set to nil ")
