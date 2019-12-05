@@ -119,10 +119,11 @@ const switchActiveAccount = (ext: Extension) => async () => {
             try {
                 ext.api.switchActiveAccount(selected);
                 window.visibleTextEditors.forEach(editor => {
-                    console.log(editor.document.uri, editor.document.lineCount);
                     if (!editor.document.lineCount) {
                         return;
                     }
+                    // TODO We add a space to the end of the last line to force
+                    // Codelens to refresh.
                     const lastLine = editor.document.lineAt(editor.document.lineCount-1);
                     editor.edit(edit => {
                         const lineCount = editor.document.lineCount;
