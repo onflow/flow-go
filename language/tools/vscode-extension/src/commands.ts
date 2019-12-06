@@ -12,7 +12,6 @@ export const CREATE_ACCOUNT = "cadence.createAccount";
 export const SWITCH_ACCOUNT = "cadence.switchActiveAccount";
 
 // Command identifies for commands handled by the Language server
-export const UPDATE_ACCOUNT_CODE_SERVER = "cadence.server.updateAccountCode";
 export const CREATE_ACCOUNT_SERVER = "cadence.server.createAccount";
 export const SWITCH_ACCOUNT_SERVER = "cadence.server.switchActiveAccount";
 
