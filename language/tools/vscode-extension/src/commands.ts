@@ -2,8 +2,7 @@ import {commands, ExtensionContext, Position, Range, window, workspace} from "vs
 import {Extension, renderExtension} from "./extension";
 import {LanguageServerAPI} from "./language-server";
 import {createTerminal} from "./terminal";
-import {ROOT_ADDR} from "./config";
-import {formatAddress} from "./address";
+import {shortAddress, stripAddressPrefix} from "./address";
 
 // Command identifiers for locally handled commands
 export const RESTART_SERVER = "cadence.restartServer";
@@ -47,6 +46,8 @@ const startEmulator = (ext: Extension) => async () => {
 
     ext.terminal.sendText(`${ext.config.flowCommand} emulator start --init --verbose --root-key ${rootKey}`);
     ext.terminal.show();
+
+    await createDefaultAccounts(ext);
 };
 
 // Stops emulator, exits the terminal, and removes all config/db files.
@@ -83,7 +84,7 @@ const updateAccountCode = (ext: Extension) => async () => {
 const createAccount = (ext: Extension) => async () => {
     try {
         const addr = await ext.api.createAccount();
-        ext.config.accounts[addr] = {address: addr};
+        ext.config.addAccount(addr);
     } catch (err) {
         window.showErrorMessage("Failed to create account: " + err);
         return;
@@ -99,7 +100,7 @@ const switchActiveAccount = (ext: Extension) => async () => {
     const accountOptions = Object
         .keys(ext.config.accounts)
         // Mark the active account with a `*` in the dialog
-        .map(addr => addr === ext.config.activeAccount ? `${formatAddress(addr)} ${activeSuffix}` : formatAddress(addr));
+        .map(addr => addr === ext.config.activeAccount ? `${shortAddress(addr)} ${activeSuffix}` : shortAddress(addr));
 
     window.showQuickPick(accountOptions)
         .then(selected => {
@@ -118,7 +119,7 @@ const switchActiveAccount = (ext: Extension) => async () => {
             }
 
             try {
-                ext.api.switchActiveAccount(selected);
+                ext.api.switchActiveAccount(stripAddressPrefix(selected));
                 window.visibleTextEditors.forEach(editor => {
                     if (!editor.document.lineCount) {
                         return;
@@ -147,3 +148,28 @@ const switchActiveAccount = (ext: Extension) => async () => {
             renderExtension(ext);
         });
 };
+
+// Automatically create the number of default accounts specified in the extension configuration.
+async function createDefaultAccounts(ext: Extension): Promise<void> {
+    // wait 3 seconds to allow emulator to launch
+    const accountCreationDelay = 3000;
+
+    return new Promise((resolve, reject) => {
+        setTimeout(async () => {
+            window.showInformationMessage(`Creating ${ext.config.numAccounts} default accounts`);
+
+            for (let i = 1; i < ext.config.numAccounts; i++) {
+                try {
+                    let addr = await ext.api.createAccount();
+                    ext.config.addAccount(addr);
+                } catch (err) {
+                    window.showWarningMessage("Failed to create default account");
+                    console.error(err);
+                    reject(err);
+                }
+            }
+
+            resolve()
+        }, accountCreationDelay)
+    });
+}

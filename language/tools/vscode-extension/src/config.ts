@@ -1,10 +1,12 @@
-import {commands, window, workspace, WorkspaceConfiguration} from "vscode";
+import {commands, window, workspace} from "vscode";
+import {shortAddress} from "./address";
 
-export const ROOT_ADDR: string = "0000000000000000000000000000000000000001";
+export const ROOT_ADDR: string = shortAddress("0000000000000000000000000000000000000001");
 
 const CONFIG_FLOW_COMMAND = "flowCommand";
 const CONFIG_ROOT_ACCOUNT_KEY = "rootAccountKey";
 const CONFIG_EMULATOR_ADDRESS = "emulatorAddress";
+const CONFIG_NUM_ACCOUNTS = "numAccounts";
 
 // A created account that we can submit transactions for.
 type Account = {
@@ -24,17 +26,24 @@ export class Config {
     // The name of the flow CLI executable
     flowCommand: string;
     serverConfig: ServerConfig;
+    numAccounts: number;
     // Set of created accounts for which we can submit transactions.
     // Mapping from account address to account object.
     accounts: AccountSet;
     // Address of the currently active account.
     activeAccount: string;
 
-    constructor(flowCommand: string, serverConfig: ServerConfig) {
+    constructor(flowCommand: string, numAccounts: number, serverConfig: ServerConfig) {
         this.flowCommand = flowCommand;
+        this.numAccounts = numAccounts;
         this.serverConfig = serverConfig;
         this.accounts = {[ROOT_ADDR]: {address: ROOT_ADDR}};
         this.activeAccount = ROOT_ADDR;
+    }
+
+    addAccount(address: string) {
+        address = shortAddress(address);
+        this.accounts[address] = {address: address};
     }
 
     // Resets account state
@@ -49,7 +58,7 @@ export function getConfig(): Config {
     const cadenceConfig = workspace
         .getConfiguration("cadence");
 
-    const flowCommand: string | undefined = cadenceConfig.get(CONFIG_FLOW_COMMAND)
+    const flowCommand: string | undefined = cadenceConfig.get(CONFIG_FLOW_COMMAND);
     if (!flowCommand) {
         throw new Error(`Missing ${CONFIG_FLOW_COMMAND} config`);
     }
@@ -64,9 +73,14 @@ export function getConfig(): Config {
         throw new Error(`Missing ${CONFIG_EMULATOR_ADDRESS} config`);
     }
 
+    const numAccounts: number | undefined = cadenceConfig.get(CONFIG_NUM_ACCOUNTS);
+    if (!numAccounts) {
+        throw new Error(`Missing ${CONFIG_NUM_ACCOUNTS} config`);
+    }
+
     const serverConfig = {rootAccountKey, emulatorAddress};
 
-    return new Config(flowCommand, serverConfig)
+    return new Config(flowCommand, numAccounts, serverConfig);
 }
 
 // Adds an event handler that prompts the user to reload whenever the config

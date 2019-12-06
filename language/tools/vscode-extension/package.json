@@ -66,6 +66,12 @@
           "default": "localhost:3569",
           "description": "The address of an emulator instance",
           "scope": "resource"
+        },
+        "cadence.numAccounts": {
+          "type": "number",
+          "default": "3",
+          "description": "The number of default accounts to create",
+          "scope": "resource"
         }
       }
     },
