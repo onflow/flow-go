@@ -1,4 +1,4 @@
-import {commands, ExtensionContext, window, workspace} from "vscode";
+import {commands, ExtensionContext, Position, Range, window, workspace} from "vscode";
 import {Extension, renderExtension} from "./extension";
 import {LanguageServerAPI} from "./language-server";
 import {createTerminal} from "./terminal";
@@ -53,6 +53,12 @@ const startEmulator = (ext: Extension) => async () => {
 const stopEmulator = (ext: Extension) => async () => {
     ext.terminal.dispose();
     ext.terminal = createTerminal(ext.ctx);
+
+    // Clear accounts and restart language server to ensure account
+    // state is in sync.
+    ext.config.resetAccounts();
+    await ext.api.client.stop();
+    ext.api = new LanguageServerAPI(ext.ctx, ext.config);
 };
 
 // Submits a transaction that updates the current account's code the
@@ -113,6 +119,24 @@ const switchActiveAccount = (ext: Extension) => async () => {
 
             try {
                 ext.api.switchActiveAccount(selected);
+                window.visibleTextEditors.forEach(editor => {
+                    if (!editor.document.lineCount) {
+                        return;
+                    }
+                    // TODO We add a space to the end of the last line to force
+                    // Codelens to refresh.
+                    const lineCount = editor.document.lineCount;
+                    const lastLine = editor.document.lineAt(lineCount-1);
+                    const lastLineLen =lastLine.text.length;
+                    editor.edit(edit => {
+                        if (lastLine.isEmptyOrWhitespace) {
+                            edit.insert(new Position(lineCount-1, 0), ' ');
+                            edit.delete(new Range(lineCount-1, 0, lineCount-1, 1000));
+                        } else {
+                            edit.insert(new Position(lineCount-1, 1000), '\n');
+                        }
+                    });
+                });
             } catch (err) {
                 window.showWarningMessage("Failed to switch active account");
                 console.error(err);

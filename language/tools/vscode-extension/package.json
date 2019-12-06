@@ -15,7 +15,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:cadence"
+    "onLanguage:cadence",
+    "onCommand:cadence.runEmulator"
   ],
   "main": "./out/extension.js",
   "contributes": {
