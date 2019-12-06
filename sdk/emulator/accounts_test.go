@@ -595,8 +595,6 @@ func TestUpdateAccountCode(t *testing.T) {
 			  prepare(account: Account) {
 				updateAccountCode(%s, nil)
 			  }
-			  
-			  execute {}
 			}
 		`, accountAddressB.Hex()))
 

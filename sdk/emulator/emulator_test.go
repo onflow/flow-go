@@ -41,8 +41,6 @@ func generateAddTwoToCounterScript(counterAddress flow.Address) string {
     	        }
 				signer.published[&Counter]?.add(2)
 			  }
-
-			  execute {}
 			}
 		`,
 		counterAddress,
