@@ -234,7 +234,7 @@ func (s *Server) createAccount(conn protocol.Conn, args ...interface{}) (interfa
 	return addr, nil
 }
 
-// createDefaultAccounts creates a set of default account and returns their addresses.
+// createDefaultAccounts creates a set of default accounts and returns their addresses.
 //
 // This command will wait until the emulator server is started before submitting any transactions.
 func (s *Server) createDefaultAccounts(conn protocol.Conn, args ...interface{}) (interface{}, error) {
