@@ -147,7 +147,7 @@ type CyclicImportsError struct {
 }
 
 func (e CyclicImportsError) Error() string {
-	return fmt.Sprintf("cyclic import of %s", e.Location)
+	return fmt.Sprintf("cyclic import of `%s`", e.Location)
 }
 
 func (p *Program) resolveImports(

@@ -227,3 +227,25 @@ func TestCheckImportTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckInvalidImportCycle(t *testing.T) {
+
+	// NOTE: only parse, don't check imported program.
+	// will be checked by checker checking importing program
+
+	const code = `import 0x1`
+	imported, _, err := parser.ParseProgram(code)
+
+	require.NoError(t, err)
+
+	_, err = ParseAndCheckWithOptions(t,
+		code,
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+				return imported, nil
+			},
+		},
+	)
+
+	assert.IsType(t, ast.CyclicImportsError{}, err)
+}
