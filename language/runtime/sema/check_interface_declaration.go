@@ -3,6 +3,7 @@ package sema
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
 func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDeclaration) ast.Repr {
@@ -42,8 +43,16 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 	for name, nestedType := range interfaceType.NestedTypes {
 		nestedDeclaration := checker.Elaboration.InterfaceNestedDeclarations[declaration][name]
 
+		identifier := nestedDeclaration.DeclarationIdentifier()
+		if identifier == nil {
+			// It should be impossible to have a nested declaration
+			// that does not have an identifier
+
+			panic(errors.NewUnreachableError())
+		}
+
 		_, err := checker.typeActivations.DeclareType(
-			nestedDeclaration.DeclarationIdentifier(),
+			*identifier,
 			nestedType,
 			nestedDeclaration.DeclarationKind(),
 			nestedDeclaration.DeclarationAccess(),

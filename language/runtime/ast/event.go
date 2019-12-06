@@ -19,8 +19,8 @@ func (e *EventDeclaration) Accept(visitor Visitor) Repr {
 func (*EventDeclaration) isDeclaration() {}
 func (*EventDeclaration) isStatement()   {}
 
-func (e *EventDeclaration) DeclarationIdentifier() Identifier {
-	return e.Identifier
+func (e *EventDeclaration) DeclarationIdentifier() *Identifier {
+	return &e.Identifier
 }
 
 func (e *EventDeclaration) DeclarationKind() common.DeclarationKind {
