@@ -151,8 +151,8 @@ const switchActiveAccount = (ext: Extension) => async () => {
 
 // Automatically create the number of default accounts specified in the extension configuration.
 async function createDefaultAccounts(ext: Extension): Promise<void> {
-    // wait 3 seconds to allow emulator to launch
-    const accountCreationDelay = 3000;
+    // wait 5 seconds to allow emulator to launch
+    const accountCreationDelay = 5000;
 
     return new Promise((resolve, reject) => {
         setTimeout(async () => {
