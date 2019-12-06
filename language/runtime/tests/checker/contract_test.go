@@ -69,3 +69,16 @@ func TestCheckInvalidContractAccountFieldInitialization(t *testing.T) {
 
 	assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[0])
 }
+
+func TestCheckInvalidContractAccountFieldAccess(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      contract Test {}
+
+      let test = Test().account
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+}
