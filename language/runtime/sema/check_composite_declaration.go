@@ -385,7 +385,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 				Identifier:      identifier,
 				Access:          nestedCompositeDeclaration.Access,
 				ContainerType:   compositeType,
-				Type:            nestedCompositeDeclarationVariable.Type,
+				TypeAnnotation:  NewTypeAnnotation(nestedCompositeDeclarationVariable.Type),
 				DeclarationKind: nestedCompositeDeclarationVariable.DeclarationKind,
 				VariableKind:    ast.VariableKindConstant,
 			}
@@ -394,6 +394,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		// Check conformances and members
 
 		conformances := checker.conformances(declaration, compositeType)
+		compositeType.Conformances = conformances
 
 		members, origins := checker.membersAndOrigins(
 			compositeType,
@@ -403,8 +404,6 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		)
 
 		compositeType.Members = members
-		compositeType.Conformances = conformances
-
 		checker.memberOrigins[compositeType] = origins
 
 		// NOTE: determine initializer parameter types while nested types are in scope,
@@ -599,7 +598,9 @@ func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member
 	// Check type
 
 	// TODO: subtype?
-	if !compositeMember.Type.Equal(interfaceMember.Type) {
+	if !compositeMember.TypeAnnotation.Type.
+		Equal(interfaceMember.TypeAnnotation.Type) {
+
 		return false
 	}
 
@@ -777,27 +778,55 @@ func (checker *Checker) membersAndOrigins(
 	members = make(map[string]*Member, memberCount)
 	origins = make(map[string]*Origin, memberCount)
 
+	predeclaredMembers := checker.predeclaredMembers(containerType)
+	invalidIdentifiers := make(map[string]bool, len(predeclaredMembers))
+
+	for _, predeclaredMember := range predeclaredMembers {
+		name := predeclaredMember.Identifier.Identifier
+		members[name] = predeclaredMember
+		invalidIdentifiers[name] = true
+	}
+
+	checkInvalidIdentifier := func(declaration ast.Declaration) bool {
+		identifier := declaration.DeclarationIdentifier()
+		if invalidIdentifiers == nil || !invalidIdentifiers[identifier.Identifier] {
+			return true
+		}
+
+		checker.report(
+			&InvalidDeclarationError{
+				Identifier: identifier.Identifier,
+				Kind:       declaration.DeclarationKind(),
+				Range:      ast.NewRangeFromPositioned(identifier),
+			},
+		)
+
+		return false
+	}
+
 	// declare a member for each field
 	for _, field := range fields {
-		fieldTypeAnnotation := checker.ConvertTypeAnnotation(field.TypeAnnotation)
-
-		fieldType := fieldTypeAnnotation.Type
-
-		checker.checkTypeAnnotation(fieldTypeAnnotation, field.TypeAnnotation.StartPos)
+		if !checkInvalidIdentifier(field) {
+			continue
+		}
 
 		identifier := field.Identifier.Identifier
+
+		fieldTypeAnnotation := checker.ConvertTypeAnnotation(field.TypeAnnotation)
+
+		checker.checkTypeAnnotation(fieldTypeAnnotation, field.TypeAnnotation.StartPos)
 
 		members[identifier] = &Member{
 			ContainerType:   containerType,
 			Access:          field.Access,
 			Identifier:      field.Identifier,
 			DeclarationKind: common.DeclarationKindField,
-			Type:            fieldType,
+			TypeAnnotation:  fieldTypeAnnotation,
 			VariableKind:    field.VariableKind,
 		}
 
 		origins[identifier] =
-			checker.recordFieldDeclarationOrigin(field, fieldType)
+			checker.recordFieldDeclarationOrigin(field, fieldTypeAnnotation.Type)
 
 		if requireVariableKind &&
 			field.VariableKind == ast.VariableKindNotSpecified {
@@ -813,18 +842,24 @@ func (checker *Checker) membersAndOrigins(
 
 	// declare a member for each function
 	for _, function := range functions {
+		if !checkInvalidIdentifier(function) {
+			continue
+		}
+
+		identifier := function.Identifier.Identifier
+
 		functionType := checker.functionType(function.ParameterList, function.ReturnTypeAnnotation)
 
 		argumentLabels := function.ParameterList.ArgumentLabels()
 
-		identifier := function.Identifier.Identifier
+		fieldTypeAnnotation := &TypeAnnotation{Type: functionType}
 
 		members[identifier] = &Member{
 			ContainerType:   containerType,
 			Access:          function.Access,
 			Identifier:      function.Identifier,
 			DeclarationKind: common.DeclarationKindFunction,
-			Type:            functionType,
+			TypeAnnotation:  fieldTypeAnnotation,
 			VariableKind:    ast.VariableKindConstant,
 			ArgumentLabels:  argumentLabels,
 		}
@@ -1186,7 +1221,9 @@ func (checker *Checker) checkNoDestructorNoResourceFields(
 	}
 
 	for memberName, member := range members {
-		if !member.Type.IsResourceType() {
+		// NOTE: check type, not move annotation:
+		// the field could have a wrong annotation
+		if !member.TypeAnnotation.Type.IsResourceType() {
 			continue
 		}
 
@@ -1252,7 +1289,9 @@ func (checker *Checker) checkCompositeResourceInvalidated(containerType Type, co
 //
 func (checker *Checker) checkResourceFieldsInvalidated(containerTypeIdentifier string, members map[string]*Member) {
 	for _, member := range members {
-		if !member.Type.IsResourceType() {
+		// NOTE: check type, not move annotation:
+		// the field could have a wrong annotation
+		if !member.TypeAnnotation.Type.IsResourceType() {
 			return
 		}
 
