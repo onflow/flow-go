@@ -38,27 +38,7 @@ func (checker *Checker) visitStatements(statements []ast.Statement) {
 			functionActivation.ReportedDeadCode = true
 		}
 
-		// check statement is not a local composite or interface declaration
-
-		if compositeDeclaration, ok := statement.(*ast.CompositeDeclaration); ok {
-			checker.report(
-				&InvalidDeclarationError{
-					Kind:  compositeDeclaration.DeclarationKind(),
-					Range: ast.NewRangeFromPositioned(statement),
-				},
-			)
-
-			continue
-		}
-
-		if interfaceDeclaration, ok := statement.(*ast.InterfaceDeclaration); ok {
-			checker.report(
-				&InvalidDeclarationError{
-					Kind:  interfaceDeclaration.DeclarationKind(),
-					Range: ast.NewRangeFromPositioned(statement),
-				},
-			)
-
+		if !checker.checkValidStatement(statement) {
 			continue
 		}
 
@@ -66,4 +46,31 @@ func (checker *Checker) visitStatements(statements []ast.Statement) {
 
 		statement.Accept(checker)
 	}
+}
+
+func (checker *Checker) checkValidStatement(statement ast.Statement) bool {
+
+	// Check the statement is not a declaration which is not allowed locally
+
+	declaration, isDeclaration := statement.(ast.Declaration)
+	if !isDeclaration {
+		return true
+	}
+
+	// Only function and variable declarations are allowed locally
+
+	switch declaration.(type) {
+	case *ast.FunctionDeclaration, *ast.VariableDeclaration:
+		return true
+	}
+
+	checker.report(
+		&InvalidDeclarationError{
+			Identifier: declaration.DeclarationIdentifier().Identifier,
+			Kind:       declaration.DeclarationKind(),
+			Range:      ast.NewRangeFromPositioned(statement),
+		},
+	)
+
+	return false
 }
