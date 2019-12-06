@@ -120,7 +120,7 @@ func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (int
 		ScriptAccounts: []flow.Address{s.activeAccount},
 	}
 
-	err := s.sendTransaction(conn, tx)
+	err := s.sendTransactionHelper(conn, tx)
 	return nil, err
 }
 
