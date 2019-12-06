@@ -214,6 +214,29 @@ func (s *Server) switchActiveAccount(conn protocol.Conn, args ...interface{}) (i
 	return nil, nil
 }
 
+// createAccount creates a new account and returns its address.
+func (s *Server) createAccount(conn protocol.Conn, args ...interface{}) (interface{}, error) {
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: fmt.Sprintf("create acct args: %v", args),
+	})
+
+	expectedArgCount := 0
+	if len(args) != expectedArgCount {
+		return nil, fmt.Errorf("expecting %d args got: %d", expectedArgCount, len(args))
+	}
+
+	addr, err := s.createAccountHelper(conn)
+	if err != nil {
+		return nil, err
+	}
+
+	return addr, nil
+}
+
+// createDefaultAccounts creates a set of default account and returns their addresses.
+//
+// This command will wait until the emulator server is started before submitting any transactions.
 func (s *Server) createDefaultAccounts(conn protocol.Conn, args ...interface{}) (interface{}, error) {
 	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Log,
@@ -237,6 +260,7 @@ func (s *Server) createDefaultAccounts(conn protocol.Conn, args ...interface{}) 
 		Message: fmt.Sprintf("Creating %d default accounts", count),
 	})
 
+	// Ping the emulator server until it is available
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	for {
@@ -257,26 +281,6 @@ func (s *Server) createDefaultAccounts(conn protocol.Conn, args ...interface{}) 
 	}
 
 	return accounts, nil
-}
-
-// createAccount creates a new account and returns its address.
-func (s *Server) createAccount(conn protocol.Conn, args ...interface{}) (interface{}, error) {
-	conn.LogMessage(&protocol.LogMessageParams{
-		Type:    protocol.Log,
-		Message: fmt.Sprintf("create acct args: %v", args),
-	})
-
-	expectedArgCount := 0
-	if len(args) != expectedArgCount {
-		return nil, fmt.Errorf("expecting %d args got: %d", expectedArgCount, len(args))
-	}
-
-	addr, err := s.createAccountHelper(conn)
-	if err != nil {
-		return nil, err
-	}
-
-	return addr, nil
 }
 
 // updateAccountCode updates the configured account with the code of the given
@@ -322,17 +326,17 @@ func (s *Server) updateAccountCode(conn protocol.Conn, args ...interface{}) (int
 		ScriptAccounts: []flow.Address{s.activeAccount},
 	}
 
-	err := s.sendTransaction(conn, tx)
+	err := s.sendTransactionHelper(conn, tx)
 	return nil, err
 }
 
-// sendTransaction sends a transaction with the given script, from the
+// sendTransactionHelper sends a transaction with the given script, from the
 // currently active account. Returns the hash of the transaction if it is
 // successfully submitted.
 //
 // If an error occurs, attempts to show an appropriate message (either via logs
 // or UI popups in the client).
-func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) error {
+func (s *Server) sendTransactionHelper(conn protocol.Conn, tx flow.Transaction) error {
 	key, ok := s.accounts[s.activeAccount]
 	if !ok {
 		return fmt.Errorf("cannot sign transaction for account with unknown address %s", s.activeAccount)
@@ -384,15 +388,7 @@ func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) error 
 	return err
 }
 
-func parseFileFromURI(uri string) string {
-	u, err := url.Parse(uri)
-	if err != nil {
-		return uri
-	}
-
-	return filepath.Base(u.Path)
-}
-
+// createAccountHelper creates a new account and returns its address.
 func (s *Server) createAccountHelper(conn protocol.Conn) (addr flow.Address, err error) {
 	accountKey := flow.AccountPublicKey{
 		PublicKey: s.config.RootAccountKey.PrivateKey.PublicKey(),
@@ -414,7 +410,7 @@ func (s *Server) createAccountHelper(conn protocol.Conn) (addr flow.Address, err
 		ScriptAccounts: []flow.Address{},
 	}
 
-	err = s.sendTransaction(conn, tx)
+	err = s.sendTransactionHelper(conn, tx)
 	if err != nil {
 		return addr, err
 	}
@@ -447,4 +443,13 @@ func (s *Server) createAccountHelper(conn protocol.Conn) (addr flow.Address, err
 	s.accounts[addr] = s.config.RootAccountKey
 
 	return addr, nil
+}
+
+func parseFileFromURI(uri string) string {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return uri
+	}
+
+	return filepath.Base(u.Path)
 }
