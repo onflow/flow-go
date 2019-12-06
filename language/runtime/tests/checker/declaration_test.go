@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/language/runtime/cmd"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -420,9 +419,7 @@ func TestCheckTopLevelContractRestriction(t *testing.T) {
 		},
 	)
 
-	if !assert.NoError(t, err) {
-		cmd.PrettyPrintError(err, "", map[string]string{"": ""})
-	}
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidTopLevelContractRestriction(t *testing.T) {
