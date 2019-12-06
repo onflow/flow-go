@@ -84,6 +84,9 @@ func (e *Decoder) Decode(t types2.Type) (values.Value, error) {
 		return e.DecodeComposite(x)
 	case types2.Event:
 		return e.DecodeEvent(x)
+	case types2.Optional:
+		return e.DecodeOptional(x)
+
 	default:
 		return nil, fmt.Errorf("unsupported type: %T", t)
 	}
@@ -434,4 +437,24 @@ func (e *Decoder) DecodeEvent(t types2.Event) (values.Event, error) {
 		Identifier: t.Identifier,
 		Fields:     fields,
 	}, nil
+}
+
+// DecodeEvent reads the XDR-encoded optional type representation.
+//
+// An event is encoded as a fixed-length array of its field values.
+func (e *Decoder) DecodeOptional(t types2.Optional) (values.Optional, error) {
+
+	hasValue, err := e.DecodeBool()
+	if err != nil {
+		return values.Optional{}, err
+	}
+
+	if hasValue {
+		value, err := e.Decode(t.Of)
+		if err != nil {
+			return values.Optional{}, err
+		}
+		return values.Optional{Value: value}, nil
+	}
+	return values.Optional{Value: nil}, nil
 }

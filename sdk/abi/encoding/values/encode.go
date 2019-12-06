@@ -86,6 +86,8 @@ func (e *Encoder) Encode(v values.Value) error {
 		return e.EncodeComposite(x)
 	case values.Event:
 		return e.EncodeEvent(x)
+	case values.Optional:
+		return e.EncodeOptional(x)
 	default:
 		return fmt.Errorf("unsupported value: %T, %v", v, v)
 	}
@@ -334,4 +336,19 @@ func (e *Encoder) EncodeComposite(v values.Composite) error {
 // An event is encoded as a fixed-length array of its field values.
 func (e *Encoder) EncodeEvent(v values.Event) error {
 	return e.encodeArray(v.Fields)
+}
+
+// EncodeOptional writes the XDR-encoded representation of an optional value
+// as a union
+// https://tools.ietf.org/html/rfc4506#section-4.19
+func (e *Encoder) EncodeOptional(v values.Optional) error {
+	hasValue := v.Value != nil
+	_, err := e.enc.EncodeBool(hasValue)
+	if err != nil {
+		return err
+	}
+	if hasValue {
+		return e.Encode(v.Value)
+	}
+	return nil
 }

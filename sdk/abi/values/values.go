@@ -1,6 +1,9 @@
 package values
 
-import "math/big"
+import (
+	"fmt"
+	"math/big"
+)
 
 type Value interface {
 	isValue()
@@ -175,6 +178,19 @@ func (e Event) ToGoValue() interface{} {
 	return ret
 }
 
+type Optional struct {
+	Value Value
+}
+
+func (Optional) isValue() {}
+
+func (o Optional) ToGoValue() interface{} {
+	if o.Value == nil {
+		return nil
+	}
+	return o.Value.ToGoValue()
+}
+
 type Composite struct {
 	Fields []Value
 }
@@ -201,4 +217,67 @@ func BytesToAddress(b []byte) Address {
 	var a Address
 	copy(a[:], b)
 	return a
+}
+
+func NewValue(value interface{}) (Value, error) {
+
+	switch v := value.(type) {
+	case string:
+		ret := String(v)
+		return &ret, nil
+	case int:
+		ret := NewInt(v)
+		return &ret, nil
+	case int8:
+		ret := Int8(v)
+		return &ret, nil
+	case int16:
+		ret := Int16(v)
+		return &ret, nil
+	case int32:
+		ret := Int32(v)
+		return &ret, nil
+	case int64:
+		ret := Int64(v)
+		return &ret, nil
+	case uint8:
+		ret := UInt8(v)
+		return &ret, nil
+	case uint16:
+		ret := UInt16(v)
+		return &ret, nil
+	case uint32:
+		ret := UInt32(v)
+		return &ret, nil
+	case uint64:
+		ret := UInt64(v)
+		return &ret, nil
+	case []interface{}:
+		values := make([]Value, len(v))
+		for i, v := range v {
+			t, err := NewValue(v)
+			if err != nil {
+				return nil, err
+			}
+			values[i] = t
+		}
+		ret := VariableSizedArray(values)
+		return &ret, nil
+	case nil:
+		ret := Nil{}
+		return &ret, nil
+
+	}
+
+	return nil, fmt.Errorf("value type %T cannot be converted to ABI Value type", value)
+}
+
+// NewValueOrPanic is convenience function when failure is really unexpected
+// like generated Go code
+func NewValueOrPanic(value interface{}) Value {
+	ret, err := NewValue(value)
+	if err != nil {
+		panic(err)
+	}
+	return ret
 }

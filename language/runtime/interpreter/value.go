@@ -2049,7 +2049,7 @@ func (NilValue) String() string {
 }
 
 func (v NilValue) Export() values.Value {
-	return values.Nil{}
+	return values.Optional{Value: nil}
 }
 
 // SomeValue
@@ -2102,6 +2102,10 @@ func (v *SomeValue) Destroy(interpreter *Interpreter, location LocationPosition)
 
 func (v *SomeValue) String() string {
 	return fmt.Sprint(v.Value)
+}
+
+func (v *SomeValue) Export() values.Value {
+	return values.Optional{Value: v.Value.(ExportableValue).Export()}
 }
 
 // AnyValue
