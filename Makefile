@@ -18,7 +18,7 @@ crypto/relic/build: crypto/relic
 
 .PHONY: install-tools
 install-tools: crypto/relic/build
-	sudo apt-get install capnproto
+	sudo apt-get -y install capnproto
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/davecheney/godoc2md@master; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
@@ -97,7 +97,7 @@ ci: install-tools generate check-generated-code lint test coverage
 
 .PHONY: docker-ci
 docker-ci:
-	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) -v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.3 make ci
+	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) -v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.4 make ci
 
 cmd/flow/flow: crypto/*.go $(shell find  cli/ -name '*.go') $(shell find cmd -name '*.go') $(shell find model -name '*.go') $(shell find protobuf -name '*.go') $(shell find sdk -name '*.go')
 	GO111MODULE=on go build \
