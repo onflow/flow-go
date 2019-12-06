@@ -26,8 +26,6 @@ func GenerateCreateSaleScript(tokenAddr flow.Address, marketAddr flow.Address) [
 				acct.published[&SaleCollection] = &acct.storage[SaleCollection] as SaleCollection
 
 			}
-			execute {}
-
 		}`
 	return []byte(fmt.Sprintf(template, tokenAddr, marketAddr))
 }
@@ -49,8 +47,6 @@ func GenerateStartSaleScript(nftAddr flow.Address, marketAddr flow.Address, id, 
 				saleRef.listForSale(token: <-token, price: %d)
 
 			}
-			execute {}
-
 		}`
 	return []byte(fmt.Sprintf(template, nftAddr, marketAddr, id, price))
 }
@@ -77,8 +73,6 @@ func GenerateBuySaleScript(tokenAddr, nftAddr, marketAddr, userAddr flow.Address
 				saleRef.purchase(tokenID: %d, recipient: collectionRef, buyTokens: <-tokens)
 
 			}
-			execute {}
-
 		}`
 	return []byte(fmt.Sprintf(template, tokenAddr, nftAddr, marketAddr, userAddr, amount, id))
 }

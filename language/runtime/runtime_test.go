@@ -133,7 +133,6 @@ func TestRuntimeTransactionWithAccount(t *testing.T) {
         prepare(signer: Account) {
           log(signer.address)
         }
-        execute {}
       }
     `)
 
@@ -259,7 +258,6 @@ func TestRuntimeStorage(t *testing.T) {
                     prepare(signer: Account) {
                       %s
                     }
-                    execute {}
                   }
                 `,
 				code,
@@ -330,8 +328,6 @@ func TestRuntimeStorageMultipleTransactionsResourceWithArray(t *testing.T) {
           let ref = &signer.storage[Container] as Container
           signer.storage[&Container] = ref
         }
-
-        execute {}
       }
     `)
 
@@ -345,7 +341,6 @@ func TestRuntimeStorageMultipleTransactionsResourceWithArray(t *testing.T) {
           ref.values.append(1)
           let length2 = ref.values.length
         }
-        execute {}
       }
     `)
 
@@ -359,7 +354,6 @@ func TestRuntimeStorageMultipleTransactionsResourceWithArray(t *testing.T) {
           ref.values.append(2)
           let length2 = ref.values.length
         }
-        execute {}
       }
     `)
 
@@ -431,8 +425,6 @@ func TestRuntimeStorageMultipleTransactionsResourceFunction(t *testing.T) {
           }
           destroy existing
         }
-
-        execute {}
       }
     `)
 
@@ -444,7 +436,6 @@ func TestRuntimeStorageMultipleTransactionsResourceFunction(t *testing.T) {
           let answer = signer.storage[DeepThought]?.answer()
           log(answer ?? 0)
         }
-        execute {}
       }
     `)
 
@@ -515,7 +506,6 @@ func TestRuntimeStorageMultipleTransactionsResourceField(t *testing.T) {
           destroy oldNumber
 
         }
-        execute {}
       }
     `)
 
@@ -529,7 +519,6 @@ func TestRuntimeStorageMultipleTransactionsResourceField(t *testing.T) {
             destroy number
           }
         }
-        execute {}
       }
     `)
 
@@ -600,7 +589,6 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
           let oldY <- signer.storage[Y] <- createY()
           destroy oldY
         }
-        execute {}
       }
     `)
 
@@ -613,7 +601,6 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
           y?.x()
           destroy y
         }
-        execute {}
       }
     `)
 
@@ -674,8 +661,6 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
           }
           destroy r
         }
-
-        execute {}
       }
     `)
 
@@ -688,8 +673,6 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
           let ref = &signer.storage[R] as R
           ref.x()
         }
-
-        execute {}
       }
     `)
 
@@ -759,8 +742,6 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 
           signer.storage[&R] = &signer.storage[R] as R
         }
-
-        execute {}
       }
     `)
 
@@ -772,7 +753,6 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
           let ref = signer.storage[&R] ?? panic("no R ref")
           ref.x()
         }
-        execute {}
       }
     `)
 
@@ -851,7 +831,6 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 
           signer.storage[&RI] = &signer.storage[R] as RI
         }
-        execute {}
       }
     `)
 
@@ -868,7 +847,6 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
           let ref = signer.storage[&RI] ?? panic("no RI ref")
           ref.x()
         }
-        execute {}
       }
     `)
 
@@ -991,7 +969,6 @@ func TestRuntimeStorageChanges(t *testing.T) {
           let ref = &signer.storage[X] as X
           ref.x = 1
         }
-        execute {}
       }
     `)
 
@@ -1003,7 +980,6 @@ func TestRuntimeStorageChanges(t *testing.T) {
           let ref = &signer.storage[X] as X
           log(ref.x)
         }
-        execute {}
       }
     `)
 
@@ -1052,7 +1028,6 @@ func TestRuntimeAccountAddress(t *testing.T) {
         prepare(signer: Account) {
           log(signer.address)
         }
-        execute {}
       }
     `)
 
@@ -1080,12 +1055,9 @@ func TestRuntimePublicAccountAddress(t *testing.T) {
 
 	script := []byte(`
       transaction {
-
         prepare() {
           log(getAccount(0x42).address)
         }
-
-        execute {}
       }
     `)
 
@@ -1132,7 +1104,6 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
           destroy existing
           signer.published[&R] = &signer.storage[R] as R 
         }
-        execute {}
       }
     `)
 
@@ -1144,12 +1115,9 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
               import "imported"
     
               transaction {
-    
                 prepare(signer: Account) {
                   log(getAccount(0x%s).published[&R]?.test() ?? 0)
                 }
-    
-                execute {}
               }
             `,
 			address,

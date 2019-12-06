@@ -1828,18 +1828,6 @@ func (e *InvalidTransactionBlockError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
-// TransactionMissingExecuteError
-
-type TransactionMissingExecuteError struct {
-	ast.Range
-}
-
-func (e *TransactionMissingExecuteError) Error() string {
-	return "transaction missing an execute block"
-}
-
-func (*TransactionMissingExecuteError) isSemanticError() {}
-
 // TransactionMissingPrepareError
 
 type TransactionMissingPrepareError struct {

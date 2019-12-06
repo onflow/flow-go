@@ -23,8 +23,6 @@ func GenerateCreateMinterScript(nftAddr flow.Address, initialID, specialMod int)
 
 			acct.storage[&GreatNFTMinter] = &acct.storage[GreatNFTMinter] as GreatNFTMinter
 		  }
-
-		  execute {}
 		}
 	`
 
@@ -45,8 +43,6 @@ func GenerateMintScript(nftCodeAddr flow.Address) []byte {
 			destroy existing
             acct.published[&GreatNFT] = &acct.storage[GreatNFT] as GreatNFT
 		  }
-
-		  execute {}
 		}
 	`
 
