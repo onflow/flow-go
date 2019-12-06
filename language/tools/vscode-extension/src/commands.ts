@@ -13,6 +13,7 @@ export const SWITCH_ACCOUNT = "cadence.switchActiveAccount";
 
 // Command identifies for commands handled by the Language server
 export const CREATE_ACCOUNT_SERVER = "cadence.server.createAccount";
+export const CREATE_DEFAULT_ACCOUNTS_SERVER = "cadence.server.createDefaultAccounts";
 export const SWITCH_ACCOUNT_SERVER = "cadence.server.switchActiveAccount";
 
 // Registers a command with VS Code so it can be invoked by the user.
@@ -44,7 +45,9 @@ const startEmulator = (ext: Extension) => async () => {
     ext.terminal.sendText(`${ext.config.flowCommand} emulator start --init --verbose --root-key ${rootKey}`);
     ext.terminal.show();
 
-    await createDefaultAccounts(ext);
+    // create default accounts after the emulator has started
+    const accounts = await ext.api.createDefaultAccounts(ext.config.numAccounts);
+    accounts.forEach(address => ext.config.addAccount(address));
 };
 
 // Stops emulator, exits the terminal, and removes all config/db files.
@@ -128,28 +131,3 @@ const switchActiveAccount = (ext: Extension) => async () => {
             renderExtension(ext);
         });
 };
-
-// Automatically create the number of default accounts specified in the extension configuration.
-async function createDefaultAccounts(ext: Extension): Promise<void> {
-    // wait 5 seconds to allow emulator to launch
-    const accountCreationDelay = 5000;
-
-    return new Promise((resolve, reject) => {
-        setTimeout(async () => {
-            window.showInformationMessage(`Creating ${ext.config.numAccounts} default accounts`);
-
-            for (let i = 1; i < ext.config.numAccounts; i++) {
-                try {
-                    let addr = await ext.api.createAccount();
-                    ext.config.addAccount(addr);
-                } catch (err) {
-                    window.showErrorMessage("Failed to create default account");
-                    console.error(err);
-                    reject(err);
-                }
-            }
-
-            resolve()
-        }, accountCreationDelay)
-    });
-}
