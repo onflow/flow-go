@@ -640,8 +640,11 @@ func TestImportAccountCode(t *testing.T) {
 	address, err := b.CreateAccount([]flow.AccountPublicKey{publicKey}, accountScript, getNonce())
 	assert.NoError(t, err)
 
-	script := []byte(fmt.Sprintf(`
-		import 0x%s
+	assert.Equal(t, flow.HexToAddress("02"), address)
+
+	script := []byte(`
+		// address imports can omit leading zeros
+		import 0x02
 
 		transaction {
 		  execute {
@@ -651,7 +654,7 @@ func TestImportAccountCode(t *testing.T) {
 			}
 		  }
 		}
-	`, address.Hex()))
+	`)
 
 	tx := flow.Transaction{
 		Script:             script,
