@@ -287,7 +287,7 @@ func (checker *Checker) checkInvocationArguments(
 
 	// Add extra argument types
 
-	for i := minCount - 1; i < argumentCount; i++ {
+	for i := minCount; i < argumentCount; i++ {
 		argument := invocationExpression.Arguments[i]
 
 		argumentTypes[i] = argument.Expression.Accept(checker).(Type)
