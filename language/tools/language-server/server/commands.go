@@ -319,11 +319,7 @@ func (s *Server) updateAccountCode(conn protocol.Conn, args ...interface{}) (int
 	}
 
 	err := s.sendTransaction(conn, tx)
-	if err != nil {
-		return nil, err
-	}
-
-	return nil, nil
+	return nil, err
 }
 
 // sendTransaction sends a transaction with the given script, from the
