@@ -1,16 +1,16 @@
 import {commands, ExtensionContext, Position, Range, window, workspace} from "vscode";
-import {Extension} from "./extension";
+import {Extension, renderExtension} from "./extension";
 import {LanguageServerAPI} from "./language-server";
 import {createTerminal} from "./terminal";
 import {ROOT_ADDR} from "./config";
 
 // Command identifiers for locally handled commands
-const RESTART_SERVER = "cadence.restartServer";
-const START_EMULATOR = "cadence.runEmulator";
-const STOP_EMULATOR = "cadence.stopEmulator";
-const UPDATE_ACCOUNT_CODE = "cadence.updateAccountCode";
-const CREATE_ACCOUNT = "cadence.createAccount";
-const SWITCH_ACCOUNT = "cadence.switchActiveAccount";
+export const RESTART_SERVER = "cadence.restartServer";
+export const START_EMULATOR = "cadence.runEmulator";
+export const STOP_EMULATOR = "cadence.stopEmulator";
+export const UPDATE_ACCOUNT_CODE = "cadence.updateAccountCode";
+export const CREATE_ACCOUNT = "cadence.createAccount";
+export const SWITCH_ACCOUNT = "cadence.switchActiveAccount";
 
 // Command identifies for commands handled by the Language server
 export const UPDATE_ACCOUNT_CODE_SERVER = "cadence.server.updateAccountCode";
@@ -143,5 +143,6 @@ const switchActiveAccount = (ext: Extension) => async () => {
             }
             ext.config.activeAccount = selected;
             window.showInformationMessage(`Switched to account ${selected}`);
+            renderExtension(ext);
         });
 };
