@@ -124,10 +124,16 @@ const switchActiveAccount = (ext: Extension) => async () => {
                     }
                     // TODO We add a space to the end of the last line to force
                     // Codelens to refresh.
-                    const lastLine = editor.document.lineAt(editor.document.lineCount-1);
+                    const lineCount = editor.document.lineCount;
+                    const lastLine = editor.document.lineAt(lineCount-1);
+                    const lastLineLen =lastLine.text.length;
                     editor.edit(edit => {
-                        const lineCount = editor.document.lineCount;
-                        edit.insert(new Position(lineCount-1, lastLine.text.length), ' ');
+                        if (lastLine.isEmptyOrWhitespace) {
+                            edit.insert(new Position(lineCount-1, 0), ' ');
+                            edit.delete(new Range(lineCount-1, 0, lineCount-1, 1000));
+                        } else {
+                            edit.insert(new Position(lineCount-1, 1000), '\n');
+                        }
                     });
                 });
             } catch (err) {
