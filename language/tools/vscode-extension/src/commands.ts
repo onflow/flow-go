@@ -3,6 +3,7 @@ import {Extension, renderExtension} from "./extension";
 import {LanguageServerAPI} from "./language-server";
 import {createTerminal} from "./terminal";
 import {ROOT_ADDR} from "./config";
+import {formatAddress} from "./address";
 
 // Command identifiers for locally handled commands
 export const RESTART_SERVER = "cadence.restartServer";
@@ -92,7 +93,7 @@ const switchActiveAccount = (ext: Extension) => async () => {
     const accountOptions = Object
         .keys(ext.config.accounts)
         // Mark the active account with a `*` in the dialog
-        .map(addr => addr === ext.config.activeAccount ? `${addr} ${activeSuffix}` : addr);
+        .map(addr => addr === ext.config.activeAccount ? `${formatAddress(addr)} ${activeSuffix}` : formatAddress(addr));
 
     window.showQuickPick(accountOptions)
         .then(selected => {
