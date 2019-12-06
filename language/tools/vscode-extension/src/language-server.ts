@@ -61,12 +61,12 @@ export class LanguageServerAPI {
         return res as string;
     }
 
-    // Sends a request to create a new account. Returns the address of the new
-    // account, if it was created successfully.
-    async createDefaultAccounts(n: number): Promise<Array<string>> {
+    // Sends a request to create a set of default accounts. Returns the addresses of the new
+    // accounts, if they were created successfully.
+    async createDefaultAccounts(count: number): Promise<Array<string>> {
         let res = await this.client.sendRequest("workspace/executeCommand", {
             command: CREATE_DEFAULT_ACCOUNTS_SERVER,
-            arguments: [n],
+            arguments: [count],
         });
         return res as Array<string>;
     }

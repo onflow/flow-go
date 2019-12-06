@@ -45,6 +45,7 @@ const startEmulator = (ext: Extension) => async () => {
     ext.terminal.sendText(`${ext.config.flowCommand} emulator start --init --verbose --root-key ${rootKey}`);
     ext.terminal.show();
 
+    // create default accounts after the emulator has started
     const accounts = await ext.api.createDefaultAccounts(ext.config.numAccounts);
     accounts.forEach(address => ext.config.addAccount(address));
 };
@@ -130,28 +131,3 @@ const switchActiveAccount = (ext: Extension) => async () => {
             renderExtension(ext);
         });
 };
-
-// Automatically create the number of default accounts specified in the extension configuration.
-async function createDefaultAccounts(ext: Extension): Promise<void> {
-    // wait 5 seconds to allow emulator to launch
-    const accountCreationDelay = 5000;
-
-    return new Promise((resolve, reject) => {
-        setTimeout(async () => {
-            window.showInformationMessage(`Creating ${ext.config.numAccounts} default accounts`);
-
-            for (let i = 1; i < ext.config.numAccounts; i++) {
-                try {
-                    let addr = await ext.api.createAccount();
-                    ext.config.addAccount(addr);
-                } catch (err) {
-                    window.showErrorMessage("Failed to create default account");
-                    console.error(err);
-                    reject(err);
-                }
-            }
-
-            resolve()
-        }, accountCreationDelay)
-    });
-}
