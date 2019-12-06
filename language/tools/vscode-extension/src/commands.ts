@@ -8,12 +8,10 @@ import {shortAddress, stripAddressPrefix} from "./address";
 export const RESTART_SERVER = "cadence.restartServer";
 export const START_EMULATOR = "cadence.runEmulator";
 export const STOP_EMULATOR = "cadence.stopEmulator";
-export const UPDATE_ACCOUNT_CODE = "cadence.updateAccountCode";
 export const CREATE_ACCOUNT = "cadence.createAccount";
 export const SWITCH_ACCOUNT = "cadence.switchActiveAccount";
 
 // Command identifies for commands handled by the Language server
-export const UPDATE_ACCOUNT_CODE_SERVER = "cadence.server.updateAccountCode";
 export const CREATE_ACCOUNT_SERVER = "cadence.server.createAccount";
 export const SWITCH_ACCOUNT_SERVER = "cadence.server.switchActiveAccount";
 
@@ -28,7 +26,6 @@ export function registerCommands(ext: Extension) {
     registerCommand(ext.ctx, RESTART_SERVER, restartServer(ext));
     registerCommand(ext.ctx, START_EMULATOR, startEmulator(ext));
     registerCommand(ext.ctx, STOP_EMULATOR, stopEmulator(ext));
-    registerCommand(ext.ctx, UPDATE_ACCOUNT_CODE, updateAccountCode(ext));
     registerCommand(ext.ctx, CREATE_ACCOUNT, createAccount(ext));
     registerCommand(ext.ctx, SWITCH_ACCOUNT, switchActiveAccount(ext));
 }
@@ -60,23 +57,6 @@ const stopEmulator = (ext: Extension) => async () => {
     ext.config.resetAccounts();
     await ext.api.client.stop();
     ext.api = new LanguageServerAPI(ext.ctx, ext.config);
-};
-
-// Submits a transaction that updates the current account's code the
-// code defined in the active document.
-const updateAccountCode = (ext: Extension) => async () => {
-    const activeEditor = window.activeTextEditor;
-    if (!activeEditor) {
-        return;
-    }
-    const activeDocumentUri = activeEditor.document.uri;
-
-    try {
-        ext.api.updateAccountCode(activeDocumentUri);
-    } catch (err) {
-        window.showWarningMessage("Failed to update account code");
-        console.error(err);
-    }
 };
 
 // Creates a new account by requesting that the Language Server submit
@@ -163,7 +143,7 @@ async function createDefaultAccounts(ext: Extension): Promise<void> {
                     let addr = await ext.api.createAccount();
                     ext.config.addAccount(addr);
                 } catch (err) {
-                    window.showWarningMessage("Failed to create default account");
+                    window.showErrorMessage("Failed to create default account");
                     console.error(err);
                     reject(err);
                 }

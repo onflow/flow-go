@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"path/filepath"
 	"time"
 
 	"github.com/dapperlabs/flow-go/sdk/templates"
@@ -298,6 +300,13 @@ func (s *Server) updateAccountCode(conn protocol.Conn, args ...interface{}) (int
 		return nil, fmt.Errorf("could not find document for URI %s", uri)
 	}
 
+	file := parseFileFromURI(uri)
+
+	conn.ShowMessage(&protocol.ShowMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("Deploying %s to account %s", file, s.activeAccount.Short()),
+	})
+
 	accountCode := []byte(doc.text)
 	script := templates.UpdateAccountCode(accountCode)
 
@@ -369,4 +378,13 @@ func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) error 
 	}
 
 	return err
+}
+
+func parseFileFromURI(uri string) string {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return uri
+	}
+
+	return filepath.Base(u.Path)
 }
