@@ -260,24 +260,30 @@ func (s *Server) createDefaultAccounts(conn protocol.Conn, args ...interface{}) 
 		Message: fmt.Sprintf("Creating %d default accounts", count),
 	})
 
-	// Ping the emulator server until it is available
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
+	// Ping the emulator server for 30 seconds until it is available
+	timer := time.NewTimer(30 * time.Second)
+RetryLoop:
 	for {
-		err := s.flowClient.Ping(ctx)
-		if err == nil {
-			break
+		select {
+		case <-timer.C:
+			return nil, errors.New("emulator server timed out")
+		default:
+			err := s.flowClient.Ping(context.Background())
+			if err == nil {
+				break RetryLoop
+			}
 		}
 	}
 
-	accounts := make([]flow.Address, count)
+	accounts := make([]flow.Address, 0, count-1)
 
+	// Start from index 1 since first account is root
 	for i := 1; i < count; i++ {
 		addr, err := s.createAccountHelper(conn)
 		if err != nil {
 			return nil, err
 		}
-		accounts[i] = addr
+		accounts = append(accounts, addr)
 	}
 
 	return accounts, nil
