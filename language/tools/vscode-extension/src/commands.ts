@@ -46,7 +46,8 @@ const startEmulator = (ext: Extension) => async () => {
     ext.terminal.show();
 
     // create default accounts after the emulator has started
-    const accounts = await ext.api.createDefaultAccounts(ext.config.numAccounts);
+    // skip root account since it is already created
+    const accounts = await ext.api.createDefaultAccounts(ext.config.numAccounts - 1);
     accounts.forEach(address => ext.config.addAccount(address));
 };
 

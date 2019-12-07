@@ -69,7 +69,7 @@
         },
         "cadence.numAccounts": {
           "type": "number",
-          "default": "3",
+          "default": 3,
           "description": "The number of default accounts to create",
           "scope": "resource"
         }
