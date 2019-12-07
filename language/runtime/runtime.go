@@ -291,14 +291,30 @@ func (r *interpreterRuntime) newInterpreter(
 				return indexingType.String()
 			},
 		),
-		interpreter.WithInitialCompositeFieldsHandler(
-			func(inter *interpreter.Interpreter, _ string) map[string]interpreter.Value {
+		interpreter.WithInjectedCompositeFieldsHandler(
+			func(inter *interpreter.Interpreter, compositeKind common.CompositeKind, _ string) map[string]interpreter.Value {
+				switch compositeKind {
+				case common.CompositeKindContract:
+					var address []byte
 
-				addressLocation := interpreter.NewAddressValueFromBytes(inter.Checker.Location.(ast.AddressLocation))
+					switch location := inter.Checker.Location.(type) {
+					case ast.AddressLocation:
+						address = location
+					case AddressLocation:
+						address = location
 
-				return map[string]interpreter.Value{
-					"account": interpreter.NewAccountValue(addressLocation),
+					default:
+						return nil
+					}
+
+					addressLocation := interpreter.NewAddressValueFromBytes(address)
+
+					return map[string]interpreter.Value{
+						"account": interpreter.NewAccountValue(addressLocation),
+					}
 				}
+
+				return nil
 			},
 		),
 	)

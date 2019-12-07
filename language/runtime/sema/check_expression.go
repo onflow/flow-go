@@ -68,7 +68,7 @@ func (checker *Checker) checkSelfVariableUseInInitializer(variable *Variable, po
 		// If the member access is to a predeclared field, it can be considered
 		// initialized and its use is valid
 
-		if !accessedSelfMember.Predeclared {
+		if accessedSelfMember == nil || !accessedSelfMember.Predeclared {
 
 			// If the member access is to a non-field, e.g. a function,
 			// *all* fields must have been initialized

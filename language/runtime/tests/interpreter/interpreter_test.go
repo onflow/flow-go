@@ -6540,8 +6540,8 @@ func TestInterpretContractAccountFieldUse(t *testing.T) {
 	inter := parseCheckAndInterpretWithOptions(t, code,
 		ParseCheckAndInterpretOptions{
 			Options: []interpreter.Option{
-				interpreter.WithInitialCompositeFieldsHandler(
-					func(_ *interpreter.Interpreter, compositeIdentifier string) map[string]interpreter.Value {
+				interpreter.WithInjectedCompositeFieldsHandler(
+					func(_ *interpreter.Interpreter, _ common.CompositeKind, _ string) map[string]interpreter.Value {
 						return map[string]interpreter.Value{
 							"account": interpreter.NewAccountValue(addressValue),
 						}

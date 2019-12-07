@@ -122,30 +122,31 @@ type StorageKeyHandlerFunc func(
 	indexingType sema.Type,
 ) string
 
-// InitialCompositeFieldsHandlerFunc is a function that handles storage reads.
+// InjectedCompositeFieldsHandlerFunc is a function that handles storage reads.
 //
-type InitialCompositeFieldsHandlerFunc func(
+type InjectedCompositeFieldsHandlerFunc func(
 	interpreter *Interpreter,
+	compositeKind common.CompositeKind,
 	compositeIdentifier string,
 ) map[string]Value
 
 type Interpreter struct {
-	Checker                       *sema.Checker
-	PredefinedValues              map[string]Value
-	activations                   *activations.Activations
-	Globals                       map[string]*Variable
-	InterfaceDeclarations         map[*sema.InterfaceType]*ast.InterfaceDeclaration
-	CompositeDeclarations         map[*sema.CompositeType]*ast.CompositeDeclaration
-	CompositeFunctions            map[string]map[string]FunctionValue
-	DestructorFunctions           map[string]*InterpretedFunctionValue
-	SubInterpreters               map[ast.LocationID]*Interpreter
-	Transactions                  []*HostFunctionValue
-	onEventEmitted                OnEventEmittedFunc
-	onStatement                   OnStatementFunc
-	storageReadHandler            StorageReadHandlerFunc
-	storageWriteHandler           StorageWriteHandlerFunc
-	storageKeyHandler             StorageKeyHandlerFunc
-	initialCompositeFieldsHandler InitialCompositeFieldsHandlerFunc
+	Checker                        *sema.Checker
+	PredefinedValues               map[string]Value
+	activations                    *activations.Activations
+	Globals                        map[string]*Variable
+	InterfaceDeclarations          map[*sema.InterfaceType]*ast.InterfaceDeclaration
+	CompositeDeclarations          map[*sema.CompositeType]*ast.CompositeDeclaration
+	CompositeFunctions             map[string]map[string]FunctionValue
+	DestructorFunctions            map[string]*InterpretedFunctionValue
+	SubInterpreters                map[ast.LocationID]*Interpreter
+	Transactions                   []*HostFunctionValue
+	onEventEmitted                 OnEventEmittedFunc
+	onStatement                    OnStatementFunc
+	storageReadHandler             StorageReadHandlerFunc
+	storageWriteHandler            StorageWriteHandlerFunc
+	storageKeyHandler              StorageKeyHandlerFunc
+	injectedCompositeFieldsHandler InjectedCompositeFieldsHandlerFunc
 }
 
 type Option func(*Interpreter) error
@@ -218,12 +219,12 @@ func WithStorageKeyHandler(handler StorageKeyHandlerFunc) Option {
 	}
 }
 
-// WithInitialCompositeFieldsHandler returns an interpreter option which sets the given function
+// WithInjectedCompositeFieldsHandler returns an interpreter option which sets the given function
 // as the function that is used to initialize new composite values' fields
 //
-func WithInitialCompositeFieldsHandler(handler InitialCompositeFieldsHandlerFunc) Option {
+func WithInjectedCompositeFieldsHandler(handler InjectedCompositeFieldsHandlerFunc) Option {
 	return func(interpreter *Interpreter) error {
-		interpreter.SetInitialCompositeFieldsHandler(handler)
+		interpreter.SetInjectedCompositeFieldsHandler(handler)
 		return nil
 	}
 }
@@ -282,11 +283,11 @@ func (interpreter *Interpreter) SetStorageKeyHandler(function StorageKeyHandlerF
 	interpreter.storageKeyHandler = function
 }
 
-// SetInitialCompositeFieldsHandler sets the function that is used to initialize
+// SetInjectedCompositeFieldsHandler sets the function that is used to initialize
 // new composite values' fields
 //
-func (interpreter *Interpreter) SetInitialCompositeFieldsHandler(function InitialCompositeFieldsHandlerFunc) {
-	interpreter.initialCompositeFieldsHandler = function
+func (interpreter *Interpreter) SetInjectedCompositeFieldsHandler(function InjectedCompositeFieldsHandlerFunc) {
+	interpreter.injectedCompositeFieldsHandler = function
 }
 
 // locationRange returns a new location range for the given positioned element.
@@ -1972,21 +1973,19 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 	function = NewHostFunctionValue(
 		func(invocation Invocation) Trampoline {
 
-			var fields map[string]Value
-
-			if interpreter.initialCompositeFieldsHandler != nil {
-				fields = interpreter.initialCompositeFieldsHandler(interpreter, identifier)
-			} else {
-				fields = map[string]Value{}
+			var xFields map[string]Value
+			if interpreter.injectedCompositeFieldsHandler != nil {
+				xFields = interpreter.injectedCompositeFieldsHandler(interpreter, declaration.CompositeKind, identifier)
 			}
 
 			value := &CompositeValue{
-				Location:   interpreter.Checker.Location,
-				Identifier: identifier,
-				Kind:       declaration.CompositeKind,
-				Fields:     fields,
-				Functions:  functions,
-				Destructor: destructorFunction,
+				Location:       interpreter.Checker.Location,
+				Identifier:     identifier,
+				Kind:           declaration.CompositeKind,
+				Fields:         map[string]Value{},
+				InjectedFields: xFields,
+				Functions:      functions,
+				Destructor:     destructorFunction,
 				// NOTE: new value has no owner
 				Owner: "",
 			}
@@ -2454,7 +2453,7 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 		WithStorageReadHandler(interpreter.storageReadHandler),
 		WithStorageWriteHandler(interpreter.storageWriteHandler),
 		WithStorageKeyHandler(interpreter.storageKeyHandler),
-		WithInitialCompositeFieldsHandler(interpreter.initialCompositeFieldsHandler),
+		WithInjectedCompositeFieldsHandler(interpreter.injectedCompositeFieldsHandler),
 	)
 	if err != nil {
 		panic(err)
