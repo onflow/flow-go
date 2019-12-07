@@ -1384,3 +1384,63 @@ func TestRuntimeTransactionWithUpdateAccountContractValid(t *testing.T) {
 		})
 	}
 }
+
+func TestRuntimeContractAccount(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	addressValue := values.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xCA, 0xDE,
+	}
+
+	importedScript := []byte(`
+     pub contract Test {
+          pub let address: Address
+
+          init() {
+              // field 'account' can be used, as it is considered initialized
+              self.address = self.account.address
+          }
+
+          pub fun test(): Address {
+              return self.account.address
+          }
+     }
+    `)
+
+	script1 := []byte(`
+      import Test from 0xCADE
+
+      pub fun main(): Address {
+          return Test().address
+      }
+    `)
+
+	script2 := []byte(`
+      import Test from 0xCADE
+
+      pub fun main(): Address {
+          return Test().test()
+      }
+    `)
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(_ Location) (bytes values.Bytes, err error) {
+			return importedScript, nil
+		},
+	}
+
+	t.Run("", func(t *testing.T) {
+		value, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, addressValue, value)
+	})
+
+	t.Run("", func(t *testing.T) {
+		value, err := runtime.ExecuteScript(script2, runtimeInterface, nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, addressValue, value)
+	})
+}

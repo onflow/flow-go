@@ -291,6 +291,16 @@ func (r *interpreterRuntime) newInterpreter(
 				return indexingType.String()
 			},
 		),
+		interpreter.WithInitialCompositeFieldsHandler(
+			func(inter *interpreter.Interpreter, _ string) map[string]interpreter.Value {
+
+				addressLocation := interpreter.NewAddressValueFromBytes(inter.Checker.Location.(ast.AddressLocation))
+
+				return map[string]interpreter.Value{
+					"account": interpreter.NewAccountValue(addressLocation),
+				}
+			},
+		),
 	)
 }
 
