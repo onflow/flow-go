@@ -1664,6 +1664,8 @@ type Member struct {
 	DeclarationKind common.DeclarationKind
 	VariableKind    ast.VariableKind
 	ArgumentLabels  []string
+	// Predeclared fields can be considered initialized
+	Predeclared bool
 }
 
 // NewCheckedMember panics if the member declaration is invalid.

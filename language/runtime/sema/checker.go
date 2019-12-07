@@ -1156,6 +1156,7 @@ func (checker *Checker) predeclaredMembers(containerType Type) []*Member {
 
 		predeclaredMembers = append(predeclaredMembers,
 			&Member{
+				Predeclared:     true,
 				ContainerType:   compositeType,
 				Access:          ast.AccessPrivate,
 				Identifier:      ast.Identifier{Identifier: "account"},
