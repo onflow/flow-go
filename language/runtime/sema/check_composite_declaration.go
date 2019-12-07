@@ -754,10 +754,13 @@ func (checker *Checker) declareCompositeConstructor(
 		checker.Elaboration.SpecialFunctionTypes[firstInitializer] = functionType
 	}
 
-	_, err := checker.valueActivations.DeclareFunction(
-		compositeDeclaration.Identifier,
-		compositeDeclaration.Access,
+	_, err := checker.valueActivations.Declare(
+		compositeDeclaration.Identifier.Identifier,
 		functionType,
+		compositeDeclaration.Access,
+		compositeDeclaration.DeclarationKind(),
+		compositeDeclaration.Identifier.Pos,
+		true,
 		argumentLabels,
 	)
 	checker.report(err)
