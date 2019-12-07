@@ -200,10 +200,10 @@ func WithStorageWriteHandler(handler StorageWriteHandlerFunc) Option {
 	}
 }
 
-// WithStorageKeyHandlerFunc returns an interpreter option which sets the given function
+// WithStorageKeyHandler returns an interpreter option which sets the given function
 // as the function that is used when a stored value is written.
 //
-func WithStorageKeyHandlerFunc(handler StorageKeyHandlerFunc) Option {
+func WithStorageKeyHandler(handler StorageKeyHandlerFunc) Option {
 	return func(interpreter *Interpreter) error {
 		interpreter.SetStorageKeyHandler(handler)
 		return nil
@@ -2421,6 +2421,7 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 		WithOnStatementHandler(interpreter.onStatement),
 		WithStorageReadHandler(interpreter.storageReadHandler),
 		WithStorageWriteHandler(interpreter.storageWriteHandler),
+		WithStorageKeyHandler(interpreter.storageKeyHandler),
 	)
 	if err != nil {
 		panic(err)

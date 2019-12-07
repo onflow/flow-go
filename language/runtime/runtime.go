@@ -286,7 +286,7 @@ func (r *interpreterRuntime) newInterpreter(
 				runtimeStorage.writeValue(storageIdentifier, key, value)
 			},
 		),
-		interpreter.WithStorageKeyHandlerFunc(
+		interpreter.WithStorageKeyHandler(
 			func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
 				return indexingType.String()
 			},
