@@ -275,15 +275,14 @@ RetryLoop:
 		}
 	}
 
-	accounts := make([]flow.Address, 0, count-1)
+	accounts := make([]flow.Address, count)
 
-	// Start from index 1 since first account is root
-	for i := 1; i < count; i++ {
+	for i := 0; i < count; i++ {
 		addr, err := s.createAccountHelper(conn)
 		if err != nil {
 			return nil, err
 		}
-		accounts = append(accounts, addr)
+		accounts[i] = addr
 	}
 
 	return accounts, nil
