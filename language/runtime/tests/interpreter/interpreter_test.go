@@ -6512,3 +6512,52 @@ func TestInterpretFungibleTokenContract(t *testing.T) {
 		value,
 	)
 }
+
+func TestInterpretContractAccountFieldUse(t *testing.T) {
+
+	code := `
+      pub contract Test {
+          pub let address: Address
+
+          init() {
+              // field 'account' can be used, as it is considered initialized
+              self.address = self.account.address
+          }
+
+          pub fun test(): Address {
+              return self.account.address
+          }
+      }
+
+      pub let address1 = Test().address
+      pub let address2 = Test().test()
+    `
+
+	addressValue := interpreter.AddressValue{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+	}
+
+	inter := parseCheckAndInterpretWithOptions(t, code,
+		ParseCheckAndInterpretOptions{
+			Options: []interpreter.Option{
+				interpreter.WithInitialCompositeFieldsHandler(
+					func(_ *interpreter.Interpreter, compositeIdentifier string) map[string]interpreter.Value {
+						return map[string]interpreter.Value{
+							"account": interpreter.NewAccountValue(addressValue),
+						}
+					},
+				),
+			},
+		},
+	)
+
+	assert.Equal(t,
+		addressValue,
+		inter.Globals["address1"].Value,
+	)
+
+	assert.Equal(t,
+		addressValue,
+		inter.Globals["address2"].Value,
+	)
+}
