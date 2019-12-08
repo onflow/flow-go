@@ -104,6 +104,14 @@ type InjectedCompositeFieldsHandlerFunc func(
 	compositeKind common.CompositeKind,
 ) map[string]Value
 
+// ContractValueHandlerFunc is a function that handles contract values.
+//
+type ContractValueHandlerFunc func(
+	inter *Interpreter,
+	compositeType *sema.CompositeType,
+	constructor FunctionValue,
+) *CompositeValue
+
 type Interpreter struct {
 	Checker                        *sema.Checker
 	PredefinedValues               map[string]Value
@@ -121,6 +129,7 @@ type Interpreter struct {
 	storageWriteHandler            StorageWriteHandlerFunc
 	storageKeyHandler              StorageKeyHandlerFunc
 	injectedCompositeFieldsHandler InjectedCompositeFieldsHandlerFunc
+	contractValueHandler           ContractValueHandlerFunc
 }
 
 type Option func(*Interpreter) error
@@ -203,6 +212,16 @@ func WithInjectedCompositeFieldsHandler(handler InjectedCompositeFieldsHandlerFu
 	}
 }
 
+// WithContractValueHandler returns an interpreter option which sets the given function
+// as the function that is used to handle imports of values.
+//
+func WithContractValueHandler(handler ContractValueHandlerFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetContractValueHandler(handler)
+		return nil
+	}
+}
+
 func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, error) {
 	interpreter := &Interpreter{
 		Checker:               checker,
@@ -262,6 +281,12 @@ func (interpreter *Interpreter) SetStorageKeyHandler(function StorageKeyHandlerF
 //
 func (interpreter *Interpreter) SetInjectedCompositeFieldsHandler(function InjectedCompositeFieldsHandlerFunc) {
 	interpreter.injectedCompositeFieldsHandler = function
+}
+
+// SetContractValueHandler sets the function that is used to handle imports of values
+//
+func (interpreter *Interpreter) SetContractValueHandler(function ContractValueHandlerFunc) {
+	interpreter.contractValueHandler = function
 }
 
 // locationRange returns a new location range for the given positioned element.
@@ -2434,6 +2459,7 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 		WithStorageWriteHandler(interpreter.storageWriteHandler),
 		WithStorageKeyHandler(interpreter.storageKeyHandler),
 		WithInjectedCompositeFieldsHandler(interpreter.injectedCompositeFieldsHandler),
+		WithContractValueHandler(interpreter.contractValueHandler),
 	)
 	if err != nil {
 		panic(err)
