@@ -2264,6 +2264,63 @@ func TestCheckInvalidResourceFieldMoveThroughParameter(t *testing.T) {
 	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
 }
 
+func TestCheckInvalidResourceFieldMoveSelf(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Y {}
+
+      resource X {
+
+          var y: <-Y
+
+          init() {
+              self.y <- create Y()
+          }
+
+          fun test() {
+             absorb(<-self.y)
+          }
+
+          destroy() {
+              destroy self.y
+          }
+      }
+
+      fun absorb(_ y: <-Y) {
+          destroy y
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+}
+
+func TestCheckInvalidResourceFieldUseAfterDestroy(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Y {}
+
+      resource X {
+
+          var y: <-Y
+
+          init() {
+              self.y <- create Y()
+          }
+
+          destroy() {
+              destroy self.y
+              destroy self.y
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
+}
+
 func TestCheckResourceArrayAppend(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
