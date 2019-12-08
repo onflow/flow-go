@@ -104,7 +104,7 @@ func TestCheckCompositeDeclarationNestedStructInterfaceUse(t *testing.T) {
           }
 
           fun test() {
-              Test(xi: X())
+              self.xi = X()
           }
       }
     `)
@@ -120,7 +120,7 @@ func TestCheckCompositeDeclarationNestedTypeScopingInsideNestedOuter(t *testing.
           struct X {
 
               fun test(): Test {
-                  return Test()
+                  return Test
               }
           }
       }
@@ -203,10 +203,9 @@ func TestCheckInvalidCompositeDeclarationNestedType(t *testing.T) {
       let x: Test.X = Test.X()
     `)
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
-	assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }
 
 func TestCheckInvalidNestedType(t *testing.T) {
