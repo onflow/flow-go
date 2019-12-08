@@ -59,21 +59,21 @@ type getterSetter struct {
 // OnEventEmittedFunc is a function that is triggered when an event is emitted by the program.
 //
 type OnEventEmittedFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	event EventValue,
 )
 
 // OnStatementFunc is a function that is triggered when a statement is about to be executed.
 //
 type OnStatementFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	statement *Statement,
 )
 
 // StorageReadHandlerFunc is a function that handles storage reads.
 //
 type StorageReadHandlerFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	storageIdentifier string,
 	key string,
 ) OptionalValue
@@ -81,7 +81,7 @@ type StorageReadHandlerFunc func(
 // StorageWriteHandlerFunc is a function that handles storage writes.
 //
 type StorageWriteHandlerFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	storageIdentifier string,
 	key string,
 	value OptionalValue,
@@ -90,7 +90,7 @@ type StorageWriteHandlerFunc func(
 // StorageKeyHandlerFunc is a function that handles storage indexing types.
 //
 type StorageKeyHandlerFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	storageIdentifier string,
 	indexingType sema.Type,
 ) string
