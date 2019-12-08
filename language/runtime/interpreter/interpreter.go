@@ -53,33 +53,6 @@ type getterSetter struct {
 	set func(Value)
 }
 
-// StatementTrampoline
-
-type StatementTrampoline struct {
-	F    func() Trampoline
-	Line int
-}
-
-func (m StatementTrampoline) Resume() interface{} {
-	return m.F
-}
-
-func (m StatementTrampoline) FlatMap(f func(interface{}) Trampoline) Trampoline {
-	return FlatMap{Subroutine: m, Continuation: f}
-}
-
-func (m StatementTrampoline) Map(f func(interface{}) interface{}) Trampoline {
-	return MapTrampoline(m, f)
-}
-
-func (m StatementTrampoline) Then(f func(interface{})) Trampoline {
-	return ThenTrampoline(m, f)
-}
-
-func (m StatementTrampoline) Continue() Trampoline {
-	return m.F()
-}
-
 // Visit-methods for statement which return a non-nil value
 // are treated like they are returning a value.
 
