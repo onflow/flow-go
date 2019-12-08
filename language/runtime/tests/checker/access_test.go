@@ -780,6 +780,11 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
 					access.Keyword(),
 				)
 
+				arguments := ""
+				if compositeKind != common.CompositeKindContract {
+					arguments = "()"
+				}
+
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
@@ -794,15 +799,16 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test %[3]s %[4]s Test()
+                                  let test %[3]s %[4]s Test%[5]s
                                   test.test()
-                                  %[5]s test
+                                  %[6]s test
                               }
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
 							compositeKind.TransferOperator(),
 							compositeKind.ConstructionKeyword(),
+							arguments,
 							compositeKind.DestructionKeyword(),
 						),
 						ParseAndCheckOptions{
@@ -876,6 +882,11 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
 					access.Keyword(),
 				)
 
+				arguments := ""
+				if compositeKind != common.CompositeKindContract {
+					arguments = "()"
+				}
+
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
@@ -894,9 +905,9 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test: %[3]sTest %[4]s %[5]s TestImpl()
+                                  let test: %[3]sTest %[4]s %[5]s TestImpl%[6]s
                                   test.test()
-                                  %[6]s test
+                                  %[7]s test
                               }
 	                        `,
 							compositeKind.Keyword(),
@@ -904,6 +915,7 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
 							compositeKind.Annotation(),
 							compositeKind.TransferOperator(),
 							compositeKind.ConstructionKeyword(),
+							arguments,
 							compositeKind.DestructionKeyword(),
 						),
 						ParseAndCheckOptions{
@@ -970,6 +982,11 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
 					access.Keyword(),
 				)
 
+				arguments := ""
+				if compositeKind != common.CompositeKindContract {
+					arguments = "()"
+				}
+
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
@@ -988,15 +1005,16 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test %[3]s %[4]s Test()
+                                  let test %[3]s %[4]s Test%[5]s
                                   test.test
-                                  %[5]s test
+                                  %[6]s test
                               }
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
 							compositeKind.TransferOperator(),
 							compositeKind.ConstructionKeyword(),
+							arguments,
 							compositeKind.DestructionKeyword(),
 						),
 						ParseAndCheckOptions{
@@ -1063,6 +1081,11 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 					access.Keyword(),
 				)
 
+				arguments := ""
+				if compositeKind != common.CompositeKindContract {
+					arguments = "()"
+				}
+
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
@@ -1085,9 +1108,9 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test: %[3]sTest %[4]s %[5]s TestImpl()
+                                  let test: %[3]sTest %[4]s %[5]s TestImpl%[6]s
                                   test.test
-                                  %[6]s test
+                                  %[7]s test
                               }
 	                        `,
 							compositeKind.Keyword(),
@@ -1095,6 +1118,7 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 							compositeKind.Annotation(),
 							compositeKind.TransferOperator(),
 							compositeKind.ConstructionKeyword(),
+							arguments,
 							compositeKind.DestructionKeyword(),
 						),
 						ParseAndCheckOptions{
@@ -1161,6 +1185,11 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 					access.Keyword(),
 				)
 
+				arguments := ""
+				if compositeKind != common.CompositeKindContract {
+					arguments = "()"
+				}
+
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
@@ -1181,17 +1210,18 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test %[3]s %[4]s Test()
+                                  let test %[3]s %[4]s Test%[5]s
                                   test.test = 3
                                   var temp = 4
                                   test.test <-> temp
-                                  %[5]s test
+                                  %[6]s test
                               }
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
 							compositeKind.TransferOperator(),
 							compositeKind.ConstructionKeyword(),
+							arguments,
 							compositeKind.DestructionKeyword(),
 						),
 						ParseAndCheckOptions{
@@ -1268,6 +1298,11 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 					access.Keyword(),
 				)
 
+				arguments := ""
+				if compositeKind != common.CompositeKindContract {
+					arguments = "()"
+				}
+
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
@@ -1292,11 +1327,11 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test: %[3]sTest %[4]s %[5]s TestImpl()
+                                  let test: %[3]sTest %[4]s %[5]s TestImpl%[6]s
                                   test.test = 3
                                   var temp = 4
                                   test.test <-> temp
-                                  %[6]s test
+                                  %[7]s test
                               }
 	                        `,
 							compositeKind.Keyword(),
@@ -1304,6 +1339,7 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 							compositeKind.Annotation(),
 							compositeKind.TransferOperator(),
 							compositeKind.ConstructionKeyword(),
+							arguments,
 							compositeKind.DestructionKeyword(),
 						),
 						ParseAndCheckOptions{
