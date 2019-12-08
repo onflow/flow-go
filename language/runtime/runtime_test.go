@@ -975,7 +975,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
 	imported := []byte(`
       pub resource X {
         pub(set) var x: Int
-    
+
         init() {
           self.x = 0
         }
@@ -1137,7 +1137,7 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
         prepare(signer: Account) {
           let existing <- signer.storage[R] <- createR()
           destroy existing
-          signer.published[&R] = &signer.storage[R] as R 
+          signer.published[&R] = &signer.storage[R] as R
         }
         execute {}
       }
@@ -1149,13 +1149,13 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
 		fmt.Sprintf(
 			`
               import "imported"
-    
+
               transaction {
-    
+
                 prepare(signer: Account) {
                   log(getAccount(0x%s).published[&R]?.test() ?? 0)
                 }
-    
+
                 execute {}
               }
             `,
@@ -1242,7 +1242,7 @@ func TestRuntimeTransactionWithUpdateAccountContractEmpty(t *testing.T) {
 	assert.Len(t, events, 1)
 }
 
-func FromBytes(bytes []byte) *interpreter.ArrayValue {
+func ArrayValueFromBytes(bytes []byte) *interpreter.ArrayValue {
 	byteValues := make([]interpreter.Value, len(bytes))
 
 	for i, b := range bytes {
@@ -1328,7 +1328,7 @@ func TestRuntimeTransactionWithUpdateAccountContractValid(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
-			contractArrayCode := FromBytes([]byte(test.contract)).String()
+			contractArrayCode := ArrayValueFromBytes([]byte(test.contract)).String()
 
 			argumentCodes := make([]string, len(test.arguments))
 
@@ -1343,13 +1343,13 @@ func TestRuntimeTransactionWithUpdateAccountContractValid(t *testing.T) {
 
 			script := []byte(fmt.Sprintf(
 				`
-	              transaction {
-	                prepare(signer: Account) {
-	                  updateAccountContract(signer.address, %s%s)
-	                }
-	                execute {}
-	              }
-	            `,
+                  transaction {
+                    prepare(signer: Account) {
+                      updateAccountContract(signer.address, %s%s)
+                    }
+                    execute {}
+                  }
+                `,
 				contractArrayCode,
 				argumentCode,
 			))
@@ -1393,42 +1393,83 @@ func TestRuntimeContractAccount(t *testing.T) {
 		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xCA, 0xDE,
 	}
 
-	importedScript := []byte(`
-     pub contract Test {
-          pub let address: Address
+	contract := []byte(`
+      pub contract Test {
+           pub let address: Address
 
-          init() {
-              // field 'account' can be used, as it is considered initialized
-              self.address = self.account.address
-          }
+           init() {
+               // field 'account' can be used, as it is considered initialized
+               self.address = self.account.address
+           }
 
-          pub fun test(): Address {
-              return self.account.address
-          }
-     }
+           // test that both functions are linked back into restored composite values,
+           // and also injected fields are injected back into restored composite values
+           //
+           pub fun test(): Address {
+               return self.account.address
+           }
+      }
     `)
 
 	script1 := []byte(`
-      import Test from 0xCADE
+     import Test from 0xCADE
 
-      pub fun main(): Address {
-          return Test().address
-      }
+     pub fun main(): Address {
+         return Test.address
+     }
     `)
 
 	script2 := []byte(`
       import Test from 0xCADE
 
       pub fun main(): Address {
-          return Test().test()
+          return Test.test()
       }
     `)
 
+	deploy := []byte(fmt.Sprintf(
+		`
+          transaction {
+            prepare(signer: Account) {
+              updateAccountContract(signer.address, %s)
+            }
+            execute {}
+          }
+        `,
+		ArrayValueFromBytes(contract).String(),
+	))
+
+	storedValues := map[string][]byte{}
+	var accountCode values.Bytes
+	var events []values.Event
+
 	runtimeInterface := &testRuntimeInterface{
 		resolveImport: func(_ Location) (bytes values.Bytes, err error) {
-			return importedScript, nil
+			return accountCode, nil
+		},
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[string(key)], nil
+		},
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[string(key)] = value
+			return nil
+		},
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{addressValue}
+		},
+		updateAccountCode: func(address values.Address, code values.Bytes) (err error) {
+			accountCode = code
+			return nil
+		},
+		emitEvent: func(event values.Event) {
+			events = append(events, event)
 		},
 	}
+
+	err := runtime.ExecuteTransaction(deploy, runtimeInterface, nil)
+	require.NoError(t, err)
+
+	assert.NotNil(t, accountCode)
 
 	t.Run("", func(t *testing.T) {
 		value, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
