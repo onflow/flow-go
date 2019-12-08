@@ -167,53 +167,70 @@ func TestCheckInvalidNestedOptionalComparison(t *testing.T) {
 
 func TestCheckCompositeNilEquality(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKinds {
 
-		_, err := ParseAndCheck(t,
-			fmt.Sprintf(
-				`
-                  %[1]s X {}
+		arguments := ""
+		if compositeKind != common.CompositeKindContract {
+			arguments = "()"
+		}
 
-                  let x: %[2]sX? %[3]s %[4]s X()
+		t.Run(compositeKind.Name(), func(t *testing.T) {
 
-                  let a = x == nil
-                  let b = nil == x
-                `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			),
-		)
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s X {}
 
-		require.NoError(t, err)
+                      let x: %[2]sX? %[3]s %[4]s X%[5]s
+
+                      let a = x == nil
+                      let b = nil == x
+                    `,
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					arguments,
+				),
+			)
+
+			require.NoError(t, err)
+		})
 	}
 }
 
 func TestCheckInvalidCompositeNilEquality(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKinds {
 
-		_, err := ParseAndCheck(t,
-			fmt.Sprintf(
-				`
+		arguments := ""
+		if compositeKind != common.CompositeKindContract {
+			arguments = "()"
+		}
+
+		t.Run(compositeKind.Name(), func(t *testing.T) {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
                   %[1]s X {}
 
-                  let x: %[2]sX? %[3]s %[4]s X()
+                  let x: %[2]sX? %[3]s %[4]s X%[5]s
                   let y: %[2]sX? %[3]s nil
 
                   let a = x == y
                 `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			),
-		)
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					arguments,
+				),
+			)
 
-		errs := ExpectCheckerErrors(t, err, 1)
+			errs := ExpectCheckerErrors(t, err, 1)
 
-		assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
+			assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
+		})
 	}
 }
 
