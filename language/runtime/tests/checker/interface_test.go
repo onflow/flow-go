@@ -239,8 +239,14 @@ func TestCheckInterfaceUse(t *testing.T) {
 
 func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		arguments := ""
+		if compositeKind != common.CompositeKindContract {
+			arguments = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -249,12 +255,13 @@ func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 
                       %[1]s TestImpl: Test {}
 
-                      let test: %[2]sTest %[3]s %[4]s TestImpl()
+                      let test: %[2]sTest %[3]s %[4]s TestImpl%[5]s
 	                `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					arguments,
 				))
 
 			require.NoError(t, err)
@@ -278,6 +285,11 @@ func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T
 				secondKind.Keyword(),
 			)
 
+			secondArguments := ""
+			if secondKind != common.CompositeKindContract {
+				secondArguments = "()"
+			}
+
 			t.Run(testName, func(t *testing.T) {
 
 				_, err := ParseAndCheck(t,
@@ -287,13 +299,14 @@ func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T
 
                           %[2]s TestImpl: Test {}
 
-                          let test: %[3]sTest %[4]s %[5]s TestImpl()
+                          let test: %[3]sTest %[4]s %[5]s TestImpl%[6]s
 	                    `,
 						firstKind.Keyword(),
 						secondKind.Keyword(),
 						firstKind.Annotation(),
 						firstKind.TransferOperator(),
 						secondKind.ConstructionKeyword(),
+						secondArguments,
 					),
 				)
 
@@ -307,8 +320,14 @@ func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T
 
 func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		arguments := ""
+		if compositeKind != common.CompositeKindContract {
+			arguments = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -318,12 +337,13 @@ func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
                       // NOTE: not declaring conformance
                       %[1]s TestImpl {}
 
-                      let test: %[2]sTest %[3]s %[4]s TestImpl()
+                      let test: %[2]sTest %[3]s %[4]s TestImpl%[5]s
 	                `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					arguments,
 				),
 			)
 
@@ -357,8 +377,14 @@ func TestCheckInvalidCompositeInterfaceConformanceNonInterface(t *testing.T) {
 
 func TestCheckInterfaceFieldUse(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			// Contracts cannot be instantiated
+			continue
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -379,10 +405,10 @@ func TestCheckInterfaceFieldUse(t *testing.T) {
 
                       let x = test.x
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
 				),
 			)
 
@@ -393,8 +419,14 @@ func TestCheckInterfaceFieldUse(t *testing.T) {
 
 func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			// Contracts cannot be instantiated
+			continue
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -413,10 +445,10 @@ func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
 
                       let x = test.x
     	            `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
 				),
 			)
 
@@ -429,8 +461,14 @@ func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
 
 func TestCheckInterfaceFunctionUse(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		arguments := ""
+		if compositeKind != common.CompositeKindContract {
+			arguments = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -445,14 +483,15 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
                           }
                       }
 
-                      let test: %[2]sTest %[3]s %[4]s TestImpl()
+                      let test: %[2]sTest %[3]s %[4]s TestImpl%[5]s
 
                       let val = test.test()
 	                `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					arguments,
 				),
 			)
 
@@ -463,8 +502,14 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
 
 func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		arguments := ""
+		if compositeKind != common.CompositeKindContract {
+			arguments = "()"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -477,14 +522,15 @@ func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
                           }
                       }
 
-                      let test: %[2]sTest %[3]s %[4]s TestImpl()
+                      let test: %[2]sTest %[3]s %[4]s TestImpl%[5]s
 
                       let val = test.test()
 	                `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					arguments,
 				),
 			)
 
@@ -1436,7 +1482,7 @@ func TestCheckContractInterfaceFungibleTokenUse(t *testing.T) {
 		validExampleFungibleTokenContract + "\n" + `
 
       fun test(): Int {
-          let contract = ExampleToken()
+          let contract = ExampleToken
 
           // valid, because code is in the same location
           let publisher <- create ExampleToken.Vault(balance: 100)
