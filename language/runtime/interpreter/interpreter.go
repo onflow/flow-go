@@ -1900,14 +1900,16 @@ func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.Compo
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	_, _ = interpreter.declareCompositeConstructor(declaration, lexicalScope)
+	_, _ = interpreter.declareCompositeValue(declaration, lexicalScope)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-// declareCompositeConstructor creates a constructor function
-// for the given composite, bound in a variable.
+// declareCompositeValue creates and declares the value for
+// the composite declaration.
+//
+// For all composite kinds a constructor function is created.
 //
 // The constructor is a host function which creates a new composite,
 // calls the initializer (interpreted function), if any,
@@ -1916,21 +1918,26 @@ func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.Compo
 // Inside the initializer and all functions, `self` is bound to
 // the new composite value, and the constructor itself is bound
 //
-func (interpreter *Interpreter) declareCompositeConstructor(
+// For contracts, `contractValueHandler` is used to declare
+// a contract value / instance (singleton).
+//
+// For all other composite kinds the constructor function is declared.
+//
+func (interpreter *Interpreter) declareCompositeValue(
 	declaration *ast.CompositeDeclaration,
 	lexicalScope hamt.Map,
 ) (
 	scope hamt.Map,
-	function HostFunctionValue,
+	value Value,
 ) {
 	identifier := declaration.Identifier.Identifier
 	variable := interpreter.findOrDeclareVariable(identifier)
 
-	// Make the constructor available in the initializer
+	// Make the value available in the initializer
 	lexicalScope = lexicalScope.
 		Insert(common.StringEntry(identifier), variable)
 
-	// Evaluate nested declarations in a new scope, so constructors
+	// Evaluate nested declarations in a new scope, so values
 	// of nested declarations won't be visible after the containing declaration
 
 	members := map[string]Value{}
@@ -1949,15 +1956,15 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 
 		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
 
-			// Pass the lexical scope, which has the containing composite's constructor declared,
+			// Pass the lexical scope, which has the containing composite's value declared,
 			// to the nested declarations so they can refer to it, and update the lexical scope
 			// so the container's functions can refer to the nested constructors
 
-			var nestedConstructor FunctionValue
-			lexicalScope, nestedConstructor =
-				interpreter.declareCompositeConstructor(nestedCompositeDeclaration, lexicalScope)
+			var nestedValue Value
+			lexicalScope, nestedValue =
+				interpreter.declareCompositeValue(nestedCompositeDeclaration, lexicalScope)
 
-			members[nestedCompositeDeclaration.Identifier.Identifier] = nestedConstructor
+			members[nestedCompositeDeclaration.Identifier.Identifier] = nestedValue
 		}
 	})()
 
@@ -1969,7 +1976,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 	functions := interpreter.compositeFunctions(declaration, lexicalScope)
 	interpreter.CompositeFunctions[identifier] = functions
 
-	function = NewHostFunctionValue(
+	constructor := NewHostFunctionValue(
 		func(invocation Invocation) Trampoline {
 
 			// TODO: is this necessary if CompositeValue loads injected fields?
@@ -2012,10 +2019,22 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 				})
 		},
 	)
-	function.Members = members
-	variable.Value = function
 
-	return lexicalScope, function
+	// Contract declarations declare a value / instance (singleton),
+	// for all other composite kinds, the constructor is declared
+
+	if declaration.CompositeKind == common.CompositeKindContract {
+		compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[declaration]
+		contract := interpreter.contractValueHandler(interpreter, compositeType, constructor)
+		contract.NestedValues = members
+		value = contract
+	} else {
+		value = constructor
+		constructor.Members = members
+	}
+	variable.Value = value
+
+	return lexicalScope, value
 }
 
 // bindSelf returns a function which binds `self` to the structure

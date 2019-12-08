@@ -1415,6 +1415,7 @@ type CompositeValue struct {
 	Kind           common.CompositeKind
 	Fields         map[string]Value
 	InjectedFields map[string]Value
+	NestedValues   map[string]Value
 	Functions      map[string]FunctionValue
 	Destructor     *InterpretedFunctionValue
 	Owner          string
@@ -1447,9 +1448,13 @@ func (v *CompositeValue) Destroy(interpreter *Interpreter, location LocationPosi
 func (*CompositeValue) isValue() {}
 
 func (v *CompositeValue) Copy() Value {
-	// Resources are moved and not copied
-	if v.Kind == common.CompositeKindResource {
+	// Resources and contracts are not copied
+	switch v.Kind {
+	case common.CompositeKindResource, common.CompositeKindContract:
 		return v
+
+	default:
+		break
 	}
 
 	newFields := make(map[string]Value, len(v.Fields))
@@ -1465,6 +1470,7 @@ func (v *CompositeValue) Copy() Value {
 		Kind:           v.Kind,
 		Fields:         newFields,
 		InjectedFields: v.InjectedFields,
+		NestedValues:   v.NestedValues,
 		Functions:      v.Functions,
 		Destructor:     v.Destructor,
 		// NOTE: new value has no owner
@@ -1500,6 +1506,11 @@ func (v *CompositeValue) Export() values.Value {
 
 func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
 	value, ok := v.Fields[name]
+	if ok {
+		return value
+	}
+
+	value, ok = v.NestedValues[name]
 	if ok {
 		return value
 	}
