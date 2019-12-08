@@ -75,7 +75,7 @@ func TestCheckInvalidContractAccountFieldAccess(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       contract Test {}
 
-      let test = Test().account
+      let test = Test.account
     `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
@@ -99,8 +99,8 @@ func TestCheckContractAccountFieldUseInitialized(t *testing.T) {
           }
       }
 
-      let address1 = Test().address
-      let address2 = Test().test()
+      let address1 = Test.address
+      let address2 = Test.test()
     `
 	_, err := ParseAndCheck(t, code)
 
