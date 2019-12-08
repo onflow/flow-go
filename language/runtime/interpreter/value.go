@@ -1561,6 +1561,10 @@ func (v *CompositeValue) GobEncode() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = encoder.Encode(v.Kind)
+	if err != nil {
+		return nil, err
+	}
 	err = encoder.Encode(v.Fields)
 	if err != nil {
 		return nil, err
@@ -1577,6 +1581,10 @@ func (v *CompositeValue) GobDecode(buf []byte) error {
 		return err
 	}
 	err = decoder.Decode(&v.Identifier)
+	if err != nil {
+		return err
+	}
+	err = decoder.Decode(&v.Kind)
 	if err != nil {
 		return err
 	}
