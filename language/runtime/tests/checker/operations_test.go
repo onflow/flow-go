@@ -221,22 +221,28 @@ func TestCheckConcatenatingExpression(t *testing.T) {
 
 func TestCheckInvalidCompositeEquality(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKinds {
+
+		arguments := ""
+		if compositeKind != common.CompositeKindContract {
+			arguments = "()"
+		}
 
 		_, err := ParseAndCheck(t,
 			fmt.Sprintf(
 				`
                   %[1]s X {}
 
-                  let x1: %[2]sX %[3]s %[4]s X()
-                  let x2: %[2]sX %[3]s %[4]s X()
+                  let x1: %[2]sX %[3]s %[4]s X%[5]s
+                  let x2: %[2]sX %[3]s %[4]s X%[5]s
 
                   let a = x1 == x2
                 `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
+				compositeKind.Keyword(),
+				compositeKind.Annotation(),
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
+				arguments,
 			),
 		)
 
