@@ -292,19 +292,18 @@ func (r *interpreterRuntime) newInterpreter(
 			},
 		),
 		interpreter.WithInjectedCompositeFieldsHandler(
-			func(inter *interpreter.Interpreter, compositeKind common.CompositeKind, _ string) map[string]interpreter.Value {
+			func(_ *interpreter.Interpreter, location ast.Location, compositeIdentifier string, compositeKind common.CompositeKind) map[string]interpreter.Value {
 				switch compositeKind {
 				case common.CompositeKindContract:
 					var address []byte
 
-					switch location := inter.Checker.Location.(type) {
+					switch location := location.(type) {
 					case ast.AddressLocation:
 						address = location
 					case AddressLocation:
 						address = location
-
 					default:
-						return nil
+						panic(runtimeErrors.NewUnreachableError())
 					}
 
 					addressLocation := interpreter.NewAddressValueFromBytes(address)

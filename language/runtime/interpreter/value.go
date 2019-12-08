@@ -1521,7 +1521,7 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 	}
 
 	if v.InjectedFields == nil && interpreter.injectedCompositeFieldsHandler != nil {
-		v.InjectedFields = interpreter.injectedCompositeFieldsHandler(interpreter, v.Kind, v.Identifier)
+		v.InjectedFields = interpreter.injectedCompositeFieldsHandler(interpreter, v.Location, v.Identifier, v.Kind)
 	}
 
 	if v.InjectedFields != nil {

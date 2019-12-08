@@ -98,9 +98,10 @@ type StorageKeyHandlerFunc func(
 // InjectedCompositeFieldsHandlerFunc is a function that handles storage reads.
 //
 type InjectedCompositeFieldsHandlerFunc func(
-	interpreter *Interpreter,
-	compositeKind common.CompositeKind,
+	inter *Interpreter,
+	location ast.Location,
 	compositeIdentifier string,
+	compositeKind common.CompositeKind,
 ) map[string]Value
 
 type Interpreter struct {
@@ -1946,9 +1947,15 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 	function = NewHostFunctionValue(
 		func(invocation Invocation) Trampoline {
 
-			var xFields map[string]Value
+			// TODO: is this necessary if CompositeValue loads injected fields?
+			var injectedFields map[string]Value
 			if interpreter.injectedCompositeFieldsHandler != nil {
-				xFields = interpreter.injectedCompositeFieldsHandler(interpreter, declaration.CompositeKind, identifier)
+				injectedFields = interpreter.injectedCompositeFieldsHandler(
+					interpreter,
+					interpreter.Checker.Location,
+					identifier,
+					declaration.CompositeKind,
+				)
 			}
 
 			value := &CompositeValue{
@@ -1956,7 +1963,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 				Identifier:     identifier,
 				Kind:           declaration.CompositeKind,
 				Fields:         map[string]Value{},
-				InjectedFields: xFields,
+				InjectedFields: injectedFields,
 				Functions:      functions,
 				Destructor:     destructorFunction,
 				// NOTE: new value has no owner
