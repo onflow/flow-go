@@ -817,11 +817,6 @@ func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
-			arguments := ""
-			if compositeKind != common.CompositeKindContract {
-				arguments = "()"
-			}
-
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
@@ -838,7 +833,7 @@ func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -1172,11 +1167,6 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 				secondKind.Keyword(),
 			)
 
-			secondArguments := ""
-			if secondKind != common.CompositeKindContract {
-				secondArguments = "()"
-			}
-
 			t.Run(testName, func(t *testing.T) {
 
 				_, err := ParseAndCheck(t,
@@ -1197,7 +1187,7 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 						firstKind.Annotation(),
 						firstKind.TransferOperator(),
 						secondKind.ConstructionKeyword(),
-						secondArguments,
+						constructorArguments(secondKind),
 					),
 				)
 
@@ -1259,11 +1249,6 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -1282,7 +1267,7 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -1361,11 +1346,6 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -1382,7 +1362,7 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -1394,11 +1374,6 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
 func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -1416,7 +1391,7 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
 					compositeKind.Keyword(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -1430,11 +1405,6 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
 func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -1468,7 +1438,7 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
 					compositeKind.ConstructionKeyword(),
 					compositeKind.TransferOperator(),
 					compositeKind.DestructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -1558,11 +1528,6 @@ func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -1582,7 +1547,7 @@ func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
                     `,
 					compositeKind.Annotation(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 					compositeKind.Keyword(),
 				),
 			)

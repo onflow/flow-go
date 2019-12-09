@@ -68,6 +68,13 @@ func parseCheckAndInterpretWithOptions(
 	return inter
 }
 
+func constructorArguments(compositeKind common.CompositeKind, arguments string) string {
+	if compositeKind == common.CompositeKindContract {
+		return ""
+	}
+	return fmt.Sprintf("(%s)", arguments)
+}
+
 // makeContractValueHandler creates a interpreter option which
 // sets the ContractValueHandler.
 // The handler immediately invokes the constructor with the given arguments.
@@ -1691,11 +1698,6 @@ func TestInterpretCompositeDeclaration(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Name(), func(t *testing.T) {
 
 			inter := parseCheckAndInterpretWithOptions(t,
@@ -1710,7 +1712,7 @@ func TestInterpretCompositeDeclaration(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind, ""),
 				),
 				ParseCheckAndInterpretOptions{
 					Options: []interpreter.Option{
@@ -3208,11 +3210,6 @@ func TestInterpretCompositeNilEquality(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Name(), func(t *testing.T) {
 
 			inter := parseCheckAndInterpretWithOptions(t,
@@ -3228,7 +3225,7 @@ func TestInterpretCompositeNilEquality(t *testing.T) {
 					compositeKind.Annotation(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind, ""),
 				),
 				ParseCheckAndInterpretOptions{
 					Options: []interpreter.Option{
@@ -3436,11 +3433,6 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			inter := parseCheckAndInterpretWithOptions(t,
@@ -3456,7 +3448,7 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 					compositeKind.Annotation(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind, ""),
 				),
 				ParseCheckAndInterpretOptions{
 					Options: []interpreter.Option{
@@ -3476,11 +3468,6 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 func TestInterpretInterfaceFieldUse(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "(x: 1)"
-		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -3507,7 +3494,7 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 					compositeKind.Annotation(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind, "x: 1"),
 				),
 				ParseCheckAndInterpretOptions{
 					Options: []interpreter.Option{
@@ -3538,11 +3525,6 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			inter := parseCheckAndInterpretWithOptions(t,
@@ -3566,7 +3548,7 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 					compositeKind.Annotation(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind, ""),
 				),
 				ParseCheckAndInterpretOptions{
 					Options: []interpreter.Option{
@@ -3586,11 +3568,6 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -3625,7 +3602,7 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 					compositeKind.Annotation(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind, ""),
 					compositeKind.DestructionKeyword(),
 				),
 				ParseCheckAndInterpretOptions{
@@ -3665,11 +3642,6 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "(x: x)"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			for value, expectedError := range tests {
@@ -3702,7 +3674,7 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 							compositeKind.Keyword(),
 							compositeKind.Annotation(),
 							compositeKind.ConstructionKeyword(),
-							arguments,
+							constructorArguments(compositeKind, "x: x"),
 						),
 					)
 					require.NoError(t, err)

@@ -223,11 +223,6 @@ func TestCheckInvalidCompositeEquality(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		_, err := ParseAndCheck(t,
 			fmt.Sprintf(
 				`
@@ -242,7 +237,7 @@ func TestCheckInvalidCompositeEquality(t *testing.T) {
 				compositeKind.Annotation(),
 				compositeKind.TransferOperator(),
 				compositeKind.ConstructionKeyword(),
-				arguments,
+				constructorArguments(compositeKind),
 			),
 		)
 

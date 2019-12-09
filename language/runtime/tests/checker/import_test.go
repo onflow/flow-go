@@ -156,11 +156,6 @@ func TestCheckImportTypes(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			checker, err := ParseAndCheck(t,
@@ -189,7 +184,7 @@ func TestCheckImportTypes(t *testing.T) {
 					compositeKind.Annotation(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 				ParseAndCheckOptions{
 					ImportResolver: func(location ast.Location) (program *ast.Program, e error) {

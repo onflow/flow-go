@@ -169,11 +169,6 @@ func TestCheckCompositeNilEquality(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Name(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -190,7 +185,7 @@ func TestCheckCompositeNilEquality(t *testing.T) {
 					compositeKind.Annotation(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -202,11 +197,6 @@ func TestCheckCompositeNilEquality(t *testing.T) {
 func TestCheckInvalidCompositeNilEquality(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
 
 		t.Run(compositeKind.Name(), func(t *testing.T) {
 			_, err := ParseAndCheck(t,
@@ -223,7 +213,7 @@ func TestCheckInvalidCompositeNilEquality(t *testing.T) {
 					compositeKind.Annotation(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 

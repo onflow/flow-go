@@ -13,6 +13,13 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
+func constructorArguments(compositeKind common.CompositeKind) string {
+	if compositeKind == common.CompositeKindContract {
+		return ""
+	}
+	return "()"
+}
+
 func TestCheckInvalidLocalInterface(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
@@ -241,11 +248,6 @@ func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -261,7 +263,7 @@ func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 					compositeKind.Annotation(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				))
 
 			require.NoError(t, err)
@@ -285,11 +287,6 @@ func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T
 				secondKind.Keyword(),
 			)
 
-			secondArguments := ""
-			if secondKind != common.CompositeKindContract {
-				secondArguments = "()"
-			}
-
 			t.Run(testName, func(t *testing.T) {
 
 				_, err := ParseAndCheck(t,
@@ -306,7 +303,7 @@ func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T
 						firstKind.Annotation(),
 						firstKind.TransferOperator(),
 						secondKind.ConstructionKeyword(),
-						secondArguments,
+						constructorArguments(secondKind),
 					),
 				)
 
@@ -321,11 +318,6 @@ func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T
 func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -343,7 +335,7 @@ func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
 					compositeKind.Annotation(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -463,11 +455,6 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -491,7 +478,7 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
 					compositeKind.Annotation(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -503,11 +490,6 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
 func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -530,7 +512,7 @@ func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 					compositeKind.Annotation(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 

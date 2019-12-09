@@ -18,11 +18,6 @@ func TestCheckFailableCastingWithMoveAnnotation(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -35,7 +30,7 @@ func TestCheckFailableCastingWithMoveAnnotation(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -138,11 +133,6 @@ func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -157,7 +147,7 @@ func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -181,11 +171,6 @@ func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -200,7 +185,7 @@ func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -224,11 +209,6 @@ func TestCheckVariableDeclarationWithMoveAnnotation(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -241,7 +221,7 @@ func TestCheckVariableDeclarationWithMoveAnnotation(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -265,11 +245,6 @@ func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -282,7 +257,7 @@ func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -479,11 +454,6 @@ func TestCheckFunctionExpressionParameterWithoutMoveAnnotation(t *testing.T) {
 func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -498,7 +468,7 @@ func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -522,11 +492,6 @@ func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
 func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -541,7 +506,7 @@ func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -633,11 +598,6 @@ func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -652,7 +612,7 @@ func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -675,11 +635,6 @@ func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
 func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -694,7 +649,7 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -717,11 +672,6 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
 func TestCheckFailableCastingWithoutMoveAnnotation(t *testing.T) {
 	for _, compositeKind := range common.CompositeKinds {
 
-		arguments := ""
-		if compositeKind != common.CompositeKindContract {
-			arguments = "()"
-		}
-
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -734,7 +684,7 @@ func TestCheckFailableCastingWithoutMoveAnnotation(t *testing.T) {
 					compositeKind.Keyword(),
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
-					arguments,
+					constructorArguments(compositeKind),
 				),
 			)
 
