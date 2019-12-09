@@ -2918,7 +2918,7 @@ func TestInterpretNilCoalescingShortCircuitLeftFailure(t *testing.T) {
 	)
 }
 
-func TestInterpretNilCoalescingOptionalAnyNil(t *testing.T) {
+func TestInterpretNilCoalescingOptionalAnyStructNil(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: AnyStruct? = nil
@@ -2934,7 +2934,7 @@ func TestInterpretNilCoalescingOptionalAnyNil(t *testing.T) {
 	)
 }
 
-func TestInterpretNilCoalescingOptionalAnySome(t *testing.T) {
+func TestInterpretNilCoalescingOptionalAnyStructSome(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: AnyStruct? = 2
@@ -3831,7 +3831,7 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 	)
 }
 
-func TestInterpretFailableCastingAnySuccess(t *testing.T) {
+func TestInterpretFailableCastingAnyStructSuccess(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: AnyStruct = 42
@@ -3854,7 +3854,7 @@ func TestInterpretFailableCastingAnySuccess(t *testing.T) {
 	)
 }
 
-func TestInterpretFailableCastingAnyFailure(t *testing.T) {
+func TestInterpretFailableCastingAnyStructFailure(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: AnyStruct = 42
@@ -3867,7 +3867,7 @@ func TestInterpretFailableCastingAnyFailure(t *testing.T) {
 	)
 }
 
-func TestInterpretOptionalAny(t *testing.T) {
+func TestInterpretOptionalAnyStruct(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: AnyStruct? = 42
@@ -3884,7 +3884,7 @@ func TestInterpretOptionalAny(t *testing.T) {
 	)
 }
 
-func TestInterpretOptionalAnyFailableCasting(t *testing.T) {
+func TestInterpretOptionalAnyStructFailableCasting(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: AnyStruct? = 42
@@ -3909,7 +3909,7 @@ func TestInterpretOptionalAnyFailableCasting(t *testing.T) {
 	)
 }
 
-func TestInterpretOptionalAnyFailableCastingInt(t *testing.T) {
+func TestInterpretOptionalAnyStructFailableCastingInt(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: AnyStruct? = 23
@@ -3943,7 +3943,7 @@ func TestInterpretOptionalAnyFailableCastingInt(t *testing.T) {
 	)
 }
 
-func TestInterpretOptionalAnyFailableCastingNil(t *testing.T) {
+func TestInterpretOptionalAnyStructFailableCastingNil(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x: AnyStruct? = nil
@@ -5763,7 +5763,7 @@ func TestInterpretCastingIntLiteralToInt8(t *testing.T) {
 	)
 }
 
-func TestInterpretCastingIntLiteralToAny(t *testing.T) {
+func TestInterpretCastingIntLiteralToAnyStruct(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       let x = 42 as AnyStruct
@@ -5787,6 +5787,28 @@ func TestInterpretCastingIntLiteralToOptional(t *testing.T) {
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(interpreter.NewIntValue(42)),
 		inter.Globals["x"].Value,
+	)
+}
+
+func TestInterpretCastingResourceToAnyAnyResource(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      resource R {}
+
+      fun test(): <-AnyResource {
+          let r <- create R()
+          let x <- r as <-AnyResource
+          return <-x
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	require.IsType(t, &interpreter.AnyValue{}, value)
+	assert.IsType(t,
+		&interpreter.CompositeValue{},
+		value.(*interpreter.AnyValue).Value,
 	)
 }
 

@@ -75,6 +75,15 @@ func TestIsResourceType_AnyStructNestedInArray(t *testing.T) {
 	assert.False(t, ty.IsResourceType())
 }
 
+func TestIsResourceType_AnyResourceNestedInArray(t *testing.T) {
+
+	ty := &VariableSizedType{
+		Type: &AnyResourceType{},
+	}
+
+	assert.True(t, ty.IsResourceType())
+}
+
 func TestIsResourceType_ResourceNestedInArray(t *testing.T) {
 
 	ty := &VariableSizedType{

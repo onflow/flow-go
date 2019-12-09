@@ -33,3 +33,28 @@ func TestCheckInvalidAnyStructResourceType(t *testing.T) {
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 }
+
+func TestCheckAnyResource(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      let a: <-AnyResource <- create R()
+      let b: <-AnyResource <- [<-create R()]
+    `)
+
+	assert.NoError(t, err)
+}
+
+func TestCheckInvalidAnyResourceNonResourceType(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      let a: AnyStruct = create R()
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+}

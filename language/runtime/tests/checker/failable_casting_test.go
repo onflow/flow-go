@@ -10,7 +10,7 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-func TestCheckFailableCastingAny(t *testing.T) {
+func TestCheckFailableCastingAnyStruct(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
       let x: AnyStruct = 1
@@ -22,7 +22,7 @@ func TestCheckFailableCastingAny(t *testing.T) {
 	assert.NotEmpty(t, checker.Elaboration.CastingTargetTypes)
 }
 
-func TestCheckInvalidFailableCastingAny(t *testing.T) {
+func TestCheckInvalidFailableCastingAnyStruct(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       let x: AnyStruct = 1
@@ -66,7 +66,7 @@ func TestCheckInvalidFailableCastingInterface(t *testing.T) {
 }
 
 // TODO: add support for "wrapped" Any: optional, array, dictionary
-func TestCheckInvalidFailableCastingOptionalAny(t *testing.T) {
+func TestCheckInvalidFailableCastingOptionalAnyStruct(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       let x: AnyStruct? = 1
@@ -79,7 +79,7 @@ func TestCheckInvalidFailableCastingOptionalAny(t *testing.T) {
 }
 
 // TODO: add support for "wrapped" Any: optional, array, dictionary
-func TestCheckInvalidFailableCastingArrayAny(t *testing.T) {
+func TestCheckInvalidFailableCastingArrayAnyStruct(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       let x: [AnyStruct] = [1]
@@ -91,7 +91,7 @@ func TestCheckInvalidFailableCastingArrayAny(t *testing.T) {
 	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
 }
 
-func TestCheckOptionalAnyFailableCastingNil(t *testing.T) {
+func TestCheckOptionalAnyStructFailableCastingNil(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
       let x: AnyStruct? = nil

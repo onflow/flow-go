@@ -27,6 +27,8 @@ type Bytes struct{ isAType }
 
 type AnyStruct struct{ isAType }
 
+type AnyResource struct{ isAType }
+
 type Int struct{ isAType }
 
 type Int8 struct{ isAType }

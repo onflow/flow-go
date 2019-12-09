@@ -95,7 +95,7 @@ func NewTypeAnnotations(types ...Type) []*TypeAnnotation {
 	return typeAnnotations
 }
 
-// AnyStructType represents the top type of all structs
+// AnyStructType represents the top type of all non-resource types
 type AnyStructType struct{}
 
 func (*AnyStructType) isType() {}
@@ -122,6 +122,36 @@ func (*AnyStructType) IsResourceType() bool {
 }
 
 func (*AnyStructType) IsInvalidType() bool {
+	return false
+}
+
+// AnyResourceType represents the top type of all resource types
+type AnyResourceType struct{}
+
+func (*AnyResourceType) isType() {}
+
+func (*AnyResourceType) String() string {
+	return "AnyResource"
+}
+
+func (*AnyResourceType) ID() string {
+	return "AnyResource"
+}
+
+func (*AnyResourceType) Equal(other Type) bool {
+	_, ok := other.(*AnyResourceType)
+	return ok
+}
+
+func (*AnyResourceType) AnyResourceType(_ *ast.Program, variable *Variable) types.Type {
+	return wrapVariable(types.AnyResource{}, variable)
+}
+
+func (*AnyResourceType) IsResourceType() bool {
+	return true
+}
+
+func (*AnyResourceType) IsInvalidType() bool {
 	return false
 }
 
@@ -1358,6 +1388,7 @@ func init() {
 	types := []Type{
 		&VoidType{},
 		&AnyStructType{},
+		&AnyResourceType{},
 		&NeverType{},
 		&BoolType{},
 		&CharacterType{},
@@ -2415,8 +2446,12 @@ func IsSubType(subType Type, superType Type) bool {
 		return true
 	}
 
-	if _, ok := superType.(*AnyStructType); ok {
+	switch superType.(type) {
+	case *AnyStructType:
 		return !subType.IsResourceType()
+
+	case *AnyResourceType:
+		return subType.IsResourceType()
 	}
 
 	if _, ok := subType.(*NeverType); ok {

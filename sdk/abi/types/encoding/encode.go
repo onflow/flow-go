@@ -163,6 +163,8 @@ func (encoder *Encoder) encode(t types.Type) interface{} {
 	switch v := (t).(type) {
 	case types.AnyStruct:
 		return "AnyStruct"
+	case types.AnyResource:
+		return "AnyResource"
 	case types.Bool:
 		return "Bool"
 	case types.Void:
