@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 // Order is the evolved version of the deprecated tracker type of Gossip package.

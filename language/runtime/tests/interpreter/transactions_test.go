@@ -57,8 +57,6 @@ func TestInterpretTransactions(t *testing.T) {
             pre {
               self.x > 1
             }
-            
-            execute {}
           }
         `)
 
@@ -79,8 +77,6 @@ func TestInterpretTransactions(t *testing.T) {
             pre {
               self.x > 10
             }
-            
-            execute {}
           }
         `)
 
@@ -176,8 +172,6 @@ func TestInterpretTransactions(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
             prepare(signer: Account) {}
-
-            execute {}
           }
         `)
 

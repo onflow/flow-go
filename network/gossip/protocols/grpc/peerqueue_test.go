@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 // TestAddPeer tests peer adding (makes sure that once a stream is added, it can be

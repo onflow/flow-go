@@ -6,21 +6,24 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff"
 	"github.com/dapperlabs/flow-go/engine/simulation/generator"
-	"github.com/dapperlabs/flow-go/module/committee"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/network/codec/captain"
+	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/trickle"
-	"github.com/dapperlabs/flow-go/network/trickle/cache"
 	"github.com/dapperlabs/flow-go/network/trickle/middleware"
-	"github.com/dapperlabs/flow-go/network/trickle/state"
+	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 )
 
 func main() {
@@ -31,17 +34,21 @@ func main() {
 
 	// declare configuration parameters
 	var (
-		identity    string
+		nodeID      string
 		entries     []string
 		timeout     time.Duration
 		connections uint
+		datadir     string
+		level       string
 	)
 
 	// bind configuration parameters
-	pflag.StringVarP(&identity, "identity", "i", "consensus1", "identity of our node")
-	pflag.StringSliceVarP(&entries, "entries", "e", []string{"consensus-consensus1@localhost:7297"}, "identity table entries for all nodes")
+	pflag.StringVarP(&nodeID, "nodeid", "n", "node1", "identity of our node")
+	pflag.StringSliceVarP(&entries, "entries", "e", []string{"consensus-node1@address1=1000"}, "identity table entries for all nodes")
 	pflag.DurationVarP(&timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	pflag.UintVarP(&connections, "connections", "c", 0, "number of connections to establish to peers")
+	pflag.StringVarP(&datadir, "datadir", "d", "data", "directory to store the protocol state")
+	pflag.StringVarP(&level, "loglevel", "l", "info", "level for logging output")
 
 	// parse configuration parameters
 	pflag.Parse()
@@ -49,16 +56,55 @@ func main() {
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
 
-	log := zerolog.New(os.Stderr).With().Str("identity", identity).Logger()
-
 	log.Info().Msg("flow consensus node starting up")
+
+	// configure logger with standard level, node ID and UTC timestamp
+	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
+	log := zerolog.New(os.Stderr).With().Timestamp().Str("node_id", nodeID).Logger()
+
+	// parse config log level and apply to logger
+	lvl, err := zerolog.ParseLevel(strings.ToLower(level))
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid log level")
+	}
+	log.Level(lvl)
 
 	log.Info().Msg("initializing engine modules")
 
-	// initialize the node identity list
-	com, err := committee.New(entries, identity)
+	db, err := badger.Open(badger.DefaultOptions(datadir).WithLogger(nil))
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not open key-value store")
+	}
+
+	state, err := protocol.NewState(db)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize flow committee")
+	}
+
+	var ids flow.IdentityList
+	for _, entry := range entries {
+		id, err := flow.ParseIdentity(entry)
+		if err != nil {
+			log.Fatal().Err(err).Str("entry", entry).Msg("could not parse identity")
+		}
+		ids = append(ids, id)
+	}
+
+	err = state.Mutate().Bootstrap(flow.Genesis(ids))
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not bootstrap protocol state")
+	}
+
+	var trueID flow.Identifier
+	copy(trueID[:], []byte(nodeID))
+	id, err := state.Final().Identity(trueID)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not get identity")
+	}
+
+	me, err := local.New(id)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not initialize local")
 	}
 
 	pool, err := mempool.New()
@@ -66,33 +112,19 @@ func main() {
 		log.Fatal().Err(err).Msg("could not initialize engine mempool")
 	}
 
-	log.Info().Msg("initializing network modules")
+	log.Info().Msg("initializing network stack")
 
-	codec := captain.NewCodec()
+	codec := json.NewCodec()
 
-	state, err := state.New()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize trickle state")
-	}
-
-	cache, err := cache.New()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize trickle cache")
-	}
-
-	mw, err := middleware.New(log, codec, connections, com.Me().Address)
+	mw, err := middleware.New(log, codec, connections, me.Address())
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize trickle middleware")
 	}
 
-	log.Info().Msg("initializing trickle network")
-
-	net, err := trickle.NewNetwork(log, codec, com, mw, state, cache)
+	net, err := trickle.NewNetwork(log, codec, state, me, mw)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize trickle network")
 	}
-
-	log.Info().Msg("starting trickle network")
 
 	select {
 	case <-net.Ready():
@@ -106,13 +138,10 @@ func main() {
 
 	log.Info().Msg("initializing propagation engine")
 
-	// initialize the propagation engines
-	prop, err := propagation.New(log, net, com, pool)
+	prop, err := propagation.New(log, net, state, me, pool)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize propagation engine")
 	}
-
-	log.Info().Msg("starting propagation engine")
 
 	select {
 	case <-prop.Ready():
@@ -124,15 +153,29 @@ func main() {
 		os.Exit(1)
 	}
 
+	log.Info().Msg("initializing coldstuff engine")
+
+	cold, err := coldstuff.New(log, net, state, me, pool)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not initialize coldstuff engine")
+	}
+
+	select {
+	case <-cold.Ready():
+		log.Info().Msg("coldstuff engine ready")
+	case <-time.After(timeout):
+		log.Fatal().Msg("could not start coldstuff engine")
+	case <-sig:
+		log.Warn().Msg("coldstuff engine start aborted")
+		os.Exit(1)
+	}
+
 	log.Info().Msg("initializing generator engine")
 
-	// initialize the fake collection generation
 	gen, err := generator.New(log, prop)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not initialize generator engine")
 	}
-
-	log.Info().Msg("starting generator engine")
 
 	select {
 	case <-gen.Ready():
@@ -141,23 +184,6 @@ func main() {
 		log.Fatal().Msg("could not start generator engine")
 	case <-sig:
 		log.Warn().Msg("generator engine start aborted")
-	}
-
-	cons, err := coldstuff.New(log, net, com, pool)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize coldstuff engine")
-	}
-
-	log.Info().Msg("starting coldstuff engine")
-
-	select {
-	case <-cons.Ready():
-		log.Info().Msg("coldstuff engine ready")
-	case <-time.After(timeout):
-		log.Fatal().Msg("could not start coldstuff engine")
-	case <-sig:
-		log.Warn().Msg("coldstuff engine start aborted")
-		os.Exit(1)
 	}
 
 	log.Info().Msg("flow consensus node startup complete")
@@ -180,7 +206,7 @@ func main() {
 	log.Info().Msg("stopping coldstuff engine")
 
 	select {
-	case <-cons.Done():
+	case <-cold.Done():
 		log.Info().Msg("coldstuff engine shutdown complete")
 	case <-time.After(timeout):
 		log.Fatal().Msg("could not stop coldstuff engine")
@@ -201,7 +227,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Info().Msg("stopping trickle network")
+	log.Info().Msg("stopping network stack")
 
 	select {
 	case <-net.Done():

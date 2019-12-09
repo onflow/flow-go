@@ -1,42 +1,57 @@
 import {
     ExtensionContext,
     window,
-    Terminal
+    Terminal,
+    StatusBarItem,
 } from "vscode";
-import {LanguageClient} from "vscode-languageclient";
 import {getConfig, handleConfigChanges, Config} from "./config";
-import {startServer} from "./language-server";
+import {LanguageServerAPI} from "./language-server";
 import {registerCommands} from "./commands";
 import {createTerminal} from "./terminal";
+import {createActiveAccountStatusBarItem, updateActiveAccountStatusBarItem} from "./status-bar";
 
 // The container for all data relevant to the extension.
 export type Extension = {
     config: Config
     ctx: ExtensionContext
-    client?: LanguageClient
-    terminal?: Terminal
+    api: LanguageServerAPI
+    terminal: Terminal
+    activeAccountStatusBarItem: StatusBarItem
 };
 
 // Called when the extension starts up. Reads config, starts the language
 // server, and registers command handlers.
 export function activate(ctx: ExtensionContext) {
-    const maybeConfig: Config | undefined = getConfig();
-    if (!maybeConfig) {
-        window.showWarningMessage("Missing required config");
+    let config: Config;
+    let terminal: Terminal;
+    let activeAccountStatusBarItem: StatusBarItem;
+    let api: LanguageServerAPI;
+
+    try {
+        config = getConfig();
+        terminal = createTerminal(ctx);
+        api = new LanguageServerAPI(ctx, config);
+        activeAccountStatusBarItem = createActiveAccountStatusBarItem();
+    } catch (err) {
+        window.showErrorMessage("Failed to activate extension: ", err);
+        return;
     }
-    const config = maybeConfig as Config;
     handleConfigChanges();
 
     const ext: Extension = {
         config: config,
         ctx: ctx,
+        api: api,
+        terminal: terminal,
+        activeAccountStatusBarItem: activeAccountStatusBarItem,
     };
 
-    ext.client = startServer(ext);
-    ext.terminal = createTerminal(ext);
-
-
     registerCommands(ext);
+    renderExtension(ext);
 }
 
 export function deactivate() {}
+
+export function renderExtension(ext: Extension) {
+    updateActiveAccountStatusBarItem(ext.activeAccountStatusBarItem, ext.config.activeAccount);
+}

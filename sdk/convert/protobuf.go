@@ -5,23 +5,22 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/proto/sdk/entities"
+	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")
 
-func MessageToBlockHeader(m *entities.BlockHeader) flow.BlockHeader {
-	return flow.BlockHeader{
-		Hash:              crypto.BytesToHash(m.GetHash()),
-		PreviousBlockHash: crypto.BytesToHash(m.GetPreviousBlockHash()),
-		Number:            m.GetNumber(),
+func MessageToBlockHeader(m *entities.BlockHeader) flow.Header {
+	return flow.Header{
+		Parent: m.GetPreviousBlockHash(),
+		Number: m.GetNumber(),
 	}
 }
 
-func BlockHeaderToMessage(b flow.BlockHeader) *entities.BlockHeader {
+func BlockHeaderToMessage(b flow.Header) *entities.BlockHeader {
 	return &entities.BlockHeader{
-		Hash:              b.Hash,
-		PreviousBlockHash: b.PreviousBlockHash,
+		Hash:              b.Hash(),
+		PreviousBlockHash: b.Parent,
 		Number:            b.Number,
 	}
 }
