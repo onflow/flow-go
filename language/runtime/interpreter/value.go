@@ -1411,13 +1411,14 @@ func ConvertUInt64(value Value) Value {
 // CompositeValue
 
 type CompositeValue struct {
-	Location   ast.Location
-	Identifier string
-	Kind       common.CompositeKind
-	Fields     map[string]Value
-	Functions  map[string]FunctionValue
-	Destructor *InterpretedFunctionValue
-	Owner      string
+	Location       ast.Location
+	Identifier     string
+	Kind           common.CompositeKind
+	Fields         map[string]Value
+	InjectedFields map[string]Value
+	Functions      map[string]FunctionValue
+	Destructor     *InterpretedFunctionValue
+	Owner          string
 }
 
 func init() {
@@ -1460,12 +1461,13 @@ func (v *CompositeValue) Copy() Value {
 	// NOTE: not copying functions or destructor – they are linked in
 
 	return &CompositeValue{
-		Location:   v.Location,
-		Identifier: v.Identifier,
-		Kind:       v.Kind,
-		Fields:     newFields,
-		Functions:  v.Functions,
-		Destructor: v.Destructor,
+		Location:       v.Location,
+		Identifier:     v.Identifier,
+		Kind:           v.Kind,
+		Fields:         newFields,
+		InjectedFields: v.InjectedFields,
+		Functions:      v.Functions,
+		Destructor:     v.Destructor,
 		// NOTE: new value has no owner
 		Owner: "",
 	}
@@ -1519,9 +1521,22 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 	}
 
 	// if composite was deserialized, dynamically link in the functions
+	// and get injected fields
+
 	if v.Functions == nil {
 		functions := interpreter.CompositeFunctions[v.Identifier]
 		v.Functions = functions
+	}
+
+	if v.InjectedFields == nil && interpreter.injectedCompositeFieldsHandler != nil {
+		v.InjectedFields = interpreter.injectedCompositeFieldsHandler(interpreter, v.Kind, v.Identifier)
+	}
+
+	if v.InjectedFields != nil {
+		value, ok = v.InjectedFields[name]
+		if ok {
+			return value
+		}
 	}
 
 	function, ok := v.Functions[name]
@@ -2354,7 +2369,7 @@ func NewAccountValue(address AddressValue) *CompositeValue {
 
 	return &CompositeValue{
 		Identifier: (&sema.AccountType{}).ID(),
-		Fields: map[string]Value{
+		InjectedFields: map[string]Value{
 			"address":   address,
 			"storage":   StorageValue{Identifier: storageIdentifier},
 			"published": PublishedValue{Identifier: storageIdentifier},
@@ -2369,7 +2384,7 @@ func NewPublicAccountValue(address AddressValue) *CompositeValue {
 
 	return &CompositeValue{
 		Identifier: (&sema.PublicAccountType{}).ID(),
-		Fields: map[string]Value{
+		InjectedFields: map[string]Value{
 			"address":   address,
 			"published": PublishedValue{Identifier: storageIdentifier},
 		},

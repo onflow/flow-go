@@ -135,7 +135,7 @@ func Test_exportability(t *testing.T) {
 						Identifier: "fieldA",
 						Pos:        position,
 					},
-					Type:            &IntType{},
+					TypeAnnotation:  &TypeAnnotation{Type: &IntType{}},
 					DeclarationKind: 0,
 					VariableKind:    ast.VariableKindVariable,
 					ArgumentLabels:  nil,

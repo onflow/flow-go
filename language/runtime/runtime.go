@@ -286,9 +286,35 @@ func (r *interpreterRuntime) newInterpreter(
 				runtimeStorage.writeValue(storageIdentifier, key, value)
 			},
 		),
-		interpreter.WithStorageKeyHandlerFunc(
+		interpreter.WithStorageKeyHandler(
 			func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
 				return indexingType.String()
+			},
+		),
+		interpreter.WithInjectedCompositeFieldsHandler(
+			func(inter *interpreter.Interpreter, compositeKind common.CompositeKind, _ string) map[string]interpreter.Value {
+				switch compositeKind {
+				case common.CompositeKindContract:
+					var address []byte
+
+					switch location := inter.Checker.Location.(type) {
+					case ast.AddressLocation:
+						address = location
+					case AddressLocation:
+						address = location
+
+					default:
+						return nil
+					}
+
+					addressLocation := interpreter.NewAddressValueFromBytes(address)
+
+					return map[string]interpreter.Value{
+						"account": interpreter.NewAccountValue(addressLocation),
+					}
+				}
+
+				return nil
 			},
 		),
 	)
