@@ -152,7 +152,7 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 	// conforms to – these are requirements that the composite declaration of the implementation
 	// of the containing interface must conform to.
 	//
-	// Thus, missing members are valid, but sill check that members that are declared as requirements
+	// Thus, missing members are valid, but still check that members that are declared as requirements
 	// match the members of the conformances (members in the interface)
 
 	checkMissingMembers := kind != ContainerKindInterface
