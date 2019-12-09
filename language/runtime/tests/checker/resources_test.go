@@ -615,7 +615,8 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
-				fmt.Sprintf(`
+				fmt.Sprintf(
+					`
                       %[1]s T {}
 
                       let test: ((): T) = fun (): T {
@@ -1894,18 +1895,11 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenBranch(t *testing.T) {
 }
 
 func TestCheckResourceNesting(t *testing.T) {
-
-	// TODO: add support for contracts
-
-	compositeKindPossibilities := []common.CompositeKind{
-		common.CompositeKindResource,
-		common.CompositeKindStructure,
-	}
 	interfacePossibilities := []bool{true, false}
 
-	for _, innerCompositeKind := range compositeKindPossibilities {
+	for _, innerCompositeKind := range common.CompositeKinds {
 		for _, innerIsInterface := range interfacePossibilities {
-			for _, outerCompositeKind := range compositeKindPossibilities {
+			for _, outerCompositeKind := range common.CompositeKinds {
 				for _, outerIsInterface := range interfacePossibilities {
 
 					testName := fmt.Sprintf(
@@ -2001,20 +1995,25 @@ func testResourceNesting(
 
 	_, err := ParseAndCheck(t, program)
 
-	// TODO: add support for non-structure / non-resource declarations
-
 	switch outerCompositeKind {
-	case common.CompositeKindStructure:
+	case common.CompositeKindStructure, common.CompositeKindContract:
 		switch innerCompositeKind {
-		case common.CompositeKindStructure:
+		case common.CompositeKindStructure, common.CompositeKindContract:
 			require.NoError(t, err)
+
 		case common.CompositeKindResource:
 			errs := ExpectCheckerErrors(t, err, 1)
 			assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[0])
+
+		default:
+			panic(errors.NewUnreachableError())
 		}
 
 	case common.CompositeKindResource:
 		require.NoError(t, err)
+
+	default:
+		panic(errors.NewUnreachableError())
 	}
 }
 
@@ -2672,13 +2671,6 @@ func TestCheckResourceParameterInInterfaceNoResourceLossError(t *testing.T) {
 	}
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contract interface declarations
-
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
 		for _, declarationKind := range declarationKinds {
 			for _, hasCondition := range []bool{true, false} {
 

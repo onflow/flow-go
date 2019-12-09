@@ -127,12 +127,6 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 		ContainerKindComposite,
 	)
 
-	checker.checkCompositeDeclarationSupport(
-		declaration.CompositeKind,
-		declaration.DeclarationKind(),
-		declaration.Identifier,
-	)
-
 	for _, nestedDeclaration := range nestedDeclarations {
 		nestedDeclaration.Accept(checker)
 	}
@@ -250,30 +244,6 @@ func (checker *Checker) visitNestedDeclarations(
 	}
 
 	return
-}
-
-func (checker *Checker) checkCompositeDeclarationSupport(
-	compositeKind common.CompositeKind,
-	declarationKind common.DeclarationKind,
-	identifier ast.Identifier,
-) {
-	switch compositeKind {
-	case common.CompositeKindStructure, common.CompositeKindResource:
-		break
-	default:
-		if declarationKind != common.DeclarationKindContractInterface {
-			return
-		}
-
-		// TODO: add support for contract interfaces
-
-		checker.report(
-			&UnsupportedDeclarationError{
-				DeclarationKind: declarationKind,
-				Range:           ast.NewRangeFromPositioned(identifier),
-			},
-		)
-	}
 }
 
 func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDeclaration) *CompositeType {

@@ -45,28 +45,12 @@ func TestCheckCompositeDeclarationNesting(t *testing.T) {
 
 							switch innerComposite {
 							case common.CompositeKindContract:
-								if outerIsInterface {
-									errs := ExpectCheckerErrors(t, err, 2)
+								errs := ExpectCheckerErrors(t, err, 1)
 
-									assert.IsType(t, &sema.InvalidNestedDeclarationError{}, errs[0])
-									assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-
-								} else if !innerIsInterface {
-									errs := ExpectCheckerErrors(t, err, 1)
-
-									assert.IsType(t, &sema.InvalidNestedDeclarationError{}, errs[0])
-								}
+								assert.IsType(t, &sema.InvalidNestedDeclarationError{}, errs[0])
 
 							case common.CompositeKindResource, common.CompositeKindStructure:
-								// TODO: add support for contract interfaces
-
-								if outerIsInterface {
-									errs := ExpectCheckerErrors(t, err, 1)
-
-									assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-								} else {
-									require.NoError(t, err)
-								}
+								require.NoError(t, err)
 
 							default:
 								t.Errorf("unknown outer composite kind %s", outerComposite)

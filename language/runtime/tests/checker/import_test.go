@@ -168,20 +168,7 @@ func TestCheckImportTypes(t *testing.T) {
 				),
 			)
 
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			case common.CompositeKindContract:
-				// TODO: add support for contract interfaces
-
-				errs := ExpectCheckerErrors(t, err, 1)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-			default:
-				panic(errors.NewUnreachableError())
-			}
+			require.NoError(t, err)
 
 			_, err = ParseAndCheckWithOptions(t,
 				fmt.Sprintf(
@@ -205,21 +192,13 @@ func TestCheckImportTypes(t *testing.T) {
 			)
 
 			switch kind {
-			case common.CompositeKindStructure:
+			case common.CompositeKindStructure, common.CompositeKindContract:
 				require.NoError(t, err)
 
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.CreateImportedResourceError{}, errs[0])
-
-			case common.CompositeKindContract:
-				errs := ExpectCheckerErrors(t, err, 4)
-
-				assert.IsType(t, &sema.ImportedProgramError{}, errs[0])
-				assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
-				assert.IsType(t, &sema.NotDeclaredError{}, errs[2])
-				assert.IsType(t, &sema.NotDeclaredError{}, errs[3])
 
 			default:
 				panic(errors.NewUnreachableError())
