@@ -458,3 +458,32 @@ func TestCheckFieldInitializationWithPotentialNeverCallInElse(t *testing.T) {
 
 	require.NoError(t, err)
 }
+
+func TestCheckFieldInitializationWithPotentialNeverCallInNilCoalescing(t *testing.T) {
+
+	code := `
+      struct Test {
+          let foo: Int
+
+          init(foo: Int?) {
+              self.foo = foo ?? panic("no x")
+          }
+      }
+    `
+	_, err := ParseAndCheckWithOptions(
+		t,
+		code,
+		ParseAndCheckOptions{
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.PanicFunction,
+					}.ToValueDeclarations(),
+				),
+				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+			},
+		},
+	)
+
+	require.NoError(t, err)
+}
