@@ -1025,7 +1025,9 @@ func (checker *Checker) checkResourceFieldNesting(
 	}
 
 	for name, member := range members {
-		if !member.Type.IsResourceType() {
+		// NOTE: check type, not move annotation:
+		// the field could have a wrong annotation
+		if !member.TypeAnnotation.Type.IsResourceType() {
 			continue
 		}
 
@@ -1258,4 +1260,28 @@ func (checker *Checker) withSelfResourceInvalidationAllowed(f func()) {
 	}()
 
 	f()
+}
+  
+func (checker *Checker) predeclaredMembers(containerType Type) []*Member {
+	var predeclaredMembers []*Member
+
+	// Contracts have a predeclared `account: Account` field
+
+	if compositeType, ok := containerType.(*CompositeType); ok &&
+		compositeType.Kind == common.CompositeKindContract {
+
+		predeclaredMembers = append(predeclaredMembers,
+			&Member{
+				Predeclared:     true,
+				ContainerType:   compositeType,
+				Access:          ast.AccessPrivate,
+				Identifier:      ast.Identifier{Identifier: "account"},
+				TypeAnnotation:  &TypeAnnotation{Type: &AccountType{}},
+				DeclarationKind: common.DeclarationKindField,
+				VariableKind:    ast.VariableKindConstant,
+			},
+		)
+	}
+
+	return predeclaredMembers
 }

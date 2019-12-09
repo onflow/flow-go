@@ -1429,9 +1429,9 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
 
 			testFunctionMember := structureType.Members["test"]
 
-			assert.IsType(t, &sema.FunctionType{}, testFunctionMember.Type)
+			assert.IsType(t, &sema.FunctionType{}, testFunctionMember.TypeAnnotation.Type)
 
-			testFunctionType := testFunctionMember.Type.(*sema.FunctionType)
+			testFunctionType := testFunctionMember.TypeAnnotation.Type.(*sema.FunctionType)
 
 			actual := testFunctionType.ReturnTypeAnnotation.Type
 			if actual != structureType {

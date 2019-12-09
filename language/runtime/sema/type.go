@@ -354,14 +354,16 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					&StringType{},
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&StringType{},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						&StringType{},
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&StringType{},
+					),
+				},
+			),
 		})
 
 	case "slice":
@@ -371,15 +373,17 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					&IntType{},
-					&IntType{},
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&StringType{},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						&IntType{},
+						&IntType{},
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&StringType{},
+					),
+				},
+			),
 			ArgumentLabels: []string{"from", "upTo"},
 		})
 
@@ -390,7 +394,7 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
-			Type:            &IntType{},
+			TypeAnnotation:  NewTypeAnnotation(&IntType{}),
 		})
 
 	default:
@@ -843,14 +847,16 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					elementType,
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&VoidType{},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						elementType,
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&VoidType{},
+					),
+				},
+			),
 		})
 
 	case "concat":
@@ -884,12 +890,14 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: []*TypeAnnotation{
-					typeAnnotation,
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: []*TypeAnnotation{
+						typeAnnotation,
+					},
+					ReturnTypeAnnotation: typeAnnotation,
 				},
-				ReturnTypeAnnotation: typeAnnotation,
-			},
+			),
 		})
 
 	case "insert":
@@ -908,15 +916,17 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					&IntegerType{},
-					elementType,
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&VoidType{},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						&IntegerType{},
+						elementType,
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&VoidType{},
+					),
+				},
+			),
 			ArgumentLabels: []string{"at", ArgumentLabelNotRequired},
 		})
 
@@ -936,14 +946,16 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					&IntegerType{},
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					elementType,
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						&IntegerType{},
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						elementType,
+					),
+				},
+			),
 			ArgumentLabels: []string{"at"},
 		})
 
@@ -963,11 +975,13 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					elementType,
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						elementType,
+					),
+				},
+			),
 		})
 
 	case "removeLast":
@@ -986,11 +1000,13 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					elementType,
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						elementType,
+					),
+				},
+			),
 		})
 
 	case "contains":
@@ -1026,14 +1042,16 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					elementType,
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&BoolType{},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						elementType,
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&BoolType{},
+					),
+				},
+			),
 		})
 
 	case "length":
@@ -1043,7 +1061,7 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
-			Type:            &IntType{},
+			TypeAnnotation:  NewTypeAnnotation(&IntType{}),
 		})
 
 	default:
@@ -1579,7 +1597,7 @@ func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.T
 		for name, field := range t.Members {
 			fieldTypes[name] = &types.Field{
 				Identifier: name,
-				Type:       field.Type.(ExportableType).Export(program, nil),
+				Type:       field.TypeAnnotation.Type.(ExportableType).Export(program, nil),
 			}
 		}
 
@@ -1686,7 +1704,7 @@ func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
 			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &AddressType{},
+			TypeAnnotation:  NewTypeAnnotation(&AddressType{}),
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 		})
@@ -1696,7 +1714,7 @@ func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
 			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &StorageType{},
+			TypeAnnotation:  NewTypeAnnotation(&StorageType{}),
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 		})
@@ -1706,7 +1724,7 @@ func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
 			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &ReferencesType{Assignable: true},
+			TypeAnnotation:  NewTypeAnnotation(&ReferencesType{Assignable: true}),
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 		})
@@ -1754,7 +1772,7 @@ func (t *PublicAccountType) GetMember(identifier string, _ ast.Range, _ func(err
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
 			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &AddressType{},
+			TypeAnnotation:  NewTypeAnnotation(&AddressType{}),
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 		})
@@ -1764,7 +1782,7 @@ func (t *PublicAccountType) GetMember(identifier string, _ ast.Range, _ func(err
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
 			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &ReferencesType{Assignable: false},
+			TypeAnnotation:  NewTypeAnnotation(&ReferencesType{Assignable: false}),
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 		})
@@ -1780,10 +1798,12 @@ type Member struct {
 	ContainerType   Type
 	Access          ast.Access
 	Identifier      ast.Identifier
-	Type            Type
+	TypeAnnotation  *TypeAnnotation
 	DeclarationKind common.DeclarationKind
 	VariableKind    ast.VariableKind
 	ArgumentLabels  []string
+	// Predeclared fields can be considered initialized
+	Predeclared bool
 }
 
 // NewCheckedMember panics if the member declaration is invalid.
@@ -1805,7 +1825,7 @@ func NewCheckedMember(member *Member) *Member {
 		))
 	}
 
-	if invokableType, ok := member.Type.(InvokableType); ok {
+	if invokableType, ok := member.TypeAnnotation.Type.(InvokableType); ok {
 		functionType := invokableType.InvocationFunctionType()
 
 		if member.ArgumentLabels != nil &&
@@ -1964,7 +1984,7 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
-			Type:            &IntType{},
+			TypeAnnotation:  NewTypeAnnotation(&IntType{}),
 		})
 
 	case "keys":
@@ -1986,7 +2006,9 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
-			Type:            &VariableSizedType{Type: t.KeyType},
+			TypeAnnotation: NewTypeAnnotation(
+				&VariableSizedType{Type: t.KeyType},
+			),
 		})
 
 	case "values":
@@ -2008,7 +2030,9 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
-			Type:            &VariableSizedType{Type: t.ValueType},
+			TypeAnnotation: NewTypeAnnotation(
+				&VariableSizedType{Type: t.ValueType},
+			),
 		})
 
 	case "insert":
@@ -2018,17 +2042,19 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					t.KeyType,
-					t.ValueType,
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&OptionalType{
-						Type: t.ValueType,
-					},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						t.KeyType,
+						t.ValueType,
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&OptionalType{
+							Type: t.ValueType,
+						},
+					),
+				},
+			),
 			ArgumentLabels: []string{"key", ArgumentLabelNotRequired},
 		})
 
@@ -2039,16 +2065,18 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					t.KeyType,
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&OptionalType{
-						Type: t.ValueType,
-					},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						t.KeyType,
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&OptionalType{
+							Type: t.ValueType,
+						},
+					),
+				},
+			),
 			ArgumentLabels: []string{"key"},
 		})
 

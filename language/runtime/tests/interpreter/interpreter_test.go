@@ -4924,7 +4924,7 @@ func TestInterpretStorage(t *testing.T) {
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
-				interpreter.WithStorageKeyHandlerFunc(
+				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
 						return indexingType.String()
 					},
@@ -5456,7 +5456,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 				interpreter.WithPredefinedValues(map[string]interpreter.Value{
 					"storage": storageValue,
 				}),
-				interpreter.WithStorageKeyHandlerFunc(
+				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
 						return indexingType.String()
 					},
@@ -5553,7 +5553,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
-				interpreter.WithStorageKeyHandlerFunc(
+				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
 						return indexingType.String()
 					},
@@ -5636,7 +5636,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
-				interpreter.WithStorageKeyHandlerFunc(
+				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
 						return indexingType.String()
 					},
@@ -5705,7 +5705,7 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
-				interpreter.WithStorageKeyHandlerFunc(
+				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
 						return indexingType.String()
 					},
@@ -6073,7 +6073,7 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
-				interpreter.WithStorageKeyHandlerFunc(
+				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
 						return indexingType.String()
 					},
@@ -6212,7 +6212,7 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 				}),
 				interpreter.WithStorageReadHandler(getter),
 				interpreter.WithStorageWriteHandler(setter),
-				interpreter.WithStorageKeyHandlerFunc(
+				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
 						return indexingType.String()
 					},
@@ -6510,5 +6510,54 @@ func TestInterpretFungibleTokenContract(t *testing.T) {
 			interpreter.NewIntValue(60),
 		),
 		value,
+	)
+}
+
+func TestInterpretContractAccountFieldUse(t *testing.T) {
+
+	code := `
+      pub contract Test {
+          pub let address: Address
+
+          init() {
+              // field 'account' can be used, as it is considered initialized
+              self.address = self.account.address
+          }
+
+          pub fun test(): Address {
+              return self.account.address
+          }
+      }
+
+      pub let address1 = Test().address
+      pub let address2 = Test().test()
+    `
+
+	addressValue := interpreter.AddressValue{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+	}
+
+	inter := parseCheckAndInterpretWithOptions(t, code,
+		ParseCheckAndInterpretOptions{
+			Options: []interpreter.Option{
+				interpreter.WithInjectedCompositeFieldsHandler(
+					func(_ *interpreter.Interpreter, _ common.CompositeKind, _ string) map[string]interpreter.Value {
+						return map[string]interpreter.Value{
+							"account": interpreter.NewAccountValue(addressValue),
+						}
+					},
+				),
+			},
+		},
+	)
+
+	assert.Equal(t,
+		addressValue,
+		inter.Globals["address1"].Value,
+	)
+
+	assert.Equal(t,
+		addressValue,
+		inter.Globals["address2"].Value,
 	)
 }
