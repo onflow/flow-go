@@ -677,12 +677,12 @@ func (v *ProgramVisitor) VisitDictionaryType(ctx *DictionaryTypeContext) interfa
 }
 
 func (v *ProgramVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interface{} {
-	move := ctx.Move() != nil
+	isResource := ctx.ResourceAnnotation() != nil
 	fullType := ctx.FullType().Accept(v).(ast.Type)
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.TypeAnnotation{
-		Move:     move,
+		Move:     isResource,
 		Type:     fullType,
 		StartPos: startPosition,
 	}
