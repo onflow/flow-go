@@ -401,6 +401,67 @@ func TestCheckVariableDeclarationSecondValueNil(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestCheckTopLevelContractRestriction(t *testing.T) {
+
+	_, err := ParseAndCheckWithOptions(t,
+		`
+          contract C {}
+        `,
+		ParseAndCheckOptions{
+			Options: []sema.Option{
+				sema.WithValidTopLevelDeclarations(
+					[]common.DeclarationKind{
+						common.DeclarationKindContract,
+						common.DeclarationKindImport,
+					},
+				),
+				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+			},
+		},
+	)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidTopLevelContractRestriction(t *testing.T) {
+
+	tests := map[string]string{
+		"resource":           `resource Test {}`,
+		"struct":             `struct Test {}`,
+		"resource interface": `resource interface Test {}`,
+		"struct interface":   `struct interface Test {}`,
+		"event":              `event Test()`,
+		"function":           `fun test() {}`,
+		"transaction":        `transaction { execute {} }`,
+		"constant":           `var x = 1`,
+		"variable":           `let x = 1`,
+	}
+
+	for name, code := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := ParseAndCheckWithOptions(t,
+				code,
+				ParseAndCheckOptions{
+					Options: []sema.Option{
+						sema.WithValidTopLevelDeclarations(
+							[]common.DeclarationKind{
+								common.DeclarationKindContractInterface,
+								common.DeclarationKindContract,
+								common.DeclarationKindImport,
+							},
+						),
+						sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+					},
+				},
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidTopLevelDeclarationError{}, errs[0])
+		})
+	}
+}
+
 func TestCheckInvalidLocalDeclarations(t *testing.T) {
 
 	tests := map[string]string{
@@ -451,6 +512,7 @@ func TestCheckInvalidLocalDeclarations(t *testing.T) {
 			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+
 		})
 	}
 }

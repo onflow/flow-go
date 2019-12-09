@@ -456,7 +456,11 @@ func (interpreter *Interpreter) visitGlobalDeclaration(declaration ast.Declarati
 }
 
 func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
-	name := declaration.DeclarationIdentifier().Identifier
+	identifier := declaration.DeclarationIdentifier()
+	if identifier == nil {
+		return
+	}
+	name := identifier.Identifier
 	// NOTE: semantic analysis already checked possible invalid redeclaration
 	interpreter.Globals[name] = interpreter.findVariable(name)
 }

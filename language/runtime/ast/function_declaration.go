@@ -32,8 +32,8 @@ func (f *FunctionDeclaration) Accept(visitor Visitor) Repr {
 func (*FunctionDeclaration) isDeclaration() {}
 func (*FunctionDeclaration) isStatement()   {}
 
-func (f *FunctionDeclaration) DeclarationIdentifier() Identifier {
-	return f.Identifier
+func (f *FunctionDeclaration) DeclarationIdentifier() *Identifier {
+	return &f.Identifier
 }
 
 func (f *FunctionDeclaration) DeclarationKind() common.DeclarationKind {
