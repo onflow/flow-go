@@ -177,15 +177,17 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 
 	// NOTE: check destructors after initializer and functions
 
-	checker.checkDestructors(
-		declaration.Members.Destructors(),
-		declaration.Members.FieldsByIdentifier(),
-		compositeType.Members,
-		compositeType,
-		declaration.DeclarationKind(),
-		declaration.Identifier.Identifier,
-		kind,
-	)
+	checker.withSelfResourceInvalidationAllowed(func() {
+		checker.checkDestructors(
+			declaration.Members.Destructors(),
+			declaration.Members.FieldsByIdentifier(),
+			compositeType.Members,
+			compositeType,
+			declaration.DeclarationKind(),
+			declaration.Identifier.Identifier,
+			kind,
+		)
+	})
 
 	// NOTE: visit interfaces first
 	// DON'T use `nestedDeclarations`, because of non-deterministic order
@@ -904,7 +906,6 @@ func (checker *Checker) checkInitializers(
 		initializer,
 		containerType,
 		containerDeclarationKind,
-		containerTypeIdentifier,
 		initializerParameterTypeAnnotations,
 		containerKind,
 		initializationInfo,
@@ -940,7 +941,6 @@ func (checker *Checker) checkSpecialFunction(
 	specialFunction *ast.SpecialFunctionDeclaration,
 	containerType Type,
 	containerDeclarationKind common.DeclarationKind,
-	typeIdentifier string,
 	parameterTypeAnnotations []*TypeAnnotation,
 	containerKind ContainerKind,
 	initializationInfo *InitializationInfo,
@@ -1271,7 +1271,6 @@ func (checker *Checker) checkDestructor(
 		destructor,
 		containerType,
 		containerDeclarationKind,
-		containerTypeIdentifier,
 		parameterTypeAnnotations,
 		containerKind,
 		nil,

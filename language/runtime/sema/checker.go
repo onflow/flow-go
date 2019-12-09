@@ -32,33 +32,34 @@ var beforeType = &FunctionType{
 // Checker
 
 type Checker struct {
-	Program                   *ast.Program
-	Location                  ast.Location
-	PredeclaredValues         map[string]ValueDeclaration
-	PredeclaredTypes          map[string]TypeDeclaration
-	ImportCheckers            map[ast.LocationID]*Checker
-	AccessCheckMode           AccessCheckMode
-	errors                    []error
-	valueActivations          *VariableActivations
-	resources                 *Resources
-	typeActivations           *VariableActivations
-	containerTypes            map[Type]bool
-	functionActivations       *FunctionActivations
-	GlobalValues              map[string]*Variable
-	GlobalTypes               map[string]*Variable
-	TransactionTypes          []*TransactionType
-	inCondition               bool
-	Occurrences               *Occurrences
-	variableOrigins           map[*Variable]*Origin
-	memberOrigins             map[Type]map[string]*Origin
-	seenImports               map[ast.LocationID]bool
-	isChecked                 bool
-	inCreate                  bool
-	inInvocation              bool
-	inAssignment              bool
-	Elaboration               *Elaboration
-	currentMemberExpression   *ast.MemberExpression
-	ValidTopLevelDeclarations []common.DeclarationKind
+	Program                            *ast.Program
+	Location                           ast.Location
+	PredeclaredValues                  map[string]ValueDeclaration
+	PredeclaredTypes                   map[string]TypeDeclaration
+	ImportCheckers                     map[ast.LocationID]*Checker
+	AccessCheckMode                    AccessCheckMode
+	errors                             []error
+	valueActivations                   *VariableActivations
+	resources                          *Resources
+	typeActivations                    *VariableActivations
+	containerTypes                     map[Type]bool
+	functionActivations                *FunctionActivations
+	GlobalValues                       map[string]*Variable
+	GlobalTypes                        map[string]*Variable
+	TransactionTypes                   []*TransactionType
+	inCondition                        bool
+	Occurrences                        *Occurrences
+	variableOrigins                    map[*Variable]*Origin
+	memberOrigins                      map[Type]map[string]*Origin
+	seenImports                        map[ast.LocationID]bool
+	isChecked                          bool
+	inCreate                           bool
+	inInvocation                       bool
+	inAssignment                       bool
+	allowSelfResourceFieldInvalidation bool
+	Elaboration                        *Elaboration
+	currentMemberExpression            *ast.MemberExpression
+	ValidTopLevelDeclarations          []common.DeclarationKind
 }
 
 type Option func(*Checker) error
@@ -883,13 +884,11 @@ func (checker *Checker) recordResourceInvalidation(
 		)
 	}
 
-	// TODO: improve handling of `self`: only allow invalidation once
-
 	accessedSelfMember := checker.accessedSelfMember(expression)
 
 	switch expression.(type) {
 	case *ast.MemberExpression:
-		if accessedSelfMember == nil {
+		if accessedSelfMember == nil || !checker.allowSelfResourceFieldInvalidation {
 			reportInvalidNestedMove()
 			return
 		}
@@ -905,7 +904,7 @@ func (checker *Checker) recordResourceInvalidation(
 		EndPos:   expression.EndPosition(),
 	}
 
-	if accessedSelfMember != nil {
+	if checker.allowSelfResourceFieldInvalidation && accessedSelfMember != nil {
 		checker.resources.AddInvalidation(accessedSelfMember, invalidation)
 		return
 	}
@@ -1253,6 +1252,16 @@ func (checker *Checker) isWriteableAccess(access ast.Access) bool {
 	}
 }
 
+func (checker *Checker) withSelfResourceInvalidationAllowed(f func()) {
+	allowSelfResourceFieldInvalidation := checker.allowSelfResourceFieldInvalidation
+	checker.allowSelfResourceFieldInvalidation = true
+	defer func() {
+		checker.allowSelfResourceFieldInvalidation = allowSelfResourceFieldInvalidation
+	}()
+
+	f()
+}
+  
 func (checker *Checker) predeclaredMembers(containerType Type) []*Member {
 	var predeclaredMembers []*Member
 

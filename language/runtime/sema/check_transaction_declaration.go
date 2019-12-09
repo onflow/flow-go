@@ -36,7 +36,11 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 
 	checker.visitTransactionPrepareFunction(declaration.Prepare, transactionType, fieldMembers)
 	checker.visitTransactionPreConditions(declaration.PreConditions)
-	checker.visitTransactionExecuteFunction(declaration.Execute, transactionType)
+
+	checker.withSelfResourceInvalidationAllowed(func() {
+		checker.visitTransactionExecuteFunction(declaration.Execute, transactionType)
+	})
+
 	checker.visitTransactionPostConditions(declaration.PostConditions)
 
 	checker.checkResourceFieldsInvalidated(transactionType.String(), transactionType.Members)
