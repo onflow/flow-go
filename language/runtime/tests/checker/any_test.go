@@ -51,10 +51,11 @@ func TestCheckInvalidAnyResourceNonResourceType(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource R {}
 
-      let a: AnyStruct = create R()
+      let a: AnyStruct <- create R()
     `)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[1])
 }
