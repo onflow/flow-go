@@ -64,8 +64,16 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 	for name, nestedType := range compositeType.NestedTypes {
 		nestedDeclaration := nestedDeclarations[name]
 
+		identifier := nestedDeclaration.DeclarationIdentifier()
+		if identifier == nil {
+			// It should be impossible to have a nested declaration
+			// that does not have an identifier
+
+			panic(errors.NewUnreachableError())
+		}
+
 		_, err := checker.typeActivations.DeclareType(
-			nestedDeclaration.DeclarationIdentifier(),
+			*identifier,
 			nestedType,
 			nestedDeclaration.DeclarationKind(),
 			nestedDeclaration.DeclarationAccess(),

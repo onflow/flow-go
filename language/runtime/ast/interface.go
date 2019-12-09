@@ -28,8 +28,8 @@ func (*InterfaceDeclaration) isDeclaration() {}
 //
 func (*InterfaceDeclaration) isStatement() {}
 
-func (d *InterfaceDeclaration) DeclarationIdentifier() Identifier {
-	return d.Identifier
+func (d *InterfaceDeclaration) DeclarationIdentifier() *Identifier {
+	return &d.Identifier
 }
 
 func (d *InterfaceDeclaration) DeclarationAccess() Access {

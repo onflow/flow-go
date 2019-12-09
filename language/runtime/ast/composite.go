@@ -29,8 +29,8 @@ func (*CompositeDeclaration) isDeclaration() {}
 //
 func (*CompositeDeclaration) isStatement() {}
 
-func (d *CompositeDeclaration) DeclarationIdentifier() Identifier {
-	return d.Identifier
+func (d *CompositeDeclaration) DeclarationIdentifier() *Identifier {
+	return &d.Identifier
 }
 
 func (d *CompositeDeclaration) DeclarationKind() common.DeclarationKind {
@@ -66,8 +66,8 @@ func (f *FieldDeclaration) Accept(visitor Visitor) Repr {
 
 func (*FieldDeclaration) isDeclaration() {}
 
-func (f *FieldDeclaration) DeclarationIdentifier() Identifier {
-	return f.Identifier
+func (f *FieldDeclaration) DeclarationIdentifier() *Identifier {
+	return &f.Identifier
 }
 
 func (f *FieldDeclaration) DeclarationKind() common.DeclarationKind {
