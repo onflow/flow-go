@@ -5,7 +5,7 @@ import (
 	"context"
 
 	"github.com/dapperlabs/flow-go/network/gossip/registry"
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 // Mode defines mode of the gossip based on the set of recipients

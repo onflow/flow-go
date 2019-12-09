@@ -1839,18 +1839,6 @@ func (e *InvalidTransactionBlockError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
-// TransactionMissingExecuteError
-
-type TransactionMissingExecuteError struct {
-	ast.Range
-}
-
-func (e *TransactionMissingExecuteError) Error() string {
-	return "transaction missing an execute block"
-}
-
-func (*TransactionMissingExecuteError) isSemanticError() {}
-
 // TransactionMissingPrepareError
 
 type TransactionMissingPrepareError struct {
@@ -1944,7 +1932,7 @@ type InvalidNestedTypeError struct {
 }
 
 func (e *InvalidNestedTypeError) Error() string {
-	return fmt.Sprintf("type has no nested types: `%s`", e.Type)
+	return fmt.Sprintf("type does not support nested types: `%s`", e.Type)
 }
 
 func (*InvalidNestedTypeError) isSemanticError() {}
@@ -1982,3 +1970,19 @@ func (e *DeclarationKindMismatchError) SecondaryError() string {
 		e.ActualDeclarationKind.Name(),
 	)
 }
+
+// InvalidTopLevelDeclarationError
+
+type InvalidTopLevelDeclarationError struct {
+	DeclarationKind common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidTopLevelDeclarationError) Error() string {
+	return fmt.Sprintf(
+		"%s declarations are not valid at the top-level",
+		e.DeclarationKind.Name(),
+	)
+}
+
+func (*InvalidTopLevelDeclarationError) isSemanticError() {}

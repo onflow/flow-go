@@ -49,10 +49,13 @@ func FisherYatesShuffle(seed []uint64, subset int, items []exec.Chunk) []exec.Ch
 func ChunkSelfSelect(er exec.ExecutionResult, checkRatio float64, sk crypto.PrivateKey) (selectedchunks []exec.Chunk, proof []byte, err error) {
 	// hasher Hasher
 	hasher, err := crypto.NewHasher(crypto.SHA3_256)
+	if err != nil {
+		return nil, nil, errors.New("failed to load hasher")
+	}
 	temp := er.Hash()
 	proof, err = sk.Sign(temp, hasher)
 	if err != nil {
-		return nil, nil, errors.New("failed to load hasher")
+		return nil, nil, errors.New("failed to generate proof")
 	}
 	seed, _ := SeedPrep(proof)
 	n := int(math.Ceil(float64(len(er.Chunks)) * checkRatio))
@@ -69,6 +72,9 @@ func VerifyChunkSelfSelect(er exec.ExecutionResult, checkRatio float64, pk crypt
 	}
 	temp := er.Hash()
 	result, err := pk.Verify(proof, temp, hasher)
+	if err != nil {
+		return false, errors.New("failed to verify proof")
+	}
 	if !result {
 		return false, nil
 	}

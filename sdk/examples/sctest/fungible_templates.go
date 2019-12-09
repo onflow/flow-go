@@ -26,8 +26,6 @@ func GenerateCreateTokenScript(tokenAddr flow.Address, initialBalance int) []byt
 
 			destroy vaultA
 		  }
-
-		  execute {}
 		}
 	`
 	return []byte(fmt.Sprintf(template, tokenAddr, initialBalance))
@@ -58,8 +56,6 @@ func GenerateCreateThreeTokensArrayScript(tokenAddr flow.Address, initialBalance
 
 			destroy storedVaults
 		  }
-
-		  execute {}
 		}
 	`
 	return []byte(fmt.Sprintf(template, tokenAddr, initialBalance, bal2, bal3))
@@ -83,7 +79,6 @@ func GenerateWithdrawScript(tokenCodeAddr flow.Address, vaultNumber int, withdra
 			destroy withdrawVault
 			destroy storedVaults
 		  }
-		  execute {}
 		}
 	`
 
@@ -110,7 +105,6 @@ func GenerateWithdrawDepositScript(tokenCodeAddr flow.Address, withdrawVaultNumb
 
 			destroy storedVaults
 		  }
-		  execute {}
 		}
 	`
 
@@ -134,8 +128,6 @@ func GenerateDepositVaultScript(tokenCodeAddr flow.Address, receiverAddr flow.Ad
 
 			receiverRef.deposit(from: <-tokens)
 		  }
-
-		  execute {}
 		}
 	`
 
@@ -158,8 +150,6 @@ func GenerateTransferVaultScript(tokenCodeAddr flow.Address, receiverAddr flow.A
 
 			providerRef.transfer(to: receiverRef, amount: %d)
 		  }
-
-		  execute {}
 		}
 	`
 
@@ -180,8 +170,6 @@ func GenerateInvalidTransferSenderScript(tokenCodeAddr flow.Address, receiverAdd
 
 			receiverRef.transfer(to: receiverRef, amount: %d)
 		  }
-
-		  execute {}
 		}
 	`
 
@@ -203,8 +191,6 @@ func GenerateInvalidTransferReceiverScript(tokenCodeAddr flow.Address, receiverA
 
 			providerRef.transfer(to: providerRef, amount: %d)
 		  }
-
-		  execute {}
 		}
 	`
 

@@ -49,8 +49,16 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 	for name, nestedType := range interfaceType.NestedTypes {
 		nestedDeclaration := nestedDeclarations[name]
 
+		identifier := nestedDeclaration.DeclarationIdentifier()
+		if identifier == nil {
+			// It should be impossible to have a nested declaration
+			// that does not have an identifier
+
+			panic(errors.NewUnreachableError())
+		}
+
 		_, err := checker.typeActivations.DeclareType(
-			nestedDeclaration.DeclarationIdentifier(),
+			*identifier,
 			nestedType,
 			nestedDeclaration.DeclarationKind(),
 			nestedDeclaration.DeclarationAccess(),
@@ -144,7 +152,6 @@ func (checker *Checker) checkInterfaceFunctions(
 			checker.enterValueScope()
 			defer checker.leaveValueScope(false)
 
-			// NOTE: required for
 			checker.declareSelfValue(selfType)
 
 			checker.visitFunctionDeclaration(

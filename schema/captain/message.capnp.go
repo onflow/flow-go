@@ -20,17 +20,13 @@ const (
 	Message_Which_request              Message_Which = 4
 	Message_Which_response             Message_Which = 5
 	Message_Which_guaranteedCollection Message_Which = 6
-	Message_Which_snapshotRequest      Message_Which = 7
-	Message_Which_snapshotResponse     Message_Which = 8
-	Message_Which_mempoolRequest       Message_Which = 9
-	Message_Which_mempoolResponse      Message_Which = 10
-	Message_Which_blockProposal        Message_Which = 11
-	Message_Which_blockVote            Message_Which = 12
-	Message_Which_blockCommit          Message_Which = 13
+	Message_Which_blockProposal        Message_Which = 7
+	Message_Which_blockVote            Message_Which = 8
+	Message_Which_blockCommit          Message_Which = 9
 )
 
 func (w Message_Which) String() string {
-	const s = "authpingpongannouncerequestresponseguaranteedCollectionsnapshotRequestsnapshotResponsemempoolRequestmempoolResponseblockProposalblockVoteblockCommit"
+	const s = "authpingpongannouncerequestresponseguaranteedCollectionblockProposalblockVoteblockCommit"
 	switch w {
 	case Message_Which_auth:
 		return s[0:4]
@@ -46,20 +42,12 @@ func (w Message_Which) String() string {
 		return s[27:35]
 	case Message_Which_guaranteedCollection:
 		return s[35:55]
-	case Message_Which_snapshotRequest:
-		return s[55:70]
-	case Message_Which_snapshotResponse:
-		return s[70:86]
-	case Message_Which_mempoolRequest:
-		return s[86:100]
-	case Message_Which_mempoolResponse:
-		return s[100:115]
 	case Message_Which_blockProposal:
-		return s[115:128]
+		return s[55:68]
 	case Message_Which_blockVote:
-		return s[128:137]
+		return s[68:77]
 	case Message_Which_blockCommit:
-		return s[137:148]
+		return s[77:88]
 
 	}
 	return "Message_Which(" + strconv.FormatUint(uint64(w), 10) + ")"
@@ -322,140 +310,8 @@ func (s Message) NewGuaranteedCollection() (GuaranteedCollection, error) {
 	return ss, err
 }
 
-func (s Message) SnapshotRequest() (SnapshotRequest, error) {
-	if s.Struct.Uint16(0) != 7 {
-		panic("Which() != snapshotRequest")
-	}
-	p, err := s.Struct.Ptr(0)
-	return SnapshotRequest{Struct: p.Struct()}, err
-}
-
-func (s Message) HasSnapshotRequest() bool {
-	if s.Struct.Uint16(0) != 7 {
-		return false
-	}
-	p, err := s.Struct.Ptr(0)
-	return p.IsValid() || err != nil
-}
-
-func (s Message) SetSnapshotRequest(v SnapshotRequest) error {
-	s.Struct.SetUint16(0, 7)
-	return s.Struct.SetPtr(0, v.Struct.ToPtr())
-}
-
-// NewSnapshotRequest sets the snapshotRequest field to a newly
-// allocated SnapshotRequest struct, preferring placement in s's segment.
-func (s Message) NewSnapshotRequest() (SnapshotRequest, error) {
-	s.Struct.SetUint16(0, 7)
-	ss, err := NewSnapshotRequest(s.Struct.Segment())
-	if err != nil {
-		return SnapshotRequest{}, err
-	}
-	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
-	return ss, err
-}
-
-func (s Message) SnapshotResponse() (SnapshotResponse, error) {
-	if s.Struct.Uint16(0) != 8 {
-		panic("Which() != snapshotResponse")
-	}
-	p, err := s.Struct.Ptr(0)
-	return SnapshotResponse{Struct: p.Struct()}, err
-}
-
-func (s Message) HasSnapshotResponse() bool {
-	if s.Struct.Uint16(0) != 8 {
-		return false
-	}
-	p, err := s.Struct.Ptr(0)
-	return p.IsValid() || err != nil
-}
-
-func (s Message) SetSnapshotResponse(v SnapshotResponse) error {
-	s.Struct.SetUint16(0, 8)
-	return s.Struct.SetPtr(0, v.Struct.ToPtr())
-}
-
-// NewSnapshotResponse sets the snapshotResponse field to a newly
-// allocated SnapshotResponse struct, preferring placement in s's segment.
-func (s Message) NewSnapshotResponse() (SnapshotResponse, error) {
-	s.Struct.SetUint16(0, 8)
-	ss, err := NewSnapshotResponse(s.Struct.Segment())
-	if err != nil {
-		return SnapshotResponse{}, err
-	}
-	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
-	return ss, err
-}
-
-func (s Message) MempoolRequest() (MempoolRequest, error) {
-	if s.Struct.Uint16(0) != 9 {
-		panic("Which() != mempoolRequest")
-	}
-	p, err := s.Struct.Ptr(0)
-	return MempoolRequest{Struct: p.Struct()}, err
-}
-
-func (s Message) HasMempoolRequest() bool {
-	if s.Struct.Uint16(0) != 9 {
-		return false
-	}
-	p, err := s.Struct.Ptr(0)
-	return p.IsValid() || err != nil
-}
-
-func (s Message) SetMempoolRequest(v MempoolRequest) error {
-	s.Struct.SetUint16(0, 9)
-	return s.Struct.SetPtr(0, v.Struct.ToPtr())
-}
-
-// NewMempoolRequest sets the mempoolRequest field to a newly
-// allocated MempoolRequest struct, preferring placement in s's segment.
-func (s Message) NewMempoolRequest() (MempoolRequest, error) {
-	s.Struct.SetUint16(0, 9)
-	ss, err := NewMempoolRequest(s.Struct.Segment())
-	if err != nil {
-		return MempoolRequest{}, err
-	}
-	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
-	return ss, err
-}
-
-func (s Message) MempoolResponse() (MempoolResponse, error) {
-	if s.Struct.Uint16(0) != 10 {
-		panic("Which() != mempoolResponse")
-	}
-	p, err := s.Struct.Ptr(0)
-	return MempoolResponse{Struct: p.Struct()}, err
-}
-
-func (s Message) HasMempoolResponse() bool {
-	if s.Struct.Uint16(0) != 10 {
-		return false
-	}
-	p, err := s.Struct.Ptr(0)
-	return p.IsValid() || err != nil
-}
-
-func (s Message) SetMempoolResponse(v MempoolResponse) error {
-	s.Struct.SetUint16(0, 10)
-	return s.Struct.SetPtr(0, v.Struct.ToPtr())
-}
-
-// NewMempoolResponse sets the mempoolResponse field to a newly
-// allocated MempoolResponse struct, preferring placement in s's segment.
-func (s Message) NewMempoolResponse() (MempoolResponse, error) {
-	s.Struct.SetUint16(0, 10)
-	ss, err := NewMempoolResponse(s.Struct.Segment())
-	if err != nil {
-		return MempoolResponse{}, err
-	}
-	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
-	return ss, err
-}
-
 func (s Message) BlockProposal() (BlockProposal, error) {
-	if s.Struct.Uint16(0) != 11 {
+	if s.Struct.Uint16(0) != 7 {
 		panic("Which() != blockProposal")
 	}
 	p, err := s.Struct.Ptr(0)
@@ -463,7 +319,7 @@ func (s Message) BlockProposal() (BlockProposal, error) {
 }
 
 func (s Message) HasBlockProposal() bool {
-	if s.Struct.Uint16(0) != 11 {
+	if s.Struct.Uint16(0) != 7 {
 		return false
 	}
 	p, err := s.Struct.Ptr(0)
@@ -471,14 +327,14 @@ func (s Message) HasBlockProposal() bool {
 }
 
 func (s Message) SetBlockProposal(v BlockProposal) error {
-	s.Struct.SetUint16(0, 11)
+	s.Struct.SetUint16(0, 7)
 	return s.Struct.SetPtr(0, v.Struct.ToPtr())
 }
 
 // NewBlockProposal sets the blockProposal field to a newly
 // allocated BlockProposal struct, preferring placement in s's segment.
 func (s Message) NewBlockProposal() (BlockProposal, error) {
-	s.Struct.SetUint16(0, 11)
+	s.Struct.SetUint16(0, 7)
 	ss, err := NewBlockProposal(s.Struct.Segment())
 	if err != nil {
 		return BlockProposal{}, err
@@ -488,7 +344,7 @@ func (s Message) NewBlockProposal() (BlockProposal, error) {
 }
 
 func (s Message) BlockVote() (BlockVote, error) {
-	if s.Struct.Uint16(0) != 12 {
+	if s.Struct.Uint16(0) != 8 {
 		panic("Which() != blockVote")
 	}
 	p, err := s.Struct.Ptr(0)
@@ -496,7 +352,7 @@ func (s Message) BlockVote() (BlockVote, error) {
 }
 
 func (s Message) HasBlockVote() bool {
-	if s.Struct.Uint16(0) != 12 {
+	if s.Struct.Uint16(0) != 8 {
 		return false
 	}
 	p, err := s.Struct.Ptr(0)
@@ -504,14 +360,14 @@ func (s Message) HasBlockVote() bool {
 }
 
 func (s Message) SetBlockVote(v BlockVote) error {
-	s.Struct.SetUint16(0, 12)
+	s.Struct.SetUint16(0, 8)
 	return s.Struct.SetPtr(0, v.Struct.ToPtr())
 }
 
 // NewBlockVote sets the blockVote field to a newly
 // allocated BlockVote struct, preferring placement in s's segment.
 func (s Message) NewBlockVote() (BlockVote, error) {
-	s.Struct.SetUint16(0, 12)
+	s.Struct.SetUint16(0, 8)
 	ss, err := NewBlockVote(s.Struct.Segment())
 	if err != nil {
 		return BlockVote{}, err
@@ -521,7 +377,7 @@ func (s Message) NewBlockVote() (BlockVote, error) {
 }
 
 func (s Message) BlockCommit() (BlockCommit, error) {
-	if s.Struct.Uint16(0) != 13 {
+	if s.Struct.Uint16(0) != 9 {
 		panic("Which() != blockCommit")
 	}
 	p, err := s.Struct.Ptr(0)
@@ -529,7 +385,7 @@ func (s Message) BlockCommit() (BlockCommit, error) {
 }
 
 func (s Message) HasBlockCommit() bool {
-	if s.Struct.Uint16(0) != 13 {
+	if s.Struct.Uint16(0) != 9 {
 		return false
 	}
 	p, err := s.Struct.Ptr(0)
@@ -537,14 +393,14 @@ func (s Message) HasBlockCommit() bool {
 }
 
 func (s Message) SetBlockCommit(v BlockCommit) error {
-	s.Struct.SetUint16(0, 13)
+	s.Struct.SetUint16(0, 9)
 	return s.Struct.SetPtr(0, v.Struct.ToPtr())
 }
 
 // NewBlockCommit sets the blockCommit field to a newly
 // allocated BlockCommit struct, preferring placement in s's segment.
 func (s Message) NewBlockCommit() (BlockCommit, error) {
-	s.Struct.SetUint16(0, 13)
+	s.Struct.SetUint16(0, 9)
 	ss, err := NewBlockCommit(s.Struct.Segment())
 	if err != nil {
 		return BlockCommit{}, err
@@ -607,22 +463,6 @@ func (p Message_Promise) GuaranteedCollection() GuaranteedCollection_Promise {
 	return GuaranteedCollection_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
 }
 
-func (p Message_Promise) SnapshotRequest() SnapshotRequest_Promise {
-	return SnapshotRequest_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
-}
-
-func (p Message_Promise) SnapshotResponse() SnapshotResponse_Promise {
-	return SnapshotResponse_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
-}
-
-func (p Message_Promise) MempoolRequest() MempoolRequest_Promise {
-	return MempoolRequest_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
-}
-
-func (p Message_Promise) MempoolResponse() MempoolResponse_Promise {
-	return MempoolResponse_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
-}
-
 func (p Message_Promise) BlockProposal() BlockProposal_Promise {
 	return BlockProposal_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
 }
@@ -635,46 +475,38 @@ func (p Message_Promise) BlockCommit() BlockCommit_Promise {
 	return BlockCommit_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
 }
 
-const schema_cc8ede639915bf22 = "x\xdal\xd0[H\x14\x7f\x14\x07\xf0\xef\xd9\x9d\xddu" +
-	"\xbd\xce\x9f\x99\x7f\x17$\x84(\x83\x1e\xc4\x08!\x8d\xc8" +
-	"\x92\x8a\"C\x9d\xe8)\x92\xd9uPqwf\xdb\x99" +
-	"\x85\x92\xa4\x12%K\x0c\xa5z\x90\x16\xeaA)\x04Q" +
-	"\xa4\x87n`\x82\x90\x95AB\x0fv!\x0d\xba\x10\xf8" +
-	"\x10YY\x96\xfd\xe2l\x8eT\xf48\xe7\xf3=\x97\xf9" +
-	"\x15\xceS\xa9g\x83\xefR\x1aPY\xe3\xf3\x8b\xd0p" +
-	"\xe1\xbe\x9e\x8e\xc6\x01Tf\x13\x89\xd5\xc3\xffw\x87_" +
-	"\x9c\x1d\xc7\x0e\x0ad\x03J\x914\xa4l\x91\x02\xc0\xc6" +
-	"bi\xb9\x17\x02A\x115l[\xaf5\x0a(\xac\xc7" +
-	"\xccXI\xb9\x91\x97\xfa\xae \xaa\xdc\xe4\x952\x85\x90" +
-	"\x08P\x8e\xd2z@s\xc8K\xda\x09\xf2P\x16\xfd\x10" +
-	"*14\xa5\xe0\x08C\x0b\x83gA\xa8\xe4\x01\x94\x93" +
-	")8\xc6\xd0\xc6\xe0\xfd.T\xf2\x02J+\xed\x01\xb4" +
-	"\x16\x86N\x06\xe9\x9bPI\x02\x94\x0e\xda\x0ehm\x0c" +
-	"\xe7\x19|\xf3B%\x1f\xa0t\xa5::\x19\x92\x0c\xfe" +
-	"\xafB%?\xa0tS\x1f\xa0%\x19\xae2\x04\xbe\x08" +
-	"\x95\x02\x80\xd2K\xcd\x80\xd6\xc30\xc8\x906'TJ" +
-	"\x03\x94~:\x03h\x83\x0c\xb7\x19\x82\x9f\x85JA@" +
-	"\xb9A\x8d\x80v\x9da\x94!\xfd\x93P)\x1dPF" +
-	"R\xa3\xee0\x8c3d|\x14*e\x00\xca=\x8a\x03" +
-	"\xda\x18\xc3c\x86\xccY\xa1R&\xa0LP\x15\xa0=" +
-	"bx\xce\x90\xf5A\xa8\x94\x05(O(\x04h\x93\x0c" +
-	"\xaf\xc8C9z\xc2\xa9#Y\xac\x1bx\x10x;\xf7" +
-	"p\x12 \x92A9\xb1z\xb3\x96d\xd1|\x7f\xa5T" +
-	"Z\xbd\xb9}\xa9l\xa5\xca\xff\xe5\xcf\x06\x05\xf9G\x16" +
-	"\xcbB7M+a\x86\x0d\x00$\x8bU\x03\xed#\xed" +
-	"F\xc3\xd3E=\x1e7\x0e'\x0c\xdb!Y\xbc{\xb9" +
-	"\xb7\xfc\xfdp\xfek\xb7/n\xd81\xcb\xb4\x17\xfbr" +
-	"\xa7\xa7\xee\x16\xad\xb5\xa6]\xadM\xe8q\xddt\x0c2" +
-	"j\xca\xacH\xc4\x08\xe78\xf5\x96\xc9\xc1\xa4\xd4\xdc\xdf" +
-	"wh\xd4\x0d\xda\xa6\x1e\xb3\xeb,\x87\xaa~m\xe2a" +
-	"\x19\xbbn\xf5\xe6.;\xd7\xfb\x8f\x8c\xbb\x93d\xb1\xe6" +
-	"\xb4\xa7d\xdb\xb3S3n*jDc\x96\x15\xa9\xc2" +
-	"\xd6\xa5\x9b\xdf\xc4\xc7\xe6C\xad\xd1\xcb\x7fG\xc8\x9d\xc3" +
-	"\xcfdTO\xedV\x9d!7\x13\x8aX\xe1\x86\x8a\xb8" +
-	"\x85\xbc\x98e\xeb\x11\x92E\xc1\x95k3;\x0f6$" +
-	"\xffH\x1c\xb0\x1c\x90A\xf2B\xcf\x8a\x9bM\x17\xfa;" +
-	"\x7f\xb72+\x8a@\xb4\x9e/\xb8\x98_\xbc\x7f\xa2\x8b" +
-	"\xdc_\xf9\x19\x00\x00\xff\xff\x13\x0c\xf3\xd5"
+const schema_cc8ede639915bf22 = "x\xdaT\xceKh\x13Q\x18\x05\xe0\xf3\xcfL2\x8d" +
+	"\xb4d\xca\xdcBE\x82U4j)m\xa5\x16\xdf\x10" +
+	"\xac\x15\x11+\x89#\xe2B\x94\xc9xIC\x92\xb9c" +
+	"f\xb2\x11D\xe86(\xba\x10Q\xbb\xac\x08\x85\x12\x04" +
+	"W\x82\x84\x80 \xf8X\xb8\x13\x17Z\x17\xa2\x82\x0bA" +
+	"\xb0\xbe\xea\x95\x1b\x12\xd1\xe5\x7f\xbes\xe0\x1f\xbfE\x19" +
+	"m{\xec\x86\x09\xe4N\xc5\xe22\xdf\x1c?\xb6p\xf9" +
+	"B\x03\xb9\x14\x91\xdc\xd8\x1c\xb8\xe9\xbd\xbe\xf2\x0c\xd3d" +
+	"\xae\x01&\xee\xe9\xc3d\xb7t\x13\x98x\xa8\xef\xd4\xf0" +
+	"A\x86\xde,\xaf\xb8c\x9e\xee\x06\x91[\xf4\xc7*<" +
+	"\x0c\xdd\x02\x1f\xf5\xdc\xc0\x0f\xf6\xcc\xf00\xa9\xce,Q" +
+	"n\xabn\xf4Ji\x10`'h\x18p\x0c\xd2\xc9\xb1" +
+	"H\xa3>\xfa-\x19)\xe8kC\x8f\x02\xa6@[\x95" +
+	"\x8c4\xc0\xeeoC\xaf\x82A\x05\xfa/\xc9H\x07\xec" +
+	"\x01:\x028L\xc1\x90\x02\xe3\xa7dd\x00v\x8a\x0e" +
+	"\x00\xce\xa0\x82M\x0ab?$\xa3\x18`oh/\x86" +
+	"\x14\x8c(\x88\x7f\x97\x8c\xe2\x80\xbd\x8d\x16\x01gD\xc1" +
+	".\x05\xe67\xc9\xc8\x04\xecI\xaa\x02\xce\x0e\x05\x19\x05" +
+	"=+\x92Q\x0f`\xef\xa7\xe3\x80\xb3O\xc1a\x05\x89" +
+	"\xaf\x92Q\x02\xb0\xa7)\x0f8\x07\x15dI\xa3\xa4[" +
+	"\x8bf\xc9\x92[\x1aO\xcd\xf7+\xcf_\x02D\x16(" +
+	"\x19\x14\xfd\x02Yr\xee\xc9Z#svo\xfdo," +
+	"\xdaq\x7f\xfaKBR\xbc\xd5\x89\xa5\xeb\xfb\xa2\xe6{" +
+	"\x1c\x00Y2\xd5\xa8\xb7\xea\xbc\xf4\xaa\xa3\x97\xaa\xfc|" +
+	"\x8d\x87\x11Y\xf2\xe3\xdb\xa33\x9f\x9b\xe9w\xdd]\x95" +
+	"\x87\x81\xf0\xc3\xcen\xdd\xf2\x9b\xc7\x93\x9b\xc5rW\x0b" +
+	"5\xb7\xea\xfa\x11'~nJ\x94\xcb\xdcKFE\xe1" +
+	"\xab\xe2\xbc1\xb7\xb4x\xe6Q\xb7\x98/\x0b\xaf\x94\xad" +
+	"\x0a\xac\x0fD\xe8\x96\xc9\x92\xa3w\xef\x7f:t\xba4" +
+	"\xff_\xe3\xa4\x88@\x9c\xac\xd5\x85\xc1\x07\x17\xaf/]" +
+	"\xfd\xd7\xa6D\x05f\xa5\xa8\x9e\xbc\x9d\xde}\xe2\xc55" +
+	"\xba\xd3\xd9\xfe\x09\x00\x00\xff\xffJ\x0e\xa4\x06"
 
 func init() {
 	schemas.Register(schema_cc8ede639915bf22,

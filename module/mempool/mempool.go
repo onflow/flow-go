@@ -11,6 +11,7 @@ import (
 	"github.com/dchest/siphash"
 	"github.com/pkg/errors"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/collection"
 )
 
@@ -31,11 +32,21 @@ func New() (*Mempool, error) {
 
 // Has checks if we know already know the guaranteed collection of the given
 // hash.
-func (m *Mempool) Has(hash []byte) bool {
+func (m *Mempool) Has(hash crypto.Hash) bool {
 	m.Lock()
 	defer m.Unlock()
 	key := hex.EncodeToString(hash)
 	_, ok := m.collections[key]
+	return ok
+}
+
+// Rem will remove the collection with the given hash.
+func (m *Mempool) Rem(hash crypto.Hash) bool {
+	m.Lock()
+	defer m.Unlock()
+	key := hex.EncodeToString(hash)
+	_, ok := m.collections[key]
+	delete(m.collections, key)
 	return ok
 }
 
@@ -53,7 +64,7 @@ func (m *Mempool) Add(coll *collection.GuaranteedCollection) error {
 }
 
 // Get returns the given collection from the pool.
-func (m *Mempool) Get(hash []byte) (*collection.GuaranteedCollection, error) {
+func (m *Mempool) Get(hash crypto.Hash) (*collection.GuaranteedCollection, error) {
 	m.Lock()
 	defer m.Unlock()
 	key := hex.EncodeToString(hash)
@@ -69,7 +80,10 @@ func (m *Mempool) Hash() []byte {
 	m.Lock()
 	defer m.Unlock()
 	hash := siphash.New([]byte("flowcollmempoolx"))
-	collections := m.all()
+	collections := make([]*collection.GuaranteedCollection, 0, len(m.collections))
+	for _, coll := range m.collections {
+		collections = append(collections, coll)
+	}
 	sort.Slice(collections, func(i int, j int) bool {
 		return bytes.Compare(collections[i].Hash, collections[j].Hash) < 0
 	})
@@ -90,22 +104,9 @@ func (m *Mempool) Size() uint {
 func (m *Mempool) All() []*collection.GuaranteedCollection {
 	m.Lock()
 	defer m.Unlock()
-	return m.all()
-}
-
-// It's thread-unsafe to call this function.
-// Remember to acquire the lock by calling m.Lock() before calling this function to avoid race condition.
-func (m *Mempool) all() []*collection.GuaranteedCollection {
 	collections := make([]*collection.GuaranteedCollection, 0, len(m.collections))
 	for _, coll := range m.collections {
 		collections = append(collections, coll)
 	}
 	return collections
-}
-
-// Drop will drop all collections from the memory pool.
-func (m *Mempool) Drop() {
-	m.Lock()
-	defer m.Unlock()
-	m.collections = make(map[string]*collection.GuaranteedCollection)
 }

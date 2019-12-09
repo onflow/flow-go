@@ -66,13 +66,16 @@ type AccountCreatedEvent interface {
 }
 
 var AccountCreatedEventType types.Type = types.Event{
-	Identifier: EventAccountCreated,
-	FieldTypes: []types.EventField{
+	Fields: []*types.Parameter{
 		{
-			Identifier: "address",
-			Type:       types.Address{},
+			Field: types.Field{
+				Identifier: "address",
+				Type:       types.Address{},
+			},
+			Label: "",
 		},
 	},
+	Identifier: EventAccountCreated,
 }
 
 func newAccountCreatedEventFromValue(v values.Value) AccountCreatedEvent {

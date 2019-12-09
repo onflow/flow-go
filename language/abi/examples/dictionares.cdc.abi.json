@@ -28,7 +28,6 @@
                   "String",
                   "String"
                 ],
-                ,
                 "returnType": {
                   "optional": "Any"
                 }

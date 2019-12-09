@@ -32,32 +32,33 @@ var beforeType = &FunctionType{
 // Checker
 
 type Checker struct {
-	Program                 *ast.Program
-	Location                ast.Location
-	PredeclaredValues       map[string]ValueDeclaration
-	PredeclaredTypes        map[string]TypeDeclaration
-	ImportCheckers          map[ast.LocationID]*Checker
-	AccessCheckMode         AccessCheckMode
-	errors                  []error
-	valueActivations        *VariableActivations
-	resources               *Resources
-	typeActivations         *VariableActivations
-	containerTypes          map[Type]bool
-	functionActivations     *FunctionActivations
-	GlobalValues            map[string]*Variable
-	GlobalTypes             map[string]*Variable
-	TransactionTypes        []*TransactionType
-	inCondition             bool
-	Occurrences             *Occurrences
-	variableOrigins         map[*Variable]*Origin
-	memberOrigins           map[Type]map[string]*Origin
-	seenImports             map[ast.LocationID]bool
-	isChecked               bool
-	inCreate                bool
-	inInvocation            bool
-	inAssignment            bool
-	Elaboration             *Elaboration
-	currentMemberExpression *ast.MemberExpression
+	Program                   *ast.Program
+	Location                  ast.Location
+	PredeclaredValues         map[string]ValueDeclaration
+	PredeclaredTypes          map[string]TypeDeclaration
+	ImportCheckers            map[ast.LocationID]*Checker
+	AccessCheckMode           AccessCheckMode
+	errors                    []error
+	valueActivations          *VariableActivations
+	resources                 *Resources
+	typeActivations           *VariableActivations
+	containerTypes            map[Type]bool
+	functionActivations       *FunctionActivations
+	GlobalValues              map[string]*Variable
+	GlobalTypes               map[string]*Variable
+	TransactionTypes          []*TransactionType
+	inCondition               bool
+	Occurrences               *Occurrences
+	variableOrigins           map[*Variable]*Origin
+	memberOrigins             map[Type]map[string]*Origin
+	seenImports               map[ast.LocationID]bool
+	isChecked                 bool
+	inCreate                  bool
+	inInvocation              bool
+	inAssignment              bool
+	Elaboration               *Elaboration
+	currentMemberExpression   *ast.MemberExpression
+	ValidTopLevelDeclarations []common.DeclarationKind
 }
 
 type Option func(*Checker) error
@@ -90,6 +91,13 @@ func WithPredeclaredTypes(predeclaredTypes map[string]TypeDeclaration) Option {
 func WithAccessCheckMode(mode AccessCheckMode) Option {
 	return func(checker *Checker) error {
 		checker.AccessCheckMode = mode
+		return nil
+	}
+}
+
+func WithValidTopLevelDeclarations(validTopLevelDeclarations []common.DeclarationKind) Option {
+	return func(checker *Checker) error {
+		checker.ValidTopLevelDeclarations = validTopLevelDeclarations
 		return nil
 	}
 }
@@ -233,6 +241,44 @@ func (checker *Checker) report(err error) {
 	checker.errors = append(checker.errors, err)
 }
 
+//TODO Once we have a flag which allows us to distinguish builtin from user defined
+// types we can remove this silly list
+// See https://github.com/dapperlabs/flow-go/issues/1627
+var blacklist = map[string]interface{}{
+	"Int":     nil,
+	"Int8":    nil,
+	"Int16":   nil,
+	"Int32":   nil,
+	"Int64":   nil,
+	"UInt8":   nil,
+	"UInt16":  nil,
+	"UInt32":  nil,
+	"UInt64":  nil,
+	"Address": nil,
+}
+
+func (checker *Checker) UserDefinedValues() map[string]*Variable {
+	ret := map[string]*Variable{}
+	for key, value := range checker.GlobalValues {
+		if _, ok := blacklist[key]; ok == true {
+			continue
+		}
+		if _, ok := checker.PredeclaredValues[key]; ok {
+			continue
+		}
+
+		if _, ok := checker.PredeclaredTypes[key]; ok {
+			continue
+		}
+		if typeValue, ok := checker.GlobalTypes[key]; ok {
+			ret[key] = typeValue
+			continue
+		}
+		ret[key] = value
+	}
+	return ret
+}
+
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 	for _, declaration := range program.ImportDeclarations() {
@@ -263,6 +309,8 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 	// check all declarations
 
+	checker.checkTopLevelDeclarationValidity(program.Declarations)
+
 	for _, declaration := range program.Declarations {
 
 		// Skip import declarations, they are already handled above
@@ -275,6 +323,45 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 	}
 
 	return nil
+}
+
+func (checker *Checker) checkTopLevelDeclarationValidity(declarations []ast.Declaration) {
+	if checker.ValidTopLevelDeclarations == nil {
+		return
+	}
+
+	validDeclarationKinds := map[common.DeclarationKind]bool{}
+
+	for _, declarationKind := range checker.ValidTopLevelDeclarations {
+		validDeclarationKinds[declarationKind] = true
+	}
+
+	for _, declaration := range declarations {
+		isValid := validDeclarationKinds[declaration.DeclarationKind()]
+		if isValid {
+			continue
+		}
+
+		var errorRange ast.Range
+
+		identifier := declaration.DeclarationIdentifier()
+		if identifier == nil {
+			position := declaration.StartPosition()
+			errorRange = ast.Range{
+				StartPos: position,
+				EndPos:   position,
+			}
+		} else {
+			errorRange = ast.NewRangeFromPositioned(identifier)
+		}
+
+		checker.report(
+			&InvalidTopLevelDeclarationError{
+				DeclarationKind: declaration.DeclarationKind(),
+				Range:           errorRange,
+			},
+		)
+	}
 }
 
 func (checker *Checker) declareGlobalFunctionDeclaration(declaration *ast.FunctionDeclaration) {
@@ -349,7 +436,7 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 				literalCount := len(typedExpression.Values)
 
 				if IsSubType(valueElementType, targetElementType) &&
-					literalCount == constantSizedTargetType.Size {
+					literalCount == int(constantSizedTargetType.Size) {
 
 					return true
 				}
@@ -426,10 +513,10 @@ func (checker *Checker) checkRange(value, min, max *big.Int) bool {
 
 func (checker *Checker) declareGlobalDeclaration(declaration ast.Declaration) {
 	identifier := declaration.DeclarationIdentifier()
-	name := identifier.Identifier
-	if name == "" {
+	if identifier == nil {
 		return
 	}
+	name := identifier.Identifier
 	checker.declareGlobalValue(name)
 	checker.declareGlobalType(name)
 }
@@ -823,27 +910,17 @@ func (checker *Checker) recordResourceInvalidation(
 		return
 	}
 
-	switch typedExpression := expression.(type) {
-	case *ast.IdentifierExpression:
-
-		variable := checker.findAndCheckVariable(typedExpression.Identifier, false)
-		if variable == nil {
-			return
-		}
-
-		checker.resources.AddInvalidation(variable, invalidation)
-
-	case *ast.CreateExpression:
-	case *ast.InvocationExpression:
-	case *ast.ArrayExpression:
-	case *ast.DictionaryExpression:
-	case *ast.NilExpression:
-	case *ast.CastingExpression:
-	case *ast.BinaryExpression:
-		// (nil-coalescing)
-	default:
-		panic(errors.NewUnreachableError())
+	identifierExpression, ok := expression.(*ast.IdentifierExpression)
+	if !ok {
+		return
 	}
+
+	variable := checker.findAndCheckVariable(identifierExpression.Identifier, false)
+	if variable == nil {
+		return
+	}
+
+	checker.resources.AddInvalidation(variable, invalidation)
 }
 
 func (checker *Checker) checkWithResources(
@@ -1028,6 +1105,8 @@ func (checker *Checker) checkDeclarationAccessModifier(
 		}
 	} else {
 
+		isTypeDeclaration := declarationKind.IsTypeDeclaration()
+
 		switch access {
 		case ast.AccessPublicSettable:
 			// Public settable access for a constant is not sensible
@@ -1042,7 +1121,35 @@ func (checker *Checker) checkDeclarationAccessModifier(
 				)
 			}
 
+		case ast.AccessPrivate:
+			// Type declarations cannot be private for now
+
+			if isTypeDeclaration {
+
+				checker.report(
+					&InvalidAccessModifierError{
+						Access:          access,
+						DeclarationKind: declarationKind,
+						Pos:             startPos,
+					},
+				)
+			}
+
 		case ast.AccessNotSpecified:
+
+			// Type declarations cannot be effectively private for now
+
+			if isTypeDeclaration &&
+				checker.AccessCheckMode == AccessCheckModeNotSpecifiedRestricted {
+
+				checker.report(
+					&MissingAccessModifierError{
+						DeclarationKind: declarationKind,
+						Pos:             startPos,
+					},
+				)
+			}
+
 			// In strict mode, access modifiers must be given
 
 			if checker.AccessCheckMode == AccessCheckModeStrict {

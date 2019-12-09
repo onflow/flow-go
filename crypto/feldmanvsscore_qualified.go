@@ -241,7 +241,7 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 			return
 		}
 		// read the complainer private share
-		C.bn_read_bin((*C.bn_st)(&c.answer),
+		C.bn_read_bin((*C.bn_st)(&s.complaints[complainer].answer),
 			(*C.uchar)(&data[1]),
 			PrKeyLenBLS_BLS12381,
 		)

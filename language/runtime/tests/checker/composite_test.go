@@ -550,29 +550,6 @@ func TestCheckCompositeFunctionSelfReference(t *testing.T) {
 	}
 }
 
-func TestCheckInvalidLocalComposite(t *testing.T) {
-
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
-
-			_, err := ParseAndCheck(t,
-				fmt.Sprintf(
-					`
-                      fun test() {
-                          %s Test {}
-                      }
-                    `,
-					kind.Keyword(),
-				),
-			)
-
-			errs := ExpectCheckerErrors(t, err, 1)
-
-			assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
-		})
-	}
-}
-
 func TestCheckInvalidCompositeMissingInitializer(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {

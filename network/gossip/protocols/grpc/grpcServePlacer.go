@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/encoding/gzip"
 
 	"github.com/dapperlabs/flow-go/network/gossip"
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 var (

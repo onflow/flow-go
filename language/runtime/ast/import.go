@@ -4,6 +4,8 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 
+	"github.com/dapperlabs/flow-go/model/flow"
+
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 )
 
@@ -44,8 +46,8 @@ func (v *ImportDeclaration) Accept(visitor Visitor) Repr {
 	return visitor.VisitImportDeclaration(v)
 }
 
-func (v *ImportDeclaration) DeclarationIdentifier() Identifier {
-	return Identifier{}
+func (v *ImportDeclaration) DeclarationIdentifier() *Identifier {
+	return nil
 }
 
 func (v *ImportDeclaration) DeclarationKind() common.DeclarationKind {
@@ -102,6 +104,10 @@ func (l AddressLocation) ID() LocationID {
 
 func (l AddressLocation) String() string {
 	return hex.EncodeToString([]byte(l))
+}
+
+func (l AddressLocation) ToAddress() (addr flow.Address) {
+	return flow.BytesToAddress(l)
 }
 
 func init() {

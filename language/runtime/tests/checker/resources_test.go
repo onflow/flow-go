@@ -3109,3 +3109,19 @@ func TestCheckInvalidResourceFailableCastOutsideOptionalBinding(t *testing.T) {
 	// TODO: remove once supported
 	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
 }
+
+func TestCheckInvalidUnaryMoveAndCopyTransfer(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource R {}
+
+      fun test() {
+          let r = <- create R()
+          destroy r
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[0])
+}

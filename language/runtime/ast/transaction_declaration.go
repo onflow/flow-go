@@ -18,8 +18,8 @@ func (d *TransactionDeclaration) Accept(visitor Visitor) Repr {
 func (*TransactionDeclaration) isDeclaration() {}
 func (*TransactionDeclaration) isStatement()   {}
 
-func (d *TransactionDeclaration) DeclarationIdentifier() Identifier {
-	return Identifier{}
+func (d *TransactionDeclaration) DeclarationIdentifier() *Identifier {
+	return nil
 }
 
 func (d *TransactionDeclaration) DeclarationKind() common.DeclarationKind {

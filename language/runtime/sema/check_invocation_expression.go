@@ -115,8 +115,7 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 
 	if returnType.Equal(&NeverType{}) {
 		functionActivation := checker.functionActivations.Current()
-		functionActivation.ReturnInfo.MaybeReturned = true
-		functionActivation.ReturnInfo.DefinitelyReturned = true
+		functionActivation.ReturnInfo.DefinitelyHalted = true
 	}
 
 	if isOptionalResult {
