@@ -7,9 +7,10 @@ import (
 	"net"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/network/gossip"
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/network/gossip"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 // TestCacheDialerFundamentals tests the fundamental functionality of CacheDialer, such as invalid inputs

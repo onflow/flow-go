@@ -3,8 +3,9 @@ package protocols
 import (
 	"context"
 	"fmt"
+
 	"github.com/dapperlabs/flow-go/network/gossip"
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 var _ gossip.Connection = &GRPCUnderlayConnection{}

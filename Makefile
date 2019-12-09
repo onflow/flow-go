@@ -6,6 +6,8 @@ COMMIT := $(shell git rev-parse HEAD)
 VERSION := $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
 # Name of the cover profile
 COVER_PROFILE := cover.out
+# Disable go sum database lookup for private repos
+GOPRIVATE=github.com/dapperlabs/*
 
 export FLOW_ABI_EXAMPLES_DIR := $(CURDIR)/language/abi/examples/
 
@@ -18,10 +20,12 @@ crypto/relic/build: crypto/relic
 
 .PHONY: install-tools
 install-tools: crypto/relic/build
+	sudo apt-get -y install capnproto
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/davecheney/godoc2md@master; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
+	GO111MODULE=on go get zombiezen.com/go/capnproto2@v0.0.0-20190505172156-0c36f8f86ab2; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
 	GO111MODULE=on go get github.com/mgechev/revive@master; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@master; \
@@ -56,20 +60,27 @@ generate-godoc:
 
 .PHONY: generate-proto
 generate-proto:
-	prototool generate proto
+	prototool generate protobuf
+
+.PHONY: generate-capnp
+generate-capnp:
+	capnp compile -I${GOPATH}/src/zombiezen.com/go/capnproto2/std -ogo schema/captain/*.capnp
 
 .PHONY: generate-registries
 generate-registries:
 	GO111MODULE=on go build -o /tmp/registry-generator ./network/gossip/scripts/
-	find ./proto/services -type f -iname "*pb.go" -exec /tmp/registry-generator -w {} \;
+	find ./protobuf/services -type f -iname "*pb.go" -exec /tmp/registry-generator -w {} \;
 	rm /tmp/registry-generator
 
 .PHONY: generate-mocks
 generate-mocks:
 	GO111MODULE=on mockgen -destination=sdk/client/mocks/mock_client.go -package=mocks github.com/dapperlabs/flow-go/sdk/client RPCClient
+	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/emulated_blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator EmulatedBlockchainAPI
+	GO111MODULE=on mockgen -destination=sdk/emulator/storage/mocks/store.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator/storage Store
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
-	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/emulated_blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator EmulatedBlockchainAPI
+	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
+	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
 
 .PHONY: generate-bindata
 generate-bindata:
@@ -88,9 +99,9 @@ ci: install-tools generate check-generated-code lint test coverage
 
 .PHONY: docker-ci
 docker-ci:
-	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) -v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.2 make ci
+	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) -v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.5 make ci
 
-cmd/flow/flow: crypto/*.go $(shell find  cli/ -name '*.go') $(shell find cmd -name '*.go') $(shell find model -name '*.go') $(shell find proto -name '*.go') $(shell find sdk -name '*.go')
+cmd/flow/flow: crypto/*.go $(shell find  cli/ -name '*.go') $(shell find cmd -name '*.go') $(shell find model -name '*.go') $(shell find protobuf -name '*.go') $(shell find sdk -name '*.go')
 	GO111MODULE=on go build \
 	    -ldflags \
 	    "-X github.com/dapperlabs/flow-go/cli/flow/version.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/cli/flow/version.version=$(VERSION)" \

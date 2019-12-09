@@ -22,18 +22,13 @@ func TestCheckTransactions(t *testing.T) {
 		`
 		  transaction {}
 		`,
-		[]error{
-			&sema.TransactionMissingExecuteError{},
-		},
+		nil,
 	}
 
 	noopTx := test{
 		"No-op",
 		`
-		  transaction {
-
-		    execute {}
-		  }
+		  transaction {}
 		`,
 		nil,
 	}
@@ -85,10 +80,7 @@ func TestCheckTransactions(t *testing.T) {
 		"ValidPrepareParameters",
 		`
 		  transaction {
-
 		    prepare(x: Account, y: Account) {}
-
-		    execute {}
 		  }
 		`,
 		nil,
@@ -99,8 +91,6 @@ func TestCheckTransactions(t *testing.T) {
 		`
 		  transaction {
 		    prepare(x: Int, y: Int) {}
-
-		    execute {}
 		  }
 		`,
 		[]error{

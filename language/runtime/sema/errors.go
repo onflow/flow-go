@@ -842,22 +842,6 @@ func (e *UnsupportedTypeError) Error() string {
 
 func (*UnsupportedTypeError) isSemanticError() {}
 
-// UnsupportedDeclarationError
-
-type UnsupportedDeclarationError struct {
-	DeclarationKind common.DeclarationKind
-	ast.Range
-}
-
-func (e *UnsupportedDeclarationError) Error() string {
-	return fmt.Sprintf(
-		"%s declarations are not supported yet",
-		e.DeclarationKind.Name(),
-	)
-}
-
-func (*UnsupportedDeclarationError) isSemanticError() {}
-
 // UnsupportedOverloadingError
 
 type UnsupportedOverloadingError struct {
@@ -1827,18 +1811,6 @@ func (e *InvalidTransactionBlockError) EndPosition() ast.Position {
 	length := len(e.Name)
 	return e.Pos.Shifted(length - 1)
 }
-
-// TransactionMissingExecuteError
-
-type TransactionMissingExecuteError struct {
-	ast.Range
-}
-
-func (e *TransactionMissingExecuteError) Error() string {
-	return "transaction missing an execute block"
-}
-
-func (*TransactionMissingExecuteError) isSemanticError() {}
 
 // TransactionMissingPrepareError
 

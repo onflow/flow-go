@@ -9,8 +9,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/proto/sdk/entities"
-	"github.com/dapperlabs/flow-go/proto/services/observation"
+	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
+	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
@@ -87,15 +87,14 @@ func (b *Backend) GetLatestBlock(ctx context.Context, req *observation.GetLatest
 	}
 
 	// create block header for block
-	blockHeader := flow.BlockHeader{
-		Hash:              block.Hash(),
-		PreviousBlockHash: block.PreviousBlockHash,
-		Number:            block.Number,
+	blockHeader := flow.Header{
+		Parent: block.PreviousBlockHash,
+		Number: block.Number,
 	}
 
 	b.logger.WithFields(log.Fields{
 		"blockNum":  blockHeader.Number,
-		"blockHash": blockHeader.Hash.Hex(),
+		"blockHash": blockHeader.Hash().Hex(),
 	}).Debugf("🎁  GetLatestBlock called")
 
 	response := &observation.GetLatestBlockResponse{

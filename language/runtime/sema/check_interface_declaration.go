@@ -102,12 +102,6 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		interfaceType.CompositeKind,
 	)
 
-	checker.checkCompositeDeclarationSupport(
-		declaration.CompositeKind,
-		declaration.DeclarationKind(),
-		declaration.Identifier,
-	)
-
 	return nil
 }
 

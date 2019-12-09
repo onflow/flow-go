@@ -542,12 +542,19 @@ func TestInterpretStringSlicing(t *testing.T) {
 	for _, test := range tests {
 		t.Run("", func(t *testing.T) {
 
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-                fun test(): String {
-                  let s = "%s"
-                  return s.slice(from: %d, upTo: %d)
-                }
-            `, test.str, test.from, test.to))
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      fun test(): String {
+                        let s = "%s"
+                        return s.slice(from: %d, upTo: %d)
+                      }
+                    `,
+					test.str,
+					test.from,
+					test.to,
+				),
+			)
 
 			value, err := inter.Invoke("test")
 			assert.IsType(t, test.expectedError, err)
@@ -3340,28 +3347,23 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure / non-resource composites
-
-		if kind != common.CompositeKindStructure &&
-			kind != common.CompositeKindResource {
-
-			continue
-		}
-
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-              %[1]s interface Test {}
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface Test {}
 
-              %[1]s TestImpl: Test {}
+                      %[1]s TestImpl: Test {}
 
-              let test: %[2]sTest %[3]s %[4]s TestImpl()
-            `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			))
+                      let test: %[2]sTest %[3]s %[4]s TestImpl()
+                    `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+				),
+			)
 
 			assert.IsType(t,
 				&interpreter.CompositeValue{},
@@ -3374,38 +3376,33 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 func TestInterpretInterfaceFieldUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure / non-resource composites
-
-		if kind != common.CompositeKindStructure &&
-			kind != common.CompositeKindResource {
-
-			continue
-		}
-
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-              %[1]s interface Test {
-                  x: Int
-              }
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface Test {
+                          x: Int
+                      }
 
-              %[1]s TestImpl: Test {
-                  var x: Int
+                      %[1]s TestImpl: Test {
+                          var x: Int
+        
+                          init(x: Int) {
+                              self.x = x
+                          }
+                      }
 
-                  init(x: Int) {
-                      self.x = x
-                  }
-              }
+                      let test: %[2]sTest %[3]s %[4]s TestImpl(x: 1)
 
-              let test: %[2]sTest %[3]s %[4]s TestImpl(x: 1)
-
-              let x = test.x
-            `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			))
+                      let x = test.x
+                    `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+				),
+			)
 
 			assert.Equal(t,
 				interpreter.NewIntValue(1),
@@ -3418,37 +3415,31 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 func TestInterpretInterfaceFunctionUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure / non-resource composites
-
-		if kind != common.CompositeKindStructure &&
-			kind != common.CompositeKindResource {
-
-			continue
-		}
-
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(
-				`
-                    %[1]s interface Test {
-                        fun test(): Int
-                    }
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface Test {
+                          fun test(): Int
+                      }
 
-                    %[1]s TestImpl: Test {
-                        fun test(): Int {
-                            return 2
-                        }
-                    }
+                      %[1]s TestImpl: Test {
+                          fun test(): Int {
+                              return 2
+                          }
+                      }
 
-                    let test: %[2]s Test %[3]s %[4]s TestImpl()
+                      let test: %[2]s Test %[3]s %[4]s TestImpl()
 
-                    let val = test.test()
-                `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			))
+                      let val = test.test()
+                    `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+				),
+			)
 
 			assert.Equal(t,
 				interpreter.NewIntValue(2),
@@ -3461,47 +3452,42 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure / non-resource composites
-
-		if kind != common.CompositeKindStructure &&
-			kind != common.CompositeKindResource {
-
-			continue
-		}
-
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-              %[1]s interface Test {
-                  fun test(x: Int): Int {
-                      pre {
-                          x > 0: "x must be positive"
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface Test {
+                          fun test(x: Int): Int {
+                              pre {
+                                  x > 0: "x must be positive"
+                              }
+                          }
                       }
-                  }
-              }
 
-              %[1]s TestImpl: Test {
-                  fun test(x: Int): Int {
-                      pre {
-                          x < 2: "x must be smaller than 2"
+                      %[1]s TestImpl: Test {
+                          fun test(x: Int): Int {
+                              pre {
+                                  x < 2: "x must be smaller than 2"
+                              }
+                              return x
+                          }
                       }
-                      return x
-                  }
-              }
 
-              fun callTest(x: Int): Int {
-                  let test: %[2]s Test %[3]s %[4]s TestImpl()
-                  let res = test.test(x: x)
-                  %[5]s test
-                  return res
-              }
-            `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-				kind.DestructionKeyword(),
-			))
+                      fun callTest(x: Int): Int {
+                          let test: %[2]s Test %[3]s %[4]s TestImpl()
+                          let res = test.test(x: x)
+                          %[5]s test
+                          return res
+                      }
+                    `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+					kind.DestructionKeyword(),
+				),
+			)
 
 			_, err := inter.Invoke("callTest", big.NewInt(0))
 			assert.IsType(t, &interpreter.ConditionError{}, err)
@@ -3526,41 +3512,36 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure / non-resource composites
-
-		if kind != common.CompositeKindStructure &&
-			kind != common.CompositeKindResource {
-
-			continue
-		}
-
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-              %[1]s interface Test {
-                  init(x: Int) {
-                      pre {
-                          x > 0: "x must be positive"
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface Test {
+                          init(x: Int) {
+                              pre {
+                                  x > 0: "x must be positive"
+                              }
+                          }
                       }
-                  }
-              }
 
-              %[1]s TestImpl: Test {
-                  init(x: Int) {
-                      pre {
-                          x < 2: "x must be smaller than 2"
+                      %[1]s TestImpl: Test {
+                          init(x: Int) {
+                              pre {
+                                  x < 2: "x must be smaller than 2"
+                              }
+                          }
                       }
-                  }
-              }
 
-              fun test(x: Int): %[2]sTest {
-                  return %[2]s %[3]s TestImpl(x: x)
-              }
-            `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.ConstructionKeyword(),
-			))
+                      fun test(x: Int): %[2]sTest {
+                          return %[2]s %[3]s TestImpl(x: x)
+                      }
+                    `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.ConstructionKeyword(),
+				),
+			)
 
 			_, err := inter.Invoke("test", big.NewInt(0))
 			assert.IsType(t,

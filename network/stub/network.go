@@ -5,8 +5,10 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/protocol"
 )
 
 // Network is a mocked network layer made for testing Engine's behavior.
@@ -14,19 +16,21 @@ import (
 // all Engine's events synchronously in memory to another Engine, so that tests can run
 // fast and easy to assert errors.
 type Network struct {
-	hub     *Hub
-	com     module.Committee
-	engines map[uint8]network.Engine
 	sync.Mutex
+	state        protocol.State
+	me           module.Local
+	hub          *Hub
+	engines      map[uint8]network.Engine
 	seenEventIDs map[string]bool
 }
 
 // NewNetwork create a mocked network.
 // The committee has the identity of the node already, so only `committee` is needed
 // in order for a mock hub to find each other.
-func NewNetwork(com module.Committee, hub *Hub) *Network {
+func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 	o := &Network{
-		com:          com,
+		state:        state,
+		me:           me,
 		hub:          hub,
 		engines:      make(map[uint8]network.Engine),
 		seenEventIDs: make(map[string]bool),
@@ -37,15 +41,14 @@ func NewNetwork(com module.Committee, hub *Hub) *Network {
 }
 
 // submit is called when an Engine is sending an event to an Engine on another node or nodes.
-func (mn *Network) submit(engineID uint8, event interface{}, targetIDs ...string) error {
+func (mn *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 	mn.buffer(mn.GetID(), engineID, event, targetIDs)
 	return nil
 }
 
 // GetID returns the identity of the Node.
-func (mn *Network) GetID() string {
-	me := mn.com.Me()
-	return me.NodeID
+func (mn *Network) GetID() flow.Identifier {
+	return mn.me.NodeID()
 }
 
 // Register implements pkg/module/Network's interface
@@ -81,7 +84,7 @@ func (mn *Network) seen(key string) {
 }
 
 // buffer saves the request into pending buffer
-func (mn *Network) buffer(from string, engineID uint8, event interface{}, targetIDs []string) {
+func (mn *Network) buffer(from flow.Identifier, engineID uint8, event interface{}, targetIDs []flow.Identifier) {
 	mn.hub.Buffer.Save(from, engineID, event, targetIDs)
 }
 
@@ -110,7 +113,7 @@ func (mn *Network) sendToAllTargets(m *PendingMessage) error {
 	for _, nodeID := range m.TargetIDs {
 		// Find the network of the targeted node
 		receiverNetwork, exist := mn.hub.GetNetwork(nodeID)
-		if exist == false {
+		if !exist {
 			return errors.Errorf("Network can not find a node by ID %v", nodeID)
 		}
 

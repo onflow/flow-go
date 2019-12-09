@@ -9,7 +9,7 @@ require (
 	github.com/davecgh/go-xdr v0.0.0-20161123171359-e6a2ba005892
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger v1.6.0
-	github.com/dgraph-io/ristretto v0.0.0-20191010170704-2ba187ef9534
+	github.com/dgraph-io/badger/v2 v2.0.0
 	github.com/ethereum/go-ethereum v1.9.2
 	github.com/go-test/deep v1.0.4
 	github.com/gogo/protobuf v1.2.1
@@ -22,7 +22,8 @@ require (
 	github.com/jteeuwen/go-bindata v3.0.7+incompatible // indirect
 	github.com/logrusorgru/aurora v0.0.0-20190428105938-cea283e61946
 	github.com/magiconair/properties v1.8.0
-	github.com/mattn/go-colorable v0.1.2 // indirect
+	github.com/mattn/go-colorable v0.1.4 // indirect
+	github.com/mattn/go-isatty v0.0.10 // indirect
 	github.com/mattn/go-runewidth v0.0.5 // indirect
 	github.com/mattn/go-tty v0.0.0-20190424173100-523744f04859 // indirect
 	github.com/nsf/jsondiff v0.0.0-20190712045011-8443391ee9b6
@@ -46,7 +47,6 @@ require (
 	github.com/tinylib/msgp v1.1.0 // indirect
 	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 	golang.org/x/net v0.0.0-20190912160710-24e19bdeb0f2 // indirect
-	golang.org/x/sys v0.0.0-20190912141932-bc967efca4b8 // indirect
 	golang.org/x/text v0.3.2
 	gonum.org/v1/gonum v0.0.0-20191018104224-74cb7b153f2c
 	google.golang.org/grpc v1.23.1

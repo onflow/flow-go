@@ -63,9 +63,9 @@ func (e *Engine) generate() {
 	// defer the waitgroup signal to unblock shutdown
 	defer e.wg.Done()
 
-	// we randomize interval from 80% to 120%
-	min := uint64(e.interval) * 8 / 10
-	max := uint64(e.interval) * 12 / 10
+	// we randomize interval from 50% to 150%
+	min := uint64(e.interval) * 5 / 10
+	max := uint64(e.interval) * 15 / 10
 
 	// first sleep is between zero and possible range between min and max
 	dur := (rand.Uint64() % (max - min))

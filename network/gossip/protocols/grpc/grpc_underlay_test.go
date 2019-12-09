@@ -7,11 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/flow-go/network/gossip"
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+
+	"github.com/dapperlabs/flow-go/network/gossip"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 func TestGRPCUnderlay_Start_Twice(t *testing.T) {
