@@ -295,23 +295,18 @@ func (b *EmulatedBlockchain) GetEvents(eventType string, startBlock, endBlock ui
 //
 // Note that the resulting state is not finalized until CommitBlock() is called.
 // However, the pending blockchain state is indexed for testing purposes.
-func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
+func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) (types.TransactionReceipt, error) {
 	// Prevents tx from being executed with other transactions added previously
 	if len(b.pendingBlock.TransactionHashes) > 0 {
-		return &ErrPendingBlockNotEmpty{BlockHash: b.pendingBlock.Hash()}
+		return types.TransactionReceipt{}, &ErrPendingBlockNotEmpty{BlockHash: b.pendingBlock.Hash()}
 	}
 
 	err := b.AddTransaction(tx)
 	if err != nil {
-		return err
+		return types.TransactionReceipt{}, err
 	}
 
-	err = b.ExecuteNextTransaction()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return b.ExecuteNextTransaction()
 }
 
 // AddTransaction adds a transaction to the current pending block (validates the transaction) but holds off on executing it.
@@ -356,32 +351,30 @@ func (b *EmulatedBlockchain) AddTransaction(tx flow.Transaction) error {
 }
 
 // ExecuteBlock executes the remaining transactions in pending block.
-func (b *EmulatedBlockchain) ExecuteBlock() error {
+func (b *EmulatedBlockchain) ExecuteBlock() ([]types.TransactionReceipt, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if b.pendingBlock.Index >= len(b.pendingBlock.TransactionHashes) {
-		return &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
-	}
+	results := make([]types.TransactionReceipt, 0)
 
-	errors := make([]string, 0)
+	if b.pendingBlock.Index >= len(b.pendingBlock.TransactionHashes) {
+		return results, &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
+	}
 
 	for b.pendingBlock.Index < len(b.pendingBlock.TransactionHashes) {
-		err := b.executeTransaction()
+		result, err := b.executeTransaction()
 		if err != nil {
-			errors = append(errors, err.Error())
+			return results, err
 		}
+		results = append(results, result)
+
 	}
 
-	if len(errors) > 0 {
-		return &ErrBlockExecutionErrors{Errors: errors}
-	}
-
-	return nil
+	return results, nil
 }
 
 // ExecuteNextTransaction executes the next indexed transaction in pending block.
-func (b *EmulatedBlockchain) ExecuteNextTransaction() error {
+func (b *EmulatedBlockchain) ExecuteNextTransaction() (types.TransactionReceipt, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -389,10 +382,10 @@ func (b *EmulatedBlockchain) ExecuteNextTransaction() error {
 }
 
 // executeTransaction is a helper function for ExecuteBlock and ExecuteNextTransaction that runs through the transaction execution.
-func (b *EmulatedBlockchain) executeTransaction() error {
+func (b *EmulatedBlockchain) executeTransaction() (types.TransactionReceipt, error) {
 	// Check if there are remaining txs to be executed
 	if b.pendingBlock.Index >= len(b.pendingBlock.TransactionHashes) {
-		return &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
+		return types.TransactionReceipt{}, &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
 	}
 
 	txHash := b.pendingBlock.TransactionHashes[b.pendingBlock.Index]
@@ -407,7 +400,14 @@ func (b *EmulatedBlockchain) executeTransaction() error {
 	events, err := b.computer.ExecuteTransaction(ledger, *tx)
 	if err != nil {
 		tx.Status = flow.TransactionReverted
-		return &ErrTransactionReverted{TxHash: tx.Hash(), Err: err}
+
+		receipt := types.TransactionReceipt{
+			TransactionHash: txHash,
+			Status:          tx.Status,
+			Error:           err,
+		}
+
+		return receipt, nil
 	}
 
 	// Update pending state with ledger changed during transaction execution
@@ -421,7 +421,7 @@ func (b *EmulatedBlockchain) executeTransaction() error {
 	// TODO: improve the pending block, provide all block information
 	prevBlock, err := b.storage.GetLatestBlock()
 	if err != nil {
-		return fmt.Errorf("failed to get latest block: %w", err)
+		return types.TransactionReceipt{}, fmt.Errorf("failed to get latest block: %w", err)
 	}
 	blockNumber := prevBlock.Number + 1
 
@@ -430,10 +430,17 @@ func (b *EmulatedBlockchain) executeTransaction() error {
 
 	// TODO: Do this in CommitBlock instead
 	if err := b.storage.InsertEvents(blockNumber, events...); err != nil {
-		return fmt.Errorf("failed to insert events: %w", err)
+		return types.TransactionReceipt{}, fmt.Errorf("failed to insert events: %w", err)
 	}
 
-	return nil
+	receipt := types.TransactionReceipt{
+		TransactionHash: txHash,
+		Status:          tx.Status,
+		Error:           nil,
+		Events:          tx.Events,
+	}
+
+	return receipt, nil
 }
 
 // CommitBlock seals the current pending block and saves it to storage.
@@ -498,8 +505,7 @@ func (b *EmulatedBlockchain) CommitBlock() (*types.Block, error) {
 
 // ExecuteAndCommitBlock is a utility that combines ExecuteBlock with CommitState.
 func (b *EmulatedBlockchain) ExecuteAndCommitBlock() (*types.Block, error) {
-	// TODO: what happens to the TransactionReverted errors?
-	err := b.ExecuteBlock()
+	_, err := b.ExecuteBlock()
 	if err != nil {
 		return nil, err
 	}
@@ -611,7 +617,7 @@ func (b *EmulatedBlockchain) CreateAccount(
 
 	tx.AddSignature(b.RootAccountAddress(), sig)
 
-	err = b.SubmitTransaction(tx)
+	_, err = b.SubmitTransaction(tx)
 	if err != nil {
 		return flow.Address{}, err
 	}
