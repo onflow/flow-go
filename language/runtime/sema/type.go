@@ -1636,7 +1636,7 @@ func (t *CompositeType) IsInvalidType() bool {
 	return false
 }
 
-func (t *CompositeType) InterfaceDeclaration() *InterfaceType {
+func (t *CompositeType) InterfaceType() *InterfaceType {
 	return &InterfaceType{
 		Location:                            t.Location,
 		Identifier:                          t.Identifier,

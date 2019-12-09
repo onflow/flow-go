@@ -3,13 +3,16 @@ package sema
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
 func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDeclaration) ast.Repr {
-
 	const kind = ContainerKindInterface
 
 	interfaceType := checker.Elaboration.InterfaceDeclarationTypes[declaration]
+	if interfaceType == nil {
+		panic(errors.NewUnreachableError())
+	}
 
 	checker.containerTypes[interfaceType] = true
 	defer func() {
@@ -107,18 +110,18 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		kind,
 	)
 
-	for _, nestedDeclaration := range nestedDeclarations {
+	// NOTE: visit interfaces first
+	// DON'T use `nestedDeclarations`, because of non-deterministic order
 
-		switch typedNestedDeclaration := nestedDeclaration.(type) {
-		case *ast.InterfaceDeclaration:
-			checker.VisitInterfaceDeclaration(typedNestedDeclaration)
+	for _, nestedInterface := range declaration.InterfaceDeclarations {
+		nestedInterface.Accept(checker)
+	}
 
-		case *ast.CompositeDeclaration:
-			// Composite declarations nested in interface declarations are type requirements,
-			// i.e. they should be checked like interfaces
+	for _, nestedComposite := range declaration.CompositeDeclarations {
+		// Composite declarations nested in interface declarations are type requirements,
+		// i.e. they should be checked like interfaces
 
-			checker.visitCompositeDeclaration(typedNestedDeclaration, kind)
-		}
+		checker.visitCompositeDeclaration(nestedComposite, kind)
 	}
 
 	return nil
@@ -200,7 +203,7 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 		// Check and declare nested types
 
 		nestedDeclarations, nestedInterfaceTypes, nestedCompositeTypes :=
-			checker.visitNestedDeclarations(
+			checker.declareNestedDeclarations(
 				ContainerKindInterface,
 				declaration.CompositeKind,
 				declaration.DeclarationKind(),

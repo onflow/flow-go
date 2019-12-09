@@ -329,13 +329,10 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 }
 
 func (v *ProgramVisitor) VisitConformances(ctx *ConformancesContext) interface{} {
-	identifierNodes := ctx.AllIdentifier
-	conformances := make([]*ast.NominalType, len(identifierNodes()))
-	for i, identifierNode := range identifierNodes() {
-		identifier := identifierNode.Accept(v).(ast.Identifier)
-		conformances[i] = &ast.NominalType{
-			Identifier: identifier,
-		}
+	typeContexts := ctx.AllNominalType()
+	conformances := make([]*ast.NominalType, len(typeContexts))
+	for i, typeContext := range typeContexts {
+		conformances[i] = typeContext.Accept(v).(*ast.NominalType)
 	}
 	return conformances
 }

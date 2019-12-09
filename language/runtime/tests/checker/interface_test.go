@@ -1226,37 +1226,206 @@ func TestCheckContractInterfaceTypeRequirementWithFunction(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCheckContractInterfaceFungibleToken(t *testing.T) {
+func TestCheckContractInterfaceTypeRequirementConformanceMissingMembers(t *testing.T) {
 
-	_, err := ParseAndCheck(t, `
-      pub contract interface FungibleToken {
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
 
-          pub resource interface Provider {
+              struct interface NestedInterface {
+                  fun test(): Bool
+              }
 
-              pub fun withdraw(amount: Int): <-Vault
+              struct Nested: NestedInterface {
+                  // missing function 'test' is valid:
+                  // 'Nested' is a requirement, not an actual declaration
+              }
           }
-
-          pub resource interface Receiver {
-
-              pub fun deposit(vault: <-Vault)
-          }
-
-          pub resource Vault: Provider, Receiver {
-
-              pub balance: Int
-
-              init(balance: Int)
-
-              pub fun withdraw(amount: Int): <-Vault
-
-              pub fun deposit(vault: <-Vault)
-          }
-
-          pub fun absorb(vault: <-Vault)
-
-          pub fun sprout(): <-Vault
-      }
-    `)
+	    `,
+	)
 
 	require.NoError(t, err)
+}
+
+func TestCheckInvalidContractInterfaceTypeRequirementConformance(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
+
+              struct interface NestedInterface {
+                  fun test(): Bool
+              }
+
+              struct Nested: NestedInterface {
+                  // return type mismatch, should be 'Bool'
+                  fun test(): Int
+              }
+          }
+	    `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ConformanceError{}, errs[0])
+}
+
+func TestCheckInvalidContractInterfaceTypeRequirementConformanceMissingFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
+
+              struct interface NestedInterface {
+                  fun test(): Bool
+              }
+
+              struct Nested: NestedInterface {}
+          }
+
+          contract TestImpl: Test {
+
+              struct Nested: Test.NestedInterface {
+                  // missing function 'test'
+              }
+          }
+	    `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ConformanceError{}, errs[0])
+}
+
+func TestCheckInvalidContractInterfaceTypeRequirementMissingConformance(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
+
+              struct interface NestedInterface {
+                  fun test(): Bool
+              }
+
+              struct Nested: NestedInterface {}
+          }
+
+          contract TestImpl: Test {
+
+              // missing conformance to 'Test.NestedInterface'
+              struct Nested {
+                  fun test(): Bool {
+                      return true
+                  }
+              }
+          }
+	    `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.MissingConformanceError{}, errs[0])
+}
+
+func TestCheckContractInterfaceTypeRequirementImplementation(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          struct interface OtherInterface {}
+
+          contract interface Test {
+
+              struct interface NestedInterface {
+                  fun test(): Bool
+              }
+
+              struct Nested: NestedInterface {}
+          }
+
+          contract TestImpl: Test {
+
+              struct Nested: Test.NestedInterface, OtherInterface {
+                  fun test(): Bool {
+                      return true
+                  }
+              }
+          }
+	    `,
+	)
+
+	require.NoError(t, err)
+}
+
+const fungibleTokenContractInterface = `
+  pub contract interface FungibleToken {
+
+	  pub resource interface Provider {
+
+		  pub fun withdraw(amount: Int): <-Vault
+	  }
+
+	  pub resource interface Receiver {
+
+		  pub fun deposit(vault: <-Vault)
+	  }
+
+	  pub resource Vault: Provider, Receiver {
+
+		  pub balance: Int
+
+		  init(balance: Int)
+	  }
+
+	  pub fun absorb(vault: <-Vault)
+
+	  pub fun sprout(): <-Vault
+  }
+`
+
+func TestCheckContractInterfaceFungibleToken(t *testing.T) {
+
+	_, err := ParseAndCheck(t, fungibleTokenContractInterface)
+
+	require.NoError(t, err)
+}
+
+const validExampleFungibleTokenContract = `
+ pub contract ExampleToken: FungibleToken {
+
+     pub resource Vault: FungibleToken.Receiver, FungibleToken.Provider {
+
+         pub var balance: Int
+
+         init(balance: Int) {
+             self.balance = balance
+         }
+
+         pub fun withdraw(amount: Int): <-Vault {
+             self.balance = self.balance - amount
+             return <-create Vault(balance: amount)
+         }
+
+         pub fun deposit(from: <-Vault) {
+            self.balance = self.balance + from.balance
+            destroy from
+         }
+     }
+
+     pub fun absorb(vault: <-Vault) {
+         destroy vault
+     }
+
+     pub fun sprout(): <-Vault {
+         return <-create Vault(balance: 0)
+     }
+ }
+`
+
+func TestCheckContractInterfaceFungibleTokenConformance(t *testing.T) {
+
+	code := fungibleTokenContractInterface + "\n" + validExampleFungibleTokenContract
+
+	_, err := ParseAndCheck(t, code)
+
+	assert.NoError(t, err)
 }

@@ -118,7 +118,7 @@ compositeDeclaration
     ;
 
 conformances
-    : (':' identifier (',' identifier)*)?
+    : (':' nominalType (',' nominalType)*)?
     ;
 
 variableKind
