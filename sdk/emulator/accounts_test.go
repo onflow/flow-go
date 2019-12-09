@@ -414,6 +414,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	addKeyScript, err := templates.AddAccountKey(publicKey)
 	assert.NoError(t, err)
 
+	// create transaction that adds publicKey to account keys
 	tx1 := flow.Transaction{
 		Script:             addKeyScript,
 		ReferenceBlockHash: nil,
@@ -423,11 +424,13 @@ func TestRemoveAccountKey(t *testing.T) {
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
+	// sign with root key
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
 	assert.NoError(t, err)
 
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
+	// submit tx1 (should succeed)
 	result, err := b.SubmitTransaction(tx1)
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
@@ -440,6 +443,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	assert.Len(t, account.Keys, 2)
 
+	// create transaction that removes root key
 	tx2 := flow.Transaction{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
@@ -449,11 +453,13 @@ func TestRemoveAccountKey(t *testing.T) {
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
+	// sign with root key
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
 	assert.NoError(t, err)
 
 	tx2.AddSignature(b.RootAccountAddress(), sig)
 
+	// submit tx2 (should succeed)
 	result, err = b.SubmitTransaction(tx2)
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
@@ -466,6 +472,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	assert.Len(t, account.Keys, 1)
 
+	// create transaction that removes remaining account key
 	tx3 := flow.Transaction{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
@@ -475,14 +482,15 @@ func TestRemoveAccountKey(t *testing.T) {
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
+	// sign with root key (that has been removed)
 	sig, err = keys.SignTransaction(tx3, b.RootKey())
 	assert.NoError(t, err)
 
 	tx3.AddSignature(b.RootAccountAddress(), sig)
 
-	result, err = b.SubmitTransaction(tx3)
-	assert.NoError(t, err)
-	assert.True(t, result.Succeeded())
+	// submit tx3 (should fail)
+	_, err = b.SubmitTransaction(tx3)
+	assert.IsType(t, &emulator.ErrInvalidSignaturePublicKey{}, err)
 
 	_, err = b.CommitBlock()
 	assert.NoError(t, err)
@@ -492,6 +500,7 @@ func TestRemoveAccountKey(t *testing.T) {
 
 	assert.Len(t, account.Keys, 1)
 
+	// create transaction that removes remaining account key
 	tx4 := flow.Transaction{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
@@ -501,11 +510,13 @@ func TestRemoveAccountKey(t *testing.T) {
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 	}
 
+	// sign with remaining account key
 	sig, err = keys.SignTransaction(tx4, privateKey)
 	assert.NoError(t, err)
 
 	tx4.AddSignature(b.RootAccountAddress(), sig)
 
+	// submit tx4 (should succeed)
 	result, err = b.SubmitTransaction(tx4)
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
@@ -516,6 +527,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	account, err = b.GetAccount(b.RootAccountAddress())
 	assert.NoError(t, err)
 
+	// no more keys left on account
 	assert.Empty(t, account.Keys)
 }
 
