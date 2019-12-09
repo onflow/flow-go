@@ -4,29 +4,25 @@ package gossip
 import (
 	"context"
 	"errors"
-	"github.com/dapperlabs/flow-go/network/mock"
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"io/ioutil"
+	"testing"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
-	"testing"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/network/mock"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 // A mock engine that implements the engine interface (see engine.go for more details)
 type helloEngine struct {
 	event  string
-	sender string
+	sender flow.Identifier
 }
 
-func (he *helloEngine) Identify(event interface{}) ([]byte, error) {
-	return nil, nil
-}
-func (he *helloEngine) Retrieve(eventID []byte) (interface{}, error) {
-	return nil, nil
-}
-
-func (he *helloEngine) Process(originID string, event interface{}) error {
+func (he *helloEngine) Process(originID flow.Identifier, event interface{}) error {
 	str, ok := event.(string)
 	if !ok {
 		return errors.New("could not cast event to string")

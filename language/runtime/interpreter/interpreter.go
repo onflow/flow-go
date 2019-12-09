@@ -2547,8 +2547,12 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 		prepareFunctionType = transactionType.PrepareFunctionType().InvocationFunctionType()
 	}
 
-	executeFunction := declaration.Execute.FunctionDeclaration.ToExpression()
-	executeFunctionType := transactionType.ExecuteFunctionType().InvocationFunctionType()
+	var executeFunction *ast.FunctionExpression
+	var executeFunctionType *sema.FunctionType
+	if declaration.Execute != nil {
+		executeFunction = declaration.Execute.FunctionDeclaration.ToExpression()
+		executeFunctionType = transactionType.ExecuteFunctionType().InvocationFunctionType()
+	}
 
 	beforeStatements, rewrittenPostConditions :=
 		interpreter.rewritePostConditions(declaration.PostConditions)
@@ -2566,7 +2570,8 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 
 			transactionScope := interpreter.activations.CurrentOrNew()
 
-			var entryPoint Trampoline
+			var prepareTrampoline = func() Trampoline { return Done{} }
+			var executeTrampoline = func() Trampoline { return Done{} }
 
 			if prepareFunction != nil {
 				prepare := newInterpretedFunction(
@@ -2576,29 +2581,35 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 					transactionScope,
 				)
 
-				entryPoint = prepare.invoke(invocation)
-			} else {
-				entryPoint = interpreter.visitStatements(beforeStatements)
+				prepareTrampoline = func() Trampoline {
+					return prepare.invoke(invocation)
+				}
 			}
 
-			execute := newInterpretedFunction(
-				interpreter,
-				executeFunction,
-				executeFunctionType,
-				transactionScope,
-			)
+			if executeFunction != nil {
+				execute := newInterpretedFunction(
+					interpreter,
+					executeFunction,
+					executeFunctionType,
+					transactionScope,
+				)
 
-			return entryPoint.
+				executeTrampoline = func() Trampoline {
+					invocationWithoutArguments := invocation
+					invocationWithoutArguments.Arguments = nil
+					return execute.invoke(invocationWithoutArguments)
+				}
+			}
+
+			return prepareTrampoline().
+				FlatMap(func(_ interface{}) Trampoline {
+					return interpreter.visitStatements(beforeStatements)
+				}).
 				FlatMap(func(_ interface{}) Trampoline {
 					return interpreter.visitConditions(declaration.PreConditions)
 				}).
 				FlatMap(func(_ interface{}) Trampoline {
-					return execute.invoke(Invocation{
-						Arguments:     nil,
-						ArgumentTypes: nil,
-						Location:      invocation.Location,
-						Interpreter:   invocation.Interpreter,
-					})
+					return executeTrampoline()
 				}).
 				FlatMap(func(_ interface{}) Trampoline {
 					return interpreter.visitConditions(rewrittenPostConditions)

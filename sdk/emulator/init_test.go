@@ -22,7 +22,7 @@ func TestInitialization(t *testing.T) {
 	dir, err := ioutil.TempDir("", "badger-test")
 	require.Nil(t, err)
 	defer os.RemoveAll(dir)
-	store, err := badger.New(dir)
+	store, err := badger.New(badger.WithPath(dir))
 	require.Nil(t, err)
 	defer store.Close()
 
@@ -63,8 +63,6 @@ func TestInitialization(t *testing.T) {
                 destroy existing
                 acct.published[&Counter] = &acct.storage[Counter] as Counter
               }
-
-              execute {}
             }
         `,
 			counterAddress,

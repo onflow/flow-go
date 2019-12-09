@@ -7,42 +7,49 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/flow-go/network/gossip"
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+
+	"github.com/dapperlabs/flow-go/network/gossip"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
+// TestGRPCUnderlay_Start_Twice tests if the GRPCUnderlay doesn't allow starting it twice
 func TestGRPCUnderlay_Start_Twice(t *testing.T) {
 	var protocol gossip.Underlay = &GRPCUnderlay{}
 	require.NotNil(t, protocol, "Protocol is nil")
 	protocol.Handle(func(sender string, msg []byte) {})
-	address := "127.0.0.1:50000"
+	address := ":0"
+	listener, err := net.Listen("tcp4", address)
+	require.NoError(t, err)
 	go func() {
-		assert.NoError(t, protocol.Start(address))
+		require.NoError(t, protocol.StartWithListener(listener))
 	}()
 	time.Sleep(time.Duration(1))
 	defer protocol.Stop()
-	checkClientConnection(t, address)
-	assert.Error(t, protocol.Start(address))
+	checkClientConnection(t, listener.Addr().String())
+	assert.Error(t, protocol.StartWithListener(listener))
 }
 
+// TestGRPCUnderlay_Start_Stop tests starting and stopping of the GRPC underlay
 func TestGRPCUnderlay_Start_Stop(t *testing.T) {
 	var protocol gossip.Underlay = &GRPCUnderlay{}
 	require.NotNil(t, protocol, "Protocol is nil")
 	protocol.Handle(func(sender string, msg []byte) {})
-	address := "127.0.0.1:50000"
+	address := ":0"
+	listener, err := net.Listen("tcp4", address)
+	require.NoError(t, err)
 	go func() {
-		assert.NoError(t, protocol.Start(address))
+		require.NoError(t, protocol.StartWithListener(listener))
 	}()
-	checkClientConnection(t, address)
+	checkClientConnection(t, listener.Addr().String())
 	assert.NoError(t, protocol.Stop())
 }
 
+// TestGRPCUnderlay_Handle tests if callback handler is called
 func TestGRPCUnderlay_Handle(t *testing.T) {
 	var protocol gossip.Underlay = &GRPCUnderlay{}
-	address := "127.0.0.1:50000"
 	type Tuple struct {
 		sender string
 		msg    []byte
@@ -52,12 +59,15 @@ func TestGRPCUnderlay_Handle(t *testing.T) {
 		ch <- Tuple{sender: sender, msg: msg}
 	}
 	assert.NoError(t, protocol.Handle(callbackfunc))
+	address := ":0"
+	listener, err := net.Listen("tcp4", address)
+	require.NoError(t, err)
 	go func() {
-		assert.NoError(t, protocol.Start(address))
+		require.NoError(t, protocol.StartWithListener(listener))
 	}()
-	checkClientConnection(t, address)
+	checkClientConnection(t, listener.Addr().String())
 	defer protocol.Stop()
-	conn, err := createClientConnection(address)
+	conn, err := createClientConnection(listener.Addr().String())
 	assert.NoError(t, err)
 	client := messages.NewMessageReceiverClient(conn)
 	stream, err := client.StreamQueueService(context.Background())

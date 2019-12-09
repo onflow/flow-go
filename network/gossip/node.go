@@ -5,26 +5,24 @@ import (
 	"net"
 	"os"
 
-	"github.com/dapperlabs/flow-go/network/gossip/cache"
-	"github.com/dapperlabs/flow-go/network/gossip/storage"
-	"github.com/dapperlabs/flow-go/network/gossip/util"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/network/gossip/cache"
 	"github.com/dapperlabs/flow-go/network/gossip/order"
 	"github.com/dapperlabs/flow-go/network/gossip/registry"
+	"github.com/dapperlabs/flow-go/network/gossip/storage"
+	"github.com/dapperlabs/flow-go/network/gossip/util"
 	"github.com/dapperlabs/flow-go/network/mock"
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 // To make sure that Node complies with the Service interface
-var _ Service = (*Node)(nil)
 
-// constant values that represent message types
 const (
 	hashProposal registry.MessageType = iota
 	requestMessage
@@ -48,6 +46,7 @@ type Node struct {
 	// QueueSize is the buffer size of the node for holding incoming Gossip Messages
 	// Once buffer of a node gets full, it does not accept incoming messages
 
+	id              flow.Identifier  // stores the local node identifier
 	address         *messages.Socket // stores the address of the node
 	peers           []string         // stores a list of other nodes' IPs
 	fanoutSet       []string         // stores the fanout set of th node
@@ -208,7 +207,8 @@ func (n *Node) sendEngine(ctx context.Context, eprb []byte) ([]byte, error) {
 		return nil, errors.Wrap(err, "could not decode event")
 	}
 
-	return nil, n.er.Process(uint8(epr.GetEngineID()), epr.GetSenderID(), event)
+	senderID := util.StringToID(epr.GetSenderID())
+	return nil, n.er.Process(uint8(epr.GetEngineID()), senderID, event)
 }
 
 // Gossip synchronizes over the delivery
@@ -547,25 +547,21 @@ func (n *Node) Register(engineID uint8, engine network.Engine) (network.Conduit,
 		return nil, errors.Wrap(err, "could not add engnie to registry")
 	}
 
-	return &conduit{send: func(event interface{}, targetIDs ...string) error {
+	return &conduit{send: func(event interface{}, targetIDs ...flow.Identifier) error {
 		return n.send(engineID, event, targetIDs...)
 	}}, nil
 }
 
 // send is the basic conduit function that gets wrapped for every engine
 // registered
-func (n *Node) send(engineID uint8, event interface{}, targetIDs ...string) error {
+func (n *Node) send(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 	eventBytes, err := n.codec.Encode(event)
 	if err != nil {
 		return errors.Wrap(err, "could not encode event")
 	}
 
-	senderID, err := n.pt.GetID(util.SocketToString(n.address))
-	if err != nil {
-		return errors.Wrap(err, "could not get sender ID from sender's IP")
-	}
-
-	eprBytes, err := proto.Marshal(&messages.EventProcessRequest{EngineID: uint32(engineID), Event: eventBytes, SenderID: senderID})
+	sender := util.IDToString(n.id)
+	eprBytes, err := proto.Marshal(&messages.EventProcessRequest{EngineID: uint32(engineID), Event: eventBytes, SenderID: sender})
 	if err != nil {
 		return errors.Wrap(err, "could not marshal event process request")
 	}

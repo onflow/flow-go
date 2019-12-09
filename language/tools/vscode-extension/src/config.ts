@@ -1,51 +1,86 @@
 import {commands, window, workspace} from "vscode";
+import {shortAddress} from "./address";
 
-// The config used by the extension
-export type Config = {
-    flowCommand: string
-    serverConfig: ServerConfig
+export const ROOT_ADDR: string = shortAddress("0000000000000000000000000000000000000001");
+
+const CONFIG_FLOW_COMMAND = "flowCommand";
+const CONFIG_ROOT_ACCOUNT_KEY = "rootAccountKey";
+const CONFIG_EMULATOR_ADDRESS = "emulatorAddress";
+const CONFIG_NUM_ACCOUNTS = "numAccounts";
+
+// A created account that we can submit transactions for.
+type Account = {
+    address: string
 };
+
+type AccountSet = {[key: string]: Account};
 
 // The subset of extension configuration used by the language server.
 type ServerConfig = {
-    accountKey: string
-    accountAddress: string
+    rootAccountKey: string
     emulatorAddress: string
 };
 
+// The config used by the extension
+export class Config {
+    // The name of the flow CLI executable
+    flowCommand: string;
+    serverConfig: ServerConfig;
+    numAccounts: number;
+    // Set of created accounts for which we can submit transactions.
+    // Mapping from account address to account object.
+    accounts: AccountSet;
+    // Address of the currently active account.
+    activeAccount: string;
+
+    constructor(flowCommand: string, numAccounts: number, serverConfig: ServerConfig) {
+        this.flowCommand = flowCommand;
+        this.numAccounts = numAccounts;
+        this.serverConfig = serverConfig;
+        this.accounts = {[ROOT_ADDR]: {address: ROOT_ADDR}};
+        this.activeAccount = ROOT_ADDR;
+    }
+
+    addAccount(address: string) {
+        address = shortAddress(address);
+        this.accounts[address] = {address: address};
+    }
+
+    // Resets account state
+    resetAccounts() {
+        this.accounts = {[ROOT_ADDR]: {address: ROOT_ADDR}};
+        this.activeAccount = ROOT_ADDR;
+    }
+}
+
 // Retrieves config from the workspace.
-export function getConfig(): Config | undefined {
+export function getConfig(): Config {
     const cadenceConfig = workspace
         .getConfiguration("cadence");
 
-    const flowCommand: string | undefined = cadenceConfig.get("flowCommand")
+    const flowCommand: string | undefined = cadenceConfig.get(CONFIG_FLOW_COMMAND);
     if (!flowCommand) {
-        return;
+        throw new Error(`Missing ${CONFIG_FLOW_COMMAND} config`);
     }
 
-    const accountKey : string | undefined = cadenceConfig.get("accountKey");
-    if (!accountKey) {
-        return;
+    const rootAccountKey : string | undefined = cadenceConfig.get(CONFIG_ROOT_ACCOUNT_KEY);
+    if (!rootAccountKey) {
+        throw new Error(`Missing ${CONFIG_ROOT_ACCOUNT_KEY} config`);
     }
 
-    const accountAddress: string | undefined = cadenceConfig.get("accountAddress");
-    if (!accountAddress) {
-        return;
-    }
-
-    const emulatorAddress: string | undefined = cadenceConfig.get("emulatorAddress");
+    const emulatorAddress: string | undefined = cadenceConfig.get(CONFIG_EMULATOR_ADDRESS);
     if (!emulatorAddress) {
-        return;
+        throw new Error(`Missing ${CONFIG_EMULATOR_ADDRESS} config`);
     }
 
-    return {
-        flowCommand: flowCommand,
-        serverConfig: {
-            accountKey: accountKey,
-            accountAddress: accountAddress,
-            emulatorAddress: emulatorAddress,
-        },
-    };
+    const numAccounts: number | undefined = cadenceConfig.get(CONFIG_NUM_ACCOUNTS);
+    if (!numAccounts) {
+        throw new Error(`Missing ${CONFIG_NUM_ACCOUNTS} config`);
+    }
+
+    const serverConfig = {rootAccountKey, emulatorAddress};
+
+    return new Config(flowCommand, numAccounts, serverConfig);
 }
 
 // Adds an event handler that prompts the user to reload whenever the config
