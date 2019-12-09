@@ -5895,7 +5895,7 @@ func TestInterpretCastingIntLiteralToOptional(t *testing.T) {
 	)
 }
 
-func TestInterpretCastingResourceToAnyAnyResource(t *testing.T) {
+func TestInterpretCastingResourceToAnyResource(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       resource R {}

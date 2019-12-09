@@ -37,7 +37,7 @@ func TestCheckInvalidCastingIntLiteralToString(t *testing.T) {
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
-func TestCheckCastingIntLiteralToAnyAnyStruct(t *testing.T) {
+func TestCheckCastingIntLiteralToAnyStruct(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
       let x = 1 as AnyStruct
@@ -53,7 +53,7 @@ func TestCheckCastingIntLiteralToAnyAnyStruct(t *testing.T) {
 	assert.NotEmpty(t, checker.Elaboration.CastingTargetTypes)
 }
 
-func TestCheckCastingResourceToAnyAnyResource(t *testing.T) {
+func TestCheckCastingResourceToAnyResource(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
       resource R {}
