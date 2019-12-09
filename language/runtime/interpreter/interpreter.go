@@ -123,20 +123,21 @@ type StorageKeyHandlerFunc func(
 ) string
 
 type Interpreter struct {
-	Checker             *sema.Checker
-	PredefinedValues    map[string]Value
-	activations         *activations.Activations
-	Globals             map[string]*Variable
-	Interfaces          map[string]*ast.InterfaceDeclaration
-	CompositeFunctions  map[string]map[string]FunctionValue
-	DestructorFunctions map[string]*InterpretedFunctionValue
-	SubInterpreters     map[ast.LocationID]*Interpreter
-	Transactions        []*HostFunctionValue
-	onEventEmitted      OnEventEmittedFunc
-	onStatement         OnStatementFunc
-	storageReadHandler  StorageReadHandlerFunc
-	storageWriteHandler StorageWriteHandlerFunc
-	storageKeyHandler   StorageKeyHandlerFunc
+	Checker               *sema.Checker
+	PredefinedValues      map[string]Value
+	activations           *activations.Activations
+	Globals               map[string]*Variable
+	InterfaceDeclarations map[*sema.InterfaceType]*ast.InterfaceDeclaration
+	CompositeDeclarations map[*sema.CompositeType]*ast.CompositeDeclaration
+	CompositeFunctions    map[string]map[string]FunctionValue
+	DestructorFunctions   map[string]*InterpretedFunctionValue
+	SubInterpreters       map[ast.LocationID]*Interpreter
+	Transactions          []*HostFunctionValue
+	onEventEmitted        OnEventEmittedFunc
+	onStatement           OnStatementFunc
+	storageReadHandler    StorageReadHandlerFunc
+	storageWriteHandler   StorageWriteHandlerFunc
+	storageKeyHandler     StorageKeyHandlerFunc
 }
 
 type Option func(*Interpreter) error
@@ -211,13 +212,14 @@ func WithStorageKeyHandlerFunc(handler StorageKeyHandlerFunc) Option {
 
 func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, error) {
 	interpreter := &Interpreter{
-		Checker:             checker,
-		activations:         &activations.Activations{},
-		Globals:             map[string]*Variable{},
-		Interfaces:          map[string]*ast.InterfaceDeclaration{},
-		CompositeFunctions:  map[string]map[string]FunctionValue{},
-		DestructorFunctions: map[string]*InterpretedFunctionValue{},
-		SubInterpreters:     map[ast.LocationID]*Interpreter{},
+		Checker:               checker,
+		activations:           &activations.Activations{},
+		Globals:               map[string]*Variable{},
+		InterfaceDeclarations: map[*sema.InterfaceType]*ast.InterfaceDeclaration{},
+		CompositeDeclarations: map[*sema.CompositeType]*ast.CompositeDeclaration{},
+		CompositeFunctions:    map[string]map[string]FunctionValue{},
+		DestructorFunctions:   map[string]*InterpretedFunctionValue{},
+		SubInterpreters:       map[ast.LocationID]*Interpreter{},
 	}
 
 	interpreter.defineBaseFunctions()
@@ -383,7 +385,7 @@ func (interpreter *Interpreter) interpret() Trampoline {
 func (interpreter *Interpreter) prepareInterpretation() {
 	program := interpreter.Checker.Program
 
-	// pre-declare empty variables for all structures, interfaces, and function declarations
+	// Pre-declare empty variables for all structures, interfaces, and function declarations
 	for _, declaration := range program.InterfaceDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
@@ -393,6 +395,10 @@ func (interpreter *Interpreter) prepareInterpretation() {
 	for _, declaration := range program.FunctionDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
+
+	// Register top-level interface declarations, as their functions' conditions
+	// need to be included in conforming composites' functions
+
 	for _, declaration := range program.InterfaceDeclarations() {
 		interpreter.declareInterface(declaration)
 	}
@@ -521,7 +527,12 @@ func (interpreter *Interpreter) prepareInvoke(
 		preparedArguments[i] = interpreter.convertAndBox(argument, nil, parameterType)
 	}
 
-	trampoline = functionValue.invoke(preparedArguments, LocationPosition{})
+	// NOTE: can't fill argument types, as they are unknown
+	trampoline = functionValue.invoke(Invocation{
+		Arguments:   preparedArguments,
+		Interpreter: interpreter,
+	})
+
 	return trampoline, nil
 }
 
@@ -1645,27 +1656,20 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 
 			return interpreter.visitExpressionsNonCopying(argumentExpressions).
 				FlatMap(func(result interface{}) Trampoline {
-					arguments := result.(*ArrayValue)
+					arguments := result.(*ArrayValue).Values
 
 					argumentTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression]
 					parameterTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression]
 
-					argumentCopies := make([]Value, len(arguments.Values))
-					for i, argument := range arguments.Values {
-						argumentType := argumentTypes[i]
-						parameterType := parameterTypes[i]
-						argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
-					}
-
-					// TODO: optimize: only potentially used by host-functions
-					location := LocationPosition{
-						Position: invocationExpression.StartPosition(),
-						Location: interpreter.Checker.Location,
-					}
-
-					invocation := function.invoke(argumentCopies, location)
+					invocation := interpreter.functionValueInvocationTrampoline(
+						function,
+						arguments,
+						argumentTypes,
+						parameterTypes,
+						invocationExpression.StartPosition(),
+					)
 
 					// If this is invocation is optional chaining, wrap the result
 					// as an optional, as the result is expected to be an optional
@@ -1679,6 +1683,69 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 					})
 				})
 		})
+}
+
+func (interpreter *Interpreter) InvokeFunctionValue(
+	function FunctionValue,
+	arguments []Value,
+	argumentTypes []sema.Type,
+	parameterTypes []sema.Type,
+	pos ast.Position,
+) (value Value, err error) {
+	// recover internal panics and return them as an error
+	defer recoverErrors(func(internalErr error) {
+		err = internalErr
+	})
+
+	trampoline := interpreter.functionValueInvocationTrampoline(
+		function,
+		arguments,
+		argumentTypes,
+		parameterTypes,
+		pos,
+	)
+
+	result := interpreter.runAllStatements(trampoline)
+	if result == nil {
+		return nil, nil
+	}
+	return result.(Value), nil
+}
+
+func (interpreter *Interpreter) functionValueInvocationTrampoline(
+	function FunctionValue,
+	arguments []Value,
+	argumentTypes []sema.Type,
+	parameterTypes []sema.Type,
+	pos ast.Position,
+) Trampoline {
+
+	parameterTypeCount := len(parameterTypes)
+	argumentCopies := make([]Value, len(arguments))
+
+	for i, argument := range arguments {
+		argumentType := argumentTypes[i]
+		if i < parameterTypeCount {
+			parameterType := parameterTypes[i]
+			argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
+		} else {
+			argumentCopies[i] = argument.Copy()
+		}
+	}
+
+	// TODO: optimize: only potentially used by host-functions
+
+	location := LocationPosition{
+		Position: pos,
+		Location: interpreter.Checker.Location,
+	}
+
+	return function.invoke(Invocation{
+		Arguments:     argumentCopies,
+		ArgumentTypes: argumentTypes,
+		Location:      location,
+		Interpreter:   interpreter,
+	})
 }
 
 func (interpreter *Interpreter) invokeInterpretedFunction(
@@ -1848,6 +1915,14 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 		interpreter.activations.PushCurrent()
 		defer interpreter.activations.Pop()
 
+		for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
+			interpreter.declareInterface(nestedInterfaceDeclaration)
+		}
+
+		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+			interpreter.declareComposite(nestedCompositeDeclaration)
+		}
+
 		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
 
 			// Pass the lexical scope, which has the containing composite's constructor declared,
@@ -1871,7 +1946,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 	interpreter.CompositeFunctions[identifier] = functions
 
 	function = NewHostFunctionValue(
-		func(arguments []Value, location LocationPosition) Trampoline {
+		func(invocation Invocation) Trampoline {
 
 			value := &CompositeValue{
 				Location:   interpreter.Checker.Location,
@@ -1889,8 +1964,10 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 			if initializerFunction != nil {
 				// NOTE: arguments are already properly boxed by invocation expression
 
-				initializationTrampoline = interpreter.bindSelf(*initializerFunction, value).
-					invoke(arguments, location)
+				initializationTrampoline =
+					interpreter.
+						bindSelf(*initializerFunction, value).
+						invoke(invocation)
 			}
 
 			return initializationTrampoline.
@@ -1911,7 +1988,7 @@ func (interpreter *Interpreter) bindSelf(
 	function InterpretedFunctionValue,
 	structure *CompositeValue,
 ) FunctionValue {
-	return NewHostFunctionValue(func(arguments []Value, location LocationPosition) Trampoline {
+	return NewHostFunctionValue(func(invocation Invocation) Trampoline {
 		// start a new activation record
 		// lexical scope: use the function declaration's activation record,
 		// not the current one (which would be dynamic scope)
@@ -1920,7 +1997,7 @@ func (interpreter *Interpreter) bindSelf(
 		// make `self` available
 		interpreter.declareVariable(sema.SelfIdentifier, structure)
 
-		return interpreter.invokeInterpretedFunctionActivated(function, arguments)
+		return interpreter.invokeInterpretedFunctionActivated(function, invocation.Arguments)
 	})
 }
 
@@ -1935,8 +2012,10 @@ func (interpreter *Interpreter) initializerFunction(
 	var preConditions []*ast.Condition
 	var postConditions []*ast.Condition
 
-	for _, conformance := range compositeDeclaration.Conformances {
-		interfaceDeclaration := interpreter.Interfaces[conformance.Identifier.Identifier]
+	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
+
+	for _, conformance := range compositeType.Conformances {
+		interfaceDeclaration := interpreter.InterfaceDeclarations[conformance]
 
 		// TODO: support multiple overloaded initializers
 
@@ -2023,9 +2102,11 @@ func (interpreter *Interpreter) destructorFunction(
 	var preConditions []*ast.Condition
 	var postConditions []*ast.Condition
 
-	for _, conformance := range compositeDeclaration.Conformances {
-		conformanceIdentifier := conformance.Identifier.Identifier
-		interfaceDeclaration := interpreter.Interfaces[conformanceIdentifier]
+	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
+
+	for _, conformance := range compositeType.Conformances {
+		interfaceDeclaration := interpreter.InterfaceDeclarations[conformance]
+
 		interfaceDestructor := interfaceDeclaration.Members.Destructor()
 		if interfaceDestructor == nil || interfaceDestructor.FunctionBlock == nil {
 			continue
@@ -2093,10 +2174,30 @@ func (interpreter *Interpreter) compositeFunctions(
 
 	functions := map[string]FunctionValue{}
 
+	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
+
+	var typeRequirements []*sema.CompositeType
+
+	if containerComposite, ok := compositeType.ContainerType.(*sema.CompositeType); ok {
+		for _, conformance := range containerComposite.Conformances {
+			ty := conformance.NestedTypes[compositeDeclaration.Identifier.Identifier]
+			typeRequirement, ok := ty.(*sema.CompositeType)
+			if !ok {
+				continue
+			}
+
+			typeRequirements = append(typeRequirements, typeRequirement)
+		}
+	}
+
 	for _, functionDeclaration := range compositeDeclaration.Members.Functions {
 		functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
 
-		function := interpreter.compositeFunction(functionDeclaration, compositeDeclaration.Conformances)
+		function := interpreter.compositeFunction(
+			functionDeclaration,
+			compositeType.Conformances,
+			typeRequirements,
+		)
 
 		functions[functionDeclaration.Identifier.Identifier] =
 			newInterpretedFunction(
@@ -2112,7 +2213,8 @@ func (interpreter *Interpreter) compositeFunctions(
 
 func (interpreter *Interpreter) compositeFunction(
 	functionDeclaration *ast.FunctionDeclaration,
-	conformances []*ast.NominalType,
+	conformances []*sema.InterfaceType,
+	typeRequirements []*sema.CompositeType,
 ) *ast.FunctionExpression {
 
 	functionIdentifier := functionDeclaration.Identifier.Identifier
@@ -2123,12 +2225,11 @@ func (interpreter *Interpreter) compositeFunction(
 	functionBlockCopy := *function.FunctionBlock
 	function.FunctionBlock = &functionBlockCopy
 
-	for _, conformance := range conformances {
-		conformanceIdentifier := conformance.Identifier.Identifier
-		interfaceDeclaration := interpreter.Interfaces[conformanceIdentifier]
-		interfaceFunction, ok := interfaceDeclaration.Members.FunctionsByIdentifier()[functionIdentifier]
+	addConditionsFromMembers := func(members *ast.Members) {
+		functionsByIdentifier := members.FunctionsByIdentifier()
+		interfaceFunction, ok := functionsByIdentifier[functionIdentifier]
 		if !ok || interfaceFunction.FunctionBlock == nil {
-			continue
+			return
 		}
 
 		functionBlockCopy.PreConditions = append(
@@ -2140,6 +2241,16 @@ func (interpreter *Interpreter) compositeFunction(
 			functionBlockCopy.PostConditions,
 			interfaceFunction.FunctionBlock.PostConditions...,
 		)
+	}
+
+	for _, conformance := range conformances {
+		interfaceDeclaration := interpreter.InterfaceDeclarations[conformance]
+		addConditionsFromMembers(interfaceDeclaration.Members)
+	}
+
+	for _, typeRequirement := range typeRequirements {
+		compositeDeclaration := interpreter.CompositeDeclarations[typeRequirement]
+		addConditionsFromMembers(compositeDeclaration.Members)
 	}
 
 	return function
@@ -2275,7 +2386,29 @@ func (interpreter *Interpreter) VisitInterfaceDeclaration(declaration *ast.Inter
 }
 
 func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDeclaration) {
-	interpreter.Interfaces[declaration.Identifier.Identifier] = declaration
+	interfaceType := interpreter.Checker.Elaboration.InterfaceDeclarationTypes[declaration]
+	interpreter.InterfaceDeclarations[interfaceType] = declaration
+
+	for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
+		interpreter.declareInterface(nestedInterfaceDeclaration)
+	}
+
+	for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+		interpreter.declareComposite(nestedCompositeDeclaration)
+	}
+}
+
+func (interpreter *Interpreter) declareComposite(declaration *ast.CompositeDeclaration) {
+	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[declaration]
+	interpreter.CompositeDeclarations[compositeType] = declaration
+
+	for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
+		interpreter.declareInterface(nestedInterfaceDeclaration)
+	}
+
+	for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+		interpreter.declareComposite(nestedCompositeDeclaration)
+	}
 }
 
 func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
@@ -2321,6 +2454,18 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 				variables = subInterpreter.Globals
 			}
 
+			// Import all interface declarations from sub-interpreter
+
+			for interfaceType, interfaceDeclaration := range subInterpreter.InterfaceDeclarations {
+				interpreter.InterfaceDeclarations[interfaceType] = interfaceDeclaration
+			}
+
+			// Import all composite declarations from sub-interpreter
+
+			for compositeType, compositeDeclaration := range subInterpreter.CompositeDeclarations {
+				interpreter.CompositeDeclarations[compositeType] = compositeDeclaration
+			}
+
 			// set variables for all imported values
 			for name, variable := range variables {
 
@@ -2335,12 +2480,6 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 				}
 
 				interpreter.setVariable(name, variable)
-
-				// If the imported name refers to an interface, also import it from the sub-interpreter
-
-				if interfaceDeclaration, ok := subInterpreter.Interfaces[name]; ok {
-					interpreter.Interfaces[name] = interfaceDeclaration
-				}
 
 				// If the imported name refers to a composite, also import the composite functions
 				// and the destructor function from the sub-interpreter
@@ -2391,7 +2530,7 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 	}
 
 	transactionFunction := NewHostFunctionValue(
-		func(arguments []Value, location LocationPosition) Trampoline {
+		func(invocation Invocation) Trampoline {
 			interpreter.activations.Push(lexicalScope)
 
 			interpreter.declareVariable(sema.SelfIdentifier, self)
@@ -2410,7 +2549,7 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 				)
 
 				prepareTrampoline = func() Trampoline {
-					return prepare.invoke(arguments, location)
+					return prepare.invoke(invocation)
 				}
 			}
 
@@ -2423,7 +2562,9 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 				)
 
 				executeTrampoline = func() Trampoline {
-					return execute.invoke(nil, location)
+					invocationWithoutArguments := invocation
+					invocationWithoutArguments.Arguments = nil
+					return execute.invoke(invocationWithoutArguments)
 				}
 			}
 
@@ -2468,12 +2609,12 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 
 	variable := interpreter.findOrDeclareVariable(identifier)
 	variable.Value = NewHostFunctionValue(
-		func(arguments []Value, location LocationPosition) Trampoline {
+		func(invocation Invocation) Trampoline {
 			fields := make([]EventField, len(eventType.Fields))
 			for i, field := range eventType.Fields {
 				fields[i] = EventField{
 					Identifier: field.Identifier,
-					Value:      arguments[i],
+					Value:      invocation.Arguments[i],
 				}
 			}
 
@@ -2603,8 +2744,8 @@ func (interpreter *Interpreter) defineBaseFunctions() {
 
 func (interpreter *Interpreter) newConverterFunction(converter func(Value) Value) HostFunctionValue {
 	return HostFunctionValue{
-		Function: func(arguments []Value, location LocationPosition) Trampoline {
-			return Done{Result: converter(arguments[0])}
+		Function: func(invocation Invocation) Trampoline {
+			return Done{Result: converter(invocation.Arguments[0])}
 		},
 	}
 }

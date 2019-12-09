@@ -1636,6 +1636,18 @@ func (t *CompositeType) IsInvalidType() bool {
 	return false
 }
 
+func (t *CompositeType) InterfaceType() *InterfaceType {
+	return &InterfaceType{
+		Location:                            t.Location,
+		Identifier:                          t.Identifier,
+		CompositeKind:                       t.Kind,
+		Members:                             t.Members,
+		InitializerParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
+		ContainerType:                       t.ContainerType,
+		NestedTypes:                         t.NestedTypes,
+	}
+}
+
 // AccountType
 
 type AccountType struct{}

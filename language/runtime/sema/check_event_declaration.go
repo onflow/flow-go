@@ -2,10 +2,14 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
 func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
 	eventType := checker.Elaboration.EventDeclarationTypes[declaration]
+	if eventType == nil {
+		panic(errors.NewUnreachableError())
+	}
 
 	constructorFunctionType := eventType.ConstructorFunctionType().InvocationFunctionType()
 
