@@ -346,7 +346,7 @@ var parserATN = []uint16{
 	145, 3, 2, 2, 2, 724, 729, 5, 154, 78, 2, 725, 729, 5, 156, 79, 2, 726,
 	729, 5, 158, 80, 2, 727, 729, 5, 160, 81, 2, 728, 724, 3, 2, 2, 2, 728,
 	725, 3, 2, 2, 2, 728, 726, 3, 2, 2, 2, 728, 727, 3, 2, 2, 2, 729, 147,
-	3, 2, 2, 2, 730, 731, 7, 62, 2, 2, 731, 732, 5, 104, 53, 2, 732, 733, 5,
+	3, 2, 2, 2, 730, 731, 7, 62, 2, 2, 731, 732, 5, 58, 30, 2, 732, 733, 5,
 	168, 85, 2, 733, 149, 3, 2, 2, 2, 734, 735, 7, 63, 2, 2, 735, 736, 5, 104,
 	53, 2, 736, 151, 3, 2, 2, 2, 737, 738, 7, 26, 2, 2, 738, 739, 5, 104, 53,
 	2, 739, 740, 7, 31, 2, 2, 740, 741, 5, 54, 28, 2, 741, 153, 3, 2, 2, 2,
@@ -11984,14 +11984,14 @@ func (s *CreateExpressionContext) Create() antlr.TerminalNode {
 	return s.GetToken(CadenceParserCreate, 0)
 }
 
-func (s *CreateExpressionContext) Expression() IExpressionContext {
-	var t = s.GetTypedRuleContext(reflect.TypeOf((*IExpressionContext)(nil)).Elem(), 0)
+func (s *CreateExpressionContext) NominalType() INominalTypeContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*INominalTypeContext)(nil)).Elem(), 0)
 
 	if t == nil {
 		return nil
 	}
 
-	return t.(IExpressionContext)
+	return t.(INominalTypeContext)
 }
 
 func (s *CreateExpressionContext) Invocation() IInvocationContext {
@@ -12061,7 +12061,7 @@ func (p *CadenceParser) CreateExpression() (localctx ICreateExpressionContext) {
 	}
 	{
 		p.SetState(729)
-		p.Expression()
+		p.NominalType()
 	}
 	{
 		p.SetState(730)

@@ -477,7 +477,7 @@ primaryExpressionStart
     ;
 
 createExpression
-    : Create expression invocation
+    : Create nominalType invocation
     ;
 
 destroyExpression
@@ -697,7 +697,7 @@ WS
     ;
 
 Terminator
-    : [\r\n]+ -> channel(HIDDEN)
+    : [\r\n\u2028\u2029]+ -> channel(HIDDEN)
     ;
 
 BlockComment

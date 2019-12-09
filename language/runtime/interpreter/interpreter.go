@@ -128,6 +128,7 @@ type Interpreter struct {
 	activations           *activations.Activations
 	Globals               map[string]*Variable
 	InterfaceDeclarations map[*sema.InterfaceType]*ast.InterfaceDeclaration
+	CompositeDeclarations map[*sema.CompositeType]*ast.CompositeDeclaration
 	CompositeFunctions    map[string]map[string]FunctionValue
 	DestructorFunctions   map[string]*InterpretedFunctionValue
 	SubInterpreters       map[ast.LocationID]*Interpreter
@@ -215,6 +216,7 @@ func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, err
 		activations:           &activations.Activations{},
 		Globals:               map[string]*Variable{},
 		InterfaceDeclarations: map[*sema.InterfaceType]*ast.InterfaceDeclaration{},
+		CompositeDeclarations: map[*sema.CompositeType]*ast.CompositeDeclaration{},
 		CompositeFunctions:    map[string]map[string]FunctionValue{},
 		DestructorFunctions:   map[string]*InterpretedFunctionValue{},
 		SubInterpreters:       map[ast.LocationID]*Interpreter{},
@@ -383,7 +385,7 @@ func (interpreter *Interpreter) interpret() Trampoline {
 func (interpreter *Interpreter) prepareInterpretation() {
 	program := interpreter.Checker.Program
 
-	// pre-declare empty variables for all structures, interfaces, and function declarations
+	// Pre-declare empty variables for all structures, interfaces, and function declarations
 	for _, declaration := range program.InterfaceDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
@@ -393,6 +395,10 @@ func (interpreter *Interpreter) prepareInterpretation() {
 	for _, declaration := range program.FunctionDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
+
+	// Register top-level interface declarations, as their functions' conditions
+	// need to be included in conforming composites' functions
+
 	for _, declaration := range program.InterfaceDeclarations() {
 		interpreter.declareInterface(declaration)
 	}
@@ -1853,6 +1859,10 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 		}
 
 		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+			interpreter.declareComposite(nestedCompositeDeclaration)
+		}
+
+		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
 
 			// Pass the lexical scope, which has the containing composite's constructor declared,
 			// to the nested declarations so they can refer to it, and update the lexical scope
@@ -2103,10 +2113,28 @@ func (interpreter *Interpreter) compositeFunctions(
 
 	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
 
+	var typeRequirements []*sema.CompositeType
+
+	if containerComposite, ok := compositeType.ContainerType.(*sema.CompositeType); ok {
+		for _, conformance := range containerComposite.Conformances {
+			ty := conformance.NestedTypes[compositeDeclaration.Identifier.Identifier]
+			typeRequirement, ok := ty.(*sema.CompositeType)
+			if !ok {
+				continue
+			}
+
+			typeRequirements = append(typeRequirements, typeRequirement)
+		}
+	}
+
 	for _, functionDeclaration := range compositeDeclaration.Members.Functions {
 		functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
 
-		function := interpreter.compositeFunction(functionDeclaration, compositeType.Conformances)
+		function := interpreter.compositeFunction(
+			functionDeclaration,
+			compositeType.Conformances,
+			typeRequirements,
+		)
 
 		functions[functionDeclaration.Identifier.Identifier] =
 			newInterpretedFunction(
@@ -2123,6 +2151,7 @@ func (interpreter *Interpreter) compositeFunctions(
 func (interpreter *Interpreter) compositeFunction(
 	functionDeclaration *ast.FunctionDeclaration,
 	conformances []*sema.InterfaceType,
+	typeRequirements []*sema.CompositeType,
 ) *ast.FunctionExpression {
 
 	functionIdentifier := functionDeclaration.Identifier.Identifier
@@ -2133,13 +2162,11 @@ func (interpreter *Interpreter) compositeFunction(
 	functionBlockCopy := *function.FunctionBlock
 	function.FunctionBlock = &functionBlockCopy
 
-	for _, conformance := range conformances {
-		interfaceDeclaration := interpreter.InterfaceDeclarations[conformance]
-
-		functionsByIdentifier := interfaceDeclaration.Members.FunctionsByIdentifier()
+	addConditionsFromMembers := func(members *ast.Members) {
+		functionsByIdentifier := members.FunctionsByIdentifier()
 		interfaceFunction, ok := functionsByIdentifier[functionIdentifier]
 		if !ok || interfaceFunction.FunctionBlock == nil {
-			continue
+			return
 		}
 
 		functionBlockCopy.PreConditions = append(
@@ -2151,6 +2178,16 @@ func (interpreter *Interpreter) compositeFunction(
 			functionBlockCopy.PostConditions,
 			interfaceFunction.FunctionBlock.PostConditions...,
 		)
+	}
+
+	for _, conformance := range conformances {
+		interfaceDeclaration := interpreter.InterfaceDeclarations[conformance]
+		addConditionsFromMembers(interfaceDeclaration.Members)
+	}
+
+	for _, typeRequirement := range typeRequirements {
+		compositeDeclaration := interpreter.CompositeDeclarations[typeRequirement]
+		addConditionsFromMembers(compositeDeclaration.Members)
 	}
 
 	return function
@@ -2292,6 +2329,23 @@ func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDecla
 	for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
 		interpreter.declareInterface(nestedInterfaceDeclaration)
 	}
+
+	for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+		interpreter.declareComposite(nestedCompositeDeclaration)
+	}
+}
+
+func (interpreter *Interpreter) declareComposite(declaration *ast.CompositeDeclaration) {
+	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[declaration]
+	interpreter.CompositeDeclarations[compositeType] = declaration
+
+	for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
+		interpreter.declareInterface(nestedInterfaceDeclaration)
+	}
+
+	for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+		interpreter.declareComposite(nestedCompositeDeclaration)
+	}
 }
 
 func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
@@ -2341,6 +2395,12 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 
 			for interfaceType, interfaceDeclaration := range subInterpreter.InterfaceDeclarations {
 				interpreter.InterfaceDeclarations[interfaceType] = interfaceDeclaration
+			}
+
+			// Import all composite declarations from sub-interpreter
+
+			for compositeType, compositeDeclaration := range subInterpreter.CompositeDeclarations {
+				interpreter.CompositeDeclarations[compositeType] = compositeDeclaration
 			}
 
 			// set variables for all imported values
