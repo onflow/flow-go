@@ -19,7 +19,7 @@ var _ = reflect.Copy
 var _ = strconv.Itoa
 
 var parserATN = []uint16{
-	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 74, 860,
+	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 75, 860,
 	4, 2, 9, 2, 4, 3, 9, 3, 4, 4, 9, 4, 4, 5, 9, 5, 4, 6, 9, 6, 4, 7, 9, 7,
 	4, 8, 9, 8, 4, 9, 9, 9, 4, 10, 9, 10, 4, 11, 9, 11, 4, 12, 9, 12, 4, 13,
 	9, 13, 4, 14, 9, 14, 4, 15, 9, 15, 4, 16, 9, 16, 4, 17, 9, 17, 4, 18, 9,
@@ -117,10 +117,10 @@ var parserATN = []uint16{
 	80, 82, 84, 86, 88, 90, 92, 94, 96, 98, 100, 102, 104, 106, 108, 110, 112,
 	114, 116, 118, 120, 122, 124, 126, 128, 130, 132, 134, 136, 138, 140, 142,
 	144, 146, 148, 150, 152, 154, 156, 158, 160, 162, 164, 166, 168, 170, 172,
-	174, 176, 178, 180, 182, 184, 186, 188, 190, 192, 2, 13, 3, 2, 52, 53,
-	3, 2, 36, 38, 4, 2, 12, 12, 28, 28, 3, 2, 15, 16, 3, 2, 17, 20, 3, 2, 21,
-	22, 3, 2, 23, 25, 4, 2, 22, 22, 27, 28, 3, 2, 31, 32, 3, 2, 57, 58, 4,
-	2, 38, 38, 61, 64, 2, 881, 2, 200, 3, 2, 2, 2, 4, 208, 3, 2, 2, 2, 6, 215,
+	174, 176, 178, 180, 182, 184, 186, 188, 190, 192, 2, 13, 3, 2, 53, 54,
+	3, 2, 37, 39, 4, 2, 12, 12, 28, 28, 3, 2, 15, 16, 3, 2, 17, 20, 3, 2, 21,
+	22, 3, 2, 23, 25, 4, 2, 22, 22, 27, 28, 3, 2, 31, 32, 3, 2, 58, 59, 4,
+	2, 39, 39, 62, 65, 2, 881, 2, 200, 3, 2, 2, 2, 4, 208, 3, 2, 2, 2, 6, 215,
 	3, 2, 2, 2, 8, 217, 3, 2, 2, 2, 10, 220, 3, 2, 2, 2, 12, 231, 3, 2, 2,
 	2, 14, 233, 3, 2, 2, 2, 16, 261, 3, 2, 2, 2, 18, 263, 3, 2, 2, 2, 20, 266,
 	3, 2, 2, 2, 22, 288, 3, 2, 2, 2, 24, 290, 3, 2, 2, 2, 26, 307, 3, 2, 2,
@@ -164,7 +164,7 @@ var parserATN = []uint16{
 	2, 229, 232, 5, 46, 24, 2, 230, 232, 5, 14, 8, 2, 231, 224, 3, 2, 2, 2,
 	231, 225, 3, 2, 2, 2, 231, 226, 3, 2, 2, 2, 231, 227, 3, 2, 2, 2, 231,
 	228, 3, 2, 2, 2, 231, 229, 3, 2, 2, 2, 231, 230, 3, 2, 2, 2, 232, 13, 3,
-	2, 2, 2, 233, 234, 7, 35, 2, 2, 234, 235, 7, 4, 2, 2, 235, 237, 5, 32,
+	2, 2, 2, 233, 234, 7, 36, 2, 2, 234, 235, 7, 4, 2, 2, 235, 237, 5, 32,
 	17, 2, 236, 238, 5, 16, 9, 2, 237, 236, 3, 2, 2, 2, 237, 238, 3, 2, 2,
 	2, 238, 257, 3, 2, 2, 2, 239, 241, 5, 72, 37, 2, 240, 239, 3, 2, 2, 2,
 	240, 241, 3, 2, 2, 2, 241, 243, 3, 2, 2, 2, 242, 244, 5, 18, 10, 2, 243,
@@ -177,14 +177,14 @@ var parserATN = []uint16{
 	240, 3, 2, 2, 2, 257, 249, 3, 2, 2, 2, 258, 259, 3, 2, 2, 2, 259, 260,
 	7, 5, 2, 2, 260, 15, 3, 2, 2, 2, 261, 262, 5, 42, 22, 2, 262, 17, 3, 2,
 	2, 2, 263, 264, 5, 190, 96, 2, 264, 265, 5, 68, 35, 2, 265, 19, 3, 2, 2,
-	2, 266, 277, 7, 60, 2, 2, 267, 272, 5, 190, 96, 2, 268, 269, 7, 6, 2, 2,
+	2, 266, 277, 7, 61, 2, 2, 267, 272, 5, 190, 96, 2, 268, 269, 7, 6, 2, 2,
 	269, 271, 5, 190, 96, 2, 270, 268, 3, 2, 2, 2, 271, 274, 3, 2, 2, 2, 272,
 	270, 3, 2, 2, 2, 272, 273, 3, 2, 2, 2, 273, 275, 3, 2, 2, 2, 274, 272,
-	3, 2, 2, 2, 275, 276, 7, 61, 2, 2, 276, 278, 3, 2, 2, 2, 277, 267, 3, 2,
+	3, 2, 2, 2, 275, 276, 7, 62, 2, 2, 276, 278, 3, 2, 2, 2, 277, 267, 3, 2,
 	2, 2, 277, 278, 3, 2, 2, 2, 278, 281, 3, 2, 2, 2, 279, 282, 5, 178, 90,
-	2, 280, 282, 7, 68, 2, 2, 281, 279, 3, 2, 2, 2, 281, 280, 3, 2, 2, 2, 282,
-	21, 3, 2, 2, 2, 283, 289, 3, 2, 2, 2, 284, 289, 7, 45, 2, 2, 285, 289,
-	7, 46, 2, 2, 286, 289, 7, 47, 2, 2, 287, 289, 7, 48, 2, 2, 288, 283, 3,
+	2, 280, 282, 7, 69, 2, 2, 281, 279, 3, 2, 2, 2, 281, 280, 3, 2, 2, 2, 282,
+	21, 3, 2, 2, 2, 283, 289, 3, 2, 2, 2, 284, 289, 7, 46, 2, 2, 285, 289,
+	7, 47, 2, 2, 286, 289, 7, 48, 2, 2, 287, 289, 7, 49, 2, 2, 288, 283, 3,
 	2, 2, 2, 288, 284, 3, 2, 2, 2, 288, 285, 3, 2, 2, 2, 288, 286, 3, 2, 2,
 	2, 288, 287, 3, 2, 2, 2, 289, 23, 3, 2, 2, 2, 290, 291, 5, 22, 12, 2, 291,
 	292, 5, 40, 21, 2, 292, 293, 5, 190, 96, 2, 293, 294, 5, 26, 14, 2, 294,
@@ -200,7 +200,7 @@ var parserATN = []uint16{
 	320, 322, 7, 3, 2, 2, 321, 320, 3, 2, 2, 2, 321, 322, 3, 2, 2, 2, 322,
 	324, 3, 2, 2, 2, 323, 319, 3, 2, 2, 2, 324, 327, 3, 2, 2, 2, 325, 323,
 	3, 2, 2, 2, 325, 326, 3, 2, 2, 2, 326, 33, 3, 2, 2, 2, 327, 325, 3, 2,
-	2, 2, 328, 329, 5, 22, 12, 2, 329, 330, 5, 40, 21, 2, 330, 331, 7, 39,
+	2, 2, 328, 329, 5, 22, 12, 2, 329, 330, 5, 40, 21, 2, 330, 331, 7, 40,
 	2, 2, 331, 332, 5, 190, 96, 2, 332, 333, 7, 4, 2, 2, 333, 334, 5, 36, 19,
 	2, 334, 335, 7, 5, 2, 2, 335, 35, 3, 2, 2, 2, 336, 338, 5, 38, 20, 2, 337,
 	339, 7, 3, 2, 2, 338, 337, 3, 2, 2, 2, 338, 339, 3, 2, 2, 2, 339, 341,
@@ -212,19 +212,19 @@ var parserATN = []uint16{
 	3, 2, 2, 2, 351, 39, 3, 2, 2, 2, 352, 353, 9, 3, 2, 2, 353, 41, 3, 2, 2,
 	2, 354, 355, 5, 190, 96, 2, 355, 357, 5, 48, 25, 2, 356, 358, 5, 70, 36,
 	2, 357, 356, 3, 2, 2, 2, 357, 358, 3, 2, 2, 2, 358, 43, 3, 2, 2, 2, 359,
-	360, 5, 22, 12, 2, 360, 361, 7, 40, 2, 2, 361, 362, 5, 190, 96, 2, 362,
+	360, 5, 22, 12, 2, 360, 361, 7, 41, 2, 2, 361, 362, 5, 190, 96, 2, 362,
 	365, 5, 48, 25, 2, 363, 364, 7, 7, 2, 2, 364, 366, 5, 52, 27, 2, 365, 363,
 	3, 2, 2, 2, 365, 366, 3, 2, 2, 2, 366, 368, 3, 2, 2, 2, 367, 369, 5, 70,
 	36, 2, 368, 367, 3, 2, 2, 2, 368, 369, 3, 2, 2, 2, 369, 45, 3, 2, 2, 2,
-	370, 371, 7, 41, 2, 2, 371, 372, 5, 190, 96, 2, 372, 373, 5, 48, 25, 2,
-	373, 47, 3, 2, 2, 2, 374, 383, 7, 33, 2, 2, 375, 380, 5, 50, 26, 2, 376,
+	370, 371, 7, 42, 2, 2, 371, 372, 5, 190, 96, 2, 372, 373, 5, 48, 25, 2,
+	373, 47, 3, 2, 2, 2, 374, 383, 7, 34, 2, 2, 375, 380, 5, 50, 26, 2, 376,
 	377, 7, 6, 2, 2, 377, 379, 5, 50, 26, 2, 378, 376, 3, 2, 2, 2, 379, 382,
 	3, 2, 2, 2, 380, 378, 3, 2, 2, 2, 380, 381, 3, 2, 2, 2, 381, 384, 3, 2,
 	2, 2, 382, 380, 3, 2, 2, 2, 383, 375, 3, 2, 2, 2, 383, 384, 3, 2, 2, 2,
-	384, 385, 3, 2, 2, 2, 385, 386, 7, 34, 2, 2, 386, 49, 3, 2, 2, 2, 387,
+	384, 385, 3, 2, 2, 2, 385, 386, 7, 35, 2, 2, 386, 49, 3, 2, 2, 2, 387,
 	389, 5, 190, 96, 2, 388, 387, 3, 2, 2, 2, 388, 389, 3, 2, 2, 2, 389, 390,
 	3, 2, 2, 2, 390, 391, 5, 190, 96, 2, 391, 392, 7, 7, 2, 2, 392, 393, 5,
-	52, 27, 2, 393, 51, 3, 2, 2, 2, 394, 396, 7, 28, 2, 2, 395, 394, 3, 2,
+	52, 27, 2, 393, 51, 3, 2, 2, 2, 394, 396, 7, 33, 2, 2, 395, 394, 3, 2,
 	2, 2, 395, 396, 3, 2, 2, 2, 396, 397, 3, 2, 2, 2, 397, 398, 5, 54, 28,
 	2, 398, 53, 3, 2, 2, 2, 399, 400, 7, 26, 2, 2, 400, 401, 6, 28, 2, 2, 401,
 	411, 5, 56, 29, 2, 402, 407, 5, 56, 29, 2, 403, 404, 6, 28, 3, 2, 404,
@@ -237,15 +237,15 @@ var parserATN = []uint16{
 	3, 2, 2, 2, 418, 57, 3, 2, 2, 2, 419, 424, 5, 190, 96, 2, 420, 421, 7,
 	8, 2, 2, 421, 423, 5, 190, 96, 2, 422, 420, 3, 2, 2, 2, 423, 426, 3, 2,
 	2, 2, 424, 422, 3, 2, 2, 2, 424, 425, 3, 2, 2, 2, 425, 59, 3, 2, 2, 2,
-	426, 424, 3, 2, 2, 2, 427, 428, 7, 33, 2, 2, 428, 437, 7, 33, 2, 2, 429,
+	426, 424, 3, 2, 2, 2, 427, 428, 7, 34, 2, 2, 428, 437, 7, 34, 2, 2, 429,
 	434, 5, 52, 27, 2, 430, 431, 7, 6, 2, 2, 431, 433, 5, 52, 27, 2, 432, 430,
 	3, 2, 2, 2, 433, 436, 3, 2, 2, 2, 434, 432, 3, 2, 2, 2, 434, 435, 3, 2,
 	2, 2, 435, 438, 3, 2, 2, 2, 436, 434, 3, 2, 2, 2, 437, 429, 3, 2, 2, 2,
-	437, 438, 3, 2, 2, 2, 438, 439, 3, 2, 2, 2, 439, 440, 7, 34, 2, 2, 440,
-	441, 7, 7, 2, 2, 441, 442, 5, 52, 27, 2, 442, 443, 7, 34, 2, 2, 443, 61,
+	437, 438, 3, 2, 2, 2, 438, 439, 3, 2, 2, 2, 439, 440, 7, 35, 2, 2, 440,
+	441, 7, 7, 2, 2, 441, 442, 5, 52, 27, 2, 442, 443, 7, 35, 2, 2, 443, 61,
 	3, 2, 2, 2, 444, 445, 7, 9, 2, 2, 445, 446, 5, 54, 28, 2, 446, 447, 7,
 	10, 2, 2, 447, 63, 3, 2, 2, 2, 448, 449, 7, 9, 2, 2, 449, 450, 5, 54, 28,
-	2, 450, 451, 7, 3, 2, 2, 451, 452, 7, 65, 2, 2, 452, 453, 7, 10, 2, 2,
+	2, 450, 451, 7, 3, 2, 2, 451, 452, 7, 66, 2, 2, 452, 453, 7, 10, 2, 2,
 	453, 65, 3, 2, 2, 2, 454, 455, 7, 4, 2, 2, 455, 456, 5, 54, 28, 2, 456,
 	457, 7, 7, 2, 2, 457, 458, 5, 54, 28, 2, 458, 459, 7, 5, 2, 2, 459, 67,
 	3, 2, 2, 2, 460, 461, 7, 4, 2, 2, 461, 462, 5, 80, 41, 2, 462, 463, 7,
@@ -253,8 +253,8 @@ var parserATN = []uint16{
 	2, 466, 465, 3, 2, 2, 2, 466, 467, 3, 2, 2, 2, 467, 469, 3, 2, 2, 2, 468,
 	470, 5, 74, 38, 2, 469, 468, 3, 2, 2, 2, 469, 470, 3, 2, 2, 2, 470, 471,
 	3, 2, 2, 2, 471, 472, 5, 80, 41, 2, 472, 473, 7, 5, 2, 2, 473, 71, 3, 2,
-	2, 2, 474, 475, 7, 43, 2, 2, 475, 476, 7, 4, 2, 2, 476, 477, 5, 76, 39,
-	2, 477, 478, 7, 5, 2, 2, 478, 73, 3, 2, 2, 2, 479, 480, 7, 44, 2, 2, 480,
+	2, 2, 474, 475, 7, 44, 2, 2, 475, 476, 7, 4, 2, 2, 476, 477, 5, 76, 39,
+	2, 477, 478, 7, 5, 2, 2, 478, 73, 3, 2, 2, 2, 479, 480, 7, 45, 2, 2, 480,
 	481, 7, 4, 2, 2, 481, 482, 5, 76, 39, 2, 482, 483, 7, 5, 2, 2, 483, 75,
 	3, 2, 2, 2, 484, 485, 5, 78, 40, 2, 485, 486, 5, 192, 97, 2, 486, 488,
 	3, 2, 2, 2, 487, 484, 3, 2, 2, 2, 488, 491, 3, 2, 2, 2, 489, 487, 3, 2,
@@ -270,16 +270,16 @@ var parserATN = []uint16{
 	2, 515, 505, 3, 2, 2, 2, 515, 506, 3, 2, 2, 2, 515, 507, 3, 2, 2, 2, 515,
 	508, 3, 2, 2, 2, 515, 509, 3, 2, 2, 2, 515, 510, 3, 2, 2, 2, 515, 511,
 	3, 2, 2, 2, 515, 512, 3, 2, 2, 2, 515, 513, 3, 2, 2, 2, 515, 514, 3, 2,
-	2, 2, 516, 83, 3, 2, 2, 2, 517, 520, 7, 49, 2, 2, 518, 519, 6, 43, 4, 2,
+	2, 2, 516, 83, 3, 2, 2, 2, 517, 520, 7, 50, 2, 2, 518, 519, 6, 43, 4, 2,
 	519, 521, 5, 104, 53, 2, 520, 518, 3, 2, 2, 2, 520, 521, 3, 2, 2, 2, 521,
-	85, 3, 2, 2, 2, 522, 523, 7, 50, 2, 2, 523, 87, 3, 2, 2, 2, 524, 525, 7,
-	51, 2, 2, 525, 89, 3, 2, 2, 2, 526, 529, 7, 54, 2, 2, 527, 530, 5, 104,
+	85, 3, 2, 2, 2, 522, 523, 7, 51, 2, 2, 523, 87, 3, 2, 2, 2, 524, 525, 7,
+	52, 2, 2, 525, 89, 3, 2, 2, 2, 526, 529, 7, 55, 2, 2, 527, 530, 5, 104,
 	53, 2, 528, 530, 5, 96, 49, 2, 529, 527, 3, 2, 2, 2, 529, 528, 3, 2, 2,
-	2, 530, 531, 3, 2, 2, 2, 531, 537, 5, 68, 35, 2, 532, 535, 7, 55, 2, 2,
+	2, 530, 531, 3, 2, 2, 2, 531, 537, 5, 68, 35, 2, 532, 535, 7, 56, 2, 2,
 	533, 536, 5, 90, 46, 2, 534, 536, 5, 68, 35, 2, 535, 533, 3, 2, 2, 2, 535,
 	534, 3, 2, 2, 2, 536, 538, 3, 2, 2, 2, 537, 532, 3, 2, 2, 2, 537, 538,
-	3, 2, 2, 2, 538, 91, 3, 2, 2, 2, 539, 540, 7, 56, 2, 2, 540, 541, 5, 104,
-	53, 2, 541, 542, 5, 68, 35, 2, 542, 93, 3, 2, 2, 2, 543, 544, 7, 42, 2,
+	3, 2, 2, 2, 538, 91, 3, 2, 2, 2, 539, 540, 7, 57, 2, 2, 540, 541, 5, 104,
+	53, 2, 541, 542, 5, 68, 35, 2, 542, 93, 3, 2, 2, 2, 543, 544, 7, 43, 2,
 	2, 544, 545, 5, 190, 96, 2, 545, 546, 5, 168, 85, 2, 546, 95, 3, 2, 2,
 	2, 547, 548, 5, 22, 12, 2, 548, 549, 5, 28, 15, 2, 549, 552, 5, 190, 96,
 	2, 550, 551, 7, 7, 2, 2, 551, 553, 5, 52, 27, 2, 552, 550, 3, 2, 2, 2,
@@ -346,26 +346,26 @@ var parserATN = []uint16{
 	145, 3, 2, 2, 2, 724, 729, 5, 154, 78, 2, 725, 729, 5, 156, 79, 2, 726,
 	729, 5, 158, 80, 2, 727, 729, 5, 160, 81, 2, 728, 724, 3, 2, 2, 2, 728,
 	725, 3, 2, 2, 2, 728, 726, 3, 2, 2, 2, 728, 727, 3, 2, 2, 2, 729, 147,
-	3, 2, 2, 2, 730, 731, 7, 62, 2, 2, 731, 732, 5, 58, 30, 2, 732, 733, 5,
-	168, 85, 2, 733, 149, 3, 2, 2, 2, 734, 735, 7, 63, 2, 2, 735, 736, 5, 104,
+	3, 2, 2, 2, 730, 731, 7, 63, 2, 2, 731, 732, 5, 58, 30, 2, 732, 733, 5,
+	168, 85, 2, 733, 149, 3, 2, 2, 2, 734, 735, 7, 64, 2, 2, 735, 736, 5, 104,
 	53, 2, 736, 151, 3, 2, 2, 2, 737, 738, 7, 26, 2, 2, 738, 739, 5, 104, 53,
 	2, 739, 740, 7, 31, 2, 2, 740, 741, 5, 54, 28, 2, 741, 153, 3, 2, 2, 2,
 	742, 743, 5, 190, 96, 2, 743, 155, 3, 2, 2, 2, 744, 745, 5, 172, 87, 2,
-	745, 157, 3, 2, 2, 2, 746, 747, 7, 40, 2, 2, 747, 750, 5, 48, 25, 2, 748,
+	745, 157, 3, 2, 2, 2, 746, 747, 7, 41, 2, 2, 747, 750, 5, 48, 25, 2, 748,
 	749, 7, 7, 2, 2, 749, 751, 5, 52, 27, 2, 750, 748, 3, 2, 2, 2, 750, 751,
 	3, 2, 2, 2, 751, 752, 3, 2, 2, 2, 752, 753, 5, 70, 36, 2, 753, 159, 3,
-	2, 2, 2, 754, 755, 7, 33, 2, 2, 755, 756, 5, 104, 53, 2, 756, 757, 7, 34,
+	2, 2, 2, 754, 755, 7, 34, 2, 2, 755, 756, 5, 104, 53, 2, 756, 757, 7, 35,
 	2, 2, 757, 161, 3, 2, 2, 2, 758, 761, 5, 164, 83, 2, 759, 761, 5, 166,
 	84, 2, 760, 758, 3, 2, 2, 2, 760, 759, 3, 2, 2, 2, 761, 163, 3, 2, 2, 2,
 	762, 764, 7, 29, 2, 2, 763, 762, 3, 2, 2, 2, 763, 764, 3, 2, 2, 2, 764,
 	765, 3, 2, 2, 2, 765, 766, 7, 8, 2, 2, 766, 767, 5, 190, 96, 2, 767, 165,
 	3, 2, 2, 2, 768, 771, 7, 9, 2, 2, 769, 772, 5, 104, 53, 2, 770, 772, 5,
 	54, 28, 2, 771, 769, 3, 2, 2, 2, 771, 770, 3, 2, 2, 2, 772, 773, 3, 2,
-	2, 2, 773, 774, 7, 10, 2, 2, 774, 167, 3, 2, 2, 2, 775, 784, 7, 33, 2,
+	2, 2, 773, 774, 7, 10, 2, 2, 774, 167, 3, 2, 2, 2, 775, 784, 7, 34, 2,
 	2, 776, 781, 5, 170, 86, 2, 777, 778, 7, 6, 2, 2, 778, 780, 5, 170, 86,
 	2, 779, 777, 3, 2, 2, 2, 780, 783, 3, 2, 2, 2, 781, 779, 3, 2, 2, 2, 781,
 	782, 3, 2, 2, 2, 782, 785, 3, 2, 2, 2, 783, 781, 3, 2, 2, 2, 784, 776,
-	3, 2, 2, 2, 784, 785, 3, 2, 2, 2, 785, 786, 3, 2, 2, 2, 786, 787, 7, 34,
+	3, 2, 2, 2, 784, 785, 3, 2, 2, 2, 785, 786, 3, 2, 2, 2, 786, 787, 7, 35,
 	2, 2, 787, 169, 3, 2, 2, 2, 788, 789, 5, 190, 96, 2, 789, 790, 7, 7, 2,
 	2, 790, 792, 3, 2, 2, 2, 791, 788, 3, 2, 2, 2, 791, 792, 3, 2, 2, 2, 792,
 	793, 3, 2, 2, 2, 793, 794, 5, 104, 53, 2, 794, 171, 3, 2, 2, 2, 795, 802,
@@ -373,12 +373,12 @@ var parserATN = []uint16{
 	5, 186, 94, 2, 799, 802, 5, 178, 90, 2, 800, 802, 5, 176, 89, 2, 801, 795,
 	3, 2, 2, 2, 801, 796, 3, 2, 2, 2, 801, 797, 3, 2, 2, 2, 801, 798, 3, 2,
 	2, 2, 801, 799, 3, 2, 2, 2, 801, 800, 3, 2, 2, 2, 802, 173, 3, 2, 2, 2,
-	803, 804, 9, 11, 2, 2, 804, 175, 3, 2, 2, 2, 805, 806, 7, 59, 2, 2, 806,
-	177, 3, 2, 2, 2, 807, 808, 7, 70, 2, 2, 808, 179, 3, 2, 2, 2, 809, 811,
+	803, 804, 9, 11, 2, 2, 804, 175, 3, 2, 2, 2, 805, 806, 7, 60, 2, 2, 806,
+	177, 3, 2, 2, 2, 807, 808, 7, 71, 2, 2, 808, 179, 3, 2, 2, 2, 809, 811,
 	7, 22, 2, 2, 810, 809, 3, 2, 2, 2, 810, 811, 3, 2, 2, 2, 811, 812, 3, 2,
-	2, 2, 812, 813, 5, 182, 92, 2, 813, 181, 3, 2, 2, 2, 814, 820, 7, 65, 2,
-	2, 815, 820, 7, 66, 2, 2, 816, 820, 7, 67, 2, 2, 817, 820, 7, 68, 2, 2,
-	818, 820, 7, 69, 2, 2, 819, 814, 3, 2, 2, 2, 819, 815, 3, 2, 2, 2, 819,
+	2, 2, 812, 813, 5, 182, 92, 2, 813, 181, 3, 2, 2, 2, 814, 820, 7, 66, 2,
+	2, 815, 820, 7, 67, 2, 2, 816, 820, 7, 68, 2, 2, 817, 820, 7, 69, 2, 2,
+	818, 820, 7, 70, 2, 2, 819, 814, 3, 2, 2, 2, 819, 815, 3, 2, 2, 2, 819,
 	816, 3, 2, 2, 2, 819, 817, 3, 2, 2, 2, 819, 818, 3, 2, 2, 2, 820, 183,
 	3, 2, 2, 2, 821, 830, 7, 9, 2, 2, 822, 827, 5, 104, 53, 2, 823, 824, 7,
 	6, 2, 2, 824, 826, 5, 104, 53, 2, 825, 823, 3, 2, 2, 2, 826, 829, 3, 2,
@@ -408,7 +408,7 @@ var literalNames = []string{
 	"", "';'", "'{'", "'}'", "','", "':'", "'.'", "'['", "']'", "'<->'", "'='",
 	"'||'", "'&&'", "'=='", "'!='", "'<'", "'>'", "'<='", "'>='", "'+'", "'-'",
 	"'*'", "'/'", "'%'", "'&'", "'!'", "'<-'", "'?'", "", "'as'", "'as?'",
-	"'('", "')'", "'transaction'", "'struct'", "'resource'", "'contract'",
+	"'@'", "'('", "')'", "'transaction'", "'struct'", "'resource'", "'contract'",
 	"'interface'", "'fun'", "'event'", "'emit'", "'pre'", "'post'", "'priv'",
 	"'auth'", "'pub'", "'pub(set)'", "'return'", "'break'", "'continue'", "'let'",
 	"'var'", "'if'", "'else'", "'while'", "'true'", "'false'", "'nil'", "'import'",
@@ -418,13 +418,13 @@ var symbolicNames = []string{
 	"", "", "", "", "", "", "", "", "", "", "", "", "", "Equal", "Unequal",
 	"Less", "Greater", "LessEqual", "GreaterEqual", "Plus", "Minus", "Mul",
 	"Div", "Mod", "Ampersand", "Negate", "Move", "Optional", "NilCoalescing",
-	"Casting", "FailableCasting", "OpenParen", "CloseParen", "Transaction",
-	"Struct", "Resource", "Contract", "Interface", "Fun", "Event", "Emit",
-	"Pre", "Post", "Priv", "Auth", "Pub", "PubSet", "Return", "Break", "Continue",
-	"Let", "Var", "If", "Else", "While", "True", "False", "Nil", "Import",
-	"From", "Create", "Destroy", "Identifier", "DecimalLiteral", "BinaryLiteral",
-	"OctalLiteral", "HexadecimalLiteral", "InvalidNumberLiteral", "StringLiteral",
-	"WS", "Terminator", "BlockComment", "LineComment",
+	"Casting", "FailableCasting", "ResourceAnnotation", "OpenParen", "CloseParen",
+	"Transaction", "Struct", "Resource", "Contract", "Interface", "Fun", "Event",
+	"Emit", "Pre", "Post", "Priv", "Auth", "Pub", "PubSet", "Return", "Break",
+	"Continue", "Let", "Var", "If", "Else", "While", "True", "False", "Nil",
+	"Import", "From", "Create", "Destroy", "Identifier", "DecimalLiteral",
+	"BinaryLiteral", "OctalLiteral", "HexadecimalLiteral", "InvalidNumberLiteral",
+	"StringLiteral", "WS", "Terminator", "BlockComment", "LineComment",
 }
 
 var ruleNames = []string{
@@ -549,48 +549,49 @@ const (
 	CadenceParserNilCoalescing        = 28
 	CadenceParserCasting              = 29
 	CadenceParserFailableCasting      = 30
-	CadenceParserOpenParen            = 31
-	CadenceParserCloseParen           = 32
-	CadenceParserTransaction          = 33
-	CadenceParserStruct               = 34
-	CadenceParserResource             = 35
-	CadenceParserContract             = 36
-	CadenceParserInterface            = 37
-	CadenceParserFun                  = 38
-	CadenceParserEvent                = 39
-	CadenceParserEmit                 = 40
-	CadenceParserPre                  = 41
-	CadenceParserPost                 = 42
-	CadenceParserPriv                 = 43
-	CadenceParserAuth                 = 44
-	CadenceParserPub                  = 45
-	CadenceParserPubSet               = 46
-	CadenceParserReturn               = 47
-	CadenceParserBreak                = 48
-	CadenceParserContinue             = 49
-	CadenceParserLet                  = 50
-	CadenceParserVar                  = 51
-	CadenceParserIf                   = 52
-	CadenceParserElse                 = 53
-	CadenceParserWhile                = 54
-	CadenceParserTrue                 = 55
-	CadenceParserFalse                = 56
-	CadenceParserNil                  = 57
-	CadenceParserImport               = 58
-	CadenceParserFrom                 = 59
-	CadenceParserCreate               = 60
-	CadenceParserDestroy              = 61
-	CadenceParserIdentifier           = 62
-	CadenceParserDecimalLiteral       = 63
-	CadenceParserBinaryLiteral        = 64
-	CadenceParserOctalLiteral         = 65
-	CadenceParserHexadecimalLiteral   = 66
-	CadenceParserInvalidNumberLiteral = 67
-	CadenceParserStringLiteral        = 68
-	CadenceParserWS                   = 69
-	CadenceParserTerminator           = 70
-	CadenceParserBlockComment         = 71
-	CadenceParserLineComment          = 72
+	CadenceParserResourceAnnotation   = 31
+	CadenceParserOpenParen            = 32
+	CadenceParserCloseParen           = 33
+	CadenceParserTransaction          = 34
+	CadenceParserStruct               = 35
+	CadenceParserResource             = 36
+	CadenceParserContract             = 37
+	CadenceParserInterface            = 38
+	CadenceParserFun                  = 39
+	CadenceParserEvent                = 40
+	CadenceParserEmit                 = 41
+	CadenceParserPre                  = 42
+	CadenceParserPost                 = 43
+	CadenceParserPriv                 = 44
+	CadenceParserAuth                 = 45
+	CadenceParserPub                  = 46
+	CadenceParserPubSet               = 47
+	CadenceParserReturn               = 48
+	CadenceParserBreak                = 49
+	CadenceParserContinue             = 50
+	CadenceParserLet                  = 51
+	CadenceParserVar                  = 52
+	CadenceParserIf                   = 53
+	CadenceParserElse                 = 54
+	CadenceParserWhile                = 55
+	CadenceParserTrue                 = 56
+	CadenceParserFalse                = 57
+	CadenceParserNil                  = 58
+	CadenceParserImport               = 59
+	CadenceParserFrom                 = 60
+	CadenceParserCreate               = 61
+	CadenceParserDestroy              = 62
+	CadenceParserIdentifier           = 63
+	CadenceParserDecimalLiteral       = 64
+	CadenceParserBinaryLiteral        = 65
+	CadenceParserOctalLiteral         = 66
+	CadenceParserHexadecimalLiteral   = 67
+	CadenceParserInvalidNumberLiteral = 68
+	CadenceParserStringLiteral        = 69
+	CadenceParserWS                   = 70
+	CadenceParserTerminator           = 71
+	CadenceParserBlockComment         = 72
+	CadenceParserLineComment          = 73
 )
 
 // CadenceParser rules.
@@ -814,7 +815,7 @@ func (p *CadenceParser) Program() (localctx IProgramContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for ((_la-33)&-(0x1f+1)) == 0 && ((1<<uint((_la-33)))&((1<<(CadenceParserTransaction-33))|(1<<(CadenceParserStruct-33))|(1<<(CadenceParserResource-33))|(1<<(CadenceParserContract-33))|(1<<(CadenceParserFun-33))|(1<<(CadenceParserEvent-33))|(1<<(CadenceParserPriv-33))|(1<<(CadenceParserAuth-33))|(1<<(CadenceParserPub-33))|(1<<(CadenceParserPubSet-33))|(1<<(CadenceParserLet-33))|(1<<(CadenceParserVar-33))|(1<<(CadenceParserImport-33)))) != 0 {
+	for ((_la-34)&-(0x1f+1)) == 0 && ((1<<uint((_la-34)))&((1<<(CadenceParserTransaction-34))|(1<<(CadenceParserStruct-34))|(1<<(CadenceParserResource-34))|(1<<(CadenceParserContract-34))|(1<<(CadenceParserFun-34))|(1<<(CadenceParserEvent-34))|(1<<(CadenceParserPriv-34))|(1<<(CadenceParserAuth-34))|(1<<(CadenceParserPub-34))|(1<<(CadenceParserPubSet-34))|(1<<(CadenceParserLet-34))|(1<<(CadenceParserVar-34))|(1<<(CadenceParserImport-34)))) != 0 {
 		{
 			p.SetState(192)
 			p.Declaration()
@@ -964,7 +965,7 @@ func (p *CadenceParser) ReplInput() (localctx IReplInputContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove)|(1<<CadenceParserOpenParen))) != 0) || (((_la-33)&-(0x1f+1)) == 0 && ((1<<uint((_la-33)))&((1<<(CadenceParserTransaction-33))|(1<<(CadenceParserStruct-33))|(1<<(CadenceParserResource-33))|(1<<(CadenceParserContract-33))|(1<<(CadenceParserFun-33))|(1<<(CadenceParserEvent-33))|(1<<(CadenceParserEmit-33))|(1<<(CadenceParserPriv-33))|(1<<(CadenceParserAuth-33))|(1<<(CadenceParserPub-33))|(1<<(CadenceParserPubSet-33))|(1<<(CadenceParserReturn-33))|(1<<(CadenceParserBreak-33))|(1<<(CadenceParserContinue-33))|(1<<(CadenceParserLet-33))|(1<<(CadenceParserVar-33))|(1<<(CadenceParserIf-33))|(1<<(CadenceParserWhile-33))|(1<<(CadenceParserTrue-33))|(1<<(CadenceParserFalse-33))|(1<<(CadenceParserNil-33))|(1<<(CadenceParserImport-33))|(1<<(CadenceParserFrom-33))|(1<<(CadenceParserCreate-33))|(1<<(CadenceParserDestroy-33))|(1<<(CadenceParserIdentifier-33))|(1<<(CadenceParserDecimalLiteral-33))|(1<<(CadenceParserBinaryLiteral-33)))) != 0) || (((_la-65)&-(0x1f+1)) == 0 && ((1<<uint((_la-65)))&((1<<(CadenceParserOctalLiteral-65))|(1<<(CadenceParserHexadecimalLiteral-65))|(1<<(CadenceParserInvalidNumberLiteral-65))|(1<<(CadenceParserStringLiteral-65)))) != 0) {
+	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove))) != 0) || (((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(CadenceParserOpenParen-32))|(1<<(CadenceParserTransaction-32))|(1<<(CadenceParserStruct-32))|(1<<(CadenceParserResource-32))|(1<<(CadenceParserContract-32))|(1<<(CadenceParserFun-32))|(1<<(CadenceParserEvent-32))|(1<<(CadenceParserEmit-32))|(1<<(CadenceParserPriv-32))|(1<<(CadenceParserAuth-32))|(1<<(CadenceParserPub-32))|(1<<(CadenceParserPubSet-32))|(1<<(CadenceParserReturn-32))|(1<<(CadenceParserBreak-32))|(1<<(CadenceParserContinue-32))|(1<<(CadenceParserLet-32))|(1<<(CadenceParserVar-32))|(1<<(CadenceParserIf-32))|(1<<(CadenceParserWhile-32))|(1<<(CadenceParserTrue-32))|(1<<(CadenceParserFalse-32))|(1<<(CadenceParserNil-32))|(1<<(CadenceParserImport-32))|(1<<(CadenceParserFrom-32))|(1<<(CadenceParserCreate-32))|(1<<(CadenceParserDestroy-32))|(1<<(CadenceParserIdentifier-32)))) != 0) || (((_la-64)&-(0x1f+1)) == 0 && ((1<<uint((_la-64)))&((1<<(CadenceParserDecimalLiteral-64))|(1<<(CadenceParserBinaryLiteral-64))|(1<<(CadenceParserOctalLiteral-64))|(1<<(CadenceParserHexadecimalLiteral-64))|(1<<(CadenceParserInvalidNumberLiteral-64))|(1<<(CadenceParserStringLiteral-64)))) != 0) {
 		{
 			p.SetState(203)
 			p.ReplElement()
@@ -1752,7 +1753,7 @@ func (p *CadenceParser) TransactionDeclaration() (localctx ITransactionDeclarati
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if ((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(CadenceParserContract-36))|(1<<(CadenceParserFrom-36))|(1<<(CadenceParserCreate-36))|(1<<(CadenceParserDestroy-36))|(1<<(CadenceParserIdentifier-36)))) != 0 {
+		if ((_la-37)&-(0x1f+1)) == 0 && ((1<<uint((_la-37)))&((1<<(CadenceParserContract-37))|(1<<(CadenceParserFrom-37))|(1<<(CadenceParserCreate-37))|(1<<(CadenceParserDestroy-37))|(1<<(CadenceParserIdentifier-37)))) != 0 {
 			{
 				p.SetState(240)
 				p.Execute()
@@ -1798,7 +1799,7 @@ func (p *CadenceParser) TransactionDeclaration() (localctx ITransactionDeclarati
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 
-		if ((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(CadenceParserContract-36))|(1<<(CadenceParserFrom-36))|(1<<(CadenceParserCreate-36))|(1<<(CadenceParserDestroy-36))|(1<<(CadenceParserIdentifier-36)))) != 0 {
+		if ((_la-37)&-(0x1f+1)) == 0 && ((1<<uint((_la-37)))&((1<<(CadenceParserContract-37))|(1<<(CadenceParserFrom-37))|(1<<(CadenceParserCreate-37))|(1<<(CadenceParserDestroy-37))|(1<<(CadenceParserIdentifier-37)))) != 0 {
 			{
 				p.SetState(252)
 				p.Execute()
@@ -2186,7 +2187,7 @@ func (p *CadenceParser) ImportDeclaration() (localctx IImportDeclarationContext)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if ((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(CadenceParserContract-36))|(1<<(CadenceParserFrom-36))|(1<<(CadenceParserCreate-36))|(1<<(CadenceParserDestroy-36))|(1<<(CadenceParserIdentifier-36)))) != 0 {
+	if ((_la-37)&-(0x1f+1)) == 0 && ((1<<uint((_la-37)))&((1<<(CadenceParserContract-37))|(1<<(CadenceParserFrom-37))|(1<<(CadenceParserCreate-37))|(1<<(CadenceParserDestroy-37))|(1<<(CadenceParserIdentifier-37)))) != 0 {
 		{
 			p.SetState(265)
 			p.Identifier()
@@ -3407,7 +3408,7 @@ func (p *CadenceParser) MembersAndNestedDeclarations() (localctx IMembersAndNest
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for ((_la-34)&-(0x1f+1)) == 0 && ((1<<uint((_la-34)))&((1<<(CadenceParserStruct-34))|(1<<(CadenceParserResource-34))|(1<<(CadenceParserContract-34))|(1<<(CadenceParserFun-34))|(1<<(CadenceParserPriv-34))|(1<<(CadenceParserAuth-34))|(1<<(CadenceParserPub-34))|(1<<(CadenceParserPubSet-34))|(1<<(CadenceParserLet-34))|(1<<(CadenceParserVar-34))|(1<<(CadenceParserFrom-34))|(1<<(CadenceParserCreate-34))|(1<<(CadenceParserDestroy-34))|(1<<(CadenceParserIdentifier-34)))) != 0 {
+	for ((_la-35)&-(0x1f+1)) == 0 && ((1<<uint((_la-35)))&((1<<(CadenceParserStruct-35))|(1<<(CadenceParserResource-35))|(1<<(CadenceParserContract-35))|(1<<(CadenceParserFun-35))|(1<<(CadenceParserPriv-35))|(1<<(CadenceParserAuth-35))|(1<<(CadenceParserPub-35))|(1<<(CadenceParserPubSet-35))|(1<<(CadenceParserLet-35))|(1<<(CadenceParserVar-35))|(1<<(CadenceParserFrom-35))|(1<<(CadenceParserCreate-35))|(1<<(CadenceParserDestroy-35))|(1<<(CadenceParserIdentifier-35)))) != 0 {
 		{
 			p.SetState(334)
 			p.MemberOrNestedDeclaration()
@@ -3719,7 +3720,7 @@ func (p *CadenceParser) CompositeKind() (localctx ICompositeKindContext) {
 		p.SetState(350)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(((_la-34)&-(0x1f+1)) == 0 && ((1<<uint((_la-34)))&((1<<(CadenceParserStruct-34))|(1<<(CadenceParserResource-34))|(1<<(CadenceParserContract-34)))) != 0) {
+		if !(((_la-35)&-(0x1f+1)) == 0 && ((1<<uint((_la-35)))&((1<<(CadenceParserStruct-35))|(1<<(CadenceParserResource-35))|(1<<(CadenceParserContract-35)))) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
@@ -4332,7 +4333,7 @@ func (p *CadenceParser) ParameterList() (localctx IParameterListContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if ((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(CadenceParserContract-36))|(1<<(CadenceParserFrom-36))|(1<<(CadenceParserCreate-36))|(1<<(CadenceParserDestroy-36))|(1<<(CadenceParserIdentifier-36)))) != 0 {
+	if ((_la-37)&-(0x1f+1)) == 0 && ((1<<uint((_la-37)))&((1<<(CadenceParserContract-37))|(1<<(CadenceParserFrom-37))|(1<<(CadenceParserCreate-37))|(1<<(CadenceParserDestroy-37))|(1<<(CadenceParserIdentifier-37)))) != 0 {
 		{
 			p.SetState(373)
 			p.Parameter()
@@ -4589,8 +4590,8 @@ func (s *TypeAnnotationContext) FullType() IFullTypeContext {
 	return t.(IFullTypeContext)
 }
 
-func (s *TypeAnnotationContext) Move() antlr.TerminalNode {
-	return s.GetToken(CadenceParserMove, 0)
+func (s *TypeAnnotationContext) ResourceAnnotation() antlr.TerminalNode {
+	return s.GetToken(CadenceParserResourceAnnotation, 0)
 }
 
 func (s *TypeAnnotationContext) GetRuleContext() antlr.RuleContext {
@@ -4649,10 +4650,10 @@ func (p *CadenceParser) TypeAnnotation() (localctx ITypeAnnotationContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if _la == CadenceParserMove {
+	if _la == CadenceParserResourceAnnotation {
 		{
 			p.SetState(392)
-			p.Match(CadenceParserMove)
+			p.Match(CadenceParserResourceAnnotation)
 		}
 
 	}
@@ -5368,7 +5369,7 @@ func (p *CadenceParser) FunctionType() (localctx IFunctionTypeContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserAmpersand)|(1<<CadenceParserMove)|(1<<CadenceParserOpenParen))) != 0) || (((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(CadenceParserContract-36))|(1<<(CadenceParserFrom-36))|(1<<(CadenceParserCreate-36))|(1<<(CadenceParserDestroy-36))|(1<<(CadenceParserIdentifier-36)))) != 0) {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserAmpersand)|(1<<CadenceParserResourceAnnotation))) != 0) || (((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(CadenceParserOpenParen-32))|(1<<(CadenceParserContract-32))|(1<<(CadenceParserFrom-32))|(1<<(CadenceParserCreate-32))|(1<<(CadenceParserDestroy-32))|(1<<(CadenceParserIdentifier-32)))) != 0) {
 		{
 			p.SetState(427)
 
@@ -6503,7 +6504,7 @@ func (p *CadenceParser) Conditions() (localctx IConditionsContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove)|(1<<CadenceParserOpenParen))) != 0) || (((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(CadenceParserContract-36))|(1<<(CadenceParserFun-36))|(1<<(CadenceParserTrue-36))|(1<<(CadenceParserFalse-36))|(1<<(CadenceParserNil-36))|(1<<(CadenceParserFrom-36))|(1<<(CadenceParserCreate-36))|(1<<(CadenceParserDestroy-36))|(1<<(CadenceParserIdentifier-36))|(1<<(CadenceParserDecimalLiteral-36))|(1<<(CadenceParserBinaryLiteral-36))|(1<<(CadenceParserOctalLiteral-36))|(1<<(CadenceParserHexadecimalLiteral-36))|(1<<(CadenceParserInvalidNumberLiteral-36)))) != 0) || _la == CadenceParserStringLiteral {
+	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove))) != 0) || (((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(CadenceParserOpenParen-32))|(1<<(CadenceParserContract-32))|(1<<(CadenceParserFun-32))|(1<<(CadenceParserTrue-32))|(1<<(CadenceParserFalse-32))|(1<<(CadenceParserNil-32))|(1<<(CadenceParserFrom-32))|(1<<(CadenceParserCreate-32))|(1<<(CadenceParserDestroy-32))|(1<<(CadenceParserIdentifier-32)))) != 0) || (((_la-64)&-(0x1f+1)) == 0 && ((1<<uint((_la-64)))&((1<<(CadenceParserDecimalLiteral-64))|(1<<(CadenceParserBinaryLiteral-64))|(1<<(CadenceParserOctalLiteral-64))|(1<<(CadenceParserHexadecimalLiteral-64))|(1<<(CadenceParserInvalidNumberLiteral-64))|(1<<(CadenceParserStringLiteral-64)))) != 0) {
 		{
 			p.SetState(482)
 			p.Condition()
@@ -6823,7 +6824,7 @@ func (p *CadenceParser) Statements() (localctx IStatementsContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove)|(1<<CadenceParserOpenParen))) != 0) || (((_la-33)&-(0x1f+1)) == 0 && ((1<<uint((_la-33)))&((1<<(CadenceParserTransaction-33))|(1<<(CadenceParserStruct-33))|(1<<(CadenceParserResource-33))|(1<<(CadenceParserContract-33))|(1<<(CadenceParserFun-33))|(1<<(CadenceParserEvent-33))|(1<<(CadenceParserEmit-33))|(1<<(CadenceParserPriv-33))|(1<<(CadenceParserAuth-33))|(1<<(CadenceParserPub-33))|(1<<(CadenceParserPubSet-33))|(1<<(CadenceParserReturn-33))|(1<<(CadenceParserBreak-33))|(1<<(CadenceParserContinue-33))|(1<<(CadenceParserLet-33))|(1<<(CadenceParserVar-33))|(1<<(CadenceParserIf-33))|(1<<(CadenceParserWhile-33))|(1<<(CadenceParserTrue-33))|(1<<(CadenceParserFalse-33))|(1<<(CadenceParserNil-33))|(1<<(CadenceParserImport-33))|(1<<(CadenceParserFrom-33))|(1<<(CadenceParserCreate-33))|(1<<(CadenceParserDestroy-33))|(1<<(CadenceParserIdentifier-33))|(1<<(CadenceParserDecimalLiteral-33))|(1<<(CadenceParserBinaryLiteral-33)))) != 0) || (((_la-65)&-(0x1f+1)) == 0 && ((1<<uint((_la-65)))&((1<<(CadenceParserOctalLiteral-65))|(1<<(CadenceParserHexadecimalLiteral-65))|(1<<(CadenceParserInvalidNumberLiteral-65))|(1<<(CadenceParserStringLiteral-65)))) != 0) {
+	for (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove))) != 0) || (((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(CadenceParserOpenParen-32))|(1<<(CadenceParserTransaction-32))|(1<<(CadenceParserStruct-32))|(1<<(CadenceParserResource-32))|(1<<(CadenceParserContract-32))|(1<<(CadenceParserFun-32))|(1<<(CadenceParserEvent-32))|(1<<(CadenceParserEmit-32))|(1<<(CadenceParserPriv-32))|(1<<(CadenceParserAuth-32))|(1<<(CadenceParserPub-32))|(1<<(CadenceParserPubSet-32))|(1<<(CadenceParserReturn-32))|(1<<(CadenceParserBreak-32))|(1<<(CadenceParserContinue-32))|(1<<(CadenceParserLet-32))|(1<<(CadenceParserVar-32))|(1<<(CadenceParserIf-32))|(1<<(CadenceParserWhile-32))|(1<<(CadenceParserTrue-32))|(1<<(CadenceParserFalse-32))|(1<<(CadenceParserNil-32))|(1<<(CadenceParserImport-32))|(1<<(CadenceParserFrom-32))|(1<<(CadenceParserCreate-32))|(1<<(CadenceParserDestroy-32))|(1<<(CadenceParserIdentifier-32)))) != 0) || (((_la-64)&-(0x1f+1)) == 0 && ((1<<uint((_la-64)))&((1<<(CadenceParserDecimalLiteral-64))|(1<<(CadenceParserBinaryLiteral-64))|(1<<(CadenceParserOctalLiteral-64))|(1<<(CadenceParserHexadecimalLiteral-64))|(1<<(CadenceParserInvalidNumberLiteral-64))|(1<<(CadenceParserStringLiteral-64)))) != 0) {
 		{
 			p.SetState(495)
 			p.Statement()
@@ -13355,7 +13356,7 @@ func (p *CadenceParser) Invocation() (localctx IInvocationContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove)|(1<<CadenceParserOpenParen))) != 0) || (((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(CadenceParserContract-36))|(1<<(CadenceParserFun-36))|(1<<(CadenceParserTrue-36))|(1<<(CadenceParserFalse-36))|(1<<(CadenceParserNil-36))|(1<<(CadenceParserFrom-36))|(1<<(CadenceParserCreate-36))|(1<<(CadenceParserDestroy-36))|(1<<(CadenceParserIdentifier-36))|(1<<(CadenceParserDecimalLiteral-36))|(1<<(CadenceParserBinaryLiteral-36))|(1<<(CadenceParserOctalLiteral-36))|(1<<(CadenceParserHexadecimalLiteral-36))|(1<<(CadenceParserInvalidNumberLiteral-36)))) != 0) || _la == CadenceParserStringLiteral {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove))) != 0) || (((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(CadenceParserOpenParen-32))|(1<<(CadenceParserContract-32))|(1<<(CadenceParserFun-32))|(1<<(CadenceParserTrue-32))|(1<<(CadenceParserFalse-32))|(1<<(CadenceParserNil-32))|(1<<(CadenceParserFrom-32))|(1<<(CadenceParserCreate-32))|(1<<(CadenceParserDestroy-32))|(1<<(CadenceParserIdentifier-32)))) != 0) || (((_la-64)&-(0x1f+1)) == 0 && ((1<<uint((_la-64)))&((1<<(CadenceParserDecimalLiteral-64))|(1<<(CadenceParserBinaryLiteral-64))|(1<<(CadenceParserOctalLiteral-64))|(1<<(CadenceParserHexadecimalLiteral-64))|(1<<(CadenceParserInvalidNumberLiteral-64))|(1<<(CadenceParserStringLiteral-64)))) != 0) {
 		{
 			p.SetState(774)
 			p.Argument()
@@ -14620,7 +14621,7 @@ func (p *CadenceParser) ArrayLiteral() (localctx IArrayLiteralContext) {
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove)|(1<<CadenceParserOpenParen))) != 0) || (((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(CadenceParserContract-36))|(1<<(CadenceParserFun-36))|(1<<(CadenceParserTrue-36))|(1<<(CadenceParserFalse-36))|(1<<(CadenceParserNil-36))|(1<<(CadenceParserFrom-36))|(1<<(CadenceParserCreate-36))|(1<<(CadenceParserDestroy-36))|(1<<(CadenceParserIdentifier-36))|(1<<(CadenceParserDecimalLiteral-36))|(1<<(CadenceParserBinaryLiteral-36))|(1<<(CadenceParserOctalLiteral-36))|(1<<(CadenceParserHexadecimalLiteral-36))|(1<<(CadenceParserInvalidNumberLiteral-36)))) != 0) || _la == CadenceParserStringLiteral {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove))) != 0) || (((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(CadenceParserOpenParen-32))|(1<<(CadenceParserContract-32))|(1<<(CadenceParserFun-32))|(1<<(CadenceParserTrue-32))|(1<<(CadenceParserFalse-32))|(1<<(CadenceParserNil-32))|(1<<(CadenceParserFrom-32))|(1<<(CadenceParserCreate-32))|(1<<(CadenceParserDestroy-32))|(1<<(CadenceParserIdentifier-32)))) != 0) || (((_la-64)&-(0x1f+1)) == 0 && ((1<<uint((_la-64)))&((1<<(CadenceParserDecimalLiteral-64))|(1<<(CadenceParserBinaryLiteral-64))|(1<<(CadenceParserOctalLiteral-64))|(1<<(CadenceParserHexadecimalLiteral-64))|(1<<(CadenceParserInvalidNumberLiteral-64))|(1<<(CadenceParserStringLiteral-64)))) != 0) {
 		{
 			p.SetState(820)
 			p.Expression()
@@ -14774,7 +14775,7 @@ func (p *CadenceParser) DictionaryLiteral() (localctx IDictionaryLiteralContext)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
-	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove)|(1<<CadenceParserOpenParen))) != 0) || (((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(CadenceParserContract-36))|(1<<(CadenceParserFun-36))|(1<<(CadenceParserTrue-36))|(1<<(CadenceParserFalse-36))|(1<<(CadenceParserNil-36))|(1<<(CadenceParserFrom-36))|(1<<(CadenceParserCreate-36))|(1<<(CadenceParserDestroy-36))|(1<<(CadenceParserIdentifier-36))|(1<<(CadenceParserDecimalLiteral-36))|(1<<(CadenceParserBinaryLiteral-36))|(1<<(CadenceParserOctalLiteral-36))|(1<<(CadenceParserHexadecimalLiteral-36))|(1<<(CadenceParserInvalidNumberLiteral-36)))) != 0) || _la == CadenceParserStringLiteral {
+	if (((_la)&-(0x1f+1)) == 0 && ((1<<uint(_la))&((1<<CadenceParserT__1)|(1<<CadenceParserT__6)|(1<<CadenceParserMinus)|(1<<CadenceParserAmpersand)|(1<<CadenceParserNegate)|(1<<CadenceParserMove))) != 0) || (((_la-32)&-(0x1f+1)) == 0 && ((1<<uint((_la-32)))&((1<<(CadenceParserOpenParen-32))|(1<<(CadenceParserContract-32))|(1<<(CadenceParserFun-32))|(1<<(CadenceParserTrue-32))|(1<<(CadenceParserFalse-32))|(1<<(CadenceParserNil-32))|(1<<(CadenceParserFrom-32))|(1<<(CadenceParserCreate-32))|(1<<(CadenceParserDestroy-32))|(1<<(CadenceParserIdentifier-32)))) != 0) || (((_la-64)&-(0x1f+1)) == 0 && ((1<<uint((_la-64)))&((1<<(CadenceParserDecimalLiteral-64))|(1<<(CadenceParserBinaryLiteral-64))|(1<<(CadenceParserOctalLiteral-64))|(1<<(CadenceParserHexadecimalLiteral-64))|(1<<(CadenceParserInvalidNumberLiteral-64))|(1<<(CadenceParserStringLiteral-64)))) != 0) {
 		{
 			p.SetState(833)
 			p.DictionaryEntry()
@@ -15077,7 +15078,7 @@ func (p *CadenceParser) Identifier() (localctx IIdentifierContext) {
 		p.SetState(849)
 		_la = p.GetTokenStream().LA(1)
 
-		if !(((_la-36)&-(0x1f+1)) == 0 && ((1<<uint((_la-36)))&((1<<(CadenceParserContract-36))|(1<<(CadenceParserFrom-36))|(1<<(CadenceParserCreate-36))|(1<<(CadenceParserDestroy-36))|(1<<(CadenceParserIdentifier-36)))) != 0) {
+		if !(((_la-37)&-(0x1f+1)) == 0 && ((1<<uint((_la-37)))&((1<<(CadenceParserContract-37))|(1<<(CadenceParserFrom-37))|(1<<(CadenceParserCreate-37))|(1<<(CadenceParserDestroy-37))|(1<<(CadenceParserIdentifier-37)))) != 0) {
 			p.GetErrorHandler().RecoverInline(p)
 		} else {
 			p.GetErrorHandler().ReportMatch(p)
