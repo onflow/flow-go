@@ -1597,7 +1597,7 @@ func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.T
 		for name, field := range t.Members {
 			fieldTypes[name] = &types.Field{
 				Identifier: name,
-				Type:       field.Type.(ExportableType).Export(program, nil),
+				Type:       field.TypeAnnotation.Type.(ExportableType).Export(program, nil),
 			}
 		}
 
