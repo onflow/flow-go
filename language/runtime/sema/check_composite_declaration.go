@@ -90,7 +90,20 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 				nestedDeclaration.(*ast.CompositeDeclaration); isCompositeDeclaration {
 
 				nestedCompositeType := nestedType.(*CompositeType)
-				checker.declareCompositeConstructor(nestedCompositeDeclaration, nestedCompositeType)
+
+				nestedConstructorType, nestedConstructorArgumentLabels :=
+					checker.compositeConstructorType(nestedCompositeDeclaration, nestedCompositeType)
+
+				_, err := checker.valueActivations.Declare(
+					nestedCompositeDeclaration.Identifier.Identifier,
+					nestedConstructorType,
+					nestedCompositeDeclaration.Access,
+					nestedCompositeDeclaration.DeclarationKind(),
+					nestedCompositeDeclaration.Identifier.Pos,
+					true,
+					nestedConstructorArgumentLabels,
+				)
+				checker.report(err)
 			}
 		}
 	}
@@ -347,7 +360,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		variable,
 	)
 
-	constructorMembers := map[string]*Member{}
+	declarationMembers := map[string]*Member{}
 
 	(func() {
 		// Activate new scopes for nested types
@@ -391,7 +404,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 			nestedCompositeDeclarationVariable :=
 				checker.valueActivations.Find(identifier.Identifier)
 
-			constructorMembers[nestedCompositeDeclarationVariable.Identifier] = &Member{
+			declarationMembers[nestedCompositeDeclarationVariable.Identifier] = &Member{
 				Identifier:      identifier,
 				Access:          nestedCompositeDeclaration.Access,
 				ContainerType:   compositeType,
@@ -423,10 +436,47 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 			checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())
 	})()
 
-	// Declare constructor after the nested scope, so it is visible after the declaration
+	// Always determine composite constructor type
 
-	constructorFunction := checker.declareCompositeConstructor(declaration, compositeType)
-	constructorFunction.Members = constructorMembers
+	constructorType, constructorArgumentLabels := checker.compositeConstructorType(declaration, compositeType)
+	constructorType.Members = declarationMembers
+
+	// If the composite is a contract, declare a value – the contract is a singleton.
+	// For all other kinds of composites, declare constructor.
+
+	// NOTE: perform declarations after the nested scope, so they are visible after the declaration
+
+	if compositeType.Kind == common.CompositeKindContract {
+		_, err := checker.valueActivations.Declare(
+			declaration.Identifier.Identifier,
+			compositeType,
+			// NOTE: contracts are always public
+			ast.AccessPublic,
+			common.DeclarationKindContract,
+			declaration.Identifier.Pos,
+			true,
+			nil,
+		)
+		checker.report(err)
+
+		for name, declarationMember := range declarationMembers {
+			if compositeType.Members[name] != nil {
+				continue
+			}
+			compositeType.Members[name] = declarationMember
+		}
+	} else {
+		_, err := checker.valueActivations.Declare(
+			declaration.Identifier.Identifier,
+			constructorType,
+			declaration.Access,
+			declaration.DeclarationKind(),
+			declaration.Identifier.Pos,
+			true,
+			constructorArgumentLabels,
+		)
+		checker.report(err)
+	}
 
 	checker.Elaboration.CompositeDeclarationTypes[declaration] = compositeType
 
@@ -738,18 +788,19 @@ func (checker *Checker) checkTypeRequirement(
 	)
 }
 
-func (checker *Checker) declareCompositeConstructor(
+func (checker *Checker) compositeConstructorType(
 	compositeDeclaration *ast.CompositeDeclaration,
 	compositeType *CompositeType,
-) *SpecialFunctionType {
+) (
+	functionType *SpecialFunctionType,
+	argumentLabels []string,
+) {
 
-	functionType := &SpecialFunctionType{
+	functionType = &SpecialFunctionType{
 		FunctionType: &FunctionType{
 			ReturnTypeAnnotation: NewTypeAnnotation(compositeType),
 		},
 	}
-
-	var argumentLabels []string
 
 	// TODO: support multiple overloaded initializers
 
@@ -764,15 +815,7 @@ func (checker *Checker) declareCompositeConstructor(
 		checker.Elaboration.SpecialFunctionTypes[firstInitializer] = functionType
 	}
 
-	_, err := checker.valueActivations.DeclareFunction(
-		compositeDeclaration.Identifier,
-		compositeDeclaration.Access,
-		functionType,
-		argumentLabels,
-	)
-	checker.report(err)
-
-	return functionType
+	return functionType, argumentLabels
 }
 
 func (checker *Checker) membersAndOrigins(

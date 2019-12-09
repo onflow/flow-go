@@ -68,6 +68,44 @@ func parseCheckAndInterpretWithOptions(
 	return inter
 }
 
+func constructorArguments(compositeKind common.CompositeKind, arguments string) string {
+	if compositeKind == common.CompositeKindContract {
+		return ""
+	}
+	return fmt.Sprintf("(%s)", arguments)
+}
+
+// makeContractValueHandler creates a interpreter option which
+// sets the ContractValueHandler.
+// The handler immediately invokes the constructor with the given arguments.
+//
+func makeContractValueHandler(
+	arguments []interpreter.Value,
+	argumentTypes []sema.Type,
+	parameterTypes []sema.Type,
+) interpreter.Option {
+	return interpreter.WithContractValueHandler(
+		func(
+			inter *interpreter.Interpreter,
+			compositeType *sema.CompositeType,
+			constructor interpreter.FunctionValue,
+		) *interpreter.CompositeValue {
+			value, err := inter.InvokeFunctionValue(
+				constructor,
+				arguments,
+				argumentTypes,
+				parameterTypes,
+				ast.Position{},
+			)
+			if err != nil {
+				panic(err)
+			}
+
+			return value.(*interpreter.CompositeValue)
+		},
+	)
+}
+
 func TestInterpretConstantAndVariableDeclarations(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
@@ -1660,70 +1698,37 @@ func TestInterpretCompositeDeclaration(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		inter := parseCheckAndInterpret(t,
-			fmt.Sprintf(
-				`
-                   %[1]s Test {}
+		t.Run(compositeKind.Name(), func(t *testing.T) {
 
-                   fun test(): %[2]sTest {
-                       return %[2]s %[3]s Test()
+			inter := parseCheckAndInterpretWithOptions(t,
+				fmt.Sprintf(
+					`
+                   pub %[1]s Test {}
+
+                   pub fun test(): %[2]sTest {
+                       return %[2]s %[3]s Test%[4]s
                    }
                 `,
-				compositeKind.Keyword(),
-				compositeKind.Annotation(),
-				compositeKind.ConstructionKeyword(),
-			),
-		)
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind, ""),
+				),
+				ParseCheckAndInterpretOptions{
+					Options: []interpreter.Option{
+						makeContractValueHandler(nil, nil, nil),
+					},
+				},
+			)
 
-		value, err := inter.Invoke("test")
-		require.NoError(t, err)
+			value, err := inter.Invoke("test")
+			require.NoError(t, err)
 
-		assert.IsType(t,
-			&interpreter.CompositeValue{},
-			value,
-		)
-	}
-}
-
-func TestInterpretCompositeDeclarationWithInitializer(t *testing.T) {
-
-	for _, compositeKind := range common.CompositeKinds {
-
-		inter := parseCheckAndInterpret(t,
-			fmt.Sprintf(
-				`
-                   var value = 0
-
-                   %[1]s Test {
-                       init(_ newValue: Int) {
-                           value = newValue
-                       }
-                   }
-
-                   fun test(newValue: Int): %[2]sTest {
-                       return %[2]s %[3]s Test(newValue)
-                   }
-                `,
-				compositeKind.Keyword(),
-				compositeKind.Annotation(),
-				compositeKind.ConstructionKeyword(),
-			),
-		)
-
-		newValue := big.NewInt(42)
-
-		value, err := inter.Invoke("test", newValue)
-		require.NoError(t, err)
-
-		assert.IsType(t,
-			&interpreter.CompositeValue{},
-			value,
-		)
-
-		assert.Equal(t,
-			interpreter.IntValue{Int: newValue},
-			inter.Globals["value"].Value,
-		)
+			assert.IsType(t,
+				&interpreter.CompositeValue{},
+				value,
+			)
+		})
 	}
 }
 
@@ -3203,33 +3208,42 @@ func TestInterpretNestedOptionalComparisonMixed(t *testing.T) {
 
 func TestInterpretCompositeNilEquality(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKinds {
 
-		inter := parseCheckAndInterpret(t,
-			fmt.Sprintf(
-				`
-                  %[1]s X {}
+		t.Run(compositeKind.Name(), func(t *testing.T) {
 
-                  let x: %[2]sX? %[3]s %[4]s X()
-                  let y = x == nil
-                  let z = nil == x
-                `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			),
-		)
+			inter := parseCheckAndInterpretWithOptions(t,
+				fmt.Sprintf(
+					`
+                      pub %[1]s X {}
 
-		assert.Equal(t,
-			interpreter.BoolValue(false),
-			inter.Globals["y"].Value,
-		)
+                      pub let x: %[2]sX? %[3]s %[4]s X%[5]s
+                      pub let y = x == nil
+                      pub let z = nil == x
+                    `,
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind, ""),
+				),
+				ParseCheckAndInterpretOptions{
+					Options: []interpreter.Option{
+						makeContractValueHandler(nil, nil, nil),
+					},
+				},
+			)
 
-		assert.Equal(t,
-			interpreter.BoolValue(false),
-			inter.Globals["z"].Value,
-		)
+			assert.Equal(t,
+				interpreter.BoolValue(false),
+				inter.Globals["y"].Value,
+			)
+
+			assert.Equal(t,
+				interpreter.BoolValue(false),
+				inter.Globals["z"].Value,
+			)
+		})
 	}
 }
 
@@ -3417,23 +3431,30 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 
 func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
 
-			inter := parseCheckAndInterpret(t,
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
+
+			inter := parseCheckAndInterpretWithOptions(t,
 				fmt.Sprintf(
 					`
-                      %[1]s interface Test {}
+                      pub %[1]s interface Test {}
 
-                      %[1]s TestImpl: Test {}
+                      pub %[1]s TestImpl: Test {}
 
-                      let test: %[2]sTest %[3]s %[4]s TestImpl()
+                      pub let test: %[2]sTest %[3]s %[4]s TestImpl%[5]s
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind, ""),
 				),
+				ParseCheckAndInterpretOptions{
+					Options: []interpreter.Option{
+						makeContractValueHandler(nil, nil, nil),
+					},
+				},
 			)
 
 			assert.IsType(t,
@@ -3446,33 +3467,50 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 
 func TestInterpretInterfaceFieldUse(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
 
-			inter := parseCheckAndInterpret(t,
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
+
+			inter := parseCheckAndInterpretWithOptions(t,
 				fmt.Sprintf(
 					`
-                      %[1]s interface Test {
-                          x: Int
+                      pub %[1]s interface Test {
+                          pub x: Int
                       }
 
-                      %[1]s TestImpl: Test {
-                          var x: Int
+                      pub %[1]s TestImpl: Test {
+                          pub var x: Int
         
                           init(x: Int) {
                               self.x = x
                           }
                       }
 
-                      let test: %[2]sTest %[3]s %[4]s TestImpl(x: 1)
+                      pub let test: %[2]sTest %[3]s %[4]s TestImpl%[5]s
 
-                      let x = test.x
+                      pub let x = test.x
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind, "x: 1"),
 				),
+				ParseCheckAndInterpretOptions{
+					Options: []interpreter.Option{
+						makeContractValueHandler(
+							[]interpreter.Value{
+								interpreter.NewIntValue(1),
+							},
+							[]sema.Type{
+								&sema.IntType{},
+							},
+							[]sema.Type{
+								&sema.IntType{},
+							},
+						),
+					},
+				},
 			)
 
 			assert.Equal(t,
@@ -3485,31 +3523,38 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 
 func TestInterpretInterfaceFunctionUse(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
 
-			inter := parseCheckAndInterpret(t,
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
+
+			inter := parseCheckAndInterpretWithOptions(t,
 				fmt.Sprintf(
 					`
-                      %[1]s interface Test {
-                          fun test(): Int
+                      pub %[1]s interface Test {
+                          pub fun test(): Int
                       }
 
-                      %[1]s TestImpl: Test {
-                          fun test(): Int {
+                      pub %[1]s TestImpl: Test {
+                          pub fun test(): Int {
                               return 2
                           }
                       }
 
-                      let test: %[2]s Test %[3]s %[4]s TestImpl()
+                      pub let test: %[2]s Test %[3]s %[4]s TestImpl%[5]s
 
-                      let val = test.test()
+                      pub let val = test.test()
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind, ""),
 				),
+				ParseCheckAndInterpretOptions{
+					Options: []interpreter.Option{
+						makeContractValueHandler(nil, nil, nil),
+					},
+				},
 			)
 
 			assert.Equal(t,
@@ -3522,22 +3567,23 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 
 func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
 
-			inter := parseCheckAndInterpret(t,
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
+
+			inter := parseCheckAndInterpretWithOptions(t,
 				fmt.Sprintf(
 					`
-                      %[1]s interface Test {
-                          fun test(x: Int): Int {
+                      pub %[1]s interface Test {
+                          pub fun test(x: Int): Int {
                               pre {
                                   x > 0: "x must be positive"
                               }
                           }
                       }
 
-                      %[1]s TestImpl: Test {
-                          fun test(x: Int): Int {
+                      pub %[1]s TestImpl: Test {
+                          pub fun test(x: Int): Int {
                               pre {
                                   x < 2: "x must be smaller than 2"
                               }
@@ -3545,19 +3591,25 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
                           }
                       }
 
-                      fun callTest(x: Int): Int {
-                          let test: %[2]s Test %[3]s %[4]s TestImpl()
+                      pub fun callTest(x: Int): Int {
+                          let test: %[2]s Test %[3]s %[4]s TestImpl%[5]s
                           let res = test.test(x: x)
-                          %[5]s test
+                          %[6]s test
                           return res
                       }
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
-					kind.DestructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind, ""),
+					compositeKind.DestructionKeyword(),
 				),
+				ParseCheckAndInterpretOptions{
+					Options: []interpreter.Option{
+						makeContractValueHandler(nil, nil, nil),
+					},
+				},
 			)
 
 			_, err := inter.Invoke("callTest", big.NewInt(0))
@@ -3582,69 +3634,103 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 
 func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	tests := map[int64]error{
+		0: &interpreter.ConditionError{},
+		1: nil,
+		2: &interpreter.ConditionError{},
+	}
 
-			inter := parseCheckAndInterpret(t,
-				fmt.Sprintf(
-					`
-                      %[1]s interface Test {
-                          init(x: Int) {
-                              pre {
-                                  x > 0: "x must be positive"
-                              }
-                          }
-                      }
+	for _, compositeKind := range common.CompositeKinds {
 
-                      %[1]s TestImpl: Test {
-                          init(x: Int) {
-                              pre {
-                                  x < 2: "x must be smaller than 2"
-                              }
-                          }
-                      }
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
-                      fun test(x: Int): %[2]sTest {
-                          return %[2]s %[3]s TestImpl(x: x)
-                      }
-                    `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.ConstructionKeyword(),
-				),
-			)
+			for value, expectedError := range tests {
 
-			_, err := inter.Invoke("test", big.NewInt(0))
-			assert.IsType(t,
-				&interpreter.ConditionError{},
-				err,
-			)
+				t.Run(fmt.Sprint(value), func(t *testing.T) {
 
-			value, err := inter.Invoke("test", big.NewInt(1))
-			require.NoError(t, err)
+					checker, err := ParseAndCheck(t,
+						fmt.Sprintf(
+							`
+					             pub %[1]s interface Test {
+					                 init(x: Int) {
+					                     pre {
+					                         x > 0: "x must be positive"
+					                     }
+					                 }
+					             }
 
-			assert.IsType(t,
-				&interpreter.CompositeValue{},
-				value,
-			)
+					             pub %[1]s TestImpl: Test {
+					                 init(x: Int) {
+					                     pre {
+					                         x < 2: "x must be smaller than 2"
+					                     }
+					                 }
+					             }
 
-			_, err = inter.Invoke("test", big.NewInt(2))
-			assert.IsType(t,
-				&interpreter.ConditionError{},
-				err,
-			)
+					             pub fun test(x: Int): %[2]sTest {
+					                 return %[2]s %[3]s TestImpl%[4]s
+					             }
+					           `,
+							compositeKind.Keyword(),
+							compositeKind.Annotation(),
+							compositeKind.ConstructionKeyword(),
+							constructorArguments(compositeKind, "x: x"),
+						),
+					)
+					require.NoError(t, err)
+
+					check := func(err error) {
+						if expectedError == nil {
+							require.NoError(t, err)
+						} else {
+							assert.IsType(t, expectedError, err)
+						}
+					}
+
+					if compositeKind == common.CompositeKindContract {
+
+						inter, err := interpreter.NewInterpreter(
+							checker,
+							makeContractValueHandler(
+								[]interpreter.Value{
+									interpreter.NewIntValue(value),
+								},
+								[]sema.Type{
+									&sema.IntType{},
+								},
+								[]sema.Type{
+									&sema.IntType{},
+								},
+							),
+						)
+						require.NoError(t, err)
+
+						err = inter.Interpret()
+						check(err)
+					} else {
+						inter, err := interpreter.NewInterpreter(checker)
+						require.NoError(t, err)
+
+						err = inter.Interpret()
+						require.NoError(t, err)
+
+						_, err = inter.Invoke("test", big.NewInt(value))
+						check(err)
+					}
+				})
+			}
 		})
 	}
 }
 
 func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
 
-	inter := parseCheckAndInterpret(t,
+	inter := parseCheckAndInterpretWithOptions(t,
 		`
-          contract interface Test {
+          pub contract interface Test {
 
-              struct Nested {
-                  fun test(x: Int) {
+              pub struct Nested {
+                  pub fun test(x: Int) {
                       pre {
                           x > 0: "x must be positive"
                       }
@@ -3652,10 +3738,10 @@ func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
               }
           }
 
-          contract TestImpl: Test {
+          pub contract TestImpl: Test {
 
-              struct Nested {
-                  fun test(x: Int) {
+              pub struct Nested {
+                  pub fun test(x: Int) {
                       pre {
                           x < 2: "x must be smaller than 2"
                       }
@@ -3663,10 +3749,15 @@ func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
               }
           }
 
-          fun test(x: Int) {
+          pub fun test(x: Int) {
               TestImpl.Nested().test(x: x)
           }
         `,
+		ParseCheckAndInterpretOptions{
+			Options: []interpreter.Option{
+				makeContractValueHandler(nil, nil, nil),
+			},
+		},
 	)
 
 	_, err := inter.Invoke("test", big.NewInt(0))
@@ -6352,24 +6443,31 @@ func TestInterpretOptionalChainingFunctionCallAndNilCoalescing(t *testing.T) {
 
 func TestInterpretCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) {
 
-	inter := parseCheckAndInterpret(t, `
-      contract Test {
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+          pub contract Test {
 
-          struct X {
+              pub struct X {
 
-              fun test(): Test {
-                 return Test()
+                  pub fun test(): Test {
+                     return Test
+                  }
+              }
+
+              pub fun x(): X {
+                 return X()
               }
           }
 
-          fun x(): X {
-             return X()
-          }
-      }
-
-      let x1 = Test().x()
-      let x2 = x1.test().x()
-    `)
+          pub let x1 = Test.x()
+          pub let x2 = x1.test().x()
+        `,
+		ParseCheckAndInterpretOptions{
+			Options: []interpreter.Option{
+				makeContractValueHandler(nil, nil, nil),
+			},
+		},
+	)
 
 	x1 := inter.Globals["x1"].Value
 	x2 := inter.Globals["x2"].Value
@@ -6397,14 +6495,21 @@ func TestInterpretCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) 
 
 func TestInterpretCompositeDeclarationNestedConstructor(t *testing.T) {
 
-	inter := parseCheckAndInterpret(t, `
-      contract Test {
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+          pub contract Test {
 
-          struct X {}
-      }
+              pub struct X {}
+          }
 
-      let x = Test.X()
-    `)
+          pub let x = Test.X()
+        `,
+		ParseCheckAndInterpretOptions{
+			Options: []interpreter.Option{
+				makeContractValueHandler(nil, nil, nil),
+			},
+		},
+	)
 
 	x := inter.Globals["x"].Value
 
@@ -6479,13 +6584,12 @@ func TestInterpretFungibleTokenContract(t *testing.T) {
 
 	code := fungibleTokenContract + "\n" + `
 
-      fun test(): [Int; 2] {
-          let contract = ExampleToken()
+      pub fun test(): [Int; 2] {
 
           // valid, because code is in the same location
           let publisher <- create ExampleToken.Vault(balance: 100)
 
-          let receiver <- contract.sprout()
+          let receiver <- ExampleToken.sprout()
 
           let withdrawn <- publisher.withdraw(amount: 60)
           receiver.deposit(from: <-withdrawn)
@@ -6499,7 +6603,14 @@ func TestInterpretFungibleTokenContract(t *testing.T) {
           return [publisherBalance, receiverBalance]
       }
     `
-	inter := parseCheckAndInterpret(t, code)
+	inter := parseCheckAndInterpretWithOptions(t,
+		code,
+		ParseCheckAndInterpretOptions{
+			Options: []interpreter.Option{
+				makeContractValueHandler(nil, nil, nil),
+			},
+		},
+	)
 
 	value, err := inter.Invoke("test")
 	require.NoError(t, err)
@@ -6529,8 +6640,8 @@ func TestInterpretContractAccountFieldUse(t *testing.T) {
           }
       }
 
-      pub let address1 = Test().address
-      pub let address2 = Test().test()
+      pub let address1 = Test.address
+      pub let address2 = Test.test()
     `
 
 	addressValue := interpreter.AddressValue{
@@ -6540,8 +6651,9 @@ func TestInterpretContractAccountFieldUse(t *testing.T) {
 	inter := parseCheckAndInterpretWithOptions(t, code,
 		ParseCheckAndInterpretOptions{
 			Options: []interpreter.Option{
+				makeContractValueHandler(nil, nil, nil),
 				interpreter.WithInjectedCompositeFieldsHandler(
-					func(_ *interpreter.Interpreter, _ common.CompositeKind, _ string) map[string]interpreter.Value {
+					func(_ *interpreter.Interpreter, _ ast.Location, _ string, _ common.CompositeKind) map[string]interpreter.Value {
 						return map[string]interpreter.Value{
 							"account": interpreter.NewAccountValue(addressValue),
 						}

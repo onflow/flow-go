@@ -53,54 +53,27 @@ type getterSetter struct {
 	set func(Value)
 }
 
-// StatementTrampoline
-
-type StatementTrampoline struct {
-	F    func() Trampoline
-	Line int
-}
-
-func (m StatementTrampoline) Resume() interface{} {
-	return m.F
-}
-
-func (m StatementTrampoline) FlatMap(f func(interface{}) Trampoline) Trampoline {
-	return FlatMap{Subroutine: m, Continuation: f}
-}
-
-func (m StatementTrampoline) Map(f func(interface{}) interface{}) Trampoline {
-	return MapTrampoline(m, f)
-}
-
-func (m StatementTrampoline) Then(f func(interface{})) Trampoline {
-	return ThenTrampoline(m, f)
-}
-
-func (m StatementTrampoline) Continue() Trampoline {
-	return m.F()
-}
-
 // Visit-methods for statement which return a non-nil value
 // are treated like they are returning a value.
 
 // OnEventEmittedFunc is a function that is triggered when an event is emitted by the program.
 //
 type OnEventEmittedFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	event EventValue,
 )
 
 // OnStatementFunc is a function that is triggered when a statement is about to be executed.
 //
 type OnStatementFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	statement *Statement,
 )
 
 // StorageReadHandlerFunc is a function that handles storage reads.
 //
 type StorageReadHandlerFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	storageIdentifier string,
 	key string,
 ) OptionalValue
@@ -108,7 +81,7 @@ type StorageReadHandlerFunc func(
 // StorageWriteHandlerFunc is a function that handles storage writes.
 //
 type StorageWriteHandlerFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	storageIdentifier string,
 	key string,
 	value OptionalValue,
@@ -117,7 +90,7 @@ type StorageWriteHandlerFunc func(
 // StorageKeyHandlerFunc is a function that handles storage indexing types.
 //
 type StorageKeyHandlerFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	storageIdentifier string,
 	indexingType sema.Type,
 ) string
@@ -125,10 +98,19 @@ type StorageKeyHandlerFunc func(
 // InjectedCompositeFieldsHandlerFunc is a function that handles storage reads.
 //
 type InjectedCompositeFieldsHandlerFunc func(
-	interpreter *Interpreter,
-	compositeKind common.CompositeKind,
+	inter *Interpreter,
+	location ast.Location,
 	compositeIdentifier string,
+	compositeKind common.CompositeKind,
 ) map[string]Value
+
+// ContractValueHandlerFunc is a function that handles contract values.
+//
+type ContractValueHandlerFunc func(
+	inter *Interpreter,
+	compositeType *sema.CompositeType,
+	constructor FunctionValue,
+) *CompositeValue
 
 type Interpreter struct {
 	Checker                        *sema.Checker
@@ -147,6 +129,7 @@ type Interpreter struct {
 	storageWriteHandler            StorageWriteHandlerFunc
 	storageKeyHandler              StorageKeyHandlerFunc
 	injectedCompositeFieldsHandler InjectedCompositeFieldsHandlerFunc
+	contractValueHandler           ContractValueHandlerFunc
 }
 
 type Option func(*Interpreter) error
@@ -229,6 +212,16 @@ func WithInjectedCompositeFieldsHandler(handler InjectedCompositeFieldsHandlerFu
 	}
 }
 
+// WithContractValueHandler returns an interpreter option which sets the given function
+// as the function that is used to handle imports of values.
+//
+func WithContractValueHandler(handler ContractValueHandlerFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetContractValueHandler(handler)
+		return nil
+	}
+}
+
 func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, error) {
 	interpreter := &Interpreter{
 		Checker:               checker,
@@ -288,6 +281,12 @@ func (interpreter *Interpreter) SetStorageKeyHandler(function StorageKeyHandlerF
 //
 func (interpreter *Interpreter) SetInjectedCompositeFieldsHandler(function InjectedCompositeFieldsHandlerFunc) {
 	interpreter.injectedCompositeFieldsHandler = function
+}
+
+// SetContractValueHandler sets the function that is used to handle imports of values
+//
+func (interpreter *Interpreter) SetContractValueHandler(function ContractValueHandlerFunc) {
+	interpreter.contractValueHandler = function
 }
 
 // locationRange returns a new location range for the given positioned element.
@@ -1905,14 +1904,16 @@ func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.Compo
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	_, _ = interpreter.declareCompositeConstructor(declaration, lexicalScope)
+	_, _ = interpreter.declareCompositeValue(declaration, lexicalScope)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-// declareCompositeConstructor creates a constructor function
-// for the given composite, bound in a variable.
+// declareCompositeValue creates and declares the value for
+// the composite declaration.
+//
+// For all composite kinds a constructor function is created.
 //
 // The constructor is a host function which creates a new composite,
 // calls the initializer (interpreted function), if any,
@@ -1921,21 +1922,26 @@ func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.Compo
 // Inside the initializer and all functions, `self` is bound to
 // the new composite value, and the constructor itself is bound
 //
-func (interpreter *Interpreter) declareCompositeConstructor(
+// For contracts, `contractValueHandler` is used to declare
+// a contract value / instance (singleton).
+//
+// For all other composite kinds the constructor function is declared.
+//
+func (interpreter *Interpreter) declareCompositeValue(
 	declaration *ast.CompositeDeclaration,
 	lexicalScope hamt.Map,
 ) (
 	scope hamt.Map,
-	function HostFunctionValue,
+	value Value,
 ) {
 	identifier := declaration.Identifier.Identifier
 	variable := interpreter.findOrDeclareVariable(identifier)
 
-	// Make the constructor available in the initializer
+	// Make the value available in the initializer
 	lexicalScope = lexicalScope.
 		Insert(common.StringEntry(identifier), variable)
 
-	// Evaluate nested declarations in a new scope, so constructors
+	// Evaluate nested declarations in a new scope, so values
 	// of nested declarations won't be visible after the containing declaration
 
 	members := map[string]Value{}
@@ -1954,15 +1960,15 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 
 		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
 
-			// Pass the lexical scope, which has the containing composite's constructor declared,
+			// Pass the lexical scope, which has the containing composite's value declared,
 			// to the nested declarations so they can refer to it, and update the lexical scope
 			// so the container's functions can refer to the nested constructors
 
-			var nestedConstructor FunctionValue
-			lexicalScope, nestedConstructor =
-				interpreter.declareCompositeConstructor(nestedCompositeDeclaration, lexicalScope)
+			var nestedValue Value
+			lexicalScope, nestedValue =
+				interpreter.declareCompositeValue(nestedCompositeDeclaration, lexicalScope)
 
-			members[nestedCompositeDeclaration.Identifier.Identifier] = nestedConstructor
+			members[nestedCompositeDeclaration.Identifier.Identifier] = nestedValue
 		}
 	})()
 
@@ -1974,12 +1980,18 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 	functions := interpreter.compositeFunctions(declaration, lexicalScope)
 	interpreter.CompositeFunctions[identifier] = functions
 
-	function = NewHostFunctionValue(
+	constructor := NewHostFunctionValue(
 		func(invocation Invocation) Trampoline {
 
-			var xFields map[string]Value
+			// TODO: is this necessary if CompositeValue loads injected fields?
+			var injectedFields map[string]Value
 			if interpreter.injectedCompositeFieldsHandler != nil {
-				xFields = interpreter.injectedCompositeFieldsHandler(interpreter, declaration.CompositeKind, identifier)
+				injectedFields = interpreter.injectedCompositeFieldsHandler(
+					interpreter,
+					interpreter.Checker.Location,
+					identifier,
+					declaration.CompositeKind,
+				)
 			}
 
 			value := &CompositeValue{
@@ -1987,7 +1999,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 				Identifier:     identifier,
 				Kind:           declaration.CompositeKind,
 				Fields:         map[string]Value{},
-				InjectedFields: xFields,
+				InjectedFields: injectedFields,
 				Functions:      functions,
 				Destructor:     destructorFunction,
 				// NOTE: new value has no owner
@@ -2011,10 +2023,22 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 				})
 		},
 	)
-	function.Members = members
-	variable.Value = function
 
-	return lexicalScope, function
+	// Contract declarations declare a value / instance (singleton),
+	// for all other composite kinds, the constructor is declared
+
+	if declaration.CompositeKind == common.CompositeKindContract {
+		compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[declaration]
+		contract := interpreter.contractValueHandler(interpreter, compositeType, constructor)
+		contract.NestedValues = members
+		value = contract
+	} else {
+		value = constructor
+		constructor.Members = members
+	}
+	variable.Value = value
+
+	return lexicalScope, value
 }
 
 // bindSelf returns a function which binds `self` to the structure
@@ -2458,6 +2482,7 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 		WithStorageWriteHandler(interpreter.storageWriteHandler),
 		WithStorageKeyHandler(interpreter.storageKeyHandler),
 		WithInjectedCompositeFieldsHandler(interpreter.injectedCompositeFieldsHandler),
+		WithContractValueHandler(interpreter.contractValueHandler),
 	)
 	if err != nil {
 		panic(err)
