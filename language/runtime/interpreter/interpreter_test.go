@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,7 +15,7 @@ func TestInterpreterOptionalBoxing(t *testing.T) {
 	inter, err := NewInterpreter(nil)
 	require.NoError(t, err)
 
-	t.Run("", func(t *testing.T) {
+	t.Run("Bool to Bool?", func(t *testing.T) {
 		value, newType := inter.boxOptional(
 			BoolValue(true),
 			&sema.BoolType{},
@@ -30,7 +31,7 @@ func TestInterpreterOptionalBoxing(t *testing.T) {
 		)
 	})
 
-	t.Run("", func(t *testing.T) {
+	t.Run("Bool? to Bool?", func(t *testing.T) {
 		value, newType := inter.boxOptional(
 			NewSomeValueOwningNonCopying(BoolValue(true)),
 			&sema.OptionalType{Type: &sema.BoolType{}},
@@ -46,7 +47,7 @@ func TestInterpreterOptionalBoxing(t *testing.T) {
 		)
 	})
 
-	t.Run("", func(t *testing.T) {
+	t.Run("Bool? to Bool??", func(t *testing.T) {
 		value, newType := inter.boxOptional(
 			NewSomeValueOwningNonCopying(BoolValue(true)),
 			&sema.OptionalType{Type: &sema.BoolType{}},
@@ -64,7 +65,7 @@ func TestInterpreterOptionalBoxing(t *testing.T) {
 		)
 	})
 
-	t.Run("", func(t *testing.T) {
+	t.Run("nil (Never?) to Bool??", func(t *testing.T) {
 		// NOTE:
 		value, newType := inter.boxOptional(
 			NilValue{},
@@ -81,7 +82,7 @@ func TestInterpreterOptionalBoxing(t *testing.T) {
 		)
 	})
 
-	t.Run("", func(t *testing.T) {
+	t.Run("nil (Some(nil): Never??) to Bool??", func(t *testing.T) {
 		// NOTE:
 		value, newType := inter.boxOptional(
 			NewSomeValueOwningNonCopying(NilValue{}),
@@ -110,7 +111,7 @@ func TestInterpreterAnyBoxing(t *testing.T) {
 	} {
 		t.Run(anyType.String(), func(t *testing.T) {
 
-			t.Run("", func(t *testing.T) {
+			t.Run(fmt.Sprintf("Bool to %s", anyType), func(t *testing.T) {
 				assert.Equal(t,
 					NewAnyValueOwningNonCopying(
 						BoolValue(true),
@@ -124,7 +125,7 @@ func TestInterpreterAnyBoxing(t *testing.T) {
 				)
 			})
 
-			t.Run("", func(t *testing.T) {
+			t.Run(fmt.Sprintf("Bool? to %s?", anyType), func(t *testing.T) {
 
 				assert.Equal(t,
 					NewSomeValueOwningNonCopying(
@@ -141,7 +142,7 @@ func TestInterpreterAnyBoxing(t *testing.T) {
 				)
 			})
 
-			t.Run("", func(t *testing.T) {
+			t.Run(fmt.Sprintf("%[1]s to %[1]s", anyType), func(t *testing.T) {
 				// don't box already boxed
 				assert.Equal(t,
 					NewAnyValueOwningNonCopying(
@@ -174,7 +175,7 @@ func TestInterpreterBoxing(t *testing.T) {
 
 		t.Run(anyType.String(), func(t *testing.T) {
 
-			t.Run("", func(t *testing.T) {
+			t.Run(fmt.Sprintf("Bool to %s?", anyType), func(t *testing.T) {
 
 				assert.Equal(t,
 					NewSomeValueOwningNonCopying(
@@ -192,7 +193,7 @@ func TestInterpreterBoxing(t *testing.T) {
 
 			})
 
-			t.Run("", func(t *testing.T) {
+			t.Run(fmt.Sprintf("Bool? to %s?", anyType), func(t *testing.T) {
 
 				assert.Equal(t,
 					NewSomeValueOwningNonCopying(
