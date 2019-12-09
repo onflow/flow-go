@@ -3,10 +3,14 @@ package sema
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
 func (checker *Checker) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
 	transactionType := checker.Elaboration.TransactionDeclarationTypes[declaration]
+	if transactionType == nil {
+		panic(errors.NewUnreachableError())
+	}
 
 	checker.containerTypes[transactionType] = true
 	defer func() {
@@ -92,11 +96,6 @@ func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDecla
 				Pos:  executeIdentifier.Pos,
 			})
 		}
-	} else {
-		// report an error if no execute block is defined
-		checker.report(&TransactionMissingExecuteError{
-			Range: declaration.Range,
-		})
 	}
 }
 

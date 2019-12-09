@@ -1,4 +1,4 @@
-fun adder(a: [Int]): Int? {
+pub fun adder(a: [Int]): Int? {
 
    if a.length == 0 {
     return nil
@@ -15,7 +15,7 @@ fun adder(a: [Int]): Int? {
 }
 
 
-fun zipOf3(a: [Any;3], b:[Int;3]): [[Any;2];3] {
+pub fun zipOf3(a: [Any;3], b:[Int;3]): [[Any;2];3] {
 
     let c1: [Any;2] = [a[0], b[0]]
     let c2: [Any;2] = [a[1], b[1]]
@@ -26,7 +26,7 @@ fun zipOf3(a: [Any;3], b:[Int;3]): [[Any;2];3] {
     return c
 }
 
-fun callAll(functions fs: [(():Any?)]): [Any?] {
+pub fun callAll(functions fs: [(():Any?)]): [Any?] {
     var i = 0
     let ret: [Any?] = []
 
@@ -38,13 +38,13 @@ fun callAll(functions fs: [(():Any?)]): [Any?] {
     return ret
 }
 
-fun forEach(array: [Any?], f: ((Any?):Any?):[Any?] {
+pub fun forEach(array: [Any?], f: ((Any?):Any?)):[Any?] {
     var i = 0
 
     let ret: [Any?] = []
 
     while (i < array.length) {
-        ret.append(f(array[i])
+        ret.append(f(array[i]))
         i=i+1
     }
 

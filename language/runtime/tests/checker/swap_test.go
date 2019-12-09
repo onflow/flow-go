@@ -244,44 +244,46 @@ func TestCheckInvalidSwapConstantResourceFields(t *testing.T) {
 
 		t.Run(testName, func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  resource X {}
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      resource X {}
 
-                  resource Y {
-                      %[1]s x: <-X
+                      resource Y {
+                          %[1]s x: <-X
 
-                      init(x: <-X) {
-                          self.x <- x
+                          init(x: <-X) {
+                              self.x <- x
+                          }
+
+                          destroy() {
+                              destroy self.x
+                          }
                       }
 
-                      destroy() {
-                          destroy self.x
+                      resource Z {
+                          %[2]s x: <-X
+
+                          init(x: <-X) {
+                              self.x <- x
+                          }
+
+                          destroy() {
+                              destroy self.x
+                          }
                       }
-                  }
 
-                  resource Z {
-                      %[2]s x: <-X
-
-                      init(x: <-X) {
-                          self.x <- x
+                      fun test() {
+                          let y <- create Y(x: <-create X())
+                          let z <- create Z(x: <-create X())
+                          y.x <-> z.x
+                          destroy y
+                          destroy z
                       }
-
-                      destroy() {
-                          destroy self.x
-                      }
-                  }
-
-                  fun test() {
-                      let y <- create Y(x: <-create X())
-                      let z <- create Z(x: <-create X())
-                      y.x <-> z.x
-                      destroy y
-                      destroy z
-                  }
-                `,
-				first,
-				second,
-			))
+                    `,
+					first,
+					second,
+				))
 
 			errs := ExpectCheckerErrors(t, err, 1)
 

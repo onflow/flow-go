@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -398,4 +399,58 @@ func TestCheckVariableDeclarationSecondValueNil(t *testing.T) {
    `)
 
 	require.NoError(t, err)
+}
+
+func TestCheckInvalidLocalDeclarations(t *testing.T) {
+
+	tests := map[string]string{
+		"event":       `event Test()`,
+		"transaction": `transaction { execute {} }`,
+		"import":      `import 0x1`,
+	}
+
+	// composites and interfaces
+
+	for _, kind := range common.CompositeKinds {
+		for _, isInterface := range []bool{true, false} {
+			interfaceKeyword := ""
+			if isInterface {
+				interfaceKeyword = "interface"
+			}
+
+			name := fmt.Sprintf(
+				"%s %s",
+				kind.Keyword(),
+
+				interfaceKeyword,
+			)
+			tests[name] = fmt.Sprintf(
+				`%s %s Test {}`,
+				kind.Keyword(),
+				interfaceKeyword,
+			)
+		}
+	}
+
+	//
+
+	for name, code := range tests {
+		t.Run(name, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      fun test() {
+                          %s
+                      }
+                    `,
+					code,
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+		})
+	}
 }

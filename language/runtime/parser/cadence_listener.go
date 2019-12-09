@@ -58,11 +58,11 @@ type CadenceListener interface {
 	// EnterInterfaceDeclaration is called when entering the interfaceDeclaration production.
 	EnterInterfaceDeclaration(c *InterfaceDeclarationContext)
 
-	// EnterMembers is called when entering the members production.
-	EnterMembers(c *MembersContext)
+	// EnterMembersAndNestedDeclarations is called when entering the membersAndNestedDeclarations production.
+	EnterMembersAndNestedDeclarations(c *MembersAndNestedDeclarationsContext)
 
-	// EnterMember is called when entering the member production.
-	EnterMember(c *MemberContext)
+	// EnterMemberOrNestedDeclaration is called when entering the memberOrNestedDeclaration production.
+	EnterMemberOrNestedDeclaration(c *MemberOrNestedDeclarationContext)
 
 	// EnterCompositeKind is called when entering the compositeKind production.
 	EnterCompositeKind(c *CompositeKindContext)
@@ -358,11 +358,11 @@ type CadenceListener interface {
 	// ExitInterfaceDeclaration is called when exiting the interfaceDeclaration production.
 	ExitInterfaceDeclaration(c *InterfaceDeclarationContext)
 
-	// ExitMembers is called when exiting the members production.
-	ExitMembers(c *MembersContext)
+	// ExitMembersAndNestedDeclarations is called when exiting the membersAndNestedDeclarations production.
+	ExitMembersAndNestedDeclarations(c *MembersAndNestedDeclarationsContext)
 
-	// ExitMember is called when exiting the member production.
-	ExitMember(c *MemberContext)
+	// ExitMemberOrNestedDeclaration is called when exiting the memberOrNestedDeclaration production.
+	ExitMemberOrNestedDeclaration(c *MemberOrNestedDeclarationContext)
 
 	// ExitCompositeKind is called when exiting the compositeKind production.
 	ExitCompositeKind(c *CompositeKindContext)

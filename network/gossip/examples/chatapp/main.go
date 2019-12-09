@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/dapperlabs/flow-go/network/gossip/testnet"
 	"io/ioutil"
 	"log"
 	"os"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/network/gossip"
 	protocols "github.com/dapperlabs/flow-go/network/gossip/protocols/grpc"
+	"github.com/dapperlabs/flow-go/network/gossip/testnet"
 )
 
 // Demo of a simple chat application based on the gossip node implementation

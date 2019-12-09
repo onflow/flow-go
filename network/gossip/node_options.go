@@ -1,12 +1,14 @@
 package gossip
 
 import (
+	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/order"
 	"github.com/dapperlabs/flow-go/network/gossip/registry"
 	"github.com/dapperlabs/flow-go/network/gossip/storage"
 	"github.com/dapperlabs/flow-go/network/gossip/util"
-	"github.com/rs/zerolog"
 )
 
 // Option is a configuration function for a node.
@@ -76,4 +78,9 @@ func WithFanout(fanoutSet []string) Option {
 // WithStaticFanoutSize specifies the size of the static fanout set to be generated
 func WithStaticFanoutSize(staticFanoutSize int) Option {
 	return func(n *Node) { n.staticFanoutNum = staticFanoutSize }
+}
+
+// WithNodeID specifies the local node identitie.
+func WithNodeID(id flow.Identifier) Option {
+	return func(n *Node) { n.id = id }
 }

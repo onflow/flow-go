@@ -6,11 +6,12 @@ import (
 	"log"
 	"net"
 
+	"github.com/rs/zerolog"
+
 	"github.com/dapperlabs/flow-go/network/gossip"
 	"github.com/dapperlabs/flow-go/network/gossip/examples/collector"
 	protocols "github.com/dapperlabs/flow-go/network/gossip/protocols/grpc"
-	"github.com/dapperlabs/flow-go/proto/services/collection"
-	"github.com/rs/zerolog"
+	"github.com/dapperlabs/flow-go/protobuf/services/collection"
 )
 
 //A step by step on how to use gossip

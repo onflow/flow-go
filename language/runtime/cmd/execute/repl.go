@@ -9,6 +9,7 @@ import (
 	"github.com/logrusorgru/aurora"
 
 	"github.com/dapperlabs/flow-go/language/runtime"
+	"github.com/dapperlabs/flow-go/language/runtime/cmd"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 )
 
@@ -24,7 +25,7 @@ func RunREPL() {
 	repl, err := runtime.NewREPL(
 		func(err error) {
 			// TODO: handle imports
-			PrettyPrintError(err, replFilename, map[string]string{replFilename: code})
+			cmd.PrettyPrintError(err, replFilename, map[string]string{replFilename: code})
 		},
 		func(value interpreter.Value) {
 			if _, isVoid := value.(*interpreter.VoidValue); isVoid || value == nil {

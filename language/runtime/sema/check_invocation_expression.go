@@ -115,8 +115,7 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 
 	if returnType.Equal(&NeverType{}) {
 		functionActivation := checker.functionActivations.Current()
-		functionActivation.ReturnInfo.MaybeReturned = true
-		functionActivation.ReturnInfo.DefinitelyReturned = true
+		functionActivation.ReturnInfo.DefinitelyHalted = true
 	}
 
 	if isOptionalResult {
@@ -300,7 +299,8 @@ func (checker *Checker) checkInvocationArguments(
 func (checker *Checker) checkInvocationArgument(argument *ast.Argument, parameterType Type) Type {
 	argumentType := argument.Expression.Accept(checker).(Type)
 
-	if !parameterType.IsInvalidType() &&
+	if !argumentType.IsInvalidType() &&
+		!parameterType.IsInvalidType() &&
 		!checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {
 
 		checker.report(

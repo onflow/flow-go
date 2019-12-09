@@ -21,14 +21,14 @@ func TestHash(t *testing.T) {
 		// create the first mempool with gc1 and gc2
 		pool1, err := mempool.New()
 		require.Nil(t, err)
-		pool1.Add(gc1)
-		pool1.Add(gc2)
+		_ = pool1.Add(gc1)
+		_ = pool1.Add(gc2)
 
 		// create the second mempool with gc2 and gc1
 		pool2, err := mempool.New()
 		require.Nil(t, err)
-		pool2.Add(gc2)
-		pool2.Add(gc1)
+		_ = pool2.Add(gc2)
+		_ = pool2.Add(gc1)
 
 		// check pool1 and pool2 should have the same hash
 		require.Equal(t, pool1.Hash(), pool2.Hash())
@@ -38,13 +38,13 @@ func TestHash(t *testing.T) {
 		// create the first mempool with only gc1
 		pool1, err := mempool.New()
 		require.Nil(t, err)
-		pool1.Add(gc1)
+		_ = pool1.Add(gc1)
 
 		// create the second mempool with gc1 and gc2
 		pool2, err := mempool.New()
 		require.Nil(t, err)
-		pool2.Add(gc1)
-		pool1.Add(gc2)
+		_ = pool2.Add(gc1)
+		_ = pool1.Add(gc2)
 
 		// check pool1 and pool2 should have the different hash
 		require.NotEqual(t, pool1.Hash(), pool2.Hash())
@@ -54,13 +54,13 @@ func TestHash(t *testing.T) {
 		// create the first mempool with gc1 and gc2
 		pool, err := mempool.New()
 		require.Nil(t, err)
-		pool.Add(gc1)
-		pool.Add(gc2)
+		_ = pool.Add(gc1)
+		_ = pool.Add(gc2)
 
 		hash1 := pool.Hash()
 
 		// add gc2 again
-		pool.Add(gc2)
+		_ = pool.Add(gc2)
 
 		// check hash should not change
 		require.Equal(t, hash1, pool.Hash())

@@ -12,7 +12,9 @@
             }
           }
         ],
-        "returnType": "Int"
+        "returnType": {
+          "optional": "Int"
+        }
       }
     },
     "zipOf3": {

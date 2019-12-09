@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/network/gossip"
-	"github.com/stretchr/testify/assert"
 )
 
 // TestGRPCUnderlayConnection_Send tests if a message can be sent using the GRPC underlay
