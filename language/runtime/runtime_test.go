@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
@@ -1159,4 +1160,42 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"42"}, loggedMessages)
+}
+
+func TestRuntimeCyclicImport(t *testing.T) {
+	runtime := NewInterpreterRuntime()
+
+	imported := []byte(`
+      import "imported"
+    `)
+
+	script := []byte(
+		`
+		  import "imported"
+
+		  transaction {
+			execute {}
+		  }
+		`,
+	)
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
+			switch location {
+			case StringLocation("imported"):
+				return imported, nil
+			default:
+				return nil, fmt.Errorf("unknown import location: %s", location)
+			}
+		},
+		getSigningAccounts: func() []values.Address {
+			return nil
+		},
+	}
+
+	err := runtime.ExecuteTransaction(script, runtimeInterface, nil)
+
+	require.Error(t, err)
+	require.IsType(t, Error{}, err)
+	assert.IsType(t, ast.CyclicImportsError{}, err.(Error).Unwrap())
 }

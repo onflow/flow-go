@@ -329,13 +329,10 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 }
 
 func (v *ProgramVisitor) VisitConformances(ctx *ConformancesContext) interface{} {
-	identifierNodes := ctx.AllIdentifier
-	conformances := make([]*ast.NominalType, len(identifierNodes()))
-	for i, identifierNode := range identifierNodes() {
-		identifier := identifierNode.Accept(v).(ast.Identifier)
-		conformances[i] = &ast.NominalType{
-			Identifier: identifier,
-		}
+	typeContexts := ctx.AllNominalType()
+	conformances := make([]*ast.NominalType, len(typeContexts))
+	for i, typeContext := range typeContexts {
+		conformances[i] = typeContext.Accept(v).(*ast.NominalType)
 	}
 	return conformances
 }
@@ -1450,12 +1447,18 @@ func (v *ProgramVisitor) VisitPrimaryExpressionStart(ctx *PrimaryExpressionStart
 }
 
 func (v *ProgramVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {
-	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 	invocation := ctx.Invocation().Accept(v).(*ast.InvocationExpression)
-	invocation.InvokedExpression =
-		&ast.IdentifierExpression{
-			Identifier: identifier,
+	ty := ctx.NominalType().Accept(v).(*ast.NominalType)
+	invocation.InvokedExpression = &ast.IdentifierExpression{
+		Identifier: ty.Identifier,
+	}
+
+	for _, nestedIdentifier := range ty.NestedIdentifiers {
+		invocation.InvokedExpression = &ast.MemberExpression{
+			Expression: invocation.InvokedExpression,
+			Identifier: nestedIdentifier,
 		}
+	}
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 

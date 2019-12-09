@@ -488,11 +488,20 @@ func (*InvalidVariableKindError) isSemanticError() {}
 // InvalidDeclarationError
 
 type InvalidDeclarationError struct {
-	Kind common.DeclarationKind
+	Identifier string
+	Kind       common.DeclarationKind
 	ast.Range
 }
 
 func (e *InvalidDeclarationError) Error() string {
+	if e.Identifier != "" {
+		return fmt.Sprintf(
+			"cannot declare %s here: `%s`",
+			e.Kind.Name(),
+			e.Identifier,
+		)
+	}
+
 	return fmt.Sprintf("cannot declare %s here", e.Kind.Name())
 }
 
@@ -690,18 +699,21 @@ type InitializerMismatch struct {
 //  use `InitializerMismatch`, `MissingMembers`, `MemberMismatches`, etc
 
 type ConformanceError struct {
-	CompositeType       *CompositeType
-	InterfaceType       *InterfaceType
-	InitializerMismatch *InitializerMismatch
-	MissingMembers      []*Member
-	MemberMismatches    []MemberMismatch
-	Pos                 ast.Position
+	CompositeType               *CompositeType
+	InterfaceType               *InterfaceType
+	InitializerMismatch         *InitializerMismatch
+	MissingMembers              []*Member
+	MemberMismatches            []MemberMismatch
+	MissingNestedCompositeTypes []*CompositeType
+	Pos                         ast.Position
 }
 
 func (e *ConformanceError) Error() string {
 	return fmt.Sprintf(
-		"structure `%s` does not conform to interface `%s`",
+		"%s `%s` does not conform to %s `%s`",
+		e.CompositeType.Kind.Name(),
 		e.CompositeType.Identifier,
+		e.InterfaceType.CompositeKind.DeclarationKind(true).Name(),
 		e.InterfaceType.Identifier,
 	)
 }
@@ -721,27 +733,42 @@ func (e *ConformanceError) EndPosition() ast.Position {
 // TODO: just make this a warning?
 
 type DuplicateConformanceError struct {
-	CompositeIdentifier string
-	Conformance         *ast.NominalType
+	CompositeType *CompositeType
+	InterfaceType *InterfaceType
+	ast.Range
 }
 
 func (e *DuplicateConformanceError) Error() string {
 	return fmt.Sprintf(
-		"structure `%s` repeats conformance for interface `%s`",
-		e.CompositeIdentifier,
-		e.Conformance.Identifier.Identifier,
+		"%s `%s` repeats conformance to %s `%s`",
+		e.CompositeType.Kind.Name(),
+		e.CompositeType.Identifier,
+		e.InterfaceType.CompositeKind.DeclarationKind(true).Name(),
+		e.InterfaceType.Identifier,
 	)
 }
 
 func (*DuplicateConformanceError) isSemanticError() {}
 
-func (e *DuplicateConformanceError) StartPosition() ast.Position {
-	return e.Conformance.StartPosition()
+// MissingConformanceError
+
+type MissingConformanceError struct {
+	CompositeType *CompositeType
+	InterfaceType *InterfaceType
+	ast.Range
 }
 
-func (e *DuplicateConformanceError) EndPosition() ast.Position {
-	return e.Conformance.EndPosition()
+func (e *MissingConformanceError) Error() string {
+	return fmt.Sprintf(
+		"%s `%s` is missing a declaration to required conformance to %s `%s`",
+		e.CompositeType.Kind.Name(),
+		e.CompositeType.Identifier,
+		e.InterfaceType.CompositeKind.DeclarationKind(true).Name(),
+		e.InterfaceType.Identifier,
+	)
 }
+
+func (*MissingConformanceError) isSemanticError() {}
 
 // UnresolvedImportError
 
@@ -841,22 +868,6 @@ func (e *UnsupportedTypeError) Error() string {
 }
 
 func (*UnsupportedTypeError) isSemanticError() {}
-
-// UnsupportedDeclarationError
-
-type UnsupportedDeclarationError struct {
-	DeclarationKind common.DeclarationKind
-	ast.Range
-}
-
-func (e *UnsupportedDeclarationError) Error() string {
-	return fmt.Sprintf(
-		"%s declarations are not supported yet",
-		e.DeclarationKind.Name(),
-	)
-}
-
-func (*UnsupportedDeclarationError) isSemanticError() {}
 
 // UnsupportedOverloadingError
 
