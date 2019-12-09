@@ -5118,10 +5118,10 @@ func TestParseEventEmitStatement(t *testing.T) {
 	unittest.AssertEqualWithDiff(t, expectedStatements, actualStatements)
 }
 
-func TestParseMoveReturnType(t *testing.T) {
+func TestParseResourceReturnType(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        fun test(): <-X {}
+        fun test(): @X {}
 	`)
 
 	require.NoError(t, err)
@@ -5142,7 +5142,7 @@ func TestParseMoveReturnType(t *testing.T) {
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "X",
-					Pos:        Position{Offset: 23, Line: 2, Column: 22},
+					Pos:        Position{Offset: 22, Line: 2, Column: 21},
 				},
 			},
 			StartPos: Position{Offset: 21, Line: 2, Column: 20},
@@ -5150,8 +5150,8 @@ func TestParseMoveReturnType(t *testing.T) {
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
 				Range: Range{
-					StartPos: Position{Offset: 25, Line: 2, Column: 24},
-					EndPos:   Position{Offset: 26, Line: 2, Column: 25},
+					StartPos: Position{Offset: 24, Line: 2, Column: 23},
+					EndPos:   Position{Offset: 25, Line: 2, Column: 24},
 				},
 			},
 		},
@@ -5325,10 +5325,10 @@ func TestParseMoveOperator(t *testing.T) {
 	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
-func TestParseMoveParameterType(t *testing.T) {
+func TestParseResourceParameterType(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        fun test(x: <-X) {}
+        fun test(x: @X) {}
 	`)
 
 	require.NoError(t, err)
@@ -5343,10 +5343,10 @@ func TestParseMoveParameterType(t *testing.T) {
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "",
-					Pos:        Position{Offset: 24, Line: 2, Column: 23},
+					Pos:        Position{Offset: 23, Line: 2, Column: 22},
 				},
 			},
-			StartPos: Position{Offset: 24, Line: 2, Column: 23},
+			StartPos: Position{Offset: 23, Line: 2, Column: 22},
 		},
 		ParameterList: &ParameterList{
 			Parameters: []*Parameter{
@@ -5361,27 +5361,27 @@ func TestParseMoveParameterType(t *testing.T) {
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "X",
-								Pos:        Position{Offset: 23, Line: 2, Column: 22},
+								Pos:        Position{Offset: 22, Line: 2, Column: 21},
 							},
 						},
 						StartPos: Position{Offset: 21, Line: 2, Column: 20},
 					},
 					Range: Range{
 						StartPos: Position{Offset: 18, Line: 2, Column: 17},
-						EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+						EndPos:   Position{Offset: 22, Line: 2, Column: 21},
 					},
 				},
 			},
 			Range: Range{
 				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+				EndPos:   Position{Offset: 23, Line: 2, Column: 22},
 			},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
 				Range: Range{
-					StartPos: Position{Offset: 26, Line: 2, Column: 25},
-					EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+					StartPos: Position{Offset: 25, Line: 2, Column: 24},
+					EndPos:   Position{Offset: 26, Line: 2, Column: 25},
 				},
 			},
 		},
@@ -5398,7 +5398,7 @@ func TestParseMoveParameterType(t *testing.T) {
 func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        let x: <-R <- y
+        let x: @R <- y
 	`)
 
 	require.NoError(t, err)
@@ -5414,7 +5414,7 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "R",
-					Pos:        Position{Offset: 18, Line: 2, Column: 17},
+					Pos:        Position{Offset: 17, Line: 2, Column: 16},
 				},
 			},
 			StartPos: Position{Offset: 16, Line: 2, Column: 15},
@@ -5422,12 +5422,12 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
 				Identifier: "y",
-				Pos:        Position{Offset: 23, Line: 2, Column: 22},
+				Pos:        Position{Offset: 22, Line: 2, Column: 21},
 			},
 		},
 		Transfer: &Transfer{
 			Operation: TransferOperationMove,
-			Pos:       Position{Offset: 20, Line: 2, Column: 19},
+			Pos:       Position{Offset: 19, Line: 2, Column: 18},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
 	}
@@ -5442,7 +5442,7 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        struct X { x: <-R }
+        struct X { x: @R }
 	`)
 
 	require.NoError(t, err)
@@ -5468,21 +5468,21 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "R",
-								Pos:        Position{Offset: 25, Line: 2, Column: 24},
+								Pos:        Position{Offset: 24, Line: 2, Column: 23},
 							},
 						},
 						StartPos: Position{Offset: 23, Line: 2, Column: 22},
 					},
 					Range: Range{
 						StartPos: Position{Offset: 20, Line: 2, Column: 19},
-						EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+						EndPos:   Position{Offset: 24, Line: 2, Column: 23},
 					},
 				},
 			},
 		},
 		Range: Range{
 			StartPos: Position{Offset: 9, Line: 2, Column: 8},
-			EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+			EndPos:   Position{Offset: 26, Line: 2, Column: 25},
 		},
 	}
 
@@ -5493,10 +5493,10 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
-func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
+func TestParseFunctionTypeWithResourceTypeAnnotation(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        let f: ((): <-R) = g
+        let f: ((): @R) = g
 	`)
 
 	require.NoError(t, err)
@@ -5516,26 +5516,26 @@ func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
 					Type: &NominalType{
 						Identifier: Identifier{
 							Identifier: "R",
-							Pos:        Position{Offset: 23, Line: 2, Column: 22},
+							Pos:        Position{Offset: 22, Line: 2, Column: 21},
 						},
 					},
 					StartPos: Position{Offset: 21, Line: 2, Column: 20},
 				},
 				Range: Range{
 					StartPos: Position{Offset: 16, Line: 2, Column: 15},
-					EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+					EndPos:   Position{Offset: 22, Line: 2, Column: 21},
 				},
 			},
 			StartPos: Position{Offset: 16, Line: 2, Column: 15},
 		},
 		Transfer: &Transfer{
 			Operation: TransferOperationCopy,
-			Pos:       Position{Offset: 26, Line: 2, Column: 25},
+			Pos:       Position{Offset: 25, Line: 2, Column: 24},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
 				Identifier: "g",
-				Pos:        Position{Offset: 28, Line: 2, Column: 27},
+				Pos:        Position{Offset: 27, Line: 2, Column: 26},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
@@ -5548,10 +5548,10 @@ func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
 	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
-func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
+func TestParseFunctionExpressionWithResourceTypeAnnotation(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        let f = fun (): <-R { return X }
+        let f = fun (): @R { return X }
 	`)
 
 	require.NoError(t, err)
@@ -5578,7 +5578,7 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 				Type: &NominalType{
 					Identifier: Identifier{
 						Identifier: "R",
-						Pos:        Position{Offset: 27, Line: 2, Column: 26},
+						Pos:        Position{Offset: 26, Line: 2, Column: 25},
 					},
 				},
 				StartPos: Position{Offset: 25, Line: 2, Column: 24},
@@ -5590,18 +5590,18 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 							Expression: &IdentifierExpression{
 								Identifier: Identifier{
 									Identifier: "X",
-									Pos:        Position{Offset: 38, Line: 2, Column: 37},
+									Pos:        Position{Offset: 37, Line: 2, Column: 36},
 								},
 							},
 							Range: Range{
-								StartPos: Position{Offset: 31, Line: 2, Column: 30},
-								EndPos:   Position{Offset: 38, Line: 2, Column: 37},
+								StartPos: Position{Offset: 30, Line: 2, Column: 29},
+								EndPos:   Position{Offset: 37, Line: 2, Column: 36},
 							},
 						},
 					},
 					Range: Range{
-						StartPos: Position{Offset: 29, Line: 2, Column: 28},
-						EndPos:   Position{Offset: 40, Line: 2, Column: 39},
+						StartPos: Position{Offset: 28, Line: 2, Column: 27},
+						EndPos:   Position{Offset: 39, Line: 2, Column: 38},
 					},
 				},
 			},
@@ -5617,10 +5617,10 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
-func TestParseFailableCastingMoveTypeAnnotation(t *testing.T) {
+func TestParseFailableCastingResourceTypeAnnotation(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        let y = x as? <-R
+        let y = x as? @R
 	`)
 
 	require.NoError(t, err)
@@ -5638,7 +5638,7 @@ func TestParseFailableCastingMoveTypeAnnotation(t *testing.T) {
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "R",
-					Pos:        Position{Offset: 25, Line: 2, Column: 24},
+					Pos:        Position{Offset: 24, Line: 2, Column: 23},
 				},
 			},
 			StartPos: Position{Offset: 23, Line: 2, Column: 22},
