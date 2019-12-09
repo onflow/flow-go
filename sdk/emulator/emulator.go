@@ -140,7 +140,7 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 		initialState = latestState
 		// Restore pending block from store information
 		pendingBlock = &types.Block{
-			Number:            latestBlock.Number,
+			Number:            latestBlock.Number + 1,
 			PreviousBlockHash: latestBlock.Hash(),
 			TransactionHashes: make([]crypto.Hash, 0),
 			Index:             0,
@@ -165,7 +165,7 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 
 		// Create pending block from genesis block
 		pendingBlock = &types.Block{
-			Number:            genesis.Number,
+			Number:            genesis.Number + 1,
 			PreviousBlockHash: genesis.Hash(),
 			TransactionHashes: make([]crypto.Hash, 0),
 			Index:             0,
@@ -513,7 +513,12 @@ func (b *EmulatedBlockchain) ExecuteAndCommitBlock() (*types.Block, error) {
 }
 
 // ResetPendingBlock clears the transactions in pending block.
-func (b *EmulatedBlockchain) ResetPendingBlock() {
+func (b *EmulatedBlockchain) ResetPendingBlock() error {
+	block, err := b.GetLatestBlock()
+	if err != nil {
+		return err
+	}
+
 	// Remove pending block transactions from transaction pool
 	for _, txHash := range b.pendingBlock.TransactionHashes {
 		delete(b.txPool, string(txHash))
@@ -521,9 +526,13 @@ func (b *EmulatedBlockchain) ResetPendingBlock() {
 
 	// Reset pending block
 	b.pendingBlock = &types.Block{
+		Number:            block.Number + 1,
+		PreviousBlockHash: block.Hash(),
 		TransactionHashes: make([]crypto.Hash, 0),
 		Index:             0,
 	}
+
+	return nil
 }
 
 // ExecuteScript executes a read-only script against the world state and returns the result.
