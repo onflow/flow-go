@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // Chunk is a collection of transactions, we assume Tx content correctness and
@@ -14,8 +15,8 @@ import (
 type Chunk struct {
 	Transactions                  []flow.Transaction
 	TotalGasSpent                 uint64
-	StartState                    StateCommitment
-	FinalState                    StateCommitment
+	StartState                    storage.StateCommitment
+	FinalState                    storage.StateCommitment
 	FirstTxInTheNextChunk         *flow.Transaction
 	FirstTxGasSpent               uint64 // T0
 	FirstTxInTheNextChunkGasSpent uint64 // T'0
@@ -56,7 +57,7 @@ func (c *Chunk) Encode() []byte {
 type chunkWrapper struct {
 	Transactions    []flow.TransactionWrapper
 	TotalGasSpent   uint64
-	StartState      StateCommitment
+	StartState      storage.StateCommitment
 	FirstTxGasSpent uint64 // T0
 }
 

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"log"
 
-	"github.com/dapperlabs/flow-go/proto/sdk/entities"
-	"github.com/dapperlabs/flow-go/proto/services/collection"
+	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
+	"github.com/dapperlabs/flow-go/protobuf/services/collection"
 )
 
 var (

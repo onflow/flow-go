@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dgraph-io/badger"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
-
-	"github.com/dgraph-io/badger"
 )
 
 // Store is an embedded storage implementation using Badger as the underlying
@@ -20,8 +20,10 @@ type Store struct {
 }
 
 // New returns a new Badger Store.
-func New(path string) (Store, error) {
-	db, err := badger.Open(badger.DefaultOptions(path))
+func New(opts ...Opt) (Store, error) {
+	badgerOptions := getBadgerOptions(opts...)
+
+	db, err := badger.Open(badgerOptions)
 	if err != nil {
 		return Store{}, fmt.Errorf("could not open database: %w", err)
 	}

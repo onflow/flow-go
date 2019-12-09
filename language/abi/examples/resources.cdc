@@ -1,7 +1,7 @@
-struct Colour {
-    let r: UInt8
-    let g: UInt8
-    let b: UInt8
+pub struct Colour {
+    pub let r: UInt8
+    pub let g: UInt8
+    pub let b: UInt8
 
     init(r: UInt8, g: UInt8, b: UInt8) {
         self.r = r
@@ -10,18 +10,22 @@ struct Colour {
     }
 }
 
-resource Banana {
-    let colour: Colour
+pub resource Banana {
+    pub let colour: Colour
 
     init(colour: Colour) {
         self.colour = colour
     }
 }
 
-resource BunchOfBananas {
-    let bananas: <-[Banana]
+pub resource BunchOfBananas {
+    pub let bananas: <-[Banana?]
 
     init(bananas: <-[Banana]) {
         self.bananas <- bananas
+    }
+
+    destroy() {
+        destroy self.bananas
     }
 }

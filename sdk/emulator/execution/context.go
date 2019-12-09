@@ -320,7 +320,9 @@ func (r *RuntimeContext) ResolveImport(location runtime.Location) (values.Bytes,
 		return nil, errors.New("import location must be an account address")
 	}
 
-	accountID := []byte(addressLocation)
+	address := flow.BytesToAddress(addressLocation)
+
+	accountID := address.Bytes()
 
 	code, exists := r.ledger.Get(fullKey(string(accountID), string(accountID), keyCode))
 	if !exists {

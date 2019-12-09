@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/execution"
 	exec "github.com/dapperlabs/flow-go/model/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // Chunker converts executed transactions into chunks
@@ -24,8 +24,8 @@ type ChunkVerifier interface {
 func GetChunks(Txs []exec.ExecutedTransaction, maxGasSpentPerChunk uint64) ([]exec.Chunk, error) {
 	var totalGasSpent uint64
 	var firstTxGasSpent uint64
-	var startState exec.StateCommitment
-	var finalState exec.StateCommitment
+	var startState storage.StateCommitment
+	var finalState storage.StateCommitment
 	var activeTxs []flow.Transaction
 	var chunks []exec.Chunk
 	for _, tx := range Txs {
@@ -68,7 +68,7 @@ func GetChunks(Txs []exec.ExecutedTransaction, maxGasSpentPerChunk uint64) ([]ex
 // ChunkVerify implements a chunk verifier
 func ChunkVerify(chunk exec.Chunk, vm exec.VirtualMachine, maxGasSpentPerChunk uint64) (verified bool, err error) {
 	var totalGasSpent uint64
-	var finalState execution.StateCommitment = chunk.StartState
+	var finalState storage.StateCommitment = chunk.StartState
 	for i, tx := range chunk.Transactions {
 		etx, err := vm.ExecuteTransaction(&tx, finalState)
 		if err != nil {
@@ -95,7 +95,7 @@ func ChunkVerify(chunk exec.Chunk, vm exec.VirtualMachine, maxGasSpentPerChunk u
 		return false, nil
 	}
 	// assert final state
-	if bytes.Compare(finalState, chunk.FinalState) != 0 {
+	if !bytes.Equal(finalState, chunk.FinalState) {
 		return false, nil
 	}
 

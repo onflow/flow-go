@@ -4,6 +4,8 @@ package adaptor
 
 import (
 	"context"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // sendFunc serves as function for the sender to submit messages to the wrapper
@@ -22,8 +24,12 @@ type Conduit struct {
 }
 
 // Submit will function as sending function for this engine.
-func (c *Conduit) Submit(event interface{}, recipients ...string) error {
-	return c.submit(c.engineID, event, recipients...)
+func (c *Conduit) Submit(event interface{}, recipients ...flow.Identifier) error {
+	converted := make([]string, 0, len(recipients))
+	for _, recipient := range recipients {
+		converted = append(converted, string(recipient[:]))
+	}
+	return c.submit(c.engineID, event, converted...)
 }
 
 // Handle functions as GRPC callback to handle payloads for this engine.

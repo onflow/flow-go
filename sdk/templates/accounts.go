@@ -46,7 +46,6 @@ func UpdateAccountCode(code []byte) []byte {
             let code = %s
             updateAccountCode(signer.address, code)
           }
-          execute {}
         }
     `, codeStr)
 
@@ -68,7 +67,6 @@ func AddAccountKey(accountKey flow.AccountPublicKey) ([]byte, error) {
             let key = %s
             addAccountKey(signer.address, key)
           }
-          execute {}
         }
    	`, publicKeyStr)
 
@@ -83,7 +81,6 @@ func RemoveAccountKey(index int) []byte {
             let index = %d
             removeAccountKey(signer.address, index)
           }
-          execute {}
         }
     `, index)
 

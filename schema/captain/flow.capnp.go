@@ -8,127 +8,393 @@ import (
 	schemas "zombiezen.com/go/capnproto2/schemas"
 )
 
-type BlockHeader struct{ capnp.Struct }
+type Identity struct{ capnp.Struct }
 
-// BlockHeader_TypeID is the unique identifier for the type BlockHeader.
-const BlockHeader_TypeID = 0xb52e2dc8e7887069
+// Identity_TypeID is the unique identifier for the type Identity.
+const Identity_TypeID = 0x87bef45c1dc996c0
 
-func NewBlockHeader(s *capnp.Segment) (BlockHeader, error) {
-	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 24, PointerCount: 2})
-	return BlockHeader{st}, err
+func NewIdentity(s *capnp.Segment) (Identity, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 16, PointerCount: 2})
+	return Identity{st}, err
 }
 
-func NewRootBlockHeader(s *capnp.Segment) (BlockHeader, error) {
-	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 24, PointerCount: 2})
-	return BlockHeader{st}, err
+func NewRootIdentity(s *capnp.Segment) (Identity, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 16, PointerCount: 2})
+	return Identity{st}, err
 }
 
-func ReadRootBlockHeader(msg *capnp.Message) (BlockHeader, error) {
+func ReadRootIdentity(msg *capnp.Message) (Identity, error) {
 	root, err := msg.RootPtr()
-	return BlockHeader{root.Struct()}, err
+	return Identity{root.Struct()}, err
 }
 
-func (s BlockHeader) String() string {
-	str, _ := text.Marshal(0xb52e2dc8e7887069, s.Struct)
+func (s Identity) String() string {
+	str, _ := text.Marshal(0x87bef45c1dc996c0, s.Struct)
 	return str
 }
 
-func (s BlockHeader) Height() uint64 {
-	return s.Struct.Uint64(0)
-}
-
-func (s BlockHeader) SetHeight(v uint64) {
-	s.Struct.SetUint64(0, v)
-}
-
-func (s BlockHeader) Nonce() uint64 {
-	return s.Struct.Uint64(8)
-}
-
-func (s BlockHeader) SetNonce(v uint64) {
-	s.Struct.SetUint64(8, v)
-}
-
-func (s BlockHeader) Timestamp() uint64 {
-	return s.Struct.Uint64(16)
-}
-
-func (s BlockHeader) SetTimestamp(v uint64) {
-	s.Struct.SetUint64(16, v)
-}
-
-func (s BlockHeader) Parent() ([]byte, error) {
+func (s Identity) NodeId() ([]byte, error) {
 	p, err := s.Struct.Ptr(0)
 	return []byte(p.Data()), err
 }
 
-func (s BlockHeader) HasParent() bool {
+func (s Identity) HasNodeId() bool {
 	p, err := s.Struct.Ptr(0)
 	return p.IsValid() || err != nil
 }
 
-func (s BlockHeader) SetParent(v []byte) error {
+func (s Identity) SetNodeId(v []byte) error {
 	return s.Struct.SetData(0, v)
 }
 
-func (s BlockHeader) Payload() ([]byte, error) {
+func (s Identity) Address() (string, error) {
 	p, err := s.Struct.Ptr(1)
-	return []byte(p.Data()), err
+	return p.Text(), err
 }
 
-func (s BlockHeader) HasPayload() bool {
+func (s Identity) HasAddress() bool {
 	p, err := s.Struct.Ptr(1)
 	return p.IsValid() || err != nil
 }
 
-func (s BlockHeader) SetPayload(v []byte) error {
-	return s.Struct.SetData(1, v)
+func (s Identity) AddressBytes() ([]byte, error) {
+	p, err := s.Struct.Ptr(1)
+	return p.TextBytes(), err
 }
 
-// BlockHeader_List is a list of BlockHeader.
-type BlockHeader_List struct{ capnp.List }
-
-// NewBlockHeader creates a new list of BlockHeader.
-func NewBlockHeader_List(s *capnp.Segment, sz int32) (BlockHeader_List, error) {
-	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 24, PointerCount: 2}, sz)
-	return BlockHeader_List{l}, err
+func (s Identity) SetAddress(v string) error {
+	return s.Struct.SetText(1, v)
 }
 
-func (s BlockHeader_List) At(i int) BlockHeader { return BlockHeader{s.List.Struct(i)} }
+func (s Identity) Role() uint8 {
+	return s.Struct.Uint8(0)
+}
 
-func (s BlockHeader_List) Set(i int, v BlockHeader) error { return s.List.SetStruct(i, v.Struct) }
+func (s Identity) SetRole(v uint8) {
+	s.Struct.SetUint8(0, v)
+}
 
-func (s BlockHeader_List) String() string {
-	str, _ := text.MarshalList(0xb52e2dc8e7887069, s.List)
+func (s Identity) Stake() uint64 {
+	return s.Struct.Uint64(8)
+}
+
+func (s Identity) SetStake(v uint64) {
+	s.Struct.SetUint64(8, v)
+}
+
+// Identity_List is a list of Identity.
+type Identity_List struct{ capnp.List }
+
+// NewIdentity creates a new list of Identity.
+func NewIdentity_List(s *capnp.Segment, sz int32) (Identity_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 16, PointerCount: 2}, sz)
+	return Identity_List{l}, err
+}
+
+func (s Identity_List) At(i int) Identity { return Identity{s.List.Struct(i)} }
+
+func (s Identity_List) Set(i int, v Identity) error { return s.List.SetStruct(i, v.Struct) }
+
+func (s Identity_List) String() string {
+	str, _ := text.MarshalList(0x87bef45c1dc996c0, s.List)
 	return str
 }
 
-// BlockHeader_Promise is a wrapper for a BlockHeader promised by a client call.
-type BlockHeader_Promise struct{ *capnp.Pipeline }
+// Identity_Promise is a wrapper for a Identity promised by a client call.
+type Identity_Promise struct{ *capnp.Pipeline }
 
-func (p BlockHeader_Promise) Struct() (BlockHeader, error) {
+func (p Identity_Promise) Struct() (Identity, error) {
 	s, err := p.Pipeline.Struct()
-	return BlockHeader{s}, err
+	return Identity{s}, err
 }
 
-const schema_cf3ad8085685b22d = "x\xda4\xcb?J\x03A\x18\x86\xf1\xf7\xfdfb\x12" +
-	"$\xc5\x90\xeds\x82\x04\xff`a@\"\xa9,\xfd," +
-	"\xec\x87d4\xc1dw\x88\x0b*(\"$\xb0\x85\x82" +
-	"\x82\x85\x9dw\x10l<\x81\x9d\xad7\xf0\x18+)\xb6" +
-	"|~\xf0lMx(\xdb\xb5\xf7\x06\xa0\xe3\xdaF9" +
-	"\x8d\xc5\xdfw\xb7\xf7\x09\xdd\xa4)\xbb\x1f\xab\xd3\xc6o" +
-	"\xff\x075\xa9\x03\xed=\xfb\xd5>\xb0u`w\xdfv" +
-	"\x88\x12\xcd\xf2l\x96]\xf5F>2\x8d\xfd\xe1,\x1b" +
-	"]\x0c\x8e\x82\x1f\x87\xc51\xa9\x89\xb1\x80%\xe0\xee\xfa" +
-	"\x80^\x1b\xeaR\xe8\xc8\x84k|\xd8\x01\xf4\xd6P\x0b" +
-	"\xa1\x13I(\x80[\x9d\x00\xba4\xd4g!MB\x03" +
-	"\xb8\xa7\xf5]\x18\xea\xab\xd0Y&\xb4\x80{\x19\x02\xfa" +
-	"h\xa8o\xc2\xc1$L\xcf'9\x9b\x106\xc1N\x9a" +
-	"\xa5\xa3PU\x99O\xe7\xe12\xf7s0V6\x88~" +
-	"\x11\xd2\x9c-\x08[\xe0}\xf47\xb3\xcc\x8f\xab\xfe\x0f" +
-	"\x00\x00\xff\xff\xe7}7\xed"
+type Header struct{ capnp.Struct }
+
+// Header_TypeID is the unique identifier for the type Header.
+const Header_TypeID = 0xde11024ca833d34a
+
+func NewHeader(s *capnp.Segment) (Header, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 16, PointerCount: 3})
+	return Header{st}, err
+}
+
+func NewRootHeader(s *capnp.Segment) (Header, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 16, PointerCount: 3})
+	return Header{st}, err
+}
+
+func ReadRootHeader(msg *capnp.Message) (Header, error) {
+	root, err := msg.RootPtr()
+	return Header{root.Struct()}, err
+}
+
+func (s Header) String() string {
+	str, _ := text.Marshal(0xde11024ca833d34a, s.Struct)
+	return str
+}
+
+func (s Header) Number() uint64 {
+	return s.Struct.Uint64(0)
+}
+
+func (s Header) SetNumber(v uint64) {
+	s.Struct.SetUint64(0, v)
+}
+
+func (s Header) Timestamp() uint64 {
+	return s.Struct.Uint64(8)
+}
+
+func (s Header) SetTimestamp(v uint64) {
+	s.Struct.SetUint64(8, v)
+}
+
+func (s Header) Parent() ([]byte, error) {
+	p, err := s.Struct.Ptr(0)
+	return []byte(p.Data()), err
+}
+
+func (s Header) HasParent() bool {
+	p, err := s.Struct.Ptr(0)
+	return p.IsValid() || err != nil
+}
+
+func (s Header) SetParent(v []byte) error {
+	return s.Struct.SetData(0, v)
+}
+
+func (s Header) Payload() ([]byte, error) {
+	p, err := s.Struct.Ptr(1)
+	return []byte(p.Data()), err
+}
+
+func (s Header) HasPayload() bool {
+	p, err := s.Struct.Ptr(1)
+	return p.IsValid() || err != nil
+}
+
+func (s Header) SetPayload(v []byte) error {
+	return s.Struct.SetData(1, v)
+}
+
+func (s Header) Signatures() (capnp.DataList, error) {
+	p, err := s.Struct.Ptr(2)
+	return capnp.DataList{List: p.List()}, err
+}
+
+func (s Header) HasSignatures() bool {
+	p, err := s.Struct.Ptr(2)
+	return p.IsValid() || err != nil
+}
+
+func (s Header) SetSignatures(v capnp.DataList) error {
+	return s.Struct.SetPtr(2, v.List.ToPtr())
+}
+
+// NewSignatures sets the signatures field to a newly
+// allocated capnp.DataList, preferring placement in s's segment.
+func (s Header) NewSignatures(n int32) (capnp.DataList, error) {
+	l, err := capnp.NewDataList(s.Struct.Segment(), n)
+	if err != nil {
+		return capnp.DataList{}, err
+	}
+	err = s.Struct.SetPtr(2, l.List.ToPtr())
+	return l, err
+}
+
+// Header_List is a list of Header.
+type Header_List struct{ capnp.List }
+
+// NewHeader creates a new list of Header.
+func NewHeader_List(s *capnp.Segment, sz int32) (Header_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 16, PointerCount: 3}, sz)
+	return Header_List{l}, err
+}
+
+func (s Header_List) At(i int) Header { return Header{s.List.Struct(i)} }
+
+func (s Header_List) Set(i int, v Header) error { return s.List.SetStruct(i, v.Struct) }
+
+func (s Header_List) String() string {
+	str, _ := text.MarshalList(0xde11024ca833d34a, s.List)
+	return str
+}
+
+// Header_Promise is a wrapper for a Header promised by a client call.
+type Header_Promise struct{ *capnp.Pipeline }
+
+func (p Header_Promise) Struct() (Header, error) {
+	s, err := p.Pipeline.Struct()
+	return Header{s}, err
+}
+
+type Block struct{ capnp.Struct }
+
+// Block_TypeID is the unique identifier for the type Block.
+const Block_TypeID = 0xb21c60ff9d83fbf5
+
+func NewBlock(s *capnp.Segment) (Block, error) {
+	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
+	return Block{st}, err
+}
+
+func NewRootBlock(s *capnp.Segment) (Block, error) {
+	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3})
+	return Block{st}, err
+}
+
+func ReadRootBlock(msg *capnp.Message) (Block, error) {
+	root, err := msg.RootPtr()
+	return Block{root.Struct()}, err
+}
+
+func (s Block) String() string {
+	str, _ := text.Marshal(0xb21c60ff9d83fbf5, s.Struct)
+	return str
+}
+
+func (s Block) Header() (Header, error) {
+	p, err := s.Struct.Ptr(0)
+	return Header{Struct: p.Struct()}, err
+}
+
+func (s Block) HasHeader() bool {
+	p, err := s.Struct.Ptr(0)
+	return p.IsValid() || err != nil
+}
+
+func (s Block) SetHeader(v Header) error {
+	return s.Struct.SetPtr(0, v.Struct.ToPtr())
+}
+
+// NewHeader sets the header field to a newly
+// allocated Header struct, preferring placement in s's segment.
+func (s Block) NewHeader() (Header, error) {
+	ss, err := NewHeader(s.Struct.Segment())
+	if err != nil {
+		return Header{}, err
+	}
+	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
+	return ss, err
+}
+
+func (s Block) NewIdentities() (Identity_List, error) {
+	p, err := s.Struct.Ptr(1)
+	return Identity_List{List: p.List()}, err
+}
+
+func (s Block) HasNewIdentities() bool {
+	p, err := s.Struct.Ptr(1)
+	return p.IsValid() || err != nil
+}
+
+func (s Block) SetNewIdentities(v Identity_List) error {
+	return s.Struct.SetPtr(1, v.List.ToPtr())
+}
+
+// NewNewIdentities sets the newIdentities field to a newly
+// allocated Identity_List, preferring placement in s's segment.
+func (s Block) NewNewIdentities(n int32) (Identity_List, error) {
+	l, err := NewIdentity_List(s.Struct.Segment(), n)
+	if err != nil {
+		return Identity_List{}, err
+	}
+	err = s.Struct.SetPtr(1, l.List.ToPtr())
+	return l, err
+}
+
+func (s Block) GuaranteedCollections() (GuaranteedCollection_List, error) {
+	p, err := s.Struct.Ptr(2)
+	return GuaranteedCollection_List{List: p.List()}, err
+}
+
+func (s Block) HasGuaranteedCollections() bool {
+	p, err := s.Struct.Ptr(2)
+	return p.IsValid() || err != nil
+}
+
+func (s Block) SetGuaranteedCollections(v GuaranteedCollection_List) error {
+	return s.Struct.SetPtr(2, v.List.ToPtr())
+}
+
+// NewGuaranteedCollections sets the guaranteedCollections field to a newly
+// allocated GuaranteedCollection_List, preferring placement in s's segment.
+func (s Block) NewGuaranteedCollections(n int32) (GuaranteedCollection_List, error) {
+	l, err := NewGuaranteedCollection_List(s.Struct.Segment(), n)
+	if err != nil {
+		return GuaranteedCollection_List{}, err
+	}
+	err = s.Struct.SetPtr(2, l.List.ToPtr())
+	return l, err
+}
+
+// Block_List is a list of Block.
+type Block_List struct{ capnp.List }
+
+// NewBlock creates a new list of Block.
+func NewBlock_List(s *capnp.Segment, sz int32) (Block_List, error) {
+	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 3}, sz)
+	return Block_List{l}, err
+}
+
+func (s Block_List) At(i int) Block { return Block{s.List.Struct(i)} }
+
+func (s Block_List) Set(i int, v Block) error { return s.List.SetStruct(i, v.Struct) }
+
+func (s Block_List) String() string {
+	str, _ := text.MarshalList(0xb21c60ff9d83fbf5, s.List)
+	return str
+}
+
+// Block_Promise is a wrapper for a Block promised by a client call.
+type Block_Promise struct{ *capnp.Pipeline }
+
+func (p Block_Promise) Struct() (Block, error) {
+	s, err := p.Pipeline.Struct()
+	return Block{s}, err
+}
+
+func (p Block_Promise) Header() Header_Promise {
+	return Header_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
+}
+
+const schema_cf3ad8085685b22d = "x\xda|\x91\xbfk\x14A\x18\x86\xdfwf/1\x92" +
+	"\xc4[\xee\xaa\xa8\\/h\xd4ti\x12\"B\")" +
+	"2\x16\"\x12%\xe3\xed\x98[\xb2\xbf\xd8\x9d\x10S\x88" +
+	"Q#*($ \x8a`z\x11E\xbc^Q\xb0\xb1" +
+	"\x0ahce\xeb?\xa0\x95\xc5\xca\x1c\xc9\xdda\x91n" +
+	"\xf9\xf6\xfd\x86\xe7\xfd\x9e\xd3\xbb\x9c\x16g*\xcf\x07\x01" +
+	"u\xb92P~z\xf6\xf5\xf8\xe2\xef\x8f\x0f\xa0\xc6(" +
+	"\xca\x93\xed\xfb\x97\x0e\xfd\x98\xdcEE\x0c\x02\x13\xef\xe5" +
+	"\x18k\x9f\xe5 P\xfb \x7f\x81\xe5\x9f\xbf\xf7v\xca" +
+	"\xa5cm\xf8c\xec\x0b\xbb\xc4\xc4\xb6'X\xdb\xf1\\" +
+	"\xf8\x85\xf7\x0e,/|\x9fx5/\xfc\x9f\xff?\xdd" +
+	"I_\xad\x1cf-\xae\xb8\xcf\xb0\xd2 \xbe\x95E\xb3" +
+	"eb=\xde\x94:\xb3:L\xc6oD\xe9\xda\xa9\xa6" +
+	"\xce\x92lr.0\x89\x0d\xa5]_ UUz\x80" +
+	"G\xc0\xd7\x93\x80Z\x94T-A\x9f\xac\xd3\x0d\xcd\x0c" +
+	"\xa0\x96$U$HQ\xa7\x00\xfc\xf0\x04\xa0\x02I\x95" +
+	"\x09\xfa\x92uJ\xc0\x8f\xcf\x02\xaa%\xa9\xac\xe0T\x92" +
+	"\x06f.\xe0\x08\x04G\xc0\xdb:\x08rS\x14\x1c\x86" +
+	"\xe00x$O#\xc3\x01\x08\x0e\x80\x8d\xc2\xea\x15\xc3" +
+	"!\x08\x0e\x81\x07a\xcfDis\x05\x8ey\xb8\xcb|" +
+	"\xde1OK\xaa\xf9>\xe6\xb9\x1cP\xb3\x92*\x10\xf4" +
+	"\xc5\x1e\xb4n\xefAo\x08N\xb5\x8c\x0eL\xcej\xef" +
+	"\xa8 \xab`\x99\x98\xb5\xceu\xd0\x08mh\x0a\x8e\x82" +
+	"\x0b\x92\xac\xf6\xc4\x82nX.\xaf\xea\\'\xd6\xd0\x04" +
+	"\xe7\xd2(2\xcd\x86\x0d\xd3\xa4o\xe1\xe8K\xef\xee\xdb" +
+	"\xd7\xd7\xbe\xec/\x1cPl\xb6C\x83N\xb5z\xb7\xda" +
+	"-W\xed\xa6\xa4\xda\xec\xabv\xe7\"\xa06$\xd5\xe3" +
+	"\x9e\x8eG.\xb8)\xa9\xb6\xfat<q\xde\x1eJ\xaa" +
+	"\xa7\x82\xbe'\xea\xf4\x00\x7f\xfb\x0a\xa0\xb6$\xd5\x1b\xe7" +
+	"h5\xben\xf2\xee\xe1m\x18\x9b\xc2\xea\x18\xcc\xf6g" +
+	"S\x99\xceMb\xbb\x1a3\xbd\x1e\xa5\xba\xab\xb5,\xc2" +
+	"\xe5D\xdb\xd5\x1c\xb2w)\xf7o\x14\xfc\x17\x00\x00\xff" +
+	"\xff\x0a\x1f\xb4\xa2"
 
 func init() {
 	schemas.Register(schema_cf3ad8085685b22d,
-		0xb52e2dc8e7887069)
+		0x87bef45c1dc996c0,
+		0xb21c60ff9d83fbf5,
+		0xde11024ca833d34a)
 }

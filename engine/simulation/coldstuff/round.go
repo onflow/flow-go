@@ -3,27 +3,39 @@
 package coldstuff
 
 import (
-	"github.com/dapperlabs/flow-go/model/coldstuff"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Round implements a simple state cache for the consensus algorithm.
 type Round interface {
 
-	// Reset will reset the current consensus state and thus start a new round.
-	Reset()
+	// Parent returns the parent of the block for this round.
+	Parent() *flow.Header
 
-	// Propose will store a candidate block as the current round subject.
-	Propose(candidate *coldstuff.BlockHeader)
+	// Leader returns the leader of this round, who will make the block proposal
+	// and to whom votes should be sent.
+	Leader() flow.Identity
 
-	// Candidate will return the header that is subject of the current round.
-	Candidate() *coldstuff.BlockHeader
+	// Quorum returns the current quorum of voting stakes required for a
+	// qualified majority in this round.
+	Quorum() uint64
 
-	// Voted will check if the given node ID has already voted this round.
-	Voted(nodeID string) bool
+	// Participants will return a list of the other participants of the
+	// consensus algorithm for this round.
+	Participants() flow.IdentityList
 
-	// Tally will count the vote of the given consensus node.
-	Tally(nodeID string)
+	// Propose will store a block as the candidate for consensus in this round.
+	Propose(candidate *flow.Block)
 
-	// Votes will give a count of received positive votes for this round.
-	Votes() uint
+	// Candidate will return the block that we are voting for in this round.
+	Candidate() *flow.Block
+
+	// Voted will check if the given node has already voted this round.
+	Voted(nodeID flow.Identifier) bool
+
+	// Tally will count the vote stake of the given consensus node.
+	Tally(nodeID flow.Identifier, stake uint64)
+
+	// Votes will give the sum of received positive votes for this round.
+	Votes() uint64
 }
