@@ -488,11 +488,20 @@ func (*InvalidVariableKindError) isSemanticError() {}
 // InvalidDeclarationError
 
 type InvalidDeclarationError struct {
-	Kind common.DeclarationKind
+	Identifier string
+	Kind       common.DeclarationKind
 	ast.Range
 }
 
 func (e *InvalidDeclarationError) Error() string {
+	if e.Identifier != "" {
+		return fmt.Sprintf(
+			"cannot declare %s here: `%s`",
+			e.Kind.Name(),
+			e.Identifier,
+		)
+	}
+
 	return fmt.Sprintf("cannot declare %s here", e.Kind.Name())
 }
 
