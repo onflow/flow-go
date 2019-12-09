@@ -141,7 +141,6 @@ func (checker *Checker) checkInterfaceFunctions(
 			checker.enterValueScope()
 			defer checker.leaveValueScope(false)
 
-			// NOTE: required for
 			checker.declareSelfValue(selfType)
 
 			checker.visitFunctionDeclaration(
