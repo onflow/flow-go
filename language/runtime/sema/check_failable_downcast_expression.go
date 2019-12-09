@@ -43,8 +43,10 @@ func (checker *Checker) VisitCastingExpression(expression *ast.CastingExpression
 
 	switch expression.Operation {
 	case ast.OperationFailableCast:
-		// TODO: non-Any types (interfaces, wrapped (e.g Any?, [Any], etc.)) are not supported for now
-		if _, ok := leftHandType.(*AnyType); !ok {
+		// TODO: non-AnyStruct types (interfaces, wrapped (e.g AnyStruct?, [AnyStruct], etc.)) are not supported for now
+		if _, ok := leftHandType.(*AnyStructType); !ok &&
+			!leftHandType.IsInvalidType() {
+
 			checker.report(
 				&UnsupportedTypeError{
 					Type:  leftHandType,
@@ -56,7 +58,9 @@ func (checker *Checker) VisitCastingExpression(expression *ast.CastingExpression
 		return &OptionalType{Type: rightHandType}
 
 	case ast.OperationCast:
-		if !checker.IsTypeCompatible(leftHandExpression, leftHandType, rightHandType) {
+		if !leftHandType.IsInvalidType() &&
+			!checker.IsTypeCompatible(leftHandExpression, leftHandType, rightHandType) {
+
 			checker.report(
 				&TypeMismatchError{
 					ActualType:   leftHandType,

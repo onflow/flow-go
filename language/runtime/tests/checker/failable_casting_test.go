@@ -13,7 +13,7 @@ import (
 func TestCheckFailableCastingAny(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
-      let x: Any = 1
+      let x: AnyStruct = 1
       let y: Int? = x as? Int
     `)
 
@@ -25,7 +25,7 @@ func TestCheckFailableCastingAny(t *testing.T) {
 func TestCheckInvalidFailableCastingAny(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-      let x: Any = 1
+      let x: AnyStruct = 1
       let y: Bool? = x as? Int
     `)
 
@@ -69,7 +69,7 @@ func TestCheckInvalidFailableCastingInterface(t *testing.T) {
 func TestCheckInvalidFailableCastingOptionalAny(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-      let x: Any? = 1
+      let x: AnyStruct? = 1
       let y: Int?? = x as? Int?
     `)
 
@@ -82,7 +82,7 @@ func TestCheckInvalidFailableCastingOptionalAny(t *testing.T) {
 func TestCheckInvalidFailableCastingArrayAny(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-      let x: [Any] = [1]
+      let x: [AnyStruct] = [1]
       let y: [Int]? = x as? [Int]
     `)
 
@@ -94,7 +94,7 @@ func TestCheckInvalidFailableCastingArrayAny(t *testing.T) {
 func TestCheckOptionalAnyFailableCastingNil(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
-      let x: Any? = nil
+      let x: AnyStruct? = nil
       let y = x ?? 23
       let z = y as? Int
     `)
@@ -102,13 +102,13 @@ func TestCheckOptionalAnyFailableCastingNil(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t,
-		&sema.OptionalType{Type: &sema.AnyType{}},
+		&sema.OptionalType{Type: &sema.AnyStructType{}},
 		checker.GlobalValues["x"].Type,
 	)
 
 	// TODO: record result type of conditional and box to any in interpreter
 	assert.Equal(t,
-		&sema.AnyType{},
+		&sema.AnyStructType{},
 		checker.GlobalValues["y"].Type,
 	)
 

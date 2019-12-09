@@ -66,10 +66,10 @@ func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
 	assert.Equal(t, ty.String(), "[((Int8): Int16)]")
 }
 
-func TestIsResourceType_AnyNestedInArray(t *testing.T) {
+func TestIsResourceType_AnyStructNestedInArray(t *testing.T) {
 
 	ty := &VariableSizedType{
-		Type: &AnyType{},
+		Type: &AnyStructType{},
 	}
 
 	assert.False(t, ty.IsResourceType())
@@ -78,7 +78,7 @@ func TestIsResourceType_AnyNestedInArray(t *testing.T) {
 func TestIsResourceType_ResourceNestedInArray(t *testing.T) {
 
 	ty := &VariableSizedType{
-		&CompositeType{
+		Type: &CompositeType{
 			Kind: common.CompositeKindResource,
 		},
 	}
@@ -118,7 +118,7 @@ func Test_exportability(t *testing.T) {
 
 	t.Run("structs", func(t *testing.T) {
 		position := ast.Position{
-			1, 2, 3,
+			Offset: 1, Line: 2, Column: 3,
 		}
 		identifier := "my_structure"
 
@@ -212,7 +212,7 @@ func Test_exportability(t *testing.T) {
 	t.Run("events", func(t *testing.T) {
 
 		position := ast.Position{
-			2, 1, 37,
+			Offset: 2, Line: 1, Column: 37,
 		}
 
 		ty := &EventType{

@@ -89,7 +89,7 @@ var getAccountFunctionType = sema.FunctionType{
 
 var logFunctionType = sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		&sema.AnyType{},
+		&sema.AnyStructType{},
 	),
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
 		&sema.VoidType{},

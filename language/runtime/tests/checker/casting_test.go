@@ -40,13 +40,13 @@ func TestCheckInvalidCastingIntLiteralToString(t *testing.T) {
 func TestCheckCastingIntLiteralToAny(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
-      let x = 1 as Any
+      let x = 1 as AnyStruct
     `)
 
 	require.Nil(t, err)
 
 	assert.Equal(t,
-		&sema.AnyType{},
+		&sema.AnyStructType{},
 		checker.GlobalValues["x"].Type,
 	)
 
@@ -56,11 +56,11 @@ func TestCheckCastingIntLiteralToAny(t *testing.T) {
 func TestCheckCastingArrayLiteral(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-      fun zipOf3(a: [Any; 3], b: [Int; 3]): [[Any; 2]; 3] {
+      fun zipOf3(a: [AnyStruct; 3], b: [Int; 3]): [[AnyStruct; 2]; 3] {
           return [
-              [a[0], b[0]] as [Any; 2],
-              [a[1], b[1]] as [Any; 2],
-              [a[2], b[2]] as [Any; 2]
+              [a[0], b[0]] as [AnyStruct; 2],
+              [a[1], b[1]] as [AnyStruct; 2],
+              [a[2], b[2]] as [AnyStruct; 2]
           ]
       }
     `)

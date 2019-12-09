@@ -95,33 +95,33 @@ func NewTypeAnnotations(types ...Type) []*TypeAnnotation {
 	return typeAnnotations
 }
 
-// AnyType represents the top type
-type AnyType struct{}
+// AnyStructType represents the top type of all structs
+type AnyStructType struct{}
 
-func (*AnyType) isType() {}
+func (*AnyStructType) isType() {}
 
-func (*AnyType) String() string {
-	return "Any"
+func (*AnyStructType) String() string {
+	return "AnyStruct"
 }
 
-func (*AnyType) ID() string {
-	return "Any"
+func (*AnyStructType) ID() string {
+	return "AnyStruct"
 }
 
-func (*AnyType) Equal(other Type) bool {
-	_, ok := other.(*AnyType)
+func (*AnyStructType) Equal(other Type) bool {
+	_, ok := other.(*AnyStructType)
 	return ok
 }
 
-func (*AnyType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Any{}, variable)
+func (*AnyStructType) Export(_ *ast.Program, variable *Variable) types.Type {
+	return wrapVariable(types.AnyStruct{}, variable)
 }
 
-func (*AnyType) IsResourceType() bool {
+func (*AnyStructType) IsResourceType() bool {
 	return false
 }
 
-func (*AnyType) IsInvalidType() bool {
+func (*AnyStructType) IsInvalidType() bool {
 	return false
 }
 
@@ -156,7 +156,7 @@ type VoidType struct{}
 
 func (*VoidType) isType() {}
 
-func (*VoidType) Export(program *ast.Program, variable *Variable) types.Type {
+func (*VoidType) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(types.Void{}, variable)
 }
 
@@ -259,7 +259,7 @@ type BoolType struct{}
 
 func (*BoolType) isType() {}
 
-func (*BoolType) Export(program *ast.Program, variable *Variable) types.Type {
+func (*BoolType) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(types.Bool{}, variable)
 }
 
@@ -316,7 +316,7 @@ type StringType struct{}
 
 func (*StringType) isType() {}
 
-func (*StringType) Export(program *ast.Program, variable *Variable) types.Type {
+func (*StringType) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(types.String{}, variable)
 }
 
@@ -456,7 +456,7 @@ type IntType struct{}
 
 func (*IntType) isType() {}
 
-func (*IntType) Export(program *ast.Program, variable *Variable) types.Type {
+func (*IntType) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(types.Int{}, variable)
 }
 
@@ -495,7 +495,7 @@ type Int8Type struct{}
 
 func (*Int8Type) isType() {}
 
-func (*Int8Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*Int8Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(types.Int8{}, variable)
 }
 
@@ -536,7 +536,7 @@ type Int16Type struct{}
 
 func (*Int16Type) isType() {}
 
-func (*Int16Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*Int16Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(types.Int16{}, variable)
 }
 
@@ -577,7 +577,7 @@ type Int32Type struct{}
 
 func (*Int32Type) isType() {}
 
-func (*Int32Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*Int32Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(types.Int32{}, variable)
 }
 
@@ -618,7 +618,7 @@ type Int64Type struct{}
 
 func (*Int64Type) isType() {}
 
-func (*Int64Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*Int64Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(types.Int64{}, variable)
 }
 
@@ -659,7 +659,7 @@ type UInt8Type struct{}
 
 func (*UInt8Type) isType() {}
 
-func (*UInt8Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*UInt8Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(types.UInt8{}, variable)
 }
 
@@ -700,7 +700,7 @@ type UInt16Type struct{}
 
 func (*UInt16Type) isType() {}
 
-func (*UInt16Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*UInt16Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(types.UInt16{}, variable)
 }
 
@@ -741,7 +741,7 @@ type UInt32Type struct{}
 
 func (*UInt32Type) isType() {}
 
-func (*UInt32Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*UInt32Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(types.UInt32{}, variable)
 }
 
@@ -782,7 +782,7 @@ type UInt64Type struct{}
 
 func (*UInt64Type) isType() {}
 
-func (*UInt64Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*UInt64Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(types.UInt64{}, variable)
 }
 
@@ -1357,7 +1357,7 @@ func init() {
 
 	types := []Type{
 		&VoidType{},
-		&AnyType{},
+		&AnyStructType{},
 		&NeverType{},
 		&BoolType{},
 		&CharacterType{},
@@ -2415,8 +2415,8 @@ func IsSubType(subType Type, superType Type) bool {
 		return true
 	}
 
-	if _, ok := superType.(*AnyType); ok {
-		return true
+	if _, ok := superType.(*AnyStructType); ok {
+		return !subType.IsResourceType()
 	}
 
 	if _, ok := subType.(*NeverType); ok {

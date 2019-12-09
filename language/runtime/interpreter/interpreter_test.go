@@ -102,7 +102,7 @@ func TestInterpreterAnyBoxing(t *testing.T) {
 		inter.boxAny(
 			BoolValue(true),
 			&sema.BoolType{},
-			&sema.AnyType{},
+			&sema.AnyStructType{},
 		),
 	)
 
@@ -116,7 +116,7 @@ func TestInterpreterAnyBoxing(t *testing.T) {
 		inter.boxAny(
 			NewSomeValueOwningNonCopying(BoolValue(true)),
 			&sema.OptionalType{Type: &sema.BoolType{}},
-			&sema.OptionalType{Type: &sema.AnyType{}},
+			&sema.OptionalType{Type: &sema.AnyStructType{}},
 		),
 	)
 
@@ -131,8 +131,8 @@ func TestInterpreterAnyBoxing(t *testing.T) {
 				BoolValue(true),
 				&sema.BoolType{},
 			),
-			&sema.AnyType{},
-			&sema.AnyType{},
+			&sema.AnyStructType{},
+			&sema.AnyStructType{},
 		),
 	)
 
@@ -153,7 +153,7 @@ func TestInterpreterBoxing(t *testing.T) {
 		inter.convertAndBox(
 			BoolValue(true),
 			&sema.BoolType{},
-			&sema.OptionalType{Type: &sema.AnyType{}},
+			&sema.OptionalType{Type: &sema.AnyStructType{}},
 		),
 	)
 
@@ -167,7 +167,7 @@ func TestInterpreterBoxing(t *testing.T) {
 		inter.convertAndBox(
 			NewSomeValueOwningNonCopying(BoolValue(true)),
 			&sema.OptionalType{Type: &sema.BoolType{}},
-			&sema.OptionalType{Type: &sema.AnyType{}},
+			&sema.OptionalType{Type: &sema.AnyStructType{}},
 		),
 	)
 }

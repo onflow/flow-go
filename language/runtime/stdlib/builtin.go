@@ -106,7 +106,7 @@ var LogFunction = NewStandardLibraryFunction(
 	"log",
 	&sema.FunctionType{
 		ParameterTypeAnnotations: sema.NewTypeAnnotations(
-			&sema.AnyType{},
+			&sema.AnyStructType{},
 		),
 		ReturnTypeAnnotation: sema.NewTypeAnnotation(
 			&sema.VoidType{},
