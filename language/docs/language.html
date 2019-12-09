@@ -211,9 +211,6 @@
             <p><a href="#imports">Imports</a></p>
           </li>
           <li>
-            <p><a href="#attestations">Attestations</a></p>
-          </li>
-          <li>
             <p><a href="#accounts">Accounts</a></p>
           </li>
           <li>
@@ -3046,7 +3043,8 @@
           <p>
             Fields may have an optional getter and an optional setter.
             Getters are functions that are called when a field is read,
-            and setters are functions that are called when a field is written.<br>Only certain assignments are allowed in getters and setters.
+            and setters are functions that are called when a field is written.
+            Only certain assignments are allowed in getters and setters.
           </p>
           <p>Getters and setters are enclosed in opening and closing braces, after the field's type.</p>
           <p>
@@ -3948,8 +3946,11 @@
           <li>
             <ol>
               <li>
-                Access control between accounts using capability security.<br>Within Flow, a caller is not able to access an object
-                unless it owns the object or has a specific reference to that object.<br>This means that nothing is truly public by default.<br>Other accounts can not read or write the objects in an account
+                Access control between accounts using capability security.
+                Within Flow, a caller is not able to access an object
+                unless it owns the object or has a specific reference to that object.
+                This means that nothing is truly public by default.
+                Other accounts can not read or write the objects in an account
                 unless the owner of the account has granted them access
                 by providing references to the objects.
               </li>
@@ -3958,7 +3959,8 @@
           <li>
             <ol start="2">
               <li>
-                Access control within programs using <code>private</code> and <code>public</code> keywords.<br>Assuming the caller has a valid reference that
+                Access control within programs using <code>private</code> and <code>public</code> keywords.
+                Assuming the caller has a valid reference that
                 satisfies the first type of access control,
                 these keywords further govern how access is controlled.
               </li>
@@ -4828,45 +4830,6 @@
 </span></code></pre>
       </section>
       <section>
-        <h2 id="attestations"><a href="#attestations" aria-hidden="true"><span class="icon icon-link"></span></a>Attestations</h2>
-        <blockquote>
-          <p>🚧 Status: Attestations are not implemented yet.</p>
-        </blockquote>
-        <p>Attestations are values that prove ownership without giving any control over it. They can be created for resources to show that they exists.</p>
-        <p>Attestations are useful in cases where ownership of some asset/resource should be demonstrated to potentially untrusted code.</p>
-        <p>
-          As an analogy, a bank statement is a proof of ownership of money.
-          However, unlike a bank statement, an attestation is "live", i.e. it is not just a snapshot at the time it was created,
-          but it reflects the current state of the underlying resource.
-        </p>
-        <p>
-          Attestations can only be created from resources, i.e., they cannot be forged by parties who do not have ownership of the resource,
-          and can be safely handed to untrusted parties.
-        </p>
-        <p>
-          An attestation reflects the current state of a resource. The state is read-only, so the resource that is referred to cannot be modified.
-          It is not possible to change the ownership of a resource through an attestation, or store an attestation.
-        </p>
-        <p>
-          Attestations of resources are created using the <code>@</code> operator.
-          Attestation types have the name of the resource type, prefixed with the <code>@</code> symbol.
-        </p>
-        <pre><code class="language-cadence,file=attestations.cdc"><span style="color: #008000">// Declare a resource named `Token`.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">resource</span><span style="color: #000000"> Token {}</span><span>
-</span><span>
-</span><span style="color: #008000">// Create a new instance of the resource type `Token`.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> token &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Token()</span><span>
-</span><span>
-</span><span style="color: #008000">// Declare a constant named `attestation` that has the attestation type `@Token`,</span><span>
-</span><span style="color: #008000">// and has an attestation for the token value as its initial value.</span><span>
-</span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> attestation: @</span><span style="color: #0000FF">Token</span><span style="color: #000000"> = @token</span><span>
-</span></code></pre>
-        <p>Like resources, attestations are associated with an <a href="#accounts">account</a>.</p>
-      </section>
-      <section>
         <h2 id="accounts"><a href="#accounts" aria-hidden="true"><span class="icon icon-link"></span></a>Accounts</h2>
         <pre><code class="language-cadence"><span style="color: #0000FF">struct interface</span><span style="color: #000000"> Account {</span><span>
 </span><span style="color: #000000">    address: Address</span><span>
@@ -4927,7 +4890,8 @@
           and methods on the storage location directly.
         </p>
         <p>
-          References are <strong>copied</strong>, i.e. they are value types.<br>Any number of references to a storage location can be created,
+          References are <strong>copied</strong>, i.e. they are value types.
+          Any number of references to a storage location can be created,
           but only by the account that owns the location being referenced.
         </p>
         <p>
@@ -5008,7 +4972,8 @@
           </p>
           <p>
             Based on the above example,
-            a user could use an interface to restrict access to only the <code>count</code> field.<br>Often, other accounts will have functions that take specific references
+            a user could use an interface to restrict access to only the <code>count</code> field.
+            Often, other accounts will have functions that take specific references
             as parameters, so this method can be used to create those valid references.
           </p>
           <pre><code class="language-cadence,file=storage-access-control.cdc"><span>
@@ -5129,7 +5094,7 @@
 </span><span style="color: #000000">    emit FooEvent(x: </span><span style="color: #09885A">1</span><span style="color: #000000">, y: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Emit event with explicit argument labels</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Note that the emitted event will only contain the field names, </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Note that the emitted event will only contain the field names,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// not the argument labels used at the invocation site.</span><span>
 </span><span style="color: #000000">    emit FooEvent(labelA: </span><span style="color: #09885A">1</span><span style="color: #000000">, labelB: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -5347,10 +5312,10 @@
 </span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> token</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// The function `transfer` combines the functions `withdraw` and `deposit` </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The function `transfer` combines the functions `withdraw` and `deposit`</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// into a single function call</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> transfer(to: &#x26;</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">, amount: Int) {</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// Deposit the tokens that withdraw creates into the </span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Deposit the tokens that withdraw creates into the</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// recipient's account using their deposit reference</span><span>
 </span><span style="color: #000000">        to.deposit(from: &#x3C;-</span><span style="color: #0000FF">self</span><span style="color: #000000">.withdraw(amount: amount))</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -5388,7 +5353,7 @@
 </span><span style="color: #000000">    prepare(signer: Account) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Create a new token as an optional.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">var</span><span style="color: #000000"> tokenA: &#x3C;-ExampleToken? &#x3C;- newEmptyExampleToken()</span><span>
-</span><span style="color: #000000">		</span><span>
+</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Store the new token in storage by replacing whatever</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// is in the existing location.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> oldToken &#x3C;- signer.storage[ExampleToken] &#x3C;- tokenA</span><span>
@@ -5401,7 +5366,7 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">// The `Receiver` references is stored in the `published` object</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// because an account will usually want anyone to be able to read</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// their balance and call their deposit function</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// </span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        signer.published[&#x26;Receiver] = &#x26;signer.storage[ExampleToken] as Receiver</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// The `Provider` reference is stored in account storage</span><span>
@@ -5467,8 +5432,8 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> receiverRef = recipient.published[&#x26;Receiver] ?? panic(</span><span style="color: #A31515">"Recipient has no receiver"</span><span style="color: #000000">)</span><span>
 </span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// Call the provider's transfer function which withdraws 5 tokens </span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// from their account and deposits it to the receiver's account </span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Call the provider's transfer function which withdraws 5 tokens</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// from their account and deposits it to the receiver's account</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// using the reference to their deposit function.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.providerRef.transfer(to: receiverRef, amount: </span><span style="color: #09885A">5</span><span style="color: #000000">)</span><span>
