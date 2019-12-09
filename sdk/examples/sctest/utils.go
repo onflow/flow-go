@@ -75,10 +75,10 @@ func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testi
 		if !assert.NoError(t, err) {
 			t.Log(err.Error())
 		}
-
-		_, err = b.CommitBlock()
-		assert.NoError(t, err)
 	}
+
+	_, err = b.CommitBlock()
+	assert.NoError(t, err)
 }
 
 // setupUsersTokens sets up two accounts with 30 Fungible Tokens each
