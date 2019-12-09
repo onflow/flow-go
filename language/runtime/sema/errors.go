@@ -690,12 +690,13 @@ type InitializerMismatch struct {
 //  use `InitializerMismatch`, `MissingMembers`, `MemberMismatches`, etc
 
 type ConformanceError struct {
-	CompositeType       *CompositeType
-	InterfaceType       *InterfaceType
-	InitializerMismatch *InitializerMismatch
-	MissingMembers      []*Member
-	MemberMismatches    []MemberMismatch
-	Pos                 ast.Position
+	CompositeType               *CompositeType
+	InterfaceType               *InterfaceType
+	InitializerMismatch         *InitializerMismatch
+	MissingMembers              []*Member
+	MemberMismatches            []MemberMismatch
+	MissingNestedCompositeTypes []*CompositeType
+	Pos                         ast.Position
 }
 
 func (e *ConformanceError) Error() string {
@@ -1920,4 +1921,26 @@ func (e *InvalidNestedTypeError) StartPosition() ast.Position {
 
 func (e *InvalidNestedTypeError) EndPosition() ast.Position {
 	return e.Type.EndPosition()
+}
+
+// DeclarationKindMismatchError
+
+type DeclarationKindMismatchError struct {
+	ExpectedDeclarationKind common.DeclarationKind
+	ActualDeclarationKind   common.DeclarationKind
+	ast.Range
+}
+
+func (e *DeclarationKindMismatchError) Error() string {
+	return "mismatched declarations"
+}
+
+func (*DeclarationKindMismatchError) isSemanticError() {}
+
+func (e *DeclarationKindMismatchError) SecondaryError() string {
+	return fmt.Sprintf(
+		"expected `%s`, got `%s`",
+		e.ExpectedDeclarationKind,
+		e.ActualDeclarationKind,
+	)
 }

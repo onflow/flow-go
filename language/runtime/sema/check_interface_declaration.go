@@ -7,6 +7,8 @@ import (
 
 func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDeclaration) ast.Repr {
 
+	const kind = ContainerKindInterface
+
 	interfaceType := checker.Elaboration.InterfaceDeclarationTypes[declaration]
 
 	checker.containerTypes[interfaceType] = true
@@ -39,8 +41,10 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 
 	// Declare nested types
 
+	nestedDeclarations := checker.Elaboration.InterfaceNestedDeclarations[declaration]
+
 	for name, nestedType := range interfaceType.NestedTypes {
-		nestedDeclaration := checker.Elaboration.InterfaceNestedDeclarations[declaration][name]
+		nestedDeclaration := nestedDeclarations[name]
 
 		_, err := checker.typeActivations.DeclareType(
 			nestedDeclaration.DeclarationIdentifier(),
@@ -74,18 +78,8 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.DeclarationKind(),
 		declaration.Identifier.Identifier,
 		interfaceType.InitializerParameterTypeAnnotations,
-		ContainerKindInterface,
+		kind,
 		nil,
-	)
-
-	checker.checkDestructors(
-		declaration.Members.Destructors(),
-		declaration.Members.FieldsByIdentifier(),
-		interfaceType.Members,
-		interfaceType,
-		declaration.DeclarationKind(),
-		declaration.Identifier.Identifier,
-		ContainerKindInterface,
 	)
 
 	checker.checkUnknownSpecialFunctions(declaration.Members.SpecialFunctions)
@@ -93,6 +87,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 	checker.checkInterfaceFunctions(
 		declaration.Members.Functions,
 		interfaceType,
+		declaration.CompositeKind,
 		declaration.DeclarationKind(),
 	)
 
@@ -102,15 +97,40 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		interfaceType.CompositeKind,
 	)
 
+	checker.checkDestructors(
+		declaration.Members.Destructors(),
+		declaration.Members.FieldsByIdentifier(),
+		interfaceType.Members,
+		interfaceType,
+		declaration.DeclarationKind(),
+		declaration.Identifier.Identifier,
+		kind,
+	)
+
+	for _, nestedDeclaration := range nestedDeclarations {
+
+		switch typedNestedDeclaration := nestedDeclaration.(type) {
+		case *ast.InterfaceDeclaration:
+			checker.VisitInterfaceDeclaration(typedNestedDeclaration)
+
+		case *ast.CompositeDeclaration:
+			// Composite declarations nested in interface declarations are type requirements,
+			// i.e. they should be checked like interfaces
+
+			checker.visitCompositeDeclaration(typedNestedDeclaration, kind)
+		}
+	}
+
 	return nil
 }
 
 func (checker *Checker) checkInterfaceFunctions(
 	functions []*ast.FunctionDeclaration,
-	interfaceType *InterfaceType,
+	selfType Type,
+	compositeKind common.CompositeKind,
 	declarationKind common.DeclarationKind,
 ) {
-	inResource := interfaceType.CompositeKind == common.CompositeKindResource
+	inResource := compositeKind == common.CompositeKindResource
 
 	for _, function := range functions {
 		// NOTE: new activation, as function declarations
@@ -121,8 +141,7 @@ func (checker *Checker) checkInterfaceFunctions(
 			checker.enterValueScope()
 			defer checker.leaveValueScope(false)
 
-			// NOTE: required for
-			checker.declareSelfValue(interfaceType)
+			checker.declareSelfValue(selfType)
 
 			checker.visitFunctionDeclaration(
 				function,
@@ -182,6 +201,7 @@ func (checker *Checker) declareInterfaceDeclaration(declaration *ast.InterfaceDe
 
 		nestedDeclarations, nestedInterfaceTypes, nestedCompositeTypes :=
 			checker.visitNestedDeclarations(
+				ContainerKindInterface,
 				declaration.CompositeKind,
 				declaration.DeclarationKind(),
 				declaration.CompositeDeclarations,

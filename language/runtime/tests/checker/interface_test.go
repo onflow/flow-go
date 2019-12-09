@@ -1086,3 +1086,177 @@ func TestCheckInterfaceSelfUse(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckInvalidContractInterfaceConformanceMissingTypeRequirement(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
+              struct Nested {}
+          }
+
+          contract TestImpl: Test {
+              // missing 'Nested'
+          }
+	    `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ConformanceError{}, errs[0])
+}
+
+func TestCheckInvalidContractInterfaceConformanceTypeRequirementKindMismatch(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
+              struct Nested {}
+          }
+
+          contract TestImpl: Test {
+              // expected struct, not struct interface
+              struct interface Nested {}
+          }
+	    `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.DeclarationKindMismatchError{}, errs[0])
+}
+
+func TestCheckInvalidContractInterfaceConformanceTypeRequirementMismatch(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+         contract interface Test {
+             struct Nested {}
+         }
+
+         contract TestImpl: Test {
+             // expected struct
+             resource Nested {}
+         }
+	    `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.CompositeKindMismatchError{}, errs[0])
+}
+
+func TestCheckContractInterfaceTypeRequirement(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
+              struct Nested {
+                  fun test(): Int
+              }
+          }
+	    `,
+	)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidContractInterfaceTypeRequirementFunctionImplementation(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
+              struct Nested {
+                  fun test(): Int {
+                      return 1
+                  }
+              }
+          }
+	    `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidImplementationError{}, errs[0])
+}
+
+func TestCheckInvalidContractInterfaceTypeRequirementMissingFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
+              struct Nested {
+                  fun test(): Int
+              }
+          }
+
+          contract TestImpl: Test {
+             struct Nested {
+                 // missing function 'test'
+             }
+          }
+	    `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ConformanceError{}, errs[0])
+}
+
+func TestCheckContractInterfaceTypeRequirementWithFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          contract interface Test {
+              struct Nested {
+                  fun test(): Int
+              }
+          }
+
+          contract TestImpl: Test {
+             struct Nested {
+                  fun test(): Int {
+                      return 1
+                  }
+             }
+          }
+	    `,
+	)
+
+	require.NoError(t, err)
+}
+
+func TestCheckContractInterfaceFungibleToken(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      pub contract interface FungibleToken {
+
+          pub resource interface Provider {
+
+              pub fun withdraw(amount: Int): <-Vault
+          }
+
+          pub resource interface Receiver {
+
+              pub fun deposit(vault: <-Vault)
+          }
+
+          pub resource Vault: Provider, Receiver {
+
+              pub balance: Int
+
+              init(balance: Int)
+
+              pub fun withdraw(amount: Int): <-Vault
+
+              pub fun deposit(vault: <-Vault)
+          }
+
+          pub fun absorb(vault: <-Vault)
+
+          pub fun sprout(): <-Vault
+      }
+    `)
+
+	require.NoError(t, err)
+}
