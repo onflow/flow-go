@@ -3,6 +3,7 @@ package code
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"unicode"
 
 	"github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
@@ -38,11 +39,13 @@ func (a *abiAwareStatement) Type(t types.Type) *abiAwareStatement {
 	case *types.String:
 		return wrap(a.String())
 	case *types.VariableSizedArray:
-		return wrap(a.Index()).Type(v.ElementType)
+		return a.Index().Type(v.ElementType)
 	case *types.StructPointer:
 		return a.Id(viewInterfaceName(v.TypeName))
 	case *types.Optional:
 		return a.Op("*").Type(v.Of)
+	case *types.Int:
+		return wrap(a.Int())
 	case *types.UInt8:
 		return wrap(a.Uint8())
 	case *types.UInt16:
@@ -54,17 +57,178 @@ func (a *abiAwareStatement) Type(t types.Type) *abiAwareStatement {
 
 var ifErrorBlock = jen.If(id("err").Op("!=").Nil()).Block(
 	jen.Return(jen.List(jen.Nil(), id("err"))),
-)
+).Line()
 
-func FieldToGo(t types.Type, fieldName string, fieldAccessor *jen.Statement) (*jen.Statement, *abiAwareStatement) {
-	switch v := t.(type) {
-	case *types.StructPointer:
-		return jen.List(id(fieldName), id("err")).Op(":=").Id(viewInterfaceFromComposite(v.TypeName)).Call(fieldAccessor.Assert(qual(valuesImportPath, "Composite"))).Line().Add(ifErrorBlock), id(fieldName)
-	case *types.VariableSizedArray:
-		id(fieldName).Op(":=").Make(wrap(jen.Index()).Type(t), jen.Lit(0))
+var converterFunctions = map[string]*abiAwareStatement{}
+var converterTypesCache = map[types.Type]string{}
+var converterCounter = 0
 
+//converterFor generates a converter function which converts
+// interface{} to desired type.
+// Due to Go limitation with casting and arbitrary nesting
+// of structures in Cadence, generating this seems like a best
+// approach
+func converterFor(t types.Type) *abiAwareStatement {
+
+	paramName := "p"
+
+	// Caches/creates a converter function for a type
+	funcWrapper := func(statement *jen.Statement) *abiAwareStatement {
+
+		if name, ok := converterTypesCache[t]; ok {
+			return id(name)
+		}
+
+		name := "__converter" + strconv.Itoa(converterCounter)
+		f := wrap(jen.Func().Id(name).Params(id(paramName).Qual(valuesImportPath, "Value")).
+			Params(empty().Type(t), jen.Error()).Block(statement))
+
+		converterFunctions[name] = f
+		converterTypesCache[t] = name
+
+		converterCounter++
+
+		return id(name)
 	}
-	return nil, wrap(fieldAccessor.Dot("ToGoValue").Call().Assert(empty().Type(t)))
+
+	var convert func(t types.Type, depth int, writeTo *abiAwareStatement, param *abiAwareStatement) *abiAwareStatement
+
+	param := id(paramName)
+
+	// Builds "intelligent" nil check
+	ifNil := func(value *abiAwareStatement, writeTo *abiAwareStatement, code []jen.Code) *abiAwareStatement {
+		if writeTo == nil {
+			return wrap(jen.If(value.Op("==").Nil()).Block(
+				jen.Return(jen.Nil(), jen.Nil()),
+			).Else().Block(code...).Line())
+		}
+		return wrap(jen.If(value.Op("==").Nil()).Block(
+			writeTo.Clone().Op("=").Nil(),
+		).Else().Block(code...).Line())
+	}
+
+	convert = func(t types.Type, depth int, writeTo *abiAwareStatement, param *abiAwareStatement) *abiAwareStatement {
+
+		retVariable := "ret" + strconv.Itoa(depth)
+		goVariable := "go" + strconv.Itoa(depth)
+		castVariable := "cast" + strconv.Itoa(depth)
+
+		//casts and converts to given types
+		goCast := func(target *abiAwareStatement, value *abiAwareStatement, typ jen.Code, errorZero *abiAwareStatement) *abiAwareStatement {
+			return wrap(&jen.Statement{
+				jen.List(id(castVariable), id("ok")).Op(":=").Add(value.Clone()).Assert(typ).Line(),
+				jen.If(jen.Op("!").Id("ok")).Block(
+					jen.Return(errorZero, qual("fmt", "Errorf").Call(jen.Lit("cannot cast %T"), value)).Line(),
+				).Line(),
+				jen.Do(func(statement *jen.Statement) {
+					if target != nil {
+						statement.Add(target.Clone().Op("=").Id(castVariable).Dot("ToGoValue").Call().Line())
+					}
+				}),
+			})
+		}
+
+		switch v := t.(type) {
+		case *types.Optional:
+			if writeTo == nil {
+				return funcWrapper(&jen.Statement{
+					variable().Id(retVariable).Type(v.Of).Line(),
+					variable().Id(goVariable).Interface().Line(),
+					goCast(id(goVariable), param, qual(valuesImportPath, "Optional"), nilStatement()).Line(),
+					variable().Err().Error().Line(),
+					ifNil(id(goVariable), writeTo, []jen.Code{
+						convert(v.Of, depth+1, id(retVariable), id(castVariable).Dot("Value")).Line(),
+					}),
+					jen.Return(op("&").Id(retVariable), jen.Nil()).Line(),
+				})
+			}
+			return wrap(&jen.Statement{
+				variable().Id(retVariable).Type(v.Of).Line(),
+				variable().Id(goVariable).Interface().Line(),
+				goCast(id(goVariable), param, qual(valuesImportPath, "Optional"), nilStatement()).Line(),
+				ifNil(id(goVariable), writeTo, []jen.Code{
+					convert(v.Of, depth+1, id(retVariable), id(castVariable).Dot("Value")).Line(),
+					writeTo.Clone().Op("=").Op("&").Id(retVariable).Line(),
+				}),
+			})
+
+		case *types.Int:
+			if writeTo == nil {
+				return qual(valuesImportPath, "CastToInt")
+			}
+			return wrap(&jen.Statement{
+				goCast(nil, param, qual(valuesImportPath, "Int"), id(retVariable)).Line(),
+				jen.List(writeTo, id("err")).Op("=").Qual(valuesImportPath, "CastToInt").Call(id(castVariable)).Line(),
+				ifErrorBlock,
+			})
+		case *types.String:
+			if writeTo == nil {
+				return qual(valuesImportPath, "CastToString")
+			}
+			return wrap(&jen.Statement{
+				goCast(nil, param, qual(valuesImportPath, "String"), nilStatement()).Line(),
+				jen.List(writeTo, id("err")).Op("=").Qual(valuesImportPath, "CastToString").Call(id(castVariable)).Line(),
+				ifErrorBlock,
+			})
+		case *types.UInt8:
+			if writeTo == nil {
+				return qual(valuesImportPath, "CastToUInt8")
+			}
+			return wrap(&jen.Statement{
+				goCast(nil, param, qual(valuesImportPath, "UInt8"), nilStatement()).Line(),
+				jen.List(writeTo, id("err")).Op("=").Qual(valuesImportPath, "CastToUInt8").Call(id(castVariable)).Line(),
+				ifErrorBlock,
+			})
+		case *types.UInt16:
+			if writeTo == nil {
+				return qual(valuesImportPath, "CastToUInt16")
+			}
+			return wrap(&jen.Statement{
+				goCast(nil, param, qual(valuesImportPath, "UInt16"), nilStatement()).Line(),
+				jen.List(writeTo, id("err")).Op("=").Qual(valuesImportPath, "CastToUInt16").Call(id(castVariable)).Line(),
+				ifErrorBlock,
+			})
+		case *types.StructPointer:
+			if writeTo == nil {
+				return id(viewInterfaceFromValue(v.TypeName))
+			}
+			return wrap(&jen.Statement{
+				jen.List(writeTo, id("err")).Op("=").Id(viewInterfaceFromValue(v.TypeName)).Call(param).Line(),
+				ifErrorBlock,
+			})
+		case *types.VariableSizedArray:
+			elemVariable := "elem" + strconv.Itoa(depth)
+			iterVariable := "i" + strconv.Itoa(depth)
+			if writeTo == nil {
+				return funcWrapper(&jen.Statement{
+					variable().Id(retVariable).Index().Type(v.ElementType).Line(),
+					goCast(nil, param, qual(valuesImportPath, "VariableSizedArray"), nilStatement()).Line(),
+					variable().Err().Error().Line(),
+					ifErrorBlock,
+					id(retVariable).Op("=").Make(index().Type(v.ElementType), jen.Len(id(castVariable))).Line(),
+					jen.For().List(id(iterVariable), id(elemVariable)).Op(":=").Range().Id(castVariable).Block(
+						convert(v.ElementType, depth+1, id(retVariable).Index(id(iterVariable)), id(elemVariable).Clone()).Line(),
+					).Line(),
+					jen.Return(id(retVariable), jen.Nil()).Line(),
+				})
+			}
+			return wrap(&jen.Statement{
+				variable().Id(retVariable).Index().Type(v.ElementType).Line(),
+				goCast(nil, param, qual(valuesImportPath, "VariableSizedArray"), nilStatement()).Line(),
+				ifErrorBlock,
+				id(retVariable).Op("=").Make(index().Type(v.ElementType), jen.Len(id(castVariable))).Line(),
+				jen.For().List(id(iterVariable), id(elemVariable)).Op(":=").Range().Id(castVariable).Block(
+					convert(v.ElementType, depth+1, id(retVariable).Index(id(iterVariable)), id(elemVariable).Clone()).Line(),
+				).Line(),
+				writeTo.Clone().Op("=").Id(retVariable).Line(),
+			})
+
+		}
+
+		panic(fmt.Errorf("unsupoprted type %T cor converter generation", t))
+	}
+
+	return convert(t, 0, nil, param)
 }
 
 const (
@@ -149,8 +313,28 @@ func (a *abiAwareStatement) Op(op string) *abiAwareStatement {
 	return wrap(a.Statement.Op(op))
 }
 
+func (a *abiAwareStatement) Dot(name string) *abiAwareStatement {
+	return wrap(a.Statement.Dot(name))
+}
+
 func (a *abiAwareStatement) Qual(path, name string) *abiAwareStatement {
 	return wrap(a.Statement.Qual(path, name))
+}
+
+func (a *abiAwareStatement) Block(statements ...jen.Code) *abiAwareStatement {
+	return wrap(a.Statement.Block(statements...))
+}
+
+func (a *abiAwareStatement) Clone() *abiAwareStatement {
+	return wrap(a.Statement.Clone())
+}
+
+func (a *abiAwareStatement) Assert(typ jen.Code) *abiAwareStatement {
+	return wrap(a.Statement.Assert(typ))
+}
+
+func (a *abiAwareStatement) Index(items ...jen.Code) *abiAwareStatement {
+	return wrap(a.Statement.Index(items...))
 }
 
 func qual(path, name string) *abiAwareStatement {
@@ -167,6 +351,14 @@ func id(name string) *abiAwareStatement {
 
 func empty() *abiAwareStatement {
 	return wrap(jen.Empty())
+}
+
+func nilStatement() *abiAwareStatement {
+	return wrap(jen.Nil())
+}
+
+func index() *abiAwareStatement {
+	return wrap(jen.Index())
 }
 
 func function() *abiAwareStatement {
@@ -195,8 +387,8 @@ func typeVariableName(name string) string {
 	return startLower(name) + "Type"
 }
 
-func viewInterfaceFromComposite(name string) string {
-	return viewInterfaceName(name) + "fromComposite"
+func viewInterfaceFromValue(name string) string {
+	return viewInterfaceName(name) + "fromValue"
 }
 
 func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer io.Writer) error {
@@ -217,7 +409,7 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 		viewInterfaceName := viewInterfaceName(name)
 		typeName := startLower(name) + "Type"
 		typeVariableName := typeVariableName(name)
-		viewInterfaceFromComposite := viewInterfaceFromComposite(name)
+		viewInterfaceFromValue := viewInterfaceFromValue(name)
 
 		fieldNames := make([]string, 0, len(typ.Fields))
 		for _, field := range typ.Fields {
@@ -248,11 +440,13 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 				jen.Return(jen.Id("t").Dot(viewStructFieldName)),
 			))
 
-			preparation, value := FieldToGo(field.Type, viewStructFieldName, id("composite").Dot("Fields").Index(jen.Lit(fieldEncodingOrder[field.Identifier])))
+			fieldAccessor := id("composite").Dot("Fields").Index(jen.Lit(fieldEncodingOrder[field.Identifier])) //.Dot("ToGoValue").Call()
 
-			decodeFunctionPrepareStatement = append(decodeFunctionPrepareStatement, preparation)
+			preparation := jen.List(id(viewStructFieldName), id("err")).Op(":=").Add(converterFor(field.Type)).Call(fieldAccessor)
 
-			decodeFunctionFields[id(viewStructFieldName)] = value
+			decodeFunctionPrepareStatement = append(decodeFunctionPrepareStatement, preparation.Line().Add(ifErrorBlock).Line())
+
+			decodeFunctionFields[id(viewStructFieldName)] = id(viewStructFieldName)
 		}
 
 		// Main view interface
@@ -266,18 +460,19 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 			f.Add(viewInterfaceMethodImpl)
 		}
 
-		f.Func().Id(viewInterfaceFromComposite).Params(id("composite").Qual(valuesImportPath, "Composite")).Params(id(viewInterfaceName), jen.Error()).Block(
-			//return &<Object>View{_<field>>: v.Fields[uint(0x0)].ToGoValue().(string)}, nil
+		f.Func().Id(viewInterfaceFromValue).Params(id("value").Qual(valuesImportPath, "Value")).Params(id(viewInterfaceName), jen.Error()).Block(
+			jen.List(id("composite"), jen.Err()).Op(":=").Qual(valuesImportPath, "CastToComposite").Call(id("value")),
+			ifErrorBlock,
 
 			empty().Add(decodeFunctionPrepareStatement...),
 
+			//return &<Object>View{_<field>>: v.Fields[uint(0x0)].ToGoValue().(string)}, nil
 			jen.Return(
 				jen.List(jen.Op("&").Id(viewStructName).Values(decodeFunctionFields), jen.Nil()),
 			),
 		)
 
 		//Main view decoding function
-
 		f.Func().Id("Decode"+viewInterfaceName).Params(id("b").Index().Byte()).Params(id(viewInterfaceName), jen.Error()).Block(
 			//r := bytes.NewReader(b)
 			id("r").Op(":=").Qual("bytes", "NewReader").Call(id("b")),
@@ -292,7 +487,7 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 			jen.List(id("v"), id("err")).Op(":=").Id("dec").Dot("DecodeComposite").Call(id(typeName)),
 			ifErrorBlock,
 
-			jen.Return(id(viewInterfaceFromComposite).Call(id("v"))),
+			jen.Return(id(viewInterfaceFromValue).Call(id("v"))),
 		)
 
 		// Variable size array of main views decoding function
@@ -320,7 +515,7 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 			//  }
 			//}
 			jen.For(jen.List(id("i"), id("t"))).Op(":=").Range().Id("v").Block(
-				jen.List(id("array").Index(id("i")), id("err")).Op("=").Id(viewInterfaceFromComposite).Call(id("t").Assert(qual(valuesImportPath, "Composite"))),
+				jen.List(id("array").Index(id("i")), id("err")).Op("=").Id(viewInterfaceFromValue).Call(id("t").Assert(qual(valuesImportPath, "Composite"))),
 				ifErrorBlock,
 			),
 
@@ -350,7 +545,7 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 			}
 			constructorStructFields[i] = id(param.Identifier).Type(param.Type)
 
-			encodedConstructorFields[i] = valueConstructor(param.Type, id("p").Dot(param.Identifier))
+			encodedConstructorFields[i] = valueConstructor(param.Type, id("p").Dot(param.Identifier).Statement)
 
 			constructorFields[i] = id(label).Type(param.Type)
 
@@ -397,6 +592,9 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 		f.Func().Id(newConstructorName).Params(constructorFields...).Params(id(constructorInterfaceName), jen.Error()).Block(
 			jen.Return(id(constructorStructName).Values(constructorObjectParams), jen.Nil()),
 		)
+	}
+	for _, fun := range converterFunctions {
+		f.Add(fun)
 	}
 
 	return f.Render(writer)

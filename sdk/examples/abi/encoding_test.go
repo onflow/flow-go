@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/cmd/abi"
@@ -89,11 +90,16 @@ func TestDecodingUsingAbi(t *testing.T) {
 
 	require.NoError(t, err)
 
-	println(response)
-
 	albums, err := generated.DecodeAlbumViewVariableSizedArray(response.Value)
 
 	require.NoError(t, err)
 
-	println(albums)
+	//Those values come from hardcoded function in music.cdc
+	assert.Len(t, albums, 3)
+	assert.NotEmpty(t, albums[0].Artist())
+	assert.NotNil(t, albums[1].Artist().Members())
+	assert.Equal(t, "Ralf Hütter", (*albums[1].Artist().Members())[0])
+
+	assert.Nil(t, albums[0].Rating())
+	assert.Nil(t, albums[2].Artist().Members())
 }
