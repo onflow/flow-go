@@ -34,7 +34,6 @@ func newInterpreterRuntimeStorage(runtimeInterface Interface) *interpreterRuntim
 // places in the cache, and returned.
 //
 func (s *interpreterRuntimeStorage) readValue(
-	_ *interpreter.Interpreter,
 	storageIdentifier string,
 	key string,
 ) interpreter.OptionalValue {
@@ -87,7 +86,6 @@ func (s *interpreterRuntimeStorage) readValue(
 // (The Cache is finally written back through the runtime interface in `writeCached`.)
 //
 func (s *interpreterRuntimeStorage) writeValue(
-	_ *interpreter.Interpreter,
 	storageIdentifier string,
 	key string,
 	value interpreter.OptionalValue,
