@@ -46,8 +46,8 @@ func (v *ImportDeclaration) Accept(visitor Visitor) Repr {
 	return visitor.VisitImportDeclaration(v)
 }
 
-func (v *ImportDeclaration) DeclarationIdentifier() Identifier {
-	return Identifier{}
+func (v *ImportDeclaration) DeclarationIdentifier() *Identifier {
+	return nil
 }
 
 func (v *ImportDeclaration) DeclarationKind() common.DeclarationKind {
