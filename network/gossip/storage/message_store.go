@@ -1,6 +1,8 @@
 package storage
 
-import "github.com/dapperlabs/flow-go/proto/gossip/messages"
+import (
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
+)
 
 // MessageStore is an on memory storage interface that keeps a copy of the
 // messages that a node receives. This is done as a support to the hash

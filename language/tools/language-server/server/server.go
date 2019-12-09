@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dapperlabs/flow-go/model/flow"
+
 	"github.com/dapperlabs/flow-go/language/runtime"
 
 	"github.com/dapperlabs/flow-go/sdk/client"
@@ -44,6 +46,9 @@ type Server struct {
 	// registry of custom commands we support
 	commands   map[string]CommandHandler
 	flowClient *client.Client
+	// set of created accounts we can submit transactions for
+	accounts      map[flow.Address]flow.AccountPrivateKey
+	activeAccount flow.Address
 	// the nonce to use when submitting transactions
 	nonce uint64
 }
@@ -53,6 +58,7 @@ func NewServer() *Server {
 		checkers:  make(map[protocol.DocumentUri]*sema.Checker),
 		documents: make(map[protocol.DocumentUri]document),
 		commands:  make(map[string]CommandHandler),
+		accounts:  make(map[flow.Address]flow.AccountPrivateKey),
 	}
 }
 
@@ -89,6 +95,10 @@ func (s *Server) Initialize(
 	}
 	s.config = conf
 
+	// add the root account as a usable account
+	s.accounts[flow.RootAddress] = conf.RootAccountKey
+	s.activeAccount = flow.RootAddress
+
 	s.flowClient, err = client.New(s.config.EmulatorAddr)
 	if err != nil {
 		return nil, err
@@ -96,9 +106,8 @@ func (s *Server) Initialize(
 
 	// TODO remove
 	conn.LogMessage(&protocol.LogMessageParams{
-		Type: protocol.Info,
-		Message: fmt.Sprintf("Successfully loaded config emu_addr: %s acct_addr: %s",
-			conf.EmulatorAddr, conf.AccountAddr.String()),
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("Successfully loaded config emu_addr: %s", conf.EmulatorAddr),
 	})
 
 	// after initialization, indicate to the client which commands we support
@@ -235,7 +244,7 @@ func (s *Server) SignatureHelp(
 func (s *Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([]*protocol.CodeLens, error) {
 	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Info,
-		Message: "code lens called" + string(params.TextDocument.URI),
+		Message: "code lens called uri:" + string(params.TextDocument.URI) + " acct:" + s.activeAccount.String(),
 	})
 
 	uri := params.TextDocument.URI
@@ -261,12 +270,25 @@ func (s *Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) (
 			})
 		}
 	}
-	// Search for transaction declarations.
+	if len(checker.Elaboration.TransactionDeclarationTypes) == 0 {
+		actions = append(actions, &protocol.CodeLens{
+			Range: firstLineRange(),
+			Command: &protocol.Command{
+				Title:     fmt.Sprintf("deploy code to account 0x%s", s.activeAccount.Short()),
+				Command:   CommandUpdateAccountCode,
+				Arguments: []interface{}{uri},
+			},
+		})
+	}
+	// If there is not exactly one transaction, exit early.
+	if len(checker.Elaboration.TransactionDeclarationTypes) != 1 {
+		return actions, nil
+	}
 	for txDeclaration := range checker.Elaboration.TransactionDeclarationTypes {
 		actions = append(actions, &protocol.CodeLens{
 			Range: astToProtocolRange(txDeclaration.StartPosition(), txDeclaration.StartPosition()),
 			Command: &protocol.Command{
-				Title:     "submit transaction",
+				Title:     fmt.Sprintf("submit transaction with account 0x%s", s.activeAccount.Short()),
 				Command:   CommandSubmitTransaction,
 				Arguments: []interface{}{uri},
 			},
@@ -445,10 +467,6 @@ func (s *Server) resolveFileImport(mainPath string, location ast.StringLocation)
 
 func (s *Server) resolveAccountImport(conn protocol.Conn, location ast.AddressLocation) (*ast.Program, error) {
 	accountAddr := location.ToAddress()
-	conn.LogMessage(&protocol.LogMessageParams{
-		Type:    protocol.Log,
-		Message: fmt.Sprintf("resolving loc:%s   addr:%s   client:%v", location.String(), accountAddr.String(), s.flowClient),
-	})
 	acct, err := s.flowClient.GetAccount(context.Background(), accountAddr)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get account with address %s err: %w", accountAddr, err)
@@ -522,5 +540,20 @@ func astToProtocolRange(startPos, endPos ast.Position) protocol.Range {
 	return protocol.Range{
 		Start: astToProtocolPosition(startPos),
 		End:   astToProtocolPosition(endPos.Shifted(1)),
+	}
+}
+
+// firstLine returns a range mapping to the first character of the first
+// line of the document.
+func firstLineRange() protocol.Range {
+	return protocol.Range{
+		Start: protocol.Position{
+			Line:      0,
+			Character: 0,
+		},
+		End: protocol.Position{
+			Line:      0,
+			Character: 0,
+		},
 	}
 }

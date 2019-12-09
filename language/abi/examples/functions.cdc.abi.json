@@ -4,8 +4,8 @@
       "function": {
         "parameters": [
           {
-            "name": "d",
-            "label": "divisor",
+            "name": "x",
+            "label": "x",
             "type": "Int"
           }
         ],

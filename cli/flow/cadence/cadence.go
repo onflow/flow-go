@@ -3,6 +3,7 @@ package cadence
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/dapperlabs/flow-go/cli/flow/cadence/abi"
 	"github.com/dapperlabs/flow-go/cli/flow/cadence/languageserver"
 	"github.com/dapperlabs/flow-go/cli/flow/cadence/vscode"
 	"github.com/dapperlabs/flow-go/language/runtime/cmd/execute"
@@ -23,4 +24,5 @@ var Cmd = &cobra.Command{
 func init() {
 	Cmd.AddCommand(languageserver.Cmd)
 	Cmd.AddCommand(vscode.Cmd)
+	Cmd.AddCommand(abi.Cmd)
 }

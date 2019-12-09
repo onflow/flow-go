@@ -3,7 +3,6 @@ package gossip
 import (
 	"context"
 	"fmt"
-	"github.com/dapperlabs/flow-go/network/gossip/util"
 	"io/ioutil"
 	"testing"
 
@@ -13,7 +12,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/network/gossip/order"
 	"github.com/dapperlabs/flow-go/network/gossip/registry"
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"github.com/dapperlabs/flow-go/network/gossip/util"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 var (

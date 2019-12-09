@@ -33,26 +33,26 @@ func (s BlockProposal) String() string {
 	return str
 }
 
-func (s BlockProposal) Header() (BlockHeader, error) {
+func (s BlockProposal) Block() (Block, error) {
 	p, err := s.Struct.Ptr(0)
-	return BlockHeader{Struct: p.Struct()}, err
+	return Block{Struct: p.Struct()}, err
 }
 
-func (s BlockProposal) HasHeader() bool {
+func (s BlockProposal) HasBlock() bool {
 	p, err := s.Struct.Ptr(0)
 	return p.IsValid() || err != nil
 }
 
-func (s BlockProposal) SetHeader(v BlockHeader) error {
+func (s BlockProposal) SetBlock(v Block) error {
 	return s.Struct.SetPtr(0, v.Struct.ToPtr())
 }
 
-// NewHeader sets the header field to a newly
-// allocated BlockHeader struct, preferring placement in s's segment.
-func (s BlockProposal) NewHeader() (BlockHeader, error) {
-	ss, err := NewBlockHeader(s.Struct.Segment())
+// NewBlock sets the block field to a newly
+// allocated Block struct, preferring placement in s's segment.
+func (s BlockProposal) NewBlock() (Block, error) {
+	ss, err := NewBlock(s.Struct.Segment())
 	if err != nil {
-		return BlockHeader{}, err
+		return Block{}, err
 	}
 	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
 	return ss, err
@@ -84,8 +84,8 @@ func (p BlockProposal_Promise) Struct() (BlockProposal, error) {
 	return BlockProposal{s}, err
 }
 
-func (p BlockProposal_Promise) Header() BlockHeader_Promise {
-	return BlockHeader_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
+func (p BlockProposal_Promise) Block() Block_Promise {
+	return Block_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
 }
 
 type BlockVote struct{ capnp.Struct }
@@ -218,21 +218,22 @@ func (p BlockCommit_Promise) Struct() (BlockCommit, error) {
 	return BlockCommit{s}, err
 }
 
-const schema_ca03600dec38188d = "x\xda2\x08ct`2d\x9d\xcf\xc1\xc0\x10\x98\xc2" +
-	"\xca\xf6w\x89\xc4\xae\xda\xa9k'\x08\x0a0\xfe\xef\x95" +
-	"\xb0x\xc3\x9b\xc0|\x8a\x81\x95\x91\x9d\x81A\xd8\x94\xe5" +
-	"\x92\xb0#\x0b\x88e\xcbb\xcf\xc0\xf8_o\xf9\x967" +
-	"n1\xd9s\x18\xb0\xa8\x8de\xf9$\x9c\x09V\x9b\x0a" +
-	"V;[\xcd2\xe4\xe2D\xc6\xa5\xd8\xd4\xb6\xb2<\x12" +
-	"\x9e\x08V\xdb\xcbb\xcf\xf0\xf9\x7fr~NJqI" +
-	"i\x1aS\x9a^rbA^\x81\x95SN~rv" +
-	"X~\x09cj\x00#c \x0b3\x0b\x03\x03\x0b#" +
-	"\x03\x83 \xaf\x16\x03C \x073c\xa0\x08\x13#\x7f" +
-	"Fbq\x06#/\x03\x13#/\x03#\x0e#\x02\x8a" +
-	"\xf2\xe5\x0b\xf2\x8b\x13s\xd0\x8c\xb1B\x18c\x9f\x91\x9a" +
-	"\x98\x92Z\xc4(\xf0?\xb3\xa0\xe3\xf9\x09]\xbd\xad\x0c" +
-	"\x0c\x8c\x8c\x028\x8dt\xce\xcfe\xcf\xcd,!\xd2]" +
-	"\x80\x00\x00\x00\xff\xff\x81\xf2Y\xd8"
+const schema_ca03600dec38188d = "x\xda2\xb0ft`2d\x9d\xce\xce\xc0\x10\x18\xc1" +
+	"\xca\xf6w\x89\xc4\xae\xda\xa9k'\x08\xca3\xfe\xef\x95" +
+	"\xb0x\xc3\x9b\xc0|\x8a\x81\x95\x91\x9d\x81\xc1x#\xb3" +
+	"\x17\xa3\xf0Qfv\x06\x06\xe1\x83\xcc\xf6\x0c\x8c\xff\xf5" +
+	"\x96oy\xe3\x16\x93=\x87\x01\x8b\xe2\x87\xccY\x8c\xc2" +
+	"_\xc1\x8a?\x82\x15\xcfV\xb3\x0c\xb98\x91q)6" +
+	"\xc5\x82,Q\x8c\xc2\xaa, \xc5\x8a,\xf6\x0c\x97\xfe" +
+	"\x17'g\xa4\xe6&\xea'\xb3$\x16\x94$f\xe6\xe9" +
+	"'\xe7\xe7\xa4\x14\x97\x94\xa6\xa5\xe9%'\x16\xe4\x15X" +
+	"9\xe5\xe4'g\x87\xe5\x97\xa420\x0402\x06\xb2" +
+	"0\xb300\xb0020\x08\xf2j10\x04r0" +
+	"3\x06\x8a01\xf2g$\x16g0\xf2201\xf2" +
+	"20\x12gd@Q~\x01\x7f~qb\x0e\x9a\xa9" +
+	"F\x08S\xe5\x93@\x0a\x19\x05\xfe\x7f\xfd\xdd<\xf7\x7f" +
+	"\x82\xcc&\x06\x06FF\x01b-p\xce\xcf\xcde\xce" +
+	",!\xd2\xd1\x80\x00\x00\x00\xff\xff\xed\x82k\xe2"
 
 func init() {
 	schemas.Register(schema_ca03600dec38188d,

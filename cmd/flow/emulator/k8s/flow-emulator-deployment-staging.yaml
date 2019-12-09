@@ -138,7 +138,7 @@ spec:
         - name: flow-emulator
           # No tag, will be attached by teamcity
           image: gcr.io/dl-flow/emulator
-          args: ["emulator", "start", "--init", "-v"]
+          args: ["emulator", "start", "--init", "-v", "--persistent"]
 
           # Ports exposed can be named so other resources can reference
           # them by name and not have to hard code numbers

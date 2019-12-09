@@ -16,10 +16,9 @@ const (
 
 	CodeGuaranteedCollection
 
-	CodeSnapshotRequest
-	CodeSnapshotResponse
-	CodeMempoolRequest
-	CodeMempoolResponse
+	CodeBlockProposal
+	CodeBlockVote
+	CodeBlockCommit
 )
 
 // Envelope is a wrapper to convey type information with JSON encoding without

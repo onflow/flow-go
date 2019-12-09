@@ -1,22 +1,26 @@
 package stub
 
+import (
+	"github.com/dapperlabs/flow-go/model/flow"
+)
+
 // Hub is a value that stores mocked networks in order for them to send events directly
 type Hub struct {
-	networks map[string]*Network
+	networks map[flow.Identifier]*Network
 	Buffer   *Buffer
 }
 
 // NewNetworkHub returns a MockHub value with empty network slice
 func NewNetworkHub() *Hub {
 	return &Hub{
-		networks: make(map[string]*Network),
+		networks: make(map[flow.Identifier]*Network),
 		Buffer:   NewBuffer(),
 	}
 }
 
 // GetNetwork returns the Network by the network ID (or node ID)
-func (hub *Hub) GetNetwork(networkID string) (*Network, bool) {
-	net, ok := hub.networks[networkID]
+func (hub *Hub) GetNetwork(nodeID flow.Identifier) (*Network, bool) {
+	net, ok := hub.networks[nodeID]
 	return net, ok
 }
 
