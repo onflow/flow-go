@@ -90,20 +90,6 @@ func (e *ErrInvalidTransaction) Error() string {
 	)
 }
 
-// ErrTransactionReverted indicates that a transaction reverted.
-type ErrTransactionReverted struct {
-	TxHash crypto.Hash
-	Err    error
-}
-
-func (e *ErrTransactionReverted) Error() string {
-	return fmt.Sprintf(
-		"Transaction with hash %x reverted during execution: %s",
-		e.TxHash,
-		e.Err.Error(),
-	)
-}
-
 // ErrInvalidStateVersion indicates that a state version hash provided is invalid.
 type ErrInvalidStateVersion struct {
 	Version crypto.Hash
@@ -147,15 +133,6 @@ type ErrPendingBlockTransactionsExhausted struct {
 
 func (e *ErrPendingBlockTransactionsExhausted) Error() string {
 	return fmt.Sprintf("Pending block with hash %x contains no more transactions to execute", e.BlockHash)
-}
-
-// ErrBlockExecutionErrors indicates that all the TransactionReverted errors that occured during block execution.
-type ErrBlockExecutionErrors struct {
-	Errors []string
-}
-
-func (e *ErrBlockExecutionErrors) Error() string {
-	return strings.Join(e.Errors, "\n")
 }
 
 // ErrStorage indicates that an error occurred in the storage provider.
