@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 func ExampleNewSync() {

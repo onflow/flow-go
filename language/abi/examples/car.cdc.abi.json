@@ -13,31 +13,6 @@
               "name": "fullname",
               "type": "String"
             }
-          ],
-          [
-            {
-              "name": "params",
-              "type": {
-                "array": {
-                  "of": "String",
-                  "size": 3
-                }
-              }
-            }
-          ],
-          [
-            {
-              "name": "model",
-              "type": "String"
-            },
-            {
-              "name": "make",
-              "type": "String"
-            },
-            {
-              "name": "trim",
-              "type": "String"
-            }
           ]
         ]
       }
@@ -45,7 +20,7 @@
     "Fleet": {
       "struct": {
         "fields": {
-          "cards": {
+          "cars": {
             "array": {
               "of": {
                 "struct": "Car"
@@ -80,6 +55,22 @@
           ]
         ]
       }
+    },
+    "FenderBender": {
+      "event": [
+        {
+          "name": "place",
+          "label": "where",
+          "type": "String"
+        },
+        {
+          "name": "cost",
+          "type": "Int"
+        }
+      ]
+    },
+    "speed": {
+      "variable": "String"
     }
   }
 }

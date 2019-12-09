@@ -233,6 +233,44 @@ func (checker *Checker) report(err error) {
 	checker.errors = append(checker.errors, err)
 }
 
+//TODO Once we have a flag which allows us to distinguish builtin from user defined
+// types we can remove this silly list
+// See https://github.com/dapperlabs/flow-go/issues/1627
+var blacklist = map[string]interface{}{
+	"Int":     nil,
+	"Int8":    nil,
+	"Int16":   nil,
+	"Int32":   nil,
+	"Int64":   nil,
+	"UInt8":   nil,
+	"UInt16":  nil,
+	"UInt32":  nil,
+	"UInt64":  nil,
+	"Address": nil,
+}
+
+func (checker *Checker) UserDefinedValues() map[string]*Variable {
+	ret := map[string]*Variable{}
+	for key, value := range checker.GlobalValues {
+		if _, ok := blacklist[key]; ok == true {
+			continue
+		}
+		if _, ok := checker.PredeclaredValues[key]; ok {
+			continue
+		}
+
+		if _, ok := checker.PredeclaredTypes[key]; ok {
+			continue
+		}
+		if typeValue, ok := checker.GlobalTypes[key]; ok {
+			ret[key] = typeValue
+			continue
+		}
+		ret[key] = value
+	}
+	return ret
+}
+
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 	for _, declaration := range program.ImportDeclarations() {
@@ -349,7 +387,7 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 				literalCount := len(typedExpression.Values)
 
 				if IsSubType(valueElementType, targetElementType) &&
-					literalCount == constantSizedTargetType.Size {
+					literalCount == int(constantSizedTargetType.Size) {
 
 					return true
 				}

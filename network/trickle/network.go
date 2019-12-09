@@ -13,10 +13,15 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/model/trickle"
+	"github.com/dapperlabs/flow-go/model/trickle/peer"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/network/trickle/cache"
+	"github.com/dapperlabs/flow-go/network/trickle/topology"
+	"github.com/dapperlabs/flow-go/protocol"
 )
 
 // Network represents the overlay network of our peer-to-peer network, including
@@ -24,10 +29,11 @@ import (
 type Network struct {
 	log     zerolog.Logger
 	codec   network.Codec
-	com     module.Committee
+	state   protocol.State
+	me      module.Local
 	mw      Middleware
 	cache   Cache
-	state   State
+	top     Topology
 	sip     hash.Hash
 	engines map[uint8]network.Engine
 }
@@ -35,16 +41,27 @@ type Network struct {
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & cache interfaces to track volatile information.
-func NewNetwork(log zerolog.Logger, codec network.Codec, com module.Committee, mw Middleware, state State, cache Cache) (*Network, error) {
+func NewNetwork(log zerolog.Logger, codec network.Codec, state protocol.State, me module.Local, mw Middleware) (*Network, error) {
+
+	top, err := topology.New()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not initialize topology")
+	}
+
+	ca, err := cache.New()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not initialize cache")
+	}
 
 	o := &Network{
 		log:     log,
 		codec:   codec,
-		com:     com,
-		mw:      mw,
 		state:   state,
-		cache:   cache,
-		sip:     siphash.New([]byte("tricklehashseedx")),
+		me:      me,
+		mw:      mw,
+		top:     top,
+		cache:   ca,
+		sip:     siphash.New([]byte("daflowtrickleson")),
 		engines: make(map[uint8]network.Engine),
 	}
 
@@ -56,7 +73,7 @@ func (n *Network) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	n.mw.Start(n)
 	go func() {
-		for n.state.Count() < 1 {
+		for n.top.Count() < 1 {
 			time.Sleep(100 * time.Millisecond)
 		}
 		close(ready)
@@ -105,91 +122,93 @@ func (n *Network) Register(engineID uint8, engine network.Engine) (network.Condu
 func (n *Network) Address() (string, error) {
 
 	// get a list of other nodes that are not us, and we are not connected to
-	nodeIDs := n.state.Peers().IDs()
-	nodeIDs = append(nodeIDs, n.com.Me().NodeID)
-	nodes := n.com.Select().
-		Filter(identity.Not(identity.NodeID(nodeIDs...)))
-
-	// if we don't have nodes available, we can't do anything
-	if len(nodes) == 0 {
-		return "", errors.New("no nodes available")
+	nodeIDs := n.top.Peers().NodeIDs()
+	nodeIDs = append(nodeIDs, n.me.NodeID())
+	ids, err := n.state.Final().Identities(identity.Not(identity.HasNodeID(nodeIDs...)))
+	if err != nil {
+		return "", errors.Wrap(err, "could not get identities")
 	}
 
-	// select a random node from the list
-	node := nodes[rand.Int()%len(nodes)]
+	// if we don't have nodes available, we can't do anything
+	if len(ids) == 0 {
+		return "", errors.New("no identities available")
+	}
 
-	return node.Address, nil
+	// select a random identity from the list
+	id := ids[rand.Int()%len(ids)]
+
+	return id.Address, nil
 }
 
 // HandleHandshake implements a callback to validate new connections on the
 // overlay layer, allowing us to implement peer authentication on first contact.
-func (n *Network) Handshake(conn Connection) (string, error) {
+func (n *Network) Handshake(conn Connection) (flow.Identifier, error) {
 
 	// initialize our own authentication message
 	out := &trickle.Auth{
-		NodeID: n.com.Me().NodeID,
+		NodeID: n.me.NodeID(),
 	}
 	err := conn.Send(out)
 	if err != nil {
-		return "", errors.Wrap(err, "could not send outgoing auth")
+		return flow.Identifier{}, errors.Wrap(err, "could not send outgoing auth")
 	}
 
 	// read their authentication message
 	msg, err := conn.Receive()
 	if err != nil {
-		return "", errors.Wrap(err, "could not receive incoming auth")
+		return flow.Identifier{}, errors.Wrap(err, "could not receive incoming auth")
 	}
 
 	// type assert the response
 	in, ok := msg.(*trickle.Auth)
 	if !ok {
-		return "", errors.Errorf("invalid type for incoming auth (%T)", msg)
+		return flow.Identifier{}, errors.Errorf("invalid type for incoming auth (%T)", msg)
 	}
 
 	// check if this node is ourselves
-	if in.NodeID == n.com.Me().NodeID {
-		return "", errors.New("connections to self forbidden")
+	if in.NodeID == n.me.NodeID() {
+		return flow.Identifier{}, errors.New("connections to self forbidden")
 	}
 
 	// check if we are already connected to this peer
-	ok = n.state.Alive(in.NodeID)
+	ok = n.top.IsUp(in.NodeID)
 	if ok {
-		return "", errors.Errorf("node already connected (%s)", in.NodeID)
+		return flow.Identifier{}, errors.Errorf("node already connected (%s)", in.NodeID)
 	}
 
 	// check if the committee has a node with the given ID
-	_, err = n.com.Get(in.NodeID)
+	_, err = n.state.Final().Identity(in.NodeID)
 	if err != nil {
-		return "", errors.Errorf("unknown nodeID (%s)", in.NodeID)
+		return flow.Identifier{}, errors.Errorf("unknown nodeID (%s)", in.NodeID)
 	}
 
 	// initialize the peer state using the address as its ID
-	n.state.Up(in.NodeID)
+	n.top.Up(in.NodeID)
 
 	return in.NodeID, nil
 }
 
 // Cleanup implements a callback to handle peers that have been dropped
 // by the middleware layer.
-func (n *Network) Cleanup(node string) error {
+func (n *Network) Cleanup(nodeID flow.Identifier) error {
 
 	// drop the peer state using the ID we registered
-	n.state.Down(node)
+	n.top.Down(nodeID)
 
 	return nil
 }
 
 // Receive provides a callback to handle the incoming message from the
 // given peer.
-func (n *Network) Receive(peerID string, msg interface{}) error {
+func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
 	var err error
 	switch m := msg.(type) {
 	case *trickle.Announce:
-		err = n.processAnnounce(peerID, m)
+		err = n.processAnnounce(nodeID, m)
 	case *trickle.Request:
-		err = n.processRequest(peerID, m)
+		err = n.processRequest(nodeID, m)
 	case *trickle.Response:
-		err = n.processResponse(peerID, m)
+		err = n.processResponse(nodeID, m)
 	default:
 		err = errors.Errorf("invalid message type (%T)", m)
 	}
@@ -216,7 +235,7 @@ func (n *Network) pack(engineID uint8, event interface{}) ([]byte, []byte, error
 
 // submit will submit the given event for the given engine to the overlay layer
 // for processing; it is used by engines through conduits.
-func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...string) error {
+func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 
 	// pack the event to get payload and event ID
 	eventID, payload, err := n.pack(engineID, event)
@@ -233,7 +252,7 @@ func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...string)
 }
 
 // gossip will cache the event and announce it to everyone wha hasn't seen it.
-func (n *Network) gossip(engineID uint8, eventID []byte, payload []byte, targetIDs ...string) error {
+func (n *Network) gossip(engineID uint8, eventID []byte, payload []byte, targetIDs ...flow.Identifier) error {
 
 	// check if the event is already in the cache
 	ok := n.cache.Has(engineID, eventID)
@@ -245,15 +264,15 @@ func (n *Network) gossip(engineID uint8, eventID []byte, payload []byte, targetI
 	res := &trickle.Response{
 		EngineID:  engineID,
 		EventID:   eventID,
-		OriginID:  n.com.Me().NodeID,
+		OriginID:  n.me.NodeID(),
 		TargetIDs: targetIDs,
 		Payload:   payload,
 	}
 	n.cache.Set(engineID, eventID, res)
 
 	// get all peers that haven't seen it yet
-	peerIDs := n.state.Peers(Not(Seen(eventID))).IDs()
-	if len(peerIDs) == 0 {
+	nodeIDs := n.top.Peers(peer.Not(peer.HasSeen(eventID))).NodeIDs()
+	if len(nodeIDs) == 0 {
 		return nil
 	}
 
@@ -262,7 +281,7 @@ func (n *Network) gossip(engineID uint8, eventID []byte, payload []byte, targetI
 		EngineID: engineID,
 		EventID:  eventID,
 	}
-	err := n.send(ann, peerIDs...)
+	err := n.send(ann, nodeIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not send announce")
 	}
@@ -272,10 +291,10 @@ func (n *Network) gossip(engineID uint8, eventID []byte, payload []byte, targetI
 
 // processAnnounce will check if we have already seen the announced event and
 // request it if it's new for us.
-func (n *Network) processAnnounce(peerID string, ann *trickle.Announce) error {
+func (n *Network) processAnnounce(nodeID flow.Identifier, ann *trickle.Announce) error {
 
 	// remember that this peer has this event
-	n.state.Seen(peerID, ann.EventID)
+	n.top.Seen(nodeID, ann.EventID)
 
 	// see if we have already cached this event
 	ok := n.cache.Has(ann.EngineID, ann.EventID)
@@ -288,7 +307,7 @@ func (n *Network) processAnnounce(peerID string, ann *trickle.Announce) error {
 		EngineID: ann.EngineID,
 		EventID:  ann.EventID,
 	}
-	err := n.mw.Send(peerID, req)
+	err := n.mw.Send(nodeID, req)
 	if err != nil {
 		return errors.Wrap(err, "could not send request")
 	}
@@ -297,7 +316,7 @@ func (n *Network) processAnnounce(peerID string, ann *trickle.Announce) error {
 }
 
 // processRequest will process the given request and fulfill it.
-func (n *Network) processRequest(peerID string, req *trickle.Request) error {
+func (n *Network) processRequest(nodeID flow.Identifier, req *trickle.Request) error {
 
 	// check to find ID and payload in cache
 	res, ok := n.cache.Get(req.EngineID, req.EventID)
@@ -306,7 +325,7 @@ func (n *Network) processRequest(peerID string, req *trickle.Request) error {
 	}
 
 	// send the response message to the peer
-	err := n.mw.Send(peerID, res)
+	err := n.mw.Send(nodeID, res)
 	if err != nil {
 		return errors.Wrap(err, "could not send gossip")
 	}
@@ -315,10 +334,10 @@ func (n *Network) processRequest(peerID string, req *trickle.Request) error {
 }
 
 // processResponse will process the payload of an event sent to us by a peer.
-func (n *Network) processResponse(peerID string, res *trickle.Response) error {
+func (n *Network) processResponse(nodeID flow.Identifier, res *trickle.Response) error {
 
 	// mark this event as seen for this peer (usually redundant)
-	n.state.Seen(peerID, res.EventID)
+	n.top.Seen(nodeID, res.EventID)
 
 	// check if we already have the event in the cache
 	ok := n.cache.Has(res.EngineID, res.EventID)
@@ -346,7 +365,7 @@ func (n *Network) processEvent(res *trickle.Response) error {
 
 	// if we are not an intended recipient of the message, don't worry about it
 	// either
-	ok = n.isfor(n.com.Me().NodeID, res)
+	ok = n.isfor(n.me.NodeID(), res)
 	if !ok {
 		return nil
 	}
@@ -366,12 +385,12 @@ func (n *Network) processEvent(res *trickle.Response) error {
 	return nil
 }
 
-func (n *Network) send(msg interface{}, peerIDs ...string) error {
+func (n *Network) send(msg interface{}, nodeIDs ...flow.Identifier) error {
 
 	// send the message through the peer connection
 	var result *multierror.Error
-	for _, peerID := range peerIDs {
-		err := n.mw.Send(peerID, msg)
+	for _, nodeID := range nodeIDs {
+		err := n.mw.Send(nodeID, msg)
 		if err != nil {
 			result = multierror.Append(result, err)
 		}
@@ -380,7 +399,7 @@ func (n *Network) send(msg interface{}, peerIDs ...string) error {
 	return result.ErrorOrNil()
 }
 
-func (n *Network) isfor(nodeID string, res *trickle.Response) bool {
+func (n *Network) isfor(nodeID flow.Identifier, res *trickle.Response) bool {
 
 	// if there are no targets, the message is for broadcasting
 	if len(res.TargetIDs) == 0 {

@@ -96,11 +96,6 @@ func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDecla
 				Pos:  executeIdentifier.Pos,
 			})
 		}
-	} else {
-		// report an error if no execute block is defined
-		checker.report(&TransactionMissingExecuteError{
-			Range: declaration.Range,
-		})
 	}
 }
 

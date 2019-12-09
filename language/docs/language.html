@@ -174,6 +174,7 @@
                 <p><a href="#composite-data-type-behaviour">Composite Data Type Behaviour</a></p>
                 <ul>
                   <li><a href="#structures">Structures</a></li>
+                  <li><a href="#accessing-fields-and-functions-of-composite-data-types-using-optional-chaining">Accessing Fields and Functions of Composite Data Types Using Optional Chaining</a></li>
                   <li><a href="#resources">Resources</a></li>
                   <li><a href="#resource-variables">Resource variables</a></li>
                   <li><a href="#resource-destructors">Resource Destructors</a></li>
@@ -223,6 +224,9 @@
             <ul>
               <li><a href="#reference-based-access-control">Reference-Based Access Control</a></li>
             </ul>
+          </li>
+          <li>
+            <p><a href="#publishing-references">Publishing References</a></p>
           </li>
           <li>
             <p><a href="#events">Events</a></p>
@@ -326,18 +330,23 @@
       <section>
         <h2 id="constants-and-variable-declarations"><a href="#constants-and-variable-declarations" aria-hidden="true"><span class="icon icon-link"></span></a>Constants and Variable Declarations</h2>
         <p>
-          Constants and variables are declarations that bind a value and <a href="#type-safety">type</a> to an identifier.
+          Constants and variables are declarations that bind
+          a value and <a href="#type-safety">type</a> to an identifier.
           Constants are initialized with a value and cannot be reassigned afterwards.
           Variables are initialized with a value and can be reassigned later.
           Declarations can be created in any scope, including the global scope.
         </p>
         <p>
-          Constant means that the <em>identifier's</em> association is constant, not the <em>value</em> itself –
+          Constant means that the <em>identifier's</em> association is constant,
+          not the <em>value</em> itself –
           the value may still be changed if is mutable.
         </p>
         <p>
-          Constants are declared using the <code>let</code> keyword. Variables are declared using the <code>var</code> keyword.
-          The keywords are followed by the identifier, an optional <a href="#type-annotations">type annotation</a>, an equals sign <code>=</code>, and the initial value.
+          Constants are declared using the <code>let</code> keyword. Variables are declared
+          using the <code>var</code> keyword.
+          The keywords are followed by the identifier,
+          an optional <a href="#type-annotations">type annotation</a>, an equals sign <code>=</code>,
+          and the initial value.
         </p>
         <pre><code class="language-cadence,file=constants-and-variables.cdc"><span style="color: #008000">// Declare a constant named `a`.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -361,8 +370,10 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a</span><span>
 </span></code></pre>
         <p>
-          The names of the variable or constant declarations in each scope must be unique.
-          Declaring another variable or constant with a name that is already declared in the current scope is invalid, regardless of kind or type.
+          The names of the variable or constant
+          declarations in each scope must be unique.
+          Declaring another variable or constant with a name that is already
+          declared in the current scope is invalid, regardless of kind or type.
         </p>
         <pre><code class="language-cadence"><span style="color: #008000">// Declare a constant named `a`.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -411,10 +422,14 @@
       <section>
         <h2 id="type-annotations"><a href="#type-annotations" aria-hidden="true"><span class="icon icon-link"></span></a>Type Annotations</h2>
         <p>
-          When declaring a constant or variable, an optional <em>type annotation</em> can be provided,
+          When declaring a constant or variable,
+          an optional <em>type annotation</em> can be provided,
           to make it explicit what type the declaration has.
         </p>
-        <p>If no type annotation is provided, the type of the declaration is <a href="#type-inference">inferred from the initial value</a>.</p>
+        <p>
+          If no type annotation is provided, the type of the declaration is
+          <a href="#type-inference">inferred from the initial value</a>.
+        </p>
         <pre><code class="language-cadence,file=type-annotations.cdc"><span style="color: #008000">// Declare a variable named `boolVarWithAnnotation`, which has an explicit type annotation.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #008000">// `Bool` is the type of booleans.</span><span>
@@ -458,8 +473,10 @@
       <section>
         <h2 id="naming"><a href="#naming" aria-hidden="true"><span class="icon icon-link"></span></a>Naming</h2>
         <p>
-          Names may start with any upper or lowercase letter (A-Z, a-z) or an underscore (<code>_</code>).
-          This may be followed by zero or more upper and lower case letters, underscores, and numbers (0-9).
+          Names may start with any upper or lowercase letter (A-Z, a-z)
+          or an underscore (<code>_</code>).
+          This may be followed by zero or more upper and lower case letters,
+          underscores, and numbers (0-9).
           Names may not begin with a number.
         </p>
         <pre><code class="language-cadence"><span style="color: #008000">// Valid: title-case</span><span>
@@ -612,7 +629,8 @@
           <h3 id="integers"><a href="#integers" aria-hidden="true"><span class="icon icon-link"></span></a>Integers</h3>
           <p>
             Integers are numbers without a fractional part.
-            They are either <em>signed</em> (positive, zero, or negative) or <em>unsigned</em> (positive or zero)
+            They are either <em>signed</em> (positive, zero, or negative)
+            or <em>unsigned</em> (positive or zero)
             and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
           </p>
           <p>
@@ -626,6 +644,7 @@
             <li><strong><code>Int16</code></strong>: -32768 through 32767</li>
             <li><strong><code>Int32</code></strong>: -2147483648 through 2147483647</li>
             <li><strong><code>Int64</code></strong>: -9223372036854775808 through 9223372036854775807</li>
+            <li><strong><code>UInt8</code></strong>: 0 through 255</li>
             <li><strong><code>UInt16</code></strong>: 0 through 65535</li>
             <li><strong><code>UInt32</code></strong>: 0 through 4294967295</li>
             <li><strong><code>UInt64</code></strong>: 0 through 18446744073709551615</li>
@@ -736,7 +755,8 @@
 </span><span style="color: #000000">a + </span><span style="color: #09885A">2</span><span>
 </span></code></pre>
           <p>
-            <code>Any</code> may be used like any other type, for example, it may be the element type of <a href="#arrays">arrays</a>
+            <code>Any</code> may be used like any other type, for example,
+            it may be the element type of <a href="#arrays">arrays</a>
             or be the element type of an <a href="#optionals">optional type</a>.
           </p>
           <pre><code class="language-cadence"><span style="color: #008000">// Declare a variable that has the type `[Any]`, i.e. an array of elements of any type.</span><span>
@@ -821,8 +841,10 @@
           <section>
             <h4 id="nil-coalescing-operator"><a href="#nil-coalescing-operator" aria-hidden="true"><span class="icon icon-link"></span></a>Nil-Coalescing Operator</h4>
             <p>
-              The nil-coalescing operator <code>??</code> returns the value inside an optional if it contains a value,
-              or returns an alternative value if the optional has no value, i.e., the optional value is <code>nil</code>.
+              The nil-coalescing operator <code>??</code> returns
+              the value inside an optional if it contains a value,
+              or returns an alternative value if the optional has no value,
+              i.e., the optional value is <code>nil</code>.
             </p>
             <p>If the left-hand side is non-nil, the right-hand side is not evaluated.</p>
             <pre><code class="language-cadence"><span style="color: #008000">// Declare a constant which has an optional integer type</span><span>
@@ -835,7 +857,10 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int = a ?? </span><span style="color: #09885A">42</span><span>
 </span><span style="color: #008000">// `b` is 42, as `a` is nil</span><span>
 </span></code></pre>
-            <p>The nil-coalescing operator can only be applied to values which have an optional type.</p>
+            <p>
+              The nil-coalescing operator can only be applied
+              to values which have an optional type.
+            </p>
             <pre><code class="language-cadence"><span style="color: #008000">// Declare a constant with a non-optional integer type.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
@@ -877,9 +902,11 @@
               </p>
             </blockquote>
             <p>
-              The conditional downcasting operator <code>as?</code> can be used to type cast a value to a type.
+              The conditional downcasting operator <code>as?</code>
+              can be used to type cast a value to a type.
               The operator returns an optional.
-              If the value has a type that is a subtype of the given type that should be casted to,
+              If the value has a type that is a subtype
+              of the given type that should be casted to,
               the operator returns the value as the given type,
               otherwise the result is <code>nil</code>.
             </p>
@@ -975,7 +1002,8 @@
             <li><code>\'</code>: Single quotation mark</li>
             <li>
               <code>\u</code>: A Unicode scalar value, written as <code>\u{x}</code>,
-              where <code>x</code> is a 1–8 digit hexadecimal number which needs to be a valid Unicode scalar value,
+              where <code>x</code> is a 1–8 digit hexadecimal number
+              which needs to be a valid Unicode scalar value,
               i.e., in the range 0 to 0xD7FF and 0xE000 to 0x10FFFF inclusive
             </li>
           </ul>
@@ -988,10 +1016,12 @@
 </span></code></pre>
           <p>The type <code>Character</code> represents a single, human-readable character. Characters are extended grapheme clusters, which consist of one or more Unicode scalars.</p>
           <p>
-            For example, the single character <code>ü</code> can be represented in several ways in Unicode.
+            For example, the single character <code>ü</code> can be represented
+            in several ways in Unicode.
             First, it can be represented by a single Unicode scalar value <code>ü</code>
             ("LATIN SMALL LETTER U WITH DIAERESIS", code point U+00FC).
-            Second, the same single character can be represented by two Unicode scalar values:
+            Second, the same single character can be represented
+            by two Unicode scalar values:
             <code>u</code> ("LATIN SMALL LETTER U", code point U+0075),
             and "COMBINING DIAERESIS" (code point U+0308).
             The combining Unicode scalar value is applied to the scalar before it,
@@ -1048,11 +1078,13 @@
               <li>
                 <p>
                   <code>slice(from: Int, upTo: Int): String</code>:
-                  Returns a string slice of the characters in the given string from start index <code>from</code> up to,
+                  Returns a string slice of the characters
+                  in the given string from start index <code>from</code> up to,
                   but not including, the end index <code>upTo</code>.
                   This function creates a new string whose length is <code>upto - from</code>.
                   It does not modify the original string.
-                  If either of the parameters are out of the bounds of the string, the function will fail.
+                  If either of the parameters are out of
+                  the bounds of the string, the function will fail.
                 </p>
                 <pre><code class="language-cadence,file=string-slice.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> example = </span><span style="color: #A31515">"helloworld"</span><span>
 </span><span>
@@ -1092,7 +1124,8 @@
             <p>Arrays either have a fixed size or are variably sized, i.e., elements can be added and removed.</p>
             <p>
               Fixed-size arrays have the form <code>[T; N]</code>, where <code>T</code> is the element type,
-              and <code>N</code> is the size of the array.
+              and <code>N</code> is the size of the array. <code>N</code> has to be statically known, meaning
+              that it needs to be an integer literal.
               For example, a fixed-size array of 3 <code>Int8</code> elements has the type <code>[Int8; 3]</code>.
             </p>
             <p>
@@ -1106,7 +1139,11 @@
               when used as function argument,
               or when returned from a function call.
             </p>
-            <pre><code class="language-cadence,file=array-types.cdc"><span style="color: #008000">// Declare a fixed-sized array of integers</span><span>
+            <pre><code class="language-cadence,file=array-types.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> size = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #008000">// Invalid: Array-size must be an integer literal</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers: [Int; </span><span style="color: #0000FF">size</span><span style="color: #000000">] = []</span><span>
+</span><span>
+</span><span style="color: #008000">// Declare a fixed-sized array of integers</span><span>
 </span><span style="color: #008000">// which always contains exactly two elements.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> array: [Int8; 2] = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
@@ -1202,12 +1239,14 @@
               <li>
                 <p>
                   <code>concat(_ array: T): T</code>:
-                  Concatenates the parameter <code>array</code> to the end of the array the function is called on,
+                  Concatenates the parameter <code>array</code> to the end
+                  of the array the function is called on,
                   but does not modify that array.
                 </p>
                 <p>Both arrays must be the same type <code>T</code>.</p>
                 <p>
-                  This function creates a new array whose length is the sum of the length of the array
+                  This function creates a new array whose length is
+                  the sum of the length of the array
                   the function is called on and the length of the array given as the parameter.
                 </p>
                 <pre><code class="language-cadence,file=array-concat.cdc"><span style="color: #008000">// Declare two arrays of integers.</span><span>
@@ -1274,15 +1313,19 @@
                 <li>
                   <p>
                     <code>insert(at index: Int, _ element: T): Void</code>:
-                    Inserts the new element <code>element</code> of type <code>T</code> at the given <code>index</code> of the array.
+                    Inserts the new element <code>element</code> of type <code>T</code>
+                    at the given <code>index</code> of the array.
                   </p>
-                  <p>The new element must be of the same type as all the other elements in the array.</p>
+                  <p>The new element must be of the same type as the other elements in the array.</p>
                   <p>
                     The <code>index</code> must be within the bounds of the array.
                     If the index is outside the bounds, the program aborts.
                   </p>
                   <p>The existing element at the supplied index is not overwritten.</p>
-                  <p>All the elements after the new inserted element are shifted to the right by one.</p>
+                  <p>
+                    All the elements after the new inserted element
+                    are shifted to the right by one.
+                  </p>
                   <pre><code class="language-cadence,file=array-insert.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #09885A">23</span><span style="color: #000000">, </span><span style="color: #09885A">31</span><span style="color: #000000">, </span><span style="color: #09885A">12</span><span style="color: #000000">]</span><span>
 </span><span>
@@ -1375,12 +1418,16 @@
           <h3 id="dictionaries"><a href="#dictionaries" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionaries</h3>
           <p>
             Dictionaries are mutable, unordered collections of key-value associations.
-            In a dictionary, all keys must have the same type, and all values must have the same type.
-            Dictionaries may contain a key only once and may contain a value multiple times.
+            In a dictionary, all keys must have the same type,
+            and all values must have the same type.
+            Dictionaries may contain a key only once and
+            may contain a value multiple times.
           </p>
           <p>
-            Dictionary literals start with an opening brace <code>{</code> and end with a closing brace <code>}</code>.
-            Keys are separated from values by a colon, and key-value associations are separated by commas.
+            Dictionary literals start with an opening brace <code>{</code>
+            and end with a closing brace <code>}</code>.
+            Keys are separated from values by a colon,
+            and key-value associations are separated by commas.
           </p>
           <pre><code class="language-cadence,file=dictionaries.cdc"><span style="color: #008000">// An empty dictionary</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -1406,7 +1453,8 @@
               Dictionaries have the form <code>{K: V}</code>,
               where <code>K</code> is the type of the key,
               and <code>V</code> is the type of the value.
-              For example, a dictionary with <code>Int</code> keys and <code>Bool</code> values has type <code>{Int: Bool}</code>.
+              For example, a dictionary with <code>Int</code> keys and <code>Bool</code>
+              values has type <code>{Int: Bool}</code>.
             </p>
             <pre><code class="language-cadence,file=dictionary-types.cdc"><span style="color: #008000">// Declare a constant that has type `{Int: Bool}`,</span><span>
 </span><span style="color: #008000">// a dictionary mapping integers to booleans.</span><span>
@@ -1426,15 +1474,18 @@
 </span></code></pre>
             <p>
               Dictionary types are covariant in their key and value types.
-              For example, <code>[Int: String]</code> is a subtype of <code>[Any: String]</code> and also a subtype of <code>[Int: Any]</code>.
+              For example, <code>[Int: String]</code> is a subtype of <code>[Any: String]</code>
+              and also a subtype of <code>[Int: Any]</code>.
               This is safe because dictionaries are value types and not reference types.
             </p>
           </section>
           <section>
             <h4 id="dictionary-access"><a href="#dictionary-access" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Access</h4>
             <p>
-              To get the value for a specific key from a dictionary, the access syntax can be used:
-              The dictionary is followed by an opening square bracket <code>[</code>, the key, and ends with a closing square bracket <code>]</code>.
+              To get the value for a specific key from a dictionary,
+              the access syntax can be used:
+              The dictionary is followed by an opening square bracket <code>[</code>, the key,
+              and ends with a closing square bracket <code>]</code>.
             </p>
             <p>
               Accessing a key returns an <a href="#optionals">optional</a>:
@@ -1472,7 +1523,10 @@
 </span><span style="color: #000000">integers[</span><span style="color: #0000FF">true</span><span style="color: #000000">] </span><span style="color: #008000">// is `1`</span><span>
 </span><span style="color: #000000">integers[</span><span style="color: #0000FF">false</span><span style="color: #000000">] </span><span style="color: #008000">// is `0`</span><span>
 </span></code></pre>
-            <p>To set the value for a key of a dictionary, the access syntax can be used as well.</p>
+            <p>
+              To set the value for a key of a dictionary,
+              the access syntax can be used as well.
+            </p>
             <pre><code class="language-cadence,file=dictionary-assignment.cdc"><span style="color: #008000">// Declare a constant that has type `{Int: Bool}`,</span><span>
 </span><span style="color: #008000">// a dictionary mapping booleans to integers.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -1511,7 +1565,8 @@
                   Removes the value for the given <code>key</code> of type <code>K</code> from the dictionary.
                 </p>
                 <p>
-                  Returns the value of type <code>V</code> as an optional if the dictionary contained the key,
+                  Returns the value of type <code>V</code> as an optional
+                  if the dictionary contained the key,
                   otherwise <code>nil</code>.
                 </p>
                 <pre><code class="language-cadence,file=dictionary-remove.cdc"><span style="color: #008000">// Declare a dictionary mapping strings to integers.</span><span>
@@ -1535,19 +1590,60 @@
 </span><span style="color: #008000">// `numbers` is `{"twentyThree": 23}`</span><span>
 </span></code></pre>
               </li>
+              <li>
+                <p>
+                  <code>keys: [K]</code>:
+                  Returns an array of the keys of type <code>K</code> in the dictionary. This does not
+                  modify the dictionary, just returns a copy of the keys as an array.
+                  If the dictionary is empty, this returns an empty array.
+                </p>
+                <pre><code class="language-cadence,file=dictionary-keys-field.cdc"><span style="color: #008000">// Declare a dictionary mapping strings to integers.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = {</span><span style="color: #A31515">"fortyTwo"</span><span style="color: #000000">: </span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #A31515">"twentyThree"</span><span style="color: #000000">: </span><span style="color: #09885A">23</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Find the keys of the dictionary.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> keys = numbers.keys</span><span>
+</span><span>
+</span><span style="color: #008000">// `keys` has type `[String]` and is `["fortyTwo","twentyThree"]`</span><span>
+</span></code></pre>
+              </li>
+              <li>
+                <p>
+                  <code>values: [V]</code>:
+                  Returns an array of the values of type <code>V</code> in the dictionary. This does not
+                  modify the dictionary, just returns a copy of the values as an array.
+                  If the dictionary is empty, this returns an empty array.
+                </p>
+                <p>This field is not available if <code>V</code> is a resource type.</p>
+                <pre><code class="language-cadence,file=dictionary-values-field.cdc"><span style="color: #008000">// Declare a dictionary mapping strings to integers.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = {</span><span style="color: #A31515">"fortyTwo"</span><span style="color: #000000">: </span><span style="color: #09885A">42</span><span style="color: #000000">, </span><span style="color: #A31515">"twentyThree"</span><span style="color: #000000">: </span><span style="color: #09885A">23</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Find the values of the dictionary.</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> values = numbers.values</span><span>
+</span><span>
+</span><span style="color: #008000">// `values` has type [Int] and is `[42, 23]`</span><span>
+</span></code></pre>
+              </li>
             </ul>
           </section>
           <section>
             <h4 id="dictionary-keys"><a href="#dictionary-keys" aria-hidden="true"><span class="icon icon-link"></span></a>Dictionary Keys</h4>
-            <p>Dictionary keys must be hashable and equatable, i.e., must implement the <a href="#hashable-interface"><code>Hashable</code></a> and <a href="#equatable-interface"><code>Equatable</code></a> <a href="#interfaces">interfaces</a>.</p>
-            <p>Most of the built-in types, like booleans, integers, are hashable and equatable, so can be used as keys in dictionaries.</p>
+            <p>
+              Dictionary keys must be hashable and equatable,
+              i.e., must implement the <a href="#hashable-interface"><code>Hashable</code></a>
+              and <a href="#equatable-interface"><code>Equatable</code></a> <a href="#interfaces">interfaces</a>.
+            </p>
+            <p>
+              Most of the built-in types, like booleans and integers,
+              are hashable and equatable, so can be used as keys in dictionaries.
+            </p>
           </section>
         </section>
       </section>
       <section>
         <h2 id="operators"><a href="#operators" aria-hidden="true"><span class="icon icon-link"></span></a>Operators</h2>
         <p>
-          Operators are special symbols that perform a computation for one or more values.
+          Operators are special symbols that perform a computation
+          for one or more values.
           They are either unary, binary, or ternary.
         </p>
         <ul>
@@ -1566,7 +1662,8 @@
           <li>
             <p>
               Ternary operators operate on three values.
-              The first operator symbol appears between the first and second value, the second operator symbol appears between the second and third value (infix).
+              The first operator symbol appears between the first and second value,
+              the second operator symbol appears between the second and third value (infix).
             </p>
           </li>
         </ul>
@@ -1584,7 +1681,8 @@
         <section>
           <h3 id="assignment"><a href="#assignment" aria-hidden="true"><span class="icon icon-link"></span></a>Assignment</h3>
           <p>
-            The binary assignment operator <code>=</code> can be used to assign a new value to a variable.
+            The binary assignment operator <code>=</code> can be used
+            to assign a new value to a variable.
             It is only allowed in a statement and is not allowed in expressions.
           </p>
           <pre><code class="language-cadence,file=assignment.cdc"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
@@ -1609,7 +1707,8 @@
 </span></code></pre>
           <p>
             The left-hand side of the assignment operand must be an identifier.
-            For arrays and dictionaries, this identifier can be followed by one or more index or access expressions.
+            For arrays and dictionaries, this identifier can be followed
+            by one or more index or access expressions.
           </p>
           <pre><code class="language-cadence,file=assignment-numbers.cdc"><span style="color: #008000">// Declare an array of integers.</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> numbers = [</span><span style="color: #09885A">1</span><span style="color: #000000">, </span><span style="color: #09885A">2</span><span style="color: #000000">]</span><span>
@@ -1645,7 +1744,8 @@
         <section>
           <h3 id="swapping"><a href="#swapping" aria-hidden="true"><span class="icon icon-link"></span></a>Swapping</h3>
           <p>
-            The binary swap operator <code>&#x3C;-></code> can be used to exchange the values of two variables.
+            The binary swap operator <code>&#x3C;-></code> can be used
+            to exchange the values of two variables.
             It is only allowed in a statement and is not allowed in expressions.
           </p>
           <pre><code class="language-cadence,file=swap.cdc"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
@@ -1663,7 +1763,10 @@
 </span><span style="color: #000000">b &#x3C;-> c</span><span>
 </span><span style="color: #000000">a &#x3C;-> b</span><span>
 </span></code></pre>
-          <p>Both sides of the swap operation must be variable, assignment to constants is invalid.</p>
+          <p>
+            Both sides of the swap operation must be variable,
+            assignment to constants is invalid.
+          </p>
           <pre><code class="language-cadence,file=swap-with-constant.cdc"><span style="color: #0000FF">var</span><span style="color: #000000"> a = </span><span style="color: #09885A">1</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b = </span><span style="color: #09885A">2</span><span>
 </span><span>
@@ -1698,13 +1801,19 @@
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> c = a * b</span><span>
 </span><span style="color: #008000">// `c` is `10000`, and has type `Int`</span><span>
 </span></code></pre>
-          <p>If overflow behavior is intended, overflowing operators are available, which are prefixed with an <code>&#x26;</code>:</p>
+          <p>
+            If overflow behavior is intended, overflowing operators are available,
+            which are prefixed with an <code>&#x26;</code>:
+          </p>
           <ul>
             <li>Overflow addition: <code>&#x26;+</code></li>
             <li>Overflow subtraction: <code>&#x26;-</code></li>
             <li>Overflow multiplication: <code>&#x26;*</code></li>
           </ul>
-          <p>For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111). Adding 1 results in an overflow, truncation to 8 bits, and the value 0.</p>
+          <p>
+            For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111).
+            Adding 1 results in an overflow, truncation to 8 bits, and the value 0.
+          </p>
           <pre><code class="language-cadence"><span style="color: #008000">//     11111111 = 255</span><span>
 </span><span style="color: #008000">// &#x26;+         1</span><span>
 </span><span style="color: #008000">//  = 100000000 = 0</span><span>
@@ -1921,16 +2030,25 @@
           <p>Argument labels should be named so they make sense from the perspective of the function call.</p>
           <p>
             Argument labels precede the parameter name.
-            The special argument label <code>_</code> indicates that a function call can omit the argument label.
+            The special argument label <code>_</code> indicates
+            that a function call can omit the argument label.
             If no argument label is declared in the function declaration,
             the parameter name is the argument label of the function declaration,
             and function calls must use the parameter name as the argument label.
           </p>
-          <p>Each parameter needs to have a type annotation, which follows the parameter name after a colon.</p>
-          <p>Function calls may provide arguments for parameters which are subtypes of the parameter types.</p>
           <p>
-            There is <strong>no</strong> support for optional parameters, i.e. default values for parameters,
-            and variadic functions, i.e. functions that take an arbitrary amount of arguments.
+            Each parameter needs to have a type annotation,
+            which follows the parameter name after a colon.
+          </p>
+          <p>
+            Function calls may provide arguments for parameters
+            which are subtypes of the parameter types.
+          </p>
+          <p>
+            There is <strong>no</strong> support for optional parameters,
+            i.e. default values for parameters,
+            and variadic functions,
+            i.e. functions that take an arbitrary amount of arguments.
           </p>
           <pre><code class="language-cadence,file=function-double.cdc"><span style="color: #008000">// Declare a function named `double`, which multiples a number by two.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2043,7 +2161,10 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">send(from: sender, to: receiver, amount: </span><span style="color: #09885A">100</span><span style="color: #000000">)</span><span>
 </span></code></pre>
-          <p>The order of the arguments in a function call must match the order of the parameters in the function declaration.</p>
+          <p>
+            The order of the arguments in a function call must
+            match the order of the parameters in the function declaration.
+          </p>
           <pre><code class="language-cadence,file=function-test.cdc"><span style="color: #008000">// Declare a function named `test`, which accepts two parameters, named `first` and `second`</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> test(first: Int, second: Int) {</span><span>
@@ -2055,7 +2176,10 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">test(second: </span><span style="color: #09885A">1</span><span style="color: #000000">, first: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
 </span></code></pre>
-          <p>Functions can be nested, i.e., the code of a function may declare further functions.</p>
+          <p>
+            Functions can be nested,
+            i.e., the code of a function may declare further functions.
+          </p>
           <pre><code class="language-cadence,file=function-doubleAndAddOne.cdc"><span style="color: #008000">// Declare a function which multiplies a number by two, and adds one.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">fun</span><span style="color: #000000"> doubleAndAddOne(_ x: Int): Int {</span><span>
@@ -2078,7 +2202,8 @@
             <p>🚧 Status: Function overloading is not implemented.</p>
           </blockquote>
           <p>
-            It is possible to declare functions with the same name, as long as they have different sets of argument labels.
+            It is possible to declare functions with the same name,
+            as long as they have different sets of argument labels.
             This is known as function overloading.
           </p>
           <pre><code class="language-cadence,file=function-overloading.cdc"><span style="color: #008000">// Declare a function named "assert" which requires a test value</span><span>
@@ -2100,7 +2225,8 @@
           <h3 id="function-expressions"><a href="#function-expressions" aria-hidden="true"><span class="icon icon-link"></span></a>Function Expressions</h3>
           <p>
             Functions can be also used as expressions.
-            The syntax is the same as for function declarations, except that function expressions have no name, i.e., they are anonymous.
+            The syntax is the same as for function declarations,
+            except that function expressions have no name, i.e., they are anonymous.
           </p>
           <pre><code class="language-cadence,file=function-expression.cdc"><span style="color: #008000">// Declare a constant named `double`, which has a function as its value.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -2116,7 +2242,10 @@
         </section>
         <section>
           <h3 id="function-calls"><a href="#function-calls" aria-hidden="true"><span class="icon icon-link"></span></a>Function Calls</h3>
-          <p>Functions can be called (invoked). Function calls need to provide exactly as many argument values as the function has parameters.</p>
+          <p>
+            Functions can be called (invoked). Function calls
+            need to provide exactly as many argument values as the function has parameters.
+          </p>
           <pre><code class="language-cadence,file=function-call.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> double(_ x: Int): Int {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> x * </span><span style="color: #09885A">2</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -2136,9 +2265,13 @@
         </section>
         <section>
           <h3 id="function-types"><a href="#function-types" aria-hidden="true"><span class="icon icon-link"></span></a>Function Types</h3>
-          <p>Function types consist of the function's parameter types and the function's return type.</p>
           <p>
-            The parameter types need to be enclosed in parentheses, followed by a colon (<code>:</code>), and end with the return type.
+            Function types consist of the function's parameter types
+            and the function's return type.
+          </p>
+          <p>
+            The parameter types need to be enclosed in parentheses,
+            followed by a colon (<code>:</code>), and end with the return type.
             The whole function type needs to be enclosed in parentheses.
           </p>
           <pre><code class="language-cadence,file=function-type.cdc"><span style="color: #008000">// Declare a function named `add`, with the function type `((Int, Int): Int)`.</span><span>
@@ -2163,13 +2296,20 @@
 </span></code></pre>
           <p>
             Parentheses also control precedence.
-            For example, a function type <code>((Int): ((): Int))</code> is the type for a function which accepts one argument with type <code>Int</code>,
-            and which returns another function, that takes no arguments and returns an <code>Int</code>.
+            For example, a function type <code>((Int): ((): Int))</code> is the type
+            for a function which accepts one argument with type <code>Int</code>,
+            and which returns another function,
+            that takes no arguments and returns an <code>Int</code>.
           </p>
-          <p>The type <code>[((Int): Int); 2]</code> specifies an array type of two functions, which accept one integer and return one integer.</p>
+          <p>
+            The type <code>[((Int): Int); 2]</code> specifies an array type of two functions,
+            which accept one integer and return one integer.
+          </p>
           <p>
             Argument labels are not part of the function type.
-            This has the advantage that functions with different argument labels, potentially written by different authors are compatible as long as the parameter types and the return type match.
+            This has the advantage that functions with different argument labels,
+            potentially written by different authors are compatible
+            as long as the parameter types and the return type match.
             It has the disadvantage that function calls to plain function values,
             cannot accept argument labels.
           </p>
@@ -2214,9 +2354,12 @@
         <section>
           <h3 id="closures"><a href="#closures" aria-hidden="true"><span class="icon icon-link"></span></a>Closures</h3>
           <p>
-            A function may refer to variables and constants of its outer scopes in which it is defined.
-            It is called a closure, because it is closing over those variables and constants.
-            A closure can can read from the variables and constants and assign to the variables it refers to.
+            A function may refer to variables and constants of its outer scopes
+            in which it is defined.
+            It is called a closure, because
+            it is closing over those variables and constants.
+            A closure can can read from the variables and constants
+            and assign to the variables it refers to.
           </p>
           <pre><code class="language-cadence,file=closures-counter.cdc"><span style="color: #008000">// Declare a function named `makeCounter` which returns a function that</span><span>
 </span><span style="color: #008000">// each time when called, returns the next integer, starting at 1.</span><span>
@@ -2241,7 +2384,8 @@
           <h3 id="argument-passing-behavior"><a href="#argument-passing-behavior" aria-hidden="true"><span class="icon icon-link"></span></a>Argument Passing Behavior</h3>
           <p>
             When arguments are passed to a function, they are copied.
-            Therefore, values that are passed into a function are unchanged in the caller's scope when the function returns.
+            Therefore, values that are passed into a function
+            are unchanged in the caller's scope when the function returns.
             This behavior is known as <a href="https://en.wikipedia.org/w/index.php?title=Evaluation_strategy&#x26;oldid=896280571#Call_by_value">call-by-value</a>.
           </p>
           <pre><code class="language-cadence,file=function-change.cdc"><span style="color: #008000">// Declare a function that changes the first two elements</span><span>
@@ -2331,7 +2475,9 @@
           <h3 id="conditional-branching-if-statement"><a href="#conditional-branching-if-statement" aria-hidden="true"><span class="icon icon-link"></span></a>Conditional branching: if-statement</h3>
           <p>If-statements allow a certain piece of code to be executed only when a given condition is true.</p>
           <p>
-            The if-statement starts with the <code>if</code> keyword, followed by the condition, and the code that should be executed if the condition is true inside opening and closing braces.
+            The if-statement starts with the <code>if</code> keyword, followed by the condition,
+            and the code that should be executed if the condition is true
+            inside opening and closing braces.
             The condition expression must be Bool
             The braces are required and not optional.
             Parentheses around the condition are optional.
@@ -2424,7 +2570,9 @@
           <h3 id="looping-while-statement"><a href="#looping-while-statement" aria-hidden="true"><span class="icon icon-link"></span></a>Looping: while-statement</h3>
           <p>While-statements allow a certain piece of code to be executed repeatedly, as long as a condition remains true.</p>
           <p>
-            The while-statement starts with the <code>while</code> keyword, followed by the condition, and the code that should be repeatedly executed if the condition is true inside opening and closing braces.
+            The while-statement starts with the <code>while</code> keyword, followed by the condition,
+            and the code that should be repeatedly
+            executed if the condition is true inside opening and closing braces.
             The condition must be boolean and the braces are required.
           </p>
           <p>
@@ -2564,7 +2712,8 @@
           Types are <strong>not</strong> automatically converted.
           For example, an integer is not automatically converted to a boolean,
           nor is an <code>Int32</code> automatically converted to an <code>Int8</code>,
-          nor is an optional integer <code>Int?</code> automatically converted to a non-optional integer <code>Int</code>,
+          nor is an optional integer <code>Int?</code>
+          automatically converted to a non-optional integer <code>Int</code>,
           or vice-versa.
         </p>
         <pre><code class="language-cadence,file=type-safety-add.cdc"><span style="color: #0000FF">fun</span><span style="color: #000000"> add(_ a: Int8, _ b: Int8): Int {</span><span>
@@ -2751,7 +2900,8 @@
             <li>
               <p>
                 <strong>Constant fields</strong> are also stored in the composite value,
-                but after they have been initialized with a value they <strong>cannot</strong> have new values assigned to them afterwards.
+                but after they have been initialized with a value
+                they <strong>cannot</strong> have new values assigned to them afterwards.
                 A constant field must be initialized exactly once.
               </p>
               <p>Constant fields are declared using the <code>let</code> keyword.</p>
@@ -2893,9 +3043,16 @@
         </section>
         <section>
           <h3 id="composite-data-type-field-getters-and-setters"><a href="#composite-data-type-field-getters-and-setters" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Type Field Getters and Setters</h3>
-          <p>Fields may have an optional getter and an optional setter. Getters are functions that are called when a field is read, and setters are functions that are called when a field is written.<br>Only certain assignments are allowed in getters and setters.</p>
+          <p>
+            Fields may have an optional getter and an optional setter.
+            Getters are functions that are called when a field is read,
+            and setters are functions that are called when a field is written.<br>Only certain assignments are allowed in getters and setters.
+          </p>
           <p>Getters and setters are enclosed in opening and closing braces, after the field's type.</p>
-          <p>Getters are declared using the <code>get</code> keyword. Getters have no parameters and their return type is implicitly the type of the field.</p>
+          <p>
+            Getters are declared using the <code>get</code> keyword.
+            Getters have no parameters and their return type is implicitly the type of the field.
+          </p>
           <pre><code class="language-cadence,file=composite-data-type-field-getter.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> GetterExample {</span><span>
 </span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Declare a variable field named `balance` with a getter</span><span>
@@ -2903,9 +3060,6 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">           </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">               result >= </span><span style="color: #09885A">0</span><span>
-</span><span style="color: #000000">           }</span><span>
 </span><span>
 </span><span style="color: #000000">           </span><span style="color: #0000FF">if</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance &#x3C; </span><span style="color: #09885A">0</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">               </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #09885A">0</span><span>
@@ -2928,8 +3082,10 @@
 </span><span style="color: #008000">// though `example.balance` is `0` because the getter for `balance` returns `0` instead.</span><span>
 </span></code></pre>
           <p>
-            Setters are declared using the <code>set</code> keyword, followed by the name for the new value enclosed in parentheses.
-            The parameter has implicitly the type of the field. Another type cannot be specified. Setters have no return type.
+            Setters are declared using the <code>set</code> keyword,
+            followed by the name for the new value enclosed in parentheses.
+            The parameter has implicitly the type of the field.
+            Another type cannot be specified. Setters have no return type.
           </p>
           <p>The types of values assigned to setters must always match the field's type.</p>
           <pre><code class="language-cadence,file=composite-data-type-field-setter.cdc"><span style="color: #0000FF">struct</span><span style="color: #000000"> SetterExample {</span><span>
@@ -2961,7 +3117,8 @@
         <section>
           <h3 id="synthetic-composite-data-type-fields"><a href="#synthetic-composite-data-type-fields" aria-hidden="true"><span class="icon icon-link"></span></a>Synthetic Composite Data Type Fields</h3>
           <p>
-            Fields which are not stored in the composite value are <em>synthetic</em>, i.e., the field value is computed.
+            Fields which are not stored in the composite value are <em>synthetic</em>,
+            i.e., the field value is computed.
             Synthetic can be either read-only, or readable and writable.
           </p>
           <p>Synthetic fields are declared using the <code>synthetic</code> keyword.</p>
@@ -3152,7 +3309,8 @@
           <section>
             <h4 id="structures"><a href="#structures" aria-hidden="true"><span class="icon icon-link"></span></a>Structures</h4>
             <p>
-              Structures are <strong>copied</strong> when used as an initial value for constant or variable,
+              Structures are <strong>copied</strong> when
+              used as an initial value for constant or variable,
               when assigned to a different variable,
               when passed as an argument to a function,
               and when returned from a function.
@@ -3188,6 +3346,79 @@
 </span></code></pre>
           </section>
           <section>
+            <h4 id="accessing-fields-and-functions-of-composite-data-types-using-optional-chaining"><a href="#accessing-fields-and-functions-of-composite-data-types-using-optional-chaining" aria-hidden="true"><span class="icon icon-link"></span></a>Accessing Fields and Functions of Composite Data Types Using Optional Chaining</h4>
+            <p>
+              If a composite data type with fields and functions is wrapped in an optional,
+              optional chaining can be used to get those values or call the function without
+              having to get the value of the optional first.
+            </p>
+            <p>
+              Optional chaining is used by adding a <code>?</code>
+              before the <code>.</code> access operator for fields or
+              functions of an optional composite type.
+            </p>
+            <p>
+              When getting a field value or
+              calling a function with a return value, the access returns
+              the value as an optional.
+              If the object doesn't exist, the value will always be <code>nil</code>
+            </p>
+            <p>
+              When calling a function on an optional like this, if the object doesn't exist,
+              nothing will happen and the execution will continue.
+            </p>
+            <p>
+              It is still invalid
+              to access a field of an optional composite type that is not declared.
+            </p>
+            <pre><code class="language-cadence,file=optional-chaining.cdc"><span style="color: #008000">// Declare a struct with a field and method.</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Value {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> number: Int</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">() {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.number = </span><span style="color: #09885A">2</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> set(new: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.number = new</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> setAndReturn(new: Int): Int {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.number = new</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> new</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// create a new instance of the struct as an optional</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> value: </span><span style="color: #0000FF">Value</span><span style="color: #000000">? = Value()</span><span>
+</span><span style="color: #008000">// create another optional with the same type, but nil</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> noValue: </span><span style="color: #0000FF">Value</span><span style="color: #000000">? = </span><span style="color: #0000FF">nil</span><span>
+</span><span>
+</span><span style="color: #008000">// Access the `number` field using optional chaining</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> twoOpt = value?.number</span><span>
+</span><span style="color: #008000">// Because `value` is an optional, `twoOpt` has type `Int?`</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> two = zeroOpt ?? </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #008000">// `two` is `2`</span><span>
+</span><span>
+</span><span style="color: #008000">// Try to access the `number` field of `noValue`, which has type `Value?`</span><span>
+</span><span style="color: #008000">// This still returns an `Int?`</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> nilValue = noValue?.number</span><span>
+</span><span style="color: #008000">// This time, since `noValue` is `nil`, `nilValue` will also be `nil`</span><span>
+</span><span>
+</span><span style="color: #008000">// Call the `set` function of the struct</span><span>
+</span><span style="color: #008000">// whether or not the object exists, this will not fail</span><span>
+</span><span style="color: #000000">value?.set(new: </span><span style="color: #09885A">4</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">noValue?.set(new: </span><span style="color: #09885A">4</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Call the `setAndReturn` function, which returns an `Int`</span><span>
+</span><span style="color: #008000">// Because `value` is an optional, the return value is type `Int?`</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> sixOpt = value?.setAndReturn(new: </span><span style="color: #09885A">6</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> six = sixOpt ?? </span><span style="color: #09885A">0</span><span>
+</span><span style="color: #008000">// `six` is `6`</span><span>
+</span><span>
+</span></code></pre>
+          </section>
+          <section>
             <h4 id="resources"><a href="#resources" aria-hidden="true"><span class="icon icon-link"></span></a>Resources</h4>
             <p>Resources are types that can only exist in <strong>one</strong> location at a time and <strong>must</strong> be used <strong>exactly once</strong>.</p>
             <p>Resources <strong>must</strong> be created (instantiated) by using the <code>create</code> keyword.</p>
@@ -3204,12 +3435,14 @@
             <p>Resources are <strong>destroyed</strong> using the <code>destroy</code> keyword.</p>
             <p>Accessing a field or calling a function of a resource does not move or destroy it.</p>
             <p>
-              When the resource was moved, the constant or variable that referred to the resource before the move becomes <strong>invalid</strong>.
+              When the resource was moved, the constant or variable
+              that referred to the resource before the move becomes <strong>invalid</strong>.
               An <strong>invalid</strong> resource cannot be used again.
             </p>
             <p>
-              To make the behaviour of resource types explicit, the move prefix <code>&#x3C;-</code> must be used
-              in type annotations of variable or constant declarations, parameters, and return types.
+              To make the behaviour of resource types explicit,
+              the move prefix <code>&#x3C;-</code> must be used in type annotations
+              of variable or constant declarations, parameters, and return types.
             </p>
             <p>
               To make moves of resources explicit, the move operator <code>&#x3C;-</code> must be used
@@ -3282,7 +3515,8 @@
 </span><span style="color: #000000">d.value</span><span>
 </span></code></pre>
             <p>
-              To make it explicit that the type is moved, it must be prefixed with <code>&#x3C;-</code> in all type annotations,
+              To make it explicit that the type is moved,
+              it must be prefixed with <code>&#x3C;-</code> in all type annotations,
               e.g. for variable declarations, parameters, or return types.
             </p>
             <pre><code class="language-cadence,file=resource-type-annotation.cdc"><span style="color: #008000">// Declare a constant with an explicit type annotation.</span><span>
@@ -3438,7 +3672,8 @@
             <h4 id="nested-resources"><a href="#nested-resources" aria-hidden="true"><span class="icon icon-link"></span></a>Nested Resources</h4>
             <p>Fields in composite data types behave differently when they have a resource type.</p>
             <p>
-              If a resource type has fields that have a resource type it <strong>must</strong> declare a destructor,
+              If a resource type has fields that have a resource type,
+              it <strong>must</strong> declare a destructor,
               which <strong>must</strong> invalidate all resource fields, i.e. move or destroy them.
             </p>
             <pre><code class="language-cadence,file=resource-nested-field.cdc"><span style="color: #0000FF">resource</span><span style="color: #000000"> Child {</span><span>
@@ -3613,7 +3848,8 @@
 </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resources</span><span>
 </span></code></pre>
             <p>
-              The variable array functions like <code>append</code>, <code>insert</code>, and <code>remove</code> behave like for non-resource arrays.
+              The variable array functions like <code>append</code>, <code>insert</code>, and <code>remove</code>
+              behave like for non-resource arrays.
               Note however, that the result of the <code>remove</code> functions must be used.
             </p>
             <pre><code class="language-cadence,file-resource-array-mutating-functions.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- [&#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()]</span><span>
@@ -3637,11 +3873,16 @@
 </span></code></pre>
             <p>
               The variable array function <code>contains</code> is not available, as it is impossible:
-              If the resource can be passed to the <code>contains</code> function, it is by definition not in the array.
+              If the resource can be passed to the <code>contains</code> function,
+              it is by definition not in the array.
             </p>
-            <p>The variable array function <code>concat</code> is not available, as it would result in the duplication of resources.</p>
             <p>
-              The dictionary functions like <code>insert</code> and <code>remove</code> behave like for non-resource dictionaries.
+              The variable array function <code>concat</code> is not available,
+              as it would result in the duplication of resources.
+            </p>
+            <p>
+              The dictionary functions like <code>insert</code> and <code>remove</code>
+              behave like for non-resource dictionaries.
               Note however, that the result of these functions must be used.
             </p>
             <pre><code class="language-cadence,file-resource-dictionary-mutating-functions.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> resources &#x3C;- {</span><span style="color: #A31515">"r1"</span><span style="color: #000000">: &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> R()}</span><span>
@@ -3671,9 +3912,25 @@
         </section>
         <section>
           <h3 id="inheritance-and-abstract-types"><a href="#inheritance-and-abstract-types" aria-hidden="true"><span class="icon icon-link"></span></a>Inheritance and Abstract Types</h3>
-          <p>There is <strong>no</strong> support for inheritance. Inheritance is a feature common in other programming languages, that allows including the fields and functions of one type in another type.</p>
-          <p>Instead, follow the "composition over inheritance" principle, the idea of composing functionality from multiple individual parts, rather than building an inheritance tree.</p>
-          <p>Furthermore, there is also <strong>no</strong> support for abstract types. An abstract type is a feature common in other programming languages, that prevents creating values of the type and only allows the creation of values of a subtype. In addition, abstract types may declare functions, but omit the implementation of them and instead require subtypes to implement them.</p>
+          <p>
+            There is <strong>no</strong> support for inheritance.
+            Inheritance is a feature common in other programming languages,
+            that allows including the fields and functions of one type in another type.
+          </p>
+          <p>
+            Instead, follow the "composition over inheritance" principle,
+            the idea of composing functionality from multiple individual parts,
+            rather than building an inheritance tree.
+          </p>
+          <p>
+            Furthermore, there is also <strong>no</strong> support for abstract types.
+            An abstract type is a feature common in other programming languages,
+            that prevents creating values of the type and only
+            allows the creation of values of a subtype.
+            In addition, abstract types may declare functions,
+            but omit the implementation of them
+            and instead require subtypes to implement them.
+          </p>
           <p>Instead, consider using <a href="#interfaces">interfaces</a>.</p>
         </section>
       </section>
@@ -3682,47 +3939,68 @@
         <blockquote>
           <p>🚧 Status: Access control is not implemented yet.</p>
         </blockquote>
-        <p>Access control allows making certain parts of the program accessible/visible and making other parts inaccessible/invisible.</p>
+        <p>
+          Access control allows making certain parts of the program accessible/visible
+          and making other parts inaccessible/invisible.
+        </p>
         <p>In Flow and Cadence, there are two types of access control</p>
         <ul>
           <li>
             <ol>
               <li>
-                Access control between accounts using capability security.<br>Within Flow, a caller is not able to access an object unless it owns the object or has a specific reference to that object.<br>This means that nothing is truly public by default.<br>Other accounts can not read or write the objects in an account
-                unless the owner of the account has granted them access by providing references to the objects.
+                Access control between accounts using capability security.<br>Within Flow, a caller is not able to access an object
+                unless it owns the object or has a specific reference to that object.<br>This means that nothing is truly public by default.<br>Other accounts can not read or write the objects in an account
+                unless the owner of the account has granted them access
+                by providing references to the objects.
               </li>
             </ol>
           </li>
           <li>
             <ol start="2">
               <li>
-                Access control within programs using <code>private</code> and <code>public</code> keywords.<br>Assuming the caller has a valid reference that satisfies the first type of access control,
+                Access control within programs using <code>private</code> and <code>public</code> keywords.<br>Assuming the caller has a valid reference that
+                satisfies the first type of access control,
                 these keywords further govern how access is controlled.
               </li>
             </ol>
           </li>
         </ul>
-        <p>The high-level reference-based security (point 1 above) will be covered in a later section. For now, it is assumed that all callers have complete access to the objects in the descriptions and examples.</p>
-        <p>Top-level declarations (variables, constants, functions, structures, resources, interfaces) and fields (in structures, and resources) are either private or public.</p>
+        <p>
+          The high-level reference-based security (point 1 above)
+          will be covered in a later section.
+          For now, it is assumed that all callers have complete
+          access to the objects in the descriptions and examples.
+        </p>
+        <p>
+          Top-level declarations
+          (variables, constants, functions, structures, resources, interfaces)
+          and fields (in structures, and resources) are either private or public.
+        </p>
         <ul>
           <li>
             <p>
-              <strong>Private</strong> means the declaration is only accessible/visible in the current and inner scopes.
-              For example, a private field can only be accessed by functions of the type is part of,
+              <strong>Private</strong> means the declaration is only accessible/visible
+              in the current and inner scopes.
+              For example, a private field can only be
+              accessed by functions of the type is part of,
               not by code that uses an instance of the type in an outer scope.
             </p>
           </li>
           <li>
             <p>
               <strong>Public</strong> means the declaration is accessible/visible in all scopes.
-              This includes the current and inner scopes like for private, and the outer scopes.
-              For example, a public field in a type can be accessed using the access syntax on an instance of the type in an outer scope.
+              This includes the current and inner scopes like for private,
+              and the outer scopes.
+              For example, a public field in a type can be accessed using the access syntax
+              on an instance of the type in an outer scope.
               This does not allow the declaration to be publicly writable though.
             </p>
           </li>
         </ul>
-        <p><strong>By default, everything is private.</strong></p>
-        <p>An element is made public by using the <code>pub</code> keyword.</p>
+        <p>
+          <strong>By default, everything is private.</strong>
+          An element is made public by using the <code>pub</code> keyword.
+        </p>
         <p>The <code>(set)</code> suffix can be used to make variables also publicly writable.</p>
         <p>To summarize the behavior for variable declarations, constant declarations, and fields:</p>
         <table>
@@ -3891,8 +4169,11 @@
       <section>
         <h2 id="interfaces"><a href="#interfaces" aria-hidden="true"><span class="icon icon-link"></span></a>Interfaces</h2>
         <p>
-          An interface is an abstract type that specifies the behavior of types that <em>implement</em> the interface.
-          Interfaces declare the required functions and fields, the access control for those declarations, and preconditions and postconditions that implementing types need to provide.
+          An interface is an abstract type that specifies the behavior of types
+          that <em>implement</em> the interface.
+          Interfaces declare the required functions and fields,
+          the access control for those declarations,
+          and preconditions and postconditions that implementing types need to provide.
         </p>
         <p>There are two kinds of interfaces:</p>
         <ul>
@@ -3901,10 +4182,15 @@
         </ul>
         <p>Structure and resource types may implement multiple interfaces.</p>
         <p>
-          Interfaces consist of the function and field requirements that a type implementing the interface must provide implementations for.
-          Interface requirements, and therefore also their implementations, must always be at least public.
+          Interfaces consist of the function and field requirements
+          that a type implementing the interface must provide implementations for.
+          Interface requirements, and therefore also their implementations,
+          must always be at least public.
         </p>
-        <p>Variable field requirements may be annotated to require them to be publicly settable.</p>
+        <p>
+          Variable field requirements may be annotated
+          to require them to be publicly settable.
+        </p>
         <p>
           Function requirements consist of the name of the function, parameter types, an optional return type,
           and optional preconditions and postconditions.
@@ -3926,10 +4212,12 @@
             and the requirements, which must be enclosed in opening and closing braces.
           </p>
           <p>
-            Field requirements can be annotated to require the implementation to be a variable field, by using the <code>var</code> keyword;
+            Field requirements can be annotated to
+            require the implementation to be a variable field, by using the <code>var</code> keyword;
             require the implementation to be a constant field, by using the <code>let</code> keyword;
             or the field requirement may specify nothing,
-            in which case the implementation may either be a variable field, a constant field, or a synthetic field.
+            in which case the implementation may either be
+            a variable field, a constant field, or a synthetic field.
           </p>
           <p>
             Field requirements and function requirements must specify the required level of access.
@@ -3958,13 +4246,7 @@
 </span><span style="color: #000000">        </span><span style="color: #0000FF">set</span><span style="color: #000000">(newBalance) {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                newBalance >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
-</span><span style="color: #000000">                    </span><span style="color: #A31515">"Balances are always non-negative"</span><span>
-</span><span style="color: #000000">            }</span><span>
-</span><span style="color: #000000">        }</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">                result >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
-</span><span style="color: #000000">                    </span><span style="color: #A31515">"Balances are always non-negative"</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"Balances are always set as non-negative numbers"</span><span>
 </span><span style="color: #000000">            }</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -4164,8 +4446,10 @@
 </span></code></pre>
           <p>
             The access level for variable fields in an implementation may be less restrictive than the interface requires.
-            For example, an interface may require a field to be at least public (i.e. the <code>pub</code> keyword is specified),
-            and an implementation may provide a variable field which is public, but also publicly settable (the <code>pub(set)</code> keyword is specified).
+            For example, an interface may require a field to be
+            at least public (i.e. the <code>pub</code> keyword is specified),
+            and an implementation may provide a variable field which is public,
+            but also publicly settable (the <code>pub(set)</code> keyword is specified).
           </p>
           <pre><code class="language-cadence"><span style="color: #0000FF">struct interface</span><span style="color: #000000"> AnInterface {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Require the implementing type to provide a publicly readable</span><span>
@@ -4301,8 +4585,10 @@
         <section>
           <h3 id="interface-implementation-requirements"><a href="#interface-implementation-requirements" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation Requirements</h3>
           <p>
-            Interfaces can require implementing types to also implement other interfaces of the same kind.
-            Interface implementation requirements can be declared by following the interface name with a colon (<code>:</code>)
+            Interfaces can require implementing types
+            to also implement other interfaces of the same kind.
+            Interface implementation requirements can be declared
+            by following the interface name with a colon (<code>:</code>)
             and one or more names of interfaces of the same kind, separated by commas.
           </p>
           <pre><code class="language-cadence,file=interface-implementation-requirement.cdc"><span style="color: #008000">// Declare a structure interface named `Shape`.</span><span>
@@ -4438,11 +4724,13 @@
           </p>
           <p>Hashable types can be used as keys in dictionaries.</p>
           <p>
-            Hashable types must also be equatable, i.e., they must also implement the <code>Equatable</code> interface.
+            Hashable types must also be equatable,
+            i.e., they must also implement the <code>Equatable</code> interface.
             This is because the hash value is only evidence for inequality:
             two values that have different hash values are guaranteed to be unequal.
             However, if the hash values of two values are the same,
-            then the two values could still be unequal and just happen to hash to the same hash value.
+            then the two values could still be unequal
+            and just happen to hash to the same hash value.
             In that case equality still needs to be determined through an equality check.
             Without <code>Equatable</code>, values could be added to a dictionary,
             but it would not be possible to retrieve them.
@@ -4590,6 +4878,11 @@
         <h2 id="account-storage"><a href="#account-storage" aria-hidden="true"><span class="icon icon-link"></span></a>Account Storage</h2>
         <p>All accounts have a <code>storage</code> object which contains the stored values of the account.</p>
         <p>
+          All accounts also have a <code>published</code> object
+          which contains the published references
+          in an account. This will be covered later.
+        </p>
+        <p>
           Account storage is a key-value store where the <strong>keys are types</strong>.
           The stored value must be a subtype of the type it is keyed by.
           This means that if the type <code>Vault</code> is used as a key,
@@ -4629,13 +4922,13 @@
         <p>
           It is possible to create references to <strong>storage locations</strong>.
           References allow access to stored values. A reference can be used to read or
-          call fields and methods of stored values without having to move or call the fields
+          call fields and methods of stored values
+          without having to move or call the fields
           and methods on the storage location directly.
         </p>
         <p>
-          References are <strong>copied</strong>, i.e. they are value types. Any number of references to
-          a storage location can be created and used, but only by the account that owns
-          the location being referenced.
+          References are <strong>copied</strong>, i.e. they are value types.<br>Any number of references to a storage location can be created,
+          but only by the account that owns the location being referenced.
         </p>
         <p>
           Note that references are <strong>not</strong> referencing stored values –
@@ -4644,15 +4937,17 @@
           the reference is not updated and it becomes invalid.
         </p>
         <p>
-          References are created by using the <code>&#x26;</code> operator, followed by the storage location,
-          the <code>as</code> keyword, and the type through which the stored location should be accessed.
+          References are created by using the <code>&#x26;</code> operator,
+          followed by the storage location,the <code>as</code> keyword,
+          and the type through which the stored location should be accessed.
         </p>
         <pre><code class="language-cadence,file=reference-ex.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> nameRef: &#x26;</span><span style="color: #0000FF">Name</span><span style="color: #000000"> = &#x26;account.storage[Name] as Name</span><span>
 </span></code></pre>
         <p>The storage location must be a subtype of the type given after the <code>as</code> keyword.</p>
         <p>
           References are covariant in their base types.
-          For example, <code>&#x26;R</code> is a subtype of <code>&#x26;RI</code>, if <code>R</code> is a resource, <code>RI</code> is a resource interface,
+          For example, <code>&#x26;R</code> is a subtype of <code>&#x26;RI</code>,
+          if <code>R</code> is a resource, <code>RI</code> is a resource interface,
           and resource <code>R</code> conforms to (implements) resource interface <code>RI</code>.
         </p>
         <pre><code class="language-cadence,file=storage-reference.cdc"><span>
@@ -4702,8 +4997,8 @@
           <h3 id="reference-based-access-control"><a href="#reference-based-access-control" aria-hidden="true"><span class="icon icon-link"></span></a>Reference-Based Access Control</h3>
           <p>
             As was mentioned before, access to stored objects is governed by the
-            tenets of <a href="https://en.wikipedia.org/wiki/Capability-based_security">Capability Security</a>. This
-            means that if an account wants to be able to access another account's
+            tenets of <a href="https://en.wikipedia.org/wiki/Capability-based_security">Capability Security</a>.
+            This means that if an account wants to be able to access another account's
             stored objects, it must have a valid reference to that object.
           </p>
           <p>
@@ -4712,8 +5007,9 @@
             specifies are able to be called by those who have a reference.
           </p>
           <p>
-            Based on the above example, a user could use an interface to restrict access to only
-            the <code>count</code> field.
+            Based on the above example,
+            a user could use an interface to restrict access to only the <code>count</code> field.<br>Often, other accounts will have functions that take specific references
+            as parameters, so this method can be used to create those valid references.
           </p>
           <pre><code class="language-cadence,file=storage-access-control.cdc"><span>
 </span><span style="color: #008000">// Declare a resource interface `HasCount`.</span><span>
@@ -4746,6 +5042,70 @@
 </span><span style="color: #000000">limitedReference.increment()</span><span>
 </span></code></pre>
         </section>
+      </section>
+      <section>
+        <h2 id="publishing-references"><a href="#publishing-references" aria-hidden="true"><span class="icon icon-link"></span></a>Publishing References</h2>
+        <p>
+          Users will often want to make it so anyone can access certain fields
+          and methods of an object. This can be done by publishing a reference to that object.
+        </p>
+        <p>
+          Publishing a reference is done by storing the reference in the account's <code>published</code>
+          object. <code>published</code> is a key-value store where the keys are restricted
+          to be only reference types.
+        </p>
+        <p>To continue the example above:</p>
+        <pre><code class="language-cadence,file=published-writing.cdc"><span style="color: #0000FF">resource interface</span><span style="color: #000000"> HasCount {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Require implementations of the interface to provide</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// a field named `count` which can be publicly read.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> count: Int</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #008000">// Create another reference to the storage location `account.storage[Counter]`</span><span>
+</span><span style="color: #008000">// and only allow access to it as the type `HasCount`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> limitedReference: &#x26;</span><span style="color: #0000FF">HasCount</span><span style="color: #000000"> = &#x26;account.storage[Counter] as HasCount</span><span>
+</span><span>
+</span><span style="color: #008000">// Store the reference in the `published` object.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">account.published[&#x26;HasCount] = limitedReference</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot store non-reference types in the `published` object.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">account.published[Counter] &#x3C;- account.storage[Counter]</span><span>
+</span><span>
+</span></code></pre>
+        <p>To get the published portion of an account, the <code>getAccount</code> function can be used.</p>
+        <p>
+          The public account object only has the <code>published</code> object, which is read-only,
+          and can be used to access all published references of the account.
+        </p>
+        <p>Imagine that the next example is from a different account as before.</p>
+        <pre><code class="language-cadence,file=published-reading"><span>
+</span><span style="color: #008000">// Get the public account object for the account that published the reference.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> acct = getAccount(</span><span style="color: #09885A">0x72</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Read the `&#x26;HasCount` reference from their published object.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> countRef = acct.published[&#x26;HasCount] ?? panic(</span><span style="color: #A31515">"missing Count reference!"</span><span style="color: #000000">)</span><span>
+</span><span>
+</span><span style="color: #008000">// Read one of the exposed fields in the reference.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">countRef.count  </span><span style="color: #008000">// is `43`</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The `increment` function is not accessible for the reference,</span><span>
+</span><span style="color: #008000">// because the reference has the type `&#x26;HasCount`.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">countRef.increment()</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot access the account.storage object</span><span>
+</span><span style="color: #008000">// from the public account object.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> countObj = acct.storage[Counter]</span><span>
+</span><span>
+</span></code></pre>
       </section>
       <section>
         <h2 id="events"><a href="#events" aria-hidden="true"><span class="icon icon-link"></span></a>Events</h2>
@@ -4800,13 +5160,15 @@
         <ul>
           <li>
             <p>
-              The <strong>prepare phase</strong> acts like the initializer in a composite data type, i.e., it initializes fields that can then be used in the execution phase.
-              The prepare phase has the permissions to read from and write to the storage of all the accounts that signed the transaction.
+              The <strong>prepare phase</strong> acts like the initializer in a composite data type,
+              i.e., it initializes fields that can then be used in the execution phase.
+              The prepare phase has the permissions to read from and write to the storage
+              of all the accounts that signed the transaction.
             </p>
           </li>
           <li>
             <p>
-              The <strong>execute phase</strong> is where all interaction with external contracts happens.
+              The <strong>execute phase</strong> is where interaction with external contracts happens.
               This usually involves interacting with contracts with public types and functions that are deployed in other accounts.
             </p>
           </li>
@@ -4817,7 +5179,8 @@
         <p>Transactions are declared using the <code>transaction</code> keyword.</p>
         <p>Within the transaction, but before the prepare phase, any number of constants and/or variables can be declared. These are valid within the entire scope of the transaction.</p>
         <p>
-          The prepare phase is declared using the <code>prepare</code> keyword and the execution phase can be declared using the <code>execute</code> keyword.
+          The prepare phase is declared using the <code>prepare</code> keyword
+          and the execution phase can be declared using the <code>execute</code> keyword.
           The <code>post</code> section can be used to declare postconditions.
         </p>
         <pre><code class="language-cadence,file=transaction-declaration.cdc"><span style="color: #008000">// Optional: Importing external types from other accounts using `import`.</span><span>
@@ -4884,13 +5247,7 @@
 </span><span style="color: #000000">        </span><span style="color: #0000FF">set</span><span style="color: #000000">(newBalance) {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">                newBalance >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
-</span><span style="color: #000000">                    </span><span style="color: #A31515">"Balances are always non-negative"</span><span>
-</span><span style="color: #000000">            }</span><span>
-</span><span style="color: #000000">        }</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">get</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
-</span><span style="color: #000000">                result >= </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
-</span><span style="color: #000000">                    </span><span style="color: #A31515">"Balances are always non-negative"</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"Balances are always set as non-negative numbers"</span><span>
 </span><span style="color: #000000">            }</span><span>
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -5002,7 +5359,7 @@
 </span><span style="color: #008000">// Declare a function that lets any user create an example token</span><span>
 </span><span style="color: #008000">// with an initial empty balance.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> newEmptyExampleToken(): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> newEmptyExampleToken(): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -5032,25 +5389,32 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">// Create a new token as an optional.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">var</span><span style="color: #000000"> tokenA: &#x3C;-ExampleToken? &#x3C;- newEmptyExampleToken()</span><span>
 </span><span style="color: #000000">		</span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// Store the new token in storage by swapping it with whatever</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Store the new token in storage by replacing whatever</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// is in the existing location.</span><span>
-</span><span style="color: #000000">        signer.storage[ExampleToken] &#x3C;-> tokenA</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> oldToken &#x3C;- signer.storage[ExampleToken] &#x3C;- tokenA</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// destroy the empty old resource.</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> oldToken</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// create references to the stored `ExampleToken`.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// `Receiver` is for external calls.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// `Provider` is for internal calls by the owner.</span><span>
-</span><span style="color: #000000">        signer.storage[&#x26;Receiver] = &#x26;signer.storage[ExampleToken] as Receiver</span><span>
-</span><span style="color: #000000">        signer.storage[&#x26;Provider] = &#x26;signer.storage[ExampleToken] as Provider</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// The `Receiver` references is stored in the `published` object</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// because an account will usually want anyone to be able to read</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// their balance and call their deposit function</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// </span><span>
+</span><span style="color: #000000">        signer.published[&#x26;Receiver] = &#x26;signer.storage[ExampleToken] as Receiver</span><span>
 </span><span>
-</span><span style="color: #000000">        </span><span style="color: #008000">// destroy the empty swapped resource</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> tokenA</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// The `Provider` reference is stored in account storage</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// because an account will not want to expose its withdraw method</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// to the public</span><span>
+</span><span style="color: #000000">        signer.storage[&#x26;Provider] = &#x26;signer.storage[ExampleToken] as Provider</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>
             Now, the resource type <code>ExampleToken</code> is stored in the account
-            and its <code>Receiver</code> interface is available so that anyone can
-            interact with it by importing it from the account.
+            and its <code>Receiver</code> interface is available via the <code>published</code> object
+            so that anyone can interact with it by importing it from the account.
           </p>
           <p>
             Once an account is prepared in such a way, transactions can be run that deposit
@@ -5101,7 +5465,7 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">// If the recipient's account has no receiver reference stored in it,</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// or it is not published, abort the transaction.</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> receiverRef = recipient.storage[&#x26;Receiver] ?? panic(</span><span style="color: #A31515">"Recipient has no receiver"</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> receiverRef = recipient.published[&#x26;Receiver] ?? panic(</span><span style="color: #A31515">"Recipient has no receiver"</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Call the provider's transfer function which withdraws 5 tokens </span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// from their account and deposits it to the receiver's account </span><span>

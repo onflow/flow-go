@@ -7,7 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/proto/services/observation"
+	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 )
 
@@ -69,7 +69,7 @@ func (c *Client) SendTransaction(ctx context.Context, tx flow.Transaction) error
 }
 
 // GetLatestBlock gets the header of the latest sealed or unsealed block.
-func (c *Client) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.BlockHeader, error) {
+func (c *Client) GetLatestBlock(ctx context.Context, isSealed bool) (*flow.Header, error) {
 	res, err := c.rpcClient.GetLatestBlock(
 		ctx,
 		&observation.GetLatestBlockRequest{IsSealed: isSealed},

@@ -6,45 +6,30 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Not filters nodes that are the opposite of the wrapped filter.
 func Not(filter flow.IdentityFilter) flow.IdentityFilter {
-	return func(identity flow.Identity) bool {
-		return !filter(identity)
+	return func(id flow.Identity) bool {
+		return !filter(id)
 	}
 }
 
-// NodeID ids nodes for the given roles.
-func NodeID(nodeIDs ...string) flow.IdentityFilter {
-	lookup := make(map[string]struct{})
+func HasNodeID(nodeIDs ...flow.Identifier) flow.IdentityFilter {
+	lookup := make(map[flow.Identifier]struct{})
 	for _, nodeID := range nodeIDs {
 		lookup[nodeID] = struct{}{}
 	}
-	return func(identity flow.Identity) bool {
-		_, ok := lookup[identity.NodeID]
+	return func(id flow.Identity) bool {
+		_, ok := lookup[id.NodeID]
 		return ok
 	}
 }
 
-// Address filters nodes for the given addresses.
-func Address(addresses ...string) flow.IdentityFilter {
-	lookup := make(map[string]struct{})
-	for _, address := range addresses {
-		lookup[address] = struct{}{}
-	}
-	return func(identity flow.Identity) bool {
-		_, ok := lookup[identity.Address]
-		return ok
-	}
-}
-
-// Role filters nodes for the given roles.
-func Role(roles ...string) flow.IdentityFilter {
-	lookup := make(map[string]struct{})
+func HasRole(roles ...flow.Role) flow.IdentityFilter {
+	lookup := make(map[flow.Role]struct{})
 	for _, role := range roles {
 		lookup[role] = struct{}{}
 	}
-	return func(identity flow.Identity) bool {
-		_, ok := lookup[identity.Role]
+	return func(id flow.Identity) bool {
+		_, ok := lookup[id.Role]
 		return ok
 	}
 }
