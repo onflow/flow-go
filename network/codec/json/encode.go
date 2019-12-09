@@ -7,8 +7,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/collection"
-	"github.com/dapperlabs/flow-go/model/consensus"
 	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
@@ -34,14 +34,12 @@ func encode(v interface{}) (*Envelope, error) {
 	case *collection.GuaranteedCollection:
 		code = CodeGuaranteedCollection
 
-	case *consensus.SnapshotRequest:
-		code = CodeSnapshotRequest
-	case *consensus.SnapshotResponse:
-		code = CodeSnapshotResponse
-	case *consensus.MempoolRequest:
-		code = CodeMempoolRequest
-	case *consensus.MempoolResponse:
-		code = CodeMempoolResponse
+	case *coldstuff.BlockProposal:
+		code = CodeBlockProposal
+	case *coldstuff.BlockVote:
+		code = CodeBlockVote
+	case *coldstuff.BlockCommit:
+		code = CodeBlockCommit
 
 	default:
 		return nil, errors.Errorf("invalid encode type (%T)", v)

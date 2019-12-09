@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -423,4 +424,66 @@ func TestCheckFieldInitializationWithReturn(t *testing.T) {
 
 		assert.IsType(t, &sema.FieldUninitializedError{}, errs[0])
 	})
+}
+
+func TestCheckFieldInitializationWithPotentialNeverCallInElse(t *testing.T) {
+
+	code := `
+      struct Test {
+          let foo: Int
+
+          init(foo: Int?) {
+              if let foo = foo {
+                  self.foo = foo
+              } else {
+                  panic("no x")
+              }
+          }
+      }
+    `
+	_, err := ParseAndCheckWithOptions(
+		t,
+		code,
+		ParseAndCheckOptions{
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.PanicFunction,
+					}.ToValueDeclarations(),
+				),
+				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+			},
+		},
+	)
+
+	require.NoError(t, err)
+}
+
+func TestCheckFieldInitializationWithPotentialNeverCallInNilCoalescing(t *testing.T) {
+
+	code := `
+      struct Test {
+          let foo: Int
+
+          init(foo: Int?) {
+              self.foo = foo ?? panic("no x")
+          }
+      }
+    `
+	_, err := ParseAndCheckWithOptions(
+		t,
+		code,
+		ParseAndCheckOptions{
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.PanicFunction,
+					}.ToValueDeclarations(),
+				),
+				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+			},
+		},
+	)
+
+	require.NoError(t, err)
 }

@@ -33,7 +33,6 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int) []byte {
 
 			acct.published[&NFTCollection] = &acct.storage[NFTCollection] as NFTCollection
 		  }
-		  execute {}
 		}
 	`
 
@@ -57,7 +56,6 @@ func GenerateDepositScript(tokenCodeAddr flow.Address, receiverAddr flow.Address
 
 			depositRef.deposit(token: <-nft)
 		  }
-		  execute {}
 		}
 	`
 
@@ -79,7 +77,6 @@ func GenerateTransferScript(tokenCodeAddr flow.Address, receiverAddr flow.Addres
 
 			collectionRef.transfer(recipient: depositRef, tokenID: %d)
 		  }
-		  execute {}
 		}
 	`
 

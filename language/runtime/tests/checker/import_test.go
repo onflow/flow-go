@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -156,26 +157,18 @@ func TestCheckImportTypes(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			checker, err := ParseAndCheck(t, fmt.Sprintf(`
-               pub %[1]s Test {}
+			checker, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                       pub %[1]s Test {}
 
-               pub %[1]s interface TestInterface {}
-            `,
-				kind.Keyword(),
-			))
+                       pub %[1]s interface TestInterface {}
+                    `,
+					kind.Keyword(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 2)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-			}
+			require.NoError(t, err)
 
 			_, err = ParseAndCheckWithOptions(t,
 				fmt.Sprintf(
@@ -198,10 +191,8 @@ func TestCheckImportTypes(t *testing.T) {
 				},
 			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
 			switch kind {
-			case common.CompositeKindStructure:
+			case common.CompositeKindStructure, common.CompositeKindContract:
 				require.NoError(t, err)
 
 			case common.CompositeKindResource:
@@ -210,14 +201,30 @@ func TestCheckImportTypes(t *testing.T) {
 				assert.IsType(t, &sema.CreateImportedResourceError{}, errs[0])
 
 			default:
-				errs := ExpectCheckerErrors(t, err, 5)
-
-				assert.IsType(t, &sema.ImportedProgramError{}, errs[0])
-				assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-				assert.IsType(t, &sema.NotDeclaredError{}, errs[3])
-				assert.IsType(t, &sema.NotDeclaredError{}, errs[4])
+				panic(errors.NewUnreachableError())
 			}
 		})
 	}
+}
+
+func TestCheckInvalidImportCycle(t *testing.T) {
+
+	// NOTE: only parse, don't check imported program.
+	// will be checked by checker checking importing program
+
+	const code = `import 0x1`
+	imported, _, err := parser.ParseProgram(code)
+
+	require.NoError(t, err)
+
+	_, err = ParseAndCheckWithOptions(t,
+		code,
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+				return imported, nil
+			},
+		},
+	)
+
+	assert.IsType(t, ast.CyclicImportsError{}, err)
 }

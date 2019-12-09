@@ -597,30 +597,22 @@ func TestCheckArraySubtyping(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s interface I {}
-              %[1]s S: I {}
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface I {}
+                      %[1]s S: I {}
 
-              let xs: %[2]s[S] %[3]s []
-              let ys: %[2]s[I] %[3]s xs
-	        `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-			))
+                      let xs: %[2]s[S] %[3]s []
+                      let ys: %[2]s[I] %[3]s xs
+	                `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.TransferOperator(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 2)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -642,31 +634,22 @@ func TestCheckDictionarySubtyping(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s interface I {}
-              %[1]s S: I {}
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface I {}
+                      %[1]s S: I {}
 
-              let xs: %[2]s{String: S} %[3]s {}
-              let ys: %[2]s{String: I} %[3]s xs
-	        `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-			))
+                      let xs: %[2]s{String: S} %[3]s {}
+                      let ys: %[2]s{String: I} %[3]s xs
+	                `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.TransferOperator(),
+				),
+			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				require.NoError(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 2)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -793,12 +776,15 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 	} {
 		t.Run("valid", func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s
-              let xs = {k: "x"}
-            `,
-				code,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s
+                      let xs = {k: "x"}
+                    `,
+					code,
+				),
+			)
 
 			require.NoError(t, err)
 		})
@@ -814,12 +800,15 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 	} {
 		t.Run("invalid", func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s
-              let xs = {k: "x"}
-            `,
-				code,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s
+                      let xs = {k: "x"}
+                    `,
+					code,
+				),
+			)
 
 			errs := ExpectCheckerErrors(t, err, 1)
 

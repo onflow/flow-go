@@ -235,7 +235,6 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 		script := []byte(`
 		  transaction {
 		    prepare(signer: Account) {}
-		    execute {}
 		  }
 		`)
 
@@ -271,7 +270,6 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 		script := []byte(`
 		  transaction {
 		    prepare(signerA: Account, signerB: Account) {}
- 		    execute {}
 		  }
 		`)
 
@@ -396,7 +394,6 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 		script := []byte(`
 		  transaction {
 		    prepare(signer: Account) {}
-		    execute {}
 		  }
 		`)
 
@@ -488,7 +485,6 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		      log(signerA.address)
 			  log(signerB.address)
 		    }
- 		    execute {}
 		  }
 		`)
 
@@ -524,10 +520,12 @@ func TestGetTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	myEventType := types.Event{
-		FieldTypes: []types.EventField{
+		Fields: []*types.Parameter{
 			{
-				Identifier: "x",
-				Type:       types.Int{},
+				Field: types.Field{
+					Identifier: "x",
+					Type:       types.Int{},
+				},
 			},
 		},
 	}

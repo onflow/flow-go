@@ -70,11 +70,6 @@ func TestCheckAccessModifierCompositeFunctionDeclaration(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
 		isAuthAllowed := compositeKind == common.CompositeKindResource
 
 		tests := map[ast.Access]bool{
@@ -106,16 +101,19 @@ func TestCheckAccessModifierCompositeFunctionDeclaration(t *testing.T) {
 
 				t.Run(testName, func(t *testing.T) {
 
-					_, err := ParseAndCheck(t, fmt.Sprintf(`
-                          %[1]s %[2]s Test {
-                              %[3]s fun test() %[4]s
-                          }
-	                    `,
-						compositeKind.Keyword(),
-						interfaceKeyword,
-						access.Keyword(),
-						body,
-					))
+					_, err := ParseAndCheck(t,
+						fmt.Sprintf(
+							`
+                              %[1]s %[2]s Test {
+                                  %[3]s fun test() %[4]s
+                              }
+	                        `,
+							compositeKind.Keyword(),
+							interfaceKeyword,
+							access.Keyword(),
+							body,
+						),
+					)
 
 					if expectSuccess {
 						assert.NoError(t, err)
@@ -144,12 +142,6 @@ func TestCheckAccessModifierCompositeConstantFieldDeclaration(t *testing.T) {
 
 	for access, expectSuccess := range tests {
 		for _, compositeKind := range common.CompositeKinds {
-
-			// TODO: add support for contracts
-			if compositeKind == common.CompositeKindContract {
-				continue
-			}
-
 			for _, isInterface := range []bool{true, false} {
 
 				interfaceKeyword := ""
@@ -168,17 +160,20 @@ func TestCheckAccessModifierCompositeConstantFieldDeclaration(t *testing.T) {
 
 				t.Run(testName, func(t *testing.T) {
 
-					_, err := ParseAndCheck(t, fmt.Sprintf(`
-                          %[1]s %[2]s Test {
-                              %[3]s let test: Int
-                              %[4]s
-                          }
-	                    `,
-						compositeKind.Keyword(),
-						interfaceKeyword,
-						access.Keyword(),
-						initializer,
-					))
+					_, err := ParseAndCheck(t,
+						fmt.Sprintf(
+							`
+                              %[1]s %[2]s Test {
+                                  %[3]s let test: Int
+                                  %[4]s
+                              }
+	                        `,
+							compositeKind.Keyword(),
+							interfaceKeyword,
+							access.Keyword(),
+							initializer,
+						),
+					)
 
 					if expectSuccess {
 						assert.NoError(t, err)
@@ -197,12 +192,6 @@ func TestCheckAccessModifierCompositeVariableFieldDeclaration(t *testing.T) {
 
 	for _, access := range ast.Accesses {
 		for _, compositeKind := range common.CompositeKinds {
-
-			// TODO: add support for contracts
-			if compositeKind == common.CompositeKindContract {
-				continue
-			}
-
 			for _, isInterface := range []bool{true, false} {
 
 				interfaceKeyword := ""
@@ -221,17 +210,20 @@ func TestCheckAccessModifierCompositeVariableFieldDeclaration(t *testing.T) {
 
 				t.Run(testName, func(t *testing.T) {
 
-					_, err := ParseAndCheck(t, fmt.Sprintf(`
-                          %[1]s %[2]s Test {
-                              %[3]s var test: Int
-                              %[4]s
-                          }
-	                    `,
-						compositeKind.Keyword(),
-						interfaceKeyword,
-						access.Keyword(),
-						initializer,
-					))
+					_, err := ParseAndCheck(t,
+						fmt.Sprintf(
+							`
+                              %[1]s %[2]s Test {
+                                  %[3]s var test: Int
+                                  %[4]s
+                              }
+	                        `,
+							compositeKind.Keyword(),
+							interfaceKeyword,
+							access.Keyword(),
+							initializer,
+						),
+					)
 
 					assert.NoError(t, err)
 				})
@@ -256,11 +248,14 @@ func TestCheckAccessModifierGlobalFunctionDeclaration(t *testing.T) {
 
 		t.Run(access.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  %s fun test() {}
-	            `,
-				access.Keyword(),
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s fun test() {}
+	                `,
+					access.Keyword(),
+				),
+			)
 
 			if expectSuccess {
 				assert.NoError(t, err)
@@ -289,11 +284,14 @@ func TestCheckAccessModifierGlobalVariableDeclaration(t *testing.T) {
 
 		t.Run(access.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  %s var test = 1
-	            `,
-				access.Keyword(),
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s var test = 1
+	                `,
+					access.Keyword(),
+				),
+			)
 
 			if expectSuccess {
 				assert.NoError(t, err)
@@ -322,11 +320,14 @@ func TestCheckAccessModifierGlobalConstantDeclaration(t *testing.T) {
 
 		t.Run(access.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  %s let test = 1
-	            `,
-				access.Keyword(),
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s let test = 1
+	                `,
+					access.Keyword(),
+				),
+			)
 
 			if expectSuccess {
 				assert.NoError(t, err)
@@ -363,14 +364,17 @@ func TestCheckAccessModifierLocalVariableDeclaration(t *testing.T) {
 
 			t.Run(testName, func(t *testing.T) {
 
-				_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  fun test() {
-                      %s %s foo = 1
-                  }
-	            `,
-					access.Keyword(),
-					variableKind.Keyword(),
-				))
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          fun test() {
+                              %s %s foo = 1
+                          }
+	                    `,
+						access.Keyword(),
+						variableKind.Keyword(),
+					),
+				)
 
 				if expectSuccess {
 					assert.NoError(t, err)
@@ -400,14 +404,17 @@ func TestCheckAccessModifierLocalOptionalBinding(t *testing.T) {
 
 		t.Run(access.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  fun test() {
-                      let opt: Int? = 1
-                      if %s let value = opt { }
-                  }
-	            `,
-				access.Keyword(),
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      fun test() {
+                          let opt: Int? = 1
+                          if %s let value = opt { }
+                      }
+	                `,
+					access.Keyword(),
+				),
+			)
 
 			if expectSuccess {
 				assert.NoError(t, err)
@@ -436,13 +443,16 @@ func TestCheckAccessModifierLocalFunctionDeclaration(t *testing.T) {
 
 		t.Run(access.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  fun test() {
-                      %s fun foo() {}
-                  }
-	            `,
-				access.Keyword(),
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      fun test() {
+                          %s fun foo() {}
+                      }
+	                `,
+					access.Keyword(),
+				),
+			)
 
 			if expectSuccess {
 				assert.NoError(t, err)
@@ -457,55 +467,91 @@ func TestCheckAccessModifierLocalFunctionDeclaration(t *testing.T) {
 
 func TestCheckAccessModifierGlobalCompositeDeclaration(t *testing.T) {
 
-	tests := map[ast.Access]bool{
-		ast.AccessNotSpecified:   true,
-		ast.AccessPrivate:        true,
-		ast.AccessAuthorized:     false,
-		ast.AccessPublic:         true,
-		ast.AccessPublicSettable: false,
+	expectInvalidAccessModifierError := func(t *testing.T, err error) {
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidAccessModifierError{}, errs[0])
 	}
 
-	require.Len(t, tests, len(ast.Accesses))
+	expectMissingAccessModifierError := func(t *testing.T, err error) {
+		errs := ExpectCheckerErrors(t, err, 1)
 
-	for access, expectSuccess := range tests {
-		for _, compositeKind := range common.CompositeKinds {
+		assert.IsType(t, &sema.MissingAccessModifierError{}, errs[0])
+	}
 
-			// TODO: add support for contracts
-			if compositeKind == common.CompositeKindContract {
-				continue
-			}
+	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
+		sema.AccessCheckModeStrict: {
+			ast.AccessNotSpecified:   expectMissingAccessModifierError,
+			ast.AccessPrivate:        expectInvalidAccessModifierError,
+			ast.AccessAuthorized:     expectInvalidAccessModifierError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectInvalidAccessModifierError,
+		},
+		sema.AccessCheckModeNotSpecifiedRestricted: {
+			ast.AccessNotSpecified:   expectMissingAccessModifierError,
+			ast.AccessPrivate:        expectInvalidAccessModifierError,
+			ast.AccessAuthorized:     expectInvalidAccessModifierError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectInvalidAccessModifierError,
+		},
+		sema.AccessCheckModeNotSpecifiedUnrestricted: {
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectInvalidAccessModifierError,
+			ast.AccessAuthorized:     expectInvalidAccessModifierError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectInvalidAccessModifierError,
+		},
+		sema.AccessCheckModeNone: {
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectInvalidAccessModifierError,
+			ast.AccessAuthorized:     expectInvalidAccessModifierError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectInvalidAccessModifierError,
+		},
+	}
 
-			for _, isInterface := range []bool{true, false} {
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
 
-				interfaceKeyword := ""
-				if isInterface {
-					interfaceKeyword = "interface"
-				}
+	for checkMode, tests := range checkModeTests {
+		require.Len(t, tests, len(ast.Accesses))
 
-				testName := fmt.Sprintf("%s %s/%s",
-					compositeKind.Keyword(),
-					interfaceKeyword,
-					access.Keyword(),
-				)
+		for access, check := range tests {
+			for _, compositeKind := range common.CompositeKinds {
+				for _, isInterface := range []bool{true, false} {
 
-				t.Run(testName, func(t *testing.T) {
+					interfaceKeyword := ""
+					if isInterface {
+						interfaceKeyword = "interface"
+					}
 
-					_, err := ParseAndCheck(t, fmt.Sprintf(`
-                          %[1]s %[2]s %[3]s Test {}
-	                    `,
-						access.Keyword(),
+					testName := fmt.Sprintf("%s %s/%s/%s",
 						compositeKind.Keyword(),
 						interfaceKeyword,
-					))
+						checkMode,
+						access.Keyword(),
+					)
 
-					if expectSuccess {
-						assert.NoError(t, err)
-					} else {
-						errs := ExpectCheckerErrors(t, err, 1)
+					t.Run(testName, func(t *testing.T) {
 
-						assert.IsType(t, &sema.InvalidAccessModifierError{}, errs[0])
-					}
-				})
+						_, err := ParseAndCheckWithOptions(t,
+							fmt.Sprintf(
+								`
+                                  %[1]s %[2]s %[3]s Test {}
+	                            `,
+								access.Keyword(),
+								compositeKind.Keyword(),
+								interfaceKeyword,
+							),
+							ParseAndCheckOptions{
+								Options: []sema.Option{
+									sema.WithAccessCheckMode(checkMode),
+								},
+							},
+						)
+
+						check(t, err)
+					})
+				}
 			}
 		}
 	}
@@ -555,6 +601,8 @@ func TestCheckAccessImportGlobalValue(t *testing.T) {
 		},
 		sema.AccessCheckModeNone: expectSuccess,
 	}
+
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
 
 	for checkMode, check := range checkModeTests {
 
@@ -619,117 +667,9 @@ func TestCheckAccessImportGlobalValue(t *testing.T) {
 	}
 }
 
-func TestCheckAccessImportGlobalType(t *testing.T) {
-
-	checkModeTests := map[sema.AccessCheckMode]func(*testing.T, error){
-		sema.AccessCheckModeStrict: func(t *testing.T, err error) {
-			errs := ExpectCheckerErrors(t, err, 2)
-
-			require.IsType(t, &sema.InvalidAccessError{}, errs[0])
-			assert.Equal(t,
-				"A",
-				errs[0].(*sema.InvalidAccessError).Name,
-			)
-
-			require.IsType(t, &sema.InvalidAccessError{}, errs[1])
-			assert.Equal(t,
-				"C",
-				errs[1].(*sema.InvalidAccessError).Name,
-			)
-		},
-		sema.AccessCheckModeNotSpecifiedRestricted: func(t *testing.T, err error) {
-			errs := ExpectCheckerErrors(t, err, 2)
-
-			require.IsType(t, &sema.InvalidAccessError{}, errs[0])
-			assert.Equal(t,
-				"A",
-				errs[0].(*sema.InvalidAccessError).Name,
-			)
-
-			require.IsType(t, &sema.InvalidAccessError{}, errs[1])
-			assert.Equal(t,
-				"C",
-				errs[1].(*sema.InvalidAccessError).Name,
-			)
-		},
-		sema.AccessCheckModeNotSpecifiedUnrestricted: func(t *testing.T, err error) {
-			errs := ExpectCheckerErrors(t, err, 1)
-
-			require.IsType(t, &sema.InvalidAccessError{}, errs[0])
-			assert.Equal(t,
-				"A",
-				errs[0].(*sema.InvalidAccessError).Name,
-			)
-		},
-		sema.AccessCheckModeNone: func(t *testing.T, err error) {
-			require.Nil(t, err)
-		},
-	}
-
-	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
-		for checkMode, check := range checkModeTests {
-
-			testName := fmt.Sprintf("%s/%s",
-				compositeKind.Keyword(),
-				checkMode,
-			)
-
-			t.Run(testName, func(t *testing.T) {
-
-				// NOTE: only parse, don't check imported program.
-				// will be checked by checker checking importing program
-
-				lastAccessModifier := ""
-				if checkMode == sema.AccessCheckModeStrict {
-					lastAccessModifier = "priv"
-				}
-
-				imported, _, err := parser.ParseProgram(fmt.Sprintf(
-					`
-                       priv %[1]s A {}
-                       pub %[1]s B {}
-                       %[2]s %[1]s C {}
-                    `,
-					compositeKind.Keyword(),
-					lastAccessModifier,
-				))
-
-				require.Nil(t, err)
-
-				_, err = ParseAndCheckWithOptions(t,
-					`
-                       import A, B, C from "imported"
-                    `,
-					ParseAndCheckOptions{
-						ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
-							return imported, nil
-						},
-						Options: []sema.Option{
-							sema.WithAccessCheckMode(checkMode),
-						},
-					},
-				)
-
-				check(t, err)
-			})
-		}
-	}
-}
-
 func TestCheckAccessCompositeFunction(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
 
 		isAuthAllowed := compositeKind == common.CompositeKindResource
 		authExpectation := expectSuccess
@@ -767,6 +707,8 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
 				ast.AccessPublicSettable: nil,
 			},
 		}
+
+		require.Len(t, checkModeTests, len(sema.AccessCheckModes))
 
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
@@ -827,11 +769,6 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
 		isAuthAllowed := compositeKind == common.CompositeKindResource
 		authExpectation := expectSuccess
 		if !isAuthAllowed {
@@ -868,6 +805,8 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
 				ast.AccessPublicSettable: nil,
 			},
 		}
+
+		require.Len(t, checkModeTests, len(sema.AccessCheckModes))
 
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
@@ -962,13 +901,9 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
 		},
 	}
 
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
+
 	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
 
@@ -1061,13 +996,9 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 		},
 	}
 
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
+
 	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
 
@@ -1087,7 +1018,8 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
-						fmt.Sprintf(`
+						fmt.Sprintf(
+							`
                               pub %[1]s interface Test {
                                   %[2]s var test: Int
                               }
@@ -1164,13 +1096,9 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 		},
 	}
 
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
+
 	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
 
@@ -1190,7 +1118,8 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
-						fmt.Sprintf(`
+						fmt.Sprintf(
+							`
                               pub %[1]s Test {
                                   %[2]s var test: Int
 
@@ -1276,13 +1205,9 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 		},
 	}
 
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
+
 	for _, compositeKind := range common.CompositeKinds {
-
-		// TODO: add support for contracts
-		if compositeKind == common.CompositeKindContract {
-			continue
-		}
-
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
 
@@ -1302,7 +1227,8 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
-						fmt.Sprintf(`
+						fmt.Sprintf(
+							`
                               pub %[1]s interface Test {
                                   %[2]s var test: Int
                               }
@@ -1383,6 +1309,8 @@ func TestCheckAccessCompositeFieldVariableDeclarationWithSecondValue(t *testing.
 		},
 	}
 
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
+
 	for checkMode, checkModeTests := range checkModeTests {
 		require.Len(t, checkModeTests, len(ast.Accesses))
 
@@ -1401,7 +1329,8 @@ func TestCheckAccessCompositeFieldVariableDeclarationWithSecondValue(t *testing.
 			t.Run(testName, func(t *testing.T) {
 
 				_, err := ParseAndCheckWithOptions(t,
-					fmt.Sprintf(`
+					fmt.Sprintf(
+						`
                           pub resource A {}
 
                           pub resource B {
@@ -1484,6 +1413,8 @@ func TestCheckAccessInterfaceFieldVariableDeclarationWithSecondValue(t *testing.
 		},
 	}
 
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
+
 	for checkMode, checkModeTests := range checkModeTests {
 		require.Len(t, checkModeTests, len(ast.Accesses))
 
@@ -1502,7 +1433,8 @@ func TestCheckAccessInterfaceFieldVariableDeclarationWithSecondValue(t *testing.
 			t.Run(testName, func(t *testing.T) {
 
 				_, err := ParseAndCheckWithOptions(t,
-					fmt.Sprintf(`
+					fmt.Sprintf(
+						`
                           pub resource A {}
 
                           pub resource interface B {
@@ -1691,6 +1623,8 @@ func TestCheckAccessImportGlobalValueAssignmentAndSwap(t *testing.T) {
 		},
 	}
 
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
+
 	for checkMode, check := range checkModeTests {
 
 		t.Run(checkMode.String(), func(t *testing.T) {
@@ -1704,13 +1638,15 @@ func TestCheckAccessImportGlobalValueAssignmentAndSwap(t *testing.T) {
 			}
 
 			imported, _, err := parser.ParseProgram(
-				fmt.Sprintf(`
-                   priv var a = 1
-                   pub var b = 2
-                   %s var c = 3
-                `,
+				fmt.Sprintf(
+					`
+                       priv var a = 1
+                       pub var b = 2
+                       %s var c = 3
+                    `,
 					lastAccessModifier,
-				))
+				),
+			)
 
 			require.Nil(t, err)
 

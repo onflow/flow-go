@@ -12,8 +12,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/proto/sdk/entities"
-	"github.com/dapperlabs/flow-go/proto/services/observation"
+	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
+	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
@@ -226,18 +226,24 @@ func TestGetEvents(t *testing.T) {
 	// declare event type used for decoding event payloads
 	mockEventType := types.Event{
 		Identifier: "Transfer",
-		FieldTypes: []types.EventField{
+		Fields: []*types.Parameter{
 			{
-				Identifier: "to",
-				Type:       types.Address{},
+				Field: types.Field{
+					Identifier: "to",
+					Type:       types.Address{},
+				},
 			},
 			{
-				Identifier: "from",
-				Type:       types.Address{},
+				Field: types.Field{
+					Identifier: "from",
+					Type:       types.Address{},
+				},
 			},
 			{
-				Identifier: "amount",
-				Type:       types.Int{},
+				Field: types.Field{
+					Identifier: "amount",
+					Type:       types.Int{},
+				},
 			},
 		},
 	}

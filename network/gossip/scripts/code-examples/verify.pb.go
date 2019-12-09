@@ -8,7 +8,7 @@ import (
 	fmt "fmt"
 	math "math"
 
-	entities "github.com/dapperlabs/flow-go/proto/sdk/entities"
+	entities "github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 	proto "github.com/golang/protobuf/proto"
 	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"

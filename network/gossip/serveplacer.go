@@ -4,8 +4,9 @@ package gossip
 
 import (
 	"context"
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
 	"net"
+
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 // ServePlacer is an interface that represents the protocol

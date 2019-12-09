@@ -113,11 +113,12 @@ access
     ;
 
 compositeDeclaration
-    : access compositeKind identifier conformances '{' members '}'
+    : access compositeKind identifier conformances
+      '{' membersAndNestedDeclarations '}'
     ;
 
 conformances
-    : (':' identifier (',' identifier)*)?
+    : (':' nominalType (',' nominalType)*)?
     ;
 
 variableKind
@@ -134,14 +135,14 @@ fields
     ;
 
 interfaceDeclaration
-    : access compositeKind Interface identifier '{' members '}'
+    : access compositeKind Interface identifier '{' membersAndNestedDeclarations '}'
     ;
 
-members
-    : (member ';'?)*
+membersAndNestedDeclarations
+    : (memberOrNestedDeclaration ';'?)*
     ;
 
-member
+memberOrNestedDeclaration
     : field
     | specialFunctionDeclaration
     | functionDeclaration
@@ -202,7 +203,7 @@ baseType
     ;
 
 nominalType
-    : identifier
+    : identifier ('.' identifier)*
     ;
 
 functionType
@@ -476,7 +477,7 @@ primaryExpressionStart
     ;
 
 createExpression
-    : Create identifier invocation
+    : Create nominalType invocation
     ;
 
 destroyExpression
@@ -624,6 +625,7 @@ identifier
     | From
     | Create
     | Destroy
+    | Contract
     ;
 
 Identifier
@@ -695,7 +697,7 @@ WS
     ;
 
 Terminator
-    : [\r\n]+ -> channel(HIDDEN)
+    : [\r\n\u2028\u2029]+ -> channel(HIDDEN)
     ;
 
 BlockComment

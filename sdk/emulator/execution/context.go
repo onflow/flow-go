@@ -246,16 +246,16 @@ func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys []val
 	return nil
 }
 
+// CheckCode checks the code for its validity.
+func (r *RuntimeContext) CheckCode(address values.Address, code values.Bytes) (err error) {
+	return r.checkProgram(code, address)
+}
+
 // UpdateAccountCode updates the deployed code on an existing account.
 //
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
 func (r *RuntimeContext) UpdateAccountCode(address values.Address, code values.Bytes) (err error) {
-	// prevent invalid code from being deployed to account
-	if err := r.checkProgram(code, address); err != nil {
-		return err
-	}
-
 	accountID := address[:]
 
 	if !r.isValidSigningAccount(address) {
@@ -320,7 +320,9 @@ func (r *RuntimeContext) ResolveImport(location runtime.Location) (values.Bytes,
 		return nil, errors.New("import location must be an account address")
 	}
 
-	accountID := []byte(addressLocation)
+	address := flow.BytesToAddress(addressLocation)
+
+	accountID := address.Bytes()
 
 	code, exists := r.ledger.Get(fullKey(string(accountID), string(accountID), keyCode))
 	if !exists {

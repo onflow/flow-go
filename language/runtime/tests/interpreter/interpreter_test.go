@@ -60,11 +60,10 @@ func parseCheckAndInterpretWithOptions(
 		options.Options...,
 	)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	err = inter.Interpret()
-
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	return inter
 }
@@ -123,7 +122,7 @@ func TestInterpretDeclarations(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(42),
@@ -172,7 +171,7 @@ func TestInterpretLexicalScope(t *testing.T) {
 	)
 
 	value, err := inter.Invoke("f")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(10),
@@ -180,7 +179,7 @@ func TestInterpretLexicalScope(t *testing.T) {
 	)
 
 	value, err = inter.Invoke("g")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(10),
@@ -201,7 +200,7 @@ func TestInterpretFunctionSideEffects(t *testing.T) {
 	newValue := big.NewInt(42)
 
 	value, err := inter.Invoke("test", newValue)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.VoidValue{},
@@ -229,7 +228,7 @@ func TestInterpretNoHoisting(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(2),
@@ -273,7 +272,7 @@ func TestInterpretVariableAssignment(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(3),
@@ -298,7 +297,7 @@ func TestInterpretGlobalVariableAssignment(t *testing.T) {
 	)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(3),
@@ -328,7 +327,7 @@ func TestInterpretConstantRedeclaration(t *testing.T) {
 	)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(3),
@@ -349,7 +348,7 @@ func TestInterpretParameters(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("returnA", big.NewInt(24), big.NewInt(42))
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(24),
@@ -357,7 +356,7 @@ func TestInterpretParameters(t *testing.T) {
 	)
 
 	value, err = inter.Invoke("returnB", big.NewInt(24), big.NewInt(42))
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(42),
@@ -375,7 +374,7 @@ func TestInterpretArrayIndexing(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(3),
@@ -394,7 +393,7 @@ func TestInterpretArrayIndexingAssignment(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(2),
@@ -440,7 +439,7 @@ func TestInterpretStringIndexingUnicode(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("testUnicodeA")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewStringValue("\u00e9"),
@@ -448,7 +447,7 @@ func TestInterpretStringIndexingUnicode(t *testing.T) {
 	)
 
 	value, err = inter.Invoke("testUnicodeB")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewStringValue("e\u0301"),
@@ -468,7 +467,7 @@ func TestInterpretStringIndexingAssignment(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		value,
@@ -488,7 +487,7 @@ func TestInterpretStringIndexingAssignmentUnicode(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewStringValue("cafe\u0301 chair"),
@@ -509,7 +508,7 @@ func TestInterpretStringIndexingAssignmentWithCharacterLiteral(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewStringValue("def"),
@@ -542,12 +541,19 @@ func TestInterpretStringSlicing(t *testing.T) {
 	for _, test := range tests {
 		t.Run("", func(t *testing.T) {
 
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-                fun test(): String {
-                  let s = "%s"
-                  return s.slice(from: %d, upTo: %d)
-                }
-            `, test.str, test.from, test.to))
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      fun test(): String {
+                        let s = "%s"
+                        return s.slice(from: %d, upTo: %d)
+                      }
+                    `,
+					test.str,
+					test.from,
+					test.to,
+				),
+			)
 
 			value, err := inter.Invoke("test")
 			assert.IsType(t, test.expectedError, err)
@@ -568,7 +574,7 @@ func TestInterpretReturnWithoutExpression(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("returnNothing")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.VoidValue{},
@@ -595,7 +601,7 @@ func TestInterpretReturns(t *testing.T) {
 	)
 
 	value, err := inter.Invoke("returnEarly")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(2),
@@ -781,7 +787,7 @@ func TestInterpretEqualOperator(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			value, err := inter.Invoke(name)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t,
 				interpreter.BoolValue(expected),
@@ -829,7 +835,7 @@ func TestInterpretUnequalOperator(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			value, err := inter.Invoke(name)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t,
 				interpreter.BoolValue(expected),
@@ -862,7 +868,7 @@ func TestInterpretLessOperator(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			value, err := inter.Invoke(name)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t,
 				interpreter.BoolValue(expected),
@@ -895,7 +901,7 @@ func TestInterpretLessEqualOperator(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			value, err := inter.Invoke(name)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t,
 				interpreter.BoolValue(expected),
@@ -928,7 +934,7 @@ func TestInterpretGreaterOperator(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			value, err := inter.Invoke(name)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t,
 				interpreter.BoolValue(expected),
@@ -961,7 +967,7 @@ func TestInterpretGreaterEqualOperator(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			value, err := inter.Invoke(name)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t,
 				interpreter.BoolValue(expected),
@@ -999,7 +1005,7 @@ func TestInterpretOrOperator(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			value, err := inter.Invoke(name)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t,
 				interpreter.BoolValue(expected),
@@ -1107,7 +1113,7 @@ func TestInterpretAndOperator(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			value, err := inter.Invoke(name)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t,
 				interpreter.BoolValue(expected),
@@ -1243,7 +1249,7 @@ func TestInterpretIfStatement(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			value, err := inter.Invoke(name)
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t,
 				interpreter.NewIntValue(expected),
@@ -1267,7 +1273,7 @@ func TestInterpretWhileStatement(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(6),
@@ -1291,7 +1297,7 @@ func TestInterpretWhileStatementWithReturn(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(6),
@@ -1317,7 +1323,7 @@ func TestInterpretWhileStatementWithContinue(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(6),
@@ -1341,7 +1347,7 @@ func TestInterpretWhileStatementWithBreak(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(5),
@@ -1370,7 +1376,7 @@ func TestInterpretExpressionStatement(t *testing.T) {
 	)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(2),
@@ -1396,7 +1402,7 @@ func TestInterpretConditionalOperator(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("testTrue")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(2),
@@ -1404,7 +1410,7 @@ func TestInterpretConditionalOperator(t *testing.T) {
 	)
 
 	value, err = inter.Invoke("testFalse")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(3),
@@ -1421,7 +1427,7 @@ func TestInterpretFunctionBindingInFunction(t *testing.T) {
   `)
 
 	_, err := inter.Invoke("foo")
-	require.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestInterpretRecursionFib(t *testing.T) {
@@ -1439,7 +1445,7 @@ func TestInterpretRecursionFib(t *testing.T) {
    `)
 
 	value, err := inter.Invoke("fib", big.NewInt(14))
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(377),
@@ -1460,7 +1466,7 @@ func TestInterpretRecursionFactorial(t *testing.T) {
    `)
 
 	value, err := inter.Invoke("factorial", big.NewInt(5))
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(120),
@@ -1522,7 +1528,7 @@ func TestInterpretHostFunction(t *testing.T) {
       pub let a = test(1, 2)
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	testFunction := stdlib.NewStandardLibraryFunction(
 		"test",
@@ -1535,9 +1541,9 @@ func TestInterpretHostFunction(t *testing.T) {
 				&sema.IntType{},
 			),
 		},
-		func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-			a := arguments[0].(interpreter.IntValue).Int
-			b := arguments[1].(interpreter.IntValue).Int
+		func(invocation interpreter.Invocation) trampoline.Trampoline {
+			a := invocation.Arguments[0].(interpreter.IntValue).Int
+			b := invocation.Arguments[1].(interpreter.IntValue).Int
 			value := big.NewInt(0).Add(a, b)
 			result := interpreter.IntValue{Int: value}
 			return trampoline.Done{Result: result}
@@ -1554,10 +1560,10 @@ func TestInterpretHostFunction(t *testing.T) {
 			}.ToValueDeclarations(),
 		),
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	err = checker.Check()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	inter, err := interpreter.NewInterpreter(
 		checker,
@@ -1567,10 +1573,10 @@ func TestInterpretHostFunction(t *testing.T) {
 			},
 		),
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	err = inter.Interpret()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(3),
@@ -1578,58 +1584,150 @@ func TestInterpretHostFunction(t *testing.T) {
 	)
 }
 
-func TestInterpretStructureDeclaration(t *testing.T) {
+func TestInterpretHostFunctionWithVariableArguments(t *testing.T) {
 
-	inter := parseCheckAndInterpret(t, `
-       struct Test {}
-
-       fun test(): Test {
-           return Test()
-       }
+	program, _, err := parser.ParseProgram(`
+      pub let nothing = test(1, true, "test")
     `)
 
-	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
-	assert.IsType(t,
-		&interpreter.CompositeValue{},
-		value,
+	called := false
+
+	testFunction := stdlib.NewStandardLibraryFunction(
+		"test",
+		&sema.FunctionType{
+			ParameterTypeAnnotations: sema.NewTypeAnnotations(
+				&sema.IntType{},
+			),
+			ReturnTypeAnnotation: sema.NewTypeAnnotation(
+				&sema.IntType{},
+			),
+			RequiredArgumentCount: (func() *int {
+				var count = 1
+				return &count
+			})(),
+		},
+		func(invocation interpreter.Invocation) trampoline.Trampoline {
+			called = true
+
+			require.Len(t, invocation.ArgumentTypes, 3)
+			assert.IsType(t, &sema.IntType{}, invocation.ArgumentTypes[0])
+			assert.IsType(t, &sema.BoolType{}, invocation.ArgumentTypes[1])
+			assert.IsType(t, &sema.StringType{}, invocation.ArgumentTypes[2])
+
+			require.Len(t, invocation.Arguments, 3)
+			assert.Equal(t, interpreter.NewIntValue(1), invocation.Arguments[0])
+			assert.Equal(t, interpreter.BoolValue(true), invocation.Arguments[1])
+			assert.Equal(t, interpreter.NewStringValue("test"), invocation.Arguments[2])
+
+			return trampoline.Done{Result: interpreter.VoidValue{}}
+		},
+		nil,
 	)
+
+	checker, err := sema.NewChecker(
+		program,
+		TestLocation,
+		sema.WithPredeclaredValues(
+			stdlib.StandardLibraryFunctions{
+				testFunction,
+			}.ToValueDeclarations(),
+		),
+	)
+	require.NoError(t, err)
+
+	err = checker.Check()
+	require.NoError(t, err)
+
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		interpreter.WithPredefinedValues(
+			map[string]interpreter.Value{
+				testFunction.Name: testFunction.Function,
+			},
+		),
+	)
+	require.NoError(t, err)
+
+	err = inter.Interpret()
+	require.NoError(t, err)
+
+	assert.True(t, called)
 }
 
-func TestInterpretStructureDeclarationWithInitializer(t *testing.T) {
+func TestInterpretCompositeDeclaration(t *testing.T) {
 
-	inter := parseCheckAndInterpret(t, `
-       var value = 0
+	for _, compositeKind := range common.CompositeKinds {
 
-       struct Test {
-           init(_ newValue: Int) {
-               value = newValue
-           }
-       }
+		inter := parseCheckAndInterpret(t,
+			fmt.Sprintf(
+				`
+                   %[1]s Test {}
 
-       fun test(newValue: Int): Test {
-           return Test(newValue)
-       }
-    `)
+                   fun test(): %[2]sTest {
+                       return %[2]s %[3]s Test()
+                   }
+                `,
+				compositeKind.Keyword(),
+				compositeKind.Annotation(),
+				compositeKind.ConstructionKeyword(),
+			),
+		)
 
-	newValue := big.NewInt(42)
+		value, err := inter.Invoke("test")
+		require.NoError(t, err)
 
-	value, err := inter.Invoke("test", newValue)
-	require.Nil(t, err)
-
-	assert.IsType(t,
-		&interpreter.CompositeValue{},
-		value,
-	)
-
-	assert.Equal(t,
-		interpreter.IntValue{Int: newValue},
-		inter.Globals["value"].Value,
-	)
+		assert.IsType(t,
+			&interpreter.CompositeValue{},
+			value,
+		)
+	}
 }
 
-func TestInterpretStructureSelfReferenceInInitializer(t *testing.T) {
+func TestInterpretCompositeDeclarationWithInitializer(t *testing.T) {
+
+	for _, compositeKind := range common.CompositeKinds {
+
+		inter := parseCheckAndInterpret(t,
+			fmt.Sprintf(
+				`
+                   var value = 0
+
+                   %[1]s Test {
+                       init(_ newValue: Int) {
+                           value = newValue
+                       }
+                   }
+
+                   fun test(newValue: Int): %[2]sTest {
+                       return %[2]s %[3]s Test(newValue)
+                   }
+                `,
+				compositeKind.Keyword(),
+				compositeKind.Annotation(),
+				compositeKind.ConstructionKeyword(),
+			),
+		)
+
+		newValue := big.NewInt(42)
+
+		value, err := inter.Invoke("test", newValue)
+		require.NoError(t, err)
+
+		assert.IsType(t,
+			&interpreter.CompositeValue{},
+			value,
+		)
+
+		assert.Equal(t,
+			interpreter.IntValue{Int: newValue},
+			inter.Globals["value"].Value,
+		)
+	}
+}
+
+func TestInterpretStructureSelfUseInInitializer(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
 
@@ -1646,7 +1744,7 @@ func TestInterpretStructureSelfReferenceInInitializer(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.VoidValue{},
@@ -1654,7 +1752,7 @@ func TestInterpretStructureSelfReferenceInInitializer(t *testing.T) {
 	)
 }
 
-func TestInterpretStructureConstructorReferenceInInitializerAndFunction(t *testing.T) {
+func TestInterpretStructureConstructorUseInInitializerAndFunction(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
 
@@ -1679,7 +1777,7 @@ func TestInterpretStructureConstructorReferenceInInitializerAndFunction(t *testi
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.IsType(t,
 		&interpreter.CompositeValue{},
@@ -1687,7 +1785,7 @@ func TestInterpretStructureConstructorReferenceInInitializerAndFunction(t *testi
 	)
 
 	value, err = inter.Invoke("test2")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.IsType(t,
 		&interpreter.CompositeValue{},
@@ -1695,7 +1793,7 @@ func TestInterpretStructureConstructorReferenceInInitializerAndFunction(t *testi
 	)
 }
 
-func TestInterpretStructureSelfReferenceInFunction(t *testing.T) {
+func TestInterpretStructureSelfUseInFunction(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
 
@@ -1712,7 +1810,7 @@ func TestInterpretStructureSelfReferenceInFunction(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.VoidValue{},
@@ -1720,7 +1818,7 @@ func TestInterpretStructureSelfReferenceInFunction(t *testing.T) {
 	)
 }
 
-func TestInterpretStructureConstructorReferenceInFunction(t *testing.T) {
+func TestInterpretStructureConstructorUseInFunction(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
 
@@ -1737,7 +1835,7 @@ func TestInterpretStructureConstructorReferenceInFunction(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.VoidValue{},
@@ -1766,7 +1864,7 @@ func TestInterpretStructureDeclarationWithField(t *testing.T) {
 	newValue := big.NewInt(42)
 
 	value, err := inter.Invoke("test", newValue)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.IntValue{Int: newValue},
@@ -1794,7 +1892,7 @@ func TestInterpretStructureDeclarationWithFunction(t *testing.T) {
 	newValue := big.NewInt(42)
 
 	value, err := inter.Invoke("test", newValue)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.VoidValue{},
@@ -1863,7 +1961,7 @@ func TestInterpretStructureFieldAssignment(t *testing.T) {
 	)
 
 	value, err := inter.Invoke("callTest")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.VoidValue{},
@@ -1924,7 +2022,7 @@ func TestInterpretStructureFunctionMutatesSelf(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(2),
@@ -1948,7 +2046,7 @@ func TestInterpretFunctionPreCondition(t *testing.T) {
 
 	zero := big.NewInt(0)
 	value, err := inter.Invoke("test", zero)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.IntValue{Int: zero},
@@ -1973,7 +2071,7 @@ func TestInterpretFunctionPostCondition(t *testing.T) {
 
 	zero := big.NewInt(0)
 	value, err := inter.Invoke("test", zero)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.IntValue{Int: zero},
@@ -1997,7 +2095,7 @@ func TestInterpretFunctionWithResultAndPostConditionWithResult(t *testing.T) {
 
 	zero := big.NewInt(0)
 	value, err := inter.Invoke("test", zero)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.IntValue{Int: zero},
@@ -2017,7 +2115,7 @@ func TestInterpretFunctionWithoutResultAndPostConditionWithResult(t *testing.T) 
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.VoidValue{},
@@ -2042,7 +2140,7 @@ func TestInterpretFunctionPostConditionWithBefore(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.VoidValue{},
@@ -2124,7 +2222,7 @@ func TestInterpretFunctionPostConditionWithMessageUsingStringLiteral(t *testing.
 
 	zero := big.NewInt(0)
 	value, err := inter.Invoke("test", zero)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.IntValue{Int: zero},
@@ -2154,7 +2252,7 @@ func TestInterpretFunctionPostConditionWithMessageUsingResult(t *testing.T) {
 
 	zero := big.NewInt(0)
 	value, err := inter.Invoke("test", zero)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewStringValue("return value"),
@@ -2222,7 +2320,7 @@ func TestInterpretStructCopyOnDeclaration(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -2257,7 +2355,7 @@ func TestInterpretStructCopyOnDeclarationModifiedWithStructFunction(t *testing.T
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -2289,7 +2387,7 @@ func TestInterpretStructCopyOnIdentifierAssignment(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -2321,7 +2419,7 @@ func TestInterpretStructCopyOnIndexingAssignment(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -2360,7 +2458,7 @@ func TestInterpretStructCopyOnMemberAssignment(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -2394,7 +2492,7 @@ func TestInterpretStructCopyOnPassing(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.BoolValue(false),
@@ -2422,7 +2520,7 @@ func TestInterpretArrayCopy(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -2453,7 +2551,7 @@ func TestInterpretStructCopyInArray(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -2486,7 +2584,7 @@ func TestInterpretMutuallyRecursiveFunctions(t *testing.T) {
 	four := big.NewInt(4)
 
 	value, err := inter.Invoke("isEven", four)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.BoolValue(true),
@@ -2494,7 +2592,7 @@ func TestInterpretMutuallyRecursiveFunctions(t *testing.T) {
 	)
 
 	value, err = inter.Invoke("isOdd", four)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.BoolValue(false),
@@ -2502,7 +2600,7 @@ func TestInterpretMutuallyRecursiveFunctions(t *testing.T) {
 	)
 }
 
-func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
+func TestInterpretUseBeforeDeclaration(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       var tests = 0
@@ -2524,7 +2622,7 @@ func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
 	)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.IsType(t,
 		&interpreter.CompositeValue{},
@@ -2537,7 +2635,7 @@ func TestInterpretReferenceBeforeDeclaration(t *testing.T) {
 	)
 
 	value, err = inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.IsType(t,
 		&interpreter.CompositeValue{},
@@ -2575,7 +2673,7 @@ func TestInterpretOptionalParameterInvokedExternal(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test", big.NewInt(2))
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
@@ -2600,7 +2698,7 @@ func TestInterpretOptionalParameterInvokedInternal(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
@@ -2621,7 +2719,7 @@ func TestInterpretOptionalReturn(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test", big.NewInt(2))
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
@@ -2644,7 +2742,7 @@ func TestInterpretOptionalAssignment(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.VoidValue{},
@@ -2694,7 +2792,7 @@ func TestInterpretNilReturnValue(t *testing.T) {
    `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NilValue{},
@@ -2712,7 +2810,7 @@ func TestInterpretSomeReturnValue(t *testing.T) {
    `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
@@ -2732,7 +2830,7 @@ func TestInterpretSomeReturnValueFromDictionary(t *testing.T) {
    `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
@@ -3106,23 +3204,22 @@ func TestInterpretNestedOptionalComparisonMixed(t *testing.T) {
 func TestInterpretCompositeNilEquality(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for contracts
-		if kind == common.CompositeKindContract {
-			continue
-		}
 
-		inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-          %[1]s X {}
+		inter := parseCheckAndInterpret(t,
+			fmt.Sprintf(
+				`
+                  %[1]s X {}
 
-          let x: %[2]sX? %[3]s %[4]s X()
-          let y = x == nil
-          let z = nil == x
-        `,
-			kind.Keyword(),
-			kind.Annotation(),
-			kind.TransferOperator(),
-			kind.ConstructionKeyword(),
-		))
+                  let x: %[2]sX? %[3]s %[4]s X()
+                  let y = x == nil
+                  let z = nil == x
+                `,
+				kind.Keyword(),
+				kind.Annotation(),
+				kind.TransferOperator(),
+				kind.ConstructionKeyword(),
+			),
+		)
 
 		assert.Equal(t,
 			interpreter.BoolValue(false),
@@ -3154,7 +3251,7 @@ func TestInterpretIfStatementTestWithDeclaration(t *testing.T) {
 
 	t.Run("2", func(t *testing.T) {
 		value, err := inter.Invoke("test", big.NewInt(2))
-		require.Nil(t, err)
+		require.NoError(t, err)
 		assert.Equal(t,
 			interpreter.NewIntValue(2),
 			value,
@@ -3167,7 +3264,7 @@ func TestInterpretIfStatementTestWithDeclaration(t *testing.T) {
 
 	t.Run("nil", func(t *testing.T) {
 		value, err := inter.Invoke("test", nil)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		assert.Equal(t,
 			interpreter.NewIntValue(0),
 			value,
@@ -3196,7 +3293,7 @@ func TestInterpretIfStatementTestWithDeclarationAndElse(t *testing.T) {
 
 	t.Run("2", func(t *testing.T) {
 		value, err := inter.Invoke("test", big.NewInt(2))
-		require.Nil(t, err)
+		require.NoError(t, err)
 		assert.Equal(t,
 			interpreter.NewIntValue(2),
 			value,
@@ -3209,7 +3306,7 @@ func TestInterpretIfStatementTestWithDeclarationAndElse(t *testing.T) {
 
 	t.Run("nil", func(t *testing.T) {
 		value, err := inter.Invoke("test", nil)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		assert.Equal(t,
 			interpreter.NewIntValue(0),
 			value,
@@ -3240,7 +3337,7 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
 
 	t.Run("2", func(t *testing.T) {
 		value, err := inter.Invoke("test", big.NewInt(2))
-		require.Nil(t, err)
+		require.NoError(t, err)
 		assert.Equal(t,
 			interpreter.NewSomeValueOwningNonCopying(
 				interpreter.NewIntValue(2),
@@ -3255,7 +3352,7 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionals(t *testing.T) {
 
 	t.Run("nil", func(t *testing.T) {
 		value, err := inter.Invoke("test", nil)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		assert.Equal(t,
 			interpreter.NewSomeValueOwningNonCopying(
@@ -3288,7 +3385,7 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 
 	t.Run("2", func(t *testing.T) {
 		value, err := inter.Invoke("test", big.NewInt(2))
-		require.Nil(t, err)
+		require.NoError(t, err)
 		assert.Equal(t,
 			interpreter.NewSomeValueOwningNonCopying(
 				interpreter.NewIntValue(2),
@@ -3304,7 +3401,7 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 
 	t.Run("nil", func(t *testing.T) {
 		value, err := inter.Invoke("test", nil)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		assert.Equal(t,
 			interpreter.NewSomeValueOwningNonCopying(
 				interpreter.NewIntValue(0),
@@ -3321,28 +3418,23 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure / non-resource composites
-
-		if kind != common.CompositeKindStructure &&
-			kind != common.CompositeKindResource {
-
-			continue
-		}
-
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-              %[1]s interface Test {}
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface Test {}
 
-              %[1]s TestImpl: Test {}
+                      %[1]s TestImpl: Test {}
 
-              let test: %[2]sTest %[3]s %[4]s TestImpl()
-            `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			))
+                      let test: %[2]sTest %[3]s %[4]s TestImpl()
+                    `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+				),
+			)
 
 			assert.IsType(t,
 				&interpreter.CompositeValue{},
@@ -3355,38 +3447,33 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 func TestInterpretInterfaceFieldUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure / non-resource composites
-
-		if kind != common.CompositeKindStructure &&
-			kind != common.CompositeKindResource {
-
-			continue
-		}
-
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-              %[1]s interface Test {
-                  x: Int
-              }
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface Test {
+                          x: Int
+                      }
 
-              %[1]s TestImpl: Test {
-                  var x: Int
+                      %[1]s TestImpl: Test {
+                          var x: Int
+        
+                          init(x: Int) {
+                              self.x = x
+                          }
+                      }
 
-                  init(x: Int) {
-                      self.x = x
-                  }
-              }
+                      let test: %[2]sTest %[3]s %[4]s TestImpl(x: 1)
 
-              let test: %[2]sTest %[3]s %[4]s TestImpl(x: 1)
-
-              let x = test.x
-            `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			))
+                      let x = test.x
+                    `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+				),
+			)
 
 			assert.Equal(t,
 				interpreter.NewIntValue(1),
@@ -3399,37 +3486,31 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 func TestInterpretInterfaceFunctionUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure / non-resource composites
-
-		if kind != common.CompositeKindStructure &&
-			kind != common.CompositeKindResource {
-
-			continue
-		}
-
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(
-				`
-                    %[1]s interface Test {
-                        fun test(): Int
-                    }
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface Test {
+                          fun test(): Int
+                      }
 
-                    %[1]s TestImpl: Test {
-                        fun test(): Int {
-                            return 2
-                        }
-                    }
+                      %[1]s TestImpl: Test {
+                          fun test(): Int {
+                              return 2
+                          }
+                      }
 
-                    let test: %[2]s Test %[3]s %[4]s TestImpl()
+                      let test: %[2]s Test %[3]s %[4]s TestImpl()
 
-                    let val = test.test()
-                `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			))
+                      let val = test.test()
+                    `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+				),
+			)
 
 			assert.Equal(t,
 				interpreter.NewIntValue(2),
@@ -3442,53 +3523,48 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure / non-resource composites
-
-		if kind != common.CompositeKindStructure &&
-			kind != common.CompositeKindResource {
-
-			continue
-		}
-
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-              %[1]s interface Test {
-                  fun test(x: Int): Int {
-                      pre {
-                          x > 0: "x must be positive"
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface Test {
+                          fun test(x: Int): Int {
+                              pre {
+                                  x > 0: "x must be positive"
+                              }
+                          }
                       }
-                  }
-              }
 
-              %[1]s TestImpl: Test {
-                  fun test(x: Int): Int {
-                      pre {
-                          x < 2: "x must be smaller than 2"
+                      %[1]s TestImpl: Test {
+                          fun test(x: Int): Int {
+                              pre {
+                                  x < 2: "x must be smaller than 2"
+                              }
+                              return x
+                          }
                       }
-                      return x
-                  }
-              }
 
-              fun callTest(x: Int): Int {
-                  let test: %[2]s Test %[3]s %[4]s TestImpl()
-                  let res = test.test(x: x)
-                  %[5]s test
-                  return res
-              }
-            `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-				kind.DestructionKeyword(),
-			))
+                      fun callTest(x: Int): Int {
+                          let test: %[2]s Test %[3]s %[4]s TestImpl()
+                          let res = test.test(x: x)
+                          %[5]s test
+                          return res
+                      }
+                    `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.TransferOperator(),
+					kind.ConstructionKeyword(),
+					kind.DestructionKeyword(),
+				),
+			)
 
 			_, err := inter.Invoke("callTest", big.NewInt(0))
 			assert.IsType(t, &interpreter.ConditionError{}, err)
 
 			value, err := inter.Invoke("callTest", big.NewInt(1))
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.Equal(t,
 				interpreter.NewIntValue(1),
@@ -3507,41 +3583,36 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
-		// TODO: add support for non-structure / non-resource composites
-
-		if kind != common.CompositeKindStructure &&
-			kind != common.CompositeKindResource {
-
-			continue
-		}
-
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			inter := parseCheckAndInterpret(t, fmt.Sprintf(`
-              %[1]s interface Test {
-                  init(x: Int) {
-                      pre {
-                          x > 0: "x must be positive"
+			inter := parseCheckAndInterpret(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface Test {
+                          init(x: Int) {
+                              pre {
+                                  x > 0: "x must be positive"
+                              }
+                          }
                       }
-                  }
-              }
 
-              %[1]s TestImpl: Test {
-                  init(x: Int) {
-                      pre {
-                          x < 2: "x must be smaller than 2"
+                      %[1]s TestImpl: Test {
+                          init(x: Int) {
+                              pre {
+                                  x < 2: "x must be smaller than 2"
+                              }
+                          }
                       }
-                  }
-              }
 
-              fun test(x: Int): %[2]sTest {
-                  return %[2]s %[3]s TestImpl(x: x)
-              }
-            `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.ConstructionKeyword(),
-			))
+                      fun test(x: Int): %[2]sTest {
+                          return %[2]s %[3]s TestImpl(x: x)
+                      }
+                    `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.ConstructionKeyword(),
+				),
+			)
 
 			_, err := inter.Invoke("test", big.NewInt(0))
 			assert.IsType(t,
@@ -3550,7 +3621,7 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 			)
 
 			value, err := inter.Invoke("test", big.NewInt(1))
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			assert.IsType(t,
 				&interpreter.CompositeValue{},
@@ -3566,6 +3637,59 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 	}
 }
 
+func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          contract interface Test {
+
+              struct Nested {
+                  fun test(x: Int) {
+                      pre {
+                          x > 0: "x must be positive"
+                      }
+                  }
+              }
+          }
+
+          contract TestImpl: Test {
+
+              struct Nested {
+                  fun test(x: Int) {
+                      pre {
+                          x < 2: "x must be smaller than 2"
+                      }
+                  }
+              }
+          }
+
+          fun test(x: Int) {
+              TestImpl.Nested().test(x: x)
+          }
+        `,
+	)
+
+	_, err := inter.Invoke("test", big.NewInt(0))
+	assert.IsType(t,
+		&interpreter.ConditionError{},
+		err,
+	)
+
+	value, err := inter.Invoke("test", big.NewInt(1))
+	require.NoError(t, err)
+
+	assert.IsType(t,
+		interpreter.VoidValue{},
+		value,
+	)
+
+	_, err = inter.Invoke("test", big.NewInt(2))
+	assert.IsType(t,
+		&interpreter.ConditionError{},
+		err,
+	)
+}
+
 func TestInterpretImport(t *testing.T) {
 
 	checkerImported, err := ParseAndCheck(t, `
@@ -3573,7 +3697,7 @@ func TestInterpretImport(t *testing.T) {
           return 42
       }
     `)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	checkerImporting, err := ParseAndCheckWithOptions(t,
 		`
@@ -3593,16 +3717,16 @@ func TestInterpretImport(t *testing.T) {
 			},
 		},
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	inter, err := interpreter.NewInterpreter(checkerImporting)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	err = inter.Interpret()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(42),
@@ -3629,7 +3753,7 @@ func TestInterpretImportError(t *testing.T) {
 			},
 		},
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	checkerImporting, err := ParseAndCheckWithOptions(t,
 		`
@@ -3652,7 +3776,7 @@ func TestInterpretImportError(t *testing.T) {
 			},
 		},
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	values := stdlib.StandardLibraryFunctions{
 		stdlib.PanicFunction,
@@ -3662,10 +3786,10 @@ func TestInterpretImportError(t *testing.T) {
 		checkerImporting,
 		interpreter.WithPredefinedValues(values),
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	err = inter.Interpret()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = inter.Invoke("test")
 
@@ -3798,7 +3922,7 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.VoidValue{},
@@ -3992,7 +4116,7 @@ func TestInterpretStructureFunctionBindingInside(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.IsType(t,
 		&interpreter.CompositeValue{},
@@ -4017,7 +4141,7 @@ func TestInterpretStructureFunctionBindingOutside(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.IsType(t,
 		&interpreter.CompositeValue{},
@@ -4036,7 +4160,7 @@ func TestInterpretArrayAppend(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -4061,7 +4185,7 @@ func TestInterpretArrayAppendBound(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -4084,7 +4208,7 @@ func TestInterpretArrayConcat(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -4108,7 +4232,7 @@ func TestInterpretArrayConcatBound(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -4132,7 +4256,7 @@ func TestInterpretArrayInsert(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -4223,7 +4347,7 @@ func TestInterpretArrayContains(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("doesContain")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.BoolValue(true),
@@ -4231,7 +4355,7 @@ func TestInterpretArrayContains(t *testing.T) {
 	)
 
 	value, err = inter.Invoke("doesNotContain")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.BoolValue(false),
@@ -4249,7 +4373,7 @@ func TestInterpretStringConcat(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewStringValue("abcdef"),
@@ -4268,7 +4392,7 @@ func TestInterpretStringConcatBound(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewStringValue("abcdef"),
@@ -4289,7 +4413,7 @@ func TestInterpretDictionaryRemove(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewDictionaryValueUnownedNonCopying(
@@ -4319,7 +4443,7 @@ func TestInterpretDictionaryInsert(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewDictionaryValueUnownedNonCopying(
@@ -4348,7 +4472,7 @@ func TestInterpretDictionaryKeys(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -4371,7 +4495,7 @@ func TestInterpretDictionaryValues(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -4424,7 +4548,7 @@ func TestInterpretIntegerLiteralTypeConversionInAssignment(t *testing.T) {
 	)
 
 	_, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.Int8Value(2),
@@ -4449,7 +4573,7 @@ func TestInterpretIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T)
 	)
 
 	_, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
@@ -4500,7 +4624,7 @@ func TestInterpretIntegerLiteralTypeConversionInReturn(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.Int8Value(1),
@@ -4517,7 +4641,7 @@ func TestInterpretIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(
@@ -4539,7 +4663,7 @@ func TestInterpretIndirectDestroy(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.VoidValue{},
@@ -4563,7 +4687,7 @@ func TestInterpretUnaryMove(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("bar")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.VoidValue{},
@@ -4604,7 +4728,7 @@ func TestInterpretResourceMoveInArrayAndDestroy(t *testing.T) {
 	)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(2),
@@ -4648,7 +4772,7 @@ func TestInterpretResourceMoveInDictionaryAndDestroy(t *testing.T) {
 	)
 
 	_, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(2),
@@ -4673,7 +4797,7 @@ func TestInterpretClosure(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(1),
@@ -4681,7 +4805,7 @@ func TestInterpretClosure(t *testing.T) {
 	)
 
 	value, err = inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(2),
@@ -4689,7 +4813,7 @@ func TestInterpretClosure(t *testing.T) {
 	)
 
 	value, err = inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(3),
@@ -4715,7 +4839,7 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
           }
       }
     `)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	checkerImporting, err := ParseAndCheckWithOptions(t,
 		`
@@ -4736,16 +4860,16 @@ func TestInterpretCompositeFunctionInvocationFromImportingProgram(t *testing.T) 
 			},
 		},
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	inter, err := interpreter.NewInterpreter(checkerImporting)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	err = inter.Interpret()
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 }
 
 var storageValueDeclaration = map[string]sema.ValueDeclaration{
@@ -4810,7 +4934,7 @@ func TestInterpretStorage(t *testing.T) {
 	)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	require.IsType(t,
 		&interpreter.SomeValue{},
@@ -4835,7 +4959,7 @@ func TestInterpretSwapVariables(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -4866,7 +4990,7 @@ func TestInterpretSwapArrayAndField(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -4889,7 +5013,7 @@ func TestInterpretResourceDestroyExpressionNoDestructor(t *testing.T) {
     `)
 
 	_, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestInterpretResourceDestroyExpressionDestructor(t *testing.T) {
@@ -4915,7 +5039,7 @@ func TestInterpretResourceDestroyExpressionDestructor(t *testing.T) {
 	)
 
 	_, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.BoolValue(true),
@@ -4966,7 +5090,7 @@ func TestInterpretResourceDestroyExpressionNestedResources(t *testing.T) {
 	)
 
 	_, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.BoolValue(true),
@@ -5002,7 +5126,7 @@ func TestInterpretResourceDestroyArray(t *testing.T) {
 	)
 
 	_, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(2),
@@ -5033,7 +5157,7 @@ func TestInterpretResourceDestroyDictionary(t *testing.T) {
 	)
 
 	_, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(2),
@@ -5064,7 +5188,7 @@ func TestInterpretResourceDestroyOptionalSome(t *testing.T) {
 	)
 
 	_, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(1),
@@ -5095,7 +5219,7 @@ func TestInterpretResourceDestroyOptionalNil(t *testing.T) {
 	)
 
 	_, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewIntValue(0),
@@ -5172,7 +5296,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 	})
 
 	_, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	expectedEvents := []interpreter.EventValue{
 		{
@@ -5241,7 +5365,7 @@ func TestInterpretSwapResourceDictionaryElementReturnSwapped(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NilValue{},
@@ -5264,7 +5388,7 @@ func TestInterpretSwapResourceDictionaryElementReturnDictionary(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	require.IsType(t,
 		&interpreter.DictionaryValue{},
@@ -5300,7 +5424,7 @@ func TestInterpretSwapResourceDictionaryElementRemoveUsingNil(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	require.IsType(t,
 		&interpreter.SomeValue{},
@@ -5342,7 +5466,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 	)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	require.IsType(t,
 		&interpreter.ReferenceValue{},
@@ -5439,7 +5563,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 	)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -5522,7 +5646,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 	)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		interpreter.NewArrayValueUnownedNonCopying(
@@ -5642,7 +5766,7 @@ func TestInterpretVariableDeclarationSecondValue(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	require.IsType(t,
 		&interpreter.ArrayValue{},
@@ -5976,7 +6100,7 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 	}
 
 	_, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// Assert the ownership of the resource changed to account 2
 
@@ -6115,7 +6239,7 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 	}
 
 	_, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	// Assert the ownership of the resource changed to account 2
 
@@ -6223,5 +6347,168 @@ func TestInterpretOptionalChainingFunctionCallAndNilCoalescing(t *testing.T) {
 	assert.Equal(t,
 		inter.Globals["x"].Value,
 		interpreter.NewIntValue(42),
+	)
+}
+
+func TestInterpretCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      contract Test {
+
+          struct X {
+
+              fun test(): Test {
+                 return Test()
+              }
+          }
+
+          fun x(): X {
+             return X()
+          }
+      }
+
+      let x1 = Test().x()
+      let x2 = x1.test().x()
+    `)
+
+	x1 := inter.Globals["x1"].Value
+	x2 := inter.Globals["x2"].Value
+
+	require.IsType(t,
+		&interpreter.CompositeValue{},
+		x1,
+	)
+
+	assert.Equal(t,
+		"X",
+		x1.(*interpreter.CompositeValue).Identifier,
+	)
+
+	require.IsType(t,
+		&interpreter.CompositeValue{},
+		x2,
+	)
+
+	assert.Equal(t,
+		"X",
+		x2.(*interpreter.CompositeValue).Identifier,
+	)
+}
+
+func TestInterpretCompositeDeclarationNestedConstructor(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      contract Test {
+
+          struct X {}
+      }
+
+      let x = Test.X()
+    `)
+
+	x := inter.Globals["x"].Value
+
+	require.IsType(t,
+		&interpreter.CompositeValue{},
+		x,
+	)
+
+	assert.Equal(t,
+		"X",
+		x.(*interpreter.CompositeValue).Identifier,
+	)
+}
+
+const fungibleTokenContract = `
+  pub contract interface FungibleToken {
+
+      pub resource interface Provider {
+
+          pub fun withdraw(amount: Int): <-Vault
+      }
+
+      pub resource interface Receiver {
+
+          pub fun deposit(vault: <-Vault)
+      }
+
+      pub resource Vault: Provider, Receiver {
+
+          pub balance: Int
+
+          init(balance: Int)
+      }
+
+      pub fun absorb(vault: <-Vault)
+
+      pub fun sprout(): <-Vault
+  }
+
+  pub contract ExampleToken: FungibleToken {
+
+     pub resource Vault: FungibleToken.Receiver, FungibleToken.Provider {
+
+         pub var balance: Int
+
+         init(balance: Int) {
+             self.balance = balance
+         }
+
+         pub fun withdraw(amount: Int): <-Vault {
+             self.balance = self.balance - amount
+             return <-create Vault(balance: amount)
+         }
+
+         pub fun deposit(from: <-Vault) {
+            self.balance = self.balance + from.balance
+            destroy from
+         }
+     }
+
+     pub fun absorb(vault: <-Vault) {
+         destroy vault
+     }
+
+     pub fun sprout(): <-Vault {
+         return <-create Vault(balance: 0)
+     }
+  }
+`
+
+func TestInterpretFungibleTokenContract(t *testing.T) {
+
+	code := fungibleTokenContract + "\n" + `
+
+      fun test(): [Int; 2] {
+          let contract = ExampleToken()
+
+          // valid, because code is in the same location
+          let publisher <- create ExampleToken.Vault(balance: 100)
+
+          let receiver <- contract.sprout()
+
+          let withdrawn <- publisher.withdraw(amount: 60)
+          receiver.deposit(from: <-withdrawn)
+
+          let publisherBalance = publisher.balance
+          let receiverBalance = receiver.balance
+
+          destroy publisher
+          destroy receiver
+
+          return [publisherBalance, receiverBalance]
+      }
+    `
+	inter := parseCheckAndInterpret(t, code)
+
+	value, err := inter.Invoke("test")
+	require.NoError(t, err)
+
+	assert.Equal(t,
+		interpreter.NewArrayValueUnownedNonCopying(
+			interpreter.NewIntValue(40),
+			interpreter.NewIntValue(60),
+		),
+		value,
 	)
 }

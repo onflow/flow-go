@@ -451,7 +451,7 @@ func BenchmarkBlockDiskUsage(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	store, err := badger.New(dir)
+	store, err := badger.New(badger.WithPath(dir))
 	if err != nil {
 		b.Fatal(err)
 	}

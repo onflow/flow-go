@@ -1,7 +1,7 @@
 # Collection Stream
 /cmd/collection/** @jordanschalm
 /engine/collection/** @jordanschalm
-/proto/services/collection/** @jordanschalm
+/protobuf/services/collection/** @jordanschalm
 
 # Consensus Stream
 /cmd/consensus/** @AlexHentschel @awishformore @zhangchiqing
@@ -14,7 +14,7 @@
 # Observation Stream
 /cmd/observation/** @psiemens
 /engine/observation/** @psiemens
-/proto/services/observation/** @psiemens
+/protobuf/services/observation/** @psiemens
 
 # Verification Stream
 /cmd/verification/** @ramtinms

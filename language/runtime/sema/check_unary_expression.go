@@ -37,7 +37,9 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 		return valueType
 
 	case ast.OperationMove:
-		if !valueType.IsResourceType() {
+		if !valueType.IsInvalidType() &&
+			!valueType.IsResourceType() {
+
 			checker.report(
 				&InvalidMoveOperationError{
 					Range: ast.Range{

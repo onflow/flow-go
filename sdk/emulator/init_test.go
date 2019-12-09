@@ -63,8 +63,6 @@ func TestInitialization(t *testing.T) {
                 destroy existing
                 acct.published[&Counter] = &acct.storage[Counter] as Counter
               }
-
-              execute {}
             }
         `,
 			counterAddress,

@@ -1,8 +1,10 @@
 package gossip
 
 import (
-	"github.com/dapperlabs/flow-go/network"
 	"github.com/pkg/errors"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/network"
 )
 
 // EngineRegistry provies an engine store for gossip nodes
@@ -29,7 +31,7 @@ func (er *EngineRegistry) Add(engineID uint8, engine network.Engine) error {
 }
 
 // Process runs the given event on the specified engineID
-func (er *EngineRegistry) Process(engineID uint8, originID string, event interface{}) error {
+func (er *EngineRegistry) Process(engineID uint8, originID flow.Identifier, event interface{}) error {
 	engine, ok := er.store[engineID]
 	if !ok {
 		return errors.Errorf("could not process request. Engine with ID (%v) is not registered", engineID)

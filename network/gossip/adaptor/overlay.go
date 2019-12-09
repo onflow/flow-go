@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip"
 	"github.com/dapperlabs/flow-go/network/gossip/registry"
@@ -17,16 +18,18 @@ import (
 type Network struct {
 	node    *gossip.Node
 	codec   network.Codec
+	me      module.Local
 	engines map[uint8]network.Engine
 }
 
 // NewNetwork creates a new implementation of the network interface, wrapping
 // around the provided gossip node and using the given codec.
-func NewNetwork(node *gossip.Node, codec network.Codec) (*Network, error) {
+func NewNetwork(node *gossip.Node, codec network.Codec, me module.Local) (*Network, error) {
 
 	w := Network{
 		node:    node,
 		codec:   codec,
+		me:      me,
 		engines: make(map[uint8]network.Engine),
 	}
 
@@ -102,7 +105,7 @@ func (n *Network) handle(engineID uint8, payload []byte) error {
 	// no idea where we received the payload from; we simply pass an empty string
 
 	// bubble up payload to engine
-	err = engine.Process("", event)
+	err = engine.Process(n.me.NodeID(), event)
 	if err != nil {
 		return errors.Wrap(err, "could not receive payload")
 	}

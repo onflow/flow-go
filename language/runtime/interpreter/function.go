@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/raviqqe/hamt"
 	// revive:disable:dot-imports
@@ -9,12 +10,21 @@ import (
 	// revive:enable
 )
 
+// Invocation
+
+type Invocation struct {
+	Arguments     []Value
+	ArgumentTypes []sema.Type
+	Location      LocationPosition
+	Interpreter   *Interpreter
+}
+
 // FunctionValue
 
 type FunctionValue interface {
 	Value
 	isFunctionValue()
-	invoke(arguments []Value, location LocationPosition) Trampoline
+	invoke(Invocation) Trampoline
 }
 
 // InterpretedFunctionValue
@@ -57,16 +67,25 @@ func newInterpretedFunction(
 	}
 }
 
-func (f InterpretedFunctionValue) invoke(arguments []Value, _ LocationPosition) Trampoline {
-	return f.Interpreter.invokeInterpretedFunction(f, arguments)
+func (f InterpretedFunctionValue) invoke(invocation Invocation) Trampoline {
+	return f.Interpreter.invokeInterpretedFunction(f, invocation.Arguments)
 }
 
 // HostFunctionValue
 
-type HostFunction func(arguments []Value, location LocationPosition) Trampoline
+type HostFunction func(invocation Invocation) Trampoline
 
 type HostFunctionValue struct {
 	Function HostFunction
+	Members  map[string]Value
+}
+
+func NewHostFunctionValue(
+	function HostFunction,
+) HostFunctionValue {
+	return HostFunctionValue{
+		Function: function,
+	}
 }
 
 func (HostFunctionValue) isValue() {}
@@ -86,14 +105,14 @@ func (HostFunctionValue) SetOwner(owner string) {
 
 func (HostFunctionValue) isFunctionValue() {}
 
-func (f HostFunctionValue) invoke(arguments []Value, location LocationPosition) Trampoline {
-	return f.Function(arguments, location)
+func (f HostFunctionValue) invoke(invocation Invocation) Trampoline {
+	return f.Function(invocation)
 }
 
-func NewHostFunctionValue(
-	function HostFunction,
-) HostFunctionValue {
-	return HostFunctionValue{
-		Function: function,
-	}
+func (f HostFunctionValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+	return f.Members[name]
+}
+
+func (f HostFunctionValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
+	panic(errors.NewUnreachableError())
 }
