@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	values2 "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
-	types2 "github.com/dapperlabs/flow-go/sdk/abi/types"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
@@ -18,18 +18,18 @@ import (
 
 func TestEventEmitted(t *testing.T) {
 	// event type definition that is reused in tests
-	myEventType := types2.Event{
-		Fields: []*types2.Parameter{
+	myEventType := types.Event{
+		Fields: []*types.Parameter{
 			{
-				Field: types2.Field{
+				Field: types.Field{
 					Identifier: "x",
-					Type:       types2.Int{},
+					Type:       types.Int{},
 				},
 			},
 			{
-				Field: types2.Field{
+				Field: types.Field{
 					Identifier: "y",
-					Type:       types2.Int{},
+					Type:       types.Int{},
 				},
 			},
 		},
@@ -74,7 +74,7 @@ func TestEventEmitted(t *testing.T) {
 
 		actualEvent := events[0]
 
-		eventValue, err := values2.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
@@ -108,7 +108,7 @@ func TestEventEmitted(t *testing.T) {
 
 		actualEvent := events[0]
 
-		eventValue, err := values2.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
@@ -174,7 +174,7 @@ func TestEventEmitted(t *testing.T) {
 
 		actualEvent := events[0]
 
-		eventValue, err := values2.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)

@@ -9,8 +9,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	values2 "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
-	types2 "github.com/dapperlabs/flow-go/sdk/abi/types"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/keys"
@@ -506,12 +506,12 @@ func TestGetTransaction(t *testing.T) {
 	b, err := emulator.NewEmulatedBlockchain()
 	require.NoError(t, err)
 
-	myEventType := types2.Event{
-		Fields: []*types2.Parameter{
+	myEventType := types.Event{
+		Fields: []*types.Parameter{
 			{
-				Field: types2.Field{
+				Field: types.Field{
 					Identifier: "x",
-					Type:       types2.Int{},
+					Type:       types.Int{},
 				},
 			},
 		},
@@ -559,7 +559,7 @@ func TestGetTransaction(t *testing.T) {
 
 		actualEvent := resTx.Events[0]
 
-		eventValue, err := values2.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		require.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)

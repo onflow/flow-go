@@ -8,8 +8,8 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/hash"
-	values2 "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
-	types2 "github.com/dapperlabs/flow-go/sdk/abi/types"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -65,12 +65,12 @@ type AccountCreatedEvent interface {
 	Address() Address
 }
 
-var AccountCreatedEventType types2.Type = types2.Event{
-	Fields: []*types2.Parameter{
+var AccountCreatedEventType types.Type = types.Event{
+	Fields: []*types.Parameter{
 		{
-			Field: types2.Field{
+			Field: types.Field{
 				Identifier: "address",
-				Type:       types2.Address{},
+				Type:       types.Address{},
 			},
 			Label: "",
 		},
@@ -92,7 +92,7 @@ func (a accountCreatedEvent) Address() Address {
 }
 
 func DecodeAccountCreatedEvent(b []byte) (AccountCreatedEvent, error) {
-	value, err := values2.Decode(AccountCreatedEventType, b)
+	value, err := encodingValues.Decode(AccountCreatedEventType, b)
 	if err != nil {
 		return nil, err
 	}

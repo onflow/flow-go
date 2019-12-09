@@ -17,7 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	values2 "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -1490,7 +1490,7 @@ func (v *CompositeValue) Export() values.Value {
 		keys = append(keys, key)
 	}
 
-	values2.SortInEncodingOrder(keys)
+	encodingValues.SortInEncodingOrder(keys)
 
 	for _, key := range keys {
 		fields = append(fields, v.Fields[key].(ExportableValue).Export())

@@ -8,7 +8,7 @@ import (
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 
-	types2 "github.com/dapperlabs/flow-go/sdk/abi/types"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -21,7 +21,7 @@ type Decoder struct {
 //
 // This function returns an error if the bytes do not match the given type
 // definition.
-func Decode(t types2.Type, b []byte) (values.Value, error) {
+func Decode(t types.Type, b []byte) (values.Value, error) {
 	r := bytes.NewReader(b)
 	dec := NewDecoder(r)
 
@@ -44,47 +44,47 @@ func NewDecoder(r io.Reader) *Decoder {
 //
 // This function returns an error if the bytes do not match the given type
 // definition.
-func (e *Decoder) Decode(t types2.Type) (values.Value, error) {
+func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 	switch x := t.(type) {
-	case types2.Void:
+	case types.Void:
 		return e.DecodeVoid()
-	case types2.Bool:
+	case types.Bool:
 		return e.DecodeBool()
-	case types2.String:
+	case types.String:
 		return e.DecodeString()
-	case types2.Bytes:
+	case types.Bytes:
 		return e.DecodeBytes()
-	case types2.Address:
+	case types.Address:
 		return e.DecodeAddress()
-	case types2.Int:
+	case types.Int:
 		return e.DecodeInt()
-	case types2.Int8:
+	case types.Int8:
 		return e.DecodeInt8()
-	case types2.Int16:
+	case types.Int16:
 		return e.DecodeInt16()
-	case types2.Int32:
+	case types.Int32:
 		return e.DecodeInt32()
-	case types2.Int64:
+	case types.Int64:
 		return e.DecodeInt64()
-	case types2.UInt8:
+	case types.UInt8:
 		return e.DecodeUInt8()
-	case types2.UInt16:
+	case types.UInt16:
 		return e.DecodeUInt16()
-	case types2.UInt32:
+	case types.UInt32:
 		return e.DecodeUInt32()
-	case types2.UInt64:
+	case types.UInt64:
 		return e.DecodeUInt64()
-	case types2.VariableSizedArray:
+	case types.VariableSizedArray:
 		return e.DecodeVariableSizedArray(x)
-	case types2.ConstantSizedArray:
+	case types.ConstantSizedArray:
 		return e.DecodeConstantSizedArray(x)
-	case types2.Dictionary:
+	case types.Dictionary:
 		return e.DecodeDictionary(x)
-	case types2.Composite:
+	case types.Composite:
 		return e.DecodeComposite(x)
-	case types2.Event:
+	case types.Event:
 		return e.DecodeEvent(x)
-	case types2.Optional:
+	case types.Optional:
 		return e.DecodeOptional(x)
 
 	default:
@@ -307,13 +307,13 @@ func (e *Decoder) DecodeUInt64() (values.UInt64, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.13
 //  RFC Section 4.13 - Variable-Length Array
 //  Unsigned integer length followed by individually XDR-encoded array elements
-func (e *Decoder) DecodeVariableSizedArray(t types2.VariableSizedArray) (values.VariableSizedArray, error) {
+func (e *Decoder) DecodeVariableSizedArray(t types.VariableSizedArray) (values.VariableSizedArray, error) {
 	size, _, err := e.dec.DecodeUint()
 	if err != nil {
 		return nil, err
 	}
 
-	constantType := types2.ConstantSizedArray{
+	constantType := types.ConstantSizedArray{
 		Size:        uint(size),
 		ElementType: t.ElementType,
 	}
@@ -332,7 +332,7 @@ func (e *Decoder) DecodeVariableSizedArray(t types2.VariableSizedArray) (values.
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.12
 //  RFC Section 4.12 - Fixed-Length Array
 //  Individually XDR-encoded array elements
-func (e *Decoder) DecodeConstantSizedArray(t types2.ConstantSizedArray) (values.ConstantSizedArray, error) {
+func (e *Decoder) DecodeConstantSizedArray(t types.ConstantSizedArray) (values.ConstantSizedArray, error) {
 	return e.decodeArray(t.ElementType, t.Size)
 }
 
@@ -341,7 +341,7 @@ func (e *Decoder) DecodeConstantSizedArray(t types2.ConstantSizedArray) (values.
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.12
 //  RFC Section 4.12 - Fixed-Length Array
 //  Individually XDR-encoded array elements
-func (e *Decoder) decodeArray(t types2.Type, size uint) ([]values.Value, error) {
+func (e *Decoder) decodeArray(t types.Type, size uint) ([]values.Value, error) {
 	array := make([]values.Value, size)
 
 	var i uint
@@ -362,7 +362,7 @@ func (e *Decoder) decodeArray(t types2.Type, size uint) ([]values.Value, error) 
 // The size of the dictionary is encoded as an unsigned integer, followed by
 // the dictionary keys, then elements, each represented as individually
 // XDR-encoded array elements.
-func (e *Decoder) DecodeDictionary(t types2.Dictionary) (values.Dictionary, error) {
+func (e *Decoder) DecodeDictionary(t types.Dictionary) (values.Dictionary, error) {
 	size, _, err := e.dec.DecodeUint()
 	if err != nil {
 		return nil, err
@@ -396,7 +396,7 @@ func (e *Decoder) DecodeDictionary(t types2.Dictionary) (values.Dictionary, erro
 // DecodeComposite reads the XDR-encoded representation of a composite value.
 //
 // A composite is encoded as a fixed-length array of its field values.
-func (e *Decoder) DecodeComposite(t types2.Composite) (values.Composite, error) {
+func (e *Decoder) DecodeComposite(t types.Composite) (values.Composite, error) {
 	fields := make([]values.Value, 0, len(t.Fields))
 
 	keys := make([]string, 0, len(t.Fields))
@@ -421,7 +421,7 @@ func (e *Decoder) DecodeComposite(t types2.Composite) (values.Composite, error) 
 // DecodeEvent reads the XDR-encoded representation of an event.
 //
 // An event is encoded as a fixed-length array of its field values.
-func (e *Decoder) DecodeEvent(t types2.Event) (values.Event, error) {
+func (e *Decoder) DecodeEvent(t types.Event) (values.Event, error) {
 	fields := make([]values.Value, len(t.Fields))
 
 	for i, field := range t.Fields {
@@ -442,7 +442,7 @@ func (e *Decoder) DecodeEvent(t types2.Event) (values.Event, error) {
 // DecodeEvent reads the XDR-encoded optional type representation.
 //
 // An event is encoded as a fixed-length array of its field values.
-func (e *Decoder) DecodeOptional(t types2.Optional) (values.Optional, error) {
+func (e *Decoder) DecodeOptional(t types.Optional) (values.Optional, error) {
 
 	hasValue, err := e.DecodeBool()
 	if err != nil {

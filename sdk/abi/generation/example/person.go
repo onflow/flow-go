@@ -3,8 +3,8 @@ package example
 import (
 	"bytes"
 
-	values2 "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
-	types2 "github.com/dapperlabs/flow-go/sdk/abi/types"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
+	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -33,7 +33,7 @@ type personConstructor struct {
 func (p personConstructor) Encode() ([]byte, error) {
 
 	var w bytes.Buffer
-	encoder := values2.NewEncoder(&w)
+	encoder := encodingValues.NewEncoder(&w)
 
 	err := encoder.EncodeConstantSizedArray(
 		values.ConstantSizedArray{
@@ -56,25 +56,25 @@ func NewPersonConstructor(firstName string, lastName string) (PersonConstructor,
 	}, nil
 }
 
-var personType = types2.Composite{
-	Fields: map[string]*types2.Field{
-		"FullName": &types2.Field{
-			Type:       types2.String{},
+var personType = types.Composite{
+	Fields: map[string]*types.Field{
+		"FullName": &types.Field{
+			Type:       types.String{},
 			Identifier: "FullName",
 		},
 	},
-	Initializers: [][]*types2.Parameter{
+	Initializers: [][]*types.Parameter{
 		{
-			&types2.Parameter{
-				Field: types2.Field{
+			&types.Parameter{
+				Field: types.Field{
 					Identifier: "firstName",
-					Type:       types2.String{},
+					Type:       types.String{},
 				},
 			},
-			&types2.Parameter{
-				Field: types2.Field{
+			&types.Parameter{
+				Field: types.Field{
 					Identifier: "lastName",
-					Type:       types2.String{},
+					Type:       types.String{},
 				},
 			},
 		},
@@ -83,7 +83,7 @@ var personType = types2.Composite{
 
 func DecodePersonView(b []byte) (PersonView, error) {
 	r := bytes.NewReader(b)
-	dec := values2.NewDecoder(r)
+	dec := encodingValues.NewDecoder(r)
 
 	v, err := dec.DecodeComposite(personType)
 	if err != nil {
