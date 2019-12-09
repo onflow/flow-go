@@ -1541,9 +1541,9 @@ func TestInterpretHostFunction(t *testing.T) {
 				&sema.IntType{},
 			),
 		},
-		func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-			a := arguments[0].(interpreter.IntValue).Int
-			b := arguments[1].(interpreter.IntValue).Int
+		func(invocation interpreter.Invocation) trampoline.Trampoline {
+			a := invocation.Arguments[0].(interpreter.IntValue).Int
+			b := invocation.Arguments[1].(interpreter.IntValue).Int
 			value := big.NewInt(0).Add(a, b)
 			result := interpreter.IntValue{Int: value}
 			return trampoline.Done{Result: result}
@@ -1582,6 +1582,78 @@ func TestInterpretHostFunction(t *testing.T) {
 		interpreter.NewIntValue(3),
 		inter.Globals["a"].Value,
 	)
+}
+
+func TestInterpretHostFunctionWithVariableArguments(t *testing.T) {
+
+	program, _, err := parser.ParseProgram(`
+      pub let nothing = test(1, true, "test")
+    `)
+
+	require.NoError(t, err)
+
+	called := false
+
+	testFunction := stdlib.NewStandardLibraryFunction(
+		"test",
+		&sema.FunctionType{
+			ParameterTypeAnnotations: sema.NewTypeAnnotations(
+				&sema.IntType{},
+			),
+			ReturnTypeAnnotation: sema.NewTypeAnnotation(
+				&sema.IntType{},
+			),
+			RequiredArgumentCount: (func() *int {
+				var count = 1
+				return &count
+			})(),
+		},
+		func(invocation interpreter.Invocation) trampoline.Trampoline {
+			called = true
+
+			require.Len(t, invocation.ArgumentTypes, 3)
+			assert.IsType(t, &sema.IntType{}, invocation.ArgumentTypes[0])
+			assert.IsType(t, &sema.BoolType{}, invocation.ArgumentTypes[1])
+			assert.IsType(t, &sema.StringType{}, invocation.ArgumentTypes[2])
+
+			require.Len(t, invocation.Arguments, 3)
+			assert.Equal(t, interpreter.NewIntValue(1), invocation.Arguments[0])
+			assert.Equal(t, interpreter.BoolValue(true), invocation.Arguments[1])
+			assert.Equal(t, interpreter.NewStringValue("test"), invocation.Arguments[2])
+
+			return trampoline.Done{Result: interpreter.VoidValue{}}
+		},
+		nil,
+	)
+
+	checker, err := sema.NewChecker(
+		program,
+		TestLocation,
+		sema.WithPredeclaredValues(
+			stdlib.StandardLibraryFunctions{
+				testFunction,
+			}.ToValueDeclarations(),
+		),
+	)
+	require.NoError(t, err)
+
+	err = checker.Check()
+	require.NoError(t, err)
+
+	inter, err := interpreter.NewInterpreter(
+		checker,
+		interpreter.WithPredefinedValues(
+			map[string]interpreter.Value{
+				testFunction.Name: testFunction.Function,
+			},
+		),
+	)
+	require.NoError(t, err)
+
+	err = inter.Interpret()
+	require.NoError(t, err)
+
+	assert.True(t, called)
 }
 
 func TestInterpretCompositeDeclaration(t *testing.T) {

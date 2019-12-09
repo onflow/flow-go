@@ -531,7 +531,12 @@ func (interpreter *Interpreter) prepareInvoke(
 		preparedArguments[i] = interpreter.convertAndBox(argument, nil, parameterType)
 	}
 
-	trampoline = functionValue.invoke(preparedArguments, LocationPosition{})
+	// NOTE: can't fill argument types, as they are unknown
+	trampoline = functionValue.invoke(Invocation{
+		Arguments:   preparedArguments,
+		Interpreter: interpreter,
+	})
+
 	return trampoline, nil
 }
 
@@ -1655,27 +1660,20 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 
 			return interpreter.visitExpressionsNonCopying(argumentExpressions).
 				FlatMap(func(result interface{}) Trampoline {
-					arguments := result.(*ArrayValue)
+					arguments := result.(*ArrayValue).Values
 
 					argumentTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression]
 					parameterTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression]
 
-					argumentCopies := make([]Value, len(arguments.Values))
-					for i, argument := range arguments.Values {
-						argumentType := argumentTypes[i]
-						parameterType := parameterTypes[i]
-						argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
-					}
-
-					// TODO: optimize: only potentially used by host-functions
-					location := LocationPosition{
-						Position: invocationExpression.StartPosition(),
-						Location: interpreter.Checker.Location,
-					}
-
-					invocation := function.invoke(argumentCopies, location)
+					invocation := interpreter.functionValueInvocationTrampoline(
+						function,
+						arguments,
+						argumentTypes,
+						parameterTypes,
+						invocationExpression.StartPosition(),
+					)
 
 					// If this is invocation is optional chaining, wrap the result
 					// as an optional, as the result is expected to be an optional
@@ -1689,6 +1687,69 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 					})
 				})
 		})
+}
+
+func (interpreter *Interpreter) InvokeFunctionValue(
+	function FunctionValue,
+	arguments []Value,
+	argumentTypes []sema.Type,
+	parameterTypes []sema.Type,
+	pos ast.Position,
+) (value Value, err error) {
+	// recover internal panics and return them as an error
+	defer recoverErrors(func(internalErr error) {
+		err = internalErr
+	})
+
+	trampoline := interpreter.functionValueInvocationTrampoline(
+		function,
+		arguments,
+		argumentTypes,
+		parameterTypes,
+		pos,
+	)
+
+	result := interpreter.runAllStatements(trampoline)
+	if result == nil {
+		return nil, nil
+	}
+	return result.(Value), nil
+}
+
+func (interpreter *Interpreter) functionValueInvocationTrampoline(
+	function FunctionValue,
+	arguments []Value,
+	argumentTypes []sema.Type,
+	parameterTypes []sema.Type,
+	pos ast.Position,
+) Trampoline {
+
+	parameterTypeCount := len(parameterTypes)
+	argumentCopies := make([]Value, len(arguments))
+
+	for i, argument := range arguments {
+		argumentType := argumentTypes[i]
+		if i < parameterTypeCount {
+			parameterType := parameterTypes[i]
+			argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
+		} else {
+			argumentCopies[i] = argument.Copy()
+		}
+	}
+
+	// TODO: optimize: only potentially used by host-functions
+
+	location := LocationPosition{
+		Position: pos,
+		Location: interpreter.Checker.Location,
+	}
+
+	return function.invoke(Invocation{
+		Arguments:     argumentCopies,
+		ArgumentTypes: argumentTypes,
+		Location:      location,
+		Interpreter:   interpreter,
+	})
 }
 
 func (interpreter *Interpreter) invokeInterpretedFunction(
@@ -1889,7 +1950,7 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 	interpreter.CompositeFunctions[identifier] = functions
 
 	function = NewHostFunctionValue(
-		func(arguments []Value, location LocationPosition) Trampoline {
+		func(invocation Invocation) Trampoline {
 
 			value := &CompositeValue{
 				Location:   interpreter.Checker.Location,
@@ -1907,8 +1968,10 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 			if initializerFunction != nil {
 				// NOTE: arguments are already properly boxed by invocation expression
 
-				initializationTrampoline = interpreter.bindSelf(*initializerFunction, value).
-					invoke(arguments, location)
+				initializationTrampoline =
+					interpreter.
+						bindSelf(*initializerFunction, value).
+						invoke(invocation)
 			}
 
 			return initializationTrampoline.
@@ -1929,7 +1992,7 @@ func (interpreter *Interpreter) bindSelf(
 	function InterpretedFunctionValue,
 	structure *CompositeValue,
 ) FunctionValue {
-	return NewHostFunctionValue(func(arguments []Value, location LocationPosition) Trampoline {
+	return NewHostFunctionValue(func(invocation Invocation) Trampoline {
 		// start a new activation record
 		// lexical scope: use the function declaration's activation record,
 		// not the current one (which would be dynamic scope)
@@ -1938,7 +2001,7 @@ func (interpreter *Interpreter) bindSelf(
 		// make `self` available
 		interpreter.declareVariable(sema.SelfIdentifier, structure)
 
-		return interpreter.invokeInterpretedFunctionActivated(function, arguments)
+		return interpreter.invokeInterpretedFunctionActivated(function, invocation.Arguments)
 	})
 }
 
@@ -2471,7 +2534,7 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 	}
 
 	transactionFunction := NewHostFunctionValue(
-		func(arguments []Value, location LocationPosition) Trampoline {
+		func(invocation Invocation) Trampoline {
 			interpreter.activations.Push(lexicalScope)
 
 			interpreter.declareVariable(sema.SelfIdentifier, self)
@@ -2490,7 +2553,7 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 				)
 
 				prepareTrampoline = func() Trampoline {
-					return prepare.invoke(arguments, location)
+					return prepare.invoke(invocation)
 				}
 			}
 
@@ -2503,7 +2566,9 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 				)
 
 				executeTrampoline = func() Trampoline {
-					return execute.invoke(nil, location)
+					invocationWithoutArguments := invocation
+					invocationWithoutArguments.Arguments = nil
+					return execute.invoke(invocationWithoutArguments)
 				}
 			}
 
@@ -2548,12 +2613,12 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 
 	variable := interpreter.findOrDeclareVariable(identifier)
 	variable.Value = NewHostFunctionValue(
-		func(arguments []Value, location LocationPosition) Trampoline {
+		func(invocation Invocation) Trampoline {
 			fields := make([]EventField, len(eventType.Fields))
 			for i, field := range eventType.Fields {
 				fields[i] = EventField{
 					Identifier: field.Identifier,
-					Value:      arguments[i],
+					Value:      invocation.Arguments[i],
 				}
 			}
 
@@ -2683,8 +2748,8 @@ func (interpreter *Interpreter) defineBaseFunctions() {
 
 func (interpreter *Interpreter) newConverterFunction(converter func(Value) Value) HostFunctionValue {
 	return HostFunctionValue{
-		Function: func(arguments []Value, location LocationPosition) Trampoline {
-			return Done{Result: converter(arguments[0])}
+		Function: func(invocation Invocation) Trampoline {
+			return Done{Result: converter(invocation.Arguments[0])}
 		},
 	}
 }

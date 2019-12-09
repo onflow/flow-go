@@ -269,8 +269,8 @@ func (v *StringValue) GetMember(interpreter *Interpreter, _ LocationRange, name 
 
 	case "concat":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				otherValue := arguments[0].(ConcatenatableValue)
+			func(invocation Invocation) trampoline.Trampoline {
+				otherValue := invocation.Arguments[0].(ConcatenatableValue)
 				result := v.Concat(otherValue)
 				return trampoline.Done{Result: result}
 			},
@@ -278,9 +278,9 @@ func (v *StringValue) GetMember(interpreter *Interpreter, _ LocationRange, name 
 
 	case "slice":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				from := arguments[0].(IntValue)
-				to := arguments[1].(IntValue)
+			func(invocation Invocation) trampoline.Trampoline {
+				from := invocation.Arguments[0].(IntValue)
+				to := invocation.Arguments[1].(IntValue)
 				result := v.Slice(from, to)
 				return trampoline.Done{Result: result}
 			},
@@ -475,23 +475,23 @@ func (v *ArrayValue) Contains(needleValue Value) BoolValue {
 	return false
 }
 
-func (v *ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+func (v *ArrayValue) GetMember(_ *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
 		return NewIntValue(int64(v.Count()))
 
 	case "append":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				v.Append(arguments[0])
+			func(invocation Invocation) trampoline.Trampoline {
+				v.Append(invocation.Arguments[0])
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
 
 	case "concat":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				otherArray := arguments[0].(ConcatenatableValue)
+			func(invocation Invocation) trampoline.Trampoline {
+				otherArray := invocation.Arguments[0].(ConcatenatableValue)
 				result := v.Concat(otherArray)
 				return trampoline.Done{Result: result}
 			},
@@ -499,9 +499,9 @@ func (v *ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name s
 
 	case "insert":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				i := arguments[0].(IntegerValue).IntValue()
-				element := arguments[1]
+			func(invocation Invocation) trampoline.Trampoline {
+				i := invocation.Arguments[0].(IntegerValue).IntValue()
+				element := invocation.Arguments[1]
 				v.Insert(i, element)
 				return trampoline.Done{Result: VoidValue{}}
 			},
@@ -509,8 +509,8 @@ func (v *ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name s
 
 	case "remove":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				i := arguments[0].(IntegerValue).IntValue()
+			func(invocation Invocation) trampoline.Trampoline {
+				i := invocation.Arguments[0].(IntegerValue).IntValue()
 				result := v.Remove(i)
 				return trampoline.Done{Result: result}
 			},
@@ -518,7 +518,7 @@ func (v *ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name s
 
 	case "removeFirst":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
+			func(invocation Invocation) trampoline.Trampoline {
 				result := v.RemoveFirst()
 				return trampoline.Done{Result: result}
 			},
@@ -526,7 +526,7 @@ func (v *ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name s
 
 	case "removeLast":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
+			func(invocation Invocation) trampoline.Trampoline {
 				result := v.RemoveLast()
 				return trampoline.Done{Result: result}
 			},
@@ -534,8 +534,8 @@ func (v *ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name s
 
 	case "contains":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				result := v.Contains(arguments[0])
+			func(invocation Invocation) trampoline.Trampoline {
+				result := v.Contains(invocation.Arguments[0])
 				return trampoline.Done{Result: result}
 			},
 		)
@@ -1436,7 +1436,12 @@ func (v *CompositeValue) Destroy(interpreter *Interpreter, location LocationPosi
 	}
 
 	return interpreter.bindSelf(*destructor, v).
-		invoke(nil, location)
+		invoke(Invocation{
+			Arguments:     nil,
+			ArgumentTypes: nil,
+			Location:      location,
+			Interpreter:   interpreter,
+		})
 }
 
 func (*CompositeValue) isValue() {}
@@ -1784,8 +1789,8 @@ func (v *DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string
 
 	case "remove":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				keyValue := arguments[0]
+			func(invocation Invocation) trampoline.Trampoline {
+				keyValue := invocation.Arguments[0]
 
 				existingValue := v.Remove(keyValue)
 
@@ -1804,9 +1809,9 @@ func (v *DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string
 
 	case "insert":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				keyValue := arguments[0]
-				newValue := arguments[1]
+			func(invocation Invocation) trampoline.Trampoline {
+				keyValue := invocation.Arguments[0]
+				newValue := invocation.Arguments[1]
 
 				existingValue := v.Insert(keyValue, newValue)
 
