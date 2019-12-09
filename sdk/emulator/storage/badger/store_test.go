@@ -6,6 +6,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/dapperlabs/flow-go/crypto"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 
@@ -352,7 +355,7 @@ func TestPersistence(t *testing.T) {
 	assert.NoError(t, err)
 
 	// create a new store with the same database directory
-	store, err = badger.New(dir)
+	store, err = badger.New(badger.WithPath(dir))
 	require.Nil(t, err)
 
 	// should be able to retrieve what we stored
@@ -380,7 +383,7 @@ func benchmarkSetLedger(b *testing.B, nKeys int) {
 		b.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	store, err := badger.New(dir)
+	store, err := badger.New(badger.WithPath(dir))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -411,7 +414,7 @@ func benchmarkGetLedger(b *testing.B, nBlocks int) {
 		b.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	store, err := badger.New(dir)
+	store, err := badger.New(badger.WithPath(dir))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -441,6 +444,46 @@ func BenchmarkGetLedger10(b *testing.B)   { benchmarkGetLedger(b, 10) }
 func BenchmarkGetLedger100(b *testing.B)  { benchmarkGetLedger(b, 100) }
 func BenchmarkGetLedger1000(b *testing.B) { benchmarkGetLedger(b, 1000) }
 
+func BenchmarkBlockDiskUsage(b *testing.B) {
+	b.StopTimer()
+	dir, err := ioutil.TempDir("", "badger-test")
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	store, err := badger.New(badger.WithPath(dir))
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer store.Close()
+
+	b.StartTimer()
+	var lastDBSize int64
+	for i := 0; i < b.N; i++ {
+		block := types.Block{
+			Number:            uint64(i),
+			Timestamp:         time.Now(),
+			PreviousBlockHash: unittest.HashFixture(32),
+			TransactionHashes: []crypto.Hash{unittest.HashFixture(32)},
+		}
+		if err := store.InsertBlock(block); err != nil {
+			b.Fatal(err)
+		}
+		if err := store.Sync(); err != nil {
+			b.Fatal(err)
+		}
+
+		size, err := dirSize(dir)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		dbSizeIncrease := size - lastDBSize
+		b.ReportMetric(float64(dbSizeIncrease), "db_size_increase_bytes/op")
+		lastDBSize = size
+	}
+}
+
 func BenchmarkLedgerDiskUsage(b *testing.B) {
 	b.StopTimer()
 	dir, err := ioutil.TempDir("", "badger-test")
@@ -448,7 +491,7 @@ func BenchmarkLedgerDiskUsage(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	store, err := badger.New(dir)
+	store, err := badger.New(badger.WithPath(dir))
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -474,7 +517,7 @@ func BenchmarkLedgerDiskUsage(b *testing.B) {
 		}
 
 		dbSizeIncrease := size - lastDBSize
-		b.ReportMetric(float64(dbSizeIncrease), "db_size_increase/op")
+		b.ReportMetric(float64(dbSizeIncrease), "db_size_increase_bytes/op")
 		lastDBSize = size
 	}
 }
@@ -486,7 +529,7 @@ func setupStore(t *testing.T) (badger.Store, string) {
 	dir, err := ioutil.TempDir("", "badger-test")
 	require.Nil(t, err)
 
-	store, err := badger.New(dir)
+	store, err := badger.New(badger.WithPath(dir))
 	require.Nil(t, err)
 
 	return store, dir

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"sort"
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 
@@ -14,6 +15,11 @@ import (
 // An Encoder converts Cadence values into XDR-encoded bytes.
 type Encoder struct {
 	enc *xdr.Encoder
+}
+
+// EncodingOrder is a central point to keep ordering for encoding the same.
+func SortInEncodingOrder(names []string) {
+	sort.Strings(names)
 }
 
 // Encode returns the XDR-encoded representation of the given value.
@@ -83,8 +89,6 @@ func (e *Encoder) Encode(v values.Value) error {
 	default:
 		return fmt.Errorf("unsupported value: %T, %v", v, v)
 	}
-
-	return nil
 }
 
 // EncodeVoid writes the XDR-encoded representation of a void value.

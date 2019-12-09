@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -38,11 +39,10 @@ func AccountSignatureFixture() flow.AccountSignature {
 	}
 }
 
-func BlockHeaderFixture() flow.BlockHeader {
-	return flow.BlockHeader{
-		Hash:              crypto.Hash("abc"),
-		PreviousBlockHash: crypto.Hash("def"),
-		Number:            100,
+func BlockHeaderFixture() flow.Header {
+	return flow.Header{
+		Parent: crypto.Hash("parent"),
+		Number: 100,
 	}
 }
 
@@ -110,4 +110,10 @@ func LedgerFixture() flow.Ledger {
 	return flow.Ledger{
 		"key": []byte("value"),
 	}
+}
+
+func IdentifierFixture() flow.Identifier {
+	var id flow.Identifier
+	_, _ = rand.Read(id[:])
+	return id
 }

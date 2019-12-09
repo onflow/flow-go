@@ -5,6 +5,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestPeersTableAdd(t *testing.T) {
@@ -13,7 +16,7 @@ func TestPeersTableAdd(t *testing.T) {
 	require.Nil(t, err, "failed to create peersTable")
 
 	IP := "127.0.0.1:1999"
-	ID := "20"
+	ID := unittest.IdentifierFixture()
 
 	var ok bool
 
@@ -39,12 +42,15 @@ func TestPeersTableGetIP(t *testing.T) {
 
 	require.Nil(t, err, "failed to create peersTable")
 
+	id1 := unittest.IdentifierFixture()
+	id2 := unittest.IdentifierFixture()
+
 	tt := []struct {
 		IP string
-		ID string
+		ID flow.Identifier
 	}{
-		{IP: "127.0.0.1:1999", ID: "20"},
-		{IP: "127.0.0.1:1998", ID: "30"},
+		{IP: "127.0.0.1:1999", ID: id1},
+		{IP: "127.0.0.1:1998", ID: id2},
 	}
 
 	for _, tc := range tt {
@@ -61,10 +67,14 @@ func TestPeersTableGetIPS(t *testing.T) {
 
 	require.Nil(t, err, "failed to create peersTable")
 
-	pt.fromIDToIP = map[string]string{
-		"20": "127.0.0.1:1999",
-		"30": "127.0.0.1:1998",
-		"40": "127.0.0.1:1997",
+	id1 := unittest.IdentifierFixture()
+	id2 := unittest.IdentifierFixture()
+	id3 := unittest.IdentifierFixture()
+
+	pt.fromIDToIP = map[flow.Identifier]string{
+		id1: "127.0.0.1:1999",
+		id2: "127.0.0.1:1998",
+		id3: "127.0.0.1:1997",
 	}
 
 	IPs := []string{
@@ -73,7 +83,7 @@ func TestPeersTableGetIPS(t *testing.T) {
 		"127.0.0.1:1997",
 	}
 
-	nIPs, err := pt.GetIPs("20", "30", "40")
+	nIPs, err := pt.GetIPs(id1, id2, id3)
 	require.Nil(t, err, "failed to get IP from ID")
 
 	assert.Equal(t, IPs, nIPs, "added IPs should be the same as retrieved IPs")
@@ -84,12 +94,15 @@ func TestPeersTableGetID(t *testing.T) {
 
 	require.Nil(t, err, "failed to create peersTable")
 
+	id1 := unittest.IdentifierFixture()
+	id2 := unittest.IdentifierFixture()
+
 	tt := []struct {
-		ID string
+		ID flow.Identifier
 		IP string
 	}{
-		{ID: "20", IP: "127.0.0.1:1999"},
-		{ID: "30", IP: "127.0.0.1:1998"},
+		{ID: id1, IP: "127.0.0.1:1999"},
+		{ID: id2, IP: "127.0.0.1:1998"},
 	}
 
 	for _, tc := range tt {
@@ -106,13 +119,17 @@ func TestPeersTableGetIDS(t *testing.T) {
 
 	require.Nil(t, err, "failed to create peersTable")
 
-	pt.fromIPToID = map[string]string{
-		"127.0.0.1:1999": "20",
-		"127.0.0.1:1998": "30",
-		"127.0.0.1:1997": "40",
+	id1 := unittest.IdentifierFixture()
+	id2 := unittest.IdentifierFixture()
+	id3 := unittest.IdentifierFixture()
+
+	pt.fromIPToID = map[string]flow.Identifier{
+		"127.0.0.1:1999": id1,
+		"127.0.0.1:1998": id2,
+		"127.0.0.1:1997": id3,
 	}
 
-	IDs := []string{"20", "30", "40"}
+	IDs := []flow.Identifier{id1, id2, id3}
 
 	nIDs, err := pt.GetIDs("127.0.0.1:1999", "127.0.0.1:1998", "127.0.0.1:1997")
 	require.Nil(t, err, "failed to get ID from IP")

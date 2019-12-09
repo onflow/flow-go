@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/proto/sdk/entities"
-	"github.com/dapperlabs/flow-go/proto/services/collection"
+	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
+	"github.com/dapperlabs/flow-go/protobuf/services/collection"
 )
 
 // TestCollector_SubmitTransaction tests the function SubmitTransaction

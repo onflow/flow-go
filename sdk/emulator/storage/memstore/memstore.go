@@ -28,8 +28,8 @@ type Store struct {
 }
 
 // New returns a new in-memory Store implementation.
-func New() Store {
-	return Store{
+func New() *Store {
+	return &Store{
 		mu:                  sync.RWMutex{},
 		blockHashToNumber:   make(map[string]uint64),
 		blocks:              make(map[uint64]types.Block),
@@ -39,7 +39,7 @@ func New() Store {
 	}
 }
 
-func (s Store) GetBlockByHash(hash crypto.Hash) (types.Block, error) {
+func (s *Store) GetBlockByHash(hash crypto.Hash) (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -52,7 +52,7 @@ func (s Store) GetBlockByHash(hash crypto.Hash) (types.Block, error) {
 	return block, nil
 }
 
-func (s Store) GetBlockByNumber(blockNumber uint64) (types.Block, error) {
+func (s *Store) GetBlockByNumber(blockNumber uint64) (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -64,7 +64,7 @@ func (s Store) GetBlockByNumber(blockNumber uint64) (types.Block, error) {
 	return block, nil
 }
 
-func (s Store) GetLatestBlock() (types.Block, error) {
+func (s *Store) GetLatestBlock() (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -75,7 +75,7 @@ func (s Store) GetLatestBlock() (types.Block, error) {
 	return latestBlock, nil
 }
 
-func (s Store) InsertBlock(block types.Block) error {
+func (s *Store) InsertBlock(block types.Block) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -87,7 +87,7 @@ func (s Store) InsertBlock(block types.Block) error {
 	return nil
 }
 
-func (s Store) GetTransaction(txHash crypto.Hash) (flow.Transaction, error) {
+func (s *Store) GetTransaction(txHash crypto.Hash) (flow.Transaction, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -98,7 +98,7 @@ func (s Store) GetTransaction(txHash crypto.Hash) (flow.Transaction, error) {
 	return tx, nil
 }
 
-func (s Store) InsertTransaction(tx flow.Transaction) error {
+func (s *Store) InsertTransaction(tx flow.Transaction) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -106,7 +106,7 @@ func (s Store) InsertTransaction(tx flow.Transaction) error {
 	return nil
 }
 
-func (s Store) GetLedger(blockNumber uint64) (flow.Ledger, error) {
+func (s *Store) GetLedger(blockNumber uint64) (flow.Ledger, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -117,7 +117,7 @@ func (s Store) GetLedger(blockNumber uint64) (flow.Ledger, error) {
 	return ledger, nil
 }
 
-func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
+func (s *Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -125,7 +125,7 @@ func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
 	return nil
 }
 
-func (s Store) GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error) {
+func (s *Store) GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -150,7 +150,7 @@ func (s Store) GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.
 	return events, nil
 }
 
-func (s Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
+func (s *Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -164,6 +164,6 @@ func (s Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
 }
 
 // Returns the block with the highest number.
-func (s Store) getLatestBlock() types.Block {
+func (s *Store) getLatestBlock() types.Block {
 	return s.blocks[s.blockHeight]
 }

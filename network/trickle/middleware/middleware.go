@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/trickle"
 )
@@ -22,7 +23,7 @@ type Middleware struct {
 	codec network.Codec
 	ov    trickle.Overlay
 	slots chan struct{} // semaphore for outgoing connection slots
-	conns map[string]*Connection
+	conns map[flow.Identifier]*Connection
 	ln    net.Listener
 	wg    *sync.WaitGroup
 	stop  chan struct{}
@@ -43,7 +44,7 @@ func New(log zerolog.Logger, codec network.Codec, conns uint, address string) (*
 		log:   log,
 		codec: codec,
 		slots: make(chan struct{}, conns),
-		conns: make(map[string]*Connection),
+		conns: make(map[flow.Identifier]*Connection),
 		ln:    ln,
 		wg:    &sync.WaitGroup{},
 		stop:  make(chan struct{}),
@@ -71,27 +72,27 @@ func (m *Middleware) Stop() {
 }
 
 // Send will try to send the given message to the given peer.
-func (m *Middleware) Send(connID string, msg interface{}) error {
+func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 	m.Lock()
 	defer m.Unlock()
 
 	// get the conn from our list
-	conn, ok := m.conns[connID]
+	conn, ok := m.conns[nodeID]
 	if !ok {
-		return errors.Errorf("connection not found (conn_id: %s)", connID)
+		return errors.Errorf("connection not found (node_id: %s)", nodeID)
 	}
 
 	// check if the peer is still running
 	select {
 	case <-conn.done:
-		return errors.Errorf("connection already closed (conn_id: %s)", connID)
+		return errors.Errorf("connection already closed (node_id: %s)", nodeID)
 	default:
 	}
 
 	// whichever comes first, sending the message or ending the provided context
 	select {
 	case <-conn.done:
-		return errors.Errorf("connection has closed (conn_id: %s)", connID)
+		return errors.Errorf("connection has closed (node_id: %s)", nodeID)
 	case conn.outbound <- msg:
 		return nil
 	}
@@ -212,7 +213,7 @@ func (m *Middleware) handle(netc net.Conn) {
 	conn := NewConnection(log, m.codec, netc)
 
 	// execute the initial handshake
-	connID, err := m.ov.Handshake(conn)
+	nodeID, err := m.ov.Handshake(conn)
 	if isClosedErr(err) {
 		log.Debug().Msg("connection aborted remotely")
 		return
@@ -222,16 +223,16 @@ func (m *Middleware) handle(netc net.Conn) {
 		return
 	}
 
-	log = log.With().Str("conn_id", connID).Logger()
+	log = log.With().Hex("node_id", nodeID[:]).Logger()
 
 	// register the peer with the returned peer ID
-	m.add(connID, conn)
-	defer m.remove(connID)
+	m.add(nodeID, conn)
+	defer m.remove(nodeID)
 
 	log.Info().Msg("connection established")
 
 	// start processing messages in the background
-	conn.Process(connID)
+	conn.Process(nodeID)
 
 	// process incoming messages for as long as the peer is running
 ProcessLoop:
@@ -240,7 +241,7 @@ ProcessLoop:
 		case <-conn.done:
 			break ProcessLoop
 		case msg := <-conn.inbound:
-			err = m.ov.Receive(connID, msg)
+			err = m.ov.Receive(nodeID, msg)
 			if err != nil {
 				log.Error().Err(err).Msg("could not receive message")
 				continue ProcessLoop
@@ -258,16 +259,16 @@ func (m *Middleware) release(slots chan struct{}) {
 
 // add will add the given conn with the given address to our list in a
 // concurrency-safe manner.
-func (m *Middleware) add(connID string, conn *Connection) {
+func (m *Middleware) add(nodeID flow.Identifier, conn *Connection) {
 	m.Lock()
 	defer m.Unlock()
-	m.conns[connID] = conn
+	m.conns[nodeID] = conn
 }
 
-// remove will remove the connection with the given connID from the list in
+// remove will remove the connection with the given nodeID from the list in
 // a concurrency-safe manner.
-func (m *Middleware) remove(connID string) {
+func (m *Middleware) remove(nodeID flow.Identifier) {
 	m.Lock()
 	defer m.Unlock()
-	delete(m.conns, connID)
+	delete(m.conns, nodeID)
 }

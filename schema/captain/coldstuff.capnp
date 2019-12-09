@@ -10,7 +10,7 @@ using Flow = import "flow.capnp";
 @0xca03600dec38188d;
 
 struct BlockProposal {
-  header @0 :Flow.BlockHeader;
+  block @0 :Flow.Block;
 }
 
 struct BlockVote {

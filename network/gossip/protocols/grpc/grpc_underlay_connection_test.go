@@ -5,8 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/flow-go/network/gossip"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/dapperlabs/flow-go/network/gossip"
 )
 
 func TestGRPCUnderlayConnection_Send(t *testing.T) {
