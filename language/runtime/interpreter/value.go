@@ -1411,13 +1411,15 @@ func ConvertUInt64(value Value) Value {
 // CompositeValue
 
 type CompositeValue struct {
-	Location   ast.Location
-	Identifier string
-	Kind       common.CompositeKind
-	Fields     map[string]Value
-	Functions  map[string]FunctionValue
-	Destructor *InterpretedFunctionValue
-	Owner      string
+	Location       ast.Location
+	Identifier     string
+	Kind           common.CompositeKind
+	Fields         map[string]Value
+	InjectedFields map[string]Value
+	NestedValues   map[string]Value
+	Functions      map[string]FunctionValue
+	Destructor     *InterpretedFunctionValue
+	Owner          string
 }
 
 func init() {
@@ -1447,9 +1449,13 @@ func (v *CompositeValue) Destroy(interpreter *Interpreter, location LocationPosi
 func (*CompositeValue) isValue() {}
 
 func (v *CompositeValue) Copy() Value {
-	// Resources are moved and not copied
-	if v.Kind == common.CompositeKindResource {
+	// Resources and contracts are not copied
+	switch v.Kind {
+	case common.CompositeKindResource, common.CompositeKindContract:
 		return v
+
+	default:
+		break
 	}
 
 	newFields := make(map[string]Value, len(v.Fields))
@@ -1460,12 +1466,14 @@ func (v *CompositeValue) Copy() Value {
 	// NOTE: not copying functions or destructor – they are linked in
 
 	return &CompositeValue{
-		Location:   v.Location,
-		Identifier: v.Identifier,
-		Kind:       v.Kind,
-		Fields:     newFields,
-		Functions:  v.Functions,
-		Destructor: v.Destructor,
+		Location:       v.Location,
+		Identifier:     v.Identifier,
+		Kind:           v.Kind,
+		Fields:         newFields,
+		InjectedFields: v.InjectedFields,
+		NestedValues:   v.NestedValues,
+		Functions:      v.Functions,
+		Destructor:     v.Destructor,
 		// NOTE: new value has no owner
 		Owner: "",
 	}
@@ -1510,6 +1518,11 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 		return value
 	}
 
+	value, ok = v.NestedValues[name]
+	if ok {
+		return value
+	}
+
 	// get correct interpreter
 	if v.Location != nil {
 		subInterpreter, ok := interpreter.SubInterpreters[v.Location.ID()]
@@ -1519,9 +1532,22 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 	}
 
 	// if composite was deserialized, dynamically link in the functions
+	// and get injected fields
+
 	if v.Functions == nil {
 		functions := interpreter.CompositeFunctions[v.Identifier]
 		v.Functions = functions
+	}
+
+	if v.InjectedFields == nil && interpreter.injectedCompositeFieldsHandler != nil {
+		v.InjectedFields = interpreter.injectedCompositeFieldsHandler(interpreter, v.Location, v.Identifier, v.Kind)
+	}
+
+	if v.InjectedFields != nil {
+		value, ok = v.InjectedFields[name]
+		if ok {
+			return value
+		}
 	}
 
 	function, ok := v.Functions[name]
@@ -1554,6 +1580,10 @@ func (v *CompositeValue) GobEncode() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	err = encoder.Encode(v.Kind)
+	if err != nil {
+		return nil, err
+	}
 	err = encoder.Encode(v.Fields)
 	if err != nil {
 		return nil, err
@@ -1570,6 +1600,10 @@ func (v *CompositeValue) GobDecode(buf []byte) error {
 		return err
 	}
 	err = decoder.Decode(&v.Identifier)
+	if err != nil {
+		return err
+	}
+	err = decoder.Decode(&v.Kind)
 	if err != nil {
 		return err
 	}
@@ -2354,7 +2388,7 @@ func NewAccountValue(address AddressValue) *CompositeValue {
 
 	return &CompositeValue{
 		Identifier: (&sema.AccountType{}).ID(),
-		Fields: map[string]Value{
+		InjectedFields: map[string]Value{
 			"address":   address,
 			"storage":   StorageValue{Identifier: storageIdentifier},
 			"published": PublishedValue{Identifier: storageIdentifier},
@@ -2369,7 +2403,7 @@ func NewPublicAccountValue(address AddressValue) *CompositeValue {
 
 	return &CompositeValue{
 		Identifier: (&sema.PublicAccountType{}).ID(),
-		Fields: map[string]Value{
+		InjectedFields: map[string]Value{
 			"address":   address,
 			"published": PublishedValue{Identifier: storageIdentifier},
 		},

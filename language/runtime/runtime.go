@@ -95,6 +95,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		runtimeStorage,
 		checker,
 		functions,
+		nil,
 		func(inter *interpreter.Interpreter) (interpreter.Value, error) {
 			return inter.Invoke("main")
 		},
@@ -118,12 +119,13 @@ func (r *interpreterRuntime) interpret(
 	runtimeStorage *interpreterRuntimeStorage,
 	checker *sema.Checker,
 	functions stdlib.StandardLibraryFunctions,
+	options []interpreter.Option,
 	f func(inter *interpreter.Interpreter) (interpreter.Value, error),
 ) (
 	interpreter.Value,
 	error,
 ) {
-	inter, err := r.newInterpreter(checker, functions, runtimeInterface, runtimeStorage)
+	inter, err := r.newInterpreter(checker, functions, runtimeInterface, runtimeStorage, options)
 	if err != nil {
 		return nil, err
 	}
@@ -132,12 +134,15 @@ func (r *interpreterRuntime) interpret(
 		return nil, err
 	}
 
-	value, err := f(inter)
-	if err != nil {
-		return nil, err
+	if f != nil {
+		value, err := f(inter)
+		if err != nil {
+			return nil, err
+		}
+		return value, nil
 	}
 
-	return value, nil
+	return nil, nil
 }
 
 func (r *interpreterRuntime) ExecuteTransaction(
@@ -199,6 +204,7 @@ func (r *interpreterRuntime) ExecuteTransaction(
 		runtimeStorage,
 		checker,
 		functions,
+		nil,
 		func(inter *interpreter.Interpreter) (interpreter.Value, error) {
 			err := inter.InvokeTransaction(0, signingAccounts...)
 			return nil, err
@@ -267,9 +273,10 @@ func (r *interpreterRuntime) newInterpreter(
 	functions stdlib.StandardLibraryFunctions,
 	runtimeInterface Interface,
 	runtimeStorage *interpreterRuntimeStorage,
+	options []interpreter.Option,
 ) (*interpreter.Interpreter, error) {
-	return interpreter.NewInterpreter(
-		checker,
+
+	defaultOptions := []interpreter.Option{
 		interpreter.WithPredefinedValues(functions.ToValues()),
 		interpreter.WithOnEventEmittedHandler(
 			func(_ *interpreter.Interpreter, eventValue interpreter.EventValue) {
@@ -286,11 +293,52 @@ func (r *interpreterRuntime) newInterpreter(
 				runtimeStorage.writeValue(storageIdentifier, key, value)
 			},
 		),
-		interpreter.WithStorageKeyHandlerFunc(
+		interpreter.WithStorageKeyHandler(
 			func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
 				return indexingType.String()
 			},
 		),
+		interpreter.WithInjectedCompositeFieldsHandler(
+			func(_ *interpreter.Interpreter, location ast.Location, compositeIdentifier string, compositeKind common.CompositeKind) map[string]interpreter.Value {
+				switch compositeKind {
+				case common.CompositeKindContract:
+					var address []byte
+
+					switch location := location.(type) {
+					case ast.AddressLocation:
+						address = location
+					case AddressLocation:
+						address = location
+					default:
+						panic(runtimeErrors.NewUnreachableError())
+					}
+
+					addressLocation := interpreter.NewAddressValueFromBytes(address)
+
+					return map[string]interpreter.Value{
+						"account": interpreter.NewAccountValue(addressLocation),
+					}
+				}
+
+				return nil
+			},
+		),
+		interpreter.WithContractValueHandler(
+			func(
+				inter *interpreter.Interpreter,
+				compositeType *sema.CompositeType,
+				_ interpreter.FunctionValue,
+			) *interpreter.CompositeValue {
+				// Load the contract from storage
+
+				return r.loadContract(compositeType, runtimeStorage)
+			},
+		),
+	}
+
+	return interpreter.NewInterpreter(
+		checker,
+		append(defaultOptions, options...)...,
 	)
 }
 
@@ -550,18 +598,57 @@ func (r *interpreterRuntime) newUpdateAccountContractFunction(
 			panic(err)
 		}
 
-		runtimeStorage.writeValue(
-			accountAddress.StorageIdentifier(),
-			// TODO: what key should we use for the contract?
-			contractKey,
-			contractValue,
-		)
+		r.writeContract(runtimeStorage, accountAddress, contractValue)
 
 		// TODO: new event type?
 		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, accountAddressValue, code)
 
 		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
+	}
+}
+
+func (r *interpreterRuntime) writeContract(
+	runtimeStorage *interpreterRuntimeStorage,
+	accountAddress interpreter.AddressValue,
+	contractValue interpreter.OptionalValue,
+) {
+	runtimeStorage.writeValue(
+		accountAddress.StorageIdentifier(),
+		contractKey,
+		contractValue,
+	)
+}
+
+func (r *interpreterRuntime) loadContract(
+	compositeType *sema.CompositeType,
+	runtimeStorage *interpreterRuntimeStorage,
+) *interpreter.CompositeValue {
+	var address []byte
+
+	switch location := compositeType.Location.(type) {
+	case ast.AddressLocation:
+		address = location
+	case AddressLocation:
+		address = location
+	default:
+		panic(runtimeErrors.NewUnreachableError())
+	}
+
+	addressLocation := interpreter.NewAddressValueFromBytes(address)
+
+	storedValue := runtimeStorage.readValue(
+		addressLocation.StorageIdentifier(),
+		contractKey,
+	)
+	switch typedValue := storedValue.(type) {
+	case *interpreter.SomeValue:
+		return typedValue.Value.(*interpreter.CompositeValue)
+	case interpreter.NilValue:
+		// TODO: missing contract. panic?
+		return nil
+	default:
+		panic(runtimeErrors.NewUnreachableError())
 	}
 }
 
@@ -608,31 +695,66 @@ func (r *interpreterRuntime) instantiateContract(
 		}
 	}
 
-	return r.interpret(
+	// Use a custom contract value handler that detects if the requested contract value
+	// is for the contract declaration that is being deployed.
+	//
+	// If the contract is the deployed contract, instantiate it using
+	// the provided constructor and given arguments.
+	//
+	// If the contract is not the deployed contract, load it from storage.
+
+	var contract *interpreter.CompositeValue
+
+	interpreterOptions := []interpreter.Option{
+		interpreter.WithContractValueHandler(
+			func(
+				inter *interpreter.Interpreter,
+				compositeType *sema.CompositeType,
+				constructor interpreter.FunctionValue,
+			) *interpreter.CompositeValue {
+
+				// If the contract is the deployed contract, instantiate it using
+				// the provided constructor and given arguments
+
+				if compositeType.Location.ID() == contractType.Location.ID() &&
+					compositeType.Identifier == contractType.Identifier {
+
+					value, err := inter.InvokeFunctionValue(constructor,
+						constructorArguments,
+						argumentTypes,
+						parameterTypes,
+						invocationPos,
+					)
+					if err != nil {
+						panic(err)
+					}
+
+					contract = value.(*interpreter.CompositeValue)
+
+					return contract
+				} else {
+					// The contract is not the deployed contract, load it from storage
+
+					return r.loadContract(compositeType, runtimeStorage)
+				}
+			},
+		),
+	}
+
+	_, err := r.interpret(
 		runtimeInterface,
 		runtimeStorage,
 		checker,
 		functions,
-		func(inter *interpreter.Interpreter) (value interpreter.Value, err error) {
-			variable := inter.Globals[contractType.Identifier]
-			if variable == nil {
-				return nil, fmt.Errorf("missing contract constructor: `%s`", contractType.Identifier)
-			}
-
-			constructor, ok := variable.Value.(interpreter.FunctionValue)
-			if !ok {
-				return nil, fmt.Errorf("invalid contract constructor: `%s`", contractType.Identifier)
-			}
-
-			return inter.InvokeFunctionValue(
-				constructor,
-				constructorArguments,
-				argumentTypes,
-				parameterTypes,
-				invocationPos,
-			)
-		},
+		interpreterOptions,
+		nil,
 	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return contract, err
 }
 
 func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
