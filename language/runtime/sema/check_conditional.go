@@ -155,8 +155,17 @@ func (checker *Checker) checkConditionalBranches(
 	functionActivation.ReturnInfo.MergeBranches(thenReturnInfo, elseReturnInfo)
 
 	if functionActivation.InitializationInfo != nil {
-		functionActivation.InitializationInfo.InitializedFieldMembers =
-			thenInitializedMembers.Intersection(elseInitializedMembers)
+
+		// If one side definitely halted, the initializations in the other side can be considered definite
+
+		if thenReturnInfo.DefinitelyHalted {
+			functionActivation.InitializationInfo.InitializedFieldMembers = elseInitializedMembers
+		} else if elseReturnInfo.DefinitelyHalted {
+			functionActivation.InitializationInfo.InitializedFieldMembers = thenInitializedMembers
+		} else {
+			functionActivation.InitializationInfo.InitializedFieldMembers =
+				thenInitializedMembers.Intersection(elseInitializedMembers)
+		}
 	}
 
 	checker.resources.MergeBranches(thenResources, elseResources)
