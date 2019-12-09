@@ -66,29 +66,6 @@ func NewValueOrPanic(value interface{}) Value {
 	return ret
 }
 
-//func CastToOptionalArrayString(value Value) (*[]string, error) {
-//
-//	goValue := value.ToGoValue()
-//	if goValue == nil {
-//		return nil, nil
-//	}
-//
-//	values, ok := goValue.([]interface{})
-//	if !ok {
-//		return nil, fmt.Errorf("%v is not an []interface{}", goValue)
-//	}
-//
-//	ret := make([]string, len(values))
-//	for i, v := range values {
-//		r, ok := v.(string)
-//		if  !ok {
-//			return nil, fmt.Errorf("cannot cast %T to string", v)
-//		}
-//		ret[i] = r
-//	}
-//	return &ret, nil
-//}
-
 func CastToString(value Value) (string, error) {
 
 	casted, ok := value.(String)
@@ -137,17 +114,32 @@ func CastToUInt16(value Value) (uint16, error) {
 	return u, nil
 }
 
-func CastToArray(value interface{}) ([]interface{}, error) {
+func CastToArray(value Value) ([]interface{}, error) {
 
-	u, ok := value.([]interface{})
+	casted, ok := value.(VariableSizedArray)
+	if !ok {
+		return nil, fmt.Errorf("%T is not a values.VariableSizedArray", value)
+	}
+
+	goValue := casted.ToGoValue()
+
+	u, ok := goValue.([]interface{})
 	if !ok {
 		return nil, fmt.Errorf("%T is not a []interface{}]", value)
 	}
 	return u, nil
 }
 
-func CastToInt(value interface{}) (int, error) {
-	u, ok := value.(int)
+func CastToInt(value Value) (int, error) {
+
+	casted, ok := value.(Int)
+	if !ok {
+		return 0, fmt.Errorf("%T is not a values.Int", value)
+	}
+
+	goValue := casted.ToGoValue()
+
+	u, ok := goValue.(int)
 	if !ok {
 		return 0, fmt.Errorf("%T %v is not a int", value, value)
 	}
@@ -161,17 +153,3 @@ func CastToComposite(value Value) (Composite, error) {
 	}
 	return u, nil
 }
-
-//func CastToOptionalUint8(value Value) (*uint8, error) {
-//	goValue := value.ToGoValue()
-//
-//	if goValue == nil {
-//		return nil, nil
-//	}
-//
-//	u, ok := goValue.(*uint8)
-//	if !ok {
-//		return nil, fmt.Errorf("%v is not *uint8", goValue)
-//	}
-//	return u, nil
-//}
