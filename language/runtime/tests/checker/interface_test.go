@@ -1390,7 +1390,7 @@ func TestCheckContractInterfaceFungibleToken(t *testing.T) {
 }
 
 const validExampleFungibleTokenContract = `
- pub contract ExampleToken: FungibleToken {
+  pub contract ExampleToken: FungibleToken {
 
      pub resource Vault: FungibleToken.Receiver, FungibleToken.Provider {
 
@@ -1418,12 +1418,43 @@ const validExampleFungibleTokenContract = `
      pub fun sprout(): <-Vault {
          return <-create Vault(balance: 0)
      }
- }
+  }
 `
 
 func TestCheckContractInterfaceFungibleTokenConformance(t *testing.T) {
 
 	code := fungibleTokenContractInterface + "\n" + validExampleFungibleTokenContract
+
+	_, err := ParseAndCheck(t, code)
+
+	assert.NoError(t, err)
+}
+
+func TestCheckContractInterfaceFungibleTokenUse(t *testing.T) {
+
+	code := fungibleTokenContractInterface + "\n" +
+		validExampleFungibleTokenContract + "\n" + `
+
+      fun test(): Int {
+          let contract = ExampleToken()
+
+          // valid, because code is in the same location
+          let publisher <- create ExampleToken.Vault(balance: 100)
+
+          let receiver <- contract.sprout()
+
+          let withdrawn <- publisher.withdraw(amount: 60)
+          receiver.deposit(from: <-withdrawn)
+
+          let publisherBalance = publisher.balance
+          let receiverBalance = receiver.balance
+
+          destroy publisher
+          destroy receiver
+
+          return receiverBalance
+      }
+	`
 
 	_, err := ParseAndCheck(t, code)
 

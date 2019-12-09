@@ -477,7 +477,7 @@ primaryExpressionStart
     ;
 
 createExpression
-    : Create identifier invocation
+    : Create nominalType invocation
     ;
 
 destroyExpression
@@ -625,6 +625,7 @@ identifier
     | From
     | Create
     | Destroy
+    | Contract
     ;
 
 Identifier
@@ -696,7 +697,7 @@ WS
     ;
 
 Terminator
-    : [\r\n]+ -> channel(HIDDEN)
+    : [\r\n\u2028\u2029]+ -> channel(HIDDEN)
     ;
 
 BlockComment
