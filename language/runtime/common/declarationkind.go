@@ -35,6 +35,22 @@ const (
 	DeclarationKindExecute
 )
 
+func (k DeclarationKind) IsTypeDeclaration() bool {
+	switch k {
+	case DeclarationKindStructure,
+		DeclarationKindResource,
+		DeclarationKindContract,
+		DeclarationKindStructureInterface,
+		DeclarationKindResourceInterface,
+		DeclarationKindContractInterface:
+
+		return true
+
+	default:
+		return false
+	}
+}
+
 func (k DeclarationKind) Name() string {
 	switch k {
 	case DeclarationKindValue:

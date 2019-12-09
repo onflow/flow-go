@@ -99,12 +99,13 @@ func TestCheckIntegerLiteralRanges(t *testing.T) {
 				maxString = max.String()
 			}
 
-			code := fmt.Sprintf(`
-                let min: %[1]s = %[2]s
-                let max: %[1]s = %[3]s
-                let a = %[1]s(%[2]s)
-                let b = %[1]s(%[3]s)
-            `,
+			code := fmt.Sprintf(
+				`
+                    let min: %[1]s = %[2]s
+                    let max: %[1]s = %[3]s
+                    let a = %[1]s(%[2]s)
+                    let b = %[1]s(%[3]s)
+                `,
 				ty.String(),
 				minString,
 				maxString,
@@ -143,13 +144,16 @@ func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
 				minMinusOneString = minMinusOne.String()
 			}
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                let minMinusOne: %[1]s = %[2]s
-                let minMinusOne2 = %[1]s(%[2]s)
-            `,
-				ty.String(),
-				minMinusOneString,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      let minMinusOne: %[1]s = %[2]s
+                      let minMinusOne2 = %[1]s(%[2]s)
+                    `,
+					ty.String(),
+					minMinusOneString,
+				),
+			)
 
 			errs := ExpectCheckerErrors(t, err, 2)
 
@@ -174,13 +178,16 @@ func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
 				maxPlusOneString = maxPlusOne.String()
 			}
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                let maxPlusOne: %[1]s = %[2]s
-                let maxPlusOne2 = %[1]s(%[2]s)
-            `,
-				ty.String(),
-				maxPlusOneString,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      let maxPlusOne: %[1]s = %[2]s
+                      let maxPlusOne2 = %[1]s(%[2]s)
+                    `,
+					ty.String(),
+					maxPlusOneString,
+				),
+			)
 
 			errs := ExpectCheckerErrors(t, err, 2)
 
