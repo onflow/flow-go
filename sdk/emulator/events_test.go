@@ -58,8 +58,9 @@ func TestEventEmitted(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		err = b.SubmitTransaction(tx)
+		result, err := b.SubmitTransaction(tx)
 		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
 
 		block, err := b.CommitBlock()
 		require.NoError(t, err)
@@ -157,8 +158,9 @@ func TestEventEmitted(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		err = b.SubmitTransaction(tx)
+		result, err := b.SubmitTransaction(tx)
 		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
 
 		block, err := b.CommitBlock()
 		require.NoError(t, err)

@@ -33,8 +33,9 @@ func TestCommitBlock(t *testing.T) {
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	// Submit tx1
-	err = b.SubmitTransaction(tx1)
+	result, err := b.SubmitTransaction(tx1)
 	assert.NoError(t, err)
+	assert.True(t, result.Succeeded())
 
 	tx, err := b.GetTransaction(tx1.Hash())
 	assert.NoError(t, err)
@@ -60,8 +61,9 @@ func TestCommitBlock(t *testing.T) {
 	tx2.AddSignature(b.RootAccountAddress(), sig)
 
 	// Submit invalid tx2
-	err = b.SubmitTransaction(tx2)
-	assert.NotNil(t, err)
+	result, err = b.SubmitTransaction(tx2)
+	assert.NoError(t, err)
+	assert.True(t, result.Reverted())
 
 	tx, err = b.GetTransaction(tx2.Hash())
 	assert.NoError(t, err)
@@ -74,11 +76,11 @@ func TestCommitBlock(t *testing.T) {
 
 	// tx1 status becomes TransactionSealed
 	tx, err = b.GetTransaction(tx1.Hash())
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, flow.TransactionSealed, tx.Status)
 
 	// tx2 status stays TransactionReverted
 	tx, err = b.GetTransaction(tx2.Hash())
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, flow.TransactionReverted, tx.Status)
 }

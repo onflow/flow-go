@@ -37,8 +37,9 @@ func TestSubmitTransaction(t *testing.T) {
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	// Submit tx1
-	err = b.SubmitTransaction(tx1)
+	result, err := b.SubmitTransaction(tx1)
 	assert.NoError(t, err)
+	assert.True(t, result.Succeeded())
 
 	// tx1 status becomes TransactionFinalized
 	tx2, err := b.GetTransaction(tx1.Hash())
@@ -69,8 +70,8 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		// Submit tx1
-		err = b.SubmitTransaction(tx)
+		// Submit tx
+		_, err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
@@ -88,8 +89,8 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		// Submit tx1
-		err = b.SubmitTransaction(tx)
+		// Submit tx
+		_, err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
@@ -107,8 +108,8 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		// Submit tx1
-		err = b.SubmitTransaction(tx)
+		// Submit tx
+		_, err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
@@ -126,8 +127,8 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		// Submit tx1
-		err = b.SubmitTransaction(tx)
+		// Submit tx
+		_, err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
@@ -145,8 +146,8 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		// Submit tx1
-		err = b.SubmitTransaction(tx)
+		// Submit tx
+		_, err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 }
@@ -173,15 +174,16 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 
 	tx.AddSignature(accountAddress, sig)
 
-	// Submit tx1
-	err = b.SubmitTransaction(tx)
+	// Submit tx
+	result, err := b.SubmitTransaction(tx)
 	assert.NoError(t, err)
+	assert.True(t, result.Succeeded())
 
 	_, err = b.CommitBlock()
 	assert.NoError(t, err)
 
-	// Submit tx1 again (errors)
-	err = b.SubmitTransaction(tx)
+	// Submit same tx again (errors)
+	_, err = b.SubmitTransaction(tx)
 	assert.IsType(t, err, &emulator.ErrDuplicateTransaction{})
 }
 
@@ -203,14 +205,15 @@ func TestSubmitTransactionReverted(t *testing.T) {
 
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
-	// Submit invalid tx1 (errors)
-	err = b.SubmitTransaction(tx1)
-	assert.NotNil(t, err)
+	// Submit invalid tx1
+	result, err := b.SubmitTransaction(tx1)
+	assert.NoError(t, err)
+	assert.True(t, result.Reverted())
 
 	// tx1 status becomes TransactionReverted
-	tx2, err := b.GetTransaction(tx1.Hash())
+	tx, err := b.GetTransaction(tx1.Hash())
 	assert.NoError(t, err)
-	assert.Equal(t, flow.TransactionReverted, tx2.Status)
+	assert.Equal(t, flow.TransactionReverted, tx.Status)
 }
 
 func TestSubmitTransactionScriptAccounts(t *testing.T) {
@@ -255,8 +258,9 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 		tx.AddSignature(accountAddressA, sigA)
 		tx.AddSignature(accountAddressB, sigB)
 
-		err = b.SubmitTransaction(tx)
-		assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
+		result, err := b.SubmitTransaction(tx)
+		assert.NoError(t, err)
+		assert.True(t, result.Reverted())
 
 		_, err = b.CommitBlock()
 		assert.NoError(t, err)
@@ -286,8 +290,9 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 		tx.AddSignature(accountAddressA, sig)
 
-		err = b.SubmitTransaction(tx)
-		assert.IsType(t, &emulator.ErrTransactionReverted{}, err)
+		result, err := b.SubmitTransaction(tx)
+		assert.NoError(t, err)
+		assert.True(t, result.Reverted())
 
 		_, err = b.CommitBlock()
 		assert.NoError(t, err)
@@ -317,8 +322,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		err = b.SubmitTransaction(tx)
-
+		_, err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrMissingSignature{})
 	})
 
@@ -342,8 +346,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 		tx.AddSignature(invalidAddress, sig)
 
-		err = b.SubmitTransaction(tx)
-
+		_, err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidSignatureAccount{})
 	})
 
@@ -371,7 +374,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		err = b.SubmitTransaction(tx)
+		_, err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidSignaturePublicKey{})
 	})
 
@@ -412,7 +415,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 			tx.AddSignature(accountAddressA, sig)
 
-			err = b.SubmitTransaction(tx)
+			_, err = b.SubmitTransaction(tx)
 			assert.IsType(t, err, &emulator.ErrMissingSignature{})
 		})
 
@@ -426,8 +429,9 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 			tx.AddSignature(accountAddressA, sigA)
 			tx.AddSignature(accountAddressA, sigB)
 
-			err = b.SubmitTransaction(tx)
+			result, err := b.SubmitTransaction(tx)
 			assert.NoError(t, err)
+			assert.True(t, result.Succeeded())
 		})
 	})
 }
@@ -455,8 +459,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		err = b.SubmitTransaction(tx)
-		assert.NotNil(t, err)
+		_, err = b.SubmitTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrMissingSignature{})
 	})
 
@@ -507,8 +510,9 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		tx.AddSignature(accountAddressA, sigA)
 		tx.AddSignature(accountAddressB, sigB)
 
-		err = b.SubmitTransaction(tx)
+		result, err := b.SubmitTransaction(tx)
 		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
 
 		assert.Contains(t, loggedMessages, fmt.Sprintf("%x", accountAddressA.Bytes()))
 		assert.Contains(t, loggedMessages, fmt.Sprintf("%x", accountAddressB.Bytes()))
@@ -550,8 +554,9 @@ func TestGetTransaction(t *testing.T) {
 
 	tx.AddSignature(b.RootAccountAddress(), sig)
 
-	err = b.SubmitTransaction(tx)
+	result, err := b.SubmitTransaction(tx)
 	assert.NoError(t, err)
+	assert.True(t, result.Succeeded())
 
 	t.Run("InvalidHash", func(t *testing.T) {
 		_, err := b.GetTransaction(crypto.Hash{})
