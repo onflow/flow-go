@@ -436,7 +436,7 @@ func (b *EmulatedBlockchain) executeTransaction() error {
 	return nil
 }
 
-// CommitBlock takes all executed transactions and commits them into a block.
+// CommitBlock seals the current pending block and saves it to storage.
 //
 // Note: this clears the pending transaction pool and resets the pending block.
 // This also indexes the committed blockchain state for testing purposes.
