@@ -15,14 +15,12 @@ const SelfIdentifier = "self"
 const BeforeIdentifier = "before"
 const ResultIdentifier = "result"
 
-// TODO: move annotations
-
 var beforeType = &FunctionType{
 	ParameterTypeAnnotations: NewTypeAnnotations(
-		&AnyType{},
+		&AnyStructType{},
 	),
 	ReturnTypeAnnotation: NewTypeAnnotation(
-		&AnyType{},
+		&AnyStructType{},
 	),
 	GetReturnType: func(argumentTypes []Type) Type {
 		return argumentTypes[0]

@@ -25,7 +25,9 @@ type String struct{ isAType }
 
 type Bytes struct{ isAType }
 
-type Any struct{ isAType }
+type AnyStruct struct{ isAType }
+
+type AnyResource struct{ isAType }
 
 type Int struct{ isAType }
 
