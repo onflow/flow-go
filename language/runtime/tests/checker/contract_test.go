@@ -45,7 +45,7 @@ func TestCheckContractAccountFieldUse(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       contract Test {
 
-          init(account: Account) {
+          init() {
               self.account.address
           }
       }
