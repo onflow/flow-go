@@ -48,7 +48,7 @@ func TestCheckFailableCastingWithResourceAnnotation(t *testing.T) {
 
 				errs := ExpectCheckerErrors(t, err, 2)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 
 				// TODO: add support for non-Any types in failable casting
 
@@ -86,7 +86,7 @@ func TestCheckFunctionDeclarationParameterWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -117,7 +117,7 @@ func TestCheckFunctionDeclarationParameterWithoutResourceAnnotation(t *testing.T
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				require.NoError(t, err)
@@ -158,7 +158,7 @@ func TestCheckFunctionDeclarationReturnTypeWithResourceAnnotation(t *testing.T) 
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -193,7 +193,7 @@ func TestCheckFunctionDeclarationReturnTypeWithoutResourceAnnotation(t *testing.
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				require.NoError(t, err)
@@ -232,7 +232,7 @@ func TestCheckVariableDeclarationWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -265,7 +265,7 @@ func TestCheckVariableDeclarationWithoutResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				require.NoError(t, err)
@@ -318,10 +318,10 @@ func TestCheckFieldDeclarationWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindContract, common.CompositeKindStructure:
 				errs := ExpectCheckerErrors(t, err, 2)
 
-				// NOTE: one invalid move annotation error for field, one for parameter
+				// NOTE: one invalid resource annotation error for field, one for parameter
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[1])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -365,12 +365,12 @@ func TestCheckFieldDeclarationWithoutResourceAnnotation(t *testing.T) {
 
 			switch kind {
 			case common.CompositeKindResource:
-				// NOTE: one missing move annotation error for field, one for parameter
+				// NOTE: one missing resource annotation error for field, one for parameter
 
 				errs := ExpectCheckerErrors(t, err, 2)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[1])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[1])
 
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				require.NoError(t, err)
@@ -407,7 +407,7 @@ func TestCheckFunctionExpressionParameterWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -439,7 +439,7 @@ func TestCheckFunctionExpressionParameterWithoutResourceAnnotation(t *testing.T)
 
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				require.NoError(t, err)
@@ -480,7 +480,7 @@ func TestCheckFunctionExpressionReturnTypeWithResourceAnnotation(t *testing.T) {
 
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -514,7 +514,7 @@ func TestCheckFunctionExpressionReturnTypeWithoutResourceAnnotation(t *testing.T
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				require.NoError(t, err)
@@ -551,7 +551,7 @@ func TestCheckFunctionTypeParameterWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -582,7 +582,7 @@ func TestCheckFunctionTypeParameterWithoutResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				require.NoError(t, err)
@@ -623,7 +623,7 @@ func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.InvalidMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -657,7 +657,7 @@ func TestCheckFunctionTypeReturnTypeWithoutResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				require.NoError(t, err)
@@ -692,7 +692,7 @@ func TestCheckFailableCastingWithoutResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 3)
 
-				assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
 				assert.IsType(t, &sema.InvalidFailableResourceDowncastOutsideOptionalBindingError{}, errs[1])
 

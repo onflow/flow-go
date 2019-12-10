@@ -1023,7 +1023,7 @@ func (checker *Checker) checkResourceFieldNesting(
 	}
 
 	for name, member := range members {
-		// NOTE: check type, not move annotation:
+		// NOTE: check type, not resource annotation:
 		// the field could have a wrong annotation
 		if !member.TypeAnnotation.Type.IsResourceType() {
 			continue
@@ -1259,7 +1259,7 @@ func (checker *Checker) withSelfResourceInvalidationAllowed(f func()) {
 
 	f()
 }
-  
+
 func (checker *Checker) predeclaredMembers(containerType Type) []*Member {
 	var predeclaredMembers []*Member
 

@@ -608,7 +608,7 @@ func TestCheckResourceWithDestructor(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCheckInvalidResourceFieldWithMissingMoveAnnotation(t *testing.T) {
+func TestCheckInvalidResourceFieldWithMissingResourceAnnotation(t *testing.T) {
 
 	interfacePossibilities := []bool{true, false}
 
@@ -658,7 +658,7 @@ func TestCheckInvalidResourceFieldWithMissingMoveAnnotation(t *testing.T) {
 
 			errs := ExpectCheckerErrors(t, err, 1)
 
-			assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+			assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 		})
 	}
 }

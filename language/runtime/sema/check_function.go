@@ -179,26 +179,26 @@ func (checker *Checker) checkParameters(parameterList *ast.ParameterList, parame
 }
 
 func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos ast.Position) {
-	checker.checkMoveAnnotation(
+	checker.checkResourceAnnotation(
 		typeAnnotation.Type,
 		typeAnnotation.IsResource,
 		pos,
 	)
 }
 
-func (checker *Checker) checkMoveAnnotation(ty Type, move bool, pos ast.Position) {
+func (checker *Checker) checkResourceAnnotation(ty Type, isResourceMove bool, pos ast.Position) {
 	if ty.IsResourceType() {
-		if !move {
+		if !isResourceMove {
 			checker.report(
-				&MissingMoveAnnotationError{
+				&MissingResourceAnnotationError{
 					Pos: pos,
 				},
 			)
 		}
 	} else {
-		if move {
+		if isResourceMove {
 			checker.report(
-				&InvalidMoveAnnotationError{
+				&InvalidResourceAnnotationError{
 					Pos: pos,
 				},
 			)
