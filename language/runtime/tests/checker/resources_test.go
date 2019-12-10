@@ -682,7 +682,7 @@ func TestCheckFailableCastingWithoutResourceAnnotation(t *testing.T) {
                       let test %[2]s %[3]s T%[4]s as? T
                     `,
 					compositeKind.Keyword(),
-					compositeKind.TransferOperator(),
+					compositeKind.AssignmentOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -2296,7 +2296,7 @@ func TestCheckInvalidResourceFieldMoveSelf(t *testing.T) {
 
       resource X {
 
-          var y: <-Y
+          var y: @Y
 
           init() {
               self.y <- create Y()
@@ -2311,7 +2311,7 @@ func TestCheckInvalidResourceFieldMoveSelf(t *testing.T) {
           }
       }
 
-      fun absorb(_ y: <-Y) {
+      fun absorb(_ y: @Y) {
           destroy y
       }
     `)
@@ -2328,7 +2328,7 @@ func TestCheckInvalidResourceFieldUseAfterDestroy(t *testing.T) {
 
       resource X {
 
-          var y: <-Y
+          var y: @Y
 
           init() {
               self.y <- create Y()

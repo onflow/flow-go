@@ -3223,7 +3223,7 @@ func TestInterpretCompositeNilEquality(t *testing.T) {
                     `,
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
-					compositeKind.TransferOperator(),
+					compositeKind.AssignmentOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind, ""),
 				),
@@ -3446,7 +3446,7 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
                     `,
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
-					compositeKind.TransferOperator(),
+					compositeKind.AssignmentOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind, ""),
 				),
@@ -5992,9 +5992,9 @@ func TestInterpretCastingResourceToAnyResource(t *testing.T) {
 	inter := parseCheckAndInterpret(t, `
       resource R {}
 
-      fun test(): <-AnyResource {
+      fun test(): @AnyResource {
           let r <- create R()
-          let x <- r as <-AnyResource
+          let x <- r as @AnyResource
           return <-x
       }
     `)
