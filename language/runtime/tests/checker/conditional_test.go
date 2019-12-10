@@ -66,7 +66,7 @@ func TestCheckInvalidConditionalExpressionTypes(t *testing.T) {
 func TestCheckInvalidAnyConditional(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-      let x: Any = true
+      let x: AnyStruct = true
       let y = true ? 1 : x
     `)
 

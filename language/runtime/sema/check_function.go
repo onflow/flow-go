@@ -79,10 +79,13 @@ func (checker *Checker) declareFunctionDeclaration(
 ) {
 	argumentLabels := declaration.ParameterList.ArgumentLabels()
 
-	variable, err := checker.valueActivations.DeclareFunction(
-		declaration.Identifier,
-		declaration.Access,
+	variable, err := checker.valueActivations.Declare(
+		declaration.Identifier.Identifier,
 		functionType,
+		declaration.Access,
+		common.DeclarationKindFunction,
+		declaration.Identifier.Pos,
+		true,
 		argumentLabels,
 	)
 	checker.report(err)

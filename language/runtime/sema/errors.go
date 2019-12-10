@@ -1970,3 +1970,19 @@ func (e *DeclarationKindMismatchError) SecondaryError() string {
 		e.ActualDeclarationKind.Name(),
 	)
 }
+
+// InvalidTopLevelDeclarationError
+
+type InvalidTopLevelDeclarationError struct {
+	DeclarationKind common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidTopLevelDeclarationError) Error() string {
+	return fmt.Sprintf(
+		"%s declarations are not valid at the top-level",
+		e.DeclarationKind.Name(),
+	)
+}
+
+func (*InvalidTopLevelDeclarationError) isSemanticError() {}

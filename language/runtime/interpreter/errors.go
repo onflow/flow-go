@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/sema"
 )
 
 // unsupportedOperation
@@ -67,12 +68,14 @@ func (e *ArgumentCountError) Error() string {
 	)
 }
 
-// AnyParameterTypeInInvocationError
+// InvalidParameterTypeInInvocationError
 
-type AnyParameterTypeInInvocationError struct{}
+type InvalidParameterTypeInInvocationError struct {
+	InvalidParameterType sema.Type
+}
 
-func (e *AnyParameterTypeInInvocationError) Error() string {
-	return "cannot invoke functions with `Any` parameter type"
+func (e *InvalidParameterTypeInInvocationError) Error() string {
+	return fmt.Sprintf("cannot invoke functions with parameter type: `%s`", e.InvalidParameterType)
 }
 
 // TransactionNotDeclaredError

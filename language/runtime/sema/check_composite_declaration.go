@@ -64,8 +64,16 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 	for name, nestedType := range compositeType.NestedTypes {
 		nestedDeclaration := nestedDeclarations[name]
 
+		identifier := nestedDeclaration.DeclarationIdentifier()
+		if identifier == nil {
+			// It should be impossible to have a nested declaration
+			// that does not have an identifier
+
+			panic(errors.NewUnreachableError())
+		}
+
 		_, err := checker.typeActivations.DeclareType(
-			nestedDeclaration.DeclarationIdentifier(),
+			*identifier,
 			nestedType,
 			nestedDeclaration.DeclarationKind(),
 			nestedDeclaration.DeclarationAccess(),
@@ -82,7 +90,20 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 				nestedDeclaration.(*ast.CompositeDeclaration); isCompositeDeclaration {
 
 				nestedCompositeType := nestedType.(*CompositeType)
-				checker.declareCompositeConstructor(nestedCompositeDeclaration, nestedCompositeType)
+
+				nestedConstructorType, nestedConstructorArgumentLabels :=
+					checker.compositeConstructorType(nestedCompositeDeclaration, nestedCompositeType)
+
+				_, err := checker.valueActivations.Declare(
+					nestedCompositeDeclaration.Identifier.Identifier,
+					nestedConstructorType,
+					nestedCompositeDeclaration.Access,
+					nestedCompositeDeclaration.DeclarationKind(),
+					nestedCompositeDeclaration.Identifier.Pos,
+					true,
+					nestedConstructorArgumentLabels,
+				)
+				checker.report(err)
 			}
 		}
 	}
@@ -169,15 +190,17 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 
 	// NOTE: check destructors after initializer and functions
 
-	checker.checkDestructors(
-		declaration.Members.Destructors(),
-		declaration.Members.FieldsByIdentifier(),
-		compositeType.Members,
-		compositeType,
-		declaration.DeclarationKind(),
-		declaration.Identifier.Identifier,
-		kind,
-	)
+	checker.withSelfResourceInvalidationAllowed(func() {
+		checker.checkDestructors(
+			declaration.Members.Destructors(),
+			declaration.Members.FieldsByIdentifier(),
+			compositeType.Members,
+			compositeType,
+			declaration.DeclarationKind(),
+			declaration.Identifier.Identifier,
+			kind,
+		)
+	})
 
 	// NOTE: visit interfaces first
 	// DON'T use `nestedDeclarations`, because of non-deterministic order
@@ -337,7 +360,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		variable,
 	)
 
-	constructorMembers := map[string]*Member{}
+	declarationMembers := map[string]*Member{}
 
 	(func() {
 		// Activate new scopes for nested types
@@ -381,11 +404,11 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 			nestedCompositeDeclarationVariable :=
 				checker.valueActivations.Find(identifier.Identifier)
 
-			constructorMembers[nestedCompositeDeclarationVariable.Identifier] = &Member{
+			declarationMembers[nestedCompositeDeclarationVariable.Identifier] = &Member{
 				Identifier:      identifier,
 				Access:          nestedCompositeDeclaration.Access,
 				ContainerType:   compositeType,
-				Type:            nestedCompositeDeclarationVariable.Type,
+				TypeAnnotation:  NewTypeAnnotation(nestedCompositeDeclarationVariable.Type),
 				DeclarationKind: nestedCompositeDeclarationVariable.DeclarationKind,
 				VariableKind:    ast.VariableKindConstant,
 			}
@@ -394,6 +417,7 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		// Check conformances and members
 
 		conformances := checker.conformances(declaration, compositeType)
+		compositeType.Conformances = conformances
 
 		members, origins := checker.membersAndOrigins(
 			compositeType,
@@ -403,8 +427,6 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		)
 
 		compositeType.Members = members
-		compositeType.Conformances = conformances
-
 		checker.memberOrigins[compositeType] = origins
 
 		// NOTE: determine initializer parameter types while nested types are in scope,
@@ -414,10 +436,47 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 			checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())
 	})()
 
-	// Declare constructor after the nested scope, so it is visible after the declaration
+	// Always determine composite constructor type
 
-	constructorFunction := checker.declareCompositeConstructor(declaration, compositeType)
-	constructorFunction.Members = constructorMembers
+	constructorType, constructorArgumentLabels := checker.compositeConstructorType(declaration, compositeType)
+	constructorType.Members = declarationMembers
+
+	// If the composite is a contract, declare a value – the contract is a singleton.
+	// For all other kinds of composites, declare constructor.
+
+	// NOTE: perform declarations after the nested scope, so they are visible after the declaration
+
+	if compositeType.Kind == common.CompositeKindContract {
+		_, err := checker.valueActivations.Declare(
+			declaration.Identifier.Identifier,
+			compositeType,
+			// NOTE: contracts are always public
+			ast.AccessPublic,
+			common.DeclarationKindContract,
+			declaration.Identifier.Pos,
+			true,
+			nil,
+		)
+		checker.report(err)
+
+		for name, declarationMember := range declarationMembers {
+			if compositeType.Members[name] != nil {
+				continue
+			}
+			compositeType.Members[name] = declarationMember
+		}
+	} else {
+		_, err := checker.valueActivations.Declare(
+			declaration.Identifier.Identifier,
+			constructorType,
+			declaration.Access,
+			declaration.DeclarationKind(),
+			declaration.Identifier.Pos,
+			true,
+			constructorArgumentLabels,
+		)
+		checker.report(err)
+	}
 
 	checker.Elaboration.CompositeDeclarationTypes[declaration] = compositeType
 
@@ -599,7 +658,9 @@ func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member
 	// Check type
 
 	// TODO: subtype?
-	if !compositeMember.Type.Equal(interfaceMember.Type) {
+	if !compositeMember.TypeAnnotation.Type.
+		Equal(interfaceMember.TypeAnnotation.Type) {
+
 		return false
 	}
 
@@ -727,18 +788,19 @@ func (checker *Checker) checkTypeRequirement(
 	)
 }
 
-func (checker *Checker) declareCompositeConstructor(
+func (checker *Checker) compositeConstructorType(
 	compositeDeclaration *ast.CompositeDeclaration,
 	compositeType *CompositeType,
-) *SpecialFunctionType {
+) (
+	functionType *SpecialFunctionType,
+	argumentLabels []string,
+) {
 
-	functionType := &SpecialFunctionType{
+	functionType = &SpecialFunctionType{
 		FunctionType: &FunctionType{
 			ReturnTypeAnnotation: NewTypeAnnotation(compositeType),
 		},
 	}
-
-	var argumentLabels []string
 
 	// TODO: support multiple overloaded initializers
 
@@ -753,15 +815,7 @@ func (checker *Checker) declareCompositeConstructor(
 		checker.Elaboration.SpecialFunctionTypes[firstInitializer] = functionType
 	}
 
-	_, err := checker.valueActivations.DeclareFunction(
-		compositeDeclaration.Identifier,
-		compositeDeclaration.Access,
-		functionType,
-		argumentLabels,
-	)
-	checker.report(err)
-
-	return functionType
+	return functionType, argumentLabels
 }
 
 func (checker *Checker) membersAndOrigins(
@@ -777,27 +831,55 @@ func (checker *Checker) membersAndOrigins(
 	members = make(map[string]*Member, memberCount)
 	origins = make(map[string]*Origin, memberCount)
 
+	predeclaredMembers := checker.predeclaredMembers(containerType)
+	invalidIdentifiers := make(map[string]bool, len(predeclaredMembers))
+
+	for _, predeclaredMember := range predeclaredMembers {
+		name := predeclaredMember.Identifier.Identifier
+		members[name] = predeclaredMember
+		invalidIdentifiers[name] = true
+	}
+
+	checkInvalidIdentifier := func(declaration ast.Declaration) bool {
+		identifier := declaration.DeclarationIdentifier()
+		if invalidIdentifiers == nil || !invalidIdentifiers[identifier.Identifier] {
+			return true
+		}
+
+		checker.report(
+			&InvalidDeclarationError{
+				Identifier: identifier.Identifier,
+				Kind:       declaration.DeclarationKind(),
+				Range:      ast.NewRangeFromPositioned(identifier),
+			},
+		)
+
+		return false
+	}
+
 	// declare a member for each field
 	for _, field := range fields {
-		fieldTypeAnnotation := checker.ConvertTypeAnnotation(field.TypeAnnotation)
-
-		fieldType := fieldTypeAnnotation.Type
-
-		checker.checkTypeAnnotation(fieldTypeAnnotation, field.TypeAnnotation.StartPos)
+		if !checkInvalidIdentifier(field) {
+			continue
+		}
 
 		identifier := field.Identifier.Identifier
+
+		fieldTypeAnnotation := checker.ConvertTypeAnnotation(field.TypeAnnotation)
+
+		checker.checkTypeAnnotation(fieldTypeAnnotation, field.TypeAnnotation.StartPos)
 
 		members[identifier] = &Member{
 			ContainerType:   containerType,
 			Access:          field.Access,
 			Identifier:      field.Identifier,
 			DeclarationKind: common.DeclarationKindField,
-			Type:            fieldType,
+			TypeAnnotation:  fieldTypeAnnotation,
 			VariableKind:    field.VariableKind,
 		}
 
 		origins[identifier] =
-			checker.recordFieldDeclarationOrigin(field, fieldType)
+			checker.recordFieldDeclarationOrigin(field, fieldTypeAnnotation.Type)
 
 		if requireVariableKind &&
 			field.VariableKind == ast.VariableKindNotSpecified {
@@ -813,18 +895,24 @@ func (checker *Checker) membersAndOrigins(
 
 	// declare a member for each function
 	for _, function := range functions {
+		if !checkInvalidIdentifier(function) {
+			continue
+		}
+
+		identifier := function.Identifier.Identifier
+
 		functionType := checker.functionType(function.ParameterList, function.ReturnTypeAnnotation)
 
 		argumentLabels := function.ParameterList.ArgumentLabels()
 
-		identifier := function.Identifier.Identifier
+		fieldTypeAnnotation := &TypeAnnotation{Type: functionType}
 
 		members[identifier] = &Member{
 			ContainerType:   containerType,
 			Access:          function.Access,
 			Identifier:      function.Identifier,
 			DeclarationKind: common.DeclarationKindFunction,
-			Type:            functionType,
+			TypeAnnotation:  fieldTypeAnnotation,
 			VariableKind:    ast.VariableKindConstant,
 			ArgumentLabels:  argumentLabels,
 		}
@@ -861,7 +949,6 @@ func (checker *Checker) checkInitializers(
 		initializer,
 		containerType,
 		containerDeclarationKind,
-		containerTypeIdentifier,
 		initializerParameterTypeAnnotations,
 		containerKind,
 		initializationInfo,
@@ -897,7 +984,6 @@ func (checker *Checker) checkSpecialFunction(
 	specialFunction *ast.SpecialFunctionDeclaration,
 	containerType Type,
 	containerDeclarationKind common.DeclarationKind,
-	typeIdentifier string,
 	parameterTypeAnnotations []*TypeAnnotation,
 	containerKind ContainerKind,
 	initializationInfo *InitializationInfo,
@@ -1186,7 +1272,9 @@ func (checker *Checker) checkNoDestructorNoResourceFields(
 	}
 
 	for memberName, member := range members {
-		if !member.Type.IsResourceType() {
+		// NOTE: check type, not move annotation:
+		// the field could have a wrong annotation
+		if !member.TypeAnnotation.Type.IsResourceType() {
 			continue
 		}
 
@@ -1226,7 +1314,6 @@ func (checker *Checker) checkDestructor(
 		destructor,
 		containerType,
 		containerDeclarationKind,
-		containerTypeIdentifier,
 		parameterTypeAnnotations,
 		containerKind,
 		nil,
@@ -1252,7 +1339,9 @@ func (checker *Checker) checkCompositeResourceInvalidated(containerType Type, co
 //
 func (checker *Checker) checkResourceFieldsInvalidated(containerTypeIdentifier string, members map[string]*Member) {
 	for _, member := range members {
-		if !member.Type.IsResourceType() {
+		// NOTE: check type, not move annotation:
+		// the field could have a wrong annotation
+		if !member.TypeAnnotation.Type.IsResourceType() {
 			return
 		}
 

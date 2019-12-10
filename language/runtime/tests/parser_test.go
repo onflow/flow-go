@@ -4787,7 +4787,7 @@ func TestParseImportWithString(t *testing.T) {
 
 	assert.Equal(t,
 		map[LocationID]*Program{
-			importLocation.ID(): &Program{},
+			importLocation.ID(): {},
 		},
 		actualImports,
 	)
@@ -4830,7 +4830,7 @@ func TestParseImportWithAddress(t *testing.T) {
 
 	assert.Equal(t,
 		map[LocationID]*Program{
-			importLocation.ID(): &Program{},
+			importLocation.ID(): {},
 		},
 		actualImports,
 	)
@@ -5067,8 +5067,7 @@ func TestParseEventEmitStatement(t *testing.T) {
         emit Transfer(to: 1, from: 2)
       }
 	`)
-
-	actualStatements := actual.Declarations[0].(*FunctionDeclaration).FunctionBlock.Block.Statements
+	require.NoError(t, err)
 
 	expectedStatements := []Statement{
 		&EmitStatement{
@@ -5113,7 +5112,7 @@ func TestParseEventEmitStatement(t *testing.T) {
 		},
 	}
 
-	require.Nil(t, err)
+	actualStatements := actual.Declarations[0].(*FunctionDeclaration).FunctionBlock.Block.Statements
 
 	unittest.AssertEqualWithDiff(t, expectedStatements, actualStatements)
 }
@@ -6500,7 +6499,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 									Statements: []Statement{
 										&AssignmentStatement{
 											Target: &IdentifierExpression{
-												Identifier{
+												Identifier: Identifier{
 													Identifier: "x",
 													Pos:        Position{Offset: 84, Line: 7, Column: 11},
 												},
@@ -6547,7 +6546,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 									Statements: []Statement{
 										&AssignmentStatement{
 											Target: &IdentifierExpression{
-												Identifier{
+												Identifier: Identifier{
 													Identifier: "x",
 													Pos:        Position{Offset: 124, Line: 11, Column: 11},
 												},
@@ -6695,7 +6694,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 									Statements: []Statement{
 										&AssignmentStatement{
 											Target: &IdentifierExpression{
-												Identifier{
+												Identifier: Identifier{
 													Identifier: "x",
 													Pos:        Position{Offset: 84, Line: 7, Column: 11},
 												},
@@ -6731,7 +6730,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							Test: &BinaryExpression{
 								Operation: OperationEqual,
 								Left: &IdentifierExpression{
-									Identifier{
+									Identifier: Identifier{
 										Identifier: "x",
 										Pos:        Position{Offset: 116, Line: 11, Column: 10},
 									},
@@ -6753,7 +6752,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							Test: &BinaryExpression{
 								Operation: OperationEqual,
 								Left: &IdentifierExpression{
-									Identifier{
+									Identifier: Identifier{
 										Identifier: "x",
 										Pos:        Position{Offset: 198, Line: 19, Column: 11},
 									},
@@ -6784,7 +6783,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 									Statements: []Statement{
 										&AssignmentStatement{
 											Target: &IdentifierExpression{
-												Identifier{
+												Identifier: Identifier{
 													Identifier: "x",
 													Pos:        Position{Offset: 157, Line: 15, Column: 11},
 												},
@@ -6932,7 +6931,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 									Statements: []Statement{
 										&AssignmentStatement{
 											Target: &IdentifierExpression{
-												Identifier{
+												Identifier: Identifier{
 													Identifier: "x",
 													Pos:        Position{Offset: 84, Line: 7, Column: 11},
 												},
@@ -6968,7 +6967,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							Test: &BinaryExpression{
 								Operation: OperationEqual,
 								Left: &IdentifierExpression{
-									Identifier{
+									Identifier: Identifier{
 										Identifier: "x",
 										Pos:        Position{Offset: 116, Line: 11, Column: 10},
 									},
@@ -6990,7 +6989,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							Test: &BinaryExpression{
 								Operation: OperationEqual,
 								Left: &IdentifierExpression{
-									Identifier{
+									Identifier: Identifier{
 										Identifier: "x",
 										Pos:        Position{Offset: 153, Line: 15, Column: 11},
 									},
@@ -7021,7 +7020,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 									Statements: []Statement{
 										&AssignmentStatement{
 											Target: &IdentifierExpression{
-												Identifier{
+												Identifier: Identifier{
 													Identifier: "x",
 													Pos:        Position{Offset: 200, Line: 19, Column: 11},
 												},

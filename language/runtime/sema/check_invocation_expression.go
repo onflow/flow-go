@@ -44,7 +44,7 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		var member *Member
 		member, isOptionalResult = checker.visitMember(memberExpression)
 		if member != nil {
-			expressionType = member.Type
+			expressionType = member.TypeAnnotation.Type
 		}
 	}
 
@@ -273,7 +273,7 @@ func (checker *Checker) checkInvocationArguments(
 		minCount = parameterCount
 	}
 
-	argumentTypes = make([]Type, minCount)
+	argumentTypes = make([]Type, argumentCount)
 
 	for i := 0; i < minCount; i++ {
 		// ensure the type of the argument matches the type of the parameter
@@ -282,6 +282,14 @@ func (checker *Checker) checkInvocationArguments(
 		argument := invocationExpression.Arguments[i]
 
 		argumentTypes[i] = checker.checkInvocationArgument(argument, parameterType)
+	}
+
+	// Add extra argument types
+
+	for i := minCount; i < argumentCount; i++ {
+		argument := invocationExpression.Arguments[i]
+
+		argumentTypes[i] = argument.Expression.Accept(checker).(Type)
 	}
 
 	// The invokable type might have special checks for the arguments

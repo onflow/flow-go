@@ -13,8 +13,6 @@ import (
 
 // AssertFunction
 
-var assertRequiredArgumentCount = 1
-
 var AssertFunction = NewStandardLibraryFunction(
 	"assert",
 	&sema.FunctionType{
@@ -25,18 +23,21 @@ var AssertFunction = NewStandardLibraryFunction(
 		ReturnTypeAnnotation: sema.NewTypeAnnotation(
 			&sema.VoidType{},
 		),
-		RequiredArgumentCount: &assertRequiredArgumentCount,
+		RequiredArgumentCount: (func() *int {
+			var count = 1
+			return &count
+		})(),
 	},
-	func(arguments []interpreter.Value, location interpreter.LocationPosition) trampoline.Trampoline {
-		result := arguments[0].(interpreter.BoolValue)
+	func(invocation interpreter.Invocation) trampoline.Trampoline {
+		result := invocation.Arguments[0].(interpreter.BoolValue)
 		if !result {
 			var message string
-			if len(arguments) > 1 {
-				message = arguments[1].(*interpreter.StringValue).Str
+			if len(invocation.Arguments) > 1 {
+				message = invocation.Arguments[1].(*interpreter.StringValue).Str
 			}
 			panic(AssertionError{
 				Message:  message,
-				Location: location,
+				Location: invocation.Location,
 			})
 		}
 		return trampoline.Done{}
@@ -82,11 +83,11 @@ var PanicFunction = NewStandardLibraryFunction(
 			&sema.NeverType{},
 		),
 	},
-	func(arguments []interpreter.Value, location interpreter.LocationPosition) trampoline.Trampoline {
-		message := arguments[0].(*interpreter.StringValue)
+	func(invocation interpreter.Invocation) trampoline.Trampoline {
+		message := invocation.Arguments[0].(*interpreter.StringValue)
 		panic(PanicError{
 			Message:  message.Str,
-			Location: location,
+			Location: invocation.Location,
 		})
 		return trampoline.Done{}
 	},
@@ -106,15 +107,16 @@ var LogFunction = NewStandardLibraryFunction(
 	"log",
 	&sema.FunctionType{
 		ParameterTypeAnnotations: sema.NewTypeAnnotations(
-			&sema.AnyType{},
+			&sema.AnyStructType{},
 		),
 		ReturnTypeAnnotation: sema.NewTypeAnnotation(
 			&sema.VoidType{},
 		),
 	},
-	func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		fmt.Printf("%v\n", arguments[0])
-		return trampoline.Done{Result: &interpreter.VoidValue{}}
+	func(invocation interpreter.Invocation) trampoline.Trampoline {
+		fmt.Printf("%v\n", invocation.Arguments[0])
+		result := interpreter.VoidValue{}
+		return trampoline.Done{Result: result}
 	},
 	nil,
 )

@@ -14,24 +14,27 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-func TestCheckFailableCastingWithMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFailableCastingWithResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.CompositeKinds {
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
                       %[1]s T {}
 
-                      let test %[2]s %[3]s T() as? @T
+                      let test %[2]s %[3]s T%[4]s as? @T
                     `,
-					kind.Keyword(),
-					kind.AssignmentOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.AssignmentOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 2)
 
@@ -58,7 +61,7 @@ func TestCheckFailableCastingWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionDeclarationParameterWithMoveAnnotation(t *testing.T) {
+func TestCheckFunctionDeclarationParameterWithResourceAnnotation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -92,7 +95,7 @@ func TestCheckFunctionDeclarationParameterWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionDeclarationParameterWithoutMoveAnnotation(t *testing.T) {
+func TestCheckFunctionDeclarationParameterWithoutResourceAnnotation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -126,9 +129,11 @@ func TestCheckFunctionDeclarationParameterWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFunctionDeclarationReturnTypeWithResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.CompositeKinds {
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -136,16 +141,17 @@ func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
                       %[1]s T {}
 
                       fun test(): @T {
-                          return %[2]s %[3]s T()
+                          return %[2]s %[3]s T%[4]s
                       }
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
@@ -161,9 +167,11 @@ func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFunctionDeclarationReturnTypeWithoutResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.CompositeKinds {
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -171,16 +179,17 @@ func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
                       %[1]s T {}
 
                       fun test(): T {
-                          return %[2]s %[3]s T()
+                          return %[2]s %[3]s T%[4]s
                       }
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -196,24 +205,27 @@ func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckVariableDeclarationWithMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckVariableDeclarationWithResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.CompositeKinds {
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
                       %[1]s T {}
 
-                      let test: @T %[2]s %[3]s T()
+                      let test: @T %[2]s %[3]s T%[4]s
                     `,
-					kind.Keyword(),
-					kind.AssignmentOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.AssignmentOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
@@ -229,24 +241,27 @@ func TestCheckVariableDeclarationWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckVariableDeclarationWithoutResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.CompositeKinds {
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
                       %[1]s T {}
 
-                      let test: T %[2]s %[3]s T()
+                      let test: T %[2]s %[3]s T%[4]s
                     `,
-					kind.Keyword(),
-					kind.AssignmentOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.AssignmentOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -262,7 +277,7 @@ func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
+func TestCheckFieldDeclarationWithResourceAnnotation(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
@@ -315,7 +330,7 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFieldDeclarationWithoutMoveAnnotation(t *testing.T) {
+func TestCheckFieldDeclarationWithoutResourceAnnotation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -367,7 +382,7 @@ func TestCheckFieldDeclarationWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionExpressionParameterWithMoveAnnotation(t *testing.T) {
+func TestCheckFunctionExpressionParameterWithResourceAnnotation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -401,7 +416,7 @@ func TestCheckFunctionExpressionParameterWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionExpressionParameterWithoutMoveAnnotation(t *testing.T) {
+func TestCheckFunctionExpressionParameterWithoutResourceAnnotation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -436,9 +451,10 @@ func TestCheckFunctionExpressionParameterWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFunctionExpressionReturnTypeWithResourceAnnotation(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -446,16 +462,17 @@ func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
                       %[1]s T {}
 
                       let test = fun (): @T {
-                          return %[2]s %[3]s T()
+                          return %[2]s %[3]s T%[4]s
                       }
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
@@ -472,9 +489,10 @@ func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFunctionExpressionReturnTypeWithoutResourceAnnotation(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -482,16 +500,17 @@ func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
                       %[1]s T {}
 
                       let test = fun (): T {
-                          return %[2]s %[3]s T()
+                          return %[2]s %[3]s T%[4]s
                       }
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -507,7 +526,7 @@ func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionTypeParameterWithMoveAnnotation(t *testing.T) {
+func TestCheckFunctionTypeParameterWithResourceAnnotation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -541,7 +560,7 @@ func TestCheckFunctionTypeParameterWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionTypeParameterWithoutMoveAnnotation(t *testing.T) {
+func TestCheckFunctionTypeParameterWithoutResourceAnnotation(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
@@ -575,9 +594,11 @@ func TestCheckFunctionTypeParameterWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
+
+	for _, compositeKind := range common.CompositeKinds {
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -585,16 +606,17 @@ func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
                       %[1]s T {}
 
                       let test: ((): @T) = fun (): @T {
-                          return %[2]s %[3]s T()
+                          return %[2]s %[3]s T%[4]s
                       }
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
@@ -610,9 +632,10 @@ func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFunctionTypeReturnTypeWithoutResourceAnnotation(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -620,16 +643,17 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
                       %[1]s T {}
 
                       let test: ((): T) = fun (): T {
-                          return %[2]s %[3]s T()
+                          return %[2]s %[3]s T%[4]s
                       }
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
@@ -645,24 +669,26 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
 	}
 }
 
-func TestCheckFailableCastingWithoutMoveAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+func TestCheckFailableCastingWithoutResourceAnnotation(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
                       %[1]s T {}
 
-                      let test %[2]s %[3]s T() as? T
+                      let test %[2]s %[3]s T%[4]s as? T
                     `,
-					kind.Keyword(),
-					kind.AssignmentOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 3)
 
@@ -2261,6 +2287,63 @@ func TestCheckInvalidResourceFieldMoveThroughParameter(t *testing.T) {
 
 	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
 	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+}
+
+func TestCheckInvalidResourceFieldMoveSelf(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Y {}
+
+      resource X {
+
+          var y: <-Y
+
+          init() {
+              self.y <- create Y()
+          }
+
+          fun test() {
+             absorb(<-self.y)
+          }
+
+          destroy() {
+              destroy self.y
+          }
+      }
+
+      fun absorb(_ y: <-Y) {
+          destroy y
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+}
+
+func TestCheckInvalidResourceFieldUseAfterDestroy(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Y {}
+
+      resource X {
+
+          var y: <-Y
+
+          init() {
+              self.y <- create Y()
+          }
+
+          destroy() {
+              destroy self.y
+              destroy self.y
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceUseAfterInvalidationError{}, errs[0])
 }
 
 func TestCheckResourceArrayAppend(t *testing.T) {

@@ -67,9 +67,16 @@ func (checker *Checker) checkValidStatement(statement ast.Statement) bool {
 		return true
 	}
 
+	identifier := declaration.DeclarationIdentifier()
+
+	var name string
+	if identifier != nil {
+		name = identifier.Identifier
+	}
+
 	checker.report(
 		&InvalidDeclarationError{
-			Identifier: declaration.DeclarationIdentifier().Identifier,
+			Identifier: name,
 			Kind:       declaration.DeclarationKind(),
 			Range:      ast.NewRangeFromPositioned(statement),
 		},

@@ -53,54 +53,27 @@ type getterSetter struct {
 	set func(Value)
 }
 
-// StatementTrampoline
-
-type StatementTrampoline struct {
-	F    func() Trampoline
-	Line int
-}
-
-func (m StatementTrampoline) Resume() interface{} {
-	return m.F
-}
-
-func (m StatementTrampoline) FlatMap(f func(interface{}) Trampoline) Trampoline {
-	return FlatMap{Subroutine: m, Continuation: f}
-}
-
-func (m StatementTrampoline) Map(f func(interface{}) interface{}) Trampoline {
-	return MapTrampoline(m, f)
-}
-
-func (m StatementTrampoline) Then(f func(interface{})) Trampoline {
-	return ThenTrampoline(m, f)
-}
-
-func (m StatementTrampoline) Continue() Trampoline {
-	return m.F()
-}
-
 // Visit-methods for statement which return a non-nil value
 // are treated like they are returning a value.
 
 // OnEventEmittedFunc is a function that is triggered when an event is emitted by the program.
 //
 type OnEventEmittedFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	event EventValue,
 )
 
 // OnStatementFunc is a function that is triggered when a statement is about to be executed.
 //
 type OnStatementFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	statement *Statement,
 )
 
 // StorageReadHandlerFunc is a function that handles storage reads.
 //
 type StorageReadHandlerFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	storageIdentifier string,
 	key string,
 ) OptionalValue
@@ -108,7 +81,7 @@ type StorageReadHandlerFunc func(
 // StorageWriteHandlerFunc is a function that handles storage writes.
 //
 type StorageWriteHandlerFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	storageIdentifier string,
 	key string,
 	value OptionalValue,
@@ -117,27 +90,46 @@ type StorageWriteHandlerFunc func(
 // StorageKeyHandlerFunc is a function that handles storage indexing types.
 //
 type StorageKeyHandlerFunc func(
-	interpreter *Interpreter,
+	inter *Interpreter,
 	storageIdentifier string,
 	indexingType sema.Type,
 ) string
 
+// InjectedCompositeFieldsHandlerFunc is a function that handles storage reads.
+//
+type InjectedCompositeFieldsHandlerFunc func(
+	inter *Interpreter,
+	location ast.Location,
+	compositeIdentifier string,
+	compositeKind common.CompositeKind,
+) map[string]Value
+
+// ContractValueHandlerFunc is a function that handles contract values.
+//
+type ContractValueHandlerFunc func(
+	inter *Interpreter,
+	compositeType *sema.CompositeType,
+	constructor FunctionValue,
+) *CompositeValue
+
 type Interpreter struct {
-	Checker               *sema.Checker
-	PredefinedValues      map[string]Value
-	activations           *activations.Activations
-	Globals               map[string]*Variable
-	InterfaceDeclarations map[*sema.InterfaceType]*ast.InterfaceDeclaration
-	CompositeDeclarations map[*sema.CompositeType]*ast.CompositeDeclaration
-	CompositeFunctions    map[string]map[string]FunctionValue
-	DestructorFunctions   map[string]*InterpretedFunctionValue
-	SubInterpreters       map[ast.LocationID]*Interpreter
-	Transactions          []*HostFunctionValue
-	onEventEmitted        OnEventEmittedFunc
-	onStatement           OnStatementFunc
-	storageReadHandler    StorageReadHandlerFunc
-	storageWriteHandler   StorageWriteHandlerFunc
-	storageKeyHandler     StorageKeyHandlerFunc
+	Checker                        *sema.Checker
+	PredefinedValues               map[string]Value
+	activations                    *activations.Activations
+	Globals                        map[string]*Variable
+	InterfaceDeclarations          map[*sema.InterfaceType]*ast.InterfaceDeclaration
+	CompositeDeclarations          map[*sema.CompositeType]*ast.CompositeDeclaration
+	CompositeFunctions             map[string]map[string]FunctionValue
+	DestructorFunctions            map[string]*InterpretedFunctionValue
+	SubInterpreters                map[ast.LocationID]*Interpreter
+	Transactions                   []*HostFunctionValue
+	onEventEmitted                 OnEventEmittedFunc
+	onStatement                    OnStatementFunc
+	storageReadHandler             StorageReadHandlerFunc
+	storageWriteHandler            StorageWriteHandlerFunc
+	storageKeyHandler              StorageKeyHandlerFunc
+	injectedCompositeFieldsHandler InjectedCompositeFieldsHandlerFunc
+	contractValueHandler           ContractValueHandlerFunc
 }
 
 type Option func(*Interpreter) error
@@ -200,12 +192,32 @@ func WithStorageWriteHandler(handler StorageWriteHandlerFunc) Option {
 	}
 }
 
-// WithStorageKeyHandlerFunc returns an interpreter option which sets the given function
+// WithStorageKeyHandler returns an interpreter option which sets the given function
 // as the function that is used when a stored value is written.
 //
-func WithStorageKeyHandlerFunc(handler StorageKeyHandlerFunc) Option {
+func WithStorageKeyHandler(handler StorageKeyHandlerFunc) Option {
 	return func(interpreter *Interpreter) error {
 		interpreter.SetStorageKeyHandler(handler)
+		return nil
+	}
+}
+
+// WithInjectedCompositeFieldsHandler returns an interpreter option which sets the given function
+// as the function that is used to initialize new composite values' fields
+//
+func WithInjectedCompositeFieldsHandler(handler InjectedCompositeFieldsHandlerFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetInjectedCompositeFieldsHandler(handler)
+		return nil
+	}
+}
+
+// WithContractValueHandler returns an interpreter option which sets the given function
+// as the function that is used to handle imports of values.
+//
+func WithContractValueHandler(handler ContractValueHandlerFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetContractValueHandler(handler)
 		return nil
 	}
 }
@@ -262,6 +274,19 @@ func (interpreter *Interpreter) SetStorageWriteHandler(function StorageWriteHand
 //
 func (interpreter *Interpreter) SetStorageKeyHandler(function StorageKeyHandlerFunc) {
 	interpreter.storageKeyHandler = function
+}
+
+// SetInjectedCompositeFieldsHandler sets the function that is used to initialize
+// new composite values' fields
+//
+func (interpreter *Interpreter) SetInjectedCompositeFieldsHandler(function InjectedCompositeFieldsHandlerFunc) {
+	interpreter.injectedCompositeFieldsHandler = function
+}
+
+// SetContractValueHandler sets the function that is used to handle imports of values
+//
+func (interpreter *Interpreter) SetContractValueHandler(function ContractValueHandlerFunc) {
+	interpreter.contractValueHandler = function
 }
 
 // locationRange returns a new location range for the given positioned element.
@@ -430,7 +455,11 @@ func (interpreter *Interpreter) visitGlobalDeclaration(declaration ast.Declarati
 }
 
 func (interpreter *Interpreter) declareGlobal(declaration ast.Declaration) {
-	name := declaration.DeclarationIdentifier().Identifier
+	identifier := declaration.DeclarationIdentifier()
+	if identifier == nil {
+		return
+	}
+	name := identifier.Identifier
 	// NOTE: semantic analysis already checked possible invalid redeclaration
 	interpreter.Globals[name] = interpreter.findVariable(name)
 }
@@ -517,8 +546,9 @@ func (interpreter *Interpreter) prepareInvoke(
 	preparedArguments := make([]Value, len(arguments))
 	for i, argument := range argumentValues {
 		parameterType := parameterTypeAnnotations[i].Type
-		// TODO: value type is not known – only used for Any boxing right now, so reject for now
-		if parameterType.Equal(&sema.AnyType{}) {
+		// TODO: value type is not known, reject for now
+		switch parameterType.(type) {
+		case *sema.AnyStructType, *sema.AnyResourceType:
 			return nil, &NotInvokableError{
 				Value: functionValue,
 			}
@@ -527,7 +557,12 @@ func (interpreter *Interpreter) prepareInvoke(
 		preparedArguments[i] = interpreter.convertAndBox(argument, nil, parameterType)
 	}
 
-	trampoline = functionValue.invoke(preparedArguments, LocationPosition{})
+	// NOTE: can't fill argument types, as they are unknown
+	trampoline = functionValue.invoke(Invocation{
+		Arguments:   preparedArguments,
+		Interpreter: interpreter,
+	})
+
 	return trampoline, nil
 }
 
@@ -1651,27 +1686,20 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 
 			return interpreter.visitExpressionsNonCopying(argumentExpressions).
 				FlatMap(func(result interface{}) Trampoline {
-					arguments := result.(*ArrayValue)
+					arguments := result.(*ArrayValue).Values
 
 					argumentTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression]
 					parameterTypes :=
 						interpreter.Checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression]
 
-					argumentCopies := make([]Value, len(arguments.Values))
-					for i, argument := range arguments.Values {
-						argumentType := argumentTypes[i]
-						parameterType := parameterTypes[i]
-						argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
-					}
-
-					// TODO: optimize: only potentially used by host-functions
-					location := LocationPosition{
-						Position: invocationExpression.StartPosition(),
-						Location: interpreter.Checker.Location,
-					}
-
-					invocation := function.invoke(argumentCopies, location)
+					invocation := interpreter.functionValueInvocationTrampoline(
+						function,
+						arguments,
+						argumentTypes,
+						parameterTypes,
+						invocationExpression.StartPosition(),
+					)
 
 					// If this is invocation is optional chaining, wrap the result
 					// as an optional, as the result is expected to be an optional
@@ -1685,6 +1713,69 @@ func (interpreter *Interpreter) VisitInvocationExpression(invocationExpression *
 					})
 				})
 		})
+}
+
+func (interpreter *Interpreter) InvokeFunctionValue(
+	function FunctionValue,
+	arguments []Value,
+	argumentTypes []sema.Type,
+	parameterTypes []sema.Type,
+	pos ast.Position,
+) (value Value, err error) {
+	// recover internal panics and return them as an error
+	defer recoverErrors(func(internalErr error) {
+		err = internalErr
+	})
+
+	trampoline := interpreter.functionValueInvocationTrampoline(
+		function,
+		arguments,
+		argumentTypes,
+		parameterTypes,
+		pos,
+	)
+
+	result := interpreter.runAllStatements(trampoline)
+	if result == nil {
+		return nil, nil
+	}
+	return result.(Value), nil
+}
+
+func (interpreter *Interpreter) functionValueInvocationTrampoline(
+	function FunctionValue,
+	arguments []Value,
+	argumentTypes []sema.Type,
+	parameterTypes []sema.Type,
+	pos ast.Position,
+) Trampoline {
+
+	parameterTypeCount := len(parameterTypes)
+	argumentCopies := make([]Value, len(arguments))
+
+	for i, argument := range arguments {
+		argumentType := argumentTypes[i]
+		if i < parameterTypeCount {
+			parameterType := parameterTypes[i]
+			argumentCopies[i] = interpreter.copyAndConvert(argument, argumentType, parameterType)
+		} else {
+			argumentCopies[i] = argument.Copy()
+		}
+	}
+
+	// TODO: optimize: only potentially used by host-functions
+
+	location := LocationPosition{
+		Position: pos,
+		Location: interpreter.Checker.Location,
+	}
+
+	return function.invoke(Invocation{
+		Arguments:     argumentCopies,
+		ArgumentTypes: argumentTypes,
+		Location:      location,
+		Interpreter:   interpreter,
+	})
 }
 
 func (interpreter *Interpreter) invokeInterpretedFunction(
@@ -1814,14 +1905,16 @@ func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.Compo
 	// lexical scope: variables in functions are bound to what is visible at declaration time
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	_, _ = interpreter.declareCompositeConstructor(declaration, lexicalScope)
+	_, _ = interpreter.declareCompositeValue(declaration, lexicalScope)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
 }
 
-// declareCompositeConstructor creates a constructor function
-// for the given composite, bound in a variable.
+// declareCompositeValue creates and declares the value for
+// the composite declaration.
+//
+// For all composite kinds a constructor function is created.
 //
 // The constructor is a host function which creates a new composite,
 // calls the initializer (interpreted function), if any,
@@ -1830,22 +1923,26 @@ func (interpreter *Interpreter) VisitCompositeDeclaration(declaration *ast.Compo
 // Inside the initializer and all functions, `self` is bound to
 // the new composite value, and the constructor itself is bound
 //
-func (interpreter *Interpreter) declareCompositeConstructor(
+// For contracts, `contractValueHandler` is used to declare
+// a contract value / instance (singleton).
+//
+// For all other composite kinds the constructor function is declared.
+//
+func (interpreter *Interpreter) declareCompositeValue(
 	declaration *ast.CompositeDeclaration,
 	lexicalScope hamt.Map,
 ) (
 	scope hamt.Map,
-	function HostFunctionValue,
+	value Value,
 ) {
-
 	identifier := declaration.Identifier.Identifier
 	variable := interpreter.findOrDeclareVariable(identifier)
 
-	// Make the constructor available in the initializer
+	// Make the value available in the initializer
 	lexicalScope = lexicalScope.
 		Insert(common.StringEntry(identifier), variable)
 
-	// Evaluate nested declarations in a new scope, so constructors
+	// Evaluate nested declarations in a new scope, so values
 	// of nested declarations won't be visible after the containing declaration
 
 	members := map[string]Value{}
@@ -1864,15 +1961,15 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 
 		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
 
-			// Pass the lexical scope, which has the containing composite's constructor declared,
+			// Pass the lexical scope, which has the containing composite's value declared,
 			// to the nested declarations so they can refer to it, and update the lexical scope
 			// so the container's functions can refer to the nested constructors
 
-			var nestedConstructor FunctionValue
-			lexicalScope, nestedConstructor =
-				interpreter.declareCompositeConstructor(nestedCompositeDeclaration, lexicalScope)
+			var nestedValue Value
+			lexicalScope, nestedValue =
+				interpreter.declareCompositeValue(nestedCompositeDeclaration, lexicalScope)
 
-			members[nestedCompositeDeclaration.Identifier.Identifier] = nestedConstructor
+			members[nestedCompositeDeclaration.Identifier.Identifier] = nestedValue
 		}
 	})()
 
@@ -1884,16 +1981,28 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 	functions := interpreter.compositeFunctions(declaration, lexicalScope)
 	interpreter.CompositeFunctions[identifier] = functions
 
-	function = NewHostFunctionValue(
-		func(arguments []Value, location LocationPosition) Trampoline {
+	constructor := NewHostFunctionValue(
+		func(invocation Invocation) Trampoline {
+
+			// TODO: is this necessary if CompositeValue loads injected fields?
+			var injectedFields map[string]Value
+			if interpreter.injectedCompositeFieldsHandler != nil {
+				injectedFields = interpreter.injectedCompositeFieldsHandler(
+					interpreter,
+					interpreter.Checker.Location,
+					identifier,
+					declaration.CompositeKind,
+				)
+			}
 
 			value := &CompositeValue{
-				Location:   interpreter.Checker.Location,
-				Identifier: identifier,
-				Kind:       declaration.CompositeKind,
-				Fields:     map[string]Value{},
-				Functions:  functions,
-				Destructor: destructorFunction,
+				Location:       interpreter.Checker.Location,
+				Identifier:     identifier,
+				Kind:           declaration.CompositeKind,
+				Fields:         map[string]Value{},
+				InjectedFields: injectedFields,
+				Functions:      functions,
+				Destructor:     destructorFunction,
 				// NOTE: new value has no owner
 				Owner: "",
 			}
@@ -1903,8 +2012,10 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 			if initializerFunction != nil {
 				// NOTE: arguments are already properly boxed by invocation expression
 
-				initializationTrampoline = interpreter.bindSelf(*initializerFunction, value).
-					invoke(arguments, location)
+				initializationTrampoline =
+					interpreter.
+						bindSelf(*initializerFunction, value).
+						invoke(invocation)
 			}
 
 			return initializationTrampoline.
@@ -1913,10 +2024,22 @@ func (interpreter *Interpreter) declareCompositeConstructor(
 				})
 		},
 	)
-	function.Members = members
-	variable.Value = function
 
-	return lexicalScope, function
+	// Contract declarations declare a value / instance (singleton),
+	// for all other composite kinds, the constructor is declared
+
+	if declaration.CompositeKind == common.CompositeKindContract {
+		compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[declaration]
+		contract := interpreter.contractValueHandler(interpreter, compositeType, constructor)
+		contract.NestedValues = members
+		value = contract
+	} else {
+		value = constructor
+		constructor.Members = members
+	}
+	variable.Value = value
+
+	return lexicalScope, value
 }
 
 // bindSelf returns a function which binds `self` to the structure
@@ -1925,7 +2048,7 @@ func (interpreter *Interpreter) bindSelf(
 	function InterpretedFunctionValue,
 	structure *CompositeValue,
 ) FunctionValue {
-	return NewHostFunctionValue(func(arguments []Value, location LocationPosition) Trampoline {
+	return NewHostFunctionValue(func(invocation Invocation) Trampoline {
 		// start a new activation record
 		// lexical scope: use the function declaration's activation record,
 		// not the current one (which would be dynamic scope)
@@ -1934,7 +2057,7 @@ func (interpreter *Interpreter) bindSelf(
 		// make `self` available
 		interpreter.declareVariable(sema.SelfIdentifier, structure)
 
-		return interpreter.invokeInterpretedFunctionActivated(function, arguments)
+		return interpreter.invokeInterpretedFunctionActivated(function, invocation.Arguments)
 	})
 }
 
@@ -2281,7 +2404,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 // boxOptional boxes a value in an Any value, if necessary
 func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.Type) Value {
 	switch targetType := targetType.(type) {
-	case *sema.AnyType:
+	case *sema.AnyStructType, *sema.AnyResourceType:
 		// no need to convert already boxed value
 		if _, ok := value.(*AnyValue); ok {
 			return value
@@ -2358,6 +2481,9 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 		WithOnStatementHandler(interpreter.onStatement),
 		WithStorageReadHandler(interpreter.storageReadHandler),
 		WithStorageWriteHandler(interpreter.storageWriteHandler),
+		WithStorageKeyHandler(interpreter.storageKeyHandler),
+		WithInjectedCompositeFieldsHandler(interpreter.injectedCompositeFieldsHandler),
+		WithContractValueHandler(interpreter.contractValueHandler),
 	)
 	if err != nil {
 		panic(err)
@@ -2467,7 +2593,7 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 	}
 
 	transactionFunction := NewHostFunctionValue(
-		func(arguments []Value, location LocationPosition) Trampoline {
+		func(invocation Invocation) Trampoline {
 			interpreter.activations.Push(lexicalScope)
 
 			interpreter.declareVariable(sema.SelfIdentifier, self)
@@ -2486,7 +2612,7 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 				)
 
 				prepareTrampoline = func() Trampoline {
-					return prepare.invoke(arguments, location)
+					return prepare.invoke(invocation)
 				}
 			}
 
@@ -2499,7 +2625,9 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 				)
 
 				executeTrampoline = func() Trampoline {
-					return execute.invoke(nil, location)
+					invocationWithoutArguments := invocation
+					invocationWithoutArguments.Arguments = nil
+					return execute.invoke(invocationWithoutArguments)
 				}
 			}
 
@@ -2544,12 +2672,12 @@ func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDe
 
 	variable := interpreter.findOrDeclareVariable(identifier)
 	variable.Value = NewHostFunctionValue(
-		func(arguments []Value, location LocationPosition) Trampoline {
+		func(invocation Invocation) Trampoline {
 			fields := make([]EventField, len(eventType.Fields))
 			for i, field := range eventType.Fields {
 				fields[i] = EventField{
 					Identifier: field.Identifier,
-					Value:      arguments[i],
+					Value:      invocation.Arguments[i],
 				}
 			}
 
@@ -2679,8 +2807,8 @@ func (interpreter *Interpreter) defineBaseFunctions() {
 
 func (interpreter *Interpreter) newConverterFunction(converter func(Value) Value) HostFunctionValue {
 	return HostFunctionValue{
-		Function: func(arguments []Value, location LocationPosition) Trampoline {
-			return Done{Result: converter(arguments[0])}
+		Function: func(invocation Invocation) Trampoline {
+			return Done{Result: converter(invocation.Arguments[0])}
 		},
 	}
 }

@@ -3,7 +3,7 @@ pub let bools = {
     1: true
 }
 
-pub fun forEach(d: {String: String}, f: ((String,String):Any?)): [Any?] {
+pub fun forEach(d: {String: String}, f: ((String,String):AnyStruct?)): [AnyStruct?] {
     return []
 }
 

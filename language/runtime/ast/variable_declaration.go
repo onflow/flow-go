@@ -33,8 +33,8 @@ func (d *VariableDeclaration) Accept(visitor Visitor) Repr {
 	return visitor.VisitVariableDeclaration(d)
 }
 
-func (d *VariableDeclaration) DeclarationIdentifier() Identifier {
-	return d.Identifier
+func (d *VariableDeclaration) DeclarationIdentifier() *Identifier {
+	return &d.Identifier
 }
 
 func (d *VariableDeclaration) DeclarationKind() common.DeclarationKind {

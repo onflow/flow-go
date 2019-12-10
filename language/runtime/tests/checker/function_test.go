@@ -130,7 +130,7 @@ func TestCheckReturnWithoutExpression(t *testing.T) {
 func TestCheckAnyReturnType(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-      fun foo(): Any {
+      fun foo(): AnyStruct {
           return foo
       }
 	`)
