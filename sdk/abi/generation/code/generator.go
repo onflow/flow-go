@@ -402,7 +402,14 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 	f.ImportName(typesImportPath, "types")
 	f.ImportName(valuesImportPath, "values")
 
-	for name, typ := range typesToGenerate {
+	names := make([]string, 0, len(typesToGenerate))
+	for name, _ := range typesToGenerate {
+		names = append(names, name)
+	}
+	values.SortInEncodingOrder(names)
+
+	for _, name := range names {
+		typ := typesToGenerate[name]
 
 		//Generating view-related items
 		viewStructName := startLower(name) + "View"
@@ -428,7 +435,10 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 		decodeFunctionFields := jen.Dict{}
 		decodeFunctionPrepareStatement := make([]jen.Code, 0)
 
-		for _, field := range typ.Fields {
+		for _, fieldName := range fieldNames {
+			field := typ.Fields[fieldName]
+
+			//for _, field := range typ.Fields {
 			viewInterfaceMethodName := startUpper(field.Identifier)
 			viewStructFieldName := _lower(field.Identifier)
 
@@ -593,8 +603,15 @@ func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer 
 			jen.Return(id(constructorStructName).Values(constructorObjectParams), jen.Nil()),
 		)
 	}
-	for _, fun := range converterFunctions {
-		f.Add(fun)
+
+	convertersNames := make([]string, 0, len(converterFunctions))
+	for key, _ := range converterFunctions {
+		convertersNames = append(convertersNames, key)
+	}
+	values.SortInEncodingOrder(convertersNames)
+
+	for _, name := range convertersNames {
+		f.Add(converterFunctions[name])
 	}
 
 	return f.Render(writer)

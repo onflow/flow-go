@@ -161,7 +161,7 @@ func (encoder *Encoder) encodeReturnType(returnType types.Type) interface{} {
 }
 
 var typeToJSON = map[types.Type]string{
-	&types.Any{}:         "AnyStruct",
+	&types.AnyStruct{}:   "AnyStruct",
 	&types.AnyResource{}: "AnyResource",
 	&types.Bool{}:        "Bool",
 	&types.Void{}:        "Void",

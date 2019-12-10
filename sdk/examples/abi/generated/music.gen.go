@@ -11,21 +11,18 @@ import (
 )
 
 type AlbumView interface {
-	Year() uint16
 	Artist() ArtistView
 	Name() string
 	Rating() *uint8
+	Year() uint16
 }
 type albumView struct {
-	_year   uint16
 	_artist ArtistView
 	_name   string
 	_rating *uint8
+	_year   uint16
 }
 
-func (t *albumView) Year() uint16 {
-	return t._year
-}
 func (t *albumView) Artist() ArtistView {
 	return t._artist
 }
@@ -35,13 +32,11 @@ func (t *albumView) Name() string {
 func (t *albumView) Rating() *uint8 {
 	return t._rating
 }
+func (t *albumView) Year() uint16 {
+	return t._year
+}
 func AlbumViewfromValue(value values.Value) (AlbumView, error) {
 	composite, err := values.CastToComposite(value)
-	if err != nil {
-		return nil, err
-	}
-
-	_year, err := values.CastToUInt16(composite.Fields[uint(0x3)])
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +52,11 @@ func AlbumViewfromValue(value values.Value) (AlbumView, error) {
 	}
 
 	_rating, err := __converter0(composite.Fields[uint(0x2)])
+	if err != nil {
+		return nil, err
+	}
+
+	_year, err := values.CastToUInt16(composite.Fields[uint(0x3)])
 	if err != nil {
 		return nil, err
 	}

@@ -258,6 +258,9 @@
           "$ref": "#/definitions/builtinType"
         },
         {
+          "$ref": "#/definitions/anyStruct"
+        },
+        {
           "$ref": "#/definitions/arrayType"
         },
         {
@@ -281,6 +284,12 @@
       "oneOf": [
         {
           "$ref": "#/definitions/builtinType"
+        },
+        {
+          "$ref": "#/definitions/anyStruct"
+        },
+        {
+          "$ref": "#/definitions/anyResource"
         },
         {
           "$ref": "#/definitions/resourceReferenceType"
@@ -352,7 +361,6 @@
       "type": "string",
       "enum": [
         "Address",
-        "Any",
         "Int8",
         "Int16",
         "Int32",
@@ -362,6 +370,18 @@
         "UInt32",
         "UInt64"
       ],
+      "additionalProperties": false
+    },
+    "anyStruct": {
+      "title": "Any structure type",
+      "type": "string",
+      "const": "AnyStruct",
+      "additionalProperties": false
+    },
+    "anyResource": {
+      "title": "Any resource type",
+      "type": "string",
+      "const": "AnyResource",
       "additionalProperties": false
     },
     "arrayType": {
