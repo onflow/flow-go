@@ -169,6 +169,21 @@ func TestCheckCompositeNilEquality(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
+		var setupCode, identifier string
+
+		if compositeKind == common.CompositeKindContract {
+			identifier = "X"
+		} else {
+			setupCode = fmt.Sprintf(
+				`let x: %[1]sX? %[2]s %[3]s X%[4]s`,
+				compositeKind.Annotation(),
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
+				constructorArguments(compositeKind),
+			)
+			identifier = "x"
+		}
+
 		t.Run(compositeKind.Name(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -176,16 +191,14 @@ func TestCheckCompositeNilEquality(t *testing.T) {
 					`
                       %[1]s X {}
 
-                      let x: %[2]sX? %[3]s %[4]s X%[5]s
+                      %[2]s
 
-                      let a = x == nil
-                      let b = nil == x
+                      let a = %[3]s == nil
+                      let b = nil == %[3]s
                     `,
 					compositeKind.Keyword(),
-					compositeKind.Annotation(),
-					compositeKind.TransferOperator(),
-					compositeKind.ConstructionKeyword(),
-					constructorArguments(compositeKind),
+					setupCode,
+					identifier,
 				),
 			)
 

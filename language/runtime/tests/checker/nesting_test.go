@@ -119,8 +119,8 @@ func TestCheckCompositeDeclarationNestedTypeScopingInsideNestedOuter(t *testing.
 
           struct X {
 
-              fun test(): Test {
-                  return Test
+              fun test() {
+                  Test
               }
           }
       }
