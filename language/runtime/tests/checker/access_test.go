@@ -1135,6 +1135,23 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 					access.Keyword(),
 				)
 
+				var setupCode, tearDownCode, identifier string
+				if compositeKind == common.CompositeKindContract {
+					identifier = "Test"
+				} else {
+					setupCode = fmt.Sprintf(
+						`let test %[1]s %[2]s Test%[3]s`,
+						compositeKind.TransferOperator(),
+						compositeKind.ConstructionKeyword(),
+						constructorArguments(compositeKind),
+					)
+					identifier = "test"
+				}
+
+				if compositeKind == common.CompositeKindResource {
+					tearDownCode = `destroy test`
+				}
+
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
@@ -1155,19 +1172,20 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test %[3]s %[4]s Test%[5]s
-                                  test.test = 3
+                                  %[3]s
+
+                                  %[4]s.test = 3
                                   var temp = 4
-                                  test.test <-> temp
-                                  %[6]s test
+                                  %[4]s.test <-> temp
+
+                                  %[5]s
                               }
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
-							compositeKind.TransferOperator(),
-							compositeKind.ConstructionKeyword(),
-							constructorArguments(compositeKind),
-							compositeKind.DestructionKeyword(),
+							setupCode,
+							identifier,
+							tearDownCode,
 						),
 						ParseAndCheckOptions{
 							Options: []sema.Option{
