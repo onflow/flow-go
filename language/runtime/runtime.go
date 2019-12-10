@@ -31,7 +31,7 @@ type Interface interface {
 	// CheckCode checks the validity of the code.
 	CheckCode(address values.Address, code values.Bytes) (err error)
 	// UpdateAccountCode updates the code associated with an account.
-	UpdateAccountCode(address values.Address, code values.Bytes) (err error)
+	UpdateAccountCode(address values.Address, code values.Bytes, checkPermission bool) (err error)
 	// GetSigningAccounts returns the signing accounts.
 	GetSigningAccounts() []values.Address
 	// Log logs a string.
@@ -466,6 +466,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 			accountAddress,
 			constructorArguments,
 			constructorArgumentTypes,
+			false,
 			invocation.Location.Position,
 		)
 
@@ -545,6 +546,7 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(
 			accountAddressValue,
 			constructorArguments,
 			constructorArgumentTypes,
+			true,
 			invocation.Location.Position,
 		)
 
@@ -562,6 +564,7 @@ func (r *interpreterRuntime) updateAccountCode(
 	accountAddress values.Address,
 	constructorArguments []interpreter.Value,
 	constructorArgumentTypes []sema.Type,
+	checkPermission bool,
 	invocationPosition ast.Position,
 ) {
 	location := AddressLocation(accountAddress[:])
@@ -628,7 +631,7 @@ func (r *interpreterRuntime) updateAccountCode(
 
 	// NOTE: only update account code if contract instantiation succeeded
 
-	err = runtimeInterface.UpdateAccountCode(accountAddress, code)
+	err = runtimeInterface.UpdateAccountCode(accountAddress, code, checkPermission)
 	if err != nil {
 		panic(err)
 	}

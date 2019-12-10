@@ -21,7 +21,7 @@ type testRuntimeInterface struct {
 	addAccountKey      func(address values.Address, publicKey values.Bytes) error
 	removeAccountKey   func(address values.Address, index values.Int) (publicKey values.Bytes, err error)
 	checkCode          func(address values.Address, code values.Bytes) (err error)
-	updateAccountCode  func(address values.Address, code values.Bytes) (err error)
+	updateAccountCode  func(address values.Address, code values.Bytes, checkPermission bool) (err error)
 	getSigningAccounts func() []values.Address
 	log                func(string)
 	emitEvent          func(values.Event)
@@ -55,8 +55,8 @@ func (i *testRuntimeInterface) CheckCode(address values.Address, code values.Byt
 	return i.checkCode(address, code)
 }
 
-func (i *testRuntimeInterface) UpdateAccountCode(address values.Address, code values.Bytes) (err error) {
-	return i.updateAccountCode(address, code)
+func (i *testRuntimeInterface) UpdateAccountCode(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+	return i.updateAccountCode(address, code, checkPermission)
 }
 
 func (i *testRuntimeInterface) GetSigningAccounts() []values.Address {
@@ -1195,7 +1195,7 @@ func TestRuntimeTransactionWithUpdateAccountCodeEmpty(t *testing.T) {
 		getSigningAccounts: func() []values.Address {
 			return []values.Address{{42}}
 		},
-		updateAccountCode: func(address values.Address, code values.Bytes) (err error) {
+		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
 			accountCode = code
 			return nil
 		},
@@ -1237,7 +1237,7 @@ func TestRuntimeTransactionWithCreateAccountEmpty(t *testing.T) {
 		createAccount: func(publicKeys []values.Bytes) (address values.Address, err error) {
 			return values.Address{42}, nil
 		},
-		updateAccountCode: func(address values.Address, code values.Bytes) (err error) {
+		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
 			accountCode = code
 			return nil
 		},
@@ -1431,7 +1431,7 @@ func TestRuntimeTransactionWithContractDeployment(t *testing.T) {
 					getSigningAccounts: func() []values.Address {
 						return []values.Address{{42}}
 					},
-					updateAccountCode: func(address values.Address, code values.Bytes) (err error) {
+					updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
 						accountCode = code
 						return nil
 					},
@@ -1493,7 +1493,7 @@ func TestRuntimeTransactionWithContractDeployment(t *testing.T) {
 					createAccount: func(publicKeys []values.Bytes) (address values.Address, err error) {
 						return values.Address{42}, nil
 					},
-					updateAccountCode: func(address values.Address, code values.Bytes) (err error) {
+					updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
 						accountCode = code
 						return nil
 					},
@@ -1582,7 +1582,7 @@ func TestRuntimeContractAccount(t *testing.T) {
 		getSigningAccounts: func() []values.Address {
 			return []values.Address{addressValue}
 		},
-		updateAccountCode: func(address values.Address, code values.Bytes) (err error) {
+		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
 			accountCode = code
 			return nil
 		},
