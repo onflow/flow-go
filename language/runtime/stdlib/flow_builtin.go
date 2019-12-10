@@ -23,11 +23,15 @@ var createAccountFunctionType = &sema.FunctionType{
 			},
 		},
 	),
-	// value
-	// TODO: add proper type
+	// address
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.IntType{},
+		&sema.AddressType{},
 	),
+	// additional arguments are passed to the contract initializer
+	RequiredArgumentCount: (func() *int {
+		var count = 2
+		return &count
+	})(),
 }
 
 var addAccountKeyFunctionType = &sema.FunctionType{
@@ -71,6 +75,7 @@ var updateAccountCodeFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
 		&sema.VoidType{},
 	),
+	// additional arguments are passed to the contract initializer
 	RequiredArgumentCount: (func() *int {
 		var count = 2
 		return &count

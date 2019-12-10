@@ -94,7 +94,7 @@ func (r *RuntimeContext) SetValue(owner, controller, key, value values.Bytes) er
 //
 // After creating the account, this function calls the onAccountCreated callback registered
 // with this context.
-func (r *RuntimeContext) CreateAccount(publicKeys []values.Bytes, code values.Bytes) (values.Address, error) {
+func (r *RuntimeContext) CreateAccount(publicKeys []values.Bytes) (values.Address, error) {
 	latestAccountID, _ := r.ledger.Get(keyLatestAccount)
 
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
@@ -104,13 +104,7 @@ func (r *RuntimeContext) CreateAccount(publicKeys []values.Bytes, code values.By
 
 	accountID := accountAddress[:]
 
-	// prevent invalid code from being deployed to account
-	if err := r.checkProgram(code, accountAddress); err != nil {
-		return values.Address{}, err
-	}
-
 	r.ledger.Set(fullKey(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
-	r.ledger.Set(fullKey(string(accountID), string(accountID), keyCode), code)
 
 	err := r.setAccountPublicKeys(accountID, publicKeys)
 	if err != nil {
@@ -121,7 +115,6 @@ func (r *RuntimeContext) CreateAccount(publicKeys []values.Bytes, code values.By
 
 	r.Log("Creating new account\n")
 	r.Log(fmt.Sprintf("Address: %x", accountAddress))
-	r.Log(fmt.Sprintf("Code:\n%s", string(code)))
 
 	return accountAddress, nil
 }
