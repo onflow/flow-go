@@ -28,7 +28,7 @@ func TestCheckFailableCastingWithResourceAnnotation(t *testing.T) {
                       let test %[2]s %[3]s T%[4]s as? @T
                     `,
 					compositeKind.Keyword(),
-					compositeKind.AssignmentOperator(),
+					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -145,7 +145,7 @@ func TestCheckFunctionDeclarationReturnTypeWithResourceAnnotation(t *testing.T) 
                       }
                     `,
 					compositeKind.Keyword(),
-					compositeKind.TransferOperator(),
+					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -183,7 +183,7 @@ func TestCheckFunctionDeclarationReturnTypeWithoutResourceAnnotation(t *testing.
                       }
                     `,
 					compositeKind.Keyword(),
-					compositeKind.TransferOperator(),
+					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -219,7 +219,7 @@ func TestCheckVariableDeclarationWithResourceAnnotation(t *testing.T) {
                       let test: @T %[2]s %[3]s T%[4]s
                     `,
 					compositeKind.Keyword(),
-					compositeKind.AssignmentOperator(),
+					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -255,7 +255,7 @@ func TestCheckVariableDeclarationWithoutResourceAnnotation(t *testing.T) {
                       let test: T %[2]s %[3]s T%[4]s
                     `,
 					compositeKind.Keyword(),
-					compositeKind.AssignmentOperator(),
+					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -306,7 +306,7 @@ func TestCheckFieldDeclarationWithResourceAnnotation(t *testing.T) {
                       }
                     `,
 					kind.Keyword(),
-					kind.AssignmentOperator(),
+					kind.TransferOperator(),
 					destructor,
 				),
 			)
@@ -358,7 +358,7 @@ func TestCheckFieldDeclarationWithoutResourceAnnotation(t *testing.T) {
                       }
                     `,
 					kind.Keyword(),
-					kind.AssignmentOperator(),
+					kind.TransferOperator(),
 					destructor,
 				),
 			)
@@ -466,7 +466,7 @@ func TestCheckFunctionExpressionReturnTypeWithResourceAnnotation(t *testing.T) {
                       }
                     `,
 					compositeKind.Keyword(),
-					compositeKind.TransferOperator(),
+					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -504,7 +504,7 @@ func TestCheckFunctionExpressionReturnTypeWithoutResourceAnnotation(t *testing.T
                       }
                     `,
 					compositeKind.Keyword(),
-					compositeKind.TransferOperator(),
+					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -610,7 +610,7 @@ func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
                       }
                     `,
 					compositeKind.Keyword(),
-					compositeKind.TransferOperator(),
+					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -647,7 +647,7 @@ func TestCheckFunctionTypeReturnTypeWithoutResourceAnnotation(t *testing.T) {
                       }
                     `,
 					compositeKind.Keyword(),
-					compositeKind.TransferOperator(),
+					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -682,7 +682,7 @@ func TestCheckFailableCastingWithoutResourceAnnotation(t *testing.T) {
                       let test %[2]s %[3]s T%[4]s as? T
                     `,
 					compositeKind.Keyword(),
-					compositeKind.AssignmentOperator(),
+					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -1981,7 +1981,7 @@ func testResourceNesting(
               }
             `,
 			innerCompositeKind.Annotation(),
-			innerCompositeKind.AssignmentOperator(),
+			innerCompositeKind.TransferOperator(),
 		)
 	}
 

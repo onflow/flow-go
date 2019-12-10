@@ -764,7 +764,7 @@ func TestCheckCompositeFieldAssignment(t *testing.T) {
                       }
                     `,
 					kind.Keyword(),
-					kind.AssignmentOperator(),
+					kind.TransferOperator(),
 				),
 			)
 
@@ -831,7 +831,7 @@ func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
                       }
                     `,
 					compositeKind.Keyword(),
-					compositeKind.AssignmentOperator(),
+					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -1062,7 +1062,7 @@ func TestCheckCompositeInstantiation(t *testing.T) {
                     `,
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
-					compositeKind.AssignmentOperator(),
+					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					compositeKind.DestructionKeyword(),
 				),
@@ -1185,7 +1185,7 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 						firstKind.Keyword(),
 						secondKind.Keyword(),
 						firstKind.Annotation(),
-						firstKind.AssignmentOperator(),
+						firstKind.TransferOperator(),
 						secondKind.ConstructionKeyword(),
 						constructorArguments(secondKind),
 					),
@@ -1265,7 +1265,7 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
                       let test %[2]s %[3]s Test%[4]s
                     `,
 					compositeKind.Keyword(),
-					compositeKind.AssignmentOperator(),
+					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -1298,7 +1298,7 @@ func TestCheckCompositeInitializerWithArgumentLabel(t *testing.T) {
                       let test %[2]s %[3]s Test(x: 1)
                     `,
 					compositeKind.Keyword(),
-					compositeKind.AssignmentOperator(),
+					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 				),
 			)
@@ -1330,7 +1330,7 @@ func TestCheckInvalidCompositeInitializerCallWithMissingArgumentLabel(t *testing
                       let test %[2]s %[3]s Test(1)
                     `,
 					compositeKind.Keyword(),
-					compositeKind.AssignmentOperator(),
+					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 				),
 			)
@@ -1360,7 +1360,7 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
                       let void = test.test(x: 1)
                     `,
 					compositeKind.Keyword(),
-					compositeKind.AssignmentOperator(),
+					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -1389,7 +1389,7 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
                       let void = test.test(1)
                     `,
 					compositeKind.Keyword(),
-					compositeKind.AssignmentOperator(),
+					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -1435,8 +1435,8 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
                     `,
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
-					compositeKind.AssignmentOperator(),
 					compositeKind.TransferOperator(),
+					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					compositeKind.DestructionKeyword(),
 					constructorArguments(compositeKind),
@@ -1517,7 +1517,7 @@ func TestCheckCompositeFunction(t *testing.T) {
                     `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.MoveOperator(),
 				),
 			)
 
@@ -1537,21 +1537,21 @@ func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
 					`
                       var tests = 0
 
-                      fun test(): %[2]sTest {
-                          return %[3]s %[4]s Test%[5]s
+                      fun test(): %[1]sTest {
+                          return %[2]s %[3]s Test%[4]s
                       }
 
-                      %[1]s Test {
+                      %[5]s Test {
                          init() {
                              tests = tests + 1
                          }
                       }
                     `,
-					compositeKind.Keyword(),
 					compositeKind.Annotation(),
-					compositeKind.TransferOperator(),
+					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
+					compositeKind.Keyword(),
 				),
 			)
 

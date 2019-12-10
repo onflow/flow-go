@@ -235,7 +235,7 @@ func TestCheckInvalidCompositeEquality(t *testing.T) {
                 `,
 				compositeKind.Keyword(),
 				compositeKind.Annotation(),
-				compositeKind.AssignmentOperator(),
+				compositeKind.TransferOperator(),
 				compositeKind.ConstructionKeyword(),
 				constructorArguments(compositeKind),
 			),

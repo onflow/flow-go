@@ -78,14 +78,14 @@ func (k CompositeKind) Annotation() string {
 	return "@"
 }
 
-func (k CompositeKind) AssignmentOperator() string {
+func (k CompositeKind) TransferOperator() string {
 	if k != CompositeKindResource {
 		return "="
 	}
 	return "<-"
 }
 
-func (k CompositeKind) TransferOperator() string {
+func (k CompositeKind) MoveOperator() string {
 	if k != CompositeKindResource {
 		return ""
 	}
