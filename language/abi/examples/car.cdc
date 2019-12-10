@@ -36,4 +36,4 @@ pub struct Fleet {
     }
 }
 
-event FenderBender(where place: String, cost: Int)
+pub event FenderBender(where place: String, cost: Int)
