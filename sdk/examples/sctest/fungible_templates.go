@@ -17,7 +17,7 @@ func GenerateCreateTokenScript(tokenAddr flow.Address, initialBalance int) []byt
 		transaction {
 
 		  prepare(acct: Account) {
-			var vaultA: <-Vault? <- createVault(initialBalance: %d)
+			var vaultA: @Vault? <- createVault(initialBalance: %d)
 			
 			acct.storage[Vault] <-> vaultA
 
@@ -42,15 +42,15 @@ func GenerateCreateThreeTokensArrayScript(tokenAddr flow.Address, initialBalance
 		transaction {
 
 		  prepare(acct: Account) {
-			let vaultA: <-Vault <- createVault(initialBalance: %d)
-    		let vaultB: <-Vault <- createVault(initialBalance: %d)
-			let vaultC: <-Vault <- createVault(initialBalance: %d)
+			let vaultA: @Vault <- createVault(initialBalance: %d)
+    		let vaultB: @Vault <- createVault(initialBalance: %d)
+			let vaultC: @Vault <- createVault(initialBalance: %d)
 			
-			var vaultArray: <-[Vault] <- [<-vaultA, <-vaultB]
+			var vaultArray: @[Vault] <- [<-vaultA, <-vaultB]
 
 			vaultArray.append(<-vaultC)
 			
-			var storedVaults: <-[Vault]? <- vaultArray
+			var storedVaults: @[Vault]? <- vaultArray
 			acct.storage[[Vault]] <-> storedVaults
             acct.published[&[Vault]] = &acct.storage[[Vault]] as [Vault] 
 
@@ -73,7 +73,7 @@ func GenerateWithdrawScript(tokenCodeAddr flow.Address, vaultNumber int, withdra
 			
 			let withdrawVault <- vaultArray[%d].withdraw(amount: %d)
 
-			var storedVaults: <-[Vault]? <- vaultArray
+			var storedVaults: @[Vault]? <- vaultArray
 			acct.storage[[Vault]] <-> storedVaults
 
 			destroy withdrawVault
@@ -100,7 +100,7 @@ func GenerateWithdrawDepositScript(tokenCodeAddr flow.Address, withdrawVaultNumb
 
 			vaultArray[%d].deposit(from: <-withdrawVault)
 
-			var storedVaults: <-[Vault]? <- vaultArray
+			var storedVaults: @[Vault]? <- vaultArray
 			acct.storage[[Vault]] <-> storedVaults
 
 			destroy storedVaults

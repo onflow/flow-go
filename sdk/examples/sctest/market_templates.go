@@ -18,7 +18,7 @@ func GenerateCreateSaleScript(tokenAddr flow.Address, marketAddr flow.Address) [
 
 				let ownerVault = acct.published[&Receiver] ?? panic("No receiver reference!")
 
-				let collection: <-SaleCollection <- createSaleCollection(ownerVault: ownerVault)
+				let collection: @SaleCollection <- createSaleCollection(ownerVault: ownerVault)
 				
 				let oldCollection <- acct.storage[SaleCollection] <- collection
 				destroy oldCollection
