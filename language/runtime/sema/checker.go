@@ -867,7 +867,7 @@ func (checker *Checker) checkResourceLoss(depth int) {
 func (checker *Checker) recordResourceInvalidation(
 	expression ast.Expression,
 	valueType Type,
-	kind ResourceInvalidationKind,
+	invalidationKind ResourceInvalidationKind,
 ) {
 	if !valueType.IsResourceType() {
 		return
@@ -897,7 +897,7 @@ func (checker *Checker) recordResourceInvalidation(
 	}
 
 	invalidation := ResourceInvalidation{
-		Kind:     kind,
+		Kind:     invalidationKind,
 		StartPos: expression.StartPosition(),
 		EndPos:   expression.EndPosition(),
 	}
@@ -915,6 +915,14 @@ func (checker *Checker) recordResourceInvalidation(
 	variable := checker.findAndCheckVariable(identifierExpression.Identifier, false)
 	if variable == nil {
 		return
+	}
+
+	if variable.DeclarationKind == common.DeclarationKindSelf {
+		checker.report(&InvalidSelfInvalidationError{
+			InvalidationKind: invalidationKind,
+			StartPos:         expression.StartPosition(),
+			EndPos:           expression.EndPosition(),
+		})
 	}
 
 	checker.resources.AddInvalidation(variable, invalidation)
@@ -1259,7 +1267,7 @@ func (checker *Checker) withSelfResourceInvalidationAllowed(f func()) {
 
 	f()
 }
-  
+
 func (checker *Checker) predeclaredMembers(containerType Type) []*Member {
 	var predeclaredMembers []*Member
 

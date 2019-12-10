@@ -774,12 +774,12 @@ func TestCheckCompositeFieldAssignment(t *testing.T) {
 
 			case common.CompositeKindResource:
 
-				errs := ExpectCheckerErrors(t, err, 2)
+				errs := ExpectCheckerErrors(t, err, 4)
 
-				// TODO: remove once `self` is handled properly
-
-				assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+				assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
 				assert.IsType(t, &sema.ResourceLossError{}, errs[1])
+				assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[2])
+				assert.IsType(t, &sema.ResourceLossError{}, errs[3])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -1519,7 +1519,19 @@ func TestCheckCompositeFunction(t *testing.T) {
 				),
 			)
 
-			require.NoError(t, err)
+			switch kind {
+			case common.CompositeKindStructure, common.CompositeKindContract:
+				require.NoError(t, err)
+
+			case common.CompositeKindResource:
+
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+
+			default:
+				panic(errors.NewUnreachableError())
+			}
 		})
 	}
 }

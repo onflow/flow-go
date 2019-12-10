@@ -1104,6 +1104,8 @@ func (e *ResourceUseAfterInvalidationError) Cause() (wasMoved, wasDestroyed bool
 			wasMoved = true
 		case ResourceInvalidationKindDestroy:
 			wasDestroyed = true
+		default:
+			panic(errors.NewUnreachableError())
 		}
 	}
 
@@ -1210,6 +1212,8 @@ func (n ResourceInvalidationNote) Message() string {
 		action = "moved"
 	case ResourceInvalidationKindDestroy:
 		action = "destroyed"
+	default:
+		panic(errors.NewUnreachableError())
 	}
 	return fmt.Sprintf("resource %s here", action)
 }
@@ -1986,3 +1990,34 @@ func (e *InvalidTopLevelDeclarationError) Error() string {
 }
 
 func (*InvalidTopLevelDeclarationError) isSemanticError() {}
+
+// InvalidSelfInvalidationError
+
+type InvalidSelfInvalidationError struct {
+	InvalidationKind ResourceInvalidationKind
+	StartPos         ast.Position
+	EndPos           ast.Position
+}
+
+func (e *InvalidSelfInvalidationError) Error() string {
+	var action string
+	switch e.InvalidationKind {
+	case ResourceInvalidationKindMove:
+		action = "move"
+	case ResourceInvalidationKindDestroy:
+		action = "destroy"
+	default:
+		panic(errors.NewUnreachableError())
+	}
+	return fmt.Sprintf("cannot %s `self`", action)
+}
+
+func (*InvalidSelfInvalidationError) isSemanticError() {}
+
+func (e *InvalidSelfInvalidationError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidSelfInvalidationError) EndPosition() ast.Position {
+	return e.EndPos
+}
