@@ -268,6 +268,7 @@ func (v *ProgramVisitor) VisitExecute(ctx *ExecuteContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
+	access := ctx.Access().Accept(v).(ast.Access)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
 	var parameterList *ast.ParameterList
@@ -279,6 +280,7 @@ func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) int
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.EventDeclaration{
+		Access:        access,
 		Identifier:    identifier,
 		ParameterList: parameterList,
 		Range: ast.Range{

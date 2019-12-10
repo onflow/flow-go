@@ -542,9 +542,8 @@ func createAccount(ledger flow.Ledger, privateKey flow.AccountPrivateKey) flow.A
 	view := ledger.NewView()
 
 	runtimeContext := execution.NewRuntimeContext(view)
-	accountAddress, _ := runtimeContext.CreateAccount(
+	accountAddress, err := runtimeContext.CreateAccount(
 		[]values.Bytes{publicKeyBytes},
-		[]byte{},
 	)
 	if err != nil {
 		panic(err)
