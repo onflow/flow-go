@@ -254,7 +254,7 @@ func TestRuntimeStorage(t *testing.T) {
 			imported := []byte(`
               pub resource R {}
 
-              pub fun createR(): <-R {
+              pub fun createR(): @R {
                 return <-create R()
               }
             `)
@@ -319,7 +319,7 @@ func TestRuntimeStorageMultipleTransactionsResourceWithArray(t *testing.T) {
         }
       }
 
-      pub fun createContainer(): <-Container {
+      pub fun createContainer(): @Container {
         return <-create Container()
       }
     `)
@@ -330,7 +330,7 @@ func TestRuntimeStorageMultipleTransactionsResourceWithArray(t *testing.T) {
       transaction {
 
         prepare(signer: Account) {
-          var container: <-Container? <- createContainer()
+          var container: @Container? <- createContainer()
           signer.storage[Container] <-> container
           destroy container
           let ref = &signer.storage[Container] as Container
@@ -416,7 +416,7 @@ func TestRuntimeStorageMultipleTransactionsResourceFunction(t *testing.T) {
         }
       }
 
-      pub fun createDeepThought(): <-DeepThought {
+      pub fun createDeepThought(): @DeepThought {
         return <-create DeepThought()
       }
     `)
@@ -497,7 +497,7 @@ func TestRuntimeStorageMultipleTransactionsResourceField(t *testing.T) {
         }
       }
 
-      pub fun createNumber(_ n: Int): <-Number {
+      pub fun createNumber(_ n: Int): @Number {
         return <-create Number(n)
       }
     `)
@@ -584,7 +584,7 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
         }
       }
 
-      pub fun createY(): <-Y {
+      pub fun createY(): @Y {
         return <-create Y()
       }
     `)
@@ -652,7 +652,7 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
         }
       }
 
-      pub fun createR(): <-R {
+      pub fun createR(): @R {
         return <- create R()
       }
     `)
@@ -731,7 +731,7 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
         }
       }
 
-      pub fun createR(): <-R {
+      pub fun createR(): @R {
           return <- create R()
       }
     `)
@@ -819,7 +819,7 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
         }
       }
 
-      pub fun createR(): <-R {
+      pub fun createR(): @R {
         return <- create R()
       }
     `)
@@ -830,7 +830,7 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 
       transaction {
         prepare(signer: Account) {
-          var r: <-R? <- createR()
+          var r: @R? <- createR()
           signer.storage[R] <-> r
           if r != nil {
             panic("already initialized")
@@ -960,7 +960,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
         }
       }
 
-      pub fun createX(): <-X {
+      pub fun createX(): @X {
           return <-create X()
       }
     `)
@@ -970,7 +970,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
 
       transaction {
         prepare(signer: Account) {
-          var x: <-X? <- createX()
+          var x: @X? <- createX()
           signer.storage[X] <-> x
           destroy x
 
@@ -1098,7 +1098,7 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
         }
       }
 
-      pub fun createR(): <-R {
+      pub fun createR(): @R {
         return <-create R()
       }
     `)

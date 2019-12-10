@@ -1389,12 +1389,12 @@ const fungibleTokenContractInterface = `
 
 	  pub resource interface Provider {
 
-		  pub fun withdraw(amount: Int): <-Vault
+		  pub fun withdraw(amount: Int): @Vault
 	  }
 
 	  pub resource interface Receiver {
 
-		  pub fun deposit(vault: <-Vault)
+		  pub fun deposit(vault: @Vault)
 	  }
 
 	  pub resource Vault: Provider, Receiver {
@@ -1404,9 +1404,9 @@ const fungibleTokenContractInterface = `
 		  init(balance: Int)
 	  }
 
-	  pub fun absorb(vault: <-Vault)
+	  pub fun absorb(vault: @Vault)
 
-	  pub fun sprout(): <-Vault
+	  pub fun sprout(): @Vault
   }
 `
 
@@ -1428,22 +1428,22 @@ const validExampleFungibleTokenContract = `
              self.balance = balance
          }
 
-         pub fun withdraw(amount: Int): <-Vault {
+         pub fun withdraw(amount: Int): @Vault {
              self.balance = self.balance - amount
              return <-create Vault(balance: amount)
          }
 
-         pub fun deposit(from: <-Vault) {
+         pub fun deposit(from: @Vault) {
             self.balance = self.balance + from.balance
             destroy from
          }
      }
 
-     pub fun absorb(vault: <-Vault) {
+     pub fun absorb(vault: @Vault) {
          destroy vault
      }
 
-     pub fun sprout(): <-Vault {
+     pub fun sprout(): @Vault {
          return <-create Vault(balance: 0)
      }
   }

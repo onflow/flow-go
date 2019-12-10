@@ -8,14 +8,14 @@ import (
 // TypeAnnotation
 
 type TypeAnnotation struct {
-	Move     bool
-	Type     Type
-	StartPos Position
+	IsResource bool
+	Type       Type
+	StartPos   Position
 }
 
 func (e *TypeAnnotation) String() string {
-	if e.Move {
-		return fmt.Sprintf("<-%s", e.Type)
+	if e.IsResource {
+		return fmt.Sprintf("@%s", e.Type)
 	}
 	return fmt.Sprint(e.Type)
 }

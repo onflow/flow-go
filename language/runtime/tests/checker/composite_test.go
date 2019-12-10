@@ -577,8 +577,8 @@ func TestCheckInvalidResourceMissingDestructor(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
-           init(test: <-Test) {
+           let test: @Test
+           init(test: @Test) {
                self.test <- test
            }
        }
@@ -593,9 +593,9 @@ func TestCheckResourceWithDestructor(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -608,7 +608,7 @@ func TestCheckResourceWithDestructor(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCheckInvalidResourceFieldWithMissingMoveAnnotation(t *testing.T) {
+func TestCheckInvalidResourceFieldWithMissingResourceAnnotation(t *testing.T) {
 
 	interfacePossibilities := []bool{true, false}
 
@@ -645,7 +645,7 @@ func TestCheckInvalidResourceFieldWithMissingMoveAnnotation(t *testing.T) {
                       resource %[1]s Test {
                           let test: Test
    
-                          init(test: <-Test) %[2]s
+                          init(test: @Test) %[2]s
    
                           destroy() %[3]s
                       }
@@ -658,7 +658,7 @@ func TestCheckInvalidResourceFieldWithMissingMoveAnnotation(t *testing.T) {
 
 			errs := ExpectCheckerErrors(t, err, 1)
 
-			assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+			assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 		})
 	}
 }
@@ -1418,25 +1418,26 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
                           }
 
                           fun test(): %[2]sTest {
-                              return %[2]s%[3]s Test%[6]s
+                              return %[4]s%[5]s Test%[7]s
                           }
                       }
 
                       fun test(): %[2]sTest {
-                          return %[2]s%[3]s Test%[6]s
+                          return %[4]s%[5]s Test%[7]s
                       }
 
                       fun test2(): %[2]sTest {
-                          let test %[4]s %[3]s Test%[6]s
-                          let res %[4]s test.test()
-                          %[5]s test
-                          return %[2]sres
+                          let test %[3]s %[5]s Test%[7]s
+                          let res %[3]s test.test()
+                          %[6]s test
+                          return %[4]sres
                       }
                     `,
 					compositeKind.Keyword(),
 					compositeKind.Annotation(),
-					compositeKind.ConstructionKeyword(),
 					compositeKind.TransferOperator(),
+					compositeKind.MoveOperator(),
+					compositeKind.ConstructionKeyword(),
 					compositeKind.DestructionKeyword(),
 					constructorArguments(compositeKind),
 				),
@@ -1506,16 +1507,17 @@ func TestCheckCompositeFunction(t *testing.T) {
 					`
                       %[1]s X {
                           fun foo(): %[2]sX {
-                              return %[2]s self.bar()
+                              return %[3]s self.bar()
                           }
 
                           fun bar(): %[2]sX {
-                              return %[2]s self
+                              return %[3]s self
                           }
                       }
                     `,
 					kind.Keyword(),
 					kind.Annotation(),
+					kind.MoveOperator(),
 				),
 			)
 
@@ -1548,16 +1550,17 @@ func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
                       var tests = 0
 
                       fun test(): %[1]sTest {
-                          return %[1]s %[2]s Test%[3]s
+                          return %[2]s %[3]s Test%[4]s
                       }
 
-                      %[4]s Test {
+                      %[5]s Test {
                          init() {
                              tests = tests + 1
                          }
                       }
                     `,
 					compositeKind.Annotation(),
+					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
 					compositeKind.Keyword(),
@@ -1610,9 +1613,9 @@ func TestCheckInvalidResourceWithDestructorMissingFieldInvalidation(t *testing.T
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -1629,9 +1632,9 @@ func TestCheckInvalidResourceWithDestructorMissingDefinitiveFieldInvalidation(t 
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -1671,9 +1674,9 @@ func TestCheckInvalidResourceDestructorMoveInvalidation(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -1683,7 +1686,7 @@ func TestCheckInvalidResourceDestructorMoveInvalidation(t *testing.T) {
            }
        }
 
-       fun absorb(_ test: <-Test) {
+       fun absorb(_ test: @Test) {
            destroy test
        }
     `)
@@ -1697,9 +1700,9 @@ func TestCheckInvalidResourceDestructorRepeatedDestruction(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -1718,17 +1721,17 @@ func TestCheckInvalidResourceDestructorRepeatedDestruction(t *testing.T) {
 func TestCheckInvalidResourceDestructorCapturing(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-       var duplicate: ((): <-Test)? = nil
+       var duplicate: ((): @Test)? = nil
 
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
            destroy() {
-               duplicate = fun (): <-Test {
+               duplicate = fun (): @Test {
                    return <-self.test
                }
            }

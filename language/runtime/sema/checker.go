@@ -716,8 +716,8 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 func (checker *Checker) ConvertTypeAnnotation(typeAnnotation *ast.TypeAnnotation) *TypeAnnotation {
 	convertedType := checker.ConvertType(typeAnnotation.Type)
 	return &TypeAnnotation{
-		Move: typeAnnotation.Move,
-		Type: convertedType,
+		IsResource: typeAnnotation.IsResource,
+		Type:       convertedType,
 	}
 }
 
@@ -745,8 +745,8 @@ func (checker *Checker) parameterTypeAnnotations(parameterList *ast.ParameterLis
 		convertedParameterType := checker.ConvertType(parameter.TypeAnnotation.Type)
 
 		parameterTypeAnnotations[i] = &TypeAnnotation{
-			Move: parameter.TypeAnnotation.Move,
-			Type: convertedParameterType,
+			IsResource: parameter.TypeAnnotation.IsResource,
+			Type:       convertedParameterType,
 		}
 	}
 
@@ -1031,7 +1031,7 @@ func (checker *Checker) checkResourceFieldNesting(
 	}
 
 	for name, member := range members {
-		// NOTE: check type, not move annotation:
+		// NOTE: check type, not resource annotation:
 		// the field could have a wrong annotation
 		if !member.TypeAnnotation.Type.IsResourceType() {
 			continue

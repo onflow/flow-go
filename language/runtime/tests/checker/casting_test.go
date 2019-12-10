@@ -60,7 +60,7 @@ func TestCheckCastingResourceToAnyResource(t *testing.T) {
 
       fun test() {
           let r <- create R()
-          let x <- r as <-AnyResource
+          let x <- r as @AnyResource
           destroy x
       }
     `)

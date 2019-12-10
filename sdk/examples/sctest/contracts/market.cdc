@@ -25,7 +25,7 @@ pub contract Market {
     pub resource SaleCollection {
 
         // a dictionary of the NFTs that the user is putting up for sale
-        pub var forSale: <-{Int: NonFungibleToken.NFT}
+        pub var forSale: @{Int: NonFungibleToken.NFT}
 
         // dictionary of the prices for each NFT by ID
         pub var prices: {Int: Int}
@@ -42,7 +42,7 @@ pub contract Market {
         }
 
         // withdraw gives the owner the opportunity to remove a sale from the collection
-        pub fun withdraw(tokenID: Int): <-NonFungibleToken.NFT {
+        pub fun withdraw(tokenID: Int): @NonFungibleToken.NFT {
             // remove the price
             self.prices.remove(key: tokenID)
             // remove and return the token
@@ -51,7 +51,7 @@ pub contract Market {
         }
 
         // listForSale lists an NFT for sale in this collection
-        pub fun listForSale(token: <-NonFungibleToken.NFT, price: Int) {
+        pub fun listForSale(token: @NonFungibleToken.NFT, price: Int) {
             let id: Int = token.id
 
             self.prices[id] = price
@@ -66,7 +66,7 @@ pub contract Market {
         }
 
         // purchase lets a user send tokens to purchase an NFT that is for sale
-        pub fun purchase(tokenID: Int, recipient: &NonFungibleToken.NFTCollection, buyTokens: <-FungibleToken.Receiver) {
+        pub fun purchase(tokenID: Int, recipient: &NonFungibleToken.NFTCollection, buyTokens: @FungibleToken.Receiver) {
             pre {
                 self.forSale[tokenID] != nil && self.prices[tokenID] != nil:
                     "No token matching this ID for sale!"
@@ -98,16 +98,15 @@ pub contract Market {
         }
 
         // createCollection returns a new collection resource to the caller
-        pub fun createCollection(ownerVault: &FungibleToken.Receiver): <-SaleCollection {
+        pub fun createCollection(ownerVault: &FungibleToken.Receiver): @SaleCollection {
             return <- create SaleCollection(vault: ownerVault)
         }
     }
 
     // createCollection returns a new collection resource to the caller
-    pub fun createSaleCollection(ownerVault: &FungibleToken.Receiver): <-SaleCollection {
+    pub fun createSaleCollection(ownerVault: &FungibleToken.Receiver): @SaleCollection {
         return <- create SaleCollection(vault: ownerVault)
     }
-
 
     // Marketplace would be the central contract where people can post their sale
     // references so that anyone can access them
