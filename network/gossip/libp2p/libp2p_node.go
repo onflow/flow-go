@@ -3,12 +3,13 @@ package libp2p
 
 import (
 	"context"
-
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
 )
 
 // NodeAddress is used to define a libp2p node
@@ -21,20 +22,28 @@ type NodeAddress struct {
 
 // P2PNode manages the the libp2p node.
 type P2PNode struct {
-	name       string
-	libP2PHost host.Host
+	name       string      // friendly human readable name of the node
+	libP2PHost host.Host  // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
+	logger zerolog.Logger // for logging
 }
 
+
+
 // Start starts a libp2p node on the given address.
-func (l *P2PNode) Start(n NodeAddress) (err error) {
+func (l *P2PNode) Start(n NodeAddress, logger zerolog.Logger) (err error) {
 	l.name = n.name
+	l.logger = logger
 	sourceMultiAddr, err := GetLocationMultiaddr(n)
 	if err != nil {
+		err = errors.Wrap(err, "unable to generate multi-address for " + l.name)
+		l.logger.Debug().Err(err).Send()
 		return err
 	}
 
 	key, err := GetPublicKey(n.name)
 	if err != nil {
+		err = errors.Wrap(err, "could not generate public key for " + l.name)
+		l.logger.Debug().Err(err).Send()
 		return err
 	}
 
@@ -48,19 +57,29 @@ func (l *P2PNode) Start(n NodeAddress) (err error) {
 	)
 
 	l.libP2PHost = host
+
+	if err == nil {
+		l.logger.Debug().Msg("libp2p node " + l.name + " started successfully")
+	}
+
 	return err
 }
 
 // Stop stops the libp2p node.
 func (l *P2PNode) Stop() (err error) {
-	return l.libP2PHost.Network().Close()
+	err = l.libP2PHost.Network().Close()
+	if err == nil {
+		l.logger.Debug().Msg("libp2p node " + l.name + " stopped")
+	}
+	return err
 }
 
-// AddPeers adds other nodes as peers to this node
+// AddPeers adds other nodes as peers to this node by adding them to the node's peerstore and connecting to them
 func (l *P2PNode) AddPeers(peers []NodeAddress) error {
 	for _, p := range peers {
 		pInfo, err := GetPeerInfo(p)
 		if err != nil {
+			l.logger.Debug().Err(errors.Wrap(err, "could not add peer " +  p.name + " for " + l.name)).Send()
 			return err
 		}
 
@@ -70,6 +89,7 @@ func (l *P2PNode) AddPeers(peers []NodeAddress) error {
 
 		err = l.libP2PHost.Connect(context.Background(), pInfo)
 		if err != nil {
+			l.logger.Debug().Err(errors.Wrap(err, "could not connect " +  l.name + " to " + p.name)).Send()
 			return err
 		}
 	}

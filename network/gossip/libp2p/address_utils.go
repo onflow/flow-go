@@ -34,12 +34,15 @@ func GetPublicKey(seed string) (crypto.PrivKey, error) {
 // return the same int64 seed)
 func generateSeed(seed string) (int64, error) {
 	h := md5.New()
+	// Generate the MD5 hash of the given string
 	_, err := io.WriteString(h, seed)
 	if err != nil {
 		return 0, err
 	}
-	var s uint64 = binary.BigEndian.Uint64(h.Sum(nil))
+	// Get the current hash
+	s := binary.BigEndian.Uint64(h.Sum(nil))
+	// Seed the random generator
 	rand.Seed(int64(s))
-	s1 := rand.Int63()
-	return s1, nil
+	// Generate a pseudo-random number
+	return rand.Int63(), nil
 }
