@@ -155,10 +155,16 @@ func TestCheckFunctionDeclarationReturnTypeWithResourceAnnotation(t *testing.T) 
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure:
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -170,6 +176,10 @@ func TestCheckFunctionDeclarationReturnTypeWithResourceAnnotation(t *testing.T) 
 func TestCheckFunctionDeclarationReturnTypeWithoutResourceAnnotation(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -490,11 +500,16 @@ func TestCheckFunctionExpressionReturnTypeWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
-
+			case common.CompositeKindStructure:
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -505,6 +520,10 @@ func TestCheckFunctionExpressionReturnTypeWithResourceAnnotation(t *testing.T) {
 
 func TestCheckFunctionExpressionReturnTypeWithoutResourceAnnotation(t *testing.T) {
 	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -3164,7 +3183,7 @@ func TestCheckInvalidResourceSelfMoveToFunction(t *testing.T) {
           }
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
