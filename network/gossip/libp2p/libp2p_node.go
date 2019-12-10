@@ -76,7 +76,7 @@ func (l *P2PNode) AddPeers(peers []NodeAddress) error {
 	return nil
 }
 
-// GetPeerInfo generates the address of a Node/Peer given it's address in a deterministic and consistent way.
+// GetPeerInfo generates the address of a Node/Peer given its address in a deterministic and consistent way.
 // Libp2p uses the hash of the public key of node as its id (https://docs.libp2p.io/reference/glossary/#multihash)
 // Since the public key of a node may not be available to other nodes, for now a simple scheme of naming nodes can be
 // used e.g. "node1, node2,... nodex" to helps nodes address each other.
