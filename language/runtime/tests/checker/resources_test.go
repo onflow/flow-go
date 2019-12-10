@@ -3144,7 +3144,7 @@ func TestCheckInvalidResourceSelfMoveToFunction(t *testing.T) {
           }
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -3195,7 +3195,7 @@ func TestCheckInvalidResourceSelfMoveReturnFromFunction(t *testing.T) {
 
       resource X {
 
-          fun test(): <-X {
+          fun test(): @X {
               return <-self
           }
       }
@@ -3212,7 +3212,7 @@ func TestCheckInvalidResourceSelfMoveIntoArrayLiteral(t *testing.T) {
 
       resource X {
 
-          fun test(): <-[X] {
+          fun test(): @[X] {
               return <-[<-self]
           }
       }
@@ -3229,7 +3229,7 @@ func TestCheckInvalidResourceSelfMoveIntoDictionaryLiteral(t *testing.T) {
 
       resource X {
 
-          fun test(): <-{String: X} {
+          fun test(): @{String: X} {
               return <-{"self": <-self}
           }
       }
@@ -3247,7 +3247,7 @@ func TestCheckInvalidResourceSelfMoveSwap(t *testing.T) {
       resource X {
 
           fun test() {
-              var x: <-X? <- nil
+              var x: @X? <- nil
               let oldX <- x <- self
               destroy x
               destroy oldX
