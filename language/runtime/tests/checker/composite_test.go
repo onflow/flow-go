@@ -806,10 +806,12 @@ func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
 			assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[3])
 		},
 		common.CompositeKindContract: func(err error) {
-			errs := ExpectCheckerErrors(t, err, 2)
+			errs := ExpectCheckerErrors(t, err, 4)
 
 			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
-			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[1])
+			assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
+			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[2])
+			assert.IsType(t, &sema.InvalidMoveError{}, errs[3])
 		},
 	}
 

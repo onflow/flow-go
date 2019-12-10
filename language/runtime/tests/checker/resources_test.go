@@ -1924,6 +1924,12 @@ func TestCheckResourceNesting(t *testing.T) {
 	interfacePossibilities := []bool{true, false}
 
 	for _, innerCompositeKind := range common.CompositeKinds {
+
+		// Don't test contract fields/parameters: contracts can't be passed by value
+		if innerCompositeKind == common.CompositeKindContract {
+			continue
+		}
+
 		for _, innerIsInterface := range interfacePossibilities {
 			for _, outerCompositeKind := range common.CompositeKinds {
 				for _, outerIsInterface := range interfacePossibilities {
