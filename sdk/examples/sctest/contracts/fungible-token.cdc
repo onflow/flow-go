@@ -1,6 +1,6 @@
 pub resource interface Provider {
 
-    pub fun withdraw(amount: Int): <-Vault {
+    pub fun withdraw(amount: Int): @Vault {
         pre {
             amount > 0:
                 "Withdrawal amount must be positive"
@@ -29,7 +29,7 @@ pub resource interface Receiver {
         }
     }
 
-    pub fun deposit(from: <-Receiver) {
+    pub fun deposit(from: @Receiver) {
         pre {
             from.balance > 0:
                 "Deposit balance needs to be positive!"
@@ -52,7 +52,7 @@ pub resource Vault: Provider, Receiver {
 
     // withdraw subtracts amount from the vaults balance and 
     // returns a vault object with the subtracted balance
-    pub fun withdraw(amount: Int): <-Vault {
+    pub fun withdraw(amount: Int): @Vault {
         self.balance = self.balance - amount
         return <-create Vault(balance: amount)
     }
@@ -73,7 +73,7 @@ pub resource Vault: Provider, Receiver {
     // deposit takes a vault object as a parameter and adds
     // its balance to the balance of the Account's vault, then
     // destroys the sent vault because its balance has been consumed
-    pub fun deposit(from: <-Receiver) {
+    pub fun deposit(from: @Receiver) {
         self.balance = self.balance + from.balance
         destroy from
     }
@@ -81,6 +81,6 @@ pub resource Vault: Provider, Receiver {
 
 
 
-pub fun createVault(initialBalance: Int): <- Vault {
+pub fun createVault(initialBalance: Int): @ Vault {
     return <-create Vault(balance: initialBalance)
 }

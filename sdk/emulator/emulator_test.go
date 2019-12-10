@@ -19,7 +19,7 @@ const counterScript = `
         }
     }
 
-    pub fun createCounter(): <-Counter {
+    pub fun createCounter(): @Counter {
         return <-create Counter()
     }
 `

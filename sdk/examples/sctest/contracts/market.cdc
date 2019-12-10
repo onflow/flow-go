@@ -28,7 +28,7 @@ import INFT, NFT, INFTCollection, NFTCollection from 0x0000000000000000000000000
 pub resource SaleCollection {
 
     // a dictionary of the NFTs that the user is putting up for sale
-    pub var forSale: <-{Int: NFT}
+    pub var forSale: @{Int: NFT}
 
     // dictionary of the prices for each NFT by ID
     pub var prices: {Int: Int}
@@ -45,7 +45,7 @@ pub resource SaleCollection {
     }
 
     // withdraw gives the owner the opportunity to remove a sale from the collection
-    pub fun withdraw(tokenID: Int): <-NFT {
+    pub fun withdraw(tokenID: Int): @NFT {
         // remove the price
         self.prices.remove(key: tokenID)
         // remove and return the token
@@ -54,7 +54,7 @@ pub resource SaleCollection {
     }
 
     // listForSale lists an NFT for sale in this collection
-    pub fun listForSale(token: <-NFT, price: Int) {
+    pub fun listForSale(token: @NFT, price: Int) {
         let id: Int = token.id
 
         self.prices[id] = price
@@ -69,7 +69,7 @@ pub resource SaleCollection {
     }
 
     // purchase lets a user send tokens to purchase an NFT that is for sale
-    pub fun purchase(tokenID: Int, recipient: &NFTCollection, buyTokens: <-Receiver) {
+    pub fun purchase(tokenID: Int, recipient: &NFTCollection, buyTokens: @Receiver) {
         pre {
             self.forSale[tokenID] != nil && self.prices[tokenID] != nil:
                 "No token matching this ID for sale!"
@@ -101,13 +101,13 @@ pub resource SaleCollection {
     }
 
     // createCollection returns a new collection resource to the caller
-    pub fun createCollection(ownerVault: &Receiver): <-SaleCollection {
+    pub fun createCollection(ownerVault: &Receiver): @SaleCollection {
         return <- create SaleCollection(vault: ownerVault)
     }
 }
 
 // createCollection returns a new collection resource to the caller
-pub fun createSaleCollection(ownerVault: &Receiver): <-SaleCollection {
+pub fun createSaleCollection(ownerVault: &Receiver): @SaleCollection {
     return <- create SaleCollection(vault: ownerVault)
 }
 
