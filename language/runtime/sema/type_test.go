@@ -143,8 +143,8 @@ func Test_exportability(t *testing.T) {
 			},
 			ConstructorParameterTypeAnnotations: []*TypeAnnotation{
 				{
-					Move: false,
-					Type: &Int8Type{},
+					IsResource: false,
+					Type:       &Int8Type{},
 				},
 			},
 		}

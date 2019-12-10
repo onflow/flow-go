@@ -1058,7 +1058,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 				},
 			},
 			ReturnTypeAnnotation: &TypeAnnotation{
-				Move: false,
+				IsResource: false,
 				Type: &NominalType{
 					Identifier: Identifier{
 						Identifier: "Int",
@@ -1124,7 +1124,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1181,7 +1181,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 						Pos:        Position{Offset: 15, Line: 2, Column: 14},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int",
@@ -1202,7 +1202,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 21, Line: 2, Column: 20},
@@ -1251,7 +1251,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 						Pos:        Position{Offset: 17, Line: 2, Column: 16},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int",
@@ -1272,7 +1272,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 23, Line: 2, Column: 22},
@@ -1328,7 +1328,7 @@ func TestParseIfStatement(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1533,7 +1533,7 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1587,7 +1587,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1667,7 +1667,7 @@ func TestParseWhileStatement(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1758,7 +1758,7 @@ func TestParseAssignment(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1829,7 +1829,7 @@ func TestParseAccessAssignment(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1944,7 +1944,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -2048,7 +2048,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 						Pos:        Position{Offset: 16, Line: 2, Column: 15},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int32",
@@ -2068,7 +2068,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 						Pos:        Position{Offset: 26, Line: 2, Column: 25},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &ConstantSizedType{
 							Type: &NominalType{
 								Identifier: Identifier{
@@ -2095,7 +2095,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 						Pos:        Position{Offset: 41, Line: 2, Column: 40},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &VariableSizedType{
 							Type: &ConstantSizedType{
 								Type: &NominalType{
@@ -2129,7 +2129,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &VariableSizedType{
 				Type: &VariableSizedType{
 					Type: &NominalType{
@@ -2181,7 +2181,7 @@ func TestParseDictionaryType(t *testing.T) {
 			Pos: Position{Offset: 10, Line: 2, Column: 9},
 		},
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &DictionaryType{
 				KeyType: &NominalType{
 					Identifier: Identifier{
@@ -2865,7 +2865,7 @@ func TestParseIntegerTypes(t *testing.T) {
 
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "Int8",
@@ -2895,7 +2895,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "Int16",
@@ -2925,7 +2925,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "Int32",
@@ -2955,7 +2955,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "Int64",
@@ -2985,7 +2985,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "UInt8",
@@ -3015,7 +3015,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "UInt16",
@@ -3045,7 +3045,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "UInt32",
@@ -3075,7 +3075,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "UInt64",
@@ -3121,11 +3121,11 @@ func TestParseFunctionType(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: []*TypeAnnotation{
 					{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int8",
@@ -3135,7 +3135,7 @@ func TestParseFunctionType(t *testing.T) {
 						StartPos: Position{Offset: 14, Line: 2, Column: 13},
 					},
 					{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int16",
@@ -3146,7 +3146,7 @@ func TestParseFunctionType(t *testing.T) {
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &NominalType{
 						Identifier: Identifier{
 							Identifier: "Int32",
@@ -3198,12 +3198,12 @@ func TestParseFunctionArrayType(t *testing.T) {
 
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &ConstantSizedType{
 				Type: &FunctionType{
 					ParameterTypeAnnotations: []*TypeAnnotation{
 						{
-							Move: false,
+							IsResource: false,
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int8",
@@ -3214,7 +3214,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 						},
 					},
 					ReturnTypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int16",
@@ -3272,11 +3272,11 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: []*TypeAnnotation{
 					{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int8",
@@ -3287,7 +3287,7 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &ConstantSizedType{
 						Type: &NominalType{
 							Identifier: Identifier{
@@ -3345,11 +3345,11 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: []*TypeAnnotation{
 					{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int8",
@@ -3360,11 +3360,11 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &FunctionType{
 						ParameterTypeAnnotations: []*TypeAnnotation{
 							{
-								Move: false,
+								IsResource: false,
 								Type: &NominalType{
 									Identifier: Identifier{
 										Identifier: "Int16",
@@ -3375,7 +3375,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 							},
 						},
 						ReturnTypeAnnotation: &TypeAnnotation{
-							Move: false,
+							IsResource: false,
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int32",
@@ -3434,11 +3434,11 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: []*TypeAnnotation{
 					{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int8",
@@ -3449,11 +3449,11 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &FunctionType{
 						ParameterTypeAnnotations: []*TypeAnnotation{
 							{
-								Move: false,
+								IsResource: false,
 								Type: &NominalType{
 									Identifier: Identifier{
 										Identifier: "Int16",
@@ -3464,7 +3464,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 							},
 						},
 						ReturnTypeAnnotation: &TypeAnnotation{
-							Move: false,
+							IsResource: false,
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int32",
@@ -3524,10 +3524,10 @@ func TestParseMissingReturnType(t *testing.T) {
 
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &FunctionType{
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &NominalType{
 						Identifier: Identifier{
 							Identifier: "Void",
@@ -3555,7 +3555,7 @@ func TestParseMissingReturnType(t *testing.T) {
 				},
 			},
 			ReturnTypeAnnotation: &TypeAnnotation{
-				Move: false,
+				IsResource: false,
 				Type: &NominalType{
 					Identifier: Identifier{
 						Pos: Position{Offset: 43, Line: 3, Column: 17},
@@ -3821,7 +3821,7 @@ func TestParseStructure(t *testing.T) {
 						Pos:        Position{Offset: 48, Line: 3, Column: 25},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int",
@@ -3853,7 +3853,7 @@ func TestParseStructure(t *testing.T) {
 										Pos:        Position{Offset: 75, Line: 5, Column: 17},
 									},
 									TypeAnnotation: &TypeAnnotation{
-										Move: false,
+										IsResource: false,
 										Type: &NominalType{
 											Identifier: Identifier{
 												Identifier: "Int",
@@ -3925,7 +3925,7 @@ func TestParseStructure(t *testing.T) {
 						},
 					},
 					ReturnTypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int",
@@ -4055,7 +4055,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 								Pos:        Position{Offset: 18, Line: 2, Column: 17},
 							},
 							TypeAnnotation: &TypeAnnotation{
-								Move: false,
+								IsResource: false,
 								Type: &NominalType{
 									Identifier: Identifier{
 										Identifier: "Int",
@@ -4076,7 +4076,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &NominalType{
 						Identifier: Identifier{
 							Identifier: "",
@@ -4316,7 +4316,7 @@ func TestParseConditionMessage(t *testing.T) {
 								Pos: Position{Offset: 18, Line: 2, Column: 17},
 							},
 							TypeAnnotation: &TypeAnnotation{
-								Move: false,
+								IsResource: false,
 								Type: &NominalType{
 									Identifier: Identifier{
 										Identifier: "Int",
@@ -4337,7 +4337,7 @@ func TestParseConditionMessage(t *testing.T) {
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &NominalType{
 						Identifier: Identifier{
 							Identifier: "",
@@ -4423,7 +4423,7 @@ func TestParseOptionalType(t *testing.T) {
 					Pos:        Position{Offset: 12, Line: 2, Column: 11},
 				},
 				TypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &OptionalType{
 						Type: &OptionalType{
 							Type: &NominalType{
@@ -4578,7 +4578,7 @@ func TestParseFailableCasting(t *testing.T) {
 		},
 		Operation: OperationFailableCast,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "Int",
@@ -4651,7 +4651,7 @@ func TestParseInterface(t *testing.T) {
 							Pos:        Position{Offset: 53, Line: 3, Column: 16},
 						},
 						TypeAnnotation: &TypeAnnotation{
-							Move: false,
+							IsResource: false,
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int",
@@ -4683,7 +4683,7 @@ func TestParseInterface(t *testing.T) {
 											Pos:        Position{Offset: 84, Line: 5, Column: 21},
 										},
 										TypeAnnotation: &TypeAnnotation{
-											Move: false,
+											IsResource: false,
 											Type: &NominalType{
 												Identifier: Identifier{
 													Identifier: "Int",
@@ -4722,7 +4722,7 @@ func TestParseInterface(t *testing.T) {
 							},
 						},
 						ReturnTypeAnnotation: &TypeAnnotation{
-							Move: false,
+							IsResource: false,
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int",
@@ -5006,7 +5006,7 @@ func TestParseEvent(t *testing.T) {
 						Pos:        Position{Offset: 24, Line: 2, Column: 23},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Address",
@@ -5027,7 +5027,7 @@ func TestParseEvent(t *testing.T) {
 						Pos:        Position{Offset: 37, Line: 2, Column: 36},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Address",
@@ -5138,7 +5138,7 @@ func TestParseResourceReturnType(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: true,
+			IsResource: true,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "X",
@@ -5221,7 +5221,7 @@ func TestParseMoveStatement(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "",
@@ -5339,7 +5339,7 @@ func TestParseResourceParameterType(t *testing.T) {
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "",
@@ -5357,7 +5357,7 @@ func TestParseResourceParameterType(t *testing.T) {
 						Pos:        Position{Offset: 18, Line: 2, Column: 17},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: true,
+						IsResource: true,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "X",
@@ -5410,7 +5410,7 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
 		TypeAnnotation: &TypeAnnotation{
-			Move: true,
+			IsResource: true,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "R",
@@ -5464,7 +5464,7 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 						Pos:        Position{Offset: 20, Line: 2, Column: 19},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: true,
+						IsResource: true,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "R",
@@ -5508,11 +5508,11 @@ func TestParseFunctionTypeWithResourceTypeAnnotation(t *testing.T) {
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: nil,
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: true,
+					IsResource: true,
 					Type: &NominalType{
 						Identifier: Identifier{
 							Identifier: "R",
@@ -5574,7 +5574,7 @@ func TestParseFunctionExpressionWithResourceTypeAnnotation(t *testing.T) {
 				},
 			},
 			ReturnTypeAnnotation: &TypeAnnotation{
-				Move: true,
+				IsResource: true,
 				Type: &NominalType{
 					Identifier: Identifier{
 						Identifier: "R",
@@ -5634,7 +5634,7 @@ func TestParseFailableCastingResourceTypeAnnotation(t *testing.T) {
 		},
 		Operation: OperationFailableCast,
 		TypeAnnotation: &TypeAnnotation{
-			Move: true,
+			IsResource: true,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "R",
@@ -5742,7 +5742,7 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "",
@@ -5790,7 +5790,7 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 									},
 								},
 								ReturnTypeAnnotation: &TypeAnnotation{
-									Move: false,
+									IsResource: false,
 									Type: &NominalType{
 										Identifier: Identifier{
 											Identifier: "",
@@ -5873,7 +5873,7 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "",
@@ -5942,7 +5942,7 @@ func TestParseSwapStatement(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "",
@@ -6083,7 +6083,7 @@ func TestParseReferenceType(t *testing.T) {
 					Pos:        Position{Offset: 12, Line: 2, Column: 11},
 				},
 				TypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &ReferenceType{
 						Type: &VariableSizedType{
 							Type: &ReferenceType{
@@ -6442,7 +6442,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 								Pos:        Position{Offset: 31, Line: 4, Column: 10},
 							},
 							TypeAnnotation: &TypeAnnotation{
-								Move: false,
+								IsResource: false,
 								Type: &NominalType{
 									Identifier: Identifier{
 										Identifier: "Int",
@@ -6474,7 +6474,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											Pos:        Position{Offset: 54, Line: 6, Column: 14},
 										},
 										TypeAnnotation: &TypeAnnotation{
-											Move: false,
+											IsResource: false,
 											Type: &NominalType{
 												Identifier: Identifier{
 													Identifier: "Account",
@@ -6637,7 +6637,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 								Pos:        Position{Offset: 31, Line: 4, Column: 10},
 							},
 							TypeAnnotation: &TypeAnnotation{
-								Move: false,
+								IsResource: false,
 								Type: &NominalType{
 									Identifier: Identifier{
 										Identifier: "Int",
@@ -6669,7 +6669,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											Pos:        Position{Offset: 54, Line: 6, Column: 14},
 										},
 										TypeAnnotation: &TypeAnnotation{
-											Move: false,
+											IsResource: false,
 											Type: &NominalType{
 												Identifier: Identifier{
 													Identifier: "Account",
@@ -6874,7 +6874,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 								Pos:        Position{Offset: 31, Line: 4, Column: 10},
 							},
 							TypeAnnotation: &TypeAnnotation{
-								Move: false,
+								IsResource: false,
 								Type: &NominalType{
 									Identifier: Identifier{
 										Identifier: "Int",
@@ -6906,7 +6906,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											Pos:        Position{Offset: 54, Line: 6, Column: 14},
 										},
 										TypeAnnotation: &TypeAnnotation{
-											Move: false,
+											IsResource: false,
 											Type: &NominalType{
 												Identifier: Identifier{
 													Identifier: "Account",
