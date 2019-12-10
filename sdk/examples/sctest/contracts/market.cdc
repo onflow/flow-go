@@ -1,10 +1,5 @@
-import Receiver, Provider, Vault, createVault from 0x0000000000000000000000000000000000000002
-
-import INFT, NFT, INFTCollection, NFTCollection from 0x0000000000000000000000000000000000000003
-
-// import Receiver, Provider, Vault, createVault from "fungible-token.cdc"
-
-// import NFT, NFTCollection, createNFT, createCollection from "nft.cdc"
+import FungibleToken from 0x0000000000000000000000000000000000000002
+import NonFungibleToken from 0x0000000000000000000000000000000000000003
 
 // Marketplace is where users can put their NFTs up for sale with a price
 // if another user sees an NFT that they want to buy,
@@ -25,116 +20,119 @@ import INFT, NFT, INFTCollection, NFTCollection from 0x0000000000000000000000000
 //       and storage types?
 
 
-pub resource SaleCollection {
+pub contract Market {
 
-    // a dictionary of the NFTs that the user is putting up for sale
-    pub var forSale: <-{Int: NFT}
+    pub resource SaleCollection {
 
-    // dictionary of the prices for each NFT by ID
-    pub var prices: {Int: Int}
+        // a dictionary of the NFTs that the user is putting up for sale
+        pub var forSale: <-{Int: NonFungibleToken.NFT}
 
-    // the fungible token vault of the owner of this sale
-    // so that when someone buys a token, this resource can deposit
-    // tokens in their account
-    pub let ownerVault: &Receiver
+        // dictionary of the prices for each NFT by ID
+        pub var prices: {Int: Int}
 
-    init (vault: &Receiver) {
-        self.forSale <- {}
-        self.ownerVault = vault
-        self.prices = {}
-    }
+        // the fungible token vault of the owner of this sale
+        // so that when someone buys a token, this resource can deposit
+        // tokens in their account
+        pub let ownerVault: &FungibleToken.Receiver
 
-    // withdraw gives the owner the opportunity to remove a sale from the collection
-    pub fun withdraw(tokenID: Int): <-NFT {
-        // remove the price
-        self.prices.remove(key: tokenID)
-        // remove and return the token
-        let token <- self.forSale.remove(key: tokenID) ?? panic("missing NFT")
-        return <-token
-    }
-
-    // listForSale lists an NFT for sale in this collection
-    pub fun listForSale(token: <-NFT, price: Int) {
-        let id: Int = token.id
-
-        self.prices[id] = price
-
-        let oldToken <- self.forSale[id] <- token
-        destroy oldToken
-    }
-
-    // changePrice changes the price of a token that is currently for sale
-    pub fun changePrice(tokenID: Int, newPrice: Int) {
-        self.prices[tokenID] = newPrice
-    }
-
-    // purchase lets a user send tokens to purchase an NFT that is for sale
-    pub fun purchase(tokenID: Int, recipient: &NFTCollection, buyTokens: <-Receiver) {
-        pre {
-            self.forSale[tokenID] != nil && self.prices[tokenID] != nil:
-                "No token matching this ID for sale!"
-            buyTokens.balance >= (self.prices[tokenID] ?? 0):
-                "Not enough tokens to by the NFT!"
+        init (vault: &FungibleToken.Receiver) {
+            self.forSale <- {}
+            self.ownerVault = vault
+            self.prices = {}
         }
 
-        // deposit the purchasing tokens into the owners vault
-        self.ownerVault.deposit(from: <-buyTokens)
+        // withdraw gives the owner the opportunity to remove a sale from the collection
+        pub fun withdraw(tokenID: Int): <-NonFungibleToken.NFT {
+            // remove the price
+            self.prices.remove(key: tokenID)
+            // remove and return the token
+            let token <- self.forSale.remove(key: tokenID) ?? panic("missing NFT")
+            return <-token
+        }
 
-        // deposit the NFT into the buyers collection
-        recipient.deposit(token: <-self.withdraw(tokenID: tokenID))
+        // listForSale lists an NFT for sale in this collection
+        pub fun listForSale(token: <-NonFungibleToken.NFT, price: Int) {
+            let id: Int = token.id
 
-    }
+            self.prices[id] = price
 
-    // idPrice returns the price of a specific token in the sale
-    pub fun idPrice(tokenID: Int): Int? {
-        let price = self.prices[tokenID]
-        return price
-    }
+            let oldToken <- self.forSale[id] <- token
+            destroy oldToken
+        }
 
-    // getIDs returns an array of token IDs that are for sale
-    pub fun getIDs(): [Int] {
-        return self.forSale.keys
-    }
+        // changePrice changes the price of a token that is currently for sale
+        pub fun changePrice(tokenID: Int, newPrice: Int) {
+            self.prices[tokenID] = newPrice
+        }
 
-    destroy() {
-        destroy self.forSale
+        // purchase lets a user send tokens to purchase an NFT that is for sale
+        pub fun purchase(tokenID: Int, recipient: &NonFungibleToken.NFTCollection, buyTokens: <-FungibleToken.Receiver) {
+            pre {
+                self.forSale[tokenID] != nil && self.prices[tokenID] != nil:
+                    "No token matching this ID for sale!"
+                buyTokens.balance >= (self.prices[tokenID] ?? 0):
+                    "Not enough tokens to by the NFT!"
+            }
+
+            // deposit the purchasing tokens into the owners vault
+            self.ownerVault.deposit(from: <-buyTokens)
+
+            // deposit the NFT into the buyers collection
+            recipient.deposit(token: <-self.withdraw(tokenID: tokenID))
+
+        }
+
+        // idPrice returns the price of a specific token in the sale
+        pub fun idPrice(tokenID: Int): Int? {
+            let price = self.prices[tokenID]
+            return price
+        }
+
+        // getIDs returns an array of token IDs that are for sale
+        pub fun getIDs(): [Int] {
+            return self.forSale.keys
+        }
+
+        destroy() {
+            destroy self.forSale
+        }
+
+        // createCollection returns a new collection resource to the caller
+        pub fun createCollection(ownerVault: &FungibleToken.Receiver): <-SaleCollection {
+            return <- create SaleCollection(vault: ownerVault)
+        }
     }
 
     // createCollection returns a new collection resource to the caller
-    pub fun createCollection(ownerVault: &Receiver): <-SaleCollection {
+    pub fun createSaleCollection(ownerVault: &FungibleToken.Receiver): <-SaleCollection {
         return <- create SaleCollection(vault: ownerVault)
     }
-}
-
-// createCollection returns a new collection resource to the caller
-pub fun createSaleCollection(ownerVault: &Receiver): <-SaleCollection {
-    return <- create SaleCollection(vault: ownerVault)
-}
 
 
-// Marketplace would be the central contract where people can post their sale
-// references so that anyone can access them
-// It is just an example and hasn't been tested so don't take it seriously
-pub resource Marketplace {
-    // Data structure to store active sales
-    pub var tokensForSale: [&SaleCollection]
+    // Marketplace would be the central contract where people can post their sale
+    // references so that anyone can access them
+    // It is just an example and hasn't been tested so don't take it seriously
+    pub resource Marketplace {
+        // Data structure to store active sales
+        pub var tokensForSale: [&SaleCollection]
 
-    init() {
-        self.tokensForSale = []
+        init() {
+            self.tokensForSale = []
+        }
+
+        // listSaleCollection lists a users sale reference in the array
+        // and returns the index of the sale so that users can know
+        // how to remove it from the marketplace
+        pub fun listSaleCollection(collection: &SaleCollection): Int {
+            self.tokensForSale.append(collection)
+            return (self.tokensForSale.length - 1)
+        }
+
+        // removeSaleCollection removes a user's sale from the array
+        // of sale references
+        pub fun removeSaleCollection(index: Int) {
+            self.tokensForSale.remove(at: index)
+        }
+
     }
-
-    // listSaleCollection lists a users sale reference in the array
-    // and returns the index of the sale so that users can know
-    // how to remove it from the marketplace
-    pub fun listSaleCollection(collection: &SaleCollection): Int {
-        self.tokensForSale.append(collection)
-        return (self.tokensForSale.length - 1)
-    }
-
-    // removeSaleCollection removes a user's sale from the array
-    // of sale references
-    pub fun removeSaleCollection(index: Int) {
-        self.tokensForSale.remove(at: index)
-    }
-
 }
