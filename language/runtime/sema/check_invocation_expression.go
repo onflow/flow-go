@@ -320,6 +320,7 @@ func (checker *Checker) checkInvocationArgument(argument *ast.Argument, paramete
 		)
 	}
 
+	checker.checkVariableMove(argument.Expression)
 	checker.checkResourceMoveOperation(argument.Expression, argumentType)
 
 	return argumentType

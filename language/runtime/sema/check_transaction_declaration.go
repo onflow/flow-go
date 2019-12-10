@@ -55,7 +55,7 @@ func (checker *Checker) checkTransactionFields(declaration *ast.TransactionDecla
 			checker.report(
 				&InvalidTransactionFieldAccessModifierError{
 					Name:   field.Identifier.Identifier,
-					Access: field.Access.Keyword(),
+					Access: field.Access,
 					Pos:    field.StartPosition(),
 				},
 			)

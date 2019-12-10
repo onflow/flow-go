@@ -983,24 +983,24 @@ func (e *MissingMoveAnnotationError) EndPosition() ast.Position {
 	return e.Pos
 }
 
-// InvalidNestedMoveError
+// InvalidNestedResourceMoveError
 
-type InvalidNestedMoveError struct {
+type InvalidNestedResourceMoveError struct {
 	StartPos ast.Position
 	EndPos   ast.Position
 }
 
-func (e *InvalidNestedMoveError) Error() string {
+func (e *InvalidNestedResourceMoveError) Error() string {
 	return "cannot move nested resource"
 }
 
-func (*InvalidNestedMoveError) isSemanticError() {}
+func (*InvalidNestedResourceMoveError) isSemanticError() {}
 
-func (e *InvalidNestedMoveError) StartPosition() ast.Position {
+func (e *InvalidNestedResourceMoveError) StartPosition() ast.Position {
 	return e.StartPos
 }
 
-func (e *InvalidNestedMoveError) EndPosition() ast.Position {
+func (e *InvalidNestedResourceMoveError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
@@ -1872,14 +1872,15 @@ func (e *TransactionMissingPrepareError) EndPosition() ast.Position {
 
 type InvalidTransactionFieldAccessModifierError struct {
 	Name   string
-	Access string
+	Access ast.Access
 	Pos    ast.Position
 }
 
 func (e *InvalidTransactionFieldAccessModifierError) Error() string {
 	return fmt.Sprintf(
-		"access modifier not allowed for transaction field `%s`",
+		"access modifier not allowed for transaction field `%s`: `%s`",
 		e.Name,
+		e.Access.Keyword(),
 	)
 }
 
@@ -1890,7 +1891,7 @@ func (e *InvalidTransactionFieldAccessModifierError) StartPosition() ast.Positio
 }
 
 func (e *InvalidTransactionFieldAccessModifierError) EndPosition() ast.Position {
-	length := len(e.Access)
+	length := len(e.Access.Keyword())
 	return e.Pos.Shifted(length - 1)
 }
 
@@ -2020,4 +2021,31 @@ func (e *InvalidSelfInvalidationError) StartPosition() ast.Position {
 
 func (e *InvalidSelfInvalidationError) EndPosition() ast.Position {
 	return e.EndPos
+}
+
+// InvalidMoveError
+
+type InvalidMoveError struct {
+	Name            string
+	DeclarationKind common.DeclarationKind
+	Pos             ast.Position
+}
+
+func (e *InvalidMoveError) Error() string {
+	return fmt.Sprintf(
+		"cannot move %s: `%s`",
+		e.DeclarationKind.Name(),
+		e.Name,
+	)
+}
+
+func (*InvalidMoveError) isSemanticError() {}
+
+func (e *InvalidMoveError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidMoveError) EndPosition() ast.Position {
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
 }

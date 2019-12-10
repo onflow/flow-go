@@ -308,5 +308,5 @@ func TestCheckInvalidResourceMoveOutOfStorage(t *testing.T) {
     `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 }

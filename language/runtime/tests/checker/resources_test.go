@@ -958,7 +958,7 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 		errs := ExpectCheckerErrors(t, err, 2)
 
 		assert.IsType(t, &sema.ResourceLossError{}, errs[0])
-		assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+		assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 	})
 
 	t.Run("ImmediateIndexingFunctionInvocation", func(t *testing.T) {
@@ -982,7 +982,7 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 		errs := ExpectCheckerErrors(t, err, 2)
 
 		assert.IsType(t, &sema.ResourceLossError{}, errs[0])
-		assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+		assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 	})
 }
 
@@ -2159,7 +2159,7 @@ func TestCheckInvalidResourceLossAfterMoveThroughArrayIndexing(t *testing.T) {
     `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
 
@@ -2243,8 +2243,8 @@ func TestCheckInvalidResourceFieldMoveThroughVariableDeclaration(t *testing.T) {
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 }
 
 // TestCheckInvalidResourceFieldMoveThroughParameter tests if resources nested
@@ -2285,8 +2285,8 @@ func TestCheckInvalidResourceFieldMoveThroughParameter(t *testing.T) {
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 }
 
 func TestCheckInvalidResourceFieldMoveSelf(t *testing.T) {
@@ -2318,7 +2318,7 @@ func TestCheckInvalidResourceFieldMoveSelf(t *testing.T) {
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 }
 
 func TestCheckInvalidResourceFieldUseAfterDestroy(t *testing.T) {
@@ -2593,7 +2593,7 @@ func TestCheckInvalidResourceDictionaryKeys(t *testing.T) {
 
 	assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[0])
 	assert.IsType(t, &sema.InvalidResourceDictionaryMemberError{}, errs[1])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[2])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[2])
 }
 
 func TestCheckInvalidResourceDictionaryValues(t *testing.T) {
@@ -2612,7 +2612,7 @@ func TestCheckInvalidResourceDictionaryValues(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.InvalidResourceDictionaryMemberError{}, errs[0])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 }
 
 func TestCheckInvalidResourceLossAfterMoveThroughDictionaryIndexing(t *testing.T) {
@@ -2631,7 +2631,7 @@ func TestCheckInvalidResourceLossAfterMoveThroughDictionaryIndexing(t *testing.T
     `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
 
@@ -2742,7 +2742,7 @@ func TestCheckInvalidResourceFieldDestroy(t *testing.T) {
 
 	// TODO: maybe have dedicated error
 
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
 
