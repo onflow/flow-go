@@ -315,13 +315,22 @@ func TestCheckFieldDeclarationWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindContract, common.CompositeKindStructure:
+			case common.CompositeKindStructure:
 				errs := ExpectCheckerErrors(t, err, 2)
 
 				// NOTE: one invalid resource annotation error for field, one for parameter
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 3)
+
+				// NOTE: one invalid resource annotation error for field, one for parameter
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[2])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -372,7 +381,12 @@ func TestCheckFieldDeclarationWithoutResourceAnnotation(t *testing.T) {
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[1])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+
+			case common.CompositeKindStructure:
 				require.NoError(t, err)
 
 			default:
@@ -3201,7 +3215,7 @@ func TestCheckInvalidResourceSelfMoveReturnFromFunction(t *testing.T) {
 
       resource X {
 
-          fun test(): <-X {
+          fun test(): @X {
               return <-self
           }
       }
@@ -3218,7 +3232,7 @@ func TestCheckInvalidResourceSelfMoveIntoArrayLiteral(t *testing.T) {
 
       resource X {
 
-          fun test(): <-[X] {
+          fun test(): @[X] {
               return <-[<-self]
           }
       }
@@ -3235,7 +3249,7 @@ func TestCheckInvalidResourceSelfMoveIntoDictionaryLiteral(t *testing.T) {
 
       resource X {
 
-          fun test(): <-{String: X} {
+          fun test(): @{String: X} {
               return <-{"self": <-self}
           }
       }
@@ -3253,7 +3267,7 @@ func TestCheckInvalidResourceSelfMoveSwap(t *testing.T) {
       resource X {
 
           fun test() {
-              var x: <-X? <- nil
+              var x: @X? <- nil
               let oldX <- x <- self
               destroy x
               destroy oldX

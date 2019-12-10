@@ -1464,12 +1464,10 @@ func TestCheckContractInterfaceFungibleTokenUse(t *testing.T) {
 		validExampleFungibleTokenContract + "\n" + `
 
       fun test(): Int {
-          let contract = ExampleToken
-
           // valid, because code is in the same location
           let publisher <- create ExampleToken.Vault(balance: 100)
 
-          let receiver <- contract.sprout()
+          let receiver <- ExampleToken.sprout()
 
           let withdrawn <- publisher.withdraw(amount: 60)
           receiver.deposit(from: <-withdrawn)
