@@ -348,13 +348,12 @@ func (r *interpreterRuntime) standardLibraryFunctions(
 ) stdlib.StandardLibraryFunctions {
 	return append(
 		stdlib.FlowBuiltInFunctions(stdlib.FlowBuiltinImpls{
-			CreateAccount:         r.newCreateAccountFunction(runtimeInterface),
-			AddAccountKey:         r.addAccountKeyFunction(runtimeInterface),
-			RemoveAccountKey:      r.removeAccountKeyFunction(runtimeInterface),
-			UpdateAccountCode:     r.newUpdateAccountCodeFunction(runtimeInterface),
-			UpdateAccountContract: r.newUpdateAccountContractFunction(runtimeInterface, runtimeStorage),
-			GetAccount:            r.newGetAccountFunction(runtimeInterface),
-			Log:                   r.newLogFunction(runtimeInterface),
+			CreateAccount:     r.newCreateAccountFunction(runtimeInterface),
+			AddAccountKey:     r.addAccountKeyFunction(runtimeInterface),
+			RemoveAccountKey:  r.removeAccountKeyFunction(runtimeInterface),
+			UpdateAccountCode: r.newUpdateAccountCodeFunction(runtimeInterface, runtimeStorage),
+			GetAccount:        r.newGetAccountFunction(runtimeInterface),
+			Log:               r.newLogFunction(runtimeInterface),
 		}),
 		stdlib.BuiltinFunctions...,
 	)
@@ -496,35 +495,7 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 	}
 }
 
-func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(invocation interpreter.Invocation) trampoline.Trampoline {
-		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
-
-		code, err := toBytes(invocation.Arguments[1])
-		if err != nil {
-			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
-		}
-
-		accountAddressValue := accountAddress.Export().(values.Address)
-
-		err = runtimeInterface.CheckCode(accountAddressValue, code)
-		if err != nil {
-			panic(err)
-		}
-
-		err = runtimeInterface.UpdateAccountCode(accountAddressValue, code)
-		if err != nil {
-			panic(err)
-		}
-
-		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, accountAddressValue, code)
-
-		result := interpreter.VoidValue{}
-		return trampoline.Done{Result: result}
-	}
-}
-
-func (r *interpreterRuntime) newUpdateAccountContractFunction(
+func (r *interpreterRuntime) newUpdateAccountCodeFunction(
 	runtimeInterface Interface,
 	runtimeStorage *interpreterRuntimeStorage,
 ) interpreter.HostFunction {
@@ -535,7 +506,7 @@ func (r *interpreterRuntime) newUpdateAccountContractFunction(
 
 		code, err := toBytes(invocation.Arguments[1])
 		if err != nil {
-			panic(fmt.Sprintf("updateAccountContract requires the second parameter to be an array"))
+			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
 		}
 
 		accountAddressValue := accountAddress.Export().(values.Address)
@@ -558,7 +529,7 @@ func (r *interpreterRuntime) newUpdateAccountContractFunction(
 		}
 
 		if len(contractTypes) > 1 {
-			panic(fmt.Sprintf("updateAccountContract: code declares more than one contract"))
+			panic(fmt.Sprintf("updateAccountCode: code declares more than one contract"))
 		}
 
 		// If the code declares a contract, instantiate it and store it

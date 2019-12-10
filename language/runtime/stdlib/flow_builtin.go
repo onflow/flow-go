@@ -71,21 +71,6 @@ var updateAccountCodeFunctionType = &sema.FunctionType{
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
 		&sema.VoidType{},
 	),
-}
-
-var updateAccountContractFunctionType = &sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// address
-		&sema.AddressType{},
-		// code
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
-		},
-	),
-	// nothing
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
-	),
 	RequiredArgumentCount: (func() *int {
 		var count = 2
 		return &count
@@ -114,13 +99,12 @@ var logFunctionType = &sema.FunctionType{
 // FlowBuiltinImpls defines the set of functions needed to implement the Flow
 // built-in functions.
 type FlowBuiltinImpls struct {
-	CreateAccount         interpreter.HostFunction
-	AddAccountKey         interpreter.HostFunction
-	RemoveAccountKey      interpreter.HostFunction
-	UpdateAccountCode     interpreter.HostFunction
-	UpdateAccountContract interpreter.HostFunction
-	GetAccount            interpreter.HostFunction
-	Log                   interpreter.HostFunction
+	CreateAccount     interpreter.HostFunction
+	AddAccountKey     interpreter.HostFunction
+	RemoveAccountKey  interpreter.HostFunction
+	UpdateAccountCode interpreter.HostFunction
+	GetAccount        interpreter.HostFunction
+	Log               interpreter.HostFunction
 }
 
 // FlowBuiltInFunctions returns a list of standard library functions, bound to
@@ -149,12 +133,6 @@ func FlowBuiltInFunctions(impls FlowBuiltinImpls) StandardLibraryFunctions {
 			"updateAccountCode",
 			updateAccountCodeFunctionType,
 			impls.UpdateAccountCode,
-			nil,
-		),
-		NewStandardLibraryFunction(
-			"updateAccountContract",
-			updateAccountContractFunctionType,
-			impls.UpdateAccountContract,
 			nil,
 		),
 		NewStandardLibraryFunction(

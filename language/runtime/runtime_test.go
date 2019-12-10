@@ -1170,13 +1170,13 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
 	assert.Equal(t, []string{"42"}, loggedMessages)
 }
 
-func TestRuntimeTransactionWithUpdateAccountContractEmpty(t *testing.T) {
+func TestRuntimeTransactionWithUpdateAccountCodeEmpty(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	script := []byte(`
       transaction {
         prepare(signer: Account) {
-          updateAccountContract(signer.address, [])
+          updateAccountCode(signer.address, [])
         }
         execute {}
       }
@@ -1260,7 +1260,7 @@ func ArrayValueFromBytes(bytes []byte) *interpreter.ArrayValue {
 	return interpreter.NewArrayValueUnownedNonCopying(byteValues...)
 }
 
-func TestRuntimeTransactionWithUpdateAccountContractValid(t *testing.T) {
+func TestRuntimeTransactionWithUpdateAccountCodeValid(t *testing.T) {
 
 	expectSuccess := func(t *testing.T, err error, accountCode values.Bytes, events []values.Event) {
 		require.NoError(t, err)
@@ -1353,7 +1353,7 @@ func TestRuntimeTransactionWithUpdateAccountContractValid(t *testing.T) {
 				`
                   transaction {
                     prepare(signer: Account) {
-                      updateAccountContract(signer.address, %s%s)
+                      updateAccountCode(signer.address, %s%s)
                     }
                     execute {}
                   }
@@ -1439,7 +1439,7 @@ func TestRuntimeContractAccount(t *testing.T) {
 		`
           transaction {
             prepare(signer: Account) {
-              updateAccountContract(signer.address, %s)
+              updateAccountCode(signer.address, %s)
             }
             execute {}
           }
