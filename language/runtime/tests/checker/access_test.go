@@ -747,7 +747,7 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
-							compositeKind.TransferOperator(),
+							compositeKind.AssignmentOperator(),
 							compositeKind.ConstructionKeyword(),
 							compositeKind.DestructionKeyword(),
 						),
@@ -850,7 +850,7 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
 							compositeKind.Keyword(),
 							access.Keyword(),
 							compositeKind.Annotation(),
-							compositeKind.TransferOperator(),
+							compositeKind.AssignmentOperator(),
 							compositeKind.ConstructionKeyword(),
 							compositeKind.DestructionKeyword(),
 						),
@@ -945,7 +945,7 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
-							compositeKind.TransferOperator(),
+							compositeKind.AssignmentOperator(),
 							compositeKind.ConstructionKeyword(),
 							compositeKind.DestructionKeyword(),
 						),
@@ -1045,7 +1045,7 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 							compositeKind.Keyword(),
 							access.Keyword(),
 							compositeKind.Annotation(),
-							compositeKind.TransferOperator(),
+							compositeKind.AssignmentOperator(),
 							compositeKind.ConstructionKeyword(),
 							compositeKind.DestructionKeyword(),
 						),
@@ -1144,7 +1144,7 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
-							compositeKind.TransferOperator(),
+							compositeKind.AssignmentOperator(),
 							compositeKind.ConstructionKeyword(),
 							compositeKind.DestructionKeyword(),
 						),
@@ -1258,7 +1258,7 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 							compositeKind.Keyword(),
 							access.Keyword(),
 							compositeKind.Annotation(),
-							compositeKind.TransferOperator(),
+							compositeKind.AssignmentOperator(),
 							compositeKind.ConstructionKeyword(),
 							compositeKind.DestructionKeyword(),
 						),
@@ -1334,7 +1334,7 @@ func TestCheckAccessCompositeFieldVariableDeclarationWithSecondValue(t *testing.
                           pub resource A {}
 
                           pub resource B {
-                              %[1]s var a: <-A
+                              %[1]s var a: @A
 
                               init() {
                                   self.a <- create A()
@@ -1438,11 +1438,11 @@ func TestCheckAccessInterfaceFieldVariableDeclarationWithSecondValue(t *testing.
                           pub resource A {}
 
                           pub resource interface B {
-                              %[1]s var a: <-A
+                              %[1]s var a: @A
                           }
 
                           pub resource BImpl: B {
-                              %[1]s var a: <-A
+                              %[1]s var a: @A
 
                               init() {
                                   self.a <- create A()
@@ -1459,7 +1459,7 @@ func TestCheckAccessInterfaceFieldVariableDeclarationWithSecondValue(t *testing.
                           }
 
                           pub fun test() {
-                              let b: <-B <- create BImpl()
+                              let b: @B <- create BImpl()
                               let oldA <- b.a <- create A()
                               destroy oldA
                               destroy b
@@ -1692,7 +1692,7 @@ func TestCheckAccessImportGlobalValueVariableDeclarationWithSecondValue(t *testi
 	imported, _, err := parser.ParseProgram(`
        pub resource R {}
 
-       pub fun createR(): <-R {
+       pub fun createR(): @R {
            return <-create R()
        }
 

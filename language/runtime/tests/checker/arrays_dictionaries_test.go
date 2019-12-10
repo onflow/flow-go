@@ -608,7 +608,7 @@ func TestCheckArraySubtyping(t *testing.T) {
 	                `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 				),
 			)
 
@@ -645,7 +645,7 @@ func TestCheckDictionarySubtyping(t *testing.T) {
 	                `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 				),
 			)
 

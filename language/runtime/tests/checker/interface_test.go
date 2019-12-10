@@ -219,7 +219,7 @@ func TestCheckInterfaceUse(t *testing.T) {
                     `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 				),
 				ParseAndCheckOptions{
 					Options: []sema.Option{
@@ -253,7 +253,7 @@ func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 	                `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				))
 
@@ -292,7 +292,7 @@ func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T
 						firstKind.Keyword(),
 						secondKind.Keyword(),
 						firstKind.Annotation(),
-						firstKind.TransferOperator(),
+						firstKind.AssignmentOperator(),
 						secondKind.ConstructionKeyword(),
 					),
 				)
@@ -322,7 +322,7 @@ func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
 	                `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -381,7 +381,7 @@ func TestCheckInterfaceFieldUse(t *testing.T) {
                     `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -415,7 +415,7 @@ func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
     	            `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -451,7 +451,7 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
 	                `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -483,7 +483,7 @@ func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 	                `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -1361,12 +1361,12 @@ const fungibleTokenContractInterface = `
 
 	  pub resource interface Provider {
 
-		  pub fun withdraw(amount: Int): <-Vault
+		  pub fun withdraw(amount: Int): @Vault
 	  }
 
 	  pub resource interface Receiver {
 
-		  pub fun deposit(vault: <-Vault)
+		  pub fun deposit(vault: @Vault)
 	  }
 
 	  pub resource Vault: Provider, Receiver {
@@ -1376,9 +1376,9 @@ const fungibleTokenContractInterface = `
 		  init(balance: Int)
 	  }
 
-	  pub fun absorb(vault: <-Vault)
+	  pub fun absorb(vault: @Vault)
 
-	  pub fun sprout(): <-Vault
+	  pub fun sprout(): @Vault
   }
 `
 
@@ -1400,22 +1400,22 @@ const validExampleFungibleTokenContract = `
              self.balance = balance
          }
 
-         pub fun withdraw(amount: Int): <-Vault {
+         pub fun withdraw(amount: Int): @Vault {
              self.balance = self.balance - amount
              return <-create Vault(balance: amount)
          }
 
-         pub fun deposit(from: <-Vault) {
+         pub fun deposit(from: @Vault) {
             self.balance = self.balance + from.balance
             destroy from
          }
      }
 
-     pub fun absorb(vault: <-Vault) {
+     pub fun absorb(vault: @Vault) {
          destroy vault
      }
 
-     pub fun sprout(): <-Vault {
+     pub fun sprout(): @Vault {
          return <-create Vault(balance: 0)
      }
   }

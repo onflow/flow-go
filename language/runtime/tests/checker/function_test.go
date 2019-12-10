@@ -225,9 +225,9 @@ func TestCheckInvalidResourceCapturingThroughVariable(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource Kitty {}
 
-      fun makeKittyCloner(): ((): <-Kitty) {
+      fun makeKittyCloner(): ((): @Kitty) {
           let kitty <- create Kitty()
-          return fun (): <-Kitty {
+          return fun (): @Kitty {
               return <-kitty
           }
       }
@@ -245,8 +245,8 @@ func TestCheckInvalidResourceCapturingThroughParameter(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource Kitty {}
 
-      fun makeKittyCloner(kitty: <-Kitty): ((): <-Kitty) {
-          return fun (): <-Kitty {
+      fun makeKittyCloner(kitty: @Kitty): ((): @Kitty) {
+          return fun (): @Kitty {
               return <-kitty
           }
       }
@@ -263,8 +263,8 @@ func TestCheckInvalidSelfResourceCapturing(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       resource Kitty {
-          fun makeCloner(): ((): <-Kitty) {
-              return fun (): <-Kitty {
+          fun makeCloner(): ((): @Kitty) {
+              return fun (): @Kitty {
                   return <-self
               }
           }

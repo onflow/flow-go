@@ -577,8 +577,8 @@ func TestCheckInvalidResourceMissingDestructor(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
-           init(test: <-Test) {
+           let test: @Test
+           init(test: @Test) {
                self.test <- test
            }
        }
@@ -593,9 +593,9 @@ func TestCheckResourceWithDestructor(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -645,7 +645,7 @@ func TestCheckInvalidResourceFieldWithMissingMoveAnnotation(t *testing.T) {
                       resource %[1]s Test {
                           let test: Test
    
-                          init(test: <-Test) %[2]s
+                          init(test: @Test) %[2]s
    
                           destroy() %[3]s
                       }
@@ -764,7 +764,7 @@ func TestCheckCompositeFieldAssignment(t *testing.T) {
                       }
                     `,
 					kind.Keyword(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 				),
 			)
 
@@ -831,7 +831,7 @@ func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
                       }
                     `,
 					compositeKind.Keyword(),
-					compositeKind.TransferOperator(),
+					compositeKind.AssignmentOperator(),
 					compositeKind.ConstructionKeyword(),
 				),
 			)
@@ -1055,7 +1055,7 @@ func TestCheckCompositeInstantiation(t *testing.T) {
                     `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 					kind.DestructionKeyword(),
 				),
@@ -1178,7 +1178,7 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 						firstKind.Keyword(),
 						secondKind.Keyword(),
 						firstKind.Annotation(),
-						firstKind.TransferOperator(),
+						firstKind.AssignmentOperator(),
 						secondKind.ConstructionKeyword(),
 					),
 				)
@@ -1256,7 +1256,7 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
                       let test %[2]s %[3]s Test()
                     `,
 					kind.Keyword(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -1282,7 +1282,7 @@ func TestCheckCompositeInitializerWithArgumentLabel(t *testing.T) {
                       let test %[2]s %[3]s Test(x: 1)
                     `,
 					kind.Keyword(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -1308,7 +1308,7 @@ func TestCheckInvalidCompositeInitializerCallWithMissingArgumentLabel(t *testing
                       let test %[2]s %[3]s Test(1)
                     `,
 					kind.Keyword(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -1337,7 +1337,7 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
                       let void = test.test(x: 1)
                     `,
 					kind.Keyword(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -1364,7 +1364,7 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
                       let void = test.test(1)
                     `,
 					kind.Keyword(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -1391,24 +1391,25 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
                           }
 
                           fun test(): %[2]sTest {
-                              return %[2]s%[3]s Test()
+                              return %[5]s%[3]s Test()
                           }
                       }
 
                       fun test(): %[2]sTest {
-                          return %[2]s%[3]s Test()
+                          return %[5]s%[3]s Test()
                       }
 
                       fun test2(): %[2]sTest {
                           let test %[4]s %[3]s Test()
                           let res %[4]s test.test()
-                          %[5]s test
-                          return %[2]sres
+                          %[6]s test
+                          return %[5]sres
                       }
                     `,
 					kind.Keyword(),
 					kind.Annotation(),
 					kind.ConstructionKeyword(),
+					kind.AssignmentOperator(),
 					kind.TransferOperator(),
 					kind.DestructionKeyword(),
 				),
@@ -1478,16 +1479,17 @@ func TestCheckCompositeFunction(t *testing.T) {
 					`
                       %[1]s X {
                           fun foo(): %[2]sX {
-                              return %[2]s self.bar()
+                              return %[3]s self.bar()
                           }
 
                           fun bar(): %[2]sX {
-                              return %[2]s self
+                              return %[3]s self
                           }
                       }
                     `,
 					kind.Keyword(),
 					kind.Annotation(),
+					kind.TransferOperator(),
 				),
 			)
 
@@ -1507,16 +1509,17 @@ func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
                       var tests = 0
 
                       fun test(): %[1]sTest {
-                          return %[1]s %[2]s Test()
+                          return %[2]s %[3]s Test()
                       }
 
-                      %[3]s Test {
+                      %[4]s Test {
                          init() {
                              tests = tests + 1
                          }
                       }
                     `,
 					kind.Annotation(),
+					kind.TransferOperator(),
 					kind.ConstructionKeyword(),
 					kind.Keyword(),
 				),
@@ -1568,9 +1571,9 @@ func TestCheckInvalidResourceWithDestructorMissingFieldInvalidation(t *testing.T
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -1587,9 +1590,9 @@ func TestCheckInvalidResourceWithDestructorMissingDefinitiveFieldInvalidation(t 
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -1629,9 +1632,9 @@ func TestCheckInvalidResourceDestructorMoveInvalidation(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -1641,7 +1644,7 @@ func TestCheckInvalidResourceDestructorMoveInvalidation(t *testing.T) {
            }
        }
 
-       fun absorb(_ test: <-Test) {
+       fun absorb(_ test: @Test) {
            destroy test
        }
     `)
@@ -1655,9 +1658,9 @@ func TestCheckInvalidResourceDestructorRepeatedDestruction(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -1676,17 +1679,17 @@ func TestCheckInvalidResourceDestructorRepeatedDestruction(t *testing.T) {
 func TestCheckInvalidResourceDestructorCapturing(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-       var duplicate: ((): <-Test)? = nil
+       var duplicate: ((): @Test)? = nil
 
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
            destroy() {
-               duplicate = fun (): <-Test {
+               duplicate = fun (): @Test {
                    return <-self.test
                }
            }

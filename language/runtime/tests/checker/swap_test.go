@@ -202,9 +202,9 @@ func TestCheckSwapResourceFields(t *testing.T) {
       resource X {}
 
       resource Y {
-          var x: <-X
+          var x: @X
 
-          init(x: <-X) {
+          init(x: @X) {
               self.x <- x
           }
 
@@ -250,9 +250,9 @@ func TestCheckInvalidSwapConstantResourceFields(t *testing.T) {
                       resource X {}
 
                       resource Y {
-                          %[1]s x: <-X
+                          %[1]s x: @X
 
-                          init(x: <-X) {
+                          init(x: @X) {
                               self.x <- x
                           }
 
@@ -262,9 +262,9 @@ func TestCheckInvalidSwapConstantResourceFields(t *testing.T) {
                       }
 
                       resource Z {
-                          %[2]s x: <-X
+                          %[2]s x: @X
 
-                          init(x: <-X) {
+                          init(x: @X) {
                               self.x <- x
                           }
 
@@ -298,8 +298,8 @@ func TestCheckSwapResourceDictionaryElement(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-{String: X} <- {}
-          var x: <-X? <- create X()
+          let xs: @{String: X} <- {}
+          var x: @X? <- create X()
           xs["foo"] <-> x
           destroy xs
           destroy x
@@ -315,7 +315,7 @@ func TestCheckInvalidSwapResourceDictionaryElement(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-{String: X} <- {}
+          let xs: @{String: X} <- {}
           var x <- create X()
           xs["foo"] <-> x
           destroy xs
@@ -334,7 +334,7 @@ func TestCheckSwapStorage(t *testing.T) {
           resource R {}
 
           fun test() {
-              var r: <-R? <- create R()
+              var r: @R? <- create R()
               storage[R] <-> r
               destroy r
           }

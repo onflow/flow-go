@@ -75,12 +75,19 @@ func (k CompositeKind) Annotation() string {
 	if k != CompositeKindResource {
 		return ""
 	}
+	return "@"
+}
+
+func (k CompositeKind) AssignmentOperator() string {
+	if k != CompositeKindResource {
+		return "="
+	}
 	return "<-"
 }
 
 func (k CompositeKind) TransferOperator() string {
 	if k != CompositeKindResource {
-		return "="
+		return ""
 	}
 	return "<-"
 }

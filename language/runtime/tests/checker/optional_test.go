@@ -181,7 +181,7 @@ func TestCheckCompositeNilEquality(t *testing.T) {
                 `,
 				kind.Keyword(),
 				kind.Annotation(),
-				kind.TransferOperator(),
+				kind.AssignmentOperator(),
 				kind.ConstructionKeyword(),
 			),
 		)
@@ -206,7 +206,7 @@ func TestCheckInvalidCompositeNilEquality(t *testing.T) {
                 `,
 				kind.Keyword(),
 				kind.Annotation(),
-				kind.TransferOperator(),
+				kind.AssignmentOperator(),
 				kind.ConstructionKeyword(),
 			),
 		)

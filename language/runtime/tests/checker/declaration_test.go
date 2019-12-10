@@ -391,7 +391,7 @@ func TestCheckVariableDeclarationSecondValueNil(t *testing.T) {
      resource R {}
 
      fun test() {
-         var x: <-R? <- create R()
+         var x: @R? <- create R()
          let y <- x <- nil
          destroy x
          destroy y

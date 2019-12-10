@@ -1594,11 +1594,12 @@ func TestInterpretCompositeDeclaration(t *testing.T) {
                    %[1]s Test {}
 
                    fun test(): %[2]sTest {
-                       return %[2]s %[3]s Test()
+                       return %[3]s %[4]s Test()
                    }
                 `,
 				compositeKind.Keyword(),
 				compositeKind.Annotation(),
+				compositeKind.TransferOperator(),
 				compositeKind.ConstructionKeyword(),
 			),
 		)
@@ -1629,11 +1630,12 @@ func TestInterpretCompositeDeclarationWithInitializer(t *testing.T) {
                    }
 
                    fun test(newValue: Int): %[2]sTest {
-                       return %[2]s %[3]s Test(newValue)
+                       return %[3]s %[4]s Test(newValue)
                    }
                 `,
 				compositeKind.Keyword(),
 				compositeKind.Annotation(),
+				compositeKind.TransferOperator(),
 				compositeKind.ConstructionKeyword(),
 			),
 		)
@@ -3144,7 +3146,7 @@ func TestInterpretCompositeNilEquality(t *testing.T) {
                 `,
 				kind.Keyword(),
 				kind.Annotation(),
-				kind.TransferOperator(),
+				kind.AssignmentOperator(),
 				kind.ConstructionKeyword(),
 			),
 		)
@@ -3359,7 +3361,7 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
                     `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -3398,7 +3400,7 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
                     `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -3435,7 +3437,7 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
                     `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -3482,7 +3484,7 @@ func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
                     `,
 					kind.Keyword(),
 					kind.Annotation(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 					kind.DestructionKeyword(),
 				),
@@ -3533,11 +3535,12 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
                       }
 
                       fun test(x: Int): %[2]sTest {
-                          return %[2]s %[3]s TestImpl(x: x)
+                          return %[3]s %[4]s TestImpl(x: x)
                       }
                     `,
 					kind.Keyword(),
 					kind.Annotation(),
+					kind.TransferOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -4604,7 +4607,7 @@ func TestInterpretUnaryMove(t *testing.T) {
 	inter := parseCheckAndInterpret(t, `
       resource X {}
 
-      fun foo(x: <-X): <-X {
+      fun foo(x: @X): @X {
           return <-x
       }
 
@@ -4834,7 +4837,7 @@ func TestInterpretStorage(t *testing.T) {
 		`
           pub resource R {}
 
-          pub fun test(): <-R? {
+          pub fun test(): @R? {
               let oldR <- storage[R] <- create R()
               destroy oldR
 
@@ -4988,9 +4991,9 @@ func TestInterpretResourceDestroyExpressionNestedResources(t *testing.T) {
       }
 
       resource A {
-          let b: <-B
+          let b: @B
 
-          init(b: <-B) {
+          init(b: @B) {
               self.b <- b
           }
 
@@ -5105,7 +5108,7 @@ func TestInterpretResourceDestroyOptionalSome(t *testing.T) {
       }
 
       fun test() {
-          let maybeR: <-R? <- create R()
+          let maybeR: @R? <- create R()
           destroy maybeR
       }
     `)
@@ -5136,7 +5139,7 @@ func TestInterpretResourceDestroyOptionalNil(t *testing.T) {
       }
 
       fun test() {
-          let maybeR: <-R? <- nil
+          let maybeR: @R? <- nil
           destroy maybeR
       }
     `)
@@ -5283,9 +5286,9 @@ func TestInterpretSwapResourceDictionaryElementReturnSwapped(t *testing.T) {
 	inter := parseCheckAndInterpret(t, `
       resource X {}
 
-      fun test(): <-X? {
-          let xs: <-{String: X} <- {}
-          var x: <-X? <- create X()
+      fun test(): @X? {
+          let xs: @{String: X} <- {}
+          var x: @X? <- create X()
           xs["foo"] <-> x
           destroy xs
           return <-x
@@ -5306,9 +5309,9 @@ func TestInterpretSwapResourceDictionaryElementReturnDictionary(t *testing.T) {
 	inter := parseCheckAndInterpret(t, `
       resource X {}
 
-      fun test(): <-{String: X} {
-          let xs: <-{String: X} <- {}
-          var x: <-X? <- create X()
+      fun test(): @{String: X} {
+          let xs: @{String: X} <- {}
+          var x: @X? <- create X()
           xs["foo"] <-> x
           destroy x
           return <-xs
@@ -5342,9 +5345,9 @@ func TestInterpretSwapResourceDictionaryElementRemoveUsingNil(t *testing.T) {
 	inter := parseCheckAndInterpret(t, `
       resource X {}
 
-      fun test(): <-X? {
-          let xs: <-{String: X} <- {"foo": <-create X()}
-          var x: <-X? <- nil
+      fun test(): @X? {
+          let xs: @{String: X} <- {"foo": <-create X()}
+          var x: @X? <- nil
           xs["foo"] <-> x
           destroy xs
           return <-x
@@ -5454,7 +5457,7 @@ func TestInterpretReferenceUse(t *testing.T) {
           }
 
           pub fun test(): [Int] {
-              var r: <-R? <- create R()
+              var r: @R? <- create R()
               storage[R] <-> r
               // there was no old value, but it must be discarded
               destroy r
@@ -5540,7 +5543,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
           }
 
           pub fun test(): [Int] {
-              var rs: <-[R]? <- [<-create R()]
+              var rs: @[R]? <- [<-create R()]
               storage[[R]] <-> rs
               // there was no old value, but it must be discarded
               destroy rs
@@ -5678,7 +5681,7 @@ func TestInterpretVariableDeclarationSecondValue(t *testing.T) {
           }
       }
 
-      fun test(): <-[R?] {
+      fun test(): @[R?] {
           let x <- create R(id: 1)
           var ys <- {"r": <-create R(id: 2)}
           // NOTE: nested move is valid here
@@ -5968,7 +5971,7 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
           pub resource R {}
 
           pub fun test() {
-              var r: <-R? <- nil
+              var r: @R? <- nil
               storage1[R] <-> r
               storage2[R] <-> r
               // there was no old value, but it must be discarded
@@ -6352,12 +6355,12 @@ const fungibleTokenContract = `
 
       pub resource interface Provider {
 
-          pub fun withdraw(amount: Int): <-Vault
+          pub fun withdraw(amount: Int): @Vault
       }
 
       pub resource interface Receiver {
 
-          pub fun deposit(vault: <-Vault)
+          pub fun deposit(vault: @Vault)
       }
 
       pub resource Vault: Provider, Receiver {
@@ -6367,9 +6370,9 @@ const fungibleTokenContract = `
           init(balance: Int)
       }
 
-      pub fun absorb(vault: <-Vault)
+      pub fun absorb(vault: @Vault)
 
-      pub fun sprout(): <-Vault
+      pub fun sprout(): @Vault
   }
 
   pub contract ExampleToken: FungibleToken {
@@ -6382,22 +6385,22 @@ const fungibleTokenContract = `
              self.balance = balance
          }
 
-         pub fun withdraw(amount: Int): <-Vault {
+         pub fun withdraw(amount: Int): @Vault {
              self.balance = self.balance - amount
              return <-create Vault(balance: amount)
          }
 
-         pub fun deposit(from: <-Vault) {
+         pub fun deposit(from: @Vault) {
             self.balance = self.balance + from.balance
             destroy from
          }
      }
 
-     pub fun absorb(vault: <-Vault) {
+     pub fun absorb(vault: @Vault) {
          destroy vault
      }
 
-     pub fun sprout(): <-Vault {
+     pub fun sprout(): @Vault {
          return <-create Vault(balance: 0)
      }
   }

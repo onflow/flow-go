@@ -23,10 +23,10 @@ func TestCheckFailableCastingWithMoveAnnotation(t *testing.T) {
 					`
                       %[1]s T {}
 
-                      let test %[2]s %[3]s T() as? <-T
+                      let test %[2]s %[3]s T() as? @T
                     `,
 					kind.Keyword(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -67,7 +67,7 @@ func TestCheckFunctionDeclarationParameterWithMoveAnnotation(t *testing.T) {
 					`
                       %[1]s T {}
 
-                      fun test(r: <-T) {
+                      fun test(r: @T) {
                           %[2]s r
                       }
                     `,
@@ -135,12 +135,12 @@ func TestCheckFunctionDeclarationReturnTypeWithMoveAnnotation(t *testing.T) {
 					`
                       %[1]s T {}
 
-                      fun test(): <-T {
+                      fun test(): @T {
                           return %[2]s %[3]s T()
                       }
                     `,
 					kind.Keyword(),
-					kind.Annotation(),
+					kind.TransferOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -175,7 +175,7 @@ func TestCheckFunctionDeclarationReturnTypeWithoutMoveAnnotation(t *testing.T) {
                       }
                     `,
 					kind.Keyword(),
-					kind.Annotation(),
+					kind.TransferOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -205,10 +205,10 @@ func TestCheckVariableDeclarationWithMoveAnnotation(t *testing.T) {
 					`
                       %[1]s T {}
 
-                      let test: <-T %[2]s %[3]s T()
+                      let test: @T %[2]s %[3]s T()
                     `,
 					kind.Keyword(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -241,7 +241,7 @@ func TestCheckVariableDeclarationWithoutMoveAnnotation(t *testing.T) {
                       let test: T %[2]s %[3]s T()
                     `,
 					kind.Keyword(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -282,8 +282,8 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
                       %[1]s T {}
 
                       %[1]s U {
-                          let t: <-T
-                          init(t: <-T) {
+                          let t: @T
+                          init(t: @T) {
                               self.t %[2]s t
                           }
 
@@ -291,7 +291,7 @@ func TestCheckFieldDeclarationWithMoveAnnotation(t *testing.T) {
                       }
                     `,
 					kind.Keyword(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					destructor,
 				),
 			)
@@ -343,7 +343,7 @@ func TestCheckFieldDeclarationWithoutMoveAnnotation(t *testing.T) {
                       }
                     `,
 					kind.Keyword(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					destructor,
 				),
 			)
@@ -376,7 +376,7 @@ func TestCheckFunctionExpressionParameterWithMoveAnnotation(t *testing.T) {
 					`
                       %[1]s T {}
 
-                      let test = fun (r: <-T) {
+                      let test = fun (r: @T) {
                           %[2]s r
                       }
                     `,
@@ -445,12 +445,12 @@ func TestCheckFunctionExpressionReturnTypeWithMoveAnnotation(t *testing.T) {
 					`
                       %[1]s T {}
 
-                      let test = fun (): <-T {
+                      let test = fun (): @T {
                           return %[2]s %[3]s T()
                       }
                     `,
 					kind.Keyword(),
-					kind.Annotation(),
+					kind.TransferOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -486,7 +486,7 @@ func TestCheckFunctionExpressionReturnTypeWithoutMoveAnnotation(t *testing.T) {
                       }
                     `,
 					kind.Keyword(),
-					kind.Annotation(),
+					kind.TransferOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -516,7 +516,7 @@ func TestCheckFunctionTypeParameterWithMoveAnnotation(t *testing.T) {
 					`
                       %[1]s T {}
 
-                      let test: ((<-T): Void) = fun (r: <-T) {
+                      let test: ((@T): Void) = fun (r: @T) {
                           %[2]s r
                       }
                     `,
@@ -584,12 +584,12 @@ func TestCheckFunctionTypeReturnTypeWithMoveAnnotation(t *testing.T) {
 					`
                       %[1]s T {}
 
-                      let test: ((): <-T) = fun (): <-T {
+                      let test: ((): @T) = fun (): @T {
                           return %[2]s %[3]s T()
                       }
                     `,
 					kind.Keyword(),
-					kind.Annotation(),
+					kind.TransferOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -624,7 +624,7 @@ func TestCheckFunctionTypeReturnTypeWithoutMoveAnnotation(t *testing.T) {
                       }
                     `,
 					kind.Keyword(),
-					kind.Annotation(),
+					kind.TransferOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -657,7 +657,7 @@ func TestCheckFailableCastingWithoutMoveAnnotation(t *testing.T) {
                       let test %[2]s %[3]s T() as? T
                     `,
 					kind.Keyword(),
-					kind.TransferOperator(),
+					kind.AssignmentOperator(),
 					kind.ConstructionKeyword(),
 				),
 			)
@@ -692,7 +692,7 @@ func TestCheckUnaryMove(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun foo(x: <-X): <-X {
+      fun foo(x: @X): @X {
           return <-x
       }
 
@@ -904,7 +904,7 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
                 }
             }
 
-            fun createResource(): <-Foo {
+            fun createResource(): @Foo {
                 return <-create Foo()
             }
 
@@ -945,7 +945,7 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
                 destroy x
             }
 
-            fun makeFoos(): <-[Foo] {
+            fun makeFoos(): @[Foo] {
                 return <-[
                     <-create Foo(),
                     <-create Foo()
@@ -965,7 +965,7 @@ func TestCheckResourceReturn(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun test(): <-X {
+      fun test(): @X {
           return <-create X()
       }
     `)
@@ -978,7 +978,7 @@ func TestCheckInvalidResourceReturnMissingMove(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun test(): <-X {
+      fun test(): @X {
           return create X()
       }
     `)
@@ -1024,7 +1024,7 @@ func TestCheckResourceArgument(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun foo(_ x: <-X) {
+      fun foo(_ x: @X) {
           destroy x
       }
 
@@ -1041,7 +1041,7 @@ func TestCheckInvalidResourceArgumentMissingMove(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun foo(_ x: <-X) {
+      fun foo(_ x: @X) {
           destroy x
       }
 
@@ -1239,7 +1239,7 @@ func TestCheckResourceMoveThroughReturn(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun test(): <-X {
+      fun test(): @X {
           let x <- create X()
           return <-x
       }
@@ -1258,7 +1258,7 @@ func TestCheckResourceMoveThroughArgumentPassing(t *testing.T) {
           absorb(<-x)
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1277,7 +1277,7 @@ func TestCheckInvalidResourceUseAfterMoveToFunction(t *testing.T) {
           absorb(<-x)
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1326,7 +1326,7 @@ func TestCheckInvalidResourceFieldUseAfterMoveToVariable(t *testing.T) {
           return x.id
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1349,7 +1349,7 @@ func TestCheckResourceUseAfterMoveInIfStatementThenBranch(t *testing.T) {
           absorb(<-x)
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1373,7 +1373,7 @@ func TestCheckResourceUseInIfStatement(t *testing.T) {
           }
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1397,7 +1397,7 @@ func TestCheckResourceUseInNestedIfStatement(t *testing.T) {
           }
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1412,7 +1412,7 @@ func TestCheckInvalidResourceUseAfterIfStatement(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource X {}
 
-      fun test(): <-X {
+      fun test(): @X {
           let x <- create X()
           if 1 > 2 {
               absorb(<-x)
@@ -1422,7 +1422,7 @@ func TestCheckInvalidResourceUseAfterIfStatement(t *testing.T) {
           return <-x
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1436,13 +1436,13 @@ func TestCheckInvalidResourceUseAfterIfStatement(t *testing.T) {
 		[]sema.ResourceInvalidation{
 			{
 				Kind:     sema.ResourceInvalidationKindMove,
-				StartPos: ast.Position{Offset: 165, Line: 9, Column: 23},
-				EndPos:   ast.Position{Offset: 165, Line: 9, Column: 23},
+				StartPos: ast.Position{Offset: 164, Line: 9, Column: 23},
+				EndPos:   ast.Position{Offset: 164, Line: 9, Column: 23},
 			},
 			{
 				Kind:     sema.ResourceInvalidationKindMove,
-				StartPos: ast.Position{Offset: 120, Line: 7, Column: 23},
-				EndPos:   ast.Position{Offset: 120, Line: 7, Column: 23},
+				StartPos: ast.Position{Offset: 119, Line: 7, Column: 23},
+				EndPos:   ast.Position{Offset: 119, Line: 7, Column: 23},
 			},
 		},
 	)
@@ -1838,7 +1838,7 @@ func TestCheckInvalidResourceLossThroughReturnInIfStatementBranches(t *testing.T
           destroy x
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1864,7 +1864,7 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenAndDestroyInElse(t *test
           }
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1886,7 +1886,7 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenBranch(t *testing.T) {
           destroy x
       }
 
-      fun absorb(_ x: <-X) {
+      fun absorb(_ x: @X) {
           destroy x
       }
     `)
@@ -1955,7 +1955,7 @@ func testResourceNesting(
               }
             `,
 			innerCompositeKind.Annotation(),
-			innerCompositeKind.TransferOperator(),
+			innerCompositeKind.AssignmentOperator(),
 		)
 	}
 
@@ -2064,7 +2064,7 @@ func TestCheckResourceInterfaceUseAsType(t *testing.T) {
 
       resource Y: X {}
 
-      let x: <-X <- create Y()
+      let x: @X <- create Y()
     `)
 
 	require.NoError(t, err)
@@ -2107,7 +2107,7 @@ func TestCheckInvalidResourceLossReturnResourceAndMemberAccess(t *testing.T) {
           return createX().id
       }
 
-      fun createX(): <-X {
+      fun createX(): @X {
           return <-create X(id: 1)
       }
     `)
@@ -2127,7 +2127,7 @@ func TestCheckInvalidResourceLossAfterMoveThroughArrayIndexing(t *testing.T) {
           foo(x: <-xs[0])
       }
 
-      fun foo(x: <-X) {
+      fun foo(x: @X) {
           destroy x
       }
     `)
@@ -2147,7 +2147,7 @@ func TestCheckInvalidResourceLossThroughFunctionResultAccess(t *testing.T) {
           }
       }
 
-      fun createFoo(): <-Foo {
+      fun createFoo(): @Foo {
           return <- create Foo(bar: 1)
       }
 
@@ -2172,7 +2172,7 @@ func TestCheckResourceInterfaceDestruction(t *testing.T) {
 
       resource Y: X {}
 
-      fun foo(x: <-X) {
+      fun foo(x: @X) {
           destroy x
       }
 
@@ -2194,9 +2194,9 @@ func TestCheckInvalidResourceFieldMoveThroughVariableDeclaration(t *testing.T) {
       resource Foo {}
 
       resource Bar {
-          let foo: <-Foo
+          let foo: @Foo
 
-          init(foo: <-Foo) {
+          init(foo: @Foo) {
               self.foo <- foo
           }
 
@@ -2205,7 +2205,7 @@ func TestCheckInvalidResourceFieldMoveThroughVariableDeclaration(t *testing.T) {
           }
       }
 
-      fun test(): <-[Foo] {
+      fun test(): @[Foo] {
           let foo <- create Foo()
           let bar <- create Bar(foo: <-foo)
           let foo2 <- bar.foo
@@ -2232,9 +2232,9 @@ func TestCheckInvalidResourceFieldMoveThroughParameter(t *testing.T) {
       resource Foo {}
 
       resource Bar {
-          let foo: <-Foo
+          let foo: @Foo
 
-          init(foo: <-Foo) {
+          init(foo: @Foo) {
               self.foo <- foo
           }
 
@@ -2243,11 +2243,11 @@ func TestCheckInvalidResourceFieldMoveThroughParameter(t *testing.T) {
           }
       }
 
-      fun identity(_ foo: <-Foo): <-Foo {
+      fun identity(_ foo: @Foo): @Foo {
           return <-foo
       }
 
-      fun test(): <-[Foo] {
+      fun test(): @[Foo] {
           let foo <- create Foo()
           let bar <- create Bar(foo: <-foo)
           let foo2 <- identity(<-bar.foo)
@@ -2269,7 +2269,7 @@ func TestCheckResourceArrayAppend(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- []
+          let xs: @[X] <- []
           xs.append(<-create X())
           destroy xs
       }
@@ -2284,7 +2284,7 @@ func TestCheckResourceArrayInsert(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- []
+          let xs: @[X] <- []
           xs.insert(at: 0, <-create X())
           destroy xs
       }
@@ -2299,7 +2299,7 @@ func TestCheckResourceArrayRemove(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           let x <- xs.remove(at: 0)
           destroy x
           destroy xs
@@ -2315,7 +2315,7 @@ func TestCheckInvalidResourceArrayRemoveResourceLoss(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           xs.remove(at: 0)
           destroy xs
       }
@@ -2332,7 +2332,7 @@ func TestCheckResourceArrayRemoveFirst(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           let x <- xs.removeFirst()
           destroy x
           destroy xs
@@ -2348,7 +2348,7 @@ func TestCheckResourceArrayRemoveLast(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           let x <- xs.removeLast()
           destroy x
           destroy xs
@@ -2364,7 +2364,7 @@ func TestCheckInvalidResourceArrayContains(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           xs.contains(<-create X())
           destroy xs
       }
@@ -2382,7 +2382,7 @@ func TestCheckResourceArrayLength(t *testing.T) {
       resource X {}
 
       fun test(): Int {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           let count = xs.length
           destroy xs
           return count
@@ -2398,7 +2398,7 @@ func TestCheckInvalidResourceArrayConcat(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-[X] <- [<-create X()]
+          let xs: @[X] <- [<-create X()]
           let xs2 <- [<-create X()]
           let xs3 <- xs.concat(<-xs2)
           destroy xs
@@ -2417,7 +2417,7 @@ func TestCheckResourceDictionaryRemove(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-{String: X} <- {"x1": <-create X()}
+          let xs: @{String: X} <- {"x1": <-create X()}
           let x <- xs.remove(key: "x1")
           destroy x
           destroy xs
@@ -2433,7 +2433,7 @@ func TestCheckInvalidResourceDictionaryRemoveResourceLoss(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-{String: X} <- {"x1": <-create X()}
+          let xs: @{String: X} <- {"x1": <-create X()}
           xs.remove(key: "x1")
           destroy xs
       }
@@ -2450,7 +2450,7 @@ func TestCheckResourceDictionaryInsert(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-{String: X} <- {}
+          let xs: @{String: X} <- {}
           let old <- xs.insert(key: "x1", <-create X())
           destroy old
           destroy xs
@@ -2466,7 +2466,7 @@ func TestCheckInvalidResourceDictionaryInsertResourceLoss(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-{String: X} <- {}
+          let xs: @{String: X} <- {}
           xs.insert(key: "x1", <-create X())
           destroy xs
       }
@@ -2483,7 +2483,7 @@ func TestCheckResourceDictionaryLength(t *testing.T) {
       resource X {}
 
       fun test(): Int {
-          let xs: <-{String: X} <- {"x1": <-create X()}
+          let xs: @{String: X} <- {"x1": <-create X()}
           let count = xs.length
           destroy xs
           return count
@@ -2542,7 +2542,7 @@ func TestCheckInvalidResourceLossAfterMoveThroughDictionaryIndexing(t *testing.T
           foo(x: <-xs["x"])
       }
 
-      fun foo(x: <-X?) {
+      fun foo(x: @X?) {
           destroy x
       }
     `)
@@ -2575,9 +2575,9 @@ func TestCheckInvalidResourceConstantResourceFieldSwap(t *testing.T) {
       resource Foo {}
 
       resource Bar {
-          let foo: <-Foo
+          let foo: @Foo
 
-          init(foo: <-Foo) {
+          init(foo: @Foo) {
               self.foo <- foo
           }
 
@@ -2607,9 +2607,9 @@ func TestCheckResourceVariableResourceFieldSwap(t *testing.T) {
       resource Foo {}
 
       resource Bar {
-          var foo: <-Foo
+          var foo: @Foo
 
-          init(foo: <-Foo) {
+          init(foo: @Foo) {
               self.foo <- foo
           }
 
@@ -2637,9 +2637,9 @@ func TestCheckInvalidResourceFieldDestroy(t *testing.T) {
      resource Foo {}
 
      resource Bar {
-         var foo: <-Foo
+         var foo: @Foo
 
-         init(foo: <-Foo) {
+         init(foo: @Foo) {
              self.foo <- foo
          }
 
@@ -2703,7 +2703,7 @@ func TestCheckResourceParameterInInterfaceNoResourceLossError(t *testing.T) {
                           %[1]s interface Y {
 
                               // Should not result in a resource loss error
-                              %[2]s(from: <-X) %[3]s
+                              %[2]s(from: @X) %[3]s
                           }
                         `,
 						compositeKind.Keyword(),
@@ -2724,9 +2724,9 @@ func TestCheckResourceFieldUseAndDestruction(t *testing.T) {
      resource interface RI {}
 
      resource R {
-         var ris: <-{String: RI}
+         var ris: @{String: RI}
 
-         init(_ ri: <-RI) {
+         init(_ ri: @RI) {
              self.ris <- {"first": <-ri}
          }
 
@@ -2740,7 +2740,7 @@ func TestCheckResourceFieldUseAndDestruction(t *testing.T) {
          }
      }
 
-     fun absorb(_ ri: <-RI?) {
+     fun absorb(_ ri: @RI?) {
          destroy ri
      }
    `)
@@ -2753,7 +2753,7 @@ func TestCheckInvalidResourceMethodBinding(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource R {}
 
-      fun test(): ((<-R): Void) {
+      fun test(): ((@R): Void) {
           let rs <- [<-create R()]
           let append = rs.append
           destroy rs
@@ -2787,7 +2787,7 @@ func TestCheckResourceOptionalBinding(t *testing.T) {
       resource R {}
 
       fun test() {
-          let maybeR: <-R? <- create R()
+          let maybeR: @R? <- create R()
           if let r <- maybeR {
               destroy r
           } else {
@@ -2805,7 +2805,7 @@ func TestCheckInvalidResourceOptionalBindingResourceLossInThen(t *testing.T) {
       resource R {}
 
       fun test() {
-          let maybeR: <-R? <- create R()
+          let maybeR: @R? <- create R()
           if let r <- maybeR {
               // resource loss of r
           } else {
@@ -2825,7 +2825,7 @@ func TestCheckInvalidResourceOptionalBindingResourceLossInElse(t *testing.T) {
       resource R {}
 
       fun test() {
-          let maybeR: <-R? <- create R()
+          let maybeR: @R? <- create R()
           if let r <- maybeR {
               destroy r
           } else {
@@ -2845,7 +2845,7 @@ func TestCheckInvalidResourceOptionalBindingResourceUseAfterInvalidationInThen(t
       resource R {}
 
       fun test() {
-          let maybeR: <-R? <- create R()
+          let maybeR: @R? <- create R()
           if let r <- maybeR {
               destroy r
               destroy maybeR
@@ -2866,7 +2866,7 @@ func TestCheckInvalidResourceOptionalBindingResourceUseAfterInvalidationAfterBra
       resource R {}
 
       fun test() {
-          let maybeR: <-R? <- create R()
+          let maybeR: @R? <- create R()
           if let r <- maybeR {
               destroy r
           } else {
@@ -2875,7 +2875,7 @@ func TestCheckInvalidResourceOptionalBindingResourceUseAfterInvalidationAfterBra
           f(<-maybeR)
       }
 
-      fun f(_ r: <-R?) {
+      fun f(_ r: @R?) {
           destroy r
       }
     `)
@@ -2894,8 +2894,8 @@ func TestCheckResourceOptionalBindingFailableCast(t *testing.T) {
          resource R: RI {}
 
          fun test() {
-             let ri: <-RI <- create R()
-             if let r <- ri as? <-R {
+             let ri: @RI <- create R()
+             if let r <- ri as? @R {
                  destroy r
              } else {
                  destroy ri
@@ -2919,8 +2919,8 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalida
          resource R: RI {}
 
          fun test() {
-             let ri: <-RI <- create R()
-             if let r <- ri as? <-R {
+             let ri: @RI <- create R()
+             if let r <- ri as? @R {
                  destroy r
                  destroy ri
              } else {
@@ -2946,8 +2946,8 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalida
          resource R: RI {}
 
          fun test() {
-             let ri: <-RI <- create R()
-             if let r <- ri as? <-R {
+             let ri: @RI <- create R()
+             if let r <- ri as? @R {
                  destroy r
              }
              destroy ri
@@ -2971,8 +2971,8 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceLossMissingElse(
          resource R: RI {}
 
          fun test() {
-             let ri: <-RI <- create R()
-             if let r <- ri as? <-R {
+             let ri: @RI <- create R()
+             if let r <- ri as? @R {
                  destroy r
              }
          }
@@ -2995,8 +2995,8 @@ func TestCheckInvalidResourceOptionalBindingFailableCastResourceUseAfterInvalida
          resource R: RI {}
 
          fun test() {
-             let ri: <-RI <- create R()
-             if let r <- ri as? <-R {
+             let ri: @RI <- create R()
+             if let r <- ri as? @R {
                  destroy r
              }
              destroy ri
@@ -3020,8 +3020,8 @@ func TestCheckInvalidResourceFailableCastOutsideOptionalBinding(t *testing.T) {
          resource R: RI {}
 
          fun test() {
-             let ri: <-RI <- create R()
-             let r <- ri as? <-R
+             let ri: @RI <- create R()
+             let r <- ri as? @R
              destroy r
          }
     `)

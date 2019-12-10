@@ -263,7 +263,7 @@ func TestCheckReferenceUse(t *testing.T) {
           }
 
           fun test(): [Int] {
-              var r: <-R? <- create R()
+              var r: @R? <- create R()
               storage[R] <-> r
               // there was no old value, but it must be discarded
               destroy r
@@ -297,7 +297,7 @@ func TestCheckReferenceUseArray(t *testing.T) {
           }
 
           fun test(): [Int] {
-              var rs: <-[R]? <- [<-create R()]
+              var rs: @[R]? <- [<-create R()]
               storage[[R]] <-> rs
               // there was no old value, but it must be discarded
               destroy rs
@@ -321,7 +321,7 @@ func TestCheckReferenceIndexingIfReferencedIndexable(t *testing.T) {
           resource R {}
 
           fun test() {
-              var rs: <-[R]? <- [<-create R()]
+              var rs: @[R]? <- [<-create R()]
               storage[[R]] <-> rs
               // there was no old value, but it must be discarded
               destroy rs
@@ -343,7 +343,7 @@ func TestCheckInvalidReferenceResourceLoss(t *testing.T) {
           resource R {}
 
           fun test() {
-              var rs: <-[R]? <- [<-create R()]
+              var rs: @[R]? <- [<-create R()]
               storage[[R]] <-> rs
               // there was no old value, but it must be discarded
               destroy rs
@@ -365,7 +365,7 @@ func TestCheckInvalidReferenceIndexingIfReferencedNotIndexable(t *testing.T) {
           resource R {}
 
           fun test() {
-              var r: <-R? <- create R()
+              var r: @R? <- create R()
               storage[R] <-> r
               // there was no old value, but it must be discarded
               destroy r
@@ -393,7 +393,7 @@ func TestCheckResourceInterfaceReferenceFunctionCall(t *testing.T) {
           }
 
           fun test() {
-              var r: <-R? <- create R()
+              var r: @R? <- create R()
               storage[R] <-> r
               // there was no old value, but it must be discarded
               destroy r
@@ -417,7 +417,7 @@ func TestCheckInvalidResourceInterfaceReferenceFunctionCall(t *testing.T) {
           }
 
           fun test() {
-              var r: <-R? <- create R()
+              var r: @R? <- create R()
               storage[R] <-> r
               // there was no old value, but it must be discarded
               destroy r
