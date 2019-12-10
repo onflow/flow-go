@@ -581,6 +581,8 @@ func (r *interpreterRuntime) updateAccountCode(
 					common.DeclarationKindImport,
 					common.DeclarationKindContract,
 					common.DeclarationKindContractInterface,
+					// TODO: remove?
+					common.DeclarationKindEvent,
 				},
 			),
 		},

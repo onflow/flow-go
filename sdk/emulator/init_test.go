@@ -50,7 +50,7 @@ func TestInitialization(t *testing.T) {
 			`
                 import 0x%s
 
-                event MyEvent(x: Int)
+                pub event MyEvent(x: Int)
 
                 transaction {
 

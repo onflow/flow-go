@@ -248,16 +248,16 @@ func (r *RuntimeContext) CheckCode(address values.Address, code values.Bytes) (e
 //
 // This function returns an error if the specified account does not exist or is
 // not a valid signing account.
-func (r *RuntimeContext) UpdateAccountCode(address values.Address, code values.Bytes) (err error) {
+func (r *RuntimeContext) UpdateAccountCode(address values.Address, code values.Bytes, checkPermission bool) (err error) {
 	accountID := address[:]
 
-	if !r.isValidSigningAccount(address) {
-		return fmt.Errorf("not permitted to update account with ID %s", accountID)
+	if checkPermission && !r.isValidSigningAccount(address) {
+		return fmt.Errorf("not permitted to update account with ID %x", accountID)
 	}
 
 	_, exists := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
 	if !exists {
-		return fmt.Errorf("account with ID %s does not exist", accountID)
+		return fmt.Errorf("account with ID %x does not exist", accountID)
 	}
 
 	r.ledger.Set(fullKey(string(accountID), string(accountID), keyCode), code)
