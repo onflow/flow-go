@@ -1306,15 +1306,23 @@ func (checker *Checker) checkVariableMove(expression ast.Expression) {
 		return
 	}
 
-	if variable.DeclarationKind == common.DeclarationKindSelf {
-		if _, ok := variable.Type.(*TransactionType); ok {
-			checker.report(
-				&InvalidMoveError{
-					Name:            variable.Identifier,
-					DeclarationKind: common.DeclarationKindTransaction,
-					Pos:             identifierExpression.StartPosition(),
-				},
-			)
+	reportInvalidMove := func(declarationKind common.DeclarationKind) {
+		checker.report(
+			&InvalidMoveError{
+				Name:            variable.Identifier,
+				DeclarationKind: declarationKind,
+				Pos:             identifierExpression.StartPosition(),
+			},
+		)
+	}
+
+	switch ty := variable.Type.(type) {
+	case *TransactionType:
+		reportInvalidMove(common.DeclarationKindTransaction)
+
+	case *CompositeType:
+		if ty.Kind == common.CompositeKindContract {
+			reportInvalidMove(common.DeclarationKindContract)
 		}
 	}
 }
