@@ -256,41 +256,22 @@ func (s *Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) (
 		return []*protocol.CodeLens{}, nil
 	}
 
+	elaboration := checker.Elaboration
 	var (
-		scriptFuncDeclarations        []*ast.FunctionDeclaration
-		txDeclarations                []*ast.TransactionDeclaration
-		contractDeclarations          []*ast.CompositeDeclaration
-		contractInterfaceDeclarations []*ast.InterfaceDeclaration
+		scriptFuncDeclarations        = getScriptDeclarations(elaboration.FunctionDeclarationFunctionTypes)
+		txDeclarations                = getTransactionDeclarations(elaboration.TransactionDeclarationTypes)
+		contractDeclarations          = getContractDeclarations(elaboration.CompositeDeclarationTypes)
+		contractInterfaceDeclarations = getContractInterfaceDeclarations(elaboration.InterfaceDeclarationTypes)
 
 		actions []*protocol.CodeLens
 	)
 
-	// Find main functions with no arguments. These are interpreted as scripts.
-	for functionDeclaration := range checker.Elaboration.FunctionDeclarationFunctionTypes {
-		if functionDeclaration.Identifier.String() == "main" && len(functionDeclaration.ParameterList.Parameters) == 0 {
-			scriptFuncDeclarations = append(scriptFuncDeclarations, functionDeclaration)
-		}
-	}
-
-	// Find all transaction declarations.
-	for txDeclaration := range checker.Elaboration.TransactionDeclarationTypes {
-		txDeclarations = append(txDeclarations, txDeclaration)
-	}
-
-	// Find all contract interface declarations.
-	for decl := range checker.Elaboration.InterfaceDeclarationTypes {
-		if decl.CompositeKind == common.CompositeKindContract {
-			contractInterfaceDeclarations = append(contractInterfaceDeclarations, decl)
-		}
-	}
-
-	// Find all contract declarations.
-	contractDeclarations = append(contractDeclarations, getContractDeclarations(checker.Elaboration.CompositeDeclarationTypes)...)
-
 	// Show submit button when there is exactly one transaction declaration and no
 	// other actionable declarations.
 	if len(txDeclarations) == 1 &&
-		len(contractDeclarations)+len(contractInterfaceDeclarations)+len(scriptFuncDeclarations) == 0 {
+		len(contractDeclarations) == 0 &&
+		len(contractInterfaceDeclarations) == 0 &&
+		len(scriptFuncDeclarations) == 0 {
 		actions = append(actions, &protocol.CodeLens{
 			Range: astToProtocolRange(txDeclarations[0].StartPosition(), txDeclarations[0].StartPosition()),
 			Command: &protocol.Command{
@@ -305,7 +286,8 @@ func (s *Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) (
 	// any number of contract interface declarations, and no other actionable
 	// declarations.
 	if len(contractDeclarations) == 1 &&
-		len(txDeclarations)+len(scriptFuncDeclarations) == 0 {
+		len(txDeclarations) == 0 &&
+		len(scriptFuncDeclarations) == 0 {
 		actions = append(actions, &protocol.CodeLens{
 			Range: astToProtocolRange(contractDeclarations[0].StartPosition(), contractDeclarations[0].StartPosition()),
 			Command: &protocol.Command{
@@ -319,7 +301,9 @@ func (s *Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) (
 	// Show deploy interface button when there are 1 or more contract interface
 	// declarations, but no other actionable declarations.
 	if len(contractInterfaceDeclarations) > 0 &&
-		len(txDeclarations)+len(scriptFuncDeclarations)+len(contractDeclarations) == 0 {
+		len(txDeclarations) == 0 &&
+		len(scriptFuncDeclarations) == 0 &&
+		len(contractDeclarations) == 0 {
 		// decide whether to pluralize
 		pluralInterface := "interface"
 		if len(contractInterfaceDeclarations) > 1 {
@@ -339,7 +323,9 @@ func (s *Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) (
 	// Show execute script button when there is exactly one valid script
 	// function and no other actionable declarations.
 	if len(scriptFuncDeclarations) == 1 &&
-		len(contractDeclarations)+len(contractInterfaceDeclarations)+len(txDeclarations) == 0 {
+		len(contractDeclarations) == 0 &&
+		len(contractInterfaceDeclarations) == 0 &&
+		len(txDeclarations) == 0 {
 		actions = append(actions, &protocol.CodeLens{
 			Range: astToProtocolRange(scriptFuncDeclarations[0].StartPosition(), scriptFuncDeclarations[0].StartPosition()),
 			Command: &protocol.Command{
@@ -618,6 +604,34 @@ func convertError(err convertibleError) protocol.Diagnostic {
 			},
 		},
 	}
+}
+
+// getScriptDeclarations finds function declarations that are interpreted as scripts.
+func getScriptDeclarations(funcDeclarationMap map[*ast.FunctionDeclaration]*sema.FunctionType) (scriptDeclarations []*ast.FunctionDeclaration) {
+	for decl := range funcDeclarationMap {
+		if decl.Identifier.String() == "main" && len(decl.ParameterList.Parameters) == 0 {
+			scriptDeclarations = append(scriptDeclarations, decl)
+		}
+	}
+	return
+}
+
+// getTranscactionDeclarations finds all transaction declarations.
+func getTransactionDeclarations(txDeclarationMap map[*ast.TransactionDeclaration]*sema.TransactionType) (txDeclarations []*ast.TransactionDeclaration) {
+	for decl := range txDeclarationMap {
+		txDeclarations = append(txDeclarations, decl)
+	}
+	return
+}
+
+// getContractInterfaceDeclarations finds all interface declarations for contracts.
+func getContractInterfaceDeclarations(interfaceDeclarationMap map[*ast.InterfaceDeclaration]*sema.InterfaceType) (contractInterfaceDeclarations []*ast.InterfaceDeclaration) {
+	for decl := range interfaceDeclarationMap {
+		if decl.CompositeKind == common.CompositeKindContract {
+			contractInterfaceDeclarations = append(contractInterfaceDeclarations, decl)
+		}
+	}
+	return
 }
 
 // getContractDeclarations returns a list of contract declarations based on
