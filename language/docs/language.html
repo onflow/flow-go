@@ -3441,7 +3441,7 @@
             </p>
             <p>
               To make the behaviour of resource types explicit,
-              the move prefix <code>&#x3C;-</code> must be used in type annotations
+              the prefix <code>@</code> must be used in type annotations
               of variable or constant declarations, parameters, and return types.
             </p>
             <p>
@@ -3463,7 +3463,7 @@
 </span><span>
 </span><span style="color: #008000">// Declare a constant with value of resource type `SomeResource`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: &#x3C;-SomeResource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> a: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000"> &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// *Move* the resource value to a new constant.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -3480,9 +3480,9 @@
 </span><span>
 </span><span style="color: #008000">// Declare a function which accepts a resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `&#x3C;-`.</span><span>
+</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `@`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
@@ -3516,29 +3516,29 @@
 </span></code></pre>
             <p>
               To make it explicit that the type is moved,
-              it must be prefixed with <code>&#x3C;-</code> in all type annotations,
+              it must be prefixed with <code>@</code> in all type annotations,
               e.g. for variable declarations, parameters, or return types.
             </p>
             <pre><code class="language-cadence,file=resource-type-annotation.cdc"><span style="color: #008000">// Declare a constant with an explicit type annotation.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// The constant has a resource type, so the type name must be prefixed with `&#x3C;-`.</span><span>
+</span><span style="color: #008000">// The constant has a resource type, so the type name must be prefixed with `@`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> someResource: &#x3C;-SomeResource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">5</span><span style="color: #000000">)</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> someResource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000"> &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource(value: </span><span style="color: #09885A">5</span><span style="color: #000000">)</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a function which consumes a resource and destroys it.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `&#x3C;-`.</span><span>
+</span><span style="color: #008000">// The parameter has a resource type, so the type name must be prefixed with `@`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> use(resource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resource</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a function which returns a resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #008000">// The return type is a resource type, so the type name must be prefixed with `&#x3C;-`.</span><span>
+</span><span style="color: #008000">// The return type is a resource type, so the type name must be prefixed with `@`.</span><span>
 </span><span style="color: #008000">// The return statement must also use the `&#x3C;-` operator to make it explicit the resource is moved.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> get(): &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> get(): @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> newResource &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> SomeResource()</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-newResource</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -3547,7 +3547,7 @@
             <pre><code class="language-cadence,file=resource-must-use.cdc"><span style="color: #008000">// Declare a function which consumes a resource but does not use it.</span><span>
 </span><span style="color: #008000">// This function is invalid, because it would cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: The resource parameter `resource` is not used, but must be.</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -3570,7 +3570,7 @@
             <pre><code class="language-cadence,file=resource-not-used.cdc"><span style="color: #008000">// Declare a function which has a resource parameter but does not use it.</span><span>
 </span><span style="color: #008000">// This function is invalid, because it would cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> forgetToUse(resource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: The resource parameter `resource` is not used, but must be.</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -3578,7 +3578,7 @@
 </span><span style="color: #008000">// This function is invalid, because it does not always use the resource parameter,</span><span>
 </span><span style="color: #008000">// which would cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> sometimesDestroy(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">, destroy: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> sometimesDestroy(resource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">, destroy: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> destroyResource {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resource</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -3591,7 +3591,7 @@
 </span><span style="color: #008000">// This function is valid, as it always uses the resource parameter,</span><span>
 </span><span style="color: #008000">// and does not cause a loss of the resource.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> alwaysUse(resource: &#x3C;-</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">, destroyResource: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> alwaysUse(resource: @</span><span style="color: #0000FF">SomeResource</span><span style="color: #000000">, destroyResource: </span><span style="color: #0000FF">Bool</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">if</span><span style="color: #000000"> destroyResource {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> resource</span><span>
 </span><span style="color: #000000">    } </span><span style="color: #0000FF">else</span><span style="color: #000000"> {</span><span>
@@ -3690,9 +3690,9 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Parent {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">let</span><span style="color: #000000"> name: </span><span style="color: #0000FF">String</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> child: &#x3C;-Child</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">var</span><span style="color: #000000"> child: @</span><span style="color: #0000FF">Child</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(name: </span><span style="color: #0000FF">String</span><span style="color: #000000">, child: &#x3C;-</span><span style="color: #0000FF">Child</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(name: </span><span style="color: #0000FF">String</span><span style="color: #000000">, child: @</span><span style="color: #0000FF">Child</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.name = name</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.child &#x3C;- child</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -3736,8 +3736,8 @@
 </span><span style="color: #008000">// the resource parameter `resource`. Each call to the returned function</span><span>
 </span><span style="color: #008000">// would return the resource, which should not be possible.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> makeCloner(resource: &#x3C;-</span><span style="color: #0000FF">R</span><span style="color: #000000">): ((): &#x3C;-</span><span style="color: #0000FF">R</span><span style="color: #000000">) {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> fun (): &#x3C;-R {</span><span>
+</span><span style="color: #0000FF">fun</span><span style="color: #000000"> makeCloner(resource: @</span><span style="color: #0000FF">R</span><span style="color: #000000">): ((): @</span><span style="color: #0000FF">R</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> fun (): @R {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-resource</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
@@ -4277,9 +4277,9 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The function must return a new fungible token.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: `&#x3C;-Self` is the resource type implementing this interface.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: `@Self` is the resource type implementing this interface.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-Self {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @Self {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be positive"</span><span>
@@ -4305,10 +4305,10 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// is positive, as this condition is already ensured by</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// the field requirement.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the first parameter has the type `&#x3C;-Self`,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the first parameter has the type `@Self`,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// i.e. the resource type implementing this interface.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: &#x3C;-Self) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: @Self) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + token.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
@@ -4383,7 +4383,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: neither the precondition nor the postcondition declared</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// in the interface have to be repeated here in the implementation.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: amount)</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -4394,7 +4394,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// The function must be public.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the type of the parameter is `&#x3C;-ExampleToken`,</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: the type of the parameter is `@ExampleToken`,</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// i.e., only a token of the same type can be deposited.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// This implementation satisfies the required postconditions.</span><span>
@@ -4402,7 +4402,7 @@
 </span><span style="color: #000000">    </span><span style="color: #008000">// NOTE: neither the precondition nor the postcondition declared</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">// in the interface have to be repeated here in the implementation.</span><span>
 </span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(_ token: @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + token.balance</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> token</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -4430,7 +4430,7 @@
 </span><span style="color: #008000">// `withdrawn.balance` is `10`</span><span>
 </span><span>
 </span><span style="color: #008000">// Deposit the withdrawn token into another one.</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> receiver: </span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> &#x3C;- </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> receiver: @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> &#x3C;- </span><span style="color: #008000">// ...</span><span>
 </span><span style="color: #000000">receiver.deposit(&#x3C;-withdrawn)</span><span>
 </span><span>
 </span><span style="color: #008000">// Run-time error: The precondition of function `withdraw` in interface</span><span>
@@ -5218,7 +5218,7 @@
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Provider {</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">FungibleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @</span><span style="color: #0000FF">FungibleToken</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            amount > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"withdrawal amount must be positive"</span><span>
@@ -5233,7 +5233,7 @@
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Receiver {</span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: &#x3C;-</span><span style="color: #0000FF">FungibleToken</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: @</span><span style="color: #0000FF">FungibleToken</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span><span style="color: #008000">// Declare a resource interface for a fungible token.</span><span>
@@ -5259,7 +5259,7 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-Self {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @Self {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            amount &#x3C;= </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"insufficient funds: the amount must be smaller or equal to the balance"</span><span>
@@ -5270,7 +5270,7 @@
 </span><span style="color: #000000">        }</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: &#x3C;-Self) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: @Self) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + token.balance:</span><span>
 </span><span style="color: #000000">                </span><span style="color: #A31515">"the amount must be added to the balance"</span><span>
@@ -5337,12 +5337,12 @@
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: amount)</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(token: @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + token.balance</span><span>
 </span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> token</span><span>
 </span><span style="color: #000000">    }</span><span>
@@ -5359,7 +5359,7 @@
 </span><span style="color: #008000">// Declare a function that lets any user create an example token</span><span>
 </span><span style="color: #008000">// with an initial empty balance.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> newEmptyExampleToken(): &#x3C;-</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> newEmptyExampleToken(): @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000"> {</span><span>
 </span><span style="color: #000000">    </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> ExampleToken(balance: </span><span style="color: #09885A">0</span><span style="color: #000000">)</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
@@ -5387,7 +5387,7 @@
 </span><span>
 </span><span style="color: #000000">    prepare(signer: Account) {</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Create a new token as an optional.</span><span>
-</span><span style="color: #000000">        </span><span style="color: #0000FF">var</span><span style="color: #000000"> tokenA: &#x3C;-ExampleToken? &#x3C;- newEmptyExampleToken()</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">var</span><span style="color: #000000"> tokenA: @</span><span style="color: #0000FF">ExampleToken</span><span style="color: #000000">? &#x3C;- newEmptyExampleToken()</span><span>
 </span><span style="color: #000000">		</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// Store the new token in storage by replacing whatever</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// is in the existing location.</span><span>

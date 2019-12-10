@@ -3311,7 +3311,7 @@ that referred to the resource before the move becomes **invalid**.
 An **invalid** resource cannot be used again.
 
 To make the behaviour of resource types explicit, 
-the move prefix `<-` must be used in type annotations 
+the prefix `@` must be used in type annotations 
 of variable or constant declarations, parameters, and return types.
 
 To make moves of resources explicit, the move operator `<-` must be used
@@ -3333,7 +3333,7 @@ resource SomeResource {
 
 // Declare a constant with value of resource type `SomeResource`.
 //
-let a: <-SomeResource <- create SomeResource(value: 0)
+let a: @SomeResource <- create SomeResource(value: 0)
 
 // *Move* the resource value to a new constant.
 //
@@ -3350,9 +3350,9 @@ b.value = 1
 
 // Declare a function which accepts a resource.
 //
-// The parameter has a resource type, so the type name must be prefixed with `<-`.
+// The parameter has a resource type, so the type name must be prefixed with `@`.
 //
-fun use(resource: <-SomeResource) {
+fun use(resource: @SomeResource) {
     // ...
 }
 
@@ -3390,30 +3390,30 @@ d.value
 ```
 
 To make it explicit that the type is moved, 
-it must be prefixed with `<-` in all type annotations,
+it must be prefixed with `@` in all type annotations,
 e.g. for variable declarations, parameters, or return types.
 
 ```cadence,file=resource-type-annotation.cdc
 // Declare a constant with an explicit type annotation.
 //
-// The constant has a resource type, so the type name must be prefixed with `<-`.
+// The constant has a resource type, so the type name must be prefixed with `@`.
 //
-let someResource: <-SomeResource <- create SomeResource(value: 5)
+let someResource: @SomeResource <- create SomeResource(value: 5)
 
 // Declare a function which consumes a resource and destroys it.
 //
-// The parameter has a resource type, so the type name must be prefixed with `<-`.
+// The parameter has a resource type, so the type name must be prefixed with `@`.
 //
-fun use(resource: <-SomeResource) {
+fun use(resource: @SomeResource) {
     destroy resource
 }
 
 // Declare a function which returns a resource.
 //
-// The return type is a resource type, so the type name must be prefixed with `<-`.
+// The return type is a resource type, so the type name must be prefixed with `@`.
 // The return statement must also use the `<-` operator to make it explicit the resource is moved.
 //
-fun get(): <-SomeResource {
+fun get(): @SomeResource {
     let newResource <- create SomeResource()
     return <-newResource
 }
@@ -3425,7 +3425,7 @@ Resources **must** be used exactly once.
 // Declare a function which consumes a resource but does not use it.
 // This function is invalid, because it would cause a loss of the resource.
 //
-fun forgetToUse(resource: <-SomeResource) {
+fun forgetToUse(resource: @SomeResource) {
     // Invalid: The resource parameter `resource` is not used, but must be.
 }
 ```
@@ -3452,7 +3452,7 @@ res.value
 // Declare a function which has a resource parameter but does not use it.
 // This function is invalid, because it would cause a loss of the resource.
 //
-fun forgetToUse(resource: <-SomeResource) {
+fun forgetToUse(resource: @SomeResource) {
     // Invalid: The resource parameter `resource` is not used, but must be.
 }
 ```
@@ -3462,7 +3462,7 @@ fun forgetToUse(resource: <-SomeResource) {
 // This function is invalid, because it does not always use the resource parameter,
 // which would cause a loss of the resource.
 //
-fun sometimesDestroy(resource: <-SomeResource, destroy: Bool) {
+fun sometimesDestroy(resource: @SomeResource, destroy: Bool) {
     if destroyResource {
         destroy resource
     }
@@ -3477,7 +3477,7 @@ fun sometimesDestroy(resource: <-SomeResource, destroy: Bool) {
 // This function is valid, as it always uses the resource parameter,
 // and does not cause a loss of the resource.
 //
-fun alwaysUse(resource: <-SomeResource, destroyResource: Bool) {
+fun alwaysUse(resource: @SomeResource, destroyResource: Bool) {
     if destroyResource {
         destroy resource
     } else {
@@ -3582,9 +3582,9 @@ resource Child {
 //
 resource Parent {
     let name: String
-    var child: <-Child
+    var child: @Child
 
-    init(name: String, child: <-Child) {
+    init(name: String, child: @Child) {
         self.name = name
         self.child <- child
     }
@@ -3631,8 +3631,8 @@ resource R {}
 // the resource parameter `resource`. Each call to the returned function
 // would return the resource, which should not be possible.
 //
-fun makeCloner(resource: <-R): ((): <-R) {
-    return fun (): <-R {
+fun makeCloner(resource: @R): ((): @R) {
+    return fun (): @R {
         return <-resource
     }
 }
@@ -4107,9 +4107,9 @@ resource interface FungibleToken {
     //
     // The function must return a new fungible token.
     //
-    // NOTE: `<-Self` is the resource type implementing this interface.
+    // NOTE: `@Self` is the resource type implementing this interface.
     //
-    pub fun withdraw(amount: Int): <-Self {
+    pub fun withdraw(amount: Int): @Self {
         pre {
             amount > 0:
                 "the amount must be positive"
@@ -4135,10 +4135,10 @@ resource interface FungibleToken {
     // is positive, as this condition is already ensured by
     // the field requirement.
     //
-    // NOTE: the first parameter has the type `<-Self`,
+    // NOTE: the first parameter has the type `@Self`,
     // i.e. the resource type implementing this interface.
     //
-    pub fun deposit(_ token: <-Self) {
+    pub fun deposit(_ token: @Self) {
         post {
             self.balance == before(self.balance) + token.balance:
                 "the amount must be added to the balance"
@@ -4213,7 +4213,7 @@ resource ExampleToken: FungibleToken {
     // NOTE: neither the precondition nor the postcondition declared
     // in the interface have to be repeated here in the implementation.
     //
-    pub fun withdraw(amount: Int): <-ExampleToken {
+    pub fun withdraw(amount: Int): @ExampleToken {
         self.balance = self.balance - amount
         return create ExampleToken(balance: amount)
     }
@@ -4224,7 +4224,7 @@ resource ExampleToken: FungibleToken {
     //
     // The function must be public.
     //
-    // NOTE: the type of the parameter is `<-ExampleToken`,
+    // NOTE: the type of the parameter is `@ExampleToken`,
     // i.e., only a token of the same type can be deposited.
     //
     // This implementation satisfies the required postconditions.
@@ -4232,7 +4232,7 @@ resource ExampleToken: FungibleToken {
     // NOTE: neither the precondition nor the postcondition declared
     // in the interface have to be repeated here in the implementation.
     //
-    pub fun deposit(_ token: <-ExampleToken) {
+    pub fun deposit(_ token: @ExampleToken) {
         self.balance = self.balance + token.balance
         destroy token
     }
@@ -4260,7 +4260,7 @@ let withdrawn <- token.withdraw(amount: 10)
 // `withdrawn.balance` is `10`
 
 // Deposit the withdrawn token into another one.
-let receiver: ExampleToken <- // ...
+let receiver: @ExampleToken <- // ...
 receiver.deposit(<-withdrawn)
 
 // Run-time error: The precondition of function `withdraw` in interface
@@ -5064,7 +5064,7 @@ Imagine it is in a file named `FungibleToken.cdc`.
 //
 pub resource interface Provider {
 
-    pub fun withdraw(amount: Int): <-FungibleToken {
+    pub fun withdraw(amount: Int): @FungibleToken {
         pre {
             amount > 0:
                 "withdrawal amount must be positive"
@@ -5079,7 +5079,7 @@ pub resource interface Provider {
 }
 
 pub resource interface Receiver {
-    pub fun deposit(token: <-FungibleToken)
+    pub fun deposit(token: @FungibleToken)
 }
 
 // Declare a resource interface for a fungible token.
@@ -5105,7 +5105,7 @@ pub resource interface FungibleToken: Provider, Receiver {
         }
     }
 
-    pub fun withdraw(amount: Int): <-Self {
+    pub fun withdraw(amount: Int): @Self {
         pre {
             amount <= self.balance:
                 "insufficient funds: the amount must be smaller or equal to the balance"
@@ -5116,7 +5116,7 @@ pub resource interface FungibleToken: Provider, Receiver {
         }
     }
 
-    pub fun deposit(token: <-Self) {
+    pub fun deposit(token: @Self) {
         post {
             self.balance == before(self.balance) + token.balance:
                 "the amount must be added to the balance"
@@ -5190,12 +5190,12 @@ resource ExampleToken: FungibleToken {
         self.balance = balance
     }
 
-    pub fun withdraw(amount: Int): <-ExampleToken {
+    pub fun withdraw(amount: Int): @ExampleToken {
         self.balance = self.balance - amount
         return <-create ExampleToken(balance: amount)
     }
 
-    pub fun deposit(token: <-ExampleToken) {
+    pub fun deposit(token: @ExampleToken) {
         self.balance = self.balance + token.balance
         destroy token
     }
@@ -5212,7 +5212,7 @@ resource ExampleToken: FungibleToken {
 // Declare a function that lets any user create an example token
 // with an initial empty balance.
 //
-pub fun newEmptyExampleToken(): <-ExampleToken {
+pub fun newEmptyExampleToken(): @ExampleToken {
     return <-create ExampleToken(balance: 0)
 }
 ```
@@ -5241,7 +5241,7 @@ transaction {
 
     prepare(signer: Account) {
         // Create a new token as an optional.
-        var tokenA: <-ExampleToken? <- newEmptyExampleToken()
+        var tokenA: @ExampleToken? <- newEmptyExampleToken()
 		
         // Store the new token in storage by replacing whatever
         // is in the existing location.
