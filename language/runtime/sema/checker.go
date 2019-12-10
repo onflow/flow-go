@@ -1324,5 +1324,10 @@ func (checker *Checker) checkVariableMove(expression ast.Expression) {
 		if ty.Kind == common.CompositeKindContract {
 			reportInvalidMove(common.DeclarationKindContract)
 		}
+
+	case *InterfaceType:
+		if ty.CompositeKind == common.CompositeKindContract {
+			reportInvalidMove(common.DeclarationKindContract)
+		}
 	}
 }
