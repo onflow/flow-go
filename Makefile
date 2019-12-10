@@ -102,7 +102,7 @@ docker-ci:
 cmd/flow/flow: crypto/*.go $(shell find  cli/ -name '*.go') $(shell find cmd -name '*.go') $(shell find model -name '*.go') $(shell find protobuf -name '*.go') $(shell find sdk -name '*.go')
 	GO111MODULE=on go build \
 	    -ldflags \
-	    "-X github.com/dapperlabs/flow-go/cli/flow/version.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/cli/flow/version.version=$(VERSION)" \
+	    "-X github.com/dapperlabs/flow-go/build.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/build.semver=$(VERSION)" \
 	    -o ./cmd/flow/flow ./cmd/flow
 
 .PHONY: install-cli
