@@ -62,9 +62,9 @@ type ArgumentCountError struct {
 
 func (e *ArgumentCountError) Error() string {
 	return fmt.Sprintf(
-		"incorrect number of arguments: got %d, need %d",
-		e.ArgumentCount,
+		"incorrect number of arguments: expected %d, got %d",
 		e.ParameterCount,
+		e.ArgumentCount,
 	)
 }
 

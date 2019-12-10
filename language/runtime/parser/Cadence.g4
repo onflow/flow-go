@@ -172,7 +172,7 @@ functionDeclaration
     ;
 
 eventDeclaration
-    : Event identifier parameterList
+    : access Event identifier parameterList
     ;
 
 parameterList
