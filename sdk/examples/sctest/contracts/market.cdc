@@ -51,7 +51,7 @@ pub contract Market {
         }
 
         // listForSale lists an NFT for sale in this collection
-        pub fun listForSale(token: <-NonFungibleToken.NFT, price: Int) {
+        pub fun listForSale(token: @NonFungibleToken.NFT, price: Int) {
             let id: Int = token.id
 
             self.prices[id] = price
