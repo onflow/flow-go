@@ -14,7 +14,6 @@ type Block struct {
 	Timestamp         time.Time
 	PreviousBlockHash crypto.Hash
 	TransactionHashes []crypto.Hash
-	Index             int
 }
 
 // Hash returns the hash of this block.
@@ -29,11 +28,6 @@ func (b Block) Hash() crypto.Hash {
 	return hasher.ComputeHash(d)
 }
 
-// AddTransaction adds a hash to the list of transaction hashes.
-func (b *Block) AddTransaction(txHash crypto.Hash) {
-	b.TransactionHashes = append(b.TransactionHashes, txHash)
-}
-
 // GenesisBlock returns the genesis block for an emulated blockchain.
 func GenesisBlock() Block {
 	return Block{
@@ -41,6 +35,5 @@ func GenesisBlock() Block {
 		Timestamp:         time.Now(),
 		PreviousBlockHash: nil,
 		TransactionHashes: make([]crypto.Hash, 0),
-		Index:             0,
 	}
 }

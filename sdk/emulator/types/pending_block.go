@@ -1,0 +1,61 @@
+package types
+
+import (
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
+)
+
+// PendingBlock is a naive data structure used to represent a pending block in the emulator.
+type PendingBlock struct {
+	// Block information (Number, PreviousBlockHash, Timestamp, TransactionHashes)
+	Header *Block
+	// Pool of transactions that have been executed, but not finalized
+	TxPool map[string]*flow.Transaction
+	// The current working register state, up-to-date with all transactions in the TxPool
+	State flow.Ledger
+	// Index of transaction execution
+	Index int
+}
+
+// Hash returns the hash of this pending block.
+func (b *PendingBlock) Hash() crypto.Hash {
+	return b.Header.Hash()
+}
+
+// AddTransaction adds a transaction to the list of TransactionHashes and TxPool.
+func (b *PendingBlock) AddTransaction(tx flow.Transaction) {
+	b.TxPool[string(tx.Hash())] = &tx
+	b.Header.TransactionHashes = append(b.Header.TransactionHashes, tx.Hash())
+}
+
+// ContainsTransaction checks if a transaction is included in the pending block.
+func (b *PendingBlock) ContainsTransaction(txHash crypto.Hash) bool {
+	_, exists := b.TxPool[string(txHash)]
+	return exists
+}
+
+// GetTransaction retrieves a transaction stored in TxPool (always preceeded by ContainsTransaction).
+func (b *PendingBlock) GetTransaction(txHash crypto.Hash) *flow.Transaction {
+	return b.TxPool[string(txHash)]
+}
+
+// ClearTxPool resets the TxPool.
+func (b *PendingBlock) ClearTxPool() {
+	b.TxPool = make(map[string]*flow.Transaction)
+}
+
+// ResetHeader resets the pending block header based off a previous block (resets Index).
+func (b *PendingBlock) ResetHeader(prevBlock *Block) {
+	b.Header = &Block{
+		Number:            prevBlock.Number + 1,
+		PreviousBlockHash: prevBlock.Hash(),
+		TransactionHashes: make([]crypto.Hash, 0),
+	}
+
+	b.Index = 0
+}
+
+// ResetState resets the pending state to a previous state.
+func (b *PendingBlock) ResetState(prevState flow.Ledger) {
+	b.State = prevState
+}
