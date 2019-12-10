@@ -2,11 +2,13 @@ package runtime
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
@@ -18,6 +20,7 @@ type testRuntimeInterface struct {
 	createAccount      func(publicKeys []values.Bytes, code values.Bytes) (address values.Address, err error)
 	addAccountKey      func(address values.Address, publicKey values.Bytes) error
 	removeAccountKey   func(address values.Address, index values.Int) (publicKey values.Bytes, err error)
+	checkCode          func(address values.Address, code values.Bytes) (err error)
 	updateAccountCode  func(address values.Address, code values.Bytes) (err error)
 	getSigningAccounts func() []values.Address
 	log                func(string)
@@ -46,6 +49,10 @@ func (i *testRuntimeInterface) AddAccountKey(address values.Address, publicKey v
 
 func (i *testRuntimeInterface) RemoveAccountKey(address values.Address, index values.Int) (publicKey values.Bytes, err error) {
 	return i.removeAccountKey(address, index)
+}
+
+func (i *testRuntimeInterface) CheckCode(address values.Address, code values.Bytes) (err error) {
+	return i.checkCode(address, code)
 }
 
 func (i *testRuntimeInterface) UpdateAccountCode(address values.Address, code values.Bytes) (err error) {
@@ -101,7 +108,8 @@ func TestRuntimeImport(t *testing.T) {
 	}
 
 	value, err := runtime.ExecuteScript(script, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
+
 	assert.Equal(t, values.NewInt(42), value)
 }
 
@@ -154,8 +162,8 @@ func TestRuntimeTransactionWithAccount(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script, runtimeInterface, nil)
+	require.NoError(t, err)
 
-	assert.NoError(t, err)
 	assert.Equal(t, "2a00000000000000000000000000000000000000", loggedMessage)
 }
 
@@ -467,10 +475,10 @@ func TestRuntimeStorageMultipleTransactionsResourceFunction(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Contains(t, loggedMessages, "42")
 }
@@ -628,10 +636,10 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
@@ -705,10 +713,10 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
 }
@@ -785,10 +793,10 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
 }
@@ -881,10 +889,10 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, []string{"\"x!\""}, loggedMessages)
 }
@@ -946,7 +954,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
 	imported := []byte(`
       pub resource X {
         pub(set) var x: Int
-    
+
         init() {
           self.x = 0
         }
@@ -1012,10 +1020,10 @@ func TestRuntimeStorageChanges(t *testing.T) {
 	}
 
 	err := runtime.ExecuteTransaction(script1, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(script2, runtimeInterface, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, []string{"1"}, loggedMessages)
 }
@@ -1102,7 +1110,7 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
         prepare(signer: Account) {
           let existing <- signer.storage[R] <- createR()
           destroy existing
-          signer.published[&R] = &signer.storage[R] as R 
+          signer.published[&R] = &signer.storage[R] as R
         }
       }
     `)
@@ -1113,8 +1121,9 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
 		fmt.Sprintf(
 			`
               import "imported"
-    
+
               transaction {
+
                 prepare(signer: Account) {
                   log(getAccount(0x%s).published[&R]?.test() ?? 0)
                 }
@@ -1159,4 +1168,328 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"42"}, loggedMessages)
+}
+
+func TestRuntimeTransactionWithUpdateAccountContractEmpty(t *testing.T) {
+	runtime := NewInterpreterRuntime()
+
+	script := []byte(`
+      transaction {
+        prepare(signer: Account) {
+          updateAccountContract(signer.address, [])
+        }
+        execute {}
+      }
+    `)
+
+	var accountCode values.Bytes
+	var events []values.Event
+
+	runtimeInterface := &testRuntimeInterface{
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return nil, nil
+		},
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			return nil
+		},
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{{42}}
+		},
+		updateAccountCode: func(address values.Address, code values.Bytes) (err error) {
+			accountCode = code
+			return nil
+		},
+		emitEvent: func(event values.Event) {
+			events = append(events, event)
+		},
+	}
+
+	err := runtime.ExecuteTransaction(script, runtimeInterface, nil)
+
+	require.NoError(t, err)
+
+	assert.NotNil(t, accountCode)
+	assert.Len(t, events, 1)
+}
+
+func TestRuntimeCyclicImport(t *testing.T) {
+	runtime := NewInterpreterRuntime()
+
+	imported := []byte(`
+      import "imported"
+    `)
+
+	script := []byte(
+		`
+		  import "imported"
+
+		  transaction {
+			execute {}
+		  }
+		`,
+	)
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
+			switch location {
+			case StringLocation("imported"):
+				return imported, nil
+			default:
+				return nil, fmt.Errorf("unknown import location: %s", location)
+			}
+		},
+		getSigningAccounts: func() []values.Address {
+			return nil
+		},
+	}
+
+	err := runtime.ExecuteTransaction(script, runtimeInterface, nil)
+
+	require.Error(t, err)
+	require.IsType(t, Error{}, err)
+	assert.IsType(t, ast.CyclicImportsError{}, err.(Error).Unwrap())
+}
+
+func ArrayValueFromBytes(bytes []byte) *interpreter.ArrayValue {
+	byteValues := make([]interpreter.Value, len(bytes))
+
+	for i, b := range bytes {
+		byteValues[i] = interpreter.UInt8Value(b)
+	}
+
+	return interpreter.NewArrayValueUnownedNonCopying(byteValues...)
+}
+
+func TestRuntimeTransactionWithUpdateAccountContractValid(t *testing.T) {
+
+	expectSuccess := func(t *testing.T, err error, accountCode values.Bytes, events []values.Event) {
+		require.NoError(t, err)
+
+		assert.NotNil(t, accountCode)
+		assert.Len(t, events, 1)
+	}
+
+	expectFailure := func(t *testing.T, err error, accountCode values.Bytes, events []values.Event) {
+		require.Error(t, err)
+
+		assert.Nil(t, accountCode)
+		assert.Len(t, events, 0)
+	}
+
+	type argument interface {
+		fmt.Stringer
+		interpreter.Value
+	}
+
+	type test struct {
+		name      string
+		contract  string
+		arguments []argument
+		check     func(t *testing.T, err error, accountCode values.Bytes, events []values.Event)
+	}
+
+	tests := []test{
+		{
+			name: "no arguments",
+			contract: `
+              pub contract Test {}
+            `,
+			arguments: []argument{},
+			check:     expectSuccess,
+		},
+		{
+			name: "with argument",
+			contract: `
+              pub contract Test {
+                  init(_ x: Int) {}
+              }
+            `,
+			arguments: []argument{
+				interpreter.NewIntValue(1),
+			},
+			check: expectSuccess,
+		},
+		{
+			name: "with incorrect argument",
+			contract: `
+              pub contract Test {
+                  init(_ x: Int) {}
+              }
+            `,
+			arguments: []argument{
+				interpreter.BoolValue(true),
+			},
+			check: expectFailure,
+		},
+		{
+			name: "additional argument",
+			contract: `
+              pub contract Test {}
+            `,
+			arguments: []argument{
+				interpreter.NewIntValue(1),
+			},
+			check: expectFailure,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			contractArrayCode := ArrayValueFromBytes([]byte(test.contract)).String()
+
+			argumentCodes := make([]string, len(test.arguments))
+
+			for i, argument := range test.arguments {
+				argumentCodes[i] = argument.String()
+			}
+
+			argumentCode := strings.Join(argumentCodes, ", ")
+			if len(test.arguments) > 0 {
+				argumentCode = ", " + argumentCode
+			}
+
+			script := []byte(fmt.Sprintf(
+				`
+                  transaction {
+                    prepare(signer: Account) {
+                      updateAccountContract(signer.address, %s%s)
+                    }
+                    execute {}
+                  }
+                `,
+				contractArrayCode,
+				argumentCode,
+			))
+
+			runtime := NewInterpreterRuntime()
+
+			var accountCode values.Bytes
+			var events []values.Event
+
+			runtimeInterface := &testRuntimeInterface{
+				getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+					return nil, nil
+				},
+				setValue: func(controller, owner, key, value values.Bytes) (err error) {
+					return nil
+				},
+				getSigningAccounts: func() []values.Address {
+					return []values.Address{{42}}
+				},
+				updateAccountCode: func(address values.Address, code values.Bytes) (err error) {
+					accountCode = code
+					return nil
+				},
+				emitEvent: func(event values.Event) {
+					events = append(events, event)
+				},
+			}
+
+			err := runtime.ExecuteTransaction(script, runtimeInterface, nil)
+
+			test.check(t, err, accountCode, events)
+		})
+	}
+}
+
+func TestRuntimeContractAccount(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	addressValue := values.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xCA, 0xDE,
+	}
+
+	contract := []byte(`
+      pub contract Test {
+           pub let address: Address
+
+           init() {
+               // field 'account' can be used, as it is considered initialized
+               self.address = self.account.address
+           }
+
+           // test that both functions are linked back into restored composite values,
+           // and also injected fields are injected back into restored composite values
+           //
+           pub fun test(): Address {
+               return self.account.address
+           }
+      }
+    `)
+
+	script1 := []byte(`
+     import Test from 0xCADE
+
+     pub fun main(): Address {
+         return Test.address
+     }
+    `)
+
+	script2 := []byte(`
+      import Test from 0xCADE
+
+      pub fun main(): Address {
+          return Test.test()
+      }
+    `)
+
+	deploy := []byte(fmt.Sprintf(
+		`
+          transaction {
+            prepare(signer: Account) {
+              updateAccountContract(signer.address, %s)
+            }
+            execute {}
+          }
+        `,
+		ArrayValueFromBytes(contract).String(),
+	))
+
+	storedValues := map[string][]byte{}
+	var accountCode values.Bytes
+	var events []values.Event
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(_ Location) (bytes values.Bytes, err error) {
+			return accountCode, nil
+		},
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[string(key)], nil
+		},
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[string(key)] = value
+			return nil
+		},
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{addressValue}
+		},
+		updateAccountCode: func(address values.Address, code values.Bytes) (err error) {
+			accountCode = code
+			return nil
+		},
+		emitEvent: func(event values.Event) {
+			events = append(events, event)
+		},
+	}
+
+	err := runtime.ExecuteTransaction(deploy, runtimeInterface, nil)
+	require.NoError(t, err)
+
+	assert.NotNil(t, accountCode)
+
+	t.Run("", func(t *testing.T) {
+		value, err := runtime.ExecuteScript(script1, runtimeInterface, nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, addressValue, value)
+	})
+
+	t.Run("", func(t *testing.T) {
+		value, err := runtime.ExecuteScript(script2, runtimeInterface, nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, addressValue, value)
+	})
 }

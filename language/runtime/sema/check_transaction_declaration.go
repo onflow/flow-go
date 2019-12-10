@@ -3,10 +3,14 @@ package sema
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
 func (checker *Checker) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
 	transactionType := checker.Elaboration.TransactionDeclarationTypes[declaration]
+	if transactionType == nil {
+		panic(errors.NewUnreachableError())
+	}
 
 	checker.containerTypes[transactionType] = true
 	defer func() {
@@ -32,7 +36,11 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 
 	checker.visitTransactionPrepareFunction(declaration.Prepare, transactionType, fieldMembers)
 	checker.visitTransactionPreConditions(declaration.PreConditions)
-	checker.visitTransactionExecuteFunction(declaration.Execute, transactionType)
+
+	checker.withSelfResourceInvalidationAllowed(func() {
+		checker.visitTransactionExecuteFunction(declaration.Execute, transactionType)
+	})
+
 	checker.visitTransactionPostConditions(declaration.PostConditions)
 
 	checker.checkResourceFieldsInvalidated(transactionType.String(), transactionType.Members)

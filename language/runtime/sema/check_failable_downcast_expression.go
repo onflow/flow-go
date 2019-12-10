@@ -26,37 +26,49 @@ func (checker *Checker) VisitCastingExpression(expression *ast.CastingExpression
 			ResourceInvalidationKindMove,
 		)
 
-		// If the casted type is a resource, the cast expression must occur
-		// in an optional binding, i.e. inside a variable declaration
+		// If the failable casted type is a resource, the failable cast expression
+		// must occur in an optional binding, i.e. inside a variable declaration
 		// as the if-statement test element
 
-		if expression.ParentVariableDeclaration == nil ||
-			expression.ParentVariableDeclaration.ParentIfStatement == nil {
+		if expression.Operation != ast.OperationCast {
 
-			checker.report(
-				&InvalidFailableResourceDowncastOutsideOptionalBindingError{
-					Range: ast.NewRangeFromPositioned(expression),
-				},
-			)
+			if expression.ParentVariableDeclaration == nil ||
+				expression.ParentVariableDeclaration.ParentIfStatement == nil {
+
+				checker.report(
+					&InvalidFailableResourceDowncastOutsideOptionalBindingError{
+						Range: ast.NewRangeFromPositioned(expression),
+					},
+				)
+			}
 		}
 	}
 
 	switch expression.Operation {
 	case ast.OperationFailableCast:
-		// TODO: non-Any types (interfaces, wrapped (e.g Any?, [Any], etc.)) are not supported for now
-		if _, ok := leftHandType.(*AnyType); !ok {
-			checker.report(
-				&UnsupportedTypeError{
-					Type:  leftHandType,
-					Range: ast.NewRangeFromPositioned(leftHandExpression),
-				},
-			)
+		// TODO: non-AnyStruct/AnyResource types (interfaces, wrapped (e.g AnyStruct?, [AnyStruct], etc.))
+		//   are not supported for now
+
+		switch leftHandType.(type) {
+		case *AnyStructType, *AnyResourceType:
+			break
+		default:
+			if !leftHandType.IsInvalidType() {
+				checker.report(
+					&UnsupportedTypeError{
+						Type:  leftHandType,
+						Range: ast.NewRangeFromPositioned(leftHandExpression),
+					},
+				)
+			}
 		}
 
 		return &OptionalType{Type: rightHandType}
 
 	case ast.OperationCast:
-		if !checker.IsTypeCompatible(leftHandExpression, leftHandType, rightHandType) {
+		if !leftHandType.IsInvalidType() &&
+			!checker.IsTypeCompatible(leftHandExpression, leftHandType, rightHandType) {
+
 			checker.report(
 				&TypeMismatchError{
 					ActualType:   leftHandType,

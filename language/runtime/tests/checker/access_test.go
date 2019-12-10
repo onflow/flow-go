@@ -467,52 +467,91 @@ func TestCheckAccessModifierLocalFunctionDeclaration(t *testing.T) {
 
 func TestCheckAccessModifierGlobalCompositeDeclaration(t *testing.T) {
 
-	tests := map[ast.Access]bool{
-		ast.AccessNotSpecified:   true,
-		ast.AccessPrivate:        true,
-		ast.AccessAuthorized:     false,
-		ast.AccessPublic:         true,
-		ast.AccessPublicSettable: false,
+	expectInvalidAccessModifierError := func(t *testing.T, err error) {
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidAccessModifierError{}, errs[0])
 	}
 
-	require.Len(t, tests, len(ast.Accesses))
+	expectMissingAccessModifierError := func(t *testing.T, err error) {
+		errs := ExpectCheckerErrors(t, err, 1)
 
-	for access, expectSuccess := range tests {
-		for _, compositeKind := range common.CompositeKinds {
-			for _, isInterface := range []bool{true, false} {
+		assert.IsType(t, &sema.MissingAccessModifierError{}, errs[0])
+	}
 
-				interfaceKeyword := ""
-				if isInterface {
-					interfaceKeyword = "interface"
-				}
+	checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
+		sema.AccessCheckModeStrict: {
+			ast.AccessNotSpecified:   expectMissingAccessModifierError,
+			ast.AccessPrivate:        expectInvalidAccessModifierError,
+			ast.AccessAuthorized:     expectInvalidAccessModifierError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectInvalidAccessModifierError,
+		},
+		sema.AccessCheckModeNotSpecifiedRestricted: {
+			ast.AccessNotSpecified:   expectMissingAccessModifierError,
+			ast.AccessPrivate:        expectInvalidAccessModifierError,
+			ast.AccessAuthorized:     expectInvalidAccessModifierError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectInvalidAccessModifierError,
+		},
+		sema.AccessCheckModeNotSpecifiedUnrestricted: {
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectInvalidAccessModifierError,
+			ast.AccessAuthorized:     expectInvalidAccessModifierError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectInvalidAccessModifierError,
+		},
+		sema.AccessCheckModeNone: {
+			ast.AccessNotSpecified:   expectSuccess,
+			ast.AccessPrivate:        expectInvalidAccessModifierError,
+			ast.AccessAuthorized:     expectInvalidAccessModifierError,
+			ast.AccessPublic:         expectSuccess,
+			ast.AccessPublicSettable: expectInvalidAccessModifierError,
+		},
+	}
 
-				testName := fmt.Sprintf("%s %s/%s",
-					compositeKind.Keyword(),
-					interfaceKeyword,
-					access.Keyword(),
-				)
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
 
-				t.Run(testName, func(t *testing.T) {
+	for checkMode, tests := range checkModeTests {
+		require.Len(t, tests, len(ast.Accesses))
 
-					_, err := ParseAndCheck(t,
-						fmt.Sprintf(
-							`
-                              %[1]s %[2]s %[3]s Test {}
-	                        `,
-							access.Keyword(),
-							compositeKind.Keyword(),
-							interfaceKeyword,
-						),
+		for access, check := range tests {
+			for _, compositeKind := range common.CompositeKinds {
+				for _, isInterface := range []bool{true, false} {
+
+					interfaceKeyword := ""
+					if isInterface {
+						interfaceKeyword = "interface"
+					}
+
+					testName := fmt.Sprintf("%s %s/%s/%s",
+						compositeKind.Keyword(),
+						interfaceKeyword,
+						checkMode,
+						access.Keyword(),
 					)
 
-					if expectSuccess {
-						assert.NoError(t, err)
-					} else {
-						errs := ExpectCheckerErrors(t, err, 1)
+					t.Run(testName, func(t *testing.T) {
 
-						assert.IsType(t, &sema.InvalidAccessModifierError{}, errs[0])
-					}
-				})
+						_, err := ParseAndCheckWithOptions(t,
+							fmt.Sprintf(
+								`
+                                  %[1]s %[2]s %[3]s Test {}
+	                            `,
+								access.Keyword(),
+								compositeKind.Keyword(),
+								interfaceKeyword,
+							),
+							ParseAndCheckOptions{
+								Options: []sema.Option{
+									sema.WithAccessCheckMode(checkMode),
+								},
+							},
+						)
+
+						check(t, err)
+					})
+				}
 			}
 		}
 	}
@@ -562,6 +601,8 @@ func TestCheckAccessImportGlobalValue(t *testing.T) {
 		},
 		sema.AccessCheckModeNone: expectSuccess,
 	}
+
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
 
 	for checkMode, check := range checkModeTests {
 
@@ -626,103 +667,6 @@ func TestCheckAccessImportGlobalValue(t *testing.T) {
 	}
 }
 
-func TestCheckAccessImportGlobalType(t *testing.T) {
-
-	checkModeTests := map[sema.AccessCheckMode]func(*testing.T, error){
-		sema.AccessCheckModeStrict: func(t *testing.T, err error) {
-			errs := ExpectCheckerErrors(t, err, 2)
-
-			require.IsType(t, &sema.InvalidAccessError{}, errs[0])
-			assert.Equal(t,
-				"A",
-				errs[0].(*sema.InvalidAccessError).Name,
-			)
-
-			require.IsType(t, &sema.InvalidAccessError{}, errs[1])
-			assert.Equal(t,
-				"C",
-				errs[1].(*sema.InvalidAccessError).Name,
-			)
-		},
-		sema.AccessCheckModeNotSpecifiedRestricted: func(t *testing.T, err error) {
-			errs := ExpectCheckerErrors(t, err, 2)
-
-			require.IsType(t, &sema.InvalidAccessError{}, errs[0])
-			assert.Equal(t,
-				"A",
-				errs[0].(*sema.InvalidAccessError).Name,
-			)
-
-			require.IsType(t, &sema.InvalidAccessError{}, errs[1])
-			assert.Equal(t,
-				"C",
-				errs[1].(*sema.InvalidAccessError).Name,
-			)
-		},
-		sema.AccessCheckModeNotSpecifiedUnrestricted: func(t *testing.T, err error) {
-			errs := ExpectCheckerErrors(t, err, 1)
-
-			require.IsType(t, &sema.InvalidAccessError{}, errs[0])
-			assert.Equal(t,
-				"A",
-				errs[0].(*sema.InvalidAccessError).Name,
-			)
-		},
-		sema.AccessCheckModeNone: func(t *testing.T, err error) {
-			require.Nil(t, err)
-		},
-	}
-
-	for _, compositeKind := range common.CompositeKinds {
-		for checkMode, check := range checkModeTests {
-
-			testName := fmt.Sprintf("%s/%s",
-				compositeKind.Keyword(),
-				checkMode,
-			)
-
-			t.Run(testName, func(t *testing.T) {
-
-				// NOTE: only parse, don't check imported program.
-				// will be checked by checker checking importing program
-
-				lastAccessModifier := ""
-				if checkMode == sema.AccessCheckModeStrict {
-					lastAccessModifier = "priv"
-				}
-
-				imported, _, err := parser.ParseProgram(fmt.Sprintf(
-					`
-                       priv %[1]s A {}
-                       pub %[1]s B {}
-                       %[2]s %[1]s C {}
-                    `,
-					compositeKind.Keyword(),
-					lastAccessModifier,
-				))
-
-				require.Nil(t, err)
-
-				_, err = ParseAndCheckWithOptions(t,
-					`
-                       import A, B, C from "imported"
-                    `,
-					ParseAndCheckOptions{
-						ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
-							return imported, nil
-						},
-						Options: []sema.Option{
-							sema.WithAccessCheckMode(checkMode),
-						},
-					},
-				)
-
-				check(t, err)
-			})
-		}
-	}
-}
-
 func TestCheckAccessCompositeFunction(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
@@ -764,6 +708,8 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
 			},
 		}
 
+		require.Len(t, checkModeTests, len(sema.AccessCheckModes))
+
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
 
@@ -794,15 +740,16 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test %[3]s %[4]s Test()
+                                  let test %[3]s %[4]s Test%[5]s
                                   test.test()
-                                  %[5]s test
+                                  %[6]s test
                               }
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
 							compositeKind.TransferOperator(),
 							compositeKind.ConstructionKeyword(),
+							constructorArguments(compositeKind),
 							compositeKind.DestructionKeyword(),
 						),
 						ParseAndCheckOptions{
@@ -860,6 +807,8 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
 			},
 		}
 
+		require.Len(t, checkModeTests, len(sema.AccessCheckModes))
+
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
 
@@ -894,9 +843,9 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test: %[3]sTest %[4]s %[5]s TestImpl()
+                                  let test: %[3]sTest %[4]s %[5]s TestImpl%[6]s
                                   test.test()
-                                  %[6]s test
+                                  %[7]s test
                               }
 	                        `,
 							compositeKind.Keyword(),
@@ -904,6 +853,7 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
 							compositeKind.Annotation(),
 							compositeKind.TransferOperator(),
 							compositeKind.ConstructionKeyword(),
+							constructorArguments(compositeKind),
 							compositeKind.DestructionKeyword(),
 						),
 						ParseAndCheckOptions{
@@ -953,6 +903,8 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
 		},
 	}
 
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
+
 	for _, compositeKind := range common.CompositeKinds {
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
@@ -988,15 +940,16 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test %[3]s %[4]s Test()
+                                  let test %[3]s %[4]s Test%[5]s
                                   test.test
-                                  %[5]s test
+                                  %[6]s test
                               }
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
 							compositeKind.TransferOperator(),
 							compositeKind.ConstructionKeyword(),
+							constructorArguments(compositeKind),
 							compositeKind.DestructionKeyword(),
 						),
 						ParseAndCheckOptions{
@@ -1046,6 +999,8 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 		},
 	}
 
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
+
 	for _, compositeKind := range common.CompositeKinds {
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
@@ -1085,9 +1040,9 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test: %[3]sTest %[4]s %[5]s TestImpl()
+                                  let test: %[3]sTest %[4]s %[5]s TestImpl%[6]s
                                   test.test
-                                  %[6]s test
+                                  %[7]s test
                               }
 	                        `,
 							compositeKind.Keyword(),
@@ -1095,6 +1050,7 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 							compositeKind.Annotation(),
 							compositeKind.TransferOperator(),
 							compositeKind.ConstructionKeyword(),
+							constructorArguments(compositeKind),
 							compositeKind.DestructionKeyword(),
 						),
 						ParseAndCheckOptions{
@@ -1144,6 +1100,8 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 		},
 	}
 
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
+
 	for _, compositeKind := range common.CompositeKinds {
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
@@ -1181,17 +1139,18 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test %[3]s %[4]s Test()
+                                  let test %[3]s %[4]s Test%[5]s
                                   test.test = 3
                                   var temp = 4
                                   test.test <-> temp
-                                  %[5]s test
+                                  %[6]s test
                               }
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
 							compositeKind.TransferOperator(),
 							compositeKind.ConstructionKeyword(),
+							constructorArguments(compositeKind),
 							compositeKind.DestructionKeyword(),
 						),
 						ParseAndCheckOptions{
@@ -1251,6 +1210,8 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 		},
 	}
 
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
+
 	for _, compositeKind := range common.CompositeKinds {
 		for checkMode, checkModeTests := range checkModeTests {
 			require.Len(t, checkModeTests, len(ast.Accesses))
@@ -1292,11 +1253,11 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test: %[3]sTest %[4]s %[5]s TestImpl()
+                                  let test: %[3]sTest %[4]s %[5]s TestImpl%[6]s
                                   test.test = 3
                                   var temp = 4
                                   test.test <-> temp
-                                  %[6]s test
+                                  %[7]s test
                               }
 	                        `,
 							compositeKind.Keyword(),
@@ -1304,6 +1265,7 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 							compositeKind.Annotation(),
 							compositeKind.TransferOperator(),
 							compositeKind.ConstructionKeyword(),
+							constructorArguments(compositeKind),
 							compositeKind.DestructionKeyword(),
 						),
 						ParseAndCheckOptions{
@@ -1352,6 +1314,8 @@ func TestCheckAccessCompositeFieldVariableDeclarationWithSecondValue(t *testing.
 			ast.AccessPublicSettable: expectSuccess,
 		},
 	}
+
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
 
 	for checkMode, checkModeTests := range checkModeTests {
 		require.Len(t, checkModeTests, len(ast.Accesses))
@@ -1454,6 +1418,8 @@ func TestCheckAccessInterfaceFieldVariableDeclarationWithSecondValue(t *testing.
 			ast.AccessPublicSettable: expectSuccess,
 		},
 	}
+
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
 
 	for checkMode, checkModeTests := range checkModeTests {
 		require.Len(t, checkModeTests, len(ast.Accesses))
@@ -1662,6 +1628,8 @@ func TestCheckAccessImportGlobalValueAssignmentAndSwap(t *testing.T) {
 			)
 		},
 	}
+
+	require.Len(t, checkModeTests, len(sema.AccessCheckModes))
 
 	for checkMode, check := range checkModeTests {
 

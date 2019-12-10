@@ -8,55 +8,57 @@ type Type interface {
 
 // revive:enable
 
-type IsAType struct{}
+type isAType struct{}
 
-func (IsAType) isType() {}
+func (isAType) isType() {}
 
 type Annotation struct {
 	IsMove bool
 	Type   Type
 }
 
-type Void struct{ IsAType }
+type Void struct{ isAType }
 
-type Bool struct{ IsAType }
+type Bool struct{ isAType }
 
-type String struct{ IsAType }
+type String struct{ isAType }
 
-type Bytes struct{ IsAType }
+type Bytes struct{ isAType }
 
-type Any struct{ IsAType }
+type AnyStruct struct{ isAType }
 
-type Int struct{ IsAType }
+type AnyResource struct{ isAType }
 
-type Int8 struct{ IsAType }
+type Int struct{ isAType }
 
-type Int16 struct{ IsAType }
+type Int8 struct{ isAType }
 
-type Int32 struct{ IsAType }
+type Int16 struct{ isAType }
 
-type Int64 struct{ IsAType }
+type Int32 struct{ isAType }
 
-type UInt8 struct{ IsAType }
+type Int64 struct{ isAType }
 
-type UInt16 struct{ IsAType }
+type UInt8 struct{ isAType }
 
-type UInt32 struct{ IsAType }
+type UInt16 struct{ isAType }
 
-type UInt64 struct{ IsAType }
+type UInt32 struct{ isAType }
+
+type UInt64 struct{ isAType }
 
 type Variable struct {
-	IsAType
+	isAType
 	Type Type
 }
 
 type VariableSizedArray struct {
-	IsAType
+	isAType
 	ElementType Type
 }
 
 type ConstantSizedArray struct {
-	IsAType
+	isAType
 	Size        uint
 	ElementType Type
 }
@@ -67,67 +69,67 @@ type Parameter struct {
 }
 
 type Composite struct {
-	IsAType
+	isAType
 	Fields       map[string]*Field
 	Identifier   string
 	Initializers [][]*Parameter
 }
 
 type Struct struct {
-	IsAType
+	isAType
 	Composite
 }
 
 type Resource struct {
-	IsAType
+	isAType
 	Composite
 }
 
 type Dictionary struct {
-	IsAType
+	isAType
 	KeyType     Type
 	ElementType Type
 }
 
 type Function struct {
-	IsAType
+	isAType
 	Parameters []*Parameter
 	ReturnType Type
 }
 
 // A type representing anonymous function (aka without named arguments)
 type FunctionType struct {
-	IsAType
+	isAType
 	ParameterTypes []Type
 	ReturnType     Type
 }
 
 type Event struct {
-	IsAType
+	isAType
 	Fields     []*Parameter
 	Identifier string
 }
 
 type Field struct {
-	IsAType
+	isAType
 	Identifier string
 	Type       Type
 }
 
 type Optional struct {
-	IsAType
+	isAType
 	Of Type
 }
 
 //Pointers are simply pointers to already existing types, to prevent circular references
 type ResourcePointer struct {
-	IsAType
+	isAType
 	TypeName string
 }
 
 type StructPointer struct {
-	IsAType
+	isAType
 	TypeName string
 }
 
-type Address struct{ IsAType }
+type Address struct{ isAType }

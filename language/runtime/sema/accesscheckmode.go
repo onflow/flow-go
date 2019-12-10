@@ -10,3 +10,10 @@ const (
 	AccessCheckModeNotSpecifiedUnrestricted
 	AccessCheckModeNone
 )
+
+var AccessCheckModes = []AccessCheckMode{
+	AccessCheckModeStrict,
+	AccessCheckModeNotSpecifiedRestricted,
+	AccessCheckModeNotSpecifiedUnrestricted,
+	AccessCheckModeNone,
+}

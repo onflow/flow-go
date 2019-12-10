@@ -3,13 +3,12 @@ package stdlib
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
 )
 
 // This file defines functions built in to the Flow runtime.
 
 // TODO: improve types
-var createAccountFunctionType = sema.FunctionType{
+var createAccountFunctionType = &sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// publicKeys
 		&sema.VariableSizedType{
@@ -31,8 +30,7 @@ var createAccountFunctionType = sema.FunctionType{
 	),
 }
 
-// TODO: improve types
-var addAccountKeyFunctionType = sema.FunctionType{
+var addAccountKeyFunctionType = &sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// address
 		&sema.AddressType{},
@@ -47,8 +45,7 @@ var addAccountKeyFunctionType = sema.FunctionType{
 	),
 }
 
-// TODO: improve types
-var removeAccountKeyFunctionType = sema.FunctionType{
+var removeAccountKeyFunctionType = &sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// address
 		&sema.AddressType{},
@@ -61,8 +58,7 @@ var removeAccountKeyFunctionType = sema.FunctionType{
 	),
 }
 
-// TODO: improve types
-var updateAccountCodeFunctionType = sema.FunctionType{
+var updateAccountCodeFunctionType = &sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// address
 		&sema.AddressType{},
@@ -77,7 +73,26 @@ var updateAccountCodeFunctionType = sema.FunctionType{
 	),
 }
 
-var getAccountFunctionType = sema.FunctionType{
+var updateAccountContractFunctionType = &sema.FunctionType{
+	ParameterTypeAnnotations: sema.NewTypeAnnotations(
+		// address
+		&sema.AddressType{},
+		// code
+		&sema.VariableSizedType{
+			Type: &sema.IntType{},
+		},
+	),
+	// nothing
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(
+		&sema.VoidType{},
+	),
+	RequiredArgumentCount: (func() *int {
+		var count = 2
+		return &count
+	})(),
+}
+
+var getAccountFunctionType = &sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
 		// address
 		&sema.AddressType{},
@@ -87,9 +102,9 @@ var getAccountFunctionType = sema.FunctionType{
 	),
 }
 
-var logFunctionType = sema.FunctionType{
+var logFunctionType = &sema.FunctionType{
 	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		&sema.AnyType{},
+		&sema.AnyStructType{},
 	),
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
 		&sema.VoidType{},
@@ -99,12 +114,13 @@ var logFunctionType = sema.FunctionType{
 // FlowBuiltinImpls defines the set of functions needed to implement the Flow
 // built-in functions.
 type FlowBuiltinImpls struct {
-	CreateAccount     func([]interpreter.Value, interpreter.LocationPosition) trampoline.Trampoline
-	AddAccountKey     func([]interpreter.Value, interpreter.LocationPosition) trampoline.Trampoline
-	RemoveAccountKey  func([]interpreter.Value, interpreter.LocationPosition) trampoline.Trampoline
-	UpdateAccountCode func([]interpreter.Value, interpreter.LocationPosition) trampoline.Trampoline
-	GetAccount        func([]interpreter.Value, interpreter.LocationPosition) trampoline.Trampoline
-	Log               func([]interpreter.Value, interpreter.LocationPosition) trampoline.Trampoline
+	CreateAccount         interpreter.HostFunction
+	AddAccountKey         interpreter.HostFunction
+	RemoveAccountKey      interpreter.HostFunction
+	UpdateAccountCode     interpreter.HostFunction
+	UpdateAccountContract interpreter.HostFunction
+	GetAccount            interpreter.HostFunction
+	Log                   interpreter.HostFunction
 }
 
 // FlowBuiltInFunctions returns a list of standard library functions, bound to
@@ -113,37 +129,43 @@ func FlowBuiltInFunctions(impls FlowBuiltinImpls) StandardLibraryFunctions {
 	return StandardLibraryFunctions{
 		NewStandardLibraryFunction(
 			"createAccount",
-			&createAccountFunctionType,
+			createAccountFunctionType,
 			impls.CreateAccount,
 			nil,
 		),
 		NewStandardLibraryFunction(
 			"addAccountKey",
-			&addAccountKeyFunctionType,
+			addAccountKeyFunctionType,
 			impls.AddAccountKey,
 			nil,
 		),
 		NewStandardLibraryFunction(
 			"removeAccountKey",
-			&removeAccountKeyFunctionType,
+			removeAccountKeyFunctionType,
 			impls.RemoveAccountKey,
 			nil,
 		),
 		NewStandardLibraryFunction(
 			"updateAccountCode",
-			&updateAccountCodeFunctionType,
+			updateAccountCodeFunctionType,
 			impls.UpdateAccountCode,
 			nil,
 		),
 		NewStandardLibraryFunction(
+			"updateAccountContract",
+			updateAccountContractFunctionType,
+			impls.UpdateAccountContract,
+			nil,
+		),
+		NewStandardLibraryFunction(
 			"getAccount",
-			&getAccountFunctionType,
+			getAccountFunctionType,
 			impls.GetAccount,
 			nil,
 		),
 		NewStandardLibraryFunction(
 			"log",
-			&logFunctionType,
+			logFunctionType,
 			impls.Log,
 			nil,
 		),

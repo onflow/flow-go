@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	runtimeErrors "github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
@@ -27,6 +28,8 @@ type Interface interface {
 	AddAccountKey(address values.Address, publicKey values.Bytes) error
 	// RemoveAccountKey removes a key from an account by index.
 	RemoveAccountKey(address values.Address, index values.Int) (publicKey values.Bytes, err error)
+	// CheckCode checks the validity of the code.
+	CheckCode(address values.Address, code values.Bytes) (err error)
 	// UpdateAccountCode updates the code associated with an account.
 	UpdateAccountCode(address values.Address, code values.Bytes) (err error)
 	// GetSigningAccounts returns the signing accounts.
@@ -61,6 +64,8 @@ var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 type ImportResolver = func(astLocation ast.Location) (program *ast.Program, e error)
 
+const contractKey = "contract"
+
 // interpreterRuntime is a interpreter-based version of the Flow runtime.
 type interpreterRuntime struct{}
 
@@ -70,7 +75,9 @@ func NewInterpreterRuntime() Runtime {
 }
 
 func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (values.Value, error) {
-	functions := r.standardLibraryFunctions(runtimeInterface)
+	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
+
+	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
 
 	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
 	if err != nil {
@@ -83,26 +90,59 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 		return nil, nil
 	}
 
-	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
-
-	inter, err := r.newInterpreter(checker, functions, runtimeInterface, runtimeStorage)
+	value, err := r.interpret(
+		runtimeInterface,
+		runtimeStorage,
+		checker,
+		functions,
+		nil,
+		func(inter *interpreter.Interpreter) (interpreter.Value, error) {
+			return inter.Invoke("main")
+		},
+	)
 	if err != nil {
 		return nil, newError(err)
 	}
 
-	if err := inter.Interpret(); err != nil {
-		return nil, newError(err)
-	}
+	// Write back all stored values, which were actually just cached, back into storage.
 
-	value, err := inter.Invoke("main")
-	if err != nil {
-		return nil, newError(err)
-	}
+	// Even though this function is `ExecuteScript`, that doesn't imply the changes
+	// to storage will be actually persisted
 
-	// Write back all stored values, which were actually just cached, back into storage
 	runtimeStorage.writeCached()
 
 	return value.(interpreter.ExportableValue).Export(), nil
+}
+
+func (r *interpreterRuntime) interpret(
+	runtimeInterface Interface,
+	runtimeStorage *interpreterRuntimeStorage,
+	checker *sema.Checker,
+	functions stdlib.StandardLibraryFunctions,
+	options []interpreter.Option,
+	f func(inter *interpreter.Interpreter) (interpreter.Value, error),
+) (
+	interpreter.Value,
+	error,
+) {
+	inter, err := r.newInterpreter(checker, functions, runtimeInterface, runtimeStorage, options)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := inter.Interpret(); err != nil {
+		return nil, err
+	}
+
+	if f != nil {
+		value, err := f(inter)
+		if err != nil {
+			return nil, err
+		}
+		return value, nil
+	}
+
+	return nil, nil
 }
 
 func (r *interpreterRuntime) ExecuteTransaction(
@@ -110,7 +150,9 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	runtimeInterface Interface,
 	location Location,
 ) error {
-	functions := r.standardLibraryFunctions(runtimeInterface)
+	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
+
+	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
 
 	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
 	if err != nil {
@@ -151,24 +193,23 @@ func (r *interpreterRuntime) ExecuteTransaction(
 		}
 	}
 
-	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
-
-	inter, err := r.newInterpreter(checker, functions, runtimeInterface, runtimeStorage)
-	if err != nil {
-		return newError(err)
-	}
-
-	if err := inter.Interpret(); err != nil {
-		return newError(err)
-	}
-
 	signingAccounts := make([]interface{}, signingAccountsCount)
 
 	for i, address := range signingAccountAddresses {
 		signingAccounts[i] = interpreter.NewAccountValue(interpreter.AddressValue(address))
 	}
 
-	err = inter.InvokeTransaction(0, signingAccounts...)
+	_, err = r.interpret(
+		runtimeInterface,
+		runtimeStorage,
+		checker,
+		functions,
+		nil,
+		func(inter *interpreter.Interpreter) (interpreter.Value, error) {
+			err := inter.InvokeTransaction(0, signingAccounts...)
+			return nil, err
+		},
+	)
 	if err != nil {
 		return newError(err)
 	}
@@ -180,7 +221,9 @@ func (r *interpreterRuntime) ExecuteTransaction(
 }
 
 func (r *interpreterRuntime) ParseAndCheckProgram(script []byte, runtimeInterface Interface, location Location) error {
-	functions := r.standardLibraryFunctions(runtimeInterface)
+	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
+	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
+
 	_, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
 	if err != nil {
 		return newError(err)
@@ -230,30 +273,88 @@ func (r *interpreterRuntime) newInterpreter(
 	functions stdlib.StandardLibraryFunctions,
 	runtimeInterface Interface,
 	runtimeStorage *interpreterRuntimeStorage,
+	options []interpreter.Option,
 ) (*interpreter.Interpreter, error) {
+
+	defaultOptions := []interpreter.Option{
+		interpreter.WithPredefinedValues(functions.ToValues()),
+		interpreter.WithOnEventEmittedHandler(
+			func(_ *interpreter.Interpreter, eventValue interpreter.EventValue) {
+				r.emitEvent(eventValue, runtimeInterface)
+			},
+		),
+		interpreter.WithStorageReadHandler(
+			func(_ *interpreter.Interpreter, storageIdentifier string, key string) interpreter.OptionalValue {
+				return runtimeStorage.readValue(storageIdentifier, key)
+			},
+		),
+		interpreter.WithStorageWriteHandler(
+			func(_ *interpreter.Interpreter, storageIdentifier string, key string, value interpreter.OptionalValue) {
+				runtimeStorage.writeValue(storageIdentifier, key, value)
+			},
+		),
+		interpreter.WithStorageKeyHandler(
+			func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+				return indexingType.String()
+			},
+		),
+		interpreter.WithInjectedCompositeFieldsHandler(
+			func(_ *interpreter.Interpreter, location ast.Location, compositeIdentifier string, compositeKind common.CompositeKind) map[string]interpreter.Value {
+				switch compositeKind {
+				case common.CompositeKindContract:
+					var address []byte
+
+					switch location := location.(type) {
+					case ast.AddressLocation:
+						address = location
+					case AddressLocation:
+						address = location
+					default:
+						panic(runtimeErrors.NewUnreachableError())
+					}
+
+					addressLocation := interpreter.NewAddressValueFromBytes(address)
+
+					return map[string]interpreter.Value{
+						"account": interpreter.NewAccountValue(addressLocation),
+					}
+				}
+
+				return nil
+			},
+		),
+		interpreter.WithContractValueHandler(
+			func(
+				inter *interpreter.Interpreter,
+				compositeType *sema.CompositeType,
+				_ interpreter.FunctionValue,
+			) *interpreter.CompositeValue {
+				// Load the contract from storage
+
+				return r.loadContract(compositeType, runtimeStorage)
+			},
+		),
+	}
+
 	return interpreter.NewInterpreter(
 		checker,
-		interpreter.WithPredefinedValues(functions.ToValues()),
-		interpreter.WithOnEventEmittedHandler(func(_ *interpreter.Interpreter, eventValue interpreter.EventValue) {
-			r.emitEvent(eventValue, runtimeInterface)
-		}),
-		interpreter.WithStorageReadHandler(runtimeStorage.readValue),
-		interpreter.WithStorageWriteHandler(runtimeStorage.writeValue),
-		interpreter.WithStorageKeyHandlerFunc(func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-			return indexingType.String()
-		}),
+		append(defaultOptions, options...)...,
 	)
 }
 
-func (r *interpreterRuntime) standardLibraryFunctions(runtimeInterface Interface) stdlib.StandardLibraryFunctions {
+func (r *interpreterRuntime) standardLibraryFunctions(
+	runtimeInterface Interface,
+	runtimeStorage *interpreterRuntimeStorage,
+) stdlib.StandardLibraryFunctions {
 	return append(
 		stdlib.FlowBuiltInFunctions(stdlib.FlowBuiltinImpls{
-			CreateAccount:     r.newCreateAccountFunction(runtimeInterface),
-			AddAccountKey:     r.addAccountKeyFunction(runtimeInterface),
-			RemoveAccountKey:  r.removeAccountKeyFunction(runtimeInterface),
-			UpdateAccountCode: r.newUpdateAccountCodeFunction(runtimeInterface),
-			GetAccount:        r.newGetAccountFunction(runtimeInterface),
-			Log:               r.newLogFunction(runtimeInterface),
+			CreateAccount:         r.newCreateAccountFunction(runtimeInterface),
+			AddAccountKey:         r.addAccountKeyFunction(runtimeInterface),
+			RemoveAccountKey:      r.removeAccountKeyFunction(runtimeInterface),
+			UpdateAccountCode:     r.newUpdateAccountCodeFunction(runtimeInterface),
+			UpdateAccountContract: r.newUpdateAccountContractFunction(runtimeInterface, runtimeStorage),
+			GetAccount:            r.newGetAccountFunction(runtimeInterface),
+			Log:                   r.newLogFunction(runtimeInterface),
 		}),
 		stdlib.BuiltinFunctions...,
 	)
@@ -322,8 +423,8 @@ func (r *interpreterRuntime) emitAccountEvent(
 }
 
 func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		pkArray := arguments[0].(*interpreter.ArrayValue)
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		pkArray := invocation.Arguments[0].(*interpreter.ArrayValue)
 		pkValues := pkArray.Values
 		publicKeys := make([]values.Bytes, len(pkValues))
 
@@ -335,7 +436,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 			publicKeys[i] = publicKey
 		}
 
-		code, err := toBytes(arguments[1])
+		code, err := toBytes(invocation.Arguments[1])
 		if err != nil {
 			panic(fmt.Sprintf("createAccount requires the third parameter to be an array"))
 		}
@@ -353,9 +454,9 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 }
 
 func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		accountAddress := arguments[0].(interpreter.AddressValue)
-		publicKey, err := toBytes(arguments[1])
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
+		publicKey, err := toBytes(invocation.Arguments[1])
 		if err != nil {
 			panic(fmt.Sprintf("addAccountKey requires the second parameter to be an array"))
 		}
@@ -369,15 +470,15 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 
 		r.emitAccountEvent(stdlib.AccountKeyAddedEventType, runtimeInterface, accountAddressValue, publicKey)
 
-		result := &interpreter.VoidValue{}
+		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
 	}
 }
 
 func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		accountAddress := arguments[0].(interpreter.AddressValue)
-		index := arguments[1].(interpreter.IntValue)
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
+		index := invocation.Arguments[1].(interpreter.IntValue)
 
 		accountAddressValue := accountAddress.Export().(values.Address)
 
@@ -390,21 +491,26 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 
 		r.emitAccountEvent(stdlib.AccountKeyRemovedEventType, runtimeInterface, accountAddressValue, publicKey)
 
-		result := &interpreter.VoidValue{}
+		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
 	}
 }
 
 func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		accountAddress := arguments[0].(interpreter.AddressValue)
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
 
-		code, err := toBytes(arguments[1])
+		code, err := toBytes(invocation.Arguments[1])
 		if err != nil {
 			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
 		}
 
 		accountAddressValue := accountAddress.Export().(values.Address)
+
+		err = runtimeInterface.CheckCode(accountAddressValue, code)
+		if err != nil {
+			panic(err)
+		}
 
 		err = runtimeInterface.UpdateAccountCode(accountAddressValue, code)
 		if err != nil {
@@ -413,23 +519,257 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Inter
 
 		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, accountAddressValue, code)
 
-		result := &interpreter.VoidValue{}
+		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
 	}
 }
 
+func (r *interpreterRuntime) newUpdateAccountContractFunction(
+	runtimeInterface Interface,
+	runtimeStorage *interpreterRuntimeStorage,
+) interpreter.HostFunction {
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		const requiredArgumentCount = 2
+
+		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
+
+		code, err := toBytes(invocation.Arguments[1])
+		if err != nil {
+			panic(fmt.Sprintf("updateAccountContract requires the second parameter to be an array"))
+		}
+
+		accountAddressValue := accountAddress.Export().(values.Address)
+
+		location := AddressLocation(accountAddressValue[:])
+
+		functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
+		checker, err := r.parseAndCheckProgram(code, runtimeInterface, location, functions)
+		if err != nil {
+			panic(err)
+		}
+
+		var contractTypes []*sema.CompositeType
+
+		for _, variable := range checker.GlobalTypes {
+			if variable.DeclarationKind == common.DeclarationKindContract {
+				contractType := variable.Type.(*sema.CompositeType)
+				contractTypes = append(contractTypes, contractType)
+			}
+		}
+
+		if len(contractTypes) > 1 {
+			panic(fmt.Sprintf("updateAccountContract: code declares more than one contract"))
+		}
+
+		// If the code declares a contract, instantiate it and store it
+
+		var contractValue interpreter.OptionalValue = interpreter.NilValue{}
+
+		if len(contractTypes) > 0 {
+			contractType := contractTypes[0]
+
+			constructorArguments := invocation.Arguments[requiredArgumentCount:]
+			constructorArgumentTypes := invocation.ArgumentTypes[requiredArgumentCount:]
+
+			contract, err := r.instantiateContract(
+				contractType,
+				constructorArguments,
+				constructorArgumentTypes,
+				runtimeInterface,
+				runtimeStorage,
+				checker,
+				functions,
+				invocation.Location.Position,
+			)
+
+			if err != nil {
+				panic(err)
+			}
+
+			contractValue = interpreter.NewSomeValueOwningNonCopying(contract)
+		}
+
+		contractValue.SetOwner(accountAddress.StorageIdentifier())
+
+		// NOTE: only update account code if contract instantiation succeeded
+
+		err = runtimeInterface.UpdateAccountCode(accountAddressValue, code)
+		if err != nil {
+			panic(err)
+		}
+
+		r.writeContract(runtimeStorage, accountAddress, contractValue)
+
+		// TODO: new event type?
+		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, accountAddressValue, code)
+
+		result := interpreter.VoidValue{}
+		return trampoline.Done{Result: result}
+	}
+}
+
+func (r *interpreterRuntime) writeContract(
+	runtimeStorage *interpreterRuntimeStorage,
+	accountAddress interpreter.AddressValue,
+	contractValue interpreter.OptionalValue,
+) {
+	runtimeStorage.writeValue(
+		accountAddress.StorageIdentifier(),
+		contractKey,
+		contractValue,
+	)
+}
+
+func (r *interpreterRuntime) loadContract(
+	compositeType *sema.CompositeType,
+	runtimeStorage *interpreterRuntimeStorage,
+) *interpreter.CompositeValue {
+	var address []byte
+
+	switch location := compositeType.Location.(type) {
+	case ast.AddressLocation:
+		address = location
+	case AddressLocation:
+		address = location
+	default:
+		panic(runtimeErrors.NewUnreachableError())
+	}
+
+	addressLocation := interpreter.NewAddressValueFromBytes(address)
+
+	storedValue := runtimeStorage.readValue(
+		addressLocation.StorageIdentifier(),
+		contractKey,
+	)
+	switch typedValue := storedValue.(type) {
+	case *interpreter.SomeValue:
+		return typedValue.Value.(*interpreter.CompositeValue)
+	case interpreter.NilValue:
+		// TODO: missing contract. panic?
+		return nil
+	default:
+		panic(runtimeErrors.NewUnreachableError())
+	}
+}
+
+func (r *interpreterRuntime) instantiateContract(
+	contractType *sema.CompositeType,
+	constructorArguments []interpreter.Value,
+	argumentTypes []sema.Type,
+	runtimeInterface Interface,
+	runtimeStorage *interpreterRuntimeStorage,
+	checker *sema.Checker,
+	functions stdlib.StandardLibraryFunctions,
+	invocationPos ast.Position,
+) (
+	interpreter.Value,
+	error,
+) {
+	parameterTypes := make([]sema.Type, len(contractType.ConstructorParameterTypeAnnotations))
+
+	for i, constructorParameterTypeAnnotation := range contractType.ConstructorParameterTypeAnnotations {
+		parameterTypes[i] = constructorParameterTypeAnnotation.Type
+	}
+
+	// Check argument count
+
+	argumentCount := len(argumentTypes)
+	parameterCount := len(parameterTypes)
+
+	if argumentCount != parameterCount {
+		return nil, fmt.Errorf("invalid argument count: expected %d, got %d", parameterCount, argumentCount)
+	}
+
+	// Check arguments match parameter
+
+	for i := 0; i < argumentCount; i++ {
+		argumentType := argumentTypes[i]
+		parameterTye := parameterTypes[i]
+		if !sema.IsSubType(argumentType, parameterTye) {
+			return nil, fmt.Errorf(
+				"invalid argument %d: expected type `%s`, got `%s`",
+				i,
+				parameterTye,
+				argumentType,
+			)
+		}
+	}
+
+	// Use a custom contract value handler that detects if the requested contract value
+	// is for the contract declaration that is being deployed.
+	//
+	// If the contract is the deployed contract, instantiate it using
+	// the provided constructor and given arguments.
+	//
+	// If the contract is not the deployed contract, load it from storage.
+
+	var contract *interpreter.CompositeValue
+
+	interpreterOptions := []interpreter.Option{
+		interpreter.WithContractValueHandler(
+			func(
+				inter *interpreter.Interpreter,
+				compositeType *sema.CompositeType,
+				constructor interpreter.FunctionValue,
+			) *interpreter.CompositeValue {
+
+				// If the contract is the deployed contract, instantiate it using
+				// the provided constructor and given arguments
+
+				if compositeType.Location.ID() == contractType.Location.ID() &&
+					compositeType.Identifier == contractType.Identifier {
+
+					value, err := inter.InvokeFunctionValue(constructor,
+						constructorArguments,
+						argumentTypes,
+						parameterTypes,
+						invocationPos,
+					)
+					if err != nil {
+						panic(err)
+					}
+
+					contract = value.(*interpreter.CompositeValue)
+
+					return contract
+				} else {
+					// The contract is not the deployed contract, load it from storage
+
+					return r.loadContract(compositeType, runtimeStorage)
+				}
+			},
+		),
+	}
+
+	_, err := r.interpret(
+		runtimeInterface,
+		runtimeStorage,
+		checker,
+		functions,
+		interpreterOptions,
+		nil,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return contract, err
+}
+
 func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		accountAddress := arguments[0].(interpreter.AddressValue)
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
 		publicAccount := interpreter.NewPublicAccountValue(accountAddress)
 		return trampoline.Done{Result: publicAccount}
 	}
 }
 
 func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(arguments []interpreter.Value, _ interpreter.LocationPosition) trampoline.Trampoline {
-		runtimeInterface.Log(fmt.Sprint(arguments[0]))
-		return trampoline.Done{Result: &interpreter.VoidValue{}}
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		runtimeInterface.Log(fmt.Sprint(invocation.Arguments[0]))
+		result := interpreter.VoidValue{}
+		return trampoline.Done{Result: result}
 	}
 }
 

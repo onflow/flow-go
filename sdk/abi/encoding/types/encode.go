@@ -161,19 +161,20 @@ func (encoder *Encoder) encodeReturnType(returnType types.Type) interface{} {
 }
 
 var typeToJSON = map[types.Type]string{
-	&types.Any{}:    "Any",
-	&types.Bool{}:   "Bool",
-	&types.Void{}:   "Void",
-	&types.String{}: "String",
-	&types.Int{}:    "Int",
-	&types.Int8{}:   "Int8",
-	&types.Int16{}:  "Int16",
-	&types.Int32{}:  "Int32",
-	&types.Int64{}:  "Int64",
-	&types.UInt8{}:  "UInt8",
-	&types.UInt16{}: "UInt16",
-	&types.UInt32{}: "UInt32",
-	&types.UInt64{}: "UInt64",
+	&types.Any{}:         "AnyStruct",
+	&types.AnyResource{}: "AnyResource",
+	&types.Bool{}:        "Bool",
+	&types.Void{}:        "Void",
+	&types.String{}:      "String",
+	&types.Int{}:         "Int",
+	&types.Int8{}:        "Int8",
+	&types.Int16{}:       "Int16",
+	&types.Int32{}:       "Int32",
+	&types.Int64{}:       "Int64",
+	&types.UInt8{}:       "UInt8",
+	&types.UInt16{}:      "UInt16",
+	&types.UInt32{}:      "UInt32",
+	&types.UInt64{}:      "UInt64",
 }
 
 const jsonTypeVariable = "variable"

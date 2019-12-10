@@ -79,10 +79,13 @@ func (checker *Checker) declareFunctionDeclaration(
 ) {
 	argumentLabels := declaration.ParameterList.ArgumentLabels()
 
-	variable, err := checker.valueActivations.DeclareFunction(
-		declaration.Identifier,
-		declaration.Access,
+	variable, err := checker.valueActivations.Declare(
+		declaration.Identifier.Identifier,
 		functionType,
+		declaration.Access,
+		common.DeclarationKindFunction,
+		declaration.Identifier.Pos,
+		true,
 		argumentLabels,
 	)
 	checker.report(err)
@@ -152,7 +155,12 @@ func (checker *Checker) checkFunctionExits(functionBlock *ast.FunctionBlock, ret
 	}
 
 	functionActivation := checker.functionActivations.Current()
-	if functionActivation.ReturnInfo.DefinitelyReturned {
+
+	definitelyReturnedOrHalted :=
+		functionActivation.ReturnInfo.DefinitelyReturned ||
+			functionActivation.ReturnInfo.DefinitelyHalted
+
+	if definitelyReturnedOrHalted {
 		return
 	}
 

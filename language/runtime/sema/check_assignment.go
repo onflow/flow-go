@@ -220,11 +220,11 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	// If the value type is valid, check that the value can be assigned to the member type
 
 	if !valueType.IsInvalidType() &&
-		!checker.IsTypeCompatible(valueExpression, valueType, member.Type) {
+		!checker.IsTypeCompatible(valueExpression, valueType, member.TypeAnnotation.Type) {
 
 		checker.report(
 			&TypeMismatchError{
-				ExpectedType: member.Type,
+				ExpectedType: member.TypeAnnotation.Type,
 				ActualType:   valueType,
 				Range:        ast.NewRangeFromPositioned(valueExpression),
 			},
@@ -267,6 +267,9 @@ func (checker *Checker) visitMemberExpressionAssignment(
 			// If the function has already returned, the initialization
 			// is not definitive, and it must be ignored
 
+			// NOTE: assignment can still be considered definitive
+			//  if the function maybe halted
+
 			if !functionActivation.ReturnInfo.MaybeReturned {
 
 				// If the field is constant and it has already previously been
@@ -278,6 +281,10 @@ func (checker *Checker) visitMemberExpressionAssignment(
 					initializedFieldMembers.Contains(accessedSelfMember) {
 
 					// TODO: dedicated error: assignment to constant after initialization
+
+					reportAssignmentToConstant()
+				} else if functionActivation.InitializationInfo.FieldMembers[accessedSelfMember] == nil {
+					// This field is not supposed to be initialized
 
 					reportAssignmentToConstant()
 				} else {
@@ -307,5 +314,5 @@ func (checker *Checker) visitMemberExpressionAssignment(
 		}
 	}
 
-	return member.Type
+	return member.TypeAnnotation.Type
 }

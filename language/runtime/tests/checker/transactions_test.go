@@ -244,7 +244,7 @@ func TestCheckTransactions(t *testing.T) {
 	// illegalSelfUsage := test{
 	// 	"IllegalSelfUsage",
 	// 	`
-	//  	  fun foo(x: Any) {}
+	//  	  fun foo(x: AnyStruct) {}
 	//
 	// 	  transaction {
 	// 	    execute {

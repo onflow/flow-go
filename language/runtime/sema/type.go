@@ -95,33 +95,63 @@ func NewTypeAnnotations(types ...Type) []*TypeAnnotation {
 	return typeAnnotations
 }
 
-// AnyType represents the top type
-type AnyType struct{}
+// AnyStructType represents the top type of all non-resource types
+type AnyStructType struct{}
 
-func (*AnyType) isType() {}
+func (*AnyStructType) isType() {}
 
-func (*AnyType) String() string {
-	return "Any"
+func (*AnyStructType) String() string {
+	return "AnyStruct"
 }
 
-func (*AnyType) ID() string {
-	return "Any"
+func (*AnyStructType) ID() string {
+	return "AnyStruct"
 }
 
-func (*AnyType) Equal(other Type) bool {
-	_, ok := other.(*AnyType)
+func (*AnyStructType) Equal(other Type) bool {
+	_, ok := other.(*AnyStructType)
 	return ok
 }
 
-func (*AnyType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(&types.Any{}, variable)
+func (*AnyStructType) Export(_ *ast.Program, variable *Variable) types.Type {
+	return wrapVariable(&types.AnyStruct{}, variable)
 }
 
-func (*AnyType) IsResourceType() bool {
+func (*AnyStructType) IsResourceType() bool {
 	return false
 }
 
-func (*AnyType) IsInvalidType() bool {
+func (*AnyStructType) IsInvalidType() bool {
+	return false
+}
+
+// AnyResourceType represents the top type of all resource types
+type AnyResourceType struct{}
+
+func (*AnyResourceType) isType() {}
+
+func (*AnyResourceType) String() string {
+	return "AnyResource"
+}
+
+func (*AnyResourceType) ID() string {
+	return "AnyResource"
+}
+
+func (*AnyResourceType) Equal(other Type) bool {
+	_, ok := other.(*AnyResourceType)
+	return ok
+}
+
+func (*AnyResourceType) AnyResourceType(_ *ast.Program, variable *Variable) types.Type {
+	return wrapVariable(&types.AnyResource{}, variable)
+}
+
+func (*AnyResourceType) IsResourceType() bool {
+	return true
+}
+
+func (*AnyResourceType) IsInvalidType() bool {
 	return false
 }
 
@@ -156,7 +186,7 @@ type VoidType struct{}
 
 func (*VoidType) isType() {}
 
-func (*VoidType) Export(program *ast.Program, variable *Variable) types.Type {
+func (*VoidType) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(&types.Void{}, variable)
 }
 
@@ -259,7 +289,7 @@ type BoolType struct{}
 
 func (*BoolType) isType() {}
 
-func (*BoolType) Export(program *ast.Program, variable *Variable) types.Type {
+func (*BoolType) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(&types.Bool{}, variable)
 }
 
@@ -316,7 +346,7 @@ type StringType struct{}
 
 func (*StringType) isType() {}
 
-func (*StringType) Export(program *ast.Program, variable *Variable) types.Type {
+func (*StringType) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(&types.String{}, variable)
 }
 
@@ -354,14 +384,16 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					&StringType{},
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&StringType{},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						&StringType{},
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&StringType{},
+					),
+				},
+			),
 		})
 
 	case "slice":
@@ -371,15 +403,17 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					&IntType{},
-					&IntType{},
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&StringType{},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						&IntType{},
+						&IntType{},
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&StringType{},
+					),
+				},
+			),
 			ArgumentLabels: []string{"from", "upTo"},
 		})
 
@@ -390,7 +424,7 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
-			Type:            &IntType{},
+			TypeAnnotation:  NewTypeAnnotation(&IntType{}),
 		})
 
 	default:
@@ -456,7 +490,7 @@ type IntType struct{}
 
 func (*IntType) isType() {}
 
-func (*IntType) Export(program *ast.Program, variable *Variable) types.Type {
+func (*IntType) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(&types.Int{}, variable)
 }
 
@@ -495,7 +529,7 @@ type Int8Type struct{}
 
 func (*Int8Type) isType() {}
 
-func (*Int8Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*Int8Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(&types.Int8{}, variable)
 }
 
@@ -536,7 +570,7 @@ type Int16Type struct{}
 
 func (*Int16Type) isType() {}
 
-func (*Int16Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*Int16Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(&types.Int16{}, variable)
 }
 
@@ -577,7 +611,7 @@ type Int32Type struct{}
 
 func (*Int32Type) isType() {}
 
-func (*Int32Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*Int32Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(&types.Int32{}, variable)
 }
 
@@ -618,7 +652,7 @@ type Int64Type struct{}
 
 func (*Int64Type) isType() {}
 
-func (*Int64Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*Int64Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(&types.Int64{}, variable)
 }
 
@@ -659,7 +693,7 @@ type UInt8Type struct{}
 
 func (*UInt8Type) isType() {}
 
-func (*UInt8Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*UInt8Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(&types.UInt8{}, variable)
 }
 
@@ -700,7 +734,7 @@ type UInt16Type struct{}
 
 func (*UInt16Type) isType() {}
 
-func (*UInt16Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*UInt16Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(&types.UInt16{}, variable)
 }
 
@@ -741,7 +775,7 @@ type UInt32Type struct{}
 
 func (*UInt32Type) isType() {}
 
-func (*UInt32Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*UInt32Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(&types.UInt32{}, variable)
 }
 
@@ -782,7 +816,7 @@ type UInt64Type struct{}
 
 func (*UInt64Type) isType() {}
 
-func (*UInt64Type) Export(program *ast.Program, variable *Variable) types.Type {
+func (*UInt64Type) Export(_ *ast.Program, variable *Variable) types.Type {
 	return wrapVariable(&types.UInt64{}, variable)
 }
 
@@ -843,14 +877,16 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					elementType,
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&VoidType{},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						elementType,
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&VoidType{},
+					),
+				},
+			),
 		})
 
 	case "concat":
@@ -884,12 +920,14 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: []*TypeAnnotation{
-					typeAnnotation,
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: []*TypeAnnotation{
+						typeAnnotation,
+					},
+					ReturnTypeAnnotation: typeAnnotation,
 				},
-				ReturnTypeAnnotation: typeAnnotation,
-			},
+			),
 		})
 
 	case "insert":
@@ -908,15 +946,17 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					&IntegerType{},
-					elementType,
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&VoidType{},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						&IntegerType{},
+						elementType,
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&VoidType{},
+					),
+				},
+			),
 			ArgumentLabels: []string{"at", ArgumentLabelNotRequired},
 		})
 
@@ -936,14 +976,16 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					&IntegerType{},
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					elementType,
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						&IntegerType{},
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						elementType,
+					),
+				},
+			),
 			ArgumentLabels: []string{"at"},
 		})
 
@@ -963,11 +1005,13 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					elementType,
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						elementType,
+					),
+				},
+			),
 		})
 
 	case "removeLast":
@@ -986,11 +1030,13 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					elementType,
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						elementType,
+					),
+				},
+			),
 		})
 
 	case "contains":
@@ -1026,14 +1072,16 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					elementType,
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&BoolType{},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						elementType,
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&BoolType{},
+					),
+				},
+			),
 		})
 
 	case "length":
@@ -1043,7 +1091,7 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			Identifier:      ast.Identifier{Identifier: field},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
-			Type:            &IntType{},
+			TypeAnnotation:  NewTypeAnnotation(&IntType{}),
 		})
 
 	default:
@@ -1357,7 +1405,8 @@ func init() {
 
 	types := []Type{
 		&VoidType{},
-		&AnyType{},
+		&AnyStructType{},
+		&AnyResourceType{},
 		&NeverType{},
 		&BoolType{},
 		&CharacterType{},
@@ -1579,7 +1628,7 @@ func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.T
 		for name, field := range t.Members {
 			fieldTypes[name] = &types.Field{
 				Identifier: name,
-				Type:       field.Type.(ExportableType).Export(program, nil),
+				Type:       field.TypeAnnotation.Type.(ExportableType).Export(program, nil),
 			}
 		}
 
@@ -1636,6 +1685,18 @@ func (t *CompositeType) IsInvalidType() bool {
 	return false
 }
 
+func (t *CompositeType) InterfaceType() *InterfaceType {
+	return &InterfaceType{
+		Location:                            t.Location,
+		Identifier:                          t.Identifier,
+		CompositeKind:                       t.Kind,
+		Members:                             t.Members,
+		InitializerParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
+		ContainerType:                       t.ContainerType,
+		NestedTypes:                         t.NestedTypes,
+	}
+}
+
 // AccountType
 
 type AccountType struct{}
@@ -1674,7 +1735,7 @@ func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
 			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &AddressType{},
+			TypeAnnotation:  NewTypeAnnotation(&AddressType{}),
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 		})
@@ -1684,7 +1745,7 @@ func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
 			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &StorageType{},
+			TypeAnnotation:  NewTypeAnnotation(&StorageType{}),
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 		})
@@ -1694,7 +1755,7 @@ func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
 			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &ReferencesType{Assignable: true},
+			TypeAnnotation:  NewTypeAnnotation(&ReferencesType{Assignable: true}),
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 		})
@@ -1742,7 +1803,7 @@ func (t *PublicAccountType) GetMember(identifier string, _ ast.Range, _ func(err
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
 			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &AddressType{},
+			TypeAnnotation:  NewTypeAnnotation(&AddressType{}),
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 		})
@@ -1752,7 +1813,7 @@ func (t *PublicAccountType) GetMember(identifier string, _ ast.Range, _ func(err
 			ContainerType:   t,
 			Access:          ast.AccessPublic,
 			Identifier:      ast.Identifier{Identifier: identifier},
-			Type:            &ReferencesType{Assignable: false},
+			TypeAnnotation:  NewTypeAnnotation(&ReferencesType{Assignable: false}),
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
 		})
@@ -1768,10 +1829,12 @@ type Member struct {
 	ContainerType   Type
 	Access          ast.Access
 	Identifier      ast.Identifier
-	Type            Type
+	TypeAnnotation  *TypeAnnotation
 	DeclarationKind common.DeclarationKind
 	VariableKind    ast.VariableKind
 	ArgumentLabels  []string
+	// Predeclared fields can be considered initialized
+	Predeclared bool
 }
 
 // NewCheckedMember panics if the member declaration is invalid.
@@ -1793,7 +1856,7 @@ func NewCheckedMember(member *Member) *Member {
 		))
 	}
 
-	if invokableType, ok := member.Type.(InvokableType); ok {
+	if invokableType, ok := member.TypeAnnotation.Type.(InvokableType); ok {
 		functionType := invokableType.InvocationFunctionType()
 
 		if member.ArgumentLabels != nil &&
@@ -1952,7 +2015,7 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
-			Type:            &IntType{},
+			TypeAnnotation:  NewTypeAnnotation(&IntType{}),
 		})
 
 	case "keys":
@@ -1974,7 +2037,9 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
-			Type:            &VariableSizedType{Type: t.KeyType},
+			TypeAnnotation: NewTypeAnnotation(
+				&VariableSizedType{Type: t.KeyType},
+			),
 		})
 
 	case "values":
@@ -1996,7 +2061,9 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindField,
 			VariableKind:    ast.VariableKindConstant,
-			Type:            &VariableSizedType{Type: t.ValueType},
+			TypeAnnotation: NewTypeAnnotation(
+				&VariableSizedType{Type: t.ValueType},
+			),
 		})
 
 	case "insert":
@@ -2006,17 +2073,19 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					t.KeyType,
-					t.ValueType,
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&OptionalType{
-						Type: t.ValueType,
-					},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						t.KeyType,
+						t.ValueType,
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&OptionalType{
+							Type: t.ValueType,
+						},
+					),
+				},
+			),
 			ArgumentLabels: []string{"key", ArgumentLabelNotRequired},
 		})
 
@@ -2027,16 +2096,18 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			Identifier:      ast.Identifier{Identifier: identifier},
 			DeclarationKind: common.DeclarationKindFunction,
 			VariableKind:    ast.VariableKindConstant,
-			Type: &FunctionType{
-				ParameterTypeAnnotations: NewTypeAnnotations(
-					t.KeyType,
-				),
-				ReturnTypeAnnotation: NewTypeAnnotation(
-					&OptionalType{
-						Type: t.ValueType,
-					},
-				),
-			},
+			TypeAnnotation: NewTypeAnnotation(
+				&FunctionType{
+					ParameterTypeAnnotations: NewTypeAnnotations(
+						t.KeyType,
+					),
+					ReturnTypeAnnotation: NewTypeAnnotation(
+						&OptionalType{
+							Type: t.ValueType,
+						},
+					),
+				},
+			),
 			ArgumentLabels: []string{"key"},
 		})
 
@@ -2415,8 +2486,12 @@ func IsSubType(subType Type, superType Type) bool {
 		return true
 	}
 
-	if _, ok := superType.(*AnyType); ok {
-		return true
+	switch superType.(type) {
+	case *AnyStructType:
+		return !subType.IsResourceType()
+
+	case *AnyResourceType:
+		return subType.IsResourceType()
 	}
 
 	if _, ok := subType.(*NeverType); ok {

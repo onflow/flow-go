@@ -29,7 +29,7 @@
                   "String"
                 ],
                 "returnType": {
-                  "optional": "Any"
+                  "optional": "AnyStruct"
                 }
               }
             }
@@ -38,7 +38,7 @@
         "returnType": {
           "array": {
             "of": {
-              "optional": "Any"
+              "optional": "AnyStruct"
             }
           }
         }

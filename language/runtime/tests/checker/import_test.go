@@ -154,8 +154,9 @@ func TestCheckInvalidImportedError(t *testing.T) {
 
 func TestCheckImportTypes(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			checker, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -164,7 +165,7 @@ func TestCheckImportTypes(t *testing.T) {
 
                        pub %[1]s interface TestInterface {}
                     `,
-					kind.Keyword(),
+					compositeKind.Keyword(),
 				),
 			)
 
@@ -177,12 +178,13 @@ func TestCheckImportTypes(t *testing.T) {
 
                       pub %[1]s TestImpl: TestInterface {}
 
-                      pub let x: %[2]sTest %[3]s %[4]s Test()
+                      pub let x: %[2]sTest %[3]s %[4]s Test%[5]s
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 				ParseAndCheckOptions{
 					ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
@@ -191,7 +193,7 @@ func TestCheckImportTypes(t *testing.T) {
 				},
 			)
 
-			switch kind {
+			switch compositeKind {
 			case common.CompositeKindStructure, common.CompositeKindContract:
 				require.NoError(t, err)
 
@@ -205,4 +207,26 @@ func TestCheckImportTypes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCheckInvalidImportCycle(t *testing.T) {
+
+	// NOTE: only parse, don't check imported program.
+	// will be checked by checker checking importing program
+
+	const code = `import 0x1`
+	imported, _, err := parser.ParseProgram(code)
+
+	require.NoError(t, err)
+
+	_, err = ParseAndCheckWithOptions(t,
+		code,
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+				return imported, nil
+			},
+		},
+	)
+
+	assert.IsType(t, ast.CyclicImportsError{}, err)
 }
