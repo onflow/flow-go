@@ -10,6 +10,17 @@ func ExpressionAsType(expression Expression) Type {
 			Identifier: expression.Identifier,
 		}
 
+	case *MemberExpression:
+		nominalType, ok := ExpressionAsType(expression.Expression).(*NominalType)
+		if !ok {
+			return nil
+		}
+		nominalType.NestedIdentifiers = append(
+			nominalType.NestedIdentifiers,
+			expression.Identifier,
+		)
+		return nominalType
+
 	case *ArrayExpression:
 		if len(expression.Values) != 1 {
 			return nil

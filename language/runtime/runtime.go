@@ -23,7 +23,7 @@ type Interface interface {
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
 	SetValue(owner, controller, key, value values.Bytes) (err error)
 	// CreateAccount creates a new account with the given public keys and code.
-	CreateAccount(publicKeys []values.Bytes, code values.Bytes) (address values.Address, err error)
+	CreateAccount(publicKeys []values.Bytes) (address values.Address, err error)
 	// AddAccountKey appends a key to an account.
 	AddAccountKey(address values.Address, publicKey values.Bytes) error
 	// RemoveAccountKey removes a key from an account by index.
@@ -31,7 +31,7 @@ type Interface interface {
 	// CheckCode checks the validity of the code.
 	CheckCode(address values.Address, code values.Bytes) (err error)
 	// UpdateAccountCode updates the code associated with an account.
-	UpdateAccountCode(address values.Address, code values.Bytes) (err error)
+	UpdateAccountCode(address values.Address, code values.Bytes, checkPermission bool) (err error)
 	// GetSigningAccounts returns the signing accounts.
 	GetSigningAccounts() []values.Address
 	// Log logs a string.
@@ -79,7 +79,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 
 	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
 
-	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
+	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions, nil)
 	if err != nil {
 		return nil, newError(err)
 	}
@@ -154,7 +154,7 @@ func (r *interpreterRuntime) ExecuteTransaction(
 
 	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
 
-	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
+	checker, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions, nil)
 	if err != nil {
 		return newError(err)
 	}
@@ -224,7 +224,7 @@ func (r *interpreterRuntime) ParseAndCheckProgram(script []byte, runtimeInterfac
 	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
 	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
 
-	_, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions)
+	_, err := r.parseAndCheckProgram(script, runtimeInterface, location, functions, nil)
 	if err != nil {
 		return newError(err)
 	}
@@ -233,12 +233,13 @@ func (r *interpreterRuntime) ParseAndCheckProgram(script []byte, runtimeInterfac
 }
 
 func (r *interpreterRuntime) parseAndCheckProgram(
-	script []byte,
+	code []byte,
 	runtimeInterface Interface,
 	location Location,
 	functions stdlib.StandardLibraryFunctions,
+	options []sema.Option,
 ) (*sema.Checker, error) {
-	program, err := r.parse(script)
+	program, err := r.parse(code)
 	if err != nil {
 		return nil, err
 	}
@@ -254,8 +255,13 @@ func (r *interpreterRuntime) parseAndCheckProgram(
 	checker, err := sema.NewChecker(
 		program,
 		location,
-		sema.WithPredeclaredValues(valueDeclarations),
-		sema.WithPredeclaredTypes(typeDeclarations),
+		append(
+			[]sema.Option{
+				sema.WithPredeclaredValues(valueDeclarations),
+				sema.WithPredeclaredTypes(typeDeclarations),
+			},
+			options...,
+		)...,
 	)
 	if err != nil {
 		return nil, err
@@ -348,13 +354,12 @@ func (r *interpreterRuntime) standardLibraryFunctions(
 ) stdlib.StandardLibraryFunctions {
 	return append(
 		stdlib.FlowBuiltInFunctions(stdlib.FlowBuiltinImpls{
-			CreateAccount:         r.newCreateAccountFunction(runtimeInterface),
-			AddAccountKey:         r.addAccountKeyFunction(runtimeInterface),
-			RemoveAccountKey:      r.removeAccountKeyFunction(runtimeInterface),
-			UpdateAccountCode:     r.newUpdateAccountCodeFunction(runtimeInterface),
-			UpdateAccountContract: r.newUpdateAccountContractFunction(runtimeInterface, runtimeStorage),
-			GetAccount:            r.newGetAccountFunction(runtimeInterface),
-			Log:                   r.newLogFunction(runtimeInterface),
+			CreateAccount:     r.newCreateAccountFunction(runtimeInterface, runtimeStorage),
+			AddAccountKey:     r.newAddAccountKeyFunction(runtimeInterface),
+			RemoveAccountKey:  r.newRemoveAccountKeyFunction(runtimeInterface),
+			UpdateAccountCode: r.newUpdateAccountCodeFunction(runtimeInterface, runtimeStorage),
+			GetAccount:        r.newGetAccountFunction(runtimeInterface),
+			Log:               r.newLogFunction(runtimeInterface),
 		}),
 		stdlib.BuiltinFunctions...,
 	)
@@ -422,8 +427,13 @@ func (r *interpreterRuntime) emitAccountEvent(
 	runtimeInterface.EmitEvent(event)
 }
 
-func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
+func (r *interpreterRuntime) newCreateAccountFunction(
+	runtimeInterface Interface,
+	runtimeStorage *interpreterRuntimeStorage,
+) interpreter.HostFunction {
 	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		const requiredArgumentCount = 2
+
 		pkArray := invocation.Arguments[0].(*interpreter.ArrayValue)
 		pkValues := pkArray.Values
 		publicKeys := make([]values.Bytes, len(pkValues))
@@ -431,20 +441,34 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 		for i, pkVal := range pkValues {
 			publicKey, err := toBytes(pkVal)
 			if err != nil {
-				panic(fmt.Sprintf("createAccount requires the first parameter to be an array of arrays"))
+				panic(fmt.Sprintf("createAccount requires the first parameter to be an array of keys ([[Int]])"))
 			}
 			publicKeys[i] = publicKey
 		}
 
 		code, err := toBytes(invocation.Arguments[1])
 		if err != nil {
-			panic(fmt.Sprintf("createAccount requires the third parameter to be an array"))
+			panic(fmt.Sprintf("createAccount requires the second parameter to be an array of bytes ([Int])"))
 		}
 
-		accountAddress, err := runtimeInterface.CreateAccount(publicKeys, code)
+		accountAddress, err := runtimeInterface.CreateAccount(publicKeys)
 		if err != nil {
 			panic(err)
 		}
+
+		constructorArguments := invocation.Arguments[requiredArgumentCount:]
+		constructorArgumentTypes := invocation.ArgumentTypes[requiredArgumentCount:]
+
+		r.updateAccountCode(
+			runtimeInterface,
+			runtimeStorage,
+			code,
+			accountAddress,
+			constructorArguments,
+			constructorArgumentTypes,
+			false,
+			invocation.Location.Position,
+		)
 
 		r.emitAccountEvent(stdlib.AccountCreatedEventType, runtimeInterface, accountAddress)
 
@@ -453,7 +477,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(runtimeInterface Interface
 	}
 }
 
-func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
+func (r *interpreterRuntime) newAddAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(invocation interpreter.Invocation) trampoline.Trampoline {
 		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
 		publicKey, err := toBytes(invocation.Arguments[1])
@@ -475,7 +499,7 @@ func (r *interpreterRuntime) addAccountKeyFunction(runtimeInterface Interface) i
 	}
 }
 
-func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
+func (r *interpreterRuntime) newRemoveAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(invocation interpreter.Invocation) trampoline.Trampoline {
 		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
 		index := invocation.Arguments[1].(interpreter.IntValue)
@@ -496,35 +520,7 @@ func (r *interpreterRuntime) removeAccountKeyFunction(runtimeInterface Interface
 	}
 }
 
-func (r *interpreterRuntime) newUpdateAccountCodeFunction(runtimeInterface Interface) interpreter.HostFunction {
-	return func(invocation interpreter.Invocation) trampoline.Trampoline {
-		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
-
-		code, err := toBytes(invocation.Arguments[1])
-		if err != nil {
-			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array"))
-		}
-
-		accountAddressValue := accountAddress.Export().(values.Address)
-
-		err = runtimeInterface.CheckCode(accountAddressValue, code)
-		if err != nil {
-			panic(err)
-		}
-
-		err = runtimeInterface.UpdateAccountCode(accountAddressValue, code)
-		if err != nil {
-			panic(err)
-		}
-
-		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, accountAddressValue, code)
-
-		result := interpreter.VoidValue{}
-		return trampoline.Done{Result: result}
-	}
-}
-
-func (r *interpreterRuntime) newUpdateAccountContractFunction(
+func (r *interpreterRuntime) newUpdateAccountCodeFunction(
 	runtimeInterface Interface,
 	runtimeStorage *interpreterRuntimeStorage,
 ) interpreter.HostFunction {
@@ -535,72 +531,25 @@ func (r *interpreterRuntime) newUpdateAccountContractFunction(
 
 		code, err := toBytes(invocation.Arguments[1])
 		if err != nil {
-			panic(fmt.Sprintf("updateAccountContract requires the second parameter to be an array"))
+			panic(fmt.Sprintf("updateAccountCode requires the second parameter to be an array of bytes ([Int])"))
 		}
+
+		constructorArguments := invocation.Arguments[requiredArgumentCount:]
+		constructorArgumentTypes := invocation.ArgumentTypes[requiredArgumentCount:]
 
 		accountAddressValue := accountAddress.Export().(values.Address)
 
-		location := AddressLocation(accountAddressValue[:])
+		r.updateAccountCode(
+			runtimeInterface,
+			runtimeStorage,
+			code,
+			accountAddressValue,
+			constructorArguments,
+			constructorArgumentTypes,
+			true,
+			invocation.Location.Position,
+		)
 
-		functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
-		checker, err := r.parseAndCheckProgram(code, runtimeInterface, location, functions)
-		if err != nil {
-			panic(err)
-		}
-
-		var contractTypes []*sema.CompositeType
-
-		for _, variable := range checker.GlobalTypes {
-			if variable.DeclarationKind == common.DeclarationKindContract {
-				contractType := variable.Type.(*sema.CompositeType)
-				contractTypes = append(contractTypes, contractType)
-			}
-		}
-
-		if len(contractTypes) > 1 {
-			panic(fmt.Sprintf("updateAccountContract: code declares more than one contract"))
-		}
-
-		// If the code declares a contract, instantiate it and store it
-
-		var contractValue interpreter.OptionalValue = interpreter.NilValue{}
-
-		if len(contractTypes) > 0 {
-			contractType := contractTypes[0]
-
-			constructorArguments := invocation.Arguments[requiredArgumentCount:]
-			constructorArgumentTypes := invocation.ArgumentTypes[requiredArgumentCount:]
-
-			contract, err := r.instantiateContract(
-				contractType,
-				constructorArguments,
-				constructorArgumentTypes,
-				runtimeInterface,
-				runtimeStorage,
-				checker,
-				functions,
-				invocation.Location.Position,
-			)
-
-			if err != nil {
-				panic(err)
-			}
-
-			contractValue = interpreter.NewSomeValueOwningNonCopying(contract)
-		}
-
-		contractValue.SetOwner(accountAddress.StorageIdentifier())
-
-		// NOTE: only update account code if contract instantiation succeeded
-
-		err = runtimeInterface.UpdateAccountCode(accountAddressValue, code)
-		if err != nil {
-			panic(err)
-		}
-
-		r.writeContract(runtimeStorage, accountAddress, contractValue)
-
-		// TODO: new event type?
 		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, accountAddressValue, code)
 
 		result := interpreter.VoidValue{}
@@ -608,9 +557,93 @@ func (r *interpreterRuntime) newUpdateAccountContractFunction(
 	}
 }
 
+func (r *interpreterRuntime) updateAccountCode(
+	runtimeInterface Interface,
+	runtimeStorage *interpreterRuntimeStorage,
+	code []byte,
+	accountAddress values.Address,
+	constructorArguments []interpreter.Value,
+	constructorArgumentTypes []sema.Type,
+	checkPermission bool,
+	invocationPosition ast.Position,
+) {
+	location := AddressLocation(accountAddress[:])
+
+	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
+	checker, err := r.parseAndCheckProgram(
+		code,
+		runtimeInterface,
+		location,
+		functions,
+		[]sema.Option{
+			sema.WithValidTopLevelDeclarations(
+				[]common.DeclarationKind{
+					common.DeclarationKindImport,
+					common.DeclarationKindContract,
+					common.DeclarationKindContractInterface,
+					// TODO: remove?
+					common.DeclarationKindEvent,
+				},
+			),
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	var contractTypes []*sema.CompositeType
+
+	for _, variable := range checker.GlobalTypes {
+		if variable.DeclarationKind == common.DeclarationKindContract {
+			contractType := variable.Type.(*sema.CompositeType)
+			contractTypes = append(contractTypes, contractType)
+		}
+	}
+
+	if len(contractTypes) > 1 {
+		panic(fmt.Sprintf("code declares more than one contract"))
+	}
+
+	// If the code declares a contract, instantiate it and store it
+
+	var contractValue interpreter.OptionalValue = interpreter.NilValue{}
+
+	if len(contractTypes) > 0 {
+		contractType := contractTypes[0]
+
+		contract, err := r.instantiateContract(
+			contractType,
+			constructorArguments,
+			constructorArgumentTypes,
+			runtimeInterface,
+			runtimeStorage,
+			checker,
+			functions,
+			invocationPosition,
+		)
+
+		if err != nil {
+			panic(err)
+		}
+
+		contractValue = interpreter.NewSomeValueOwningNonCopying(contract)
+	}
+
+	contractValue.SetOwner(accountAddress.StorageIdentifier())
+
+	// NOTE: only update account code if contract instantiation succeeded
+
+	err = runtimeInterface.UpdateAccountCode(accountAddress, code, checkPermission)
+	if err != nil {
+		panic(err)
+	}
+
+	r.writeContract(runtimeStorage, accountAddress, contractValue)
+}
+
 func (r *interpreterRuntime) writeContract(
 	runtimeStorage *interpreterRuntimeStorage,
-	accountAddress interpreter.AddressValue,
+	accountAddress values.Address,
 	contractValue interpreter.OptionalValue,
 ) {
 	runtimeStorage.writeValue(

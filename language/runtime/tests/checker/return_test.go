@@ -70,7 +70,7 @@ type exitTest struct {
 func testExits(t *testing.T, tests []exitTest) {
 	for _, test := range tests {
 		t.Run("", func(t *testing.T) {
-			code := fmt.Sprintf("fun test(): Any {%s}", test.body)
+			code := fmt.Sprintf("fun test(): AnyStruct {%s}", test.body)
 			_, err := ParseAndCheckWithOptions(
 				t,
 				code,

@@ -1459,7 +1459,7 @@ func TestInterpretConditionalOperator(t *testing.T) {
 func TestInterpretFunctionBindingInFunction(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
-      fun foo(): Any {
+      fun foo(): AnyStruct {
           return foo
       }
   `)
@@ -3001,10 +3001,10 @@ func TestInterpretNilCoalescingShortCircuitLeftFailure(t *testing.T) {
 	)
 }
 
-func TestInterpretNilCoalescingOptionalAnyNil(t *testing.T) {
+func TestInterpretNilCoalescingOptionalAnyStructNil(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
-      let x: Any? = nil
+      let x: AnyStruct? = nil
       let y = x ?? true
     `)
 
@@ -3017,10 +3017,10 @@ func TestInterpretNilCoalescingOptionalAnyNil(t *testing.T) {
 	)
 }
 
-func TestInterpretNilCoalescingOptionalAnySome(t *testing.T) {
+func TestInterpretNilCoalescingOptionalAnyStructSome(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
-      let x: Any? = 2
+      let x: AnyStruct? = 2
       let y = x ?? true
     `)
 
@@ -4027,10 +4027,10 @@ func TestInterpretDictionaryIndexingAssignmentExisting(t *testing.T) {
 	)
 }
 
-func TestInterpretFailableCastingAnySuccess(t *testing.T) {
+func TestInterpretFailableCastingAnyStructSuccess(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
-      let x: Any = 42
+      let x: AnyStruct = 42
       let y: Int? = x as? Int
     `)
 
@@ -4050,10 +4050,10 @@ func TestInterpretFailableCastingAnySuccess(t *testing.T) {
 	)
 }
 
-func TestInterpretFailableCastingAnyFailure(t *testing.T) {
+func TestInterpretFailableCastingAnyStructFailure(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
-      let x: Any = 42
+      let x: AnyStruct = 42
       let y: Bool? = x as? Bool
     `)
 
@@ -4063,10 +4063,10 @@ func TestInterpretFailableCastingAnyFailure(t *testing.T) {
 	)
 }
 
-func TestInterpretOptionalAny(t *testing.T) {
+func TestInterpretOptionalAnyStruct(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
-      let x: Any? = 42
+      let x: AnyStruct? = 42
     `)
 
 	assert.Equal(t,
@@ -4080,10 +4080,10 @@ func TestInterpretOptionalAny(t *testing.T) {
 	)
 }
 
-func TestInterpretOptionalAnyFailableCasting(t *testing.T) {
+func TestInterpretOptionalAnyStructFailableCasting(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
-      let x: Any? = 42
+      let x: AnyStruct? = 42
       let y = (x ?? 23) as? Int
     `)
 
@@ -4105,10 +4105,10 @@ func TestInterpretOptionalAnyFailableCasting(t *testing.T) {
 	)
 }
 
-func TestInterpretOptionalAnyFailableCastingInt(t *testing.T) {
+func TestInterpretOptionalAnyStructFailableCastingInt(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
-      let x: Any? = 23
+      let x: AnyStruct? = 23
       let y = x ?? 42
       let z = y as? Int
     `)
@@ -4139,10 +4139,10 @@ func TestInterpretOptionalAnyFailableCastingInt(t *testing.T) {
 	)
 }
 
-func TestInterpretOptionalAnyFailableCastingNil(t *testing.T) {
+func TestInterpretOptionalAnyStructFailableCastingNil(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
-      let x: Any? = nil
+      let x: AnyStruct? = nil
       let y = x ?? 42
       let z = y as? Int
     `)
@@ -5959,10 +5959,10 @@ func TestInterpretCastingIntLiteralToInt8(t *testing.T) {
 	)
 }
 
-func TestInterpretCastingIntLiteralToAny(t *testing.T) {
+func TestInterpretCastingIntLiteralToAnyStruct(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
-      let x = 42 as Any
+      let x = 42 as AnyStruct
     `)
 
 	assert.Equal(t,
@@ -5983,6 +5983,28 @@ func TestInterpretCastingIntLiteralToOptional(t *testing.T) {
 	assert.Equal(t,
 		interpreter.NewSomeValueOwningNonCopying(interpreter.NewIntValue(42)),
 		inter.Globals["x"].Value,
+	)
+}
+
+func TestInterpretCastingResourceToAnyResource(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      resource R {}
+
+      fun test(): <-AnyResource {
+          let r <- create R()
+          let x <- r as <-AnyResource
+          return <-x
+      }
+    `)
+
+	value, err := inter.Invoke("test")
+	require.Nil(t, err)
+
+	require.IsType(t, &interpreter.AnyValue{}, value)
+	assert.IsType(t,
+		&interpreter.CompositeValue{},
+		value.(*interpreter.AnyValue).Value,
 	)
 }
 

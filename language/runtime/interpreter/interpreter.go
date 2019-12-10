@@ -546,8 +546,9 @@ func (interpreter *Interpreter) prepareInvoke(
 	preparedArguments := make([]Value, len(arguments))
 	for i, argument := range argumentValues {
 		parameterType := parameterTypeAnnotations[i].Type
-		// TODO: value type is not known – only used for Any boxing right now, so reject for now
-		if parameterType.Equal(&sema.AnyType{}) {
+		// TODO: value type is not known, reject for now
+		switch parameterType.(type) {
+		case *sema.AnyStructType, *sema.AnyResourceType:
 			return nil, &NotInvokableError{
 				Value: functionValue,
 			}
@@ -2403,7 +2404,7 @@ func (interpreter *Interpreter) boxOptional(value Value, valueType, targetType s
 // boxOptional boxes a value in an Any value, if necessary
 func (interpreter *Interpreter) boxAny(value Value, valueType, targetType sema.Type) Value {
 	switch targetType := targetType.(type) {
-	case *sema.AnyType:
+	case *sema.AnyStructType, *sema.AnyResourceType:
 		// no need to convert already boxed value
 		if _, ok := value.(*AnyValue); ok {
 			return value
