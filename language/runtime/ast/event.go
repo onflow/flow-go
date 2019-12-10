@@ -7,6 +7,7 @@ import (
 // EventDeclaration
 
 type EventDeclaration struct {
+	Access        Access
 	Identifier    Identifier
 	ParameterList *ParameterList
 	Range

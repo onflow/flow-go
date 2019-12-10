@@ -12,6 +12,14 @@ func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration)
 		panic(errors.NewUnreachableError())
 	}
 
+	checker.checkDeclarationAccessModifier(
+		declaration.Access,
+		declaration.DeclarationKind(),
+		declaration.StartPos,
+		true,
+		false,
+	)
+
 	constructorFunctionType := eventType.ConstructorFunctionType().InvocationFunctionType()
 
 	checker.checkFunction(
