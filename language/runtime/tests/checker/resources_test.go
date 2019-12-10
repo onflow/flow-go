@@ -3132,3 +3132,130 @@ func TestCheckInvalidUnaryMoveAndCopyTransfer(t *testing.T) {
 
 	assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[0])
 }
+
+func TestCheckInvalidResourceSelfMoveToFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test() {
+              absorb(<-self)
+          }
+      }
+
+      fun absorb(_ x: <-X) {
+          destroy x
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceSelfMoveInVariableDeclaration(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test() {
+              let x <- self
+              destroy x
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceSelfDestruction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test() {
+              destroy self
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceSelfMoveReturnFromFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test(): <-X {
+              return <-self
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceSelfMoveIntoArrayLiteral(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test(): <-[X] {
+              return <-[<-self]
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceSelfMoveIntoDictionaryLiteral(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test(): <-{String: X} {
+              return <-{"self": <-self}
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceSelfMoveSwap(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {
+
+          fun test() {
+              var x: <-X? <- nil
+              let oldX <- x <- self
+              destroy x
+              destroy oldX
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}

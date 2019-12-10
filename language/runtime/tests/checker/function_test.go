@@ -274,9 +274,10 @@ func TestCheckInvalidSelfResourceCapturing(t *testing.T) {
       let test = kitty.makeCloner()
 	`)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.ResourceCapturingError{}, errs[0])
+	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[1])
 }
 
 func TestCheckInvalidResourceCapturingJustMemberAccess(t *testing.T) {
