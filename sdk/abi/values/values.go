@@ -1,6 +1,9 @@
 package values
 
-import "math/big"
+import (
+	"fmt"
+	"math/big"
+)
 
 type Value interface {
 	isValue()
@@ -110,6 +113,10 @@ func (Event) isValue() {}
 type Address [20]byte
 
 func (Address) isValue() {}
+
+func (a Address) StorageIdentifier() string {
+	return fmt.Sprintf("%x", a)
+}
 
 func BytesToAddress(b []byte) Address {
 	var a Address
