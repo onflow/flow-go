@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/keys"
@@ -22,14 +23,16 @@ func TestMarketDeployment(t *testing.T) {
 	if !assert.Nil(t, err) {
 		t.Log(err.Error())
 	}
-	b.CommitBlock()
+	_, err = b.CommitBlock()
+	require.NoError(t, err)
 
 	nftCode := ReadFile(NFTContractFile)
 	_, err = b.CreateAccount(nil, nftCode, GetNonce())
 	if !assert.Nil(t, err) {
 		t.Log(err.Error())
 	}
-	b.CommitBlock()
+	_, err = b.CommitBlock()
+	require.NoError(t, err)
 
 	// Should be able to deploy a contract as a new account with no keys.
 	marketCode := ReadFile(MarketContractFile)
@@ -37,7 +40,8 @@ func TestMarketDeployment(t *testing.T) {
 	if !assert.Nil(t, err) {
 		t.Log(err.Error())
 	}
-	b.CommitBlock()
+	_, err = b.CommitBlock()
+	require.NoError(t, err)
 }
 
 func TestCreateSale(t *testing.T) {
@@ -47,17 +51,20 @@ func TestCreateSale(t *testing.T) {
 	tokenCode := ReadFile(resourceTokenContractFile)
 	tokenAddr, err := b.CreateAccount(nil, tokenCode, GetNonce())
 	assert.Nil(t, err)
-	b.CommitBlock()
+	_, err = b.CommitBlock()
+	require.NoError(t, err)
 
 	nftCode := ReadFile(NFTContractFile)
 	nftAddr, err := b.CreateAccount(nil, nftCode, GetNonce())
 	assert.Nil(t, err)
-	b.CommitBlock()
+	_, err = b.CommitBlock()
+	require.NoError(t, err)
 
 	marketCode := ReadFile(MarketContractFile)
 	marketAddr, err := b.CreateAccount(nil, marketCode, GetNonce())
 	assert.Nil(t, err)
-	b.CommitBlock()
+	_, err = b.CommitBlock()
+	require.NoError(t, err)
 
 	// create two new accounts
 	bastianPrivateKey := randomKey()

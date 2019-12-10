@@ -2382,7 +2382,7 @@ func (v AddressValue) Equal(other Value) BoolValue {
 }
 
 func (v AddressValue) StorageIdentifier() string {
-	return fmt.Sprintf("%x", v)
+	return v.Export().(values.Address).StorageIdentifier()
 }
 
 // AccountValue

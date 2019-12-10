@@ -40,7 +40,7 @@ func TestEventEmitted(t *testing.T) {
 		require.NoError(t, err)
 
 		script := []byte(`
-			event MyEvent(x: Int, y: Int)
+			pub event MyEvent(x: Int, y: Int)
 			
 			transaction {
 		  	  execute {
@@ -95,7 +95,7 @@ func TestEventEmitted(t *testing.T) {
 		require.NoError(t, err)
 
 		script := []byte(`
-			event MyEvent(x: Int, y: Int)
+			pub event MyEvent(x: Int, y: Int)
 			
 			pub fun main() {
 			  emit MyEvent(x: 1, y: 2)
@@ -126,10 +126,12 @@ func TestEventEmitted(t *testing.T) {
 		require.NoError(t, err)
 
 		accountScript := []byte(`
-			event MyEvent(x: Int, y: Int)
+			pub event MyEvent(x: Int, y: Int)
 
-			pub fun emitMyEvent(x: Int, y: Int) {
-				emit MyEvent(x: x, y: y)
+            pub contract Test {
+				pub fun emitMyEvent(x: Int, y: Int) {
+					emit MyEvent(x: x, y: y)
+				}
 			}
 		`)
 
@@ -143,7 +145,7 @@ func TestEventEmitted(t *testing.T) {
 			
 			transaction {
 				execute {
-				  emitMyEvent(x: 1, y: 2)
+					Test.emitMyEvent(x: 1, y: 2)
 				}
 			}
 		`, address.Hex()))
