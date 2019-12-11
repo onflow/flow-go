@@ -116,6 +116,10 @@ type Address [AddressLength]byte
 
 func (Address) isValue() {}
 
+func (a Address) String() string {
+	return a.Hex()
+}
+
 func (a Address) Hex() string {
 	return fmt.Sprintf("%x", a)
 }
