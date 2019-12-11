@@ -3,8 +3,9 @@ package version
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/build"
 	"github.com/spf13/cobra"
+
+	"github.com/dapperlabs/flow-go/build"
 )
 
 var Cmd = &cobra.Command{
