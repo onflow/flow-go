@@ -39,7 +39,7 @@ pub resource AlbumHolder {
 }
 */
 
-pub fun getAlbums(): <-[Album] {
+pub fun getAlbums(): @[Album] {
     //UNICODE
     let kraftwerk = Artist(name: "Kraftwerk", members: ["Ralf Hütter","Fritz Hilpert","Henning Schmitz","Falk Grieffenhagen"], country: "Germany")
     let giorgio = Artist(name: "Giorgio Moroder", members: nil, country: "Italy")
@@ -51,6 +51,6 @@ pub fun getAlbums(): <-[Album] {
     return <-[<-autobahn, <-man_machine, <-from_here]
 }
 
-pub fun main():<-[Album] {
+pub fun main():@[Album] {
     return <-getAlbums()
 }
