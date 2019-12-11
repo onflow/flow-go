@@ -2531,6 +2531,7 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 				// Note: link composite functions for nested composite declarations,
 				// i.e. resources defined within a contract
 				// TODO: find a cleaner way to solve this
+				//   see https://github.com/dapperlabs/flow-go/issues/1847
 				name := compositeType.Identifier
 				if compositeFunctions, ok := subInterpreter.CompositeFunctions[name]; ok {
 					interpreter.CompositeFunctions[name] = compositeFunctions
