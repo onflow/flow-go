@@ -121,7 +121,7 @@ func (a Address) String() string {
 }
 
 func (a Address) Hex() string {
-	return fmt.Sprintf("%x", a)
+	return fmt.Sprintf("%x", [AddressLength]byte(a))
 }
 
 func BytesToAddress(b []byte) Address {
