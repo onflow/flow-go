@@ -388,11 +388,11 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 	// TODO: can this be generalized for all types?
 	switch location := eventValue.Location.(type) {
 	case AddressLocation:
-		identifier = fmt.Sprintf("account.%s.%s", location, eventValue.Identifier)
+		identifier = fmt.Sprintf("account.%s.%s", location.ID(), eventValue.Identifier)
 	case TransactionLocation:
-		identifier = fmt.Sprintf("tx.%s.%s", location, eventValue.Identifier)
+		identifier = fmt.Sprintf("tx.%s.%s", location.ID(), eventValue.Identifier)
 	case ScriptLocation:
-		identifier = fmt.Sprintf("script.%s.%s", location, eventValue.Identifier)
+		identifier = fmt.Sprintf("script.%s.%s", location.ID(), eventValue.Identifier)
 	default:
 		panic(fmt.Sprintf("event definition from unsupported location: %s", location))
 	}
