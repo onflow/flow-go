@@ -1794,7 +1794,7 @@ pub contract FungibleToken {
 }
 `
 
-func TestRuntimeFungibleTokenContract(t *testing.T) {
+func TestRuntimeFungibleTokenUpdateAccountCode(t *testing.T) {
 
 	runtime := NewInterpreterRuntime()
 
@@ -1894,6 +1894,113 @@ func TestRuntimeFungibleTokenContract(t *testing.T) {
 	require.NoError(t, err)
 
 	signerAccount = address2Value
+
+	err = runtime.ExecuteTransaction(setup2Transaction, runtimeInterface, nil)
+	require.NoError(t, err)
+}
+
+func TestRuntimeFungibleTokenCreateAccount(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	address1Value := values.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+	}
+
+	address2Value := values.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2,
+	}
+
+	deploy := []byte(fmt.Sprintf(
+		`
+          transaction {
+            prepare(signer: Account) {
+              createAccount([], %s)
+            }
+            execute {}
+          }
+        `,
+		ArrayValueFromBytes([]byte(fungibleTokenContract)).String(),
+	))
+
+	setup1Transaction := []byte(
+		`
+         import FungibleToken from 0x0000000000000000000000000000000000000002
+
+         transaction {
+             prepare(acct: Account) {
+                 acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as FungibleToken.Receiver
+                 acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as FungibleToken.Vault
+             }
+         }
+       `,
+	)
+
+	setup2Transaction := []byte(`
+      import FungibleToken from 0x0000000000000000000000000000000000000002
+
+      transaction {
+
+          prepare(acct: Account) {
+              // create a new vault instance
+              let vaultA <- FungibleToken.createEmptyVault()
+
+              // store it in the account storage
+              // and destroy whatever was there previously
+              let oldVault <- acct.storage[FungibleToken.Vault] <- vaultA
+              destroy oldVault
+
+              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as FungibleToken.Receiver
+              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as FungibleToken.Vault
+          }
+      }
+    `)
+
+	storedValues := map[string][]byte{}
+	accountCodes := map[string]values.Bytes{}
+	var events []values.Event
+
+	storageKey := func(owner, controller, key string) string {
+		return strings.Join([]string{owner, controller, key}, "|")
+	}
+
+	signerAccount := address1Value
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
+			key := string(location.(AddressLocation).ID())
+			return accountCodes[key], nil
+		},
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[storageKey(string(controller), string(owner), string(key))], nil
+		},
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[storageKey(string(controller), string(owner), string(key))] = value
+			return nil
+		},
+		createAccount: func(publicKeys []values.Bytes) (address values.Address, err error) {
+			return address2Value, nil
+		},
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{signerAccount}
+		},
+		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+			key := string(AddressLocation(address[:]).ID())
+			accountCodes[key] = code
+			return nil
+		},
+		emitEvent: func(event values.Event) {
+			events = append(events, event)
+		},
+	}
+
+	err := runtime.ExecuteTransaction(deploy, runtimeInterface, nil)
+	require.NoError(t, err)
+
+	signerAccount = address2Value
+
+	err = runtime.ExecuteTransaction(setup1Transaction, runtimeInterface, nil)
+	require.NoError(t, err)
 
 	err = runtime.ExecuteTransaction(setup2Transaction, runtimeInterface, nil)
 	require.NoError(t, err)
