@@ -2002,3 +2002,138 @@ func TestRuntimeFungibleTokenCreateAccount(t *testing.T) {
 	err = runtime.ExecuteTransaction(setup2Transaction, runtimeInterface, nil)
 	require.NoError(t, err)
 }
+
+func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	makeDeployTransaction := func(code string) []byte {
+		return []byte(fmt.Sprintf(
+			`
+              transaction {
+                prepare(signer: Account) {
+                  createAccount([], %s)
+                }
+              }
+            `,
+			ArrayValueFromBytes([]byte(code)).String(),
+		))
+	}
+
+	contractInterfaceCode := `
+      pub contract interface TestContractInterface {
+
+          pub resource interface RInterface {
+
+              pub fun check(answer: Int) {
+                  pre { answer > 1 }
+              }
+          }
+      }
+	`
+
+	contractCode := `
+	  import TestContractInterface from 0x2
+
+	  pub contract TestContract: TestContractInterface {
+
+	      pub resource R: TestContractInterface.RInterface {
+	          pub fun check(answer: Int) {
+	              pre { answer < 3 }
+	          }
+	      }
+
+	      pub fun createR(): @R {
+	          return <-create R()
+	      }
+	   }
+	`
+
+	setupCode := []byte(`
+	  import TestContractInterface from 0x2
+	  import TestContract from 0x3
+
+	  transaction {
+	      prepare(signer: Account) {
+	          let oldR <- signer.storage[TestContractInterface.RInterface] <- TestContract.createR()
+	          destroy oldR
+	      }
+	  }
+	`)
+
+	makeUseCode := func(answer int) []byte {
+		return []byte(
+			fmt.Sprintf(
+				`
+	              import TestContractInterface from 0x2
+	              import TestContract from 0x3
+
+	              transaction {
+	                  prepare(signer: Account) {
+	                      signer.storage[TestContractInterface.RInterface]?.check(answer: %d)
+	                  }
+	              }
+	            `,
+				answer,
+			),
+		)
+	}
+
+	storedValues := map[string][]byte{}
+	accountCodes := map[string]values.Bytes{}
+	var events []values.Event
+
+	storageKey := func(owner, controller, key string) string {
+		return strings.Join([]string{owner, controller, key}, "|")
+	}
+
+	var nextAccount byte = 0x2
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
+			key := string(location.(AddressLocation).ID())
+			return accountCodes[key], nil
+		},
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[storageKey(string(controller), string(owner), string(key))], nil
+		},
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[storageKey(string(controller), string(owner), string(key))] = value
+			return nil
+		},
+		createAccount: func(publicKeys []values.Bytes) (address values.Address, err error) {
+			result := values.BytesToAddress([]byte{nextAccount})
+			nextAccount++
+			return result, nil
+		},
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{{0x1}}
+		},
+		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+			key := string(AddressLocation(address.Hex()))
+			accountCodes[key] = code
+			return nil
+		},
+		emitEvent: func(event values.Event) {
+			events = append(events, event)
+		},
+	}
+
+	err := runtime.ExecuteTransaction(makeDeployTransaction(contractInterfaceCode), runtimeInterface, nil)
+	require.NoError(t, err)
+
+	err = runtime.ExecuteTransaction(makeDeployTransaction(contractCode), runtimeInterface, nil)
+	require.NoError(t, err)
+
+	err = runtime.ExecuteTransaction(setupCode, runtimeInterface, nil)
+	require.NoError(t, err)
+
+	err = runtime.ExecuteTransaction(makeUseCode(1), runtimeInterface, nil)
+	require.Error(t, err)
+
+	err = runtime.ExecuteTransaction(makeUseCode(3), runtimeInterface, nil)
+	require.Error(t, err)
+
+	err = runtime.ExecuteTransaction(makeUseCode(2), runtimeInterface, nil)
+	require.NoError(t, err)
+}
