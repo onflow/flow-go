@@ -1819,21 +1819,20 @@ func TestRuntimeFungibleTokenUpdateAccountCode(t *testing.T) {
 		ArrayValueFromBytes([]byte(fungibleTokenContract)).String(),
 	))
 
-	setup1Transaction := []byte(
-		`
-         import FungibleToken from 0x0000000000000000000000000000000000000001
+	setup1Transaction := []byte(`
+      import FungibleToken from 0x01
 
-         transaction {
-             prepare(acct: Account) {
-                 acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as FungibleToken.Receiver
-                 acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as FungibleToken.Vault
-             }
-         }
-       `,
-	)
+      transaction {
+          prepare(acct: Account) {
+              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as FungibleToken.Receiver
+              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as FungibleToken.Vault
+          }
+      }
+    `)
 
 	setup2Transaction := []byte(`
-      import FungibleToken from 0x0000000000000000000000000000000000000001
+      // NOTE: import location not the same as in setup1Transaction
+      import FungibleToken from 0x01
 
       transaction {
 
@@ -1923,21 +1922,20 @@ func TestRuntimeFungibleTokenCreateAccount(t *testing.T) {
 		ArrayValueFromBytes([]byte(fungibleTokenContract)).String(),
 	))
 
-	setup1Transaction := []byte(
-		`
-         import FungibleToken from 0x0000000000000000000000000000000000000002
+	setup1Transaction := []byte(`
+      import FungibleToken from 0x2
 
-         transaction {
-             prepare(acct: Account) {
-                 acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as FungibleToken.Receiver
-                 acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as FungibleToken.Vault
-             }
-         }
-       `,
-	)
+      transaction {
+          prepare(acct: Account) {
+              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as FungibleToken.Receiver
+              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as FungibleToken.Vault
+          }
+      }
+    `)
 
 	setup2Transaction := []byte(`
-      import FungibleToken from 0x0000000000000000000000000000000000000002
+      // NOTE: import location not the same as in setup1Transaction
+      import FungibleToken from 0x02
 
       transaction {
 

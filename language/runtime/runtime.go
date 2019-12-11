@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -62,7 +63,7 @@ type Runtime interface {
 
 var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
-type ImportResolver = func(astLocation ast.Location) (program *ast.Program, e error)
+type ImportResolver = func(location Location) (program *ast.Program, e error)
 
 const contractKey = "contract"
 
@@ -305,14 +306,12 @@ func (r *interpreterRuntime) newInterpreter(
 			},
 		),
 		interpreter.WithInjectedCompositeFieldsHandler(
-			func(_ *interpreter.Interpreter, location ast.Location, compositeIdentifier string, compositeKind common.CompositeKind) map[string]interpreter.Value {
+			func(_ *interpreter.Interpreter, location Location, compositeIdentifier string, compositeKind common.CompositeKind) map[string]interpreter.Value {
 				switch compositeKind {
 				case common.CompositeKindContract:
 					var address []byte
 
 					switch location := location.(type) {
-					case ast.AddressLocation:
-						address = location
 					case AddressLocation:
 						address = location
 					default:
@@ -366,16 +365,7 @@ func (r *interpreterRuntime) standardLibraryFunctions(
 }
 
 func (r *interpreterRuntime) importResolver(runtimeInterface Interface) ImportResolver {
-	return func(astLocation ast.Location) (program *ast.Program, e error) {
-		var location Location
-		switch astLocation := astLocation.(type) {
-		case ast.StringLocation:
-			location = StringLocation(astLocation)
-		case ast.AddressLocation:
-			location = AddressLocation(astLocation)
-		default:
-			panic(runtimeErrors.NewUnreachableError())
-		}
+	return func(location Location) (program *ast.Program, e error) {
 		script, err := runtimeInterface.ResolveImport(location)
 		if err != nil {
 			return nil, err
@@ -397,7 +387,7 @@ func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtim
 
 	// TODO: can this be generalized for all types?
 	switch location := eventValue.Location.(type) {
-	case ast.AddressLocation:
+	case AddressLocation:
 		identifier = fmt.Sprintf("account.%s.%s", location, eventValue.Identifier)
 	case TransactionLocation:
 		identifier = fmt.Sprintf("tx.%s.%s", location, eventValue.Identifier)
@@ -646,8 +636,9 @@ func (r *interpreterRuntime) writeContract(
 	accountAddress values.Address,
 	contractValue interpreter.OptionalValue,
 ) {
+	addressHex := flow.BytesToAddress(accountAddress[:]).Hex()
 	runtimeStorage.writeValue(
-		accountAddress.StorageIdentifier(),
+		addressHex,
 		contractKey,
 		contractValue,
 	)
@@ -657,21 +648,9 @@ func (r *interpreterRuntime) loadContract(
 	compositeType *sema.CompositeType,
 	runtimeStorage *interpreterRuntimeStorage,
 ) *interpreter.CompositeValue {
-	var address []byte
-
-	switch location := compositeType.Location.(type) {
-	case ast.AddressLocation:
-		address = location
-	case AddressLocation:
-		address = location
-	default:
-		panic(runtimeErrors.NewUnreachableError())
-	}
-
-	addressLocation := interpreter.NewAddressValueFromBytes(address)
-
+	addressHex := compositeType.Location.(AddressLocation).ToAddress().Hex()
 	storedValue := runtimeStorage.readValue(
-		addressLocation.StorageIdentifier(),
+		addressHex,
 		contractKey,
 	)
 	switch typedValue := storedValue.(type) {
@@ -749,7 +728,7 @@ func (r *interpreterRuntime) instantiateContract(
 				// If the contract is the deployed contract, instantiate it using
 				// the provided constructor and given arguments
 
-				if compositeType.Location.ID() == contractType.Location.ID() &&
+				if ast.LocationsMatch(compositeType.Location, contractType.Location) &&
 					compositeType.Identifier == contractType.Identifier {
 
 					value, err := inter.InvokeFunctionValue(constructor,

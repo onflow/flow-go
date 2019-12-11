@@ -48,7 +48,7 @@ func TestFungibleTokenTutorialContractCreation(t *testing.T) {
 	                     }
 	                 }
 	               `,
-					b.RootAccountAddress(),
+					b.RootAccountAddress().Short(),
 				),
 			),
 			Nonce:          GetNonce(),
@@ -75,7 +75,8 @@ func TestFungibleTokenTutorialContractCreation(t *testing.T) {
 			Script: []byte(
 				fmt.Sprintf(
 					`
-                      import FungibleToken from 0x%s
+                      // NOTE: using different import address to ensure user can use different formats
+                      import FungibleToken from 0x00%s
 
                       transaction {
 
@@ -93,7 +94,7 @@ func TestFungibleTokenTutorialContractCreation(t *testing.T) {
                           }
                       }
                     `,
-					b.RootAccountAddress(),
+					b.RootAccountAddress().Short(),
 				),
 			),
 			Nonce:          GetNonce(),
