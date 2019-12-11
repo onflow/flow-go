@@ -114,8 +114,8 @@ func GenerateInspectKeysScript(nftCodeAddr, userAddr flow.Address, id1, id2 int)
 		  let acct = getAccount(0x%s)
 		  let collectionRef = acct.published[&NonFungibleToken.NFTCollection] ?? panic("missing collection reference")
 		
-		  let array = collectionRef.getIDs() 
-		 
+		  let array = collectionRef.getIDs()
+
 		  if array[0] != %d || array[1] != %d {
 			panic("Keys array is incorrect!")
 		  }
