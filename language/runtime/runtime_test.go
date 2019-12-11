@@ -1610,3 +1610,88 @@ func TestRuntimeContractAccount(t *testing.T) {
 		assert.Equal(t, addressValue, value)
 	})
 }
+
+func TestRuntimeContractNestedResource(t *testing.T) {
+	runtime := NewInterpreterRuntime()
+
+	addressValue := values.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xCA, 0xDE,
+	}
+
+	contract := []byte(`
+		pub contract Test {
+			pub resource R {
+				// test that the hello function is linked back into the nested resource
+				// after being loaded from storage
+				pub fun hello(): String {
+					return "Hello World!"
+				}
+			}
+		
+			init() {
+				// store nested resource in account on deployment
+				let oldR <- self.account.storage[R] <- create R()
+				destroy oldR
+			}
+		}
+    `)
+
+	tx := []byte(`
+		import Test from 0x01
+		
+		transaction {
+			prepare(acct: Account) {
+				log(acct.storage[Test.R]?.hello())
+			}
+		}
+	`)
+
+	deploy := []byte(fmt.Sprintf(
+		`
+          transaction {
+            prepare(signer: Account) {
+              updateAccountCode(signer.address, %s)
+            }
+          }
+        `,
+		ArrayValueFromBytes(contract).String(),
+	))
+
+	storedValues := map[string][]byte{}
+	var accountCode values.Bytes
+	var loggedMessage string
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(_ Location) (bytes values.Bytes, err error) {
+			return accountCode, nil
+		},
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[string(key)], nil
+		},
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[string(key)] = value
+			return nil
+		},
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{addressValue}
+		},
+		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+			accountCode = code
+			return nil
+		},
+		emitEvent: func(event values.Event) {},
+		log: func(message string) {
+			loggedMessage = message
+		},
+	}
+
+	err := runtime.ExecuteTransaction(deploy, runtimeInterface, nil)
+	require.NoError(t, err)
+
+	assert.NotNil(t, accountCode)
+
+	err = runtime.ExecuteTransaction(tx, runtimeInterface, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, `"Hello World!"`, loggedMessage)
+}
