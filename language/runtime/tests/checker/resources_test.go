@@ -155,10 +155,16 @@ func TestCheckFunctionDeclarationReturnTypeWithResourceAnnotation(t *testing.T) 
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure:
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -170,6 +176,10 @@ func TestCheckFunctionDeclarationReturnTypeWithResourceAnnotation(t *testing.T) 
 func TestCheckFunctionDeclarationReturnTypeWithoutResourceAnnotation(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -229,10 +239,16 @@ func TestCheckVariableDeclarationWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure:
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -244,6 +260,10 @@ func TestCheckVariableDeclarationWithResourceAnnotation(t *testing.T) {
 func TestCheckVariableDeclarationWithoutResourceAnnotation(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -315,13 +335,22 @@ func TestCheckFieldDeclarationWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindContract, common.CompositeKindStructure:
+			case common.CompositeKindStructure:
 				errs := ExpectCheckerErrors(t, err, 2)
 
 				// NOTE: one invalid resource annotation error for field, one for parameter
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 3)
+
+				// NOTE: one invalid resource annotation error for field, one for parameter
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[2])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -372,7 +401,12 @@ func TestCheckFieldDeclarationWithoutResourceAnnotation(t *testing.T) {
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[1])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+
+			case common.CompositeKindStructure:
 				require.NoError(t, err)
 
 			default:
@@ -476,11 +510,16 @@ func TestCheckFunctionExpressionReturnTypeWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
-
+			case common.CompositeKindStructure:
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -491,6 +530,10 @@ func TestCheckFunctionExpressionReturnTypeWithResourceAnnotation(t *testing.T) {
 
 func TestCheckFunctionExpressionReturnTypeWithoutResourceAnnotation(t *testing.T) {
 	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -598,6 +641,10 @@ func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
+
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -634,6 +681,10 @@ func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
 
 func TestCheckFunctionTypeReturnTypeWithoutResourceAnnotation(t *testing.T) {
 	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -958,7 +1009,7 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 		errs := ExpectCheckerErrors(t, err, 2)
 
 		assert.IsType(t, &sema.ResourceLossError{}, errs[0])
-		assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+		assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 	})
 
 	t.Run("ImmediateIndexingFunctionInvocation", func(t *testing.T) {
@@ -982,7 +1033,7 @@ func TestCheckInvalidResourceLoss(t *testing.T) {
 		errs := ExpectCheckerErrors(t, err, 2)
 
 		assert.IsType(t, &sema.ResourceLossError{}, errs[0])
-		assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+		assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 	})
 }
 
@@ -1924,6 +1975,12 @@ func TestCheckResourceNesting(t *testing.T) {
 	interfacePossibilities := []bool{true, false}
 
 	for _, innerCompositeKind := range common.CompositeKinds {
+
+		// Don't test contract fields/parameters: contracts can't be passed by value
+		if innerCompositeKind == common.CompositeKindContract {
+			continue
+		}
+
 		for _, innerIsInterface := range interfacePossibilities {
 			for _, outerCompositeKind := range common.CompositeKinds {
 				for _, outerIsInterface := range interfacePossibilities {
@@ -2159,7 +2216,7 @@ func TestCheckInvalidResourceLossAfterMoveThroughArrayIndexing(t *testing.T) {
     `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
 
@@ -2243,8 +2300,8 @@ func TestCheckInvalidResourceFieldMoveThroughVariableDeclaration(t *testing.T) {
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 }
 
 // TestCheckInvalidResourceFieldMoveThroughParameter tests if resources nested
@@ -2285,8 +2342,8 @@ func TestCheckInvalidResourceFieldMoveThroughParameter(t *testing.T) {
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 }
 
 func TestCheckInvalidResourceFieldMoveSelf(t *testing.T) {
@@ -2318,7 +2375,7 @@ func TestCheckInvalidResourceFieldMoveSelf(t *testing.T) {
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 }
 
 func TestCheckInvalidResourceFieldUseAfterDestroy(t *testing.T) {
@@ -2593,7 +2650,7 @@ func TestCheckInvalidResourceDictionaryKeys(t *testing.T) {
 
 	assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[0])
 	assert.IsType(t, &sema.InvalidResourceDictionaryMemberError{}, errs[1])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[2])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[2])
 }
 
 func TestCheckInvalidResourceDictionaryValues(t *testing.T) {
@@ -2612,7 +2669,7 @@ func TestCheckInvalidResourceDictionaryValues(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.InvalidResourceDictionaryMemberError{}, errs[0])
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[1])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[1])
 }
 
 func TestCheckInvalidResourceLossAfterMoveThroughDictionaryIndexing(t *testing.T) {
@@ -2631,7 +2688,7 @@ func TestCheckInvalidResourceLossAfterMoveThroughDictionaryIndexing(t *testing.T
     `)
 
 	errs := ExpectCheckerErrors(t, err, 2)
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
 
@@ -2742,7 +2799,7 @@ func TestCheckInvalidResourceFieldDestroy(t *testing.T) {
 
 	// TODO: maybe have dedicated error
 
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 	assert.IsType(t, &sema.ResourceLossError{}, errs[1])
 }
 

@@ -477,7 +477,7 @@ func TestCheckInvalidCompositeFunction(t *testing.T) {
 	}
 }
 
-func TestCheckCompositeInitializerSelfReference(t *testing.T) {
+func TestCheckCompositeInitializerSelfUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
@@ -515,7 +515,7 @@ func TestCheckCompositeInitializerSelfReference(t *testing.T) {
 	}
 }
 
-func TestCheckCompositeFunctionSelfReference(t *testing.T) {
+func TestCheckCompositeFunctionSelfUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
@@ -769,8 +769,14 @@ func TestCheckCompositeFieldAssignment(t *testing.T) {
 			)
 
 			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure:
 				require.NoError(t, err)
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
 
 			case common.CompositeKindResource:
 
@@ -806,10 +812,12 @@ func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
 			assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[3])
 		},
 		common.CompositeKindContract: func(err error) {
-			errs := ExpectCheckerErrors(t, err, 2)
+			errs := ExpectCheckerErrors(t, err, 4)
 
 			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
-			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[1])
+			assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
+			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[2])
+			assert.IsType(t, &sema.InvalidMoveError{}, errs[3])
 		},
 	}
 
@@ -1161,6 +1169,12 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 	for _, firstKind := range common.CompositeKinds {
 		for _, secondKind := range common.CompositeKinds {
 
+			if firstKind == common.CompositeKindContract ||
+				secondKind == common.CompositeKindContract {
+
+				continue
+			}
+
 			testName := fmt.Sprintf(
 				"%s/%s",
 				firstKind.Keyword(),
@@ -1249,6 +1263,17 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
+		var setupCode string
+
+		if compositeKind != common.CompositeKindContract {
+			setupCode = fmt.Sprintf(
+				`let test %[1]s %[2]s Test%[3]s`,
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
+				constructorArguments(compositeKind),
+			)
+		}
+
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -1262,12 +1287,10 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
                           }
                       }
 
-                      let test %[2]s %[3]s Test%[4]s
+                      %[2]s
                     `,
 					compositeKind.Keyword(),
-					compositeKind.TransferOperator(),
-					compositeKind.ConstructionKeyword(),
-					constructorArguments(compositeKind),
+					setupCode,
 				),
 			)
 
@@ -1346,6 +1369,20 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
+		var setupCode, identifier string
+
+		if compositeKind == common.CompositeKindContract {
+			identifier = "Test"
+		} else {
+			setupCode = fmt.Sprintf(
+				`let test %[1]s %[2]s Test%[3]s`,
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
+				constructorArguments(compositeKind),
+			)
+			identifier = "test"
+		}
+
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -1356,13 +1393,12 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
                           fun test(x: Int) {}
                       }
 
-                      let test %[2]s %[3]s Test%[4]s
-                      let void = test.test(x: 1)
+                      %[2]s
+                      let void = %[3]s.test(x: 1)
                     `,
 					compositeKind.Keyword(),
-					compositeKind.TransferOperator(),
-					compositeKind.ConstructionKeyword(),
-					constructorArguments(compositeKind),
+					setupCode,
+					identifier,
 				),
 			)
 
@@ -1375,6 +1411,20 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
 
 	for _, compositeKind := range common.CompositeKinds {
 
+		var setupCode, identifier string
+
+		if compositeKind == common.CompositeKindContract {
+			identifier = "Test"
+		} else {
+			setupCode = fmt.Sprintf(
+				`let test %[1]s %[2]s Test%[3]s`,
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
+				constructorArguments(compositeKind),
+			)
+			identifier = "test"
+		}
+
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -1385,13 +1435,12 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
                           fun test(x: Int) {}
                       }
 
-                      let test %[2]s %[3]s Test%[4]s
-                      let void = test.test(1)
+                      %[2]s
+                      let void = %[3]s.test(1)
                     `,
 					compositeKind.Keyword(),
-					compositeKind.TransferOperator(),
-					compositeKind.ConstructionKeyword(),
-					constructorArguments(compositeKind),
+					setupCode,
+					identifier,
 				),
 			)
 
@@ -1402,9 +1451,13 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
 	}
 }
 
-func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T) {
+func TestCheckCompositeConstructorUseInInitializerAndFunction(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -1522,11 +1575,15 @@ func TestCheckCompositeFunction(t *testing.T) {
 			)
 
 			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure:
 				require.NoError(t, err)
 
-			case common.CompositeKindResource:
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 1)
 
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+
+			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
@@ -1541,6 +1598,10 @@ func TestCheckCompositeFunction(t *testing.T) {
 func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 

@@ -111,6 +111,8 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 			panic(errors.NewUnreachableError())
 		}
 
+		checker.checkVariableMove(declaration.Value)
+
 		// If only one value expression is provided, it is invalidated (if it has a resource type)
 
 		checker.recordResourceInvalidation(
