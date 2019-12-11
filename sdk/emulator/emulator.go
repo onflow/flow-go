@@ -201,6 +201,11 @@ func (b *EmulatedBlockchain) RootKey() flow.AccountPrivateKey {
 	return b.rootAccountKey
 }
 
+// GetPendingBlock gets the pending block.
+func (b *EmulatedBlockchain) GetPendingBlock() *types.PendingBlock {
+	return b.pendingBlock
+}
+
 // GetLatestBlock gets the latest sealed block.
 func (b *EmulatedBlockchain) GetLatestBlock() (*types.Block, error) {
 	block, err := b.storage.GetLatestBlock()
@@ -349,6 +354,7 @@ func (b *EmulatedBlockchain) AddTransaction(tx flow.Transaction) error {
 	return nil
 }
 
+// TODO: should be atomic
 // ExecuteBlock executes the remaining transactions in pending block.
 func (b *EmulatedBlockchain) ExecuteBlock() ([]types.TransactionReceipt, error) {
 	b.mu.Lock()
@@ -372,6 +378,7 @@ func (b *EmulatedBlockchain) ExecuteBlock() ([]types.TransactionReceipt, error) 
 	return results, nil
 }
 
+// TODO: should be atomic
 // ExecuteNextTransaction executes the next indexed transaction in pending block.
 func (b *EmulatedBlockchain) ExecuteNextTransaction() (types.TransactionReceipt, error) {
 	b.mu.Lock()
@@ -501,6 +508,7 @@ func (b *EmulatedBlockchain) CommitBlock() (*types.Block, error) {
 	return block, nil
 }
 
+// TODO: should be atomic
 // ExecuteAndCommitBlock is a utility that combines ExecuteBlock with CommitState.
 func (b *EmulatedBlockchain) ExecuteAndCommitBlock() (*types.Block, error) {
 	_, err := b.ExecuteBlock()
