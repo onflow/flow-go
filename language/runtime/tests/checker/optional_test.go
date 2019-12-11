@@ -167,53 +167,60 @@ func TestCheckInvalidNestedOptionalComparison(t *testing.T) {
 
 func TestCheckCompositeNilEquality(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKinds {
 
-		_, err := ParseAndCheck(t,
-			fmt.Sprintf(
-				`
-                  %[1]s X {}
+		t.Run(compositeKind.Name(), func(t *testing.T) {
 
-                  let x: %[2]sX? %[3]s %[4]s X()
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s X {}
 
-                  let a = x == nil
-                  let b = nil == x
-                `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			),
-		)
+                      let x: %[2]sX? %[3]s %[4]s X%[5]s
 
-		require.NoError(t, err)
+                      let a = x == nil
+                      let b = nil == x
+                    `,
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
+				),
+			)
+
+			require.NoError(t, err)
+		})
 	}
 }
 
 func TestCheckInvalidCompositeNilEquality(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKinds {
 
-		_, err := ParseAndCheck(t,
-			fmt.Sprintf(
-				`
+		t.Run(compositeKind.Name(), func(t *testing.T) {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
                   %[1]s X {}
 
-                  let x: %[2]sX? %[3]s %[4]s X()
+                  let x: %[2]sX? %[3]s %[4]s X%[5]s
                   let y: %[2]sX? %[3]s nil
 
                   let a = x == y
                 `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			),
-		)
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
+				),
+			)
 
-		errs := ExpectCheckerErrors(t, err, 1)
+			errs := ExpectCheckerErrors(t, err, 1)
 
-		assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
+			assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
+		})
 	}
 }
 

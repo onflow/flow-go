@@ -39,7 +39,7 @@ func TestCheckAccount(t *testing.T) {
 			`
               resource R {}
 
-              fun test(): <-R? {
+              fun test(): @R? {
                   let r <- account.storage[R] <- create R()
                   return <-r
               }

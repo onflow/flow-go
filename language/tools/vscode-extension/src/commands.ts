@@ -59,6 +59,7 @@ const stopEmulator = (ext: Extension) => async () => {
     // Clear accounts and restart language server to ensure account
     // state is in sync.
     ext.config.resetAccounts();
+    renderExtension(ext);
     await ext.api.client.stop();
     ext.api = new LanguageServerAPI(ext.ctx, ext.config);
 };
@@ -108,11 +109,10 @@ const switchActiveAccount = (ext: Extension) => async () => {
                     if (!editor.document.lineCount) {
                         return;
                     }
-                    // TODO We add a space to the end of the last line to force
+                    // NOTE: We add a space to the end of the last line to force
                     // Codelens to refresh.
                     const lineCount = editor.document.lineCount;
                     const lastLine = editor.document.lineAt(lineCount-1);
-                    const lastLineLen =lastLine.text.length;
                     editor.edit(edit => {
                         if (lastLine.isEmptyOrWhitespace) {
                             edit.insert(new Position(lineCount-1, 0), ' ');

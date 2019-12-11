@@ -963,23 +963,23 @@ func (e *UnsupportedOptionalChainingAssignmentError) Error() string {
 
 func (*UnsupportedOptionalChainingAssignmentError) isSemanticError() {}
 
-// MissingMoveAnnotationError
+// MissingResourceAnnotationError
 
-type MissingMoveAnnotationError struct {
+type MissingResourceAnnotationError struct {
 	Pos ast.Position
 }
 
-func (e *MissingMoveAnnotationError) Error() string {
-	return "missing move annotation: `<-`"
+func (e *MissingResourceAnnotationError) Error() string {
+	return "missing resource annotation: `@`"
 }
 
-func (*MissingMoveAnnotationError) isSemanticError() {}
+func (*MissingResourceAnnotationError) isSemanticError() {}
 
-func (e *MissingMoveAnnotationError) StartPosition() ast.Position {
+func (e *MissingResourceAnnotationError) StartPosition() ast.Position {
 	return e.Pos
 }
 
-func (e *MissingMoveAnnotationError) EndPosition() ast.Position {
+func (e *MissingResourceAnnotationError) EndPosition() ast.Position {
 	return e.Pos
 }
 
@@ -1004,23 +1004,23 @@ func (e *InvalidNestedMoveError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
-// InvalidMoveAnnotationError
+// InvalidResourceAnnotationError
 
-type InvalidMoveAnnotationError struct {
+type InvalidResourceAnnotationError struct {
 	Pos ast.Position
 }
 
-func (e *InvalidMoveAnnotationError) Error() string {
-	return "invalid move annotation: `<-`"
+func (e *InvalidResourceAnnotationError) Error() string {
+	return "invalid resource annotation: `@`"
 }
 
-func (*InvalidMoveAnnotationError) isSemanticError() {}
+func (*InvalidResourceAnnotationError) isSemanticError() {}
 
-func (e *InvalidMoveAnnotationError) StartPosition() ast.Position {
+func (e *InvalidResourceAnnotationError) StartPosition() ast.Position {
 	return e.Pos
 }
 
-func (e *InvalidMoveAnnotationError) EndPosition() ast.Position {
+func (e *InvalidResourceAnnotationError) EndPosition() ast.Position {
 	return e.Pos.Shifted(len(common.CompositeKindResource.Annotation()) - 1)
 }
 
@@ -1104,6 +1104,8 @@ func (e *ResourceUseAfterInvalidationError) Cause() (wasMoved, wasDestroyed bool
 			wasMoved = true
 		case ResourceInvalidationKindDestroy:
 			wasDestroyed = true
+		default:
+			panic(errors.NewUnreachableError())
 		}
 	}
 
@@ -1210,6 +1212,8 @@ func (n ResourceInvalidationNote) Message() string {
 		action = "moved"
 	case ResourceInvalidationKindDestroy:
 		action = "destroyed"
+	default:
+		panic(errors.NewUnreachableError())
 	}
 	return fmt.Sprintf("resource %s here", action)
 }
@@ -1986,3 +1990,34 @@ func (e *InvalidTopLevelDeclarationError) Error() string {
 }
 
 func (*InvalidTopLevelDeclarationError) isSemanticError() {}
+
+// InvalidSelfInvalidationError
+
+type InvalidSelfInvalidationError struct {
+	InvalidationKind ResourceInvalidationKind
+	StartPos         ast.Position
+	EndPos           ast.Position
+}
+
+func (e *InvalidSelfInvalidationError) Error() string {
+	var action string
+	switch e.InvalidationKind {
+	case ResourceInvalidationKindMove:
+		action = "move"
+	case ResourceInvalidationKindDestroy:
+		action = "destroy"
+	default:
+		panic(errors.NewUnreachableError())
+	}
+	return fmt.Sprintf("cannot %s `self`", action)
+}
+
+func (*InvalidSelfInvalidationError) isSemanticError() {}
+
+func (e *InvalidSelfInvalidationError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidSelfInvalidationError) EndPosition() ast.Position {
+	return e.EndPos
+}

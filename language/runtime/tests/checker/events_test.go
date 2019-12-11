@@ -106,7 +106,7 @@ func TestCheckEmitEvent(t *testing.T) {
 
 	t.Run("EmitImported", func(t *testing.T) {
 		checker, err := ParseAndCheck(t, `
-			event Transfer(to: Int, from: Int)
+			pub event Transfer(to: Int, from: Int)
 		`)
 		require.Nil(t, err)
 

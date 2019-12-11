@@ -2,6 +2,7 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
@@ -10,6 +11,14 @@ func (checker *Checker) VisitEventDeclaration(declaration *ast.EventDeclaration)
 	if eventType == nil {
 		panic(errors.NewUnreachableError())
 	}
+
+	checker.checkDeclarationAccessModifier(
+		declaration.Access,
+		declaration.DeclarationKind(),
+		declaration.StartPos,
+		true,
+		false,
+	)
 
 	constructorFunctionType := eventType.ConstructorFunctionType().InvocationFunctionType()
 
@@ -87,10 +96,13 @@ func (checker *Checker) declareEventConstructor(declaration *ast.EventDeclaratio
 
 	const access = ast.AccessPrivate
 
-	_, err := checker.valueActivations.DeclareFunction(
-		declaration.Identifier,
-		access,
+	_, err := checker.valueActivations.Declare(
+		declaration.Identifier.Identifier,
 		eventType.ConstructorFunctionType(),
+		access,
+		common.DeclarationKindEvent,
+		declaration.Identifier.Pos,
+		true,
 		declaration.ParameterList.ArgumentLabels(),
 	)
 

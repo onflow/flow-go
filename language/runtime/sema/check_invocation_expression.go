@@ -44,7 +44,7 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		var member *Member
 		member, isOptionalResult = checker.visitMember(memberExpression)
 		if member != nil {
-			expressionType = member.Type
+			expressionType = member.TypeAnnotation.Type
 		}
 	}
 

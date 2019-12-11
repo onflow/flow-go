@@ -244,7 +244,7 @@ func TestCheckTransactions(t *testing.T) {
 	// illegalSelfUsage := test{
 	// 	"IllegalSelfUsage",
 	// 	`
-	//  	  fun foo(x: Any) {}
+	//  	  fun foo(x: AnyStruct) {}
 	//
 	// 	  transaction {
 	// 	    execute {
@@ -264,7 +264,7 @@ func TestCheckTransactions(t *testing.T) {
 
 		  transaction {
 
-	   		var x: <-R
+	   		var x: @R
 
 			prepare() {
 			  self.x <- create R()
@@ -285,7 +285,7 @@ func TestCheckTransactions(t *testing.T) {
 
 		  transaction {
 
-	   		var x: <-R
+	   		var x: @R
 
 			prepare() {
 			  self.x <- create R()

@@ -46,10 +46,12 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 		}
 	}
 
+	memberType := member.TypeAnnotation.Type
+
 	if isOptional {
-		return &OptionalType{Type: member.Type}
+		return &OptionalType{Type: memberType}
 	}
-	return member.Type
+	return memberType
 }
 
 func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *Member, isOptional bool) {
@@ -79,7 +81,7 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *M
 
 	accessedSelfMember := checker.accessedSelfMember(expression)
 	if accessedSelfMember != nil &&
-		accessedSelfMember.Type.IsResourceType() {
+		accessedSelfMember.TypeAnnotation.Type.IsResourceType() {
 
 		// NOTE: Preventing the capturing of the resource field is already implicitly handled:
 		// By definition, the resource field can only be nested in a resource,

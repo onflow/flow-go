@@ -19,9 +19,9 @@ pub resource Banana {
 }
 
 pub resource BunchOfBananas {
-    pub let bananas: <-[Banana?]
+    pub let bananas: @[Banana?]
 
-    init(bananas: <-[Banana]) {
+    init(bananas: @[Banana]) {
         self.bananas <- bananas
     }
 

@@ -172,7 +172,7 @@ functionDeclaration
     ;
 
 eventDeclaration
-    : Event identifier parameterList
+    : access Event identifier parameterList
     ;
 
 parameterList
@@ -184,7 +184,7 @@ parameter
     ;
 
 typeAnnotation
-    : Move? fullType
+    : ResourceAnnotation? fullType
     ;
 
 // NOTE: only allow reference or optionals – prevent ambiguous
@@ -463,6 +463,8 @@ NilCoalescing : WS '??';
 
 Casting : 'as' ;
 FailableCasting : 'as?' ;
+
+ResourceAnnotation : '@' ;
 
 castingOp
     : Casting

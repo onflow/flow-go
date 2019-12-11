@@ -109,9 +109,9 @@ func (v *ProgramVisitor) visitReturnTypeAnnotation(ctx ITypeAnnotationContext, t
 			},
 		}
 		return &ast.TypeAnnotation{
-			Move:     false,
-			Type:     returnType,
-			StartPos: positionBeforeMissingReturnType,
+			IsResource: false,
+			Type:       returnType,
+			StartPos:   positionBeforeMissingReturnType,
 		}
 	}
 	result := ctx.Accept(v)
@@ -268,6 +268,7 @@ func (v *ProgramVisitor) VisitExecute(ctx *ExecuteContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
+	access := ctx.Access().Accept(v).(ast.Access)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
 	var parameterList *ast.ParameterList
@@ -279,6 +280,7 @@ func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) int
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.EventDeclaration{
+		Access:        access,
 		Identifier:    identifier,
 		ParameterList: parameterList,
 		Range: ast.Range{
@@ -677,14 +679,14 @@ func (v *ProgramVisitor) VisitDictionaryType(ctx *DictionaryTypeContext) interfa
 }
 
 func (v *ProgramVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interface{} {
-	move := ctx.Move() != nil
+	isResource := ctx.ResourceAnnotation() != nil
 	fullType := ctx.FullType().Accept(v).(ast.Type)
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.TypeAnnotation{
-		Move:     move,
-		Type:     fullType,
-		StartPos: startPosition,
+		IsResource: isResource,
+		Type:       fullType,
+		StartPos:   startPosition,
 	}
 }
 

@@ -15,14 +15,12 @@ const SelfIdentifier = "self"
 const BeforeIdentifier = "before"
 const ResultIdentifier = "result"
 
-// TODO: move annotations
-
 var beforeType = &FunctionType{
 	ParameterTypeAnnotations: NewTypeAnnotations(
-		&AnyType{},
+		&AnyStructType{},
 	),
 	ReturnTypeAnnotation: NewTypeAnnotation(
-		&AnyType{},
+		&AnyStructType{},
 	),
 	GetReturnType: func(argumentTypes []Type) Type {
 		return argumentTypes[0]
@@ -32,33 +30,34 @@ var beforeType = &FunctionType{
 // Checker
 
 type Checker struct {
-	Program                   *ast.Program
-	Location                  ast.Location
-	PredeclaredValues         map[string]ValueDeclaration
-	PredeclaredTypes          map[string]TypeDeclaration
-	ImportCheckers            map[ast.LocationID]*Checker
-	AccessCheckMode           AccessCheckMode
-	errors                    []error
-	valueActivations          *VariableActivations
-	resources                 *Resources
-	typeActivations           *VariableActivations
-	containerTypes            map[Type]bool
-	functionActivations       *FunctionActivations
-	GlobalValues              map[string]*Variable
-	GlobalTypes               map[string]*Variable
-	TransactionTypes          []*TransactionType
-	inCondition               bool
-	Occurrences               *Occurrences
-	variableOrigins           map[*Variable]*Origin
-	memberOrigins             map[Type]map[string]*Origin
-	seenImports               map[ast.LocationID]bool
-	isChecked                 bool
-	inCreate                  bool
-	inInvocation              bool
-	inAssignment              bool
-	Elaboration               *Elaboration
-	currentMemberExpression   *ast.MemberExpression
-	ValidTopLevelDeclarations []common.DeclarationKind
+	Program                            *ast.Program
+	Location                           ast.Location
+	PredeclaredValues                  map[string]ValueDeclaration
+	PredeclaredTypes                   map[string]TypeDeclaration
+	ImportCheckers                     map[ast.LocationID]*Checker
+	AccessCheckMode                    AccessCheckMode
+	errors                             []error
+	valueActivations                   *VariableActivations
+	resources                          *Resources
+	typeActivations                    *VariableActivations
+	containerTypes                     map[Type]bool
+	functionActivations                *FunctionActivations
+	GlobalValues                       map[string]*Variable
+	GlobalTypes                        map[string]*Variable
+	TransactionTypes                   []*TransactionType
+	inCondition                        bool
+	Occurrences                        *Occurrences
+	variableOrigins                    map[*Variable]*Origin
+	memberOrigins                      map[Type]map[string]*Origin
+	seenImports                        map[ast.LocationID]bool
+	isChecked                          bool
+	inCreate                           bool
+	inInvocation                       bool
+	inAssignment                       bool
+	allowSelfResourceFieldInvalidation bool
+	Elaboration                        *Elaboration
+	currentMemberExpression            *ast.MemberExpression
+	ValidTopLevelDeclarations          []common.DeclarationKind
 }
 
 type Option func(*Checker) error
@@ -717,8 +716,8 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 func (checker *Checker) ConvertTypeAnnotation(typeAnnotation *ast.TypeAnnotation) *TypeAnnotation {
 	convertedType := checker.ConvertType(typeAnnotation.Type)
 	return &TypeAnnotation{
-		Move: typeAnnotation.Move,
-		Type: convertedType,
+		IsResource: typeAnnotation.IsResource,
+		Type:       convertedType,
 	}
 }
 
@@ -746,8 +745,8 @@ func (checker *Checker) parameterTypeAnnotations(parameterList *ast.ParameterLis
 		convertedParameterType := checker.ConvertType(parameter.TypeAnnotation.Type)
 
 		parameterTypeAnnotations[i] = &TypeAnnotation{
-			Move: parameter.TypeAnnotation.Move,
-			Type: convertedParameterType,
+			IsResource: parameter.TypeAnnotation.IsResource,
+			Type:       convertedParameterType,
 		}
 	}
 
@@ -868,7 +867,7 @@ func (checker *Checker) checkResourceLoss(depth int) {
 func (checker *Checker) recordResourceInvalidation(
 	expression ast.Expression,
 	valueType Type,
-	kind ResourceInvalidationKind,
+	invalidationKind ResourceInvalidationKind,
 ) {
 	if !valueType.IsResourceType() {
 		return
@@ -883,13 +882,11 @@ func (checker *Checker) recordResourceInvalidation(
 		)
 	}
 
-	// TODO: improve handling of `self`: only allow invalidation once
-
 	accessedSelfMember := checker.accessedSelfMember(expression)
 
 	switch expression.(type) {
 	case *ast.MemberExpression:
-		if accessedSelfMember == nil {
+		if accessedSelfMember == nil || !checker.allowSelfResourceFieldInvalidation {
 			reportInvalidNestedMove()
 			return
 		}
@@ -900,12 +897,12 @@ func (checker *Checker) recordResourceInvalidation(
 	}
 
 	invalidation := ResourceInvalidation{
-		Kind:     kind,
+		Kind:     invalidationKind,
 		StartPos: expression.StartPosition(),
 		EndPos:   expression.EndPosition(),
 	}
 
-	if accessedSelfMember != nil {
+	if checker.allowSelfResourceFieldInvalidation && accessedSelfMember != nil {
 		checker.resources.AddInvalidation(accessedSelfMember, invalidation)
 		return
 	}
@@ -918,6 +915,14 @@ func (checker *Checker) recordResourceInvalidation(
 	variable := checker.findAndCheckVariable(identifierExpression.Identifier, false)
 	if variable == nil {
 		return
+	}
+
+	if variable.DeclarationKind == common.DeclarationKindSelf {
+		checker.report(&InvalidSelfInvalidationError{
+			InvalidationKind: invalidationKind,
+			StartPos:         expression.StartPosition(),
+			EndPos:           expression.EndPosition(),
+		})
 	}
 
 	checker.resources.AddInvalidation(variable, invalidation)
@@ -1026,7 +1031,9 @@ func (checker *Checker) checkResourceFieldNesting(
 	}
 
 	for name, member := range members {
-		if !member.Type.IsResourceType() {
+		// NOTE: check type, not resource annotation:
+		// the field could have a wrong annotation
+		if !member.TypeAnnotation.Type.IsResourceType() {
 			continue
 		}
 
@@ -1249,4 +1256,38 @@ func (checker *Checker) isWriteableAccess(access ast.Access) bool {
 	default:
 		panic(errors.NewUnreachableError())
 	}
+}
+
+func (checker *Checker) withSelfResourceInvalidationAllowed(f func()) {
+	allowSelfResourceFieldInvalidation := checker.allowSelfResourceFieldInvalidation
+	checker.allowSelfResourceFieldInvalidation = true
+	defer func() {
+		checker.allowSelfResourceFieldInvalidation = allowSelfResourceFieldInvalidation
+	}()
+
+	f()
+}
+
+func (checker *Checker) predeclaredMembers(containerType Type) []*Member {
+	var predeclaredMembers []*Member
+
+	// Contracts have a predeclared `account: Account` field
+
+	if compositeType, ok := containerType.(*CompositeType); ok &&
+		compositeType.Kind == common.CompositeKindContract {
+
+		predeclaredMembers = append(predeclaredMembers,
+			&Member{
+				Predeclared:     true,
+				ContainerType:   compositeType,
+				Access:          ast.AccessPrivate,
+				Identifier:      ast.Identifier{Identifier: "account"},
+				TypeAnnotation:  &TypeAnnotation{Type: &AccountType{}},
+				DeclarationKind: common.DeclarationKindField,
+				VariableKind:    ast.VariableKindConstant,
+			},
+		)
+	}
+
+	return predeclaredMembers
 }

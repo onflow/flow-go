@@ -15,6 +15,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+const testContract = "pub contract Test {}"
+
 func TestCreateAccount(t *testing.T) {
 	publicKeys := unittest.PublicKeyFixtures()
 
@@ -122,7 +124,7 @@ func TestCreateAccount(t *testing.T) {
 			Weight:    keys.PublicKeyWeightThreshold,
 		}
 
-		code := []byte("pub fun main() {}")
+		code := []byte(testContract)
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKeyA, publicKeyB}, code)
 		assert.NoError(t, err)
@@ -157,7 +159,7 @@ func TestCreateAccount(t *testing.T) {
 		b, err := emulator.NewEmulatedBlockchain()
 		require.NoError(t, err)
 
-		code := []byte("pub fun main() {}")
+		code := []byte(testContract)
 
 		createAccountScript, err := templates.CreateAccount(nil, code)
 		assert.NoError(t, err)
@@ -197,7 +199,7 @@ func TestCreateAccount(t *testing.T) {
 			Weight:    keys.PublicKeyWeightThreshold,
 		}
 
-		code := []byte("pub fun main() {}")
+		code := []byte(testContract)
 
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, code)
 		assert.NoError(t, err)
@@ -532,8 +534,20 @@ func TestRemoveAccountKey(t *testing.T) {
 }
 
 func TestUpdateAccountCode(t *testing.T) {
-	codeA := []byte("pub fun a(): Int { return 1 }")
-	codeB := []byte("pub fun b(): Int { return 2 }")
+	codeA := []byte(`
+      pub contract Test {
+          pub fun a(): Int {
+              return 1
+          }
+      }
+    `)
+	codeB := []byte(`
+      pub contract Test {
+          pub fun b(): Int {
+              return 2
+          }
+      }
+    `)
 
 	privateKeyB, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
 		[]byte("elephant ears space cowboy octopus rodeo potato cannon pineapple"))
@@ -675,9 +689,11 @@ func TestImportAccountCode(t *testing.T) {
 	require.NoError(t, err)
 
 	accountScript := []byte(`
-		pub fun answer(): Int {
-			return 42
-		}
+      pub contract Computer {
+          pub fun answer(): Int {
+              return 42
+          }
+      }
 	`)
 
 	publicKey := b.RootKey().PublicKey(keys.PublicKeyWeightThreshold)
@@ -693,7 +709,7 @@ func TestImportAccountCode(t *testing.T) {
 
 		transaction {
 		  execute {
-			let answer = answer()
+			let answer = Computer.answer()
 			if answer != 42 {
 				panic("?!")
 			}

@@ -531,7 +531,7 @@ func TestGetTransaction(t *testing.T) {
 	}
 
 	eventsScript := `
-		event MyEvent(x: Int)
+		pub event MyEvent(x: Int)
 
 		transaction {
 		  execute {
@@ -566,8 +566,8 @@ func TestGetTransaction(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, resTx.Status, flow.TransactionFinalized)
-		assert.Len(t, resTx.Events, 1)
 
+		require.Len(t, resTx.Events, 1)
 		actualEvent := resTx.Events[0]
 
 		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)

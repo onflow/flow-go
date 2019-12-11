@@ -86,23 +86,6 @@ func (a *VariableActivations) Declare(
 	return variable, err
 }
 
-func (a *VariableActivations) DeclareFunction(
-	identifier ast.Identifier,
-	access ast.Access,
-	invokableType InvokableType,
-	argumentLabels []string,
-) (*Variable, error) {
-	return a.Declare(
-		identifier.Identifier,
-		invokableType,
-		access,
-		common.DeclarationKindFunction,
-		identifier.Pos,
-		true,
-		argumentLabels,
-	)
-}
-
 func (a *VariableActivations) DeclareType(
 	identifier ast.Identifier,
 	ty Type,

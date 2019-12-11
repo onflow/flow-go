@@ -24,7 +24,7 @@
             "name": "a",
             "type": {
               "array": {
-                "of": "Any",
+                "of": "AnyStruct",
                 "size": 3
               }
             }
@@ -43,7 +43,7 @@
           "array": {
             "of": {
               "array": {
-                "of": "Any",
+                "of": "AnyStruct",
                 "size": 2
               }
             },
@@ -63,7 +63,7 @@
                 "of": {
                   "function": {
                     "returnType": {
-                      "optional": "Any"
+                      "optional": "AnyStruct"
                     }
                   }
                 }
@@ -74,7 +74,7 @@
         "returnType": {
           "array": {
             "of": {
-              "optional": "Any"
+              "optional": "AnyStruct"
             }
           }
         }
@@ -88,7 +88,7 @@
             "type": {
               "array": {
                 "of": {
-                  "optional": "Any"
+                  "optional": "AnyStruct"
                 }
               }
             }
@@ -99,11 +99,11 @@
               "function": {
                 "parameters": [
                   {
-                    "optional": "Any"
+                    "optional": "AnyStruct"
                   }
                 ],
                 "returnType": {
-                  "optional": "Any"
+                  "optional": "AnyStruct"
                 }
               }
             }
@@ -112,7 +112,7 @@
         "returnType": {
           "array": {
             "of": {
-              "optional": "Any"
+              "optional": "AnyStruct"
             }
           }
         }

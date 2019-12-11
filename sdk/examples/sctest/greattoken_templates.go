@@ -12,16 +12,16 @@ import (
 // The GreatNFTMinter must have been deployed already.
 func GenerateCreateMinterScript(nftAddr flow.Address, initialID, specialMod int) []byte {
 	template := `
-		import 0x%s
+		import GreatToken from 0x%s
 
 		transaction {
 
 		  prepare(acct: Account) {
-			let existing <- acct.storage[GreatNFTMinter] <- createGreatNFTMinter(firstID: %d, specialMod: %d)
+			let existing <- acct.storage[GreatToken.GreatNFTMinter] <- GreatToken.createGreatNFTMinter(firstID: %d, specialMod: %d)
 			assert(existing == nil, message: "existed")
 			destroy existing
 
-			acct.storage[&GreatNFTMinter] = &acct.storage[GreatNFTMinter] as GreatNFTMinter
+			acct.storage[&GreatToken.GreatNFTMinter] = &acct.storage[GreatToken.GreatNFTMinter] as GreatToken.GreatNFTMinter
 		  }
 		}
 	`
@@ -33,15 +33,15 @@ func GenerateCreateMinterScript(nftAddr flow.Address, initialID, specialMod int)
 // The minter must have been instantiated already.
 func GenerateMintScript(nftCodeAddr flow.Address) []byte {
 	template := `
-		import GreatNFTMinter, GreatNFT from 0x%s
+		import GreatToken from 0x%s
 
 		transaction {
 
 		  prepare(acct: Account) {
-			let minter = acct.storage[&GreatNFTMinter] ?? panic("missing minter")
-			let existing <- acct.storage[GreatNFT] <- minter.mint()
+			let minter = acct.storage[&GreatToken.GreatNFTMinter] ?? panic("missing minter")
+			let existing <- acct.storage[GreatToken.GreatNFT] <- minter.mint()
 			destroy existing
-            acct.published[&GreatNFT] = &acct.storage[GreatNFT] as GreatNFT
+            acct.published[&GreatToken.GreatNFT] = &acct.storage[GreatToken.GreatNFT] as GreatToken.GreatNFT
 		  }
 		}
 	`
@@ -54,11 +54,11 @@ func GenerateMintScript(nftCodeAddr flow.Address) []byte {
 // If these assertions fail, the script panics.
 func GenerateInspectNFTScript(nftCodeAddr, userAddr flow.Address, expectedID int, expectedIsSpecial bool) []byte {
 	template := `
-		import GreatNFT from 0x%s
+		import GreatToken from 0x%s
 
 		pub fun main() {
 		  let acct = getAccount(0x%s)
-		  let nft = acct.published[&GreatNFT] ?? panic("missing nft")
+		  let nft = acct.published[&GreatToken.GreatNFT] ?? panic("missing nft")
 		  assert(
               nft.id() == %d,
               message: "incorrect id"
