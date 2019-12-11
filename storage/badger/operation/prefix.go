@@ -17,6 +17,7 @@ const (
 	codeHeader      = 20
 	codeIdentities  = 21
 	codeCollections = 22
+	codeTransaction = 23
 	codeHash        = 100
 	codeBoundary    = 101
 )
