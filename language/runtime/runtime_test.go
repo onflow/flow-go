@@ -1610,3 +1610,206 @@ func TestRuntimeContractAccount(t *testing.T) {
 		assert.Equal(t, addressValue, value)
 	})
 }
+
+const fungibleTokenContract = `
+pub contract FungibleToken {
+
+    pub resource interface Provider {
+        pub fun withdraw(amount: Int): @Vault {
+            pre {
+                amount > 0:
+                    "Withdrawal amount must be positive"
+            }
+            post {
+                result.balance == amount:
+                    "Incorrect amount returned"
+            }
+        }
+    }
+
+    pub resource interface Receiver {
+        pub balance: Int
+
+        init(balance: Int) {
+            pre {
+                balance >= 0:
+                    "Initial balance must be non-negative"
+            }
+            post {
+                self.balance == balance:
+                    "Balance must be initialized to the initial balance"
+            }
+        }
+
+        pub fun deposit(from: @Receiver) {
+            pre {
+                from.balance > 0:
+                    "Deposit balance needs to be positive!"
+            }
+            post {
+                self.balance == before(self.balance) + before(from.balance):
+                    "Incorrect amount removed"
+            }
+        }
+    }
+
+    pub resource Vault: Provider, Receiver {
+
+        pub var balance: Int
+
+        init(balance: Int) {
+            self.balance = balance
+        }
+
+        pub fun withdraw(amount: Int): @Vault {
+            self.balance = self.balance - amount
+            return <-create Vault(balance: amount)
+        }
+
+        // transfer combines withdraw and deposit into one function call
+        pub fun transfer(to: &Receiver, amount: Int) {
+            pre {
+                amount <= self.balance:
+                    "Insufficient funds"
+            }
+            post {
+                self.balance == before(self.balance) - amount:
+                    "Incorrect amount removed"
+            }
+            to.deposit(from: <-self.withdraw(amount: amount))
+        }
+
+        pub fun deposit(from: @Receiver) {
+            self.balance = self.balance + from.balance
+            destroy from
+        }
+
+        pub fun createEmptyVault(): @Vault {
+            return <-create Vault(balance: 0)
+        }
+    }
+
+    pub fun createEmptyVault(): @Vault {
+        return <-create Vault(balance: 0)
+    }
+
+    pub resource VaultMinter {
+        pub fun mintTokens(amount: Int, recipient: &Receiver) {
+            recipient.deposit(from: <-create Vault(balance: amount))
+        }
+    }
+
+    init() {
+        let oldVault <- self.account.storage[Vault] <- create Vault(balance: 30)
+        destroy oldVault
+
+        let oldMinter <- self.account.storage[VaultMinter] <- create VaultMinter()
+        destroy oldMinter
+    }
+}
+`
+
+func TestRuntimeFungibleTokenContract(t *testing.T) {
+
+	runtime := NewInterpreterRuntime()
+
+	address1Value := values.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+	}
+
+	address2Value := values.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2,
+	}
+
+	// TODO: createAccount
+	deploy := []byte(fmt.Sprintf(
+		`
+          transaction {
+            prepare(signer: Account) {
+              updateAccountCode(signer.address, %s)
+            }
+            execute {}
+          }
+        `,
+		ArrayValueFromBytes([]byte(fungibleTokenContract)).String(),
+	))
+
+	setup1Transaction := []byte(
+		`
+         import FungibleToken from 0x0000000000000000000000000000000000000001
+
+         transaction {
+             prepare(acct: Account) {
+                 acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as FungibleToken.Receiver
+                 acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as FungibleToken.Vault
+             }
+         }
+       `,
+	)
+
+	setup2Transaction := []byte(`
+      import FungibleToken from 0x0000000000000000000000000000000000000001
+
+      transaction {
+
+          prepare(acct: Account) {
+              // create a new vault instance
+              let vaultA <- FungibleToken.createEmptyVault()
+
+              // store it in the account storage
+              // and destroy whatever was there previously
+              let oldVault <- acct.storage[FungibleToken.Vault] <- vaultA
+              destroy oldVault
+
+              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as FungibleToken.Receiver
+              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as FungibleToken.Vault
+          }
+      }
+    `)
+
+	storedValues := map[string][]byte{}
+	accountCodes := map[string]values.Bytes{}
+	var events []values.Event
+
+	storageKey := func(owner, controller, key string) string {
+		return strings.Join([]string{owner, controller, key}, "|")
+	}
+
+	signerAccount := address1Value
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(location Location) (bytes values.Bytes, err error) {
+			key := string(location.(AddressLocation).ID())
+			return accountCodes[key], nil
+		},
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[storageKey(string(controller), string(owner), string(key))], nil
+		},
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[storageKey(string(controller), string(owner), string(key))] = value
+			return nil
+		},
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{signerAccount}
+		},
+		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+			key := string(AddressLocation(address[:]).ID())
+			accountCodes[key] = code
+			return nil
+		},
+		emitEvent: func(event values.Event) {
+			events = append(events, event)
+		},
+	}
+
+	err := runtime.ExecuteTransaction(deploy, runtimeInterface, nil)
+	require.NoError(t, err)
+
+	err = runtime.ExecuteTransaction(setup1Transaction, runtimeInterface, nil)
+	require.NoError(t, err)
+
+	signerAccount = address2Value
+
+	err = runtime.ExecuteTransaction(setup2Transaction, runtimeInterface, nil)
+	require.NoError(t, err)
+}
