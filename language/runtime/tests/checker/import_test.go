@@ -171,6 +171,17 @@ func TestCheckImportTypes(t *testing.T) {
 
 			require.NoError(t, err)
 
+			var useCode string
+			if compositeKind != common.CompositeKindContract {
+				useCode = fmt.Sprintf(
+					`pub let x: %[1]sTest %[2]s %[3]s Test%[4]s`,
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
+				)
+			}
+
 			_, err = ParseAndCheckWithOptions(t,
 				fmt.Sprintf(
 					`
@@ -178,13 +189,10 @@ func TestCheckImportTypes(t *testing.T) {
 
                       pub %[1]s TestImpl: TestInterface {}
 
-                      pub let x: %[2]sTest %[3]s %[4]s Test%[5]s
+                      %[2]s
                     `,
 					compositeKind.Keyword(),
-					compositeKind.Annotation(),
-					compositeKind.TransferOperator(),
-					compositeKind.ConstructionKeyword(),
-					constructorArguments(compositeKind),
+					useCode,
 				),
 				ParseAndCheckOptions{
 					ImportResolver: func(location ast.Location) (program *ast.Program, e error) {

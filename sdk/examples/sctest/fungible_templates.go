@@ -69,7 +69,7 @@ func GenerateWithdrawScript(tokenCodeAddr flow.Address, vaultNumber int, withdra
 			
 			let withdrawVault <- vaultArray[%d].withdraw(amount: %d)
 
-			var storedVaults: <-[FungibleToken.Vault]? <- vaultArray
+			var storedVaults: @[FungibleToken.Vault]? <- vaultArray
 			acct.storage[[FungibleToken.Vault]] <-> storedVaults
 
 			destroy withdrawVault
@@ -96,7 +96,7 @@ func GenerateWithdrawDepositScript(tokenCodeAddr flow.Address, withdrawVaultNumb
 
 			vaultArray[%d].deposit(from: <-withdrawVault)
 
-			var storedVaults: <-[FungibleToken.Vault]? <- vaultArray
+			var storedVaults: @[FungibleToken.Vault]? <- vaultArray
 			acct.storage[[FungibleToken.Vault]] <-> storedVaults
 
 			destroy storedVaults

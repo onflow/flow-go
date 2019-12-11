@@ -21,7 +21,7 @@ resource Tomato {
 
 event Chopped(tomato: Tomato, seeds_left: [Seed])
 
-event Throw(where tomato: <-Tomato, how_far distance: UInt16)
+event Throw(where tomato: @Tomato, how_far distance: UInt16)
 
 event Bought(tomatoes: {String: [Tomato?]})
 */

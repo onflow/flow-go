@@ -63,12 +63,12 @@ type TypeIndexableType interface {
 // TypeAnnotation
 
 type TypeAnnotation struct {
-	Move bool
-	Type Type
+	IsResource bool
+	Type       Type
 }
 
 func (a *TypeAnnotation) String() string {
-	if a.Move {
+	if a.IsResource {
 		return fmt.Sprintf("<-%s", a.Type)
 	} else {
 		return fmt.Sprint(a.Type)
@@ -76,14 +76,14 @@ func (a *TypeAnnotation) String() string {
 }
 
 func (a *TypeAnnotation) Equal(other *TypeAnnotation) bool {
-	return a.Move == other.Move &&
+	return a.IsResource == other.IsResource &&
 		a.Type.Equal(other.Type)
 }
 
 func NewTypeAnnotation(ty Type) *TypeAnnotation {
 	return &TypeAnnotation{
-		Move: ty.IsResourceType(),
-		Type: ty,
+		IsResource: ty.IsResourceType(),
+		Type:       ty,
 	}
 }
 

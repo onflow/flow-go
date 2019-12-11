@@ -1272,7 +1272,7 @@ func (checker *Checker) checkNoDestructorNoResourceFields(
 	}
 
 	for memberName, member := range members {
-		// NOTE: check type, not move annotation:
+		// NOTE: check type, not resource annotation:
 		// the field could have a wrong annotation
 		if !member.TypeAnnotation.Type.IsResourceType() {
 			continue
@@ -1339,7 +1339,7 @@ func (checker *Checker) checkCompositeResourceInvalidated(containerType Type, co
 //
 func (checker *Checker) checkResourceFieldsInvalidated(containerTypeIdentifier string, members map[string]*Member) {
 	for _, member := range members {
-		// NOTE: check type, not move annotation:
+		// NOTE: check type, not resource annotation:
 		// the field could have a wrong annotation
 		if !member.TypeAnnotation.Type.IsResourceType() {
 			return
