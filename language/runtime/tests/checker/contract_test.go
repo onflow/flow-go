@@ -17,7 +17,7 @@ func TestCheckInvalidContractAccountField(t *testing.T) {
           let account: Account
 
           init(account: Account) {
-              self.account = account 
+              self.account = account
           }
       }
     `)
