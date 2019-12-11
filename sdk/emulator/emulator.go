@@ -444,7 +444,7 @@ func (b *EmulatedBlockchain) CreateAccount(
 	createAccountScript, err := templates.CreateAccount(publicKeys, code)
 
 	if err != nil {
-		return flow.Address{}, nil
+		return flow.Address{}, err
 	}
 
 	tx := flow.Transaction{
@@ -457,7 +457,7 @@ func (b *EmulatedBlockchain) CreateAccount(
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
 	if err != nil {
-		return flow.Address{}, nil
+		return flow.Address{}, err
 	}
 
 	tx.AddSignature(b.RootAccountAddress(), sig)
@@ -468,6 +468,37 @@ func (b *EmulatedBlockchain) CreateAccount(
 	}
 
 	return b.LastCreatedAccount().Address, nil
+}
+
+// UpdateAccountCode submits a transaction to update the code of an existing account
+// with the given code. The transaction is paid by the root account.
+func (b *EmulatedBlockchain) UpdateAccountCode(
+	code []byte, nonce uint64,
+) error {
+	createAccountScript := templates.UpdateAccountCode(code)
+
+	tx := flow.Transaction{
+		Script:             createAccountScript,
+		ReferenceBlockHash: nil,
+		Nonce:              nonce,
+		ComputeLimit:       10,
+		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
+		PayerAccount:       b.RootAccountAddress(),
+	}
+
+	sig, err := keys.SignTransaction(tx, b.RootKey())
+	if err != nil {
+		return nil
+	}
+
+	tx.AddSignature(b.RootAccountAddress(), sig)
+
+	err = b.SubmitTransaction(tx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // verifyAccountSignature verifies that an account signature is valid for the
