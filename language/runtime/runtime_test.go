@@ -1614,9 +1614,7 @@ func TestRuntimeContractAccount(t *testing.T) {
 func TestRuntimeContractNestedResource(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
-	addressValue := values.Address{
-		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xCA, 0xDE,
-	}
+	addressValue := values.BytesToAddress([]byte{0xCA, 0xDE})
 
 	contract := []byte(`
 		pub contract Test {
@@ -1637,7 +1635,7 @@ func TestRuntimeContractNestedResource(t *testing.T) {
     `)
 
 	tx := []byte(`
-		import Test from 0x01
+		import Test from 0xCADE
 
 		transaction {
 			prepare(acct: Account) {
@@ -2066,7 +2064,11 @@ func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
 			fmt.Sprintf(
 				`
 	              import TestContractInterface from 0x2
-	              import TestContract from 0x3
+
+                  // NOTE: *not* importing concrete implementation. 
+                  //   Should be imported automatically when loading the value from storage
+
+	              // import TestContract from 0x3
 
 	              transaction {
 	                  prepare(signer: Account) {

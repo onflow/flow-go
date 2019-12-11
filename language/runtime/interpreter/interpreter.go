@@ -2471,10 +2471,23 @@ func (interpreter *Interpreter) declareComposite(declaration *ast.CompositeDecla
 	}
 }
 
-func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
-	importedChecker := interpreter.Checker.ImportCheckers[declaration.Location.ID()]
+func (interpreter *Interpreter) ensureLoaded(location ast.Location) (subInterpreter *Interpreter) {
+	locationID := location.ID()
 
-	subInterpreter, err := NewInterpreter(
+	// If sub-interpreter already exists, return it
+	subInterpreter = interpreter.SubInterpreters[locationID]
+	if subInterpreter != nil {
+		return subInterpreter
+	}
+
+	// Create a new sub-interpreter and interpret the top-level declarations
+	importedChecker := interpreter.Checker.ImportCheckers[locationID]
+	if importedChecker == nil {
+		panic("missing checker")
+	}
+
+	var err error
+	subInterpreter, err = NewInterpreter(
 		importedChecker,
 		WithPredefinedValues(interpreter.PredefinedValues),
 		WithOnEventEmittedHandler(interpreter.onEventEmitted),
@@ -2490,81 +2503,83 @@ func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDe
 	}
 
 	if subInterpreter.Checker.Location == nil {
-		subInterpreter.Checker.Location = declaration.Location
+		subInterpreter.Checker.Location = location
 	}
 
-	interpreter.SubInterpreters[declaration.Location.ID()] = subInterpreter
+	interpreter.SubInterpreters[locationID] = subInterpreter
 
-	return subInterpreter.interpret().
-		Then(func(_ interface{}) {
+	subInterpreter.runAllStatements(subInterpreter.interpret())
 
-			for subSubImportLocation, subSubInterpreter := range subInterpreter.SubInterpreters {
-				interpreter.SubInterpreters[subSubImportLocation] = subSubInterpreter
-			}
+	for subSubImportLocation, subSubInterpreter := range subInterpreter.SubInterpreters {
+		interpreter.SubInterpreters[subSubImportLocation] = subSubInterpreter
+	}
 
-			// determine which identifiers are imported /
-			// which variables need to be declared
+	// TODO: improve imports: take location into account
+	//   see https://github.com/dapperlabs/flow-go/issues/1847
 
-			var variables map[string]*Variable
-			identifierLength := len(declaration.Identifiers)
-			if identifierLength > 0 {
-				variables = make(map[string]*Variable, identifierLength)
-				for _, identifier := range declaration.Identifiers {
-					variables[identifier.Identifier] =
-						subInterpreter.Globals[identifier.Identifier]
-				}
-			} else {
-				variables = subInterpreter.Globals
-			}
+	// Import all interface declarations from sub-interpreter
 
-			// Import all interface declarations from sub-interpreter
+	for interfaceType, interfaceDeclaration := range subInterpreter.InterfaceDeclarations {
+		interpreter.InterfaceDeclarations[interfaceType] = interfaceDeclaration
+	}
 
-			for interfaceType, interfaceDeclaration := range subInterpreter.InterfaceDeclarations {
-				interpreter.InterfaceDeclarations[interfaceType] = interfaceDeclaration
-			}
+	// Import all composite declarations from sub-interpreter
 
-			// Import all composite declarations from sub-interpreter
+	for compositeType, compositeDeclaration := range subInterpreter.CompositeDeclarations {
+		interpreter.CompositeDeclarations[compositeType] = compositeDeclaration
+	}
 
-			for compositeType, compositeDeclaration := range subInterpreter.CompositeDeclarations {
-				interpreter.CompositeDeclarations[compositeType] = compositeDeclaration
+	// Import all composite functions from sub-interpreter
 
-				// Note: link composite functions for nested composite declarations,
-				// i.e. resources defined within a contract
-				// TODO: find a cleaner way to solve this
-				//   see https://github.com/dapperlabs/flow-go/issues/1847
-				name := compositeType.Identifier
-				if compositeFunctions, ok := subInterpreter.CompositeFunctions[name]; ok {
-					interpreter.CompositeFunctions[name] = compositeFunctions
-				}
-			}
+	for name, compositeFunctions := range subInterpreter.CompositeFunctions {
+		interpreter.CompositeFunctions[name] = compositeFunctions
+	}
 
-			// set variables for all imported values
-			for name, variable := range variables {
+	// Import all destructor functions from the sub-interpreter
 
-				// don't import predeclared values
-				if _, ok := subInterpreter.Checker.PredeclaredValues[name]; ok {
-					continue
-				}
+	for name, destructorFunction := range subInterpreter.DestructorFunctions {
+		interpreter.DestructorFunctions[name] = destructorFunction
+	}
 
-				// don't import base values
-				if _, ok := sema.BaseValues[name]; ok {
-					continue
-				}
+	return subInterpreter
+}
 
-				interpreter.setVariable(name, variable)
+func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
 
-				// If the imported name refers to a composite, also import the composite functions
-				// and the destructor function from the sub-interpreter
+	subInterpreter := interpreter.ensureLoaded(declaration.Location)
 
-				if compositeFunctions, ok := subInterpreter.CompositeFunctions[name]; ok {
-					interpreter.CompositeFunctions[name] = compositeFunctions
-				}
+	// determine which identifiers are imported /
+	// which variables need to be declared
 
-				if destructorFunction, ok := subInterpreter.DestructorFunctions[name]; ok {
-					interpreter.DestructorFunctions[name] = destructorFunction
-				}
-			}
-		})
+	var variables map[string]*Variable
+	identifierLength := len(declaration.Identifiers)
+	if identifierLength > 0 {
+		variables = make(map[string]*Variable, identifierLength)
+		for _, identifier := range declaration.Identifiers {
+			variables[identifier.Identifier] =
+				subInterpreter.Globals[identifier.Identifier]
+		}
+	} else {
+		variables = subInterpreter.Globals
+	}
+
+	// set variables for all imported values
+	for name, variable := range variables {
+
+		// don't import predeclared values
+		if _, ok := subInterpreter.Checker.PredeclaredValues[name]; ok {
+			continue
+		}
+
+		// don't import base values
+		if _, ok := sema.BaseValues[name]; ok {
+			continue
+		}
+
+		interpreter.setVariable(name, variable)
+	}
+
+	return Done{}
 }
 
 func (interpreter *Interpreter) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {

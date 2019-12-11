@@ -1525,9 +1525,8 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 
 	// get correct interpreter
 	if v.Location != nil {
-		subInterpreter, ok := interpreter.SubInterpreters[v.Location.ID()]
-		if ok {
-			interpreter = subInterpreter
+		if !ast.LocationsMatch(interpreter.Checker.Location, v.Location) {
+			interpreter = interpreter.ensureLoaded(v.Location)
 		}
 	}
 
@@ -1535,8 +1534,7 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 	// and get injected fields
 
 	if v.Functions == nil {
-		functions := interpreter.CompositeFunctions[v.Identifier]
-		v.Functions = functions
+		v.Functions = interpreter.CompositeFunctions[v.Identifier]
 	}
 
 	if v.InjectedFields == nil && interpreter.injectedCompositeFieldsHandler != nil {
