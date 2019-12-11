@@ -248,6 +248,17 @@ func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
+		var useCode string
+		if compositeKind != common.CompositeKindContract {
+			useCode = fmt.Sprintf(
+				`let test: %[1]sTest %[2]s %[3]s TestImpl%[4]s`,
+				compositeKind.Annotation(),
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
+				constructorArguments(compositeKind),
+			)
+		}
+
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -257,13 +268,10 @@ func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 
                       %[1]s TestImpl: Test {}
 
-                      let test: %[2]sTest %[3]s %[4]s TestImpl%[5]s
+                      %[2]s
 	                `,
 					compositeKind.Keyword(),
-					compositeKind.Annotation(),
-					compositeKind.TransferOperator(),
-					compositeKind.ConstructionKeyword(),
-					constructorArguments(compositeKind),
+					useCode,
 				))
 
 			require.NoError(t, err)
@@ -287,29 +295,46 @@ func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T
 				secondKind.Keyword(),
 			)
 
+			var useCode string
+			if firstKind != common.CompositeKindContract &&
+				secondKind != common.CompositeKindContract {
+
+				useCode = fmt.Sprintf(
+					`let test: %[1]sTest %[2]s %[3]s TestImpl%[4]s`,
+					firstKind.Annotation(),
+					firstKind.TransferOperator(),
+					secondKind.ConstructionKeyword(),
+					constructorArguments(secondKind),
+				)
+			}
+
 			t.Run(testName, func(t *testing.T) {
 
-				_, err := ParseAndCheck(t,
+				checker, err := ParseAndCheck(t,
 					fmt.Sprintf(
 						`
                           %[1]s interface Test {}
 
                           %[2]s TestImpl: Test {}
 
-                          let test: %[3]sTest %[4]s %[5]s TestImpl%[6]s
+                          %[3]s
 	                    `,
 						firstKind.Keyword(),
 						secondKind.Keyword(),
-						firstKind.Annotation(),
-						firstKind.TransferOperator(),
-						secondKind.ConstructionKeyword(),
-						constructorArguments(secondKind),
+						useCode,
 					),
 				)
 
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.CompositeKindMismatchError{}, errs[0])
+
+				require.NotNil(t, checker)
+
+				testType := checker.GlobalTypes["Test"].Type
+				testImplType := checker.GlobalTypes["TestImpl"].Type
+
+				assert.True(t, sema.IsSubType(testImplType, testType))
 			})
 		}
 	}
@@ -319,9 +344,20 @@ func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
+		var useCode string
+		if compositeKind != common.CompositeKindContract {
+			useCode = fmt.Sprintf(
+				`let test: %[1]sTest %[2]s %[3]s TestImpl%[4]s`,
+				compositeKind.Annotation(),
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
+				constructorArguments(compositeKind),
+			)
+		}
+
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t,
+			checker, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
                       %[1]s interface Test {}
@@ -329,19 +365,25 @@ func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
                       // NOTE: not declaring conformance
                       %[1]s TestImpl {}
 
-                      let test: %[2]sTest %[3]s %[4]s TestImpl%[5]s
+                      %[2]s
 	                `,
 					compositeKind.Keyword(),
-					compositeKind.Annotation(),
-					compositeKind.TransferOperator(),
-					compositeKind.ConstructionKeyword(),
-					constructorArguments(compositeKind),
+					useCode,
 				),
 			)
 
-			errs := ExpectCheckerErrors(t, err, 1)
+			if compositeKind != common.CompositeKindContract {
+				errs := ExpectCheckerErrors(t, err, 1)
 
-			assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+				assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+			}
+
+			require.NotNil(t, checker)
+
+			testType := checker.GlobalTypes["Test"].Type
+			testImplType := checker.GlobalTypes["TestImpl"].Type
+
+			assert.False(t, sema.IsSubType(testImplType, testType))
 		})
 	}
 }
@@ -455,6 +497,20 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
+		var setupCode, identifier string
+		if compositeKind != common.CompositeKindContract {
+			identifier = "test"
+			setupCode = fmt.Sprintf(
+				`let test: %[1]sTest %[2]s %[3]s TestImpl%[4]s`,
+				compositeKind.Annotation(),
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
+				constructorArguments(compositeKind),
+			)
+		} else {
+			identifier = "TestImpl"
+		}
+
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -470,15 +526,13 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
                           }
                       }
 
-                      let test: %[2]sTest %[3]s %[4]s TestImpl%[5]s
+                      %[2]s
 
-                      let val = test.test()
+                      let val = %[3]s.test()
 	                `,
 					compositeKind.Keyword(),
-					compositeKind.Annotation(),
-					compositeKind.TransferOperator(),
-					compositeKind.ConstructionKeyword(),
-					constructorArguments(compositeKind),
+					setupCode,
+					identifier,
 				),
 			)
 
@@ -490,6 +544,10 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
 func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 

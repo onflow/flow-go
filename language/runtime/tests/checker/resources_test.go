@@ -239,10 +239,16 @@ func TestCheckVariableDeclarationWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure:
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -254,6 +260,10 @@ func TestCheckVariableDeclarationWithResourceAnnotation(t *testing.T) {
 func TestCheckVariableDeclarationWithoutResourceAnnotation(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -631,6 +641,10 @@ func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
 
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
+
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -667,6 +681,10 @@ func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
 
 func TestCheckFunctionTypeReturnTypeWithoutResourceAnnotation(t *testing.T) {
 	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
