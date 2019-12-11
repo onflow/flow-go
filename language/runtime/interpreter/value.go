@@ -2375,14 +2375,14 @@ func (v AddressValue) Equal(other Value) BoolValue {
 	return [common.AddressLength]byte(v) == [common.AddressLength]byte(otherAddress)
 }
 
-func (v AddressValue) StorageIdentifier() string {
-	return v.Export().(values.Address).StorageIdentifier()
+func (v AddressValue) Hex() string {
+	return v.Export().(values.Address).Hex()
 }
 
 // AccountValue
 
 func NewAccountValue(address AddressValue) *CompositeValue {
-	storageIdentifier := address.StorageIdentifier()
+	storageIdentifier := address.Hex()
 
 	return &CompositeValue{
 		Identifier: (&sema.AccountType{}).ID(),
@@ -2397,7 +2397,7 @@ func NewAccountValue(address AddressValue) *CompositeValue {
 // PublicAccountValue
 
 func NewPublicAccountValue(address AddressValue) *CompositeValue {
-	storageIdentifier := address.StorageIdentifier()
+	storageIdentifier := address.Hex()
 
 	return &CompositeValue{
 		Identifier: (&sema.PublicAccountType{}).ID(),

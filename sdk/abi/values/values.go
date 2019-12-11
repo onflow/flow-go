@@ -110,16 +110,18 @@ func (Composite) isValue() {}
 
 func (Event) isValue() {}
 
-type Address [20]byte
+const AddressLength = 20
+
+type Address [AddressLength]byte
 
 func (Address) isValue() {}
 
-func (a Address) StorageIdentifier() string {
+func (a Address) Hex() string {
 	return fmt.Sprintf("%x", a)
 }
 
 func BytesToAddress(b []byte) Address {
 	var a Address
-	copy(a[:], b)
+	copy(a[AddressLength-len(b):AddressLength], b)
 	return a
 }
