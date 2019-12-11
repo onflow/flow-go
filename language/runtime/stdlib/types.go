@@ -52,8 +52,8 @@ var AccountCreatedEventType = sema.EventType{
 	},
 	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
 		{
-			Move: false,
-			Type: &sema.StringType{},
+			IsResource: false,
+			Type:       &sema.StringType{},
 		},
 	},
 }
@@ -74,11 +74,11 @@ var AccountKeyAddedEventType = sema.EventType{
 	},
 	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
 		{
-			Move: false,
-			Type: &sema.StringType{},
+			IsResource: false,
+			Type:       &sema.StringType{},
 		},
 		{
-			Move: false,
+			IsResource: false,
 			Type: &sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},
@@ -102,11 +102,11 @@ var AccountKeyRemovedEventType = sema.EventType{
 	},
 	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
 		{
-			Move: false,
-			Type: &sema.StringType{},
+			IsResource: false,
+			Type:       &sema.StringType{},
 		},
 		{
-			Move: false,
+			IsResource: false,
 			Type: &sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},
@@ -130,11 +130,11 @@ var AccountCodeUpdatedEventType = sema.EventType{
 	},
 	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
 		{
-			Move: false,
-			Type: &sema.StringType{},
+			IsResource: false,
+			Type:       &sema.StringType{},
 		},
 		{
-			Move: false,
+			IsResource: false,
 			Type: &sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},

@@ -716,8 +716,8 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 func (checker *Checker) ConvertTypeAnnotation(typeAnnotation *ast.TypeAnnotation) *TypeAnnotation {
 	convertedType := checker.ConvertType(typeAnnotation.Type)
 	return &TypeAnnotation{
-		Move: typeAnnotation.Move,
-		Type: convertedType,
+		IsResource: typeAnnotation.IsResource,
+		Type:       convertedType,
 	}
 }
 
@@ -745,8 +745,8 @@ func (checker *Checker) parameterTypeAnnotations(parameterList *ast.ParameterLis
 		convertedParameterType := checker.ConvertType(parameter.TypeAnnotation.Type)
 
 		parameterTypeAnnotations[i] = &TypeAnnotation{
-			Move: parameter.TypeAnnotation.Move,
-			Type: convertedParameterType,
+			IsResource: parameter.TypeAnnotation.IsResource,
+			Type:       convertedParameterType,
 		}
 	}
 
@@ -867,7 +867,7 @@ func (checker *Checker) checkResourceLoss(depth int) {
 func (checker *Checker) recordResourceInvalidation(
 	expression ast.Expression,
 	valueType Type,
-	kind ResourceInvalidationKind,
+	invalidationKind ResourceInvalidationKind,
 ) {
 	if !valueType.IsResourceType() {
 		return
@@ -875,7 +875,7 @@ func (checker *Checker) recordResourceInvalidation(
 
 	reportInvalidNestedMove := func() {
 		checker.report(
-			&InvalidNestedMoveError{
+			&InvalidNestedResourceMoveError{
 				StartPos: expression.StartPosition(),
 				EndPos:   expression.EndPosition(),
 			},
@@ -897,7 +897,7 @@ func (checker *Checker) recordResourceInvalidation(
 	}
 
 	invalidation := ResourceInvalidation{
-		Kind:     kind,
+		Kind:     invalidationKind,
 		StartPos: expression.StartPosition(),
 		EndPos:   expression.EndPosition(),
 	}
@@ -915,6 +915,16 @@ func (checker *Checker) recordResourceInvalidation(
 	variable := checker.findAndCheckVariable(identifierExpression.Identifier, false)
 	if variable == nil {
 		return
+	}
+
+	if variable.DeclarationKind == common.DeclarationKindSelf {
+		checker.report(
+			&InvalidSelfInvalidationError{
+				InvalidationKind: invalidationKind,
+				StartPos:         expression.StartPosition(),
+				EndPos:           expression.EndPosition(),
+			},
+		)
 	}
 
 	checker.resources.AddInvalidation(variable, invalidation)
@@ -1023,7 +1033,7 @@ func (checker *Checker) checkResourceFieldNesting(
 	}
 
 	for name, member := range members {
-		// NOTE: check type, not move annotation:
+		// NOTE: check type, not resource annotation:
 		// the field could have a wrong annotation
 		if !member.TypeAnnotation.Type.IsResourceType() {
 			continue
@@ -1259,7 +1269,7 @@ func (checker *Checker) withSelfResourceInvalidationAllowed(f func()) {
 
 	f()
 }
-  
+
 func (checker *Checker) predeclaredMembers(containerType Type) []*Member {
 	var predeclaredMembers []*Member
 
@@ -1282,4 +1292,42 @@ func (checker *Checker) predeclaredMembers(containerType Type) []*Member {
 	}
 
 	return predeclaredMembers
+}
+
+func (checker *Checker) checkVariableMove(expression ast.Expression) {
+
+	identifierExpression, ok := expression.(*ast.IdentifierExpression)
+	if !ok {
+		return
+	}
+
+	variable := checker.valueActivations.Find(identifierExpression.Identifier.Identifier)
+	if variable == nil {
+		return
+	}
+
+	reportInvalidMove := func(declarationKind common.DeclarationKind) {
+		checker.report(
+			&InvalidMoveError{
+				Name:            variable.Identifier,
+				DeclarationKind: declarationKind,
+				Pos:             identifierExpression.StartPosition(),
+			},
+		)
+	}
+
+	switch ty := variable.Type.(type) {
+	case *TransactionType:
+		reportInvalidMove(common.DeclarationKindTransaction)
+
+	case *CompositeType:
+		if ty.Kind == common.CompositeKindContract {
+			reportInvalidMove(common.DeclarationKindContract)
+		}
+
+	case *InterfaceType:
+		if ty.CompositeKind == common.CompositeKindContract {
+			reportInvalidMove(common.DeclarationKindContract)
+		}
+	}
 }

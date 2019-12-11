@@ -15,6 +15,7 @@ func (checker *Checker) VisitArrayExpression(expression *ast.ArrayExpression) as
 
 		argumentTypes[i] = valueType
 
+		checker.checkVariableMove(value)
 		checker.checkResourceMoveOperation(value, valueType)
 
 		// infer element type from first element

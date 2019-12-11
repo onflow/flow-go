@@ -33,7 +33,7 @@ pub contract GreatToken {
     pub var nextID: Int
     pub let specialMod: Int
 
-    pub fun mint(): <-GreatNFT {
+    pub fun mint(): @GreatNFT {
       var isSpecial = self.nextID % self.specialMod == 0
       let nft <- create GreatNFT(id: self.nextID, isSpecial: isSpecial)
       self.nextID = self.nextID + 1
@@ -50,7 +50,7 @@ pub contract GreatToken {
     }
   }
 
-  pub fun createGreatNFTMinter(firstID: Int, specialMod: Int): <-GreatNFTMinter {
+  pub fun createGreatNFTMinter(firstID: Int, specialMod: Int): @GreatNFTMinter {
     return <-create GreatNFTMinter(firstID: firstID, specialMod: specialMod)
   }
 }

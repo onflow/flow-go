@@ -39,8 +39,8 @@ func TestCheckAnyResource(t *testing.T) {
 	_, err := ParseAndCheck(t, `
       resource R {}
 
-      let a: <-AnyResource <- create R()
-      let b: <-AnyResource <- [<-create R()]
+      let a: @AnyResource <- create R()
+      let b: @AnyResource <- [<-create R()]
     `)
 
 	assert.NoError(t, err)

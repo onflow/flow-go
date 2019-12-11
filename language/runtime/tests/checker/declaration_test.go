@@ -181,7 +181,7 @@ func TestCheckInvalidConstantValue(t *testing.T) {
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
-func TestCheckInvalidReference(t *testing.T) {
+func TestCheckInvalidUse(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       fun test() {
@@ -391,7 +391,7 @@ func TestCheckVariableDeclarationSecondValueNil(t *testing.T) {
      resource R {}
 
      fun test() {
-         var x: <-R? <- create R()
+         var x: @R? <- create R()
          let y <- x <- nil
          destroy x
          destroy y

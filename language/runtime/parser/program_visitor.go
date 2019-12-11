@@ -109,9 +109,9 @@ func (v *ProgramVisitor) visitReturnTypeAnnotation(ctx ITypeAnnotationContext, t
 			},
 		}
 		return &ast.TypeAnnotation{
-			Move:     false,
-			Type:     returnType,
-			StartPos: positionBeforeMissingReturnType,
+			IsResource: false,
+			Type:       returnType,
+			StartPos:   positionBeforeMissingReturnType,
 		}
 	}
 	result := ctx.Accept(v)
@@ -679,14 +679,14 @@ func (v *ProgramVisitor) VisitDictionaryType(ctx *DictionaryTypeContext) interfa
 }
 
 func (v *ProgramVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interface{} {
-	move := ctx.Move() != nil
+	isResource := ctx.ResourceAnnotation() != nil
 	fullType := ctx.FullType().Accept(v).(ast.Type)
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.TypeAnnotation{
-		Move:     move,
-		Type:     fullType,
-		StartPos: startPosition,
+		IsResource: isResource,
+		Type:       fullType,
+		StartPos:   startPosition,
 	}
 }
 

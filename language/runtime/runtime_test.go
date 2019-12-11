@@ -254,7 +254,7 @@ func TestRuntimeStorage(t *testing.T) {
 			imported := []byte(`
               pub resource R {}
 
-              pub fun createR(): <-R {
+              pub fun createR(): @R {
                 return <-create R()
               }
             `)
@@ -319,7 +319,7 @@ func TestRuntimeStorageMultipleTransactionsResourceWithArray(t *testing.T) {
         }
       }
 
-      pub fun createContainer(): <-Container {
+      pub fun createContainer(): @Container {
         return <-create Container()
       }
     `)
@@ -330,7 +330,7 @@ func TestRuntimeStorageMultipleTransactionsResourceWithArray(t *testing.T) {
       transaction {
 
         prepare(signer: Account) {
-          var container: <-Container? <- createContainer()
+          var container: @Container? <- createContainer()
           signer.storage[Container] <-> container
           destroy container
           let ref = &signer.storage[Container] as Container
@@ -416,7 +416,7 @@ func TestRuntimeStorageMultipleTransactionsResourceFunction(t *testing.T) {
         }
       }
 
-      pub fun createDeepThought(): <-DeepThought {
+      pub fun createDeepThought(): @DeepThought {
         return <-create DeepThought()
       }
     `)
@@ -497,7 +497,7 @@ func TestRuntimeStorageMultipleTransactionsResourceField(t *testing.T) {
         }
       }
 
-      pub fun createNumber(_ n: Int): <-Number {
+      pub fun createNumber(_ n: Int): @Number {
         return <-create Number(n)
       }
     `)
@@ -584,7 +584,7 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
         }
       }
 
-      pub fun createY(): <-Y {
+      pub fun createY(): @Y {
         return <-create Y()
       }
     `)
@@ -652,7 +652,7 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
         }
       }
 
-      pub fun createR(): <-R {
+      pub fun createR(): @R {
         return <- create R()
       }
     `)
@@ -731,7 +731,7 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
         }
       }
 
-      pub fun createR(): <-R {
+      pub fun createR(): @R {
           return <- create R()
       }
     `)
@@ -819,7 +819,7 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
         }
       }
 
-      pub fun createR(): <-R {
+      pub fun createR(): @R {
         return <- create R()
       }
     `)
@@ -830,7 +830,7 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 
       transaction {
         prepare(signer: Account) {
-          var r: <-R? <- createR()
+          var r: @R? <- createR()
           signer.storage[R] <-> r
           if r != nil {
             panic("already initialized")
@@ -960,7 +960,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
         }
       }
 
-      pub fun createX(): <-X {
+      pub fun createX(): @X {
           return <-create X()
       }
     `)
@@ -970,7 +970,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
 
       transaction {
         prepare(signer: Account) {
-          var x: <-X? <- createX()
+          var x: @X? <- createX()
           signer.storage[X] <-> x
           destroy x
 
@@ -1098,7 +1098,7 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
         }
       }
 
-      pub fun createR(): <-R {
+      pub fun createR(): @R {
         return <-create R()
       }
     `)
@@ -1609,4 +1609,89 @@ func TestRuntimeContractAccount(t *testing.T) {
 
 		assert.Equal(t, addressValue, value)
 	})
+}
+
+func TestRuntimeContractNestedResource(t *testing.T) {
+	runtime := NewInterpreterRuntime()
+
+	addressValue := values.Address{
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xCA, 0xDE,
+	}
+
+	contract := []byte(`
+		pub contract Test {
+			pub resource R {
+				// test that the hello function is linked back into the nested resource
+				// after being loaded from storage
+				pub fun hello(): String {
+					return "Hello World!"
+				}
+			}
+		
+			init() {
+				// store nested resource in account on deployment
+				let oldR <- self.account.storage[R] <- create R()
+				destroy oldR
+			}
+		}
+    `)
+
+	tx := []byte(`
+		import Test from 0x01
+		
+		transaction {
+			prepare(acct: Account) {
+				log(acct.storage[Test.R]?.hello())
+			}
+		}
+	`)
+
+	deploy := []byte(fmt.Sprintf(
+		`
+          transaction {
+            prepare(signer: Account) {
+              updateAccountCode(signer.address, %s)
+            }
+          }
+        `,
+		ArrayValueFromBytes(contract).String(),
+	))
+
+	storedValues := map[string][]byte{}
+	var accountCode values.Bytes
+	var loggedMessage string
+
+	runtimeInterface := &testRuntimeInterface{
+		resolveImport: func(_ Location) (bytes values.Bytes, err error) {
+			return accountCode, nil
+		},
+		getValue: func(controller, owner, key values.Bytes) (value values.Bytes, err error) {
+			return storedValues[string(key)], nil
+		},
+		setValue: func(controller, owner, key, value values.Bytes) (err error) {
+			storedValues[string(key)] = value
+			return nil
+		},
+		getSigningAccounts: func() []values.Address {
+			return []values.Address{addressValue}
+		},
+		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+			accountCode = code
+			return nil
+		},
+		emitEvent: func(event values.Event) {},
+		log: func(message string) {
+			loggedMessage = message
+		},
+	}
+
+	err := runtime.ExecuteTransaction(deploy, runtimeInterface, nil)
+	require.NoError(t, err)
+
+	assert.NotNil(t, accountCode)
+
+	err = runtime.ExecuteTransaction(tx, runtimeInterface, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, `"Hello World!"`, loggedMessage)
 }

@@ -726,6 +726,23 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
 					access.Keyword(),
 				)
 
+				var setupCode, tearDownCode, identifier string
+				if compositeKind == common.CompositeKindContract {
+					identifier = "Test"
+				} else {
+					setupCode = fmt.Sprintf(
+						`let test %[1]s %[2]s Test%[3]s`,
+						compositeKind.TransferOperator(),
+						compositeKind.ConstructionKeyword(),
+						constructorArguments(compositeKind),
+					)
+					identifier = "test"
+				}
+
+				if compositeKind == common.CompositeKindResource {
+					tearDownCode = "destroy test"
+				}
+
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
@@ -740,17 +757,16 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test %[3]s %[4]s Test%[5]s
-                                  test.test()
-                                  %[6]s test
+                                  %[3]s
+                                  %[4]s.test()
+                                  %[5]s
                               }
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
-							compositeKind.TransferOperator(),
-							compositeKind.ConstructionKeyword(),
-							constructorArguments(compositeKind),
-							compositeKind.DestructionKeyword(),
+							setupCode,
+							identifier,
+							tearDownCode,
 						),
 						ParseAndCheckOptions{
 							Options: []sema.Option{
@@ -825,6 +841,24 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
 					access.Keyword(),
 				)
 
+				var setupCode, tearDownCode, identifier string
+				if compositeKind == common.CompositeKindContract {
+					identifier = "TestImpl"
+				} else {
+					setupCode = fmt.Sprintf(
+						`let test: %[1]sTest %[2]s %[3]s TestImpl%[4]s`,
+						compositeKind.Annotation(),
+						compositeKind.TransferOperator(),
+						compositeKind.ConstructionKeyword(),
+						constructorArguments(compositeKind),
+					)
+					identifier = "test"
+				}
+
+				if compositeKind == common.CompositeKindResource {
+					tearDownCode = "destroy test"
+				}
+
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
@@ -843,18 +877,16 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test: %[3]sTest %[4]s %[5]s TestImpl%[6]s
-                                  test.test()
-                                  %[7]s test
+                                  %[3]s
+                                  %[4]s.test()
+                                  %[5]s
                               }
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
-							compositeKind.Annotation(),
-							compositeKind.TransferOperator(),
-							compositeKind.ConstructionKeyword(),
-							constructorArguments(compositeKind),
-							compositeKind.DestructionKeyword(),
+							setupCode,
+							identifier,
+							tearDownCode,
 						),
 						ParseAndCheckOptions{
 							Options: []sema.Option{
@@ -922,6 +954,24 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
 					access.Keyword(),
 				)
 
+				var setupCode, tearDownCode, identifier string
+
+				if compositeKind == common.CompositeKindContract {
+					identifier = "Test"
+				} else {
+					setupCode = fmt.Sprintf(
+						`let test %[1]s %[2]s Test%[3]s`,
+						compositeKind.TransferOperator(),
+						compositeKind.ConstructionKeyword(),
+						constructorArguments(compositeKind),
+					)
+					identifier = "test"
+				}
+
+				if compositeKind == common.CompositeKindResource {
+					tearDownCode = `destroy test`
+				}
+
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
@@ -940,17 +990,16 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test %[3]s %[4]s Test%[5]s
-                                  test.test
-                                  %[6]s test
+                                  %[3]s
+                                  %[4]s.test
+                                  %[5]s
                               }
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
-							compositeKind.TransferOperator(),
-							compositeKind.ConstructionKeyword(),
-							constructorArguments(compositeKind),
-							compositeKind.DestructionKeyword(),
+							setupCode,
+							identifier,
+							tearDownCode,
 						),
 						ParseAndCheckOptions{
 							Options: []sema.Option{
@@ -1018,6 +1067,25 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 					access.Keyword(),
 				)
 
+				var setupCode, tearDownCode, identifier string
+
+				if compositeKind == common.CompositeKindContract {
+					identifier = "TestImpl"
+				} else {
+					setupCode = fmt.Sprintf(
+						`let test: %[1]sTest %[2]s %[3]s TestImpl%[4]s`,
+						compositeKind.Annotation(),
+						compositeKind.TransferOperator(),
+						compositeKind.ConstructionKeyword(),
+						constructorArguments(compositeKind),
+					)
+					identifier = "test"
+				}
+
+				if compositeKind == common.CompositeKindResource {
+					tearDownCode = `destroy test`
+				}
+
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
@@ -1040,18 +1108,16 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test: %[3]sTest %[4]s %[5]s TestImpl%[6]s
-                                  test.test
-                                  %[7]s test
+                                  %[3]s
+                                  %[4]s.test
+                                  %[5]s
                               }
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
-							compositeKind.Annotation(),
-							compositeKind.TransferOperator(),
-							compositeKind.ConstructionKeyword(),
-							constructorArguments(compositeKind),
-							compositeKind.DestructionKeyword(),
+							setupCode,
+							identifier,
+							tearDownCode,
 						),
 						ParseAndCheckOptions{
 							Options: []sema.Option{
@@ -1119,6 +1185,23 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 					access.Keyword(),
 				)
 
+				var setupCode, tearDownCode, identifier string
+				if compositeKind == common.CompositeKindContract {
+					identifier = "Test"
+				} else {
+					setupCode = fmt.Sprintf(
+						`let test %[1]s %[2]s Test%[3]s`,
+						compositeKind.TransferOperator(),
+						compositeKind.ConstructionKeyword(),
+						constructorArguments(compositeKind),
+					)
+					identifier = "test"
+				}
+
+				if compositeKind == common.CompositeKindResource {
+					tearDownCode = `destroy test`
+				}
+
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
@@ -1139,19 +1222,20 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test %[3]s %[4]s Test%[5]s
-                                  test.test = 3
+                                  %[3]s
+
+                                  %[4]s.test = 3
                                   var temp = 4
-                                  test.test <-> temp
-                                  %[6]s test
+                                  %[4]s.test <-> temp
+
+                                  %[5]s
                               }
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
-							compositeKind.TransferOperator(),
-							compositeKind.ConstructionKeyword(),
-							constructorArguments(compositeKind),
-							compositeKind.DestructionKeyword(),
+							setupCode,
+							identifier,
+							tearDownCode,
 						),
 						ParseAndCheckOptions{
 							Options: []sema.Option{
@@ -1229,6 +1313,24 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 					access.Keyword(),
 				)
 
+				var setupCode, tearDownCode, identifier string
+				if compositeKind == common.CompositeKindContract {
+					identifier = "TestImpl"
+				} else {
+					setupCode = fmt.Sprintf(
+						`let test: %[1]sTest %[2]s %[3]s TestImpl%[4]s`,
+						compositeKind.Annotation(),
+						compositeKind.TransferOperator(),
+						compositeKind.ConstructionKeyword(),
+						constructorArguments(compositeKind),
+					)
+					identifier = "test"
+				}
+
+				if compositeKind == common.CompositeKindResource {
+					tearDownCode = "destroy test"
+				}
+
 				t.Run(testName, func(t *testing.T) {
 
 					_, err := ParseAndCheckWithOptions(t,
@@ -1253,20 +1355,18 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
                               }
 
                               pub fun test() {
-                                  let test: %[3]sTest %[4]s %[5]s TestImpl%[6]s
-                                  test.test = 3
+                                  %[3]s
+                                  %[4]s.test = 3
                                   var temp = 4
-                                  test.test <-> temp
-                                  %[7]s test
+                                  %[4]s.test <-> temp
+                                  %[5]s
                               }
 	                        `,
 							compositeKind.Keyword(),
 							access.Keyword(),
-							compositeKind.Annotation(),
-							compositeKind.TransferOperator(),
-							compositeKind.ConstructionKeyword(),
-							constructorArguments(compositeKind),
-							compositeKind.DestructionKeyword(),
+							setupCode,
+							identifier,
+							tearDownCode,
 						),
 						ParseAndCheckOptions{
 							Options: []sema.Option{
@@ -1340,7 +1440,7 @@ func TestCheckAccessCompositeFieldVariableDeclarationWithSecondValue(t *testing.
                           pub resource A {}
 
                           pub resource B {
-                              %[1]s var a: <-A
+                              %[1]s var a: @A
 
                               init() {
                                   self.a <- create A()
@@ -1444,11 +1544,11 @@ func TestCheckAccessInterfaceFieldVariableDeclarationWithSecondValue(t *testing.
                           pub resource A {}
 
                           pub resource interface B {
-                              %[1]s var a: <-A
+                              %[1]s var a: @A
                           }
 
                           pub resource BImpl: B {
-                              %[1]s var a: <-A
+                              %[1]s var a: @A
 
                               init() {
                                   self.a <- create A()
@@ -1465,7 +1565,7 @@ func TestCheckAccessInterfaceFieldVariableDeclarationWithSecondValue(t *testing.
                           }
 
                           pub fun test() {
-                              let b: <-B <- create BImpl()
+                              let b: @B <- create BImpl()
                               let oldA <- b.a <- create A()
                               destroy oldA
                               destroy b
@@ -1698,7 +1798,7 @@ func TestCheckAccessImportGlobalValueVariableDeclarationWithSecondValue(t *testi
 	imported, _, err := parser.ParseProgram(`
        pub resource R {}
 
-       pub fun createR(): <-R {
+       pub fun createR(): @R {
            return <-create R()
        }
 
