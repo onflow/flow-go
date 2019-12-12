@@ -47,8 +47,15 @@ const startEmulator = (ext: Extension) => async () => {
 
     // create default accounts after the emulator has started
     // skip root account since it is already created
-    const accounts = await ext.api.createDefaultAccounts(ext.config.numAccounts - 1);
-    accounts.forEach(address => ext.config.addAccount(address));
+    setTimeout(async () => {
+        try {
+            const accounts = await ext.api.createDefaultAccounts(ext.config.numAccounts - 1);
+            accounts.forEach(address => ext.config.addAccount(address));
+        } catch (err) {
+            console.error("Failed to create default accounts", err);
+            window.showWarningMessage("Failed to create default accounts");
+        }
+    }, 3000);
 };
 
 // Stops emulator, exits the terminal, and removes all config/db files.
