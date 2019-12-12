@@ -66,23 +66,7 @@ func (b *PendingBlock) Transactions() []crypto.Hash {
 	return b.Header.TransactionHashes
 }
 
-// ClearTxPool resets the TxPool.
-func (b *PendingBlock) ClearTxPool() {
-	b.TxPool = make(map[string]*flow.Transaction)
-}
-
-// ResetHeader resets the pending block header based off a previous block (resets Index).
-func (b *PendingBlock) ResetHeader(prevBlock *Block) {
-	b.Header = &Block{
-		Number:            prevBlock.Number + 1,
-		PreviousBlockHash: prevBlock.Hash(),
-		TransactionHashes: make([]crypto.Hash, 0),
-	}
-
-	b.Index = 0
-}
-
-// ResetState resets the pending state to a previous state.
-func (b *PendingBlock) ResetState(prevState flow.Ledger) {
-	b.State = prevState
+// TransactionCount retrieves the number of transaction in the pending block.
+func (b *PendingBlock) TransactionCount() int {
+	return len(b.Header.TransactionHashes)
 }

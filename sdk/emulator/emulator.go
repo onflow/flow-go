@@ -291,7 +291,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) (types.Trans
 	defer b.mu.Unlock()
 
 	// Prevents tx from being executed with other transactions added previously
-	if len(b.pendingBlock.Transactions()) > 0 {
+	if b.pendingBlock.TransactionCount() > 0 {
 		return types.TransactionReceipt{}, &ErrPendingBlockNotEmpty{BlockHash: b.pendingBlock.Hash()}
 	}
 
@@ -359,11 +359,11 @@ func (b *EmulatedBlockchain) ExecuteBlock() ([]types.TransactionReceipt, error) 
 func (b *EmulatedBlockchain) executeBlock() ([]types.TransactionReceipt, error) {
 	results := make([]types.TransactionReceipt, 0)
 
-	if b.pendingBlock.Index >= len(b.pendingBlock.Transactions()) {
+	if b.pendingBlock.Index >= b.pendingBlock.TransactionCount() {
 		return results, &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
 	}
 
-	for b.pendingBlock.Index < len(b.pendingBlock.Transactions()) {
+	for b.pendingBlock.Index < b.pendingBlock.TransactionCount() {
 		result, err := b.executeTransaction()
 		if err != nil {
 			return results, err
@@ -387,7 +387,7 @@ func (b *EmulatedBlockchain) ExecuteNextTransaction() (types.TransactionReceipt,
 // executeTransaction is a helper function for ExecuteBlock and ExecuteNextTransaction that runs through the transaction execution.
 func (b *EmulatedBlockchain) executeTransaction() (types.TransactionReceipt, error) {
 	// Check if there are remaining txs to be executed
-	if b.pendingBlock.Index >= len(b.pendingBlock.Transactions()) {
+	if b.pendingBlock.Index >= b.pendingBlock.TransactionCount() {
 		return types.TransactionReceipt{}, &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
 	}
 
@@ -458,12 +458,12 @@ func (b *EmulatedBlockchain) CommitBlock() (*types.Block, error) {
 
 func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
 	// Pending block cannot be committed before execution
-	if b.pendingBlock.Index == 0 && len(b.pendingBlock.Transactions()) > 0 {
+	if b.pendingBlock.Index == 0 && b.pendingBlock.TransactionCount() > 0 {
 		return nil, &ErrPendingBlockCommitBeforeExecution{BlockHash: b.pendingBlock.Hash()}
 	}
 
 	// Pending block has begun execution but has not finished (cannot commit state)
-	if b.pendingBlock.Index > 0 && b.pendingBlock.Index < len(b.pendingBlock.Transactions()) {
+	if b.pendingBlock.Index > 0 && b.pendingBlock.Index < b.pendingBlock.TransactionCount() {
 		return nil, &ErrPendingBlockMidExecution{BlockHash: b.pendingBlock.Hash()}
 	}
 
@@ -504,21 +504,21 @@ func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
 
 // TODO: should be atomic
 // ExecuteAndCommitBlock is a utility that combines ExecuteBlock with CommitState.
-func (b *EmulatedBlockchain) ExecuteAndCommitBlock() (*types.Block, error) {
+func (b *EmulatedBlockchain) ExecuteAndCommitBlock() (*types.Block, []types.TransactionReceipt, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	_, err := b.executeBlock()
+	results, err := b.executeBlock()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	block, err := b.commitBlock()
 	if err != nil {
-		return nil, err
+		return nil, results, err
 	}
 
-	return block, nil
+	return block, results, nil
 }
 
 // ResetPendingBlock clears the transactions in pending block.

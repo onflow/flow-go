@@ -45,6 +45,19 @@ func TestPendingBlockBeforeExecution(t *testing.T) {
 
 	tx2.AddSignature(b.RootAccountAddress(), sig)
 
+	t.Run("EmptyPendingBlock", func(t *testing.T) {
+		// Attempt to execute empty pending block (invalid)
+		_, err := b.ExecuteBlock()
+		assert.IsType(t, &emulator.ErrPendingBlockTransactionsExhausted{}, err)
+
+		// Commit empty pending block (valid)
+		_, err = b.CommitBlock()
+		assert.NoError(t, err)
+
+		err = b.ResetPendingBlock()
+		assert.NoError(t, err)
+	})
+
 	t.Run("AddDuplicateTransaction", func(t *testing.T) {
 		// Add tx1 to pending block
 		err = b.AddTransaction(tx1)
@@ -336,8 +349,9 @@ func TestPendingBlockCommit(t *testing.T) {
 		blockHash := b.GetPendingBlock().Hash()
 
 		// Execute and commit pending block
-		block, err := b.ExecuteAndCommitBlock()
+		block, results, err := b.ExecuteAndCommitBlock()
 		assert.NoError(t, err)
 		assert.Equal(t, blockHash, block.Hash())
+		assert.Len(t, results, 1)
 	})
 }
