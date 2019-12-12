@@ -150,7 +150,6 @@ func (checker *Checker) EnsureLoaded(location ast.Location, imported *ast.Progra
 		return importChecker, nil
 	}
 
-	var checkerErr *CheckerError
 	if !ok || importChecker == nil {
 		var err error
 		importChecker, err = NewChecker(
@@ -170,7 +169,8 @@ func (checker *Checker) EnsureLoaded(location ast.Location, imported *ast.Progra
 
 	// NOTE: ignore generic `error` result, get internal *CheckerError
 	_ = importChecker.Check()
-	checkerErr = importChecker.CheckerError()
+	checkerErr := importChecker.CheckerError()
+
 	return importChecker, checkerErr
 }
 
