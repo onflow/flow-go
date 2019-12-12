@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ func TestCheckInvalidContractAccountField(t *testing.T) {
           let account: Account
 
           init(account: Account) {
-              self.account = account 
+              self.account = account
           }
       }
     `)
@@ -105,4 +106,141 @@ func TestCheckContractAccountFieldUseInitialized(t *testing.T) {
 	_, err := ParseAndCheck(t, code)
 
 	require.NoError(t, err)
+}
+
+func TestCheckInvalidContractMoveToFunction(t *testing.T) {
+
+	for _, name := range []string{"self", "C"} {
+
+		t.Run(name, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      contract C {
+
+                          fun test() {
+                              use(%s)
+                          }
+                      }
+
+                      fun use(_ c: C) {}
+                    `,
+					name,
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+		})
+	}
+}
+
+func TestCheckInvalidContractMoveInVariableDeclaration(t *testing.T) {
+
+	for _, name := range []string{"self", "C"} {
+
+		t.Run(name, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      contract C {
+
+                          fun test() {
+                              let x = %s
+                          }
+                      }
+                    `,
+					name,
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+		})
+	}
+}
+
+func TestCheckInvalidContractMoveReturnFromFunction(t *testing.T) {
+
+	for _, name := range []string{"self", "C"} {
+
+		t.Run(name, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      contract C {
+
+                          fun test(): C {
+                              return %s
+                          }
+                      }
+                    `,
+					name,
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+		})
+	}
+}
+
+func TestCheckInvalidContractMoveIntoArrayLiteral(t *testing.T) {
+
+	for _, name := range []string{"self", "C"} {
+
+		t.Run(name, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      contract C {
+
+                          fun test() {
+                              let txs = [%s]
+                          }
+                      }
+                    `,
+					name,
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+		})
+	}
+}
+
+func TestCheckInvalidContractMoveIntoDictionaryLiteral(t *testing.T) {
+
+	for _, name := range []string{"self", "C"} {
+
+		t.Run(name, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      contract C {
+
+                          fun test() {
+                              let txs = {"C": %s}
+                          }
+                      }
+                    `,
+					name,
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+		})
+	}
 }

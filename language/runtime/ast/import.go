@@ -2,7 +2,6 @@ package ast
 
 import (
 	"encoding/gob"
-	"encoding/hex"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 
@@ -99,11 +98,7 @@ func init() {
 type AddressLocation []byte
 
 func (l AddressLocation) ID() LocationID {
-	return LocationID(l.String())
-}
-
-func (l AddressLocation) String() string {
-	return hex.EncodeToString([]byte(l))
+	return LocationID(l.ToAddress().Hex())
 }
 
 func (l AddressLocation) ToAddress() (addr flow.Address) {
