@@ -656,7 +656,12 @@ func (b *EmulatedBlockchain) UpdateAccountCode(
 
 	tx.AddSignature(b.RootAccountAddress(), sig)
 
-	err = b.SubmitTransaction(tx)
+	_, err = b.SubmitTransaction(tx)
+	if err != nil {
+		return err
+	}
+
+	_, err = b.CommitBlock()
 	if err != nil {
 		return err
 	}
