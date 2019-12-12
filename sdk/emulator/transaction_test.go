@@ -558,7 +558,7 @@ func TestGetTransaction(t *testing.T) {
 
 	t.Run("InvalidHash", func(t *testing.T) {
 		_, err := b.GetTransaction(crypto.Hash{})
-		require.IsType(t, &emulator.ErrTransactionNotFound{}, err)
+		assert.IsType(t, &emulator.ErrTransactionNotFound{}, err)
 	})
 
 	t.Run("ValidHash", func(t *testing.T) {

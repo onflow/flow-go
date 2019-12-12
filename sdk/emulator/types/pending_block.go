@@ -17,6 +17,22 @@ type PendingBlock struct {
 	Index int
 }
 
+// NewPendingBlock creates a new pending block sequentially after a specified block.
+func NewPendingBlock(prevBlock Block, state flow.Ledger) *PendingBlock {
+	header := &Block{
+		Number:            prevBlock.Number + 1,
+		PreviousBlockHash: prevBlock.Hash(),
+		TransactionHashes: make([]crypto.Hash, 0),
+	}
+
+	return &PendingBlock{
+		Header: header,
+		TxPool: make(map[string]*flow.Transaction),
+		State:  state,
+		Index:  0,
+	}
+}
+
 // Hash returns the hash of this pending block.
 func (b *PendingBlock) Hash() crypto.Hash {
 	return b.Header.Hash()
@@ -37,6 +53,17 @@ func (b *PendingBlock) ContainsTransaction(txHash crypto.Hash) bool {
 // GetTransaction retrieves a transaction stored in TxPool (always preceeded by ContainsTransaction).
 func (b *PendingBlock) GetTransaction(txHash crypto.Hash) *flow.Transaction {
 	return b.TxPool[string(txHash)]
+}
+
+// GetNextTransaction retrieves the next indexed transaction.
+func (b *PendingBlock) GetNextTransaction() *flow.Transaction {
+	txHash := b.Transactions()[b.Index]
+	return b.GetTransaction(txHash)
+}
+
+// Transactions retrieves the list of transaction hashes in the pending block.
+func (b *PendingBlock) Transactions() []crypto.Hash {
+	return b.Header.TransactionHashes
 }
 
 // ClearTxPool resets the TxPool.

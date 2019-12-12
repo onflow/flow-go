@@ -15,7 +15,7 @@ type TransactionReceipt struct {
 }
 
 func (result TransactionReceipt) Succeeded() bool {
-	return result.Status == flow.TransactionFinalized
+	return result.Status == flow.TransactionFinalized || result.Status == flow.TransactionSealed
 }
 
 func (result TransactionReceipt) Reverted() bool {
