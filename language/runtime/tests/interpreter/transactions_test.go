@@ -27,13 +27,13 @@ func TestInterpretTransactions(t *testing.T) {
 	t.Run("SetTransactionField", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
-            
+
             var x: Int
 
             prepare() {
               self.x = 5
             }
-            
+
             execute {
               let y = self.x + 1
             }
@@ -47,7 +47,7 @@ func TestInterpretTransactions(t *testing.T) {
 	t.Run("PreConditions", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
-            
+
             var x: Int
 
             prepare() {
@@ -67,7 +67,7 @@ func TestInterpretTransactions(t *testing.T) {
 	t.Run("FailingPreConditions", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
-            
+
             var x: Int
 
             prepare() {
@@ -91,13 +91,13 @@ func TestInterpretTransactions(t *testing.T) {
 	t.Run("PostConditions", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
-            
+
             var x: Int
 
             prepare() {
               self.x = 5
             }
-            
+
             execute {
               self.x = 10
             }
@@ -115,13 +115,13 @@ func TestInterpretTransactions(t *testing.T) {
 	t.Run("FailingPostConditions", func(t *testing.T) {
 		inter := parseCheckAndInterpret(t, `
           transaction {
-            
+
             var x: Int
 
             prepare() {
               self.x = 5
             }
-            
+
             execute {
               self.x = 10
             }

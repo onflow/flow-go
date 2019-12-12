@@ -56,6 +56,8 @@ func (checker *Checker) checkAssignment(
 		}
 	}
 
+	checker.checkVariableMove(value)
+
 	if valueType.IsResourceType() {
 		checker.recordResourceInvalidation(
 			value,
