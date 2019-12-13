@@ -9,29 +9,31 @@ import (
 type PendingBlock struct {
 	// Block information (Number, PreviousBlockHash, Timestamp, TransactionHashes)
 	Header *Block
-	// List of transaction hashes to be executed
-	transactionHashes []crypto.Hash
 	// Mapping from transaction hash to transaction
 	transactions map[string]*flow.Transaction
 	// The current working register state, up-to-date with all transactions in the TxPool
-	State flow.Ledger
+	State  flow.Ledger
+	events []*flow.Event
 	// Index of transaction execution
 	Index int
 }
 
 // NewPendingBlock creates a new pending block sequentially after a specified block.
 func NewPendingBlock(prevBlock Block, state flow.Ledger) *PendingBlock {
+	transactions := make(map[string]*flow.Transaction)
+	transactionHashes := make([]crypto.Hash, 0)
+
 	header := &Block{
 		Number:            prevBlock.Number + 1,
 		PreviousBlockHash: prevBlock.Hash(),
+		TransactionHashes: transactionHashes,
 	}
 
 	return &PendingBlock{
-		Header:            header,
-		transactionHashes: make([]crypto.Hash, 0),
-		transactions:      make(map[string]*flow.Transaction),
-		State:             state,
-		Index:             0,
+		Header:       header,
+		transactions: transactions,
+		State:        state,
+		Index:        0,
 	}
 }
 
@@ -59,15 +61,15 @@ func (b *PendingBlock) GetTransaction(txHash crypto.Hash) *flow.Transaction {
 
 // GetNextTransaction returns the next indexed transaction.
 func (b *PendingBlock) GetNextTransaction() *flow.Transaction {
-	txHash := b.transactionHashes[b.Index]
+	txHash := b.Header.TransactionHashes[b.Index]
 	return b.GetTransaction(txHash)
 }
 
 // Transactions returns the transactions in the pending block.
 func (b *PendingBlock) Transactions() []*flow.Transaction {
-	transactions := make([]*flow.Transaction, len(b.transactionHashes))
+	transactions := make([]*flow.Transaction, len(b.Header.TransactionHashes))
 
-	for i, txHash := range b.transactionHashes {
+	for i, txHash := range b.Header.TransactionHashes {
 		transactions[i] = b.transactions[string(txHash)]
 	}
 
@@ -76,5 +78,9 @@ func (b *PendingBlock) Transactions() []*flow.Transaction {
 
 // TransactionCount retrieves the number of transaction in the pending block.
 func (b *PendingBlock) TransactionCount() int {
-	return len(b.transactionHashes)
+	return len(b.Header.TransactionHashes)
+}
+
+func (b *PendingBlock) Events() []*flow.Event {
+	return []*flow.Event{}
 }

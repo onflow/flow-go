@@ -13,6 +13,7 @@ type Block struct {
 	Number            uint64
 	Timestamp         time.Time
 	PreviousBlockHash crypto.Hash
+	TransactionHashes []crypto.Hash
 }
 
 // Hash returns the hash of this block.
@@ -22,6 +23,7 @@ func (b Block) Hash() crypto.Hash {
 	d, _ := rlp.EncodeToBytes([]interface{}{
 		b.Number,
 		b.PreviousBlockHash,
+		b.TransactionHashes,
 	})
 
 	return hasher.ComputeHash(d)
@@ -33,5 +35,6 @@ func GenesisBlock() Block {
 		Number:            0,
 		Timestamp:         time.Now(),
 		PreviousBlockHash: nil,
+		TransactionHashes: make([]crypto.Hash, 0),
 	}
 }
