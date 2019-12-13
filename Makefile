@@ -18,7 +18,9 @@ crypto/relic/build: crypto/relic
 
 .PHONY: install-tools
 install-tools: crypto/relic/build
-	sudo apt-get -y install capnproto
+	if [[ "$OSTYPE" == "linux-gnu" ]]; then
+		sudo apt-get -y install capnproto
+	fi
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/davecheney/godoc2md@master; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
