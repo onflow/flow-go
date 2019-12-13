@@ -6,6 +6,8 @@ import (
 	"math"
 	"sort"
 
+	"github.com/dapperlabs/flow-go/protocol"
+
 	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 
@@ -196,4 +198,13 @@ func computeFinalizedDeltas(tx *badger.Txn, boundary uint64, filters []flow.Iden
 	})(tx)
 
 	return deltas, err
+}
+
+func (s *Snapshot) Clusters() (flow.ClusterList, error) {
+	nodes, err := s.Identities(identity.HasRole(flow.RoleCollection))
+	if err != nil {
+		return nil, err
+	}
+
+	return protocol.Cluster(nodes), nil
 }
