@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/dapperlabs/flow-go/sdk/emulator/storage/memstore"
 
@@ -370,8 +369,8 @@ func (b *EmulatedBlockchain) executeBlock() ([]types.TransactionReceipt, error) 
 		if err != nil {
 			return results, err
 		}
-		results = append(results, result)
 
+		results = append(results, result)
 	}
 
 	return results, nil
@@ -433,9 +432,6 @@ func (b *EmulatedBlockchain) executeTransaction() (types.TransactionReceipt, err
 	b.handleEvents(events, blockNumber, tx.Hash())
 
 	// TODO: Do this in CommitBlock instead
-	if err := b.storage.InsertEvents(blockNumber, events...); err != nil {
-		return types.TransactionReceipt{}, fmt.Errorf("failed to insert events: %w", err)
-	}
 
 	receipt := types.TransactionReceipt{
 		TransactionHash: tx.Hash(),
@@ -469,24 +465,9 @@ func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
 		return nil, &ErrPendingBlockMidExecution{BlockHash: b.pendingBlock.Hash()}
 	}
 
-	for _, tx := range b.pendingBlock.Transactions() {
-		// Update transactions to TransactionSealed status
-		if tx.Status != flow.TransactionReverted {
-			tx.Status = flow.TransactionSealed
-		}
-		if err := b.storage.InsertTransaction(*tx); err != nil {
-			return nil, &ErrStorage{err}
-		}
-	}
-
-	b.pendingBlock.Header.Timestamp = time.Now()
-
-	if err := b.storage.InsertBlock(*b.pendingBlock.Header); err != nil {
-		return nil, &ErrStorage{err}
-	}
-
-	if err := b.storage.SetLedger(b.pendingBlock.Header.Number, b.pendingBlock.State); err != nil {
-		return nil, &ErrStorage{err}
+	err := b.storage.CommitPendingBlock(b.pendingBlock)
+	if err != nil {
+		return nil, err
 	}
 
 	// Grab reference to pending block to return at the end
@@ -499,7 +480,7 @@ func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
 }
 
 // TODO: should be atomic
-// ExecuteAndCommitBlock is a utility that combines ExecuteBlock with CommitState.
+// ExecuteAndCommitBlock is a utility that combines ExecuteBlock with CommitBlock.
 func (b *EmulatedBlockchain) ExecuteAndCommitBlock() (*types.Block, []types.TransactionReceipt, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

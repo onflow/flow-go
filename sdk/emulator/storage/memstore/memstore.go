@@ -1,7 +1,9 @@
 package memstore
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
 
@@ -82,6 +84,31 @@ func (s *Store) InsertBlock(block types.Block) error {
 	s.blocks[block.Number] = block
 	if block.Number > s.blockHeight {
 		s.blockHeight = block.Number
+	}
+
+	return nil
+}
+
+func (s *Store) CommitPendingBlock(pendingBlock *types.PendingBlock) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, tx := range pendingBlock.Transactions() {
+		if err := s.InsertTransaction(*tx); err != nil {
+			return err
+		}
+	}
+
+	if err := s.InsertBlock(*pendingBlock.Header); err != nil {
+		return err
+	}
+
+	if err := s.SetLedger(pendingBlock.Header.Number, pendingBlock.State); err != nil {
+		return err
+	}
+
+	if err := s.InsertEvents(pendingBlock.Header.Number, pendingBlock.Events()...); err != nil {
+		return err
 	}
 
 	return nil

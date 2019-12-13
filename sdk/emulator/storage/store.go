@@ -39,6 +39,9 @@ type Store interface {
 	// InsertTransaction inserts a transaction.
 	InsertTransaction(flow.Transaction) error
 
+	// CommitPendingBlock saves the execution results of a block.
+	CommitPendingBlock(*types.PendingBlock) error
+
 	// GetLedger returns the ledger state at a given block.
 	GetLedger(blockNumber uint64) (flow.Ledger, error)
 
