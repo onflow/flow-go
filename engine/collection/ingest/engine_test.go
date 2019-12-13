@@ -18,7 +18,7 @@ import (
 )
 
 // Malformed, incomplete, unsigned, or otherwise invalid transactions should be
-// rejected.
+// detected.
 func TestInvalidTransaction(t *testing.T) {
 	node := unittest.IdentityFixture()
 	node.Role = flow.RoleCollection
@@ -51,12 +51,57 @@ func TestInvalidTransaction(t *testing.T) {
 	})
 }
 
-// Transactions should be routed to the correct cluster.
+// Transactions should be routed to the correct cluster and should not be
+// routed unnecessarily.
 func TestClusterRouting(t *testing.T) {
-	// TODO
+	const N = 3
+
+	nodes := unittest.IdentityListFixture(N, func(node *flow.Identity) {
+		node.Role = flow.RoleCollection
+	})
+
+	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+	hub := stub.NewNetworkHub()
+
+	engines := make([]*ingest.Engine, N)
+	pools := make([][]*flow.Transaction, N)
+
+	for i := 0; i < N; i++ {
+		me, err := local.New(nodes[i])
+		require.Nil(t, err)
+
+		stub := stub.NewNetwork(nil, me, hub)
+		pools[i] = make([]*flow.Transaction, 0)
+
+		engines[i], err = ingest.New(log, stub, me, pools[i])
+		require.Nil(t, err)
+	}
+
+	t.Run("should route transactions for a different cluster", func(t *testing.T) {
+		// TODO
+	})
+
+	t.Run("should not route transactions for my cluster", func(t *testing.T) {
+		// TODO
+	})
+
+	t.Run("should not route invalid transactions", func(t *testing.T) {
+		// TODO
+	})
 }
 
 // Transactions should be ingested to the transaction pool.
 func TestTransactionIngestion(t *testing.T) {
 	// TODO
+	t.Run("should ingest valid transaction for my cluster", func(t *testing.T) {
+		// TODO
+	})
+
+	t.Run("should not ingest invalid transactions for my cluster", func(t *testing.T) {
+		// TODO
+	})
+
+	t.Run("should not ingest valid transactions for another cluster", func(t *testing.T) {
+		// TODO
+	})
 }
