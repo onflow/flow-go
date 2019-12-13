@@ -229,14 +229,14 @@ func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*types.Block, erro
 
 // GetTransaction gets an existing transaction by hash.
 //
-// First looks in pending txPool, then looks in current blockchain state.
+// First looks in pending block, then looks in current blockchain state.
 func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*flow.Transaction, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	tx := b.pendingBlock.GetTransaction(txHash)
-	if tx != nil {
-		return tx, nil
+	pendingTx := b.pendingBlock.GetTransaction(txHash)
+	if pendingTx != nil {
+		return pendingTx, nil
 	}
 
 	tx, err := b.storage.GetTransaction(txHash)
