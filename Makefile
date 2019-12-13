@@ -18,7 +18,7 @@ crypto/relic/build: crypto/relic
 
 .PHONY: install-tools
 install-tools: crypto/relic/build
-	if [[ "$OSTYPE" == "linux-gnu" ]]; then
+	if [[ "${OSTYPE}" == "linux-gnu" ]]; then
 		sudo apt-get -y install capnproto
 	fi
 	cd ${GOPATH}; \
