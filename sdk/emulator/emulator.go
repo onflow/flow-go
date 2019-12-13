@@ -233,8 +233,10 @@ func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*types.Block, erro
 func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*flow.Transaction, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	if b.pendingBlock.ContainsTransaction(txHash) {
-		return b.pendingBlock.GetTransaction(txHash), nil
+
+	tx := b.pendingBlock.GetTransaction(txHash)
+	if tx != nil {
+		return tx, nil
 	}
 
 	tx, err := b.storage.GetTransaction(txHash)
