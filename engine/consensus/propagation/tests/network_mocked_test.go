@@ -134,7 +134,7 @@ func TestSubmitCollectionManyToManyAsynchronous(t *testing.T) {
 
 func TestSubmitCollectionManyToManyRandom(t *testing.T) {
 
-	nodes, gcs, err := prepareNodesAndCollections()
+	nodes, gcs, err := prepareNodesAndCollectionsConfigurable(10, 100)
 	require.Nil(t, err)
 
 	N := len(nodes)
