@@ -17,20 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/network/stub"
 )
 
-type mockNode struct {
-	engine *ingest.Engine
-	net    *stub.Network
-	pool   []*flow.Transaction
-}
-
-//func newMockNode(hub *stub.Hub) (*mockNode, error) {
-//	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
-//
-//	pool := make([]*flow.Transaction, 0)
-//
-//	net := stub.NewNetwork()
-//}
-
 // Malformed, incomplete, unsigned, or otherwise invalid transactions should be
 // rejected.
 func TestInvalidTransaction(t *testing.T) {
