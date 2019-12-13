@@ -6,6 +6,7 @@ package engine
 const (
 	ConsensusPropagation = 10
 
+	Execution           = 20
 	SimulationGenerator = 200
 	SimulationColdstuff = 201
 )
