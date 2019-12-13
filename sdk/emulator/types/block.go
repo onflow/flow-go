@@ -13,7 +13,6 @@ type Block struct {
 	Number            uint64
 	Timestamp         time.Time
 	PreviousBlockHash crypto.Hash
-	TransactionHashes []crypto.Hash
 }
 
 // Hash returns the hash of this block.
@@ -34,6 +33,5 @@ func GenesisBlock() Block {
 		Number:            0,
 		Timestamp:         time.Now(),
 		PreviousBlockHash: nil,
-		TransactionHashes: make([]crypto.Hash, 0),
 	}
 }

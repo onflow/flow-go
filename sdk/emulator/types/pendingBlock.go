@@ -9,8 +9,10 @@ import (
 type PendingBlock struct {
 	// Block information (Number, PreviousBlockHash, Timestamp, TransactionHashes)
 	Header *Block
-	// Pool of transactions that have been executed, but not finalized
-	TxPool map[string]*flow.Transaction
+	// List of transaction hashes to be executed
+	transactionHashes []crypto.Hash
+	// Mapping from transaction hash to transaction
+	transactions map[string]*flow.Transaction
 	// The current working register state, up-to-date with all transactions in the TxPool
 	State flow.Ledger
 	// Index of transaction execution
@@ -22,14 +24,14 @@ func NewPendingBlock(prevBlock Block, state flow.Ledger) *PendingBlock {
 	header := &Block{
 		Number:            prevBlock.Number + 1,
 		PreviousBlockHash: prevBlock.Hash(),
-		TransactionHashes: make([]crypto.Hash, 0),
 	}
 
 	return &PendingBlock{
-		Header: header,
-		TxPool: make(map[string]*flow.Transaction),
-		State:  state,
-		Index:  0,
+		Header:            header,
+		transactionHashes: make([]crypto.Hash, 0),
+		transactions:      make(map[string]*flow.Transaction),
+		State:             state,
+		Index:             0,
 	}
 }
 
@@ -38,35 +40,41 @@ func (b *PendingBlock) Hash() crypto.Hash {
 	return b.Header.Hash()
 }
 
-// AddTransaction adds a transaction to the list of TransactionHashes and TxPool.
+// AddTransaction adds a transaction to the pending block.
 func (b *PendingBlock) AddTransaction(tx flow.Transaction) {
-	b.TxPool[string(tx.Hash())] = &tx
-	b.Header.TransactionHashes = append(b.Header.TransactionHashes, tx.Hash())
+	b.transactions[string(tx.Hash())] = &tx
 }
 
 // ContainsTransaction checks if a transaction is included in the pending block.
 func (b *PendingBlock) ContainsTransaction(txHash crypto.Hash) bool {
-	_, exists := b.TxPool[string(txHash)]
+	_, exists := b.transactions[string(txHash)]
 	return exists
 }
 
-// GetTransaction retrieves a transaction stored in TxPool (always preceeded by ContainsTransaction).
+// GetTransaction retrieves a transaction in the pending block by hash, or nil
+// if it does not exist.
 func (b *PendingBlock) GetTransaction(txHash crypto.Hash) *flow.Transaction {
-	return b.TxPool[string(txHash)]
+	return b.transactions[string(txHash)]
 }
 
-// GetNextTransaction retrieves the next indexed transaction.
+// GetNextTransaction returns the next indexed transaction.
 func (b *PendingBlock) GetNextTransaction() *flow.Transaction {
-	txHash := b.Transactions()[b.Index]
+	txHash := b.transactionHashes[b.Index]
 	return b.GetTransaction(txHash)
 }
 
-// Transactions retrieves the list of transaction hashes in the pending block.
-func (b *PendingBlock) Transactions() []crypto.Hash {
-	return b.Header.TransactionHashes
+// Transactions returns the transactions in the pending block.
+func (b *PendingBlock) Transactions() []*flow.Transaction {
+	transactions := make([]*flow.Transaction, len(b.transactionHashes))
+
+	for i, txHash := range b.transactionHashes {
+		transactions[i] = b.transactions[string(txHash)]
+	}
+
+	return transactions
 }
 
 // TransactionCount retrieves the number of transaction in the pending block.
 func (b *PendingBlock) TransactionCount() int {
-	return len(b.Header.TransactionHashes)
+	return len(b.transactionHashes)
 }

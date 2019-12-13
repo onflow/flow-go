@@ -467,20 +467,14 @@ func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
 		return nil, &ErrPendingBlockMidExecution{BlockHash: b.pendingBlock.Hash()}
 	}
 
-	for _, txHash := range b.pendingBlock.Transactions() {
-		if b.pendingBlock.ContainsTransaction(txHash) {
-			tx := b.pendingBlock.GetTransaction(txHash)
-			// Update transactions to TransactionSealed status
-			if tx.Status != flow.TransactionReverted {
-				tx.Status = flow.TransactionSealed
-			}
-			if err := b.storage.InsertTransaction(*tx); err != nil {
-				return nil, &ErrStorage{err}
-			}
-		} else {
-			return nil, &ErrTransactionNotFound{TxHash: txHash}
+	for _, tx := range b.pendingBlock.Transactions() {
+		// Update transactions to TransactionSealed status
+		if tx.Status != flow.TransactionReverted {
+			tx.Status = flow.TransactionSealed
 		}
-
+		if err := b.storage.InsertTransaction(*tx); err != nil {
+			return nil, &ErrStorage{err}
+		}
 	}
 
 	b.pendingBlock.Header.Timestamp = time.Now()
