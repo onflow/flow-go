@@ -1263,12 +1263,12 @@ func TestRuntimeCyclicImport(t *testing.T) {
 
 	script := []byte(
 		`
-		  import "imported"
+          import "imported"
 
-		  transaction {
-			execute {}
-		  }
-		`,
+          transaction {
+            execute {}
+          }
+        `,
 	)
 
 	runtimeInterface := &testRuntimeInterface{
@@ -1619,43 +1619,43 @@ func TestRuntimeContractNestedResource(t *testing.T) {
 	}
 
 	contract := []byte(`
-		pub contract Test {
-			pub resource R {
-				// test that the hello function is linked back into the nested resource
-				// after being loaded from storage
-				pub fun hello(): String {
-					return "Hello World!"
-				}
-			}
+        pub contract Test {
+            pub resource R {
+                // test that the hello function is linked back into the nested resource
+                // after being loaded from storage
+                pub fun hello(): String {
+                    return "Hello World!"
+                }
+            }
 
-			init() {
-				// store nested resource in account on deployment
-				let oldR <- self.account.storage[R] <- create R()
-				destroy oldR
-			}
-		}
+            init() {
+                // store nested resource in account on deployment
+                let oldR <- self.account.storage[R] <- create R()
+                destroy oldR
+            }
+        }
     `)
 
 	deploy := []byte(fmt.Sprintf(
 		`
-	  	transaction {
-			prepare(signer: Account) {
-				updateAccountCode(signer.address, %s)
+        transaction {
+            prepare(signer: Account) {
+                updateAccountCode(signer.address, %s)
             }
-	  	}
+        }
         `,
 		ArrayValueFromBytes(contract).String(),
 	))
 
 	tx := []byte(`
-		import Test from 0x01
+        import Test from 0x01
 
-		transaction {
-			prepare(acct: Account) {
-				log(acct.storage[Test.R]?.hello())
-			}
-		}
-	`)
+        transaction {
+            prepare(acct: Account) {
+                log(acct.storage[Test.R]?.hello())
+            }
+        }
+    `)
 
 	storedValues := map[string][]byte{}
 	var accountCode values.Bytes
