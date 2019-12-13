@@ -302,7 +302,7 @@ func (r *interpreterRuntime) newInterpreter(
 		),
 		interpreter.WithStorageKeyHandler(
 			func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-				return indexingType.String()
+				return indexingType.ID()
 			},
 		),
 		interpreter.WithInjectedCompositeFieldsHandler(
