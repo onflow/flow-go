@@ -1615,7 +1615,7 @@ func TestRuntimeContractNestedResource(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
 	addressValue := values.Address{
-		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xCA, 0xDE,
+		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
 	}
 
 	contract := []byte(`
@@ -1636,6 +1636,17 @@ func TestRuntimeContractNestedResource(t *testing.T) {
 		}
     `)
 
+	deploy := []byte(fmt.Sprintf(
+		`
+	  	transaction {
+			prepare(signer: Account) {
+				updateAccountCode(signer.address, %s)
+            }
+	  	}
+        `,
+		ArrayValueFromBytes(contract).String(),
+	))
+
 	tx := []byte(`
 		import Test from 0x01
 
@@ -1645,17 +1656,6 @@ func TestRuntimeContractNestedResource(t *testing.T) {
 			}
 		}
 	`)
-
-	deploy := []byte(fmt.Sprintf(
-		`
-          transaction {
-            prepare(signer: Account) {
-              updateAccountCode(signer.address, %s)
-            }
-          }
-        `,
-		ArrayValueFromBytes(contract).String(),
-	))
 
 	storedValues := map[string][]byte{}
 	var accountCode values.Bytes
