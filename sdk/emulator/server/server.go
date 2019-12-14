@@ -151,7 +151,7 @@ func (e *EmulatorServer) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			block, err := e.backend.blockchain.CommitBlock()
+			block, results, err := e.backend.blockchain.ExecuteAndCommitBlock()
 			if err != nil {
 				e.logger.WithError(err).Error("Failed to commit block")
 			} else {
