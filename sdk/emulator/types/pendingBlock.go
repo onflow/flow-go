@@ -13,6 +13,8 @@ type PendingBlock struct {
 	transactions map[string]*flow.Transaction
 	// current working ledger, updated after each transaction execution
 	ledger flow.Ledger
+	// events emitted during execution
+	events []flow.Event
 	// index of transaction execution
 	index int
 }
@@ -32,6 +34,7 @@ func NewPendingBlock(prevBlock Block, ledger flow.Ledger) *PendingBlock {
 		block:        block,
 		transactions: transactions,
 		ledger:       ledger,
+		events:       make([]flow.Event, 0),
 		index:        0,
 	}
 }
@@ -114,6 +117,7 @@ func (b *PendingBlock) ExecuteNextTransaction(
 			tx.Status = flow.TransactionFinalized
 			tx.Events = events
 
+			b.events = append(b.events, events...)
 			b.ledger.MergeWith(ledger.Updated())
 		},
 		func() {
@@ -125,15 +129,7 @@ func (b *PendingBlock) ExecuteNextTransaction(
 }
 
 func (b *PendingBlock) Events() []flow.Event {
-	events := make([]flow.Event, 0)
-
-	for _, txHash := range b.block.TransactionHashes {
-		tx := b.transactions[string(txHash)]
-
-		events = append(events, tx.Events...)
-	}
-
-	return events
+	return b.events
 }
 
 // ExecutionStarted returns true if the pending block has started executing.
