@@ -42,8 +42,9 @@ func TestExecuteScript(t *testing.T) {
 	assert.Equal(t, values.NewInt(0), value)
 
 	// Submit tx1 (script adds 2)
-	err = b.SubmitTransaction(tx)
+	result, err := b.SubmitTransaction(tx)
 	require.NoError(t, err)
+	assert.True(t, result.Succeeded())
 
 	// Sample call (value is 2)
 	value, _, err = b.ExecuteScript([]byte(callScript))
