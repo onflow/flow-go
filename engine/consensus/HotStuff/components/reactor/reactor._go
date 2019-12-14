@@ -1,0 +1,117 @@
+package reactor
+
+import (
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/componentsbft"
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/componentscrypto"
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/componentsreactor/core"
+	"github.com/juju/loggo"
+	"time"
+)
+
+var ConsensusLogger loggo.Logger
+
+type Reactor struct {
+	core *core.ReactorCore
+}
+
+// checkIfShouldProcessBlock performs basic checks whether or not block needs processing
+// only considering the block's height and Hash
+// Returns false if any of the following conditions applies
+//  * block is for already finalized views
+//  * known block
+// ROBUST against BROKEN BLOCKS:
+// Also returns false, if block is too badly broken to evaluate the criteria above.
+func (r *Reactor) IsProcessingNeeded(proposal *def.BlockProposal) (processingNeeded bool) {
+	// If the block is so badly broken that we can't even even run our checks on it, we should definitely not process it
+	defer func() {
+		if r := recover(); r != nil { // catching panics and modifying the function's return value
+			processingNeeded = false
+		}
+	}()
+
+	return r.core.IsProcessingNeeded(proposal.BlockMRH, proposal.View)
+}
+
+func (r *Reactor) ProcessBlock(proposal *def.BlockProposal) {
+	// Before meticulously inspecting validity of the block, we first check if we even need to process it.
+	// These simple checks are cheap compared to checking crypto signatures and block structure.
+	if !r.IsProcessingNeeded(proposal) {
+		return
+	}
+	if !r.isFromExpectedPrimary(proposal) {
+		return
+	}
+	if !r.isValid(proposal) {
+		// TODO: Slashing the block proposer
+		panic("received an invalid block, the block proposer should be slashed")
+	}
+
+	var parentView uint64
+	// get parent block
+	if parentBlock, exists := r.MainChain.MapBlockHashToBlock[string(block.QC.BlockMRH)]; exists {
+		parentView = parentBlock.View
+		ConsensusLogger.Infof("parent block is %v", parentBlock)
+	} else {
+		ConsensusLogger.Warningf("cannot find parent block")
+		//noinspection GoTypesCompatibility
+		return false
+	}
+}
+
+// CheckBlockValidity inspects all details of the block
+func (r *Reactor) isValid(proposal *def.BlockProposal) bool {
+	block := proposal.Block
+
+	if !proposal.HasValidStructure() { // check valid format of resulting block structure, i.e., all needed fields included
+		ConsensusLogger.Warningf("missing block fields")
+		return false
+	}
+	if !proposal.HasValidQuorumCertificate() { //check block's QC
+		ConsensusLogger.Warningf("block proposal has invalid QC")
+		return false
+	}
+	if !proposal.HasValidSignature() { //check signature/primaryVote of proposal
+		ConsensusLogger.Warningf("invalid signature of block proposal")
+		return false
+	}
+
+	// Verify cryptography
+	aggregatedPubKeys := crypto.AggregateIDs(IDs)
+	// Should be added to IsValidBlock but that's not in this branch sooo
+	if !crypto.VerifyAggregatedSig(block.QC.BlockMRH, block.QC.AggregatedSignature, aggregatedPubKeys) {
+		// TODO: slash
+		panic("Aggregated sig invalid")
+	}
+
+	//check if BlockProposal.PrimaryVote.Signer conforms with expected value for the block's view number
+	if !bk.isFromExpectedLeader(proposal.PrimaryVote, block.View) {
+		ConsensusLogger.Warningf("block proposal signer is not primary at the block's view")
+		return false
+	}
+
+	ConsensusLogger.Infof("valid block")
+	return true
+}
+
+func (r *ReactorCore) timeLoop(proposal *def.BlockProposal) {
+	var timer *time.Timer
+	for {
+		timer = time.NewTimer(r.controller.CurrentTimeout())
+		select {
+		case block := <-r.blockQueue:
+			//ToDo: implement replica logic
+		case qc := <-r.qcQueue:
+			//ToDo:
+			// - updated highest QC
+			// - as Primary: check if qc if for current round and  build block
+			// - advance to QC.View + 1
+		case <-timer.C:
+			ReactorCoreLogger.Debugf("Timeout at View %d", r.currentView)
+		}
+	}
+}
+
+func (r *Reactor) isFromExpectedPrimary(proposal *def.BlockProposal) bool {
+	// ToDo implement
+	return true
+}

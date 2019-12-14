@@ -1,0 +1,62 @@
+package events
+
+import (
+	"reflect"
+	"sync"
+
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
+)
+
+// PubSubEventProcessor implements core.Processor
+// It allows thread-safe subscription to events
+type PubSubEventProcessor struct {
+	incorporatedQcCons []IncorporatedQuorumCertificateConsumer
+	forkChoiceCons     []ForkChoiceConsumer
+	lock               sync.RWMutex
+}
+
+func NewPubSubEventProcessor() *PubSubEventProcessor {
+	return &PubSubEventProcessor{}
+}
+
+func (p *PubSubEventProcessor) OnIncorporatedQuorumCertificate(qc *def.QuorumCertificate) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.incorporatedQcCons {
+		subscriber.OnIncorporatedQuorumCertificate(qc)
+	}
+}
+
+func (p *PubSubEventProcessor) OnForkChoiceGenerated(qc *def.QuorumCertificate) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.forkChoiceCons {
+		subscriber.OnForkChoiceGenerated(qc)
+	}
+}
+
+// AddIncorporatedQuorumCertificateConsumer adds an IncorporatedQuorumCertificateConsumer to the PubSubEventProcessor;
+// concurrency safe; returns self-reference for chaining
+func (p *PubSubEventProcessor) AddIncorporatedQuorumCertificateConsumer(cons IncorporatedQuorumCertificateConsumer) *PubSubEventProcessor {
+	ensureNotNil(cons)
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.incorporatedQcCons = append(p.incorporatedQcCons, cons)
+	return p
+}
+
+// AddForkChoiceConsumer adds a ForkChoiceConsumer to the PubSubEventProcessor;
+// concurrency safe; returns self-reference for chaining
+func (p *PubSubEventProcessor) AddForkChoiceConsumer(cons ForkChoiceConsumer) *PubSubEventProcessor {
+	ensureNotNil(cons)
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.forkChoiceCons = append(p.forkChoiceCons, cons)
+	return p
+}
+
+func ensureNotNil(cons interface{}) {
+	if cons == nil || reflect.ValueOf(cons).IsNil() {
+		panic("Processor cannot be nil")
+	}
+}
