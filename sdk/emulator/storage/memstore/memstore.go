@@ -211,8 +211,3 @@ func (s *Store) insertEvents(blockNumber uint64, events []flow.Event) error {
 
 	return nil
 }
-
-// Returns the block with the highest number.
-func (s *Store) getLatestBlock() types.Block {
-	return s.blocks[s.blockHeight]
-}
