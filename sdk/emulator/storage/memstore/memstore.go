@@ -100,15 +100,15 @@ func (s *Store) CommitPendingBlock(pendingBlock *types.PendingBlock) error {
 		}
 	}
 
-	if err := s.insertBlock(*pendingBlock.Header); err != nil {
+	if err := s.insertBlock(pendingBlock.Block()); err != nil {
 		return err
 	}
 
-	if err := s.setLedger(pendingBlock.Header.Number, pendingBlock.State); err != nil {
+	if err := s.setLedger(pendingBlock.Number(), pendingBlock.Ledger()); err != nil {
 		return err
 	}
 
-	if err := s.insertEvents(pendingBlock.Header.Number, pendingBlock.Events()...); err != nil {
+	if err := s.insertEvents(pendingBlock.Number(), pendingBlock.Events()...); err != nil {
 		return err
 	}
 

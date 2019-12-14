@@ -464,16 +464,16 @@ func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
 		return nil, err
 	}
 
-	// Update system state based on emitted events
-	b.handleEvents(b.pendingBlock.Events(), b.pendingBlock.Header.Number)
+	// update system state based on emitted events
+	b.handleEvents(b.pendingBlock.Events(), b.pendingBlock.Number())
 
-	// Grab reference to pending block to return at the end
-	block := b.pendingBlock.Header
+	// grab reference to pending block to return at the end
+	block := b.pendingBlock.Block()
 
-	// Reset pending block using current block and current register state
-	b.pendingBlock = types.NewPendingBlock(*block, b.pendingBlock.State)
+	// reset pending block using current block and current register state
+	b.pendingBlock = types.NewPendingBlock(block, b.pendingBlock.Ledger())
 
-	return block, nil
+	return &block, nil
 }
 
 // TODO: should be atomic
