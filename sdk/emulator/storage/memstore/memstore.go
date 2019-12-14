@@ -90,25 +90,34 @@ func (s *Store) insertBlock(block types.Block) error {
 	return nil
 }
 
-func (s *Store) CommitPendingBlock(pendingBlock *types.PendingBlock) error {
+func (s *Store) CommitBlock(
+	block types.Block,
+	transactions []flow.Transaction,
+	ledger flow.Ledger,
+	events []flow.Event,
+) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for _, tx := range pendingBlock.Transactions() {
-		if err := s.insertTransaction(*tx); err != nil {
+	err := s.insertBlock(block)
+	if err != nil {
+		return err
+	}
+
+	for _, tx := range transactions {
+		err := s.insertTransaction(tx)
+		if err != nil {
 			return err
 		}
 	}
 
-	if err := s.insertBlock(pendingBlock.Block()); err != nil {
+	err = s.setLedger(block.Number, ledger)
+	if err != nil {
 		return err
 	}
 
-	if err := s.setLedger(pendingBlock.Number(), pendingBlock.Ledger()); err != nil {
-		return err
-	}
-
-	if err := s.insertEvents(pendingBlock.Number(), pendingBlock.Events()...); err != nil {
+	err = s.insertEvents(block.Number, events)
+	if err != nil {
 		return err
 	}
 
@@ -186,14 +195,14 @@ func (s *Store) GetEvents(eventType string, startBlock, endBlock uint64) ([]flow
 	return events, nil
 }
 
-func (s *Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
+func (s *Store) InsertEvents(blockNumber uint64, events []flow.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.insertEvents(blockNumber, events...)
+	return s.insertEvents(blockNumber, events)
 }
 
-func (s *Store) insertEvents(blockNumber uint64, events ...flow.Event) error {
+func (s *Store) insertEvents(blockNumber uint64, events []flow.Event) error {
 	if s.eventsByBlockNumber[blockNumber] == nil {
 		s.eventsByBlockNumber[blockNumber] = events
 	} else {

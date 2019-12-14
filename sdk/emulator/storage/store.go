@@ -39,8 +39,13 @@ type Store interface {
 	// InsertTransaction inserts a transaction.
 	InsertTransaction(flow.Transaction) error
 
-	// CommitPendingBlock saves the execution results of a block.
-	CommitPendingBlock(*types.PendingBlock) error
+	// CommitBlock atomically saves the execution results for a block.
+	CommitBlock(
+		block types.Block,
+		transactions []flow.Transaction,
+		ledger flow.Ledger,
+		events []flow.Event,
+	) error
 
 	// GetLedger returns the ledger state at a given block.
 	GetLedger(blockNumber uint64) (flow.Ledger, error)
@@ -56,5 +61,5 @@ type Store interface {
 	GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
 
 	// InsertEvents inserts events for a block.
-	InsertEvents(blockNumber uint64, events ...flow.Event) error
+	InsertEvents(blockNumber uint64, events []flow.Event) error
 }

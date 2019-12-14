@@ -459,20 +459,31 @@ func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
 		return nil, &ErrPendingBlockMidExecution{BlockHash: b.pendingBlock.Hash()}
 	}
 
+	block := b.pendingBlock.Block()
+	ledger := b.pendingBlock.Ledger()
+	events := b.pendingBlock.Events()
+
+	transactions := make([]flow.Transaction, b.pendingBlock.Size())
+	for i, tx := range b.pendingBlock.Transactions() {
+		// TODO: store reverted status in receipt, seal all transactions
+		if tx.Status != flow.TransactionReverted {
+			tx.Status = flow.TransactionSealed
+		}
+
+		transactions[i] = tx
+	}
+
 	// commit the pending block to storage
-	err := b.storage.CommitPendingBlock(b.pendingBlock)
+	err := b.storage.CommitBlock(block, transactions, ledger, events)
 	if err != nil {
 		return nil, err
 	}
 
 	// update system state based on emitted events
-	b.handleEvents(b.pendingBlock.Events(), b.pendingBlock.Number())
-
-	// grab reference to pending block to return at the end
-	block := b.pendingBlock.Block()
+	b.handleEvents(events, b.pendingBlock.Number())
 
 	// reset pending block using current block and current register state
-	b.pendingBlock = types.NewPendingBlock(block, b.pendingBlock.Ledger())
+	b.pendingBlock = types.NewPendingBlock(block, ledger)
 
 	return &block, nil
 }

@@ -81,11 +81,11 @@ func (b *PendingBlock) nextTransaction() *flow.Transaction {
 }
 
 // Transactions returns the transactions in the pending block.
-func (b *PendingBlock) Transactions() []*flow.Transaction {
-	transactions := make([]*flow.Transaction, len(b.block.TransactionHashes))
+func (b *PendingBlock) Transactions() []flow.Transaction {
+	transactions := make([]flow.Transaction, len(b.block.TransactionHashes))
 
 	for i, txHash := range b.block.TransactionHashes {
-		transactions[i] = b.transactions[string(txHash)]
+		transactions[i] = *b.transactions[string(txHash)]
 	}
 
 	return transactions
