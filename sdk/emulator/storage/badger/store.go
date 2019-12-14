@@ -164,6 +164,11 @@ func (s Store) InsertBlock(block types.Block) error {
 	})
 }
 
+func (s Store) CommitPendingBlock(pendingBlock *types.PendingBlock) error {
+	// TODO: implement
+	return nil
+}
+
 func (s Store) GetTransaction(txHash crypto.Hash) (tx flow.Transaction, err error) {
 	err = s.db.View(func(txn *badger.Txn) error {
 		encTx, err := getTx(txn)(transactionKey(txHash))
