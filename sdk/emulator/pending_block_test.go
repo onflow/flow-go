@@ -71,19 +71,6 @@ func TestPendingBlockBeforeExecution(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("SubmitAfterAddTransaction", func(t *testing.T) {
-		// Add tx1 to pending block
-		err = b.AddTransaction(tx1)
-		assert.NoError(t, err)
-
-		// Attempt to submit tx2 (add + execute)
-		_, err = b.SubmitTransaction(tx2)
-		assert.IsType(t, &emulator.ErrPendingBlockNotEmpty{}, err)
-
-		err = b.ResetPendingBlock()
-		assert.NoError(t, err)
-	})
-
 	t.Run("CommitBeforeExecution", func(t *testing.T) {
 		// Add tx1 to pending block
 		err = b.AddTransaction(tx1)
