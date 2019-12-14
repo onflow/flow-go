@@ -392,53 +392,37 @@ func (b *EmulatedBlockchain) executeTransaction() (types.TransactionReceipt, err
 		return types.TransactionReceipt{}, &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
 	}
 
-	tx := b.pendingBlock.GetNextTransaction()
+	var receipt types.TransactionReceipt
 
-	// Advances the transaction list index (inside a block)
-	// Note: we want to advance the index even if tx reverts
-	b.pendingBlock.Index++
+	b.pendingBlock.ExecuteNextTransaction(
+		func(
+			tx *flow.Transaction,
+			ledger *flow.LedgerView,
+			success func(events []flow.Event),
+			revert func(),
+		) {
+			events, err := b.computer.ExecuteTransaction(ledger, *tx)
+			if err != nil {
+				receipt = types.TransactionReceipt{
+					TransactionHash: tx.Hash(),
+					Status:          flow.TransactionReverted,
+					Error:           err,
+				}
 
-	ledger := b.pendingBlock.State.NewView()
+				revert()
+				return
+			}
 
-	events, err := b.computer.ExecuteTransaction(ledger, *tx)
-	if err != nil {
-		tx.Status = flow.TransactionReverted
+			receipt = types.TransactionReceipt{
+				TransactionHash: tx.Hash(),
+				Status:          flow.TransactionFinalized,
+				Error:           nil,
+				Events:          events,
+			}
 
-		receipt := types.TransactionReceipt{
-			TransactionHash: tx.Hash(),
-			Status:          tx.Status,
-			Error:           err,
-		}
-
-		return receipt, nil
-	}
-
-	// Update pending state with ledger changed during transaction execution
-	b.pendingBlock.State.MergeWith(ledger.Updated())
-
-	// Update the transaction's status and events
-	// NOTE: this updates txPool state because txPool stores pointers
-	tx.Status = flow.TransactionFinalized
-	tx.Events = events
-
-	// TODO: improve the pending block, provide all block information
-	prevBlock, err := b.storage.GetLatestBlock()
-	if err != nil {
-		return types.TransactionReceipt{}, fmt.Errorf("failed to get latest block: %w", err)
-	}
-	blockNumber := prevBlock.Number + 1
-
-	// Update system state based on emitted events
-	b.handleEvents(events, blockNumber, tx.Hash())
-
-	// TODO: Do this in CommitBlock instead
-
-	receipt := types.TransactionReceipt{
-		TransactionHash: tx.Hash(),
-		Status:          tx.Status,
-		Error:           nil,
-		Events:          tx.Events,
-	}
+			success(events)
+		},
+	)
 
 	return receipt, nil
 }
@@ -469,6 +453,9 @@ func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Update system state based on emitted events
+	b.handleEvents(b.pendingBlock.Events(), b.pendingBlock.Header.Number)
 
 	// Grab reference to pending block to return at the end
 	block := b.pendingBlock.Header
@@ -684,7 +671,7 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 }
 
 // handleEvents updates emulator state based on emitted system events.
-func (b *EmulatedBlockchain) handleEvents(events []flow.Event, blockNumber uint64, txHash crypto.Hash) {
+func (b *EmulatedBlockchain) handleEvents(events []flow.Event, blockNumber uint64) {
 	for _, event := range events {
 		// update lastCreatedAccount if this is an AccountCreated event
 		if event.Type == flow.EventAccountCreated {

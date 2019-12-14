@@ -44,6 +44,7 @@ func (b *PendingBlock) Hash() crypto.Hash {
 
 // AddTransaction adds a transaction to the pending block.
 func (b *PendingBlock) AddTransaction(tx flow.Transaction) {
+	b.Header.TransactionHashes = append(b.Header.TransactionHashes, tx.Hash())
 	b.transactions[string(tx.Hash())] = &tx
 }
 
@@ -65,6 +66,35 @@ func (b *PendingBlock) GetNextTransaction() *flow.Transaction {
 	return b.GetTransaction(txHash)
 }
 
+func (b *PendingBlock) ExecuteNextTransaction(
+	execute func(
+		tx *flow.Transaction,
+		ledger *flow.LedgerView,
+		success func(events []flow.Event),
+		revert func(),
+	),
+) {
+	tx := b.GetNextTransaction()
+
+	ledger := b.State.NewView()
+
+	execute(
+		tx,
+		ledger,
+		func(events []flow.Event) {
+			tx.Status = flow.TransactionFinalized
+			tx.Events = events
+
+			b.State.MergeWith(ledger.Updated())
+		},
+		func() {
+			tx.Status = flow.TransactionReverted
+		},
+	)
+
+	b.Index++
+}
+
 // Transactions returns the transactions in the pending block.
 func (b *PendingBlock) Transactions() []*flow.Transaction {
 	transactions := make([]*flow.Transaction, len(b.Header.TransactionHashes))
@@ -81,6 +111,14 @@ func (b *PendingBlock) TransactionCount() int {
 	return len(b.Header.TransactionHashes)
 }
 
-func (b *PendingBlock) Events() []*flow.Event {
-	return []*flow.Event{}
+func (b *PendingBlock) Events() []flow.Event {
+	events := make([]flow.Event, 0)
+
+	for _, txHash := range b.Header.TransactionHashes {
+		tx := b.transactions[string(txHash)]
+
+		events = append(events, tx.Events...)
+	}
+
+	return events
 }
