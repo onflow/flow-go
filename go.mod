@@ -19,6 +19,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/improbable-eng/grpc-web v0.11.0
 	github.com/jrick/bitset v1.0.0
+	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/libp2p/go-libp2p v0.4.2
 	github.com/libp2p/go-libp2p-core v0.2.4
 	github.com/logrusorgru/aurora v0.0.0-20190428105938-cea283e61946
@@ -47,6 +48,7 @@ require (
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.4.0
 	github.com/tinylib/msgp v1.1.0 // indirect
+	go.uber.org/atomic v1.4.0
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/net v0.0.0-20190912160710-24e19bdeb0f2 // indirect
 	golang.org/x/text v0.3.2
