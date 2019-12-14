@@ -45,7 +45,7 @@ type EmulatedBlockchain struct {
 
 	rootAccountAddress flow.Address
 	rootAccountKey     flow.AccountPrivateKey
-	lastCreatedAccount flow.Account
+	lastCreatedAddress flow.Address
 }
 
 // EmulatedBlockchainAPI defines the method set of EmulatedBlockchain.
@@ -134,7 +134,7 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 
 		// Restore pending block header from store information
 		pendingBlock = types.NewPendingBlock(latestBlock, latestState)
-		rootAccount = getAccount(latestState, flow.RootAddress)
+		rootAccount = getAccount(latestState.NewView(), flow.RootAddress)
 
 	} else if err != nil && !errors.Is(err, storage.ErrNotFound{}) {
 		// internal storage error, fail fast
@@ -158,7 +158,7 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 
 		// Create pending block header from genesis block
 		pendingBlock = types.NewPendingBlock(genesis, genesisState)
-		rootAccount = getAccount(genesisState, flow.RootAddress)
+		rootAccount = getAccount(genesisState.NewView(), flow.RootAddress)
 	}
 
 	b := &EmulatedBlockchain{
@@ -166,7 +166,7 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 		pendingBlock:       pendingBlock,
 		rootAccountAddress: rootAccount.Address,
 		rootAccountKey:     config.RootAccountKey,
-		lastCreatedAccount: *rootAccount,
+		lastCreatedAddress: rootAccount.Address,
 	}
 
 	interpreterRuntime := runtime.NewInterpreterRuntime()
@@ -249,22 +249,34 @@ func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*flow.Transacti
 	return &tx, nil
 }
 
-// GetAccount gets account information associated with an address identifier.
+// GetAccount returns the account for the given address.
 func (b *EmulatedBlockchain) GetAccount(address flow.Address) (*flow.Account, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	acct := b.getAccount(address)
+	return b.getAccount(address)
+}
+
+// getAccount returns the account for the given address.
+func (b *EmulatedBlockchain) getAccount(address flow.Address) (*flow.Account, error) {
+	// Get latest block
+	latestBlock, err := b.GetLatestBlock()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get latest ledger
+	latestLedger, err := b.storage.GetLedger(latestBlock.Number)
+	if err != nil {
+		return nil, err
+	}
+
+	acct := getAccount(latestLedger.NewView(), address)
 	if acct == nil {
 		return nil, &ErrAccountNotFound{Address: address}
 	}
-	return acct, nil
-}
 
-// Returns the account for the given address, or nil if the account does not
-// exist.
-func (b *EmulatedBlockchain) getAccount(address flow.Address) *flow.Account {
-	return getAccount(b.pendingBlock.State, address)
+	return acct, nil
 }
 
 // TODO: Implement
@@ -272,8 +284,8 @@ func (b *EmulatedBlockchain) GetAccountAtBlock(address flow.Address, blockNumber
 	panic("not implemented")
 }
 
-func getAccount(ledger flow.Ledger, address flow.Address) *flow.Account {
-	runtimeCtx := execution.NewRuntimeContext(ledger.NewView())
+func getAccount(ledger *flow.LedgerView, address flow.Address) *flow.Account {
+	runtimeCtx := execution.NewRuntimeContext(ledger)
 	return runtimeCtx.GetAccount(address)
 }
 
@@ -490,20 +502,20 @@ func (b *EmulatedBlockchain) ResetPendingBlock() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// Get latest committed block
+	// Get latest block
 	latestBlock, err := b.GetLatestBlock()
 	if err != nil {
 		return err
 	}
 
-	// Get latest committed state
-	latestState, err := b.storage.GetLedger(latestBlock.Number)
+	// Get latest ledger
+	latestLedger, err := b.storage.GetLedger(latestBlock.Number)
 	if err != nil {
 		return err
 	}
 
 	// Reset pending block using latest committed block and state
-	b.pendingBlock = types.NewPendingBlock(*latestBlock, latestState)
+	b.pendingBlock = types.NewPendingBlock(*latestBlock, latestLedger)
 
 	return nil
 }
@@ -524,7 +536,8 @@ func (b *EmulatedBlockchain) ExecuteScriptAtBlock(script []byte, blockNumber uin
 
 // LastCreatedAccount returns the last account that was created in the blockchain.
 func (b *EmulatedBlockchain) LastCreatedAccount() flow.Account {
-	return b.lastCreatedAccount
+	account, _ := b.GetAccount(b.lastCreatedAddress)
+	return *account
 }
 
 // verifySignatures verifies that a transaction contains the necessary signatures.
@@ -644,8 +657,8 @@ func (b *EmulatedBlockchain) verifyAccountSignature(
 	accountSig flow.AccountSignature,
 	message []byte,
 ) (accountPublicKey flow.AccountPublicKey, err error) {
-	account := b.getAccount(accountSig.Account)
-	if account == nil {
+	account, err := b.getAccount(accountSig.Account)
+	if err != nil {
 		return accountPublicKey, &ErrInvalidSignatureAccount{Account: accountSig.Account}
 	}
 
@@ -680,14 +693,7 @@ func (b *EmulatedBlockchain) handleEvents(events []flow.Event, blockNumber uint6
 				panic("failed to decode AccountCreated event")
 			}
 
-			address := acctCreatedEvent.Address()
-
-			account := b.getAccount(address)
-			if account == nil {
-				panic("failed to get newly-created account")
-			}
-
-			b.lastCreatedAccount = *account
+			b.lastCreatedAddress = acctCreatedEvent.Address()
 		}
 
 	}
