@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"hash"
 	"math/rand"
-	"time"
 
 	"github.com/dchest/siphash"
 	"github.com/hashicorp/go-multierror"
@@ -72,12 +71,7 @@ func NewNetwork(log zerolog.Logger, codec network.Codec, state protocol.State, m
 func (n *Network) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	n.mw.Start(n)
-	go func() {
-		for n.top.Count() < 1 {
-			time.Sleep(100 * time.Millisecond)
-		}
-		close(ready)
-	}()
+	close(ready)
 	return ready
 }
 

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -39,7 +40,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "Entries", "e", []string{"consensus-node1@address1=1000"}, "identity table Entries for all nodes")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "Timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.UintVarP(&fnb.BaseConfig.Connections, "Connections", "c", 0, "number of Connections to establish to peers")
-	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", "data", "directory to store the protocol state")
+	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", "data", "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 }
 
@@ -74,25 +75,42 @@ func (fnb *FlowNodeBuilder) initState() {
 	state, err := protocol.NewState(fnb.DB)
 	fnb.MustNot(err).Msg("could not initialize flow committee")
 
-	var ids flow.IdentityList
-	for _, entry := range fnb.BaseConfig.Entries {
-		id, err := flow.ParseIdentity(entry)
-		fnb.MustNot(err).Str("entry", entry).Msg("could not parse identity")
-		ids = append(ids, id)
+	//check if database is initialized
+	lsm, vlog := fnb.DB.Size()
+	if vlog > 0 || lsm > 0 {
+		fnb.Logger.Debug().Msg("using existing database")
+
+	} else {
+		//Bootstrap!
+
+		fnb.Logger.Info().Msg("bootstrapping empty database")
+
+		var ids flow.IdentityList
+		for _, entry := range fnb.BaseConfig.Entries {
+			id, err := flow.ParseIdentity(entry)
+			if err != nil {
+				fnb.Logger.Fatal().Err(err).Str("entry", entry).Msg("could not parse identity")
+			}
+			ids = append(ids, id)
+		}
+
+		err = state.Mutate().Bootstrap(flow.Genesis(ids))
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol State")
+		}
 	}
 
-	err = state.Mutate().Bootstrap(flow.Genesis(ids))
-	fnb.MustNot(err).Msg("could not bootstrap protocol state")
+	trueID, err := flow.HexStringToIdentifier(fnb.BaseConfig.NodeID)
+	allIdentities, err := state.Final().Identities()
+	fnb.Logger.Debug().Msg(fmt.Sprintf("%v", allIdentities))
 
-	var trueID flow.Identifier
-	copy(trueID[:], []byte(fnb.BaseConfig.NodeID))
 	id, err := state.Final().Identity(trueID)
 	fnb.MustNot(err).Msg("could not get identity")
 
 	fnb.Me, err = local.New(id)
 	fnb.MustNot(err).Msg("could not initialize local")
 
-	fnb.state = state
+	fnb.State = state
 }
 
 func (fnb *FlowNodeBuilder) handleReadyAware(v namedReadyFn) {
@@ -105,7 +123,7 @@ func (fnb *FlowNodeBuilder) handleReadyAware(v namedReadyFn) {
 	case <-time.After(fnb.BaseConfig.Timeout):
 		fnb.Logger.Fatal().Msg("could not start " + v.name)
 	case <-fnb.sig:
-		fnb.Logger.Warn().Msg(v.name + "start aborted")
+		fnb.Logger.Warn().Msg(v.name + " start aborted")
 		os.Exit(1)
 	}
 
@@ -128,16 +146,17 @@ func (fnb *FlowNodeBuilder) handleDoneObject(v namedDoneObject) {
 	}
 }
 
-func (fnb *FlowNodeBuilder) initNetwork() {
-	fnb.Logger.Info().Msg("initializing network stack")
-
-	codec := json.NewCodec()
-
-	mw, err := middleware.New(fnb.Logger, codec, fnb.BaseConfig.Connections, fnb.Me.Address())
-	fnb.MustNot(err).Msg("could not initialize trickle middleware")
-
+func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 	fnb.CreateReadDoneAware("trickle network", func(builder *FlowNodeBuilder) network.ReadyDoneAware {
-		net, err := trickle.NewNetwork(fnb.Logger, codec, fnb.state, fnb.Me, mw)
+
+		fnb.Logger.Info().Msg("initializing network stack")
+
+		codec := json.NewCodec()
+
+		mw, err := middleware.New(fnb.Logger, codec, fnb.BaseConfig.Connections, fnb.Me.Address())
+		fnb.MustNot(err).Msg("could not initialize trickle middleware")
+
+		net, err := trickle.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, mw)
 		fnb.MustNot(err).Msg("could not initialize trickle network")
 		fnb.Network = net
 		return net
@@ -161,25 +180,11 @@ type FlowNodeBuilder struct {
 	Logger       zerolog.Logger
 	DB           *badger.DB
 	Me           *local.Local
-	state        *protocol.State
+	State        *protocol.State
 	readyDoneFns []namedReadyFn
 	doneObject   []namedDoneObject
 	sig          chan os.Signal
 	Network      *trickle.Network
-}
-
-func FlowNode(name string) *FlowNodeBuilder {
-
-	builder := &FlowNodeBuilder{
-		BaseConfig:   BaseConfig{},
-		flags:        pflag.CommandLine,
-		name:         name,
-		readyDoneFns: make([]namedReadyFn, 0),
-	}
-
-	builder.baseFlags()
-
-	return builder
 }
 
 func (fnb *FlowNodeBuilder) ExtraFlags(f func(*pflag.FlagSet)) *FlowNodeBuilder {
@@ -208,6 +213,22 @@ func (fnb *FlowNodeBuilder) CreateReadDoneAware(name string, f func(*FlowNodeBui
 	return fnb
 }
 
+func FlowNode(name string) *FlowNodeBuilder {
+
+	builder := &FlowNodeBuilder{
+		BaseConfig:   BaseConfig{},
+		flags:        pflag.CommandLine,
+		name:         name,
+		readyDoneFns: make([]namedReadyFn, 0),
+	}
+
+	builder.baseFlags()
+
+	builder.enqueueNetworkInit()
+
+	return builder
+}
+
 func (fnb *FlowNodeBuilder) Run() {
 
 	// initialize signal catcher
@@ -225,8 +246,6 @@ func (fnb *FlowNodeBuilder) Run() {
 	fnb.initDatabase()
 
 	fnb.initState()
-
-	fnb.initNetwork()
 
 	for _, f := range fnb.readyDoneFns {
 		fnb.handleReadyAware(f)

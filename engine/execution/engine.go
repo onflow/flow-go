@@ -42,7 +42,6 @@ func New(logger zerolog.Logger, net module.Network, me module.Local) (*Engine, e
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	ready := make(chan struct{})
-	e.wg.Add(1)
 	go func() {
 		close(ready)
 	}()
