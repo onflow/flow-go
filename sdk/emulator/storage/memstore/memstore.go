@@ -38,7 +38,7 @@ func New() *Store {
 	}
 }
 
-func (s *Store) GetBlockByHash(hash crypto.Hash) (types.Block, error) {
+func (s *Store) BlockByHash(hash crypto.Hash) (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -51,7 +51,7 @@ func (s *Store) GetBlockByHash(hash crypto.Hash) (types.Block, error) {
 	return block, nil
 }
 
-func (s *Store) GetBlockByNumber(blockNumber uint64) (types.Block, error) {
+func (s *Store) BlockByNumber(blockNumber uint64) (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -63,7 +63,7 @@ func (s *Store) GetBlockByNumber(blockNumber uint64) (types.Block, error) {
 	return block, nil
 }
 
-func (s *Store) GetLatestBlock() (types.Block, error) {
+func (s *Store) LatestBlock() (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -111,7 +111,7 @@ func (s *Store) CommitBlock(
 		}
 	}
 
-	err = s.setLedger(block.Number, ledger)
+	err = s.insertLedger(block.Number, ledger)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func (s *Store) CommitBlock(
 	return nil
 }
 
-func (s *Store) GetTransaction(txHash crypto.Hash) (flow.Transaction, error) {
+func (s *Store) TransactionByHash(txHash crypto.Hash) (flow.Transaction, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -147,7 +147,7 @@ func (s *Store) insertTransaction(tx flow.Transaction) error {
 	return nil
 }
 
-func (s *Store) GetLedger(blockNumber uint64) (flow.Ledger, error) {
+func (s *Store) LedgerByNumber(blockNumber uint64) (flow.Ledger, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -158,19 +158,19 @@ func (s *Store) GetLedger(blockNumber uint64) (flow.Ledger, error) {
 	return ledger, nil
 }
 
-func (s *Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
+func (s *Store) InsertLedger(blockNumber uint64, ledger flow.Ledger) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.setLedger(blockNumber, ledger)
+	return s.insertLedger(blockNumber, ledger)
 }
 
-func (s *Store) setLedger(blockNumber uint64, ledger flow.Ledger) error {
+func (s *Store) insertLedger(blockNumber uint64, ledger flow.Ledger) error {
 	s.ledger[blockNumber] = ledger
 	return nil
 }
 
-func (s *Store) GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error) {
+func (s *Store) RetrieveEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
