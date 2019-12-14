@@ -32,14 +32,14 @@ func TestCommitBlock(t *testing.T) {
 
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
-	// Submit tx1
-	err = b.SubmitTransaction(tx1)
+	// Add tx1 to pending block
+	err = b.AddTransaction(tx1)
 	assert.NoError(t, err)
 
 	tx, err := b.GetTransaction(tx1.Hash())
 	assert.NoError(t, err)
 
-	assert.Equal(t, flow.TransactionFinalized, tx.Status)
+	assert.Equal(t, flow.TransactionPending, tx.Status)
 
 	tx2 := flow.Transaction{
 		Script:             []byte("invalid script"),
@@ -55,14 +55,24 @@ func TestCommitBlock(t *testing.T) {
 
 	tx2.AddSignature(b.RootAccountAddress(), sig)
 
-	// Submit invalid tx2
-	err = b.SubmitTransaction(tx2)
-	assert.NotNil(t, err)
+	// Add tx2 to pending block
+	err = b.AddTransaction(tx2)
+	assert.NoError(t, err)
 
 	tx, err = b.GetTransaction(tx2.Hash())
 	assert.NoError(t, err)
 
-	assert.Equal(t, flow.TransactionReverted, tx.Status)
+	assert.Equal(t, flow.TransactionPending, tx.Status)
+
+	// Execute tx1
+	result, err := b.ExecuteNextTransaction()
+	assert.NoError(t, err)
+	assert.True(t, result.Succeeded())
+
+	// Execute tx2
+	result, err = b.ExecuteNextTransaction()
+	assert.NoError(t, err)
+	assert.True(t, result.Reverted())
 
 	// Commit tx1 and tx2 into new block
 	_, err = b.CommitBlock()
@@ -70,11 +80,11 @@ func TestCommitBlock(t *testing.T) {
 
 	// tx1 status becomes TransactionSealed
 	tx, err = b.GetTransaction(tx1.Hash())
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, flow.TransactionSealed, tx.Status)
 
 	// tx2 status stays TransactionReverted
 	tx, err = b.GetTransaction(tx2.Hash())
-	require.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, flow.TransactionReverted, tx.Status)
 }

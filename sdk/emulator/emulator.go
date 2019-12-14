@@ -35,13 +35,11 @@ type EmulatedBlockchain struct {
 	// Finalized chain state: blocks, transactions, registers, events
 	storage storage.Store
 
-	// Mutex protecting pending register state and txPool
+	// Mutex protecting pending block
 	mu sync.RWMutex
-	// The current working register state, up-to-date with all transactions
-	// in the txPool.
-	pendingState flow.Ledger
-	// Pool of transactions that have been executed, but not finalized
-	txPool map[string]*flow.Transaction
+
+	// Pending block containing block info, register state, tx pool
+	pendingBlock *types.PendingBlock
 
 	// The runtime context used to execute transactions and scripts
 	computer *execution.Computer
@@ -62,7 +60,7 @@ type EmulatedBlockchainAPI interface {
 	GetAccount(address flow.Address) (*flow.Account, error)
 	GetAccountAtBlock(address flow.Address, blockNumber uint64) (*flow.Account, error)
 	GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
-	SubmitTransaction(tx flow.Transaction) error
+	SubmitTransaction(tx flow.Transaction) (types.TransactionReceipt, error)
 	ExecuteScript(script []byte) (values.Value, []flow.Event, error)
 	ExecuteScriptAtBlock(script []byte, blockNumber uint64) (interface{}, []flow.Event, error)
 	CommitBlock() (*types.Block, error)
@@ -110,8 +108,8 @@ func WithStore(store storage.Store) Option {
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
 func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
-	initialState := make(flow.Ledger)
-	txPool := make(map[string]*flow.Transaction)
+	var pendingBlock *types.PendingBlock
+	var rootAccount *flow.Account
 
 	// apply options to the default config
 	config := defaultConfig
@@ -134,31 +132,39 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 		if err != nil {
 			return nil, err
 		}
-		initialState = latestState
+
+		// Restore pending block header from store information
+		pendingBlock = types.NewPendingBlock(latestBlock, latestState)
+		rootAccount = getAccount(latestState, flow.RootAddress)
+
 	} else if err != nil && !errors.Is(err, storage.ErrNotFound{}) {
 		// internal storage error, fail fast
 		return nil, err
 	} else {
+		genesisState := make(flow.Ledger)
+
 		// storage is empty, create the root account and genesis block
-		createAccount(initialState, config.RootAccountKey)
+		createAccount(genesisState, config.RootAccountKey)
 
 		// insert the genesis block
-		if err := store.InsertBlock(types.GenesisBlock()); err != nil {
+		genesis := types.GenesisBlock()
+		if err := store.InsertBlock(genesis); err != nil {
 			return nil, err
 		}
 
 		// insert the initial state containing the root account
-		if err := store.SetLedger(0, initialState); err != nil {
+		if err := store.SetLedger(0, genesisState); err != nil {
 			return nil, err
 		}
-	}
 
-	rootAccount := getAccount(initialState, flow.RootAddress)
+		// Create pending block header from genesis block
+		pendingBlock = types.NewPendingBlock(genesis, genesisState)
+		rootAccount = getAccount(genesisState, flow.RootAddress)
+	}
 
 	b := &EmulatedBlockchain{
 		storage:            config.Store,
-		pendingState:       initialState,
-		txPool:             txPool,
+		pendingBlock:       pendingBlock,
 		rootAccountAddress: rootAccount.Address,
 		rootAccountKey:     config.RootAccountKey,
 		lastCreatedAccount: *rootAccount,
@@ -179,6 +185,11 @@ func (b *EmulatedBlockchain) RootAccountAddress() flow.Address {
 // RootKey returns the root private key for this blockchain.
 func (b *EmulatedBlockchain) RootKey() flow.AccountPrivateKey {
 	return b.rootAccountKey
+}
+
+// GetPendingBlock gets the pending block.
+func (b *EmulatedBlockchain) GetPendingBlock() *types.PendingBlock {
+	return b.pendingBlock
 }
 
 // GetLatestBlock gets the latest sealed block.
@@ -222,8 +233,8 @@ func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*types.Block, erro
 func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*flow.Transaction, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	if tx, ok := b.txPool[string(txHash)]; ok {
-		return tx, nil
+	if b.pendingBlock.ContainsTransaction(txHash) {
+		return b.pendingBlock.GetTransaction(txHash), nil
 	}
 
 	tx, err := b.storage.GetTransaction(txHash)
@@ -252,7 +263,7 @@ func (b *EmulatedBlockchain) GetAccount(address flow.Address) (*flow.Account, er
 // Returns the account for the given address, or nil if the account does not
 // exist.
 func (b *EmulatedBlockchain) getAccount(address flow.Address) *flow.Account {
-	return getAccount(b.pendingState, address)
+	return getAccount(b.pendingBlock.State, address)
 }
 
 // TODO: Implement
@@ -275,9 +286,36 @@ func (b *EmulatedBlockchain) GetEvents(eventType string, startBlock, endBlock ui
 //
 // Note that the resulting state is not finalized until CommitBlock() is called.
 // However, the pending blockchain state is indexed for testing purposes.
-func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
+func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) (types.TransactionReceipt, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+
+	// Prevents tx from being executed with other transactions added previously
+	if b.pendingBlock.TransactionCount() > 0 {
+		return types.TransactionReceipt{}, &ErrPendingBlockNotEmpty{BlockHash: b.pendingBlock.Hash()}
+	}
+
+	err := b.addTransaction(tx)
+	if err != nil {
+		return types.TransactionReceipt{}, err
+	}
+
+	return b.executeTransaction()
+}
+
+// AddTransaction adds a transaction to the current pending block (validates the transaction) but holds off on executing it.
+func (b *EmulatedBlockchain) AddTransaction(tx flow.Transaction) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.addTransaction(tx)
+}
+
+func (b *EmulatedBlockchain) addTransaction(tx flow.Transaction) error {
+	// If Index > 0, pending block has begun execution (cannot add anymore txs)
+	if b.pendingBlock.Index > 0 {
+		return &ErrPendingBlockMidExecution{BlockHash: b.pendingBlock.Hash()}
+	}
 
 	// TODO: add more invalid transaction checks
 	missingFields := tx.MissingFields()
@@ -285,7 +323,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 		return &ErrInvalidTransaction{TxHash: tx.Hash(), MissingFields: missingFields}
 	}
 
-	if _, exists := b.txPool[string(tx.Hash())]; exists {
+	if b.pendingBlock.ContainsTransaction(tx.Hash()) {
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
 
@@ -302,19 +340,80 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 		return err
 	}
 
+	// Add tx to pending block (and transaction pool)
 	tx.Status = flow.TransactionPending
-	b.txPool[string(tx.Hash())] = &tx
+	b.pendingBlock.AddTransaction(tx)
 
-	ledger := b.pendingState.NewView()
+	return nil
+}
 
-	events, err := b.computer.ExecuteTransaction(ledger, tx)
+// TODO: should be atomic
+// ExecuteBlock executes the remaining transactions in pending block.
+func (b *EmulatedBlockchain) ExecuteBlock() ([]types.TransactionReceipt, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.executeBlock()
+}
+
+func (b *EmulatedBlockchain) executeBlock() ([]types.TransactionReceipt, error) {
+	results := make([]types.TransactionReceipt, 0)
+
+	if b.pendingBlock.Index >= b.pendingBlock.TransactionCount() {
+		return results, &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
+	}
+
+	for b.pendingBlock.Index < b.pendingBlock.TransactionCount() {
+		result, err := b.executeTransaction()
+		if err != nil {
+			return results, err
+		}
+		results = append(results, result)
+
+	}
+
+	return results, nil
+}
+
+// TODO: should be atomic
+// ExecuteNextTransaction executes the next indexed transaction in pending block.
+func (b *EmulatedBlockchain) ExecuteNextTransaction() (types.TransactionReceipt, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.executeTransaction()
+}
+
+// executeTransaction is a helper function for ExecuteBlock and ExecuteNextTransaction that runs through the transaction execution.
+func (b *EmulatedBlockchain) executeTransaction() (types.TransactionReceipt, error) {
+	// Check if there are remaining txs to be executed
+	if b.pendingBlock.Index >= b.pendingBlock.TransactionCount() {
+		return types.TransactionReceipt{}, &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
+	}
+
+	tx := b.pendingBlock.GetNextTransaction()
+
+	// Advances the transaction list index (inside a block)
+	// Note: we want to advance the index even if tx reverts
+	b.pendingBlock.Index++
+
+	ledger := b.pendingBlock.State.NewView()
+
+	events, err := b.computer.ExecuteTransaction(ledger, *tx)
 	if err != nil {
 		tx.Status = flow.TransactionReverted
-		return &ErrTransactionReverted{TxHash: tx.Hash(), Err: err}
+
+		receipt := types.TransactionReceipt{
+			TransactionHash: tx.Hash(),
+			Status:          tx.Status,
+			Error:           err,
+		}
+
+		return receipt, nil
 	}
 
 	// Update pending state with ledger changed during transaction execution
-	b.pendingState.MergeWith(ledger.Updated())
+	b.pendingBlock.State.MergeWith(ledger.Updated())
 
 	// Update the transaction's status and events
 	// NOTE: this updates txPool state because txPool stores pointers
@@ -324,7 +423,7 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 	// TODO: improve the pending block, provide all block information
 	prevBlock, err := b.storage.GetLatestBlock()
 	if err != nil {
-		return fmt.Errorf("failed to get latest block: %w", err)
+		return types.TransactionReceipt{}, fmt.Errorf("failed to get latest block: %w", err)
 	}
 	blockNumber := prevBlock.Number + 1
 
@@ -333,8 +432,114 @@ func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) error {
 
 	// TODO: Do this in CommitBlock instead
 	if err := b.storage.InsertEvents(blockNumber, events...); err != nil {
-		return fmt.Errorf("failed to insert events: %w", err)
+		return types.TransactionReceipt{}, fmt.Errorf("failed to insert events: %w", err)
 	}
+
+	receipt := types.TransactionReceipt{
+		TransactionHash: tx.Hash(),
+		Status:          tx.Status,
+		Error:           nil,
+		Events:          tx.Events,
+	}
+
+	return receipt, nil
+}
+
+// CommitBlock seals the current pending block and saves it to storage.
+//
+// Note: this clears the pending transaction pool and resets the pending block.
+// This also indexes the committed blockchain state for testing purposes.
+func (b *EmulatedBlockchain) CommitBlock() (*types.Block, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.commitBlock()
+}
+
+func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
+	// Pending block cannot be committed before execution
+	if b.pendingBlock.Index == 0 && b.pendingBlock.TransactionCount() > 0 {
+		return nil, &ErrPendingBlockCommitBeforeExecution{BlockHash: b.pendingBlock.Hash()}
+	}
+
+	// Pending block has begun execution but has not finished (cannot commit state)
+	if b.pendingBlock.Index > 0 && b.pendingBlock.Index < b.pendingBlock.TransactionCount() {
+		return nil, &ErrPendingBlockMidExecution{BlockHash: b.pendingBlock.Hash()}
+	}
+
+	for _, txHash := range b.pendingBlock.Transactions() {
+		if b.pendingBlock.ContainsTransaction(txHash) {
+			tx := b.pendingBlock.GetTransaction(txHash)
+			// Update transactions to TransactionSealed status
+			if tx.Status != flow.TransactionReverted {
+				tx.Status = flow.TransactionSealed
+			}
+			if err := b.storage.InsertTransaction(*tx); err != nil {
+				return nil, &ErrStorage{err}
+			}
+		} else {
+			return nil, &ErrTransactionNotFound{TxHash: txHash}
+		}
+
+	}
+
+	b.pendingBlock.Header.Timestamp = time.Now()
+
+	if err := b.storage.InsertBlock(*b.pendingBlock.Header); err != nil {
+		return nil, &ErrStorage{err}
+	}
+
+	if err := b.storage.SetLedger(b.pendingBlock.Header.Number, b.pendingBlock.State); err != nil {
+		return nil, &ErrStorage{err}
+	}
+
+	// Grab reference to pending block to return at the end
+	block := b.pendingBlock.Header
+
+	// Reset pending block using current block and current register state
+	b.pendingBlock = types.NewPendingBlock(*block, b.pendingBlock.State)
+
+	return block, nil
+}
+
+// TODO: should be atomic
+// ExecuteAndCommitBlock is a utility that combines ExecuteBlock with CommitState.
+func (b *EmulatedBlockchain) ExecuteAndCommitBlock() (*types.Block, []types.TransactionReceipt, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	results, err := b.executeBlock()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	block, err := b.commitBlock()
+	if err != nil {
+		return nil, results, err
+	}
+
+	return block, results, nil
+}
+
+// ResetPendingBlock clears the transactions in pending block.
+func (b *EmulatedBlockchain) ResetPendingBlock() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	// Get latest committed block
+	latestBlock, err := b.GetLatestBlock()
+	if err != nil {
+		return err
+	}
+
+	// Get latest committed state
+	latestState, err := b.storage.GetLedger(latestBlock.Number)
+	if err != nil {
+		return err
+	}
+
+	// Reset pending block using latest committed block and state
+	b.pendingBlock = types.NewPendingBlock(*latestBlock, latestState)
 
 	return nil
 }
@@ -344,60 +549,13 @@ func (b *EmulatedBlockchain) ExecuteScript(script []byte) (values.Value, []flow.
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	ledger := b.pendingState.NewView()
+	ledger := b.pendingBlock.State.NewView()
 	return b.computer.ExecuteScript(ledger, script)
 }
 
 // TODO: implement
 func (b *EmulatedBlockchain) ExecuteScriptAtBlock(script []byte, blockNumber uint64) (interface{}, []flow.Event, error) {
 	panic("not implemented")
-}
-
-// CommitBlock takes all pending transactions and commits them into a block.
-//
-// Note: this clears the pending transaction pool and indexes the committed blockchain
-// state for testing purposes.
-func (b *EmulatedBlockchain) CommitBlock() (*types.Block, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	txHashes := make([]crypto.Hash, 0)
-	for _, tx := range b.txPool {
-		txHashes = append(txHashes, tx.Hash())
-		if tx.Status != flow.TransactionReverted {
-			tx.Status = flow.TransactionSealed
-		}
-	}
-
-	prevBlock, err := b.storage.GetLatestBlock()
-	if err != nil {
-		return nil, &ErrStorage{err}
-	}
-	block := &types.Block{
-		Number:            prevBlock.Number + 1,
-		Timestamp:         time.Now(),
-		PreviousBlockHash: prevBlock.Hash(),
-		TransactionHashes: txHashes,
-	}
-
-	for _, tx := range b.txPool {
-		if err := b.storage.InsertTransaction(*tx); err != nil {
-			return nil, &ErrStorage{err}
-		}
-	}
-
-	if err := b.storage.InsertBlock(*block); err != nil {
-		return nil, &ErrStorage{err}
-	}
-
-	if err := b.storage.SetLedger(block.Number, b.pendingState); err != nil {
-		return nil, &ErrStorage{err}
-	}
-
-	// reset tx pool
-	b.txPool = make(map[string]*flow.Transaction)
-
-	return block, nil
 }
 
 // LastCreatedAccount returns the last account that was created in the blockchain.
@@ -462,7 +620,12 @@ func (b *EmulatedBlockchain) CreateAccount(
 
 	tx.AddSignature(b.RootAccountAddress(), sig)
 
-	err = b.SubmitTransaction(tx)
+	_, err = b.SubmitTransaction(tx)
+	if err != nil {
+		return flow.Address{}, err
+	}
+
+	_, err = b.CommitBlock()
 	if err != nil {
 		return flow.Address{}, err
 	}
@@ -493,7 +656,12 @@ func (b *EmulatedBlockchain) UpdateAccountCode(
 
 	tx.AddSignature(b.RootAccountAddress(), sig)
 
-	err = b.SubmitTransaction(tx)
+	_, err = b.SubmitTransaction(tx)
+	if err != nil {
+		return err
+	}
+
+	_, err = b.CommitBlock()
 	if err != nil {
 		return err
 	}

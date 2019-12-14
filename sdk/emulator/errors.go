@@ -90,20 +90,6 @@ func (e *ErrInvalidTransaction) Error() string {
 	)
 }
 
-// ErrTransactionReverted indicates that a transaction reverted.
-type ErrTransactionReverted struct {
-	TxHash crypto.Hash
-	Err    error
-}
-
-func (e *ErrTransactionReverted) Error() string {
-	return fmt.Sprintf(
-		"Transaction with hash %x reverted during execution: %s",
-		e.TxHash,
-		e.Err.Error(),
-	)
-}
-
 // ErrInvalidStateVersion indicates that a state version hash provided is invalid.
 type ErrInvalidStateVersion struct {
 	Version crypto.Hash
@@ -111,6 +97,42 @@ type ErrInvalidStateVersion struct {
 
 func (e *ErrInvalidStateVersion) Error() string {
 	return fmt.Sprintf("World State with version hash %x is invalid", e.Version)
+}
+
+// ErrPendingBlockCommitBeforeExecution indicates that the current pending block has not been executed (cannot commit).
+type ErrPendingBlockCommitBeforeExecution struct {
+	BlockHash crypto.Hash
+}
+
+func (e *ErrPendingBlockCommitBeforeExecution) Error() string {
+	return fmt.Sprintf("Pending block with hash %x cannot be commited before execution", e.BlockHash)
+}
+
+// ErrPendingBlockNotEmpty indicates that the current pending block contains previously added transactions.
+type ErrPendingBlockNotEmpty struct {
+	BlockHash crypto.Hash
+}
+
+func (e *ErrPendingBlockNotEmpty) Error() string {
+	return fmt.Sprintf("Pending block with hash %x is not empty", e.BlockHash)
+}
+
+// ErrPendingBlockMidExecution indicates that the current pending block is mid-execution.
+type ErrPendingBlockMidExecution struct {
+	BlockHash crypto.Hash
+}
+
+func (e *ErrPendingBlockMidExecution) Error() string {
+	return fmt.Sprintf("Pending block with hash %x is currently being executed", e.BlockHash)
+}
+
+// ErrPendingBlockTransactionsExhausted indicates that the current pending block has finished executing (no more transactions to execute).
+type ErrPendingBlockTransactionsExhausted struct {
+	BlockHash crypto.Hash
+}
+
+func (e *ErrPendingBlockTransactionsExhausted) Error() string {
+	return fmt.Sprintf("Pending block with hash %x contains no more transactions to execute", e.BlockHash)
 }
 
 // ErrStorage indicates that an error occurred in the storage provider.
