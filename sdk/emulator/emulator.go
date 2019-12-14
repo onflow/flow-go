@@ -127,23 +127,23 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 	latestBlock, err := store.GetLatestBlock()
 	if err == nil && latestBlock.Number > 0 {
 		// storage contains data, load state from storage
-		latestState, err := store.GetLedger(latestBlock.Number)
+		latestLedger, err := store.GetLedger(latestBlock.Number)
 		if err != nil {
 			return nil, err
 		}
 
-		// Restore pending block header from store information
-		pendingBlock = types.NewPendingBlock(latestBlock, latestState)
-		rootAccount = getAccount(latestState.NewView(), flow.RootAddress)
+		// restore pending block header from store information
+		pendingBlock = types.NewPendingBlock(latestBlock, latestLedger)
+		rootAccount = getAccount(latestLedger.NewView(), flow.RootAddress)
 
 	} else if err != nil && !errors.Is(err, storage.ErrNotFound{}) {
 		// internal storage error, fail fast
 		return nil, err
 	} else {
-		genesisState := make(flow.Ledger)
+		genesisLedger := make(flow.Ledger)
 
 		// storage is empty, create the root account and genesis block
-		createAccount(genesisState, config.RootAccountKey)
+		createAccount(genesisLedger, config.RootAccountKey)
 
 		// insert the genesis block
 		genesis := types.GenesisBlock()
@@ -152,13 +152,13 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 		}
 
 		// insert the initial state containing the root account
-		if err := store.SetLedger(0, genesisState); err != nil {
+		if err := store.SetLedger(0, genesisLedger); err != nil {
 			return nil, err
 		}
 
-		// Create pending block header from genesis block
-		pendingBlock = types.NewPendingBlock(genesis, genesisState)
-		rootAccount = getAccount(genesisState.NewView(), flow.RootAddress)
+		// create pending block header from genesis block
+		pendingBlock = types.NewPendingBlock(genesis, genesisLedger)
+		rootAccount = getAccount(genesisLedger.NewView(), flow.RootAddress)
 	}
 
 	b := &EmulatedBlockchain{
