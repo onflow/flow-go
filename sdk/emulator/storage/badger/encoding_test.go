@@ -2,15 +2,15 @@ package badger
 
 import (
 	"testing"
-	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestEncodeTransaction(t *testing.T) {
@@ -27,7 +27,6 @@ func TestEncodeTransaction(t *testing.T) {
 func TestEncodeBlock(t *testing.T) {
 	block := types.Block{
 		Number:            1234,
-		Timestamp:         time.Now(),
 		PreviousBlockHash: unittest.HashFixture(32),
 		TransactionHashes: []crypto.Hash{unittest.HashFixture(32)},
 	}
@@ -41,9 +40,6 @@ func TestEncodeBlock(t *testing.T) {
 	assert.Equal(t, block.Number, decodedBlock.Number)
 	assert.Equal(t, block.PreviousBlockHash, decodedBlock.PreviousBlockHash)
 	assert.Equal(t, block.TransactionHashes, decodedBlock.TransactionHashes)
-	// Compare timestamp using Equal because Gob encode/decode can cause struct
-	// representation of time type to change.
-	assert.True(t, block.Timestamp.Equal(decodedBlock.Timestamp))
 }
 
 func TestEncodeLedger(t *testing.T) {

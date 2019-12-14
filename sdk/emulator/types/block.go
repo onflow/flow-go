@@ -1,8 +1,6 @@
 package types
 
 import (
-	"time"
-
 	"github.com/ethereum/go-ethereum/rlp"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -11,7 +9,6 @@ import (
 // Block is a naive data structure used to represent blocks in the emulator.
 type Block struct {
 	Number            uint64
-	Timestamp         time.Time
 	PreviousBlockHash crypto.Hash
 	TransactionHashes []crypto.Hash
 }
@@ -33,7 +30,6 @@ func (b Block) Hash() crypto.Hash {
 func GenesisBlock() Block {
 	return Block{
 		Number:            0,
-		Timestamp:         time.Now(),
 		PreviousBlockHash: nil,
 		TransactionHashes: make([]crypto.Hash, 0),
 	}
