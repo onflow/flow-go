@@ -9,13 +9,13 @@ import (
 
 func getOnlyEntry(m map[string]interface{}) (string, interface{}, error) {
 	if len(m) > 1 {
-		return "", nil, fmt.Errorf("more then one entry in %v", m)
+		return "", nil, fmt.Errorf("more than one entry in %v", m)
 
 	}
 	for k, v := range m {
 		return k, v, nil
 	}
-	return "", nil, fmt.Errorf("no entires, but one required in %v", m)
+	return "", nil, fmt.Errorf("no entries, but one required in %v", m)
 }
 
 func getString(m map[string]interface{}, key string) (string, error) {
@@ -42,8 +42,7 @@ func getUInt(m map[string]interface{}, key string) (uint, error) {
 			return uint(s), nil
 		}
 	}
-
-	return 0, fmt.Errorf("value for key  %s it is not an uint in %v", key, m)
+	return 0, fmt.Errorf("value for key  %s it %t, expected uint", key, value)
 }
 
 func getArray(m map[string]interface{}, key string) ([]interface{}, error) {

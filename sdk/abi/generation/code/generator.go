@@ -372,7 +372,7 @@ func variable() *abiAwareStatement {
 }
 
 func valueConstructor(t types.Type, fieldExpr *jen.Statement) *abiAwareStatement {
-	return qual(valuesImportPath, "NewValueOrPanic").Call(fieldExpr)
+	return qual(valuesImportPath, "MustConvertValue").Call(fieldExpr)
 }
 
 func viewInterfaceName(name string) string {

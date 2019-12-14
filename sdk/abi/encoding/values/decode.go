@@ -439,9 +439,9 @@ func (e *Decoder) DecodeEvent(t types.Event) (values.Event, error) {
 	}, nil
 }
 
-// DecodeEvent reads the XDR-encoded optional type representation.
+// DecodeOptional reads the XDR-encoded optional type representation.
 //
-// An event is encoded as a fixed-length array of its field values.
+// An optional is encoded as a union of boolean and actual value
 func (e *Decoder) DecodeOptional(t types.Optional) (values.Optional, error) {
 
 	hasValue, err := e.DecodeBool()

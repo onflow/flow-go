@@ -340,7 +340,9 @@ func (e *Encoder) EncodeEvent(v values.Event) error {
 
 // EncodeOptional writes the XDR-encoded representation of an optional value
 // as a union
-// https://tools.ietf.org/html/rfc4506#section-4.19
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.19
+//  RFC Section 4.19 - Optional-Data
+//  Union of boolean and encoded value
 func (e *Encoder) EncodeOptional(v values.Optional) error {
 	hasValue := v.Value != nil
 	_, err := e.enc.EncodeBool(hasValue)

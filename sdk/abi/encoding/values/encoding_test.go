@@ -39,6 +39,21 @@ func TestEncodeString(t *testing.T) {
 	}...)
 }
 
+func TestEncodeOptional(t *testing.T) {
+	testAllEncode(t, []encodeTest{
+		{
+			"Nil",
+			types.Optional{Of: nil},
+			values.Optional{Value: nil},
+		},
+		{
+			"SomeString",
+			types.Optional{Of: types.String{}},
+			values.Optional{Value: values.String("abcdefg")},
+		},
+	}...)
+}
+
 func TestEncodeBool(t *testing.T) {
 	testAllEncode(t, []encodeTest{
 		{

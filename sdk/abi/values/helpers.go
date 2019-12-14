@@ -56,9 +56,9 @@ func NewValue(value interface{}) (Value, error) {
 	return nil, fmt.Errorf("value type %T cannot be converted to ABI Value type", value)
 }
 
-// NewValueOrPanic is convenience function when failure is really unexpected
+// MustConvertValue is convenience function when failure is really unexpected
 // like generated Go code
-func NewValueOrPanic(value interface{}) Value {
+func MustConvertValue(value interface{}) Value {
 	ret, err := NewValue(value)
 	if err != nil {
 		panic(err)

@@ -155,7 +155,7 @@ type albumConstructor struct {
 }
 
 func (p albumConstructor) toValue() values.ConstantSizedArray {
-	return values.ConstantSizedArray{values.NewValueOrPanic(p.artist), values.NewValueOrPanic(p.name), values.NewValueOrPanic(p.year), values.NewValueOrPanic(p.rating)}
+	return values.ConstantSizedArray{values.MustConvertValue(p.artist), values.MustConvertValue(p.name), values.MustConvertValue(p.year), values.MustConvertValue(p.rating)}
 }
 func (p albumConstructor) Encode() ([]byte, error) {
 	var w bytes.Buffer
@@ -299,7 +299,7 @@ type artistConstructor struct {
 }
 
 func (p artistConstructor) toValue() values.ConstantSizedArray {
-	return values.ConstantSizedArray{values.NewValueOrPanic(p.name), values.NewValueOrPanic(p.members), values.NewValueOrPanic(p.country)}
+	return values.ConstantSizedArray{values.MustConvertValue(p.name), values.MustConvertValue(p.members), values.MustConvertValue(p.country)}
 }
 func (p artistConstructor) Encode() ([]byte, error) {
 	var w bytes.Buffer

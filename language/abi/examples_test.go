@@ -1,7 +1,6 @@
 package abi
 
 import (
-	"fmt"
 	"io/ioutil"
 	"strings"
 	"testing"
@@ -36,7 +35,7 @@ func TestExamples(t *testing.T) {
 
 				assert.Equal(t, diff, jsondiff.FullMatch)
 
-				println(s)
+				t.Log(s)
 			})
 		}
 	}
@@ -66,7 +65,7 @@ func TestConformanceToSchema(t *testing.T) {
 
 				if !assert.True(t, result.Valid()) {
 					for _, desc := range result.Errors() {
-						fmt.Printf("- %s\n", desc)
+						t.Logf("- %s\n", desc)
 					}
 				}
 			})

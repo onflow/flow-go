@@ -1993,9 +1993,7 @@ func (f EventField) String() string {
 	return fmt.Sprintf("%s: %s", f.Identifier, f.Value)
 }
 
-// ToGoValue
-
-// ToGoValue converts a Go value into an interpreter value
+// ToValue converts a Go value into an interpreter value
 func ToValue(value interface{}) (Value, error) {
 	// TODO: support more types
 	switch value := value.(type) {
