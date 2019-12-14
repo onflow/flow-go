@@ -57,15 +57,11 @@ type EmulatedBlockchainAPI interface {
 	GetAccount(address flow.Address) (*flow.Account, error)
 	GetAccountAtBlock(address flow.Address, blockNumber uint64) (*flow.Account, error)
 	GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
-	SubmitTransaction(tx flow.Transaction) (types.TransactionReceipt, error)
+	AddTransaction(tx flow.Transaction) error
 	ExecuteScript(script []byte) (values.Value, []flow.Event, error)
 	ExecuteScriptAtBlock(script []byte, blockNumber uint64) (interface{}, []flow.Event, error)
 	CommitBlock() (*types.Block, error)
-	LastCreatedAccount() flow.Account
-	CreateAccount(
-		publicKeys []flow.AccountPublicKey,
-		code []byte, nonce uint64,
-	) (flow.Address, error)
+	ExecuteAndCommitBlock() (*types.Block, []types.TransactionReceipt, error)
 }
 
 // Config is a set of configuration options for an emulated blockchain.
@@ -290,37 +286,11 @@ func (b *EmulatedBlockchain) GetEvents(eventType string, startBlock, endBlock ui
 	return b.storage.RetrieveEvents(eventType, startBlock, endBlock)
 }
 
-// SubmitTransaction sends a transaction to the network that is immediately
-// executed (updates pending blockchain state).
-//
-// Note that the resulting state is not finalized until CommitBlock() is called.
-// However, the pending blockchain state is indexed for testing purposes.
-func (b *EmulatedBlockchain) SubmitTransaction(tx flow.Transaction) (types.TransactionReceipt, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	// Prevents tx from being executed with other transactions added previously
-	if !b.pendingBlock.Empty() {
-		return types.TransactionReceipt{}, &ErrPendingBlockNotEmpty{BlockHash: b.pendingBlock.Hash()}
-	}
-
-	err := b.addTransaction(tx)
-	if err != nil {
-		return types.TransactionReceipt{}, err
-	}
-
-	return b.executeTransaction()
-}
-
-// AddTransaction adds a transaction to the current pending block (validates the transaction) but holds off on executing it.
+// AddTransaction validates a transaction and adds it to the current pending block.
 func (b *EmulatedBlockchain) AddTransaction(tx flow.Transaction) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	return b.addTransaction(tx)
-}
-
-func (b *EmulatedBlockchain) addTransaction(tx flow.Transaction) error {
 	// If Index > 0, pending block has begun execution (cannot add anymore txs)
 	if b.pendingBlock.ExecutionStarted() {
 		return &ErrPendingBlockMidExecution{BlockHash: b.pendingBlock.Hash()}
@@ -366,6 +336,10 @@ func (b *EmulatedBlockchain) ExecuteBlock() ([]types.TransactionReceipt, error) 
 
 func (b *EmulatedBlockchain) executeBlock() ([]types.TransactionReceipt, error) {
 	results := make([]types.TransactionReceipt, 0)
+
+	if b.pendingBlock.Empty() {
+		return results, nil
+	}
 
 	if b.pendingBlock.ExecutionComplete() {
 		return results, &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
@@ -610,12 +584,12 @@ func (b *EmulatedBlockchain) CreateAccount(
 
 	tx.AddSignature(b.RootAccountAddress(), sig)
 
-	_, err = b.SubmitTransaction(tx)
+	err = b.AddTransaction(tx)
 	if err != nil {
 		return flow.Address{}, err
 	}
 
-	_, err = b.CommitBlock()
+	_, _, err = b.ExecuteAndCommitBlock()
 	if err != nil {
 		return flow.Address{}, err
 	}
@@ -646,12 +620,12 @@ func (b *EmulatedBlockchain) UpdateAccountCode(
 
 	tx.AddSignature(b.RootAccountAddress(), sig)
 
-	_, err = b.SubmitTransaction(tx)
+	err = b.AddTransaction(tx)
 	if err != nil {
 		return err
 	}
 
-	_, err = b.CommitBlock()
+	_, _, err = b.ExecuteAndCommitBlock()
 	if err != nil {
 		return err
 	}
