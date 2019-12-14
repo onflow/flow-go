@@ -44,8 +44,7 @@ func Route(nClusters int, txHash crypto.Hash) flow.ClusterID {
 	clusterID := flow.ClusterID(clusterIDBigInt.Uint64())
 
 	if clusterID >= flow.ClusterID(nClusters) {
-		// should never happen
-		panic("routed to invalid cluster")
+		panic("routed to invalid cluster") // should never happen
 	}
 
 	return clusterID
