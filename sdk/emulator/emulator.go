@@ -259,13 +259,11 @@ func (b *EmulatedBlockchain) GetAccount(address flow.Address) (*flow.Account, er
 
 // getAccount returns the account for the given address.
 func (b *EmulatedBlockchain) getAccount(address flow.Address) (*flow.Account, error) {
-	// Get latest block
 	latestBlock, err := b.GetLatestBlock()
 	if err != nil {
 		return nil, err
 	}
 
-	// Get latest ledger
 	latestLedger, err := b.storage.GetLedger(latestBlock.Number)
 	if err != nil {
 		return nil, err
@@ -502,13 +500,11 @@ func (b *EmulatedBlockchain) ResetPendingBlock() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	// Get latest block
 	latestBlock, err := b.GetLatestBlock()
 	if err != nil {
 		return err
 	}
 
-	// Get latest ledger
 	latestLedger, err := b.storage.GetLedger(latestBlock.Number)
 	if err != nil {
 		return err
@@ -525,8 +521,17 @@ func (b *EmulatedBlockchain) ExecuteScript(script []byte) (values.Value, []flow.
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
-	ledger := b.pendingBlock.State.NewView()
-	return b.computer.ExecuteScript(ledger, script)
+	latestBlock, err := b.GetLatestBlock()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	latestLedger, err := b.storage.GetLedger(latestBlock.Number)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return b.computer.ExecuteScript(latestLedger.NewView(), script)
 }
 
 // TODO: implement
@@ -536,7 +541,7 @@ func (b *EmulatedBlockchain) ExecuteScriptAtBlock(script []byte, blockNumber uin
 
 // LastCreatedAccount returns the last account that was created in the blockchain.
 func (b *EmulatedBlockchain) LastCreatedAccount() flow.Account {
-	account, _ := b.GetAccount(b.lastCreatedAddress)
+	account, _ := b.getAccount(b.lastCreatedAddress)
 	return *account
 }
 
