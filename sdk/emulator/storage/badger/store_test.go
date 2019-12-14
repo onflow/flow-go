@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
 
@@ -462,7 +461,6 @@ func BenchmarkBlockDiskUsage(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		block := types.Block{
 			Number:            uint64(i),
-			Timestamp:         time.Now(),
 			PreviousBlockHash: unittest.HashFixture(32),
 			TransactionHashes: []crypto.Hash{unittest.HashFixture(32)},
 		}
