@@ -5,15 +5,13 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/sdk/emulator/storage/memstore"
-
-	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
-
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
+	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
+	"github.com/dapperlabs/flow-go/sdk/emulator/storage/memstore"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 	"github.com/dapperlabs/flow-go/sdk/templates"
@@ -358,7 +356,6 @@ func (b *EmulatedBlockchain) addTransaction(tx flow.Transaction) error {
 	return nil
 }
 
-// TODO: should be atomic
 // ExecuteBlock executes the remaining transactions in pending block.
 func (b *EmulatedBlockchain) ExecuteBlock() ([]types.TransactionReceipt, error) {
 	b.mu.Lock()
@@ -488,7 +485,6 @@ func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
 	return &block, nil
 }
 
-// TODO: should be atomic
 // ExecuteAndCommitBlock is a utility that combines ExecuteBlock with CommitBlock.
 func (b *EmulatedBlockchain) ExecuteAndCommitBlock() (*types.Block, []types.TransactionReceipt, error) {
 	b.mu.Lock()
