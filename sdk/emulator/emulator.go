@@ -124,10 +124,10 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 	}
 	store := config.Store
 
-	latestBlock, err := store.GetLatestBlock()
+	latestBlock, err := store.LatestBlock()
 	if err == nil && latestBlock.Number > 0 {
 		// storage contains data, load state from storage
-		latestLedger, err := store.GetLedger(latestBlock.Number)
+		latestLedger, err := store.LedgerByNumber(latestBlock.Number)
 		if err != nil {
 			return nil, err
 		}
@@ -152,7 +152,7 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 		}
 
 		// insert the initial state containing the root account
-		if err := store.SetLedger(0, genesisLedger); err != nil {
+		if err := store.InsertLedger(0, genesisLedger); err != nil {
 			return nil, err
 		}
 
@@ -193,7 +193,7 @@ func (b *EmulatedBlockchain) GetPendingBlock() *types.PendingBlock {
 
 // GetLatestBlock gets the latest sealed block.
 func (b *EmulatedBlockchain) GetLatestBlock() (*types.Block, error) {
-	block, err := b.storage.GetLatestBlock()
+	block, err := b.storage.LatestBlock()
 	if err != nil {
 		return nil, &ErrStorage{err}
 	}
@@ -202,7 +202,7 @@ func (b *EmulatedBlockchain) GetLatestBlock() (*types.Block, error) {
 
 // GetBlockByHash gets a block by hash.
 func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) (*types.Block, error) {
-	block, err := b.storage.GetBlockByHash(hash)
+	block, err := b.storage.BlockByHash(hash)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound{}) {
 			return nil, &ErrBlockNotFound{BlockHash: hash}
@@ -215,7 +215,7 @@ func (b *EmulatedBlockchain) GetBlockByHash(hash crypto.Hash) (*types.Block, err
 
 // GetBlockByNumber gets a block by number.
 func (b *EmulatedBlockchain) GetBlockByNumber(number uint64) (*types.Block, error) {
-	block, err := b.storage.GetBlockByNumber(number)
+	block, err := b.storage.BlockByNumber(number)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound{}) {
 			return nil, &ErrBlockNotFound{BlockNum: number}
@@ -238,7 +238,7 @@ func (b *EmulatedBlockchain) GetTransaction(txHash crypto.Hash) (*flow.Transacti
 		return pendingTx, nil
 	}
 
-	tx, err := b.storage.GetTransaction(txHash)
+	tx, err := b.storage.TransactionByHash(txHash)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound{}) {
 			return nil, &ErrTransactionNotFound{TxHash: txHash}
@@ -264,7 +264,7 @@ func (b *EmulatedBlockchain) getAccount(address flow.Address) (*flow.Account, er
 		return nil, err
 	}
 
-	latestLedger, err := b.storage.GetLedger(latestBlock.Number)
+	latestLedger, err := b.storage.LedgerByNumber(latestBlock.Number)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +289,7 @@ func getAccount(ledger *flow.LedgerView, address flow.Address) *flow.Account {
 
 // GetEvents returns events matching a query.
 func (b *EmulatedBlockchain) GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error) {
-	return b.storage.GetEvents(eventType, startBlock, endBlock)
+	return b.storage.RetrieveEvents(eventType, startBlock, endBlock)
 }
 
 // SubmitTransaction sends a transaction to the network that is immediately
@@ -338,7 +338,7 @@ func (b *EmulatedBlockchain) addTransaction(tx flow.Transaction) error {
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
 	}
 
-	_, err := b.storage.GetTransaction(tx.Hash())
+	_, err := b.storage.TransactionByHash(tx.Hash())
 	if err == nil {
 		// Found the transaction, this is a dupe
 		return &ErrDuplicateTransaction{TxHash: tx.Hash()}
@@ -517,7 +517,7 @@ func (b *EmulatedBlockchain) ResetPendingBlock() error {
 		return err
 	}
 
-	latestLedger, err := b.storage.GetLedger(latestBlock.Number)
+	latestLedger, err := b.storage.LedgerByNumber(latestBlock.Number)
 	if err != nil {
 		return err
 	}
@@ -538,7 +538,7 @@ func (b *EmulatedBlockchain) ExecuteScript(script []byte) (values.Value, []flow.
 		return nil, nil, err
 	}
 
-	latestLedger, err := b.storage.GetLedger(latestBlock.Number)
+	latestLedger, err := b.storage.LedgerByNumber(latestBlock.Number)
 	if err != nil {
 		return nil, nil, err
 	}
