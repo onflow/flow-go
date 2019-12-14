@@ -5,17 +5,16 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// PendingBlock is a naive data structure used to represent a pending block in the emulator.
+// A PendingBlock contains the pending state required to form a new block.
 type PendingBlock struct {
-	// Block information (Number, PreviousBlockHash, Timestamp, TransactionHashes)
+	// block information (Number, PreviousBlockHash, TransactionHashes)
 	block *Block
-	// Mapping from transaction hash to transaction
+	// mapping from transaction hash to transaction
 	transactions map[string]*flow.Transaction
-	// The current working register state, up-to-date with all transactions in the TxPool
+	// current working ledger, updated after each transaction execution
 	ledger flow.Ledger
-	events []*flow.Event
-	// Index of transaction execution
-	Index int
+	// index of transaction execution
+	index int
 }
 
 // NewPendingBlock creates a new pending block sequentially after a specified block.
@@ -33,7 +32,7 @@ func NewPendingBlock(prevBlock Block, ledger flow.Ledger) *PendingBlock {
 		block:        block,
 		transactions: transactions,
 		ledger:       ledger,
-		Index:        0,
+		index:        0,
 	}
 }
 
@@ -52,6 +51,7 @@ func (b *PendingBlock) Block() Block {
 	return *b.block
 }
 
+// Ledger returns the ledger for the pending block.
 func (b *PendingBlock) Ledger() flow.Ledger {
 	return b.ledger
 }
@@ -76,7 +76,7 @@ func (b *PendingBlock) GetTransaction(txHash crypto.Hash) *flow.Transaction {
 
 // nextTransaction returns the next indexed transaction.
 func (b *PendingBlock) nextTransaction() *flow.Transaction {
-	txHash := b.block.TransactionHashes[b.Index]
+	txHash := b.block.TransactionHashes[b.index]
 	return b.GetTransaction(txHash)
 }
 
@@ -91,15 +91,10 @@ func (b *PendingBlock) Transactions() []*flow.Transaction {
 	return transactions
 }
 
-// TransactionCount retrieves the number of transaction in the pending block.
-func (b *PendingBlock) TransactionCount() int {
-	return len(b.block.TransactionHashes)
-}
-
 // ExecuteNextTransaction executes the next transaction in the pending block.
 //
-// This function uses the provided `execute` function to perform the actual
-// execution, then updates the pending block based on the output.
+// This function uses the provided execute function to perform the actual
+// execution, then updates the pending block with the output.
 func (b *PendingBlock) ExecuteNextTransaction(
 	execute func(
 		tx *flow.Transaction,
@@ -126,7 +121,7 @@ func (b *PendingBlock) ExecuteNextTransaction(
 		},
 	)
 
-	b.Index++
+	b.index++
 }
 
 func (b *PendingBlock) Events() []flow.Event {
@@ -139,4 +134,24 @@ func (b *PendingBlock) Events() []flow.Event {
 	}
 
 	return events
+}
+
+// ExecutionStarted returns true if the pending block has started executing.
+func (b *PendingBlock) ExecutionStarted() bool {
+	return b.index > 0
+}
+
+// ExecutionComplete returns true if the pending block is fully executed.
+func (b *PendingBlock) ExecutionComplete() bool {
+	return b.index >= b.Size()
+}
+
+// Size returns the number of transactions in the pending block.
+func (b *PendingBlock) Size() int {
+	return len(b.block.TransactionHashes)
+}
+
+// Empty returns true if the pending block is empty.
+func (b *PendingBlock) Empty() bool {
+	return b.Size() == 0
 }
