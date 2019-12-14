@@ -14,6 +14,9 @@ package engine
 const (
 	ConsensusPropagation = 10
 
+	CollectionProposal = 11
+	CollectionProvider = 12
+
 	SimulationGenerator = 200
 	SimulationColdstuff = 201
 

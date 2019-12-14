@@ -9,7 +9,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/txpool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/rs/zerolog"
@@ -26,22 +25,22 @@ type Engine struct {
 	con   network.Conduit
 	me    module.Local
 	state protocol.State
-	pool  *txpool.Pool // TODO replace with merkle tree
+	//pool  *txpool.Pool // TODO replace with merkle tree
 	// TODO storage provider for transactions/guaranteed collections
 
 	stop chan struct{} // used to stop the proposer goroutine
 }
 
-func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, pool *txpool.Pool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State) (*Engine, error) {
 	e := &Engine{
 		log:   log.With().Str("engine", "proposal").Logger(),
 		me:    me,
 		state: state,
-		pool:  pool,
-		stop:  make(chan struct{}),
+		//pool:  pool,
+		stop: make(chan struct{}),
 	}
 
-	con, err := net.Register(engine.CollectionIngest, e)
+	con, err := net.Register(engine.CollectionProposal, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
