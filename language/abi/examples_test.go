@@ -47,6 +47,7 @@ func TestConformanceToSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	schemaLoader := gojsonschema.NewBytesLoader(abiBytes)
+
 	schema, err := gojsonschema.NewSchema(schemaLoader)
 	require.NoError(t, err)
 
