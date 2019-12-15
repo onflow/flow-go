@@ -36,7 +36,7 @@ type EmulatedBlockchain struct {
 	mu sync.RWMutex
 
 	// Pending block containing block info, register state, tx pool
-	pendingBlock *types.PendingBlock
+	pendingBlock *PendingBlock
 
 	// The runtime context used to execute transactions and scripts
 	computer *execution.Computer
@@ -93,7 +93,7 @@ func WithStore(store storage.Store) Option {
 
 // NewEmulatedBlockchain instantiates a new blockchain backend for testing purposes.
 func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
-	var pendingBlock *types.PendingBlock
+	var pendingBlock *PendingBlock
 	var rootAccount *flow.Account
 
 	// apply options to the default config
@@ -119,7 +119,7 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 		}
 
 		// restore pending block header from store information
-		pendingBlock = types.NewPendingBlock(latestBlock, latestLedger)
+		pendingBlock = NewPendingBlock(latestBlock, latestLedger)
 		rootAccount = getAccount(latestLedger.NewView(), flow.RootAddress)
 
 	} else if err != nil && !errors.Is(err, storage.ErrNotFound{}) {
@@ -143,7 +143,7 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 		}
 
 		// create pending block header from genesis block
-		pendingBlock = types.NewPendingBlock(genesis, genesisLedger)
+		pendingBlock = NewPendingBlock(genesis, genesisLedger)
 		rootAccount = getAccount(genesisLedger.NewView(), flow.RootAddress)
 	}
 
@@ -173,7 +173,7 @@ func (b *EmulatedBlockchain) RootKey() flow.AccountPrivateKey {
 }
 
 // GetPendingBlock gets the pending block.
-func (b *EmulatedBlockchain) GetPendingBlock() *types.PendingBlock {
+func (b *EmulatedBlockchain) GetPendingBlock() *PendingBlock {
 	return b.pendingBlock
 }
 
@@ -434,7 +434,7 @@ func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
 	b.handleEvents(events, b.pendingBlock.Number())
 
 	// reset pending block using current block and ledger state
-	b.pendingBlock = types.NewPendingBlock(block, ledger)
+	b.pendingBlock = NewPendingBlock(block, ledger)
 
 	return &block, nil
 }
@@ -473,7 +473,7 @@ func (b *EmulatedBlockchain) ResetPendingBlock() error {
 	}
 
 	// Reset pending block using latest committed block and state
-	b.pendingBlock = types.NewPendingBlock(*latestBlock, latestLedger)
+	b.pendingBlock = NewPendingBlock(*latestBlock, latestLedger)
 
 	return nil
 }
