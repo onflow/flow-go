@@ -1,3 +1,13 @@
+// Package emulator provides an emulated version of the Flow blockchain that can be used
+// for development purposes.
+//
+// This package can be used as a library or as a standalone application.
+//
+// When used as a library, this package provides tools to write programmatic tests for
+// Flow applications.
+//
+// When used as a standalone application, this package implements the Flow Observation API
+// and is fully-compatible with Flow gRPC client libraries.
 package emulator
 
 import (
