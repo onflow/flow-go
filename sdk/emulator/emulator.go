@@ -81,7 +81,7 @@ func WithStore(store storage.Store) Option {
 	}
 }
 
-// NewBlockchain instantiates a new emulated blockchain.
+// NewBlockchain instantiates a new emulated blockchain with the provided options.
 func NewBlockchain(opts ...Option) (*Blockchain, error) {
 	var pendingBlock *PendingBlock
 	var rootAccount *flow.Account
@@ -203,7 +203,7 @@ func (b *Blockchain) GetBlockByNumber(number uint64) (*types.Block, error) {
 
 // GetTransaction gets an existing transaction by hash.
 //
-// First looks in pending block, then looks in current blockchain state.
+// The function first looks in the pending block, then the current blockchain state.
 func (b *Blockchain) GetTransaction(txHash crypto.Hash) (*flow.Transaction, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
