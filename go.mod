@@ -19,7 +19,7 @@ require (
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/improbable-eng/grpc-web v0.11.0
-	github.com/jteeuwen/go-bindata v3.0.7+incompatible // indirect
+	github.com/jrick/bitset v1.0.0
 	github.com/libp2p/go-libp2p v0.4.2
 	github.com/libp2p/go-libp2p-core v0.2.4
 	github.com/logrusorgru/aurora v0.0.0-20190428105938-cea283e61946

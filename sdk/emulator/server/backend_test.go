@@ -288,9 +288,9 @@ func TestBackend(t *testing.T) {
 
 		api.EXPECT().
 			SubmitTransaction(gomock.Any()).
-			DoAndReturn(func(tx flow.Transaction) error {
+			DoAndReturn(func(tx flow.Transaction) (etypes.TransactionReceipt, error) {
 				capturedTx = tx
-				return nil
+				return etypes.TransactionReceipt{}, nil
 			}).Times(1)
 
 		requestTx := observation.SendTransactionRequest{
@@ -329,7 +329,7 @@ func TestBackend(t *testing.T) {
 
 		api.EXPECT().
 			SubmitTransaction(gomock.Any()).
-			Return(&emulator.ErrInvalidSignaturePublicKey{}).Times(1)
+			Return(etypes.TransactionReceipt{}, &emulator.ErrInvalidSignaturePublicKey{}).Times(1)
 
 		requestTx := observation.SendTransactionRequest{
 			Transaction: &entities.Transaction{

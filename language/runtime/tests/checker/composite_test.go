@@ -644,9 +644,9 @@ func TestCheckInvalidResourceFieldWithMissingResourceAnnotation(t *testing.T) {
 					`
                       resource %[1]s Test {
                           let test: Test
-   
+
                           init(test: @Test) %[2]s
-   
+
                           destroy() %[3]s
                       }
                     `,

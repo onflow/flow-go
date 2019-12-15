@@ -90,7 +90,7 @@ func (VoidValue) GetOwner() string {
 	return ""
 }
 
-func (VoidValue) SetOwner(owner string) {
+func (VoidValue) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -121,7 +121,7 @@ func (BoolValue) GetOwner() string {
 	return ""
 }
 
-func (BoolValue) SetOwner(owner string) {
+func (BoolValue) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -174,7 +174,7 @@ func (*StringValue) GetOwner() string {
 	return ""
 }
 
-func (*StringValue) SetOwner(owner string) {
+func (*StringValue) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -261,7 +261,7 @@ func (v *StringValue) Set(_ *Interpreter, _ LocationRange, key Value, value Valu
 	v.Str = sb.String()
 }
 
-func (v *StringValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+func (v *StringValue) GetMember(_ *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
 		count := uniseg.GraphemeClusterCount(v.Str)
@@ -603,7 +603,7 @@ func (IntValue) GetOwner() string {
 	return ""
 }
 
-func (IntValue) SetOwner(owner string) {
+func (IntValue) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -655,22 +655,22 @@ func (v IntValue) Div(other IntegerValue) IntegerValue {
 
 func (v IntValue) Less(other IntegerValue) BoolValue {
 	cmp := v.Int.Cmp(other.(IntValue).Int)
-	return BoolValue(cmp == -1)
+	return cmp == -1
 }
 
 func (v IntValue) LessEqual(other IntegerValue) BoolValue {
 	cmp := v.Int.Cmp(other.(IntValue).Int)
-	return BoolValue(cmp <= 0)
+	return cmp <= 0
 }
 
 func (v IntValue) Greater(other IntegerValue) BoolValue {
 	cmp := v.Int.Cmp(other.(IntValue).Int)
-	return BoolValue(cmp == 1)
+	return cmp == 1
 }
 
 func (v IntValue) GreaterEqual(other IntegerValue) BoolValue {
 	cmp := v.Int.Cmp(other.(IntValue).Int)
-	return BoolValue(cmp >= 0)
+	return cmp >= 0
 }
 
 func (v IntValue) Equal(other Value) BoolValue {
@@ -679,7 +679,7 @@ func (v IntValue) Equal(other Value) BoolValue {
 		return false
 	}
 	cmp := v.Int.Cmp(otherInt.Int)
-	return BoolValue(cmp == 0)
+	return cmp == 0
 }
 
 // Int8Value
@@ -701,7 +701,7 @@ func (Int8Value) GetOwner() string {
 	return ""
 }
 
-func (Int8Value) SetOwner(owner string) {
+func (Int8Value) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -792,7 +792,7 @@ func (Int16Value) GetOwner() string {
 	return ""
 }
 
-func (Int16Value) SetOwner(owner string) {
+func (Int16Value) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -883,7 +883,7 @@ func (Int32Value) GetOwner() string {
 	return ""
 }
 
-func (Int32Value) SetOwner(owner string) {
+func (Int32Value) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -974,7 +974,7 @@ func (Int64Value) GetOwner() string {
 	return ""
 }
 
-func (Int64Value) SetOwner(owner string) {
+func (Int64Value) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -1065,7 +1065,7 @@ func (UInt8Value) GetOwner() string {
 	return ""
 }
 
-func (UInt8Value) SetOwner(owner string) {
+func (UInt8Value) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -1155,7 +1155,7 @@ func (UInt16Value) GetOwner() string {
 	return ""
 }
 
-func (UInt16Value) SetOwner(owner string) {
+func (UInt16Value) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -1245,7 +1245,7 @@ func (UInt32Value) GetOwner() string {
 	return ""
 }
 
-func (UInt32Value) SetOwner(owner string) {
+func (UInt32Value) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -1336,7 +1336,7 @@ func (UInt64Value) GetOwner() string {
 	return ""
 }
 
-func (UInt64Value) SetOwner(owner string) {
+func (UInt64Value) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -1561,7 +1561,7 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 	return nil
 }
 
-func (v *CompositeValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
+func (v *CompositeValue) SetMember(_ *Interpreter, _ LocationRange, name string, value Value) {
 	value.SetOwner(v.Owner)
 
 	v.Fields[name] = value
@@ -1812,14 +1812,14 @@ func (v *DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string
 
 	// TODO: is returning copies correct?
 	case "values":
-		values := make([]Value, v.Count())
+		dictionaryValues := make([]Value, v.Count())
 		i := 0
 		for _, keyValue := range v.Keys.Values {
 			key := dictionaryKey(keyValue)
-			values[i] = v.Entries[key].Copy()
+			dictionaryValues[i] = v.Entries[key].Copy()
 			i++
 		}
-		return NewArrayValueUnownedNonCopying(values...)
+		return NewArrayValueUnownedNonCopying(dictionaryValues...)
 
 	case "remove":
 		return NewHostFunctionValue(
@@ -1966,7 +1966,7 @@ func (EventValue) GetOwner() string {
 	return ""
 }
 
-func (EventValue) SetOwner(owner string) {
+func (EventValue) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -2027,7 +2027,7 @@ func ToValue(value interface{}) (Value, error) {
 }
 
 func ToValues(inputs []interface{}) ([]Value, error) {
-	var values []Value
+	var newValues []Value
 	for _, argument := range inputs {
 		value, ok := argument.(Value)
 		if !ok {
@@ -2037,12 +2037,12 @@ func ToValues(inputs []interface{}) ([]Value, error) {
 				return nil, err
 			}
 		}
-		values = append(
-			values,
+		newValues = append(
+			newValues,
 			value,
 		)
 	}
-	return values, nil
+	return newValues, nil
 }
 
 // OptionalValue
@@ -2073,7 +2073,7 @@ func (NilValue) GetOwner() string {
 	return ""
 }
 
-func (NilValue) SetOwner(owner string) {
+func (NilValue) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -2213,7 +2213,7 @@ func (v StorageValue) GetOwner() string {
 	return v.Identifier
 }
 
-func (StorageValue) SetOwner(owner string) {
+func (StorageValue) SetOwner(_ string) {
 	// NO-OP: ownership cannot be changed
 }
 
@@ -2235,7 +2235,7 @@ func (v PublishedValue) GetOwner() string {
 	return v.Identifier
 }
 
-func (PublishedValue) SetOwner(owner string) {
+func (PublishedValue) SetOwner(_ string) {
 	// NO-OP: ownership cannot be changed
 }
 
@@ -2317,9 +2317,7 @@ func (v *ReferenceValue) Equal(other Value) BoolValue {
 
 // AddressValue
 
-const AddressLength = 20
-
-type AddressValue [AddressLength]byte
+type AddressValue [common.AddressLength]byte
 
 func init() {
 	gob.Register(AddressValue{})
@@ -2327,7 +2325,7 @@ func init() {
 
 func NewAddressValueFromBytes(b []byte) AddressValue {
 	result := AddressValue{}
-	copy(result[AddressLength-len(b):], b)
+	copy(result[common.AddressLength-len(b):], b)
 	return result
 }
 
@@ -2336,12 +2334,12 @@ func ConvertAddress(value Value) Value {
 	if intValue, ok := value.(IntValue); ok {
 		bigEndianBytes := intValue.Int.Bytes()
 		copy(
-			result[AddressLength-len(bigEndianBytes):AddressLength],
+			result[common.AddressLength-len(bigEndianBytes):common.AddressLength],
 			bigEndianBytes,
 		)
 	} else {
 		binary.BigEndian.PutUint64(
-			result[AddressLength-8:AddressLength],
+			result[common.AddressLength-8:common.AddressLength],
 			uint64(value.(IntegerValue).IntValue()),
 		)
 	}
@@ -2359,7 +2357,7 @@ func (v AddressValue) Copy() Value {
 }
 
 func (v AddressValue) String() string {
-	return fmt.Sprintf("%x", [AddressLength]byte(v))
+	return fmt.Sprintf("%x", [common.AddressLength]byte(v))
 }
 
 func (AddressValue) GetOwner() string {
@@ -2367,7 +2365,7 @@ func (AddressValue) GetOwner() string {
 	return ""
 }
 
-func (AddressValue) SetOwner(owner string) {
+func (AddressValue) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
@@ -2376,7 +2374,7 @@ func (v AddressValue) Equal(other Value) BoolValue {
 	if !ok {
 		return false
 	}
-	return [AddressLength]byte(v) == [AddressLength]byte(otherAddress)
+	return [common.AddressLength]byte(v) == [common.AddressLength]byte(otherAddress)
 }
 
 func (v AddressValue) StorageIdentifier() string {

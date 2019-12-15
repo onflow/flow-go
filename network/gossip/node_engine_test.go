@@ -55,4 +55,5 @@ func TestSendEngine(t *testing.T) {
 
 	_, err = n.sendEngine(context.Background(), eprBytes)
 	require.Nil(t, err, "could not send event process request to engine")
+
 }

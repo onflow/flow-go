@@ -3516,7 +3516,7 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 
                       pub %[1]s TestImpl: Test {
                           pub var x: Int
-        
+
                           init(x: Int) {
                               self.x = x
                           }
