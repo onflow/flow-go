@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -31,7 +31,7 @@ func TestPing(t *testing.T) {
 	ctx := context.Background()
 	b, err := emulator.NewEmulatedBlockchain()
 	require.NoError(t, err)
-	server := server.NewBackend(b, log.New())
+	server := server.NewBackend(b, logrus.New())
 
 	res, err := server.Ping(ctx, &observation.PingRequest{})
 	assert.NoError(t, err)
@@ -48,10 +48,7 @@ func TestBackend(t *testing.T) {
 
 			api := mocks.NewMockEmulatedBlockchainAPI(mockCtrl)
 
-			backend := server.NewBackend(
-				api,
-				log.New(),
-			)
+			backend := server.NewBackend(api, logrus.New())
 
 			sut(t, backend, api)
 		}
@@ -323,10 +320,10 @@ func TestBackend(t *testing.T) {
 	}))
 
 	t.Run("SendTransaction which errors while processing", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
-
 		api.EXPECT().
 			AddTransaction(gomock.Any()).
-			Return(execution.TransactionResult{}, &emulator.ErrInvalidSignaturePublicKey{}).Times(1)
+			Return(execution.TransactionResult{}, &emulator.ErrInvalidSignaturePublicKey{}).
+			Times(1)
 
 		requestTx := observation.SendTransactionRequest{
 			Transaction: &entities.Transaction{
