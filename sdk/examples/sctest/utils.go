@@ -5,11 +5,12 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/keys"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // ReadFile reads a file from the file system
@@ -75,12 +76,17 @@ func SignAndSubmit(
 
 	// submit the signed transaction
 	err := b.AddTransaction(tx)
+	require.NoError(t, err)
 
 	result, err := b.ExecuteNextTransaction()
 	require.NoError(t, err)
 
 	if shouldRevert {
 		assert.True(t, result.Reverted())
+	} else {
+		if !assert.True(t, result.Succeeded()) {
+			t.Log(result.Error.Error())
+		}
 	}
 
 	_, err = b.CommitBlock()
