@@ -39,7 +39,7 @@ type EmulatedBlockchain struct {
 	pendingBlock *PendingBlock
 
 	// The runtime context used to execute transactions and scripts
-	computer *execution.Computer
+	computer *Computer
 
 	rootAccountAddress flow.Address
 	rootAccountKey     flow.AccountPrivateKey
@@ -58,10 +58,10 @@ type EmulatedBlockchainAPI interface {
 	GetAccountAtBlock(address flow.Address, blockNumber uint64) (*flow.Account, error)
 	GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
 	AddTransaction(tx flow.Transaction) error
-	ExecuteScript(script []byte) (execution.ScriptResult, error)
-	ExecuteScriptAtBlock(script []byte, blockNumber uint64) (execution.ScriptResult, error)
+	ExecuteScript(script []byte) (ScriptResult, error)
+	ExecuteScriptAtBlock(script []byte, blockNumber uint64) (ScriptResult, error)
 	CommitBlock() (*types.Block, error)
-	ExecuteAndCommitBlock() (*types.Block, []execution.TransactionResult, error)
+	ExecuteAndCommitBlock() (*types.Block, []TransactionResult, error)
 }
 
 // Config is a set of configuration options for an emulated blockchain.
@@ -156,7 +156,7 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 	}
 
 	interpreterRuntime := runtime.NewInterpreterRuntime()
-	computer := execution.NewComputer(interpreterRuntime)
+	computer := NewComputer(interpreterRuntime)
 	b.computer = computer
 
 	return b, nil
@@ -319,15 +319,15 @@ func (b *EmulatedBlockchain) AddTransaction(tx flow.Transaction) error {
 }
 
 // ExecuteBlock executes the remaining transactions in pending block.
-func (b *EmulatedBlockchain) ExecuteBlock() ([]execution.TransactionResult, error) {
+func (b *EmulatedBlockchain) ExecuteBlock() ([]TransactionResult, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	return b.executeBlock()
 }
 
-func (b *EmulatedBlockchain) executeBlock() ([]execution.TransactionResult, error) {
-	results := make([]execution.TransactionResult, 0)
+func (b *EmulatedBlockchain) executeBlock() ([]TransactionResult, error) {
+	results := make([]TransactionResult, 0)
 
 	// empty blocks do not require execution, treat as a no-op
 	if b.pendingBlock.Empty() {
@@ -355,7 +355,7 @@ func (b *EmulatedBlockchain) executeBlock() ([]execution.TransactionResult, erro
 }
 
 // ExecuteNextTransaction executes the next indexed transaction in pending block.
-func (b *EmulatedBlockchain) ExecuteNextTransaction() (execution.TransactionResult, error) {
+func (b *EmulatedBlockchain) ExecuteNextTransaction() (TransactionResult, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -364,10 +364,10 @@ func (b *EmulatedBlockchain) ExecuteNextTransaction() (execution.TransactionResu
 
 // executeNextTransaction is a helper function for ExecuteBlock and ExecuteNextTransaction that
 // executes the next transaction in the pending block.
-func (b *EmulatedBlockchain) executeNextTransaction() (execution.TransactionResult, error) {
+func (b *EmulatedBlockchain) executeNextTransaction() (TransactionResult, error) {
 	// check if there are remaining txs to be executed
 	if b.pendingBlock.ExecutionComplete() {
-		return execution.TransactionResult{}, &ErrPendingBlockTransactionsExhausted{
+		return TransactionResult{}, &ErrPendingBlockTransactionsExhausted{
 			BlockHash: b.pendingBlock.Hash(),
 		}
 	}
@@ -377,13 +377,13 @@ func (b *EmulatedBlockchain) executeNextTransaction() (execution.TransactionResu
 		func(
 			ledger *flow.LedgerView,
 			tx flow.Transaction,
-		) (execution.TransactionResult, error) {
+		) (TransactionResult, error) {
 			return b.computer.ExecuteTransaction(ledger, tx)
 		},
 	)
 	if err != nil {
 		// fail fast if fatal error occurs
-		return execution.TransactionResult{}, err
+		return TransactionResult{}, err
 	}
 
 	return receipt, nil
@@ -440,7 +440,7 @@ func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
 }
 
 // ExecuteAndCommitBlock is a utility that combines ExecuteBlock with CommitBlock.
-func (b *EmulatedBlockchain) ExecuteAndCommitBlock() (*types.Block, []execution.TransactionResult, error) {
+func (b *EmulatedBlockchain) ExecuteAndCommitBlock() (*types.Block, []TransactionResult, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -479,30 +479,30 @@ func (b *EmulatedBlockchain) ResetPendingBlock() error {
 }
 
 // ExecuteScript executes a read-only script against the world state and returns the result.
-func (b *EmulatedBlockchain) ExecuteScript(script []byte) (execution.ScriptResult, error) {
+func (b *EmulatedBlockchain) ExecuteScript(script []byte) (ScriptResult, error) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
 	latestBlock, err := b.GetLatestBlock()
 	if err != nil {
-		return execution.ScriptResult{}, err
+		return ScriptResult{}, err
 	}
 
 	latestLedger, err := b.storage.LedgerByNumber(latestBlock.Number)
 	if err != nil {
-		return execution.ScriptResult{}, err
+		return ScriptResult{}, err
 	}
 
 	result, err := b.computer.ExecuteScript(latestLedger.NewView(), script)
 	if err != nil {
-		return execution.ScriptResult{}, err
+		return ScriptResult{}, err
 	}
 
 	return result, nil
 }
 
 // TODO: implement
-func (b *EmulatedBlockchain) ExecuteScriptAtBlock(script []byte, blockNumber uint64) (execution.ScriptResult, error) {
+func (b *EmulatedBlockchain) ExecuteScriptAtBlock(script []byte, blockNumber uint64) (ScriptResult, error) {
 	panic("not implemented")
 }
 

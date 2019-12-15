@@ -1,4 +1,4 @@
-package execution
+package emulator
 
 import (
 	"errors"
@@ -6,8 +6,10 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/hash"
 	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
+	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 )
 
 // Computer uses a runtime instance to execute transactions and scripts.
@@ -60,7 +62,7 @@ func NewComputer(
 //
 // An error is returned if the transaction script cannot be parsed or reverts during execution.
 func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transaction) (TransactionResult, error) {
-	runtimeContext := NewRuntimeContext(ledger)
+	runtimeContext := execution.NewRuntimeContext(ledger)
 
 	runtimeContext.SetChecker(func(code []byte, location runtime.Location) error {
 		return c.runtime.ParseAndCheckProgram(code, runtimeContext, location)
@@ -104,9 +106,9 @@ func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transacti
 //
 // This function initializes a new runtime context using the provided registers view.
 func (c *Computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptResult, error) {
-	runtimeContext := NewRuntimeContext(view)
+	runtimeContext := execution.NewRuntimeContext(view)
 
-	scriptHash := ScriptHash(script)
+	scriptHash := hash.DefaultHasher.ComputeHash(script)
 
 	location := runtime.ScriptLocation(scriptHash)
 

@@ -20,7 +20,6 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/emulator/mocks"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
 	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
@@ -65,9 +64,9 @@ func TestBackend(t *testing.T) {
 
 		api.EXPECT().
 			ExecuteScript(sampleScriptText).
-			Return(execution.ScriptResult{
+			Return(emulator.ScriptResult{
 				Value: values.NewInt(2137),
-				Result: execution.Result{
+				Result: emulator.Result{
 					Error: nil,
 				},
 			}, nil).
@@ -291,9 +290,9 @@ func TestBackend(t *testing.T) {
 
 		api.EXPECT().
 			AddTransaction(gomock.Any()).
-			DoAndReturn(func(tx flow.Transaction) (execution.TransactionResult, error) {
+			DoAndReturn(func(tx flow.Transaction) (emulator.TransactionResult, error) {
 				capturedTx = tx
-				return execution.TransactionResult{}, nil
+				return emulator.TransactionResult{}, nil
 			}).Times(1)
 
 		requestTx := observation.SendTransactionRequest{

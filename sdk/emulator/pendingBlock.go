@@ -3,7 +3,6 @@ package emulator
 import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
@@ -104,8 +103,8 @@ func (b *PendingBlock) ExecuteNextTransaction(
 	execute func(
 		ledger *flow.LedgerView,
 		tx flow.Transaction,
-	) (execution.TransactionResult, error),
-) (execution.TransactionResult, error) {
+	) (TransactionResult, error),
+) (TransactionResult, error) {
 	tx := b.nextTransaction()
 
 	ledger := b.ledger.NewView()
@@ -113,7 +112,7 @@ func (b *PendingBlock) ExecuteNextTransaction(
 	result, err := execute(ledger, *tx)
 	if err != nil {
 		// fail fast if fatal error occurs
-		return execution.TransactionResult{}, err
+		return TransactionResult{}, err
 	}
 
 	// increment transaction index even if transaction reverts
