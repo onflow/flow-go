@@ -7,7 +7,7 @@ package mocks
 import (
 	crypto "github.com/dapperlabs/flow-go/crypto"
 	flow "github.com/dapperlabs/flow-go/model/flow"
-	values "github.com/dapperlabs/flow-go/sdk/abi/values"
+	execution "github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	types "github.com/dapperlabs/flow-go/sdk/emulator/types"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
@@ -36,6 +36,20 @@ func (m *MockEmulatedBlockchainAPI) EXPECT() *MockEmulatedBlockchainAPIMockRecor
 	return m.recorder
 }
 
+// AddTransaction mocks base method
+func (m *MockEmulatedBlockchainAPI) AddTransaction(arg0 flow.Transaction) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddTransaction", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddTransaction indicates an expected call of AddTransaction
+func (mr *MockEmulatedBlockchainAPIMockRecorder) AddTransaction(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddTransaction", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).AddTransaction), arg0)
+}
+
 // CommitBlock mocks base method
 func (m *MockEmulatedBlockchainAPI) CommitBlock() (*types.Block, error) {
 	m.ctrl.T.Helper()
@@ -51,29 +65,29 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) CommitBlock() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CommitBlock", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).CommitBlock))
 }
 
-// CreateAccount mocks base method
-func (m *MockEmulatedBlockchainAPI) CreateAccount(arg0 []flow.AccountPublicKey, arg1 []byte, arg2 uint64) (flow.Address, error) {
+// ExecuteAndCommitBlock mocks base method
+func (m *MockEmulatedBlockchainAPI) ExecuteAndCommitBlock() (*types.Block, []execution.TransactionResult, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateAccount", arg0, arg1, arg2)
-	ret0, _ := ret[0].(flow.Address)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "ExecuteAndCommitBlock")
+	ret0, _ := ret[0].(*types.Block)
+	ret1, _ := ret[1].([]execution.TransactionResult)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
-// CreateAccount indicates an expected call of CreateAccount
-func (mr *MockEmulatedBlockchainAPIMockRecorder) CreateAccount(arg0, arg1, arg2 interface{}) *gomock.Call {
+// ExecuteAndCommitBlock indicates an expected call of ExecuteAndCommitBlock
+func (mr *MockEmulatedBlockchainAPIMockRecorder) ExecuteAndCommitBlock() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAccount", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).CreateAccount), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecuteAndCommitBlock", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).ExecuteAndCommitBlock))
 }
 
 // ExecuteScript mocks base method
-func (m *MockEmulatedBlockchainAPI) ExecuteScript(arg0 []byte) (values.Value, []flow.Event, error) {
+func (m *MockEmulatedBlockchainAPI) ExecuteScript(arg0 []byte) (execution.ScriptResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExecuteScript", arg0)
-	ret0, _ := ret[0].(values.Value)
-	ret1, _ := ret[1].([]flow.Event)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret0, _ := ret[0].(execution.ScriptResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // ExecuteScript indicates an expected call of ExecuteScript
@@ -83,13 +97,12 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) ExecuteScript(arg0 interface{})
 }
 
 // ExecuteScriptAtBlock mocks base method
-func (m *MockEmulatedBlockchainAPI) ExecuteScriptAtBlock(arg0 []byte, arg1 uint64) (interface{}, []flow.Event, error) {
+func (m *MockEmulatedBlockchainAPI) ExecuteScriptAtBlock(arg0 []byte, arg1 uint64) (execution.ScriptResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExecuteScriptAtBlock", arg0, arg1)
-	ret0, _ := ret[0].(interface{})
-	ret1, _ := ret[1].([]flow.Event)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret0, _ := ret[0].(execution.ScriptResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // ExecuteScriptAtBlock indicates an expected call of ExecuteScriptAtBlock
@@ -203,20 +216,6 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) GetTransaction(arg0 interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTransaction", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).GetTransaction), arg0)
 }
 
-// LastCreatedAccount mocks base method
-func (m *MockEmulatedBlockchainAPI) LastCreatedAccount() flow.Account {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LastCreatedAccount")
-	ret0, _ := ret[0].(flow.Account)
-	return ret0
-}
-
-// LastCreatedAccount indicates an expected call of LastCreatedAccount
-func (mr *MockEmulatedBlockchainAPIMockRecorder) LastCreatedAccount() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastCreatedAccount", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).LastCreatedAccount))
-}
-
 // RootAccountAddress mocks base method
 func (m *MockEmulatedBlockchainAPI) RootAccountAddress() flow.Address {
 	m.ctrl.T.Helper()
@@ -243,19 +242,4 @@ func (m *MockEmulatedBlockchainAPI) RootKey() flow.AccountPrivateKey {
 func (mr *MockEmulatedBlockchainAPIMockRecorder) RootKey() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RootKey", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).RootKey))
-}
-
-// SubmitTransaction mocks base method
-func (m *MockEmulatedBlockchainAPI) SubmitTransaction(arg0 flow.Transaction) (types.TransactionReceipt, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SubmitTransaction", arg0)
-	ret0, _ := ret[0].(types.TransactionReceipt)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// SubmitTransaction indicates an expected call of SubmitTransaction
-func (mr *MockEmulatedBlockchainAPIMockRecorder) SubmitTransaction(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitTransaction", reflect.TypeOf((*MockEmulatedBlockchainAPI)(nil).SubmitTransaction), arg0)
 }

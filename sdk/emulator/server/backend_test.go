@@ -20,6 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/emulator/mocks"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
 	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
@@ -283,10 +284,10 @@ func TestBackend(t *testing.T) {
 		var capturedTx flow.Transaction
 
 		api.EXPECT().
-			SubmitTransaction(gomock.Any()).
-			DoAndReturn(func(tx flow.Transaction) (etypes.TransactionReceipt, error) {
+			AddTransaction(gomock.Any()).
+			DoAndReturn(func(tx flow.Transaction) (execution.TransactionResult, error) {
 				capturedTx = tx
-				return etypes.TransactionReceipt{}, nil
+				return execution.TransactionResult{}, nil
 			}).Times(1)
 
 		requestTx := observation.SendTransactionRequest{
@@ -324,8 +325,8 @@ func TestBackend(t *testing.T) {
 	t.Run("SendTransaction which errors while processing", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 
 		api.EXPECT().
-			SubmitTransaction(gomock.Any()).
-			Return(etypes.TransactionReceipt{}, &emulator.ErrInvalidSignaturePublicKey{}).Times(1)
+			AddTransaction(gomock.Any()).
+			Return(execution.TransactionResult{}, &emulator.ErrInvalidSignaturePublicKey{}).Times(1)
 
 		requestTx := observation.SendTransactionRequest{
 			Transaction: &entities.Transaction{
