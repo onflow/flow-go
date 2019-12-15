@@ -235,7 +235,7 @@ func TestEvents(t *testing.T) {
 		})}
 		var blockNumber uint64 = 1
 
-		err := store.InsertEvents(blockNumber, events...)
+		err := store.InsertEvents(blockNumber, events)
 		assert.NoError(t, err)
 
 		t.Run("should be able to get inserted events", func(t *testing.T) {
@@ -260,7 +260,7 @@ func TestEvents(t *testing.T) {
 				events = append(events, event)
 			}
 			eventsByBlock[uint64(i)] = events
-			err := store.InsertEvents(uint64(i), events...)
+			err := store.InsertEvents(uint64(i), events)
 			assert.NoError(t, err)
 		}
 
@@ -345,7 +345,7 @@ func TestPersistence(t *testing.T) {
 	assert.NoError(t, err)
 	err = store.InsertTransaction(tx)
 	assert.NoError(t, err)
-	err = store.InsertEvents(block.Number, events...)
+	err = store.InsertEvents(block.Number, events)
 	assert.NoError(t, err)
 	err = store.SetLedger(block.Number, ledger)
 
