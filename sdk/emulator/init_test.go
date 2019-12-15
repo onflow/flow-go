@@ -139,10 +139,10 @@ func TestInitialization(t *testing.T) {
 				b.RootAccountAddress(),
 			)
 
-			res, _, err := b.ExecuteScript([]byte(readScript))
+			result, err := b.ExecuteScript([]byte(readScript))
 			assert.NoError(t, err)
 
-			assert.Equal(t, values.Int{Int: big.NewInt(1)}, res)
+			assert.Equal(t, values.Int{Int: big.NewInt(1)}, result.Value)
 		})
 	})
 }
