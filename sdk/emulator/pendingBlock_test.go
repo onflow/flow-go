@@ -300,7 +300,7 @@ func TestPendingBlockCommit(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Enter execution mode (block hash should not change after this point)
-		blockHash := b.GetPendingBlock().Hash()
+		blockHash := b.PendingBlockHash()
 
 		// Execute tx1 (succeeds)
 		result, err := b.ExecuteNextTransaction()
@@ -333,7 +333,7 @@ func TestPendingBlockCommit(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Enter execution mode (block hash should not change after this point)
-		blockHash := b.GetPendingBlock().Hash()
+		blockHash := b.PendingBlockHash()
 
 		// Execute and commit pending block
 		block, results, err := b.ExecuteAndCommitBlock()

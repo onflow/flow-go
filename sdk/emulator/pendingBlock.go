@@ -6,8 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
-// A PendingBlock contains the pending state required to form a new block.
-type PendingBlock struct {
+// A pendingBlock contains the pending state required to form a new block.
+type pendingBlock struct {
 	// block information (Number, PreviousBlockHash, TransactionHashes)
 	block *types.Block
 	// mapping from transaction hash to transaction
@@ -20,8 +20,8 @@ type PendingBlock struct {
 	index int
 }
 
-// NewPendingBlock creates a new pending block sequentially after a specified block.
-func NewPendingBlock(prevBlock types.Block, ledger flow.Ledger) *PendingBlock {
+// newPendingBlock creates a new pending block sequentially after a specified block.
+func newPendingBlock(prevBlock types.Block, ledger flow.Ledger) *pendingBlock {
 	transactions := make(map[string]*flow.Transaction)
 	transactionHashes := make([]crypto.Hash, 0)
 
@@ -31,7 +31,7 @@ func NewPendingBlock(prevBlock types.Block, ledger flow.Ledger) *PendingBlock {
 		TransactionHashes: transactionHashes,
 	}
 
-	return &PendingBlock{
+	return &pendingBlock{
 		block:        block,
 		transactions: transactions,
 		ledger:       ledger,
@@ -41,51 +41,51 @@ func NewPendingBlock(prevBlock types.Block, ledger flow.Ledger) *PendingBlock {
 }
 
 // Hash returns the hash of the pending block.
-func (b *PendingBlock) Hash() crypto.Hash {
+func (b *pendingBlock) Hash() crypto.Hash {
 	return b.block.Hash()
 }
 
 // Number returns the number of the pending block.
-func (b *PendingBlock) Number() uint64 {
+func (b *pendingBlock) Number() uint64 {
 	return b.block.Number
 }
 
 // Block returns the block information for the pending block.
-func (b *PendingBlock) Block() types.Block {
+func (b *pendingBlock) Block() types.Block {
 	return *b.block
 }
 
 // Ledger returns the ledger for the pending block.
-func (b *PendingBlock) Ledger() flow.Ledger {
+func (b *pendingBlock) Ledger() flow.Ledger {
 	return b.ledger
 }
 
 // AddTransaction adds a transaction to the pending block.
-func (b *PendingBlock) AddTransaction(tx flow.Transaction) {
+func (b *pendingBlock) AddTransaction(tx flow.Transaction) {
 	b.block.TransactionHashes = append(b.block.TransactionHashes, tx.Hash())
 	b.transactions[string(tx.Hash())] = &tx
 }
 
 // ContainsTransaction checks if a transaction is included in the pending block.
-func (b *PendingBlock) ContainsTransaction(txHash crypto.Hash) bool {
+func (b *pendingBlock) ContainsTransaction(txHash crypto.Hash) bool {
 	_, exists := b.transactions[string(txHash)]
 	return exists
 }
 
 // GetTransaction retrieves a transaction in the pending block by hash, or nil
 // if it does not exist.
-func (b *PendingBlock) GetTransaction(txHash crypto.Hash) *flow.Transaction {
+func (b *pendingBlock) GetTransaction(txHash crypto.Hash) *flow.Transaction {
 	return b.transactions[string(txHash)]
 }
 
 // nextTransaction returns the next indexed transaction.
-func (b *PendingBlock) nextTransaction() *flow.Transaction {
+func (b *pendingBlock) nextTransaction() *flow.Transaction {
 	txHash := b.block.TransactionHashes[b.index]
 	return b.GetTransaction(txHash)
 }
 
 // Transactions returns the transactions in the pending block.
-func (b *PendingBlock) Transactions() []flow.Transaction {
+func (b *pendingBlock) Transactions() []flow.Transaction {
 	transactions := make([]flow.Transaction, len(b.block.TransactionHashes))
 
 	for i, txHash := range b.block.TransactionHashes {
@@ -99,11 +99,8 @@ func (b *PendingBlock) Transactions() []flow.Transaction {
 //
 // This function uses the provided execute function to perform the actual
 // execution, then updates the pending block with the output.
-func (b *PendingBlock) ExecuteNextTransaction(
-	execute func(
-		ledger *flow.LedgerView,
-		tx flow.Transaction,
-	) (TransactionResult, error),
+func (b *pendingBlock) ExecuteNextTransaction(
+	execute func(ledger *flow.LedgerView, tx flow.Transaction) (TransactionResult, error),
 ) (TransactionResult, error) {
 	tx := b.nextTransaction()
 
@@ -132,26 +129,26 @@ func (b *PendingBlock) ExecuteNextTransaction(
 }
 
 // Events returns all events captured during the execution of the pending block.
-func (b *PendingBlock) Events() []flow.Event {
+func (b *pendingBlock) Events() []flow.Event {
 	return b.events
 }
 
 // ExecutionStarted returns true if the pending block has started executing.
-func (b *PendingBlock) ExecutionStarted() bool {
+func (b *pendingBlock) ExecutionStarted() bool {
 	return b.index > 0
 }
 
 // ExecutionComplete returns true if the pending block is fully executed.
-func (b *PendingBlock) ExecutionComplete() bool {
+func (b *pendingBlock) ExecutionComplete() bool {
 	return b.index >= b.Size()
 }
 
 // Size returns the number of transactions in the pending block.
-func (b *PendingBlock) Size() int {
+func (b *pendingBlock) Size() int {
 	return len(b.block.TransactionHashes)
 }
 
 // Empty returns true if the pending block is empty.
-func (b *PendingBlock) Empty() bool {
+func (b *pendingBlock) Empty() bool {
 	return b.Size() == 0
 }

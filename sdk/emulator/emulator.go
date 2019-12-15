@@ -26,7 +26,7 @@ type Blockchain struct {
 	mu sync.RWMutex
 
 	// pending block containing block info, register state, pending transactions
-	pendingBlock *PendingBlock
+	pendingBlock *pendingBlock
 
 	// runtime context used to execute transactions and scripts
 	computer *computer
@@ -83,7 +83,7 @@ func WithStore(store storage.Store) Option {
 
 // NewBlockchain instantiates a new emulated blockchain with the provided options.
 func NewBlockchain(opts ...Option) (*Blockchain, error) {
-	var pendingBlock *PendingBlock
+	var pendingBlock *pendingBlock
 	var rootAccount *flow.Account
 
 	// apply options to the default config
@@ -109,7 +109,7 @@ func NewBlockchain(opts ...Option) (*Blockchain, error) {
 		}
 
 		// restore pending block header from store information
-		pendingBlock = NewPendingBlock(latestBlock, latestLedger)
+		pendingBlock = newPendingBlock(latestBlock, latestLedger)
 		rootAccount = getAccount(latestLedger.NewView(), flow.RootAddress)
 
 	} else if err != nil && !errors.Is(err, storage.ErrNotFound{}) {
@@ -133,7 +133,7 @@ func NewBlockchain(opts ...Option) (*Blockchain, error) {
 		}
 
 		// create pending block header from genesis block
-		pendingBlock = NewPendingBlock(genesis, genesisLedger)
+		pendingBlock = newPendingBlock(genesis, genesisLedger)
 		rootAccount = getAccount(genesisLedger.NewView(), flow.RootAddress)
 	}
 
@@ -161,9 +161,9 @@ func (b *Blockchain) RootKey() flow.AccountPrivateKey {
 	return b.rootAccountKey
 }
 
-// GetPendingBlock gets the pending block.
-func (b *Blockchain) GetPendingBlock() *PendingBlock {
-	return b.pendingBlock
+// PendingBlock returns the hash of the pending block.
+func (b *Blockchain) PendingBlockHash() crypto.Hash {
+	return b.pendingBlock.Hash()
 }
 
 // GetLatestBlock gets the latest sealed block.
@@ -380,7 +380,7 @@ func (b *Blockchain) executeNextTransaction() (TransactionResult, error) {
 
 // CommitBlock seals the current pending block and saves it to storage.
 //
-// Note: this function clears the pending transaction pool and resets the pending block.
+// This function clears the pending transaction pool and resets the pending block.
 func (b *Blockchain) CommitBlock() (*types.Block, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -423,7 +423,7 @@ func (b *Blockchain) commitBlock() (*types.Block, error) {
 	b.handleEvents(events, b.pendingBlock.Number())
 
 	// reset pending block using current block and ledger state
-	b.pendingBlock = NewPendingBlock(block, ledger)
+	b.pendingBlock = newPendingBlock(block, ledger)
 
 	return &block, nil
 }
@@ -461,8 +461,8 @@ func (b *Blockchain) ResetPendingBlock() error {
 		return err
 	}
 
-	// Reset pending block using latest committed block and state
-	b.pendingBlock = NewPendingBlock(*latestBlock, latestLedger)
+	// reset pending block using latest committed block and ledger state
+	b.pendingBlock = newPendingBlock(*latestBlock, latestLedger)
 
 	return nil
 }
