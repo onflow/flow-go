@@ -473,13 +473,8 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 	})
 
 	t.Run("MultipleAccounts", func(t *testing.T) {
-		loggedMessages := make([]string, 0)
-
-		b, _ := emulator.NewEmulatedBlockchain(emulator.WithRuntimeLogger(
-			func(msg string) {
-				loggedMessages = append(loggedMessages, msg)
-			},
-		))
+		b, err := emulator.NewEmulatedBlockchain()
+		require.NoError(t, err)
 
 		privateKeyA := b.RootKey()
 
@@ -525,8 +520,8 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
-		assert.Contains(t, loggedMessages, fmt.Sprintf("%x", accountAddressA.Bytes()))
-		assert.Contains(t, loggedMessages, fmt.Sprintf("%x", accountAddressB.Bytes()))
+		assert.Contains(t, result.Logs, fmt.Sprintf("%x", accountAddressA.Bytes()))
+		assert.Contains(t, result.Logs, fmt.Sprintf("%x", accountAddressB.Bytes()))
 	})
 }
 

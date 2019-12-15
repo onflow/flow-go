@@ -68,12 +68,7 @@ type Config struct {
 // NewEmulatorServer creates a new instance of a Flow Emulator server.
 func NewEmulatorServer(logger *log.Logger, store storage.Store, conf *Config) *EmulatorServer {
 
-	messageLogger := func(msg string) {
-		logger.Debug(msg)
-	}
-
 	options := []emulator.Option{
-		emulator.WithRuntimeLogger(messageLogger),
 		emulator.WithStore(store),
 	}
 	if conf.RootAccountKey != nil {
