@@ -61,7 +61,13 @@ func TestBackend(t *testing.T) {
 		}
 
 		api.EXPECT().
-			ExecuteScript(sampleScriptText).Return(values.NewInt(2137), nil, nil).
+			ExecuteScript(sampleScriptText).
+			Return(execution.ScriptResult{
+				Value: values.NewInt(2137),
+				Result: execution.Result{
+					Error: nil,
+				},
+			}, nil).
 			Times(1)
 
 		response, err := backend.ExecuteScript(context.Background(), &executionScriptRequest)
@@ -322,7 +328,7 @@ func TestBackend(t *testing.T) {
 	t.Run("SendTransaction which errors while processing", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 		api.EXPECT().
 			AddTransaction(gomock.Any()).
-			Return(execution.TransactionResult{}, &emulator.ErrInvalidSignaturePublicKey{}).
+			Return(&emulator.ErrInvalidSignaturePublicKey{}).
 			Times(1)
 
 		requestTx := observation.SendTransactionRequest{
