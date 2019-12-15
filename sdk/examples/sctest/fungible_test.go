@@ -57,9 +57,10 @@ func TestCreateToken(t *testing.T) {
 
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
-		_, err = b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 10))
-		if !assert.NoError(t, err) {
-			t.Log(err.Error())
+		result, err := b.ExecuteScript(GenerateInspectVaultScript(contractAddr, b.RootAccountAddress(), 10))
+		require.NoError(t, err)
+		if !assert.True(t, result.Succeeded()) {
+			t.Log(result.Error.Error())
 		}
 	})
 
@@ -107,9 +108,10 @@ func TestInAccountTransfers(t *testing.T) {
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 		// Assert that the vaults balance is correct
-		_, err = b.ExecuteScript(GenerateInspectVaultArrayScript(contractAddr, b.RootAccountAddress(), 0, 7))
-		if !assert.NoError(t, err) {
-			t.Log(err.Error())
+		result, err := b.ExecuteScript(GenerateInspectVaultArrayScript(contractAddr, b.RootAccountAddress(), 0, 7))
+		require.NoError(t, err)
+		if !assert.True(t, result.Succeeded()) {
+			t.Log(result.Error.Error())
 		}
 	})
 
