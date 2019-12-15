@@ -12,12 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 )
 
-// Computer uses a runtime instance to execute transactions and scripts.
-type Computer struct {
-	runtime        runtime.Runtime
-	onEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
-}
-
 // A Result is the result of executing a script or transaction.
 type Result struct {
 	Error  error
@@ -46,11 +40,17 @@ type ScriptResult struct {
 	Result
 }
 
-// NewComputer returns a new Computer initialized with a runtime.
-func NewComputer(
+// A computer uses a runtime instance to execute transactions and scripts.
+type computer struct {
+	runtime        runtime.Runtime
+	onEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
+}
+
+// newComputer returns a new computer initialized with a runtime.
+func newComputer(
 	runtime runtime.Runtime,
-) *Computer {
-	return &Computer{
+) *computer {
+	return &computer{
 		runtime: runtime,
 	}
 }
@@ -61,7 +61,7 @@ func NewComputer(
 // the accounts that authorized the transaction.
 //
 // An error is returned if the transaction script cannot be parsed or reverts during execution.
-func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transaction) (TransactionResult, error) {
+func (c *computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transaction) (TransactionResult, error) {
 	runtimeContext := execution.NewRuntimeContext(ledger)
 
 	runtimeContext.SetChecker(func(code []byte, location runtime.Location) error {
@@ -105,7 +105,7 @@ func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transacti
 // ExecuteScript executes a plain script in the runtime.
 //
 // This function initializes a new runtime context using the provided registers view.
-func (c *Computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptResult, error) {
+func (c *computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptResult, error) {
 	runtimeContext := execution.NewRuntimeContext(view)
 
 	scriptHash := hash.DefaultHasher.ComputeHash(script)

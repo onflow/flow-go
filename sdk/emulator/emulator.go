@@ -39,7 +39,7 @@ type EmulatedBlockchain struct {
 	pendingBlock *PendingBlock
 
 	// The runtime context used to execute transactions and scripts
-	computer *Computer
+	computer *computer
 
 	rootAccountAddress flow.Address
 	rootAccountKey     flow.AccountPrivateKey
@@ -156,8 +156,7 @@ func NewEmulatedBlockchain(opts ...Option) (*EmulatedBlockchain, error) {
 	}
 
 	interpreterRuntime := runtime.NewInterpreterRuntime()
-	computer := NewComputer(interpreterRuntime)
-	b.computer = computer
+	b.computer = newComputer(interpreterRuntime)
 
 	return b, nil
 }
