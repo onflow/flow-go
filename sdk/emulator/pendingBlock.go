@@ -1,15 +1,16 @@
-package types
+package emulator
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
+	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
 // A PendingBlock contains the pending state required to form a new block.
 type PendingBlock struct {
 	// block information (Number, PreviousBlockHash, TransactionHashes)
-	block *Block
+	block *types.Block
 	// mapping from transaction hash to transaction
 	transactions map[string]*flow.Transaction
 	// current working ledger, updated after each transaction execution
@@ -21,11 +22,11 @@ type PendingBlock struct {
 }
 
 // NewPendingBlock creates a new pending block sequentially after a specified block.
-func NewPendingBlock(prevBlock Block, ledger flow.Ledger) *PendingBlock {
+func NewPendingBlock(prevBlock types.Block, ledger flow.Ledger) *PendingBlock {
 	transactions := make(map[string]*flow.Transaction)
 	transactionHashes := make([]crypto.Hash, 0)
 
-	block := &Block{
+	block := &types.Block{
 		Number:            prevBlock.Number + 1,
 		PreviousBlockHash: prevBlock.Hash(),
 		TransactionHashes: transactionHashes,
@@ -51,7 +52,7 @@ func (b *PendingBlock) Number() uint64 {
 }
 
 // Block returns the block information for the pending block.
-func (b *PendingBlock) Block() Block {
+func (b *PendingBlock) Block() types.Block {
 	return *b.block
 }
 
