@@ -94,7 +94,7 @@ func NewBlockchain(opts ...Option) (*Blockchain, error) {
 
 	// if no store is specified, use a memstore
 	// NOTE: we don't initialize this in defaultConfig because otherwise the same
-	// memstore instance is shared
+	// memstore is shared between Blockchain instances
 	if config.Store == nil {
 		config.Store = memstore.New()
 	}
