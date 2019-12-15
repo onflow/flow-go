@@ -48,8 +48,11 @@ type Blockchain struct {
 
 // BlockchainAPI defines the method set of an emulated blockchain.
 type BlockchainAPI interface {
-	RootAccountAddress() flow.Address
-	RootKey() flow.AccountPrivateKey
+	AddTransaction(tx flow.Transaction) error
+	ExecuteNextTransaction() (TransactionResult, error)
+	ExecuteBlock() ([]TransactionResult, error)
+	CommitBlock() (*types.Block, error)
+	ExecuteAndCommitBlock() (*types.Block, []TransactionResult, error)
 	GetLatestBlock() (*types.Block, error)
 	GetBlockByHash(hash crypto.Hash) (*types.Block, error)
 	GetBlockByNumber(number uint64) (*types.Block, error)
@@ -57,11 +60,10 @@ type BlockchainAPI interface {
 	GetAccount(address flow.Address) (*flow.Account, error)
 	GetAccountAtBlock(address flow.Address, blockNumber uint64) (*flow.Account, error)
 	GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
-	AddTransaction(tx flow.Transaction) error
 	ExecuteScript(script []byte) (ScriptResult, error)
 	ExecuteScriptAtBlock(script []byte, blockNumber uint64) (ScriptResult, error)
-	CommitBlock() (*types.Block, error)
-	ExecuteAndCommitBlock() (*types.Block, []TransactionResult, error)
+	RootAccountAddress() flow.Address
+	RootKey() flow.AccountPrivateKey
 }
 
 // Config is a set of configuration options for an emulated blockchain.

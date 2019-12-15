@@ -81,6 +81,36 @@ func (mr *MockBlockchainAPIMockRecorder) ExecuteAndCommitBlock() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecuteAndCommitBlock", reflect.TypeOf((*MockBlockchainAPI)(nil).ExecuteAndCommitBlock))
 }
 
+// ExecuteBlock mocks base method
+func (m *MockBlockchainAPI) ExecuteBlock() ([]emulator.TransactionResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExecuteBlock")
+	ret0, _ := ret[0].([]emulator.TransactionResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ExecuteBlock indicates an expected call of ExecuteBlock
+func (mr *MockBlockchainAPIMockRecorder) ExecuteBlock() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecuteBlock", reflect.TypeOf((*MockBlockchainAPI)(nil).ExecuteBlock))
+}
+
+// ExecuteNextTransaction mocks base method
+func (m *MockBlockchainAPI) ExecuteNextTransaction() (emulator.TransactionResult, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExecuteNextTransaction")
+	ret0, _ := ret[0].(emulator.TransactionResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ExecuteNextTransaction indicates an expected call of ExecuteNextTransaction
+func (mr *MockBlockchainAPIMockRecorder) ExecuteNextTransaction() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecuteNextTransaction", reflect.TypeOf((*MockBlockchainAPI)(nil).ExecuteNextTransaction))
+}
+
 // ExecuteScript mocks base method
 func (m *MockBlockchainAPI) ExecuteScript(arg0 []byte) (emulator.ScriptResult, error) {
 	m.ctrl.T.Helper()
