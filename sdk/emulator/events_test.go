@@ -36,7 +36,7 @@ func TestEventEmitted(t *testing.T) {
 	}
 
 	t.Run("EmittedFromTransaction", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		script := []byte(`
@@ -93,7 +93,7 @@ func TestEventEmitted(t *testing.T) {
 	})
 
 	t.Run("EmittedFromScript", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		script := []byte(`
@@ -126,7 +126,7 @@ func TestEventEmitted(t *testing.T) {
 	})
 
 	t.Run("EmittedFromAccount", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		accountScript := []byte(`

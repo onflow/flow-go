@@ -10,7 +10,7 @@ import (
 )
 
 func TestRuntimeLogs(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	script := []byte(`

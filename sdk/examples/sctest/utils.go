@@ -44,8 +44,8 @@ func randomKey() flow.AccountPrivateKey {
 }
 
 // newEmulator returns a emulator object for testing
-func newEmulator() *emulator.EmulatedBlockchain {
-	b, err := emulator.NewEmulatedBlockchain()
+func newEmulator() *emulator.Blockchain {
+	b, err := emulator.NewBlockchain()
 	if err != nil {
 		panic(err)
 	}
@@ -59,7 +59,7 @@ func newEmulator() *emulator.EmulatedBlockchain {
 // This function asserts the correct result and commits the block if it passed
 func SignAndSubmit(
 	t *testing.T,
-	b *emulator.EmulatedBlockchain,
+	b *emulator.Blockchain,
 	tx flow.Transaction,
 	signingKeys []flow.AccountPrivateKey,
 	signingAddresses []flow.Address,
@@ -91,7 +91,7 @@ func SignAndSubmit(
 // and a NFT collection with 1 NFT each
 func setupUsersTokens(
 	t *testing.T,
-	b *emulator.EmulatedBlockchain,
+	b *emulator.Blockchain,
 	tokenAddr flow.Address,
 	nftAddr flow.Address,
 	signingKeys []flow.AccountPrivateKey,

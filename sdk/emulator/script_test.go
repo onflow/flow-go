@@ -13,7 +13,7 @@ import (
 )
 
 func TestExecuteScript(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, counterAddress := deployAndGenerateAddTwoScript(t, b)

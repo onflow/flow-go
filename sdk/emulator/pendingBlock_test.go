@@ -12,7 +12,7 @@ import (
 )
 
 func TestPendingBlockBeforeExecution(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -86,7 +86,7 @@ func TestPendingBlockBeforeExecution(t *testing.T) {
 }
 
 func TestPendingBlockDuringExecution(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -275,7 +275,7 @@ func TestPendingBlockDuringExecution(t *testing.T) {
 }
 
 func TestPendingBlockCommit(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)

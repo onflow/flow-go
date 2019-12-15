@@ -20,7 +20,7 @@ type CheckerFunc func([]byte, runtime.Location) error
 // A context is short-lived and is intended to be used when executing a single transaction.
 //
 // The logic in this runtime context is specific to the emulator and is designed to be
-// used with an EmulatedBlockchain instance.
+// used with an Blockchain instance.
 type RuntimeContext struct {
 	ledger          *flow.LedgerView
 	signingAccounts []values.Address

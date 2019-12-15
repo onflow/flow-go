@@ -73,7 +73,7 @@ generate-registries:
 .PHONY: generate-mocks
 generate-mocks:
 	GO111MODULE=on mockgen -destination=sdk/client/mocks/mock_client.go -package=mocks github.com/dapperlabs/flow-go/sdk/client RPCClient
-	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/emulated_blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator EmulatedBlockchainAPI
+	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator BlockchainAPI
 	GO111MODULE=on mockgen -destination=sdk/emulator/storage/mocks/store.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator/storage Store
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"

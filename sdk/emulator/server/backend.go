@@ -21,12 +21,12 @@ import (
 // Backend wraps an emulated blockchain and implements the RPC handlers
 // required by the Observation API.
 type Backend struct {
-	blockchain emulator.EmulatedBlockchainAPI
+	blockchain emulator.BlockchainAPI
 	logger     *logrus.Logger
 }
 
 // NewBackend returns a new backend.
-func NewBackend(blockchain emulator.EmulatedBlockchainAPI, logger *logrus.Logger) *Backend {
+func NewBackend(blockchain emulator.BlockchainAPI, logger *logrus.Logger) *Backend {
 	return &Backend{
 		blockchain: blockchain,
 		logger:     logger,
