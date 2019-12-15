@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/hash"
 	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
@@ -115,9 +114,7 @@ func TestEventEmitted(t *testing.T) {
 
 		decodedEvent := eventValue.(values.Event)
 
-		scriptHash := hash.DefaultHasher.ComputeHash(script)
-
-		expectedType := fmt.Sprintf("script.%s.MyEvent", scriptHash.Hex())
+		expectedType := fmt.Sprintf("script.%s.MyEvent", result.ScriptHash.Hex())
 		// NOTE: ID is undefined for events emitted from scripts
 
 		assert.Equal(t, expectedType, actualEvent.Type)
