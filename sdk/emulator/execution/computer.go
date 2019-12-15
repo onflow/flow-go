@@ -39,7 +39,8 @@ type TransactionResult struct {
 
 // A ScriptResult is the result of executing a script.
 type ScriptResult struct {
-	Value values.Value
+	ScriptHash crypto.Hash
+	Value      values.Value
 	Result
 }
 
@@ -105,7 +106,9 @@ func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transacti
 func (c *Computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptResult, error) {
 	runtimeContext := NewRuntimeContext(view)
 
-	location := runtime.ScriptLocation(ScriptHash(script))
+	scriptHash := ScriptHash(script)
+
+	location := runtime.ScriptLocation(scriptHash)
 
 	value, err := c.runtime.ExecuteScript(script, runtimeContext, location)
 
@@ -115,7 +118,8 @@ func (c *Computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptRe
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts
 			return ScriptResult{
-				Value: value,
+				ScriptHash: scriptHash,
+				Value:      value,
 				Result: Result{
 					Error:  err,
 					Logs:   runtimeContext.Logs(),
@@ -129,7 +133,8 @@ func (c *Computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptRe
 	}
 
 	return ScriptResult{
-		Value: value,
+		ScriptHash: scriptHash,
+		Value:      value,
 		Result: Result{
 			Error:  err,
 			Logs:   runtimeContext.Logs(),
