@@ -2,8 +2,10 @@ package server
 
 import (
 	"context"
+	"fmt"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/logrusorgru/aurora"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -14,17 +16,18 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 )
 
 // Backend wraps an emulated blockchain and implements the RPC handlers
 // required by the Observation API.
 type Backend struct {
 	blockchain emulator.EmulatedBlockchainAPI
-	logger     *log.Logger
+	logger     *logrus.Logger
 }
 
 // NewBackend returns a new backend.
-func NewBackend(blockchain emulator.EmulatedBlockchainAPI, logger *log.Logger) *Backend {
+func NewBackend(blockchain emulator.EmulatedBlockchainAPI, logger *logrus.Logger) *Backend {
 	return &Backend{
 		blockchain: blockchain,
 		logger:     logger,
@@ -87,7 +90,7 @@ func (b *Backend) GetLatestBlock(ctx context.Context, req *observation.GetLatest
 		Number: block.Number,
 	}
 
-	b.logger.WithFields(log.Fields{
+	b.logger.WithFields(logrus.Fields{
 		"blockNum":  blockHeader.Number,
 		"blockHash": blockHeader.Hash().Hex(),
 	}).Debugf("🎁  GetLatestBlock called")
@@ -160,22 +163,18 @@ func (b *Backend) GetAccount(ctx context.Context, req *observation.GetAccountReq
 // ExecuteScript performs a call.
 func (b *Backend) ExecuteScript(ctx context.Context, req *observation.ExecuteScriptRequest) (*observation.ExecuteScriptResponse, error) {
 	script := req.GetScript()
-	value, events, err := b.blockchain.ExecuteScript(script)
+	result, err := b.blockchain.ExecuteScript(script)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	if value == nil {
+	if result.Value == nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid script")
 	}
 
-	b.logger.Debugf("📞  Contract script called")
+	printScriptResult(b.logger, result)
 
-	for _, event := range events {
-		b.logger.Debugf("🔔  Event emitted: %s", event.String())
-	}
-
-	valueBytes, err := encoding.Encode(value)
+	valueBytes, err := encoding.Encode(result.Value)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -199,7 +198,7 @@ func (b *Backend) GetEvents(ctx context.Context, req *observation.GetEventsReque
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	b.logger.WithFields(log.Fields{
+	b.logger.WithFields(logrus.Fields{
 		"eventType":  req.Type,
 		"startBlock": req.StartBlock,
 		"endBlock":   req.EndBlock,
@@ -216,4 +215,101 @@ func (b *Backend) GetEvents(ctx context.Context, req *observation.GetEventsReque
 	}
 
 	return &res, nil
+}
+
+// commitBlock executes the current pending transactions and commits the results in a new block.
+func (b *Backend) commitBlock() {
+	block, results, err := b.blockchain.ExecuteAndCommitBlock()
+	if err != nil {
+		b.logger.WithError(err).Error("Failed to commit block")
+	} else {
+		for _, result := range results {
+			printTransactionResult(b.logger, result)
+		}
+
+		b.logger.WithFields(logrus.Fields{
+			"blockNum":  block.Number,
+			"blockHash": block.Hash().Hex(),
+			"blockSize": len(block.TransactionHashes),
+		}).Debugf("📦  Block #%d committed", block.Number)
+	}
+}
+
+func printTransactionResult(logger *logrus.Logger, result execution.TransactionResult) {
+	if result.Succeeded() {
+		logger.
+			WithField("txHash", result.TransactionHash.Hex()).
+			Info("⭐  Transaction executed")
+	} else {
+		logger.
+			WithField("txHash", result.TransactionHash.Hex()).
+			Warn("❗  Transaction reverted")
+	}
+
+	for _, log := range result.Logs {
+		logger.Debugf(
+			"%s %s",
+			logPrefix("LOG", result.TransactionHash, aurora.BlueFg),
+			log,
+		)
+	}
+
+	for _, event := range result.Events {
+		logger.Debugf(
+			"%s %s",
+			logPrefix("EVT", result.TransactionHash, aurora.GreenFg),
+			event.String(),
+		)
+	}
+
+	if result.Reverted() {
+		logger.Warnf(
+			"%s %s",
+			logPrefix("ERR", result.TransactionHash, aurora.RedFg),
+			result.Error.Error(),
+		)
+	}
+}
+
+func printScriptResult(logger *logrus.Logger, result execution.ScriptResult) {
+	if result.Succeeded() {
+		logger.
+			WithField("scriptHash", result.ScriptHash.Hex()).
+			Info("⭐  Script executed")
+	} else {
+		logger.
+			WithField("scriptHash", result.ScriptHash.Hex()).
+			Warn("❗  Script reverted")
+	}
+
+	for _, log := range result.Logs {
+		logger.Debugf(
+			"%s %s",
+			logPrefix("LOG", result.ScriptHash, aurora.BlueFg),
+			log,
+		)
+	}
+
+	for _, event := range result.Events {
+		logger.Debugf(
+			"%s %s",
+			logPrefix("EVT", result.ScriptHash, aurora.GreenFg),
+			event.String(),
+		)
+	}
+
+	if result.Reverted() {
+		logger.Warnf(
+			"%s %s",
+			logPrefix("ERR", result.ScriptHash, aurora.RedFg),
+			result.Error.Error(),
+		)
+	}
+}
+
+func logPrefix(prefix string, hash crypto.Hash, color aurora.Color) string {
+	prefix = aurora.Colorize(prefix, color|aurora.BoldFm).String()
+	shortHash := fmt.Sprintf("[%s]", hash.Hex()[:6])
+	shortHash = aurora.Colorize(shortHash, aurora.FaintFm).String()
+	return fmt.Sprintf("%s %s", prefix, shortHash)
 }
