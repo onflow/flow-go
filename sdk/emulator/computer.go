@@ -12,34 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 )
 
-// A Result is the result of executing a script or transaction.
-type Result struct {
-	Error  error
-	Logs   []string
-	Events []flow.Event
-}
-
-func (r Result) Succeeded() bool {
-	return r.Error == nil
-}
-
-func (r Result) Reverted() bool {
-	return !r.Succeeded()
-}
-
-// A TransactionResult is the result of executing a transaction.
-type TransactionResult struct {
-	TransactionHash crypto.Hash
-	Result
-}
-
-// A ScriptResult is the result of executing a script.
-type ScriptResult struct {
-	ScriptHash crypto.Hash
-	Value      values.Value
-	Result
-}
-
 // A computer uses a runtime instance to execute transactions and scripts.
 type computer struct {
 	runtime        runtime.Runtime
@@ -80,11 +52,9 @@ func (c *computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transacti
 			// runtime errors occur when the execution reverts
 			return TransactionResult{
 				TransactionHash: tx.Hash(),
-				Result: Result{
-					Error:  err,
-					Logs:   runtimeContext.Logs(),
-					Events: events,
-				},
+				Error:           err,
+				Logs:            runtimeContext.Logs(),
+				Events:          events,
 			}, nil
 		}
 
@@ -94,11 +64,9 @@ func (c *computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transacti
 
 	return TransactionResult{
 		TransactionHash: tx.Hash(),
-		Result: Result{
-			Error:  err,
-			Logs:   runtimeContext.Logs(),
-			Events: events,
-		},
+		Error:           err,
+		Logs:            runtimeContext.Logs(),
+		Events:          events,
 	}, nil
 }
 
@@ -122,11 +90,9 @@ func (c *computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptRe
 			return ScriptResult{
 				ScriptHash: scriptHash,
 				Value:      value,
-				Result: Result{
-					Error:  err,
-					Logs:   runtimeContext.Logs(),
-					Events: events,
-				},
+				Error:      err,
+				Logs:       runtimeContext.Logs(),
+				Events:     events,
 			}, nil
 		}
 
@@ -137,11 +103,9 @@ func (c *computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptRe
 	return ScriptResult{
 		ScriptHash: scriptHash,
 		Value:      value,
-		Result: Result{
-			Error:  err,
-			Logs:   runtimeContext.Logs(),
-			Events: events,
-		},
+		Error:      err,
+		Logs:       runtimeContext.Logs(),
+		Events:     events,
 	}, nil
 }
 

@@ -66,9 +66,7 @@ func TestBackend(t *testing.T) {
 			ExecuteScript(sampleScriptText).
 			Return(emulator.ScriptResult{
 				Value: values.NewInt(2137),
-				Result: emulator.Result{
-					Error: nil,
-				},
+				Error: nil,
 			}, nil).
 			Times(1)
 
