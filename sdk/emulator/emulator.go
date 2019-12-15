@@ -337,16 +337,21 @@ func (b *EmulatedBlockchain) ExecuteBlock() ([]types.TransactionReceipt, error) 
 func (b *EmulatedBlockchain) executeBlock() ([]types.TransactionReceipt, error) {
 	results := make([]types.TransactionReceipt, 0)
 
+	// empty blocks do not require execution, treat as a no-op
 	if b.pendingBlock.Empty() {
 		return results, nil
 	}
 
+	// cannot execute a block that has already executed
 	if b.pendingBlock.ExecutionComplete() {
-		return results, &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
+		return results, &ErrPendingBlockTransactionsExhausted{
+			BlockHash: b.pendingBlock.Hash(),
+		}
 	}
 
+	// continue executing transactions until execution is complete
 	for !b.pendingBlock.ExecutionComplete() {
-		result, err := b.executeTransaction()
+		result, err := b.executeNextTransaction()
 		if err != nil {
 			return results, err
 		}
@@ -357,24 +362,29 @@ func (b *EmulatedBlockchain) executeBlock() ([]types.TransactionReceipt, error) 
 	return results, nil
 }
 
-// TODO: should be atomic
 // ExecuteNextTransaction executes the next indexed transaction in pending block.
 func (b *EmulatedBlockchain) ExecuteNextTransaction() (types.TransactionReceipt, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	return b.executeTransaction()
+	return b.executeNextTransaction()
 }
 
-// executeTransaction is a helper function for ExecuteBlock and ExecuteNextTransaction that runs through the transaction execution.
-func (b *EmulatedBlockchain) executeTransaction() (types.TransactionReceipt, error) {
-	// Check if there are remaining txs to be executed
+// executeNextTransaction is a helper function for ExecuteBlock and ExecuteNextTransaction that
+// executes the next transaction in the pending block.
+func (b *EmulatedBlockchain) executeNextTransaction() (types.TransactionReceipt, error) {
+	// check if there are remaining txs to be executed
 	if b.pendingBlock.ExecutionComplete() {
-		return types.TransactionReceipt{}, &ErrPendingBlockTransactionsExhausted{BlockHash: b.pendingBlock.Hash()}
+		return types.TransactionReceipt{}, &ErrPendingBlockTransactionsExhausted{
+			BlockHash: b.pendingBlock.Hash(),
+		}
 	}
 
 	var receipt types.TransactionReceipt
 
+	// use the computer to execute the next transaction
+	// revert() and success() are used to update the pending block
+	// based on the result of the transaction
 	b.pendingBlock.ExecuteNextTransaction(
 		func(
 			tx *flow.Transaction,
@@ -410,8 +420,7 @@ func (b *EmulatedBlockchain) executeTransaction() (types.TransactionReceipt, err
 
 // CommitBlock seals the current pending block and saves it to storage.
 //
-// Note: this clears the pending transaction pool and resets the pending block.
-// This also indexes the committed blockchain state for testing purposes.
+// Note: this function clears the pending transaction pool and resets the pending block.
 func (b *EmulatedBlockchain) CommitBlock() (*types.Block, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -420,7 +429,7 @@ func (b *EmulatedBlockchain) CommitBlock() (*types.Block, error) {
 }
 
 func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
-	// pending block cannot be committed before execution (unless empty)
+	// pending block cannot be committed before execution starts (unless empty)
 	if !b.pendingBlock.ExecutionStarted() && !b.pendingBlock.Empty() {
 		return nil, &ErrPendingBlockCommitBeforeExecution{BlockHash: b.pendingBlock.Hash()}
 	}
@@ -453,7 +462,7 @@ func (b *EmulatedBlockchain) commitBlock() (*types.Block, error) {
 	// update system state based on emitted events
 	b.handleEvents(events, b.pendingBlock.Number())
 
-	// reset pending block using current block and current register state
+	// reset pending block using current block and ledger state
 	b.pendingBlock = types.NewPendingBlock(block, ledger)
 
 	return &block, nil
