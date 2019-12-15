@@ -66,29 +66,29 @@ type BlockchainAPI interface {
 	RootKey() flow.AccountPrivateKey
 }
 
-// Config is a set of configuration options for an emulated blockchain.
-type Config struct {
+// config is a set of configuration options for an emulated blockchain.
+type config struct {
 	RootAccountKey flow.AccountPrivateKey
 	Store          storage.Store
 }
 
 // defaultConfig is the default configuration for an emulated blockchain.
 // NOTE: Instantiated in init function
-var defaultConfig Config
+var defaultConfig config
 
 // Option is a function applying a change to the emulator config.
-type Option func(*Config)
+type Option func(*config)
 
 // WithRootKey sets the root key.
 func WithRootAccountKey(rootKey flow.AccountPrivateKey) Option {
-	return func(c *Config) {
+	return func(c *config) {
 		c.RootAccountKey = rootKey
 	}
 }
 
 // WithStore sets the persistent storage provider.
 func WithStore(store storage.Store) Option {
-	return func(c *Config) {
+	return func(c *config) {
 		c.Store = store
 	}
 }
