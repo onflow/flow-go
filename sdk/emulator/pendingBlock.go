@@ -13,7 +13,7 @@ type pendingBlock struct {
 	// mapping from transaction hash to transaction
 	transactions map[string]*flow.Transaction
 	// current working ledger, updated after each transaction execution
-	ledger flow.Ledger
+	ledgerView *types.LedgerView
 	// events emitted during execution
 	events []flow.Event
 	// index of transaction execution
@@ -21,7 +21,7 @@ type pendingBlock struct {
 }
 
 // newPendingBlock creates a new pending block sequentially after a specified block.
-func newPendingBlock(prevBlock types.Block, ledger flow.Ledger) *pendingBlock {
+func newPendingBlock(prevBlock types.Block, ledgerView *types.LedgerView) *pendingBlock {
 	transactions := make(map[string]*flow.Transaction)
 	transactionHashes := make([]crypto.Hash, 0)
 
@@ -34,7 +34,7 @@ func newPendingBlock(prevBlock types.Block, ledger flow.Ledger) *pendingBlock {
 	return &pendingBlock{
 		block:        block,
 		transactions: transactions,
-		ledger:       ledger,
+		ledgerView:   ledgerView,
 		events:       make([]flow.Event, 0),
 		index:        0,
 	}
@@ -55,9 +55,9 @@ func (b *pendingBlock) Block() types.Block {
 	return *b.block
 }
 
-// Ledger returns the ledger for the pending block.
-func (b *pendingBlock) Ledger() flow.Ledger {
-	return b.ledger
+// LedgerDelta returns the ledger delta for the pending block.
+func (b *pendingBlock) LedgerDelta() *types.LedgerDelta {
+	return b.ledgerView.Delta()
 }
 
 // AddTransaction adds a transaction to the pending block.
@@ -100,13 +100,11 @@ func (b *pendingBlock) Transactions() []flow.Transaction {
 // This function uses the provided execute function to perform the actual
 // execution, then updates the pending block with the output.
 func (b *pendingBlock) ExecuteNextTransaction(
-	execute func(ledger *flow.LedgerView, tx flow.Transaction) (TransactionResult, error),
+	execute func(ledger *types.LedgerView, tx flow.Transaction) (TransactionResult, error),
 ) (TransactionResult, error) {
 	tx := b.nextTransaction()
 
-	ledger := b.ledger.NewView()
-
-	result, err := execute(ledger, *tx)
+	result, err := execute(b.ledgerView, *tx)
 	if err != nil {
 		// fail fast if fatal error occurs
 		return TransactionResult{}, err
@@ -122,7 +120,6 @@ func (b *pendingBlock) ExecuteNextTransaction(
 		tx.Events = result.Events
 
 		b.events = append(b.events, result.Events...)
-		b.ledger.MergeWith(ledger.Updated())
 	}
 
 	return result, nil
