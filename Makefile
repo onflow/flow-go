@@ -20,7 +20,7 @@ crypto/relic/build: crypto/relic
 
 .PHONY: install-tools
 install-tools: crypto/relic/build
-ifeq ($(OS),"Linux)
+ifeq ($(OS),"Linux")
 	sudo apt-get -y install capnproto
 endif
 	cd ${GOPATH}; \
