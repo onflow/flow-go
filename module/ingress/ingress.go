@@ -62,7 +62,7 @@ func (i Ingress) Done() <-chan struct{} {
 
 	<-i.stop
 	go func() {
-		done <- struct{}{}
+		close(done)
 	}()
 
 	return done
