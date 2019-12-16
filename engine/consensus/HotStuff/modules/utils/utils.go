@@ -1,6 +1,9 @@
 package utils
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"reflect"
+)
 
 func ConvertBytesToHash(data []byte) [32]byte {
 	var hashArr [32]byte
@@ -47,4 +50,10 @@ func ConvertBoolSliceToByteSlice(bools []bool) []byte {
 	}
 
 	return bytes
+}
+
+func EnsureNotNil(x interface{}, structName string) {
+	if x == nil || reflect.ValueOf(x).IsNil() {
+		panic(structName + " cannot be nil")
+	}
 }
