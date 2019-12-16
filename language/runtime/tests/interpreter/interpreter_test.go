@@ -6074,7 +6074,7 @@ func TestInterpretCastingResourceToAnyResource(t *testing.T) {
     `)
 
 	value, err := inter.Invoke("test")
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	require.IsType(t, &interpreter.AnyValue{}, value)
 	assert.IsType(t,
@@ -6769,4 +6769,55 @@ func TestInterpretContractAccountFieldUse(t *testing.T) {
 		addressValue,
 		inter.Globals["address2"].Value,
 	)
+}
+
+func TestInterpretConformToImportedInterface(t *testing.T) {
+
+	checkerImported, err := ParseAndCheck(t, `
+      struct interface Foo {
+          fun check(answer: Int) {
+              pre {
+                  answer == 42
+              }
+          }
+      }
+	`)
+	require.NoError(t, err)
+
+	checkerImporting, err := ParseAndCheckWithOptions(t,
+		`
+          import Foo from "imported"
+
+          struct Bar: Foo {
+              fun check(answer: Int) {}
+          }
+
+          fun test() {
+              let bar = Bar()
+              bar.check(answer: 1)
+          }
+        `,
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+				assert.Equal(t,
+					ast.StringLocation("imported"),
+					location,
+				)
+				return checkerImported.Program, nil
+			},
+			Options: []sema.Option{
+				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	inter, err := interpreter.NewInterpreter(checkerImporting)
+	require.NoError(t, err)
+
+	err = inter.Interpret()
+	require.NoError(t, err)
+
+	_, err = inter.Invoke("test")
+	assert.IsType(t, &interpreter.ConditionError{}, err)
 }
