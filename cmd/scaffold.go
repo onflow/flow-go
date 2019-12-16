@@ -15,7 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/trickle"
 	"github.com/dapperlabs/flow-go/network/trickle/middleware"
