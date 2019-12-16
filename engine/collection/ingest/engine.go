@@ -63,9 +63,7 @@ func (e *Engine) Done() <-chan struct{} {
 	return done
 }
 
-// Submit allows us to submit local events to the propagation engine. The
-// function logs errors internally, rather than returning it, which allows other
-// engines to submit events in a non-blocking way by using a goroutine.
+// Submit allows us to submit local events to the engine.
 func (e *Engine) Submit(event interface{}) {
 
 	err := e.Process(e.me.NodeID(), event)
@@ -74,9 +72,10 @@ func (e *Engine) Submit(event interface{}) {
 	}
 }
 
-// Process processes the given propagation engine event. Events that are given
-// to this function originate within the propagation engine on the node with the
-// given origin ID.
+// Process processes engine events.
+//
+// Transactions are validated and routed to the correct cluster, then added
+// to the transaction mempool.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	var err error
 	switch ev := event.(type) {

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/dapperlabs/flow-go/engine"
+
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -30,15 +32,13 @@ type Ingress struct {
 	server  *grpc.Server // the GRPC server
 	config  Config
 
-	engine ingest.Engine // the engine that handles incoming transactions
-
 	ready chan struct{} // indicates when the server is setup
 	stop  chan struct{} // indicates that the server should stop
 }
 
 // New returns a new ingress server.
-func New(config Config, engine ingest.Engine) *Ingress {
-	return &Ingress{
+func New(config Config, engine *ingest.Engine) *Ingress {
+	ingress := &Ingress{
 		handler: &handler{
 			engine: engine,
 		},
@@ -47,6 +47,10 @@ func New(config Config, engine ingest.Engine) *Ingress {
 		ready:  make(chan struct{}),
 		stop:   make(chan struct{}),
 	}
+
+	observation.RegisterBasicObserveServiceServer(ingress.server, ingress.handler)
+
+	return ingress
 }
 
 // Ready returns a ready channel that is closed once the module has fully
@@ -72,8 +76,6 @@ func (i Ingress) Done() <-chan struct{} {
 // start starts the GRPC server and handles sending the ready signal and
 // handling the stop signal.
 func (i *Ingress) start() {
-	observation.RegisterBasicObserveServiceServer(i.server, i.handler)
-
 	log := i.logger.With().Str("module", "ingress").Logger()
 
 	log.Info().Msgf("starting server on address %s", i.config.ListenAddr)
@@ -105,7 +107,7 @@ func (i *Ingress) start() {
 
 // handler implements the basic Observation API.
 type handler struct {
-	engine ingest.Engine
+	engine engine.Engine
 }
 
 // Ping responds to requests when the server is up.

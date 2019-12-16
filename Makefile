@@ -18,7 +18,7 @@ crypto/relic/build: crypto/relic
 
 .PHONY: install-tools
 install-tools: crypto/relic/build
-	sudo apt-get -y install capnproto
+#	sudo apt-get -y install capnproto
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/davecheney/godoc2md@master; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
@@ -73,6 +73,7 @@ generate-mocks:
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
+	mockery -name '.*' -dir=engine -case=underscore -output="./engine/mock" -outpkg="mock"
 
 .PHONY: generate-bindata
 generate-bindata:
