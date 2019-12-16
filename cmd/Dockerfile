@@ -3,6 +3,8 @@
 ## (1) Build Relic first to maximize caching
 FROM golang:1.13-alpine3.10 AS build-relic
 
+ARG TARGET
+
 RUN apk update && apk add \
     build-base \
     cmake \
@@ -37,11 +39,12 @@ COPY . .
 # Copy over Relic build artifacts
 COPY --from=build-relic /build/relic/build ./crypto/relic/build
 
-RUN GO111MODULE=on CGO_ENABLED=1 GOOOS=linux GOARCH=amd64 go build -o ./app ./cmd/consensus
+RUN GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o ./app ./cmd/${TARGET}
 
 ## (3) Add the binary to a fresh Alpine image
 FROM alpine:3.10
 
 COPY --from=build-app /app/app /bin/app
+RUN chmod a+x /bin/app
 
 ENTRYPOINT ["/bin/app"]
