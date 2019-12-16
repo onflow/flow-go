@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/dapperlabs/flow-go/crypto"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 )

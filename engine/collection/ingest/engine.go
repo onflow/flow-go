@@ -5,14 +5,13 @@ package ingest
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/module/txpool"
-
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/txpool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 )

@@ -7,11 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/dapperlabs/flow-go/module/txpool"
-
-	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 	"github.com/dgraph-io/badger/v2"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -19,7 +15,9 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
+	"github.com/dapperlabs/flow-go/module/txpool"
 	"github.com/dapperlabs/flow-go/network/stub"
+	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
