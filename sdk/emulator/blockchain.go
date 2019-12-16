@@ -131,19 +131,19 @@ func NewBlockchain(opts ...Option) (*Blockchain, error) {
 
 		rootAccount = getAccount(genesisLedgerView, flow.RootAddress)
 
-		// insert the genesis block
+		// commit the genesis block to storage
 		genesis := types.GenesisBlock()
-		if err := store.InsertBlock(genesis); err != nil {
+
+		err := store.CommitBlock(genesis, nil, genesisLedgerView.Delta(), nil)
+		if err != nil {
 			return nil, err
 		}
 
-		// insert the initial state containing the root account
-		if err := store.InsertLedger(0, genesisLedgerView.Delta()); err != nil {
-			return nil, err
-		}
+		// get empty ledger view
+		ledgerView := store.LedgerViewByNumber(0)
 
-		// create pending block header from genesis block
-		pendingBlock = newPendingBlock(genesis, genesisLedgerView)
+		// create pending block from genesis
+		pendingBlock = newPendingBlock(genesis, ledgerView)
 	}
 
 	b := &Blockchain{
@@ -263,8 +263,8 @@ func (b *Blockchain) GetAccountAtBlock(address flow.Address, blockNumber uint64)
 	panic("not implemented")
 }
 
-func getAccount(ledger *types.LedgerView, address flow.Address) *flow.Account {
-	runtimeCtx := execution.NewRuntimeContext(ledger)
+func getAccount(ledgerView *types.LedgerView, address flow.Address) *flow.Account {
+	runtimeCtx := execution.NewRuntimeContext(ledgerView)
 	return runtimeCtx.GetAccount(address)
 }
 
@@ -370,10 +370,10 @@ func (b *Blockchain) executeNextTransaction() (TransactionResult, error) {
 	// use the computer to execute the next transaction
 	receipt, err := b.pendingBlock.ExecuteNextTransaction(
 		func(
-			ledger *types.LedgerView,
+			ledgerView *types.LedgerView,
 			tx flow.Transaction,
 		) (TransactionResult, error) {
-			return b.computer.ExecuteTransaction(ledger, tx)
+			return b.computer.ExecuteTransaction(ledgerView, tx)
 		},
 	)
 	if err != nil {

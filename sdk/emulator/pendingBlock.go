@@ -100,7 +100,7 @@ func (b *pendingBlock) Transactions() []flow.Transaction {
 // This function uses the provided execute function to perform the actual
 // execution, then updates the pending block with the output.
 func (b *pendingBlock) ExecuteNextTransaction(
-	execute func(ledger *types.LedgerView, tx flow.Transaction) (TransactionResult, error),
+	execute func(ledgerView *types.LedgerView, tx flow.Transaction) (TransactionResult, error),
 ) (TransactionResult, error) {
 	tx := b.nextTransaction()
 
