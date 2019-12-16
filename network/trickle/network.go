@@ -71,7 +71,9 @@ func NewNetwork(log zerolog.Logger, codec network.Codec, state protocol.State, m
 func (n *Network) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	n.mw.Start(n)
-	close(ready)
+	go func() {
+		close(ready)
+	}()
 	return ready
 }
 

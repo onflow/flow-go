@@ -17,8 +17,3 @@ type Engine interface {
 	// the peer-to-peer network.
 	Process(originID flow.Identifier, event interface{}) error
 }
-
-type ReadyDoneAware interface {
-	Ready() <-chan struct{}
-	Done() <-chan struct{}
-}

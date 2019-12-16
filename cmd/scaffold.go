@@ -1,4 +1,4 @@
-package cmd
+package node
 
 import (
 	"fmt"
@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/codec/json"
@@ -147,7 +148,7 @@ func (fnb *FlowNodeBuilder) handleDoneObject(v namedDoneObject) {
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
-	fnb.CreateReadDoneAware("trickle network", func(builder *FlowNodeBuilder) network.ReadyDoneAware {
+	fnb.CreateReadDoneAware("trickle network", func(builder *FlowNodeBuilder) module.ReadyDoneAware {
 
 		fnb.Logger.Info().Msg("initializing network stack")
 
@@ -164,12 +165,12 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 }
 
 type namedReadyFn struct {
-	fn   func(*FlowNodeBuilder) network.ReadyDoneAware
+	fn   func(*FlowNodeBuilder) module.ReadyDoneAware
 	name string
 }
 
 type namedDoneObject struct {
-	ob   network.ReadyDoneAware
+	ob   module.ReadyDoneAware
 	name string
 }
 
@@ -204,7 +205,7 @@ func (fnb *FlowNodeBuilder) MustNot(err error) *zerolog.Event {
 	return nil
 }
 
-func (fnb *FlowNodeBuilder) CreateReadDoneAware(name string, f func(*FlowNodeBuilder) network.ReadyDoneAware) *FlowNodeBuilder {
+func (fnb *FlowNodeBuilder) CreateReadDoneAware(name string, f func(*FlowNodeBuilder) module.ReadyDoneAware) *FlowNodeBuilder {
 	fnb.readyDoneFns = append(fnb.readyDoneFns, namedReadyFn{
 		fn:   f,
 		name: name,

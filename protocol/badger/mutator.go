@@ -189,6 +189,21 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		return errors.Wrapf(err, "could not check identity role (%x)", id.NodeID)
 	}
 
+	// for each identity, check it doesn't have an address yet
+	for _, id := range identities {
+
+		// check for address
+		var address string
+		err := operation.RetrieveAddress(id.NodeID, &address)(tx)
+		if errors.Cause(err) == badger.ErrKeyNotFound {
+			continue
+		}
+		if err == nil {
+			return errors.Errorf("identity address already exists (%x: %s)", id.NodeID, address)
+		}
+		return errors.Wrapf(err, "could not check identity address (%x)", id.NodeID)
+	}
+
 	return nil
 }
 
