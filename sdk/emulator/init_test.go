@@ -81,8 +81,9 @@ func TestInitialization(t *testing.T) {
 		assert.NoError(t, err)
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		err = b.SubmitTransaction(tx)
+		result, err := b.SubmitTransaction(tx)
 		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
 
 		block, err := b.CommitBlock()
 		assert.NoError(t, err)
