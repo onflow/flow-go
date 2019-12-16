@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 )
@@ -29,22 +30,22 @@ type Ingress struct {
 	server  *grpc.Server // the GRPC server
 	config  Config
 
-	// TODO
-	// engine ingress.Engine // the engine that handles incoming transactions
+	engine ingest.Engine // the engine that handles incoming transactions
 
 	ready chan struct{} // indicates when the server is setup
 	stop  chan struct{} // indicates that the server should stop
 }
 
 // New returns a new ingress server.
-func New(config Config) *Ingress {
+func New(config Config, engine ingest.Engine) *Ingress {
 	return &Ingress{
-		handler: &handler{},
-		server:  grpc.NewServer(),
-		config:  config,
-		// engine: engine,
-		ready: make(chan struct{}),
-		stop:  make(chan struct{}),
+		handler: &handler{
+			engine: engine,
+		},
+		server: grpc.NewServer(),
+		config: config,
+		ready:  make(chan struct{}),
+		stop:   make(chan struct{}),
 	}
 }
 
@@ -103,7 +104,9 @@ func (i *Ingress) start() {
 }
 
 // handler implements the basic Observation API.
-type handler struct{}
+type handler struct {
+	engine ingest.Engine
+}
 
 // Ping responds to requests when the server is up.
 func (h *handler) Ping(ctx context.Context, req *observation.PingRequest) (*observation.PingResponse, error) {
@@ -113,11 +116,12 @@ func (h *handler) Ping(ctx context.Context, req *observation.PingRequest) (*obse
 // SendTransaction accepts new transactions and inputs them to the ingress
 // engine for validation and routing.
 func (h *handler) SendTransaction(ctx context.Context, req *observation.SendTransactionRequest) (*observation.SendTransactionResponse, error) {
-	// TODO submit to ingress engine
 	tx, err := convert.MessageToTransaction(req.Transaction)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
 	}
+
+	h.engine.Submit(&tx)
 
 	return &observation.SendTransactionResponse{Hash: tx.Hash()}, nil
 }
