@@ -66,7 +66,7 @@ func (mr *MockStoreMockRecorder) BlockByNumber(arg0 interface{}) *gomock.Call {
 }
 
 // CommitBlock mocks base method
-func (m *MockStore) CommitBlock(arg0 types.Block, arg1 []flow.Transaction, arg2 flow.Ledger, arg3 []flow.Event) error {
+func (m *MockStore) CommitBlock(arg0 types.Block, arg1 []flow.Transaction, arg2 *types.LedgerDelta, arg3 []flow.Event) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CommitBlock", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
@@ -108,7 +108,7 @@ func (mr *MockStoreMockRecorder) InsertEvents(arg0, arg1 interface{}) *gomock.Ca
 }
 
 // InsertLedger mocks base method
-func (m *MockStore) InsertLedger(arg0 uint64, arg1 flow.Ledger) error {
+func (m *MockStore) InsertLedger(arg0 uint64, arg1 *types.LedgerDelta) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InsertLedger", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -150,19 +150,18 @@ func (mr *MockStoreMockRecorder) LatestBlock() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LatestBlock", reflect.TypeOf((*MockStore)(nil).LatestBlock))
 }
 
-// LedgerByNumber mocks base method
-func (m *MockStore) LedgerByNumber(arg0 uint64) (flow.Ledger, error) {
+// LedgerViewByNumber mocks base method
+func (m *MockStore) LedgerViewByNumber(arg0 uint64) *types.LedgerView {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LedgerByNumber", arg0)
-	ret0, _ := ret[0].(flow.Ledger)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "LedgerViewByNumber", arg0)
+	ret0, _ := ret[0].(*types.LedgerView)
+	return ret0
 }
 
-// LedgerByNumber indicates an expected call of LedgerByNumber
-func (mr *MockStoreMockRecorder) LedgerByNumber(arg0 interface{}) *gomock.Call {
+// LedgerViewByNumber indicates an expected call of LedgerViewByNumber
+func (mr *MockStoreMockRecorder) LedgerViewByNumber(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LedgerByNumber", reflect.TypeOf((*MockStore)(nil).LedgerByNumber), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LedgerViewByNumber", reflect.TypeOf((*MockStore)(nil).LedgerViewByNumber), arg0)
 }
 
 // RetrieveEvents mocks base method
