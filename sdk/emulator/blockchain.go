@@ -115,23 +115,21 @@ func NewBlockchain(opts ...Option) (*Blockchain, error) {
 	latestBlock, err := store.LatestBlock()
 	if err == nil && latestBlock.Number > 0 {
 		// storage contains data, load state from storage
-		latestLedger, err := store.LedgerByNumber(latestBlock.Number)
-		if err != nil {
-			return nil, err
-		}
+		latestLedgerView := store.LedgerViewByNumber(latestBlock.Number)
 
 		// restore pending block header from store information
-		pendingBlock = newPendingBlock(latestBlock, latestLedger)
-		rootAccount = getAccount(latestLedger.NewView(), flow.RootAddress)
-
+		pendingBlock = newPendingBlock(latestBlock, latestLedgerView)
+		rootAccount = getAccount(latestLedgerView, flow.RootAddress)
 	} else if err != nil && !errors.Is(err, storage.ErrNotFound{}) {
 		// internal storage error, fail fast
 		return nil, err
 	} else {
-		genesisLedger := make(flow.Ledger)
+		genesisLedgerView := store.LedgerViewByNumber(0)
 
-		// storage is empty, create the root account and genesis block
-		createAccount(genesisLedger, config.RootAccountKey)
+		// storage is empty, create the root account
+		createAccount(genesisLedgerView, config.RootAccountKey)
+
+		rootAccount = getAccount(genesisLedgerView, flow.RootAddress)
 
 		// insert the genesis block
 		genesis := types.GenesisBlock()
@@ -140,13 +138,12 @@ func NewBlockchain(opts ...Option) (*Blockchain, error) {
 		}
 
 		// insert the initial state containing the root account
-		if err := store.InsertLedger(0, genesisLedger); err != nil {
+		if err := store.InsertLedger(0, genesisLedgerView.Delta()); err != nil {
 			return nil, err
 		}
 
 		// create pending block header from genesis block
-		pendingBlock = newPendingBlock(genesis, genesisLedger)
-		rootAccount = getAccount(genesisLedger.NewView(), flow.RootAddress)
+		pendingBlock = newPendingBlock(genesis, genesisLedgerView)
 	}
 
 	b := &Blockchain{
@@ -251,12 +248,9 @@ func (b *Blockchain) getAccount(address flow.Address) (*flow.Account, error) {
 		return nil, err
 	}
 
-	latestLedger, err := b.storage.LedgerByNumber(latestBlock.Number)
-	if err != nil {
-		return nil, err
-	}
+	latestLedgerView := b.storage.LedgerViewByNumber(latestBlock.Number)
 
-	acct := getAccount(latestLedger.NewView(), address)
+	acct := getAccount(latestLedgerView, address)
 	if acct == nil {
 		return nil, &ErrAccountNotFound{Address: address}
 	}
@@ -269,7 +263,7 @@ func (b *Blockchain) GetAccountAtBlock(address flow.Address, blockNumber uint64)
 	panic("not implemented")
 }
 
-func getAccount(ledger *flow.LedgerView, address flow.Address) *flow.Account {
+func getAccount(ledger *types.LedgerView, address flow.Address) *flow.Account {
 	runtimeCtx := execution.NewRuntimeContext(ledger)
 	return runtimeCtx.GetAccount(address)
 }
@@ -376,7 +370,7 @@ func (b *Blockchain) executeNextTransaction() (TransactionResult, error) {
 	// use the computer to execute the next transaction
 	receipt, err := b.pendingBlock.ExecuteNextTransaction(
 		func(
-			ledger *flow.LedgerView,
+			ledger *types.LedgerView,
 			tx flow.Transaction,
 		) (TransactionResult, error) {
 			return b.computer.ExecuteTransaction(ledger, tx)
@@ -412,7 +406,7 @@ func (b *Blockchain) commitBlock() (*types.Block, error) {
 	}
 
 	block := b.pendingBlock.Block()
-	ledger := b.pendingBlock.Ledger()
+	delta := b.pendingBlock.LedgerDelta()
 	events := b.pendingBlock.Events()
 
 	transactions := make([]flow.Transaction, b.pendingBlock.Size())
@@ -426,16 +420,18 @@ func (b *Blockchain) commitBlock() (*types.Block, error) {
 	}
 
 	// commit the pending block to storage
-	err := b.storage.CommitBlock(block, transactions, ledger, events)
+	err := b.storage.CommitBlock(block, transactions, delta, events)
 	if err != nil {
 		return nil, err
 	}
 
 	// update system state based on emitted events
-	b.handleEvents(events, b.pendingBlock.Number())
+	b.handleEvents(events, block.Number)
+
+	ledgerView := b.storage.LedgerViewByNumber(block.Number)
 
 	// reset pending block using current block and ledger state
-	b.pendingBlock = newPendingBlock(block, ledger)
+	b.pendingBlock = newPendingBlock(block, ledgerView)
 
 	return &block, nil
 }
@@ -468,13 +464,10 @@ func (b *Blockchain) ResetPendingBlock() error {
 		return err
 	}
 
-	latestLedger, err := b.storage.LedgerByNumber(latestBlock.Number)
-	if err != nil {
-		return err
-	}
+	latestLedgerView := b.storage.LedgerViewByNumber(latestBlock.Number)
 
 	// reset pending block using latest committed block and ledger state
-	b.pendingBlock = newPendingBlock(*latestBlock, latestLedger)
+	b.pendingBlock = newPendingBlock(*latestBlock, latestLedgerView)
 
 	return nil
 }
@@ -489,12 +482,9 @@ func (b *Blockchain) ExecuteScript(script []byte) (ScriptResult, error) {
 		return ScriptResult{}, err
 	}
 
-	latestLedger, err := b.storage.LedgerByNumber(latestBlock.Number)
-	if err != nil {
-		return ScriptResult{}, err
-	}
+	latestLedgerView := b.storage.LedgerViewByNumber(latestBlock.Number)
 
-	result, err := b.computer.ExecuteScript(latestLedger.NewView(), script)
+	result, err := b.computer.ExecuteScript(latestLedgerView, script)
 	if err != nil {
 		return ScriptResult{}, err
 	}
@@ -674,24 +664,20 @@ func (b *Blockchain) handleEvents(events []flow.Event, blockNumber uint64) {
 
 // createAccount creates an account with the given private key and injects it
 // into the given state, bypassing the need for a transaction.
-func createAccount(ledger flow.Ledger, privateKey flow.AccountPrivateKey) flow.Account {
+func createAccount(ledgerView *types.LedgerView, privateKey flow.AccountPrivateKey) flow.Account {
 	publicKey := privateKey.PublicKey(keys.PublicKeyWeightThreshold)
 	publicKeyBytes, err := flow.EncodeAccountPublicKey(publicKey)
 	if err != nil {
 		panic(err)
 	}
 
-	view := ledger.NewView()
-
-	runtimeContext := execution.NewRuntimeContext(view)
+	runtimeContext := execution.NewRuntimeContext(ledgerView)
 	accountAddress, err := runtimeContext.CreateAccount(
 		[]values.Bytes{publicKeyBytes},
 	)
 	if err != nil {
 		panic(err)
 	}
-
-	ledger.MergeWith(view.Updated())
 
 	account := runtimeContext.GetAccount(flow.Address(accountAddress))
 	return *account
