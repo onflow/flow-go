@@ -119,7 +119,11 @@ docker-push-emulator:
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
-	docker build -f cmd/consensus/Dockerfile -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" .
+	docker build -f cmd/Dockerfile --build-arg TARGET=consensus -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" .
+
+.PHONY: docker-build-execution
+docker-build-execution:
+	docker build -f cmd/Dockerfile --build-arg TARGET=execution -t gcr.io/dl-flow/execution:latest -t "gcr.io/dl-flow/execution:$(SHORT_COMMIT)" .
 
 # Builds the VS Code extension
 .PHONY: build-vscode-extension

@@ -16,6 +16,7 @@ const (
 
 	CollectionIngest = 20
 
+	Execution           = 100
 	SimulationGenerator = 200
 	SimulationColdstuff = 201
 
