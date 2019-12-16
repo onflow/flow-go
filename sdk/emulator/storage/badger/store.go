@@ -232,14 +232,11 @@ func insertTransaction(tx flow.Transaction) func(txn *badger.Txn) error {
 }
 
 func (s *Store) LedgerViewByNumber(blockNumber uint64) *types.LedgerView {
-	return types.NewLedgerView(func(key string) ([]byte, error) {
+	return types.NewLedgerView(func(key string) (value []byte, err error) {
 		s.ledgerChangeLog.RLock()
 		defer s.ledgerChangeLog.RUnlock()
 
 		lastChangedBlock := s.ledgerChangeLog.getMostRecentChange(key, blockNumber)
-
-		var value []byte
-		var err error
 
 		err = s.db.View(func(txn *badger.Txn) error {
 			value, err = getTx(txn)(ledgerValueKey(key, lastChangedBlock))
