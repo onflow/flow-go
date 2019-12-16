@@ -116,7 +116,7 @@ func (h *handler) SendTransaction(ctx context.Context, req *observation.SendTran
 	// TODO submit to ingress engine
 	tx, err := convert.MessageToTransaction(req.Transaction)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: ", err.Error()))
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
 	}
 
 	return &observation.SendTransactionResponse{Hash: tx.Hash()}, nil
