@@ -47,7 +47,7 @@ ifeq ($(COVER), true)
 endif
 
 .PHONY: generate
-generate: generate-godoc generate-proto generate-registries generate-mocks generate-bindata
+generate: generate-godoc generate-proto generate-mocks generate-bindata
 
 .PHONY: generate-godoc
 generate-godoc:
@@ -63,12 +63,6 @@ generate-proto:
 .PHONY: generate-capnp
 generate-capnp:
 	capnp compile -I${GOPATH}/src/zombiezen.com/go/capnproto2/std -ogo schema/captain/*.capnp
-
-.PHONY: generate-registries
-generate-registries:
-	GO111MODULE=on go build -o /tmp/registry-generator ./network/gossip/scripts/
-	find ./protobuf/services -type f -iname "*pb.go" -exec /tmp/registry-generator -w {} \;
-	rm /tmp/registry-generator
 
 .PHONY: generate-mocks
 generate-mocks:
