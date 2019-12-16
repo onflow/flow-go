@@ -1,8 +1,8 @@
 package reactor
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/componentsreactor/core"
-	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/componentsreactor/forkchoice"
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/components/reactor/core"
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/components/reactor/forkchoice"
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/defConAct"
 	"github.com/juju/loggo"
