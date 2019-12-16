@@ -5,12 +5,13 @@ package provider
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
-	"github.com/rs/zerolog"
 )
 
 // Engine is the collection provider engine, which responds to requests for
