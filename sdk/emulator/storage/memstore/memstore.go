@@ -93,7 +93,7 @@ func (s *Store) insertBlock(block types.Block) error {
 func (s *Store) CommitBlock(
 	block types.Block,
 	transactions []flow.Transaction,
-	ledger flow.Ledger,
+	delta *types.LedgerDelta,
 	events []flow.Event,
 ) error {
 	s.mu.Lock()
@@ -111,7 +111,7 @@ func (s *Store) CommitBlock(
 		}
 	}
 
-	err = s.insertLedger(block.Number, ledger)
+	err = s.insertLedger(block.Number, delta)
 	if err != nil {
 		return err
 	}
@@ -147,26 +147,50 @@ func (s *Store) insertTransaction(tx flow.Transaction) error {
 	return nil
 }
 
-func (s *Store) LedgerByNumber(blockNumber uint64) (flow.Ledger, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s *Store) LedgerViewByNumber(blockNumber uint64) *types.LedgerView {
+	return types.NewLedgerView(func(key string) ([]byte, error) {
+		s.mu.RLock()
+		defer s.mu.RUnlock()
 
-	ledger, ok := s.ledger[blockNumber]
-	if !ok {
-		return flow.Ledger{}, storage.ErrNotFound{}
-	}
-	return ledger, nil
+		ledger, ok := s.ledger[blockNumber]
+		if !ok {
+			return nil, nil
+		}
+
+		return ledger[key], nil
+	})
 }
 
-func (s *Store) InsertLedger(blockNumber uint64, ledger flow.Ledger) error {
+func (s *Store) InsertLedger(blockNumber uint64, delta *types.LedgerDelta) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.insertLedger(blockNumber, ledger)
+	return s.insertLedger(blockNumber, delta)
 }
 
-func (s *Store) insertLedger(blockNumber uint64, ledger flow.Ledger) error {
-	s.ledger[blockNumber] = ledger
+func (s *Store) insertLedger(blockNumber uint64, delta *types.LedgerDelta) error {
+	var oldLedger flow.Ledger
+
+	if blockNumber == 0 {
+		oldLedger = make(flow.Ledger)
+	} else {
+		oldLedger = s.ledger[blockNumber-1]
+	}
+
+	newLedger := make(flow.Ledger)
+
+	for key, value := range oldLedger {
+		// do not copy deleted values
+		if _, deleted := delta.Deleted[key]; !deleted {
+			newLedger[key] = value
+		}
+	}
+
+	for key, value := range delta.Updated {
+		newLedger[key] = value
+	}
+
+	s.ledger[blockNumber] = newLedger
 	return nil
 }
 
@@ -192,6 +216,7 @@ func (s *Store) RetrieveEvents(eventType string, startBlock, endBlock uint64) ([
 			}
 		}
 	}
+
 	return events, nil
 }
 
