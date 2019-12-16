@@ -8,6 +8,8 @@ VERSION := $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
 COVER_PROFILE := cover.out
 # Disable go sum database lookup for private repos
 GOPRIVATE=github.com/dapperlabs/*
+# The OS of this machine, Linux and Darwin are supported
+OS=$(shell uname -s)
 
 crypto/relic:
 	rm -rf crypto/relic
@@ -18,7 +20,9 @@ crypto/relic/build: crypto/relic
 
 .PHONY: install-tools
 install-tools: crypto/relic/build
-#	sudo apt-get -y install capnproto
+ifeq ($(OS),"Linux)
+	sudo apt-get -y install capnproto
+endif
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/davecheney/godoc2md@master; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
