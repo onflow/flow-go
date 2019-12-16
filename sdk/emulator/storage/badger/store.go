@@ -189,7 +189,7 @@ func (s Store) CommitBlock(
 			}
 		}
 
-		err = s.insertLedger(block.Number, delta)(txn)
+		err = s.insertLedgerDelta(block.Number, delta)(txn)
 		if err != nil {
 			return err
 		}
@@ -259,26 +259,28 @@ func (s *Store) LedgerViewByNumber(blockNumber uint64) *types.LedgerView {
 	})
 }
 
-func (s *Store) InsertLedger(blockNumber uint64, delta *types.LedgerDelta) error {
-	return s.db.Update(s.insertLedger(blockNumber, delta))
+func (s *Store) InsertLedgerDelta(blockNumber uint64, delta *types.LedgerDelta) error {
+	return s.db.Update(s.insertLedgerDelta(blockNumber, delta))
 }
 
-func (s *Store) insertLedger(blockNumber uint64, delta *types.LedgerDelta) func(txn *badger.Txn) error {
+func (s *Store) insertLedgerDelta(blockNumber uint64, delta *types.LedgerDelta) func(txn *badger.Txn) error {
 	return func(txn *badger.Txn) error {
 		s.ledgerChangeLog.Lock()
 		defer s.ledgerChangeLog.Unlock()
 
 		for _, registerID := range delta.Keys() {
-			if _, deleted := delta.Deleted[registerID]; deleted {
-				if err := txn.Delete(ledgerValueKey(registerID, blockNumber)); err != nil {
-					return err
-				}
-			} else {
-				value := delta.Updated[registerID]
-				if err := txn.Set(ledgerValueKey(registerID, blockNumber), value); err != nil {
+			value := delta.Updated[registerID]
+
+			if value != nil {
+				// if register has an updated value, write it at this block
+				err := txn.Set(ledgerValueKey(registerID, blockNumber), value)
+				if err != nil {
 					return err
 				}
 			}
+
+			// otherwise register has been deleted, so keep record change
+			// and keep value as nil
 
 			// update the in-memory changelog
 			s.ledgerChangeLog.addChange(registerID, blockNumber)
@@ -288,6 +290,7 @@ func (s *Store) insertLedger(blockNumber uint64, delta *types.LedgerDelta) func(
 			if err != nil {
 				return err
 			}
+
 			if err := txn.Set(ledgerChangelogKey(registerID), encChangelist); err != nil {
 				return err
 			}

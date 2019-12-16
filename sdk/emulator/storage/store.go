@@ -50,10 +50,8 @@ type Store interface {
 	// LedgerViewByNumber returns a view into the ledger state at a given block.
 	LedgerViewByNumber(blockNumber uint64) *types.LedgerView
 
-	// InsertLedger updates all registers in the ledger for the given block.
-	// Callers should only include registers in the ledger whose value changed
-	// in the given block to save space.
-	InsertLedger(blockNumber uint64, delta *types.LedgerDelta) error
+	// InsertLedgerDelta inserts a register delta at a given block.
+	InsertLedgerDelta(blockNumber uint64, delta *types.LedgerDelta) error
 
 	// RetrieveEvents returns all events with the given type between startBlock and
 	// endBlock (inclusive). If eventType is empty, returns all events in the

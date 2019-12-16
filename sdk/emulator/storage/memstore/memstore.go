@@ -111,7 +111,7 @@ func (s *Store) CommitBlock(
 		}
 	}
 
-	err = s.insertLedger(block.Number, delta)
+	err = s.insertLedgerDelta(block.Number, delta)
 	if err != nil {
 		return err
 	}
@@ -161,16 +161,17 @@ func (s *Store) LedgerViewByNumber(blockNumber uint64) *types.LedgerView {
 	})
 }
 
-func (s *Store) InsertLedger(blockNumber uint64, delta *types.LedgerDelta) error {
+func (s *Store) InsertLedgerDelta(blockNumber uint64, delta *types.LedgerDelta) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.insertLedger(blockNumber, delta)
+	return s.insertLedgerDelta(blockNumber, delta)
 }
 
-func (s *Store) insertLedger(blockNumber uint64, delta *types.LedgerDelta) error {
+func (s *Store) insertLedgerDelta(blockNumber uint64, delta *types.LedgerDelta) error {
 	var oldLedger flow.Ledger
 
+	// use empty ledger if this is the genesis block
 	if blockNumber == 0 {
 		oldLedger = make(flow.Ledger)
 	} else {
@@ -179,6 +180,7 @@ func (s *Store) insertLedger(blockNumber uint64, delta *types.LedgerDelta) error
 
 	newLedger := make(flow.Ledger)
 
+	// copy values from the previous ledger
 	for key, value := range oldLedger {
 		// do not copy deleted values
 		if _, deleted := delta.Deleted[key]; !deleted {
@@ -186,6 +188,7 @@ func (s *Store) insertLedger(blockNumber uint64, delta *types.LedgerDelta) error
 		}
 	}
 
+	// write all updated values
 	for key, value := range delta.Updated {
 		newLedger[key] = value
 	}
