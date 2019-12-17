@@ -9,6 +9,11 @@ import (
 // GuaranteedCollection represents a signed hash for a collection, which is used
 // to announce collections to consensus nodes.
 type GuaranteedCollection struct {
-	Hash       crypto.Hash
-	Signatures []crypto.Signature
+	CollectionHash crypto.Hash
+	Signatures     []crypto.Signature
+}
+
+// Hash returns the hash of the collection.
+func (gc *GuaranteedCollection) Hash() crypto.Hash {
+	return gc.CollectionHash
 }
