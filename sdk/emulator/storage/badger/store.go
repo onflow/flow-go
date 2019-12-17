@@ -268,9 +268,7 @@ func (s *Store) insertLedgerDelta(blockNumber uint64, delta *types.LedgerDelta) 
 		s.ledgerChangeLog.Lock()
 		defer s.ledgerChangeLog.Unlock()
 
-		for _, registerID := range delta.Keys() {
-			value := delta.Updated[registerID]
-
+		for registerID, value := range delta.Updates() {
 			if value != nil {
 				// if register has an updated value, write it at this block
 				err := txn.Set(ledgerValueKey(registerID, blockNumber), value)
@@ -279,7 +277,7 @@ func (s *Store) insertLedgerDelta(blockNumber uint64, delta *types.LedgerDelta) 
 				}
 			}
 
-			// otherwise register has been deleted, so keep record change
+			// otherwise register has been deleted, so record change
 			// and keep value as nil
 
 			// update the in-memory changelog

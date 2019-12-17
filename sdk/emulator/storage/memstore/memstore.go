@@ -183,17 +183,20 @@ func (s *Store) insertLedgerDelta(blockNumber uint64, delta *types.LedgerDelta) 
 	// copy values from the previous ledger
 	for key, value := range oldLedger {
 		// do not copy deleted values
-		if _, deleted := delta.Deleted[key]; !deleted {
+		if !delta.HasBeenDeleted(key) {
 			newLedger[key] = value
 		}
 	}
 
 	// write all updated values
-	for key, value := range delta.Updated {
-		newLedger[key] = value
+	for key, value := range delta.Updates() {
+		if value != nil {
+			newLedger[key] = value
+		}
 	}
 
 	s.ledger[blockNumber] = newLedger
+
 	return nil
 }
 

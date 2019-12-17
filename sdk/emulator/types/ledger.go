@@ -1,45 +1,59 @@
 package types
 
-import "github.com/dapperlabs/flow-go/model/flow"
-
+// A LedgerDelta is a record of ledger mutations.
 type LedgerDelta struct {
-	Updated flow.Ledger
-	Deleted map[string]struct{}
+	updates map[string][]byte
 }
 
-func (d *LedgerDelta) Keys() []string {
-	keys := make([]string, 0, len(d.Updated)+len(d.Deleted))
-
-	for key, _ := range d.Updated {
-		keys = append(keys, key)
-	}
-
-	for key, _ := range d.Deleted {
-		keys = append(keys, key)
-	}
-
-	return keys
-}
-
+// NewLedgerDelta returns an empty ledger delta.
 func NewLedgerDelta() *LedgerDelta {
 	return &LedgerDelta{
-		Updated: make(flow.Ledger),
-		Deleted: make(map[string]struct{}),
+		updates: make(map[string][]byte),
 	}
 }
 
+// Get reads a register value from this delta.
+//
+// This function will return nil if the given key has been deleted in this delta.
+func (d *LedgerDelta) Get(key string) (value []byte, exists bool) {
+	value, exists = d.updates[key]
+	return
+}
+
+// Set records an update in this delta.
+func (d *LedgerDelta) Set(key string, value []byte) {
+	d.updates[key] = value
+}
+
+// Delete records a deletion in this delta.
+func (d *LedgerDelta) Delete(key string) {
+	d.updates[key] = nil
+}
+
+// Updates returns all registers that were updated by this delta.
+func (d *LedgerDelta) Updates() map[string][]byte {
+	return d.updates
+}
+
+// HasBeenDeleted returns true if the given key has been deleted in this delta.
+func (d *LedgerDelta) HasBeenDeleted(key string) bool {
+	value, exists := d.Get(key)
+	return exists && value == nil
+}
+
+// GetRegisterFunc is a function that returns the value for a register.
 type GetRegisterFunc func(key string) ([]byte, error)
 
-// LedgerView provides a read-only view into an existing ledger set.
+// A LedgerView is a read-only view into a ledger stored in an underlying data source.
 //
-// Values are written to a temporary register cache that can later be
-// committed to the world state.
+// A ledger view records writes to a delta that can be used to update the
+// underlying data source.
 type LedgerView struct {
 	delta    *LedgerDelta
 	readFunc GetRegisterFunc
 }
 
-// LedgerView
+// NewLedgerView instantiates a new ledger view with the provided read function.
 func NewLedgerView(readFunc GetRegisterFunc) *LedgerView {
 	return &LedgerView{
 		delta:    NewLedgerDelta(),
@@ -47,13 +61,13 @@ func NewLedgerView(readFunc GetRegisterFunc) *LedgerView {
 	}
 }
 
-func (r *LedgerView) Delta() *LedgerDelta {
-	return r.delta
-}
-
+// Get gets a register value from this view.
+//
+// This function will return an error if it fails to read from the underlying
+// data source for this view.
 func (r *LedgerView) Get(key string) ([]byte, error) {
-	value := r.delta.Updated[key]
-	if value != nil {
+	value, exists := r.delta.Get(key)
+	if exists {
 		return value, nil
 	}
 
@@ -65,11 +79,17 @@ func (r *LedgerView) Get(key string) ([]byte, error) {
 	return value, nil
 }
 
+// Set sets a register value in this view.
 func (r *LedgerView) Set(key string, value []byte) {
-	r.delta.Updated[key] = value
+	r.delta.Set(key, value)
 }
 
+// Delete removes a register in this view.
 func (r *LedgerView) Delete(key string) {
-	r.delta.Updated[key] = nil
-	r.delta.Deleted[key] = struct{}{}
+	r.delta.Delete(key)
+}
+
+// Delta returns a record of the registers that were mutated in this view.
+func (r *LedgerView) Delta() *LedgerDelta {
+	return r.delta
 }
