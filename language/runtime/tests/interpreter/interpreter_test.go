@@ -5671,7 +5671,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 		&interpreter.ReferenceValue{
 			TargetStorageIdentifier: storageValue.Identifier,
 			// TODO: improve
-			TargetKey: rType.String(),
+			TargetKey: rType.ID(),
 		},
 		value,
 	)
@@ -6296,12 +6296,12 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 		},
 	)
 
-	const rTypeIdentifier = "R"
+	rType := inter.Checker.GlobalTypes["R"].Type
 
-	storageKey := interpreter.PrefixedStorageKey(rTypeIdentifier, interpreter.AccessLevelPrivate)
+	storageKey := interpreter.PrefixedStorageKey(rType.ID(), interpreter.AccessLevelPrivate)
 
 	originalValue := &interpreter.CompositeValue{
-		Identifier: rTypeIdentifier,
+		Identifier: rType.ID(),
 		Kind:       common.CompositeKindResource,
 		Fields:     map[string]interpreter.Value{},
 		Owner:      storageIdentifier1,
@@ -6435,12 +6435,12 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 		},
 	)
 
-	const rTypeIdentifier = "R"
+	rType := inter.Checker.GlobalTypes["R"].Type
 
-	storageKey := interpreter.PrefixedStorageKey(rTypeIdentifier, interpreter.AccessLevelPrivate)
+	storageKey := interpreter.PrefixedStorageKey(rType.ID(), interpreter.AccessLevelPrivate)
 
 	originalValue := &interpreter.CompositeValue{
-		Identifier: rTypeIdentifier,
+		Identifier: rType.ID(),
 		Kind:       common.CompositeKindResource,
 		Fields:     map[string]interpreter.Value{},
 		Owner:      storageIdentifier1,

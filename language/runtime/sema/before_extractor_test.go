@@ -19,7 +19,7 @@ func TestBeforeExtractor(t *testing.T) {
 	require.True(t, inputIsComplete)
 	require.NoError(t, err)
 
-	extractor := NewBeforeExtractor()
+	extractor := NewBeforeExtractor(nil)
 
 	identifier1 := ast.Identifier{
 		Identifier: extractor.ExpressionExtractor.FormatIdentifier(0),
