@@ -106,12 +106,6 @@ func HashFixture(size int) crypto.Hash {
 	return hash
 }
 
-func LedgerFixture() flow.Ledger {
-	return flow.Ledger{
-		"key": []byte("value"),
-	}
-}
-
 func IdentifierFixture() flow.Identifier {
 	var id flow.Identifier
 	_, _ = rand.Read(id[:])
