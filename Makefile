@@ -115,7 +115,7 @@ docker-ci:
 .PHONY: docker-ci-team-city
 docker-ci-team-city:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
-		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -v /etc/buildAgent:/etc/buildAgent \
+		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.5 \
 		make ci
 
