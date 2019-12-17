@@ -46,11 +46,11 @@ func TestPendingBlockBeforeExecution(t *testing.T) {
 	tx2.AddSignature(b.RootAccountAddress(), sig)
 
 	t.Run("EmptyPendingBlock", func(t *testing.T) {
-		// Attempt to execute empty pending block (invalid)
+		// Execute empty pending block
 		_, err := b.ExecuteBlock()
-		assert.IsType(t, &emulator.ErrPendingBlockTransactionsExhausted{}, err)
+		assert.NoError(t, err)
 
-		// Commit empty pending block (valid)
+		// Commit empty pending block
 		_, err = b.CommitBlock()
 		assert.NoError(t, err)
 
@@ -66,19 +66,6 @@ func TestPendingBlockBeforeExecution(t *testing.T) {
 		// Add tx1 again
 		err = b.AddTransaction(tx1)
 		assert.IsType(t, &emulator.ErrDuplicateTransaction{}, err)
-
-		err = b.ResetPendingBlock()
-		assert.NoError(t, err)
-	})
-
-	t.Run("SubmitAfterAddTransaction", func(t *testing.T) {
-		// Add tx1 to pending block
-		err = b.AddTransaction(tx1)
-		assert.NoError(t, err)
-
-		// Attempt to submit tx2 (add + execute)
-		_, err = b.SubmitTransaction(tx2)
-		assert.IsType(t, &emulator.ErrPendingBlockNotEmpty{}, err)
 
 		err = b.ResetPendingBlock()
 		assert.NoError(t, err)
