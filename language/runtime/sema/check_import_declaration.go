@@ -5,7 +5,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 )
 
-func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
+func (checker *Checker) VisitImportDeclaration(_ *ast.ImportDeclaration) ast.Repr {
 	// Handled in `declareImportDeclaration`
 	panic(&UnreachableStatementError{})
 }
@@ -13,10 +13,12 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
 	imports := checker.Program.ImportedPrograms()
 
+	locationID := declaration.Location.ID()
+
 	// Find the imported program.
 	// If it is not available, report an error and return
 
-	imported := imports[declaration.Location.ID()]
+	imported := imports[locationID]
 	if imported == nil {
 		checker.report(
 			&UnresolvedImportError{
@@ -32,7 +34,7 @@ func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclarat
 	// Ensure the program is only imported once.
 	// If it was imported before, report an error and return
 
-	if checker.seenImports[declaration.Location.ID()] {
+	if checker.seenImports[locationID] {
 		checker.report(
 			&RepeatedImportError{
 				ImportLocation: declaration.Location,
@@ -44,9 +46,14 @@ func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclarat
 		)
 		return nil
 	}
-	checker.seenImports[declaration.Location.ID()] = true
+	checker.seenImports[locationID] = true
 
-	importChecker, checkerErr := checker.EnsureLoaded(declaration.Location, imported)
+	importChecker, checkerErr := checker.EnsureLoaded(
+		declaration.Location,
+		func() *ast.Program {
+			return imported
+		},
+	)
 	if checkerErr != nil {
 		checker.report(
 			&ImportedProgramError{
@@ -142,7 +149,7 @@ func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclarat
 
 // EnsureLoaded finds or create a checker for the imported program and checks it
 //
-func (checker *Checker) EnsureLoaded(location ast.Location, imported *ast.Program) (*Checker, *CheckerError) {
+func (checker *Checker) EnsureLoaded(location ast.Location, loadProgram func() *ast.Program) (*Checker, *CheckerError) {
 	locationID := location.ID()
 
 	importChecker, ok := checker.ImportCheckers[locationID]
@@ -153,7 +160,7 @@ func (checker *Checker) EnsureLoaded(location ast.Location, imported *ast.Progra
 	if !ok || importChecker == nil {
 		var err error
 		importChecker, err = NewChecker(
-			imported,
+			loadProgram(),
 			location,
 			WithPredeclaredValues(checker.PredeclaredValues),
 			WithPredeclaredTypes(checker.PredeclaredTypes),

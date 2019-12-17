@@ -112,6 +112,13 @@ type ContractValueHandlerFunc func(
 	constructor FunctionValue,
 ) *CompositeValue
 
+// ImportProgramHandlerFunc us a function that handles imports of programs.
+//
+type ImportProgramHandlerFunc func(
+	inter *Interpreter,
+	location ast.Location,
+) *ast.Program
+
 type Interpreter struct {
 	Checker                        *sema.Checker
 	PredefinedValues               map[string]Value
@@ -130,6 +137,7 @@ type Interpreter struct {
 	storageKeyHandler              StorageKeyHandlerFunc
 	injectedCompositeFieldsHandler InjectedCompositeFieldsHandlerFunc
 	contractValueHandler           ContractValueHandlerFunc
+	importProgramHandler           ImportProgramHandlerFunc
 }
 
 type Option func(*Interpreter) error
@@ -222,6 +230,16 @@ func WithContractValueHandler(handler ContractValueHandlerFunc) Option {
 	}
 }
 
+// WithImportProgramHandler returns an interpreter option which sets the given function
+// as the function that is used to handle the imports of programs.
+//
+func WithImportProgramHandler(handler ImportProgramHandlerFunc) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetImportProgramHandler(handler)
+		return nil
+	}
+}
+
 func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, error) {
 	interpreter := &Interpreter{
 		Checker:               checker,
@@ -289,6 +307,12 @@ func (interpreter *Interpreter) SetContractValueHandler(function ContractValueHa
 	interpreter.contractValueHandler = function
 }
 
+// SetImportProgramHandler sets the function that is used to handle imports of programs.
+//
+func (interpreter *Interpreter) SetImportProgramHandler(function ImportProgramHandlerFunc) {
+	interpreter.importProgramHandler = function
+}
+
 // locationRange returns a new location range for the given positioned element.
 //
 func (interpreter *Interpreter) locationRange(hasPosition ast.HasPosition) LocationRange {
@@ -321,20 +345,9 @@ func (interpreter *Interpreter) setVariable(name string, variable *Variable) {
 
 func (interpreter *Interpreter) Interpret() (err error) {
 	// recover internal panics and return them as an error
-	defer func() {
-		if r := recover(); r != nil {
-			var ok bool
-			// don't recover Go errors
-			err, ok = r.(goRuntime.Error)
-			if ok {
-				panic(err)
-			}
-			err, ok = r.(error)
-			if !ok {
-				err = fmt.Errorf("%v", r)
-			}
-		}
-	}()
+	defer recoverErrors(func(internalErr error) {
+		err = internalErr
+	})
 
 	interpreter.runAllStatements(interpreter.interpret())
 
@@ -2471,7 +2484,7 @@ func (interpreter *Interpreter) declareComposite(declaration *ast.CompositeDecla
 	}
 }
 
-func (interpreter *Interpreter) ensureLoaded(location ast.Location) (subInterpreter *Interpreter) {
+func (interpreter *Interpreter) ensureLoaded(location ast.Location, loadProgram func() *ast.Program) (subInterpreter *Interpreter) {
 	locationID := location.ID()
 
 	// If sub-interpreter already exists, return it
@@ -2479,14 +2492,14 @@ func (interpreter *Interpreter) ensureLoaded(location ast.Location) (subInterpre
 	if subInterpreter != nil {
 		return subInterpreter
 	}
-
 	// Create a new sub-interpreter and interpret the top-level declarations
-	importedChecker := interpreter.Checker.ImportCheckers[locationID]
+	var err error
+	var importedChecker *sema.Checker
+	importedChecker, err = interpreter.Checker.EnsureLoaded(location, loadProgram)
 	if importedChecker == nil {
 		panic("missing checker")
 	}
 
-	var err error
 	subInterpreter, err = NewInterpreter(
 		importedChecker,
 		WithPredefinedValues(interpreter.PredefinedValues),
@@ -2497,6 +2510,7 @@ func (interpreter *Interpreter) ensureLoaded(location ast.Location) (subInterpre
 		WithStorageKeyHandler(interpreter.storageKeyHandler),
 		WithInjectedCompositeFieldsHandler(interpreter.injectedCompositeFieldsHandler),
 		WithContractValueHandler(interpreter.contractValueHandler),
+		WithImportProgramHandler(interpreter.importProgramHandler),
 	)
 	if err != nil {
 		panic(err)
@@ -2546,7 +2560,14 @@ func (interpreter *Interpreter) ensureLoaded(location ast.Location) (subInterpre
 
 func (interpreter *Interpreter) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
 
-	subInterpreter := interpreter.ensureLoaded(declaration.Location)
+	location := declaration.Location
+
+	subInterpreter := interpreter.ensureLoaded(
+		location,
+		func() *ast.Program {
+			return interpreter.importProgramHandler(interpreter, location)
+		},
+	)
 
 	// determine which identifiers are imported /
 	// which variables need to be declared

@@ -1526,7 +1526,9 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 	// get correct interpreter
 	if v.Location != nil {
 		if !ast.LocationsMatch(interpreter.Checker.Location, v.Location) {
-			interpreter = interpreter.ensureLoaded(v.Location)
+			interpreter = interpreter.ensureLoaded(v.Location, func() *ast.Program {
+				return interpreter.importProgramHandler(interpreter, v.Location)
+			})
 		}
 	}
 

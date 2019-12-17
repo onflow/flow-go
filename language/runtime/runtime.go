@@ -283,6 +283,8 @@ func (r *interpreterRuntime) newInterpreter(
 	options []interpreter.Option,
 ) (*interpreter.Interpreter, error) {
 
+	importResolver := r.importResolver(runtimeInterface)
+
 	defaultOptions := []interpreter.Option{
 		interpreter.WithPredefinedValues(functions.ToValues()),
 		interpreter.WithOnEventEmittedHandler(
@@ -337,6 +339,15 @@ func (r *interpreterRuntime) newInterpreter(
 				// Load the contract from storage
 
 				return r.loadContract(compositeType, runtimeStorage)
+			},
+		),
+		interpreter.WithImportProgramHandler(
+			func(inter *interpreter.Interpreter, location ast.Location) *ast.Program {
+				program, err := importResolver(location)
+				if err != nil {
+					panic(err)
+				}
+				return program
 			},
 		),
 	}
