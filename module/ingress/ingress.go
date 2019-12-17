@@ -1,5 +1,5 @@
-// Package ingress implements an API for accepting transactions into the
-// network.
+// Package ingress implements accepting transactions into the system.
+// It implements a subset of the Observation API.
 package ingress
 
 import (
@@ -47,7 +47,7 @@ func New(config Config, engine *ingest.Engine) *Ingress {
 		stop:   make(chan struct{}),
 	}
 
-	observation.RegisterBasicObserveServiceServer(ingress.server, ingress.handler)
+	observation.RegisterObserveServiceServer(ingress.server, ingress.handler)
 
 	return ingress
 }
@@ -125,4 +125,24 @@ func (h *handler) SendTransaction(ctx context.Context, req *observation.SendTran
 	h.engine.Submit(&tx)
 
 	return &observation.SendTransactionResponse{Hash: tx.Hash()}, nil
+}
+
+func (h *handler) GetLatestBlock(context.Context, *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
+	return nil, nil
+}
+
+func (h *handler) GetTransaction(context.Context, *observation.GetTransactionRequest) (*observation.GetTransactionResponse, error) {
+	return nil, nil
+}
+
+func (h *handler) GetAccount(context.Context, *observation.GetAccountRequest) (*observation.GetAccountResponse, error) {
+	return nil, nil
+}
+
+func (h *handler) ExecuteScript(context.Context, *observation.ExecuteScriptRequest) (*observation.ExecuteScriptResponse, error) {
+	return nil, nil
+}
+
+func (h *handler) GetEvents(context.Context, *observation.GetEventsRequest) (*observation.GetEventsResponse, error) {
+	return nil, nil
 }

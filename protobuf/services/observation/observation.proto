@@ -6,15 +6,6 @@ option go_package = "observation";
 
 import "sdk/entities/entities.proto";
 
-// BasicObserveService is a simplified version of the Observation API for the
-// purposes of accepting transactions to a Collection Node.
-service BasicObserveService {
-  rpc Ping(PingRequest) returns (PingResponse);
-
-  // SendTransaction submits a transaction to the network.
-  rpc SendTransaction(SendTransactionRequest) returns (SendTransactionResponse);
-}
-
 // ObserveService is the user-facing API provided by access nodes.
 service ObserveService {
   rpc Ping(PingRequest) returns (PingResponse);
