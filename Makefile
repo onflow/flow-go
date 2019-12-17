@@ -23,6 +23,9 @@ install-tools: crypto/relic/build
 ifeq ($(UNAME), Linux)
 	sudo apt-get -y install capnproto
 endif
+ifeq ($(UNAME), Darwin)
+	brew install capnp
+endif
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/davecheney/godoc2md@master; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
