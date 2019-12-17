@@ -184,7 +184,8 @@ func (checker *Checker) visitIndexExpressionAssignment(
 		return &InvalidType{}
 	}
 
-	if !elementType.IsInvalidType() &&
+	if !valueType.IsInvalidType() &&
+		!elementType.IsInvalidType() &&
 		!checker.IsTypeCompatible(valueExpression, valueType, elementType) {
 
 		checker.report(
