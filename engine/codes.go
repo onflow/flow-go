@@ -19,7 +19,7 @@ const (
 	ConsensusPropagation = 50
 
 	// Execution 100-199
-	// ...
+	Execution           = 100
 
 	// Verification 150-199
 	VerificationVerifier = 150

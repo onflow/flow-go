@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 )
@@ -178,7 +178,7 @@ func (b *Backend) ExecuteScript(ctx context.Context, req *observation.ExecuteScr
 		b.logger.Debugf("🔔  Event emitted: %s", event.String())
 	}
 
-	valueBytes, err := encoding.Encode(value)
+	valueBytes, err := values.Encode(value)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
