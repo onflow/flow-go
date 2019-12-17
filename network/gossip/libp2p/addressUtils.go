@@ -3,18 +3,11 @@ package libp2p
 import (
 	"crypto/md5"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"math/rand"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/multiformats/go-multiaddr"
 )
-
-// GetLocationMultiaddr returns a Multiaddress (https://docs.libp2p.io/concepts/addressing/) given a node address
-func GetLocationMultiaddr(id NodeAddress) (multiaddr.Multiaddr, error) {
-	return multiaddr.NewMultiaddr(fmt.Sprintf("/ip4/%s/tcp/%s", id.ip, id.port))
-}
 
 // GetPublicKey generates a ECDSA key pair using the given seed
 func GetPublicKey(seed string) (crypto.PrivKey, error) {
