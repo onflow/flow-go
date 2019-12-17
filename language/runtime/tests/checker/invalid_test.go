@@ -39,3 +39,28 @@ func TestCheckSpuriousReturnWithInvalidReturnTypeMismatch(t *testing.T) {
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }
 
+func TestCheckSpuriousCastWithInvalidTargetTypeMismatch(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          let y = 1 as X
+        `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+}
+
+func TestCheckSpuriousCastWithInvalidValueTypeMismatch(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          let y = x as Int
+        `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+}

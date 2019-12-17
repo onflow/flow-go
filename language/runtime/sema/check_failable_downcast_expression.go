@@ -67,6 +67,7 @@ func (checker *Checker) VisitCastingExpression(expression *ast.CastingExpression
 
 	case ast.OperationCast:
 		if !leftHandType.IsInvalidType() &&
+			!rightHandType.IsInvalidType() &&
 			!checker.IsTypeCompatible(leftHandExpression, leftHandType, rightHandType) {
 
 			checker.report(
