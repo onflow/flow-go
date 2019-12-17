@@ -1,4 +1,4 @@
-package interpreter
+package sema
 
 import (
 	"testing"

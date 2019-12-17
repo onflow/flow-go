@@ -1,29 +1,31 @@
-package interpreter
+package sema
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
-	"github.com/dapperlabs/flow-go/language/runtime/errors"
-	"github.com/dapperlabs/flow-go/language/runtime/sema"
 )
 
 type BeforeExtractor struct {
 	ExpressionExtractor *ast.ExpressionExtractor
+	report              func(error)
 }
 
-func NewBeforeExtractor() *BeforeExtractor {
-	beforeExtractor := &BeforeExtractor{}
+func NewBeforeExtractor(report func(error)) *BeforeExtractor {
+	beforeExtractor := &BeforeExtractor{
+		report: report,
+	}
 	expressionExtractor := &ast.ExpressionExtractor{
 		InvocationExtractor: beforeExtractor,
+		FunctionExtractor:   beforeExtractor,
 	}
 	beforeExtractor.ExpressionExtractor = expressionExtractor
 	return beforeExtractor
 }
 
-func (beforeExtractor *BeforeExtractor) ExtractBefore(expression ast.Expression) ast.ExpressionExtraction {
-	return beforeExtractor.ExpressionExtractor.Extract(expression)
+func (e *BeforeExtractor) ExtractBefore(expression ast.Expression) ast.ExpressionExtraction {
+	return e.ExpressionExtractor.Extract(expression)
 }
 
-func (BeforeExtractor) ExtractInvocation(
+func (e *BeforeExtractor) ExtractInvocation(
 	extractor *ast.ExpressionExtractor,
 	expression *ast.InvocationExpression,
 ) ast.ExpressionExtraction {
@@ -31,14 +33,10 @@ func (BeforeExtractor) ExtractInvocation(
 	invokedExpression := expression.InvokedExpression
 
 	if identifierExpression, ok := invokedExpression.(*ast.IdentifierExpression); ok {
-		if identifierExpression.Identifier.Identifier == sema.BeforeIdentifier {
+		const expectedArgumentCount = 1
 
-			// semantic analysis should have rejected calls
-			// which do not have exactly one argument
-
-			if len(expression.Arguments) != 1 {
-				panic(errors.NewUnreachableError())
-			}
+		if identifierExpression.Identifier.Identifier == BeforeIdentifier &&
+			len(expression.Arguments) == expectedArgumentCount {
 
 			// rewrite the argument
 
@@ -74,4 +72,17 @@ func (BeforeExtractor) ExtractInvocation(
 	// not an invocation of `before`, perform default extraction
 
 	return extractor.ExtractInvocation(expression)
+}
+
+func (e *BeforeExtractor) ExtractFunction(
+	_ *ast.ExpressionExtractor,
+	expression *ast.FunctionExpression,
+) ast.ExpressionExtraction {
+
+	// NOTE: function expressions are not supported by the expression extractor, so return as-is
+	// An error is reported when checking invocation expressions, so no need to report here
+
+	return ast.ExpressionExtraction{
+		RewrittenExpression: expression,
+	}
 }
