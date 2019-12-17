@@ -27,6 +27,18 @@ type Identity struct {
 	Stake   uint64
 }
 
+func HexStringToIdentifier(hexString string) (Identifier, error) {
+	var identifier Identifier
+	i, err := hex.Decode(identifier[:], []byte(hexString))
+	if err != nil {
+		return identifier, err
+	}
+	if i != 32 {
+		return identifier, fmt.Errorf("malformed input, expected 32 bytes (64 characters), decoded %d", i)
+	}
+	return identifier, nil
+}
+
 // ParseIdentity parses a string representation of an identity.
 func ParseIdentity(identity string) (Identity, error) {
 
@@ -38,7 +50,10 @@ func ParseIdentity(identity string) (Identity, error) {
 
 	// none of these will error as they are checked by the regex
 	var nodeID Identifier
-	_, _ = hex.Decode(nodeID[:], []byte(matches[2]))
+	nodeID, err := HexStringToIdentifier(matches[2])
+	if err != nil {
+		return Identity{}, err
+	}
 	address := matches[3]
 	role, _ := ParseRole(matches[1])
 	stake, _ := strconv.ParseUint(matches[4], 10, 64)

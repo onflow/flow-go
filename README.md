@@ -126,7 +126,6 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 
 | Stream         | Owner(s)                    | Home directory  |
 | -------------- | --------------------------- | --------- |
-
 | Collection  | [Peter Siemens](https://github.com/psiemens) | [/engine/collection](/engine/collection) |
 | Consensus | [Alexander Hentschel](https://github.com/AlexHentschel) | [/engine/consensus](/engine/consensus) |
 | Execution      | [Bastian Müller](https://github.com/turbolent) | [/engine/execution](/engine/execution) |
