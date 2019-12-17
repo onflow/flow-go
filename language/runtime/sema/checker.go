@@ -1335,7 +1335,7 @@ func (checker *Checker) checkVariableMove(expression ast.Expression) {
 	}
 }
 
-func (checker *Checker) rewritePostConditions(postConditions []*ast.Condition) RewrittenPostConditions {
+func (checker *Checker) rewritePostConditions(postConditions []*ast.Condition) PostConditionsRewrite {
 
 	var beforeStatements []ast.Statement
 	rewrittenPostConditions := make([]*ast.Condition, len(postConditions))
@@ -1383,7 +1383,7 @@ func (checker *Checker) rewritePostConditions(postConditions []*ast.Condition) R
 		rewrittenPostConditions[i] = &newPostCondition
 	}
 
-	return RewrittenPostConditions{
+	return PostConditionsRewrite{
 		BeforeStatements:        beforeStatements,
 		RewrittenPostConditions: rewrittenPostConditions,
 	}

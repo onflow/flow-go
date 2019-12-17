@@ -286,7 +286,7 @@ func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast
 
 func (checker *Checker) visitWithPostConditions(postConditions *ast.Conditions, returnType Type, body func()) {
 
-	var rewrittenPostConditions *RewrittenPostConditions
+	var rewrittenPostConditions *PostConditionsRewrite
 
 	// If there are post-conditions, rewrite them, extracting `before` expressions.
 	// The result are variable declarations which need to be evaluated before
@@ -296,7 +296,7 @@ func (checker *Checker) visitWithPostConditions(postConditions *ast.Conditions, 
 		rewriteResult := checker.rewritePostConditions(*postConditions)
 		rewrittenPostConditions = &rewriteResult
 
-		checker.Elaboration.RewrittenPostConditions[postConditions] = rewriteResult
+		checker.Elaboration.PostConditionsRewrite[postConditions] = rewriteResult
 
 		checker.visitStatements(rewriteResult.BeforeStatements)
 	}

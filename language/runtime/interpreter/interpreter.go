@@ -708,13 +708,18 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 	// block scope: each function block gets an activation record
 	interpreter.activations.PushCurrent()
 
-	beforeStatements, rewrittenPostConditions :=
-		interpreter.rewritePostConditions(functionBlock.PostConditions)
+	postConditionsRewrite :=
+		interpreter.Checker.Elaboration.PostConditionsRewrite[functionBlock.PostConditions]
 
-	return interpreter.visitStatements(beforeStatements).
-		FlatMap(func(_ interface{}) Trampoline {
-			return interpreter.visitConditions(functionBlock.PreConditions)
-		}).
+	trampoline := interpreter.visitStatements(postConditionsRewrite.BeforeStatements)
+
+	if functionBlock.PreConditions != nil {
+		trampoline = trampoline.FlatMap(func(_ interface{}) Trampoline {
+			return interpreter.visitConditions(*functionBlock.PreConditions)
+		})
+	}
+
+	return trampoline.
 		FlatMap(func(_ interface{}) Trampoline {
 			// NOTE: not interpreting block as it enters a new scope
 			// and post-conditions need to be able to refer to block's declarations
@@ -735,7 +740,7 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 						interpreter.declareVariable(sema.ResultIdentifier, resultValue)
 					}
 
-					return interpreter.visitConditions(rewrittenPostConditions).
+					return interpreter.visitConditions(postConditionsRewrite.RewrittenPostConditions).
 						Map(func(_ interface{}) interface{} {
 							return resultValue
 						})
@@ -744,55 +749,6 @@ func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBl
 		Then(func(_ interface{}) {
 			interpreter.activations.Pop()
 		})
-}
-
-func (interpreter *Interpreter) rewritePostConditions(postConditions []*ast.Condition) (
-	beforeStatements []ast.Statement,
-	rewrittenPostConditions []*ast.Condition,
-) {
-	beforeExtractor := NewBeforeExtractor()
-
-	rewrittenPostConditions = make([]*ast.Condition, len(postConditions))
-
-	for i, postCondition := range postConditions {
-
-		// copy condition and set expression to rewritten one
-		newPostCondition := *postCondition
-
-		testExtraction := beforeExtractor.ExtractBefore(postCondition.Test)
-
-		extractedExpressions := testExtraction.ExtractedExpressions
-
-		newPostCondition.Test = testExtraction.RewrittenExpression
-
-		if postCondition.Message != nil {
-			messageExtraction := beforeExtractor.ExtractBefore(postCondition.Message)
-
-			newPostCondition.Message = messageExtraction.RewrittenExpression
-
-			extractedExpressions = append(
-				extractedExpressions,
-				messageExtraction.ExtractedExpressions...,
-			)
-		}
-
-		for _, extractedExpression := range extractedExpressions {
-
-			// TODO: update interpreter.Checker.Elaboration
-			//    VariableDeclarationValueTypes / VariableDeclarationTargetTypes
-
-			beforeStatements = append(beforeStatements,
-				&ast.VariableDeclaration{
-					Identifier: extractedExpression.Identifier,
-					Value:      extractedExpression.Expression,
-				},
-			)
-		}
-
-		rewrittenPostConditions[i] = &newPostCondition
-	}
-
-	return beforeStatements, rewrittenPostConditions
 }
 
 func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Trampoline {
@@ -2089,15 +2045,21 @@ func (interpreter *Interpreter) initializerFunction(
 			continue
 		}
 
-		preConditions = append(
-			preConditions,
-			firstInitializer.FunctionBlock.PreConditions...,
-		)
+		if firstInitializer.FunctionBlock.PreConditions != nil {
+			preConditions = append(
+				preConditions,
+				*firstInitializer.FunctionBlock.PreConditions...,
+			)
+		}
 
-		postConditions = append(
-			postConditions,
-			firstInitializer.FunctionBlock.PostConditions...,
-		)
+		// TODO: use rewritten, also evaluate before statements
+
+		if firstInitializer.FunctionBlock.PostConditions != nil {
+			postConditions = append(
+				postConditions,
+				*firstInitializer.FunctionBlock.PostConditions...,
+			)
+		}
 	}
 
 	var function *ast.FunctionExpression
@@ -2137,10 +2099,10 @@ func (interpreter *Interpreter) initializerFunction(
 		return nil
 	}
 
-	// prepend the conformances' preconditions and postconditions, if any
+	// prepend the conformances' pre-conditions and post-conditions, if any
 
-	function.FunctionBlock.PreConditions = append(preConditions, function.FunctionBlock.PreConditions...)
-	function.FunctionBlock.PostConditions = append(postConditions, function.FunctionBlock.PostConditions...)
+	function.FunctionBlock.PrependPreConditions(preConditions)
+	function.FunctionBlock.PrependPostConditions(postConditions)
 
 	result := newInterpretedFunction(
 		interpreter,
@@ -2172,15 +2134,21 @@ func (interpreter *Interpreter) destructorFunction(
 			continue
 		}
 
-		preConditions = append(
-			preConditions,
-			interfaceDestructor.FunctionBlock.PreConditions...,
-		)
+		if interfaceDestructor.FunctionBlock.PreConditions != nil {
+			preConditions = append(
+				preConditions,
+				*interfaceDestructor.FunctionBlock.PreConditions...,
+			)
+		}
 
-		postConditions = append(
-			postConditions,
-			interfaceDestructor.FunctionBlock.PostConditions...,
-		)
+		// TODO: use rewritten, also evaluate before statements
+
+		if interfaceDestructor.FunctionBlock.PostConditions != nil {
+			postConditions = append(
+				postConditions,
+				*interfaceDestructor.FunctionBlock.PostConditions...,
+			)
+		}
 	}
 
 	var function *ast.FunctionExpression
@@ -2215,8 +2183,11 @@ func (interpreter *Interpreter) destructorFunction(
 
 	// prepend the conformances' preconditions and postconditions, if any
 
-	function.FunctionBlock.PreConditions = append(preConditions, function.FunctionBlock.PreConditions...)
-	function.FunctionBlock.PostConditions = append(postConditions, function.FunctionBlock.PostConditions...)
+	function.FunctionBlock.PrependPreConditions(preConditions)
+
+	// TODO: use rewritten, also evaluate before statements
+
+	function.FunctionBlock.PrependPostConditions(postConditions)
 
 	result := newInterpretedFunction(
 		interpreter,
@@ -2292,15 +2263,19 @@ func (interpreter *Interpreter) compositeFunction(
 			return
 		}
 
-		functionBlockCopy.PreConditions = append(
-			functionBlockCopy.PreConditions,
-			interfaceFunction.FunctionBlock.PreConditions...,
-		)
+		if interfaceFunction.FunctionBlock.PreConditions != nil {
+			functionBlockCopy.PrependPreConditions(
+				*interfaceFunction.FunctionBlock.PreConditions,
+			)
+		}
 
-		functionBlockCopy.PostConditions = append(
-			functionBlockCopy.PostConditions,
-			interfaceFunction.FunctionBlock.PostConditions...,
-		)
+		// TODO: use rewritten, also evaluate before statements
+
+		if interfaceFunction.FunctionBlock.PostConditions != nil {
+			functionBlockCopy.PrependPostConditions(
+				*interfaceFunction.FunctionBlock.PostConditions,
+			)
+		}
 	}
 
 	for _, conformance := range conformances {
@@ -2593,8 +2568,8 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 		executeFunctionType = transactionType.ExecuteFunctionType().InvocationFunctionType()
 	}
 
-	beforeStatements, rewrittenPostConditions :=
-		interpreter.rewritePostConditions(declaration.PostConditions)
+	postConditionsRewrite :=
+		interpreter.Checker.Elaboration.PostConditionsRewrite[declaration.PostConditions]
 
 	self := &CompositeValue{
 		Location: interpreter.Checker.Location,
@@ -2640,18 +2615,23 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 				}
 			}
 
-			return prepareTrampoline().
+			trampoline := prepareTrampoline().
 				FlatMap(func(_ interface{}) Trampoline {
-					return interpreter.visitStatements(beforeStatements)
-				}).
-				FlatMap(func(_ interface{}) Trampoline {
-					return interpreter.visitConditions(declaration.PreConditions)
-				}).
+					return interpreter.visitStatements(postConditionsRewrite.BeforeStatements)
+				})
+
+			if declaration.PreConditions != nil {
+				trampoline = trampoline.FlatMap(func(_ interface{}) Trampoline {
+					return interpreter.visitConditions(*declaration.PreConditions)
+				})
+			}
+
+			return trampoline.
 				FlatMap(func(_ interface{}) Trampoline {
 					return executeTrampoline()
 				}).
 				FlatMap(func(_ interface{}) Trampoline {
-					return interpreter.visitConditions(rewrittenPostConditions)
+					return interpreter.visitConditions(postConditionsRewrite.RewrittenPostConditions)
 				}).
 				Then(func(_ interface{}) {
 					interpreter.activations.Pop()
