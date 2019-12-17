@@ -13,8 +13,8 @@ func (b *Block) Accept(visitor Visitor) Repr {
 
 type FunctionBlock struct {
 	*Block
-	PreConditions  []*Condition
-	PostConditions []*Condition
+	PreConditions  *Conditions
+	PostConditions *Conditions
 }
 
 func (b *FunctionBlock) Accept(visitor Visitor) Repr {
@@ -32,3 +32,5 @@ type Condition struct {
 func (c *Condition) Accept(visitor Visitor) Repr {
 	return visitor.VisitCondition(c)
 }
+
+type Conditions []*Condition
