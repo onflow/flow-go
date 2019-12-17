@@ -64,12 +64,9 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 // Submit allows us to submit local events to the engine.
-func (e *Engine) Submit(event interface{}) {
-
+func (e *Engine) Submit(event interface{}) error {
 	err := e.Process(e.me.NodeID(), event)
-	if err != nil {
-		e.log.Error().Err(err).Msg("could not process local event")
-	}
+	return err
 }
 
 // Process processes engine events.

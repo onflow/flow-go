@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -31,8 +32,8 @@ type Ingress struct {
 	server  *grpc.Server // the GRPC server
 	config  Config
 
-	ready chan struct{} // indicates when the server is setup
-	stop  chan struct{} // indicates that the server should stop
+	stop    chan struct{}  // indicates that the server should stop
+	stopped sync.WaitGroup // indicates that all goroutines have stopped
 }
 
 // New returns a new ingress server.
@@ -43,7 +44,6 @@ func New(config Config, engine *ingest.Engine) *Ingress {
 		},
 		server: grpc.NewServer(),
 		config: config,
-		ready:  make(chan struct{}),
 		stop:   make(chan struct{}),
 	}
 
@@ -56,7 +56,14 @@ func New(config Config, engine *ingest.Engine) *Ingress {
 // started. The ingress module is ready when the GRPC server has successfully
 // started.
 func (i *Ingress) Ready() <-chan struct{} {
-	return i.ready
+	ready := make(chan struct{})
+
+	go func() {
+		i.start()
+		close(ready)
+	}()
+
+	return ready
 }
 
 // Done returns a done channel that is closed once the module has fully stopped.
@@ -64,16 +71,19 @@ func (i *Ingress) Ready() <-chan struct{} {
 func (i Ingress) Done() <-chan struct{} {
 	done := make(chan struct{})
 
-	<-i.stop
 	go func() {
+		<-i.stop
+		i.stopped.Wait()
 		close(done)
 	}()
 
 	return done
 }
 
-// start starts the GRPC server and handles sending the ready signal and
-// handling the stop signal.
+// start starts the GRPC server in a goroutine.
+//
+// When this function returns, the server is considered ready.
+// This function starts a goroutine to handle stop signals.
 func (i *Ingress) start() {
 	log := i.logger.With().Str("module", "ingress").Logger()
 
@@ -85,11 +95,6 @@ func (i *Ingress) start() {
 		return
 	}
 
-	// indicate that the server has started
-	go func() {
-		close(i.ready)
-	}()
-
 	// wait for a stop signal, then gracefully stop the server
 	go func() {
 		select {
@@ -98,13 +103,19 @@ func (i *Ingress) start() {
 		}
 	}()
 
-	err = i.server.Serve(l)
-	if err != nil {
-		log.Err(err).Msg("fatal error in server")
-	}
+	// asynchronously start the server
+	go func() {
+		i.stopped.Add(1)
+		defer i.stopped.Done()
+
+		err = i.server.Serve(l)
+		if err != nil {
+			log.Err(err).Msg("fatal error in server")
+		}
+	}()
 }
 
-// handler implements the basic Observation API.
+// handler implements a subset of the Observation API.
 type handler struct {
 	engine engine.Engine
 }
@@ -122,11 +133,16 @@ func (h *handler) SendTransaction(ctx context.Context, req *observation.SendTran
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
 	}
 
-	h.engine.Submit(&tx)
+	err = h.engine.Submit(&tx)
+	if err != nil {
+		return nil, err
+	}
 
 	return &observation.SendTransactionResponse{Hash: tx.Hash()}, nil
 }
 
+// Remaining handler functions are no-ops to implement the Observation API
+// protobuf service.
 func (h *handler) GetLatestBlock(context.Context, *observation.GetLatestBlockRequest) (*observation.GetLatestBlockResponse, error) {
 	return nil, nil
 }
