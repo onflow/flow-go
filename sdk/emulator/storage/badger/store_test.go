@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
 
@@ -236,7 +235,7 @@ func TestEvents(t *testing.T) {
 		})}
 		var blockNumber uint64 = 1
 
-		err := store.InsertEvents(blockNumber, events...)
+		err := store.InsertEvents(blockNumber, events)
 		assert.NoError(t, err)
 
 		t.Run("should be able to get inserted events", func(t *testing.T) {
@@ -261,7 +260,7 @@ func TestEvents(t *testing.T) {
 				events = append(events, event)
 			}
 			eventsByBlock[uint64(i)] = events
-			err := store.InsertEvents(uint64(i), events...)
+			err := store.InsertEvents(uint64(i), events)
 			assert.NoError(t, err)
 		}
 
@@ -346,7 +345,7 @@ func TestPersistence(t *testing.T) {
 	assert.NoError(t, err)
 	err = store.InsertTransaction(tx)
 	assert.NoError(t, err)
-	err = store.InsertEvents(block.Number, events...)
+	err = store.InsertEvents(block.Number, events)
 	assert.NoError(t, err)
 	err = store.SetLedger(block.Number, ledger)
 
@@ -462,7 +461,6 @@ func BenchmarkBlockDiskUsage(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		block := types.Block{
 			Number:            uint64(i),
-			Timestamp:         time.Now(),
 			PreviousBlockHash: unittest.HashFixture(32),
 			TransactionHashes: []crypto.Hash{unittest.HashFixture(32)},
 		}

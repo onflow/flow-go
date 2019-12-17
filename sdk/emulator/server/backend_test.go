@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
@@ -170,11 +169,8 @@ func TestBackend(t *testing.T) {
 	}))
 
 	t.Run("GetLatestBlock", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
-
-		blockTimestamp := time.Time{}
 		block := types.Block{
 			Number:            11,
-			Timestamp:         blockTimestamp,
 			PreviousBlockHash: nil,
 			TransactionHashes: nil,
 		}

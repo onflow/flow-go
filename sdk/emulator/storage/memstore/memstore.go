@@ -3,10 +3,9 @@ package memstore
 import (
 	"sync"
 
-	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
-
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
@@ -79,9 +78,47 @@ func (s *Store) InsertBlock(block types.Block) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.insertBlock(block)
+}
+
+func (s *Store) insertBlock(block types.Block) error {
 	s.blocks[block.Number] = block
 	if block.Number > s.blockHeight {
 		s.blockHeight = block.Number
+	}
+
+	return nil
+}
+
+func (s *Store) CommitBlock(
+	block types.Block,
+	transactions []flow.Transaction,
+	ledger flow.Ledger,
+	events []flow.Event,
+) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	err := s.insertBlock(block)
+	if err != nil {
+		return err
+	}
+
+	for _, tx := range transactions {
+		err := s.insertTransaction(tx)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = s.setLedger(block.Number, ledger)
+	if err != nil {
+		return err
+	}
+
+	err = s.insertEvents(block.Number, events)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -102,6 +139,10 @@ func (s *Store) InsertTransaction(tx flow.Transaction) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.insertTransaction(tx)
+}
+
+func (s *Store) insertTransaction(tx flow.Transaction) error {
 	s.transactions[tx.Hash().Hex()] = tx
 	return nil
 }
@@ -121,6 +162,10 @@ func (s *Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.setLedger(blockNumber, ledger)
+}
+
+func (s *Store) setLedger(blockNumber uint64, ledger flow.Ledger) error {
 	s.ledger[blockNumber] = ledger
 	return nil
 }
@@ -150,10 +195,14 @@ func (s *Store) GetEvents(eventType string, startBlock, endBlock uint64) ([]flow
 	return events, nil
 }
 
-func (s *Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
+func (s *Store) InsertEvents(blockNumber uint64, events []flow.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.insertEvents(blockNumber, events)
+}
+
+func (s *Store) insertEvents(blockNumber uint64, events []flow.Event) error {
 	if s.eventsByBlockNumber[blockNumber] == nil {
 		s.eventsByBlockNumber[blockNumber] = events
 	} else {

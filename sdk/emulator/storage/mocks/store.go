@@ -35,6 +35,20 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 	return m.recorder
 }
 
+// CommitBlock mocks base method
+func (m *MockStore) CommitBlock(arg0 types.Block, arg1 []flow.Transaction, arg2 flow.Ledger, arg3 []flow.Event) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CommitBlock", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CommitBlock indicates an expected call of CommitBlock
+func (mr *MockStoreMockRecorder) CommitBlock(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CommitBlock", reflect.TypeOf((*MockStore)(nil).CommitBlock), arg0, arg1, arg2, arg3)
+}
+
 // GetBlockByHash mocks base method
 func (m *MockStore) GetBlockByHash(arg0 crypto.Hash) (types.Block, error) {
 	m.ctrl.T.Helper()
@@ -140,22 +154,17 @@ func (mr *MockStoreMockRecorder) InsertBlock(arg0 interface{}) *gomock.Call {
 }
 
 // InsertEvents mocks base method
-func (m *MockStore) InsertEvents(arg0 uint64, arg1 ...flow.Event) error {
+func (m *MockStore) InsertEvents(arg0 uint64, arg1 []flow.Event) error {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{arg0}
-	for _, a := range arg1 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "InsertEvents", varargs...)
+	ret := m.ctrl.Call(m, "InsertEvents", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // InsertEvents indicates an expected call of InsertEvents
-func (mr *MockStoreMockRecorder) InsertEvents(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
+func (mr *MockStoreMockRecorder) InsertEvents(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{arg0}, arg1...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertEvents", reflect.TypeOf((*MockStore)(nil).InsertEvents), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertEvents", reflect.TypeOf((*MockStore)(nil).InsertEvents), arg0, arg1)
 }
 
 // InsertTransaction mocks base method

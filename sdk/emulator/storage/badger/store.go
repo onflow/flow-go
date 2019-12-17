@@ -164,6 +164,16 @@ func (s Store) InsertBlock(block types.Block) error {
 	})
 }
 
+func (s Store) CommitBlock(
+	block types.Block,
+	transactions []flow.Transaction,
+	ledger flow.Ledger,
+	events []flow.Event,
+) error {
+	// TODO: implement
+	return nil
+}
+
 func (s Store) GetTransaction(txHash crypto.Hash) (tx flow.Transaction, err error) {
 	err = s.db.View(func(txn *badger.Txn) error {
 		encTx, err := getTx(txn)(transactionKey(txHash))
@@ -287,7 +297,7 @@ func (s Store) GetEvents(eventType string, startBlock, endBlock uint64) (events 
 	return
 }
 
-func (s Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
+func (s Store) InsertEvents(blockNumber uint64, events []flow.Event) error {
 	encEvents, err := encodeEvents(events)
 	if err != nil {
 		return err

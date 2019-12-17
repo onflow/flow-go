@@ -51,6 +51,9 @@ func TestCreateAccount(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
+		_, err = b.CommitBlock()
+		assert.NoError(t, err)
+
 		account := b.LastCreatedAccount()
 
 		assert.Equal(t, uint64(0), account.Balance)
@@ -96,6 +99,9 @@ func TestCreateAccount(t *testing.T) {
 		result, err := b.SubmitTransaction(tx)
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
+
+		_, err = b.CommitBlock()
+		assert.NoError(t, err)
 
 		account := b.LastCreatedAccount()
 
@@ -146,6 +152,9 @@ func TestCreateAccount(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
+		_, err = b.CommitBlock()
+		assert.NoError(t, err)
+
 		account := b.LastCreatedAccount()
 
 		assert.Equal(t, uint64(0), account.Balance)
@@ -180,6 +189,9 @@ func TestCreateAccount(t *testing.T) {
 		result, err := b.SubmitTransaction(tx)
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
+
+		_, err = b.CommitBlock()
+		assert.NoError(t, err)
 
 		account := b.LastCreatedAccount()
 
