@@ -4,6 +4,7 @@ package proposal
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -29,7 +30,8 @@ type Engine struct {
 	//pool  *txpool.Pool // TODO replace with merkle tree
 	// TODO storage provider for transactions/guaranteed collections
 
-	stop chan struct{} // used to stop the proposer goroutine
+	stop    chan struct{}  // used to stop the proposer goroutine
+	stopped sync.WaitGroup // used to indicate that all goroutines have stopped
 }
 
 func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State) (*Engine, error) {
@@ -67,8 +69,8 @@ func (e *Engine) Ready() <-chan struct{} {
 func (e *Engine) Done() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
-		e.stop <- struct{}{}
 		close(e.stop)
+		e.stopped.Wait()
 		close(done)
 	}()
 	return done
@@ -100,6 +102,9 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) start() {
+	e.stopped.Add(1)
+	defer e.stopped.Done()
+
 	ticker := time.NewTicker(proposalPeriod)
 
 	for {
