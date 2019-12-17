@@ -9,7 +9,7 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-func TestCheckSpuriousIndexAssignmentValueType(t *testing.T) {
+func TestCheckSpuriousIndexAssignmentInvalidValueTypeMismatch(t *testing.T) {
 
 	_, err := ParseAndCheck(t,
 		`
@@ -25,13 +25,49 @@ func TestCheckSpuriousIndexAssignmentValueType(t *testing.T) {
 	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }
 
-func TestCheckSpuriousIndexAssignmentElementType(t *testing.T) {
+func TestCheckSpuriousIndexAssignmentInvalidElementTypeMismatch(t *testing.T) {
 
 	_, err := ParseAndCheck(t,
 		`
           fun test() {
               let values: {String: X} = {}
               values["x"] = 1
+          }
+        `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+}
+
+func TestCheckSpuriousMemberAssignmentInvalidValueTypeMismatch(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          struct X {
+              var x: Int
+              init() {
+                  self.x = y
+              }
+          }
+        `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+}
+
+func TestCheckSpuriousMemberAssignmentInvalidMemberTypeMismatch(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+         struct X {
+              var y: Y
+              init() {
+                  self.y = 0
+              }
           }
         `,
 	)

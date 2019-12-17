@@ -223,6 +223,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	// If the value type is valid, check that the value can be assigned to the member type
 
 	if !valueType.IsInvalidType() &&
+		!member.TypeAnnotation.Type.IsInvalidType() &&
 		!checker.IsTypeCompatible(valueExpression, valueType, member.TypeAnnotation.Type) {
 
 		checker.report(
