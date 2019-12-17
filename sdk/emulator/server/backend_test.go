@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
@@ -16,14 +15,14 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
-	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
+	abiTypes "github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/mocks"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
-	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -70,7 +69,7 @@ func TestBackend(t *testing.T) {
 		response, err := backend.ExecuteScript(context.Background(), &executionScriptRequest)
 		assert.NoError(t, err)
 
-		value, err := encoding.Decode(types.Int{}, response.GetValue())
+		value, err := encodingValues.Decode(abiTypes.Int{}, response.GetValue())
 		assert.NoError(t, err)
 
 		assert.Equal(t, values.NewInt(2137), value)
@@ -170,11 +169,8 @@ func TestBackend(t *testing.T) {
 	}))
 
 	t.Run("GetLatestBlock", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
-
-		blockTimestamp := time.Time{}
-		block := etypes.Block{
+		block := types.Block{
 			Number:            11,
-			Timestamp:         blockTimestamp,
 			PreviousBlockHash: nil,
 			TransactionHashes: nil,
 		}
@@ -288,9 +284,9 @@ func TestBackend(t *testing.T) {
 
 		api.EXPECT().
 			SubmitTransaction(gomock.Any()).
-			DoAndReturn(func(tx flow.Transaction) (etypes.TransactionReceipt, error) {
+			DoAndReturn(func(tx flow.Transaction) (types.TransactionReceipt, error) {
 				capturedTx = tx
-				return etypes.TransactionReceipt{}, nil
+				return types.TransactionReceipt{}, nil
 			}).Times(1)
 
 		requestTx := observation.SendTransactionRequest{
@@ -329,7 +325,7 @@ func TestBackend(t *testing.T) {
 
 		api.EXPECT().
 			SubmitTransaction(gomock.Any()).
-			Return(etypes.TransactionReceipt{}, &emulator.ErrInvalidSignaturePublicKey{}).Times(1)
+			Return(types.TransactionReceipt{}, &emulator.ErrInvalidSignaturePublicKey{}).Times(1)
 
 		requestTx := observation.SendTransactionRequest{
 			Transaction: &entities.Transaction{
