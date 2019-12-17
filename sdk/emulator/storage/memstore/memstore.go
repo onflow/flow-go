@@ -93,7 +93,7 @@ func (s *Store) insertBlock(block types.Block) error {
 func (s *Store) CommitBlock(
 	block types.Block,
 	transactions []flow.Transaction,
-	delta *types.LedgerDelta,
+	delta types.LedgerDelta,
 	events []flow.Event,
 ) error {
 	s.mu.Lock()
@@ -161,14 +161,14 @@ func (s *Store) LedgerViewByNumber(blockNumber uint64) *types.LedgerView {
 	})
 }
 
-func (s *Store) InsertLedgerDelta(blockNumber uint64, delta *types.LedgerDelta) error {
+func (s *Store) InsertLedgerDelta(blockNumber uint64, delta types.LedgerDelta) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	return s.insertLedgerDelta(blockNumber, delta)
 }
 
-func (s *Store) insertLedgerDelta(blockNumber uint64, delta *types.LedgerDelta) error {
+func (s *Store) insertLedgerDelta(blockNumber uint64, delta types.LedgerDelta) error {
 	var oldLedger flow.Ledger
 
 	// use empty ledger if this is the genesis block

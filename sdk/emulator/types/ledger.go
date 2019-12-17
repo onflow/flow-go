@@ -1,42 +1,38 @@
 package types
 
 // A LedgerDelta is a record of ledger mutations.
-type LedgerDelta struct {
-	updates map[string][]byte
-}
+type LedgerDelta map[string][]byte
 
 // NewLedgerDelta returns an empty ledger delta.
-func NewLedgerDelta() *LedgerDelta {
-	return &LedgerDelta{
-		updates: make(map[string][]byte),
-	}
+func NewLedgerDelta() LedgerDelta {
+	return make(map[string][]byte)
 }
 
 // Get reads a register value from this delta.
 //
 // This function will return nil if the given key has been deleted in this delta.
-func (d *LedgerDelta) Get(key string) (value []byte, exists bool) {
-	value, exists = d.updates[key]
+func (d LedgerDelta) Get(key string) (value []byte, exists bool) {
+	value, exists = d[key]
 	return
 }
 
 // Set records an update in this delta.
-func (d *LedgerDelta) Set(key string, value []byte) {
-	d.updates[key] = value
+func (d LedgerDelta) Set(key string, value []byte) {
+	d[key] = value
 }
 
 // Delete records a deletion in this delta.
-func (d *LedgerDelta) Delete(key string) {
-	d.updates[key] = nil
+func (d LedgerDelta) Delete(key string) {
+	d[key] = nil
 }
 
 // Updates returns all registers that were updated by this delta.
-func (d *LedgerDelta) Updates() map[string][]byte {
-	return d.updates
+func (d LedgerDelta) Updates() map[string][]byte {
+	return d
 }
 
 // HasBeenDeleted returns true if the given key has been deleted in this delta.
-func (d *LedgerDelta) HasBeenDeleted(key string) bool {
+func (d LedgerDelta) HasBeenDeleted(key string) bool {
 	value, exists := d.Get(key)
 	return exists && value == nil
 }
@@ -49,7 +45,7 @@ type GetRegisterFunc func(key string) ([]byte, error)
 // A ledger view records writes to a delta that can be used to update the
 // underlying data source.
 type LedgerView struct {
-	delta    *LedgerDelta
+	delta    LedgerDelta
 	readFunc GetRegisterFunc
 }
 
@@ -90,6 +86,6 @@ func (r *LedgerView) Delete(key string) {
 }
 
 // Delta returns a record of the registers that were mutated in this view.
-func (r *LedgerView) Delta() *LedgerDelta {
+func (r *LedgerView) Delta() LedgerDelta {
 	return r.delta
 }

@@ -56,7 +56,7 @@ func (b *pendingBlock) Block() types.Block {
 }
 
 // LedgerDelta returns the ledger delta for the pending block.
-func (b *pendingBlock) LedgerDelta() *types.LedgerDelta {
+func (b *pendingBlock) LedgerDelta() types.LedgerDelta {
 	return b.ledgerView.Delta()
 }
 

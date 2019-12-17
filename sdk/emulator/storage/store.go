@@ -37,7 +37,7 @@ type Store interface {
 	CommitBlock(
 		block types.Block,
 		transactions []flow.Transaction,
-		delta *types.LedgerDelta,
+		delta types.LedgerDelta,
 		events []flow.Event,
 	) error
 
@@ -51,7 +51,7 @@ type Store interface {
 	LedgerViewByNumber(blockNumber uint64) *types.LedgerView
 
 	// InsertLedgerDelta inserts a register delta at a given block.
-	InsertLedgerDelta(blockNumber uint64, delta *types.LedgerDelta) error
+	InsertLedgerDelta(blockNumber uint64, delta types.LedgerDelta) error
 
 	// RetrieveEvents returns all events with the given type between startBlock and
 	// endBlock (inclusive). If eventType is empty, returns all events in the

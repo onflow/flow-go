@@ -173,7 +173,7 @@ func insertBlock(block types.Block) func(txn *badger.Txn) error {
 func (s Store) CommitBlock(
 	block types.Block,
 	transactions []flow.Transaction,
-	delta *types.LedgerDelta,
+	delta types.LedgerDelta,
 	events []flow.Event,
 ) (err error) {
 	err = s.db.Update(func(txn *badger.Txn) error {
@@ -259,11 +259,11 @@ func (s *Store) LedgerViewByNumber(blockNumber uint64) *types.LedgerView {
 	})
 }
 
-func (s *Store) InsertLedgerDelta(blockNumber uint64, delta *types.LedgerDelta) error {
+func (s *Store) InsertLedgerDelta(blockNumber uint64, delta types.LedgerDelta) error {
 	return s.db.Update(s.insertLedgerDelta(blockNumber, delta))
 }
 
-func (s *Store) insertLedgerDelta(blockNumber uint64, delta *types.LedgerDelta) func(txn *badger.Txn) error {
+func (s *Store) insertLedgerDelta(blockNumber uint64, delta types.LedgerDelta) func(txn *badger.Txn) error {
 	return func(txn *badger.Txn) error {
 		s.ledgerChangeLog.Lock()
 		defer s.ledgerChangeLog.Unlock()
