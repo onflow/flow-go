@@ -112,6 +112,7 @@ docker-ci:
 		make ci
 
 # This command is should only be used by Team City
+# Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
 .PHONY: docker-ci-team-city
 docker-ci-team-city:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
