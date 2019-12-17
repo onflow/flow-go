@@ -1,20 +1,19 @@
-import {commands, ExtensionContext, window, workspace} from "vscode";
-import {Extension} from "./extension";
+import {commands, ExtensionContext, Position, Range, window, workspace} from "vscode";
+import {Extension, renderExtension} from "./extension";
 import {LanguageServerAPI} from "./language-server";
 import {createTerminal} from "./terminal";
-import {ROOT_ADDR} from "./config";
+import {shortAddress, stripAddressPrefix} from "./address";
 
 // Command identifiers for locally handled commands
-const RESTART_SERVER = "cadence.restartServer";
-const START_EMULATOR = "cadence.runEmulator";
-const STOP_EMULATOR = "cadence.stopEmulator";
-const UPDATE_ACCOUNT_CODE = "cadence.updateAccountCode";
-const CREATE_ACCOUNT = "cadence.createAccount";
-const SWITCH_ACCOUNT = "cadence.switchActiveAccount";
+export const RESTART_SERVER = "cadence.restartServer";
+export const START_EMULATOR = "cadence.runEmulator";
+export const STOP_EMULATOR = "cadence.stopEmulator";
+export const CREATE_ACCOUNT = "cadence.createAccount";
+export const SWITCH_ACCOUNT = "cadence.switchActiveAccount";
 
 // Command identifies for commands handled by the Language server
-export const UPDATE_ACCOUNT_CODE_SERVER = "cadence.server.updateAccountCode";
 export const CREATE_ACCOUNT_SERVER = "cadence.server.createAccount";
+export const CREATE_DEFAULT_ACCOUNTS_SERVER = "cadence.server.createDefaultAccounts";
 export const SWITCH_ACCOUNT_SERVER = "cadence.server.switchActiveAccount";
 
 // Registers a command with VS Code so it can be invoked by the user.
@@ -28,7 +27,6 @@ export function registerCommands(ext: Extension) {
     registerCommand(ext.ctx, RESTART_SERVER, restartServer(ext));
     registerCommand(ext.ctx, START_EMULATOR, startEmulator(ext));
     registerCommand(ext.ctx, STOP_EMULATOR, stopEmulator(ext));
-    registerCommand(ext.ctx, UPDATE_ACCOUNT_CODE, updateAccountCode(ext));
     registerCommand(ext.ctx, CREATE_ACCOUNT, createAccount(ext));
     registerCommand(ext.ctx, SWITCH_ACCOUNT, switchActiveAccount(ext));
 }
@@ -46,29 +44,31 @@ const startEmulator = (ext: Extension) => async () => {
 
     ext.terminal.sendText(`${ext.config.flowCommand} emulator start --init --verbose --root-key ${rootKey}`);
     ext.terminal.show();
+
+    // create default accounts after the emulator has started
+    // skip root account since it is already created
+    setTimeout(async () => {
+        try {
+            const accounts = await ext.api.createDefaultAccounts(ext.config.numAccounts - 1);
+            accounts.forEach(address => ext.config.addAccount(address));
+        } catch (err) {
+            console.error("Failed to create default accounts", err);
+            window.showWarningMessage("Failed to create default accounts");
+        }
+    }, 3000);
 };
 
 // Stops emulator, exits the terminal, and removes all config/db files.
 const stopEmulator = (ext: Extension) => async () => {
     ext.terminal.dispose();
     ext.terminal = createTerminal(ext.ctx);
-};
 
-// Submits a transaction that updates the current account's code the
-// code defined in the active document.
-const updateAccountCode = (ext: Extension) => async () => {
-    const activeEditor = window.activeTextEditor;
-    if (!activeEditor) {
-        return;
-    }
-    const activeDocumentUri = activeEditor.document.uri;
-
-    try {
-        ext.api.updateAccountCode(activeDocumentUri);
-    } catch (err) {
-        window.showWarningMessage("Failed to update account code");
-        console.error(err);
-    }
+    // Clear accounts and restart language server to ensure account
+    // state is in sync.
+    ext.config.resetAccounts();
+    renderExtension(ext);
+    await ext.api.client.stop();
+    ext.api = new LanguageServerAPI(ext.ctx, ext.config);
 };
 
 // Creates a new account by requesting that the Language Server submit
@@ -76,7 +76,7 @@ const updateAccountCode = (ext: Extension) => async () => {
 const createAccount = (ext: Extension) => async () => {
     try {
         const addr = await ext.api.createAccount();
-        ext.config.accounts[addr] = {address: addr};
+        ext.config.addAccount(addr);
     } catch (err) {
         window.showErrorMessage("Failed to create account: " + err);
         return;
@@ -92,7 +92,7 @@ const switchActiveAccount = (ext: Extension) => async () => {
     const accountOptions = Object
         .keys(ext.config.accounts)
         // Mark the active account with a `*` in the dialog
-        .map(addr => addr === ext.config.activeAccount ? `${addr} ${activeSuffix}` : addr);
+        .map(addr => addr === ext.config.activeAccount ? `${shortAddress(addr)} ${activeSuffix}` : shortAddress(addr));
 
     window.showQuickPick(accountOptions)
         .then(selected => {
@@ -111,7 +111,24 @@ const switchActiveAccount = (ext: Extension) => async () => {
             }
 
             try {
-                ext.api.switchActiveAccount(selected);
+                ext.api.switchActiveAccount(stripAddressPrefix(selected));
+                window.visibleTextEditors.forEach(editor => {
+                    if (!editor.document.lineCount) {
+                        return;
+                    }
+                    // NOTE: We add a space to the end of the last line to force
+                    // Codelens to refresh.
+                    const lineCount = editor.document.lineCount;
+                    const lastLine = editor.document.lineAt(lineCount-1);
+                    editor.edit(edit => {
+                        if (lastLine.isEmptyOrWhitespace) {
+                            edit.insert(new Position(lineCount-1, 0), ' ');
+                            edit.delete(new Range(lineCount-1, 0, lineCount-1, 1000));
+                        } else {
+                            edit.insert(new Position(lineCount-1, 1000), '\n');
+                        }
+                    });
+                });
             } catch (err) {
                 window.showWarningMessage("Failed to switch active account");
                 console.error(err);
@@ -119,5 +136,6 @@ const switchActiveAccount = (ext: Extension) => async () => {
             }
             ext.config.activeAccount = selected;
             window.showInformationMessage(`Switched to account ${selected}`);
+            renderExtension(ext);
         });
 };

@@ -79,10 +79,13 @@ func (checker *Checker) declareFunctionDeclaration(
 ) {
 	argumentLabels := declaration.ParameterList.ArgumentLabels()
 
-	variable, err := checker.valueActivations.DeclareFunction(
-		declaration.Identifier,
-		declaration.Access,
+	variable, err := checker.valueActivations.Declare(
+		declaration.Identifier.Identifier,
 		functionType,
+		declaration.Access,
+		common.DeclarationKindFunction,
+		declaration.Identifier.Pos,
+		true,
 		argumentLabels,
 	)
 	checker.report(err)
@@ -152,7 +155,12 @@ func (checker *Checker) checkFunctionExits(functionBlock *ast.FunctionBlock, ret
 	}
 
 	functionActivation := checker.functionActivations.Current()
-	if functionActivation.ReturnInfo.DefinitelyReturned {
+
+	definitelyReturnedOrHalted :=
+		functionActivation.ReturnInfo.DefinitelyReturned ||
+			functionActivation.ReturnInfo.DefinitelyHalted
+
+	if definitelyReturnedOrHalted {
 		return
 	}
 
@@ -171,26 +179,26 @@ func (checker *Checker) checkParameters(parameterList *ast.ParameterList, parame
 }
 
 func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos ast.Position) {
-	checker.checkMoveAnnotation(
+	checker.checkResourceAnnotation(
 		typeAnnotation.Type,
-		typeAnnotation.Move,
+		typeAnnotation.IsResource,
 		pos,
 	)
 }
 
-func (checker *Checker) checkMoveAnnotation(ty Type, move bool, pos ast.Position) {
+func (checker *Checker) checkResourceAnnotation(ty Type, isResourceMove bool, pos ast.Position) {
 	if ty.IsResourceType() {
-		if !move {
+		if !isResourceMove {
 			checker.report(
-				&MissingMoveAnnotationError{
+				&MissingResourceAnnotationError{
 					Pos: pos,
 				},
 			)
 		}
 	} else {
-		if move {
+		if isResourceMove {
 			checker.report(
-				&InvalidMoveAnnotationError{
+				&InvalidResourceAnnotationError{
 					Pos: pos,
 				},
 			)

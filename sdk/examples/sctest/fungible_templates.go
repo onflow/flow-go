@@ -12,22 +12,17 @@ import (
 // The Vault must have been deployed already.
 func GenerateCreateTokenScript(tokenAddr flow.Address, initialBalance int) []byte {
 	template := `
-		import Vault, createVault, Receiver, Provider from 0x%s
+		import FungibleToken from 0x%s
 
 		transaction {
 
 		  prepare(acct: Account) {
-			var vaultA: <-Vault? <- createVault(initialBalance: %d)
-			
-			acct.storage[Vault] <-> vaultA
+			let oldVault <- acct.storage[FungibleToken.Vault] <- FungibleToken.createVault(initialBalance: %d)
+			destroy oldVault
 
-			acct.published[&Receiver] = &acct.storage[Vault] as Receiver
-			acct.published[&Provider] = &acct.storage[Vault] as Provider
-
-			destroy vaultA
+			acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as FungibleToken.Receiver
+			acct.published[&FungibleToken.Provider] = &acct.storage[FungibleToken.Vault] as FungibleToken.Provider
 		  }
-
-		  execute {}
 		}
 	`
 	return []byte(fmt.Sprintf(template, tokenAddr, initialBalance))
@@ -39,27 +34,24 @@ func GenerateCreateTokenScript(tokenAddr flow.Address, initialBalance int) []byt
 // to the storage of the signer's account
 func GenerateCreateThreeTokensArrayScript(tokenAddr flow.Address, initialBalance int, bal2 int, bal3 int) []byte {
 	template := `
-		import Vault, createVault from 0x%s
+		import FungibleToken from 0x%s
 
 		transaction {
 
 		  prepare(acct: Account) {
-			let vaultA: <-Vault <- createVault(initialBalance: %d)
-    		let vaultB: <-Vault <- createVault(initialBalance: %d)
-			let vaultC: <-Vault <- createVault(initialBalance: %d)
+			let vaultA <- FungibleToken.createVault(initialBalance: %d)
+    		let vaultB <- FungibleToken.createVault(initialBalance: %d)
+			let vaultC <- FungibleToken.createVault(initialBalance: %d)
 			
-			var vaultArray: <-[Vault] <- [<-vaultA, <-vaultB]
+			var vaultArray <- [<-vaultA, <-vaultB]
 
 			vaultArray.append(<-vaultC)
-			
-			var storedVaults: <-[Vault]? <- vaultArray
-			acct.storage[[Vault]] <-> storedVaults
-            acct.published[&[Vault]] = &acct.storage[[Vault]] as [Vault] 
 
+			let storedVaults <- acct.storage[[FungibleToken.Vault]] <- vaultArray
 			destroy storedVaults
-		  }
 
-		  execute {}
+            acct.published[&[FungibleToken.Vault]] = &acct.storage[[FungibleToken.Vault]] as [FungibleToken.Vault]
+		  }
 		}
 	`
 	return []byte(fmt.Sprintf(template, tokenAddr, initialBalance, bal2, bal3))
@@ -69,21 +61,20 @@ func GenerateCreateThreeTokensArrayScript(tokenAddr flow.Address, initialBalance
 // tokens from a vault and destroys the tokens
 func GenerateWithdrawScript(tokenCodeAddr flow.Address, vaultNumber int, withdrawAmount int) []byte {
 	template := `
-		import Vault from 0x%s
+		import FungibleToken from 0x%s
 
 		transaction {
 		  prepare(acct: Account) {
-			var vaultArray <- acct.storage[[Vault]] ?? panic("missing vault array!")
+			var vaultArray <- acct.storage[[FungibleToken.Vault]] ?? panic("missing vault array!")
 			
 			let withdrawVault <- vaultArray[%d].withdraw(amount: %d)
 
-			var storedVaults: <-[Vault]? <- vaultArray
-			acct.storage[[Vault]] <-> storedVaults
+			var storedVaults: @[FungibleToken.Vault]? <- vaultArray
+			acct.storage[[FungibleToken.Vault]] <-> storedVaults
 
 			destroy withdrawVault
 			destroy storedVaults
 		  }
-		  execute {}
 		}
 	`
 
@@ -95,22 +86,21 @@ func GenerateWithdrawScript(tokenCodeAddr flow.Address, vaultNumber int, withdra
 // them to another vault
 func GenerateWithdrawDepositScript(tokenCodeAddr flow.Address, withdrawVaultNumber int, depositVaultNumber int, withdrawAmount int) []byte {
 	template := `
-		import Vault from 0x%s
+		import FungibleToken from 0x%s
 
 		transaction {
 		  prepare(acct: Account) {
-			var vaultArray <- acct.storage[[Vault]] ?? panic("missing vault array!")
+			var vaultArray <- acct.storage[[FungibleToken.Vault]] ?? panic("missing vault array!")
 			
 			let withdrawVault <- vaultArray[%d].withdraw(amount: %d)
 
 			vaultArray[%d].deposit(from: <-withdrawVault)
 
-			var storedVaults: <-[Vault]? <- vaultArray
-			acct.storage[[Vault]] <-> storedVaults
+			var storedVaults: @[FungibleToken.Vault]? <- vaultArray
+			acct.storage[[FungibleToken.Vault]] <-> storedVaults
 
 			destroy storedVaults
 		  }
-		  execute {}
 		}
 	`
 
@@ -121,21 +111,19 @@ func GenerateWithdrawDepositScript(tokenCodeAddr flow.Address, withdrawVaultNumb
 // and deposits it to another account's vault
 func GenerateDepositVaultScript(tokenCodeAddr flow.Address, receiverAddr flow.Address, amount int) []byte {
 	template := `
-		import Vault, Provider, Receiver from 0x%s
+		import FungibleToken from 0x%s
 
 		transaction {
 		  prepare(acct: Account) {
 			let recipient = getAccount(0x%s)
 
-			let providerRef = acct.published[&Provider] ?? panic("missing Vault Provider reference")
-			let receiverRef = recipient.published[&Receiver] ?? panic("missing Vault receiver reference")
+			let providerRef = acct.published[&FungibleToken.Provider] ?? panic("missing Provider reference")
+			let receiverRef = recipient.published[&FungibleToken.Receiver] ?? panic("missing Receiver reference")
 
 			let tokens <- providerRef.withdraw(amount: %d)
 
 			receiverRef.deposit(from: <-tokens)
 		  }
-
-		  execute {}
 		}
 	`
 
@@ -146,20 +134,18 @@ func GenerateDepositVaultScript(tokenCodeAddr flow.Address, receiverAddr flow.Ad
 // and deposits it to another account's vault
 func GenerateTransferVaultScript(tokenCodeAddr flow.Address, receiverAddr flow.Address, amount int) []byte {
 	template := `
-		import Vault, Provider, Receiver from 0x%s
+		import FungibleToken from 0x%s
 
 		transaction {
 
 		  prepare(acct: Account) {
 			let recipient = getAccount(0x%s)
 
-			let providerRef = acct.published[&Provider] ?? panic("missing Vault Provider reference")
-			let receiverRef = recipient.published[&Receiver] ?? panic("missing Vault receiver reference")
+			let providerRef = acct.published[&FungibleToken.Provider] ?? panic("missing Provider reference")
+			let receiverRef = recipient.published[&FungibleToken.Receiver] ?? panic("missing Receiver reference")
 
 			providerRef.transfer(to: receiverRef, amount: %d)
 		  }
-
-		  execute {}
 		}
 	`
 
@@ -169,19 +155,17 @@ func GenerateTransferVaultScript(tokenCodeAddr flow.Address, receiverAddr flow.A
 // GenerateInvalidTransferSenderScript creates a script that trys to do a transfer from a receiver reference, which is invalid
 func GenerateInvalidTransferSenderScript(tokenCodeAddr flow.Address, receiverAddr flow.Address, amount int) []byte {
 	template := `
-		import Vault, Provider, Receiver from 0x%s
+		import FungibleToken from 0x%s
 
 		transaction {
 		  prepare(acct: Account) {
 			let recipient = getAccount(0x%s)
 
-			let providerRef = acct.published[&Provider] ?? panic("missing Vault Provider reference")
-			let receiverRef = recipient.published[&Receiver] ?? panic("missing Vault receiver reference")
+			let providerRef = acct.published[&FungibleToken.Provider] ?? panic("missing Provider reference")
+			let receiverRef = recipient.published[&FungibleToken.Receiver] ?? panic("missing Receiver reference")
 
 			receiverRef.transfer(to: receiverRef, amount: %d)
 		  }
-
-		  execute {}
 		}
 	`
 
@@ -191,20 +175,18 @@ func GenerateInvalidTransferSenderScript(tokenCodeAddr flow.Address, receiverAdd
 // GenerateInvalidTransferReceiverScript creates a script that trys to do a transfer from a receiver reference, which is invalid
 func GenerateInvalidTransferReceiverScript(tokenCodeAddr flow.Address, receiverAddr flow.Address, amount int) []byte {
 	template := `
-		import Vault, Provider, Receiver from 0x%s
+		import FungibleToken from 0x%s
 
 		transaction {
 
 		  prepare(acct: Account) {
 			let recipient = getAccount(0x%s)
 
-			let providerRef = acct.published[&Provider] ?? panic("missing Vault Provider reference")
-			let receiverRef = recipient.published[&Receiver] ?? panic("missing Vault receiver reference")
+			let providerRef = acct.published[&FungibleToken.Provider] ?? panic("missing Provider reference")
+			let receiverRef = recipient.published[&FungibleToken.Receiver] ?? panic("missing Receiver reference")
 
 			providerRef.transfer(to: providerRef, amount: %d)
 		  }
-
-		  execute {}
 		}
 	`
 
@@ -216,11 +198,11 @@ func GenerateInvalidTransferReceiverScript(tokenCodeAddr flow.Address, receiverA
 // its balance. If these assertions fail, the script panics.
 func GenerateInspectVaultScript(tokenCodeAddr, userAddr flow.Address, expectedBalance int) []byte {
 	template := `
-		import Vault, Receiver from 0x%s
+		import FungibleToken from 0x%s
 
 		pub fun main() {
 			let acct = getAccount(0x%s)
-			let vaultRef = acct.published[&Receiver] ?? panic("missing Receiver reference")
+			let vaultRef = acct.published[&FungibleToken.Receiver] ?? panic("missing Receiver reference")
 			assert(
                 vaultRef.balance == %d,
                 message: "incorrect Balance!"
@@ -236,11 +218,11 @@ func GenerateInspectVaultScript(tokenCodeAddr, userAddr flow.Address, expectedBa
 // its balance. If these assertions fail, the script panics.
 func GenerateInspectVaultArrayScript(tokenCodeAddr, userAddr flow.Address, vaultNumber int, expectedBalance int) []byte {
 	template := `
-		import Vault from 0x%s
+		import FungibleToken from 0x%s
 
 		pub fun main() {
 			let acct = getAccount(0x%s)
-			let vaultArray = acct.published[&[Vault]] ?? panic("missing vault")
+			let vaultArray = acct.published[&[FungibleToken.Vault]] ?? panic("missing vault")
 			assert(
                 vaultArray[%d].balance == %d,
                 message: "incorrect Balance!"

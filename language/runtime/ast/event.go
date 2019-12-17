@@ -7,6 +7,7 @@ import (
 // EventDeclaration
 
 type EventDeclaration struct {
+	Access        Access
 	Identifier    Identifier
 	ParameterList *ParameterList
 	Range
@@ -19,8 +20,8 @@ func (e *EventDeclaration) Accept(visitor Visitor) Repr {
 func (*EventDeclaration) isDeclaration() {}
 func (*EventDeclaration) isStatement()   {}
 
-func (e *EventDeclaration) DeclarationIdentifier() Identifier {
-	return e.Identifier
+func (e *EventDeclaration) DeclarationIdentifier() *Identifier {
+	return &e.Identifier
 }
 
 func (e *EventDeclaration) DeclarationKind() common.DeclarationKind {

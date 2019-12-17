@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
+	"path/filepath"
 	"time"
 
 	"github.com/dapperlabs/flow-go/sdk/templates"
@@ -18,11 +20,12 @@ import (
 )
 
 const (
-	CommandSubmitTransaction   = "cadence.server.submitTransaction"
-	CommandExecuteScript       = "cadence.server.executeScript"
-	CommandUpdateAccountCode   = "cadence.server.updateAccountCode"
-	CommandCreateAccount       = "cadence.server.createAccount"
-	CommandSwitchActiveAccount = "cadence.server.switchActiveAccount"
+	CommandSubmitTransaction     = "cadence.server.submitTransaction"
+	CommandExecuteScript         = "cadence.server.executeScript"
+	CommandUpdateAccountCode     = "cadence.server.updateAccountCode"
+	CommandCreateAccount         = "cadence.server.createAccount"
+	CommandCreateDefaultAccounts = "cadence.server.createDefaultAccounts"
+	CommandSwitchActiveAccount   = "cadence.server.switchActiveAccount"
 )
 
 // CommandHandler represents the form of functions that handle commands
@@ -33,7 +36,7 @@ type CommandHandler func(conn protocol.Conn, args ...interface{}) (interface{}, 
 //
 // The best reference I've found for how this works is:
 // https://stackoverflow.com/questions/43328582/how-to-implement-quickfix-via-a-language-server
-func (s Server) registerCommands(conn protocol.Conn) {
+func (s *Server) registerCommands(conn protocol.Conn) {
 	// Send a message to the client indicating which commands we support
 	registration := protocol.RegistrationParams{
 		Registrations: []protocol.Registration{
@@ -47,6 +50,7 @@ func (s Server) registerCommands(conn protocol.Conn) {
 							CommandExecuteScript,
 							CommandUpdateAccountCode,
 							CommandCreateAccount,
+							CommandCreateDefaultAccounts,
 							CommandSwitchActiveAccount,
 						},
 					},
@@ -81,6 +85,7 @@ func (s Server) registerCommands(conn protocol.Conn) {
 	s.commands[CommandUpdateAccountCode] = s.updateAccountCode
 	s.commands[CommandSwitchActiveAccount] = s.switchActiveAccount
 	s.commands[CommandCreateAccount] = s.createAccount
+	s.commands[CommandCreateDefaultAccounts] = s.createDefaultAccounts
 }
 
 // submitTransaction handles submitting a transaction defined in the
@@ -115,7 +120,7 @@ func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (int
 		ScriptAccounts: []flow.Address{s.activeAccount},
 	}
 
-	err := s.sendTransaction(conn, tx)
+	err := s.sendTransactionHelper(conn, tx)
 	return nil, err
 }
 
@@ -221,56 +226,66 @@ func (s *Server) createAccount(conn protocol.Conn, args ...interface{}) (interfa
 		return nil, fmt.Errorf("expecting %d args got: %d", expectedArgCount, len(args))
 	}
 
-	accountKey := flow.AccountPublicKey{
-		PublicKey: s.config.RootAccountKey.PrivateKey.PublicKey(),
-		SignAlgo:  s.config.RootAccountKey.SignAlgo,
-		HashAlgo:  s.config.RootAccountKey.HashAlgo,
-		Weight:    keys.PublicKeyWeightThreshold,
-	}
-	script, err := templates.CreateAccount([]flow.AccountPublicKey{accountKey}, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate account creation script: %w", err)
-	}
-
-	tx := flow.Transaction{
-		Script:         script,
-		Nonce:          s.getNextNonce(),
-		ComputeLimit:   10,
-		PayerAccount:   s.activeAccount,
-		ScriptAccounts: []flow.Address{},
-	}
-
-	err = s.sendTransaction(conn, tx)
+	addr, err := s.createAccountHelper(conn)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: replace this for loop with a synchronous GetTransaction in SDK
-	// that handles waiting for it to be mined
-	var minedTx *flow.Transaction
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
+	return addr, nil
+}
+
+// createDefaultAccounts creates a set of default accounts and returns their addresses.
+//
+// This command will wait until the emulator server is started before submitting any transactions.
+func (s *Server) createDefaultAccounts(conn protocol.Conn, args ...interface{}) (interface{}, error) {
+	conn.LogMessage(&protocol.LogMessageParams{
+		Type:    protocol.Log,
+		Message: fmt.Sprintf("create default acct %v", args),
+	})
+
+	expectedArgCount := 1
+	if len(args) != expectedArgCount {
+		return nil, fmt.Errorf("must have %d args, got: %d", expectedArgCount, len(args))
+	}
+
+	n, ok := args[0].(float64)
+	if !ok {
+		return nil, errors.New("invalid count argument")
+	}
+
+	count := int(n)
+
+	conn.ShowMessage(&protocol.ShowMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("Creating %d default accounts", count),
+	})
+
+	// Ping the emulator server for 30 seconds until it is available
+	timer := time.NewTimer(30 * time.Second)
+RetryLoop:
 	for {
-		minedTx, err = s.flowClient.GetTransaction(ctx, tx.Hash())
+		select {
+		case <-timer.C:
+			return nil, errors.New("emulator server timed out")
+		default:
+			err := s.flowClient.Ping(context.Background())
+			if err == nil {
+				break RetryLoop
+			}
+		}
+	}
+
+	accounts := make([]flow.Address, count)
+
+	for i := 0; i < count; i++ {
+		addr, err := s.createAccountHelper(conn)
 		if err != nil {
 			return nil, err
 		}
-		if minedTx.Status == flow.TransactionFinalized || minedTx.Status == flow.TransactionSealed {
-			break
-		}
+		accounts[i] = addr
 	}
 
-	if len(minedTx.Events) != 1 {
-		return nil, fmt.Errorf("failed to get new account address for tx %s", tx.Hash().Hex())
-	}
-	accountCreatedEvent, err := flow.DecodeAccountCreatedEvent(minedTx.Events[0].Payload)
-	if err != nil {
-		return nil, err
-	}
-	addr := accountCreatedEvent.Address()
-
-	s.accounts[addr] = s.config.RootAccountKey
-	return addr, nil
+	return accounts, nil
 }
 
 // updateAccountCode updates the configured account with the code of the given
@@ -298,6 +313,13 @@ func (s *Server) updateAccountCode(conn protocol.Conn, args ...interface{}) (int
 		return nil, fmt.Errorf("could not find document for URI %s", uri)
 	}
 
+	file := parseFileFromURI(uri)
+
+	conn.ShowMessage(&protocol.ShowMessageParams{
+		Type:    protocol.Info,
+		Message: fmt.Sprintf("Deploying %s to account 0x%s", file, s.activeAccount.Short()),
+	})
+
 	accountCode := []byte(doc.text)
 	script := templates.UpdateAccountCode(accountCode)
 
@@ -309,17 +331,17 @@ func (s *Server) updateAccountCode(conn protocol.Conn, args ...interface{}) (int
 		ScriptAccounts: []flow.Address{s.activeAccount},
 	}
 
-	err := s.sendTransaction(conn, tx)
+	err := s.sendTransactionHelper(conn, tx)
 	return nil, err
 }
 
-// sendTransaction sends a transaction with the given script, from the
+// sendTransactionHelper sends a transaction with the given script, from the
 // currently active account. Returns the hash of the transaction if it is
 // successfully submitted.
 //
 // If an error occurs, attempts to show an appropriate message (either via logs
 // or UI popups in the client).
-func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) error {
+func (s *Server) sendTransactionHelper(conn protocol.Conn, tx flow.Transaction) error {
 	key, ok := s.accounts[s.activeAccount]
 	if !ok {
 		return fmt.Errorf("cannot sign transaction for account with unknown address %s", s.activeAccount)
@@ -369,4 +391,70 @@ func (s *Server) sendTransaction(conn protocol.Conn, tx flow.Transaction) error 
 	}
 
 	return err
+}
+
+// createAccountHelper creates a new account and returns its address.
+func (s *Server) createAccountHelper(conn protocol.Conn) (addr flow.Address, err error) {
+	accountKey := flow.AccountPublicKey{
+		PublicKey: s.config.RootAccountKey.PrivateKey.PublicKey(),
+		SignAlgo:  s.config.RootAccountKey.SignAlgo,
+		HashAlgo:  s.config.RootAccountKey.HashAlgo,
+		Weight:    keys.PublicKeyWeightThreshold,
+	}
+
+	script, err := templates.CreateAccount([]flow.AccountPublicKey{accountKey}, nil)
+	if err != nil {
+		return addr, fmt.Errorf("failed to generate account creation script: %w", err)
+	}
+
+	tx := flow.Transaction{
+		Script:         script,
+		Nonce:          s.getNextNonce(),
+		ComputeLimit:   10,
+		PayerAccount:   s.activeAccount,
+		ScriptAccounts: []flow.Address{},
+	}
+
+	err = s.sendTransactionHelper(conn, tx)
+	if err != nil {
+		return addr, err
+	}
+
+	// TODO: replace this for loop with a synchronous GetTransaction in SDK
+	// that handles waiting for it to be mined
+	var minedTx *flow.Transaction
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	for {
+		minedTx, err = s.flowClient.GetTransaction(ctx, tx.Hash())
+		if err != nil {
+			return addr, err
+		}
+		if minedTx.Status == flow.TransactionFinalized || minedTx.Status == flow.TransactionSealed {
+			break
+		}
+	}
+
+	if len(minedTx.Events) != 1 {
+		return addr, fmt.Errorf("failed to get new account address for tx %s", tx.Hash().Hex())
+	}
+	accountCreatedEvent, err := flow.DecodeAccountCreatedEvent(minedTx.Events[0].Payload)
+	if err != nil {
+		return addr, err
+	}
+
+	addr = accountCreatedEvent.Address()
+
+	s.accounts[addr] = s.config.RootAccountKey
+
+	return addr, nil
+}
+
+func parseFileFromURI(uri string) string {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return uri
+	}
+
+	return filepath.Base(u.Path)
 }

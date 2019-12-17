@@ -135,38 +135,21 @@ func TestCheckInvalidUnknownSpecialFunction(t *testing.T) {
 
 			t.Run(testName, func(t *testing.T) {
 
-				_, err := ParseAndCheck(t, fmt.Sprintf(`
-                      %[1]s %[2]s Test {
-                          initializer() {}
-                      }
-                    `,
-					kind.Keyword(),
-					interfaceKeyword,
-				))
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          %[1]s %[2]s Test {
+                              initializer() {}
+                          }
+                        `,
+						kind.Keyword(),
+						interfaceKeyword,
+					),
+				)
 
-				switch kind {
-				case common.CompositeKindStructure, common.CompositeKindResource:
-					errs := ExpectCheckerErrors(t, err, 1)
+				errs := ExpectCheckerErrors(t, err, 1)
 
-					assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
-
-				case common.CompositeKindContract:
-					// TODO: add support for contract interface declarations
-
-					if isInterface {
-						errs := ExpectCheckerErrors(t, err, 2)
-
-						assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
-						assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-					} else {
-						errs := ExpectCheckerErrors(t, err, 1)
-
-						assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
-					}
-
-				default:
-					panic(errors.NewUnreachableError())
-				}
+				assert.IsType(t, &sema.UnknownSpecialFunctionError{}, errs[0])
 			})
 		}
 	}
@@ -201,45 +184,17 @@ func TestCheckInvalidCompositeFieldNames(t *testing.T) {
 					),
 				)
 
-				switch kind {
-				case common.CompositeKindStructure,
-					common.CompositeKindResource:
+				if isInterface {
+					errs := ExpectCheckerErrors(t, err, 2)
 
-					if isInterface {
-						errs := ExpectCheckerErrors(t, err, 2)
+					assert.IsType(t, &sema.InvalidNameError{}, errs[0])
+					assert.IsType(t, &sema.InvalidNameError{}, errs[1])
+				} else {
+					errs := ExpectCheckerErrors(t, err, 3)
 
-						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-					} else {
-						errs := ExpectCheckerErrors(t, err, 3)
-
-						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-						assert.IsType(t, &sema.MissingInitializerError{}, errs[2])
-					}
-
-				case common.CompositeKindContract:
-
-					if isInterface {
-						errs := ExpectCheckerErrors(t, err, 3)
-
-						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-
-						// TODO: add support for contract interface declarations
-
-						assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-
-					} else {
-						errs := ExpectCheckerErrors(t, err, 3)
-
-						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-						assert.IsType(t, &sema.MissingInitializerError{}, errs[2])
-					}
-
-				default:
-					panic(errors.NewUnreachableError())
+					assert.IsType(t, &sema.InvalidNameError{}, errs[0])
+					assert.IsType(t, &sema.InvalidNameError{}, errs[1])
+					assert.IsType(t, &sema.MissingInitializerError{}, errs[2])
 				}
 			})
 		}
@@ -281,33 +236,10 @@ func TestCheckInvalidCompositeFunctionNames(t *testing.T) {
 					),
 				)
 
-				switch kind {
-				case common.CompositeKindStructure, common.CompositeKindResource:
-					errs := ExpectCheckerErrors(t, err, 2)
+				errs := ExpectCheckerErrors(t, err, 2)
 
-					assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-					assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-
-				case common.CompositeKindContract:
-					if isInterface {
-						errs := ExpectCheckerErrors(t, err, 3)
-
-						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-
-						// TODO: add support for contract interface declarations
-
-						assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-					} else {
-						errs := ExpectCheckerErrors(t, err, 2)
-
-						assert.IsType(t, &sema.InvalidNameError{}, errs[0])
-						assert.IsType(t, &sema.InvalidNameError{}, errs[1])
-					}
-
-				default:
-					panic(errors.NewUnreachableError())
-				}
+				assert.IsType(t, &sema.InvalidNameError{}, errs[0])
+				assert.IsType(t, &sema.InvalidNameError{}, errs[1])
 			})
 		}
 	}
@@ -545,7 +477,7 @@ func TestCheckInvalidCompositeFunction(t *testing.T) {
 	}
 }
 
-func TestCheckCompositeInitializerSelfReference(t *testing.T) {
+func TestCheckCompositeInitializerSelfUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
@@ -583,7 +515,7 @@ func TestCheckCompositeInitializerSelfReference(t *testing.T) {
 	}
 }
 
-func TestCheckCompositeFunctionSelfReference(t *testing.T) {
+func TestCheckCompositeFunctionSelfUse(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
@@ -618,29 +550,6 @@ func TestCheckCompositeFunctionSelfReference(t *testing.T) {
 	}
 }
 
-func TestCheckInvalidLocalComposite(t *testing.T) {
-
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
-
-			_, err := ParseAndCheck(t,
-				fmt.Sprintf(
-					`
-                      fun test() {
-                          %s Test {}
-                      }
-                    `,
-					kind.Keyword(),
-				),
-			)
-
-			errs := ExpectCheckerErrors(t, err, 1)
-
-			assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
-		})
-	}
-}
-
 func TestCheckInvalidCompositeMissingInitializer(t *testing.T) {
 
 	for _, kind := range common.CompositeKinds {
@@ -668,8 +577,8 @@ func TestCheckInvalidResourceMissingDestructor(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
-           init(test: <-Test) {
+           let test: @Test
+           init(test: @Test) {
                self.test <- test
            }
        }
@@ -684,9 +593,9 @@ func TestCheckResourceWithDestructor(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -699,7 +608,7 @@ func TestCheckResourceWithDestructor(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCheckInvalidResourceFieldWithMissingMoveAnnotation(t *testing.T) {
+func TestCheckInvalidResourceFieldWithMissingResourceAnnotation(t *testing.T) {
 
 	interfacePossibilities := []bool{true, false}
 
@@ -730,23 +639,26 @@ func TestCheckInvalidResourceFieldWithMissingMoveAnnotation(t *testing.T) {
                 `
 			}
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                   resource %[1]s Test {
-                       let test: Test
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      resource %[1]s Test {
+                          let test: Test
 
-                       init(test: <-Test) %[2]s
+                          init(test: @Test) %[2]s
 
-                       destroy() %[3]s
-                   }
-                `,
-				interfaceKeyword,
-				initializerBody,
-				destructorBody,
-			))
+                          destroy() %[3]s
+                      }
+                    `,
+					interfaceKeyword,
+					initializerBody,
+					destructorBody,
+				),
+			)
 
 			errs := ExpectCheckerErrors(t, err, 1)
 
-			assert.IsType(t, &sema.MissingMoveAnnotationError{}, errs[0])
+			assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 		})
 	}
 }
@@ -757,7 +669,8 @@ func TestCheckCompositeFieldAccess(t *testing.T) {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
-				fmt.Sprintf(`
+				fmt.Sprintf(
+					`
                       %s Test {
                           let foo: Int
 
@@ -856,17 +769,23 @@ func TestCheckCompositeFieldAssignment(t *testing.T) {
 			)
 
 			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure:
 				require.NoError(t, err)
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
 
 			case common.CompositeKindResource:
 
-				errs := ExpectCheckerErrors(t, err, 2)
+				errs := ExpectCheckerErrors(t, err, 4)
 
-				// TODO: remove once `self` is handled properly
-
-				assert.IsType(t, &sema.ResourceLossError{}, errs[0])
+				assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
 				assert.IsType(t, &sema.ResourceLossError{}, errs[1])
+				assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[2])
+				assert.IsType(t, &sema.ResourceLossError{}, errs[3])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -893,10 +812,12 @@ func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
 			assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[3])
 		},
 		common.CompositeKindContract: func(err error) {
-			errs := ExpectCheckerErrors(t, err, 2)
+			errs := ExpectCheckerErrors(t, err, 4)
 
 			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[0])
-			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[1])
+			assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
+			assert.IsType(t, &sema.AssignmentToConstantError{}, errs[2])
+			assert.IsType(t, &sema.InvalidMoveError{}, errs[3])
 		},
 	}
 
@@ -904,21 +825,25 @@ func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s Test {
-                  init() {
-                      self %[2]s %[3]s Test()
-                  }
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s Test {
+                          init() {
+                              self %[2]s %[3]s Test%[4]s
+                          }
 
-                  fun test() {
-                      self %[2]s %[3]s Test()
-                  }
-              }
-            `,
-				compositeKind.Keyword(),
-				compositeKind.TransferOperator(),
-				compositeKind.ConstructionKeyword(),
-			))
+                          fun test() {
+                              self %[2]s %[3]s Test%[4]s
+                          }
+                      }
+                    `,
+					compositeKind.Keyword(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
+				),
+			)
 
 			check(err)
 		})
@@ -1116,8 +1041,14 @@ func TestCheckInvalidCompositeFunctionAssignment(t *testing.T) {
 
 func TestCheckCompositeInstantiation(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			// Contracts cannot be instantiated
+			continue
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -1137,11 +1068,11 @@ func TestCheckCompositeInstantiation(t *testing.T) {
 
                       let test: %[2]sTest %[3]s %[4]s Test(x: 3)
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
-					kind.DestructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					compositeKind.DestructionKeyword(),
 				),
 			)
 
@@ -1187,20 +1118,6 @@ func TestCheckInvalidDifferentCompositeRedeclaration(t *testing.T) {
 				continue
 			}
 
-			// TODO: add support for contract declarations
-
-			if firstKind != common.CompositeKindStructure &&
-				firstKind != common.CompositeKindResource {
-
-				continue
-			}
-
-			if secondKind != common.CompositeKindStructure &&
-				secondKind != common.CompositeKindResource {
-
-				continue
-			}
-
 			testName := fmt.Sprintf(
 				"%s/%s",
 				firstKind.Keyword(),
@@ -1209,14 +1126,17 @@ func TestCheckInvalidDifferentCompositeRedeclaration(t *testing.T) {
 
 			t.Run(testName, func(t *testing.T) {
 
-				_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  let x = 1
-                  %[1]s Foo {}
-                  %[2]s Foo {}
-                `,
-					firstKind.Keyword(),
-					secondKind.Keyword(),
-				))
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          let x = 1
+                          %[1]s Foo {}
+                          %[2]s Foo {}
+                        `,
+						firstKind.Keyword(),
+						secondKind.Keyword(),
+					),
+				)
 
 				errs := ExpectCheckerErrors(t, err, 2)
 
@@ -1249,16 +1169,8 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 	for _, firstKind := range common.CompositeKinds {
 		for _, secondKind := range common.CompositeKinds {
 
-			// TODO: add support for contract declarations
-
-			if firstKind != common.CompositeKindStructure &&
-				firstKind != common.CompositeKindResource {
-
-				continue
-			}
-
-			if secondKind != common.CompositeKindStructure &&
-				secondKind != common.CompositeKindResource {
+			if firstKind == common.CompositeKindContract ||
+				secondKind == common.CompositeKindContract {
 
 				continue
 			}
@@ -1272,7 +1184,8 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 			t.Run(testName, func(t *testing.T) {
 
 				_, err := ParseAndCheck(t,
-					fmt.Sprintf(`
+					fmt.Sprintf(
+						`
                           %[1]s Foo {
                               init() {}
                           }
@@ -1281,13 +1194,14 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
                               init() {}
                           }
 
-                          let foo: %[3]sFoo %[4]s %[5]s Bar()
+                          let foo: %[3]sFoo %[4]s %[5]s Bar%[6]s
                         `,
 						firstKind.Keyword(),
 						secondKind.Keyword(),
 						firstKind.Annotation(),
 						firstKind.TransferOperator(),
 						secondKind.ConstructionKeyword(),
+						constructorArguments(secondKind),
 					),
 				)
 
@@ -1347,8 +1261,20 @@ func TestCheckInvalidCompositeInitializerWithSelfParameter(t *testing.T) {
 
 func TestCheckCompositeInitializesConstant(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		var setupCode string
+
+		if compositeKind != common.CompositeKindContract {
+			setupCode = fmt.Sprintf(
+				`let test %[1]s %[2]s Test%[3]s`,
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
+				constructorArguments(compositeKind),
+			)
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -1361,11 +1287,10 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
                           }
                       }
 
-                      let test %[2]s %[3]s Test()
+                      %[2]s
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					setupCode,
 				),
 			)
 
@@ -1376,8 +1301,14 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
 
 func TestCheckCompositeInitializerWithArgumentLabel(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			// Contracts cannot be instantiated
+			continue
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -1389,9 +1320,9 @@ func TestCheckCompositeInitializerWithArgumentLabel(t *testing.T) {
 
                       let test %[2]s %[3]s Test(x: 1)
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
 				),
 			)
 
@@ -1402,8 +1333,14 @@ func TestCheckCompositeInitializerWithArgumentLabel(t *testing.T) {
 
 func TestCheckInvalidCompositeInitializerCallWithMissingArgumentLabel(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			// Contracts cannot be instantiated
+			continue
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -1415,9 +1352,9 @@ func TestCheckInvalidCompositeInitializerCallWithMissingArgumentLabel(t *testing
 
                       let test %[2]s %[3]s Test(1)
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
 				),
 			)
 
@@ -1430,8 +1367,23 @@ func TestCheckInvalidCompositeInitializerCallWithMissingArgumentLabel(t *testing
 
 func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		var setupCode, identifier string
+
+		if compositeKind == common.CompositeKindContract {
+			identifier = "Test"
+		} else {
+			setupCode = fmt.Sprintf(
+				`let test %[1]s %[2]s Test%[3]s`,
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
+				constructorArguments(compositeKind),
+			)
+			identifier = "test"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -1441,12 +1393,12 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
                           fun test(x: Int) {}
                       }
 
-                      let test %[2]s %[3]s Test()
-                      let void = test.test(x: 1)
+                      %[2]s
+                      let void = %[3]s.test(x: 1)
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					setupCode,
+					identifier,
 				),
 			)
 
@@ -1457,8 +1409,23 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
 
 func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		var setupCode, identifier string
+
+		if compositeKind == common.CompositeKindContract {
+			identifier = "Test"
+		} else {
+			setupCode = fmt.Sprintf(
+				`let test %[1]s %[2]s Test%[3]s`,
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
+				constructorArguments(compositeKind),
+			)
+			identifier = "test"
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -1468,12 +1435,12 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
                           fun test(x: Int) {}
                       }
 
-                      let test %[2]s %[3]s Test()
-                      let void = test.test(1)
+                      %[2]s
+                      let void = %[3]s.test(1)
                     `,
-					kind.Keyword(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					setupCode,
+					identifier,
 				),
 			)
 
@@ -1484,10 +1451,15 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
 	}
 }
 
-func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T) {
+func TestCheckCompositeConstructorUseInInitializerAndFunction(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			checker, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -1499,26 +1471,28 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
                           }
 
                           fun test(): %[2]sTest {
-                              return %[2]s%[3]s Test()
+                              return %[4]s%[5]s Test%[7]s
                           }
                       }
 
                       fun test(): %[2]sTest {
-                          return %[2]s%[3]s Test()
+                          return %[4]s%[5]s Test%[7]s
                       }
 
                       fun test2(): %[2]sTest {
-                          let test %[4]s %[3]s Test()
-                          let res %[4]s test.test()
-                          %[5]s test
-                          return %[2]sres
+                          let test %[3]s %[5]s Test%[7]s
+                          let res %[3]s test.test()
+                          %[6]s test
+                          return %[4]sres
                       }
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.ConstructionKeyword(),
-					kind.TransferOperator(),
-					kind.DestructionKeyword(),
+					compositeKind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.MoveOperator(),
+					compositeKind.ConstructionKeyword(),
+					compositeKind.DestructionKeyword(),
+					constructorArguments(compositeKind),
 				),
 			)
 
@@ -1537,9 +1511,9 @@ func TestCheckCompositeConstructorReferenceInInitializerAndFunction(t *testing.T
 
 			testFunctionMember := structureType.Members["test"]
 
-			assert.IsType(t, &sema.FunctionType{}, testFunctionMember.Type)
+			assert.IsType(t, &sema.FunctionType{}, testFunctionMember.TypeAnnotation.Type)
 
-			testFunctionType := testFunctionMember.Type.(*sema.FunctionType)
+			testFunctionType := testFunctionMember.TypeAnnotation.Type.(*sema.FunctionType)
 
 			actual := testFunctionType.ReturnTypeAnnotation.Type
 			if actual != structureType {
@@ -1581,27 +1555,55 @@ func TestCheckCompositeFunction(t *testing.T) {
 	for _, kind := range common.CompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s X {
-                  fun foo(): %[2]sX {
-                      return %[2]s self.bar()
-                  }
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s X {
+                          fun foo(): %[2]sX {
+                              return %[3]s self.bar()
+                          }
 
-                  fun bar(): %[2]sX {
-                      return %[2]s self
-                  }
-              }
-            `, kind.Keyword(), kind.Annotation()))
+                          fun bar(): %[2]sX {
+                              return %[3]s self
+                          }
+                      }
+                    `,
+					kind.Keyword(),
+					kind.Annotation(),
+					kind.MoveOperator(),
+				),
+			)
 
-			require.NoError(t, err)
+			switch kind {
+			case common.CompositeKindStructure:
+				require.NoError(t, err)
+
+			case common.CompositeKindContract:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+
+			case common.CompositeKindResource:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+
+			default:
+				panic(errors.NewUnreachableError())
+			}
 		})
 	}
 }
 
 func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.CompositeKinds {
+
+		if compositeKind == common.CompositeKindContract {
+			continue
+		}
+
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
@@ -1609,18 +1611,20 @@ func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
                       var tests = 0
 
                       fun test(): %[1]sTest {
-                          return %[1]s %[2]s Test()
+                          return %[2]s %[3]s Test%[4]s
                       }
 
-                      %[3]s Test {
+                      %[5]s Test {
                          init() {
                              tests = tests + 1
                          }
                       }
                     `,
-					kind.Annotation(),
-					kind.ConstructionKeyword(),
-					kind.Keyword(),
+					compositeKind.Annotation(),
+					compositeKind.MoveOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
+					compositeKind.Keyword(),
 				),
 			)
 
@@ -1647,14 +1651,17 @@ func TestCheckInvalidDestructorParameters(t *testing.T) {
 
 		t.Run(interfaceKeyword, func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  resource %[1]s Test {
-                      destroy(x: Int) %[2]s
-                  }
-                `,
-				interfaceKeyword,
-				destructorBody,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      resource %[1]s Test {
+                          destroy(x: Int) %[2]s
+                      }
+                    `,
+					interfaceKeyword,
+					destructorBody,
+				),
+			)
 
 			errs := ExpectCheckerErrors(t, err, 1)
 
@@ -1667,9 +1674,9 @@ func TestCheckInvalidResourceWithDestructorMissingFieldInvalidation(t *testing.T
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -1686,9 +1693,9 @@ func TestCheckInvalidResourceWithDestructorMissingDefinitiveFieldInvalidation(t 
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -1728,9 +1735,9 @@ func TestCheckInvalidResourceDestructorMoveInvalidation(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -1740,7 +1747,7 @@ func TestCheckInvalidResourceDestructorMoveInvalidation(t *testing.T) {
            }
        }
 
-       fun absorb(_ test: <-Test) {
+       fun absorb(_ test: @Test) {
            destroy test
        }
     `)
@@ -1754,9 +1761,9 @@ func TestCheckInvalidResourceDestructorRepeatedDestruction(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
@@ -1775,17 +1782,17 @@ func TestCheckInvalidResourceDestructorRepeatedDestruction(t *testing.T) {
 func TestCheckInvalidResourceDestructorCapturing(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-       var duplicate: ((): <-Test)? = nil
+       var duplicate: ((): @Test)? = nil
 
        resource Test {
-           let test: <-Test
+           let test: @Test
 
-           init(test: <-Test) {
+           init(test: @Test) {
                self.test <- test
            }
 
            destroy() {
-               duplicate = fun (): <-Test {
+               duplicate = fun (): @Test {
                    return <-self.test
                }
            }

@@ -28,7 +28,7 @@ type Mempool interface {
 
 	// Hash will return a fingerprint has representing the contents of the
 	// entire memory pool.
-	Hash() []byte
+	Hash() crypto.Hash
 
 	// Size will return the current size of the memory pool.
 	Size() uint

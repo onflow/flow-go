@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dapperlabs/flow-go/language/runtime/common"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 
 	"github.com/dapperlabs/flow-go/language/runtime"
@@ -244,7 +246,7 @@ func (s *Server) SignatureHelp(
 func (s *Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) ([]*protocol.CodeLens, error) {
 	conn.LogMessage(&protocol.LogMessageParams{
 		Type:    protocol.Info,
-		Message: "code lens called" + string(params.TextDocument.URI),
+		Message: "code lens called uri:" + string(params.TextDocument.URI) + " acct:" + s.activeAccount.String(),
 	})
 
 	uri := params.TextDocument.URI
@@ -254,29 +256,81 @@ func (s *Server) CodeLens(conn protocol.Conn, params *protocol.CodeLensParams) (
 		return []*protocol.CodeLens{}, nil
 	}
 
-	var actions []*protocol.CodeLens
+	elaboration := checker.Elaboration
+	var (
+		scriptFuncDeclarations        = getScriptDeclarations(elaboration.FunctionDeclarationFunctionTypes)
+		txDeclarations                = getTransactionDeclarations(elaboration.TransactionDeclarationTypes)
+		contractDeclarations          = getContractDeclarations(elaboration.CompositeDeclarationTypes)
+		contractInterfaceDeclarations = getContractInterfaceDeclarations(elaboration.InterfaceDeclarationTypes)
 
-	// Search for main functions with no arguments. These are interpreted
-	// as scripts.
-	for functionDeclaration := range checker.Elaboration.FunctionDeclarationFunctionTypes {
-		if functionDeclaration.Identifier.String() == "main" && len(functionDeclaration.ParameterList.Parameters) == 0 {
-			actions = append(actions, &protocol.CodeLens{
-				Range: astToProtocolRange(functionDeclaration.StartPosition(), functionDeclaration.StartPosition()),
-				Command: &protocol.Command{
-					Title:     "execute script",
-					Command:   CommandExecuteScript,
-					Arguments: []interface{}{uri},
-				},
-			})
-		}
-	}
-	// Search for transaction declarations.
-	for txDeclaration := range checker.Elaboration.TransactionDeclarationTypes {
+		actions []*protocol.CodeLens
+	)
+
+	// Show submit button when there is exactly one transaction declaration and no
+	// other actionable declarations.
+	if len(txDeclarations) == 1 &&
+		len(contractDeclarations) == 0 &&
+		len(contractInterfaceDeclarations) == 0 &&
+		len(scriptFuncDeclarations) == 0 {
 		actions = append(actions, &protocol.CodeLens{
-			Range: astToProtocolRange(txDeclaration.StartPosition(), txDeclaration.StartPosition()),
+			Range: astToProtocolRange(txDeclarations[0].StartPosition(), txDeclarations[0].StartPosition()),
 			Command: &protocol.Command{
-				Title:     "submit transaction",
+				Title:     fmt.Sprintf("submit transaction with account 0x%s", s.activeAccount.Short()),
 				Command:   CommandSubmitTransaction,
+				Arguments: []interface{}{uri},
+			},
+		})
+	}
+
+	// Show deploy button when there is exactly one contract declaration,
+	// any number of contract interface declarations, and no other actionable
+	// declarations.
+	if len(contractDeclarations) == 1 &&
+		len(txDeclarations) == 0 &&
+		len(scriptFuncDeclarations) == 0 {
+		actions = append(actions, &protocol.CodeLens{
+			Range: astToProtocolRange(contractDeclarations[0].StartPosition(), contractDeclarations[0].StartPosition()),
+			Command: &protocol.Command{
+				Title:     fmt.Sprintf("deploy contract to account 0x%s", s.activeAccount.Short()),
+				Command:   CommandUpdateAccountCode,
+				Arguments: []interface{}{uri},
+			},
+		})
+	}
+
+	// Show deploy interface button when there are 1 or more contract interface
+	// declarations, but no other actionable declarations.
+	if len(contractInterfaceDeclarations) > 0 &&
+		len(txDeclarations) == 0 &&
+		len(scriptFuncDeclarations) == 0 &&
+		len(contractDeclarations) == 0 {
+		// decide whether to pluralize
+		pluralInterface := "interface"
+		if len(contractInterfaceDeclarations) > 1 {
+			pluralInterface = "interfaces"
+		}
+
+		actions = append(actions, &protocol.CodeLens{
+			Range: firstLineRange(),
+			Command: &protocol.Command{
+				Title:     fmt.Sprintf("deploy contract %s to account 0x%s", pluralInterface, s.activeAccount.Short()),
+				Command:   CommandUpdateAccountCode,
+				Arguments: []interface{}{uri},
+			},
+		})
+	}
+
+	// Show execute script button when there is exactly one valid script
+	// function and no other actionable declarations.
+	if len(scriptFuncDeclarations) == 1 &&
+		len(contractDeclarations) == 0 &&
+		len(contractInterfaceDeclarations) == 0 &&
+		len(txDeclarations) == 0 {
+		actions = append(actions, &protocol.CodeLens{
+			Range: astToProtocolRange(scriptFuncDeclarations[0].StartPosition(), scriptFuncDeclarations[0].StartPosition()),
+			Command: &protocol.Command{
+				Title:     "execute script",
+				Command:   CommandExecuteScript,
 				Arguments: []interface{}{uri},
 			},
 		})
@@ -384,7 +438,57 @@ func (s *Server) getDiagnostics(conn protocol.Conn, uri protocol.DocumentUri, te
 		}
 	}
 
+	extraDiagnostics := getExtraDiagnostics(conn, checker)
+	diagnostics = append(diagnostics, extraDiagnostics...)
+
 	return diagnostics, nil
+}
+
+// getExtraDiagnostics gets extra non-error diagnostics based on a checker.
+//
+// For example, this function will return diagnostics for declarations that are
+// syntactically and semantically valid, but unsupported by the extension.
+func getExtraDiagnostics(conn protocol.Conn, checker *sema.Checker) (diagnostics []protocol.Diagnostic) {
+	elaboration := checker.Elaboration
+
+	// Warn if there are more than 1 transaction declarations as deployment will fail
+	if len(elaboration.TransactionDeclarationTypes) > 1 {
+		isFirst := true
+		for decl := range elaboration.TransactionDeclarationTypes {
+			// Skip the first declaration
+			if isFirst {
+				isFirst = false
+				continue
+			}
+
+			diagnostics = append(diagnostics, protocol.Diagnostic{
+				Range:    astToProtocolRange(decl.StartPosition(), decl.StartPosition().Shifted(len("transaction"))),
+				Severity: protocol.SeverityWarning,
+				Message:  "Cannot declare more than one transaction per file",
+			})
+		}
+	}
+
+	// Warn if there are more than 1 contract declarations as deployment will fail
+	contractDeclarations := getContractDeclarations(checker.Elaboration.CompositeDeclarationTypes)
+	if len(contractDeclarations) > 1 {
+		isFirst := true
+		for _, decl := range contractDeclarations {
+			// Skip the first declaration
+			if isFirst {
+				isFirst = false
+				continue
+			}
+
+			diagnostics = append(diagnostics, protocol.Diagnostic{
+				Range:    astToProtocolRange(decl.Identifier.StartPosition(), decl.Identifier.EndPosition()),
+				Severity: protocol.SeverityWarning,
+				Message:  "Cannot declare more than one contract per file",
+			})
+		}
+	}
+
+	return
 }
 
 // getDiagnosticsForParentError unpacks all child errors and converts each to
@@ -431,7 +535,7 @@ func (s *Server) resolveImport(
 	case ast.StringLocation:
 		return s.resolveFileImport(mainPath, loc)
 	case ast.AddressLocation:
-		return s.resolveAccountImport(conn, loc)
+		return s.resolveAccountImport(loc)
 	default:
 		return nil, fmt.Errorf("unresolvable import location %s", loc.ID())
 	}
@@ -452,20 +556,17 @@ func (s *Server) resolveFileImport(mainPath string, location ast.StringLocation)
 	return program, nil
 }
 
-func (s *Server) resolveAccountImport(conn protocol.Conn, location ast.AddressLocation) (*ast.Program, error) {
+func (s *Server) resolveAccountImport(location ast.AddressLocation) (*ast.Program, error) {
 	accountAddr := location.ToAddress()
-	conn.LogMessage(&protocol.LogMessageParams{
-		Type:    protocol.Log,
-		Message: fmt.Sprintf("resolving loc:%s   addr:%s   client:%v", location.String(), accountAddr.String(), s.flowClient),
-	})
-	acct, err := s.flowClient.GetAccount(context.Background(), accountAddr)
+
+	acct, err := s.flowClient.GetAccount(context.Background(), flow.BytesToAddress(accountAddr[:]))
 	if err != nil {
-		return nil, fmt.Errorf("cannot get account with address %s err: %w", accountAddr, err)
+		return nil, fmt.Errorf("cannot get account with address 0x%s. err: %w", accountAddr, err)
 	}
 
 	program, _, err := parser.ParseProgram(string(acct.Code))
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse code at adddress %s err: %w", accountAddr, err)
+		return nil, fmt.Errorf("cannot parse code at adddress 0x%s. err: %w", accountAddr, err)
 	}
 
 	return program, nil
@@ -506,6 +607,47 @@ func convertError(err convertibleError) protocol.Diagnostic {
 	}
 }
 
+// getScriptDeclarations finds function declarations that are interpreted as scripts.
+func getScriptDeclarations(funcDeclarationMap map[*ast.FunctionDeclaration]*sema.FunctionType) (scriptDeclarations []*ast.FunctionDeclaration) {
+	for decl := range funcDeclarationMap {
+		if decl.Identifier.String() == "main" && len(decl.ParameterList.Parameters) == 0 {
+			scriptDeclarations = append(scriptDeclarations, decl)
+		}
+	}
+	return
+}
+
+// getTranscactionDeclarations finds all transaction declarations.
+func getTransactionDeclarations(txDeclarationMap map[*ast.TransactionDeclaration]*sema.TransactionType) (txDeclarations []*ast.TransactionDeclaration) {
+	for decl := range txDeclarationMap {
+		txDeclarations = append(txDeclarations, decl)
+	}
+	return
+}
+
+// getContractInterfaceDeclarations finds all interface declarations for contracts.
+func getContractInterfaceDeclarations(interfaceDeclarationMap map[*ast.InterfaceDeclaration]*sema.InterfaceType) (contractInterfaceDeclarations []*ast.InterfaceDeclaration) {
+	for decl := range interfaceDeclarationMap {
+		if decl.CompositeKind == common.CompositeKindContract {
+			contractInterfaceDeclarations = append(contractInterfaceDeclarations, decl)
+		}
+	}
+	return
+}
+
+// getContractDeclarations returns a list of contract declarations based on
+// the keys of the input map.
+// Usage: `getContractDeclarations(checker.Elaboration.CompositeDeclarations)`
+func getContractDeclarations(compositeDeclarations map[*ast.CompositeDeclaration]*sema.CompositeType) []*ast.CompositeDeclaration {
+	contractDeclarations := make([]*ast.CompositeDeclaration, 0)
+	for decl := range compositeDeclarations {
+		if decl.CompositeKind == common.CompositeKindContract {
+			contractDeclarations = append(contractDeclarations, decl)
+		}
+	}
+	return contractDeclarations
+}
+
 func protocolToSemaPosition(pos protocol.Position) sema.Position {
 	return sema.Position{
 		Line:   int(pos.Line + 1),
@@ -531,5 +673,20 @@ func astToProtocolRange(startPos, endPos ast.Position) protocol.Range {
 	return protocol.Range{
 		Start: astToProtocolPosition(startPos),
 		End:   astToProtocolPosition(endPos.Shifted(1)),
+	}
+}
+
+// firstLine returns a range mapping to the first character of the first
+// line of the document.
+func firstLineRange() protocol.Range {
+	return protocol.Range{
+		Start: protocol.Position{
+			Line:      0,
+			Character: 0,
+		},
+		End: protocol.Position{
+			Line:      0,
+			Character: 0,
+		},
 	}
 }

@@ -22,18 +22,13 @@ func TestCheckTransactions(t *testing.T) {
 		`
 		  transaction {}
 		`,
-		[]error{
-			&sema.TransactionMissingExecuteError{},
-		},
+		nil,
 	}
 
 	noopTx := test{
 		"No-op",
 		`
-		  transaction {
-
-		    execute {}
-		  }
+		  transaction {}
 		`,
 		nil,
 	}
@@ -85,10 +80,7 @@ func TestCheckTransactions(t *testing.T) {
 		"ValidPrepareParameters",
 		`
 		  transaction {
-
 		    prepare(x: Account, y: Account) {}
-
-		    execute {}
 		  }
 		`,
 		nil,
@@ -99,8 +91,6 @@ func TestCheckTransactions(t *testing.T) {
 		`
 		  transaction {
 		    prepare(x: Int, y: Int) {}
-
-		    execute {}
 		  }
 		`,
 		[]error{
@@ -254,7 +244,7 @@ func TestCheckTransactions(t *testing.T) {
 	// illegalSelfUsage := test{
 	// 	"IllegalSelfUsage",
 	// 	`
-	//  	  fun foo(x: Any) {}
+	//  	  fun foo(x: AnyStruct) {}
 	//
 	// 	  transaction {
 	// 	    execute {
@@ -274,7 +264,7 @@ func TestCheckTransactions(t *testing.T) {
 
 		  transaction {
 
-	   		var x: <-R
+	   		var x: @R
 
 			prepare() {
 			  self.x <- create R()
@@ -295,7 +285,7 @@ func TestCheckTransactions(t *testing.T) {
 
 		  transaction {
 
-	   		var x: <-R
+	   		var x: @R
 
 			prepare() {
 			  self.x <- create R()
@@ -361,4 +351,92 @@ func TestCheckTransactionExecuteScope(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err)
+}
+
+func TestCheckInvalidTransactionSelfMoveToFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      transaction {
+
+          execute {
+              use(self)
+          }
+      }
+
+      fun use(_ any: AnyStruct) {}
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+}
+
+func TestCheckInvalidTransactionSelfMoveInVariableDeclaration(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+     transaction {
+
+          execute {
+              let x = self
+          }
+      }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+}
+
+func TestCheckInvalidTransactionSelfMoveReturnFromFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+     transaction {
+
+         execute {
+             return self
+         }
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
+}
+
+func TestCheckInvalidTransactionSelfMoveIntoArrayLiteral(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+     transaction {
+
+         execute {
+             let txs = [self]
+         }
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
+}
+
+func TestCheckInvalidTransactionSelfMoveIntoDictionaryLiteral(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+     transaction {
+
+         execute {
+             let txs = {"self": self}
+         }
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
 }

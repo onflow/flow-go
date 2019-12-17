@@ -246,11 +246,12 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) RootKey() *gomock.Call {
 }
 
 // SubmitTransaction mocks base method
-func (m *MockEmulatedBlockchainAPI) SubmitTransaction(arg0 flow.Transaction) error {
+func (m *MockEmulatedBlockchainAPI) SubmitTransaction(arg0 flow.Transaction) (types.TransactionReceipt, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SubmitTransaction", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(types.TransactionReceipt)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SubmitTransaction indicates an expected call of SubmitTransaction

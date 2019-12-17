@@ -202,9 +202,9 @@ func TestCheckSwapResourceFields(t *testing.T) {
       resource X {}
 
       resource Y {
-          var x: <-X
+          var x: @X
 
-          init(x: <-X) {
+          init(x: @X) {
               self.x <- x
           }
 
@@ -244,44 +244,46 @@ func TestCheckInvalidSwapConstantResourceFields(t *testing.T) {
 
 		t.Run(testName, func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  resource X {}
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      resource X {}
 
-                  resource Y {
-                      %[1]s x: <-X
+                      resource Y {
+                          %[1]s x: @X
 
-                      init(x: <-X) {
-                          self.x <- x
+                          init(x: @X) {
+                              self.x <- x
+                          }
+
+                          destroy() {
+                              destroy self.x
+                          }
                       }
 
-                      destroy() {
-                          destroy self.x
+                      resource Z {
+                          %[2]s x: @X
+
+                          init(x: @X) {
+                              self.x <- x
+                          }
+
+                          destroy() {
+                              destroy self.x
+                          }
                       }
-                  }
 
-                  resource Z {
-                      %[2]s x: <-X
-
-                      init(x: <-X) {
-                          self.x <- x
+                      fun test() {
+                          let y <- create Y(x: <-create X())
+                          let z <- create Z(x: <-create X())
+                          y.x <-> z.x
+                          destroy y
+                          destroy z
                       }
-
-                      destroy() {
-                          destroy self.x
-                      }
-                  }
-
-                  fun test() {
-                      let y <- create Y(x: <-create X())
-                      let z <- create Z(x: <-create X())
-                      y.x <-> z.x
-                      destroy y
-                      destroy z
-                  }
-                `,
-				first,
-				second,
-			))
+                    `,
+					first,
+					second,
+				))
 
 			errs := ExpectCheckerErrors(t, err, 1)
 
@@ -296,8 +298,8 @@ func TestCheckSwapResourceDictionaryElement(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-{String: X} <- {}
-          var x: <-X? <- create X()
+          let xs: @{String: X} <- {}
+          var x: @X? <- create X()
           xs["foo"] <-> x
           destroy xs
           destroy x
@@ -313,7 +315,7 @@ func TestCheckInvalidSwapResourceDictionaryElement(t *testing.T) {
       resource X {}
 
       fun test() {
-          let xs: <-{String: X} <- {}
+          let xs: @{String: X} <- {}
           var x <- create X()
           xs["foo"] <-> x
           destroy xs
@@ -332,7 +334,7 @@ func TestCheckSwapStorage(t *testing.T) {
           resource R {}
 
           fun test() {
-              var r: <-R? <- create R()
+              var r: @R? <- create R()
               storage[R] <-> r
               destroy r
           }

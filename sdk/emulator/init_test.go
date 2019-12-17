@@ -45,27 +45,26 @@ func TestInitialization(t *testing.T) {
 		require.NoError(t, err)
 
 		// Submit a transaction adds some ledger state and event state
-		script := fmt.Sprintf(`
-            import 0x%s
+		script := fmt.Sprintf(
+			`
+                import 0x%s
 
-            event MyEvent(x: Int)
-            
-            transaction {
+                pub event MyEvent(x: Int)
 
-              prepare(acct: Account) {
-                emit MyEvent(x: 1)
+                transaction {
 
-                let counter <- createCounter()
-                counter.add(1)
+                  prepare(acct: Account) {
+                    emit MyEvent(x: 1)
 
-                let existing <- acct.storage[Counter] <- counter
-                destroy existing
-                acct.published[&Counter] = &acct.storage[Counter] as Counter
-              }
+                    let counter <- Counting.createCounter()
+                    counter.add(1)
 
-              execute {}
-            }
-        `,
+                    let existing <- acct.storage[Counting.Counter] <- counter
+                    destroy existing
+                    acct.published[&Counting.Counter] = &acct.storage[Counting.Counter] as Counting.Counter
+                  }
+                }
+            `,
 			counterAddress,
 		)
 
@@ -81,8 +80,9 @@ func TestInitialization(t *testing.T) {
 		assert.NoError(t, err)
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		err = b.SubmitTransaction(tx)
+		result, err := b.SubmitTransaction(tx)
 		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
 
 		block, err := b.CommitBlock()
 		assert.NoError(t, err)
@@ -123,13 +123,14 @@ func TestInitialization(t *testing.T) {
 		})
 
 		t.Run("should be able to read ledger state", func(t *testing.T) {
-			readScript := fmt.Sprintf(`
-                import 0x%s
+			readScript := fmt.Sprintf(
+				`
+                  import 0x%s
 
-                pub fun main(): Int {
-                    return getAccount(0x%s).published[&Counter]?.count ?? 0
-                }
-            `,
+                  pub fun main(): Int {
+                      return getAccount(0x%s).published[&Counting.Counter]?.count ?? 0
+                  }
+                `,
 				counterAddress,
 				b.RootAccountAddress(),
 			)

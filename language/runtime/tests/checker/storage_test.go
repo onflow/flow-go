@@ -281,7 +281,7 @@ func TestCheckStorageIndexingWithResourceTypeInSwap(t *testing.T) {
           resource R {}
 
           fun test() {
-              var r: <-R? <- create R()
+              var r: @R? <- create R()
               storage[R] <-> r
               destroy r
           }
@@ -302,11 +302,11 @@ func TestCheckInvalidResourceMoveOutOfStorage(t *testing.T) {
           consume(<-storage[R])
       }
 
-      fun consume(_ r: <-R?) {
+      fun consume(_ r: @R?) {
           destroy r
       }
     `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
-	assert.IsType(t, &sema.InvalidNestedMoveError{}, errs[0])
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 }

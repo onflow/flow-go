@@ -1,7 +1,7 @@
 import {LanguageClient} from "vscode-languageclient";
 import {ExtensionContext, Uri, window} from "vscode";
 import {Config} from "./config";
-import {CREATE_ACCOUNT_SERVER, SWITCH_ACCOUNT_SERVER, UPDATE_ACCOUNT_CODE_SERVER} from "./commands";
+import {CREATE_ACCOUNT_SERVER, CREATE_DEFAULT_ACCOUNTS_SERVER, SWITCH_ACCOUNT_SERVER} from "./commands";
 
 // The args to pass to the Flow CLI to start the language server.
 const START_LANGUAGE_SERVER_ARGS = ["cadence", "language-server"];
@@ -41,15 +41,6 @@ export class LanguageServerAPI {
         ctx.subscriptions.push(clientDisposable);
     }
 
-    // Sends a request to update the account code of the currently active
-    // account.
-    async updateAccountCode(documentUri: Uri) {
-        return this.client.sendRequest("workspace/executeCommand", {
-            command: UPDATE_ACCOUNT_CODE_SERVER,
-            arguments: [documentUri.toString()],
-        });
-    }
-
     // Sends a request to switch the currently active account.
     async switchActiveAccount(accountAddr: string) {
         return this.client.sendRequest("workspace/executeCommand", {
@@ -68,5 +59,15 @@ export class LanguageServerAPI {
             arguments: [],
         });
         return res as string;
+    }
+
+    // Sends a request to create a set of default accounts. Returns the addresses of the new
+    // accounts, if they were created successfully.
+    async createDefaultAccounts(count: number): Promise<Array<string>> {
+        let res = await this.client.sendRequest("workspace/executeCommand", {
+            command: CREATE_DEFAULT_ACCOUNTS_SERVER,
+            arguments: [count],
+        });
+        return res as Array<string>;
     }
 }

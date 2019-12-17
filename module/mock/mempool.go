@@ -79,15 +79,15 @@ func (_m *Mempool) Has(hash crypto.Hash) bool {
 }
 
 // Hash provides a mock function with given fields:
-func (_m *Mempool) Hash() []byte {
+func (_m *Mempool) Hash() crypto.Hash {
 	ret := _m.Called()
 
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func() []byte); ok {
+	var r0 crypto.Hash
+	if rf, ok := ret.Get(0).(func() crypto.Hash); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(crypto.Hash)
 		}
 	}
 

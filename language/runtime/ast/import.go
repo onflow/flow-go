@@ -2,12 +2,10 @@ package ast
 
 import (
 	"encoding/gob"
-	"encoding/hex"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 // Identifier
@@ -47,8 +45,8 @@ func (v *ImportDeclaration) Accept(visitor Visitor) Repr {
 	return visitor.VisitImportDeclaration(v)
 }
 
-func (v *ImportDeclaration) DeclarationIdentifier() Identifier {
-	return Identifier{}
+func (v *ImportDeclaration) DeclarationIdentifier() *Identifier {
+	return nil
 }
 
 func (v *ImportDeclaration) DeclarationKind() common.DeclarationKind {
@@ -100,15 +98,11 @@ func init() {
 type AddressLocation []byte
 
 func (l AddressLocation) ID() LocationID {
-	return LocationID(fmt.Sprintf("A.%s", l))
+	return LocationID(fmt.Sprintf("A.%x", l.ToAddress()))
 }
 
-func (l AddressLocation) String() string {
-	return hex.EncodeToString(l)
-}
-
-func (l AddressLocation) ToAddress() (addr flow.Address) {
-	return flow.BytesToAddress(l)
+func (l AddressLocation) ToAddress() values.Address {
+	return values.BytesToAddress(l)
 }
 
 func init() {

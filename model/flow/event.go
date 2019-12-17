@@ -8,7 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/hash"
-	abiencoding "github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
@@ -86,7 +86,7 @@ func (a accountCreatedEvent) Address() Address {
 }
 
 func DecodeAccountCreatedEvent(b []byte) (AccountCreatedEvent, error) {
-	value, err := abiencoding.Decode(AccountCreatedEventType, b)
+	value, err := encodingValues.Decode(AccountCreatedEventType, b)
 	if err != nil {
 		return nil, err
 	}

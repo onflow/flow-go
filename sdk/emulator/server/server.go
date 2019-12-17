@@ -15,7 +15,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
 	"github.com/dapperlabs/flow-go/sdk/emulator/storage/badger"
+	"github.com/dapperlabs/flow-go/sdk/emulator/storage/memstore"
 	"github.com/dapperlabs/flow-go/utils/liveness"
 	grpcprometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
@@ -33,11 +35,11 @@ type EmulatorServer struct {
 	grpcServer    *grpc.Server
 	config        *Config
 	logger        *log.Logger
-	store         badger.Store
 	livenessCheck *liveness.CheckCollector
 
 	// Wraps the cleanup function to ensure we only run cleanup once
 	cleanupOnce sync.Once
+	onCleanup   func()
 }
 
 const (
@@ -54,6 +56,8 @@ type Config struct {
 	BlockInterval  time.Duration
 	RootAccountKey *flow.AccountPrivateKey
 	GRPCDebug      bool
+	// Persistent indicates whether to use persistent on-disk storage
+	Persistent bool
 	// DBPath is the path to the Badger database on disk
 	DBPath string
 	// LivenessCheckTolerance is the tolerence level of the liveness check
@@ -62,7 +66,7 @@ type Config struct {
 }
 
 // NewEmulatorServer creates a new instance of a Flow Emulator server.
-func NewEmulatorServer(logger *log.Logger, store badger.Store, conf *Config) *EmulatorServer {
+func NewEmulatorServer(logger *log.Logger, store storage.Store, conf *Config) *EmulatorServer {
 
 	messageLogger := func(msg string) {
 		logger.Debug(msg)
@@ -110,7 +114,6 @@ func NewEmulatorServer(logger *log.Logger, store badger.Store, conf *Config) *Em
 		grpcServer:    grpcServer,
 		config:        conf,
 		logger:        logger,
-		store:         store,
 		livenessCheck: liveness.NewCheckCollector(conf.LivenessCheckTolerance),
 	}
 
@@ -183,15 +186,31 @@ func StartServer(logger *log.Logger, config *Config) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	store, err := badger.New(
-		badger.WithPath(config.DBPath),
-		badger.WithLogger(logger),
-		badger.WithTruncate(true))
-	if err != nil {
-		logger.WithError(err).Fatal("☠️  Failed to set up Emulator server")
+	var store storage.Store
+	var onCleanup = func() {}
+
+	if config.Persistent {
+		badgerStore, err := badger.New(
+			badger.WithPath(config.DBPath),
+			badger.WithLogger(logger),
+			badger.WithTruncate(true))
+		if err != nil {
+			logger.WithError(err).Fatal("☠️  Failed to set up Emulator server")
+		}
+
+		store = badgerStore
+		onCleanup = func() {
+			if err := badgerStore.Close(); err != nil {
+				logger.WithError(err).Error("Cleanup failed: could not close store")
+			}
+		}
+	} else {
+		store = memstore.New()
 	}
 
 	emulatorServer := NewEmulatorServer(logger, store, config)
+	emulatorServer.onCleanup = onCleanup
+
 	defer emulatorServer.cleanup()
 	go emulatorServer.handleSIGTERM()
 
@@ -229,11 +248,7 @@ func StartServer(logger *log.Logger, config *Config) {
 // cleanup cleans up the server.
 // This MUST be called before the server process terminates.
 func (e *EmulatorServer) cleanup() {
-	e.cleanupOnce.Do(func() {
-		if err := e.store.Close(); err != nil {
-			e.logger.WithError(err).Error("Cleanup failed: could not close store")
-		}
-	})
+	e.cleanupOnce.Do(e.onCleanup)
 }
 
 // handleSIGTERM waits for a SIGTERM, then cleans up the server's resources.

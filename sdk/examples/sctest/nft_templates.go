@@ -14,13 +14,13 @@ import (
 // The id must be greater than zero
 func GenerateCreateNFTScript(tokenAddr flow.Address, id int) []byte {
 	template := `
-		import NFT, NFTCollection, createNFT, createCollection from 0x%s
+		import NonFungibleToken from 0x%s
 
 		transaction {
 		  prepare(acct: Account) {
-			let tokenA <- createNFT(id: %d)
+			let tokenA <- NonFungibleToken.createNFT(id: %d)
 
-			let collection: <-NFTCollection <- createCollection()
+			let collection <- NonFungibleToken.createCollection()
 
 			collection.deposit(token: <-tokenA)
 
@@ -28,12 +28,11 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int) []byte {
 				panic("Token ID doesn't exist!")
 			}
 			
-			let oldCollection <- acct.storage[NFTCollection] <- collection
+			let oldCollection <- acct.storage[NonFungibleToken.NFTCollection] <- collection
 			destroy oldCollection
 
-			acct.published[&NFTCollection] = &acct.storage[NFTCollection] as NFTCollection
+			acct.published[&NonFungibleToken.NFTCollection] = &acct.storage[NonFungibleToken.NFTCollection] as NonFungibleToken.NFTCollection
 		  }
-		  execute {}
 		}
 	`
 
@@ -44,20 +43,19 @@ func GenerateCreateNFTScript(tokenAddr flow.Address, id int) []byte {
 // from a collection and deposits it to another collection
 func GenerateDepositScript(tokenCodeAddr flow.Address, receiverAddr flow.Address, transferNFTID int) []byte {
 	template := `
-		import NFT, NFTCollection from 0x%s
+		import NonFungibleToken from 0x%s
 
 		transaction {
 		  prepare(acct: Account) {
 			let recipient = getAccount(0x%s)
 
-			let collectionRef = acct.published[&NFTCollection] ?? panic("missing NFT collection reference")
-			let depositRef = recipient.published[&NFTCollection] ?? panic("missing deposit reference")
+			let collectionRef = acct.published[&NonFungibleToken.NFTCollection] ?? panic("missing NFT collection reference")
+			let depositRef = recipient.published[&NonFungibleToken.NFTCollection] ?? panic("missing deposit reference")
 
 			let nft <- collectionRef.withdraw(tokenID: %d)
 
 			depositRef.deposit(token: <-nft)
 		  }
-		  execute {}
 		}
 	`
 
@@ -68,18 +66,17 @@ func GenerateDepositScript(tokenCodeAddr flow.Address, receiverAddr flow.Address
 // to another vault
 func GenerateTransferScript(tokenCodeAddr flow.Address, receiverAddr flow.Address, transferNFTID int) []byte {
 	template := `
-		import NFT, NFTCollection from 0x%s
+		import NonFungibleToken from 0x%s
 
 		transaction {
 		  prepare(acct: Account) {
 			let recipient = getAccount(0x%s)
 
-			let collectionRef = acct.published[&NFTCollection] ?? panic("missing NFT collection reference")
-			let depositRef = recipient.published[&NFTCollection] ?? panic("missing deposit reference")
+			let collectionRef = acct.published[&NonFungibleToken.NFTCollection] ?? panic("missing NFT collection reference")
+			let depositRef = recipient.published[&NonFungibleToken.NFTCollection] ?? panic("missing deposit reference")
 
 			collectionRef.transfer(recipient: depositRef, tokenID: %d)
 		  }
-		  execute {}
 		}
 	`
 
@@ -91,11 +88,11 @@ func GenerateTransferScript(tokenCodeAddr flow.Address, receiverAddr flow.Addres
 // function, which uses an array of IDs
 func GenerateInspectCollectionScript(nftCodeAddr, userAddr flow.Address, nftID int, shouldExist bool) []byte {
 	template := `
-		import NFT, NFTCollection from 0x%s
+		import NonFungibleToken from 0x%s
 
 		pub fun main() {
 		  let acct = getAccount(0x%s)
-		  let collectionRef = acct.published[&NFTCollection] ?? panic("missing collection reference")
+		  let collectionRef = acct.published[&NonFungibleToken.NFTCollection] ?? panic("missing collection reference")
 		
 		  if collectionRef.idExists(tokenID: %d) != %v {
 			panic("Token ID doesn't exist!")
@@ -111,14 +108,14 @@ func GenerateInspectCollectionScript(nftCodeAddr, userAddr flow.Address, nftID i
 // arrays can't be compared for equality right now so the first two elements are compared
 func GenerateInspectKeysScript(nftCodeAddr, userAddr flow.Address, id1, id2 int) []byte {
 	template := `
-		import NFT, NFTCollection from 0x%s
+		import NonFungibleToken from 0x%s
 
 		pub fun main() {
 		  let acct = getAccount(0x%s)
-		  let collectionRef = acct.published[&NFTCollection] ?? panic("missing collection reference")
+		  let collectionRef = acct.published[&NonFungibleToken.NFTCollection] ?? panic("missing collection reference")
 		
-		  let array = collectionRef.getIDs() 
-		 
+		  let array = collectionRef.getIDs()
+
 		  if array[0] != %d || array[1] != %d {
 			panic("Keys array is incorrect!")
 		  }

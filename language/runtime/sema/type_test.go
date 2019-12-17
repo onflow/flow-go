@@ -66,19 +66,28 @@ func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
 	assert.Equal(t, ty.String(), "[((Int8): Int16)]")
 }
 
-func TestIsResourceType_AnyNestedInArray(t *testing.T) {
+func TestIsResourceType_AnyStructNestedInArray(t *testing.T) {
 
 	ty := &VariableSizedType{
-		Type: &AnyType{},
+		Type: &AnyStructType{},
 	}
 
 	assert.False(t, ty.IsResourceType())
 }
 
+func TestIsResourceType_AnyResourceNestedInArray(t *testing.T) {
+
+	ty := &VariableSizedType{
+		Type: &AnyResourceType{},
+	}
+
+	assert.True(t, ty.IsResourceType())
+}
+
 func TestIsResourceType_ResourceNestedInArray(t *testing.T) {
 
 	ty := &VariableSizedType{
-		&CompositeType{
+		Type: &CompositeType{
 			Kind: common.CompositeKindResource,
 		},
 	}
@@ -118,7 +127,7 @@ func TestExportability(t *testing.T) {
 
 	t.Run("structs", func(t *testing.T) {
 		position := ast.Position{
-			1, 2, 3,
+			Offset: 1, Line: 2, Column: 3,
 		}
 		identifier := "my_structure"
 
@@ -135,7 +144,7 @@ func TestExportability(t *testing.T) {
 						Identifier: "fieldA",
 						Pos:        position,
 					},
-					Type:            &IntType{},
+					TypeAnnotation:  &TypeAnnotation{Type: &IntType{}},
 					DeclarationKind: 0,
 					VariableKind:    ast.VariableKindVariable,
 					ArgumentLabels:  nil,
@@ -143,8 +152,8 @@ func TestExportability(t *testing.T) {
 			},
 			ConstructorParameterTypeAnnotations: []*TypeAnnotation{
 				{
-					Move: false,
-					Type: &Int8Type{},
+					IsResource: false,
+					Type:       &Int8Type{},
 				},
 			},
 		}
@@ -189,15 +198,15 @@ func TestExportability(t *testing.T) {
 
 		ex := ty.Export(program, variable)
 
-		assert.IsType(t, types.Struct{}, ex)
-		s := ex.(types.Struct)
+		assert.IsType(t, &types.Struct{}, ex)
+		s := ex.(*types.Struct)
 
 		assert.Equal(t, identifier, s.Identifier)
 		require.Len(t, s.Fields, 1)
 
 		require.Contains(t, s.Fields, "fieldA")
 
-		assert.IsType(t, types.Int{}, s.Fields["fieldA"])
+		assert.IsType(t, &types.Int{}, s.Fields["fieldA"])
 	})
 
 	t.Run("string", func(t *testing.T) {
@@ -206,13 +215,13 @@ func TestExportability(t *testing.T) {
 
 		ex := ty.Export(nil, nil)
 
-		assert.IsType(t, types.String{}, ex)
+		assert.IsType(t, &types.String{}, ex)
 	})
 
 	t.Run("events", func(t *testing.T) {
 
 		position := ast.Position{
-			2, 1, 37,
+			Offset: 2, Line: 1, Column: 37,
 		}
 
 		ty := &EventType{
@@ -263,9 +272,9 @@ func TestExportability(t *testing.T) {
 
 		ex := ty.Export(program, &variable)
 
-		assert.IsType(t, types.Event{}, ex)
+		assert.IsType(t, &types.Event{}, ex)
 
-		event := ex.(types.Event)
+		event := ex.(*types.Event)
 
 		require.Len(t, event.Fields, 2)
 

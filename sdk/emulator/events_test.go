@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
@@ -30,7 +30,7 @@ func TestEventEmitted(t *testing.T) {
 		require.NoError(t, err)
 
 		script := []byte(`
-			event MyEvent(x: Int, y: Int)
+			pub event MyEvent(x: Int, y: Int)
 			
 			transaction {
 		  	  execute {
@@ -52,8 +52,9 @@ func TestEventEmitted(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		err = b.SubmitTransaction(tx)
+		result, err := b.SubmitTransaction(tx)
 		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
 
 		block, err := b.CommitBlock()
 		require.NoError(t, err)
@@ -64,7 +65,7 @@ func TestEventEmitted(t *testing.T) {
 
 		actualEvent := events[0]
 
-		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
@@ -85,7 +86,7 @@ func TestEventEmitted(t *testing.T) {
 		require.NoError(t, err)
 
 		script := []byte(`
-			event MyEvent(x: Int, y: Int)
+			pub event MyEvent(x: Int, y: Int)
 			
 			pub fun main() {
 			  emit MyEvent(x: 1, y: 2)
@@ -98,7 +99,7 @@ func TestEventEmitted(t *testing.T) {
 
 		actualEvent := events[0]
 
-		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
@@ -116,10 +117,12 @@ func TestEventEmitted(t *testing.T) {
 		require.NoError(t, err)
 
 		accountScript := []byte(`
-			event MyEvent(x: Int, y: Int)
+			pub event MyEvent(x: Int, y: Int)
 
-			pub fun emitMyEvent(x: Int, y: Int) {
-				emit MyEvent(x: x, y: y)
+            pub contract Test {
+				pub fun emitMyEvent(x: Int, y: Int) {
+					emit MyEvent(x: x, y: y)
+				}
 			}
 		`)
 
@@ -133,7 +136,7 @@ func TestEventEmitted(t *testing.T) {
 			
 			transaction {
 				execute {
-				  emitMyEvent(x: 1, y: 2)
+					Test.emitMyEvent(x: 1, y: 2)
 				}
 			}
 		`, address.Hex()))
@@ -151,8 +154,9 @@ func TestEventEmitted(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		err = b.SubmitTransaction(tx)
+		result, err := b.SubmitTransaction(tx)
 		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
 
 		block, err := b.CommitBlock()
 		require.NoError(t, err)
@@ -164,7 +168,7 @@ func TestEventEmitted(t *testing.T) {
 
 		actualEvent := events[0]
 
-		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)

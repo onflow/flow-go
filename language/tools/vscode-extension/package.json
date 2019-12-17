@@ -15,7 +15,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:cadence"
+    "onLanguage:cadence",
+    "onCommand:cadence.runEmulator"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -34,11 +35,8 @@
         "command": "cadence.stopEmulator",
         "category": "Cadence",
         "title": "Stop emulator"
-      }, {
-        "command": "cadence.updateAccountCode",
-        "category": "Cadence",
-        "title": "Update code for the current account"
-      }, {
+      },
+      {
         "command": "cadence.createAccount",
         "category": "Cadence",
         "title": "Create account"
@@ -49,8 +47,7 @@
       }
     ],
     "configuration": {
-      "type": "object",
-      "title": "Cadence configuration",
+      "title": "Cadence",
       "properties": {
         "cadence.flowCommand": {
           "type": "string",
@@ -68,6 +65,12 @@
           "type": "string",
           "default": "localhost:3569",
           "description": "The address of an emulator instance",
+          "scope": "resource"
+        },
+        "cadence.numAccounts": {
+          "type": "number",
+          "default": 3,
+          "description": "The number of default accounts to create",
           "scope": "resource"
         }
       }

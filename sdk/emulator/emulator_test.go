@@ -7,21 +7,25 @@ import (
 )
 
 const counterScript = `
-    pub resource Counter {
-        pub var count: Int
 
-        init() {
-            self.count = 0
-        }
+  pub contract Counting {
 
-        pub fun add(_ count: Int) {
-            self.count = self.count + count
-        }
-    }
+      pub resource Counter {
+          pub var count: Int
 
-    pub fun createCounter(): <-Counter {
-        return <-create Counter()
-    }
+          init() {
+              self.count = 0
+          }
+
+          pub fun add(_ count: Int) {
+              self.count = self.count + count
+          }
+      }
+
+      pub fun createCounter(): @Counter {
+          return <-create Counter()
+      }
+  }
 `
 
 // generateAddTwoToCounterScript generates a script that increments a counter.
@@ -29,22 +33,22 @@ const counterScript = `
 func generateAddTwoToCounterScript(counterAddress flow.Address) string {
 	return fmt.Sprintf(
 		`
-		    import 0x%s
+            import 0x%s
 
-			transaction {
+            transaction {
 
-			  prepare(signer: Account) {
-    	        if signer.storage[Counter] == nil {
-    	            let existing <- signer.storage[Counter] <- createCounter()
-    	            destroy existing
-                    signer.published[&Counter] = &signer.storage[Counter] as Counter
-    	        }
-				signer.published[&Counter]?.add(2)
-			  }
+                prepare(signer: Account) {
+                    if signer.storage[Counting.Counter] == nil {
+                        let existing <- signer.storage[Counting.Counter] <- Counting.createCounter()
+                        destroy existing
 
-			  execute {}
-			}
-		`,
+                        signer.published[&Counting.Counter] = &signer.storage[Counting.Counter] as Counting.Counter
+                    }
+
+                    signer.published[&Counting.Counter]?.add(2)
+                }
+            }
+        `,
 		counterAddress,
 	)
 }
@@ -52,12 +56,12 @@ func generateAddTwoToCounterScript(counterAddress flow.Address) string {
 func generateGetCounterCountScript(counterAddress flow.Address, accountAddress flow.Address) string {
 	return fmt.Sprintf(
 		`
-		    import 0x%s
+            import 0x%s
 
-			pub fun main(): Int {
-                return getAccount(0x%s).published[&Counter]?.count ?? 0
-			}
-		`,
+            pub fun main(): Int {
+                return getAccount(0x%s).published[&Counting.Counter]?.count ?? 0
+            }
+        `,
 		counterAddress,
 		accountAddress,
 	)

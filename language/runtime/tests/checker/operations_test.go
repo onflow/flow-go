@@ -221,24 +221,48 @@ func TestCheckConcatenatingExpression(t *testing.T) {
 
 func TestCheckInvalidCompositeEquality(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKinds {
 
-		_, err := ParseAndCheck(t, fmt.Sprintf(`
-          %[1]s X {}
+		t.Run(compositeKind.Name(), func(t *testing.T) {
 
-          let x1: %[2]sX %[3]s %[4]s X()
-          let x2: %[2]sX %[3]s %[4]s X()
+			var preparationCode, firstIdentifier, secondIdentifier string
+			if compositeKind == common.CompositeKindContract {
+				firstIdentifier = "X"
+				secondIdentifier = "X"
+			} else {
+				preparationCode = fmt.Sprintf(`
+		              let x1: %[1]sX %[2]s %[3]s X%[4]s
+                      let x2: %[1]sX %[2]s %[3]s X%[4]s
+		            `,
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
+				)
+				firstIdentifier = "x1"
+				secondIdentifier = "x2"
+			}
 
-          let a = x1 == x2
-        `,
-			kind.Keyword(),
-			kind.Annotation(),
-			kind.TransferOperator(),
-			kind.ConstructionKeyword(),
-		))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s X {}
 
-		errs := ExpectCheckerErrors(t, err, 1)
+                      %[2]s
 
-		assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
+                      let a = %[3]s == %[4]s
+                    `,
+					compositeKind.Keyword(),
+					preparationCode,
+					firstIdentifier,
+					secondIdentifier,
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
+
+		})
 	}
 }

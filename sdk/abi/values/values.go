@@ -1,6 +1,7 @@
 package values
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
@@ -9,6 +10,7 @@ import (
 type Value interface {
 	isValue()
 	Type() types.Type
+	ToGoValue() interface{}
 }
 
 type Void struct{}
@@ -25,6 +27,10 @@ func (Void) Type() types.Type {
 
 func (v Void) WithType(types.Type) Value { return v }
 
+func (Void) ToGoValue() interface{} {
+	return nil
+}
+
 type Nil struct{}
 
 func NewNil() Nil {
@@ -38,6 +44,34 @@ func (Nil) Type() types.Type {
 }
 
 func (v Nil) WithType(types.Type) Value { return v }
+
+func (Nil) ToGoValue() interface{} {
+	return nil
+}
+
+type Optional struct {
+	Value Value
+}
+
+func NewOptional(value Value) Optional {
+	return Optional{Value: value}
+}
+
+func (Optional) isValue() {}
+
+func (Optional) Type() types.Type {
+	return nil
+}
+
+func (o Optional) ToGoValue() interface{} {
+	if o.Value == nil {
+		return nil
+	}
+
+	value := o.Value.ToGoValue()
+
+	return value
+}
 
 type Bool bool
 
@@ -53,6 +87,10 @@ func (Bool) Type() types.Type {
 
 func (v Bool) WithType(types.Type) Value { return v }
 
+func (v Bool) ToGoValue() interface{} {
+	return bool(v)
+}
+
 type String string
 
 func NewString(s string) String {
@@ -67,6 +105,10 @@ func (String) Type() types.Type {
 
 func (v String) WithType(types.Type) Value { return v }
 
+func (v String) ToGoValue() interface{} {
+	return string(v)
+}
+
 type Bytes []byte
 
 func NewBytes(b []byte) Bytes {
@@ -77,6 +119,10 @@ func (Bytes) isValue() {}
 
 func (Bytes) Type() types.Type {
 	return types.Bytes{}
+}
+
+func (v Bytes) ToGoValue() interface{} {
+	return []byte(v)
 }
 
 func (v Bytes) WithType(types.Type) Value { return v }
@@ -103,8 +149,26 @@ func (Address) Type() types.Type {
 
 func (v Address) WithType(types.Type) Value { return v }
 
+func (v Address) ToGoValue() interface{} {
+	return [20]byte(v)
+}
+
 func (v Address) Bytes() []byte {
 	return v[:]
+}
+
+func (v Address) String() string {
+	return v.Hex()
+}
+
+func (v Address) Hex() string {
+	return fmt.Sprintf("%x", [AddressLength]byte(v))
+}
+
+func BytesToAddress(b []byte) Address {
+	var a Address
+	copy(a[AddressLength-len(b):AddressLength], b)
+	return a
 }
 
 type Int struct {
@@ -127,6 +191,10 @@ func (Int) Type() types.Type {
 
 func (v Int) WithType(types.Type) Value { return v }
 
+func (v Int) ToGoValue() interface{} {
+	return v.Int()
+}
+
 func (v Int) Int() int {
 	return int(v.Value.Int64())
 }
@@ -137,11 +205,15 @@ func (v Int) Big() *big.Int {
 
 type Int8 int8
 
-func NewInt8(i int8) Int8 {
-	return Int8(i)
+func NewInt8(v int8) Int8 {
+	return Int8(v)
 }
 
 func (Int8) isValue() {}
+
+func (v Int8) ToGoValue() interface{} {
+	return int8(v)
+}
 
 func (Int8) Type() types.Type {
 	return types.Int8{}
@@ -151,8 +223,8 @@ func (v Int8) WithType(types.Type) Value { return v }
 
 type Int16 int16
 
-func NewInt16(i int16) Int16 {
-	return Int16(i)
+func NewInt16(v int16) Int16 {
+	return Int16(v)
 }
 
 func (Int16) isValue() {}
@@ -163,10 +235,14 @@ func (Int16) Type() types.Type {
 
 func (v Int16) WithType(types.Type) Value { return v }
 
+func (v Int16) ToGoValue() interface{} {
+	return int16(v)
+}
+
 type Int32 int32
 
-func NewInt32(i int32) Int32 {
-	return Int32(i)
+func NewInt32(v int32) Int32 {
+	return Int32(v)
 }
 
 func (Int32) isValue() {}
@@ -176,6 +252,10 @@ func (Int32) Type() types.Type {
 }
 
 func (v Int32) WithType(types.Type) Value { return v }
+
+func (v Int32) ToGoValue() interface{} {
+	return int32(v)
+}
 
 type Int64 int64
 
@@ -191,61 +271,81 @@ func (Int64) Type() types.Type {
 
 func (v Int64) WithType(types.Type) Value { return v }
 
-type Uint8 uint8
-
-func NewUint8(i uint8) Uint8 {
-	return Uint8(i)
+func (v Int64) ToGoValue() interface{} {
+	return int64(v)
 }
 
-func (Uint8) isValue() {}
+type UInt8 uint8
 
-func (Uint8) Type() types.Type {
+func NewUInt8(v uint8) UInt8 {
+	return UInt8(v)
+}
+
+func (UInt8) isValue() {}
+
+func (UInt8) Type() types.Type {
 	return types.UInt8{}
 }
 
-func (v Uint8) WithType(types.Type) Value { return v }
+func (v UInt8) WithType(types.Type) Value { return v }
 
-type Uint16 uint16
-
-func NewUint16(i uint16) Uint16 {
-	return Uint16(i)
+func (v UInt8) ToGoValue() interface{} {
+	return uint8(v)
 }
 
-func (Uint16) isValue() {}
+type UInt16 uint16
 
-func (Uint16) Type() types.Type {
+func NewUInt16(v uint16) UInt16 {
+	return UInt16(v)
+}
+
+func (UInt16) isValue() {}
+
+func (UInt16) Type() types.Type {
 	return types.UInt16{}
 }
 
-func (v Uint16) WithType(types.Type) Value { return v }
+func (v UInt16) WithType(types.Type) Value { return v }
 
-type Uint32 uint32
-
-func NewUint32(i uint32) Uint32 {
-	return Uint32(i)
+func (v UInt16) ToGoValue() interface{} {
+	return uint16(v)
 }
 
-func (Uint32) isValue() {}
+type UInt32 uint32
 
-func (Uint32) Type() types.Type {
+func NewUInt32(v uint32) UInt32 {
+	return UInt32(v)
+}
+
+func (UInt32) isValue() {}
+
+func (UInt32) Type() types.Type {
 	return types.UInt32{}
 }
 
-func (v Uint32) WithType(types.Type) Value { return v }
+func (v UInt32) WithType(types.Type) Value { return v }
 
-type Uint64 uint64
-
-func NewUint64(i uint64) Uint64 {
-	return Uint64(i)
+func (v UInt32) ToGoValue() interface{} {
+	return uint32(v)
 }
 
-func (Uint64) isValue() {}
+type UInt64 uint64
 
-func (Uint64) Type() types.Type {
+func NewUInt64(v uint64) UInt64 {
+	return UInt64(v)
+}
+
+func (UInt64) isValue() {}
+
+func (UInt64) Type() types.Type {
 	return types.UInt64{}
 }
 
-func (v Uint64) WithType(types.Type) Value { return v }
+func (v UInt64) WithType(types.Type) Value { return v }
+
+func (v UInt64) ToGoValue() interface{} {
+	return uint64(v)
+}
 
 type VariableSizedArray struct {
 	typ    types.Type
@@ -256,13 +356,23 @@ func NewVariableSizedArray(values []Value) VariableSizedArray {
 	return VariableSizedArray{Values: values}
 }
 
-func (v VariableSizedArray) isValue() {}
+func (VariableSizedArray) isValue() {}
 
 func (v VariableSizedArray) Type() types.Type { return v.typ }
 
 func (v VariableSizedArray) WithType(typ types.Type) VariableSizedArray {
 	v.typ = typ
 	return v
+}
+
+func (v VariableSizedArray) ToGoValue() interface{} {
+	ret := make([]interface{}, len(v.Values))
+
+	for i, e := range v.Values {
+		ret[i] = e.ToGoValue()
+	}
+
+	return ret
 }
 
 type ConstantSizedArray struct {
@@ -274,13 +384,23 @@ func NewConstantSizedArray(values []Value) ConstantSizedArray {
 	return ConstantSizedArray{Values: values}
 }
 
-func (v ConstantSizedArray) isValue() {}
+func (ConstantSizedArray) isValue() {}
 
 func (v ConstantSizedArray) Type() types.Type { return v.typ }
 
 func (v ConstantSizedArray) WithType(typ types.Type) ConstantSizedArray {
 	v.typ = typ
 	return v
+}
+
+func (v ConstantSizedArray) ToGoValue() interface{} {
+	ret := make([]interface{}, len(v.Values))
+
+	for i, e := range v.Values {
+		ret[i] = e.ToGoValue()
+	}
+
+	return ret
 }
 
 type Dictionary struct {
@@ -292,13 +412,23 @@ func NewDictionary(pairs []KeyValuePair) Dictionary {
 	return Dictionary{Pairs: pairs}
 }
 
-func (v Dictionary) isValue() {}
+func (Dictionary) isValue() {}
 
 func (v Dictionary) Type() types.Type { return v.typ }
 
 func (v Dictionary) WithType(typ types.Type) Dictionary {
 	v.typ = typ
 	return v
+}
+
+func (v Dictionary) ToGoValue() interface{} {
+	ret := map[interface{}]interface{}{}
+
+	for _, p := range v.Pairs {
+		ret[p.Key.ToGoValue()] = p.Value.ToGoValue()
+	}
+
+	return ret
 }
 
 type KeyValuePair struct {
@@ -315,13 +445,23 @@ func NewComposite(fields map[string]Value) Composite {
 	return Composite{Fields: fields}
 }
 
-func (v Composite) isValue() {}
+func (Composite) isValue() {}
 
 func (v Composite) Type() types.Type { return v.typ }
 
 func (v Composite) WithType(typ types.Type) Composite {
 	v.typ = typ
 	return v
+}
+
+func (v Composite) ToGoValue() interface{} {
+	ret := make(map[string]interface{}, len(v.Fields))
+
+	for id, field := range v.Fields {
+		ret[id] = field.ToGoValue()
+	}
+
+	return ret
 }
 
 type Event struct {
@@ -340,4 +480,14 @@ func (v Event) Type() types.Type { return v.typ }
 func (v Event) WithType(typ types.Type) Event {
 	v.typ = typ
 	return v
+}
+
+func (v Event) ToGoValue() interface{} {
+	ret := make(map[string]interface{}, len(v.Fields))
+
+	for id, field := range v.Fields {
+		ret[id] = field.ToGoValue()
+	}
+
+	return ret
 }

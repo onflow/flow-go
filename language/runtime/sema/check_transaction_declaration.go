@@ -3,10 +3,14 @@ package sema
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
 func (checker *Checker) VisitTransactionDeclaration(declaration *ast.TransactionDeclaration) ast.Repr {
 	transactionType := checker.Elaboration.TransactionDeclarationTypes[declaration]
+	if transactionType == nil {
+		panic(errors.NewUnreachableError())
+	}
 
 	checker.containerTypes[transactionType] = true
 	defer func() {
@@ -32,7 +36,11 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 
 	checker.visitTransactionPrepareFunction(declaration.Prepare, transactionType, fieldMembers)
 	checker.visitTransactionPreConditions(declaration.PreConditions)
-	checker.visitTransactionExecuteFunction(declaration.Execute, transactionType)
+
+	checker.withSelfResourceInvalidationAllowed(func() {
+		checker.visitTransactionExecuteFunction(declaration.Execute, transactionType)
+	})
+
 	checker.visitTransactionPostConditions(declaration.PostConditions)
 
 	checker.checkResourceFieldsInvalidated(transactionType.String(), transactionType.Members)
@@ -47,7 +55,7 @@ func (checker *Checker) checkTransactionFields(declaration *ast.TransactionDecla
 			checker.report(
 				&InvalidTransactionFieldAccessModifierError{
 					Name:   field.Identifier.Identifier,
-					Access: field.Access.Keyword(),
+					Access: field.Access,
 					Pos:    field.StartPosition(),
 				},
 			)
@@ -92,11 +100,6 @@ func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDecla
 				Pos:  executeIdentifier.Pos,
 			})
 		}
-	} else {
-		// report an error if no execute block is defined
-		checker.report(&TransactionMissingExecuteError{
-			Range: declaration.Range,
-		})
 	}
 }
 

@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
-	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
@@ -34,39 +33,23 @@ func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
 
 			t.Run(testName, func(t *testing.T) {
 
-				_, err := ParseAndCheck(t, fmt.Sprintf(`
-                      %[1]s %[2]s X {
-                          init() %[3]s
-                          init(y: Int) %[3]s
-                      }
-                    `,
-					kind.Keyword(),
-					interfaceKeyword,
-					body,
-				))
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          %[1]s %[2]s X {
+                              init() %[3]s
+                              init(y: Int) %[3]s
+                          }
+                        `,
+						kind.Keyword(),
+						interfaceKeyword,
+						body,
+					),
+				)
 
-				switch kind {
-				case common.CompositeKindStructure, common.CompositeKindResource:
-					errs := ExpectCheckerErrors(t, err, 1)
+				errs := ExpectCheckerErrors(t, err, 1)
 
-					assert.IsType(t, &sema.UnsupportedOverloadingError{}, errs[0])
-
-				case common.CompositeKindContract:
-					// TODO: add support for contract interface declarations
-					if isInterface {
-						errs := ExpectCheckerErrors(t, err, 2)
-
-						assert.IsType(t, &sema.UnsupportedOverloadingError{}, errs[0])
-						assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
-					} else {
-						errs := ExpectCheckerErrors(t, err, 1)
-
-						assert.IsType(t, &sema.UnsupportedOverloadingError{}, errs[0])
-					}
-
-				default:
-					panic(errors.NewUnreachableError())
-				}
+				assert.IsType(t, &sema.UnsupportedOverloadingError{}, errs[0])
 			})
 		}
 	}
@@ -88,15 +71,18 @@ func TestCheckInvalidResourceDestructorOverloading(t *testing.T) {
 
 		t.Run(interfaceKeyword, func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                  resource %[1]s X {
-                      destroy() %[2]s
-                      destroy(y: Int) %[2]s
-                  }
-                `,
-				interfaceKeyword,
-				body,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      resource %[1]s X {
+                          destroy() %[2]s
+                          destroy(y: Int) %[2]s
+                      }
+                    `,
+					interfaceKeyword,
+					body,
+				),
+			)
 
 			errs := ExpectCheckerErrors(t, err, 1)
 

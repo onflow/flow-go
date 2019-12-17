@@ -118,7 +118,7 @@ compositeDeclaration
     ;
 
 conformances
-    : (':' identifier (',' identifier)*)?
+    : (':' nominalType (',' nominalType)*)?
     ;
 
 variableKind
@@ -172,7 +172,7 @@ functionDeclaration
     ;
 
 eventDeclaration
-    : Event identifier parameterList
+    : access Event identifier parameterList
     ;
 
 parameterList
@@ -184,7 +184,7 @@ parameter
     ;
 
 typeAnnotation
-    : Move? fullType
+    : ResourceAnnotation? fullType
     ;
 
 // NOTE: only allow reference or optionals – prevent ambiguous
@@ -464,6 +464,8 @@ NilCoalescing : WS '??';
 Casting : 'as' ;
 FailableCasting : 'as?' ;
 
+ResourceAnnotation : '@' ;
+
 castingOp
     : Casting
     | FailableCasting
@@ -477,7 +479,7 @@ primaryExpressionStart
     ;
 
 createExpression
-    : Create identifier invocation
+    : Create nominalType invocation
     ;
 
 destroyExpression
@@ -625,6 +627,7 @@ identifier
     | From
     | Create
     | Destroy
+    | Contract
     ;
 
 Identifier
@@ -696,7 +699,7 @@ WS
     ;
 
 Terminator
-    : [\r\n]+ -> channel(HIDDEN)
+    : [\r\n\u2028\u2029]+ -> channel(HIDDEN)
     ;
 
 BlockComment

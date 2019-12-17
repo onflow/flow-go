@@ -109,9 +109,9 @@ func (v *ProgramVisitor) visitReturnTypeAnnotation(ctx ITypeAnnotationContext, t
 			},
 		}
 		return &ast.TypeAnnotation{
-			Move:     false,
-			Type:     returnType,
-			StartPos: positionBeforeMissingReturnType,
+			IsResource: false,
+			Type:       returnType,
+			StartPos:   positionBeforeMissingReturnType,
 		}
 	}
 	result := ctx.Accept(v)
@@ -268,6 +268,7 @@ func (v *ProgramVisitor) VisitExecute(ctx *ExecuteContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
+	access := ctx.Access().Accept(v).(ast.Access)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
 	var parameterList *ast.ParameterList
@@ -279,6 +280,7 @@ func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) int
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.EventDeclaration{
+		Access:        access,
 		Identifier:    identifier,
 		ParameterList: parameterList,
 		Range: ast.Range{
@@ -329,13 +331,10 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 }
 
 func (v *ProgramVisitor) VisitConformances(ctx *ConformancesContext) interface{} {
-	identifierNodes := ctx.AllIdentifier
-	conformances := make([]*ast.NominalType, len(identifierNodes()))
-	for i, identifierNode := range identifierNodes() {
-		identifier := identifierNode.Accept(v).(ast.Identifier)
-		conformances[i] = &ast.NominalType{
-			Identifier: identifier,
-		}
+	typeContexts := ctx.AllNominalType()
+	conformances := make([]*ast.NominalType, len(typeContexts))
+	for i, typeContext := range typeContexts {
+		conformances[i] = typeContext.Accept(v).(*ast.NominalType)
 	}
 	return conformances
 }
@@ -680,14 +679,14 @@ func (v *ProgramVisitor) VisitDictionaryType(ctx *DictionaryTypeContext) interfa
 }
 
 func (v *ProgramVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interface{} {
-	move := ctx.Move() != nil
+	isResource := ctx.ResourceAnnotation() != nil
 	fullType := ctx.FullType().Accept(v).(ast.Type)
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.TypeAnnotation{
-		Move:     move,
-		Type:     fullType,
-		StartPos: startPosition,
+		IsResource: isResource,
+		Type:       fullType,
+		StartPos:   startPosition,
 	}
 }
 
@@ -1450,12 +1449,18 @@ func (v *ProgramVisitor) VisitPrimaryExpressionStart(ctx *PrimaryExpressionStart
 }
 
 func (v *ProgramVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {
-	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 	invocation := ctx.Invocation().Accept(v).(*ast.InvocationExpression)
-	invocation.InvokedExpression =
-		&ast.IdentifierExpression{
-			Identifier: identifier,
+	ty := ctx.NominalType().Accept(v).(*ast.NominalType)
+	invocation.InvokedExpression = &ast.IdentifierExpression{
+		Identifier: ty.Identifier,
+	}
+
+	for _, nestedIdentifier := range ty.NestedIdentifiers {
+		invocation.InvokedExpression = &ast.MemberExpression{
+			Expression: invocation.InvokedExpression,
+			Identifier: nestedIdentifier,
 		}
+	}
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 

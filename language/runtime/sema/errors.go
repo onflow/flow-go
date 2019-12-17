@@ -488,11 +488,20 @@ func (*InvalidVariableKindError) isSemanticError() {}
 // InvalidDeclarationError
 
 type InvalidDeclarationError struct {
-	Kind common.DeclarationKind
+	Identifier string
+	Kind       common.DeclarationKind
 	ast.Range
 }
 
 func (e *InvalidDeclarationError) Error() string {
+	if e.Identifier != "" {
+		return fmt.Sprintf(
+			"cannot declare %s here: `%s`",
+			e.Kind.Name(),
+			e.Identifier,
+		)
+	}
+
 	return fmt.Sprintf("cannot declare %s here", e.Kind.Name())
 }
 
@@ -690,18 +699,21 @@ type InitializerMismatch struct {
 //  use `InitializerMismatch`, `MissingMembers`, `MemberMismatches`, etc
 
 type ConformanceError struct {
-	CompositeType       *CompositeType
-	InterfaceType       *InterfaceType
-	InitializerMismatch *InitializerMismatch
-	MissingMembers      []*Member
-	MemberMismatches    []MemberMismatch
-	Pos                 ast.Position
+	CompositeType               *CompositeType
+	InterfaceType               *InterfaceType
+	InitializerMismatch         *InitializerMismatch
+	MissingMembers              []*Member
+	MemberMismatches            []MemberMismatch
+	MissingNestedCompositeTypes []*CompositeType
+	Pos                         ast.Position
 }
 
 func (e *ConformanceError) Error() string {
 	return fmt.Sprintf(
-		"structure `%s` does not conform to interface `%s`",
+		"%s `%s` does not conform to %s `%s`",
+		e.CompositeType.Kind.Name(),
 		e.CompositeType.Identifier,
+		e.InterfaceType.CompositeKind.DeclarationKind(true).Name(),
 		e.InterfaceType.Identifier,
 	)
 }
@@ -721,27 +733,42 @@ func (e *ConformanceError) EndPosition() ast.Position {
 // TODO: just make this a warning?
 
 type DuplicateConformanceError struct {
-	CompositeIdentifier string
-	Conformance         *ast.NominalType
+	CompositeType *CompositeType
+	InterfaceType *InterfaceType
+	ast.Range
 }
 
 func (e *DuplicateConformanceError) Error() string {
 	return fmt.Sprintf(
-		"structure `%s` repeats conformance for interface `%s`",
-		e.CompositeIdentifier,
-		e.Conformance.Identifier.Identifier,
+		"%s `%s` repeats conformance to %s `%s`",
+		e.CompositeType.Kind.Name(),
+		e.CompositeType.Identifier,
+		e.InterfaceType.CompositeKind.DeclarationKind(true).Name(),
+		e.InterfaceType.Identifier,
 	)
 }
 
 func (*DuplicateConformanceError) isSemanticError() {}
 
-func (e *DuplicateConformanceError) StartPosition() ast.Position {
-	return e.Conformance.StartPosition()
+// MissingConformanceError
+
+type MissingConformanceError struct {
+	CompositeType *CompositeType
+	InterfaceType *InterfaceType
+	ast.Range
 }
 
-func (e *DuplicateConformanceError) EndPosition() ast.Position {
-	return e.Conformance.EndPosition()
+func (e *MissingConformanceError) Error() string {
+	return fmt.Sprintf(
+		"%s `%s` is missing a declaration to required conformance to %s `%s`",
+		e.CompositeType.Kind.Name(),
+		e.CompositeType.Identifier,
+		e.InterfaceType.CompositeKind.DeclarationKind(true).Name(),
+		e.InterfaceType.Identifier,
+	)
 }
+
+func (*MissingConformanceError) isSemanticError() {}
 
 // UnresolvedImportError
 
@@ -842,22 +869,6 @@ func (e *UnsupportedTypeError) Error() string {
 
 func (*UnsupportedTypeError) isSemanticError() {}
 
-// UnsupportedDeclarationError
-
-type UnsupportedDeclarationError struct {
-	DeclarationKind common.DeclarationKind
-	ast.Range
-}
-
-func (e *UnsupportedDeclarationError) Error() string {
-	return fmt.Sprintf(
-		"%s declarations are not supported yet",
-		e.DeclarationKind.Name(),
-	)
-}
-
-func (*UnsupportedDeclarationError) isSemanticError() {}
-
 // UnsupportedOverloadingError
 
 type UnsupportedOverloadingError struct {
@@ -952,64 +963,64 @@ func (e *UnsupportedOptionalChainingAssignmentError) Error() string {
 
 func (*UnsupportedOptionalChainingAssignmentError) isSemanticError() {}
 
-// MissingMoveAnnotationError
+// MissingResourceAnnotationError
 
-type MissingMoveAnnotationError struct {
+type MissingResourceAnnotationError struct {
 	Pos ast.Position
 }
 
-func (e *MissingMoveAnnotationError) Error() string {
-	return "missing move annotation: `<-`"
+func (e *MissingResourceAnnotationError) Error() string {
+	return "missing resource annotation: `@`"
 }
 
-func (*MissingMoveAnnotationError) isSemanticError() {}
+func (*MissingResourceAnnotationError) isSemanticError() {}
 
-func (e *MissingMoveAnnotationError) StartPosition() ast.Position {
+func (e *MissingResourceAnnotationError) StartPosition() ast.Position {
 	return e.Pos
 }
 
-func (e *MissingMoveAnnotationError) EndPosition() ast.Position {
+func (e *MissingResourceAnnotationError) EndPosition() ast.Position {
 	return e.Pos
 }
 
-// InvalidNestedMoveError
+// InvalidNestedResourceMoveError
 
-type InvalidNestedMoveError struct {
+type InvalidNestedResourceMoveError struct {
 	StartPos ast.Position
 	EndPos   ast.Position
 }
 
-func (e *InvalidNestedMoveError) Error() string {
+func (e *InvalidNestedResourceMoveError) Error() string {
 	return "cannot move nested resource"
 }
 
-func (*InvalidNestedMoveError) isSemanticError() {}
+func (*InvalidNestedResourceMoveError) isSemanticError() {}
 
-func (e *InvalidNestedMoveError) StartPosition() ast.Position {
+func (e *InvalidNestedResourceMoveError) StartPosition() ast.Position {
 	return e.StartPos
 }
 
-func (e *InvalidNestedMoveError) EndPosition() ast.Position {
+func (e *InvalidNestedResourceMoveError) EndPosition() ast.Position {
 	return e.EndPos
 }
 
-// InvalidMoveAnnotationError
+// InvalidResourceAnnotationError
 
-type InvalidMoveAnnotationError struct {
+type InvalidResourceAnnotationError struct {
 	Pos ast.Position
 }
 
-func (e *InvalidMoveAnnotationError) Error() string {
-	return "invalid move annotation: `<-`"
+func (e *InvalidResourceAnnotationError) Error() string {
+	return "invalid resource annotation: `@`"
 }
 
-func (*InvalidMoveAnnotationError) isSemanticError() {}
+func (*InvalidResourceAnnotationError) isSemanticError() {}
 
-func (e *InvalidMoveAnnotationError) StartPosition() ast.Position {
+func (e *InvalidResourceAnnotationError) StartPosition() ast.Position {
 	return e.Pos
 }
 
-func (e *InvalidMoveAnnotationError) EndPosition() ast.Position {
+func (e *InvalidResourceAnnotationError) EndPosition() ast.Position {
 	return e.Pos.Shifted(len(common.CompositeKindResource.Annotation()) - 1)
 }
 
@@ -1093,6 +1104,8 @@ func (e *ResourceUseAfterInvalidationError) Cause() (wasMoved, wasDestroyed bool
 			wasMoved = true
 		case ResourceInvalidationKindDestroy:
 			wasDestroyed = true
+		default:
+			panic(errors.NewUnreachableError())
 		}
 	}
 
@@ -1199,6 +1212,8 @@ func (n ResourceInvalidationNote) Message() string {
 		action = "moved"
 	case ResourceInvalidationKindDestroy:
 		action = "destroyed"
+	default:
+		panic(errors.NewUnreachableError())
 	}
 	return fmt.Sprintf("resource %s here", action)
 }
@@ -1828,18 +1843,6 @@ func (e *InvalidTransactionBlockError) EndPosition() ast.Position {
 	return e.Pos.Shifted(length - 1)
 }
 
-// TransactionMissingExecuteError
-
-type TransactionMissingExecuteError struct {
-	ast.Range
-}
-
-func (e *TransactionMissingExecuteError) Error() string {
-	return "transaction missing an execute block"
-}
-
-func (*TransactionMissingExecuteError) isSemanticError() {}
-
 // TransactionMissingPrepareError
 
 type TransactionMissingPrepareError struct {
@@ -1869,14 +1872,15 @@ func (e *TransactionMissingPrepareError) EndPosition() ast.Position {
 
 type InvalidTransactionFieldAccessModifierError struct {
 	Name   string
-	Access string
+	Access ast.Access
 	Pos    ast.Position
 }
 
 func (e *InvalidTransactionFieldAccessModifierError) Error() string {
 	return fmt.Sprintf(
-		"access modifier not allowed for transaction field `%s`",
+		"access modifier not allowed for transaction field `%s`: `%s`",
 		e.Name,
+		e.Access.Keyword(),
 	)
 }
 
@@ -1887,7 +1891,7 @@ func (e *InvalidTransactionFieldAccessModifierError) StartPosition() ast.Positio
 }
 
 func (e *InvalidTransactionFieldAccessModifierError) EndPosition() ast.Position {
-	length := len(e.Access)
+	length := len(e.Access.Keyword())
 	return e.Pos.Shifted(length - 1)
 }
 
@@ -1948,4 +1952,100 @@ func (e *InvalidNestedTypeError) StartPosition() ast.Position {
 
 func (e *InvalidNestedTypeError) EndPosition() ast.Position {
 	return e.Type.EndPosition()
+}
+
+// DeclarationKindMismatchError
+
+type DeclarationKindMismatchError struct {
+	ExpectedDeclarationKind common.DeclarationKind
+	ActualDeclarationKind   common.DeclarationKind
+	ast.Range
+}
+
+func (e *DeclarationKindMismatchError) Error() string {
+	return "mismatched declarations"
+}
+
+func (*DeclarationKindMismatchError) isSemanticError() {}
+
+func (e *DeclarationKindMismatchError) SecondaryError() string {
+	return fmt.Sprintf(
+		"expected `%s`, got `%s`",
+		e.ExpectedDeclarationKind.Name(),
+		e.ActualDeclarationKind.Name(),
+	)
+}
+
+// InvalidTopLevelDeclarationError
+
+type InvalidTopLevelDeclarationError struct {
+	DeclarationKind common.DeclarationKind
+	ast.Range
+}
+
+func (e *InvalidTopLevelDeclarationError) Error() string {
+	return fmt.Sprintf(
+		"%s declarations are not valid at the top-level",
+		e.DeclarationKind.Name(),
+	)
+}
+
+func (*InvalidTopLevelDeclarationError) isSemanticError() {}
+
+// InvalidSelfInvalidationError
+
+type InvalidSelfInvalidationError struct {
+	InvalidationKind ResourceInvalidationKind
+	StartPos         ast.Position
+	EndPos           ast.Position
+}
+
+func (e *InvalidSelfInvalidationError) Error() string {
+	var action string
+	switch e.InvalidationKind {
+	case ResourceInvalidationKindMove:
+		action = "move"
+	case ResourceInvalidationKindDestroy:
+		action = "destroy"
+	default:
+		panic(errors.NewUnreachableError())
+	}
+	return fmt.Sprintf("cannot %s `self`", action)
+}
+
+func (*InvalidSelfInvalidationError) isSemanticError() {}
+
+func (e *InvalidSelfInvalidationError) StartPosition() ast.Position {
+	return e.StartPos
+}
+
+func (e *InvalidSelfInvalidationError) EndPosition() ast.Position {
+	return e.EndPos
+}
+
+// InvalidMoveError
+
+type InvalidMoveError struct {
+	Name            string
+	DeclarationKind common.DeclarationKind
+	Pos             ast.Position
+}
+
+func (e *InvalidMoveError) Error() string {
+	return fmt.Sprintf(
+		"cannot move %s: `%s`",
+		e.DeclarationKind.Name(),
+		e.Name,
+	)
+}
+
+func (*InvalidMoveError) isSemanticError() {}
+
+func (e *InvalidMoveError) StartPosition() ast.Position {
+	return e.Pos
+}
+
+func (e *InvalidMoveError) EndPosition() ast.Position {
+	length := len(e.Name)
+	return e.Pos.Shifted(length - 1)
 }

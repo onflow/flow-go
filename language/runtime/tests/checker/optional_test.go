@@ -167,53 +167,89 @@ func TestCheckInvalidNestedOptionalComparison(t *testing.T) {
 
 func TestCheckCompositeNilEquality(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKinds {
 
-		_, err := ParseAndCheck(t,
-			fmt.Sprintf(
-				`
-                  %[1]s X {}
+		var setupCode, identifier string
 
-                  let x: %[2]sX? %[3]s %[4]s X()
+		if compositeKind == common.CompositeKindContract {
+			identifier = "X"
+		} else {
+			setupCode = fmt.Sprintf(
+				`let x: %[1]sX? %[2]s %[3]s X%[4]s`,
+				compositeKind.Annotation(),
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
+				constructorArguments(compositeKind),
+			)
+			identifier = "x"
+		}
 
-                  let a = x == nil
-                  let b = nil == x
-                `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			),
-		)
+		t.Run(compositeKind.Name(), func(t *testing.T) {
 
-		require.NoError(t, err)
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s X {}
+
+                      %[2]s
+
+                      let a = %[3]s == nil
+                      let b = nil == %[3]s
+                    `,
+					compositeKind.Keyword(),
+					setupCode,
+					identifier,
+				),
+			)
+
+			require.NoError(t, err)
+		})
 	}
 }
 
 func TestCheckInvalidCompositeNilEquality(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKinds {
 
-		_, err := ParseAndCheck(t,
-			fmt.Sprintf(
-				`
-                  %[1]s X {}
-
-                  let x: %[2]sX? %[3]s %[4]s X()
-                  let y: %[2]sX? %[3]s nil
-
-                  let a = x == y
+		var setupCode, firstIdentifier, secondIdentifier string
+		if compositeKind == common.CompositeKindContract {
+			firstIdentifier = "X"
+			secondIdentifier = "X"
+		} else {
+			setupCode = fmt.Sprintf(`
+                  let x: %[1]sX? %[2]s %[3]s X%[4]s
+                  let y: %[1]sX? %[2]s nil
                 `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-				kind.ConstructionKeyword(),
-			),
-		)
+				compositeKind.Annotation(),
+				compositeKind.TransferOperator(),
+				compositeKind.ConstructionKeyword(),
+				constructorArguments(compositeKind),
+			)
+			firstIdentifier = "x"
+			secondIdentifier = "y"
+		}
 
-		errs := ExpectCheckerErrors(t, err, 1)
+		t.Run(compositeKind.Name(), func(t *testing.T) {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s X {}
 
-		assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
+                      %[2]s
+
+                      let a = %[3]s == %[4]s
+                    `,
+					compositeKind.Keyword(),
+					setupCode,
+					firstIdentifier,
+					secondIdentifier,
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
+		})
 	}
 }
 

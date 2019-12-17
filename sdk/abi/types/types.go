@@ -21,6 +21,14 @@ type Any struct{ isAType }
 
 func (Any) ID() string { return "Any" }
 
+type AnyStruct struct{ isAType }
+
+func (AnyStruct) ID() string { return "AnyStruct" }
+
+type AnyResource struct{ isAType }
+
+func (AnyResource) ID() string { return "AnyResource" }
+
 type Optional struct {
 	isAType
 	Type Type
@@ -136,7 +144,7 @@ type Composite struct {
 	TypeID       string
 	Identifier   string
 	Fields       map[string]Type
-	Initializers [][]Parameter
+	Initializers [][]*Parameter
 }
 
 func (t Composite) ID() string {
@@ -153,17 +161,28 @@ type Resource struct {
 	Composite
 }
 
+type Event struct {
+	isAType
+	TypeID      string
+	Identifier  string
+	Fields      map[string]Type
+	Initializer []*Parameter
+}
+
+func (t Event) ID() string {
+	return t.TypeID
+}
+
 type Function struct {
 	isAType
 	TypeID     string
 	Identifier string
-	Parameters []Parameter
+	Parameters []*Parameter
 	ReturnType Type
 }
 
 func (t Function) ID() string { return t.TypeID }
 
-// A type representing anonymous function (aka without named arguments)
 type FunctionType struct {
 	isAType
 	ParameterTypes []Type
@@ -173,19 +192,6 @@ type FunctionType struct {
 // TODO:
 func (t FunctionType) ID() string { return "NOT IMPLEMENTED" }
 
-type Event struct {
-	isAType
-	TypeID      string
-	Identifier  string
-	Fields      map[string]Type
-	Initializer []Parameter
-}
-
-func (t Event) ID() string {
-	return t.TypeID
-}
-
-// Pointers are simply pointers to already existing types, to prevent circular references
 type ResourcePointer struct {
 	isAType
 	TypeName string
