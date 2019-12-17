@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
-
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/storage/merkle"
 )
@@ -18,24 +16,26 @@ type Item interface {
 	Hash() crypto.Hash
 }
 
-// Mempool implements a generic memory pool backed by a merkle tree.
-type Mempool struct {
+type Mempool mempool
+
+// mempool implements a generic memory pool backed by a merkle tree.
+type mempool struct {
 	sync.RWMutex
 	tree  *merkle.Tree
 	items map[string]Item
 }
 
-// NewMempool creates a new memory pool.
-func NewMempool() (*Mempool, error) {
-	m := &Mempool{
+// newMempool creates a new memory pool.
+func newMempool() *mempool {
+	m := &mempool{
 		tree:  merkle.NewTree(),
 		items: make(map[string]Item),
 	}
-	return m, nil
+	return m
 }
 
 // Has checks if we already contain the item with the given hash.
-func (m *Mempool) Has(hash crypto.Hash) bool {
+func (m *mempool) Has(hash crypto.Hash) bool {
 	m.RLock()
 	defer m.RUnlock()
 	_, ok := m.tree.Get(hash)
@@ -43,19 +43,19 @@ func (m *Mempool) Has(hash crypto.Hash) bool {
 }
 
 // Add adds the given item to the pool.
-func (m *Mempool) Add(item Item) error {
+func (m *mempool) Add(item Item) error {
 	m.Lock()
 	defer m.Unlock()
 	ok := m.tree.Put(item.Hash(), nil)
 	if ok {
-		return errors.Errorf("item already known (%x)", item.Hash())
+		return fmt.Errorf("item already known (%x)", item.Hash())
 	}
 	m.items[fmt.Sprint(item.Hash())] = item
 	return nil
 }
 
 // Rem will remove the item with the given hash.
-func (m *Mempool) Rem(hash crypto.Hash) bool {
+func (m *mempool) Rem(hash crypto.Hash) bool {
 	m.Lock()
 	defer m.Unlock()
 	ok := m.tree.Del(hash)
@@ -67,33 +67,33 @@ func (m *Mempool) Rem(hash crypto.Hash) bool {
 }
 
 // Get returns the given item from the pool.
-func (m *Mempool) Get(hash crypto.Hash) (Item, error) {
+func (m *mempool) Get(hash crypto.Hash) (Item, error) {
 	m.RLock()
 	defer m.RUnlock()
 	_, ok := m.tree.Get(hash)
 	if !ok {
-		return nil, errors.Errorf("item not known (%x)", hash)
+		return nil, fmt.Errorf("item not known (%x)", hash)
 	}
 	coll := m.items[fmt.Sprint(hash)]
 	return coll, nil
 }
 
 // Hash returns a hash of all items in the mempool.
-func (m *Mempool) Hash() crypto.Hash {
+func (m *mempool) Hash() crypto.Hash {
 	m.RLock()
 	defer m.RUnlock()
 	return m.tree.Hash()
 }
 
 // Size will return the size of the mempool.
-func (m *Mempool) Size() uint {
+func (m *mempool) Size() uint {
 	m.RLock()
 	defer m.RUnlock()
 	return uint(len(m.items))
 }
 
 // All returns all items from the pool.
-func (m *Mempool) All() []Item {
+func (m *mempool) All() []Item {
 	m.RLock()
 	defer m.RUnlock()
 	items := make([]Item, 0, len(m.items))

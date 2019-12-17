@@ -12,29 +12,26 @@ import (
 // TransactionPool implements the transaction memory pool of the collection nodes, used to
 // store pending transactions and to generate guaranteed collections.
 type TransactionPool struct {
-	*Mempool
+	*mempool
 }
 
 // NewTransactionPool creates a new memory pool for transactions.
 func NewTransactionPool() (*TransactionPool, error) {
-	inner, err := NewMempool()
-	if err != nil {
-		return nil, err
+	m := &TransactionPool{
+		mempool: newMempool(),
 	}
-
-	m := &TransactionPool{inner}
 
 	return m, nil
 }
 
 // Add adds a transaction to the mempool.
 func (m *TransactionPool) Add(tx *flow.Transaction) error {
-	return m.Mempool.Add(tx)
+	return m.mempool.Add(tx)
 }
 
 // Get returns the given transaction from the pool.
 func (m *TransactionPool) Get(hash crypto.Hash) (*flow.Transaction, error) {
-	item, err := m.Mempool.Get(hash)
+	item, err := m.mempool.Get(hash)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +46,7 @@ func (m *TransactionPool) Get(hash crypto.Hash) (*flow.Transaction, error) {
 
 // All returns all transactions from the pool.
 func (m *TransactionPool) All() []*flow.Transaction {
-	items := m.Mempool.All()
+	items := m.mempool.All()
 
 	transactions := make([]*flow.Transaction, len(items))
 

@@ -1,11 +1,9 @@
-package mempool_test
+package mempool
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/dapperlabs/flow-go/module/mempool"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/stretchr/testify/require"
@@ -23,13 +21,13 @@ func TestHash(t *testing.T) {
 
 	t.Run("insertion order should not impact the hash", func(t *testing.T) {
 		// create the first mempool with item1 and gc2
-		pool1, err := mempool.NewMempool()
+		pool1, err := mempool.newMempool()
 		require.NoError(t, err)
 		_ = pool1.Add(item1)
 		_ = pool1.Add(item2)
 
 		// create the second mempool with gc2 and item1
-		pool2, err := mempool.NewMempool()
+		pool2, err := mempool.newMempool()
 		require.NoError(t, err)
 		_ = pool2.Add(item2)
 		_ = pool2.Add(item1)
@@ -40,12 +38,12 @@ func TestHash(t *testing.T) {
 
 	t.Run("having different items should produce different hash", func(t *testing.T) {
 		// create the first mempool with only item1
-		pool1, err := mempool.NewMempool()
+		pool1, err := mempool.newMempool()
 		require.NoError(t, err)
 		_ = pool1.Add(item1)
 
 		// create the second mempool with item1 and item2
-		pool2, err := mempool.NewMempool()
+		pool2, err := mempool.newMempool()
 		require.NoError(t, err)
 		_ = pool2.Add(item1)
 		_ = pool1.Add(item2)
@@ -56,7 +54,7 @@ func TestHash(t *testing.T) {
 
 	t.Run("insert duplicated items should not impact hash", func(t *testing.T) {
 		// create the first mempool with item1 and item2
-		pool, err := mempool.NewMempool()
+		pool, err := mempool.newMempool()
 		require.NoError(t, err)
 		_ = pool.Add(item1)
 		_ = pool.Add(item2)
@@ -75,7 +73,7 @@ func TestInsert(t *testing.T) {
 	item1 := hashable("DEAD")
 
 	t.Run("should be able to insert and retrieve", func(t *testing.T) {
-		pool, err := mempool.NewMempool()
+		pool, err := mempool.newMempool()
 		require.NoError(t, err)
 		_ = pool.Add(item1)
 

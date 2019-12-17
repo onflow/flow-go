@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dapperlabs/flow-go/module/mempool"
-
 	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -15,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 )
