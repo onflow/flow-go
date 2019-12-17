@@ -11,6 +11,8 @@ GOPRIVATE=github.com/dapperlabs/*
 # OS
 UNAME := $(shell uname)
 
+export FLOW_ABI_EXAMPLES_DIR := $(CURDIR)/language/abi/examples/
+
 crypto/relic:
 	rm -rf crypto/relic
 	git submodule update --init --recursive
@@ -111,6 +113,12 @@ cmd/flow/flow: crypto/*.go $(shell find  cli/ -name '*.go') $(shell find cmd -na
 	    -ldflags \
 	    "-X github.com/dapperlabs/flow-go/build.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/build.semver=$(VERSION)" \
 	    -o ./cmd/flow/flow ./cmd/flow
+
+sdk/abi/generation/generation: $(shell find sdk -name '*.go')
+	GO111MODULE=on go build \
+    	    -ldflags \
+    	    "-X github.com/dapperlabs/flow-go/cli/flow/version.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/cli/flow/version.version=$(VERSION)" \
+    	    -o ./sdk/abi/generation/generation ./sdk/abi/generation
 
 .PHONY: install-cli
 install-cli: cmd/flow/flow

@@ -4,7 +4,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -77,7 +77,7 @@ func convertEvents(values []values.Event, txHash crypto.Hash) []flow.Event {
 	events := make([]flow.Event, len(values))
 
 	for i, value := range values {
-		payload, err := encoding.Encode(value)
+		payload, err := encodingValues.Encode(value)
 		if err != nil {
 			panic("failed to encode event")
 		}

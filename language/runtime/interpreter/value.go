@@ -17,7 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -1078,7 +1078,7 @@ func (v UInt8Value) KeyString() string {
 }
 
 func (v UInt8Value) Export() values.Value {
-	return values.Uint8(v)
+	return values.UInt8(v)
 }
 
 func (v UInt8Value) IntValue() int {
@@ -1168,7 +1168,7 @@ func (v UInt16Value) KeyString() string {
 }
 
 func (v UInt16Value) Export() values.Value {
-	return values.Uint16(v)
+	return values.UInt16(v)
 }
 
 func (v UInt16Value) IntValue() int {
@@ -1258,7 +1258,7 @@ func (v UInt32Value) KeyString() string {
 }
 
 func (v UInt32Value) Export() values.Value {
-	return values.Uint32(v)
+	return values.UInt32(v)
 }
 
 func (v UInt32Value) IntValue() int {
@@ -1349,7 +1349,7 @@ func (v UInt64Value) KeyString() string {
 }
 
 func (v UInt64Value) Export() values.Value {
-	return values.Uint64(v)
+	return values.UInt64(v)
 }
 
 func (v UInt64Value) IntValue() int {
@@ -1503,7 +1503,7 @@ func (v *CompositeValue) Export() values.Value {
 		keys = append(keys, key)
 	}
 
-	encoding.SortInEncodingOrder(keys)
+	encodingValues.SortInEncodingOrder(keys)
 
 	for _, key := range keys {
 		fields = append(fields, v.Fields[key].(ExportableValue).Export())
@@ -1993,8 +1993,6 @@ func (f EventField) String() string {
 	return fmt.Sprintf("%s: %s", f.Identifier, f.Value)
 }
 
-// ToValue
-
 // ToValue converts a Go value into an interpreter value
 func ToValue(value interface{}) (Value, error) {
 	// TODO: support more types
@@ -2088,7 +2086,7 @@ func (NilValue) String() string {
 }
 
 func (v NilValue) Export() values.Value {
-	return values.Nil{}
+	return values.Optional{Value: nil}
 }
 
 // SomeValue
@@ -2141,6 +2139,10 @@ func (v *SomeValue) Destroy(interpreter *Interpreter, location LocationPosition)
 
 func (v *SomeValue) String() string {
 	return fmt.Sprint(v.Value)
+}
+
+func (v *SomeValue) Export() values.Value {
+	return values.Optional{Value: v.Value.(ExportableValue).Export()}
 }
 
 // AnyValue
