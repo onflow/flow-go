@@ -8,6 +8,10 @@ VERSION := $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
 COVER_PROFILE := cover.out
 # Disable go sum database lookup for private repos
 GOPRIVATE=github.com/dapperlabs/*
+# OS
+UNAME := $(shell uname)
+
+export FLOW_ABI_EXAMPLES_DIR := $(CURDIR)/language/abi/examples/
 
 crypto/relic:
 	rm -rf crypto/relic
@@ -18,7 +22,12 @@ crypto/relic/build: crypto/relic
 
 .PHONY: install-tools
 install-tools: crypto/relic/build
+ifeq ($(UNAME), Linux)
 	sudo apt-get -y install capnproto
+endif
+ifeq ($(UNAME), Darwin)
+	brew install capnp
+endif
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/davecheney/godoc2md@master; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
@@ -105,6 +114,12 @@ cmd/flow/flow: crypto/*.go $(shell find  cli/ -name '*.go') $(shell find cmd -na
 	    "-X github.com/dapperlabs/flow-go/build.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/build.semver=$(VERSION)" \
 	    -o ./cmd/flow/flow ./cmd/flow
 
+sdk/abi/generation/generation: $(shell find sdk -name '*.go')
+	GO111MODULE=on go build \
+    	    -ldflags \
+    	    "-X github.com/dapperlabs/flow-go/cli/flow/version.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/cli/flow/version.version=$(VERSION)" \
+    	    -o ./sdk/abi/generation/generation ./sdk/abi/generation
+
 .PHONY: install-cli
 install-cli: cmd/flow/flow
 	cp cmd/flow/flow $$GOPATH/bin/
@@ -119,7 +134,11 @@ docker-push-emulator:
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
-	docker build -f cmd/consensus/Dockerfile -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" .
+	docker build -f cmd/Dockerfile --build-arg TARGET=consensus -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" .
+
+.PHONY: docker-build-execution
+docker-build-execution:
+	docker build -f cmd/Dockerfile --build-arg TARGET=execution -t gcr.io/dl-flow/execution:latest -t "gcr.io/dl-flow/execution:$(SHORT_COMMIT)" .
 
 # Builds the VS Code extension
 .PHONY: build-vscode-extension

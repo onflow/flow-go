@@ -3,7 +3,7 @@ package ast
 import (
 	"encoding/gob"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 )
@@ -101,8 +101,8 @@ func (l AddressLocation) ID() LocationID {
 	return LocationID(l.ToAddress().Hex())
 }
 
-func (l AddressLocation) ToAddress() (addr flow.Address) {
-	return flow.BytesToAddress(l)
+func (l AddressLocation) ToAddress() (addr values.Address) {
+	return values.BytesToAddress(l)
 }
 
 func init() {
