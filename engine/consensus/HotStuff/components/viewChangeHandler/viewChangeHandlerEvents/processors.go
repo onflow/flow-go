@@ -1,4 +1,4 @@
-package viewChangerEvents
+package viewChangeHandlerEvents
 
 import "github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
 

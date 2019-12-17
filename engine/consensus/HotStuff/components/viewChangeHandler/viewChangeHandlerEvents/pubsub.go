@@ -1,4 +1,4 @@
-package viewChangerEvents
+package viewChangeHandlerEvents
 
 import (
 	"reflect"

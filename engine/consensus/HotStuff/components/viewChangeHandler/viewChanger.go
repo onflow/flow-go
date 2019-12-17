@@ -1,11 +1,11 @@
-package voteAggregator
+package viewChangeHandler
 
 import "github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
 
 // ViewChanger sends and receives `ViewChange`s
-type ViewChanger struct {
+type ViewChangeHandler struct {
 }
 
-func (v *ViewChanger) OnSendViewChange(qc *def.QuorumCertificate) {
+func (v *ViewChangeHandler) OnSendViewChange(qc *def.QuorumCertificate) {
 	panic("Implement me")
 }
