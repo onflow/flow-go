@@ -3211,6 +3211,32 @@ func TestInterpretNestedOptionalComparisonMixed(t *testing.T) {
 	)
 }
 
+func TestInterpretOptionalSomeValueComparison(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+     let x: Int? = 1
+     let y = x == 1
+   `)
+
+	assert.Equal(t,
+		interpreter.BoolValue(true),
+		inter.Globals["y"].Value,
+	)
+}
+
+func TestInterpretOptionalNilValueComparison(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+     let x: Int? = nil
+     let y = x == 1
+   `)
+
+	assert.Equal(t,
+		interpreter.BoolValue(false),
+		inter.Globals["y"].Value,
+	)
+}
+
 func TestInterpretCompositeNilEquality(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
@@ -5092,7 +5118,7 @@ func TestInterpretStorage(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
@@ -5624,7 +5650,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 				}),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
@@ -5721,7 +5747,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
@@ -5804,7 +5830,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
@@ -5873,7 +5899,7 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
@@ -6263,7 +6289,7 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
@@ -6402,7 +6428,7 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
@@ -6820,4 +6846,62 @@ func TestInterpretConformToImportedInterface(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	assert.IsType(t, &interpreter.ConditionError{}, err)
+}
+
+// See https://github.com/dapperlabs/flow-go/issues/1869
+//
+func TestInterpretPostConditionWithElaborationAccess(t *testing.T) {
+
+	storedValues := map[string]interpreter.OptionalValue{}
+
+	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+	//
+
+	getter := func(_ *interpreter.Interpreter, _ string, key string) interpreter.OptionalValue {
+		value, ok := storedValues[key]
+		if !ok {
+			return interpreter.NilValue{}
+		}
+		return value
+	}
+
+	setter := func(_ *interpreter.Interpreter, _ string, key string, value interpreter.OptionalValue) {
+		storedValues[key] = value
+	}
+
+	storageValue := interpreter.StorageValue{}
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+          pub resource R {}
+
+          pub fun test() {
+              post {
+                  storage[R] != nil
+              }
+              let oldR <- storage[R] <- create R()
+              destroy oldR
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
+				interpreter.WithStorageReadHandler(getter),
+				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandler(
+					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+						return indexingType.ID()
+					},
+				),
+			},
+		},
+	)
+
+	_, err := inter.Invoke("test")
+	require.NoError(t, err)
 }
