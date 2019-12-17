@@ -194,9 +194,11 @@ func (s Store) CommitBlock(
 			return err
 		}
 
-		err = insertEvents(block.Number, events)(txn)
-		if err != nil {
-			return err
+		if events != nil {
+			err = insertEvents(block.Number, events)(txn)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
