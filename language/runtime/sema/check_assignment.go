@@ -158,6 +158,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 
 	// check value type is subtype of variable type
 	if !valueType.IsInvalidType() &&
+		!variable.Type.IsInvalidType() &&
 		!checker.IsTypeCompatible(valueExpression, valueType, variable.Type) {
 
 		checker.report(

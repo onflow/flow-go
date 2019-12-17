@@ -9,6 +9,38 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
+func TestCheckSpuriousIdentifierAssignmentInvalidValueTypeMismatch(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          fun test() {
+              var x = 1
+              x = y
+          }
+        `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+}
+
+func TestCheckSpuriousIdentifierAssignmentInvalidTargetTypeMismatch(t *testing.T) {
+
+	_, err := ParseAndCheck(t,
+		`
+          fun test() {
+              var x: X = 1
+              x = 1
+          }
+        `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+}
+
 func TestCheckSpuriousIndexAssignmentInvalidValueTypeMismatch(t *testing.T) {
 
 	_, err := ParseAndCheck(t,
