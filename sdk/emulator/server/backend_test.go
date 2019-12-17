@@ -281,10 +281,11 @@ func TestBackend(t *testing.T) {
 
 		api.EXPECT().
 			AddTransaction(gomock.Any()).
-			DoAndReturn(func(tx flow.Transaction) (types.TransactionReceipt, error) {
+			DoAndReturn(func(tx flow.Transaction) error {
 				capturedTx = tx
-				return types.TransactionReceipt{}, nil
-			}).Times(1)
+				return nil
+			}).
+			Times(1)
 
 		requestTx := observation.SendTransactionRequest{
 			Transaction: &entities.Transaction{
@@ -321,7 +322,7 @@ func TestBackend(t *testing.T) {
 	t.Run("SendTransaction which errors while processing", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
 		api.EXPECT().
 			AddTransaction(gomock.Any()).
-			Return(nil, &emulator.ErrInvalidSignaturePublicKey{}).
+			Return(&emulator.ErrInvalidSignaturePublicKey{}).
 			Times(1)
 
 		requestTx := observation.SendTransactionRequest{
