@@ -47,7 +47,10 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -96,7 +99,10 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -148,7 +154,10 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -186,7 +195,10 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -229,8 +241,11 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
-		require.NoError(t, err)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
+		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
 		block, err := b.CommitBlock()
@@ -283,7 +298,10 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Reverted())
 
@@ -316,7 +334,10 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Reverted())
 
@@ -352,7 +373,10 @@ func TestAddAccountKey(t *testing.T) {
 
 		tx1.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx1)
+		err = b.AddTransaction(tx1)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -374,7 +398,10 @@ func TestAddAccountKey(t *testing.T) {
 
 		tx2.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err = b.SubmitTransaction(tx2)
+		err = b.AddTransaction(tx2)
+		assert.NoError(t, err)
+
+		result, err = b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -411,7 +438,10 @@ func TestAddAccountKey(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Reverted())
 	})
@@ -445,7 +475,10 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	// submit tx1 (should succeed)
-	result, err := b.SubmitTransaction(tx1)
+	err = b.AddTransaction(tx1)
+	assert.NoError(t, err)
+
+	result, err := b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
 
@@ -474,7 +507,10 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx2.AddSignature(b.RootAccountAddress(), sig)
 
 	// submit tx2 (should succeed)
-	result, err = b.SubmitTransaction(tx2)
+	err = b.AddTransaction(tx2)
+	assert.NoError(t, err)
+
+	result, err = b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
 
@@ -503,7 +539,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx3.AddSignature(b.RootAccountAddress(), sig)
 
 	// submit tx3 (should fail)
-	_, err = b.SubmitTransaction(tx3)
+	err = b.AddTransaction(tx3)
 	assert.IsType(t, &emulator.ErrInvalidSignaturePublicKey{}, err)
 
 	_, err = b.CommitBlock()
@@ -531,7 +567,10 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx4.AddSignature(b.RootAccountAddress(), sig)
 
 	// submit tx4 (should succeed)
-	result, err = b.SubmitTransaction(tx4)
+	err = b.AddTransaction(tx4)
+	assert.NoError(t, err)
+
+	result, err = b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
 
@@ -598,7 +637,10 @@ func TestUpdateAccountCode(t *testing.T) {
 		tx.AddSignature(accountAddressA, sigA)
 		tx.AddSignature(accountAddressB, sigB)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -637,8 +679,11 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		tx.AddSignature(accountAddressA, sig)
 
-		_, err = b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
 		assert.IsType(t, &emulator.ErrMissingSignature{}, err)
+
+		_, err = b.CommitBlock()
+		assert.NoError(t, err)
 
 		account, err = b.GetAccount(accountAddressB)
 		assert.NoError(t, err)
@@ -684,7 +729,10 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		tx.AddSignature(accountAddressA, sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Reverted())
 
@@ -742,7 +790,11 @@ func TestImportAccountCode(t *testing.T) {
 
 	tx.AddSignature(b.RootAccountAddress(), sig)
 
-	result, err := b.SubmitTransaction(tx)
+	err = b.AddTransaction(tx)
+	assert.NoError(t, err)
+
+	result, err := b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
+
 }

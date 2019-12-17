@@ -5,10 +5,12 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/keys"
-	"github.com/stretchr/testify/assert"
 )
 
 // ReadFile reads a file from the file system
@@ -66,14 +68,17 @@ func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testi
 	}
 
 	// submit the signed transaction
-	result, err := b.SubmitTransaction(tx)
+	err := b.AddTransaction(tx)
+	require.NoError(t, err)
+
+	result, err := b.ExecuteNextTransaction()
+	require.NoError(t, err)
 
 	if shouldRevert {
-		assert.NoError(t, err)
 		assert.True(t, result.Reverted())
 	} else {
-		if !assert.NoError(t, err) {
-			t.Log(err.Error())
+		if !assert.True(t, result.Succeeded()) {
+			t.Log(result.Error.Error())
 		}
 	}
 
