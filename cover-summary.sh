@@ -1,3 +1,5 @@
+#!/bin/bash
+
 gocov report cover.json | grep -e '--------' | sed -e "s/^github.com\/dapperlabs\/flow-go\///" -e "s/-//g" > cover-summary
 while read line; do
     tcLine="##teamcity[buildStatisticValue"
