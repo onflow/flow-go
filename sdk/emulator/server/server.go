@@ -151,15 +151,27 @@ func (e *EmulatorServer) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			block, err := e.backend.blockchain.CommitBlock()
+			block, results, err := e.backend.blockchain.ExecuteAndCommitBlock()
 			if err != nil {
 				e.logger.WithError(err).Error("Failed to commit block")
 			} else {
+				for _, result := range results {
+					if result.Succeeded() {
+						e.logger.
+							WithField("txHash", result.TransactionHash.Hex()).
+							Info("⭐  Transaction executed")
+					} else {
+						e.logger.
+							WithField("txHash", result.TransactionHash.Hex()).
+							Warn("❗  Transaction reverted")
+					}
+				}
+
 				e.logger.WithFields(log.Fields{
 					"blockNum":  block.Number,
 					"blockHash": block.Hash().Hex(),
 					"blockSize": len(block.TransactionHashes),
-				}).Debugf("⛏  Block #%d mined", block.Number)
+				}).Debugf("📦  Block #%d committed", block.Number)
 			}
 		case <-livenessTicker.C:
 			checker.CheckIn()
@@ -216,7 +228,7 @@ func StartServer(logger *log.Logger, config *Config) {
 
 	logger.
 		WithField("port", config.Port).
-		Infof("🌱  Starting Emulator server on port %d...", config.Port)
+		Infof("🌱  Starting emulator server on port %d...", config.Port)
 
 	go emulatorServer.Start(ctx)
 

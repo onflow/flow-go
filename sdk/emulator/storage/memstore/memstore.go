@@ -3,10 +3,9 @@ package memstore
 import (
 	"sync"
 
-	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
-
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
@@ -39,7 +38,7 @@ func New() *Store {
 	}
 }
 
-func (s *Store) GetBlockByHash(hash crypto.Hash) (types.Block, error) {
+func (s *Store) BlockByHash(hash crypto.Hash) (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -52,7 +51,7 @@ func (s *Store) GetBlockByHash(hash crypto.Hash) (types.Block, error) {
 	return block, nil
 }
 
-func (s *Store) GetBlockByNumber(blockNumber uint64) (types.Block, error) {
+func (s *Store) BlockByNumber(blockNumber uint64) (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -64,7 +63,7 @@ func (s *Store) GetBlockByNumber(blockNumber uint64) (types.Block, error) {
 	return block, nil
 }
 
-func (s *Store) GetLatestBlock() (types.Block, error) {
+func (s *Store) LatestBlock() (types.Block, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -79,6 +78,10 @@ func (s *Store) InsertBlock(block types.Block) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.insertBlock(block)
+}
+
+func (s *Store) insertBlock(block types.Block) error {
 	s.blocks[block.Number] = block
 	if block.Number > s.blockHeight {
 		s.blockHeight = block.Number
@@ -87,7 +90,41 @@ func (s *Store) InsertBlock(block types.Block) error {
 	return nil
 }
 
-func (s *Store) GetTransaction(txHash crypto.Hash) (flow.Transaction, error) {
+func (s *Store) CommitBlock(
+	block types.Block,
+	transactions []flow.Transaction,
+	ledger flow.Ledger,
+	events []flow.Event,
+) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	err := s.insertBlock(block)
+	if err != nil {
+		return err
+	}
+
+	for _, tx := range transactions {
+		err := s.insertTransaction(tx)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = s.insertLedger(block.Number, ledger)
+	if err != nil {
+		return err
+	}
+
+	err = s.insertEvents(block.Number, events)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Store) TransactionByHash(txHash crypto.Hash) (flow.Transaction, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -102,11 +139,15 @@ func (s *Store) InsertTransaction(tx flow.Transaction) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.insertTransaction(tx)
+}
+
+func (s *Store) insertTransaction(tx flow.Transaction) error {
 	s.transactions[tx.Hash().Hex()] = tx
 	return nil
 }
 
-func (s *Store) GetLedger(blockNumber uint64) (flow.Ledger, error) {
+func (s *Store) LedgerByNumber(blockNumber uint64) (flow.Ledger, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -117,15 +158,19 @@ func (s *Store) GetLedger(blockNumber uint64) (flow.Ledger, error) {
 	return ledger, nil
 }
 
-func (s *Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
+func (s *Store) InsertLedger(blockNumber uint64, ledger flow.Ledger) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.insertLedger(blockNumber, ledger)
+}
+
+func (s *Store) insertLedger(blockNumber uint64, ledger flow.Ledger) error {
 	s.ledger[blockNumber] = ledger
 	return nil
 }
 
-func (s *Store) GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error) {
+func (s *Store) RetrieveEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -150,10 +195,14 @@ func (s *Store) GetEvents(eventType string, startBlock, endBlock uint64) ([]flow
 	return events, nil
 }
 
-func (s *Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
+func (s *Store) InsertEvents(blockNumber uint64, events []flow.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	return s.insertEvents(blockNumber, events)
+}
+
+func (s *Store) insertEvents(blockNumber uint64, events []flow.Event) error {
 	if s.eventsByBlockNumber[blockNumber] == nil {
 		s.eventsByBlockNumber[blockNumber] = events
 	} else {
@@ -161,9 +210,4 @@ func (s *Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
 	}
 
 	return nil
-}
-
-// Returns the block with the highest number.
-func (s *Store) getLatestBlock() types.Block {
-	return s.blocks[s.blockHeight]
 }

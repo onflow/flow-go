@@ -11,7 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 )
@@ -49,7 +49,7 @@ func (b *Backend) SendTransaction(ctx context.Context, req *observation.SendTran
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	result, err := b.blockchain.SubmitTransaction(tx)
+	err = b.blockchain.AddTransaction(tx)
 	if err != nil {
 		switch err.(type) {
 		case *emulator.ErrDuplicateTransaction:
@@ -64,10 +64,7 @@ func (b *Backend) SendTransaction(ctx context.Context, req *observation.SendTran
 	} else {
 		b.logger.
 			WithField("txHash", tx.Hash().Hex()).
-			Infof("💸  Transaction #%d mined ", tx.Nonce)
-		if result.Reverted() {
-			b.logger.WithError(result.Error).Warnf("⚠️  Transaction #%d reverted", tx.Nonce)
-		}
+			Debug("️✉️   Transaction submitted")
 	}
 
 	response := &observation.SendTransactionResponse{
@@ -178,7 +175,7 @@ func (b *Backend) ExecuteScript(ctx context.Context, req *observation.ExecuteScr
 		b.logger.Debugf("🔔  Event emitted: %s", event.String())
 	}
 
-	valueBytes, err := encoding.Encode(value)
+	valueBytes, err := values.Encode(value)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
