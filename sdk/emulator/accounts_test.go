@@ -644,6 +644,9 @@ func TestUpdateAccountCode(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
+		_, err = b.CommitBlock()
+		assert.NoError(t, err)
+
 		account, err = b.GetAccount(accountAddressB)
 		assert.NoError(t, err)
 

@@ -41,17 +41,6 @@ func TestEncodeBlock(t *testing.T) {
 	assert.Equal(t, block.TransactionHashes, decodedBlock.TransactionHashes)
 }
 
-func TestEncodeLedger(t *testing.T) {
-	ledgers := unittest.LedgerFixture()
-	data, err := encodeLedger(ledgers)
-	require.Nil(t, err)
-
-	var decodedRegisters flow.Ledger
-	err = decodeLedger(&decodedRegisters, data)
-	require.Nil(t, err)
-	assert.Equal(t, ledgers, decodedRegisters)
-}
-
 func TestEncodeEventList(t *testing.T) {
 	eventList := []flow.Event{unittest.EventFixture(func(e *flow.Event) {
 		e.Payload = []byte{1, 2, 3, 4}
