@@ -1,7 +1,7 @@
 package blockProducerEvents
 
 import (
-	"reflect"
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/utils"
 	"sync"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
@@ -29,15 +29,9 @@ func (p *PubSubEventProcessor) OnProducedBlock(block *def.Block) {
 // AddProducedBlockConsumer adds a ProducedBlockConsumer to the PubSubEventProcessor;
 // concurrency safe; returns self-reference for chaining
 func (p *PubSubEventProcessor) AddProducedBlockConsumer(cons ProducedBlockConsumer) *PubSubEventProcessor {
-	ensureNotNil(cons)
+	utils.EnsureNotNil(cons, "Event consumer")
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.blockProducerConsumers = append(p.blockProducerConsumers, cons)
 	return p
-}
-
-func ensureNotNil(proc interface{}) {
-	if proc == nil || reflect.ValueOf(proc).IsNil() {
-		panic("Consumer cannot be nil")
-	}
 }

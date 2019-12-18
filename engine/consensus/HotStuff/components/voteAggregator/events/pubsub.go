@@ -1,7 +1,7 @@
 package events
 
 import (
-	"reflect"
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/utils"
 	"sync"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
@@ -48,7 +48,7 @@ func (p *PubSubEventProcessor) OnQcFromVotes(qc *def.QuorumCertificate) {
 // AddDoubleVoteConsumer adds a DoubleVoteConsumer to the PubSubEventProcessor;
 // concurrency safe; returns self-reference for chaining
 func (p *PubSubEventProcessor) AddDoubleVoteConsumer(cons DoubleVoteConsumer) *PubSubEventProcessor {
-	ensureNotNil(cons)
+	utils.EnsureNotNil(cons, "Event consumer")
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.doubleVoteConsumers = append(p.doubleVoteConsumers, cons)
@@ -58,7 +58,7 @@ func (p *PubSubEventProcessor) AddDoubleVoteConsumer(cons DoubleVoteConsumer) *P
 // AddInvalidVoteConsumer adds a InvalidVoteConsumer to the PubSubEventProcessor;
 // concurrency safe; returns self-reference for chaining
 func (p *PubSubEventProcessor) AddInvalidVoteConsumer(cons InvalidVoteConsumer) *PubSubEventProcessor {
-	ensureNotNil(cons)
+	utils.EnsureNotNil(cons, "Event consumer")
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.invalidVoteConsumers = append(p.invalidVoteConsumers, cons)
@@ -68,15 +68,9 @@ func (p *PubSubEventProcessor) AddInvalidVoteConsumer(cons InvalidVoteConsumer) 
 // AddQcFromVotesConsumer adds a QcFromVotesConsumer to the PubSubEventProcessor;
 // concurrency safe; returns self-reference for chaining
 func (p *PubSubEventProcessor) AddQcFromVotesConsumer(cons QcFromVotesConsumer) *PubSubEventProcessor {
-	ensureNotNil(cons)
+	utils.EnsureNotNil(cons, "Event consumer")
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.qcFromVotesConsumers = append(p.qcFromVotesConsumers, cons)
 	return p
-}
-
-func ensureNotNil(proc interface{}) {
-	if proc == nil || reflect.ValueOf(proc).IsNil() {
-		panic("Consumer cannot be nil")
-	}
 }
