@@ -116,7 +116,7 @@ func (encoder *Encoder) mapFields(m map[string]types.Type) map[string]interface{
 	return ret
 }
 
-func (encoder *Encoder) mapParameters(p []types.Parameter) []parameter {
+func (encoder *Encoder) mapParameters(p []*types.Parameter) []parameter {
 	ret := make([]parameter, len(p))
 
 	for i := range p {
@@ -132,7 +132,7 @@ func (encoder *Encoder) mapParameters(p []types.Parameter) []parameter {
 	return ret
 }
 
-func (encoder *Encoder) mapNestedParameters(p [][]types.Parameter) [][]parameter {
+func (encoder *Encoder) mapNestedParameters(p [][]*types.Parameter) [][]parameter {
 
 	ret := make([][]parameter, len(p))
 	for i := range ret {

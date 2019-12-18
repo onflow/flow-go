@@ -90,16 +90,19 @@ func getObject(data map[string]interface{}, key string) (interface{}, error) {
 	return nil, fmt.Errorf("key %s doesn't exist  in %v", key, data)
 }
 
-func toField(data interface{}, name string) (*types.Field, error) {
-	typ, err := toType(data, name)
-	if err != nil {
-		return nil, err
+func toFields(raw map[string]interface{}) (map[string]types.Type, error) {
+	fields := make(map[string]types.Type)
+
+	for name, field := range raw {
+		typ, err := toType(field, name)
+		if err != nil {
+			return nil, err
+		}
+
+		fields[name] = typ
 	}
 
-	return &types.Field{
-		Identifier: name,
-		Type:       typ,
-	}, nil
+	return fields, nil
 }
 
 func toParameter(data map[string]interface{}) (*types.Parameter, error) {
@@ -124,11 +127,9 @@ func toParameter(data map[string]interface{}) (*types.Parameter, error) {
 	}
 
 	return &types.Parameter{
-		Field: types.Field{
-			Identifier: name,
-			Type:       typ,
-		},
-		Label: label,
+		Label:      label,
+		Identifier: name,
+		Type:       typ,
 	}, nil
 }
 
@@ -154,13 +155,9 @@ func toComposite(data map[string]interface{}, name string) (types.Composite, err
 		return types.Composite{}, err
 	}
 
-	fields := map[string]*types.Field{}
-
-	for name, field := range fieldsRaw {
-		fields[name], err = toField(field, name)
-		if err != nil {
-			return types.Composite{}, err
-		}
+	fields, err := toFields(fieldsRaw)
+	if err != nil {
+		return types.Composite{}, err
 	}
 
 	initializersRaw, err := getArray(data, "initializers")
@@ -174,7 +171,6 @@ func toComposite(data map[string]interface{}, name string) (types.Composite, err
 	}
 
 	initializers, err := interfaceToListOfMaps(initializerRaw)
-
 	if err != nil {
 		return types.Composite{}, err
 	}
@@ -185,8 +181,8 @@ func toComposite(data map[string]interface{}, name string) (types.Composite, err
 	}
 
 	return types.Composite{
-		Fields:     fields,
 		Identifier: name,
+		Fields:     fields,
 		Initializers: [][]*types.Parameter{
 			parameters,
 		},
@@ -217,7 +213,6 @@ func toResource(data map[string]interface{}, name string) (*types.Resource, erro
 
 func toEvent(data []interface{}, name string) (*types.Event, error) {
 	initializers, err := interfaceToListOfMaps(data)
-
 	if err != nil {
 		return nil, err
 	}
@@ -227,9 +222,15 @@ func toEvent(data []interface{}, name string) (*types.Event, error) {
 		return nil, err
 	}
 
+	fields := make(map[string]types.Type)
+	for _, param := range parameters {
+		fields[param.Identifier] = param.Type
+	}
+
 	return &types.Event{
-		Fields:     parameters,
-		Identifier: name,
+		Identifier:  name,
+		Fields:      fields,
+		Initializer: parameters,
 	}, nil
 }
 
@@ -382,7 +383,7 @@ func toType(data interface{}, name string) (types.Type, error) {
 
 	switch v := data.(type) {
 
-	//Simple string cases - "Int"
+	// Simple string cases - "Int"
 	case string:
 
 		for typ, jsonString := range typeToJSON {
@@ -392,7 +393,7 @@ func toType(data interface{}, name string) (types.Type, error) {
 		}
 		return nil, fmt.Errorf("unsupported name %s for simple string type", v)
 
-	//If object with key as type descriptor - <{ "<function>": XX }>
+	// If object with key as type descriptor - <{ "<function>": XX }>
 	case map[string]interface{}:
 
 		key, value, err := getOnlyEntry(v)
@@ -400,7 +401,7 @@ func toType(data interface{}, name string) (types.Type, error) {
 			return nil, err
 		}
 
-		//when type of declaration doesn't matter as we can handle both
+		// when type of declaration doesn't matter as we can handle both
 		switch key {
 		case jsonTypeVariable:
 			typ, err := toType(value, name)
@@ -416,11 +417,11 @@ func toType(data interface{}, name string) (types.Type, error) {
 				return nil, err
 			}
 			return &types.Optional{
-				Of: typ,
+				Type: typ,
 			}, nil
 		}
 
-		//when case require more handling
+		// when case require more handling
 		switch v := value.(type) {
 		// when type inside is simple string - { "<struct>": "SimpleString" }
 		case string:
@@ -431,7 +432,7 @@ func toType(data interface{}, name string) (types.Type, error) {
 				return &types.ResourcePointer{TypeName: v}, nil
 			}
 
-		//when type inside is complex - { "<struct>" : { "complex": "object" } }
+		// when type inside is complex - { "<struct>" : { "complex": "object" } }
 		case map[string]interface{}:
 			switch key {
 			case "struct":
@@ -450,7 +451,7 @@ func toType(data interface{}, name string) (types.Type, error) {
 
 			}
 
-		//when type inside is array - { "<struct>" : [] }
+		// when type inside is array - { "<struct>" : [] }
 		case []interface{}:
 			switch key {
 			case "event":
