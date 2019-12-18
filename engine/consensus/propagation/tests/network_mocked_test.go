@@ -34,11 +34,11 @@ func TestSubmitCollectionOneToOne(t *testing.T) {
 	node1.net.FlushAll()
 
 	// inspect node2's mempool to check if node2's engine received the collection hash
-	coll, err := node2.pool.Get(gc.Hash)
+	coll, err := node2.pool.Get(gc.Hash())
 	require.Nil(t, err)
 
 	// should match
-	require.Equal(t, coll.Hash, gc.Hash)
+	require.Equal(t, coll.Hash(), gc.Hash())
 	terminate(node1, node2)
 }
 
@@ -65,7 +65,7 @@ func TestSubmitCollectionManyToManySynchronous(t *testing.T) {
 	gc3 := randCollection()
 
 	// check the collections are different
-	require.NotEqual(t, gc1.Hash, gc2.Hash)
+	require.NotEqual(t, gc1.Hash(), gc2.Hash())
 
 	// send gc1 to node1, which will broadcast to other nodes synchronously
 	node1.engine.Submit(gc1)
@@ -151,7 +151,7 @@ func TestSubmitCollectionManyToManyRandom(t *testing.T) {
 	wg.Wait()
 
 	// now check all nodes should have received M collections in their mempool
-	// and the Hash are the same
+	// and the hashes are the same
 	sameHash := nodes[0].pool.Hash()
 	for _, node := range nodes {
 		require.Equal(t, M, int(node.pool.Size()))

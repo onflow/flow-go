@@ -30,7 +30,7 @@ func PublicKeyFixtures() [PublicKeyFixtureCount]crypto.PublicKey {
 }
 
 func AddressFixture() flow.Address {
-	return flow.ZeroAddress
+	return flow.RootAddress
 }
 
 func AccountSignatureFixture() flow.AccountSignature {
@@ -50,8 +50,8 @@ func BlockHeaderFixture() flow.Header {
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 	tx := flow.Transaction{
 		Script:             []byte("pub fun main() {}"),
-		ReferenceBlockHash: nil,
-		Nonce:              0,
+		ReferenceBlockHash: HashFixture(32),
+		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       AddressFixture(),
 		ScriptAccounts:     []flow.Address{AddressFixture()},
@@ -107,12 +107,6 @@ func HashFixture(size int) crypto.Hash {
 	return hash
 }
 
-func LedgerFixture() flow.Ledger {
-	return flow.Ledger{
-		"key": []byte("value"),
-	}
-}
-
 func IdentifierFixture() flow.Identifier {
 	var id flow.Identifier
 	_, _ = rand.Read(id[:])
@@ -133,11 +127,7 @@ func IdentityFixture() flow.Identity {
 // can be customized (ie. set their role) by passing in a function that modifies
 // the input identities as required.
 func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList {
-	nodes := flow.IdentityList{}
-
-	if n < 0 {
-		return nodes
-	}
+	nodes := make(flow.IdentityList, n)
 
 	for i := 0; i < n; i++ {
 		node := IdentityFixture()
@@ -145,6 +135,7 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 		for _, opt := range opts {
 			opt(&node)
 		}
+		nodes[i] = node
 	}
 
 	return nodes

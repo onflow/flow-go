@@ -26,6 +26,7 @@ type Entity struct {
 func TestInsertValid(t *testing.T) {
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+	defer os.RemoveAll(dir)
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 
@@ -55,6 +56,7 @@ func TestInsertDuplicate(t *testing.T) {
 func TestUpdateValid(t *testing.T) {
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+	defer os.RemoveAll(dir)
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 
@@ -90,6 +92,7 @@ func TestUpdateMissing(t *testing.T) {
 func TestRetrieveValid(t *testing.T) {
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+	defer os.RemoveAll(dir)
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 

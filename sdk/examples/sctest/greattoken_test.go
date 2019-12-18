@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -42,7 +43,7 @@ func TestCreateMinter(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, true)
+		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, true)
 	})
 
 	t.Run("Cannot create minter with special mod < 2", func(t *testing.T) {
@@ -54,7 +55,7 @@ func TestCreateMinter(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, true)
+		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, true)
 	})
 
 	t.Run("Should be able to create minter", func(t *testing.T) {
@@ -66,7 +67,7 @@ func TestCreateMinter(t *testing.T) {
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 		}
 
-		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
+		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 	})
 }
 
@@ -87,7 +88,7 @@ func TestMinting(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	SignAndSubmit(createMinterTx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
+	SignAndSubmit(t, b, createMinterTx, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 	// Mint the first NFT
 	mintTx := flow.Transaction{
@@ -98,11 +99,14 @@ func TestMinting(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	SignAndSubmit(mintTx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
+	SignAndSubmit(t, b, mintTx, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 	// Assert that ID/specialness are correct
-	_, _, err = b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 1, false))
-	assert.NoError(t, err)
+	result, err := b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 1, false))
+	require.NoError(t, err)
+	if !assert.True(t, result.Succeeded()) {
+		t.Log(result.Error.Error())
+	}
 
 	// Mint a second NF
 	mintTx2 := flow.Transaction{
@@ -113,9 +117,12 @@ func TestMinting(t *testing.T) {
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
 	}
 
-	SignAndSubmit(mintTx2, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
+	SignAndSubmit(t, b, mintTx2, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
 	// Assert that ID/specialness are correct
-	_, _, err = b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 2, true))
-	assert.NoError(t, err)
+	result, err = b.ExecuteScript(GenerateInspectNFTScript(contractAddr, b.RootAccountAddress(), 2, true))
+	require.NoError(t, err)
+	if !assert.True(t, result.Succeeded()) {
+		t.Log(result.Error.Error())
+	}
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
@@ -26,7 +25,7 @@ func TestEventEmitted(t *testing.T) {
 	}
 
 	t.Run("EmittedFromTransaction", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		script := []byte(`
@@ -52,7 +51,10 @@ func TestEventEmitted(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -80,9 +82,7 @@ func TestEventEmitted(t *testing.T) {
 	})
 
 	t.Run("EmittedFromScript", func(t *testing.T) {
-		events := make([]flow.Event, 0)
-
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		script := []byte(`
@@ -93,18 +93,19 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`)
 
-		_, events, err = b.ExecuteScript(script)
+		result, err := b.ExecuteScript(script)
 		assert.NoError(t, err)
-		require.Len(t, events, 1)
+		require.Len(t, result.Events, 1)
 
-		actualEvent := events[0]
+		actualEvent := result.Events[0]
 
 		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
 
-		expectedType := fmt.Sprintf("S.%s.MyEvent", execution.ScriptHash(script).Hex())
+		expectedType := fmt.Sprintf("S.%s.MyEvent", result.ScriptHash.Hex())
+
 		// NOTE: ID is undefined for events emitted from scripts
 
 		assert.Equal(t, expectedType, actualEvent.Type)
@@ -113,7 +114,7 @@ func TestEventEmitted(t *testing.T) {
 	})
 
 	t.Run("EmittedFromAccount", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		accountScript := []byte(`
@@ -154,7 +155,10 @@ func TestEventEmitted(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 

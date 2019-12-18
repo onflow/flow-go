@@ -5,34 +5,52 @@ package ingest
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/txpool"
 	"github.com/dapperlabs/flow-go/network"
-	"github.com/rs/zerolog"
+	"github.com/dapperlabs/flow-go/protocol"
 )
 
 // Engine is the transaction ingestion engine, which ensures that new
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
 type Engine struct {
-	log  zerolog.Logger
-	con  network.Conduit
-	me   module.Local
-	pool []*flow.Transaction // TODO replace with merkle tree
+	log       zerolog.Logger
+	con       network.Conduit
+	me        module.Local
+	state     protocol.State
+	clusters  flow.ClusterList
+	clusterID flow.ClusterID // my cluster ID
+	pool      *txpool.Pool   // TODO replace with merkle tree
 }
 
-// New creates a new collection ingest engine
-func New(log zerolog.Logger, net module.Network, me module.Local, pool []*flow.Transaction) (*Engine, error) {
+// New creates a new collection ingest engine.
+func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, pool *txpool.Pool) (*Engine, error) {
+	identities, err := state.Final().Identities(identity.HasRole(flow.RoleCollection))
+	if err != nil {
+		return nil, fmt.Errorf("could not get identities: %w", err)
+	}
+
+	clusters := protocol.Cluster(identities)
+	clusterID := clusters.ClusterIDFor(me.NodeID())
+
 	e := &Engine{
-		log:  log.With().Str("engine", "ingest").Logger(),
-		me:   me,
-		pool: pool,
+		log:       log.With().Str("engine", "ingest").Logger(),
+		me:        me,
+		state:     state,
+		clusters:  clusters,
+		clusterID: clusterID,
+		pool:      pool,
 	}
 
 	con, err := net.Register(engine.CollectionIngest, e)
 	if err != nil {
-		return nil, fmt.Errorf("could not register engine %w", err)
+		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
 	e.con = con
@@ -63,20 +81,16 @@ func (e *Engine) Done() <-chan struct{} {
 	return done
 }
 
-// Submit allows us to submit local events to the propagation engine. The
-// function logs errors internally, rather than returning it, which allows other
-// engines to submit events in a non-blocking way by using a goroutine.
-func (e *Engine) Submit(event interface{}) {
-
+// Submit allows us to submit local events to the engine.
+func (e *Engine) Submit(event interface{}) error {
 	err := e.Process(e.me.NodeID(), event)
-	if err != nil {
-		e.log.Error().Err(err).Msg("could not process local event")
-	}
+	return err
 }
 
-// Process processes the given propagation engine event. Events that are given
-// to this function originate within the propagation engine on the node with the
-// given origin ID.
+// Process processes engine events.
+//
+// Transactions are validated and routed to the correct cluster, then added
+// to the transaction mempool.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	var err error
 	switch ev := event.(type) {
@@ -86,7 +100,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		err = fmt.Errorf("invalid event type (%T)", event)
 	}
 	if err != nil {
-		return fmt.Errorf("could not process event %w", err)
+		return fmt.Errorf("could not process event: %w", err)
 	}
 	return nil
 }
@@ -94,30 +108,54 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // onTransaction handles receipt of a new transaction. This can be submitted
 // from outside the system or routed from another collection node.
 func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) error {
-
-	e.log.Debug().
+	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("tx_hash", tx.Hash()).
-		Msg("transaction message received")
+		Logger()
+
+	log.Debug().Msg("transaction message received")
 
 	err := e.validateTransaction(tx)
 	if err != nil {
-		return fmt.Errorf("invalid transaction %w", err)
+		return fmt.Errorf("invalid transaction: %w", err)
 	}
 
-	// TODO determine correct cluster and route if necessary
+	clusterID := protocol.Route(len(e.clusters), tx.Hash())
 
-	e.pool = append(e.pool, tx)
+	// tx is routed to my cluster, add to mempool
+	if clusterID == e.clusterID {
+		log.Debug().Msg("adding transaction to pool")
+		e.pool.Add(tx)
+		return nil
+	}
+
+	// tx is routed to another cluster
+	cluster := e.clusters.Get(clusterID)
+	if len(cluster) == 0 {
+		return fmt.Errorf("transaction routed to invalid cluster")
+	}
+
+	// TODO Don't need to send to all nodes
+	err = e.con.Submit(tx, cluster.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("failed to route transaction to cluster nodes")
+	}
+
+	log.Debug().
+		Int("target_cluster", int(clusterID)).
+		Msg("routed transaction to cluster")
 
 	return nil
 }
 
 // TODO: implement
 func (e *Engine) validateTransaction(tx *flow.Transaction) error {
-	fmt.Println(tx.MissingFields())
-	if len(tx.MissingFields()) > 0 {
-		return ErrIncompleteTransaction{}
+	missingFields := tx.MissingFields()
+	if len(missingFields) > 0 {
+		return ErrIncompleteTransaction{missing: missingFields}
 	}
+
+	// TODO check account/payer signatures
 
 	return nil
 }

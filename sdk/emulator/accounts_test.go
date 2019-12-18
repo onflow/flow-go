@@ -21,7 +21,7 @@ func TestCreateAccount(t *testing.T) {
 	publicKeys := unittest.PublicKeyFixtures()
 
 	t.Run("SingleKey", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		publicKey := flow.AccountPublicKey{
@@ -47,7 +47,10 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -63,7 +66,7 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("MultipleKeys", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		publicKeyA := flow.AccountPublicKey{
@@ -96,7 +99,10 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -113,7 +119,7 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("KeysAndCode", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		publicKeyA := flow.AccountPublicKey{
@@ -148,7 +154,10 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -165,7 +174,7 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("CodeAndNoKeys", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		code := []byte(testContract)
@@ -186,7 +195,10 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -201,7 +213,7 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("EventEmitted", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		publicKey := flow.AccountPublicKey{
@@ -229,8 +241,11 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
-		require.NoError(t, err)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
+		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
 		block, err := b.CommitBlock()
@@ -254,7 +269,7 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("InvalidKeyHashingAlgorithm", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		lastAccount := b.LastCreatedAccount()
@@ -283,7 +298,10 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Reverted())
 
@@ -293,7 +311,7 @@ func TestCreateAccount(t *testing.T) {
 	})
 
 	t.Run("InvalidCode", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		lastAccount := b.LastCreatedAccount()
@@ -316,7 +334,10 @@ func TestCreateAccount(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Reverted())
 
@@ -328,7 +349,7 @@ func TestCreateAccount(t *testing.T) {
 
 func TestAddAccountKey(t *testing.T) {
 	t.Run("ValidKey", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
@@ -352,7 +373,10 @@ func TestAddAccountKey(t *testing.T) {
 
 		tx1.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx1)
+		err = b.AddTransaction(tx1)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -374,7 +398,10 @@ func TestAddAccountKey(t *testing.T) {
 
 		tx2.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err = b.SubmitTransaction(tx2)
+		err = b.AddTransaction(tx2)
+		assert.NoError(t, err)
+
+		result, err = b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -383,7 +410,7 @@ func TestAddAccountKey(t *testing.T) {
 	})
 
 	t.Run("InvalidKeyHashingAlgorithm", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		publicKey := flow.AccountPublicKey{
@@ -411,14 +438,17 @@ func TestAddAccountKey(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Reverted())
 	})
 }
 
 func TestRemoveAccountKey(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	privateKey, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
@@ -445,7 +475,10 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	// submit tx1 (should succeed)
-	result, err := b.SubmitTransaction(tx1)
+	err = b.AddTransaction(tx1)
+	assert.NoError(t, err)
+
+	result, err := b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
 
@@ -474,7 +507,10 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx2.AddSignature(b.RootAccountAddress(), sig)
 
 	// submit tx2 (should succeed)
-	result, err = b.SubmitTransaction(tx2)
+	err = b.AddTransaction(tx2)
+	assert.NoError(t, err)
+
+	result, err = b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
 
@@ -503,7 +539,7 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx3.AddSignature(b.RootAccountAddress(), sig)
 
 	// submit tx3 (should fail)
-	_, err = b.SubmitTransaction(tx3)
+	err = b.AddTransaction(tx3)
 	assert.IsType(t, &emulator.ErrInvalidSignaturePublicKey{}, err)
 
 	_, err = b.CommitBlock()
@@ -531,7 +567,10 @@ func TestRemoveAccountKey(t *testing.T) {
 	tx4.AddSignature(b.RootAccountAddress(), sig)
 
 	// submit tx4 (should succeed)
-	result, err = b.SubmitTransaction(tx4)
+	err = b.AddTransaction(tx4)
+	assert.NoError(t, err)
+
+	result, err = b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
 
@@ -566,7 +605,7 @@ func TestUpdateAccountCode(t *testing.T) {
 	publicKeyB := privateKeyB.PublicKey(keys.PublicKeyWeightThreshold)
 
 	t.Run("ValidSignature", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		privateKeyA := b.RootKey()
@@ -598,9 +637,15 @@ func TestUpdateAccountCode(t *testing.T) {
 		tx.AddSignature(accountAddressA, sigA)
 		tx.AddSignature(accountAddressB, sigB)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
+
+		_, err = b.CommitBlock()
+		assert.NoError(t, err)
 
 		account, err = b.GetAccount(accountAddressB)
 		assert.NoError(t, err)
@@ -609,7 +654,7 @@ func TestUpdateAccountCode(t *testing.T) {
 	})
 
 	t.Run("InvalidSignature", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		privateKeyA := b.RootKey()
@@ -637,8 +682,11 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		tx.AddSignature(accountAddressA, sig)
 
-		_, err = b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
 		assert.IsType(t, &emulator.ErrMissingSignature{}, err)
+
+		_, err = b.CommitBlock()
+		assert.NoError(t, err)
 
 		account, err = b.GetAccount(accountAddressB)
 		assert.NoError(t, err)
@@ -648,7 +696,7 @@ func TestUpdateAccountCode(t *testing.T) {
 	})
 
 	t.Run("UnauthorizedAccount", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		privateKeyA := b.RootKey()
@@ -665,7 +713,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		unauthorizedUpdateAccountCodeScript := []byte(fmt.Sprintf(`
 			transaction {
 			  prepare(account: Account) {
-				updateAccountCode(%s, nil)
+				updateAccountCode(0x%s, [])
 			  }
 			}
 		`, accountAddressB.Hex()))
@@ -684,7 +732,10 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		tx.AddSignature(accountAddressA, sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Reverted())
 
@@ -697,7 +748,7 @@ func TestUpdateAccountCode(t *testing.T) {
 }
 
 func TestImportAccountCode(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	accountScript := []byte(`
@@ -742,7 +793,11 @@ func TestImportAccountCode(t *testing.T) {
 
 	tx.AddSignature(b.RootAccountAddress(), sig)
 
-	result, err := b.SubmitTransaction(tx)
+	err = b.AddTransaction(tx)
+	assert.NoError(t, err)
+
+	result, err := b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
+
 }

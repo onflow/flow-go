@@ -70,13 +70,12 @@ func TestCheckInvalidFunctionNonBoolCondition(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 }
 
 func TestCheckFunctionPostConditionWithBefore(t *testing.T) {
 
-	_, err := ParseAndCheck(t, `
+	checker, err := ParseAndCheck(t, `
       fun test(x: Int) {
           post {
               before(x) != 0
@@ -85,6 +84,24 @@ func TestCheckFunctionPostConditionWithBefore(t *testing.T) {
     `)
 
 	require.NoError(t, err)
+
+	assert.Len(t, checker.Elaboration.VariableDeclarationValueTypes, 1)
+	assert.Len(t, checker.Elaboration.VariableDeclarationTargetTypes, 1)
+}
+
+func TestCheckFunctionPostConditionWithBeforeNotDeclaredUse(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test() {
+          post {
+              before(x) != 0
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }
 
 func TestCheckInvalidFunctionPostConditionWithBeforeAndNoArgument(t *testing.T) {
@@ -100,9 +117,7 @@ func TestCheckInvalidFunctionPostConditionWithBeforeAndNoArgument(t *testing.T) 
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.ArgumentCountError{}, errs[0])
-
 	assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[1])
-
 }
 
 func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {

@@ -26,7 +26,7 @@ func TestInitialization(t *testing.T) {
 	defer store.Close()
 
 	t.Run("should inject initial state when initialized with empty store", func(t *testing.T) {
-		b, _ := emulator.NewEmulatedBlockchain(emulator.WithStore(store))
+		b, _ := emulator.NewBlockchain(emulator.WithStore(store))
 
 		rootAcct, err := b.GetAccount(flow.RootAddress)
 		assert.NoError(t, err)
@@ -39,7 +39,7 @@ func TestInitialization(t *testing.T) {
 	})
 
 	t.Run("should restore state when initialized with non-empty store", func(t *testing.T) {
-		b, _ := emulator.NewEmulatedBlockchain(emulator.WithStore(store))
+		b, _ := emulator.NewBlockchain(emulator.WithStore(store))
 
 		counterAddress, err := b.CreateAccount(nil, []byte(counterScript), getNonce())
 		require.NoError(t, err)
@@ -80,7 +80,10 @@ func TestInitialization(t *testing.T) {
 		assert.NoError(t, err)
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
@@ -94,7 +97,7 @@ func TestInitialization(t *testing.T) {
 		minedEvents, err := b.GetEvents("", block.Number, block.Number)
 
 		// Create a new blockchain with the same store
-		b, _ = emulator.NewEmulatedBlockchain(emulator.WithStore(store))
+		b, _ = emulator.NewBlockchain(emulator.WithStore(store))
 
 		t.Run("should be able to read blocks", func(t *testing.T) {
 			latestBlock, err := b.GetLatestBlock()
@@ -135,10 +138,10 @@ func TestInitialization(t *testing.T) {
 				b.RootAccountAddress(),
 			)
 
-			res, _, err := b.ExecuteScript([]byte(readScript))
+			result, err := b.ExecuteScript([]byte(readScript))
 			assert.NoError(t, err)
 
-			assert.Equal(t, values.NewInt(1), res)
+			assert.Equal(t, values.NewInt(1), result.Value)
 		})
 	})
 }

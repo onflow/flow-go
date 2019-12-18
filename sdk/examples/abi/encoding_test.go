@@ -76,10 +76,10 @@ func TestDecodingUsingAbi(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	emulator, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
-	backend := server.NewBackend(emulator, logrus.New())
+	backend := server.NewBackend(b, logrus.New())
 
 	ctx := context.Background()
 

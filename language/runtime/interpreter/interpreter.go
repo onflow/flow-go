@@ -637,16 +637,44 @@ func (interpreter *Interpreter) VisitFunctionDeclaration(declaration *ast.Functi
 	// make the function itself available inside the function
 	lexicalScope = lexicalScope.Insert(common.StringEntry(identifier), variable)
 
-	functionExpression := declaration.ToExpression()
-	variable.Value = newInterpretedFunction(
-		interpreter,
-		functionExpression,
-		functionType,
-		lexicalScope,
-	)
+	variable.Value = interpreter.functionDeclarationValue(declaration, functionType, lexicalScope)
 
 	// NOTE: no result, so it does *not* act like a return-statement
 	return Done{}
+}
+
+func (interpreter *Interpreter) functionDeclarationValue(
+	declaration *ast.FunctionDeclaration,
+	functionType *sema.FunctionType,
+	lexicalScope hamt.Map,
+) InterpretedFunctionValue {
+
+	var preConditions ast.Conditions
+	if declaration.FunctionBlock.PreConditions != nil {
+		preConditions = *declaration.FunctionBlock.PreConditions
+	}
+
+	var beforeStatements []ast.Statement
+	var rewrittenPostConditions ast.Conditions
+
+	if declaration.FunctionBlock.PostConditions != nil {
+		postConditionsRewrite :=
+			interpreter.Checker.Elaboration.PostConditionsRewrite[declaration.FunctionBlock.PostConditions]
+
+		rewrittenPostConditions = postConditionsRewrite.RewrittenPostConditions
+		beforeStatements = postConditionsRewrite.BeforeStatements
+	}
+
+	return InterpretedFunctionValue{
+		Interpreter:      interpreter,
+		ParameterList:    declaration.ParameterList,
+		Type:             functionType,
+		Activation:       lexicalScope,
+		BeforeStatements: beforeStatements,
+		PreConditions:    preConditions,
+		Statements:       declaration.FunctionBlock.Statements,
+		PostConditions:   rewrittenPostConditions,
+	}
 }
 
 // NOTE: consider using NewInterpreter if the value should be predefined in all programs
@@ -699,100 +727,51 @@ func (interpreter *Interpreter) visitStatements(statements []ast.Statement) Tram
 }
 
 func (interpreter *Interpreter) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
-	// NOTE: see visitFunctionBlock
+	// NOTE: see visitBlock
 	panic(errors.NewUnreachableError())
 }
 
-func (interpreter *Interpreter) visitFunctionBlock(functionBlock *ast.FunctionBlock, returnType sema.Type) Trampoline {
+func (interpreter *Interpreter) visitFunctionBody(
+	beforeStatements []ast.Statement,
+	preConditions ast.Conditions,
+	statements []ast.Statement,
+	postConditions ast.Conditions,
+	returnType sema.Type,
+) Trampoline {
 
 	// block scope: each function block gets an activation record
 	interpreter.activations.PushCurrent()
 
-	beforeStatements, rewrittenPostConditions :=
-		interpreter.rewritePostConditions(functionBlock.PostConditions)
-
 	return interpreter.visitStatements(beforeStatements).
 		FlatMap(func(_ interface{}) Trampoline {
-			return interpreter.visitConditions(functionBlock.PreConditions)
+			return interpreter.visitConditions(preConditions)
 		}).
 		FlatMap(func(_ interface{}) Trampoline {
-			// NOTE: not interpreting block as it enters a new scope
-			// and post-conditions need to be able to refer to block's declarations
-			return interpreter.visitStatements(functionBlock.Block.Statements).
-				FlatMap(func(blockResult interface{}) Trampoline {
+			return interpreter.visitStatements(statements)
+		}).
+		FlatMap(func(blockResult interface{}) Trampoline {
+			var resultValue Value
+			if _, ok := blockResult.(functionReturn); ok {
+				resultValue = blockResult.(functionReturn).Value
+			} else {
+				resultValue = VoidValue{}
+			}
 
-					var resultValue Value
-					if _, ok := blockResult.(functionReturn); ok {
-						resultValue = blockResult.(functionReturn).Value
-					} else {
-						resultValue = VoidValue{}
-					}
+			// If there is a return type, declare the constant `result`
+			// which has the return value
 
-					// if there is a return type, declare the constant `result`
-					// which has the return value
+			if _, isVoid := returnType.(*sema.VoidType); !isVoid {
+				interpreter.declareVariable(sema.ResultIdentifier, resultValue)
+			}
 
-					if _, isVoid := returnType.(*sema.VoidType); !isVoid {
-						interpreter.declareVariable(sema.ResultIdentifier, resultValue)
-					}
-
-					return interpreter.visitConditions(rewrittenPostConditions).
-						Map(func(_ interface{}) interface{} {
-							return resultValue
-						})
+			return interpreter.visitConditions(postConditions).
+				Map(func(_ interface{}) interface{} {
+					return resultValue
 				})
 		}).
 		Then(func(_ interface{}) {
 			interpreter.activations.Pop()
 		})
-}
-
-func (interpreter *Interpreter) rewritePostConditions(postConditions []*ast.Condition) (
-	beforeStatements []ast.Statement,
-	rewrittenPostConditions []*ast.Condition,
-) {
-	beforeExtractor := NewBeforeExtractor()
-
-	rewrittenPostConditions = make([]*ast.Condition, len(postConditions))
-
-	for i, postCondition := range postConditions {
-
-		// copy condition and set expression to rewritten one
-		newPostCondition := *postCondition
-
-		testExtraction := beforeExtractor.ExtractBefore(postCondition.Test)
-
-		extractedExpressions := testExtraction.ExtractedExpressions
-
-		newPostCondition.Test = testExtraction.RewrittenExpression
-
-		if postCondition.Message != nil {
-			messageExtraction := beforeExtractor.ExtractBefore(postCondition.Message)
-
-			newPostCondition.Message = messageExtraction.RewrittenExpression
-
-			extractedExpressions = append(
-				extractedExpressions,
-				messageExtraction.ExtractedExpressions...,
-			)
-		}
-
-		for _, extractedExpression := range extractedExpressions {
-
-			// TODO: update interpreter.Checker.Elaboration
-			//    VariableDeclarationValueTypes / VariableDeclarationTargetTypes
-
-			beforeStatements = append(beforeStatements,
-				&ast.VariableDeclaration{
-					Identifier: extractedExpression.Identifier,
-					Value:      extractedExpression.Expression,
-				},
-			)
-		}
-
-		rewrittenPostConditions[i] = &newPostCondition
-	}
-
-	return beforeStatements, rewrittenPostConditions
 }
 
 func (interpreter *Interpreter) visitConditions(conditions []*ast.Condition) Trampoline {
@@ -1799,8 +1778,11 @@ func (interpreter *Interpreter) invokeInterpretedFunctionActivated(
 ) Trampoline {
 	interpreter.bindFunctionInvocationParameters(function, arguments)
 
-	functionBlockTrampoline := interpreter.visitFunctionBlock(
-		function.Expression.FunctionBlock,
+	functionBlockTrampoline := interpreter.visitFunctionBody(
+		function.BeforeStatements,
+		function.PreConditions,
+		function.Statements,
+		function.PostConditions,
 		function.Type.ReturnTypeAnnotation.Type,
 	)
 
@@ -1815,11 +1797,11 @@ func (interpreter *Interpreter) bindFunctionInvocationParameters(
 	function InterpretedFunctionValue,
 	arguments []Value,
 ) {
-	if function.Expression.ParameterList == nil {
+	if function.ParameterList == nil {
 		return
 	}
 
-	for parameterIndex, parameter := range function.Expression.ParameterList.Parameters {
+	for parameterIndex, parameter := range function.ParameterList.Parameters {
 		argument := arguments[parameterIndex]
 		interpreter.declareVariable(parameter.Identifier.Identifier, argument)
 	}
@@ -1894,7 +1876,32 @@ func (interpreter *Interpreter) VisitFunctionExpression(expression *ast.Function
 
 	functionType := interpreter.Checker.Elaboration.FunctionExpressionFunctionType[expression]
 
-	function := newInterpretedFunction(interpreter, expression, functionType, lexicalScope)
+	var preConditions ast.Conditions
+	if expression.FunctionBlock.PreConditions != nil {
+		preConditions = *expression.FunctionBlock.PreConditions
+	}
+
+	var beforeStatements []ast.Statement
+	var rewrittenPostConditions ast.Conditions
+
+	if expression.FunctionBlock.PostConditions != nil {
+		postConditionsRewrite :=
+			interpreter.Checker.Elaboration.PostConditionsRewrite[expression.FunctionBlock.PostConditions]
+
+		rewrittenPostConditions = postConditionsRewrite.RewrittenPostConditions
+		beforeStatements = postConditionsRewrite.BeforeStatements
+	}
+
+	function := InterpretedFunctionValue{
+		Interpreter:      interpreter,
+		ParameterList:    expression.ParameterList,
+		Type:             functionType,
+		Activation:       lexicalScope,
+		BeforeStatements: beforeStatements,
+		PreConditions:    preConditions,
+		Statements:       expression.FunctionBlock.Statements,
+		PostConditions:   rewrittenPostConditions,
+	}
 
 	return Done{Result: function}
 }
@@ -2066,11 +2073,12 @@ func (interpreter *Interpreter) initializerFunction(
 	lexicalScope hamt.Map,
 ) *InterpretedFunctionValue {
 
-	// NOTE: gather all conformances' preconditions and postconditions,
+	// NOTE: gather all conformances' preconditions and rewritten postconditions,
 	// even if the composite declaration does not have an initializer
 
-	var preConditions []*ast.Condition
-	var postConditions []*ast.Condition
+	var beforeStatements []ast.Statement
+	var preConditions ast.Conditions
+	var postConditions ast.Conditions
 
 	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
 
@@ -2089,43 +2097,43 @@ func (interpreter *Interpreter) initializerFunction(
 			continue
 		}
 
-		preConditions = append(
-			preConditions,
-			firstInitializer.FunctionBlock.PreConditions...,
-		)
+		if firstInitializer.FunctionBlock.PreConditions != nil {
+			preConditions = append(
+				preConditions,
+				*firstInitializer.FunctionBlock.PreConditions...,
+			)
+		}
 
-		postConditions = append(
-			postConditions,
-			firstInitializer.FunctionBlock.PostConditions...,
-		)
+		if firstInitializer.FunctionBlock.PostConditions != nil {
+
+			postConditionsRewrite :=
+				interpreter.Checker.Elaboration.PostConditionsRewrite[firstInitializer.FunctionBlock.PostConditions]
+
+			postConditions = append(
+				postConditions,
+				postConditionsRewrite.RewrittenPostConditions...,
+			)
+
+			beforeStatements = append(
+				beforeStatements,
+				postConditionsRewrite.BeforeStatements...,
+			)
+		}
 	}
 
-	var function *ast.FunctionExpression
 	var functionType *sema.FunctionType
 
 	initializers := compositeDeclaration.Members.Initializers()
+	var initializer *ast.SpecialFunctionDeclaration
 	if len(initializers) > 0 {
 		// TODO: support multiple overloaded initializers
 
-		firstInitializer := initializers[0]
+		initializer = initializers[0]
 
-		function = firstInitializer.ToExpression()
-
-		// copy function block – this makes rewriting the conditions safe
-		functionBlockCopy := *function.FunctionBlock
-		function.FunctionBlock = &functionBlockCopy
-
-		functionType = interpreter.Checker.Elaboration.SpecialFunctionTypes[firstInitializer].FunctionType
+		functionType = interpreter.Checker.Elaboration.SpecialFunctionTypes[initializer].FunctionType
 	} else if len(preConditions) > 0 || len(postConditions) > 0 {
 
 		// no initializer, but preconditions or postconditions from conformances,
-		// prepare a function expression just for those
-
-		// NOTE: the preconditions and postconditions are added below
-
-		function = &ast.FunctionExpression{
-			FunctionBlock: &ast.FunctionBlock{},
-		}
 
 		functionType = emptyFunctionType
 	}
@@ -2133,21 +2141,53 @@ func (interpreter *Interpreter) initializerFunction(
 	// no initializer in the composite declaration and also
 	// no preconditions or postconditions in the conformances: no need for initializer
 
-	if function == nil {
+	if functionType == nil {
 		return nil
 	}
 
-	// prepend the conformances' preconditions and postconditions, if any
+	// Append the function's pre-conditions and rewritten post-conditions, if any
 
-	function.FunctionBlock.PreConditions = append(preConditions, function.FunctionBlock.PreConditions...)
-	function.FunctionBlock.PostConditions = append(postConditions, function.FunctionBlock.PostConditions...)
+	var parameterList *ast.ParameterList
+	var statements []ast.Statement
 
-	result := newInterpretedFunction(
-		interpreter,
-		function,
-		functionType,
-		lexicalScope,
-	)
+	if initializer != nil {
+		parameterList = initializer.ParameterList
+		statements = initializer.FunctionBlock.Statements
+
+		if initializer.FunctionBlock.PreConditions != nil {
+			preConditions = append(
+				preConditions,
+				*initializer.FunctionBlock.PreConditions...,
+			)
+		}
+
+		if initializer.FunctionBlock.PostConditions != nil {
+
+			postConditionsRewrite :=
+				interpreter.Checker.Elaboration.PostConditionsRewrite[initializer.FunctionBlock.PostConditions]
+
+			postConditions = append(
+				postConditions,
+				postConditionsRewrite.RewrittenPostConditions...,
+			)
+
+			beforeStatements = append(
+				beforeStatements,
+				postConditionsRewrite.BeforeStatements...,
+			)
+		}
+	}
+
+	result := InterpretedFunctionValue{
+		Interpreter:      interpreter,
+		ParameterList:    parameterList,
+		Type:             functionType,
+		Activation:       lexicalScope,
+		BeforeStatements: beforeStatements,
+		PreConditions:    preConditions,
+		Statements:       statements,
+		PostConditions:   postConditions,
+	}
 	return &result
 }
 
@@ -2156,11 +2196,12 @@ func (interpreter *Interpreter) destructorFunction(
 	lexicalScope hamt.Map,
 ) *InterpretedFunctionValue {
 
-	// NOTE: gather all conformances' preconditions and postconditions,
+	// NOTE: gather all conformances' preconditions and rewritten postconditions,
 	// even if the composite declaration does not have a destructor
 
-	var preConditions []*ast.Condition
-	var postConditions []*ast.Condition
+	var beforeStatements []ast.Statement
+	var preConditions ast.Conditions
+	var postConditions ast.Conditions
 
 	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
 
@@ -2172,58 +2213,79 @@ func (interpreter *Interpreter) destructorFunction(
 			continue
 		}
 
-		preConditions = append(
-			preConditions,
-			interfaceDestructor.FunctionBlock.PreConditions...,
-		)
+		if interfaceDestructor.FunctionBlock.PreConditions != nil {
+			preConditions = append(
+				preConditions,
+				*interfaceDestructor.FunctionBlock.PreConditions...,
+			)
+		}
 
-		postConditions = append(
-			postConditions,
-			interfaceDestructor.FunctionBlock.PostConditions...,
-		)
-	}
+		if interfaceDestructor.FunctionBlock.PostConditions != nil {
 
-	var function *ast.FunctionExpression
+			postConditionsRewrite :=
+				interpreter.Checker.Elaboration.PostConditionsRewrite[interfaceDestructor.FunctionBlock.PostConditions]
 
-	destructor := compositeDeclaration.Members.Destructor()
-	if destructor != nil {
+			postConditions = append(
+				postConditions,
+				postConditionsRewrite.RewrittenPostConditions...,
+			)
 
-		function = destructor.ToExpression()
-
-		// copy function block – this makes rewriting the conditions safe
-		functionBlockCopy := *function.FunctionBlock
-		function.FunctionBlock = &functionBlockCopy
-
-	} else if len(preConditions) > 0 || len(postConditions) > 0 {
-
-		// no destructor, but preconditions or postconditions from conformances,
-		// prepare a function expression just for those
-
-		// NOTE: the preconditions and postconditions are added below
-
-		function = &ast.FunctionExpression{
-			FunctionBlock: &ast.FunctionBlock{},
+			beforeStatements = append(
+				beforeStatements,
+				postConditionsRewrite.BeforeStatements...,
+			)
 		}
 	}
 
-	// no destructor in the resource declaration and also
-	// no preconditions or postconditions in the conformances: no need for destructor
+	destructor := compositeDeclaration.Members.Destructor()
 
-	if function == nil {
+	// If there is no destructor in the resource declaration
+	// and if there are also no preconditions and postconditions in the conformances,
+	// then there is no need for a destructor
+
+	if destructor == nil && len(preConditions) == 0 && len(postConditions) == 0 {
 		return nil
 	}
 
-	// prepend the conformances' preconditions and postconditions, if any
+	// Append the destructor's pre-conditions and rewritten post-conditions, if any
 
-	function.FunctionBlock.PreConditions = append(preConditions, function.FunctionBlock.PreConditions...)
-	function.FunctionBlock.PostConditions = append(postConditions, function.FunctionBlock.PostConditions...)
+	var statements []ast.Statement
+	if destructor != nil {
+		statements = destructor.FunctionBlock.Statements
 
-	result := newInterpretedFunction(
-		interpreter,
-		function,
-		emptyFunctionType,
-		lexicalScope,
-	)
+		if destructor.FunctionBlock.PreConditions != nil {
+			preConditions = append(
+				preConditions,
+				*destructor.FunctionBlock.PreConditions...,
+			)
+		}
+
+		if destructor.FunctionBlock.PostConditions != nil {
+
+			postConditionsRewrite :=
+				interpreter.Checker.Elaboration.PostConditionsRewrite[destructor.FunctionBlock.PostConditions]
+
+			postConditions = append(
+				postConditions,
+				postConditionsRewrite.RewrittenPostConditions...,
+			)
+
+			beforeStatements = append(
+				beforeStatements,
+				postConditionsRewrite.BeforeStatements...,
+			)
+		}
+	}
+
+	result := InterpretedFunctionValue{
+		Interpreter:      interpreter,
+		Type:             emptyFunctionType,
+		Activation:       lexicalScope,
+		BeforeStatements: beforeStatements,
+		PreConditions:    preConditions,
+		Statements:       statements,
+		PostConditions:   postConditions,
+	}
 	return &result
 }
 
@@ -2253,16 +2315,11 @@ func (interpreter *Interpreter) compositeFunctions(
 	for _, functionDeclaration := range compositeDeclaration.Members.Functions {
 		functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
 
-		function := interpreter.compositeFunction(
-			functionDeclaration,
-			compositeType.Conformances,
-			typeRequirements,
-		)
-
 		functions[functionDeclaration.Identifier.Identifier] =
-			newInterpretedFunction(
-				interpreter,
-				function,
+			interpreter.compositeFunction(
+				functionDeclaration,
+				compositeType.Conformances,
+				typeRequirements,
 				functionType,
 				lexicalScope,
 			)
@@ -2275,15 +2332,17 @@ func (interpreter *Interpreter) compositeFunction(
 	functionDeclaration *ast.FunctionDeclaration,
 	conformances []*sema.InterfaceType,
 	typeRequirements []*sema.CompositeType,
-) *ast.FunctionExpression {
+	functionType *sema.FunctionType,
+	lexicalScope hamt.Map,
+) InterpretedFunctionValue {
 
 	functionIdentifier := functionDeclaration.Identifier.Identifier
 
-	function := functionDeclaration.ToExpression()
+	// NOTE: gather all conformances' preconditions and rewritten postconditions,
 
-	// copy function block, append interfaces' pre-conditions and post-condition
-	functionBlockCopy := *function.FunctionBlock
-	function.FunctionBlock = &functionBlockCopy
+	var beforeStatements []ast.Statement
+	var preConditions ast.Conditions
+	var postConditions ast.Conditions
 
 	addConditionsFromMembers := func(members *ast.Members) {
 		functionsByIdentifier := members.FunctionsByIdentifier()
@@ -2292,15 +2351,28 @@ func (interpreter *Interpreter) compositeFunction(
 			return
 		}
 
-		functionBlockCopy.PreConditions = append(
-			functionBlockCopy.PreConditions,
-			interfaceFunction.FunctionBlock.PreConditions...,
-		)
+		if interfaceFunction.FunctionBlock.PreConditions != nil {
+			preConditions = append(
+				preConditions,
+				*interfaceFunction.FunctionBlock.PreConditions...,
+			)
+		}
 
-		functionBlockCopy.PostConditions = append(
-			functionBlockCopy.PostConditions,
-			interfaceFunction.FunctionBlock.PostConditions...,
-		)
+		if interfaceFunction.FunctionBlock.PostConditions != nil {
+
+			postConditionsRewrite :=
+				interpreter.Checker.Elaboration.PostConditionsRewrite[interfaceFunction.FunctionBlock.PostConditions]
+
+			postConditions = append(
+				postConditions,
+				postConditionsRewrite.RewrittenPostConditions...,
+			)
+
+			beforeStatements = append(
+				beforeStatements,
+				postConditionsRewrite.BeforeStatements...,
+			)
+		}
 	}
 
 	for _, conformance := range conformances {
@@ -2313,7 +2385,41 @@ func (interpreter *Interpreter) compositeFunction(
 		addConditionsFromMembers(compositeDeclaration.Members)
 	}
 
-	return function
+	// Append the function's pre-conditions and rewritten post-conditions, if any
+
+	if functionDeclaration.FunctionBlock.PreConditions != nil {
+		preConditions = append(
+			preConditions,
+			*functionDeclaration.FunctionBlock.PreConditions...,
+		)
+	}
+
+	if functionDeclaration.FunctionBlock.PostConditions != nil {
+
+		postConditionsRewrite :=
+			interpreter.Checker.Elaboration.PostConditionsRewrite[functionDeclaration.FunctionBlock.PostConditions]
+
+		postConditions = append(
+			postConditions,
+			postConditionsRewrite.RewrittenPostConditions...,
+		)
+
+		beforeStatements = append(
+			beforeStatements,
+			postConditionsRewrite.BeforeStatements...,
+		)
+	}
+
+	return InterpretedFunctionValue{
+		Interpreter:      interpreter,
+		ParameterList:    functionDeclaration.ParameterList,
+		Type:             functionType,
+		Activation:       lexicalScope,
+		BeforeStatements: beforeStatements,
+		PreConditions:    preConditions,
+		Statements:       functionDeclaration.FunctionBlock.Statements,
+		PostConditions:   postConditions,
+	}
 }
 
 func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
@@ -2579,22 +2685,22 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 
 	lexicalScope := interpreter.activations.CurrentOrNew()
 
-	var prepareFunction *ast.FunctionExpression
+	var prepareFunction *ast.FunctionDeclaration
 	var prepareFunctionType *sema.FunctionType
 	if declaration.Prepare != nil {
-		prepareFunction = declaration.Prepare.FunctionDeclaration.ToExpression()
+		prepareFunction = declaration.Prepare.FunctionDeclaration
 		prepareFunctionType = transactionType.PrepareFunctionType().InvocationFunctionType()
 	}
 
-	var executeFunction *ast.FunctionExpression
+	var executeFunction *ast.FunctionDeclaration
 	var executeFunctionType *sema.FunctionType
 	if declaration.Execute != nil {
-		executeFunction = declaration.Execute.FunctionDeclaration.ToExpression()
+		executeFunction = declaration.Execute.FunctionDeclaration
 		executeFunctionType = transactionType.ExecuteFunctionType().InvocationFunctionType()
 	}
 
-	beforeStatements, rewrittenPostConditions :=
-		interpreter.rewritePostConditions(declaration.PostConditions)
+	postConditionsRewrite :=
+		interpreter.Checker.Elaboration.PostConditionsRewrite[declaration.PostConditions]
 
 	self := &CompositeValue{
 		Location: interpreter.Checker.Location,
@@ -2607,14 +2713,15 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 
 			interpreter.declareVariable(sema.SelfIdentifier, self)
 
+			// NOTE: get current scope instead of using `lexicalScope`,
+			// because current scope has `self` declared
 			transactionScope := interpreter.activations.CurrentOrNew()
 
 			var prepareTrampoline = func() Trampoline { return Done{} }
 			var executeTrampoline = func() Trampoline { return Done{} }
 
 			if prepareFunction != nil {
-				prepare := newInterpretedFunction(
-					interpreter,
+				prepare := interpreter.functionDeclarationValue(
 					prepareFunction,
 					prepareFunctionType,
 					transactionScope,
@@ -2626,8 +2733,7 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 			}
 
 			if executeFunction != nil {
-				execute := newInterpretedFunction(
-					interpreter,
+				execute := interpreter.functionDeclarationValue(
 					executeFunction,
 					executeFunctionType,
 					transactionScope,
@@ -2640,18 +2746,23 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 				}
 			}
 
-			return prepareTrampoline().
+			trampoline := prepareTrampoline().
 				FlatMap(func(_ interface{}) Trampoline {
-					return interpreter.visitStatements(beforeStatements)
-				}).
-				FlatMap(func(_ interface{}) Trampoline {
-					return interpreter.visitConditions(declaration.PreConditions)
-				}).
+					return interpreter.visitStatements(postConditionsRewrite.BeforeStatements)
+				})
+
+			if declaration.PreConditions != nil {
+				trampoline = trampoline.FlatMap(func(_ interface{}) Trampoline {
+					return interpreter.visitConditions(*declaration.PreConditions)
+				})
+			}
+
+			return trampoline.
 				FlatMap(func(_ interface{}) Trampoline {
 					return executeTrampoline()
 				}).
 				FlatMap(func(_ interface{}) Trampoline {
-					return interpreter.visitConditions(rewrittenPostConditions)
+					return interpreter.visitConditions(postConditionsRewrite.RewrittenPostConditions)
 				}).
 				Then(func(_ interface{}) {
 					interpreter.activations.Pop()

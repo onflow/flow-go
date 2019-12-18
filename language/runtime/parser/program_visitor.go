@@ -216,16 +216,18 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 		executeFunction = executeCtx.Accept(v).(*ast.SpecialFunctionDeclaration)
 	}
 
-	var preConditions []*ast.Condition
+	var preConditions *ast.Conditions
 	preConditionsCtx := ctx.PreConditions()
 	if preConditionsCtx != nil {
-		preConditions = preConditionsCtx.Accept(v).([]*ast.Condition)
+		var conditions ast.Conditions = preConditionsCtx.Accept(v).([]*ast.Condition)
+		preConditions = &conditions
 	}
 
-	var postConditions []*ast.Condition
+	var postConditions *ast.Conditions
 	postConditionsCtx := ctx.PostConditions()
 	if postConditionsCtx != nil {
-		postConditions = postConditionsCtx.Accept(v).([]*ast.Condition)
+		var conditions ast.Conditions = postConditionsCtx.Accept(v).([]*ast.Condition)
+		postConditions = &conditions
 	}
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
@@ -726,16 +728,18 @@ func (v *ProgramVisitor) VisitBlock(ctx *BlockContext) interface{} {
 func (v *ProgramVisitor) VisitFunctionBlock(ctx *FunctionBlockContext) interface{} {
 	block := v.visitBlock(ctx.BaseParserRuleContext, ctx.Statements())
 
-	var preConditions []*ast.Condition
+	var preConditions *ast.Conditions
 	preConditionsCtx := ctx.PreConditions()
 	if preConditionsCtx != nil {
-		preConditions = preConditionsCtx.Accept(v).([]*ast.Condition)
+		var conditions ast.Conditions = preConditionsCtx.Accept(v).([]*ast.Condition)
+		preConditions = &conditions
 	}
 
-	var postConditions []*ast.Condition
+	var postConditions *ast.Conditions
 	postConditionsCtx := ctx.PostConditions()
 	if postConditionsCtx != nil {
-		postConditions = postConditionsCtx.Accept(v).([]*ast.Condition)
+		var conditions ast.Conditions = postConditionsCtx.Accept(v).([]*ast.Condition)
+		postConditions = &conditions
 	}
 
 	return &ast.FunctionBlock{

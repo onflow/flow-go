@@ -9,10 +9,10 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
+	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
-type LoggerFunc func(string)
 type CheckerFunc func([]byte, runtime.Location) error
 
 // RuntimeContext implements host functionality required by the Cadence runtime.
@@ -20,20 +20,19 @@ type CheckerFunc func([]byte, runtime.Location) error
 // A context is short-lived and is intended to be used when executing a single transaction.
 //
 // The logic in this runtime context is specific to the emulator and is designed to be
-// used with an EmulatedBlockchain instance.
+// used with a Blockchain instance.
 type RuntimeContext struct {
-	ledger          *flow.LedgerView
+	ledger          *types.LedgerView
 	signingAccounts []values.Address
-	logger          LoggerFunc
 	checker         CheckerFunc
+	logs            []string
 	events          []values.Event
 }
 
 // NewRuntimeContext returns a new RuntimeContext instance.
-func NewRuntimeContext(ledger *flow.LedgerView) *RuntimeContext {
+func NewRuntimeContext(ledger *types.LedgerView) *RuntimeContext {
 	return &RuntimeContext{
 		ledger:  ledger,
-		logger:  func(string) {},
 		checker: func([]byte, runtime.Location) error { return nil },
 		events:  make([]values.Event, 0),
 	}
@@ -61,11 +60,6 @@ func (r *RuntimeContext) GetSigningAccounts() []values.Address {
 	return r.signingAccounts
 }
 
-// SetLogger sets the logging function for this context.
-func (r *RuntimeContext) SetLogger(logger LoggerFunc) {
-	r.logger = logger
-}
-
 // SetChecker sets the semantic checker function for this context.
 func (r *RuntimeContext) SetChecker(checker CheckerFunc) {
 	r.checker = checker
@@ -74,6 +68,11 @@ func (r *RuntimeContext) SetChecker(checker CheckerFunc) {
 // Events returns all events emitted by the runtime to this context.
 func (r *RuntimeContext) Events() []values.Event {
 	return r.events
+}
+
+// Logs returns all logs emitted by the runtime to this context.
+func (r *RuntimeContext) Logs() []string {
+	return r.logs
 }
 
 // GetValue gets a register value from the world state.
@@ -126,8 +125,11 @@ func (r *RuntimeContext) CreateAccount(publicKeys []values.Bytes) (values.Addres
 func (r *RuntimeContext) AddAccountKey(address values.Address, publicKey values.Bytes) error {
 	accountID := address.Bytes()
 
-	_, exists := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
-	if !exists {
+	bal, err := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
+	if err != nil {
+		return err
+	}
+	if bal == nil {
 		return fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
@@ -149,9 +151,12 @@ func (r *RuntimeContext) RemoveAccountKey(address values.Address, index values.I
 	accountID := address.Bytes()
 	i := index.Int()
 
-	_, exists := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
-	if !exists {
-		return publicKey, fmt.Errorf("account with ID %s does not exist", accountID)
+	bal, err := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
+	if err != nil {
+		return nil, err
+	}
+	if bal == nil {
+		return nil, fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
 	publicKeys, err := r.getAccountPublicKeys(accountID)
@@ -176,11 +181,15 @@ func (r *RuntimeContext) RemoveAccountKey(address values.Address, index values.I
 }
 
 func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys []values.Bytes, err error) {
-	countBytes, exists := r.ledger.Get(
+	countBytes, err := r.ledger.Get(
 		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
 	)
-	if !exists {
-		return []values.Bytes{}, fmt.Errorf("key count not set")
+	if err != nil {
+		return nil, err
+	}
+
+	if countBytes == nil {
+		return nil, fmt.Errorf("key count not set")
 	}
 
 	count := int(big.NewInt(0).SetBytes(countBytes).Int64())
@@ -188,10 +197,14 @@ func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys []va
 	publicKeys = make([]values.Bytes, count)
 
 	for i := 0; i < count; i++ {
-		publicKey, exists := r.ledger.Get(
+		publicKey, err := r.ledger.Get(
 			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
 		)
-		if !exists {
+		if err != nil {
+			return nil, err
+		}
+
+		if publicKey == nil {
 			return nil, fmt.Errorf("failed to retrieve key from account %s", accountID)
 		}
 
@@ -204,10 +217,14 @@ func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys []va
 func (r *RuntimeContext) setAccountPublicKeys(accountID []byte, publicKeys []values.Bytes) error {
 	var existingCount int
 
-	countBytes, exists := r.ledger.Get(
+	countBytes, err := r.ledger.Get(
 		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
 	)
-	if exists {
+	if err != nil {
+		return err
+	}
+
+	if countBytes != nil {
 		existingCount = int(big.NewInt(0).SetBytes(countBytes).Int64())
 	} else {
 		existingCount = 0
@@ -255,9 +272,12 @@ func (r *RuntimeContext) UpdateAccountCode(address values.Address, code values.B
 		return fmt.Errorf("not permitted to update account with ID %x", accountID)
 	}
 
-	_, exists := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
-	if !exists {
-		return fmt.Errorf("account with ID %x does not exist", accountID)
+	bal, err := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
+	if err != nil {
+		return err
+	}
+	if bal == nil {
+		return fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
 	r.ledger.Set(fullKey(string(accountID), string(accountID), keyCode), code)
@@ -271,8 +291,8 @@ func (r *RuntimeContext) UpdateAccountCode(address values.Address, code values.B
 func (r *RuntimeContext) GetAccount(address flow.Address) *flow.Account {
 	accountID := address.Bytes()
 
-	balanceBytes, exists := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
-	if !exists {
+	balanceBytes, _ := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
+	if balanceBytes == nil {
 		return nil
 	}
 
@@ -317,19 +337,21 @@ func (r *RuntimeContext) ResolveImport(location runtime.Location) ([]byte, error
 
 	accountID := address.Bytes()
 
-	code, exists := r.ledger.Get(fullKey(string(accountID), string(accountID), keyCode))
-	if !exists {
+	code, err := r.ledger.Get(fullKey(string(accountID), string(accountID), keyCode))
+	if err != nil {
+		return nil, err
+	}
+
+	if code == nil {
 		return nil, fmt.Errorf("no code deployed at address %x", accountID)
 	}
 
 	return code, nil
 }
 
-// Log logs a message from the runtime.
-//
-// This functions calls the onLog callback registered with this context.
+// Log captures a log message from the runtime.
 func (r *RuntimeContext) Log(message string) {
-	r.logger(message)
+	r.logs = append(r.logs, message)
 }
 
 // EmitEvent is called when an event is emitted by the runtime.

@@ -99,6 +99,6 @@ func randHash() []byte {
 func randCollection() *collection.GuaranteedCollection {
 	hash := randHash()
 	return &collection.GuaranteedCollection{
-		Hash: hash,
+		CollectionHash: hash,
 	}
 }

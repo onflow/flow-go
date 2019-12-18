@@ -79,7 +79,7 @@ GenerateLoop:
 			hash := make([]byte, 32)
 			_, _ = rand.Read(hash)
 			coll := &collection.GuaranteedCollection{
-				Hash: hash,
+				CollectionHash: hash,
 			}
 
 			e.log.Info().

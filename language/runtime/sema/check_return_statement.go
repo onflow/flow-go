@@ -19,8 +19,6 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 	}
 
 	valueType := statement.Expression.Accept(checker).(Type)
-	valueIsInvalid := valueType.IsInvalidType()
-
 	returnType := functionActivation.ReturnType
 
 	checker.Elaboration.ReturnStatementValueTypes[statement] = valueType
@@ -28,18 +26,19 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 
 	if valueType == nil {
 		return nil
-	} else if valueIsInvalid {
-		// return statement has expression, but function has Void return type?
-		if _, ok := returnType.(*VoidType); ok {
-			checker.report(
-				&InvalidReturnValueError{
-					Range: ast.NewRangeFromPositioned(statement.Expression),
-				},
-			)
-		}
+	}
+
+	// return statement has expression, but function has Void return type?
+	if _, ok := returnType.(*VoidType); ok {
+		checker.report(
+			&InvalidReturnValueError{
+				Range: ast.NewRangeFromPositioned(statement.Expression),
+			},
+		)
 	} else {
 
-		if !returnType.IsInvalidType() &&
+		if !valueType.IsInvalidType() &&
+			!returnType.IsInvalidType() &&
 			!checker.IsTypeCompatible(statement.Expression, valueType, returnType) {
 
 			checker.report(

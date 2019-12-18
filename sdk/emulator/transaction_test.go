@@ -17,7 +17,7 @@ import (
 )
 
 func TestSubmitTransaction(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -37,7 +37,11 @@ func TestSubmitTransaction(t *testing.T) {
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	// Submit tx1
-	result, err := b.SubmitTransaction(tx1)
+	err = b.AddTransaction(tx1)
+	assert.NoError(t, err)
+
+	// Execute tx1
+	result, err := b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
 
@@ -47,16 +51,9 @@ func TestSubmitTransaction(t *testing.T) {
 	assert.Equal(t, flow.TransactionFinalized, tx2.Status)
 }
 
-func deployAndGenerateAddTwoScript(t *testing.T, b *emulator.EmulatedBlockchain) (string, flow.Address) {
-	counterAddress, err := b.CreateAccount(nil, []byte(counterScript), getNonce())
-	require.NoError(t, err)
-
-	return generateAddTwoToCounterScript(counterAddress), counterAddress
-}
-
 // TODO: Add test case for missing ReferenceBlockHash
 func TestSubmitInvalidTransaction(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -71,7 +68,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx
-		_, err = b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
@@ -90,7 +87,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx
-		_, err = b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
@@ -109,7 +106,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx
-		_, err = b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
@@ -128,7 +125,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx
-		_, err = b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 
@@ -147,13 +144,13 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
 		// Submit tx
-		_, err = b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidTransaction{})
 	})
 }
 
 func TestSubmitDuplicateTransaction(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -175,7 +172,10 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	tx.AddSignature(accountAddress, sig)
 
 	// Submit tx
-	result, err := b.SubmitTransaction(tx)
+	err = b.AddTransaction(tx)
+	assert.NoError(t, err)
+
+	result, err := b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
 
@@ -183,12 +183,12 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Submit same tx again (errors)
-	_, err = b.SubmitTransaction(tx)
+	err = b.AddTransaction(tx)
 	assert.IsType(t, err, &emulator.ErrDuplicateTransaction{})
 }
 
 func TestSubmitTransactionReverted(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	tx1 := flow.Transaction{
@@ -206,7 +206,10 @@ func TestSubmitTransactionReverted(t *testing.T) {
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
 	// Submit invalid tx1
-	result, err := b.SubmitTransaction(tx1)
+	err = b.AddTransaction(tx1)
+	assert.NoError(t, err)
+
+	result, err := b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 	assert.True(t, result.Reverted())
 
@@ -217,7 +220,7 @@ func TestSubmitTransactionReverted(t *testing.T) {
 }
 
 func TestSubmitTransactionScriptAccounts(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	privateKeyA := b.RootKey()
@@ -257,7 +260,10 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 		tx.AddSignature(accountAddressA, sigA)
 		tx.AddSignature(accountAddressB, sigB)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Reverted())
 
@@ -288,7 +294,10 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 		tx.AddSignature(accountAddressA, sig)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Reverted())
 
@@ -299,7 +308,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 func TestSubmitTransactionPayerSignature(t *testing.T) {
 	t.Run("MissingPayerSignature", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -320,12 +329,12 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		_, err = b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrMissingSignature{})
 	})
 
 	t.Run("InvalidAccount", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		invalidAddress := flow.HexToAddress("0000000000000000000000000000000000000002")
@@ -344,12 +353,12 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 		tx.AddSignature(invalidAddress, sig)
 
-		_, err = b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidSignatureAccount{})
 	})
 
 	t.Run("InvalidKeyPair", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -372,12 +381,12 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		_, err = b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrInvalidSignaturePublicKey{})
 	})
 
 	t.Run("KeyWeights", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		privateKeyA, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
@@ -412,7 +421,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 			tx.AddSignature(accountAddressA, sig)
 
-			_, err = b.SubmitTransaction(tx)
+			err = b.AddTransaction(tx)
 			assert.IsType(t, err, &emulator.ErrMissingSignature{})
 		})
 
@@ -426,7 +435,10 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 			tx.AddSignature(accountAddressA, sigA)
 			tx.AddSignature(accountAddressA, sigB)
 
-			result, err := b.SubmitTransaction(tx)
+			err = b.AddTransaction(tx)
+			assert.NoError(t, err)
+
+			result, err := b.ExecuteNextTransaction()
 			assert.NoError(t, err)
 			assert.True(t, result.Succeeded())
 		})
@@ -435,7 +447,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 func TestSubmitTransactionScriptSignatures(t *testing.T) {
 	t.Run("MissingScriptSignature", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		addressA := flow.HexToAddress("0000000000000000000000000000000000000002")
@@ -456,18 +468,13 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		_, err = b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
 		assert.IsType(t, err, &emulator.ErrMissingSignature{})
 	})
 
 	t.Run("MultipleAccounts", func(t *testing.T) {
-		loggedMessages := make([]string, 0)
-
-		b, _ := emulator.NewEmulatedBlockchain(emulator.WithRuntimeLogger(
-			func(msg string) {
-				loggedMessages = append(loggedMessages, msg)
-			},
-		))
+		b, err := emulator.NewBlockchain()
+		require.NoError(t, err)
 
 		privateKeyA := b.RootKey()
 
@@ -506,17 +513,20 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		tx.AddSignature(accountAddressA, sigA)
 		tx.AddSignature(accountAddressB, sigB)
 
-		result, err := b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
+		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
-		assert.Contains(t, loggedMessages, fmt.Sprintf("%x", accountAddressA.Bytes()))
-		assert.Contains(t, loggedMessages, fmt.Sprintf("%x", accountAddressB.Bytes()))
+		assert.Contains(t, result.Logs, fmt.Sprintf("%x", accountAddressA.Bytes()))
+		assert.Contains(t, result.Logs, fmt.Sprintf("%x", accountAddressB.Bytes()))
 	})
 }
 
 func TestGetTransaction(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	myEventType := types.Event{
@@ -547,7 +557,10 @@ func TestGetTransaction(t *testing.T) {
 
 	tx.AddSignature(b.RootAccountAddress(), sig)
 
-	result, err := b.SubmitTransaction(tx)
+	err = b.AddTransaction(tx)
+	assert.NoError(t, err)
+
+	result, err := b.ExecuteNextTransaction()
 	assert.NoError(t, err)
 	assert.True(t, result.Succeeded())
 

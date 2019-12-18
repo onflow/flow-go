@@ -5,10 +5,12 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/keys"
-	"github.com/stretchr/testify/assert"
 )
 
 // ReadFile reads a file from the file system
@@ -43,8 +45,8 @@ func randomKey() flow.AccountPrivateKey {
 }
 
 // newEmulator returns a emulator object for testing
-func newEmulator() *emulator.EmulatedBlockchain {
-	b, err := emulator.NewEmulatedBlockchain()
+func newEmulator() *emulator.Blockchain {
+	b, err := emulator.NewBlockchain()
 	if err != nil {
 		panic(err)
 	}
@@ -52,12 +54,19 @@ func newEmulator() *emulator.EmulatedBlockchain {
 }
 
 // SignAndSubmit signs a transaction with an array of signers and adds their signatures to the transaction
-// Then submits the transaction to the emulator.  If the private keys don't match up with the addresses,
+// Then submits the transaction to the emulator. If the private keys don't match up with the addresses,
 // the transaction will not succeed.
 // shouldRevert parameter indicates whether the transaction should fail or not
 // This function asserts the correct result and commits the block if it passed
-func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testing.T, signingKeys []flow.AccountPrivateKey, signingAddresses []flow.Address, shouldRevert bool) {
-	// add array of signers to transaction
+func SignAndSubmit(
+	t *testing.T,
+	b *emulator.Blockchain,
+	tx flow.Transaction,
+	signingKeys []flow.AccountPrivateKey,
+	signingAddresses []flow.Address,
+	shouldRevert bool,
+) {
+	// sign transaction with each signer
 	for i := 0; i < len(signingAddresses); i++ {
 		sig, err := keys.SignTransaction(tx, signingKeys[i])
 		assert.NoError(t, err)
@@ -66,14 +75,17 @@ func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testi
 	}
 
 	// submit the signed transaction
-	result, err := b.SubmitTransaction(tx)
+	err := b.AddTransaction(tx)
+	require.NoError(t, err)
+
+	result, err := b.ExecuteNextTransaction()
+	require.NoError(t, err)
 
 	if shouldRevert {
-		assert.NoError(t, err)
 		assert.True(t, result.Reverted())
 	} else {
-		if !assert.NoError(t, err) {
-			t.Log(err.Error())
+		if !assert.True(t, result.Succeeded()) {
+			t.Log(result.Error.Error())
 		}
 	}
 
@@ -83,8 +95,14 @@ func SignAndSubmit(tx flow.Transaction, b *emulator.EmulatedBlockchain, t *testi
 
 // setupUsersTokens sets up two accounts with 30 Fungible Tokens each
 // and a NFT collection with 1 NFT each
-func setupUsersTokens(t *testing.T, b *emulator.EmulatedBlockchain, tokenAddr flow.Address, nftAddr flow.Address, signingKeys []flow.AccountPrivateKey, signingAddresses []flow.Address) {
-
+func setupUsersTokens(
+	t *testing.T,
+	b *emulator.Blockchain,
+	tokenAddr flow.Address,
+	nftAddr flow.Address,
+	signingKeys []flow.AccountPrivateKey,
+	signingAddresses []flow.Address,
+) {
 	// add array of signers to transaction
 	for i := 0; i < len(signingAddresses); i++ {
 		tx := flow.Transaction{
@@ -94,7 +112,7 @@ func setupUsersTokens(t *testing.T, b *emulator.EmulatedBlockchain, tokenAddr fl
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{signingAddresses[i]},
 		}
-		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), signingKeys[i]}, []flow.Address{b.RootAccountAddress(), signingAddresses[i]}, false)
+		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), signingKeys[i]}, []flow.Address{b.RootAccountAddress(), signingAddresses[i]}, false)
 
 		// then deploy a NFT to the accounts
 		tx = flow.Transaction{
@@ -104,6 +122,6 @@ func setupUsersTokens(t *testing.T, b *emulator.EmulatedBlockchain, tokenAddr fl
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{signingAddresses[i]},
 		}
-		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), signingKeys[i]}, []flow.Address{b.RootAccountAddress(), signingAddresses[i]}, false)
+		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), signingKeys[i]}, []flow.Address{b.RootAccountAddress(), signingAddresses[i]}, false)
 	}
 }

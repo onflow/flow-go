@@ -82,6 +82,6 @@ func (a Address) MarshalJSON() ([]byte, error) {
 }
 
 func (a *Address) UnmarshalJSON(data []byte) error {
-	*a = HexToAddress(string(data))
+	*a = HexToAddress(strings.Trim(string(data), "\""))
 	return nil
 }
