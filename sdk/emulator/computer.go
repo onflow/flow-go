@@ -1,4 +1,4 @@
-package execution
+package emulator
 
 import (
 	"errors"
@@ -6,49 +6,23 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/hash"
 	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
+	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 )
 
-// Computer uses a runtime instance to execute transactions and scripts.
-type Computer struct {
+// A computer uses a runtime instance to execute transactions and scripts.
+type computer struct {
 	runtime        runtime.Runtime
 	onEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
-// A Result is the result of executing a script or transaction.
-type Result struct {
-	Error  error
-	Logs   []string
-	Events []flow.Event
-}
-
-func (r Result) Succeeded() bool {
-	return r.Error == nil
-}
-
-func (r Result) Reverted() bool {
-	return !r.Succeeded()
-}
-
-// A TransactionResult is the result of executing a transaction.
-type TransactionResult struct {
-	TransactionHash crypto.Hash
-	Result
-}
-
-// A ScriptResult is the result of executing a script.
-type ScriptResult struct {
-	ScriptHash crypto.Hash
-	Value      values.Value
-	Result
-}
-
-// NewComputer returns a new Computer initialized with a runtime.
-func NewComputer(
+// newComputer returns a new computer initialized with a runtime.
+func newComputer(
 	runtime runtime.Runtime,
-) *Computer {
-	return &Computer{
+) *computer {
+	return &computer{
 		runtime: runtime,
 	}
 }
@@ -59,8 +33,8 @@ func NewComputer(
 // the accounts that authorized the transaction.
 //
 // An error is returned if the transaction script cannot be parsed or reverts during execution.
-func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transaction) (TransactionResult, error) {
-	runtimeContext := NewRuntimeContext(ledger)
+func (c *computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transaction) (TransactionResult, error) {
+	runtimeContext := execution.NewRuntimeContext(ledger)
 
 	runtimeContext.SetChecker(func(code []byte, location runtime.Location) error {
 		return c.runtime.ParseAndCheckProgram(code, runtimeContext, location)
@@ -78,11 +52,9 @@ func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transacti
 			// runtime errors occur when the execution reverts
 			return TransactionResult{
 				TransactionHash: tx.Hash(),
-				Result: Result{
-					Error:  err,
-					Logs:   runtimeContext.Logs(),
-					Events: events,
-				},
+				Error:           err,
+				Logs:            runtimeContext.Logs(),
+				Events:          events,
 			}, nil
 		}
 
@@ -92,21 +64,19 @@ func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transacti
 
 	return TransactionResult{
 		TransactionHash: tx.Hash(),
-		Result: Result{
-			Error:  nil,
-			Logs:   runtimeContext.Logs(),
-			Events: events,
-		},
+		Error:           nil,
+		Logs:            runtimeContext.Logs(),
+		Events:          events,
 	}, nil
 }
 
 // ExecuteScript executes a plain script in the runtime.
 //
 // This function initializes a new runtime context using the provided registers view.
-func (c *Computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptResult, error) {
-	runtimeContext := NewRuntimeContext(view)
+func (c *computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptResult, error) {
+	runtimeContext := execution.NewRuntimeContext(view)
 
-	scriptHash := ScriptHash(script)
+	scriptHash := hash.DefaultHasher.ComputeHash(script)
 
 	location := runtime.ScriptLocation(scriptHash)
 
@@ -120,11 +90,9 @@ func (c *Computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptRe
 			return ScriptResult{
 				ScriptHash: scriptHash,
 				Value:      value,
-				Result: Result{
-					Error:  err,
-					Logs:   runtimeContext.Logs(),
-					Events: events,
-				},
+				Error:      err,
+				Logs:       runtimeContext.Logs(),
+				Events:     events,
 			}, nil
 		}
 
@@ -135,11 +103,9 @@ func (c *Computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptRe
 	return ScriptResult{
 		ScriptHash: scriptHash,
 		Value:      value,
-		Result: Result{
-			Error:  nil,
-			Logs:   runtimeContext.Logs(),
-			Events: events,
-		},
+		Error:      nil,
+		Logs:       runtimeContext.Logs(),
+		Events:     events,
 	}, nil
 }
 

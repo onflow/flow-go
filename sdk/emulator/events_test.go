@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
@@ -36,7 +35,7 @@ func TestEventEmitted(t *testing.T) {
 	}
 
 	t.Run("EmittedFromTransaction", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		script := []byte(`
@@ -93,7 +92,7 @@ func TestEventEmitted(t *testing.T) {
 	})
 
 	t.Run("EmittedFromScript", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		script := []byte(`
@@ -115,7 +114,7 @@ func TestEventEmitted(t *testing.T) {
 
 		decodedEvent := eventValue.(values.Event)
 
-		expectedType := fmt.Sprintf("script.%s.MyEvent", execution.ScriptHash(script).Hex())
+		expectedType := fmt.Sprintf("script.%s.MyEvent", result.ScriptHash.Hex())
 		// NOTE: ID is undefined for events emitted from scripts
 
 		assert.Equal(t, expectedType, actualEvent.Type)
@@ -124,7 +123,7 @@ func TestEventEmitted(t *testing.T) {
 	})
 
 	t.Run("EmittedFromAccount", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		accountScript := []byte(`

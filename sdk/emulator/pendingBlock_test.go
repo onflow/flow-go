@@ -12,7 +12,7 @@ import (
 )
 
 func TestPendingBlockBeforeExecution(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -86,7 +86,7 @@ func TestPendingBlockBeforeExecution(t *testing.T) {
 }
 
 func TestPendingBlockDuringExecution(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -275,7 +275,7 @@ func TestPendingBlockDuringExecution(t *testing.T) {
 }
 
 func TestPendingBlockCommit(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -300,7 +300,7 @@ func TestPendingBlockCommit(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Enter execution mode (block hash should not change after this point)
-		blockHash := b.GetPendingBlock().Hash()
+		blockHash := b.PendingBlockHash()
 
 		// Execute tx1 (succeeds)
 		result, err := b.ExecuteNextTransaction()
@@ -333,7 +333,7 @@ func TestPendingBlockCommit(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Enter execution mode (block hash should not change after this point)
-		blockHash := b.GetPendingBlock().Hash()
+		blockHash := b.PendingBlockHash()
 
 		// Execute and commit pending block
 		block, results, err := b.ExecuteAndCommitBlock()
