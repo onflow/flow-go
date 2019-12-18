@@ -165,5 +165,6 @@ promote-vscode-extension: build-vscode-extension
 	go generate ./cli/flow/cadence/vscode;
 
 # Check if the go version is 1.13. flow-go only supports go 1.13
+.PHONY: check-go-version
 check-go-version:
 	go version | grep 1.13
