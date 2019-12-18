@@ -20,8 +20,8 @@ type AddressLocation = ast.AddressLocation
 
 type TransactionLocation []byte
 
-func (l TransactionLocation) ID() LocationID {
-	return LocationID(l.String())
+func (l TransactionLocation) ID() ast.LocationID {
+	return ast.LocationID(fmt.Sprintf("T.%s", l))
 }
 
 func (l TransactionLocation) String() string {
