@@ -48,6 +48,8 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 	switch x := t.(type) {
 	case types.Void:
 		return e.DecodeVoid()
+	case types.Optional:
+		return e.DecodeOptional(x)
 	case types.Bool:
 		return e.DecodeBool()
 	case types.String:
@@ -84,8 +86,6 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 		return e.DecodeComposite(x)
 	case types.Event:
 		return e.DecodeEvent(x)
-	case types.Optional:
-		return e.DecodeOptional(x)
 
 	default:
 		return nil, fmt.Errorf("unsupported type: %T", t)
@@ -100,6 +100,29 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 func (e *Decoder) DecodeVoid() (values.Void, error) {
 	// void values are not encoded
 	return values.Void{}, nil
+}
+
+// DecodeOptional reads the XDR-encoded representation of an optional value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.19
+//  RFC Section 4.19 - Optional-Data
+//  Union of boolean and encoded value
+func (e *Decoder) DecodeOptional(t types.Optional) (v values.Optional, err error) {
+	hasValue, err := e.DecodeBool()
+	if err != nil {
+		return v, err
+	}
+
+	if hasValue {
+		value, err := e.Decode(t.Type)
+		if err != nil {
+			return v, err
+		}
+
+		return values.Optional{Value: value}, nil
+	}
+
+	return values.Optional{Value: nil}, nil
 }
 
 // DecodeBool reads the XDR-encoded representation of a boolean value.
@@ -445,27 +468,4 @@ func (e *Decoder) DecodeEvent(t types.Event) (v values.Event, err error) {
 	}
 
 	return values.NewEvent(vals), nil
-}
-
-// DecodeOptional reads the XDR-encoded representation of an optional value.
-//
-// Reference: https://tools.ietf.org/html/rfc4506#section-4.19
-//  RFC Section 4.19 - Optional-Data
-//  Union of boolean and encoded value
-func (e *Decoder) DecodeOptional(t types.Optional) (values.Optional, error) {
-	hasValue, err := e.DecodeBool()
-	if err != nil {
-		return values.Optional{}, err
-	}
-
-	if hasValue {
-		value, err := e.Decode(t.Type)
-		if err != nil {
-			return values.Optional{}, err
-		}
-
-		return values.Optional{Value: value}, nil
-	}
-
-	return values.Optional{Value: nil}, nil
 }
