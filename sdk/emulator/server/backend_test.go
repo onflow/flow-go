@@ -4,10 +4,9 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -16,14 +15,14 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
-	"github.com/dapperlabs/flow-go/sdk/abi/types"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
+	abiTypes "github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 	"github.com/dapperlabs/flow-go/sdk/emulator/mocks"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
-	etypes "github.com/dapperlabs/flow-go/sdk/emulator/types"
+	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -31,7 +30,7 @@ func TestPing(t *testing.T) {
 	ctx := context.Background()
 	b, err := emulator.NewEmulatedBlockchain()
 	require.NoError(t, err)
-	server := server.NewBackend(b, log.New())
+	server := server.NewBackend(b, logrus.New())
 
 	res, err := server.Ping(ctx, &observation.PingRequest{})
 	assert.NoError(t, err)
@@ -48,10 +47,7 @@ func TestBackend(t *testing.T) {
 
 			api := mocks.NewMockEmulatedBlockchainAPI(mockCtrl)
 
-			backend := server.NewBackend(
-				api,
-				log.New(),
-			)
+			backend := server.NewBackend(api, logrus.New())
 
 			sut(t, backend, api)
 		}
@@ -70,7 +66,7 @@ func TestBackend(t *testing.T) {
 		response, err := backend.ExecuteScript(context.Background(), &executionScriptRequest)
 		assert.NoError(t, err)
 
-		value, err := encoding.Decode(types.Int{}, response.GetValue())
+		value, err := encodingValues.Decode(abiTypes.Int{}, response.GetValue())
 		assert.NoError(t, err)
 
 		assert.Equal(t, values.NewInt(2137), value)
@@ -170,11 +166,8 @@ func TestBackend(t *testing.T) {
 	}))
 
 	t.Run("GetLatestBlock", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
-
-		blockTimestamp := time.Time{}
-		block := etypes.Block{
+		block := types.Block{
 			Number:            11,
-			Timestamp:         blockTimestamp,
 			PreviousBlockHash: nil,
 			TransactionHashes: nil,
 		}
@@ -287,11 +280,12 @@ func TestBackend(t *testing.T) {
 		var capturedTx flow.Transaction
 
 		api.EXPECT().
-			SubmitTransaction(gomock.Any()).
+			AddTransaction(gomock.Any()).
 			DoAndReturn(func(tx flow.Transaction) error {
 				capturedTx = tx
 				return nil
-			}).Times(1)
+			}).
+			Times(1)
 
 		requestTx := observation.SendTransactionRequest{
 			Transaction: &entities.Transaction{
@@ -326,10 +320,10 @@ func TestBackend(t *testing.T) {
 	}))
 
 	t.Run("SendTransaction which errors while processing", withMocks(func(t *testing.T, backend *server.Backend, api *mocks.MockEmulatedBlockchainAPI) {
-
 		api.EXPECT().
-			SubmitTransaction(gomock.Any()).
-			Return(&emulator.ErrInvalidSignaturePublicKey{}).Times(1)
+			AddTransaction(gomock.Any()).
+			Return(&emulator.ErrInvalidSignaturePublicKey{}).
+			Times(1)
 
 		requestTx := observation.SendTransactionRequest{
 			Transaction: &entities.Transaction{
