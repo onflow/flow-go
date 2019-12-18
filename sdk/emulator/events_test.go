@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
@@ -77,7 +77,7 @@ func TestEventEmitted(t *testing.T) {
 
 		actualEvent := events[0]
 
-		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
@@ -109,7 +109,7 @@ func TestEventEmitted(t *testing.T) {
 
 		actualEvent := result.Events[0]
 
-		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
@@ -181,7 +181,7 @@ func TestEventEmitted(t *testing.T) {
 
 		actualEvent := events[0]
 
-		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)

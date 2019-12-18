@@ -21,5 +21,5 @@ type full struct {
 
 type leaf struct {
 	key crypto.Hash // redundant copy of hash (key/path) for root hash
-	val []byte      // the serialized data we actually stored
+	val interface{} // the concrete data we actually stored
 }

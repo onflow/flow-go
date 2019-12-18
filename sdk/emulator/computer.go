@@ -7,7 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hash"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 )
@@ -64,7 +64,7 @@ func (c *computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transacti
 
 	return TransactionResult{
 		TransactionHash: tx.Hash(),
-		Error:           err,
+		Error:           nil,
 		Logs:            runtimeContext.Logs(),
 		Events:          events,
 	}, nil
@@ -103,7 +103,7 @@ func (c *computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptRe
 	return ScriptResult{
 		ScriptHash: scriptHash,
 		Value:      value,
-		Error:      err,
+		Error:      nil,
 		Logs:       runtimeContext.Logs(),
 		Events:     events,
 	}, nil
@@ -113,7 +113,7 @@ func convertEvents(values []values.Event, txHash crypto.Hash) []flow.Event {
 	events := make([]flow.Event, len(values))
 
 	for i, value := range values {
-		payload, err := encoding.Encode(value)
+		payload, err := encodingValues.Encode(value)
 		if err != nil {
 			panic("failed to encode event")
 		}

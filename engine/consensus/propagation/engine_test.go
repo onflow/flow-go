@@ -28,7 +28,7 @@ func TestOnGuaranteedCollection(t *testing.T) {
 	state := &protocol.State{}
 	ss := &protocol.Snapshot{}
 	me := &module.Local{}
-	pool := &module.Mempool{}
+	pool := &module.CollectionPool{}
 	e := &Engine{
 		con:   con,
 		state: state,
@@ -39,7 +39,7 @@ func TestOnGuaranteedCollection(t *testing.T) {
 	// create random collection
 	hash := make([]byte, 32)
 	_, _ = rand.Read(hash)
-	coll := &collection.GuaranteedCollection{Hash: hash}
+	coll := &collection.GuaranteedCollection{CollectionHash: hash}
 
 	// NOTE: as this function relies on two other functions that have their own
 	// unit tests, we only set up and check the behaviour that proxies the
@@ -76,7 +76,7 @@ func TestOnGuaranteedCollection(t *testing.T) {
 func TestProcessGuaranteedCollection(t *testing.T) {
 
 	// initialize mocks and engine
-	pool := &module.Mempool{}
+	pool := &module.CollectionPool{}
 	e := Engine{
 		pool: pool,
 	}
@@ -87,7 +87,7 @@ func TestProcessGuaranteedCollection(t *testing.T) {
 	for i := 0; i < n; i++ {
 		hash := make([]byte, 32)
 		_, _ = rand.Read(hash)
-		coll := &collection.GuaranteedCollection{Hash: hash}
+		coll := &collection.GuaranteedCollection{CollectionHash: hash}
 		collections = append(collections, coll)
 	}
 
@@ -110,7 +110,7 @@ func TestProcessGuaranteedCollection(t *testing.T) {
 
 	// test processing of collections when the mempool fails
 	for i, coll := range collections {
-		pool.On("Has", coll.Hash).Return(false)
+		pool.On("Has", coll.Hash()).Return(false)
 		pool.On("Add", coll).Return(errors.New("dummy"))
 		err := e.processGuaranteedCollection(coll)
 		assert.NotNilf(t, err, "collection %d", i)
@@ -138,7 +138,7 @@ func TestPropagateGuaranteedCollection(t *testing.T) {
 	for i := 0; i < n; i++ {
 		hash := make([]byte, 32)
 		_, _ = rand.Read(hash)
-		coll := &collection.GuaranteedCollection{Hash: hash}
+		coll := &collection.GuaranteedCollection{CollectionHash: hash}
 		collections = append(collections, coll)
 	}
 

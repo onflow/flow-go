@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
 )
@@ -173,7 +173,7 @@ func (b *Backend) ExecuteScript(ctx context.Context, req *observation.ExecuteScr
 
 	printScriptResult(b.logger, result)
 
-	valueBytes, err := encoding.Encode(result.Value)
+	valueBytes, err := values.Encode(result.Value)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
