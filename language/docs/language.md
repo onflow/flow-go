@@ -4002,6 +4002,50 @@ some.e
 some.e = 5
 ```
 
+## Contracts
+
+A contract in Cadence is a collection of type definitions 
+of structs or resources,  data (its state), and code (its functions) 
+that lives in the contract storage area of an account in Flow.  
+Contracts are where all persistent composite types like structs, 
+resources, and events in Cadence have to be defined.  
+Therefore, an object of one of these types cannot exist 
+without having been defined in a deployed Cadence contract.  
+
+```
+// HelloWorldResource.cdc
+    
+pub contract HelloWorld {
+
+    // Declare a stored state variable in HelloWorld
+    //
+    pub let greeting: String
+
+    // Declare a function that can be called by anyone
+    // who imports the contract
+    //
+    pub fun hello(): String {
+        return greeting
+    }
+
+    // Declare a resource type definition that can be imported by anyone
+    // to use in their transaction
+    //
+    pub resource HelloAsset {
+        pub fun hello(): String {
+                return "Hello World!"
+        }
+    }
+}
+
+Contracts are like a composite type, but cannot be copied 
+or moved like resources or structs. They stay in an account's contract storage
+area and can only be updated or deleted by the account owner.
+
+There can be any number of contracts per account and they can include an arbitrary amount of data.
+
+Transactions and other contracts can interact with contracts by importing them at the beginning of a transaction or contract definition
+
 ## Interfaces
 
 An interface is an abstract type that specifies the behavior of types
@@ -4010,12 +4054,13 @@ Interfaces declare the required functions and fields,
 the access control for those declarations,
 and preconditions and postconditions that implementing types need to provide.
 
-There are two kinds of interfaces:
+There are three kinds of interfaces:
 
 - **Structure interfaces**: implemented by [structures](#structures)
 - **Resource interfaces**: implemented by [resources](#resources)
+- **Contract interfaces**: implemented by [contracts](#contracts)
 
-Structure and resource types may implement multiple interfaces.
+Structure, resource, and contract types may implement multiple interfaces.
 
 Interfaces consist of the function and field requirements
 that a type implementing the interface must provide implementations for.
