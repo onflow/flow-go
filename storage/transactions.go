@@ -12,4 +12,7 @@ type Transactions interface {
 
 	// Insert inserts the transaction, keyed by hash.
 	Insert(tx *flow.Transaction) error
+
+	// Remove removes the transaction with the given hash, if it exists.
+	Remove(hash crypto.Hash) error
 }

@@ -16,3 +16,8 @@ func InsertTransaction(hash crypto.Hash, tx *flow.Transaction) func(*badger.Txn)
 func RetrieveTransaction(hash crypto.Hash, tx *flow.Transaction) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeTransaction, hash), tx)
 }
+
+// RemoveTransaction removes the transaction with the given hash.
+func RemoveTransaction(hash crypto.Hash) func(*badger.Txn) error {
+	return remove(makePrefix(codeTransaction, hash))
+}

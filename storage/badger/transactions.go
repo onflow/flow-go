@@ -1,11 +1,13 @@
 package badger
 
 import (
+	"fmt"
+
+	"github.com/dgraph-io/badger/v2"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 )
 
 type Transactions struct {
@@ -25,7 +27,7 @@ func (t *Transactions) ByHash(hash crypto.Hash) (*flow.Transaction, error) {
 	err := t.db.View(func(btx *badger.Txn) error {
 		err := operation.RetrieveTransaction(hash, &tx)(btx)
 		if err != nil {
-			return errors.Wrap(err, "could not retrieve transaction")
+			return fmt.Errorf("could not retrieve transaction: %w", err)
 		}
 		return nil
 	})
@@ -37,7 +39,17 @@ func (t *Transactions) Insert(tx *flow.Transaction) error {
 	return t.db.Update(func(btx *badger.Txn) error {
 		err := operation.InsertTransaction(tx.Hash(), tx)(btx)
 		if err != nil {
-			return errors.Wrap(err, "could not insert transaction")
+			return fmt.Errorf("could not insert transaction: %w", err)
+		}
+		return nil
+	})
+}
+
+func (t *Transactions) Remove(hash crypto.Hash) error {
+	return t.db.Update(func(btx *badger.Txn) error {
+		err := operation.RemoveTransaction(hash)(btx)
+		if err != nil {
+			return fmt.Errorf("could not remove transaction: %w", err)
 		}
 		return nil
 	})
