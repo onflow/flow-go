@@ -66,7 +66,7 @@ func (mr *MockStoreMockRecorder) BlockByNumber(arg0 interface{}) *gomock.Call {
 }
 
 // CommitBlock mocks base method
-func (m *MockStore) CommitBlock(arg0 types.Block, arg1 []flow.Transaction, arg2 *types.LedgerDelta, arg3 []flow.Event) error {
+func (m *MockStore) CommitBlock(arg0 types.Block, arg1 []flow.Transaction, arg2 types.LedgerDelta, arg3 []flow.Event) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CommitBlock", arg0, arg1, arg2, arg3)
 	ret0, _ := ret[0].(error)
@@ -107,18 +107,18 @@ func (mr *MockStoreMockRecorder) InsertEvents(arg0, arg1 interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertEvents", reflect.TypeOf((*MockStore)(nil).InsertEvents), arg0, arg1)
 }
 
-// InsertLedger mocks base method
-func (m *MockStore) InsertLedger(arg0 uint64, arg1 *types.LedgerDelta) error {
+// InsertLedgerDelta mocks base method
+func (m *MockStore) InsertLedgerDelta(arg0 uint64, arg1 types.LedgerDelta) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "InsertLedger", arg0, arg1)
+	ret := m.ctrl.Call(m, "InsertLedgerDelta", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// InsertLedger indicates an expected call of InsertLedger
-func (mr *MockStoreMockRecorder) InsertLedger(arg0, arg1 interface{}) *gomock.Call {
+// InsertLedgerDelta indicates an expected call of InsertLedgerDelta
+func (mr *MockStoreMockRecorder) InsertLedgerDelta(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertLedger", reflect.TypeOf((*MockStore)(nil).InsertLedger), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertLedgerDelta", reflect.TypeOf((*MockStore)(nil).InsertLedgerDelta), arg0, arg1)
 }
 
 // InsertTransaction mocks base method
