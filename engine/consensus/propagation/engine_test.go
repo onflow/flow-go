@@ -28,7 +28,7 @@ func TestOnGuaranteedCollection(t *testing.T) {
 	state := &protocol.State{}
 	ss := &protocol.Snapshot{}
 	me := &module.Local{}
-	pool := &module.Mempool{}
+	pool := &module.CollectionPool{}
 	e := &Engine{
 		con:   con,
 		state: state,
@@ -76,7 +76,7 @@ func TestOnGuaranteedCollection(t *testing.T) {
 func TestProcessGuaranteedCollection(t *testing.T) {
 
 	// initialize mocks and engine
-	pool := &module.Mempool{}
+	pool := &module.CollectionPool{}
 	e := Engine{
 		pool: pool,
 	}
