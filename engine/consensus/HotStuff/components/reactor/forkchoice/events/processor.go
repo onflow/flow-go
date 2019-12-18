@@ -29,6 +29,6 @@ type IncorporatedQuorumCertificateConsumer interface {
 // Prerequisites:
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
-type ForkChoiceConsumer interface {
+type ForkChoiceGeneratedConsumer interface {
 	OnForkChoiceGenerated(viewNumber uint64, qc *def.QuorumCertificate)
 }

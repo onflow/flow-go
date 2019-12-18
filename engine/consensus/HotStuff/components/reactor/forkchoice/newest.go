@@ -6,6 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
 )
 
+// NewestForkChoice implements HotStuff's original fork choice rule:
+// always use the newest QC (i.e. the QC with highest view number)
 type NewestForkChoice struct {
 	finalizer *core.ReactorCore
 	qcCache   QcCache
@@ -15,6 +17,17 @@ type NewestForkChoice struct {
 	// preferredQc is the QC for the preferred block according to the fork-choice rule
 
 	eventprocessor events.Processor
+}
+
+func (fc *NewestForkChoice) OnForkChoiceTrigger(view uint64) {
+	choice := fc.preferredQc
+	if choice.View <= view {
+		fc.eventprocessor.OnForkChoiceGenerated(view, choice)
+
+	} else {
+		ForkChoiceLogger.Warningf("Dropped ForkChoiceTrigger for view %d as the result was already stale", view)
+	}
+	return
 }
 
 func (fc *NewestForkChoice) ProcessBlock(block *def.Block) {
@@ -43,9 +56,6 @@ func (fc *NewestForkChoice) ProcessQC(qc *def.QuorumCertificate) {
 	fc.eventprocessor.OnIncorporatedQuorumCertificate(qc)
 }
 
-func (fc *NewestForkChoice) GenerateForkChoice() *def.QuorumCertificate {
-	return fc.preferredQc
-}
 
 func NewNewestForkChoice(finalizer *core.ReactorCore, eventprocessor events.Processor) *NewestForkChoice {
 	return &NewestForkChoice{
@@ -55,3 +65,6 @@ func NewNewestForkChoice(finalizer *core.ReactorCore, eventprocessor events.Proc
 		eventprocessor: eventprocessor,
 	}
 }
+
+
+
