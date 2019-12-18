@@ -33,7 +33,7 @@ type ExportableType interface {
 // Helper function to wrap a types in a variable if a variable is set
 func wrapVariable(t types.Type, variable *Variable) types.Type {
 	if variable != nil {
-		return types.Variable{Type: t}
+		return &types.Variable{Type: t}
 	} else {
 		return t
 	}
@@ -276,7 +276,7 @@ func (t *OptionalType) IsInvalidType() bool {
 }
 
 func (t *OptionalType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Optional{
+	return wrapVariable(&types.Optional{
 		Type: t.Type.(ExportableType).Export(program, nil),
 	}, variable)
 }
@@ -1262,13 +1262,13 @@ func (t *FunctionType) Export(program *ast.Program, variable *Variable) types.Ty
 			panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
 		}()
 
-		parameterTypeAnnotations := make([]types.Parameter, len(t.ParameterTypeAnnotations))
+		parameterTypeAnnotations := make([]*types.Parameter, len(t.ParameterTypeAnnotations))
 
 		for i, annotation := range t.ParameterTypeAnnotations {
 
 			astParam := functionDeclaration.ParameterList.Parameters[i]
 
-			parameterTypeAnnotations[i] = types.Parameter{
+			parameterTypeAnnotations[i] = &types.Parameter{
 				Label:      astParam.Label,
 				Identifier: astParam.Identifier.Identifier,
 				Type:       annotation.Type.(ExportableType).Export(program, nil),
@@ -1579,9 +1579,9 @@ func (t *CompositeType) Equal(other Type) bool {
 func (t *CompositeType) exportAsPointer() types.Type {
 	switch t.Kind {
 	case common.CompositeKindStructure:
-		return types.StructPointer{TypeName: t.Identifier}
+		return &types.StructPointer{TypeName: t.Identifier}
 	case common.CompositeKindResource:
-		return types.ResourcePointer{TypeName: t.Identifier}
+		return &types.ResourcePointer{TypeName: t.Identifier}
 	}
 	panic(fmt.Sprintf("cannot convert type %v of unknown kind %v", t, t.Kind))
 }
@@ -1610,14 +1610,14 @@ func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.T
 			fieldTypes[name] = field.TypeAnnotation.Type.(ExportableType).Export(program, nil)
 		}
 
-		parameters := make([]types.Parameter, len(t.ConstructorParameterTypeAnnotations))
+		parameters := make([]*types.Parameter, len(t.ConstructorParameterTypeAnnotations))
 
 		// TODO: For now we have only one initializer, so we just assume this here
 		// as this is post SEMA we really hope AST list of params matches SEMA type one
 		for i, parameter := range compositeDeclaration.Members.Initializers()[0].ParameterList.Parameters {
 			semaType := t.ConstructorParameterTypeAnnotations[i].Type
 
-			parameters[i] = types.Parameter{
+			parameters[i] = &types.Parameter{
 				Label:      parameter.Label,
 				Identifier: parameter.Identifier.Identifier,
 				Type:       semaType.(ExportableType).Export(program, nil),
@@ -1628,7 +1628,7 @@ func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.T
 			TypeID:       t.ID(),
 			Identifier:   t.Identifier,
 			Fields:       fieldTypes,
-			Initializers: [][]types.Parameter{parameters},
+			Initializers: [][]*types.Parameter{parameters},
 		}
 	}
 
@@ -2218,7 +2218,7 @@ func (*EventType) isType() {}
 
 func (t *EventType) Export(program *ast.Program, variable *Variable) types.Type {
 
-	var parameters []types.Parameter
+	var parameters []*types.Parameter
 
 	if program != nil && variable != nil {
 		eventDeclaration := func() *ast.EventDeclaration {
@@ -2233,13 +2233,13 @@ func (t *EventType) Export(program *ast.Program, variable *Variable) types.Type 
 
 		parameterList := eventDeclaration.ParameterList.Parameters
 
-		parameters = make([]types.Parameter, len(t.Fields))
+		parameters = make([]*types.Parameter, len(t.Fields))
 
 		for i, field := range t.Fields {
 			identifier := field.Identifier
 			typ := field.Type.(ExportableType).Export(program, nil)
 
-			parameters[i] = types.Parameter{
+			parameters[i] = &types.Parameter{
 				Label:      parameterList[i].Label,
 				Identifier: identifier,
 				Type:       typ,
