@@ -19,15 +19,15 @@ import (
 // Engine is the propagation engine, which makes sure that new collections are
 // propagated to the other consensus nodes on the network.
 type Engine struct {
-	log   zerolog.Logger  // used to log relevant actions with context
-	con   network.Conduit // used to talk to other nodes on the network
-	state protocol.State  // used to access the  protocol state
-	me    module.Local    // used to access local node information
-	pool  module.Mempool  // holds guaranteed collections in memory
+	log   zerolog.Logger        // used to log relevant actions with context
+	con   network.Conduit       // used to talk to other nodes on the network
+	state protocol.State        // used to access the  protocol state
+	me    module.Local          // used to access local node information
+	pool  module.CollectionPool // holds guaranteed collections in memory
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool module.Mempool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool module.CollectionPool) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -107,7 +107,7 @@ func (e *Engine) onGuaranteedCollection(originID flow.Identifier, coll *collecti
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_hash", coll.Hash).
+		Hex("collection_hash", coll.Hash()).
 		Msg("fingerprint message received")
 
 	// process the guaranteed collection to make sure it's valid and new
@@ -124,7 +124,7 @@ func (e *Engine) onGuaranteedCollection(originID flow.Identifier, coll *collecti
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_hash", coll.Hash).
+		Hex("collection_hash", coll.Hash()).
 		Msg("guaranteed collection processed")
 
 	return nil
@@ -167,7 +167,7 @@ func (e *Engine) propagateGuaranteedCollection(coll *collection.GuaranteedCollec
 
 	e.log.Info().
 		Strs("target_ids", logging.HexSlice(targetIDs)).
-		Hex("collection_hash", coll.Hash).
+		Hex("collection_hash", coll.Hash()).
 		Msg("guaranteed collection propagated")
 
 	return nil

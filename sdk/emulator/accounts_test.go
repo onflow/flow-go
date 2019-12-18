@@ -710,7 +710,7 @@ func TestUpdateAccountCode(t *testing.T) {
 		unauthorizedUpdateAccountCodeScript := []byte(fmt.Sprintf(`
 			transaction {
 			  prepare(account: Account) {
-				updateAccountCode(%s, nil)
+				updateAccountCode(0x%s, [])
 			  }
 			}
 		`, accountAddressB.Hex()))

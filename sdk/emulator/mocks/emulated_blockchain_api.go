@@ -7,7 +7,7 @@ package mocks
 import (
 	crypto "github.com/dapperlabs/flow-go/crypto"
 	flow "github.com/dapperlabs/flow-go/model/flow"
-	values "github.com/dapperlabs/flow-go/sdk/abi/values"
+	execution "github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	types "github.com/dapperlabs/flow-go/sdk/emulator/types"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
@@ -66,11 +66,11 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) CommitBlock() *gomock.Call {
 }
 
 // ExecuteAndCommitBlock mocks base method
-func (m *MockEmulatedBlockchainAPI) ExecuteAndCommitBlock() (*types.Block, []types.TransactionReceipt, error) {
+func (m *MockEmulatedBlockchainAPI) ExecuteAndCommitBlock() (*types.Block, []execution.TransactionResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExecuteAndCommitBlock")
 	ret0, _ := ret[0].(*types.Block)
-	ret1, _ := ret[1].([]types.TransactionReceipt)
+	ret1, _ := ret[1].([]execution.TransactionResult)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }
@@ -82,13 +82,12 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) ExecuteAndCommitBlock() *gomock
 }
 
 // ExecuteScript mocks base method
-func (m *MockEmulatedBlockchainAPI) ExecuteScript(arg0 []byte) (values.Value, []flow.Event, error) {
+func (m *MockEmulatedBlockchainAPI) ExecuteScript(arg0 []byte) (execution.ScriptResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExecuteScript", arg0)
-	ret0, _ := ret[0].(values.Value)
-	ret1, _ := ret[1].([]flow.Event)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret0, _ := ret[0].(execution.ScriptResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // ExecuteScript indicates an expected call of ExecuteScript
@@ -98,13 +97,12 @@ func (mr *MockEmulatedBlockchainAPIMockRecorder) ExecuteScript(arg0 interface{})
 }
 
 // ExecuteScriptAtBlock mocks base method
-func (m *MockEmulatedBlockchainAPI) ExecuteScriptAtBlock(arg0 []byte, arg1 uint64) (interface{}, []flow.Event, error) {
+func (m *MockEmulatedBlockchainAPI) ExecuteScriptAtBlock(arg0 []byte, arg1 uint64) (execution.ScriptResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExecuteScriptAtBlock", arg0, arg1)
-	ret0, _ := ret[0].(interface{})
-	ret1, _ := ret[1].([]flow.Event)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret0, _ := ret[0].(execution.ScriptResult)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // ExecuteScriptAtBlock indicates an expected call of ExecuteScriptAtBlock

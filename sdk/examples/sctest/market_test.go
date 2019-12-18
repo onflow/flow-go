@@ -88,7 +88,7 @@ func TestCreateSale(t *testing.T) {
 			ScriptAccounts: []flow.Address{bastianAddress},
 		}
 
-		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
+		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
 	})
 
 	t.Run("Can put an NFT up for sale", func(t *testing.T) {
@@ -100,7 +100,7 @@ func TestCreateSale(t *testing.T) {
 			ScriptAccounts: []flow.Address{bastianAddress},
 		}
 
-		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
+		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
 	})
 
 	t.Run("Cannot buy an NFT for less than the sale price", func(t *testing.T) {
@@ -112,7 +112,7 @@ func TestCreateSale(t *testing.T) {
 			ScriptAccounts: []flow.Address{joshAddress},
 		}
 
-		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), joshPrivateKey}, []flow.Address{b.RootAccountAddress(), joshAddress}, true)
+		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), joshPrivateKey}, []flow.Address{b.RootAccountAddress(), joshAddress}, true)
 	})
 
 	t.Run("Cannot buy an NFT that is not for sale", func(t *testing.T) {
@@ -124,7 +124,7 @@ func TestCreateSale(t *testing.T) {
 			ScriptAccounts: []flow.Address{joshAddress},
 		}
 
-		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), joshPrivateKey}, []flow.Address{b.RootAccountAddress(), joshAddress}, true)
+		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), joshPrivateKey}, []flow.Address{b.RootAccountAddress(), joshAddress}, true)
 	})
 
 	t.Run("Can buy an NFT that is for sale", func(t *testing.T) {
@@ -136,35 +136,44 @@ func TestCreateSale(t *testing.T) {
 			ScriptAccounts: []flow.Address{joshAddress},
 		}
 
-		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey(), joshPrivateKey}, []flow.Address{b.RootAccountAddress(), joshAddress}, false)
+		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), joshPrivateKey}, []flow.Address{b.RootAccountAddress(), joshAddress}, false)
 
-		_, _, err = b.ExecuteScript(GenerateInspectVaultScript(tokenAddr, bastianAddress, 40))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
+		result, err := b.ExecuteScript(GenerateInspectVaultScript(tokenAddr, bastianAddress, 40))
+		require.NoError(t, err)
+		if !assert.True(t, result.Succeeded()) {
+			t.Log(result.Error.Error())
 		}
-		_, _, err = b.ExecuteScript(GenerateInspectVaultScript(tokenAddr, joshAddress, 20))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
+
+		result, err = b.ExecuteScript(GenerateInspectVaultScript(tokenAddr, joshAddress, 20))
+		require.NoError(t, err)
+		if !assert.True(t, result.Succeeded()) {
+			t.Log(result.Error.Error())
 		}
 
 		// Assert that the accounts' collections are correct
-		_, _, err = b.ExecuteScript(GenerateInspectCollectionScript(nftAddr, bastianAddress, 1, false))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-		_, _, err = b.ExecuteScript(GenerateInspectCollectionScript(nftAddr, bastianAddress, 2, false))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-		_, _, err = b.ExecuteScript(GenerateInspectCollectionScript(nftAddr, joshAddress, 1, true))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
-		}
-		_, _, err = b.ExecuteScript(GenerateInspectCollectionScript(nftAddr, joshAddress, 2, true))
-		if !assert.Nil(t, err) {
-			t.Log(err.Error())
+		result, err = b.ExecuteScript(GenerateInspectCollectionScript(nftAddr, bastianAddress, 1, false))
+		require.NoError(t, err)
+		if !assert.True(t, result.Succeeded()) {
+			t.Log(result.Error.Error())
 		}
 
+		result, err = b.ExecuteScript(GenerateInspectCollectionScript(nftAddr, bastianAddress, 2, false))
+		require.NoError(t, err)
+		if !assert.True(t, result.Succeeded()) {
+			t.Log(result.Error.Error())
+		}
+
+		result, err = b.ExecuteScript(GenerateInspectCollectionScript(nftAddr, joshAddress, 1, true))
+		require.NoError(t, err)
+		if !assert.True(t, result.Succeeded()) {
+			t.Log(result.Error.Error())
+		}
+
+		result, err = b.ExecuteScript(GenerateInspectCollectionScript(nftAddr, joshAddress, 2, true))
+		require.NoError(t, err)
+		if !assert.True(t, result.Succeeded()) {
+			t.Log(result.Error.Error())
+		}
 	})
 
 }

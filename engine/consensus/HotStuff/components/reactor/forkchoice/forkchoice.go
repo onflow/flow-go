@@ -1,6 +1,11 @@
 package forkchoice
 
-import "github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
+import (
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
+	"github.com/juju/loggo"
+)
+
+var ForkChoiceLogger loggo.Logger
 
 // ForkChoice determines the fork-choice.
 // It is the highest level of the consensus reactor and feeds the underlying layer

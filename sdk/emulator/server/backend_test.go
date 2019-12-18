@@ -20,6 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
+	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/emulator/mocks"
 	"github.com/dapperlabs/flow-go/sdk/emulator/server"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
@@ -60,7 +61,13 @@ func TestBackend(t *testing.T) {
 		}
 
 		api.EXPECT().
-			ExecuteScript(sampleScriptText).Return(values.NewInt(2137), nil, nil).
+			ExecuteScript(sampleScriptText).
+			Return(execution.ScriptResult{
+				Value: values.NewInt(2137),
+				Result: execution.Result{
+					Error: nil,
+				},
+			}, nil).
 			Times(1)
 
 		response, err := backend.ExecuteScript(context.Background(), &executionScriptRequest)

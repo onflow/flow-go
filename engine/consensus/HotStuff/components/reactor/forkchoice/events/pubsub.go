@@ -11,7 +11,7 @@ import (
 // It allows thread-safe subscription to events
 type PubSubEventProcessor struct {
 	incorporatedQcCons []IncorporatedQuorumCertificateConsumer
-	forkChoiceCons     []ForkChoiceConsumer
+	forkChoiceCons     []ForkChoiceGeneratedConsumer
 	lock               sync.RWMutex
 }
 
@@ -27,11 +27,11 @@ func (p *PubSubEventProcessor) OnIncorporatedQuorumCertificate(qc *def.QuorumCer
 	}
 }
 
-func (p *PubSubEventProcessor) OnForkChoiceGenerated(qc *def.QuorumCertificate) {
+func (p *PubSubEventProcessor) OnForkChoiceGenerated(viewNumber uint64, qc *def.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.forkChoiceCons {
-		subscriber.OnForkChoiceGenerated(qc)
+		subscriber.OnForkChoiceGenerated(viewNumber, qc)
 	}
 }
 
@@ -47,7 +47,7 @@ func (p *PubSubEventProcessor) AddIncorporatedQuorumCertificateConsumer(cons Inc
 
 // AddForkChoiceConsumer adds a ForkChoiceConsumer to the PubSubEventProcessor;
 // concurrency safe; returns self-reference for chaining
-func (p *PubSubEventProcessor) AddForkChoiceConsumer(cons ForkChoiceConsumer) *PubSubEventProcessor {
+func (p *PubSubEventProcessor) AddForkChoiceConsumer(cons ForkChoiceGeneratedConsumer) *PubSubEventProcessor {
 	utils.EnsureNotNil(cons, "Event consumer")
 	p.lock.Lock()
 	defer p.lock.Unlock()

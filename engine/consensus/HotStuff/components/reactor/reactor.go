@@ -65,12 +65,7 @@ func (r *Reactor) run() {
 	for {
 		select {
 		case view := <-r.forkchoiceRequests:
-			fc := r.forkchoice.GenerateForkChoice()
-			if fc.View <= view {
-				// ToDo trigger Block proposal
-			} else {
-				ConsensusLogger.Warningf("Dropped Block Proposal Trigger for view %d as it was already stale", view)
-			}
+			r.forkchoice.OnForkChoiceTrigger(view)
 		case qc := <-r.newQCs:
 			r.forkchoice.ProcessQC(qc)
 		case block := <-r.newBlockProposals:

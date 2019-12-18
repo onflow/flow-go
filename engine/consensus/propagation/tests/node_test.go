@@ -27,7 +27,7 @@ type mockPropagationNode struct {
 	// a mocked network layer in order for the Hub to route events in memory to a targeted node
 	net *stub.Network
 	// the state of the engine, exposed in order for tests to assert
-	pool *mempool.Mempool
+	pool *mempool.CollectionPool
 }
 
 // newMockPropagationNode creates a mocked node with a real engine in it, and "plug" the node into a mocked hub.
@@ -45,7 +45,7 @@ func newMockPropagationNode(hub *stub.Hub, genesis *flow.Block, nodeIndex int) (
 	// only log error logs
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 
-	pool, err := mempool.New()
+	pool, err := mempool.NewCollectionPool()
 	if err != nil {
 		return nil, errors.Wrap(err, "could not initialize mempool")
 	}

@@ -1,6 +1,8 @@
 package execution
 
 import (
+	"errors"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -11,18 +13,43 @@ import (
 // Computer uses a runtime instance to execute transactions and scripts.
 type Computer struct {
 	runtime        runtime.Runtime
-	onLogMessage   func(string)
 	onEventEmitted func(event flow.Event, blockNumber uint64, txHash crypto.Hash)
 }
 
-// NewComputer returns a new Computer initialized with a runtime and logger.
+// A Result is the result of executing a script or transaction.
+type Result struct {
+	Error  error
+	Logs   []string
+	Events []flow.Event
+}
+
+func (r Result) Succeeded() bool {
+	return r.Error == nil
+}
+
+func (r Result) Reverted() bool {
+	return !r.Succeeded()
+}
+
+// A TransactionResult is the result of executing a transaction.
+type TransactionResult struct {
+	TransactionHash crypto.Hash
+	Result
+}
+
+// A ScriptResult is the result of executing a script.
+type ScriptResult struct {
+	ScriptHash crypto.Hash
+	Value      values.Value
+	Result
+}
+
+// NewComputer returns a new Computer initialized with a runtime.
 func NewComputer(
 	runtime runtime.Runtime,
-	onLogMessage func(string),
 ) *Computer {
 	return &Computer{
-		runtime:      runtime,
-		onLogMessage: onLogMessage,
+		runtime: runtime,
 	}
 }
 
@@ -32,10 +59,9 @@ func NewComputer(
 // the accounts that authorized the transaction.
 //
 // An error is returned if the transaction script cannot be parsed or reverts during execution.
-func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transaction) ([]flow.Event, error) {
+func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transaction) (TransactionResult, error) {
 	runtimeContext := NewRuntimeContext(ledger)
 
-	runtimeContext.SetLogger(c.onLogMessage)
 	runtimeContext.SetChecker(func(code []byte, location runtime.Location) error {
 		return c.runtime.ParseAndCheckProgram(code, runtimeContext, location)
 	})
@@ -44,33 +70,77 @@ func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transacti
 	location := runtime.TransactionLocation(tx.Hash())
 
 	err := c.runtime.ExecuteTransaction(tx.Script, runtimeContext, location)
-	if err != nil {
-		return nil, err
-	}
 
 	events := convertEvents(runtimeContext.Events(), tx.Hash())
 
-	return events, nil
+	if err != nil {
+		if errors.As(err, &runtime.Error{}) {
+			// runtime errors occur when the execution reverts
+			return TransactionResult{
+				TransactionHash: tx.Hash(),
+				Result: Result{
+					Error:  err,
+					Logs:   runtimeContext.Logs(),
+					Events: events,
+				},
+			}, nil
+		}
+
+		// other errors are unexpected and should be treated as fatal
+		return TransactionResult{}, err
+	}
+
+	return TransactionResult{
+		TransactionHash: tx.Hash(),
+		Result: Result{
+			Error:  nil,
+			Logs:   runtimeContext.Logs(),
+			Events: events,
+		},
+	}, nil
 }
 
 // ExecuteScript executes a plain script in the runtime.
 //
-
 // This function initializes a new runtime context using the provided registers view.
-func (c *Computer) ExecuteScript(view *flow.LedgerView, script []byte) (values.Value, []flow.Event, error) {
+func (c *Computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptResult, error) {
 	runtimeContext := NewRuntimeContext(view)
-	runtimeContext.SetLogger(c.onLogMessage)
 
-	location := runtime.ScriptLocation(ScriptHash(script))
+	scriptHash := ScriptHash(script)
+
+	location := runtime.ScriptLocation(scriptHash)
 
 	value, err := c.runtime.ExecuteScript(script, runtimeContext, location)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	events := convertEvents(runtimeContext.Events(), nil)
 
-	return value, events, nil
+	if err != nil {
+		if errors.As(err, &runtime.Error{}) {
+			// runtime errors occur when the execution reverts
+			return ScriptResult{
+				ScriptHash: scriptHash,
+				Value:      value,
+				Result: Result{
+					Error:  err,
+					Logs:   runtimeContext.Logs(),
+					Events: events,
+				},
+			}, nil
+		}
+
+		// other errors are unexpected and should be treated as fatal
+		return ScriptResult{}, err
+	}
+
+	return ScriptResult{
+		ScriptHash: scriptHash,
+		Value:      value,
+		Result: Result{
+			Error:  nil,
+			Logs:   runtimeContext.Logs(),
+			Events: events,
+		},
+	}, nil
 }
 
 func convertEvents(values []values.Event, txHash crypto.Hash) []flow.Event {
