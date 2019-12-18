@@ -87,7 +87,7 @@ func (m *mempool) Hash() crypto.Hash {
 func (m *mempool) Size() uint {
 	m.RLock()
 	defer m.RUnlock()
-	return m.Size()
+	return uint(len(m.items))
 }
 
 // All returns all items from the pool.
