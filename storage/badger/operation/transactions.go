@@ -1,9 +1,10 @@
 package operation
 
 import (
+	"github.com/dgraph-io/badger/v2"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dgraph-io/badger/v2"
 )
 
 // InsertTransaction inserts a transaction keyed by transaction hash.

@@ -7,11 +7,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	storage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestTransactionsInsertRetrieve(t *testing.T) {

@@ -16,8 +16,8 @@ const (
 	codeDelta       = 12
 	codeHeader      = 20
 	codeIdentities  = 21
-	codeCollections = 22
-	codeTransaction = 23
+	codeTransaction = 22
+	codeCollections = 23
 	codeHash        = 100
 	codeBoundary    = 101
 )
