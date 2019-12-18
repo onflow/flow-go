@@ -158,6 +158,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 
 	// check value type is subtype of variable type
 	if !valueType.IsInvalidType() &&
+		!variable.Type.IsInvalidType() &&
 		!checker.IsTypeCompatible(valueExpression, valueType, variable.Type) {
 
 		checker.report(
@@ -184,7 +185,8 @@ func (checker *Checker) visitIndexExpressionAssignment(
 		return &InvalidType{}
 	}
 
-	if !elementType.IsInvalidType() &&
+	if !valueType.IsInvalidType() &&
+		!elementType.IsInvalidType() &&
 		!checker.IsTypeCompatible(valueExpression, valueType, elementType) {
 
 		checker.report(
@@ -222,6 +224,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	// If the value type is valid, check that the value can be assigned to the member type
 
 	if !valueType.IsInvalidType() &&
+		!member.TypeAnnotation.Type.IsInvalidType() &&
 		!checker.IsTypeCompatible(valueExpression, valueType, member.TypeAnnotation.Type) {
 
 		checker.report(

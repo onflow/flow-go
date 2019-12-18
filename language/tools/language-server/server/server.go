@@ -535,7 +535,7 @@ func (s *Server) resolveImport(
 	case ast.StringLocation:
 		return s.resolveFileImport(mainPath, loc)
 	case ast.AddressLocation:
-		return s.resolveAccountImport(conn, loc)
+		return s.resolveAccountImport(loc)
 	default:
 		return nil, fmt.Errorf("unresolvable import location %s", loc.ID())
 	}
@@ -556,16 +556,17 @@ func (s *Server) resolveFileImport(mainPath string, location ast.StringLocation)
 	return program, nil
 }
 
-func (s *Server) resolveAccountImport(conn protocol.Conn, location ast.AddressLocation) (*ast.Program, error) {
+func (s *Server) resolveAccountImport(location ast.AddressLocation) (*ast.Program, error) {
 	accountAddr := location.ToAddress()
-	acct, err := s.flowClient.GetAccount(context.Background(), accountAddr)
+
+	acct, err := s.flowClient.GetAccount(context.Background(), flow.BytesToAddress(accountAddr[:]))
 	if err != nil {
-		return nil, fmt.Errorf("cannot get account with address %s err: %w", accountAddr, err)
+		return nil, fmt.Errorf("cannot get account with address 0x%s. err: %w", accountAddr, err)
 	}
 
 	program, _, err := parser.ParseProgram(string(acct.Code))
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse code at adddress %s err: %w", accountAddr, err)
+		return nil, fmt.Errorf("cannot parse code at adddress 0x%s. err: %w", accountAddr, err)
 	}
 
 	return program, nil
