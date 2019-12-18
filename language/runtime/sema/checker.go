@@ -1364,6 +1364,9 @@ func (checker *Checker) rewritePostConditions(postConditions []*ast.Condition) P
 
 		for _, extractedExpression := range extractedExpressions {
 
+			// NOTE: no need to check the before statements or update elaboration here:
+			// The before statements are visited/checked later
+
 			variableDeclaration := &ast.VariableDeclaration{
 				Identifier: extractedExpression.Identifier,
 				Transfer: &ast.Transfer{
@@ -1371,9 +1374,6 @@ func (checker *Checker) rewritePostConditions(postConditions []*ast.Condition) P
 				},
 				Value: extractedExpression.Expression,
 			}
-
-			// TODO: update interpreter.Checker.Elaboration
-			//    VariableDeclarationValueTypes / VariableDeclarationTargetTypes
 
 			beforeStatements = append(beforeStatements,
 				variableDeclaration,
