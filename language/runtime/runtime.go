@@ -623,13 +623,6 @@ func (r *interpreterRuntime) updateAccountCode(
 		}
 
 		contractValue = interpreter.NewSomeValueOwningNonCopying(contract)
-
-		fields := map[string]values.Value{
-			"address":  accountAddress,
-			"codeHash": values.NewBytes(code),
-		}
-
-		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, fields)
 	}
 
 	contractValue.SetOwner(accountAddress.Hex())
