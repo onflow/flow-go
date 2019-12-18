@@ -82,5 +82,5 @@ func (e *Engine) handleBlock(block flow.Block) error {
 		Uint64("block_number", block.Number).
 		Msg("received block")
 
-	e.blocks.ByHash(block.Hash())
+	return e.blocks.Save(&block)
 }

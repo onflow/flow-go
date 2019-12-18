@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -180,7 +181,7 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		// check for role
 		var role flow.Role
 		err := operation.RetrieveRole(id.NodeID, &role)(tx)
-		if errors.Cause(err) == badger.ErrKeyNotFound {
+		if _, ok := errors.Cause(err).(storage.NotFoundError); ok {
 			continue
 		}
 		if err == nil {
@@ -279,7 +280,7 @@ func initializeFinalizedBoundary(tx *badger.Txn, genesis *flow.Block) error {
 	}
 
 	// insert the initial finalized state boundary
-	err := operation.InsertBoundary(genesis.Number)(tx)
+	err := operation.InsertNewBoundary(genesis.Number)(tx)
 	if err != nil {
 		return errors.Wrap(err, "could not insert boundary")
 	}
@@ -290,7 +291,7 @@ func initializeFinalizedBoundary(tx *badger.Txn, genesis *flow.Block) error {
 func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 
 	// insert the header into the DB
-	err := operation.InsertHeader(&block.Header)(tx)
+	err := operation.InsertNewHeader(&block.Header)(tx)
 	if err != nil {
 		return errors.Wrap(err, "could not insert header")
 	}
@@ -300,13 +301,13 @@ func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 	// one, instead of only by block
 
 	// insert the identities into the DB
-	err = operation.InsertIdentities(block.Hash(), block.NewIdentities)(tx)
+	err = operation.InsertNewIdentities(block.Hash(), block.NewIdentities)(tx)
 	if err != nil {
 		return errors.Wrap(err, "could not insert identities")
 	}
 
 	// insert the guaranteed collections into the DB
-	err = operation.InsertCollections(block.Hash(), block.GuaranteedCollections)(tx)
+	err = operation.InsertNewCollections(block.Hash(), block.GuaranteedCollections)(tx)
 	if err != nil {
 		return errors.Wrap(err, "could not insert collections")
 	}
@@ -314,39 +315,39 @@ func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 	return nil
 }
 
-func applyBlockChanges(tx *badger.Txn, block *flow.Block) error {
+func applyBlockChanges(tx *badger.Txn, block *flow.Block) storage.Error {
 
 	// insert the height to hash mapping for finalized block
-	err := operation.InsertHash(block.Number, block.Hash())(tx)
+	err := operation.InsertNewHash(block.Number, block.Hash())(tx)
 	if err != nil {
-		return errors.Wrap(err, "could not insert hash")
+		return storage.WrapStorageError(err, "could not insert hash")
 	}
 
 	// update the finalized boundary number
 	err = operation.UpdateBoundary(block.Number)(tx)
 	if err != nil {
-		return errors.Wrap(err, "could not update boundary")
+		return storage.WrapStorageError(err, "could not update boundary")
 	}
 
 	// insert the information for each new identity
 	for _, id := range block.NewIdentities {
 
 		// insert the role
-		err := operation.InsertRole(id.NodeID, id.Role)(tx)
+		err := operation.InsertNewRole(id.NodeID, id.Role)(tx)
 		if err != nil {
-			return errors.Wrapf(err, "could not insert role (%x)", id.NodeID)
+			return storage.WrapStorageErrorf(err, "could not insert role (%x)", id.NodeID)
 		}
 
 		// insert the address
-		err = operation.InsertAddress(id.NodeID, id.Address)(tx)
+		err = operation.InsertNewAddress(id.NodeID, id.Address)(tx)
 		if err != nil {
-			return errors.Wrapf(err, "could not insert address (%x)", id.NodeID)
+			return storage.WrapStorageErrorf(err, "could not insert address (%x)", id.NodeID)
 		}
 
 		// insert the stake delta
-		err = operation.InsertDelta(block.Number, id.Role, id.NodeID, int64(id.Stake))(tx)
+		err = operation.InsertNewDelta(block.Number, id.Role, id.NodeID, int64(id.Stake))(tx)
 		if err != nil {
-			return errors.Wrapf(err, "could not insert delta (%x)", id.NodeID)
+			return storage.WrapStorageErrorf(err, "could not insert delta (%x)", id.NodeID)
 		}
 	}
 

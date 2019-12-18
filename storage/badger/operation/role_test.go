@@ -25,7 +25,7 @@ func TestRoleInsertRetrieve(t *testing.T) {
 	nodeID := flow.Identifier{0x01}
 	expected := flow.Role(13)
 
-	err = db.Update(InsertRole(nodeID, expected))
+	err = db.Update(InsertNewRole(nodeID, expected))
 	require.Nil(t, err)
 
 	var actual flow.Role

@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -190,7 +191,7 @@ func computeFinalizedDeltas(tx *badger.Txn, boundary uint64, filters []flow.Iden
 
 	// define start and end prefixes for the range scan
 	deltas := make(map[flow.Identifier]int64)
-	err := operation.TraverseDeltas(0, boundary, filters, func(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) error {
+	err := operation.TraverseDeltas(0, boundary, filters, func(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) storage.Error {
 		deltas[nodeID] += delta
 		return nil
 	})(tx)

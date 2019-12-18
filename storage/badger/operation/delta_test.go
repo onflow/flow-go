@@ -30,7 +30,7 @@ func TestDeltaInsertRetrieve(t *testing.T) {
 		Stake:   3,
 	}
 
-	err = db.Update(InsertDelta(number, id.Role, id.NodeID, int64(id.Stake)))
+	err = db.Update(InsertNewDelta(number, id.Role, id.NodeID, int64(id.Stake)))
 	require.Nil(t, err)
 
 	var delta int64
@@ -92,7 +92,7 @@ func TestDeltasTraverse(t *testing.T) {
 	for _, v := range vectors {
 		for i, delta := range v.Deltas {
 			id := ids[i]
-			err = db.Update(InsertDelta(v.Number, id.Role, id.NodeID, delta))
+			err = db.Update(InsertNewDelta(v.Number, id.Role, id.NodeID, delta))
 			require.Nil(t, err)
 		}
 	}

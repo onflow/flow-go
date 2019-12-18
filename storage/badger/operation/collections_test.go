@@ -30,7 +30,7 @@ func TestCollectionsInsertRetrieve(t *testing.T) {
 		{Hash: crypto.Hash{0x03}, Signatures: []crypto.Signature{{0x30}}},
 	}
 
-	err = db.Update(InsertCollections(hash, expected))
+	err = db.Update(InsertNewCollections(hash, expected))
 	require.Nil(t, err)
 
 	var actual []*collection.GuaranteedCollection

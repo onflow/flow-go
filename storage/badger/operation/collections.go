@@ -7,12 +7,13 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
-func InsertCollections(hash crypto.Hash, collections []*collection.GuaranteedCollection) func(*badger.Txn) error {
-	return insert(makePrefix(codeCollections, hash), collections)
+func InsertNewCollections(hash crypto.Hash, collections []*collection.GuaranteedCollection) func(*badger.Txn) storage.Error {
+	return insertNew(makePrefix(codeCollections, hash), collections)
 }
 
-func RetrieveCollections(hash crypto.Hash, collections *[]*collection.GuaranteedCollection) func(*badger.Txn) error {
+func RetrieveCollections(hash crypto.Hash, collections *[]*collection.GuaranteedCollection) func(*badger.Txn) storage.Error {
 	return retrieve(makePrefix(codeCollections, hash), collections)
 }

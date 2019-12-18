@@ -30,7 +30,7 @@ func TestIdentitiesInsertRetrieve(t *testing.T) {
 		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.Role(3), Stake: 3},
 	}
 
-	err = db.Update(InsertIdentities(hash, expected))
+	err = db.Update(InsertNewIdentities(hash, expected))
 	require.Nil(t, err)
 
 	var actual flow.IdentityList

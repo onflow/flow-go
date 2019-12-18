@@ -6,12 +6,13 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
-func InsertHash(number uint64, hash crypto.Hash) func(*badger.Txn) error {
-	return insert(makePrefix(codeHash, number), hash)
+func InsertNewHash(number uint64, hash crypto.Hash) func(*badger.Txn) storage.Error {
+	return insertNew(makePrefix(codeHash, number), hash)
 }
 
-func RetrieveHash(number uint64, hash *crypto.Hash) func(*badger.Txn) error {
+func RetrieveHash(number uint64, hash *crypto.Hash) func(*badger.Txn) storage.Error {
 	return retrieve(makePrefix(codeHash, number), hash)
 }

@@ -6,12 +6,13 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
-func InsertAddress(nodeID flow.Identifier, address string) func(*badger.Txn) error {
-	return insert(makePrefix(codeAddress, nodeID), address)
+func InsertNewAddress(nodeID flow.Identifier, address string) func(*badger.Txn) storage.Error {
+	return insertNew(makePrefix(codeAddress, nodeID), address)
 }
 
-func RetrieveAddress(nodeID flow.Identifier, address *string) func(*badger.Txn) error {
+func RetrieveAddress(nodeID flow.Identifier, address *string) func(*badger.Txn) storage.Error {
 	return retrieve(makePrefix(codeAddress, nodeID), address)
 }

@@ -25,7 +25,7 @@ func TestAddressInsertRetrieve(t *testing.T) {
 	nodeID := flow.Identifier{0x01}
 	expected := "address"
 
-	err = db.Update(InsertAddress(nodeID, expected))
+	err = db.Update(InsertNewAddress(nodeID, expected))
 	require.Nil(t, err)
 
 	var actual string

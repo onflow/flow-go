@@ -4,16 +4,18 @@ package operation
 
 import (
 	"github.com/dgraph-io/badger/v2"
+
+	"github.com/dapperlabs/flow-go/storage"
 )
 
-func InsertBoundary(number uint64) func(*badger.Txn) error {
-	return insert(makePrefix(codeBoundary), number)
+func InsertNewBoundary(number uint64) func(*badger.Txn) storage.Error {
+	return insertNew(makePrefix(codeBoundary), number)
 }
 
-func UpdateBoundary(number uint64) func(*badger.Txn) error {
+func UpdateBoundary(number uint64) func(*badger.Txn) storage.Error {
 	return update(makePrefix(codeBoundary), number)
 }
 
-func RetrieveBoundary(number *uint64) func(*badger.Txn) error {
+func RetrieveBoundary(number *uint64) func(*badger.Txn) storage.Error {
 	return retrieve(makePrefix(codeBoundary), number)
 }

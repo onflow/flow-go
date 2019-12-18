@@ -33,7 +33,7 @@ func TestInsertValid(t *testing.T) {
 	key := []byte{0x01, 0x02, 0x03}
 	val := []byte(`{"ID":1337}`)
 
-	err = db.Update(insert(key, e))
+	err = db.Update(insertNew(key, e))
 	require.Nil(t, err)
 
 	var act []byte
