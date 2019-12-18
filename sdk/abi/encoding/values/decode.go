@@ -298,7 +298,7 @@ func (e *Decoder) DecodeUInt64() (v values.UInt64, err error) {
 		return v, err
 	}
 
-	return values.NewUint64(i), nil
+	return values.NewUInt64(i), nil
 }
 
 // DecodeVariableSizedArray reads the XDR-encoded representation of a
