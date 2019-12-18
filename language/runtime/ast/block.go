@@ -21,24 +21,6 @@ func (b *FunctionBlock) Accept(visitor Visitor) Repr {
 	return visitor.VisitFunctionBlock(b)
 }
 
-func (b *FunctionBlock) PrependPostConditions(conditions Conditions) {
-	if b.PostConditions == nil {
-		b.PostConditions = &conditions
-	} else {
-		postConditions := append(conditions, *b.PostConditions...)
-		b.PostConditions = &postConditions
-	}
-}
-
-func (b *FunctionBlock) PrependPreConditions(conditions Conditions) {
-	if b.PreConditions == nil {
-		b.PreConditions = &conditions
-	} else {
-		preConditions := append(conditions, *b.PreConditions...)
-		b.PreConditions = &preConditions
-	}
-}
-
 // Condition
 
 type Condition struct {

@@ -1807,16 +1807,16 @@ func TestInterpretStructureSelfUseInFunction(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
 
-    struct Test {
+      struct Test {
 
-        fun test() {
-            self
-        }
-    }
+          fun test() {
+              self
+          }
+      }
 
-    fun test() {
-        Test().test()
-    }
+      fun test() {
+          Test().test()
+      }
     `)
 
 	value, err := inter.Invoke("test")
@@ -1831,17 +1831,16 @@ func TestInterpretStructureSelfUseInFunction(t *testing.T) {
 func TestInterpretStructureConstructorUseInFunction(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
+      struct Test {
 
-    struct Test {
+          fun test() {
+              Test
+          }
+      }
 
-        fun test() {
-            Test
-        }
-    }
-
-    fun test() {
-        Test().test()
-    }
+      fun test() {
+          Test().test()
+      }
     `)
 
 	value, err := inter.Invoke("test")
@@ -3261,7 +3260,7 @@ func TestInterpretCompositeNilEquality(t *testing.T) {
 				fmt.Sprintf(
 					`
                       pub %[1]s X {}
-                      
+
                       %[2]s
 
                       pub let y = %[3]s == nil
@@ -6904,4 +6903,110 @@ func TestInterpretPostConditionWithElaborationAccess(t *testing.T) {
 
 	_, err := inter.Invoke("test")
 	require.NoError(t, err)
+}
+
+func TestInterpretFunctionPostConditionInInterface(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      struct interface SI {
+          on: Bool
+
+          fun turnOn() {
+              post {
+                  self.on
+              }
+          }
+      }
+
+      struct S: SI {
+          var on: Bool
+
+          init() {
+              self.on = false
+          }
+
+          fun turnOn() {
+              self.on = true
+          }
+      }
+
+      struct S2: SI {
+          var on: Bool
+
+          init() {
+              self.on = false
+          }
+
+          fun turnOn() {
+              // incorrect
+          }
+      }
+
+      fun test() {
+          S().turnOn()
+      }
+
+      fun test2() {
+          S2().turnOn()
+      }
+    `)
+
+	_, err := inter.Invoke("test")
+	require.NoError(t, err)
+
+	_, err = inter.Invoke("test2")
+	assert.IsType(t, &interpreter.ConditionError{}, err)
+}
+
+func TestInterpretFunctionPostConditionWithBeforeInInterface(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      struct interface SI {
+          on: Bool
+
+          fun toggle() {
+              post {
+                  self.on != before(self.on)
+              }
+          }
+      }
+
+      struct S: SI {
+          var on: Bool
+
+          init() {
+              self.on = false
+          }
+
+          fun toggle() {
+              self.on = !self.on
+          }
+      }
+
+      struct S2: SI {
+          var on: Bool
+
+          init() {
+              self.on = false
+          }
+
+          fun toggle() {
+              // incorrect
+          }
+      }
+
+      fun test() {
+          S().toggle()
+      }
+
+      fun test2() {
+          S2().toggle()
+      }
+    `)
+
+	_, err := inter.Invoke("test")
+	require.NoError(t, err)
+
+	_, err = inter.Invoke("test2")
+	assert.IsType(t, &interpreter.ConditionError{}, err)
 }

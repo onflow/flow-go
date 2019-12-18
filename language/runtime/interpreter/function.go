@@ -30,10 +30,14 @@ type FunctionValue interface {
 // InterpretedFunctionValue
 
 type InterpretedFunctionValue struct {
-	Interpreter *Interpreter
-	Expression  *ast.FunctionExpression
-	Type        *sema.FunctionType
-	Activation  hamt.Map
+	Interpreter      *Interpreter
+	ParameterList    *ast.ParameterList
+	Type             *sema.FunctionType
+	Activation       hamt.Map
+	BeforeStatements []ast.Statement
+	PreConditions    ast.Conditions
+	Statements       []ast.Statement
+	PostConditions   ast.Conditions
 }
 
 func (InterpretedFunctionValue) isValue() {}
@@ -52,20 +56,6 @@ func (InterpretedFunctionValue) SetOwner(owner string) {
 }
 
 func (InterpretedFunctionValue) isFunctionValue() {}
-
-func newInterpretedFunction(
-	interpreter *Interpreter,
-	expression *ast.FunctionExpression,
-	functionType *sema.FunctionType,
-	activation hamt.Map,
-) InterpretedFunctionValue {
-	return InterpretedFunctionValue{
-		Interpreter: interpreter,
-		Expression:  expression,
-		Type:        functionType,
-		Activation:  activation,
-	}
-}
 
 func (f InterpretedFunctionValue) invoke(invocation Invocation) Trampoline {
 	return f.Interpreter.invokeInterpretedFunction(f, invocation.Arguments)
