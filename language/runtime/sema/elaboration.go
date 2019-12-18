@@ -43,6 +43,7 @@ type Elaboration struct {
 	IsResourceMovingStorageIndexExpression map[*ast.IndexExpression]bool
 	CompositeNestedDeclarations            map[*ast.CompositeDeclaration]map[string]ast.Declaration
 	InterfaceNestedDeclarations            map[*ast.InterfaceDeclaration]map[string]ast.Declaration
+	PostConditionsRewrite                  map[*ast.Conditions]PostConditionsRewrite
 }
 
 func NewElaboration() *Elaboration {
@@ -79,5 +80,6 @@ func NewElaboration() *Elaboration {
 		IsResourceMovingStorageIndexExpression: map[*ast.IndexExpression]bool{},
 		CompositeNestedDeclarations:            map[*ast.CompositeDeclaration]map[string]ast.Declaration{},
 		InterfaceNestedDeclarations:            map[*ast.InterfaceDeclaration]map[string]ast.Declaration{},
+		PostConditionsRewrite:                  map[*ast.Conditions]PostConditionsRewrite{},
 	}
 }

@@ -35,13 +35,20 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 	checker.declareSelfValue(transactionType)
 
 	checker.visitTransactionPrepareFunction(declaration.Prepare, transactionType, fieldMembers)
-	checker.visitTransactionPreConditions(declaration.PreConditions)
 
-	checker.withSelfResourceInvalidationAllowed(func() {
-		checker.visitTransactionExecuteFunction(declaration.Execute, transactionType)
-	})
+	if declaration.PreConditions != nil {
+		checker.visitConditions(*declaration.PreConditions)
+	}
 
-	checker.visitTransactionPostConditions(declaration.PostConditions)
+	checker.visitWithPostConditions(
+		declaration.PostConditions,
+		&VoidType{},
+		func() {
+			checker.withSelfResourceInvalidationAllowed(func() {
+				checker.visitTransactionExecuteFunction(declaration.Execute, transactionType)
+			})
+		},
+	)
 
 	checker.checkResourceFieldsInvalidated(transactionType.String(), transactionType.Members)
 
@@ -153,11 +160,6 @@ func (checker *Checker) checkTransactionPrepareFunctionParameters(
 
 }
 
-// visitTransactionPreConditions visits and checks the pre-conditions of a transaction.
-func (checker *Checker) visitTransactionPreConditions(conditions []*ast.Condition) {
-	checker.visitConditions(conditions)
-}
-
 // visitTransactionExecuteFunction visits and checks the execute function of a transaction.
 func (checker *Checker) visitTransactionExecuteFunction(
 	executeFunction *ast.SpecialFunctionDeclaration,
@@ -178,15 +180,6 @@ func (checker *Checker) visitTransactionExecuteFunction(
 		nil,
 		true,
 	)
-}
-
-// visitTransactionPreConditions visits and checks the post-conditions of a transaction.
-func (checker *Checker) visitTransactionPostConditions(conditions []*ast.Condition) {
-	if len(conditions) > 0 {
-		checker.declareBefore()
-	}
-
-	checker.visitConditions(conditions)
 }
 
 func (checker *Checker) declareTransactionDeclaration(declaration *ast.TransactionDeclaration) {
