@@ -99,7 +99,7 @@ func TestTreeBatch(t *testing.T) {
 
 func TestRandomOrder(t *testing.T) {
 
-	// initialize randdom generator, two trees and zero hash
+	// initialize random generator, two trees and zero hash
 	rand.Seed(time.Now().UnixNano())
 	tree1 := NewTree()
 	tree2 := NewTree()

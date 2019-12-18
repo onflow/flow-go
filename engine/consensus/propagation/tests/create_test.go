@@ -14,13 +14,10 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func prepareNodesAndCollections() (
+func prepareNodesAndCollectionsConfigurable(N, M int) (
 	[]*mockPropagationNode, []*collection.GuaranteedCollection, error) {
 
 	rand.Seed(time.Now().UnixNano())
-
-	N := 16  // 16 nodes
-	M := 100 // 100 collections
 
 	// prepare N connected nodes
 	entries := make([]string, N)
@@ -39,6 +36,13 @@ func prepareNodesAndCollections() (
 		gcs[m] = randCollection()
 	}
 	return nodes, gcs, nil
+}
+
+func prepareNodesAndCollections() (
+	[]*mockPropagationNode, []*collection.GuaranteedCollection, error) {
+	N := 16  // 16 nodes
+	M := 100 // 100 collections
+	return prepareNodesAndCollectionsConfigurable(N, M)
 }
 
 // given a list of node entries, return a list of mock nodes and connect them all to a hub
@@ -95,6 +99,6 @@ func randHash() []byte {
 func randCollection() *collection.GuaranteedCollection {
 	hash := randHash()
 	return &collection.GuaranteedCollection{
-		Hash: hash,
+		CollectionHash: hash,
 	}
 }

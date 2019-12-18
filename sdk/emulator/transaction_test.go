@@ -9,7 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
@@ -583,7 +583,7 @@ func TestGetTransaction(t *testing.T) {
 		require.Len(t, resTx.Events, 1)
 		actualEvent := resTx.Events[0]
 
-		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		require.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)

@@ -1,0 +1,26 @@
+{
+  "definitions": {
+    "Person": {
+      "struct": {
+        "fields": {
+          "fullName": "String"
+        },
+        "initializers": [
+          [
+            {
+              "name": "firstName",
+              "type": "String"
+            },
+            {
+              "name": "lastName",
+              "type": "String"
+            }
+          ]
+        ]
+      }
+    },
+    "BigName": {
+      "variable": "String"
+    }
+  }
+}

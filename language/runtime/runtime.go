@@ -302,7 +302,7 @@ func (r *interpreterRuntime) newInterpreter(
 		),
 		interpreter.WithStorageKeyHandler(
 			func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-				return indexingType.String()
+				return indexingType.ID()
 			},
 		),
 		interpreter.WithInjectedCompositeFieldsHandler(
@@ -619,7 +619,7 @@ func (r *interpreterRuntime) updateAccountCode(
 		contractValue = interpreter.NewSomeValueOwningNonCopying(contract)
 	}
 
-	contractValue.SetOwner(accountAddress.StorageIdentifier())
+	contractValue.SetOwner(accountAddress.Hex())
 
 	// NOTE: only update account code if contract instantiation succeeded
 
@@ -657,8 +657,7 @@ func (r *interpreterRuntime) loadContract(
 	case *interpreter.SomeValue:
 		return typedValue.Value.(*interpreter.CompositeValue)
 	case interpreter.NilValue:
-		// TODO: missing contract. panic?
-		return nil
+		panic("failed to load contract")
 	default:
 		panic(runtimeErrors.NewUnreachableError())
 	}
