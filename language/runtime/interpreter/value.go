@@ -17,7 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -1078,7 +1077,7 @@ func (v UInt8Value) KeyString() string {
 }
 
 func (v UInt8Value) Export() values.Value {
-	return values.NewUint8(uint8(v))
+	return values.NewUInt8(uint8(v))
 }
 
 func (v UInt8Value) IntValue() int {
@@ -1168,7 +1167,7 @@ func (v UInt16Value) KeyString() string {
 }
 
 func (v UInt16Value) Export() values.Value {
-	return values.NewUint16(uint16(v))
+	return values.NewUInt16(uint16(v))
 }
 
 func (v UInt16Value) IntValue() int {
@@ -1258,7 +1257,7 @@ func (v UInt32Value) KeyString() string {
 }
 
 func (v UInt32Value) Export() values.Value {
-	return values.NewUint32(uint32(v))
+	return values.NewUInt32(uint32(v))
 }
 
 func (v UInt32Value) IntValue() int {
@@ -1349,7 +1348,7 @@ func (v UInt64Value) KeyString() string {
 }
 
 func (v UInt64Value) Export() values.Value {
-	return values.NewUint64(uint64(v))
+	return values.NewUInt64(uint64(v))
 }
 
 func (v UInt64Value) IntValue() int {
