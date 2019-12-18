@@ -4,7 +4,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/components/reactor/core"
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/components/reactor/forkchoice"
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
-	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/defConAct"
 	"github.com/juju/loggo"
 )
 
@@ -29,7 +28,7 @@ func NewReactor(finalizer *core.ReactorCore, forkchoice forkchoice.ForkChoice) *
 	}
 }
 
-func (r *Reactor) OnBlockProposalTrigger(view uint64) {
+func (r *Reactor) OnForkChoiceTrigger(view uint64) {
 	// inspired by https://content.pivotal.io/blog/a-channel-based-ring-buffer-in-go
 	select {
 	case r.forkchoiceRequests <- view:
@@ -40,7 +39,6 @@ func (r *Reactor) OnBlockProposalTrigger(view uint64) {
 }
 
 func (r *Reactor) OnQcFromVotes(qc *def.QuorumCertificate) {
-	// inspired by https://content.pivotal.io/blog/a-channel-based-ring-buffer-in-go
 	select {
 	case r.newQCs <- qc:
 	default:
@@ -49,18 +47,14 @@ func (r *Reactor) OnQcFromVotes(qc *def.QuorumCertificate) {
 	}
 }
 
-func (r *Reactor) OnReceivedViewChange(qc *def.QuorumCertificate) {
+func (r *Reactor) OnReceivedBlockProposal(block *def.Block) {
 	// inspired by https://content.pivotal.io/blog/a-channel-based-ring-buffer-in-go
 	select {
-	case r.newQCs <- qc:
+	case r.newBlockProposals <- block:
 	default:
-		<-r.newQCs
-		r.newQCs <- qc
+		<-r.newBlockProposals
+		r.newBlockProposals <- block
 	}
-}
-
-func (r *Reactor) OnReceivedBlockProposal(viewChange *defConAct.ViewChange) {
-	r.OnReceivedViewChange(viewChange.QC)
 }
 
 func (r *Reactor) Run() {
@@ -87,7 +81,3 @@ func (r *Reactor) run() {
 	}
 }
 
-func (r *Reactor) isFromExpectedPrimary(proposal *def.BlockProposal) bool {
-	// ToDo implement
-	return true
-}

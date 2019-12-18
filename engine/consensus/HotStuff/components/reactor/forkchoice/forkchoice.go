@@ -15,6 +15,7 @@ type ForkChoice interface {
 	// IsProcessingNeeded returns true if consensus reactor should process the specified block
 	IsProcessingNeeded([]byte, uint64) bool
 
-	// GenerateForkChoice returns the QC that should be included in the next block
-	GenerateForkChoice() *def.QuorumCertificate
+	// OnForkChoiceTrigger prompts the ForkChoice to generate a fork choice
+	// and publish it via emitting an OnForkChoiceGenerated event
+	OnForkChoiceTrigger(viewNumber uint64)
 }

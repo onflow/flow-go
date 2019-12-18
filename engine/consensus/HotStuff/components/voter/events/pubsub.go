@@ -1,7 +1,7 @@
 package voterEvents
 
 import (
-	"reflect"
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/utils"
 	"sync"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/defConAct"
@@ -29,15 +29,10 @@ func (p *PubSubEventProcessor) OnSentVote(vote *defConAct.Vote) {
 // AddSentVoteConsumer adds a SentVoteConsumer to the PubSubEventProcessor;
 // concurrency safe; returns self-reference for chaining
 func (p *PubSubEventProcessor) AddSentVoteConsumer(cons SentVoteConsumer) *PubSubEventProcessor {
-	ensureNotNil(cons)
+	utils.EnsureNotNil(cons, "Event consumer")
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.sentVoteConsumers = append(p.sentVoteConsumers, cons)
 	return p
 }
 
-func ensureNotNil(proc interface{}) {
-	if proc == nil || reflect.ValueOf(proc).IsNil() {
-		panic("Consumer cannot be nil")
-	}
-}

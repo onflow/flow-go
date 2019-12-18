@@ -180,15 +180,15 @@ func (f *LeveledForrest) CopyDescendants(rootId []byte, rootLevel uint64, target
 	f.uncheckedCopyDescendants(container, targetForrest)
 }
 
-// GetChildren returns a vertexIterator to iterate over the children
-// An empty vertexIterator is returned, if no vertices are known whose parent is `id` , `level`
-func (f *LeveledForrest) GetChildren(id []byte, level uint64) vertexIterator {
+// GetChildren returns a VertexIterator to iterate over the children
+// An empty VertexIterator is returned, if no vertices are known whose parent is `id` , `level`
+func (f *LeveledForrest) GetChildren(id []byte, level uint64) VertexIterator {
 	container, _ := f.findVertexContainer(id, level)
 	// if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
 	return newVertexIterator(container.children) // VertexIterator gracefully handles nil slices
 }
 
-// GetVerticesAtLevel returns a vertexIterator to iterate over the Vertices at the specified height
+// GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified height
 func (f *LeveledForrest) GetNumberOfChildren(id []byte, level uint64) int {
 	container, _ := f.findVertexContainer(id, level) // if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
 	num := 0
@@ -200,13 +200,13 @@ func (f *LeveledForrest) GetNumberOfChildren(id []byte, level uint64) int {
 	return num
 }
 
-// GetVerticesAtLevel returns a vertexIterator to iterate over the Vertices at the specified height
-// An empty vertexIterator is returned, if no vertices are known at the specified `level`
-func (f *LeveledForrest) GetVerticesAtLevel(level uint64) vertexIterator {
+// GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified height
+// An empty VertexIterator is returned, if no vertices are known at the specified `level`
+func (f *LeveledForrest) GetVerticesAtLevel(level uint64) VertexIterator {
 	return newVertexIterator(f.verticesAtLevel[level]) // go returns the zero value for a missing level. Here, a nil slice
 }
 
-// GetVerticesAtLevel returns a vertexIterator to iterate over the Vertices at the specified height
+// GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified height
 func (f *LeveledForrest) GetNumberOfVerticesAtLevel(level uint64) int {
 	num := 0
 	for _, container := range f.verticesAtLevel[level] {
@@ -217,16 +217,16 @@ func (f *LeveledForrest) GetNumberOfVerticesAtLevel(level uint64) int {
 	return num
 }
 
-// vertexIterator is a stateful iterator for VertexList.
+// VertexIterator is a stateful iterator for VertexList.
 // Internally operates directly on the Vertex Containers
 // It has one-element look ahead for skipping empty vertex containers.
-type vertexIterator struct {
+type VertexIterator struct {
 	data VertexList
 	idx  int
 	next Vertex
 }
 
-func (it *vertexIterator) preLoad() {
+func (it *VertexIterator) preLoad() {
 	for it.idx < len(it.data) {
 		v := it.data[it.idx].vertex
 		it.idx++
@@ -239,19 +239,19 @@ func (it *vertexIterator) preLoad() {
 }
 
 // NextVertex returns the next Vertex or nil if there is none
-func (it *vertexIterator) NextVertex() Vertex {
+func (it *VertexIterator) NextVertex() Vertex {
 	res := it.next
 	it.preLoad()
 	return res
 }
 
 // HasNext returns true if and only if there is a next Vertex
-func (it *vertexIterator) HasNext() bool {
+func (it *VertexIterator) HasNext() bool {
 	return it.next != nil
 }
 
-func newVertexIterator(vertexList VertexList) vertexIterator {
-	it := vertexIterator{
+func newVertexIterator(vertexList VertexList) VertexIterator {
+	it := VertexIterator{
 		data: vertexList,
 	}
 	it.preLoad()

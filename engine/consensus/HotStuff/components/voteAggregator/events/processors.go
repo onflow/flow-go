@@ -5,7 +5,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/defConAct"
 )
 
-// Processor consumes events produced by reactor.core
+// Processor consumes events produced by voteAggregator
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type Processor interface {
