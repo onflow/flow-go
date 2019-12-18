@@ -1,98 +1,73 @@
 package events
 
 import (
-	"reflect"
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/utils"
 	"sync"
 )
 
 // PubSubEventProcessor implements pacemaker.events.Processor
 // It allows thread-safe subscription to events
 type PubSubEventProcessor struct {
-	blockProposalTriggerCons []BlockProposalTriggerConsumer
-	enteringViewCons         []EnteringViewConsumer
-	enteringCatchupModeCons  []EnteringCatchupModeConsumer
-	enteringVotingModeCons   []EnteringVotingModeConsumer
-	lock                     sync.RWMutex
+	forkChoiceTriggerConsumers []ForkChoiceTriggerConsumer
+	enteringViewConsumers      []EnteringViewConsumer
+	passiveTillViewConsumers   []PassiveTillViewConsumer
+	lock                       sync.RWMutex
 }
 
 func NewPubSubEventProcessor() *PubSubEventProcessor {
 	return &PubSubEventProcessor{}
 }
 
-func (p *PubSubEventProcessor) OnBlockProposalTrigger(view uint64) {
+func (p *PubSubEventProcessor) OnForkChoiceTrigger(view uint64) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	for _, subscriber := range p.blockProposalTriggerCons {
-		subscriber.OnBlockProposalTrigger(view)
+	for _, subscriber := range p.forkChoiceTriggerConsumers {
+		subscriber.OnForkChoiceTrigger(view)
 	}
 }
 
 func (p *PubSubEventProcessor) OnEnteringView(view uint64) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	for _, subscriber := range p.enteringViewCons {
+	for _, subscriber := range p.enteringViewConsumers {
 		subscriber.OnEnteringView(view)
 	}
 }
 
-func (p *PubSubEventProcessor) OnEnteringCatchupMode(view uint64) {
+func (p *PubSubEventProcessor) OnPassiveTillView(view uint64) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	for _, subscriber := range p.enteringCatchupModeCons {
-		subscriber.OnEnteringCatchupMode(view)
+	for _, subscriber := range p.passiveTillViewConsumers {
+		subscriber.OnPassiveTillView(view)
 	}
 }
 
-func (p *PubSubEventProcessor) OnEnteringVotingMode(view uint64) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.enteringVotingModeCons {
-		subscriber.OnEnteringVotingMode(view)
-	}
-}
-
-// AddBlockProposalTrigger adds an BlockProposalTriggerConsumer to the PubSubEventProcessor;
+// AddForkChoiceTriggerConsumer adds an ForkChoiceTriggerConsumer to the PubSubEventProcessor;
 // concurrency safe; returns self-reference for chaining
-func (p *PubSubEventProcessor) AddBlockProposalTrigger(cons BlockProposalTriggerConsumer) *PubSubEventProcessor {
-	ensureNotNil(cons)
+func (p *PubSubEventProcessor) AddForkChoiceTriggerConsumer(cons ForkChoiceTriggerConsumer) *PubSubEventProcessor {
+	utils.EnsureNotNil(cons, "Event consumer")
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.blockProposalTriggerCons = append(p.blockProposalTriggerCons, cons)
+	p.forkChoiceTriggerConsumers = append(p.forkChoiceTriggerConsumers, cons)
 	return p
 }
 
 // AddEnteringViewConsumer adds an EnteringViewConsumer to the PubSubEventProcessor;
 // concurrency safe; returns self-reference for chaining
 func (p *PubSubEventProcessor) AddEnteringViewConsumer(cons EnteringViewConsumer) *PubSubEventProcessor {
-	ensureNotNil(cons)
+	utils.EnsureNotNil(cons, "Event consumer")
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.enteringViewCons = append(p.enteringViewCons, cons)
+	p.enteringViewConsumers = append(p.enteringViewConsumers, cons)
 	return p
 }
 
 // AddEnteringCatchupModeConsumer adds an EnteringCatchupModeConsumer to the PubSubEventProcessor;
 // concurrency safe; returns self-reference for chaining
-func (p *PubSubEventProcessor) AddEnteringCatchupModeConsumer(cons EnteringCatchupModeConsumer) *PubSubEventProcessor {
-	ensureNotNil(cons)
+func (p *PubSubEventProcessor) AddEnteringCatchupModeConsumer(cons PassiveTillViewConsumer) *PubSubEventProcessor {
+	utils.EnsureNotNil(cons, "Event consumer")
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.enteringCatchupModeCons = append(p.enteringCatchupModeCons, cons)
+	p.passiveTillViewConsumers = append(p.passiveTillViewConsumers, cons)
 	return p
-}
-
-// AddEnteringVotingModeConsumer adds an EnteringVotingModeConsumer to the PubSubEventProcessor;
-// concurrency safe; returns self-reference for chaining
-func (p *PubSubEventProcessor) AddEnteringVotingModeConsumer(cons EnteringVotingModeConsumer) *PubSubEventProcessor {
-	ensureNotNil(cons)
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	p.enteringVotingModeCons = append(p.enteringVotingModeCons, cons)
-	return p
-}
-
-func ensureNotNil(cons interface{}) {
-	if cons == nil || reflect.ValueOf(cons).IsNil() {
-		panic("Processor cannot be nil")
-	}
 }

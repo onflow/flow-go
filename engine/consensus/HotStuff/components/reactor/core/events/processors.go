@@ -2,7 +2,6 @@ package events
 
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
-	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/defConAct"
 )
 
 // Processor consumes events produced by reactor.core
@@ -15,7 +14,6 @@ type Processor interface {
 	OnFinalizedBlock(*def.Block)
 
 	// Detected slashing conditions:
-	OnDoubleVoteDetected(*defConAct.Vote, *defConAct.Vote)
 	OnDoubleProposeDetected(*def.Block, *def.Block)
 }
 
@@ -53,15 +51,6 @@ type SafeBlockConsumer interface {
 // and must handle repetition of the same events (with some processing overhead).
 type FinalizedConsumer interface {
 	OnFinalizedBlock(*def.Block)
-}
-
-// DoubleVoteConsumer consumes the following type of event produced by reactor.core:
-// whenever a double voting (equivocation) was detected, the `DoubleVoteDetected` event is triggered
-// Prerequisites:
-// Implementation must be concurrency safe; Non-blocking;
-// and must handle repetition of the same events (with some processing overhead).
-type DoubleVoteConsumer interface {
-	OnDoubleVoteDetected(*defConAct.Vote, *defConAct.Vote)
 }
 
 // DoubleProposalConsumer consumes the following type of event produced by reactor.core:

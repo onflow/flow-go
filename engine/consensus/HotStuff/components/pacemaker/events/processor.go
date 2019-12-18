@@ -4,44 +4,37 @@ package events
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type Processor interface {
-	BlockProposalTrigger(uint64)
-	EnteringView(uint64)
-	EnteringCatchupMode(uint64)
-	EnteringVotingMode(uint64)
+	OnForkChoiceTrigger(uint64)
+	OnEnteringView(uint64)
+	OnPassiveTillView(uint64)
 }
 
-// BlockProposalTriggerConsumer events of type `OnBlockProposalTrigger`
-// which are produced by reactor.core.
+// GenerateForkChoiceTiggerConsumer consumes events of type `OnForkChoiceTrigger`
+// which are produced by pacemaker. An `OnGenerateForkChoiceTrigger` is emitted
+// by the Pacemaker to trigger the eventual formation of a block for the view `viewNumber`
 // Prerequisites:
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
-type BlockProposalTriggerConsumer interface {
-	OnBlockProposalTrigger(uint64)
+type ForkChoiceTriggerConsumer interface {
+	OnForkChoiceTrigger(viewNumber uint64)
 }
 
-// EnteringViewConsumer events of type `OnEnteringView`
-// which are produced by reactor.core.
+// EnteringViewConsumer consumes events of type `OnEnteringView`,
+// which are produced by pacemaker whenever it enters the view `viewNumber`.
 // Prerequisites:
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type EnteringViewConsumer interface {
-	OnEnteringView(uint64)
+	OnEnteringView(viewNumber uint64)
 }
 
-// EnteringCatchupModeConsumer events of type `OnEnteringCatchupMode`
-// which are produced by reactor.core.
+// PassiveTillViewConsumer events of type `OnPassiveTillView`, which are produced by pacemaker.
+// It indicates that all active consensus participation should be suspended
+// until (and including) `viewNumber`.
 // Prerequisites:
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
-type EnteringCatchupModeConsumer interface {
-	OnEnteringCatchupMode(uint64)
+type PassiveTillViewConsumer interface {
+	OnPassiveTillView(viewNumber uint64)
 }
 
-// EnteringVotingModeConsumer events of type `OnEnteringVotingMode`
-// which are produced by reactor.core.
-// Prerequisites:
-// Implementation must be concurrency safe; Non-blocking;
-// and must handle repetition of the same events (with some processing overhead).
-type EnteringVotingModeConsumer interface {
-	OnEnteringVotingMode(uint64)
-}

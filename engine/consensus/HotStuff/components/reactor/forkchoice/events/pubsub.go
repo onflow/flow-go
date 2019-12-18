@@ -1,7 +1,7 @@
 package events
 
 import (
-	"reflect"
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/utils"
 	"sync"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
@@ -38,7 +38,7 @@ func (p *PubSubEventProcessor) OnForkChoiceGenerated(qc *def.QuorumCertificate) 
 // AddIncorporatedQuorumCertificateConsumer adds an IncorporatedQuorumCertificateConsumer to the PubSubEventProcessor;
 // concurrency safe; returns self-reference for chaining
 func (p *PubSubEventProcessor) AddIncorporatedQuorumCertificateConsumer(cons IncorporatedQuorumCertificateConsumer) *PubSubEventProcessor {
-	ensureNotNil(cons)
+	utils.EnsureNotNil(cons, "Event consumer")
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.incorporatedQcCons = append(p.incorporatedQcCons, cons)
@@ -48,15 +48,9 @@ func (p *PubSubEventProcessor) AddIncorporatedQuorumCertificateConsumer(cons Inc
 // AddForkChoiceConsumer adds a ForkChoiceConsumer to the PubSubEventProcessor;
 // concurrency safe; returns self-reference for chaining
 func (p *PubSubEventProcessor) AddForkChoiceConsumer(cons ForkChoiceConsumer) *PubSubEventProcessor {
-	ensureNotNil(cons)
+	utils.EnsureNotNil(cons, "Event consumer")
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.forkChoiceCons = append(p.forkChoiceCons, cons)
 	return p
-}
-
-func ensureNotNil(cons interface{}) {
-	if cons == nil || reflect.ValueOf(cons).IsNil() {
-		panic("Processor cannot be nil")
-	}
 }
