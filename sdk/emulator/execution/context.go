@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
-type LoggerFunc func(string)
 type CheckerFunc func([]byte, runtime.Location) error
 
 // RuntimeContext implements host functionality required by the Cadence runtime.
@@ -20,12 +19,12 @@ type CheckerFunc func([]byte, runtime.Location) error
 // A context is short-lived and is intended to be used when executing a single transaction.
 //
 // The logic in this runtime context is specific to the emulator and is designed to be
-// used with an EmulatedBlockchain instance.
+// used with a Blockchain instance.
 type RuntimeContext struct {
 	ledger          *flow.LedgerView
 	signingAccounts []values.Address
-	logger          LoggerFunc
 	checker         CheckerFunc
+	logs            []string
 	events          []values.Event
 }
 
@@ -33,7 +32,6 @@ type RuntimeContext struct {
 func NewRuntimeContext(ledger *flow.LedgerView) *RuntimeContext {
 	return &RuntimeContext{
 		ledger:  ledger,
-		logger:  func(string) {},
 		checker: func([]byte, runtime.Location) error { return nil },
 		events:  make([]values.Event, 0),
 	}
@@ -61,11 +59,6 @@ func (r *RuntimeContext) GetSigningAccounts() []values.Address {
 	return r.signingAccounts
 }
 
-// SetLogger sets the logging function for this context.
-func (r *RuntimeContext) SetLogger(logger LoggerFunc) {
-	r.logger = logger
-}
-
 // SetChecker sets the semantic checker function for this context.
 func (r *RuntimeContext) SetChecker(checker CheckerFunc) {
 	r.checker = checker
@@ -74,6 +67,11 @@ func (r *RuntimeContext) SetChecker(checker CheckerFunc) {
 // Events returns all events emitted by the runtime to this context.
 func (r *RuntimeContext) Events() []values.Event {
 	return r.events
+}
+
+// Logs returns all logs emitted by the runtime to this context.
+func (r *RuntimeContext) Logs() []string {
+	return r.logs
 }
 
 // GetValue gets a register value from the world state.
@@ -325,11 +323,9 @@ func (r *RuntimeContext) ResolveImport(location runtime.Location) (values.Bytes,
 	return code, nil
 }
 
-// Log logs a message from the runtime.
-//
-// This functions calls the onLog callback registered with this context.
+// Log captures a log message from the runtime.
 func (r *RuntimeContext) Log(message string) {
-	r.logger(message)
+	r.logs = append(r.logs, message)
 }
 
 // EmitEvent is called when an event is emitted by the runtime.

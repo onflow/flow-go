@@ -17,7 +17,7 @@ import (
 )
 
 func TestSubmitTransaction(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -53,7 +53,7 @@ func TestSubmitTransaction(t *testing.T) {
 
 // TODO: Add test case for missing ReferenceBlockHash
 func TestSubmitInvalidTransaction(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -150,7 +150,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 }
 
 func TestSubmitDuplicateTransaction(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -188,7 +188,7 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 }
 
 func TestSubmitTransactionReverted(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	tx1 := flow.Transaction{
@@ -220,7 +220,7 @@ func TestSubmitTransactionReverted(t *testing.T) {
 }
 
 func TestSubmitTransactionScriptAccounts(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	privateKeyA := b.RootKey()
@@ -308,7 +308,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 func TestSubmitTransactionPayerSignature(t *testing.T) {
 	t.Run("MissingPayerSignature", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -334,7 +334,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	})
 
 	t.Run("InvalidAccount", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		invalidAddress := flow.HexToAddress("0000000000000000000000000000000000000002")
@@ -358,7 +358,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	})
 
 	t.Run("InvalidKeyPair", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -386,7 +386,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	})
 
 	t.Run("KeyWeights", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		privateKeyA, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
@@ -447,7 +447,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 func TestSubmitTransactionScriptSignatures(t *testing.T) {
 	t.Run("MissingScriptSignature", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		addressA := flow.HexToAddress("0000000000000000000000000000000000000002")
@@ -473,13 +473,8 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 	})
 
 	t.Run("MultipleAccounts", func(t *testing.T) {
-		loggedMessages := make([]string, 0)
-
-		b, _ := emulator.NewEmulatedBlockchain(emulator.WithRuntimeLogger(
-			func(msg string) {
-				loggedMessages = append(loggedMessages, msg)
-			},
-		))
+		b, err := emulator.NewBlockchain()
+		require.NoError(t, err)
 
 		privateKeyA := b.RootKey()
 
@@ -525,13 +520,13 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 
-		assert.Contains(t, loggedMessages, fmt.Sprintf("%x", accountAddressA.Bytes()))
-		assert.Contains(t, loggedMessages, fmt.Sprintf("%x", accountAddressB.Bytes()))
+		assert.Contains(t, result.Logs, fmt.Sprintf("%x", accountAddressA.Bytes()))
+		assert.Contains(t, result.Logs, fmt.Sprintf("%x", accountAddressB.Bytes()))
 	})
 }
 
 func TestGetTransaction(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	myEventType := types.Event{
