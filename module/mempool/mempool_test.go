@@ -21,14 +21,12 @@ func TestHash(t *testing.T) {
 
 	t.Run("insertion order should not impact the hash", func(t *testing.T) {
 		// create the first mempool with item1 and gc2
-		pool1, err := mempool.newMempool()
-		require.NoError(t, err)
+		pool1 := newMempool()
 		_ = pool1.Add(item1)
 		_ = pool1.Add(item2)
 
 		// create the second mempool with gc2 and item1
-		pool2, err := mempool.newMempool()
-		require.NoError(t, err)
+		pool2 := newMempool()
 		_ = pool2.Add(item2)
 		_ = pool2.Add(item1)
 
@@ -38,13 +36,11 @@ func TestHash(t *testing.T) {
 
 	t.Run("having different items should produce different hash", func(t *testing.T) {
 		// create the first mempool with only item1
-		pool1, err := mempool.newMempool()
-		require.NoError(t, err)
+		pool1 := newMempool()
 		_ = pool1.Add(item1)
 
 		// create the second mempool with item1 and item2
-		pool2, err := mempool.newMempool()
-		require.NoError(t, err)
+		pool2 := newMempool()
 		_ = pool2.Add(item1)
 		_ = pool1.Add(item2)
 
@@ -54,8 +50,7 @@ func TestHash(t *testing.T) {
 
 	t.Run("insert duplicated items should not impact hash", func(t *testing.T) {
 		// create the first mempool with item1 and item2
-		pool, err := mempool.newMempool()
-		require.NoError(t, err)
+		pool := newMempool()
 		_ = pool.Add(item1)
 		_ = pool.Add(item2)
 
@@ -73,8 +68,7 @@ func TestInsert(t *testing.T) {
 	item1 := hashable("DEAD")
 
 	t.Run("should be able to insert and retrieve", func(t *testing.T) {
-		pool, err := mempool.newMempool()
-		require.NoError(t, err)
+		pool := newMempool()
 		_ = pool.Add(item1)
 
 		t.Run("should be able to get size", func(t *testing.T) {
