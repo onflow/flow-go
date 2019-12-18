@@ -17,7 +17,7 @@ const (
 	codeHeader      = 20
 	codeIdentities  = 21
 	codeCollections = 22
-	codeHash        = 100
+	codeHash        = 100 //block number to hash
 	codeBoundary    = 101
 )
 

@@ -12,13 +12,16 @@ import (
 
 // insert will encode the given entity using JSON and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
-// key already exists.
+// key already exists and data under the key is different that one to be saved
 func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// check if the key already exists in the db
-		_, err := tx.Get(key)
+		item, err := tx.Get(key)
 		if err == nil {
+			err := item.Value(func(val []byte) error {
+
+			})
 			return errors.Errorf("key already exists (%x)", key)
 		}
 		if err != badger.ErrKeyNotFound {
