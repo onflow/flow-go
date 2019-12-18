@@ -1,6 +1,4 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
-package operation
+package badger_test
 
 import (
 	"fmt"
@@ -13,25 +11,24 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestAddressInsertRetrieve(t *testing.T) {
-
+func TestTransactionsInsertRetrieve(t *testing.T) {
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
 	defer os.RemoveAll(dir)
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 
-	nodeID := flow.Identifier{0x01}
-	expected := "address"
+	store := storage.NewTransactions(db)
 
-	err = db.Update(InsertAddress(nodeID, expected))
+	expected := unittest.TransactionFixture()
+	err = store.Insert(&expected)
 	require.Nil(t, err)
 
-	var actual string
-	err = db.View(RetrieveAddress(nodeID, &actual))
+	actual, err := store.ByHash(expected.Hash())
 	require.Nil(t, err)
 
-	assert.Equal(t, expected, actual)
+	assert.Equal(t, &expected, actual)
 }
