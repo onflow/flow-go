@@ -334,7 +334,7 @@ func populateNewForrest() *LeveledForrest {
 	return F
 }
 
-func children2List(it *vertexIterator) []*VertexMock {
+func children2List(it *VertexIterator) []*VertexMock {
 	l := []*VertexMock{}
 	for it.HasNext() {
 		// Vertex interface is implemented by VertexMock POINTER!

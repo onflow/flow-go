@@ -99,6 +99,7 @@ func (r *ReactorCore) ProcessBlock(block *def.Block) {
 	mainChainParent, hasParentInMainchain := r.mainChain.GetVertex(block.QC.BlockMRH, block.QC.View)
 	if !hasParentInMainchain { //if parent not in mainchain: add block to cache and return
 		r.cache.AddVertex(bc)
+		r.eventProcessor.OnMissingBlock(block.BlockMRH, block.View)
 		return
 	}
 
@@ -107,8 +108,8 @@ func (r *ReactorCore) ProcessBlock(block *def.Block) {
 	r.mergeBlocksFromCache(bc)
 }
 
-// mergeBlocksFromCache adds add descendants of block that are currently in the cache to the main chain.
-// block itself is not added, as it is a newly received block that should not be in the main chain.
+// mergeBlocksFromCache adds all descendants of block that are currently in the cache to the main chain.
+// block itself is NOT added.
 // Calling this method with previously-processed blocks leaves the consensus state invariant.
 func (r *ReactorCore) mergeBlocksFromCache(block *BlockContainer) {
 	// ToDo: [Optimization]
@@ -159,7 +160,7 @@ func (r *ReactorCore) setMainChainProperties(block, parent *BlockContainer) {
 // * Consider the set S of all blocks that have a DIRECT 2-chain on top of it
 //
 // * The 'Locked Block' is the block in S with the _highest view number_ (newest);
-//   LockedBlockQC should a QC POINTING TO this block
+//   LockedBlockQC should be a QC POINTING TO this block
 //
 // Calling this method with previously-processed blocks leaves consensus state invariant.
 func (r *ReactorCore) updateLockedQc(block *BlockContainer) {
