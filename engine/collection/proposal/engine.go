@@ -27,9 +27,10 @@ type Engine struct {
 	con   network.Conduit
 	me    module.Local
 	state protocol.State
-	//pool  *txpool.Pool // TODO replace with merkle tree
+	pool  module.TransactionPool
 	// TODO storage provider for transactions/guaranteed collections
 
+	// TODO replace with engine.Unit
 	stop    chan struct{}  // used to stop the proposer goroutine
 	stopped sync.WaitGroup // used to indicate that all goroutines have stopped
 }
