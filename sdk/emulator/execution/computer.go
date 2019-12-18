@@ -93,7 +93,7 @@ func (c *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transacti
 	return TransactionResult{
 		TransactionHash: tx.Hash(),
 		Result: Result{
-			Error:  err,
+			Error:  nil,
 			Logs:   runtimeContext.Logs(),
 			Events: events,
 		},
@@ -136,7 +136,7 @@ func (c *Computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptRe
 		ScriptHash: scriptHash,
 		Value:      value,
 		Result: Result{
-			Error:  err,
+			Error:  nil,
 			Logs:   runtimeContext.Logs(),
 			Events: events,
 		},
