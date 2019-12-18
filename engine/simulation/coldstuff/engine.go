@@ -29,7 +29,7 @@ type Engine struct {
 	con       network.Conduit
 	state     protocol.State
 	me        module.Local
-	pool      module.Mempool
+	pool      module.CollectionPool
 	round     Round
 	interval  time.Duration
 	timeout   time.Duration
@@ -43,7 +43,7 @@ type Engine struct {
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool module.Mempool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool module.CollectionPool) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{
@@ -551,7 +551,7 @@ func (e *Engine) commitCandidate() error {
 	// remove all collections from the block from the mempool
 	removed := uint(0)
 	for _, gc := range candidate.GuaranteedCollections {
-		ok := e.pool.Rem(gc.Hash)
+		ok := e.pool.Rem(gc.Hash())
 		if ok {
 			removed++
 		}

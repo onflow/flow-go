@@ -13,13 +13,13 @@ import (
 
 func main() {
 
-	var pool *mempool.Mempool
+	var pool *mempool.CollectionPool
 	var prop *propagation.Engine
 	var err error
 
 	cmd.FlowNode("consensus").
 		Create(func(node *cmd.FlowNodeBuilder) {
-			pool, err = mempool.New()
+			pool, err = mempool.NewCollectionPool()
 			node.MustNot(err).Msg("could not initialize engine mempool")
 		}).
 		CreateReadDoneAware("propagation engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
