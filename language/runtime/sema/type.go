@@ -33,7 +33,7 @@ type ExportableType interface {
 //Helper function to wrap a types in a variable if a variable is set
 func wrapVariable(t types.Type, variable *Variable) types.Type {
 	if variable != nil {
-		return types.Variable{
+		return &types.Variable{
 			Type: t,
 		}
 	} else {
@@ -114,7 +114,7 @@ func (*AnyStructType) Equal(other Type) bool {
 }
 
 func (*AnyStructType) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.AnyStruct{}, variable)
+	return wrapVariable(&types.AnyStruct{}, variable)
 }
 
 func (*AnyStructType) IsResourceType() bool {
@@ -144,7 +144,7 @@ func (*AnyResourceType) Equal(other Type) bool {
 }
 
 func (*AnyResourceType) AnyResourceType(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.AnyResource{}, variable)
+	return wrapVariable(&types.AnyResource{}, variable)
 }
 
 func (*AnyResourceType) IsResourceType() bool {
@@ -187,7 +187,7 @@ type VoidType struct{}
 func (*VoidType) isType() {}
 
 func (*VoidType) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Void{}, variable)
+	return wrapVariable(&types.Void{}, variable)
 }
 
 func (*VoidType) String() string {
@@ -279,7 +279,7 @@ func (t *OptionalType) IsInvalidType() bool {
 
 func (t *OptionalType) Export(program *ast.Program, variable *Variable) types.Type {
 
-	return wrapVariable(types.Optional{
+	return wrapVariable(&types.Optional{
 		Of: t.Type.(ExportableType).Export(program, nil),
 	}, variable)
 }
@@ -290,7 +290,7 @@ type BoolType struct{}
 func (*BoolType) isType() {}
 
 func (*BoolType) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Bool{}, variable)
+	return wrapVariable(&types.Bool{}, variable)
 }
 
 func (*BoolType) String() string {
@@ -347,7 +347,7 @@ type StringType struct{}
 func (*StringType) isType() {}
 
 func (*StringType) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.String{}, variable)
+	return wrapVariable(&types.String{}, variable)
 }
 
 func (*StringType) String() string {
@@ -491,7 +491,7 @@ type IntType struct{}
 func (*IntType) isType() {}
 
 func (*IntType) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int{}, variable)
+	return wrapVariable(&types.Int{}, variable)
 }
 
 func (*IntType) String() string {
@@ -530,7 +530,7 @@ type Int8Type struct{}
 func (*Int8Type) isType() {}
 
 func (*Int8Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int8{}, variable)
+	return wrapVariable(&types.Int8{}, variable)
 }
 
 func (*Int8Type) String() string {
@@ -571,7 +571,7 @@ type Int16Type struct{}
 func (*Int16Type) isType() {}
 
 func (*Int16Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int16{}, variable)
+	return wrapVariable(&types.Int16{}, variable)
 }
 
 func (*Int16Type) String() string {
@@ -612,7 +612,7 @@ type Int32Type struct{}
 func (*Int32Type) isType() {}
 
 func (*Int32Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int32{}, variable)
+	return wrapVariable(&types.Int32{}, variable)
 }
 
 func (*Int32Type) String() string {
@@ -653,7 +653,7 @@ type Int64Type struct{}
 func (*Int64Type) isType() {}
 
 func (*Int64Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int64{}, variable)
+	return wrapVariable(&types.Int64{}, variable)
 }
 
 func (*Int64Type) String() string {
@@ -694,7 +694,7 @@ type UInt8Type struct{}
 func (*UInt8Type) isType() {}
 
 func (*UInt8Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.UInt8{}, variable)
+	return wrapVariable(&types.UInt8{}, variable)
 }
 
 func (*UInt8Type) String() string {
@@ -735,7 +735,7 @@ type UInt16Type struct{}
 func (*UInt16Type) isType() {}
 
 func (*UInt16Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.UInt16{}, variable)
+	return wrapVariable(&types.UInt16{}, variable)
 }
 
 func (*UInt16Type) String() string {
@@ -776,7 +776,7 @@ type UInt32Type struct{}
 func (*UInt32Type) isType() {}
 
 func (*UInt32Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.UInt32{}, variable)
+	return wrapVariable(&types.UInt32{}, variable)
 }
 
 func (*UInt32Type) String() string {
@@ -817,7 +817,7 @@ type UInt64Type struct{}
 func (*UInt64Type) isType() {}
 
 func (*UInt64Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.UInt64{}, variable)
+	return wrapVariable(&types.UInt64{}, variable)
 }
 
 func (*UInt64Type) String() string {
@@ -1108,7 +1108,7 @@ func (*VariableSizedType) isType()      {}
 func (*VariableSizedType) isArrayType() {}
 
 func (t *VariableSizedType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.VariableSizedArray{
+	return wrapVariable(&types.VariableSizedArray{
 		ElementType: t.Type.(ExportableType).Export(program, nil),
 	}, variable)
 }
@@ -1168,7 +1168,7 @@ func (*ConstantSizedType) isType()      {}
 func (*ConstantSizedType) isArrayType() {}
 
 func (t *ConstantSizedType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.ConstantSizedArray{
+	return wrapVariable(&types.ConstantSizedArray{
 		Size:        uint(t.Size),
 		ElementType: t.Type.(ExportableType).Export(program, nil),
 	}, variable)
@@ -1249,7 +1249,7 @@ func (t *FunctionType) Export(program *ast.Program, variable *Variable) types.Ty
 			parameterTypes[i] = annotation.Type.(ExportableType).Export(program, nil)
 		}
 
-		return types.FunctionType{
+		return &types.FunctionType{
 			ParameterTypes: parameterTypes,
 			ReturnType:     t.ReturnTypeAnnotation.Type.(ExportableType).Export(program, nil),
 		}
@@ -1280,7 +1280,7 @@ func (t *FunctionType) Export(program *ast.Program, variable *Variable) types.Ty
 			}
 		}
 
-		return types.Function{
+		return &types.Function{
 			Parameters: parameterTypeAnnotations,
 			ReturnType: t.ReturnTypeAnnotation.Type.(ExportableType).Export(program, nil),
 		}
@@ -1593,11 +1593,11 @@ func (t *CompositeType) Equal(other Type) bool {
 func (t *CompositeType) exportAsPointer() types.Type {
 	switch t.Kind {
 	case common.CompositeKindStructure:
-		return types.StructPointer{
+		return &types.StructPointer{
 			TypeName: t.Identifier,
 		}
 	case common.CompositeKindResource:
-		return types.ResourcePointer{
+		return &types.ResourcePointer{
 			TypeName: t.Identifier,
 		}
 	}
@@ -1657,11 +1657,11 @@ func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.T
 
 	switch t.Kind {
 	case common.CompositeKindStructure:
-		return types.Struct{
+		return &types.Struct{
 			Composite: convert(),
 		}
 	case common.CompositeKindResource:
-		return types.Resource{
+		return &types.Resource{
 			Composite: convert(),
 		}
 	}
@@ -1968,7 +1968,7 @@ func (t *DictionaryType) String() string {
 }
 
 func (t *DictionaryType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Dictionary{
+	return wrapVariable(&types.Dictionary{
 		KeyType:     t.KeyType.(ExportableType).Export(program, nil),
 		ElementType: t.ValueType.(ExportableType).Export(program, nil),
 	}, variable)
@@ -2273,7 +2273,7 @@ func (t *EventType) Export(program *ast.Program, variable *Variable) types.Type 
 			Label: eventDeclaration.ParameterList.Parameters[i].Label,
 		}
 	}
-	return types.Event{
+	return &types.Event{
 		Fields:     fieldTypes,
 		Identifier: t.Identifier,
 	}
