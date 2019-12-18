@@ -348,12 +348,12 @@ func (r *RuntimeContext) isValidSigningAccount(address values.Address) bool {
 }
 
 // checkProgram checks the given code for syntactic and semantic correctness.
-func (r *RuntimeContext) checkProgram(code []byte, address []byte) error {
+func (r *RuntimeContext) checkProgram(code []byte, address values.Address) error {
 	if code == nil {
 		return nil
 	}
 
-	location := runtime.AddressLocation(address)
+	location := runtime.AddressLocation(address.Bytes())
 
 	return r.checker(code, location)
 }
