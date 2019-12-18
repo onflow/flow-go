@@ -60,7 +60,7 @@ var personType = types.Composite{
 	Fields: map[string]types.Type{
 		"FullName": types.String{},
 	},
-	Initializers: [][]*types.Parameter{
+	Initializers: [][]types.Parameter{
 		{
 			{
 				Identifier: "firstName",

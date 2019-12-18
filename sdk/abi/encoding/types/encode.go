@@ -116,7 +116,7 @@ func (encoder *Encoder) mapFields(m map[string]types.Type) map[string]interface{
 	return ret
 }
 
-func (encoder *Encoder) mapParameters(p []*types.Parameter) []parameter {
+func (encoder *Encoder) mapParameters(p []types.Parameter) []parameter {
 	ret := make([]parameter, len(p))
 
 	for i := range p {
@@ -132,7 +132,7 @@ func (encoder *Encoder) mapParameters(p []*types.Parameter) []parameter {
 	return ret
 }
 
-func (encoder *Encoder) mapNestedParameters(p [][]*types.Parameter) [][]parameter {
+func (encoder *Encoder) mapNestedParameters(p [][]types.Parameter) [][]parameter {
 
 	ret := make([][]parameter, len(p))
 	for i := range ret {
@@ -154,74 +154,82 @@ func (encoder *Encoder) mapTypes(types []types.Type) []interface{} {
 
 // For function return type Void is redundant, so we remove it
 func (encoder *Encoder) encodeReturnType(returnType types.Type) interface{} {
-	if _, ok := returnType.(*types.Void); ok == true {
+	if _, ok := returnType.(types.Void); ok == true {
 		return nil
 	}
 	return encoder.encode(returnType)
-}
-
-var typeToJSON = map[types.Type]string{
-	&types.AnyStruct{}:   "AnyStruct",
-	&types.AnyResource{}: "AnyResource",
-	&types.Bool{}:        "Bool",
-	&types.Void{}:        "Void",
-	&types.String{}:      "String",
-	&types.Int{}:         "Int",
-	&types.Int8{}:        "Int8",
-	&types.Int16{}:       "Int16",
-	&types.Int32{}:       "Int32",
-	&types.Int64{}:       "Int64",
-	&types.UInt8{}:       "UInt8",
-	&types.UInt16{}:      "UInt16",
-	&types.UInt32{}:      "UInt32",
-	&types.UInt64{}:      "UInt64",
 }
 
 const jsonTypeVariable = "variable"
 
 func (encoder *Encoder) encode(t types.Type) interface{} {
 
-	if s, ok := typeToJSON[t]; ok {
-		return s
-	}
-
 	switch v := (t).(type) {
 
-	case *types.VariableSizedArray:
+	case types.AnyStruct:
+		return "AnyStruct"
+	case types.AnyResource:
+		return "AnyResource"
+	case types.Bool:
+		return "Bool"
+	case types.Void:
+		return "Void"
+	case types.String:
+		return "String"
+	case types.Int:
+		return "Int"
+	case types.Int8:
+		return "Int8"
+	case types.Int16:
+		return "Int16"
+	case types.Int32:
+		return "Int32"
+	case types.Int64:
+		return "Int64"
+	case types.UInt8:
+		return "UInt8"
+	case types.UInt16:
+		return "UInt16"
+	case types.UInt32:
+		return "UInt32"
+	case types.UInt64:
+		return "UInt64"
+
+	case types.VariableSizedArray:
 		return arrayObject{array{Of: encoder.encode(v.ElementType)}}
-	case *types.ConstantSizedArray:
+	case types.ConstantSizedArray:
 		return arrayObject{array{Of: encoder.encode(v.ElementType), Size: v.Size}}
 
-	case *types.Optional:
+	case types.Optional:
 		return optionalObject{Optional: encoder.encode(v.Type)}
 
-	case *types.Struct:
+	case types.Struct:
 		return structObject{
 			Struct: structData{
 				Fields:       encoder.mapFields(v.Fields),
 				Initializers: encoder.mapNestedParameters(v.Initializers),
 			},
 		}
-	case *types.StructPointer:
+	case types.StructPointer:
 		return structPointer{
 			v.TypeName,
 		}
-	case *types.ResourcePointer:
+	case types.ResourcePointer:
 		return resourcePointer{
 			v.TypeName,
 		}
-	case *types.Event:
+	case types.Event:
 		return eventObject{
 			Event: encoder.mapParameters(v.Initializer),
 		}
-	case *types.Function:
+	case types.Function:
 		return functionObject{
 			function{
 				Parameters: encoder.mapParameters(v.Parameters),
 				ReturnType: encoder.encodeReturnType(v.ReturnType),
 			},
 		}
-	case *types.FunctionType:
+	case types.FunctionType:
 		return functionObject{
 			functionType{
 				Parameters: encoder.mapTypes(v.ParameterTypes),
@@ -229,21 +237,21 @@ func (encoder *Encoder) encode(t types.Type) interface{} {
 			},
 		}
 
-	case *types.Dictionary:
+	case types.Dictionary:
 		return dictionaryObject{
 			dictionary{
 				Keys:   encoder.encode(v.KeyType),
 				Values: encoder.encode(v.ElementType),
 			},
 		}
-	case *types.Resource:
+	case types.Resource:
 		return resourceObject{
 			structData{
 				Fields:       encoder.mapFields(v.Fields),
 				Initializers: encoder.mapNestedParameters(v.Initializers),
 			},
 		}
-	case *types.Variable:
+	case types.Variable:
 		return variableObject{
 			encoder.encode(v.Type),
 		}

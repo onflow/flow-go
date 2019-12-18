@@ -198,15 +198,15 @@ func TestExportability(t *testing.T) {
 
 		ex := ty.Export(program, variable)
 
-		assert.IsType(t, &types.Struct{}, ex)
-		s := ex.(*types.Struct)
+		assert.IsType(t, types.Struct{}, ex)
+		s := ex.(types.Struct)
 
 		assert.Equal(t, identifier, s.Identifier)
 		require.Len(t, s.Fields, 1)
 
 		require.Contains(t, s.Fields, "fieldA")
 
-		assert.IsType(t, &types.Int{}, s.Fields["fieldA"])
+		assert.IsType(t, types.Int{}, s.Fields["fieldA"])
 	})
 
 	t.Run("string", func(t *testing.T) {
@@ -215,7 +215,7 @@ func TestExportability(t *testing.T) {
 
 		ex := ty.Export(nil, nil)
 
-		assert.IsType(t, &types.String{}, ex)
+		assert.IsType(t, types.String{}, ex)
 	})
 
 	t.Run("events", func(t *testing.T) {
@@ -272,14 +272,14 @@ func TestExportability(t *testing.T) {
 
 		ex := ty.Export(program, &variable)
 
-		assert.IsType(t, &types.Event{}, ex)
+		assert.IsType(t, types.Event{}, ex)
 
-		event := ex.(*types.Event)
+		event := ex.(types.Event)
 
 		require.Len(t, event.Fields, 2)
 
-		assert.IsType(t, &types.String{}, event.Fields["who"])
-		assert.IsType(t, &types.Int{}, event.Fields["where"])
+		assert.IsType(t, types.String{}, event.Fields["who"])
+		assert.IsType(t, types.Int{}, event.Fields["where"])
 
 		require.Len(t, event.Initializer, 2)
 		assert.Equal(t, "magic_caster", event.Initializer[0].Label)

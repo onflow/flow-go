@@ -36,19 +36,19 @@ func wrap(s *jen.Statement) *abiAwareStatement {
 // write type information as a part of statement
 func (a *abiAwareStatement) Type(t types.Type) *abiAwareStatement {
 	switch v := t.(type) {
-	case *types.String:
+	case types.String:
 		return wrap(a.String())
-	case *types.VariableSizedArray:
+	case types.VariableSizedArray:
 		return a.Index().Type(v.ElementType)
-	case *types.StructPointer:
+	case types.StructPointer:
 		return a.Id(viewInterfaceName(v.TypeName))
-	case *types.Optional:
+	case types.Optional:
 		return a.Op("*").Type(v.Type)
-	case *types.Int:
+	case types.Int:
 		return wrap(a.Int())
-	case *types.UInt8:
+	case types.UInt8:
 		return wrap(a.Uint8())
-	case *types.UInt16:
+	case types.UInt16:
 		return wrap(a.Uint16())
 	}
 
@@ -129,7 +129,7 @@ func converterFor(t types.Type) *abiAwareStatement {
 		}
 
 		switch v := t.(type) {
-		case *types.Optional:
+		case types.Optional:
 			if writeTo == nil {
 				return funcWrapper(&jen.Statement{
 					variable().Id(retVariable).Type(v.Type).Line(),
@@ -152,7 +152,7 @@ func converterFor(t types.Type) *abiAwareStatement {
 				}),
 			})
 
-		case *types.Int:
+		case types.Int:
 			if writeTo == nil {
 				return qual(valuesImportPath, "CastToInt")
 			}
@@ -161,7 +161,7 @@ func converterFor(t types.Type) *abiAwareStatement {
 				jen.List(writeTo, id("err")).Op("=").Qual(valuesImportPath, "CastToInt").Call(id(castVariable)).Line(),
 				ifErrorBlock,
 			})
-		case *types.String:
+		case types.String:
 			if writeTo == nil {
 				return qual(valuesImportPath, "CastToString")
 			}
@@ -170,7 +170,7 @@ func converterFor(t types.Type) *abiAwareStatement {
 				jen.List(writeTo, id("err")).Op("=").Qual(valuesImportPath, "CastToString").Call(id(castVariable)).Line(),
 				ifErrorBlock,
 			})
-		case *types.UInt8:
+		case types.UInt8:
 			if writeTo == nil {
 				return qual(valuesImportPath, "CastToUInt8")
 			}
@@ -179,7 +179,7 @@ func converterFor(t types.Type) *abiAwareStatement {
 				jen.List(writeTo, id("err")).Op("=").Qual(valuesImportPath, "CastToUInt8").Call(id(castVariable)).Line(),
 				ifErrorBlock,
 			})
-		case *types.UInt16:
+		case types.UInt16:
 			if writeTo == nil {
 				return qual(valuesImportPath, "CastToUInt16")
 			}
@@ -188,7 +188,7 @@ func converterFor(t types.Type) *abiAwareStatement {
 				jen.List(writeTo, id("err")).Op("=").Qual(valuesImportPath, "CastToUInt16").Call(id(castVariable)).Line(),
 				ifErrorBlock,
 			})
-		case *types.StructPointer:
+		case types.StructPointer:
 			if writeTo == nil {
 				return id(viewInterfaceFromValue(v.TypeName))
 			}
@@ -196,7 +196,7 @@ func converterFor(t types.Type) *abiAwareStatement {
 				jen.List(writeTo, id("err")).Op("=").Id(viewInterfaceFromValue(v.TypeName)).Call(param).Line(),
 				ifErrorBlock,
 			})
-		case *types.VariableSizedArray:
+		case types.VariableSizedArray:
 			elemVariable := "elem" + strconv.Itoa(depth)
 			iterVariable := "i" + strconv.Itoa(depth)
 			if writeTo == nil {
@@ -239,11 +239,11 @@ const (
 )
 
 // SelfType writes t as itself in Go
-func (a *abiAwareStatement) SelfType(t types.Type, allTypesMap map[string]*types.Composite) *abiAwareStatement {
+func (a *abiAwareStatement) SelfType(t types.Type, allTypesMap map[string]types.Composite) *abiAwareStatement {
 	switch v := t.(type) {
-	case *types.String:
+	case types.String:
 		return wrap(a.Statement.Qual(typesImportPath, "String").Values())
-	case *types.Composite:
+	case types.Composite:
 		mappedFields := jen.Dict{}
 
 		for key, field := range v.Fields {
@@ -255,7 +255,7 @@ func (a *abiAwareStatement) SelfType(t types.Type, allTypesMap map[string]*types
 		for i, initializer := range v.Initializers {
 			params := make([]jen.Code, len(initializer))
 			for i, param := range v.Initializers[i] {
-				params[i] = op("&").Qual(typesImportPath, "Parameter").Values(
+				params[i] = qual(typesImportPath, "Parameter").Values(
 					jen.Dict{
 						id("Label"):      jen.Lit(param.Label),
 						id("Identifier"): jen.Lit(param.Identifier),
@@ -269,25 +269,25 @@ func (a *abiAwareStatement) SelfType(t types.Type, allTypesMap map[string]*types
 
 		return wrap(a.Statement.Qual(typesImportPath, "Composite").Values(jen.Dict{
 			id("Fields"):       jen.Map(jen.String()).Qual(typesImportPath, "Type").Values(mappedFields),
-			id("Initializers"): jen.Index().Index().Op("*").Qual(typesImportPath, "Parameter").Values(mappedInitializers...),
+			id("Initializers"): jen.Index().Index().Qual(typesImportPath, "Parameter").Values(mappedInitializers...),
 			id("Identifier"):   jen.Lit(v.Identifier),
 		}))
-	case *types.VariableSizedArray:
+	case types.VariableSizedArray:
 		return wrap(a.Statement.Qual(typesImportPath, "VariableSizedArray").Values(jen.Dict{
 			id("ElementType"): empty().SelfType(v.ElementType, allTypesMap),
 		}))
-	case *types.StructPointer: //Here we attach real type object rather then re-print pointer
+	case types.StructPointer: //Here we attach real type object rather then re-print pointer
 		if _, ok := allTypesMap[v.TypeName]; ok {
 			return a.Id(typeVariableName(v.TypeName))
 		}
 		panic(fmt.Errorf("StructPointer to unknown type name %s", v))
-	case *types.Optional:
+	case types.Optional:
 		return wrap(a.Statement.Qual(typesImportPath, "Optional").Values(jen.Dict{
 			id("Type"): empty().SelfType(v.Type, allTypesMap),
 		}))
-	case *types.UInt8:
+	case types.UInt8:
 		return wrap(a.Statement.Qual(typesImportPath, "UInt8").Values())
-	case *types.UInt16:
+	case types.UInt16:
 		return wrap(a.Statement.Qual(typesImportPath, "UInt16").Values())
 	}
 
@@ -391,7 +391,7 @@ func viewInterfaceFromValue(name string) string {
 	return viewInterfaceName(name) + "fromValue"
 }
 
-func GenerateGo(pkg string, typesToGenerate map[string]*types.Composite, writer io.Writer) error {
+func GenerateGo(pkg string, typesToGenerate map[string]types.Composite, writer io.Writer) error {
 
 	f := jen.NewFile(pkg)
 

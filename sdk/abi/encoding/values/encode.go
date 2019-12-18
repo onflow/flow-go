@@ -103,6 +103,23 @@ func (e *Encoder) EncodeVoid() error {
 	return nil
 }
 
+// EncodeOptional writes the XDR-encoded representation of an optional value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.19
+//  RFC Section 4.19 - Optional-Data
+//  Union of boolean and encoded value
+func (e *Encoder) EncodeOptional(v values.Optional) error {
+	hasValue := v.Value != nil
+	_, err := e.enc.EncodeBool(hasValue)
+	if err != nil {
+		return err
+	}
+	if hasValue {
+		return e.Encode(v.Value)
+	}
+	return nil
+}
+
 // EncodeBool writes the XDR-encoded representation of a boolean value.
 //
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.4
@@ -364,21 +381,4 @@ func (e *Encoder) EncodeEvent(v values.Event) error {
 	}
 
 	return e.encodeArray(vals)
-}
-
-// EncodeOptional writes the XDR-encoded representation of an optional value.
-//
-// Reference: https://tools.ietf.org/html/rfc4506#section-4.19
-//  RFC Section 4.19 - Optional-Data
-//  Union of boolean and encoded value
-func (e *Encoder) EncodeOptional(v values.Optional) error {
-	hasValue := v.Value != nil
-	_, err := e.enc.EncodeBool(hasValue)
-	if err != nil {
-		return err
-	}
-	if hasValue {
-		return e.Encode(v.Value)
-	}
-	return nil
 }

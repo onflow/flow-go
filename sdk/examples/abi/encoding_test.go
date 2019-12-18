@@ -55,13 +55,13 @@ func TestDecodingUsingAbi(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	compositeTypes := map[string]*types.Composite{}
+	compositeTypes := map[string]types.Composite{}
 	for name, typ := range allTypes {
 		switch composite := typ.(type) {
-		case *types.Resource:
-			compositeTypes[name] = &composite.Composite
-		case *types.Struct:
-			compositeTypes[name] = &composite.Composite
+		case types.Resource:
+			compositeTypes[name] = composite.Composite
+		case types.Struct:
+			compositeTypes[name] = composite.Composite
 		default:
 			_, err := fmt.Fprintf(os.Stderr, "Definition %s of type %T is not supported, skipping\n", name, typ)
 			if err != nil {

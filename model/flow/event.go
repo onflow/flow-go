@@ -66,11 +66,10 @@ type AccountCreatedEvent interface {
 }
 
 var AccountCreatedEventType types.Type = types.Event{
-	TypeID: EventAccountCreated,
 	Fields: map[string]types.Type{
 		"address": types.Address{},
 	},
-}
+}.WithID(EventAccountCreated)
 
 func newAccountCreatedEventFromValue(v values.Value) AccountCreatedEvent {
 	eventValue := v.(values.Event)

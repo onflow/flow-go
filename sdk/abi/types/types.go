@@ -141,14 +141,19 @@ type Parameter struct {
 
 type Composite struct {
 	isAType
-	TypeID       string
+	typeID       string
 	Identifier   string
 	Fields       map[string]Type
-	Initializers [][]*Parameter
+	Initializers [][]Parameter
 }
 
 func (t Composite) ID() string {
-	return t.TypeID
+	return t.typeID
+}
+
+func (t Composite) WithID(id string) Composite {
+	t.typeID = id
+	return t
 }
 
 type Struct struct {
@@ -163,25 +168,35 @@ type Resource struct {
 
 type Event struct {
 	isAType
-	TypeID      string
+	typeID      string
 	Identifier  string
 	Fields      map[string]Type
-	Initializer []*Parameter
+	Initializer []Parameter
 }
 
 func (t Event) ID() string {
-	return t.TypeID
+	return t.typeID
+}
+
+func (t Event) WithID(id string) Event {
+	t.typeID = id
+	return t
 }
 
 type Function struct {
 	isAType
-	TypeID     string
+	typeID     string
 	Identifier string
-	Parameters []*Parameter
+	Parameters []Parameter
 	ReturnType Type
 }
 
-func (t Function) ID() string { return t.TypeID }
+func (t Function) ID() string { return t.typeID }
+
+func (t Function) WithID(id string) Function {
+	t.typeID = id
+	return t
+}
 
 type FunctionType struct {
 	isAType

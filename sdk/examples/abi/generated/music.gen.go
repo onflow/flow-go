@@ -11,21 +11,18 @@ import (
 )
 
 type AlbumView interface {
-	Year() uint16
 	Artist() ArtistView
 	Name() string
 	Rating() *uint8
+	Year() uint16
 }
 type albumView struct {
-	_year   uint16
 	_artist ArtistView
 	_name   string
 	_rating *uint8
+	_year   uint16
 }
 
-func (t *albumView) Year() uint16 {
-	return t._year
-}
 func (t *albumView) Artist() ArtistView {
 	return t._artist
 }
@@ -35,13 +32,11 @@ func (t *albumView) Name() string {
 func (t *albumView) Rating() *uint8 {
 	return t._rating
 }
+func (t *albumView) Year() uint16 {
+	return t._year
+}
 func AlbumViewfromValue(value values.Value) (AlbumView, error) {
 	composite, err := values.CastToComposite(value)
-	if err != nil {
-		return nil, err
-	}
-
-	_year, err := values.CastToUInt16(composite.Fields["year"])
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +52,11 @@ func AlbumViewfromValue(value values.Value) (AlbumView, error) {
 	}
 
 	_rating, err := __converter0(composite.Fields["rating"])
+	if err != nil {
+		return nil, err
+	}
+
+	_year, err := values.CastToUInt16(composite.Fields["year"])
 	if err != nil {
 		return nil, err
 	}
@@ -105,19 +105,19 @@ var albumType = types.Composite{
 		"year":   types.UInt16{},
 	},
 	Identifier: "Album",
-	Initializers: [][]*types.Parameter{{&types.Parameter{
+	Initializers: [][]types.Parameter{{types.Parameter{
 		Identifier: "artist",
 		Label:      "",
 		Type:       artistType,
-	}, &types.Parameter{
+	}, types.Parameter{
 		Identifier: "name",
 		Label:      "",
 		Type:       types.String{},
-	}, &types.Parameter{
+	}, types.Parameter{
 		Identifier: "year",
 		Label:      "",
 		Type:       types.UInt16{},
-	}, &types.Parameter{
+	}, types.Parameter{
 		Identifier: "rating",
 		Label:      "",
 		Type:       types.Optional{Type: types.UInt8{}},
@@ -157,32 +157,27 @@ func NewAlbumConstructor(artist ArtistView, name string, year uint16, rating *ui
 }
 
 type ArtistView interface {
-	Country() string
 	Members() *[]string
 	Name() string
+	Country() string
 }
 type artistView struct {
-	_country string
 	_members *[]string
 	_name    string
+	_country string
 }
 
-func (t *artistView) Country() string {
-	return t._country
-}
 func (t *artistView) Members() *[]string {
 	return t._members
 }
 func (t *artistView) Name() string {
 	return t._name
 }
+func (t *artistView) Country() string {
+	return t._country
+}
 func ArtistViewfromValue(value values.Value) (ArtistView, error) {
 	composite, err := values.CastToComposite(value)
-	if err != nil {
-		return nil, err
-	}
-
-	_country, err := values.CastToString(composite.Fields["country"])
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +188,11 @@ func ArtistViewfromValue(value values.Value) (ArtistView, error) {
 	}
 
 	_name, err := values.CastToString(composite.Fields["name"])
+	if err != nil {
+		return nil, err
+	}
+
+	_country, err := values.CastToString(composite.Fields["country"])
 	if err != nil {
 		return nil, err
 	}
@@ -239,15 +239,15 @@ var artistType = types.Composite{
 		"name":    types.String{},
 	},
 	Identifier: "Artist",
-	Initializers: [][]*types.Parameter{{&types.Parameter{
+	Initializers: [][]types.Parameter{{types.Parameter{
 		Identifier: "name",
 		Label:      "",
 		Type:       types.String{},
-	}, &types.Parameter{
+	}, types.Parameter{
 		Identifier: "members",
 		Label:      "",
 		Type:       types.Optional{Type: types.VariableSizedArray{ElementType: types.String{}}},
-	}, &types.Parameter{
+	}, types.Parameter{
 		Identifier: "country",
 		Label:      "",
 		Type:       types.String{},
