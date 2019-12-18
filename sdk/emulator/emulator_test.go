@@ -2,8 +2,12 @@ package emulator_test
 
 import (
 	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/emulator"
 )
 
 const counterScript = `
@@ -51,6 +55,13 @@ func generateAddTwoToCounterScript(counterAddress flow.Address) string {
         `,
 		counterAddress,
 	)
+}
+
+func deployAndGenerateAddTwoScript(t *testing.T, b *emulator.EmulatedBlockchain) (string, flow.Address) {
+	counterAddress, err := b.CreateAccount(nil, []byte(counterScript), getNonce())
+	require.NoError(t, err)
+
+	return generateAddTwoToCounterScript(counterAddress), counterAddress
 }
 
 func generateGetCounterCountScript(counterAddress flow.Address, accountAddress flow.Address) string {

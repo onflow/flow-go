@@ -1,0 +1,101 @@
+{
+  "definitions": {
+    "Album": {
+      "resource": {
+        "fields": {
+          "artist": {
+            "struct": "Artist"
+          },
+          "name": "String",
+          "rating": {
+            "optional": "UInt8"
+          },
+          "year": "UInt16"
+        },
+        "initializers": [
+          [
+            {
+              "name": "artist",
+              "type": {
+                "struct": "Artist"
+              }
+            },
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "year",
+              "type": "UInt16"
+            },
+            {
+              "name": "rating",
+              "type": {
+                "optional": "UInt8"
+              }
+            }
+          ]
+        ]
+      }
+    },
+    "Artist": {
+      "struct": {
+        "fields": {
+          "country": "String",
+          "members": {
+            "optional": {
+              "array": {
+                "of": "String"
+              }
+            }
+          },
+          "name": "String"
+        },
+        "initializers": [
+          [
+            {
+              "name": "name",
+              "type": "String"
+            },
+            {
+              "name": "members",
+              "type": {
+                "optional": {
+                  "array": {
+                    "of": "String"
+                  }
+                }
+              }
+            },
+            {
+              "name": "country",
+              "type": "String"
+            }
+          ]
+        ]
+      }
+    },
+    "getAlbums": {
+      "function": {
+        "returnType": {
+          "array": {
+            "of": {
+              "resource": "Album"
+            }
+          }
+        }
+      }
+    },
+    "main": {
+      "function": {
+        "returnType": {
+          "array": {
+            "of": {
+              "resource": "Album"
+            }
+          }
+        }
+      }
+    }
+  }
+}
