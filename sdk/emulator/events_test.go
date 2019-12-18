@@ -93,8 +93,6 @@ func TestEventEmitted(t *testing.T) {
 	})
 
 	t.Run("EmittedFromScript", func(t *testing.T) {
-		events := make([]flow.Event, 0)
-
 		b, err := emulator.NewEmulatedBlockchain()
 		require.NoError(t, err)
 
@@ -106,11 +104,11 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`)
 
-		_, events, err = b.ExecuteScript(script)
+		result, err := b.ExecuteScript(script)
 		assert.NoError(t, err)
-		require.Len(t, events, 1)
+		require.Len(t, result.Events, 1)
 
-		actualEvent := events[0]
+		actualEvent := result.Events[0]
 
 		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)

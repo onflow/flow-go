@@ -3,6 +3,7 @@ package types
 import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 )
 
 // A PendingBlock contains the pending state required to form a new block.
@@ -100,34 +101,37 @@ func (b *PendingBlock) Transactions() []flow.Transaction {
 // execution, then updates the pending block with the output.
 func (b *PendingBlock) ExecuteNextTransaction(
 	execute func(
-		tx *flow.Transaction,
 		ledger *flow.LedgerView,
-		success func(events []flow.Event),
-		revert func(),
-	),
-) {
+		tx flow.Transaction,
+	) (execution.TransactionResult, error),
+) (execution.TransactionResult, error) {
 	tx := b.nextTransaction()
 
 	ledger := b.ledger.NewView()
 
-	execute(
-		tx,
-		ledger,
-		func(events []flow.Event) {
-			tx.Status = flow.TransactionFinalized
-			tx.Events = events
+	result, err := execute(ledger, *tx)
+	if err != nil {
+		// fail fast if fatal error occurs
+		return execution.TransactionResult{}, err
+	}
 
-			b.events = append(b.events, events...)
-			b.ledger.MergeWith(ledger.Updated())
-		},
-		func() {
-			tx.Status = flow.TransactionReverted
-		},
-	)
-
+	// increment transaction index even if transaction reverts
 	b.index++
+
+	if result.Reverted() {
+		tx.Status = flow.TransactionReverted
+	} else {
+		tx.Status = flow.TransactionFinalized
+		tx.Events = result.Events
+
+		b.events = append(b.events, result.Events...)
+		b.ledger.MergeWith(ledger.Updated())
+	}
+
+	return result, nil
 }
 
+// Events returns all events captured during the execution of the pending block.
 func (b *PendingBlock) Events() []flow.Event {
 	return b.events
 }
