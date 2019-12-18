@@ -27,7 +27,7 @@ func NewTree() *Tree {
 
 // Put will stores the given value in the trie under the given key. If the key
 // already exists, it will replace the value and return true.
-func (t *Tree) Put(key crypto.Hash, val []byte) bool {
+func (t *Tree) Put(key crypto.Hash, val interface{}) bool {
 
 	// the path through the tree is determined by the key; we decide whether to
 	// go left or right based on whether the next bit is set or not
@@ -171,7 +171,7 @@ PutLoop:
 
 // Get will retrieve the value associated with the given key. It returns true
 // if the key was found and false otherwise.
-func (t *Tree) Get(key crypto.Hash) ([]byte, bool) {
+func (t *Tree) Get(key crypto.Hash) (interface{}, bool) {
 
 	// we start at the root again
 	cur := &t.root

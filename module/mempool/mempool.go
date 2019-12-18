@@ -16,8 +16,6 @@ type Item interface {
 	Hash() crypto.Hash
 }
 
-type Mempool mempool
-
 // mempool implements a generic memory pool backed by a merkle tree.
 type mempool struct {
 	sync.RWMutex
@@ -89,7 +87,7 @@ func (m *mempool) Hash() crypto.Hash {
 func (m *mempool) Size() uint {
 	m.RLock()
 	defer m.RUnlock()
-	return uint(len(m.items))
+	return m.Size()
 }
 
 // All returns all items from the pool.
