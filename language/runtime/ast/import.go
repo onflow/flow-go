@@ -98,7 +98,7 @@ func init() {
 type AddressLocation []byte
 
 func (l AddressLocation) ID() LocationID {
-	return LocationID(fmt.Sprintf("A.%x", l.ToAddress()))
+	return LocationID(fmt.Sprintf("A.%s", l.ToAddress().Hex()))
 }
 
 func (l AddressLocation) ToAddress() values.Address {
