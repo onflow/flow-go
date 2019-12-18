@@ -29,7 +29,7 @@ type Engine struct {
 }
 
 // New creates a new collection ingest engine.
-func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, pool module.TransactionPool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool module.TransactionPool) (*Engine, error) {
 	identities, err := state.Final().Identities(identity.HasRole(flow.RoleCollection))
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)

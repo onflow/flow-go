@@ -35,7 +35,7 @@ type Engine struct {
 	stopped sync.WaitGroup // used to indicate that all goroutines have stopped
 }
 
-func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
 	e := &Engine{
 		log:   log.With().Str("engine", "proposal").Logger(),
 		me:    me,
