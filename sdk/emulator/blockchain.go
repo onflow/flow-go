@@ -566,6 +566,7 @@ func (b *Blockchain) CreateAccount(
 		return flow.Address{}, err
 	}
 
+	
 	_, _, err = b.ExecuteAndCommitBlock()
 	if err != nil {
 		return flow.Address{}, err

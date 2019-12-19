@@ -30,14 +30,14 @@ type TransactionBody struct {
 	// Each account might provide multiple signatures (sum of weight should be at least 1)
 	// If code touches accounts that is not listed here, tx fails
 	ScriptAccounts []Address
-	// List of account signatures including signatures of the payer account and the script accounts
-	Signatures []AccountSignature
 }
 
 // Transaction is the smallest unit of task.
 type Transaction struct {
 	// Body of the transaction
 	TransactionBody
+	// List of account signatures including signatures of the payer account and the script accounts
+	Signatures       []AccountSignature
 	Status           TransactionStatus
 	Events           []Event
 	ComputationSpent uint64
@@ -48,7 +48,7 @@ type Transaction struct {
 // Fingerprint hashes the transaction body
 // Fingerprint provides a meseaure to check the integrity of the content
 func (tx *Transaction) Fingerprint() Fingerprint {
-	return Fingerprint(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(tx.TransactionBody)))
+	return Fingerprint(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(tx)))
 }
 
 // ID returns an Identifier (unique id) for this transaction
