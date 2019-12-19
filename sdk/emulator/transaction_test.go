@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
@@ -530,12 +531,10 @@ func TestGetTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	myEventType := types.Event{
-		Fields: []*types.Parameter{
+		Fields: []types.Field{
 			{
-				Field: types.Field{
-					Identifier: "x",
-					Type:       types.Int{},
-				},
+				Identifier: "x",
+				Type:       types.Int{},
 			},
 		},
 	}
@@ -588,7 +587,8 @@ func TestGetTransaction(t *testing.T) {
 
 		decodedEvent := eventValue.(values.Event)
 
-		eventType := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
+		location := runtime.TransactionLocation(tx.Hash())
+		eventType := fmt.Sprintf("%s.MyEvent", location.ID())
 
 		assert.Equal(t, tx.Hash(), actualEvent.TxHash)
 		assert.Equal(t, eventType, actualEvent.Type)

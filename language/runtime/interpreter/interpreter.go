@@ -11,9 +11,9 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	//revive:disable
+	// revive:disable
 	. "github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	//revive:enable
+	// revive:enable
 )
 
 type controlReturn interface {

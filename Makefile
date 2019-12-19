@@ -21,7 +21,7 @@ crypto/relic/build: crypto/relic
 	./crypto/relic_build.sh
 
 .PHONY: install-tools
-install-tools: crypto/relic/build
+install-tools: crypto/relic/build check-go-version
 ifeq ($(UNAME), Linux)
 	sudo apt-get -y install capnproto
 endif
@@ -82,7 +82,6 @@ generate-mocks:
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
-	mockery -name '.*' -dir=engine -case=underscore -output="./engine/mock" -outpkg="mock"
 
 .PHONY: generate-bindata
 generate-bindata:
@@ -159,3 +158,7 @@ promote-vscode-extension: build-vscode-extension
 	cp language/tools/vscode-extension/cadence-*.vsix ./cli/flow/cadence/vscode/cadence.vsix;
 	go generate ./cli/flow/cadence/vscode;
 
+# Check if the go version is 1.13. flow-go only supports go 1.13
+.PHONY: check-go-version
+check-go-version:
+	go version | grep 1.13
