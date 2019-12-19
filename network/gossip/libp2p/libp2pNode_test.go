@@ -20,6 +20,9 @@ import (
 	gologging "github.com/whyrusleeping/go-logging"
 )
 
+// Workaround for https://github.com/stretchr/testify/pull/808
+const tickForAssertEventually = 100 * time.Millisecond
+
 func TestLibP2PNode_Start_Stop(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -86,7 +89,7 @@ func TestLibP2PNode_AddPeers(t *testing.T) {
 		}
 		assert.Eventuallyf(t, func() bool {
 			return network.Connected == nodes[0].libP2PHost.Network().Connectedness(a)
-		}, 3*time.Second, time.Millisecond, fmt.Sprintf(" node 0 not connected with %s", a.String()))
+		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf(" node 0 not connected with %s", a.String()))
 	}
 }
 
@@ -132,7 +135,7 @@ func TestLibP2PNode_PubSub(t *testing.T) {
 		require.NoError(t, s.AddPeers(ctx, []NodeAddress{*nd}))
 		assert.Eventuallyf(t, func() bool {
 			return network.Connected == s.libP2PHost.Network().Connectedness(d.libP2PHost.ID())
-		}, 3*time.Second, time.Millisecond, fmt.Sprintf(" %s not connected with %s", s.name, d.name))
+		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf(" %s not connected with %s", s.name, d.name))
 		e := 2
 		if i%count == 0 {
 			e = 1
@@ -186,7 +189,7 @@ func createLibP2PNodes(ctx context.Context, t *testing.T, count int) (nodes []*P
 		require.Eventuallyf(t, func() bool {
 			ip, p := n.GetIPPort()
 			return ip != "" && p != ""
-		}, 3*time.Second, 100 * time.Millisecond, fmt.Sprintf("node%d didn't start", i))
+		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("node%d didn't start", i))
 		nodes = append(nodes, n)
 	}
 	return nodes, err
