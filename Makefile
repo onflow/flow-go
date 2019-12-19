@@ -21,7 +21,7 @@ crypto/relic/build: crypto/relic
 	./crypto/relic_build.sh
 
 .PHONY: install-tools
-install-tools: crypto/relic/build
+install-tools: crypto/relic/build check-go-version
 ifeq ($(UNAME), Linux)
 	sudo apt-get -y install capnproto
 endif
@@ -159,3 +159,7 @@ promote-vscode-extension: build-vscode-extension
 	cp language/tools/vscode-extension/cadence-*.vsix ./cli/flow/cadence/vscode/cadence.vsix;
 	go generate ./cli/flow/cadence/vscode;
 
+# Check if the go version is 1.13. flow-go only supports go 1.13
+.PHONY: check-go-version
+check-go-version:
+	go version | grep 1.13

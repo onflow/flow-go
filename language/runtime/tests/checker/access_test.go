@@ -1851,3 +1851,38 @@ func TestCheckAccessImportGlobalValueVariableDeclarationWithSecondValue(t *testi
 		errs[4].(*sema.AssignmentToConstantError).Name,
 	)
 }
+
+func TestCheckContractNestedDeclarationPrivateAccess(t *testing.T) {
+
+	const contract = `
+	  contract Outer {
+		  priv let num: Int
+
+		  init(num: Int) {
+			  self.num = num
+		  }
+
+		  resource Inner {
+			 fun getNum(): Int {
+				return Outer.num
+			 }
+		  }
+	  }
+	`
+
+	t.Run("access inside is valid", func(t *testing.T) {
+		_, err := ParseAndCheck(t, contract)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("access outside is invalid", func(t *testing.T) {
+		_, err := ParseAndCheck(t, contract+`
+          let num = Outer.num
+        `)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
+	})
+}
