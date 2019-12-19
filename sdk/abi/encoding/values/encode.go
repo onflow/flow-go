@@ -108,9 +108,11 @@ func (e *Encoder) EncodeOptional(v values.Optional) error {
 	if err != nil {
 		return err
 	}
+
 	if hasValue {
 		return e.Encode(v.Value)
 	}
+
 	return nil
 }
 
@@ -318,20 +320,6 @@ func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
 	if err != nil {
 		return err
 	}
-
-	// encodedKeys := make([][]byte, size)
-	// ebcodedValues := make(map[string])
-	//
-	// for i, pair := range v.Pairs {
-	// 	encodedKey, err := Encode(pair.Key)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	//
-	// 	encodedKeys[i] = encodedKey
-	//
-	// 	elements[i] = pair.Value
-	// }
 
 	// keys and elements are encoded as separate fixed-length arrays
 	keys := make([]values.Value, size)

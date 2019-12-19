@@ -1,37 +1,15 @@
 {
   "definitions": {
-    "Colour": {
-      "struct": {
-        "fields": {
-          "r": "UInt8",
-          "g": "UInt8",
-          "b": "UInt8"
-        },
-        "initializers": [
-          [
-            {
-              "name": "r",
-              "type": "UInt8"
-            },
-            {
-              "name": "g",
-              "type": "UInt8"
-            },
-            {
-              "name": "b",
-              "type": "UInt8"
-            }
-          ]
-        ]
-      }
-    },
     "Banana": {
       "resource": {
-        "fields": {
-          "colour": {
-            "struct": "Colour"
+        "fields": [
+          {
+            "name": "colour",
+            "type": {
+              "struct": "Colour"
+            }
           }
-        },
+        ],
         "initializers": [
           [
             {
@@ -46,17 +24,20 @@
     },
     "BunchOfBananas": {
       "resource": {
-        "fields": {
-          "bananas": {
-            "array": {
-              "of": {
-                "optional": {
-                  "resource": "Banana"
+        "fields": [
+          {
+            "name": "bananas",
+            "type": {
+              "array": {
+                "of": {
+                  "optional": {
+                    "resource": "Banana"
+                  }
                 }
               }
             }
           }
-        },
+        ],
         "initializers": [
           [
             {
@@ -68,6 +49,40 @@
                   }
                 }
               }
+            }
+          ]
+        ]
+      }
+    },
+    "Colour": {
+      "struct": {
+        "fields": [
+          {
+            "name": "b",
+            "type": "UInt8"
+          },
+          {
+            "name": "g",
+            "type": "UInt8"
+          },
+          {
+            "name": "r",
+            "type": "UInt8"
+          }
+        ],
+        "initializers": [
+          [
+            {
+              "name": "r",
+              "type": "UInt8"
+            },
+            {
+              "name": "g",
+              "type": "UInt8"
+            },
+            {
+              "name": "b",
+              "type": "UInt8"
             }
           ]
         ]

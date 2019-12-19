@@ -2,9 +2,49 @@
   "definitions": {
     "bools": {
       "variable": {
+        "dictionary": {
+          "keys": "Int",
+          "values": "Bool"
+        }
+      }
+    },
+    "call": {
+      "function": {
+        "parameters": [
+          {
+            "name": "d",
+            "type": {
+              "dictionary": {
+                "keys": "Int",
+                "values": {
+                  "function": {
+                    "parameters": [
+                      "Int"
+                    ],
+                    "returnType": {
+                      "array": {
+                        "of": {
+                          "optional": "String"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "returnType": {
           "dictionary": {
             "keys": "Int",
-            "values": "Bool"
+            "values": {
+              "array": {
+                "of": {
+                  "optional": "String"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -61,46 +101,6 @@
           "dictionary": {
             "keys": "String",
             "values": "String"
-          }
-        }
-      }
-    },
-    "call": {
-      "function": {
-        "parameters": [
-          {
-            "name": "d",
-            "type": {
-              "dictionary": {
-                "keys": "Int",
-                "values": {
-                  "function": {
-                    "parameters": [
-                      "Int"
-                    ],
-                    "returnType": {
-                      "array": {
-                        "of": {
-                          "optional": "String"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        ],
-        "returnType": {
-          "dictionary": {
-            "keys": "Int",
-            "values": {
-              "array": {
-                "of": {
-                  "optional": "String"
-                }
-              }
-            }
           }
         }
       }

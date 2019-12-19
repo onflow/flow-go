@@ -90,22 +90,41 @@ func getObject(data map[string]interface{}, key string) (interface{}, error) {
 	return nil, fmt.Errorf("key %s doesn't exist  in %v", key, data)
 }
 
-func toFields(raw map[string]interface{}) ([]types.Field, error) {
-	fields := make([]types.Field, 0, len(raw))
+func toField(data map[string]interface{}) (types.Field, error) {
+	name, err := getString(data, "name")
+	if err != nil {
+		return types.Field{}, err
+	}
 
-	for name, field := range raw {
-		typ, err := toType(field, name)
+	typRaw, err := getObject(data, "type")
+	if err != nil {
+		return types.Field{}, err
+	}
+
+	typ, err := toType(typRaw, "")
+	if err != nil {
+		return types.Field{}, err
+	}
+
+	return types.Field{
+		Identifier: name,
+		Type:       typ,
+	}, nil
+}
+
+func toFields(fields []map[string]interface{}) ([]types.Field, error) {
+	ret := make([]types.Field, len(fields))
+
+	for i, raw := range fields {
+		f, err := toField(raw)
 		if err != nil {
 			return nil, err
 		}
 
-		fields = append(fields, types.Field{
-			Identifier: name,
-			Type:       typ,
-		})
+		ret[i] = f
 	}
 
-	return fields, nil
+	return ret, nil
 }
 
 func toParameter(data map[string]interface{}) (types.Parameter, error) {
@@ -153,12 +172,17 @@ func interfaceToListOfMaps(input interface{}) ([]map[string]interface{}, error) 
 }
 
 func toComposite(data map[string]interface{}, name string) (types.Composite, error) {
-	fieldsRaw, err := getMap(data, "fields")
+	fieldsRaw, err := getArray(data, "fields")
 	if err != nil {
 		return types.Composite{}, err
 	}
 
-	fields, err := toFields(fieldsRaw)
+	fieldsMaps, err := interfaceToListOfMaps(fieldsRaw)
+	if err != nil {
+		return types.Composite{}, err
+	}
+
+	fields, err := toFields(fieldsMaps)
 	if err != nil {
 		return types.Composite{}, err
 	}
@@ -244,7 +268,6 @@ func toParameters(parameters []map[string]interface{}) ([]types.Parameter, error
 	ret := make([]types.Parameter, len(parameters))
 
 	for i, raw := range parameters {
-
 		p, err := toParameter(raw)
 		ret[i] = p
 		if err != nil {

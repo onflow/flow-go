@@ -44,14 +44,17 @@ type array struct {
 type structObject struct {
 	Struct structData `json:"struct"`
 }
+
 type structData struct {
-	Fields       map[string]interface{} `json:"fields"`
-	Initializers [][]parameter          `json:"initializers"`
+	Fields       []field       `json:"fields"`
+	Initializers [][]parameter `json:"initializers"`
 }
+
 type field struct {
 	Name string      `json:"name"`
 	Type interface{} `json:"type"`
 }
+
 type parameter struct {
 	field
 	Label string `json:"label,omitempty"`
@@ -106,11 +109,14 @@ type variableObject struct {
 
 // endregion
 
-func (encoder *Encoder) mapFields(m []types.Field) map[string]interface{} {
-	ret := map[string]interface{}{}
+func (encoder *Encoder) mapFields(m []types.Field) []field {
+	ret := make([]field, len(m))
 
-	for _, field := range m {
-		ret[field.Identifier] = encoder.encode(field.Type)
+	for i, f := range m {
+		ret[i] = field{
+			Name: f.Identifier,
+			Type: encoder.encode(f.Type),
+		}
 	}
 
 	return ret

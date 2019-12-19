@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -1495,10 +1496,17 @@ func (v *CompositeValue) SetOwner(owner string) {
 }
 
 func (v *CompositeValue) Export() values.Value {
-	fields := make([]values.Value, 0, len(v.Fields))
+	fields := make([]values.Value, len(v.Fields))
 
-	for _, value := range v.Fields {
-		fields = append(fields, value.(ExportableValue).Export())
+	keys := make([]string, 0, len(v.Fields))
+	for key := range v.Fields {
+		keys = append(keys, key)
+	}
+
+	encodingValues.SortInEncodingOrder(keys)
+
+	for i, key := range keys {
+		fields[i] = v.Fields[key].(ExportableValue).Export()
 	}
 
 	return values.NewComposite(fields)

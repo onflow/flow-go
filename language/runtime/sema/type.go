@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 )
 
@@ -1606,7 +1607,17 @@ func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.T
 
 		fields := make([]types.Field, 0, len(t.Members))
 
-		for identifer, field := range t.Members {
+		// TODO: do not sort fields before export, store in order declared
+		fieldNames := make([]string, 0, len(t.Members))
+		for identifer, _ := range t.Members {
+			fieldNames = append(fieldNames, identifer)
+		}
+
+		values.SortInEncodingOrder(fieldNames)
+
+		for _, identifer := range fieldNames {
+			field := t.Members[identifer]
+
 			typ := field.TypeAnnotation.Type.(ExportableType).Export(program, nil)
 
 			fields = append(fields, types.Field{

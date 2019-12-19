@@ -20,7 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/examples/abi/generated"
 )
 
-func TestDecodingUsingAbi(t *testing.T) {
+func TestDecodingUsingABI(t *testing.T) {
 	// Generate JSON ABI
 	const cadenceFilename = "music.cdc"
 	cadenceFile, err := ioutil.ReadFile(cadenceFilename)
@@ -90,7 +90,6 @@ func TestDecodingUsingAbi(t *testing.T) {
 	require.NoError(t, err)
 
 	albums, err := generated.DecodeAlbumViewVariableSizedArray(response.Value)
-
 	require.NoError(t, err)
 
 	// Those values come from hardcoded function in music.cdc

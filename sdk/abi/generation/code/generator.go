@@ -457,7 +457,7 @@ func GenerateGo(pkg string, typesToGenerate map[string]types.Composite, writer i
 		// struct backing main view interface
 		f.Type().Id(viewStructName).Struct(viewStructFields...)
 
-		//Main view interface methods
+		// Main view interface methods
 		for _, viewInterfaceMethodImpl := range viewInterfaceMethodsImpls {
 			f.Add(viewInterfaceMethodImpl)
 		}
