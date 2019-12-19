@@ -35,8 +35,8 @@ func TestSubmitTransaction(t *testing.T) {
 		// should submit the transaction to the engine
 		engine.AssertCalled(t, "Submit", &tx)
 
-		// should return the hash of the submitted transaction
-		assert.Equal(t, tx.Hash(), crypto.Hash(res.Hash))
+		// should return the fingerprint of the submitted transaction
+		assert.Equal(t, tx.Fingerprint(), model.Fingerprint(res.Hash))
 	})
 
 	t.Run("should pass through error", func(t *testing.T) {

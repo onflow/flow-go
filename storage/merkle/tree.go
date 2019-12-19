@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model"
 )
 
 // Tree represents a binary patricia merkle tree. The difference with a normal
@@ -171,7 +172,7 @@ PutLoop:
 
 // Get will retrieve the value associated with the given key. It returns true
 // if the key was found and false otherwise.
-func (t *Tree) Get(key crypto.Hash) (interface{}, bool) {
+func (t *Tree) Get(key model.Fingerprint) (interface{}, bool) {
 
 	// we start at the root again
 	cur := &t.root
@@ -236,7 +237,7 @@ GetLoop:
 // Internally, any parent nodes between the leaf up to the closest shared path
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
-func (t *Tree) Del(key crypto.Hash) bool {
+func (t *Tree) Del(key model.Fingerprint) bool {
 
 	// we initialize three pointers pointing to a dummy empty node
 	// this is used to keep track of the node we last pointed to, as well as
