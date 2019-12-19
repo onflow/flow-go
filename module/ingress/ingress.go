@@ -138,7 +138,7 @@ func (h *handler) SendTransaction(ctx context.Context, req *observation.SendTran
 		return nil, err
 	}
 
-	return &observation.SendTransactionResponse{Hash: tx.Hash()}, nil
+	return &observation.SendTransactionResponse{Hash: tx.Commit()}, nil
 }
 
 // Remaining handler functions are no-ops to implement the Observation API
