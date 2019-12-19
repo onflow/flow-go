@@ -9,7 +9,7 @@ import (
 func main() {
 
 	FlowNode("execution").
-		CreateReadDoneAware("execution engine", func(node *FlowNodeBuilder) module.ReadyDoneAware {
+		Component("execution engine", func(node *FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing execution engine")
 
 			exec, err := execution.New(node.Logger, node.Network, node.Me)
