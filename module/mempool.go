@@ -12,7 +12,7 @@ type CollectionPool interface {
 
 	// Has checks whether the guaranteed collection with the given hash is
 	// currently in the memory pool.
-	Has(hash crypto.Hash) bool
+	Has(fp flow.Fingerprint) bool
 
 	// Add will add the given guaranteed collection to the memory pool; it will
 	// error if the guaranteed collection is already in the memory pool.
@@ -20,11 +20,11 @@ type CollectionPool interface {
 
 	// Rem will remove the given guaranteed collection from the memory pool; it
 	// will return true if the guaranteed collection was known and removed.
-	Rem(hash crypto.Hash) bool
+	Rem(fp flow.Fingerprint) bool
 
 	// Get will retrieve the given guaranteed collection from the memory pool;
 	// it will error if the guaranteed collection is not in the memory pool.
-	Get(hash crypto.Hash) (*flow.GuaranteedCollection, error)
+	Get(fp flow.Fingerprint) (*flow.GuaranteedCollection, error)
 
 	// Hash will return a fingerprint has representing the contents of the
 	// entire memory pool.
@@ -42,7 +42,7 @@ type CollectionPool interface {
 type TransactionPool interface {
 	// Has checks whether the transaction with the given hash is currently in
 	// the memory pool.
-	Has(hash crypto.Hash) bool
+	Has(fp flow.Fingerprint) bool
 
 	// Add will add the given transaction to the memory pool; it will error if
 	// the transaction is already in the memory pool.
@@ -50,11 +50,11 @@ type TransactionPool interface {
 
 	// Rem will remove the given transaction from the memory pool; it will
 	// will return true if the transaction was known and removed.
-	Rem(hash crypto.Hash) bool
+	Rem(fp flow.Fingerprint) bool
 
 	// Get will retrieve the given transaction from the memory pool; it will
 	// error if the transaction is not in the memory pool.
-	Get(hash crypto.Hash) (*flow.Transaction, error)
+	Get(fp flow.Fingerprint) (*flow.Transaction, error)
 
 	// Hash will return a fingerprint has representing the contents of the
 	// entire memory pool.
