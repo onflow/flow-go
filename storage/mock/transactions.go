@@ -47,3 +47,17 @@ func (_m *Transactions) Insert(tx *flow.Transaction) error {
 
 	return r0
 }
+
+// Remove provides a mock function with given fields: hash
+func (_m *Transactions) Remove(hash crypto.Hash) error {
+	ret := _m.Called(hash)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(crypto.Hash) error); ok {
+		r0 = rf(hash)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
