@@ -37,7 +37,7 @@ func newMempool() *mempool {
 func (m *mempool) Has(fp flow.Fingerprint) bool {
 	m.RLock()
 	defer m.RUnlock()
-	_, ok := m.tree.Get(fp)
+	_, ok := m.tree.Get(crypto.Hash(fp))
 	return ok
 }
 
@@ -45,7 +45,7 @@ func (m *mempool) Has(fp flow.Fingerprint) bool {
 func (m *mempool) Add(item Item) error {
 	m.Lock()
 	defer m.Unlock()
-	ok := m.tree.Put(item.Fingerprint(), nil)
+	ok := m.tree.Put(crypto.Hash(item.Fingerprint()), nil)
 	if ok {
 		return fmt.Errorf("item already known (%x)", item.Fingerprint())
 	}
@@ -57,7 +57,7 @@ func (m *mempool) Add(item Item) error {
 func (m *mempool) Rem(fp flow.Fingerprint) bool {
 	m.Lock()
 	defer m.Unlock()
-	ok := m.tree.Del(fp)
+	ok := m.tree.Del(crypto.Hash(fp))
 	if !ok {
 		return false
 	}
@@ -69,7 +69,7 @@ func (m *mempool) Rem(fp flow.Fingerprint) bool {
 func (m *mempool) Get(fp flow.Fingerprint) (Item, error) {
 	m.RLock()
 	defer m.RUnlock()
-	_, ok := m.tree.Get(fp)
+	_, ok := m.tree.Get(crypto.Hash(fp))
 	if !ok {
 		return nil, fmt.Errorf("item not known (%x)", fp)
 	}
