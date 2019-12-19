@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"sort"
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 
@@ -15,11 +14,6 @@ import (
 // An Encoder converts Cadence values into XDR-encoded bytes.
 type Encoder struct {
 	enc *xdr.Encoder
-}
-
-// EncodingOrder is a central point to keep ordering for encoding the same.
-func SortInEncodingOrder(names []string) {
-	sort.Strings(names)
 }
 
 // Encode returns the XDR-encoded representation of the given value.
@@ -50,6 +44,8 @@ func (e *Encoder) Encode(v values.Value) error {
 	switch x := v.(type) {
 	case values.Void:
 		return e.EncodeVoid()
+	case values.Optional:
+		return e.EncodeOptional(x)
 	case values.Bool:
 		return e.EncodeBool(x)
 	case values.String:
@@ -86,8 +82,6 @@ func (e *Encoder) Encode(v values.Value) error {
 		return e.EncodeComposite(x)
 	case values.Event:
 		return e.EncodeEvent(x)
-	case values.Optional:
-		return e.EncodeOptional(x)
 	default:
 		return fmt.Errorf("unsupported value: %T, %v", v, v)
 	}
@@ -100,6 +94,25 @@ func (e *Encoder) Encode(v values.Value) error {
 // types that contain void values.
 func (e *Encoder) EncodeVoid() error {
 	// void values are not encoded
+	return nil
+}
+
+// EncodeOptional writes the XDR-encoded representation of an optional value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.19
+//  RFC Section 4.19 - Optional-Data
+//  Union of boolean and encoded value
+func (e *Encoder) EncodeOptional(v values.Optional) error {
+	hasValue := v.Value != nil
+	_, err := e.enc.EncodeBool(hasValue)
+	if err != nil {
+		return err
+	}
+
+	if hasValue {
+		return e.Encode(v.Value)
+	}
+
 	return nil
 }
 
@@ -139,7 +152,7 @@ func (e *Encoder) EncodeBytes(v values.Bytes) error {
 //  RFC Section 4.9 - Fixed-Length Opaque Data
 //  Fixed-length uninterpreted data zero-padded to a multiple of four
 func (e *Encoder) EncodeAddress(v values.Address) error {
-	_, err := e.enc.EncodeFixedOpaque(v[:])
+	_, err := e.enc.EncodeFixedOpaque(v.Bytes())
 	return err
 }
 
@@ -154,7 +167,9 @@ func (e *Encoder) EncodeAddress(v values.Address) error {
 //  RFC Section 4.10 - Variable-Length Opaque Data
 //  Unsigned integer length followed by fixed opaque data of that length
 func (e *Encoder) EncodeInt(v values.Int) error {
-	isPositive := v.Int.Cmp(big.NewInt(0)) >= 0
+	val := v.Big()
+
+	isPositive := val.Cmp(big.NewInt(0)) >= 0
 
 	var b []byte
 
@@ -164,7 +179,7 @@ func (e *Encoder) EncodeInt(v values.Int) error {
 		b = []byte{0}
 	}
 
-	b = append(b, v.Int.Bytes()...)
+	b = append(b, val.Bytes()...)
 
 	_, err := e.enc.EncodeOpaque(b)
 	return err
@@ -257,14 +272,14 @@ func (e *Encoder) EncodeUint64(v values.UInt64) error {
 //  RFC Section 4.13 - Variable-Length Array
 //  Unsigned integer length followed by individually XDR-encoded array elements
 func (e *Encoder) EncodeVariableSizedArray(v values.VariableSizedArray) error {
-	size := uint32(len(v))
+	size := uint32(len(v.Values))
 
 	_, err := e.enc.EncodeUint(size)
 	if err != nil {
 		return err
 	}
 
-	return e.EncodeConstantSizedArray(values.ConstantSizedArray(v))
+	return e.encodeArray(v.Values)
 }
 
 // EncodeConstantSizedArray writes the XDR-encoded representation of a
@@ -274,7 +289,7 @@ func (e *Encoder) EncodeVariableSizedArray(v values.VariableSizedArray) error {
 //  RFC Section 4.12 - Fixed-Length Array
 //  Individually XDR-encoded array elements
 func (e *Encoder) EncodeConstantSizedArray(v values.ConstantSizedArray) error {
-	return e.encodeArray(v)
+	return e.encodeArray(v.Values)
 }
 
 // encodeArray writes the XDR-encoded representation of a constant-sized array.
@@ -298,7 +313,7 @@ func (e *Encoder) encodeArray(v []values.Value) error {
 // the dictionary keys, then elements, each represented as individually
 // XDR-encoded array elements.
 func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
-	size := uint32(len(v))
+	size := uint32(len(v.Pairs))
 
 	// size is encoded as an unsigned integer
 	_, err := e.enc.EncodeUint(size)
@@ -310,7 +325,7 @@ func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
 	keys := make([]values.Value, size)
 	elements := make([]values.Value, size)
 
-	for i, pair := range v {
+	for i, pair := range v.Pairs {
 		keys[i] = pair.Key
 		elements[i] = pair.Value
 	}
@@ -336,21 +351,4 @@ func (e *Encoder) EncodeComposite(v values.Composite) error {
 // An event is encoded as a fixed-length array of its field values.
 func (e *Encoder) EncodeEvent(v values.Event) error {
 	return e.encodeArray(v.Fields)
-}
-
-// EncodeOptional writes the XDR-encoded representation of an optional value
-// as a union
-// Reference: https://tools.ietf.org/html/rfc4506#section-4.19
-//  RFC Section 4.19 - Optional-Data
-//  Union of boolean and encoded value
-func (e *Encoder) EncodeOptional(v values.Optional) error {
-	hasValue := v.Value != nil
-	_, err := e.enc.EncodeBool(hasValue)
-	if err != nil {
-		return err
-	}
-	if hasValue {
-		return e.Encode(v.Value)
-	}
-	return nil
 }

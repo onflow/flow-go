@@ -24,3 +24,4 @@ func (er *ExecutionReceipt) Encode() []byte {
 	}
 	return b.Bytes()
 }
+

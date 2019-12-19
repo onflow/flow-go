@@ -85,7 +85,6 @@ generate-mocks:
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
-	mockery -name '.*' -dir=engine -case=underscore -output="./engine/mock" -outpkg="mock"
 
 .PHONY: generate-bindata
 generate-bindata:
