@@ -2,6 +2,7 @@ package flow
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
 type ExecutionResultBody struct {
@@ -16,7 +17,10 @@ type ExecutionResult struct {
 	Signatures []crypto.Signature
 }
 
-// TODO
+func (er *ExecutionResult) Hash() Fingerprint {
+	return encoding.DefaultEncoder.MustEncode(er.ExecutionResultBody)
+}
+
 func (er *ExecutionResult) Fingerprint() Fingerprint {
-	return nil
+	return encoding.DefaultEncoder.MustEncode(er.ExecutionResultBody)
 }

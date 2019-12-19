@@ -12,7 +12,7 @@ import (
 	"crypto/rand"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	exec "github.com/dapperlabs/flow-go/model/execution"
+  "github.com/dapperlabs/flow-go/model/flow"
 )
 
 type ERStoreTestSuit struct {
@@ -162,7 +162,7 @@ func (suite *ERStoreTestSuit) TestGettingTwoERs() {
 	require.NotEqual(suite.T(), er1, er2)
 	require.NotEqual(suite.T(), er1.ExecutionResult, er2.ExecutionResult)
 
-	erlist := []*exec.ExecutionReceipt{er1, er2}
+	erlist := []*flow.ExecutionReceipt{er1, er2}
 
 	for _, er := range erlist {
 		// adding two ERs to the mempool
@@ -195,7 +195,7 @@ func (suite *ERStoreTestSuit) TestGettingTwoERsWithSharedResult() {
 	require.NotEqual(suite.T(), er1, er2)
 	require.Equal(suite.T(), er1.ExecutionResult, er2.ExecutionResult)
 
-	erlist := []*exec.ExecutionReceipt{er1, er2}
+	erlist := []*flow.ExecutionReceipt{er1, er2}
 
 	for _, er := range erlist {
 		// adding two ERs to the mempool
@@ -274,7 +274,7 @@ func (suite *ERStoreTestSuit) TestDeadlock() {
 // BlockHash
 // FinalStateCommitment
 // The rest of bytes are chosen as nil
-func randomER() *exec.ExecutionReceipt {
+func randomER() *flow.ExecutionReceipt {
 	previousER := make([]byte, 32)
 	blockHash := make([]byte, 32)
 	stateComm := make([]byte, 32)
