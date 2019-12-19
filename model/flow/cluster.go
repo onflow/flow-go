@@ -1,5 +1,7 @@
 package flow
 
+import "github.com/dapperlabs/flow-go/model"
+
 // ClusterID is the unique ID of a given collection node cluster.
 type ClusterID int
 
@@ -27,7 +29,7 @@ func (cl ClusterList) Get(id ClusterID) IdentityList {
 // in any cluster. Otherwise returns -1.
 //
 // TODO this is O(n), optimize if # of collection nodes gets large
-func (cl ClusterList) ClusterIDFor(nodeID Identifier) ClusterID {
+func (cl ClusterList) ClusterIDFor(nodeID model.Identifier) ClusterID {
 
 	for clusterID, cluster := range cl {
 		for _, identity := range cluster {

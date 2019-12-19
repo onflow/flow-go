@@ -1,5 +1,3 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package flow
 
 import (
@@ -10,25 +8,24 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
 // rxid is the regex for parsing node identity entries.
 var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|observation)-([0-9a-fA-F]{64})@([\w\d]|[\w\d][\w\d\-]*[\w\d]\.*[\w\d]|[\w\d][\w\d\-]*[\w\d]:[\d]+)?=(\d{1,20})$`)
 
-// Identifier represents a 32-byte unique identifier for a node.
-type Identifier [32]byte
-
 // Identity represents a node identity.
 type Identity struct {
-	NodeID  Identifier
+	NodeID  model.Identifier
 	Address string
 	Role    Role
 	Stake   uint64
 }
 
-func HexStringToIdentifier(hexString string) (Identifier, error) {
-	var identifier Identifier
+func HexStringToIdentifier(hexString string) (model.Identifier, error) {
+	var identifier model.Identifier
 	i, err := hex.Decode(identifier[:], []byte(hexString))
 	if err != nil {
 		return identifier, err
@@ -49,7 +46,7 @@ func ParseIdentity(identity string) (Identity, error) {
 	}
 
 	// none of these will error as they are checked by the regex
-	var nodeID Identifier
+	var nodeID model.Identifier
 	nodeID, err := HexStringToIdentifier(matches[2])
 	if err != nil {
 		return Identity{}, err
@@ -101,12 +98,20 @@ IDLoop:
 }
 
 // NodeIDs returns the NodeIDs of the nodes in the list.
-func (il IdentityList) NodeIDs() []Identifier {
-	ids := make([]Identifier, 0, len(il))
+func (il IdentityList) NodeIDs() []model.Identifier {
+	ids := make([]model.Identifier, 0, len(il))
 	for _, id := range il {
 		ids = append(ids, id.NodeID)
 	}
 	return ids
+}
+
+func (il IdentityList) Commit() model.Commit {
+	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
+	for _, item := range il {
+		hasher.Add(item.Encode())
+	}
+	return model.Commit(hasher.SumHash())
 }
 
 // TotalStake returns the total stake of all given identities.
