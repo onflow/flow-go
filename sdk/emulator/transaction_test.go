@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
@@ -17,7 +18,7 @@ import (
 )
 
 func TestSubmitTransaction(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -53,7 +54,7 @@ func TestSubmitTransaction(t *testing.T) {
 
 // TODO: Add test case for missing ReferenceBlockHash
 func TestSubmitInvalidTransaction(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -150,7 +151,7 @@ func TestSubmitInvalidTransaction(t *testing.T) {
 }
 
 func TestSubmitDuplicateTransaction(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -188,7 +189,7 @@ func TestSubmitDuplicateTransaction(t *testing.T) {
 }
 
 func TestSubmitTransactionReverted(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	tx1 := flow.Transaction{
@@ -220,7 +221,7 @@ func TestSubmitTransactionReverted(t *testing.T) {
 }
 
 func TestSubmitTransactionScriptAccounts(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	privateKeyA := b.RootKey()
@@ -308,7 +309,7 @@ func TestSubmitTransactionScriptAccounts(t *testing.T) {
 
 func TestSubmitTransactionPayerSignature(t *testing.T) {
 	t.Run("MissingPayerSignature", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -334,7 +335,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	})
 
 	t.Run("InvalidAccount", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		invalidAddress := flow.HexToAddress("0000000000000000000000000000000000000002")
@@ -358,7 +359,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	})
 
 	t.Run("InvalidKeyPair", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
@@ -386,7 +387,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 	})
 
 	t.Run("KeyWeights", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		privateKeyA, _ := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA3_256,
@@ -447,7 +448,7 @@ func TestSubmitTransactionPayerSignature(t *testing.T) {
 
 func TestSubmitTransactionScriptSignatures(t *testing.T) {
 	t.Run("MissingScriptSignature", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		addressA := flow.HexToAddress("0000000000000000000000000000000000000002")
@@ -473,7 +474,7 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 	})
 
 	t.Run("MultipleAccounts", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		privateKeyA := b.RootKey()
@@ -526,16 +527,14 @@ func TestSubmitTransactionScriptSignatures(t *testing.T) {
 }
 
 func TestGetTransaction(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	myEventType := types.Event{
-		Fields: []*types.Parameter{
+		Fields: []types.Field{
 			{
-				Field: types.Field{
-					Identifier: "x",
-					Type:       types.Int{},
-				},
+				Identifier: "x",
+				Type:       types.Int{},
 			},
 		},
 	}
@@ -588,7 +587,8 @@ func TestGetTransaction(t *testing.T) {
 
 		decodedEvent := eventValue.(values.Event)
 
-		eventType := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
+		location := runtime.TransactionLocation(tx.Hash())
+		eventType := fmt.Sprintf("%s.MyEvent", location.ID())
 
 		assert.Equal(t, tx.Hash(), actualEvent.TxHash)
 		assert.Equal(t, eventType, actualEvent.Type)

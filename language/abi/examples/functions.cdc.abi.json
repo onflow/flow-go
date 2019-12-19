@@ -1,45 +1,14 @@
 {
   "definitions": {
-    "sqrt": {
-      "function": {
-        "parameters": [
-          {
-            "name": "x",
-            "label": "x",
-            "type": "Int"
-          }
-        ],
-        "returnType": "Int"
-      }
-    },
-    "dividerProducer": {
-      "function": {
-        "parameters": [
-          {
-            "name": "d",
-            "label": "divisor",
-            "type": "Int"
-          }
-        ],
-        "returnType": {
-          "function": {
-            "parameters": [
-              "Int"
-            ],
-            "returnType": "Int"
-          }
-        }
-      }
-    },
     "decorator": {
       "function": {
         "parameters": [
           {
             "name": "f",
-            "label": "function",
             "type": {
               "function": {}
-            }
+            },
+            "label": "function"
           },
           {
             "name": "before",
@@ -61,6 +30,37 @@
         "returnType": {
           "function": {}
         }
+      }
+    },
+    "dividerProducer": {
+      "function": {
+        "parameters": [
+          {
+            "name": "d",
+            "type": "Int",
+            "label": "divisor"
+          }
+        ],
+        "returnType": {
+          "function": {
+            "parameters": [
+              "Int"
+            ],
+            "returnType": "Int"
+          }
+        }
+      }
+    },
+    "sqrt": {
+      "function": {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "Int",
+            "label": "x"
+          }
+        ],
+        "returnType": "Int"
       }
     }
   }

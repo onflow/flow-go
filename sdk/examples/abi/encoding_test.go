@@ -20,9 +20,8 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/examples/abi/generated"
 )
 
-func TestDecodingUsingAbi(t *testing.T) {
-
-	//Generate JSON ABI
+func TestDecodingUsingABI(t *testing.T) {
+	// Generate JSON ABI
 	const cadenceFilename = "music.cdc"
 	cadenceFile, err := ioutil.ReadFile(cadenceFilename)
 	require.NoError(t, err)
@@ -56,13 +55,13 @@ func TestDecodingUsingAbi(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	compositeTypes := map[string]*types.Composite{}
+	compositeTypes := map[string]types.Composite{}
 	for name, typ := range allTypes {
 		switch composite := typ.(type) {
-		case *types.Resource:
-			compositeTypes[name] = &composite.Composite
-		case *types.Struct:
-			compositeTypes[name] = &composite.Composite
+		case types.Resource:
+			compositeTypes[name] = composite.Composite
+		case types.Struct:
+			compositeTypes[name] = composite.Composite
 		default:
 			_, err := fmt.Fprintf(os.Stderr, "Definition %s of type %T is not supported, skipping\n", name, typ)
 			if err != nil {
@@ -77,10 +76,10 @@ func TestDecodingUsingAbi(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	emulator, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
-	backend := server.NewBackend(emulator, logrus.New())
+	backend := server.NewBackend(b, logrus.New())
 
 	ctx := context.Background()
 
@@ -91,10 +90,9 @@ func TestDecodingUsingAbi(t *testing.T) {
 	require.NoError(t, err)
 
 	albums, err := generated.DecodeAlbumViewVariableSizedArray(response.Value)
-
 	require.NoError(t, err)
 
-	//Those values come from hardcoded function in music.cdc
+	// Those values come from hardcoded function in music.cdc
 	assert.Len(t, albums, 3)
 	assert.NotEmpty(t, albums[0].Artist())
 	assert.NotNil(t, albums[1].Artist().Members())

@@ -16,18 +16,17 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 )
 
 // Backend wraps an emulated blockchain and implements the RPC handlers
 // required by the Observation API.
 type Backend struct {
-	blockchain emulator.EmulatedBlockchainAPI
+	blockchain emulator.BlockchainAPI
 	logger     *logrus.Logger
 }
 
 // NewBackend returns a new backend.
-func NewBackend(blockchain emulator.EmulatedBlockchainAPI, logger *logrus.Logger) *Backend {
+func NewBackend(blockchain emulator.BlockchainAPI, logger *logrus.Logger) *Backend {
 	return &Backend{
 		blockchain: blockchain,
 		logger:     logger,
@@ -235,7 +234,7 @@ func (b *Backend) commitBlock() {
 	}
 }
 
-func printTransactionResult(logger *logrus.Logger, result execution.TransactionResult) {
+func printTransactionResult(logger *logrus.Logger, result emulator.TransactionResult) {
 	if result.Succeeded() {
 		logger.
 			WithField("txHash", result.TransactionHash.Hex()).
@@ -271,7 +270,7 @@ func printTransactionResult(logger *logrus.Logger, result execution.TransactionR
 	}
 }
 
-func printScriptResult(logger *logrus.Logger, result execution.ScriptResult) {
+func printScriptResult(logger *logrus.Logger, result emulator.ScriptResult) {
 	if result.Succeeded() {
 		logger.
 			WithField("scriptHash", result.ScriptHash.Hex()).

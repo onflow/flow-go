@@ -58,6 +58,7 @@ type Checker struct {
 	Elaboration                        *Elaboration
 	currentMemberExpression            *ast.MemberExpression
 	ValidTopLevelDeclarations          []common.DeclarationKind
+	beforeExtractor                    *BeforeExtractor
 }
 
 type Option func(*Checker) error
@@ -139,6 +140,8 @@ func NewChecker(program *ast.Program, location ast.Location, options ...Option) 
 		seenImports:         map[ast.LocationID]bool{},
 		Elaboration:         NewElaboration(),
 	}
+
+	checker.beforeExtractor = NewBeforeExtractor(checker.report)
 
 	checker.declareBaseValues()
 
@@ -1329,5 +1332,59 @@ func (checker *Checker) checkVariableMove(expression ast.Expression) {
 		if ty.CompositeKind == common.CompositeKindContract {
 			reportInvalidMove(common.DeclarationKindContract)
 		}
+	}
+}
+
+func (checker *Checker) rewritePostConditions(postConditions []*ast.Condition) PostConditionsRewrite {
+
+	var beforeStatements []ast.Statement
+	rewrittenPostConditions := make([]*ast.Condition, len(postConditions))
+
+	for i, postCondition := range postConditions {
+
+		// copy condition and set expression to rewritten one
+		newPostCondition := *postCondition
+
+		testExtraction := checker.beforeExtractor.ExtractBefore(postCondition.Test)
+
+		extractedExpressions := testExtraction.ExtractedExpressions
+
+		newPostCondition.Test = testExtraction.RewrittenExpression
+
+		if postCondition.Message != nil {
+			messageExtraction := checker.beforeExtractor.ExtractBefore(postCondition.Message)
+
+			newPostCondition.Message = messageExtraction.RewrittenExpression
+
+			extractedExpressions = append(
+				extractedExpressions,
+				messageExtraction.ExtractedExpressions...,
+			)
+		}
+
+		for _, extractedExpression := range extractedExpressions {
+
+			// NOTE: no need to check the before statements or update elaboration here:
+			// The before statements are visited/checked later
+
+			variableDeclaration := &ast.VariableDeclaration{
+				Identifier: extractedExpression.Identifier,
+				Transfer: &ast.Transfer{
+					Operation: ast.TransferOperationCopy,
+				},
+				Value: extractedExpression.Expression,
+			}
+
+			beforeStatements = append(beforeStatements,
+				variableDeclaration,
+			)
+		}
+
+		rewrittenPostConditions[i] = &newPostCondition
+	}
+
+	return PostConditionsRewrite{
+		BeforeStatements:        beforeStatements,
+		RewrittenPostConditions: rewrittenPostConditions,
 	}
 }

@@ -284,38 +284,68 @@ func (checker *Checker) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast
 	panic(errors.NewUnreachableError())
 }
 
+func (checker *Checker) visitWithPostConditions(postConditions *ast.Conditions, returnType Type, body func()) {
+
+	var rewrittenPostConditions *PostConditionsRewrite
+
+	// If there are post-conditions, rewrite them, extracting `before` expressions.
+	// The result are variable declarations which need to be evaluated before
+	// the function body
+
+	if postConditions != nil {
+		rewriteResult := checker.rewritePostConditions(*postConditions)
+		rewrittenPostConditions = &rewriteResult
+
+		checker.Elaboration.PostConditionsRewrite[postConditions] = rewriteResult
+
+		checker.visitStatements(rewriteResult.BeforeStatements)
+	}
+
+	body()
+
+	// If there is a post-conditions, declare the function `before`
+
+	// TODO: improve: only declare when a condition actually refers to `before`?
+
+	if postConditions != nil &&
+		len(*postConditions) > 0 {
+
+		checker.declareBefore()
+	}
+
+	// If there is a return type, declare the constant `result` which has the return type
+
+	if _, ok := returnType.(*VoidType); !ok {
+		checker.declareResult(returnType)
+	}
+
+	if rewrittenPostConditions != nil {
+		checker.visitConditions(rewrittenPostConditions.RewrittenPostConditions)
+	}
+}
+
 func (checker *Checker) visitFunctionBlock(
 	functionBlock *ast.FunctionBlock,
 	returnTypeAnnotation *TypeAnnotation,
 	checkResourceLoss bool,
 ) {
-
 	checker.enterValueScope()
 	defer checker.leaveValueScope(checkResourceLoss)
 
-	checker.visitConditions(functionBlock.PreConditions)
-
-	// NOTE: not checking block as it enters a new scope
-	// and post-conditions need to be able to refer to block's declarations
-
-	checker.visitStatements(functionBlock.Block.Statements)
-
-	// if there is a post-condition, declare the function `before`
-
-	// TODO: improve: only declare when a condition actually refers to `before`?
-
-	if len(functionBlock.PostConditions) > 0 {
-		checker.declareBefore()
+	if functionBlock.PreConditions != nil {
+		checker.visitConditions(*functionBlock.PreConditions)
 	}
 
-	// if there is a return type, declare the constant `result`
-	// which has the return type
+	checker.visitWithPostConditions(
+		functionBlock.PostConditions,
+		returnTypeAnnotation.Type,
+		func() {
+			// NOTE: not checking block as it enters a new scope
+			// and post-conditions need to be able to refer to block's declarations
 
-	if _, ok := returnTypeAnnotation.Type.(*VoidType); !ok {
-		checker.declareResult(returnTypeAnnotation.Type)
-	}
-
-	checker.visitConditions(functionBlock.PostConditions)
+			checker.visitStatements(functionBlock.Block.Statements)
+		},
+	)
 }
 
 func (checker *Checker) declareResult(ty Type) {
