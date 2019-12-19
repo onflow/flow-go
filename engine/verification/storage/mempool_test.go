@@ -10,9 +10,10 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"crypto/rand"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/verification"
-  "github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type ERStoreTestSuit struct {
@@ -283,14 +284,12 @@ func randomER() *flow.ExecutionReceipt {
 	rand.Read(blockHash)
 	rand.Read(stateComm)
 	rand.Read(executorSignature)
-	return &exec.ExecutionReceipt{
-		ExecutionResult: exec.ExecutionResult{
-			PreviousExecutionResultHash: crypto.BytesToHash(previousER),
-			BlockHash:                   crypto.BytesToHash(blockHash),
-			FinalStateCommitment:        stateComm,
-			Chunks:                      nil,
-			Signatures:                  nil,
-		},
+	return &flow.ExecutionReceipt{
+		ExecutionResult: flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousExecutionResult: flow.Fingerprint(crypto.BytesToHash(previousER)),
+			Block:                   flow.Fingerprint(crypto.BytesToHash(previousER)),
+			FinalStateCommitment:    stateComm,
+		}},
 		Spocks:            nil,
 		ExecutorSignature: executorSignature,
 	}
