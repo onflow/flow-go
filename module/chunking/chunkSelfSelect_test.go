@@ -8,7 +8,6 @@ package chunking
 // 	"testing"
 
 // 	"github.com/dapperlabs/flow-go/crypto"
-// 	exec "github.com/dapperlabs/flow-go/model/execution"
 // 	"github.com/dapperlabs/flow-go/model/flow"
 // )
 

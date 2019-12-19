@@ -6,7 +6,6 @@ package chunking
 // 	"reflect"
 
 // 	"github.com/dapperlabs/flow-go/crypto"
-// 	exec "github.com/dapperlabs/flow-go/model/execution"
 // )
 
 // // SeedPrep prepares a seed for Rand

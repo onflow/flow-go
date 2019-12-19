@@ -6,7 +6,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model"
-	"github.com/dapperlabs/flow-go/model/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/model/verification"
@@ -67,7 +66,7 @@ func (e *Engine) Submit(event interface{}) {
 func (e *Engine) Process(originID model.Identifier, event interface{}) error {
 	var err error
 	switch ev := event.(type) {
-	case *execution.ExecutionReceipt:
+	case *flow.ExecutionReceipt:
 		err = e.onExecutionReceipt(originID, ev)
 	default:
 		err = errors.Errorf("invalid event type (%T)", event)
@@ -81,7 +80,7 @@ func (e *Engine) Process(originID model.Identifier, event interface{}) error {
 
 // onExecutionReceipt receives an execution receipt (exrcpt), verifies that and emits
 // a result approval upon successful verification
-func (e *Engine) onExecutionReceipt(originID model.Identifier, exrcpt *execution.ExecutionReceipt) error {
+func (e *Engine) onExecutionReceipt(originID model.Identifier, exrcpt *flow.ExecutionReceipt) error {
 	// todo: add id of the ER once gets available
 	e.log.Info().
 		Hex("origin_id", originID[:]).
