@@ -244,10 +244,15 @@ func (a *abiAwareStatement) SelfType(t types.Type, allTypesMap map[string]types.
 	case types.String:
 		return wrap(a.Statement.Qual(typesImportPath, "String").Values())
 	case types.Composite:
-		mappedFields := jen.Dict{}
+		mappedFields := make([]jen.Code, len(v.Fields))
 
-		for key, field := range v.Fields {
-			mappedFields[jen.Lit(key)] = empty().SelfType(field, allTypesMap)
+		for i, field := range v.Fields {
+			mappedFields[i] = qual(typesImportPath, "Field").Values(
+				jen.Dict{
+					id("Identifier"): jen.Lit(field.Identifier),
+					id("Type"):       empty().SelfType(field.Type, allTypesMap),
+				},
+			)
 		}
 
 		mappedInitializers := make([]jen.Code, len(v.Initializers))
@@ -268,9 +273,9 @@ func (a *abiAwareStatement) SelfType(t types.Type, allTypesMap map[string]types.
 		}
 
 		return wrap(a.Statement.Qual(typesImportPath, "Composite").Values(jen.Dict{
-			id("Fields"):       jen.Map(jen.String()).Qual(typesImportPath, "Type").Values(mappedFields),
-			id("Initializers"): jen.Index().Index().Qual(typesImportPath, "Parameter").Values(mappedInitializers...),
 			id("Identifier"):   jen.Lit(v.Identifier),
+			id("Fields"):       jen.Index().Qual(typesImportPath, "Field").Values(mappedFields...),
+			id("Initializers"): jen.Index().Index().Qual(typesImportPath, "Parameter").Values(mappedInitializers...),
 		}))
 	case types.VariableSizedArray:
 		return wrap(a.Statement.Qual(typesImportPath, "VariableSizedArray").Values(jen.Dict{
@@ -418,16 +423,6 @@ func GenerateGo(pkg string, typesToGenerate map[string]types.Composite, writer i
 		typeVariableName := typeVariableName(name)
 		viewInterfaceFromValue := viewInterfaceFromValue(name)
 
-		fieldNames := make([]string, 0, len(typ.Fields))
-		for name, _ := range typ.Fields {
-			fieldNames = append(fieldNames, name)
-		}
-		values.SortInEncodingOrder(fieldNames)
-		fieldEncodingOrder := map[string]uint{}
-		for i, field := range fieldNames {
-			fieldEncodingOrder[field] = uint(i)
-		}
-
 		interfaceMethods := make([]jen.Code, 0, len(typ.Fields))
 		viewStructFields := make([]jen.Code, 0, len(typ.Fields))
 		viewInterfaceMethodsImpls := make([]jen.Code, 0, len(typ.Fields))
@@ -435,21 +430,21 @@ func GenerateGo(pkg string, typesToGenerate map[string]types.Composite, writer i
 		decodeFunctionFields := jen.Dict{}
 		decodeFunctionPrepareStatement := make([]jen.Code, 0)
 
-		for fieldName, fieldType := range typ.Fields {
-			viewInterfaceMethodName := startUpper(fieldName)
-			viewStructFieldName := _lower(fieldName)
+		for i, field := range typ.Fields {
+			viewInterfaceMethodName := startUpper(field.Identifier)
+			viewStructFieldName := _lower(field.Identifier)
 
-			interfaceMethods = append(interfaceMethods, id(viewInterfaceMethodName).Params().Type(fieldType))
-			viewStructFields = append(viewStructFields, id(viewStructFieldName).Type(fieldType))
+			interfaceMethods = append(interfaceMethods, id(viewInterfaceMethodName).Params().Type(field.Type))
+			viewStructFields = append(viewStructFields, id(viewStructFieldName).Type(field.Type))
 
 			viewInterfaceMethodsImpls = append(viewInterfaceMethodsImpls, function().Params(id("t").Op("*").Id(viewStructName)).
-				Id(viewInterfaceMethodName).Params().Type(fieldType).Block(
+				Id(viewInterfaceMethodName).Params().Type(field.Type).Block(
 				jen.Return(jen.Id("t").Dot(viewStructFieldName)),
 			))
 
-			fieldAccessor := id("composite").Dot("Fields").Index(jen.Lit(fieldName)) //.Dot("ToGoValue").Call()
+			fieldAccessor := id("composite").Dot("Fields").Index(jen.Lit(i))
 
-			preparation := jen.List(id(viewStructFieldName), id("err")).Op(":=").Add(converterFor(fieldType)).Call(fieldAccessor)
+			preparation := jen.List(id(viewStructFieldName), id("err")).Op(":=").Add(converterFor(field.Type)).Call(fieldAccessor)
 
 			decodeFunctionPrepareStatement = append(decodeFunctionPrepareStatement, preparation.Line().Add(ifErrorBlock).Line())
 
