@@ -545,13 +545,13 @@ func (b *Blockchain) CreateAccount(
 		return flow.Address{}, err
 	}
 
-	tx := flow.Transaction{
+	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             createAccountScript,
 		ReferenceBlockHash: nil,
 		Nonce:              nonce,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-	}
+	}}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
 	if err != nil {
@@ -580,14 +580,14 @@ func (b *Blockchain) UpdateAccountCode(
 ) error {
 	createAccountScript := templates.UpdateAccountCode(code)
 
-	tx := flow.Transaction{
+	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             createAccountScript,
 		ReferenceBlockHash: nil,
 		Nonce:              nonce,
 		ComputeLimit:       10,
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 		PayerAccount:       b.RootAccountAddress(),
-	}
+	}}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
 	if err != nil {

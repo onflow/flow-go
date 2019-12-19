@@ -23,12 +23,12 @@ func TestChunkSelectAndVerify(t *testing.T) {
 	var ChunkTotalGasSpent = []uint64{100, 200, 100, 200, 100, 200}
 	chunks := make([]exec.Chunk, len(ChunkTotalGasSpent))
 	for i, totalGas := range ChunkTotalGasSpent {
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             []byte("script"),
 			ReferenceBlockHash: []byte("blockhash"),
 			Nonce:              uint64(i),
 			ComputeLimit:       uint64(1000),
-		}
+		}}
 		chunk := exec.Chunk{
 			Transactions:  []flow.Transaction{tx},
 			TotalGasSpent: totalGas,

@@ -69,13 +69,13 @@ func TestInitialization(t *testing.T) {
 			counterAddress,
 		)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:         []byte(script),
 			Nonce:          getNonce(),
 			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)
