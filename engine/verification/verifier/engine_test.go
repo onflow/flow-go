@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -16,19 +17,18 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/model/verification"
-	"github.com/dapperlabs/flow-go/module/mock"
+	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
-	testifymock "github.com/stretchr/testify/mock"
 )
 
 // Test suit for functionality testing of Verifier Engine
 type VerifierEngineTestSuit struct {
 	suite.Suite
-	e     *Engine       // the mock engine, used for testing different functionalities
-	net   *mock.Network // used as an instance of networking layer for the mock engine
+	e     *Engine         // the mock engine, used for testing different functionalities
+	net   *module.Network // used as an instance of networking layer for the mock engine
 	state *protocol.State
-	me    *mock.Local
+	me    *module.Local
 	con   *network.Conduit
 	ss    *protocol.Snapshot
 }
@@ -37,20 +37,21 @@ type VerifierEngineTestSuit struct {
 func (suite *VerifierEngineTestSuit) SetupTest() {
 	suite.state = &protocol.State{} // used as a mock identity table for the mock engine
 	suite.con = &network.Conduit{}  // used as a mock conduit for the mock engine
-	suite.net = &mock.Network{}     // used as a mock network for the mock engine
-	suite.me = &mock.Local{}
+	suite.net = &module.Network{}   // used as a mock network for the mock engine
+	suite.me = &module.Local{}
 	suite.ss = &protocol.Snapshot{}
 	log := zerolog.Logger{} // used as to log relevant
 
 	// the mock verifier engine
 	suite.e = &Engine{
+		unit:  engine.NewUnit(),
 		log:   log,
 		me:    suite.me,
 		state: suite.state,
 	}
 
 	// mocking the network registration of the engine
-	suite.net.On("Register", uint8(engine.VerificationVerifier), suite.e).
+	suite.net.On("Register", uint8(engine.VerificationVerifier), mock.Anything).
 		Return(suite.con, nil).
 		Once()
 }
@@ -82,7 +83,7 @@ func (suite *VerifierEngineTestSuit) Test_Submit_HappyPath() {
 		Role:    flow.RoleVerification,
 	}
 	//mocking state for me.NodeID for twice
-	suite.me.On("NodeID").Return(vn_me.NodeID).Twice()
+	suite.me.On("NodeID").Return(vn_me.NodeID).Once()
 
 	// mocking for Final().Identities(Identity(verifierNode))
 	suite.state.On("Final").Return(suite.ss).Once()
@@ -94,7 +95,7 @@ func (suite *VerifierEngineTestSuit) Test_Submit_HappyPath() {
 
 	// mocking for Final().Identities(identity.HasRole(flow.RoleConsensus))
 	suite.state.On("Final").Return(suite.ss).Once()
-	suite.ss.On("Identities", testifymock.Anything).Return(cons_id, nil)
+	suite.ss.On("Identities", mock.Anything).Return(cons_id, nil)
 
 	// extracting mock consensus nodes IDs
 	params := []interface{}{&verification.ResultApproval{}}
@@ -109,7 +110,7 @@ func (suite *VerifierEngineTestSuit) Test_Submit_HappyPath() {
 		Once()
 
 	// emitting an execution receipt form the execution node
-	vrfy.Submit(&execution.ExecutionReceipt{})
+	_ = vrfy.Process(vn_me.NodeID, &execution.ExecutionReceipt{})
 
 	suite.state.AssertExpectations(suite.T())
 	suite.con.AssertExpectations(suite.T())
@@ -260,7 +261,7 @@ func (suite *VerifierEngineTestSuit) TestOnExecutionReceipt_HappyPath() {
 
 	// mocking for Final().Identities(identity.HasRole(flow.RoleConsensus))
 	suite.state.On("Final").Return(suite.ss).Once()
-	suite.ss.On("Identities", testifymock.Anything).Return(cons_ids, nil)
+	suite.ss.On("Identities", mock.Anything).Return(cons_ids, nil)
 
 	params := []interface{}{&verification.ResultApproval{}}
 	for _, targetID := range cons_ids {
