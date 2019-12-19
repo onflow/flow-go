@@ -18,81 +18,88 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func setUp(t *testing.T) *badger.DB {
+func runWithDb(t *testing.T, f func(*badger.DB)) {
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
-	return db
+
+	f(db)
+
+	db.Close()
+	os.RemoveAll(dir)
 }
 
 func TestRetrievalByNumber(t *testing.T) {
 
-	db := setUp(t)
+	runWithDb(t, func(db *badger.DB) {
+		blocks := badger2.NewBlocks(db)
 
-	blocks := badger2.NewBlocks(db)
+		block := unittest.BlockFixture()
+		block.Number = 21
 
-	block := unittest.BlockFixture()
-	block.Number = 21
+		err := blocks.Save(&block)
+		require.NoError(t, err)
 
-	err := blocks.Save(&block)
-	require.NoError(t, err)
+		byNumber, err := blocks.ByNumber(21)
+		require.NoError(t, err)
 
-	byNumber, err := blocks.ByNumber(21)
-	require.NoError(t, err)
-
-	assert.Equal(t, byNumber, &block)
+		assert.Equal(t, byNumber, &block)
+	})
 }
 
 func TestRetrievalByNonexistingNumber(t *testing.T) {
 
-	db := setUp(t)
+	runWithDb(t, func(db *badger.DB) {
 
-	blocks := badger2.NewBlocks(db)
+		blocks := badger2.NewBlocks(db)
 
-	block := unittest.BlockFixture()
-	block.Number = 21
+		block := unittest.BlockFixture()
+		block.Number = 21
 
-	err := blocks.Save(&block)
-	require.NoError(t, err)
+		err := blocks.Save(&block)
+		require.NoError(t, err)
 
-	_, err = blocks.ByNumber(37)
+		_, err = blocks.ByNumber(37)
 
-	assert.Equal(t, storage.NotFoundErr, err)
+		assert.Equal(t, storage.NotFoundErr, err)
+	})
 }
 
 func TestStoringSameBlockTwice(t *testing.T) {
 
-	db := setUp(t)
+	runWithDb(t, func(db *badger.DB) {
 
-	blocks := badger2.NewBlocks(db)
+		blocks := badger2.NewBlocks(db)
 
-	block := unittest.BlockFixture()
-	block.Number = 21
+		block := unittest.BlockFixture()
+		block.Number = 21
 
-	err := blocks.Save(&block)
-	require.NoError(t, err)
+		err := blocks.Save(&block)
+		require.NoError(t, err)
 
-	err = blocks.Save(&block)
-	require.NoError(t, err)
+		err = blocks.Save(&block)
+		require.NoError(t, err)
+	})
 }
 
 func TestStoringBlockWithDifferentDateButSameNumberTwice(t *testing.T) {
 
-	db := setUp(t)
+	runWithDb(t, func(db *badger.DB) {
 
-	blocks := badger2.NewBlocks(db)
+		blocks := badger2.NewBlocks(db)
 
-	block := unittest.BlockFixture()
-	block.Number = 21
+		block := unittest.BlockFixture()
+		block.Number = 21
 
-	err := blocks.Save(&block)
-	require.NoError(t, err)
+		err := blocks.Save(&block)
+		require.NoError(t, err)
 
-	block2 := block
-	block2.Signatures = []crypto.Signature{[]byte("magic")}
+		block2 := block
+		block2.Signatures = []crypto.Signature{[]byte("magic")}
 
-	err = blocks.Save(&block2)
-	realError := errors2.Cause(err)
+		err = blocks.Save(&block2)
+		realError := errors2.Cause(err)
 
-	require.Equal(t, storage.DifferentDataErr, realError)
+		require.Equal(t, storage.DifferentDataErr, realError)
+	})
 }

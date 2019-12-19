@@ -52,8 +52,8 @@ func GuaranteedCollectionsFixture(n int) []*collection.GuaranteedCollection {
 	ret := make([]*collection.GuaranteedCollection, n)
 	for i := 0; i < n; i++ {
 		ret[i] = &collection.GuaranteedCollection{
-			Hash:       []byte(fmt.Sprintf("hash %d", i)),
-			Signatures: []crypto.Signature{[]byte(fmt.Sprintf("signature %d A", i)), []byte(fmt.Sprintf("signature %d B", i))},
+			CollectionHash: []byte(fmt.Sprintf("hash %d", i)),
+			Signatures:     []crypto.Signature{[]byte(fmt.Sprintf("signature %d A", i)), []byte(fmt.Sprintf("signature %d B", i))},
 		}
 	}
 	return ret
