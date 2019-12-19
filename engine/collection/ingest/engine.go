@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/txpool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 )
@@ -27,11 +26,11 @@ type Engine struct {
 	state     protocol.State
 	clusters  flow.ClusterList
 	clusterID flow.ClusterID // my cluster ID
-	pool      *txpool.Pool   // TODO replace with merkle tree
+	pool      module.TransactionPool
 }
 
 // New creates a new collection ingest engine.
-func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, pool *txpool.Pool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, pool module.TransactionPool) (*Engine, error) {
 	identities, err := state.Final().Identities(identity.HasRole(flow.RoleCollection))
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)
