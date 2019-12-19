@@ -186,7 +186,7 @@ func createLibP2PNodes(ctx context.Context, t *testing.T, count int) (nodes []*P
 		require.Eventuallyf(t, func() bool {
 			ip, p := n.GetIPPort()
 			return ip != "" && p != ""
-		}, 3*time.Second, time.Millisecond, fmt.Sprintf("node%d didn't start", i))
+		}, 3*time.Second, 100 * time.Millisecond, fmt.Sprintf("node%d didn't start", i))
 		nodes = append(nodes, n)
 	}
 	return nodes, err
