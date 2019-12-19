@@ -7,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator/storage"
 	"github.com/dapperlabs/flow-go/sdk/emulator/types"
@@ -207,9 +208,9 @@ func (s Store) CommitBlock(
 	return err
 }
 
-func (s *Store) TransactionByHash(txHash crypto.Hash) (tx flow.Transaction, err error) {
+func (s *Store) TransactionByFingerprint(fp model.Fingerprint) (tx flow.Transaction, err error) {
 	err = s.db.View(func(txn *badger.Txn) error {
-		encTx, err := getTx(txn)(transactionKey(txHash))
+		encTx, err := getTx(txn)(transactionKey(fp))
 		if err != nil {
 			return err
 		}
@@ -229,7 +230,7 @@ func insertTransaction(tx flow.Transaction) func(txn *badger.Txn) error {
 			return err
 		}
 
-		return txn.Set(transactionKey(tx.Hash()), encTx)
+		return txn.Set(transactionKey(tx.Fingerprint()), encTx)
 	}
 }
 

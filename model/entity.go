@@ -1,13 +1,22 @@
 package model
 
-import "github.com/dapperlabs/flow-go/crypto"
+import (
+	"encoding/hex"
+
+	"github.com/dapperlabs/flow-go/crypto"
+)
 
 // Identifier represents a 32-byte unique identifier for a node.
 type Identifier [32]byte
 
-// Commit is a hash of an entity to verify the content
+// Fingerprint is a hash of an entity to verify the content
 // TODO update this to be a fixed size array
 type Fingerprint crypto.Hash
+
+// Hex returns the hex string representation of the fingerprint.
+func (fp Fingerprint) Hex() string {
+	return hex.EncodeToString(fp)
+}
 
 // Entity defines how flow entities should be defined
 // Entities are flat data structures holding multiple data fields.

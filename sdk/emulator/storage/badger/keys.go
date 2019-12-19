@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model"
 )
 
 const (
@@ -36,8 +37,8 @@ func latestBlockKey() []byte {
 	return []byte("latest_block_number")
 }
 
-func transactionKey(txHash crypto.Hash) []byte {
-	return []byte(fmt.Sprintf("%s-%s", transactionKeyPrefix, txHash.Hex()))
+func transactionKey(fp model.Fingerprint) []byte {
+	return []byte(fmt.Sprintf("%s-%s", transactionKeyPrefix, fp.Hex()))
 }
 
 func eventsKey(blockNumber uint64) []byte {
