@@ -42,7 +42,7 @@ type Store interface {
 	) error
 
 	// TransactionByHash gets the transaction with the given hash.
-	TransactionByFingerprint(fp flow.Fingerprint) (flow.Transaction, error)
+	TransactionByHash(hash crypto.Hash) (flow.Transaction, error)
 
 	// InsertTransaction inserts a transaction.
 	InsertTransaction(flow.Transaction) error
