@@ -41,13 +41,13 @@ func (_m *CollectionPool) All() []*flow.GuaranteedCollection {
 	return r0
 }
 
-// Get provides a mock function with given fields: hash
-func (_m *CollectionPool) Get(hash crypto.Hash) (*flow.GuaranteedCollection, error) {
-	ret := _m.Called(hash)
+// Get provides a mock function with given fields: fp
+func (_m *CollectionPool) Get(fp flow.Fingerprint) (*flow.GuaranteedCollection, error) {
+	ret := _m.Called(fp)
 
 	var r0 *flow.GuaranteedCollection
-	if rf, ok := ret.Get(0).(func(crypto.Hash) *flow.GuaranteedCollection); ok {
-		r0 = rf(hash)
+	if rf, ok := ret.Get(0).(func(flow.Fingerprint) *flow.GuaranteedCollection); ok {
+		r0 = rf(fp)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.GuaranteedCollection)
@@ -55,8 +55,8 @@ func (_m *CollectionPool) Get(hash crypto.Hash) (*flow.GuaranteedCollection, err
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(crypto.Hash) error); ok {
-		r1 = rf(hash)
+	if rf, ok := ret.Get(1).(func(flow.Fingerprint) error); ok {
+		r1 = rf(fp)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -64,13 +64,13 @@ func (_m *CollectionPool) Get(hash crypto.Hash) (*flow.GuaranteedCollection, err
 	return r0, r1
 }
 
-// Has provides a mock function with given fields: hash
-func (_m *CollectionPool) Has(hash crypto.Hash) bool {
-	ret := _m.Called(hash)
+// Has provides a mock function with given fields: fp
+func (_m *CollectionPool) Has(fp flow.Fingerprint) bool {
+	ret := _m.Called(fp)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(crypto.Hash) bool); ok {
-		r0 = rf(hash)
+	if rf, ok := ret.Get(0).(func(flow.Fingerprint) bool); ok {
+		r0 = rf(fp)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -94,13 +94,13 @@ func (_m *CollectionPool) Hash() crypto.Hash {
 	return r0
 }
 
-// Rem provides a mock function with given fields: hash
-func (_m *CollectionPool) Rem(hash crypto.Hash) bool {
-	ret := _m.Called(hash)
+// Rem provides a mock function with given fields: fp
+func (_m *CollectionPool) Rem(fp flow.Fingerprint) bool {
+	ret := _m.Called(fp)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(crypto.Hash) bool); ok {
-		r0 = rf(hash)
+	if rf, ok := ret.Get(0).(func(flow.Fingerprint) bool); ok {
+		r0 = rf(fp)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
