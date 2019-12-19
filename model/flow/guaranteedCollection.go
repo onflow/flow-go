@@ -1,10 +1,9 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package collection
+package flow
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // GuaranteedCollection represents a signed hash for a collection, which is used
