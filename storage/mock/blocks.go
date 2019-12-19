@@ -56,3 +56,17 @@ func (_m *Blocks) ByNumber(number uint64) (*flow.Block, error) {
 
 	return r0, r1
 }
+
+// Save provides a mock function with given fields: _a0
+func (_m *Blocks) Save(_a0 *flow.Block) error {
+	ret := _m.Called(_a0)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.Block) error); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}

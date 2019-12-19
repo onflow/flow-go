@@ -8,7 +8,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
 )
 
 func toDeltaKey(number uint64, role flow.Role, nodeID flow.Identifier) []byte {
@@ -28,15 +27,15 @@ func fromDeltaKey(key []byte) (uint64, flow.Role, flow.Identifier) {
 	return number, role, nodeID
 }
 
-func InsertNewDelta(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) func(*badger.Txn) storage.Error {
+func InsertNewDelta(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) func(*badger.Txn) error {
 	return insertNew(toDeltaKey(number, role, nodeID), delta)
 }
 
-func RetrieveDelta(number uint64, role flow.Role, nodeID flow.Identifier, delta *int64) func(*badger.Txn) storage.Error {
+func RetrieveDelta(number uint64, role flow.Role, nodeID flow.Identifier, delta *int64) func(*badger.Txn) error {
 	return retrieve(toDeltaKey(number, role, nodeID), delta)
 }
 
-func TraverseDeltas(from uint64, to uint64, filters []flow.IdentityFilter, process func(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) storage.Error) func(*badger.Txn) storage.Error {
+func TraverseDeltas(from uint64, to uint64, filters []flow.IdentityFilter, process func(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) error) func(*badger.Txn) error {
 	iteration := func() (checkFunc, createFunc, handleFunc) {
 		var number uint64
 		var role flow.Role

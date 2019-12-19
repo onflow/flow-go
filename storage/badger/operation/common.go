@@ -15,28 +15,28 @@ import (
 // insertNew will encode the given entity using JSON and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists.
-func insertNew(key []byte, entity interface{}) func(*badger.Txn) storage.Error {
-	return func(tx *badger.Txn) storage.Error {
+func insertNew(key []byte, entity interface{}) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
 
 		// check if the key already exists in the db
 		_, err := tx.Get(key)
 		if err == nil {
-			return storage.NewStorageError("key already exists (%x)", key)
+			return storage.KeyAlreadyExistsErr
 		}
 		if err != badger.ErrKeyNotFound {
-			return storage.WrapStorageError(err, "could not check key")
+			return errors.Wrap(err, "could not check key")
 		}
 
 		// serialize the entity data
 		val, err := json.Marshal(entity)
 		if err != nil {
-			return storage.WrapStorageError(err, "could not encode entity")
+			return errors.Wrap(err, "could not encode entity")
 		}
 
 		// insert the entity data into the DB
 		err = tx.Set(key, val)
 		if err != nil {
-			return storage.WrapStorageError(err, "could not store data")
+			return errors.Wrap(err, "could not store data")
 		}
 
 		return nil
@@ -68,7 +68,7 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 				if bytes.Equal(val, existingVal) {
 					return nil
 				} else {
-					return storage.NewDifferentDataUnderKey(key)
+					return storage.DifferentDataErr
 				}
 			})
 			if err != nil {
@@ -89,28 +89,28 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 // update will encode the given entity with JSON and update the binary data
 // under the given key in the badger DB. It will error if the key does not exist
 // yet.
-func update(key []byte, entity interface{}) func(*badger.Txn) storage.Error {
-	return func(tx *badger.Txn) storage.Error {
+func update(key []byte, entity interface{}) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
 
 		// retrieve the item from the key-value store
 		_, err := tx.Get(key)
 		if err == badger.ErrKeyNotFound {
-			return storage.NewStorageError("could not find key %x)", key)
+			return storage.NotFoundErr
 		}
 		if err != nil {
-			return storage.WrapStorageError(err, "could not check key")
+			return errors.Wrap(err, "could not check key")
 		}
 
 		// serialize the entity data
 		val, err := json.Marshal(entity)
 		if err != nil {
-			return storage.WrapStorageError(err, "could not encode entity")
+			return errors.Wrap(err, "could not encode entity")
 		}
 
 		// insert the entity data into the DB
 		err = tx.Set(key, val)
 		if err != nil {
-			return storage.WrapStorageError(err, "could not replace data")
+			return errors.Wrap(err, "could not replace data")
 		}
 
 		return nil
@@ -120,16 +120,16 @@ func update(key []byte, entity interface{}) func(*badger.Txn) storage.Error {
 // retrieve will retrieve the binary data under the given key from the badger DB
 // and decode it into the given entity. The provided entity needs to be a
 // pointer to an initialized entity of the correct type.
-func retrieve(key []byte, entity interface{}) func(*badger.Txn) storage.Error {
-	return func(tx *badger.Txn) storage.Error {
+func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
 
 		// retrieve the item from the key-value store
 		item, err := tx.Get(key)
 		if err != nil {
 			if err == badger.ErrKeyNotFound {
-				return storage.NewNotFoundError(key)
+				return storage.NotFoundErr
 			}
-			return storage.WrapStorageError(err, "could not load data")
+			return errors.Wrap(err, "could not load data")
 		}
 
 		// get the value from the item
@@ -138,7 +138,7 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) storage.Error {
 			return err
 		})
 		if err != nil {
-			return storage.WrapStorageError(err, "could not decode entity")
+			return errors.Wrap(err, "could not decode entity")
 		}
 
 		return nil
@@ -172,8 +172,8 @@ type iterationFunc func() (checkFunc, createFunc, handleFunc)
 // the badger DB up to and including the end prefix. On each iteration it will
 // call the iteration function to initialize functions specific to processing
 // the given key-value pair.
-func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) storage.Error {
-	return func(tx *badger.Txn) storage.Error {
+func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
 
 		it := tx.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
@@ -214,7 +214,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 				return nil
 			})
 			if err != nil {
-				return storage.WrapStorageError(err, "could not process value")
+				return errors.Wrap(err, "could not process value")
 			}
 		}
 

@@ -84,6 +84,9 @@ generate-mocks:
 	GO111MODULE=on mockgen -destination=sdk/client/mocks/mock_client.go -package=mocks github.com/dapperlabs/flow-go/sdk/client RPCClient
 	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/emulated_blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator EmulatedBlockchainAPI
 	GO111MODULE=on mockgen -destination=sdk/emulator/storage/mocks/store.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator/storage Store
+	GO111MODULE=on mockgen -destination=storage/mocks/blocks.go -package=mocks github.com/dapperlabs/flow-go/storage Blocks
+	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/dapperlabs/flow-go/module Network,Local
+	GO111MODULE=on mockgen -destination=network/mocks/conduit.go -package=mocks github.com/dapperlabs/flow-go/network Conduit
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"

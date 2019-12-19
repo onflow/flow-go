@@ -181,7 +181,7 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		// check for role
 		var role flow.Role
 		err := operation.RetrieveRole(id.NodeID, &role)(tx)
-		if _, ok := errors.Cause(err).(storage.NotFoundError); ok {
+		if err == storage.NotFoundErr {
 			continue
 		}
 		if err == nil {
@@ -196,7 +196,7 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		// check for address
 		var address string
 		err := operation.RetrieveAddress(id.NodeID, &address)(tx)
-		if errors.Cause(err) == badger.ErrKeyNotFound {
+		if err == storage.NotFoundErr {
 			continue
 		}
 		if err == nil {
@@ -315,18 +315,18 @@ func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 	return nil
 }
 
-func applyBlockChanges(tx *badger.Txn, block *flow.Block) storage.Error {
+func applyBlockChanges(tx *badger.Txn, block *flow.Block) error {
 
 	// insert the height to hash mapping for finalized block
 	err := operation.InsertNewHash(block.Number, block.Hash())(tx)
 	if err != nil {
-		return storage.WrapStorageError(err, "could not insert hash")
+		return errors.Wrap(err, "could not insert hash")
 	}
 
 	// update the finalized boundary number
 	err = operation.UpdateBoundary(block.Number)(tx)
 	if err != nil {
-		return storage.WrapStorageError(err, "could not update boundary")
+		return errors.Wrap(err, "could not update boundary")
 	}
 
 	// insert the information for each new identity
@@ -335,19 +335,19 @@ func applyBlockChanges(tx *badger.Txn, block *flow.Block) storage.Error {
 		// insert the role
 		err := operation.InsertNewRole(id.NodeID, id.Role)(tx)
 		if err != nil {
-			return storage.WrapStorageErrorf(err, "could not insert role (%x)", id.NodeID)
+			return errors.Wrapf(err, "could not insert role (%x)", id.NodeID)
 		}
 
 		// insert the address
 		err = operation.InsertNewAddress(id.NodeID, id.Address)(tx)
 		if err != nil {
-			return storage.WrapStorageErrorf(err, "could not insert address (%x)", id.NodeID)
+			return errors.Wrapf(err, "could not insert address (%x)", id.NodeID)
 		}
 
 		// insert the stake delta
 		err = operation.InsertNewDelta(block.Number, id.Role, id.NodeID, int64(id.Stake))(tx)
 		if err != nil {
-			return storage.WrapStorageErrorf(err, "could not insert delta (%x)", id.NodeID)
+			return errors.Wrapf(err, "could not insert delta (%x)", id.NodeID)
 		}
 	}
 

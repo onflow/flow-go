@@ -3,15 +3,13 @@
 package badger
 
 import (
-	"fmt"
-
 	"github.com/dgraph-io/badger/v2"
-	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -35,6 +33,9 @@ func (b *Blocks) ByHash(hash crypto.Hash) (*flow.Block, error) {
 		var err error
 		block, err = b.retrieveBlock(tx, hash)
 		if err != nil {
+			if err == storage.NotFoundErr {
+				return err
+			}
 			return errors.Wrap(err, "could not retrieve block")
 		}
 
@@ -53,11 +54,17 @@ func (b *Blocks) ByNumber(number uint64) (*flow.Block, error) {
 		var hash crypto.Hash
 		err := operation.RetrieveHash(number, &hash)(tx)
 		if err != nil {
+			if err == storage.NotFoundErr {
+				return err
+			}
 			return errors.Wrap(err, "could not retrieve hash")
 		}
 
 		block, err = b.retrieveBlock(tx, hash)
 		if err != nil {
+			if err == storage.NotFoundErr {
+				return err
+			}
 			return errors.Wrap(err, "could not retrieve block")
 		}
 
@@ -108,10 +115,21 @@ func (b *Blocks) Save(block *flow.Block) error {
 		if err != nil {
 			return errors.Wrap(err, "cannot save block")
 		}
-		err := operation.InsertIdentities(block.NewIdentities)
+		err = operation.InsertIdentities(block.Hash(), block.NewIdentities)(tx)
+		if err != nil {
+			return errors.Wrap(err, "cannot save block")
+		}
+		err = operation.InsertCollections(block.Hash(), block.GuaranteedCollections)(tx)
+		if err != nil {
+			return errors.Wrap(err, "cannot save block")
+		}
+		err = operation.InsertHash(block.Number, block.Hash())(tx)
+		if err != nil {
+			return errors.Wrap(err, "cannot save block")
+		}
 
 		return nil
-	}
+	})
 	return err
 
 }

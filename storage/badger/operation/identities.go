@@ -7,13 +7,16 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
 )
 
-func InsertNewIdentities(hash crypto.Hash, identities flow.IdentityList) func(*badger.Txn) storage.Error {
+func InsertNewIdentities(hash crypto.Hash, identities flow.IdentityList) func(*badger.Txn) error {
 	return insertNew(makePrefix(codeIdentities, hash), identities)
 }
 
-func RetrieveIdentities(hash crypto.Hash, identities *flow.IdentityList) func(*badger.Txn) storage.Error {
+func InsertIdentities(hash crypto.Hash, identities flow.IdentityList) func(*badger.Txn) error {
+	return insert(makePrefix(codeIdentities, hash), identities)
+}
+
+func RetrieveIdentities(hash crypto.Hash, identities *flow.IdentityList) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeIdentities, hash), identities)
 }

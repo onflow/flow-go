@@ -13,6 +13,8 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 func init() {
@@ -23,17 +25,22 @@ type Entity struct {
 	ID uint64
 }
 
-func TestInsertValid(t *testing.T) {
-
+func setUp(t *testing.T) *badger.DB {
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
+	return db
+}
+
+func TestInsertValid(t *testing.T) {
+
+	db := setUp(t)
 
 	e := Entity{ID: 1337}
 	key := []byte{0x01, 0x02, 0x03}
 	val := []byte(`{"ID":1337}`)
 
-	err = db.Update(insertNew(key, e))
+	err := db.Update(insertNew(key, e))
 	require.Nil(t, err)
 
 	var act []byte
@@ -49,14 +56,34 @@ func TestInsertValid(t *testing.T) {
 }
 
 func TestInsertDuplicate(t *testing.T) {
-	// TODO
+	db := setUp(t)
+
+	e := Entity{ID: 1337}
+	e2 := Entity{ID: 1338}
+	key := []byte{0x01, 0x02, 0x03}
+
+	//insert first time
+	err := db.Update(insertNew(key, e))
+	require.NoError(t, err)
+
+	//Insert again
+	err = db.Update(insertNew(key, e))
+	require.Error(t, err)
+	require.Equal(t, err, storage.KeyAlreadyExistsErr)
+
+	//insert again, but using different method
+	err = db.Update(insert(key, e))
+	require.NoError(t, err)
+
+	//again with different data
+	err = db.Update(insert(key, e2))
+	require.Error(t, err)
+	require.Equal(t, err, storage.DifferentDataErr)
 }
 
 func TestUpdateValid(t *testing.T) {
 
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
-	require.Nil(t, err)
+	db := setUp(t)
 
 	e := Entity{ID: 1337}
 	key := []byte{0x01, 0x02, 0x03}
@@ -68,7 +95,7 @@ func TestUpdateValid(t *testing.T) {
 		return nil
 	})
 
-	err = db.Update(update(key, e))
+	err := db.Update(update(key, e))
 	require.Nil(t, err)
 
 	var act []byte
@@ -89,9 +116,7 @@ func TestUpdateMissing(t *testing.T) {
 
 func TestRetrieveValid(t *testing.T) {
 
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
-	require.Nil(t, err)
+	db := setUp(t)
 
 	e := Entity{ID: 1337}
 	key := []byte{0x01, 0x02, 0x03}
@@ -104,7 +129,7 @@ func TestRetrieveValid(t *testing.T) {
 	})
 
 	var act Entity
-	err = db.View(retrieve(key, &act))
+	err := db.View(retrieve(key, &act))
 	require.Nil(t, err)
 
 	assert.Equal(t, act, e)

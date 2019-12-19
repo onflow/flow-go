@@ -12,15 +12,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/dapperlabs/flow-go/storage"
 )
-
-func wrap(fn func(txn *badger.Txn) storage.Error) func(txn *badger.Txn) error {
-	return func(txn *badger.Txn) error {
-		return fn(txn)
-	}
-}
 
 func TestBoundaryInsertUpdateRetrieve(t *testing.T) {
 
@@ -30,20 +22,20 @@ func TestBoundaryInsertUpdateRetrieve(t *testing.T) {
 
 	boundary := uint64(1337)
 
-	err = db.Update(wrap(InsertNewBoundary(boundary)))
+	err = db.Update(InsertNewBoundary(boundary))
 	require.Nil(t, err)
 
 	var retrieved uint64
-	err = db.View(wrap(RetrieveBoundary(&retrieved)))
+	err = db.View(RetrieveBoundary(&retrieved))
 	require.Nil(t, err)
 
 	assert.Equal(t, retrieved, boundary)
 
 	boundary = 9999
-	err = db.Update(wrap(UpdateBoundary(boundary)))
+	err = db.Update(UpdateBoundary(boundary))
 	require.Nil(t, err)
 
-	err = db.View(wrap(RetrieveBoundary(&retrieved)))
+	err = db.View(RetrieveBoundary(&retrieved))
 	require.Nil(t, err)
 
 	assert.Equal(t, retrieved, boundary)

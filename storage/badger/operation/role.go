@@ -6,13 +6,12 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
 )
 
-func InsertNewRole(nodeID flow.Identifier, role flow.Role) func(*badger.Txn) storage.Error {
+func InsertNewRole(nodeID flow.Identifier, role flow.Role) func(*badger.Txn) error {
 	return insertNew(makePrefix(codeRole, nodeID), role)
 }
 
-func RetrieveRole(nodeID flow.Identifier, role *flow.Role) func(*badger.Txn) storage.Error {
+func RetrieveRole(nodeID flow.Identifier, role *flow.Role) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeRole, nodeID), role)
 }
