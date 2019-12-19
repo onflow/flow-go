@@ -5,7 +5,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -75,7 +74,7 @@ func SignTransaction(
 		return nil, err
 	}
 
-	b := encoding.DefaultEncoder.MustEncode(tx.TransactionBody)
+	b := tx.Singularity()
 
 	return privateKey.PrivateKey.Sign(b, hasher)
 }

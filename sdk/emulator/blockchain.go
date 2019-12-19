@@ -17,7 +17,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
-	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
@@ -510,7 +509,7 @@ func (b *Blockchain) LastCreatedAccount() flow.Account {
 func (b *Blockchain) verifySignatures(tx flow.Transaction) error {
 	accountWeights := make(map[flow.Address]int)
 
-	encodedTx := encoding.DefaultEncoder.MustEncode(tx.TransactionBody)
+	encodedTx := tx.Singularity()
 
 	for _, accountSig := range tx.Signatures {
 		accountPublicKey, err := b.verifyAccountSignature(accountSig, encodedTx)
@@ -566,7 +565,6 @@ func (b *Blockchain) CreateAccount(
 		return flow.Address{}, err
 	}
 
-	
 	_, _, err = b.ExecuteAndCommitBlock()
 	if err != nil {
 		return flow.Address{}, err
