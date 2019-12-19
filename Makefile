@@ -21,7 +21,7 @@ crypto/relic/build: crypto/relic
 	./crypto/relic_build.sh
 
 .PHONY: install-tools
-install-tools: crypto/relic/build
+install-tools: crypto/relic/build check-go-version
 ifeq ($(UNAME), Linux)
 	sudo apt-get -y install capnproto
 endif
@@ -35,7 +35,7 @@ endif
 	GO111MODULE=on go get zombiezen.com/go/capnproto2@v0.0.0-20190505172156-0c36f8f86ab2; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
 	GO111MODULE=on go get github.com/mgechev/revive@master; \
-	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@master; \
+	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v0.0.0-20181123154057-e78b021dcbb5; \
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
 	GO111MODULE=on go get github.com/kevinburke/go-bindata/...@v3.11.0;
 
@@ -56,7 +56,7 @@ ifeq ($(COVER), true)
 endif
 
 .PHONY: generate
-generate: generate-godoc generate-proto generate-registries generate-mocks generate-bindata
+generate: generate-godoc generate-proto generate-mocks generate-bindata
 
 .PHONY: generate-godoc
 generate-godoc:
@@ -73,16 +73,10 @@ generate-proto:
 generate-capnp:
 	capnp compile -I${GOPATH}/src/zombiezen.com/go/capnproto2/std -ogo schema/captain/*.capnp
 
-.PHONY: generate-registries
-generate-registries:
-	GO111MODULE=on go build -o /tmp/registry-generator ./network/gossip/scripts/
-	find ./protobuf/services -type f -iname "*pb.go" -exec /tmp/registry-generator -w {} \;
-	rm /tmp/registry-generator
-
 .PHONY: generate-mocks
 generate-mocks:
 	GO111MODULE=on mockgen -destination=sdk/client/mocks/mock_client.go -package=mocks github.com/dapperlabs/flow-go/sdk/client RPCClient
-	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/emulated_blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator EmulatedBlockchainAPI
+	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator BlockchainAPI
 	GO111MODULE=on mockgen -destination=sdk/emulator/storage/mocks/store.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator/storage Store
 	GO111MODULE=on mockgen -destination=storage/mocks/blocks.go -package=mocks github.com/dapperlabs/flow-go/storage Blocks
 	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/dapperlabs/flow-go/module Network,Local
@@ -91,6 +85,7 @@ generate-mocks:
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
+	mockery -name '.*' -dir=engine -case=underscore -output="./engine/mock" -outpkg="mock"
 
 .PHONY: generate-bindata
 generate-bindata:
@@ -167,3 +162,7 @@ promote-vscode-extension: build-vscode-extension
 	cp language/tools/vscode-extension/cadence-*.vsix ./cli/flow/cadence/vscode/cadence.vsix;
 	go generate ./cli/flow/cadence/vscode;
 
+# Check if the go version is 1.13. flow-go only supports go 1.13
+.PHONY: check-go-version
+check-go-version:
+	go version | grep 1.13

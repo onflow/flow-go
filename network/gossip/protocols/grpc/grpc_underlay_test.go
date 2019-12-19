@@ -17,6 +17,7 @@ import (
 
 // TestGRPCUnderlay_Start_Twice tests if the GRPCUnderlay doesn't allow starting it twice
 func TestGRPCUnderlay_Start_Twice(t *testing.T) {
+	t.Skipf(" Skipping this test since the underlay functionality is no longer needed")
 	var protocol gossip.Underlay = &GRPCUnderlay{}
 	require.NotNil(t, protocol, "Protocol is nil")
 	protocol.Handle(func(sender string, msg []byte) {})
@@ -34,6 +35,7 @@ func TestGRPCUnderlay_Start_Twice(t *testing.T) {
 
 // TestGRPCUnderlay_Start_Stop tests starting and stopping of the GRPC underlay
 func TestGRPCUnderlay_Start_Stop(t *testing.T) {
+	t.Skipf(" Skipping this test since the underlay functionality is no longer needed")
 	var protocol gossip.Underlay = &GRPCUnderlay{}
 	require.NotNil(t, protocol, "Protocol is nil")
 	protocol.Handle(func(sender string, msg []byte) {})
@@ -49,6 +51,7 @@ func TestGRPCUnderlay_Start_Stop(t *testing.T) {
 
 // TestGRPCUnderlay_Handle tests if callback handler is called
 func TestGRPCUnderlay_Handle(t *testing.T) {
+	t.Skipf(" Skipping this test since the underlay functionality is no longer needed")
 	var protocol gossip.Underlay = &GRPCUnderlay{}
 	type Tuple struct {
 		sender string

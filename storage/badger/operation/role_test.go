@@ -19,6 +19,7 @@ import (
 func TestRoleInsertRetrieve(t *testing.T) {
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+	defer os.RemoveAll(dir)
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 

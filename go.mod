@@ -1,6 +1,6 @@
 module github.com/dapperlabs/flow-go
 
-go 1.12
+go 1.13
 
 require (
 	github.com/antlr/antlr4 v0.0.0-20190723154043-128983ff903e
@@ -22,6 +22,7 @@ require (
 	github.com/improbable-eng/grpc-web v0.11.0
 	github.com/ipfs/go-log v0.0.1
 	github.com/jrick/bitset v1.0.0
+	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
 	github.com/libp2p/go-libp2p v0.4.2
 	github.com/libp2p/go-libp2p-core v0.2.5
 	github.com/libp2p/go-libp2p-pubsub v0.2.5
@@ -54,6 +55,7 @@ require (
 	github.com/tinylib/msgp v1.1.0 // indirect
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 	github.com/xeipuuv/gojsonschema v1.2.0
+	go.uber.org/atomic v1.4.0
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/net v0.0.0-20190912160710-24e19bdeb0f2 // indirect
 	golang.org/x/text v0.3.2

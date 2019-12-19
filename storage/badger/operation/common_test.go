@@ -53,6 +53,8 @@ func TestInsertValid(t *testing.T) {
 	})
 
 	assert.Equal(t, act, val)
+
+	defer os.RemoveAll(dir)
 }
 
 func TestInsertDuplicate(t *testing.T) {
@@ -79,6 +81,8 @@ func TestInsertDuplicate(t *testing.T) {
 	err = db.Update(insert(key, e2))
 	require.Error(t, err)
 	require.Equal(t, err, storage.DifferentDataErr)
+
+	defer os.RemoveAll(dir)
 }
 
 func TestUpdateValid(t *testing.T) {
@@ -108,6 +112,8 @@ func TestUpdateValid(t *testing.T) {
 	})
 
 	assert.Equal(t, act, val)
+
+	defer os.RemoveAll(dir)
 }
 
 func TestUpdateMissing(t *testing.T) {
@@ -133,6 +139,8 @@ func TestRetrieveValid(t *testing.T) {
 	require.Nil(t, err)
 
 	assert.Equal(t, act, e)
+
+	defer os.RemoveAll(dir)
 }
 
 func TestRetrieveMissing(t *testing.T) {
