@@ -207,9 +207,9 @@ func (s Store) CommitBlock(
 	return err
 }
 
-func (s *Store) TransactionByFingerprint(fp flow.Fingerprint) (tx flow.Transaction, err error) {
+func (s *Store) TransactionByHash(hash crypto.Hash) (tx flow.Transaction, err error) {
 	err = s.db.View(func(txn *badger.Txn) error {
-		encTx, err := getTx(txn)(transactionKey(fp))
+		encTx, err := getTx(txn)(transactionKey(hash))
 		if err != nil {
 			return err
 		}
@@ -229,7 +229,7 @@ func insertTransaction(tx flow.Transaction) func(txn *badger.Txn) error {
 			return err
 		}
 
-		return txn.Set(transactionKey(tx.Fingerprint()), encTx)
+		return txn.Set(transactionKey(tx.Hash()), encTx)
 	}
 }
 
