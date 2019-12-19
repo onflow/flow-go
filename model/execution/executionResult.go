@@ -15,6 +15,7 @@ type ExecutionResult struct {
 	Signatures                  []crypto.Signature
 }
 
+
 // Hash returns the canonical hash of this execution result.
 func (er *ExecutionResult) Hash() crypto.Hash {
 	return hash.DefaultHasher.ComputeHash(er.Encode())
@@ -44,3 +45,4 @@ func wrapExecutionResult(er ExecutionResult) ExecutionResultWrapper {
 		FinalStateCommitment:        er.FinalStateCommitment,
 		Chunks:                      chunks}
 }
+
