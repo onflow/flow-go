@@ -48,15 +48,15 @@ func BlockHeaderFixture() flow.Header {
 }
 
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
-	tx := flow.Transaction{
+	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             []byte("pub fun main() {}"),
-		ReferenceBlockHash: HashFixture(32),
+		ReferenceBlockHash: flow.Fingerprint(HashFixture(32)),
 		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       AddressFixture(),
 		ScriptAccounts:     []flow.Address{AddressFixture()},
 		Signatures:         []flow.AccountSignature{AccountSignatureFixture()},
-	}
+	}}
 	if len(n) > 0 {
 		n[0](&tx)
 	}

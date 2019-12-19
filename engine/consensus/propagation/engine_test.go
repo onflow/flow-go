@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -39,7 +38,7 @@ func TestOnGuaranteedCollection(t *testing.T) {
 	// create random collection
 	hash := make([]byte, 32)
 	_, _ = rand.Read(hash)
-	coll := &collection.GuaranteedCollection{CollectionHash: hash}
+	coll := &flow.GuaranteedCollection{CollectionHash: hash}
 
 	// NOTE: as this function relies on two other functions that have their own
 	// unit tests, we only set up and check the behaviour that proxies the
@@ -83,11 +82,11 @@ func TestProcessGuaranteedCollection(t *testing.T) {
 
 	// generate n random collections
 	n := 3
-	collections := make([]*collection.GuaranteedCollection, 0, n)
+	collections := make([]*flow.GuaranteedCollection, 0, n)
 	for i := 0; i < n; i++ {
 		hash := make([]byte, 32)
 		_, _ = rand.Read(hash)
-		coll := &collection.GuaranteedCollection{CollectionHash: hash}
+		coll := &flow.GuaranteedCollection{CollectionHash: hash}
 		collections = append(collections, coll)
 	}
 
@@ -134,11 +133,11 @@ func TestPropagateGuaranteedCollection(t *testing.T) {
 
 	// generate random collections
 	n := 3
-	collections := make([]*collection.GuaranteedCollection, 0, n)
+	collections := make([]*flow.GuaranteedCollection, 0, n)
 	for i := 0; i < n; i++ {
 		hash := make([]byte, 32)
 		_, _ = rand.Read(hash)
-		coll := &collection.GuaranteedCollection{CollectionHash: hash}
+		coll := &flow.GuaranteedCollection{CollectionHash: hash}
 		collections = append(collections, coll)
 	}
 
