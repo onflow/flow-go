@@ -12,9 +12,9 @@ type StateProof []byte
 // StateCommitment holds the root hash of the tree (Snapshot)
 type StateCommitment []byte
 
-// State takes care of storing registers (key, value pairs) providing proof of correctness
+// ExecutionState takes care of storing registers (key, value pairs) providing proof of correctness
 // we aim to store a state of the order of 10^10 registers with up to 1M historic state versions
-type State interface {
+type ExecutionState interface {
 	// Trusted methods (without proof)
 	// Get registers at specific StateCommitment by a list of register ids
 	GetRegisters(registerIDs []RegisterID, stateCommitment StateCommitment) (values []RegisterValue, err error)
@@ -28,8 +28,8 @@ type State interface {
 	UpdateRegisterWithProof(registerIDs []RegisterID, values []RegisterValue, stateCommitment StateCommitment) (newStateCommitment StateCommitment, proofs []StateProof, err error)
 }
 
-// StateVerifier should be designed as an standalone package to verify proofs of storage
-type StateVerifier interface {
+// ExecutionStateVerifier should be designed as an standalone package to verify proofs of storage
+type ExecutionStateVerifier interface {
 	// verify if a provided proof for getRegisters is accurate
 	VerifyGetRegistersProof(registerIDs []RegisterID, stateCommitment StateCommitment, values []RegisterValue, proof []StateProof) (verified bool, err error)
 	// verify if a provided proof updateRegister is accurate
