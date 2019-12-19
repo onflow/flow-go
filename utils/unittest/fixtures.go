@@ -59,6 +59,18 @@ func GuaranteedCollectionsFixture(n int) []*collection.GuaranteedCollection {
 	return ret
 }
 
+func FlowCollectionFixture(n int) flow.Collection {
+	col := make([]*flow.Transaction, 0)
+
+	for i := 0; i < n; i++ {
+		TransactionFixture(func(t *flow.Transaction) {
+			t.Script = []byte(fmt.Sprintf("pub fun main() { print(\"%d\")}", i))
+		})
+	}
+
+	return flow.Collection{Transactions: col}
+}
+
 func BlockFixture() flow.Block {
 	return flow.Block{
 		Header:                BlockHeaderFixture(),

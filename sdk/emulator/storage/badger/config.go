@@ -1,7 +1,7 @@
 package badger
 
 import (
-	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/v2"
 )
 
 // Config defines the configurable parameters of the Badger storage implementation.

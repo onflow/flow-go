@@ -1,11 +1,12 @@
 package badger
 
 import (
+	"github.com/dgraph-io/badger/v2"
+	"github.com/pkg/errors"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 )
 
 type Transactions struct {

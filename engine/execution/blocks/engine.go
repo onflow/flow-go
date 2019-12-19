@@ -15,20 +15,22 @@ import (
 
 // Engine manages execution of transactions
 type Engine struct {
-	log     zerolog.Logger
-	conduit network.Conduit
-	me      module.Local
-	wg      *sync.WaitGroup
-	blocks  storage.Blocks
+	log         zerolog.Logger
+	conduit     network.Conduit
+	me          module.Local
+	wg          *sync.WaitGroup
+	blocks      storage.Blocks
+	collections storage.Collections
 }
 
-func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks) (*Engine, error) {
+func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections) (*Engine, error) {
 
 	eng := Engine{
-		log:    logger,
-		me:     me,
-		wg:     &sync.WaitGroup{},
-		blocks: blocks,
+		log:         logger,
+		me:          me,
+		wg:          &sync.WaitGroup{},
+		blocks:      blocks,
+		collections: collections,
 	}
 
 	con, err := net.Register(engine.Execution, &eng)
@@ -67,6 +69,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	switch v := event.(type) {
 	case flow.Block:
 		err = e.handleBlock(v)
+	case flow.Collection:
+		err = e.handleCollection(v)
 	default:
 		err = errors.Errorf("invalid event type (%T)", event)
 	}
@@ -83,4 +87,12 @@ func (e *Engine) handleBlock(block flow.Block) error {
 		Msg("received block")
 
 	return e.blocks.Save(&block)
+}
+
+func (e *Engine) handleCollection(collection flow.Collection) error {
+	e.log.Debug().
+		Hex("collection_hash", collection.Hash()).
+		Msg("received collection")
+
+	return e.collections.Insert(&collection)
 }

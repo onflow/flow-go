@@ -3,10 +3,6 @@
 package operation
 
 import (
-	"fmt"
-	"math/rand"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -16,30 +12,28 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestHeaderInsertNewRetrieve(t *testing.T) {
 
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	defer os.RemoveAll(dir)
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
-	require.Nil(t, err)
+	unittest.RunWithDB(t, func(db *badger.DB) {
+		expected := flow.Header{
+			Number:     1337,
+			Timestamp:  time.Now().UTC(),
+			Parent:     crypto.Hash([]byte("parent")),
+			Payload:    crypto.Hash([]byte("payload")),
+			Signatures: []crypto.Signature{{0x99}},
+		}
+		hash := expected.Hash()
 
-	expected := flow.Header{
-		Number:     1337,
-		Timestamp:  time.Now().UTC(),
-		Parent:     crypto.Hash([]byte("parent")),
-		Payload:    crypto.Hash([]byte("payload")),
-		Signatures: []crypto.Signature{{0x99}},
-	}
-	hash := expected.Hash()
+		err := db.Update(InsertNewHeader(&expected))
+		require.Nil(t, err)
 
-	err = db.Update(InsertNewHeader(&expected))
-	require.Nil(t, err)
+		var actual flow.Header
+		err = db.View(RetrieveHeader(hash, &actual))
+		require.Nil(t, err)
 
-	var actual flow.Header
-	err = db.View(RetrieveHeader(hash, &actual))
-	require.Nil(t, err)
-
-	assert.Equal(t, expected, actual)
+		assert.Equal(t, expected, actual)
+	})
 }

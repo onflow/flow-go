@@ -92,7 +92,7 @@ func (b *Blocks) retrieveBlock(tx *badger.Txn, hash crypto.Hash) (*flow.Block, e
 
 	// get the guaranteed collections
 	var collections []*collection.GuaranteedCollection
-	err = operation.RetrieveCollections(hash, &collections)(tx)
+	err = operation.RetrieveGuaranteedCollections(hash, &collections)(tx)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not retrieve collections")
 	}
@@ -119,7 +119,7 @@ func (b *Blocks) Save(block *flow.Block) error {
 		if err != nil {
 			return errors.Wrap(err, "cannot save block")
 		}
-		err = operation.InsertCollections(block.Hash(), block.GuaranteedCollections)(tx)
+		err = operation.InsertGuaranteedCollections(block.Hash(), block.GuaranteedCollections)(tx)
 		if err != nil {
 			return errors.Wrap(err, "cannot save block")
 		}

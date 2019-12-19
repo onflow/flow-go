@@ -3,10 +3,7 @@
 package operation
 
 import (
-	"fmt"
 	"math/rand"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -15,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func init() {
@@ -25,18 +23,9 @@ type Entity struct {
 	ID uint64
 }
 
-func runWithDb(t *testing.T, f func(*badger.DB)) {
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
-	require.Nil(t, err)
-	f(db)
-	db.Close()
-	os.RemoveAll(dir)
-}
-
 func TestInsertValid(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val := []byte(`{"ID":1337}`)
@@ -58,7 +47,7 @@ func TestInsertValid(t *testing.T) {
 }
 
 func TestInsertDuplicate(t *testing.T) {
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithDB(t, func(db *badger.DB) {
 
 		e := Entity{ID: 1337}
 		e2 := Entity{ID: 1338}
@@ -83,12 +72,11 @@ func TestInsertDuplicate(t *testing.T) {
 		require.Equal(t, err, storage.DifferentDataErr)
 
 	})
-
 }
 
 func TestUpdateValid(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithDB(t, func(db *badger.DB) {
 
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
@@ -113,9 +101,7 @@ func TestUpdateValid(t *testing.T) {
 		})
 
 		assert.Equal(t, act, val)
-
 	})
-
 }
 
 func TestUpdateMissing(t *testing.T) {
@@ -124,7 +110,7 @@ func TestUpdateMissing(t *testing.T) {
 
 func TestRetrieveValid(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithDB(t, func(db *badger.DB) {
 
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
