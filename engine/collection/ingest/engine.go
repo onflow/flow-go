@@ -111,7 +111,7 @@ func (e *Engine) Process(originID model.Identifier, event interface{}) error {
 func (e *Engine) onTransaction(originID model.Identifier, tx *flow.Transaction) error {
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
-		Hex("tx_hash", tx.Hash()).
+		Hex("tx_hash", tx.Fingerprint()).
 		Logger()
 
 	log.Debug().Msg("transaction message received")
