@@ -19,14 +19,8 @@ var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|obs
 // Identifier represents a 32-byte unique identifier for a node.
 type Identifier [32]byte
 
-// Identity represents a node identity.
-type Identity struct {
-	NodeID  Identifier
-	Address string
-	Role    Role
-	Stake   uint64
-}
-
+// HexStringToIdentifier converts a hex string to an identifier. The input
+// must be 64 characters long and contain only valid hex characters.
 func HexStringToIdentifier(hexString string) (Identifier, error) {
 	var identifier Identifier
 	i, err := hex.Decode(identifier[:], []byte(hexString))
@@ -37,6 +31,19 @@ func HexStringToIdentifier(hexString string) (Identifier, error) {
 		return identifier, fmt.Errorf("malformed input, expected 32 bytes (64 characters), decoded %d", i)
 	}
 	return identifier, nil
+}
+
+// String returns the hex string representation of the identifier.
+func (id Identifier) String() string {
+	return hex.EncodeToString(id[:])
+}
+
+// Identity represents a node identity.
+type Identity struct {
+	NodeID  Identifier
+	Address string
+	Role    Role
+	Stake   uint64
 }
 
 // ParseIdentity parses a string representation of an identity.
