@@ -1,8 +1,6 @@
 package execution
 
 import (
-	"sync"
-
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -14,59 +12,76 @@ import (
 
 // Engine manages execution of transactions
 type Engine struct {
-	log     zerolog.Logger
-	conduit network.Conduit
-	me      module.Local
-	wg      *sync.WaitGroup
+	unit *engine.Unit
+	log  zerolog.Logger
+	con  network.Conduit
+	me   module.Local
 }
 
-func New(logger zerolog.Logger, net module.Network, me module.Local) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, me module.Local) (*Engine, error) {
 
-	eng := Engine{
-		log: logger,
-		me:  me,
-		wg:  &sync.WaitGroup{},
+	e := Engine{
+		unit: engine.NewUnit(),
+		log:  log,
+		me:   me,
 	}
 
-	con, err := net.Register(engine.Execution, &eng)
+	con, err := net.Register(engine.Execution, &e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
 
-	eng.conduit = con
+	e.con = con
 
-	return &eng, nil
+	return &e, nil
 }
 
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	ready := make(chan struct{})
-	go func() {
-		close(ready)
-	}()
-	return ready
+	return e.unit.Ready()
 }
 
 // Done returns a channel that will close when the engine has
 // successfully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	done := make(chan struct{})
-	go func() {
-		e.wg.Wait()
-		close(done)
-	}()
-	return done
+	return e.unit.Done()
 }
 
+// SubmitLocal submits an event originating on the local node.
+func (e *Engine) SubmitLocal(event interface{}) {
+	e.Submit(e.me.NodeID(), event)
+}
+
+// Submit submits the given event from the node with the given origin ID
+// for processing in a non-blocking manner. It returns instantly and logs
+// a potential processing error internally when done.
+func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+	e.unit.Launch(func() {
+		err := e.Process(originID, event)
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not process submitted event")
+		}
+	})
+}
+
+// ProcessLocal processes an event originating on the local node.
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.Process(e.me.NodeID(), event)
+}
+
+// Process processes the given event from the node with the given origin ID in
+// a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	var err error
+	return e.unit.Do(func() error {
+		return e.process(originID, event)
+	})
+}
+
+// process processes events for the execution engine on the execution node.
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	default:
-		err = errors.Errorf("invalid event type (%T)", event)
+		return errors.Errorf("invalid event type (%T)", event)
 	}
-	if err != nil {
-		return errors.Wrap(err, "could not process event")
-	}
-	return nil
 }

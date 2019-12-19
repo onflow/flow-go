@@ -19,6 +19,7 @@ import (
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
 type Engine struct {
+	unit      *engine.Unit
 	log       zerolog.Logger
 	con       network.Conduit
 	me        module.Local
@@ -39,6 +40,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 	clusterID := clusters.ClusterIDFor(me.NodeID())
 
 	e := &Engine{
+		unit:      engine.NewUnit(),
 		log:       log.With().Str("engine", "ingest").Logger(),
 		me:        me,
 		state:     state,
@@ -61,47 +63,56 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 // started.
 // TODO describe condition for ingest engine being ready
 func (e *Engine) Ready() <-chan struct{} {
-	// TODO implement
-	ready := make(chan struct{})
-	go func() {
-		close(ready)
-	}()
-	return ready
+	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // TODO describe conditions under which engine is done
 func (e *Engine) Done() <-chan struct{} {
-	// TODO implement
-	done := make(chan struct{})
-	go func() {
-		close(done)
-	}()
-	return done
+	return e.unit.Done()
 }
 
-// Submit allows us to submit local events to the engine.
-func (e *Engine) Submit(event interface{}) error {
-	err := e.Process(e.me.NodeID(), event)
-	return err
+// SubmitLocal submits an event originating on the local node.
+func (e *Engine) SubmitLocal(event interface{}) {
+	e.Submit(e.me.NodeID(), event)
 }
 
-// Process processes engine events.
+// Submit submits the given event from the node with the given origin ID
+// for processing in a non-blocking manner. It returns instantly and logs
+// a potential processing error internally when done.
+func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+	e.unit.Launch(func() {
+		err := e.Process(originID, event)
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not process submitted event")
+		}
+	})
+}
+
+// ProcessLocal processes an event originating on the local node.
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.Process(e.me.NodeID(), event)
+}
+
+// Process processes the given event from the node with the given origin ID in
+// a blocking manner. It returns the potential processing error when done.
+func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+	return e.unit.Do(func() error {
+		return e.process(originID, event)
+	})
+}
+
+// pocess processes engine events.
 //
 // Transactions are validated and routed to the correct cluster, then added
 // to the transaction mempool.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	var err error
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.Transaction:
-		err = e.onTransaction(originID, ev)
+		return e.onTransaction(originID, ev)
 	default:
-		err = fmt.Errorf("invalid event type (%T)", event)
+		return fmt.Errorf("invalid event type (%T)", event)
 	}
-	if err != nil {
-		return fmt.Errorf("could not process event: %w", err)
-	}
-	return nil
 }
 
 // onTransaction handles receipt of a new transaction. This can be submitted

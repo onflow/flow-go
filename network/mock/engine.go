@@ -23,3 +23,27 @@ func (_m *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 	return r0
 }
+
+// ProcessLocal provides a mock function with given fields: event
+func (_m *Engine) ProcessLocal(event interface{}) error {
+	ret := _m.Called(event)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(interface{}) error); ok {
+		r0 = rf(event)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Submit provides a mock function with given fields: originID, event
+func (_m *Engine) Submit(originID flow.Identifier, event interface{}) {
+	_m.Called(originID, event)
+}
+
+// SubmitLocal provides a mock function with given fields: event
+func (_m *Engine) SubmitLocal(event interface{}) {
+	_m.Called(event)
+}

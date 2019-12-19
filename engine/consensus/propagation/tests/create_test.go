@@ -38,13 +38,6 @@ func prepareNodesAndCollectionsConfigurable(N, M int) (
 	return nodes, gcs, nil
 }
 
-func prepareNodesAndCollections() (
-	[]*mockPropagationNode, []*collection.GuaranteedCollection, error) {
-	N := 16  // 16 nodes
-	M := 100 // 100 collections
-	return prepareNodesAndCollectionsConfigurable(N, M)
-}
-
 // given a list of node entries, return a list of mock nodes and connect them all to a hub
 func createConnectedNodes(nodeEntries ...string) (*stub.Hub, []*mockPropagationNode, error) {
 	if len(nodeEntries) == 0 {

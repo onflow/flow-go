@@ -135,17 +135,20 @@ func TestLedger(t *testing.T) {
 		}()
 
 		var blockNumber uint64 = 1
-		ledger := unittest.LedgerFixture()
+
+		ledger := make(types.LedgerDelta)
+		ledger["foo"] = []byte("bar")
 
 		t.Run("should get able to set ledger", func(t *testing.T) {
-			err := store.InsertLedger(blockNumber, ledger)
+			err := store.InsertLedgerDelta(blockNumber, ledger)
 			assert.NoError(t, err)
 		})
 
 		t.Run("should be to get set ledger", func(t *testing.T) {
-			gotLedger, err := store.LedgerByNumber(blockNumber)
+			gotLedger := store.LedgerViewByNumber(blockNumber)
+			gotRegister, err := gotLedger.Get("foo")
 			assert.NoError(t, err)
-			assert.Equal(t, ledger, gotLedger)
+			assert.Equal(t, ledger["foo"], gotRegister)
 		})
 	})
 
@@ -159,9 +162,9 @@ func TestLedger(t *testing.T) {
 		// Create a list of ledgers, where the ledger at index i has
 		// keys (i+2)-1->(i+2)+1 set to value i-1.
 		totalBlocks := 10
-		var ledgers []flow.Ledger
+		var ledgers []types.LedgerDelta
 		for i := 2; i < totalBlocks+2; i++ {
-			ledger := make(flow.Ledger)
+			ledger := make(types.LedgerDelta)
 			for j := i - 1; j <= i+1; j++ {
 				ledger[fmt.Sprintf("%d", j)] = []byte{byte(i - 1)}
 			}
@@ -177,25 +180,16 @@ func TestLedger(t *testing.T) {
 		// The combined state at block N looks like:
 		// {1: 1, 2: 2, 3: 3, ..., N+1: N, N+2: N}
 		for i, ledger := range ledgers {
-			err := store.InsertLedger(uint64(i+1), ledger)
+			err := store.InsertLedgerDelta(uint64(i+1), ledger)
 			require.NoError(t, err)
 		}
 
-		// We didn't insert anything at block 0, so this should be empty.
-		t.Run("should return empty view for block 0", func(t *testing.T) {
-			gotLedger, err := store.LedgerByNumber(0)
-			require.NoError(t, err)
-			expected := make(flow.Ledger)
-			assert.Equal(t, expected, gotLedger)
-		})
-
 		// View at block 1 should have keys 1, 2, 3
 		t.Run("should version the first written block", func(t *testing.T) {
-			gotLedger, err := store.LedgerByNumber(1)
-			require.NoError(t, err)
+			gotLedger := store.LedgerViewByNumber(1)
 			for i := 1; i <= 3; i++ {
-				val, ok := gotLedger[fmt.Sprintf("%d", i)]
-				assert.True(t, ok)
+				val, err := gotLedger.Get(fmt.Sprintf("%d", i))
+				assert.NoError(t, err)
 				assert.Equal(t, []byte{byte(1)}, val)
 			}
 		})
@@ -203,18 +197,17 @@ func TestLedger(t *testing.T) {
 		// View at block N should have values 1->N+2
 		t.Run("should version all blocks", func(t *testing.T) {
 			for block := 2; block < totalBlocks; block++ {
-				gotLedger, err := store.LedgerByNumber(uint64(block))
-				require.NoError(t, err)
+				gotLedger := store.LedgerViewByNumber(uint64(block))
 				// The keys 1->N-1 are defined in previous blocks
 				for i := 1; i < block; i++ {
-					val, ok := gotLedger[fmt.Sprintf("%d", i)]
-					assert.True(t, ok)
+					val, err := gotLedger.Get(fmt.Sprintf("%d", i))
+					assert.NoError(t, err)
 					assert.Equal(t, []byte{byte(i)}, val)
 				}
 				// The keys N->N+2 are defined in the queried block
 				for i := block; i <= block+2; i++ {
-					val, ok := gotLedger[fmt.Sprintf("%d", i)]
-					assert.True(t, ok)
+					val, err := gotLedger.Get(fmt.Sprintf("%d", i))
+					assert.NoError(t, err)
 					assert.Equal(t, []byte{byte(block)}, val)
 				}
 			}
@@ -338,7 +331,9 @@ func TestPersistence(t *testing.T) {
 	events := []flow.Event{unittest.EventFixture(func(e *flow.Event) {
 		e.Payload = []byte{1, 2, 3, 4}
 	})}
-	ledger := unittest.LedgerFixture()
+
+	ledger := make(types.LedgerDelta)
+	ledger["foo"] = []byte("bar")
 
 	// insert some stuff to to the store
 	err := store.InsertBlock(block)
@@ -347,7 +342,7 @@ func TestPersistence(t *testing.T) {
 	assert.NoError(t, err)
 	err = store.InsertEvents(block.Number, events)
 	assert.NoError(t, err)
-	err = store.InsertLedger(block.Number, ledger)
+	err = store.InsertLedgerDelta(block.Number, ledger)
 
 	// close the store
 	err = store.Close()
@@ -370,12 +365,13 @@ func TestPersistence(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, events, gotEvents)
 
-	gotLedger, err := store.LedgerByNumber(block.Number)
+	gotLedger := store.LedgerViewByNumber(block.Number)
+	gotRegister, err := gotLedger.Get("foo")
 	assert.NoError(t, err)
-	assert.Equal(t, ledger, gotLedger)
+	assert.Equal(t, ledger["foo"], gotRegister)
 }
 
-func benchmarkInsertLedger(b *testing.B, nKeys int) {
+func benchmarkInsertLedgerDelta(b *testing.B, nKeys int) {
 	b.StopTimer()
 	dir, err := ioutil.TempDir("", "badger-test")
 	if err != nil {
@@ -388,60 +384,23 @@ func benchmarkInsertLedger(b *testing.B, nKeys int) {
 	}
 	defer store.Close()
 
-	ledger := make(flow.Ledger)
+	ledger := make(types.LedgerDelta)
 	for i := 0; i < nKeys; i++ {
 		ledger[fmt.Sprintf("%d", i)] = []byte{byte(i)}
 	}
 
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		if err := store.InsertLedger(1, unittest.LedgerFixture()); err != nil {
+		if err := store.InsertLedgerDelta(1, ledger); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-func BenchmarkInsertLedger1(b *testing.B)    { benchmarkInsertLedger(b, 1) }
-func BenchmarkInsertLedger10(b *testing.B)   { benchmarkInsertLedger(b, 10) }
-func BenchmarkInsertLedger100(b *testing.B)  { benchmarkInsertLedger(b, 100) }
-func BenchmarkInsertLedger1000(b *testing.B) { benchmarkInsertLedger(b, 1000) }
-
-func benchmarkLedgerByNumber(b *testing.B, nBlocks int) {
-	b.StopTimer()
-	dir, err := ioutil.TempDir("", "badger-test")
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-	store, err := badger.New(badger.WithPath(dir))
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer store.Close()
-
-	for i := 0; i < nBlocks; i++ {
-		ledger := make(flow.Ledger)
-		for j := i + 2; j < i+12; j++ {
-			ledger[fmt.Sprintf("%d", i)] = []byte{byte(i)}
-		}
-		if err := store.InsertLedger(uint64(i), ledger); err != nil {
-			b.Fatal(err)
-		}
-	}
-
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		_, err := store.LedgerByNumber(uint64(b.N))
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkLedgerByNumber1(b *testing.B)    { benchmarkLedgerByNumber(b, 1) }
-func BenchmarkLedgerByNumber10(b *testing.B)   { benchmarkLedgerByNumber(b, 10) }
-func BenchmarkLedgerByNumber100(b *testing.B)  { benchmarkLedgerByNumber(b, 100) }
-func BenchmarkLedgerByNumber1000(b *testing.B) { benchmarkLedgerByNumber(b, 1000) }
+func BenchmarkInsertLedgerDelta1(b *testing.B)    { benchmarkInsertLedgerDelta(b, 1) }
+func BenchmarkInsertLedgerDelta10(b *testing.B)   { benchmarkInsertLedgerDelta(b, 10) }
+func BenchmarkInsertLedgerDelta100(b *testing.B)  { benchmarkInsertLedgerDelta(b, 100) }
+func BenchmarkInsertLedgerDelta1000(b *testing.B) { benchmarkInsertLedgerDelta(b, 1000) }
 
 func BenchmarkBlockDiskUsage(b *testing.B) {
 	b.StopTimer()
@@ -498,11 +457,11 @@ func BenchmarkLedgerDiskUsage(b *testing.B) {
 	b.StartTimer()
 	var lastDBSize int64
 	for i := 0; i < b.N; i++ {
-		ledger := make(flow.Ledger)
+		ledger := make(types.LedgerDelta)
 		for j := 0; j < 100; j++ {
 			ledger[fmt.Sprintf("%d-%d", i, j)] = []byte{byte(i), byte(j)}
 		}
-		if err := store.InsertLedger(uint64(i), ledger); err != nil {
+		if err := store.InsertLedgerDelta(uint64(i), ledger); err != nil {
 			b.Fatal(err)
 		}
 		if err := store.Sync(); err != nil {

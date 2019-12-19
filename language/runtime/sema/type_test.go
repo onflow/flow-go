@@ -123,7 +123,7 @@ func TestIsResourceType_StructNestedInDictionary(t *testing.T) {
 	assert.False(t, ty.IsResourceType())
 }
 
-func Test_exportability(t *testing.T) {
+func TestExportability(t *testing.T) {
 
 	t.Run("structs", func(t *testing.T) {
 		position := ast.Position{
@@ -198,15 +198,14 @@ func Test_exportability(t *testing.T) {
 
 		ex := ty.Export(program, variable)
 
-		assert.IsType(t, &types.Struct{}, ex)
-		s := ex.(*types.Struct)
+		assert.IsType(t, types.Struct{}, ex)
+		s := ex.(types.Struct)
 
 		assert.Equal(t, identifier, s.Identifier)
 		require.Len(t, s.Fields, 1)
 
-		require.Contains(t, s.Fields, "fieldA")
-
-		assert.IsType(t, &types.Int{}, s.Fields["fieldA"].Type)
+		assert.Equal(t, "fieldA", s.Fields[0].Identifier)
+		assert.IsType(t, types.Int{}, s.Fields[0].Type)
 	})
 
 	t.Run("string", func(t *testing.T) {
@@ -215,7 +214,7 @@ func Test_exportability(t *testing.T) {
 
 		ex := ty.Export(nil, nil)
 
-		assert.IsType(t, &types.String{}, ex)
+		assert.IsType(t, types.String{}, ex)
 	})
 
 	t.Run("events", func(t *testing.T) {
@@ -272,15 +271,19 @@ func Test_exportability(t *testing.T) {
 
 		ex := ty.Export(program, &variable)
 
-		assert.IsType(t, &types.Event{}, ex)
+		assert.IsType(t, types.Event{}, ex)
 
-		event := ex.(*types.Event)
+		event := ex.(types.Event)
 
 		require.Len(t, event.Fields, 2)
+		assert.Equal(t, "who", event.Fields[0].Identifier)
+		assert.IsType(t, types.String{}, event.Fields[0].Type)
 
-		// for fields in event, order matters
 		assert.Equal(t, "where", event.Fields[1].Identifier)
-		assert.Equal(t, "magic_place", event.Fields[1].Label)
-	})
+		assert.IsType(t, types.Int{}, event.Fields[1].Type)
 
+		require.Len(t, event.Initializer, 2)
+		assert.Equal(t, "magic_caster", event.Initializer[0].Label)
+		assert.Equal(t, "magic_place", event.Initializer[1].Label)
+	})
 }
