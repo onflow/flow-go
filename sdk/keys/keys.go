@@ -75,7 +75,7 @@ func SignTransaction(
 		return nil, err
 	}
 
-	b := encoding.DefaultEncoder.MustEncode(tx)
+	b := encoding.DefaultEncoder.MustEncode(tx.TransactionBody)
 
 	return privateKey.PrivateKey.Sign(b, hasher)
 }
