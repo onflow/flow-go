@@ -237,7 +237,7 @@ GetLoop:
 // Internally, any parent nodes between the leaf up to the closest shared path
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
-func (t *Tree) Del(key Fingerprint) bool {
+func (t *Tree) Del(key flow.Fingerprint) bool {
 
 	// we initialize three pointers pointing to a dummy empty node
 	// this is used to keep track of the node we last pointed to, as well as
