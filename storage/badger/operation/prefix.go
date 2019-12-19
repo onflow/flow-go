@@ -40,6 +40,8 @@ func b(v interface{}) []byte {
 		return b
 	case crypto.Hash:
 		return []byte(i)
+	case model.Fingerprint:
+		return []byte(i)
 	case flow.Role:
 		return []byte{byte(i)}
 	case model.Identifier:
