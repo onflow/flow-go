@@ -16,15 +16,15 @@ type Fingerprint crypto.Hash
 // of keeping an slice of entity object itself. This simplifies storage, signature and validation
 // of entities.
 type Entity interface {
-	// returns a unique id for this entity,
-	// note that ID is built based on the immutable and rudimentary
-	// part of the content, it doesn't holds the state of the entity.
+	// ID returns a unique id for this entity,
+	// Note that ID is built based on the immutable and rudimentary
+	// part of the content, it doesn't hold the state of the entity.
 	ID() Identifier
 	// Body returns the body party of the entity; critical properties
 	// that requires validation upon receiving. In other words, properties
 	// outside of the body is controlled locally and is not trustable by other nodes.
 	Body() interface{}
-	// Commit returns a proof (some sort of root hash) for content of the body.
+	// Fingerprint returns a proof (some sort of root hash) for content of the body.
 	Fingerprint() Fingerprint
 }
 
