@@ -7,11 +7,10 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func toDeltaKey(number uint64, role flow.Role, nodeID model.Identifier) []byte {
+func toDeltaKey(number uint64, role flow.Role, nodeID flow.Identifier) []byte {
 	key := make([]byte, 42)
 	key[0] = codeDelta
 	binary.BigEndian.PutUint64(key[1:9], number)
@@ -20,27 +19,27 @@ func toDeltaKey(number uint64, role flow.Role, nodeID model.Identifier) []byte {
 	return key
 }
 
-func fromDeltaKey(key []byte) (uint64, flow.Role, model.Identifier) {
+func fromDeltaKey(key []byte) (uint64, flow.Role, flow.Identifier) {
 	number := binary.BigEndian.Uint64(key[1:9])
 	role := flow.Role(key[9])
-	var nodeID model.Identifier
+	var nodeID flow.Identifier
 	copy(nodeID[:], key[10:42])
 	return number, role, nodeID
 }
 
-func InsertDelta(number uint64, role flow.Role, nodeID model.Identifier, delta int64) func(*badger.Txn) error {
+func InsertDelta(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) func(*badger.Txn) error {
 	return insert(toDeltaKey(number, role, nodeID), delta)
 }
 
-func RetrieveDelta(number uint64, role flow.Role, nodeID model.Identifier, delta *int64) func(*badger.Txn) error {
+func RetrieveDelta(number uint64, role flow.Role, nodeID flow.Identifier, delta *int64) func(*badger.Txn) error {
 	return retrieve(toDeltaKey(number, role, nodeID), delta)
 }
 
-func TraverseDeltas(from uint64, to uint64, filters []flow.IdentityFilter, process func(number uint64, role flow.Role, nodeID model.Identifier, delta int64) error) func(*badger.Txn) error {
+func TraverseDeltas(from uint64, to uint64, filters []flow.IdentityFilter, process func(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) error) func(*badger.Txn) error {
 	iteration := func() (checkFunc, createFunc, handleFunc) {
 		var number uint64
 		var role flow.Role
-		var nodeID model.Identifier
+		var nodeID flow.Identifier
 		var delta int64
 		check := func(key []byte) bool {
 			number, role, nodeID = fromDeltaKey(key)

@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
@@ -49,27 +48,27 @@ func TestOnGuaranteedCollection(t *testing.T) {
 
 	// check that we propagate if collection is new
 	pool.On("Add", mock.Anything).Return(nil).Once()
-	me.On("NodeID").Return(model.Identifier{}).Once()
+	me.On("NodeID").Return(flow.Identifier{}).Once()
 	state.On("Final").Return(ss).Once()
 	ss.On("Identities", mock.Anything, mock.Anything).Return(flow.IdentityList{}, nil).Once()
 	con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once()
-	err := e.onGuaranteedCollection(model.Identifier{}, coll)
+	err := e.onGuaranteedCollection(flow.Identifier{}, coll)
 	assert.Nil(t, err)
 	con.AssertExpectations(t)
 
 	// check that we don't propagate if processing fails
 	pool.On("Add", mock.Anything).Return(errors.New("dummy")).Once()
-	err = e.onGuaranteedCollection(model.Identifier{}, coll)
+	err = e.onGuaranteedCollection(flow.Identifier{}, coll)
 	assert.NotNil(t, err)
 	con.AssertExpectations(t)
 
 	// check that we error if propagation fails
 	pool.On("Add", mock.Anything).Return(nil).Once()
-	me.On("NodeID").Return(model.Identifier{}).Once()
+	me.On("NodeID").Return(flow.Identifier{}).Once()
 	state.On("Final").Return(ss).Once()
 	ss.On("Identities", mock.Anything, mock.Anything).Return(flow.IdentityList{}, nil).Once()
 	con.On("Submit", mock.Anything, mock.Anything).Return(errors.New("dummy")).Once()
-	err = e.onGuaranteedCollection(model.Identifier{}, coll)
+	err = e.onGuaranteedCollection(flow.Identifier{}, coll)
 	assert.NotNil(t, err)
 	con.AssertExpectations(t)
 }
@@ -146,7 +145,7 @@ func TestPropagateGuaranteedCollection(t *testing.T) {
 	// generate our own node identity
 	var ids flow.IdentityList
 	id := flow.Identity{
-		NodeID:  model.Identifier{0x09, 0x09, 0x09, 0x09},
+		NodeID:  flow.Identifier{0x09, 0x09, 0x09, 0x09},
 		Address: "home",
 		Role:    flow.RoleConsensus,
 	}
@@ -155,7 +154,7 @@ func TestPropagateGuaranteedCollection(t *testing.T) {
 	// generae another 1000 node ids
 	var targetIDs flow.IdentityList
 	for i := 0; i < 1000; i++ {
-		var nodeID model.Identifier
+		var nodeID flow.Identifier
 		_, _ = rand.Read(nodeID[:])
 		address := fmt.Sprintf("address%d", i)
 		var role flow.Role

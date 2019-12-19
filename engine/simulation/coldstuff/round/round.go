@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
@@ -22,7 +21,7 @@ type Round struct {
 	quorum       uint64
 	participants flow.IdentityList
 	candidate    *flow.Block
-	votes        map[model.Identifier]uint64
+	votes        map[flow.Identifier]uint64
 }
 
 // New creates a new consensus cache.
@@ -59,7 +58,7 @@ func New(state protocol.State, me module.Local) (*Round, error) {
 		leader:       leader,
 		quorum:       quorum,
 		participants: participants,
-		votes:        make(map[model.Identifier]uint64),
+		votes:        make(map[flow.Identifier]uint64),
 	}
 	return s, nil
 }
@@ -95,13 +94,13 @@ func (r *Round) Candidate() *flow.Block {
 }
 
 // Voted checks if the given node has already voted.
-func (r *Round) Voted(nodeID model.Identifier) bool {
+func (r *Round) Voted(nodeID flow.Identifier) bool {
 	_, ok := r.votes[nodeID]
 	return ok
 }
 
 // Tally will add the given vote to the node tally.
-func (r *Round) Tally(voterID model.Identifier, stake uint64) {
+func (r *Round) Tally(voterID flow.Identifier, stake uint64) {
 	r.votes[voterID] = stake
 }
 

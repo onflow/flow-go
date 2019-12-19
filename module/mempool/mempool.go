@@ -7,14 +7,14 @@ import (
 	"sync"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/merkle"
 )
 
 // Item defines the interface for items in the mempool.
 type Item interface {
 	// Fingerprint should return the canonical hash for the item.
-	Fingerprint() model.Fingerprint
+	Fingerprint() flow.Fingerprint
 }
 
 // mempool implements a generic memory pool backed by a merkle tree.
@@ -34,7 +34,7 @@ func newMempool() *mempool {
 }
 
 // Has checks if we already contain the item with the given hash.
-func (m *mempool) Has(fp model.Fingerprint) bool {
+func (m *mempool) Has(fp flow.Fingerprint) bool {
 	m.RLock()
 	defer m.RUnlock()
 	_, ok := m.tree.Get(fp)
@@ -54,7 +54,7 @@ func (m *mempool) Add(item Item) error {
 }
 
 // Rem will remove the item with the given hash.
-func (m *mempool) Rem(fp model.Fingerprint) bool {
+func (m *mempool) Rem(fp flow.Fingerprint) bool {
 	m.Lock()
 	defer m.Unlock()
 	ok := m.tree.Del(fp)
@@ -66,7 +66,7 @@ func (m *mempool) Rem(fp model.Fingerprint) bool {
 }
 
 // Get returns the given item from the pool.
-func (m *mempool) Get(fp model.Fingerprint) (Item, error) {
+func (m *mempool) Get(fp flow.Fingerprint) (Item, error) {
 	m.RLock()
 	defer m.RUnlock()
 	_, ok := m.tree.Get(fp)

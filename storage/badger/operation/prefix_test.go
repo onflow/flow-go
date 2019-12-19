@@ -8,7 +8,6 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -34,7 +33,7 @@ func TestMakePrefix(t *testing.T) {
 
 	assert.Equal(t, expected, actual)
 
-	id := model.Identifier{0x05, 0x06, 0x07}
+	id := flow.Identifier{0x05, 0x06, 0x07}
 	expected = []byte{0x01,
 		0x05, 0x06, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

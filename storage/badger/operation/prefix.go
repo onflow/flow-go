@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -40,11 +39,11 @@ func b(v interface{}) []byte {
 		return b
 	case crypto.Hash:
 		return []byte(i)
-	case model.Fingerprint:
+	case flow.Fingerprint:
 		return []byte(i)
 	case flow.Role:
 		return []byte{byte(i)}
-	case model.Identifier:
+	case flow.Identifier:
 		return i[:]
 	default:
 		panic(fmt.Sprintf("unsupported type to convert (%T)", v))

@@ -3,7 +3,6 @@
 package mock
 
 import (
-	"github.com/dapperlabs/flow-go/model"
 	flow "github.com/dapperlabs/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -14,18 +13,18 @@ type Identities struct {
 }
 
 // ByNodeID provides a mock function with given fields: _a0
-func (_m *Identities) ByNodeID(_a0 model.Identifier) (flow.Identity, error) {
+func (_m *Identities) ByNodeID(_a0 flow.Identifier) (flow.Identity, error) {
 	ret := _m.Called(_a0)
 
 	var r0 flow.Identity
-	if rf, ok := ret.Get(0).(func(model.Identifier) flow.Identity); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identity); ok {
 		r0 = rf(_a0)
 	} else {
 		r0 = ret.Get(0).(flow.Identity)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(model.Identifier) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
 		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)

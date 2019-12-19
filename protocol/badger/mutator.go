@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -159,7 +158,7 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 
 	// check that we don't have duplicate identity entries
-	lookup := make(map[model.Identifier]struct{})
+	lookup := make(map[flow.Identifier]struct{})
 	for _, id := range identities {
 		_, ok := lookup[id.NodeID]
 		if ok {

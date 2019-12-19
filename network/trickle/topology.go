@@ -3,18 +3,18 @@
 package trickle
 
 import (
-	"github.com/dapperlabs/flow-go/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
 // Topology represents the state of the overlay network, such as which peers we
 // are connected to, as well as which events they have seen.
 type Topology interface {
-	Up(nodeID model.Identifier)
-	IsUp(nodeID model.Identifier) bool
-	Down(nodeID model.Identifier)
-	Seen(nodeID model.Identifier, hash []byte)
-	HasSeen(nodeID model.Identifier, hash []byte) bool
+	Up(nodeID flow.Identifier)
+	IsUp(nodeID flow.Identifier) bool
+	Down(nodeID flow.Identifier)
+	Seen(nodeID flow.Identifier, hash []byte)
+	HasSeen(nodeID flow.Identifier, hash []byte) bool
 	Count() uint
 	Peers(filters ...trickle.PeerFilter) trickle.PeerList
 }

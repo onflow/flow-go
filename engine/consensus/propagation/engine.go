@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
@@ -88,7 +87,7 @@ func (e *Engine) Submit(event interface{}) {
 // Process processes the given propagation engine event. Events that are given
 // to this function originate within the propagation engine on the node with the
 // given origin ID.
-func (e *Engine) Process(originID model.Identifier, event interface{}) error {
+func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	var err error
 	switch ev := event.(type) {
 	case *collection.GuaranteedCollection:
@@ -104,7 +103,7 @@ func (e *Engine) Process(originID model.Identifier, event interface{}) error {
 
 // onGuaranteedCollection is called when a new guaranteed collection is received
 // from another node on the network.
-func (e *Engine) onGuaranteedCollection(originID model.Identifier, coll *collection.GuaranteedCollection) error {
+func (e *Engine) onGuaranteedCollection(originID flow.Identifier, coll *collection.GuaranteedCollection) error {
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).

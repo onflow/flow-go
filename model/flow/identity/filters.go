@@ -3,7 +3,6 @@
 package identity
 
 import (
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -13,8 +12,8 @@ func Not(filter flow.IdentityFilter) flow.IdentityFilter {
 	}
 }
 
-func HasNodeID(nodeIDs ...model.Identifier) flow.IdentityFilter {
-	lookup := make(map[model.Identifier]struct{})
+func HasNodeID(nodeIDs ...flow.Identifier) flow.IdentityFilter {
+	lookup := make(map[flow.Identifier]struct{})
 	for _, nodeID := range nodeIDs {
 		lookup[nodeID] = struct{}{}
 	}

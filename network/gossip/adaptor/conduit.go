@@ -5,7 +5,7 @@ package adaptor
 import (
 	"context"
 
-	"github.com/dapperlabs/flow-go/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // sendFunc serves as function for the sender to submit messages to the wrapper
@@ -24,7 +24,7 @@ type Conduit struct {
 }
 
 // Submit will function as sending function for this engine.
-func (c *Conduit) Submit(event interface{}, recipients ...model.Identifier) error {
+func (c *Conduit) Submit(event interface{}, recipients ...flow.Identifier) error {
 	converted := make([]string, 0, len(recipients))
 	for _, recipient := range recipients {
 		converted = append(converted, string(recipient[:]))

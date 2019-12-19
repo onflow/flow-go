@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 func TestAddressInsertRetrieve(t *testing.T) {
@@ -23,7 +23,7 @@ func TestAddressInsertRetrieve(t *testing.T) {
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 
-	nodeID := model.Identifier{0x01}
+	nodeID := flow.Identifier{0x01}
 	expected := "address"
 
 	err = db.Update(InsertAddress(nodeID, expected))

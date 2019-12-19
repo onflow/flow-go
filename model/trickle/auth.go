@@ -3,10 +3,10 @@
 package trickle
 
 import (
-	"github.com/dapperlabs/flow-go/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Auth is the outgoing handshake message
 type Auth struct {
-	NodeID model.Identifier
+	NodeID flow.Identifier
 }

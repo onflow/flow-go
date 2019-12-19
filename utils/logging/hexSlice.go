@@ -5,10 +5,10 @@ package logging
 import (
 	"encoding/hex"
 
-	"github.com/dapperlabs/flow-go/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func HexSlice(nodeIDs []model.Identifier) []string {
+func HexSlice(nodeIDs []flow.Identifier) []string {
 	ss := make([]string, 0, len(nodeIDs))
 	for _, nodeID := range nodeIDs {
 		ss = append(ss, hex.EncodeToString(nodeID[:]))

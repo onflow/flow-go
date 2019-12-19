@@ -3,13 +3,13 @@
 package trickle
 
 import (
-	"github.com/dapperlabs/flow-go/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Peer holds the information we know about a peer on the network, such as his
 // ID and what events he has seen.
 type Peer struct {
-	ID   model.Identifier
+	ID   flow.Identifier
 	Seen map[string]struct{}
 }
 
@@ -17,8 +17,8 @@ type Peer struct {
 type PeerList []*Peer
 
 // IDs returns the list of IDs for the peers in the list.
-func (pl PeerList) NodeIDs() []model.Identifier {
-	nodeIDs := make([]model.Identifier, 0, len(pl))
+func (pl PeerList) NodeIDs() []flow.Identifier {
+	nodeIDs := make([]flow.Identifier, 0, len(pl))
 	for _, p := range pl {
 		nodeIDs = append(nodeIDs, p.ID)
 	}

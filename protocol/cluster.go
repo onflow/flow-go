@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 )
@@ -32,7 +31,7 @@ func Cluster(nodes flow.IdentityList) flow.ClusterList {
 //
 // For evenly distributed transaction hashes, this will evenly distribute
 // transaction between clusters.
-func Route(nClusters int, fingerprint model.Fingerprint) flow.ClusterID {
+func Route(nClusters int, fingerprint flow.Fingerprint) flow.ClusterID {
 	if nClusters < 1 {
 		return flow.ClusterID(0)
 	}

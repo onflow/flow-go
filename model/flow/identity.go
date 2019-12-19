@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
@@ -18,14 +17,14 @@ var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|obs
 
 // Identity represents a node identity.
 type Identity struct {
-	NodeID  model.Identifier
+	NodeID  Identifier
 	Address string
 	Role    Role
 	Stake   uint64
 }
 
-func HexStringToIdentifier(hexString string) (model.Identifier, error) {
-	var identifier model.Identifier
+func HexStringToIdentifier(hexString string) (Identifier, error) {
+	var identifier Identifier
 	i, err := hex.Decode(identifier[:], []byte(hexString))
 	if err != nil {
 		return identifier, err
@@ -46,7 +45,7 @@ func ParseIdentity(identity string) (Identity, error) {
 	}
 
 	// none of these will error as they are checked by the regex
-	var nodeID model.Identifier
+	var nodeID Identifier
 	nodeID, err := HexStringToIdentifier(matches[2])
 	if err != nil {
 		return Identity{}, err
@@ -98,20 +97,20 @@ IDLoop:
 }
 
 // NodeIDs returns the NodeIDs of the nodes in the list.
-func (il IdentityList) NodeIDs() []model.Identifier {
-	ids := make([]model.Identifier, 0, len(il))
+func (il IdentityList) NodeIDs() []Identifier {
+	ids := make([]Identifier, 0, len(il))
 	for _, id := range il {
 		ids = append(ids, id.NodeID)
 	}
 	return ids
 }
 
-func (il IdentityList) Fingerprint() model.Fingerprint {
+func (il IdentityList) Fingerprint() Fingerprint {
 	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
 	for _, item := range il {
 		hasher.Add(item.Encode())
 	}
-	return model.Fingerprint(hasher.SumHash())
+	return Fingerprint(hasher.SumHash())
 }
 
 // TotalStake returns the total stake of all given identities.

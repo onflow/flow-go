@@ -4,40 +4,39 @@ import (
 	"bytes"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/encoding"
 	"github.com/dapperlabs/flow-go/model/hash"
 )
 
 // Collection is set of transactions (transaction set)
 type Collection struct {
-	Transactions []model.Fingerprint
+	Transactions []Fingerprint
 }
 
 // Fingerprint returns the canonical hash of this collection.
-func (c *Collection) Fingerprint() model.Fingerprint {
-	return model.Fingerprint(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(c)))
+func (c *Collection) Fingerprint() Fingerprint {
+	return Fingerprint(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(c)))
 }
 
 // AddItem adds another entityID to the collection
-func (c *Collection) Add(item model.Entity) {
+func (c *Collection) Add(item Entity) {
 	c.Transactions = append(c.Transactions, item.Fingerprint())
 }
 
 // GetItem returns a single item from the collection with the proof that this item is located at this index
-func (c *Collection) GetItem(index uint64) (fingerprint model.Fingerprint, proof []byte) {
+func (c *Collection) GetItem(index uint64) (fingerprint Fingerprint, proof []byte) {
 	return c.Transactions[index], nil
 }
 
 // GetItem returns a range of elements from the collection
 // and provides an aggregated proof
-func (c *Collection) GetItems(startIndex uint64, length uint64) (fingerprints []model.Fingerprint, proof []byte) {
+func (c *Collection) GetItems(startIndex uint64, length uint64) (fingerprints []Fingerprint, proof []byte) {
 	return c.Transactions[startIndex : startIndex+length], nil
 }
 
 // Reset resets all transactions inside the collection
 func (c *Collection) Reset() {
-	c.Transactions = make([]model.Fingerprint, 0)
+	c.Transactions = make([]Fingerprint, 0)
 }
 
 // IsEmpty returns true if the collection is empty
@@ -50,8 +49,8 @@ func (c *Collection) Size() int {
 	return len(c.Transactions)
 }
 
-func (c *Collection) ID() model.Identifier {
-	var id model.Identifier
+func (c *Collection) ID() Identifier {
+	var id Identifier
 	copy(id[:], hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(c)))
 	return id
 }
@@ -61,12 +60,12 @@ type CollectionList struct {
 	collections []Collection
 }
 
-func (cl *CollectionList) Fingerprint() model.Fingerprint {
+func (cl *CollectionList) Fingerprint() Fingerprint {
 	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
 	for _, item := range cl.collections {
 		hasher.Add(item.Fingerprint())
 	}
-	return model.Fingerprint(hasher.SumHash())
+	return Fingerprint(hasher.SumHash())
 }
 
 func (cl *CollectionList) Append(ch Collection) {
@@ -78,7 +77,7 @@ func (cl *CollectionList) Items() []Collection {
 }
 
 // ByFingerprint returns an entity from the list by entity fingerprint
-func (cl *CollectionList) ByFingerprint(c model.Fingerprint) Collection {
+func (cl *CollectionList) ByFingerprint(c Fingerprint) Collection {
 	for _, item := range cl.collections {
 		if bytes.Equal(item.Fingerprint(), c) {
 			return item
@@ -93,6 +92,6 @@ func (cl *CollectionList) ByIndex(i uint64) Collection {
 }
 
 //  ByIndexWithProof returns an entity from the list by index and proof of membership
-func (cl *CollectionList) ByIndexWithProof(i uint64) (Collection, model.MembershipProof) {
+func (cl *CollectionList) ByIndexWithProof(i uint64) (Collection, MembershipProof) {
 	return cl.collections[i], nil
 }

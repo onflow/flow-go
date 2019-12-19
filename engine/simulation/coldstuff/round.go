@@ -3,7 +3,6 @@
 package coldstuff
 
 import (
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -32,10 +31,10 @@ type Round interface {
 	Candidate() *flow.Block
 
 	// Voted will check if the given node has already voted this round.
-	Voted(nodeID model.Identifier) bool
+	Voted(nodeID flow.Identifier) bool
 
 	// Tally will count the vote stake of the given consensus node.
-	Tally(nodeID model.Identifier, stake uint64)
+	Tally(nodeID flow.Identifier, stake uint64)
 
 	// Votes will give the sum of received positive votes for this round.
 	Votes() uint64

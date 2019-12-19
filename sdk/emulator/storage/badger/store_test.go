@@ -357,7 +357,7 @@ func TestPersistence(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, block, gotBlock)
 
-	gotTx, err := store.TransactionByHash(tx.Hash())
+	gotTx, err := store.TransactionByFingerprint(tx.Fingerprint())
 	assert.NoError(t, err)
 	assert.Equal(t, tx, gotTx)
 

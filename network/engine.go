@@ -3,7 +3,7 @@
 package network
 
 import (
-	"github.com/dapperlabs/flow-go/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Engine represents an isolated process running across the peer-to-peer network
@@ -15,5 +15,5 @@ type Engine interface {
 	// propagate an event unless it was successfully processed by the engine.
 	// The origin ID indicates the node which originally submitted the event to
 	// the peer-to-peer network.
-	Process(originID model.Identifier, event interface{}) error
+	Process(originID flow.Identifier, event interface{}) error
 }

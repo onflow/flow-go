@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/gossip"
 	"github.com/dapperlabs/flow-go/network/gossip/peerstable"
 	protocols "github.com/dapperlabs/flow-go/network/gossip/protocols/grpc"
@@ -25,10 +25,10 @@ import (
 type helloEngine struct {
 	wg     *sync.WaitGroup
 	event  string
-	sender model.Identifier
+	sender flow.Identifier
 }
 
-func (he *helloEngine) Process(originID model.Identifier, event interface{}) error {
+func (he *helloEngine) Process(originID flow.Identifier, event interface{}) error {
 
 	str, ok := event.(string)
 	if !ok {

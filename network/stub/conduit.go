@@ -1,7 +1,7 @@
 package stub
 
 import (
-	"github.com/dapperlabs/flow-go/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/trickle"
 )
 
@@ -10,6 +10,6 @@ type Conduit struct {
 	submit   trickle.SubmitFunc
 }
 
-func (c *Conduit) Submit(event interface{}, targetIDs ...model.Identifier) error {
+func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {
 	return c.submit(c.engineID, event, targetIDs...)
 }

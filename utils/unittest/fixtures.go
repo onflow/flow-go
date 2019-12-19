@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
@@ -51,7 +50,7 @@ func BlockHeaderFixture() flow.Header {
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             []byte("pub fun main() {}"),
-		ReferenceBlockHash: model.Fingerprint(HashFixture(32)),
+		ReferenceBlockHash: flow.Fingerprint(HashFixture(32)),
 		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       AddressFixture(),
@@ -108,8 +107,8 @@ func HashFixture(size int) crypto.Hash {
 	return hash
 }
 
-func IdentifierFixture() model.Identifier {
-	var id model.Identifier
+func IdentifierFixture() flow.Identifier {
+	var id flow.Identifier
 	_, _ = rand.Read(id[:])
 	return id
 }

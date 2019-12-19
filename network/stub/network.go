@@ -5,7 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/model"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -41,13 +41,13 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 }
 
 // submit is called when an Engine is sending an event to an Engine on another node or nodes.
-func (mn *Network) submit(engineID uint8, event interface{}, targetIDs ...model.Identifier) error {
+func (mn *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 	mn.buffer(mn.GetID(), engineID, event, targetIDs)
 	return nil
 }
 
 // GetID returns the identity of the Node.
-func (mn *Network) GetID() model.Identifier {
+func (mn *Network) GetID() flow.Identifier {
 	return mn.me.NodeID()
 }
 
@@ -84,7 +84,7 @@ func (mn *Network) seen(key string) {
 }
 
 // buffer saves the request into pending buffer
-func (mn *Network) buffer(from model.Identifier, engineID uint8, event interface{}, targetIDs []model.Identifier) {
+func (mn *Network) buffer(from flow.Identifier, engineID uint8, event interface{}, targetIDs []flow.Identifier) {
 	mn.hub.Buffer.Save(from, engineID, event, targetIDs)
 }
 

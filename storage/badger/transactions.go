@@ -1,7 +1,6 @@
 package badger
 
 import (
-	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dgraph-io/badger/v2"
@@ -19,7 +18,7 @@ func NewTransactions(db *badger.DB) *Transactions {
 	return &t
 }
 
-func (t *Transactions) ByFingerprint(fp model.Fingerprint) (*flow.Transaction, error) {
+func (t *Transactions) ByFingerprint(fp flow.Fingerprint) (*flow.Transaction, error) {
 	var tx flow.Transaction
 
 	err := t.db.View(func(btx *badger.Txn) error {
