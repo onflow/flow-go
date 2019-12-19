@@ -56,7 +56,7 @@ You can find a high-level overview of the Flow architecture on the [documentatio
 
 #### Install Go
 
-- Download and install [Go 1.12](https://golang.org/doc/install)
+- Download and install [Go 1.13](https://golang.org/doc/install)
 - Create your workspace `$GOPATH` directory and update your bash_profile to contain the following:
 
 ```bash
