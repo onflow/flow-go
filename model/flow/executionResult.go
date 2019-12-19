@@ -17,7 +17,7 @@ type ExecutionResult struct {
 	Signatures []crypto.Signature
 }
 
-func (er *ExecutionResult) Hash() Fingerprint {
+func (er *ExecutionResult) Hash() crypto.Hash {
 	return encoding.DefaultEncoder.MustEncode(er.ExecutionResultBody)
 }
 
