@@ -13,6 +13,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff/round"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -108,7 +109,7 @@ func (e *Engine) Submit(event interface{}) {
 }
 
 // Process will process coldstuff consensus events from the given origin.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(originID model.Identifier, event interface{}) error {
 	var err error
 	switch ev := event.(type) {
 	case *coldstuff.BlockProposal:

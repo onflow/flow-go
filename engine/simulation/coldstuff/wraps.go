@@ -4,20 +4,21 @@ package coldstuff
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type proposalWrap struct {
-	originID flow.Identifier
+	originID model.Identifier
 	block    *flow.Block
 }
 
 type voteWrap struct {
-	originID flow.Identifier
+	originID model.Identifier
 	hash     crypto.Hash
 }
 
 type commitWrap struct {
-	originID flow.Identifier
+	originID model.Identifier
 	hash     crypto.Hash
 }

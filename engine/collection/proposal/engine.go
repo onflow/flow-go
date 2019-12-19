@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -89,7 +89,7 @@ func (e *Engine) Submit(event interface{}) {
 // Process processes the given propagation engine event. Events that are given
 // to this function originate within the propagation engine on the node with the
 // given origin ID.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(originID model.Identifier, event interface{}) error {
 	var err error
 	switch event.(type) {
 	default:

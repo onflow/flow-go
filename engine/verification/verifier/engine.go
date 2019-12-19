@@ -5,6 +5,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
@@ -63,7 +64,7 @@ func (e *Engine) Submit(event interface{}) {
 // it is successfully processed by the engine.
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(originID model.Identifier, event interface{}) error {
 	var err error
 	switch ev := event.(type) {
 	case *execution.ExecutionReceipt:
@@ -80,7 +81,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // onExecutionReceipt receives an execution receipt (exrcpt), verifies that and emits
 // a result approval upon successful verification
-func (e *Engine) onExecutionReceipt(originID flow.Identifier, exrcpt *execution.ExecutionReceipt) error {
+func (e *Engine) onExecutionReceipt(originID model.Identifier, exrcpt *execution.ExecutionReceipt) error {
 	// todo: add id of the ER once gets available
 	e.log.Info().
 		Hex("origin_id", originID[:]).

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
@@ -77,7 +78,7 @@ func (suite *VerifierEngineTestSuit) Test_Submit_HappyPath() {
 
 	//mocking the identity of the verification node under test
 	vn_me := flow.Identity{
-		NodeID:  flow.Identifier{0x01, 0x01, 0x01, 0x01},
+		NodeID:  model.Identifier{0x01, 0x01, 0x01, 0x01},
 		Address: "mock-vn-address",
 		Role:    flow.RoleVerification,
 	}
@@ -119,24 +120,24 @@ func (suite *VerifierEngineTestSuit) Test_Submit_HappyPath() {
 
 // TestProcess_UnhappyInput covers unhappy inputs for Process method
 func (suite *VerifierEngineTestSuit) TestProcess_UnhappyInput() {
-	// mocking state for Final().Identity(flow.Identifier{})
+	// mocking state for Final().Identity(model.Identifier{})
 	suite.state.On("Final").Return(suite.ss).Once()
-	suite.ss.On("Identity", flow.Identifier{}).Return(flow.Identity{}, errors.New("non-nil")).Once()
+	suite.ss.On("Identity", model.Identifier{}).Return(flow.Identity{}, errors.New("non-nil")).Once()
 
 	// creating a new engine
 	vrfy, err := New(suite.e.log, suite.net, suite.e.state, suite.me)
 	require.Nil(suite.T(), err, "could not create an engine")
 
 	// nil event
-	err = vrfy.Process(flow.Identifier{}, nil)
+	err = vrfy.Process(model.Identifier{}, nil)
 	assert.NotNil(suite.T(), err, "failed recognizing nil event")
 
 	// non-execution receipt event
-	err = vrfy.Process(flow.Identifier{}, new(struct{}))
+	err = vrfy.Process(model.Identifier{}, new(struct{}))
 	assert.NotNil(suite.T(), err, "failed recognizing non-execution receipt events")
 
 	// non-recoverable id
-	err = vrfy.Process(flow.Identifier{}, &execution.ExecutionReceipt{})
+	err = vrfy.Process(model.Identifier{}, &execution.ExecutionReceipt{})
 	assert.NotNilf(suite.T(), err, "broken happy path: %s", err)
 
 	// asserting a single calls in unhappy path
@@ -154,7 +155,7 @@ func (suite *VerifierEngineTestSuit) TestProcess_UnstakeEmit() {
 	require.Nil(suite.T(), err, "could not create an engine")
 
 	unstaked_id := flow.Identity{
-		NodeID:  flow.Identifier{0x02, 0x02, 0x02, 0x02},
+		NodeID:  model.Identifier{0x02, 0x02, 0x02, 0x02},
 		Address: "unstaked_address",
 		Role:    flow.RoleExecution,
 		Stake:   0,
@@ -203,7 +204,7 @@ func (suite *VerifierEngineTestSuit) TestProcess_UnauthorizedEmits() {
 
 	//mocking the identity of the verification node under test
 	vn_me := flow.Identity{
-		NodeID:  flow.Identifier{0x01, 0x01, 0x01, 0x01},
+		NodeID:  model.Identifier{0x01, 0x01, 0x01, 0x01},
 		Address: "mock-vn-address",
 		Role:    flow.RoleVerification,
 	}
@@ -214,7 +215,7 @@ func (suite *VerifierEngineTestSuit) TestProcess_UnauthorizedEmits() {
 
 	for _, tc := range tt {
 		id := flow.Identity{
-			NodeID:  flow.Identifier{0x02, 0x02, 0x02, 0x02},
+			NodeID:  model.Identifier{0x02, 0x02, 0x02, 0x02},
 			Address: "mock-address",
 			Role:    tc.role,
 		}
@@ -244,7 +245,7 @@ func (suite *VerifierEngineTestSuit) TestOnExecutionReceipt_HappyPath() {
 
 	// a mock staked execution node for generating a mock execution receipt
 	exe_id := flow.Identity{
-		NodeID:  flow.Identifier{0x02, 0x02, 0x02, 0x02},
+		NodeID:  model.Identifier{0x02, 0x02, 0x02, 0x02},
 		Address: "mock-en-address",
 		Role:    flow.RoleExecution,
 	}
@@ -289,7 +290,7 @@ func generateMockIdentities(size int) flow.IdentityList {
 	var identities flow.IdentityList
 	for i := 0; i < size; i++ {
 		// creating mock identities as a random byte array
-		var nodeID flow.Identifier
+		var nodeID model.Identifier
 		_, _ = rand.Read(nodeID[:])
 		address := fmt.Sprintf("address%d", i)
 		var role flow.Role

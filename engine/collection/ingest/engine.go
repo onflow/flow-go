@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
@@ -91,7 +92,7 @@ func (e *Engine) Submit(event interface{}) error {
 //
 // Transactions are validated and routed to the correct cluster, then added
 // to the transaction mempool.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(originID model.Identifier, event interface{}) error {
 	var err error
 	switch ev := event.(type) {
 	case *flow.Transaction:
@@ -107,7 +108,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // onTransaction handles receipt of a new transaction. This can be submitted
 // from outside the system or routed from another collection node.
-func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) error {
+func (e *Engine) onTransaction(originID model.Identifier, tx *flow.Transaction) error {
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("tx_hash", tx.Hash()).

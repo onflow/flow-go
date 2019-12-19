@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/collection/proposal"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
@@ -20,7 +20,7 @@ func TestStartStop(t *testing.T) {
 
 	state := new(protocol.State)
 	me := new(module.Local)
-	me.On("NodeID").Return(flow.Identifier{})
+	me.On("NodeID").Return(model.Identifier{})
 
 	hub := stub.NewNetworkHub()
 	stub := stub.NewNetwork(state, me, hub)
