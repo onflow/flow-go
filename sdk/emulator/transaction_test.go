@@ -530,8 +530,11 @@ func TestGetTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	myEventType := types.Event{
-		Fields: map[string]types.Type{
-			"x": types.Int{},
+		Fields: []types.Field{
+			{
+				Identifier: "x",
+				Type:       types.Int{},
+			},
 		},
 	}
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"sort"
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 
@@ -15,11 +14,6 @@ import (
 // An Encoder converts Cadence values into XDR-encoded bytes.
 type Encoder struct {
 	enc *xdr.Encoder
-}
-
-// EncodingOrder is a central point to keep ordering for encoding the same.
-func SortInEncodingOrder(names []string) {
-	sort.Strings(names)
 }
 
 // Encode returns the XDR-encoded representation of the given value.
@@ -325,6 +319,20 @@ func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
 		return err
 	}
 
+	// encodedKeys := make([][]byte, size)
+	// ebcodedValues := make(map[string])
+	//
+	// for i, pair := range v.Pairs {
+	// 	encodedKey, err := Encode(pair.Key)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	//
+	// 	encodedKeys[i] = encodedKey
+	//
+	// 	elements[i] = pair.Value
+	// }
+
 	// keys and elements are encoded as separate fixed-length arrays
 	keys := make([]values.Value, size)
 	elements := make([]values.Value, size)
@@ -347,38 +355,12 @@ func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
 //
 // A composite is encoded as a fixed-length array of its field values.
 func (e *Encoder) EncodeComposite(v values.Composite) error {
-	fields := make([]string, 0, len(v.Fields))
-	for field := range v.Fields {
-		fields = append(fields, field)
-	}
-
-	SortInEncodingOrder(fields)
-
-	vals := make([]values.Value, len(v.Fields))
-
-	for i, identifier := range fields {
-		vals[i] = v.Fields[identifier]
-	}
-
-	return e.encodeArray(vals)
+	return e.encodeArray(v.Fields)
 }
 
 // EncodeEvent writes the XDR-encoded representation of an event.
 //
 // An event is encoded as a fixed-length array of its field values.
 func (e *Encoder) EncodeEvent(v values.Event) error {
-	fields := make([]string, 0, len(v.Fields))
-	for field := range v.Fields {
-		fields = append(fields, field)
-	}
-
-	SortInEncodingOrder(fields)
-
-	vals := make([]values.Value, len(v.Fields))
-
-	for i, identifier := range fields {
-		vals[i] = v.Fields[identifier]
-	}
-
-	return e.encodeArray(vals)
+	return e.encodeArray(v.Fields)
 }

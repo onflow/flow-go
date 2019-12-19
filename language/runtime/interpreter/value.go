@@ -1495,10 +1495,10 @@ func (v *CompositeValue) SetOwner(owner string) {
 }
 
 func (v *CompositeValue) Export() values.Value {
-	fields := make(map[string]values.Value, len(v.Fields))
+	fields := make([]values.Value, 0, len(v.Fields))
 
-	for identifier, value := range v.Fields {
-		fields[identifier] = value.(ExportableValue).Export()
+	for _, value := range v.Fields {
+		fields = append(fields, value.(ExportableValue).Export())
 	}
 
 	return values.NewComposite(fields)
@@ -1925,10 +1925,10 @@ type EventValue struct {
 func (EventValue) isValue() {}
 
 func (v EventValue) Export() values.Value {
-	fields := make(map[string]values.Value, len(v.Fields))
+	fields := make([]values.Value, len(v.Fields))
 
-	for _, field := range v.Fields {
-		fields[field.Identifier] = field.Value.(ExportableValue).Export()
+	for i, field := range v.Fields {
+		fields[i] = field.Value.(ExportableValue).Export()
 	}
 
 	return values.NewEvent(fields)

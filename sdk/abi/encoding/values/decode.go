@@ -420,24 +420,15 @@ func (e *Decoder) DecodeDictionary(t types.Dictionary) (v values.Dictionary, err
 //
 // A composite is encoded as a fixed-length array of its field values.
 func (e *Decoder) DecodeComposite(t types.Composite) (v values.Composite, err error) {
-	fields := make([]string, 0, len(t.Fields))
-	for field := range t.Fields {
-		fields = append(fields, field)
-	}
+	vals := make([]values.Value, len(t.Fields))
 
-	SortInEncodingOrder(fields)
-
-	vals := make(map[string]values.Value, len(fields))
-
-	for _, identifier := range fields {
-		typ := t.Fields[identifier]
-
-		value, err := e.Decode(typ)
+	for i, field := range t.Fields {
+		value, err := e.Decode(field.Type)
 		if err != nil {
 			return v, err
 		}
 
-		vals[identifier] = value
+		vals[i] = value
 	}
 
 	return values.NewComposite(vals), nil
@@ -447,24 +438,15 @@ func (e *Decoder) DecodeComposite(t types.Composite) (v values.Composite, err er
 //
 // An event is encoded as a fixed-length array of its field values.
 func (e *Decoder) DecodeEvent(t types.Event) (v values.Event, err error) {
-	fields := make([]string, 0, len(t.Fields))
-	for field := range t.Fields {
-		fields = append(fields, field)
-	}
+	vals := make([]values.Value, len(t.Fields))
 
-	SortInEncodingOrder(fields)
-
-	vals := make(map[string]values.Value, len(fields))
-
-	for _, identifier := range fields {
-		typ := t.Fields[identifier]
-
-		value, err := e.Decode(typ)
+	for i, field := range t.Fields {
+		value, err := e.Decode(field.Type)
 		if err != nil {
 			return v, err
 		}
 
-		vals[identifier] = value
+		vals[i] = value
 	}
 
 	return values.NewEvent(vals), nil

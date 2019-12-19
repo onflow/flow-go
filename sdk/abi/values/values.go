@@ -438,10 +438,10 @@ type KeyValuePair struct {
 
 type Composite struct {
 	typ    types.Type
-	Fields map[string]Value
+	Fields []Value
 }
 
-func NewComposite(fields map[string]Value) Composite {
+func NewComposite(fields []Value) Composite {
 	return Composite{Fields: fields}
 }
 
@@ -455,10 +455,10 @@ func (v Composite) WithType(typ types.Type) Composite {
 }
 
 func (v Composite) ToGoValue() interface{} {
-	ret := make(map[string]interface{}, len(v.Fields))
+	ret := make([]interface{}, len(v.Fields))
 
-	for id, field := range v.Fields {
-		ret[id] = field.ToGoValue()
+	for i, field := range v.Fields {
+		ret[i] = field.ToGoValue()
 	}
 
 	return ret
@@ -466,10 +466,10 @@ func (v Composite) ToGoValue() interface{} {
 
 type Event struct {
 	typ    types.Type
-	Fields map[string]Value
+	Fields []Value
 }
 
-func NewEvent(fields map[string]Value) Event {
+func NewEvent(fields []Value) Event {
 	return Event{Fields: fields}
 }
 
@@ -483,10 +483,10 @@ func (v Event) WithType(typ types.Type) Event {
 }
 
 func (v Event) ToGoValue() interface{} {
-	ret := make(map[string]interface{}, len(v.Fields))
+	ret := make([]interface{}, len(v.Fields))
 
-	for id, field := range v.Fields {
-		ret[id] = field.ToGoValue()
+	for i, field := range v.Fields {
+		ret[i] = field.ToGoValue()
 	}
 
 	return ret

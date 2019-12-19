@@ -57,8 +57,11 @@ func NewPersonConstructor(firstName string, lastName string) (PersonConstructor,
 }
 
 var personType = types.Composite{
-	Fields: map[string]types.Type{
-		"FullName": types.String{},
+	Fields: []types.Field{
+		{
+			Identifier: "FullName",
+			Type:       types.String{},
+		},
 	},
 	Initializers: [][]types.Parameter{
 		{
@@ -84,6 +87,6 @@ func DecodePersonView(b []byte) (PersonView, error) {
 	}
 
 	return personView{
-		_fullName: string(v.Fields["FullName"].(values.String)),
+		_fullName: string(v.Fields[0].(values.String)),
 	}, nil
 }

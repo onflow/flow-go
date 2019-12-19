@@ -396,7 +396,7 @@ func (r *interpreterRuntime) emitEvent(
 func (r *interpreterRuntime) emitAccountEvent(
 	eventType sema.EventType,
 	runtimeInterface Interface,
-	eventFields map[string]values.Value,
+	eventFields []values.Value,
 ) {
 	t := eventType.Export(nil, nil)
 	eventValue := values.NewEvent(eventFields).WithType(t)
@@ -447,11 +447,11 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 			invocation.Location.Position,
 		)
 
-		fields := map[string]values.Value{
-			"address": accountAddress,
-		}
-
-		r.emitAccountEvent(stdlib.AccountCreatedEventType, runtimeInterface, fields)
+		r.emitAccountEvent(
+			stdlib.AccountCreatedEventType,
+			runtimeInterface,
+			[]values.Value{accountAddress},
+		)
 
 		result := interpreter.AddressValue(accountAddress)
 		return trampoline.Done{Result: result}
@@ -473,12 +473,11 @@ func (r *interpreterRuntime) newAddAccountKeyFunction(runtimeInterface Interface
 			panic(err)
 		}
 
-		fields := map[string]values.Value{
-			"address":   accountAddressValue,
-			"publicKey": publicKey,
-		}
-
-		r.emitAccountEvent(stdlib.AccountKeyAddedEventType, runtimeInterface, fields)
+		r.emitAccountEvent(
+			stdlib.AccountKeyAddedEventType,
+			runtimeInterface,
+			[]values.Value{accountAddressValue, publicKey},
+		)
 
 		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
@@ -499,12 +498,11 @@ func (r *interpreterRuntime) newRemoveAccountKeyFunction(runtimeInterface Interf
 			panic(err)
 		}
 
-		fields := map[string]values.Value{
-			"address":   accountAddressValue,
-			"publicKey": publicKey,
-		}
-
-		r.emitAccountEvent(stdlib.AccountKeyRemovedEventType, runtimeInterface, fields)
+		r.emitAccountEvent(
+			stdlib.AccountKeyAddedEventType,
+			runtimeInterface,
+			[]values.Value{accountAddressValue, publicKey},
+		)
 
 		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
@@ -541,12 +539,11 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(
 			invocation.Location.Position,
 		)
 
-		fields := map[string]values.Value{
-			"address": accountAddressValue,
-			"code":    values.NewBytes(code),
-		}
-
-		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, fields)
+		r.emitAccountEvent(
+			stdlib.AccountCodeUpdatedEventType,
+			runtimeInterface,
+			[]values.Value{accountAddressValue, values.NewBytes(code)},
+		)
 
 		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}

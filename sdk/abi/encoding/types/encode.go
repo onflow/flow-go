@@ -106,11 +106,11 @@ type variableObject struct {
 
 // endregion
 
-func (encoder *Encoder) mapFields(m map[string]types.Type) map[string]interface{} {
+func (encoder *Encoder) mapFields(m []types.Field) map[string]interface{} {
 	ret := map[string]interface{}{}
 
-	for identifier, typ := range m {
-		ret[identifier] = encoder.encode(typ)
+	for _, field := range m {
+		ret[field.Identifier] = encoder.encode(field.Type)
 	}
 
 	return ret

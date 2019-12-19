@@ -66,8 +66,11 @@ type AccountCreatedEvent interface {
 }
 
 var AccountCreatedEventType types.Type = types.Event{
-	Fields: map[string]types.Type{
-		"address": types.Address{},
+	Fields: []types.Field{
+		{
+			Identifier: "address",
+			Type:       types.Address{},
+		},
 	},
 }.WithID(EventAccountCreated)
 
@@ -81,7 +84,7 @@ type accountCreatedEvent struct {
 }
 
 func (a accountCreatedEvent) Address() Address {
-	return Address(a.Fields["address"].(values.Address))
+	return Address(a.Fields[0].(values.Address))
 }
 
 func DecodeAccountCreatedEvent(b []byte) (AccountCreatedEvent, error) {

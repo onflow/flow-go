@@ -1604,10 +1604,15 @@ func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.T
 			panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
 		}()
 
-		fieldTypes := map[string]types.Type{}
+		fields := make([]types.Field, 0, len(t.Members))
 
-		for name, field := range t.Members {
-			fieldTypes[name] = field.TypeAnnotation.Type.(ExportableType).Export(program, nil)
+		for identifer, field := range t.Members {
+			typ := field.TypeAnnotation.Type.(ExportableType).Export(program, nil)
+
+			fields = append(fields, types.Field{
+				Identifier: identifer,
+				Type:       typ,
+			})
 		}
 
 		parameters := make([]types.Parameter, len(t.ConstructorParameterTypeAnnotations))
@@ -1626,7 +1631,7 @@ func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.T
 
 		return types.Composite{
 			Identifier:   t.Identifier,
-			Fields:       fieldTypes,
+			Fields:       fields,
 			Initializers: [][]types.Parameter{parameters},
 		}.WithID(t.ID())
 	}
@@ -2246,12 +2251,16 @@ func (t *EventType) Export(program *ast.Program, variable *Variable) types.Type 
 		}
 	}
 
-	fields := make(map[string]types.Type, len(t.Fields))
-	for _, field := range t.Fields {
+	fields := make([]types.Field, len(t.Fields))
+
+	for i, field := range t.Fields {
 		identifier := field.Identifier
 		typ := field.Type.(ExportableType).Export(program, nil)
 
-		fields[identifier] = typ
+		fields[i] = types.Field{
+			Identifier: identifier,
+			Type:       typ,
+		}
 	}
 
 	return types.Event{

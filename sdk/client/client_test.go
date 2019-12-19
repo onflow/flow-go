@@ -226,10 +226,19 @@ func TestGetEvents(t *testing.T) {
 	// declare event type used for decoding event payloads
 	mockEventType := types.Event{
 		Identifier: "Transfer",
-		Fields: map[string]types.Type{
-			"to":     types.Address{},
-			"from":   types.Address{},
-			"amount": types.Int{},
+		Fields: []types.Field{
+			{
+				Identifier: "to",
+				Type:       types.Address{},
+			},
+			{
+				Identifier: "from",
+				Type:       types.Address{},
+			},
+			{
+				Identifier: "amount",
+				Type:       types.Int{},
+			},
 		},
 	}
 
@@ -238,7 +247,7 @@ func TestGetEvents(t *testing.T) {
 	amount := values.NewInt(42)
 
 	mockEventValue := values.
-		NewEvent(map[string]values.Value{"to": to, "from": from, "amount": amount}).
+		NewEvent([]values.Value{to, from, amount}).
 		WithType(mockEventType)
 
 	// encode event payload from mock value
@@ -272,9 +281,9 @@ func TestGetEvents(t *testing.T) {
 		eventValue := value.(values.Event)
 
 		assert.Equal(t, actualEvent.Type, mockEvent.Type)
-		assert.Equal(t, to, eventValue.Fields["to"])
-		assert.Equal(t, from, eventValue.Fields["from"])
-		assert.Equal(t, amount, eventValue.Fields["amount"])
+		assert.Equal(t, to, eventValue.Fields[0])
+		assert.Equal(t, from, eventValue.Fields[1])
+		assert.Equal(t, amount, eventValue.Fields[2])
 	})
 
 	t.Run("Server error", func(t *testing.T) {

@@ -90,8 +90,8 @@ func getObject(data map[string]interface{}, key string) (interface{}, error) {
 	return nil, fmt.Errorf("key %s doesn't exist  in %v", key, data)
 }
 
-func toFields(raw map[string]interface{}) (map[string]types.Type, error) {
-	fields := make(map[string]types.Type)
+func toFields(raw map[string]interface{}) ([]types.Field, error) {
+	fields := make([]types.Field, 0, len(raw))
 
 	for name, field := range raw {
 		typ, err := toType(field, name)
@@ -99,7 +99,10 @@ func toFields(raw map[string]interface{}) (map[string]types.Type, error) {
 			return nil, err
 		}
 
-		fields[name] = typ
+		fields = append(fields, types.Field{
+			Identifier: name,
+			Type:       typ,
+		})
 	}
 
 	return fields, nil
@@ -222,9 +225,12 @@ func toEvent(data []interface{}, name string) (types.Event, error) {
 		return types.Event{}, err
 	}
 
-	fields := make(map[string]types.Type)
-	for _, param := range parameters {
-		fields[param.Identifier] = param.Type
+	fields := make([]types.Field, len(parameters))
+	for i, param := range parameters {
+		fields[i] = types.Field{
+			Identifier: param.Identifier,
+			Type:       param.Type,
+		}
 	}
 
 	return types.Event{

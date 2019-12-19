@@ -133,6 +133,11 @@ func (t Dictionary) ID() string {
 	)
 }
 
+type Field struct {
+	Identifier string
+	Type       Type
+}
+
 type Parameter struct {
 	Label      string
 	Identifier string
@@ -143,7 +148,7 @@ type Composite struct {
 	isAType
 	typeID       string
 	Identifier   string
-	Fields       map[string]Type
+	Fields       []Field
 	Initializers [][]Parameter
 }
 
@@ -170,7 +175,7 @@ type Event struct {
 	isAType
 	typeID      string
 	Identifier  string
-	Fields      map[string]Type
+	Fields      []Field
 	Initializer []Parameter
 }
 
