@@ -207,7 +207,7 @@ func (s Store) CommitBlock(
 	return err
 }
 
-func (s *Store) TransactionByFingerprint(fp Fingerprint) (tx flow.Transaction, err error) {
+func (s *Store) TransactionByFingerprint(fp flow.Fingerprint) (tx flow.Transaction, err error) {
 	err = s.db.View(func(txn *badger.Txn) error {
 		encTx, err := getTx(txn)(transactionKey(fp))
 		if err != nil {
