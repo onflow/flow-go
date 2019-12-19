@@ -6,9 +6,9 @@ import (
 )
 
 type ExecutionResultBody struct {
-	PreviousExecutionResult model.Commit    // commit of the previous ER
-	Block                   model.Commit    // commit of the current block
-	FinalStateCommitment    StateCommitment // final state commitment
+	PreviousExecutionResult model.Fingerprint // commit of the previous ER
+	Block                   model.Fingerprint // commit of the current block
+	FinalStateCommitment    StateCommitment   // final state commitment
 	Chunks                  ChunkList
 }
 
@@ -18,6 +18,6 @@ type ExecutionResult struct {
 }
 
 // TODO
-func (er *ExecutionResult) Commit() model.Commit {
+func (er *ExecutionResult) Fingerprint() model.Fingerprint {
 	return nil
 }

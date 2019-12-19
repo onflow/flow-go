@@ -51,7 +51,7 @@ func BlockHeaderFixture() flow.Header {
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             []byte("pub fun main() {}"),
-		ReferenceBlockHash: model.Commit(HashFixture(32)),
+		ReferenceBlockHash: model.Fingerprint(HashFixture(32)),
 		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       AddressFixture(),

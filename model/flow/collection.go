@@ -11,33 +11,33 @@ import (
 
 // Collection is set of transactions (transaction set)
 type Collection struct {
-	Transactions []model.Commit
+	Transactions []model.Fingerprint
 }
 
-// Commit returns the canonical hash of this collection.
-func (c *Collection) Commit() model.Commit {
-	return model.Commit(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(c)))
+// Fingerprint returns the canonical hash of this collection.
+func (c *Collection) Fingerprint() model.Fingerprint {
+	return model.Fingerprint(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(c)))
 }
 
 // AddItem adds another entityID to the collection
-func (c *Collection) AddItem(item model.Entity) {
-	c.Transactions = append(c.Transactions, item.Commit())
+func (c *Collection) Add(item model.Entity) {
+	c.Transactions = append(c.Transactions, item.Fingerprint())
 }
 
 // GetItem returns a single item from the collection with the proof that this item is located at this index
-func (c *Collection) GetItem(index uint64) (commit model.Commit, proof []byte) {
+func (c *Collection) GetItem(index uint64) (fingerprint model.Fingerprint, proof []byte) {
 	return c.Transactions[index], nil
 }
 
 // GetItem returns a range of elements from the collection
 // and provides an aggregated proof
-func (c *Collection) GetItems(startIndex uint64, length uint64) (commits []model.Commit, proof []byte) {
+func (c *Collection) GetItems(startIndex uint64, length uint64) (fingerprints []model.Fingerprint, proof []byte) {
 	return c.Transactions[startIndex : startIndex+length], nil
 }
 
 // Reset resets all transactions inside the collection
 func (c *Collection) Reset() {
-	c.Transactions = make([]model.Commit, 0)
+	c.Transactions = make([]model.Fingerprint, 0)
 }
 
 // IsEmpty returns true if the collection is empty
@@ -61,15 +61,15 @@ type CollectionList struct {
 	collections []Collection
 }
 
-func (cl *CollectionList) Commit() model.Commit {
+func (cl *CollectionList) Fingerprint() model.Fingerprint {
 	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
 	for _, item := range cl.collections {
-		hasher.Add(item.Commit())
+		hasher.Add(item.Fingerprint())
 	}
-	return model.Commit(hasher.SumHash())
+	return model.Fingerprint(hasher.SumHash())
 }
 
-func (cl *CollectionList) AppendItem(ch Collection) {
+func (cl *CollectionList) Append(ch Collection) {
 	cl.collections = append(cl.collections, ch)
 }
 
@@ -77,10 +77,10 @@ func (cl *CollectionList) Items() []Collection {
 	return cl.collections
 }
 
-// ByCommit returns an entity from the list by entity commit
-func (cl *CollectionList) ByCommit(c model.Commit) Collection {
+// ByFingerprint returns an entity from the list by entity fingerprint
+func (cl *CollectionList) ByFingerprint(c model.Fingerprint) Collection {
 	for _, item := range cl.collections {
-		if bytes.Equal(item.Commit(), c) {
+		if bytes.Equal(item.Fingerprint(), c) {
 			return item
 		}
 	}

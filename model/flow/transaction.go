@@ -16,7 +16,7 @@ type TransactionBody struct {
 	// for example, if block reference is pointing to a block with height of X and network limit is 10,
 	// a block with x+10 height is the last block that is allowed to include this transaction.
 	// user can adjust this reference to older blocks if he/she wants to make tx expire faster
-	ReferenceBlockHash model.Commit
+	ReferenceBlockHash model.Fingerprint
 	// the script part of the transaction in Cadence Language
 	Script []byte
 	// a unique random number to differentiate two transactions with the same properties
@@ -46,10 +46,10 @@ type Transaction struct {
 	EndState         StateCommitment
 }
 
-// Commit hashes the transaction body
-// Commit provides a meseaure to check the integrity of the content
-func (tx *Transaction) Commit() crypto.Hash {
-	return hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(tx.TransactionBody))
+// Fingerprint hashes the transaction body
+// Fingerprint provides a meseaure to check the integrity of the content
+func (tx *Transaction) Fingerprint() model.Fingerprint {
+	return model.Fingerprint(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(tx.TransactionBody)))
 }
 
 // ID returns an Identifier (unique id) for this transaction

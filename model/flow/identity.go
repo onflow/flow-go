@@ -106,12 +106,12 @@ func (il IdentityList) NodeIDs() []model.Identifier {
 	return ids
 }
 
-func (il IdentityList) Commit() model.Commit {
+func (il IdentityList) Fingerprint() model.Fingerprint {
 	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
 	for _, item := range il {
 		hasher.Add(item.Encode())
 	}
-	return model.Commit(hasher.SumHash())
+	return model.Fingerprint(hasher.SumHash())
 }
 
 // TotalStake returns the total stake of all given identities.
