@@ -8,20 +8,29 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 )
 
-type Location = ast.Location
+type (
+	Location        = ast.Location
+	LocationID      = ast.LocationID
+	StringLocation  = ast.StringLocation
+	AddressLocation = ast.AddressLocation
+)
 
-type LocationID = ast.LocationID
-
-type StringLocation = ast.StringLocation
-
-type AddressLocation = ast.AddressLocation
+const (
+	AddressPrefix            = ast.AddressPrefix
+	TransactionPrefix string = "T"
+	ScriptPrefix      string = "S"
+)
 
 // TransactionLocation
 
 type TransactionLocation []byte
 
 func (l TransactionLocation) ID() ast.LocationID {
-	return ast.LocationID(fmt.Sprintf("T.%s", l))
+	return LocationID(fmt.Sprintf(
+		"%s.%s",
+		TransactionPrefix,
+		l.String(),
+	))
 }
 
 func (l TransactionLocation) String() string {
@@ -37,7 +46,11 @@ func init() {
 type ScriptLocation []byte
 
 func (l ScriptLocation) ID() ast.LocationID {
-	return ast.LocationID(fmt.Sprintf("S.%s", l))
+	return LocationID(fmt.Sprintf(
+		"%s.%s",
+		ScriptPrefix,
+		l.String(),
+	))
 }
 
 func (l ScriptLocation) String() string {
@@ -49,7 +62,7 @@ func (l ScriptLocation) String() string {
 type FileLocation string
 
 func (l FileLocation) ID() ast.LocationID {
-	return ast.LocationID(fmt.Sprintf("F.%s", l))
+	return LocationID(l.String())
 }
 
 func (l FileLocation) String() string {

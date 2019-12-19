@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
@@ -72,7 +73,9 @@ func TestEventEmitted(t *testing.T) {
 
 		decodedEvent := eventValue.(values.Event)
 
-		expectedType := fmt.Sprintf("T.%s.MyEvent", tx.Hash().Hex())
+		location := runtime.TransactionLocation(tx.Hash())
+		expectedType := fmt.Sprintf("%s.MyEvent", location.ID())
+
 		expectedID := flow.Event{TxHash: tx.Hash(), Index: 0}.ID()
 
 		assert.Equal(t, expectedType, actualEvent.Type)
@@ -104,7 +107,8 @@ func TestEventEmitted(t *testing.T) {
 
 		decodedEvent := eventValue.(values.Event)
 
-		expectedType := fmt.Sprintf("S.%s.MyEvent", result.ScriptHash.Hex())
+		location := runtime.ScriptLocation(result.ScriptHash)
+		expectedType := fmt.Sprintf("%s.MyEvent", location.ID())
 
 		// NOTE: ID is undefined for events emitted from scripts
 
@@ -165,7 +169,9 @@ func TestEventEmitted(t *testing.T) {
 		block, err := b.CommitBlock()
 		require.NoError(t, err)
 
-		expectedType := fmt.Sprintf("A.%s.MyEvent", address.Hex())
+		location := runtime.AddressLocation(address.Bytes())
+		expectedType := fmt.Sprintf("%s.MyEvent", location.ID())
+
 		events, err := b.GetEvents(expectedType, block.Number, block.Number)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
