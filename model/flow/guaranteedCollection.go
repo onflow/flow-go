@@ -15,8 +15,8 @@ type GuaranteedCollection struct {
 
 // TODO we need to fix this later
 // Fingerprint returns the fingerprint of the Guaranteed collection.
-func (gc *GuaranteedCollection) Fingerprint() flow.Fingerprint {
-	return gc.CollectionHash
+func (gc *GuaranteedCollection) Fingerprint() Fingerprint {
+	return Fingerprint(gc.CollectionHash)
 }
 
 // Hash returns the hash of the collection.
