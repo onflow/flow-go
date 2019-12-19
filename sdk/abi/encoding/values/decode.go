@@ -48,6 +48,8 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 	switch x := t.(type) {
 	case types.Void:
 		return e.DecodeVoid()
+	case types.Optional:
+		return e.DecodeOptional(x)
 	case types.Bool:
 		return e.DecodeBool()
 	case types.String:
@@ -84,8 +86,6 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 		return e.DecodeComposite(x)
 	case types.Event:
 		return e.DecodeEvent(x)
-	case types.Optional:
-		return e.DecodeOptional(x)
 
 	default:
 		return nil, fmt.Errorf("unsupported type: %T", t)
@@ -99,7 +99,30 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 // types that contain void values.
 func (e *Decoder) DecodeVoid() (values.Void, error) {
 	// void values are not encoded
-	return struct{}{}, nil
+	return values.Void{}, nil
+}
+
+// DecodeOptional reads the XDR-encoded representation of an optional value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.19
+//  RFC Section 4.19 - Optional-Data
+//  Union of boolean and encoded value
+func (e *Decoder) DecodeOptional(t types.Optional) (v values.Optional, err error) {
+	hasValue, err := e.DecodeBool()
+	if err != nil {
+		return v, err
+	}
+
+	if hasValue {
+		value, err := e.Decode(t.Type)
+		if err != nil {
+			return v, err
+		}
+
+		return values.Optional{Value: value}, nil
+	}
+
+	return values.Optional{Value: nil}, nil
 }
 
 // DecodeBool reads the XDR-encoded representation of a boolean value.
@@ -107,13 +130,13 @@ func (e *Decoder) DecodeVoid() (values.Void, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.4
 //  RFC Section 4.4 - Boolean
 //  Represented as an XDR encoded enumeration where 0 is false and 1 is true
-func (e *Decoder) DecodeBool() (values.Bool, error) {
+func (e *Decoder) DecodeBool() (v values.Bool, err error) {
 	b, _, err := e.dec.DecodeBool()
 	if err != nil {
-		return false, err
+		return v, err
 	}
 
-	return values.Bool(b), nil
+	return values.NewBool(b), nil
 }
 
 // DecodeString reads the XDR-encoded representation of a string value.
@@ -121,13 +144,13 @@ func (e *Decoder) DecodeBool() (values.Bool, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.11
 //  RFC Section 4.11 - String
 //  Unsigned integer length followed by bytes zero-padded to a multiple of four
-func (e *Decoder) DecodeString() (values.String, error) {
+func (e *Decoder) DecodeString() (v values.String, err error) {
 	str, _, err := e.dec.DecodeString()
 	if err != nil {
-		return "", err
+		return v, err
 	}
 
-	return values.String(str), nil
+	return values.NewString(str), nil
 }
 
 // DecodeBytes reads the XDR-encoded representation of a byte array.
@@ -135,17 +158,17 @@ func (e *Decoder) DecodeString() (values.String, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.10
 //  RFC Section 4.10 - Variable-Length Opaque Data
 //  Unsigned integer length followed by fixed opaque data of that length
-func (e *Decoder) DecodeBytes() (values.Bytes, error) {
+func (e *Decoder) DecodeBytes() (v values.Bytes, err error) {
 	b, _, err := e.dec.DecodeOpaque()
 	if err != nil {
-		return nil, err
+		return v, err
 	}
 
 	if b == nil {
 		b = []byte{}
 	}
 
-	return b, nil
+	return values.NewBytes(b), nil
 }
 
 // DecodeAddress reads the XDR-encoded representation of an address.
@@ -153,13 +176,13 @@ func (e *Decoder) DecodeBytes() (values.Bytes, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.9
 //  RFC Section 4.9 - Fixed-Length Opaque Data
 //  Fixed-length uninterpreted data zero-padded to a multiple of four
-func (e *Decoder) DecodeAddress() (values.Address, error) {
+func (e *Decoder) DecodeAddress() (v values.Address, err error) {
 	b, _, err := e.dec.DecodeFixedOpaque(20)
 	if err != nil {
-		return values.Address{}, err
+		return v, err
 	}
 
-	return values.BytesToAddress(b), nil
+	return values.NewAddressFromBytes(b), nil
 }
 
 // DecodeInt reads the XDR-encoded representation of an arbitrary-precision
@@ -172,10 +195,10 @@ func (e *Decoder) DecodeAddress() (values.Address, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.10
 //  RFC Section 4.10 - Variable-Length Opaque Data
 //  Unsigned integer length followed by fixed opaque data of that length
-func (e *Decoder) DecodeInt() (values.Int, error) {
+func (e *Decoder) DecodeInt() (v values.Int, err error) {
 	b, _, err := e.dec.DecodeOpaque()
 	if err != nil {
-		return values.Int{}, err
+		return v, err
 	}
 
 	isPositive := b[0] == 1
@@ -194,13 +217,13 @@ func (e *Decoder) DecodeInt() (values.Int, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.1
 //  RFC Section 4.1 - Integer
 //  32-bit big-endian signed integer in range [-2147483648, 2147483647]
-func (e *Decoder) DecodeInt8() (values.Int8, error) {
+func (e *Decoder) DecodeInt8() (v values.Int8, err error) {
 	i, _, err := e.dec.DecodeInt()
 	if err != nil {
-		return 0, err
+		return v, err
 	}
 
-	return values.Int8(i), nil
+	return values.NewInt8(int8(i)), nil
 }
 
 // DecodeInt16 reads the XDR-encoded representation of an int-16 value.
@@ -208,13 +231,13 @@ func (e *Decoder) DecodeInt8() (values.Int8, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.1
 //  RFC Section 4.1 - Integer
 //  32-bit big-endian signed integer in range [-2147483648, 2147483647]
-func (e *Decoder) DecodeInt16() (values.Int16, error) {
+func (e *Decoder) DecodeInt16() (v values.Int16, err error) {
 	i, _, err := e.dec.DecodeInt()
 	if err != nil {
-		return 0, err
+		return v, err
 	}
 
-	return values.Int16(i), nil
+	return values.NewInt16(int16(i)), nil
 }
 
 // DecodeInt32 reads the XDR-encoded representation of an int-32 value.
@@ -222,13 +245,13 @@ func (e *Decoder) DecodeInt16() (values.Int16, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.1
 //  RFC Section 4.1 - Integer
 //  32-bit big-endian signed integer in range [-2147483648, 2147483647]
-func (e *Decoder) DecodeInt32() (values.Int32, error) {
+func (e *Decoder) DecodeInt32() (v values.Int32, err error) {
 	i, _, err := e.dec.DecodeInt()
 	if err != nil {
-		return 0, err
+		return v, err
 	}
 
-	return values.Int32(i), nil
+	return values.NewInt32(i), nil
 }
 
 // DecodeInt64 reads the XDR-encoded representation of an int-64 value.
@@ -236,13 +259,13 @@ func (e *Decoder) DecodeInt32() (values.Int32, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.5
 //  RFC Section 4.5 - Hyper Integer
 //  64-bit big-endian signed integer in range [-9223372036854775808, 9223372036854775807]
-func (e *Decoder) DecodeInt64() (values.Int64, error) {
+func (e *Decoder) DecodeInt64() (v values.Int64, err error) {
 	i, _, err := e.dec.DecodeHyper()
 	if err != nil {
-		return 0, err
+		return v, err
 	}
 
-	return values.Int64(i), nil
+	return values.NewInt64(i), nil
 }
 
 // DecodeUInt8 reads the XDR-encoded representation of a uint-8 value.
@@ -250,13 +273,13 @@ func (e *Decoder) DecodeInt64() (values.Int64, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Decoder) DecodeUInt8() (values.UInt8, error) {
+func (e *Decoder) DecodeUInt8() (v values.UInt8, err error) {
 	i, _, err := e.dec.DecodeUint()
 	if err != nil {
-		return 0, err
+		return v, err
 	}
 
-	return values.UInt8(i), nil
+	return values.NewUInt8(uint8(i)), nil
 }
 
 // DecodeUInt16 reads the XDR-encoded representation of a uint-16 value.
@@ -264,13 +287,13 @@ func (e *Decoder) DecodeUInt8() (values.UInt8, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Decoder) DecodeUInt16() (values.UInt16, error) {
+func (e *Decoder) DecodeUInt16() (v values.UInt16, err error) {
 	i, _, err := e.dec.DecodeUint()
 	if err != nil {
-		return 0, err
+		return v, err
 	}
 
-	return values.UInt16(i), nil
+	return values.NewUInt16(uint16(i)), nil
 }
 
 // DecodeUInt32 reads the XDR-encoded representation of a uint-32 value.
@@ -278,13 +301,13 @@ func (e *Decoder) DecodeUInt16() (values.UInt16, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Decoder) DecodeUInt32() (values.UInt32, error) {
+func (e *Decoder) DecodeUInt32() (v values.UInt32, err error) {
 	i, _, err := e.dec.DecodeUint()
 	if err != nil {
-		return 0, err
+		return v, err
 	}
 
-	return values.UInt32(i), nil
+	return values.NewUInt32(i), nil
 }
 
 // DecodeUInt64 reads the XDR-encoded representation of a uint-64 value.
@@ -292,13 +315,13 @@ func (e *Decoder) DecodeUInt32() (values.UInt32, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.5
 //  RFC Section 4.5 - Unsigned Hyper Integer
 //  64-bit big-endian unsigned integer in range [0, 18446744073709551615]
-func (e *Decoder) DecodeUInt64() (values.UInt64, error) {
+func (e *Decoder) DecodeUInt64() (v values.UInt64, err error) {
 	i, _, err := e.dec.DecodeUhyper()
 	if err != nil {
-		return 0, err
+		return v, err
 	}
 
-	return values.UInt64(i), nil
+	return values.NewUInt64(i), nil
 }
 
 // DecodeVariableSizedArray reads the XDR-encoded representation of a
@@ -307,23 +330,18 @@ func (e *Decoder) DecodeUInt64() (values.UInt64, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.13
 //  RFC Section 4.13 - Variable-Length Array
 //  Unsigned integer length followed by individually XDR-encoded array elements
-func (e *Decoder) DecodeVariableSizedArray(t types.VariableSizedArray) (values.VariableSizedArray, error) {
+func (e *Decoder) DecodeVariableSizedArray(t types.VariableSizedArray) (v values.VariableSizedArray, err error) {
 	size, _, err := e.dec.DecodeUint()
 	if err != nil {
-		return nil, err
+		return v, err
 	}
 
-	constantType := types.ConstantSizedArray{
-		Size:        uint(size),
-		ElementType: t.ElementType,
-	}
-
-	array, err := e.DecodeConstantSizedArray(constantType)
+	vals, err := e.decodeArray(t.ElementType, uint(size))
 	if err != nil {
-		return nil, err
+		return v, err
 	}
 
-	return values.VariableSizedArray(array), nil
+	return values.NewVariableSizedArray(vals), nil
 }
 
 // DecodeConstantSizedArray reads the XDR-encoded representation of a
@@ -332,8 +350,13 @@ func (e *Decoder) DecodeVariableSizedArray(t types.VariableSizedArray) (values.V
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.12
 //  RFC Section 4.12 - Fixed-Length Array
 //  Individually XDR-encoded array elements
-func (e *Decoder) DecodeConstantSizedArray(t types.ConstantSizedArray) (values.ConstantSizedArray, error) {
-	return e.decodeArray(t.ElementType, t.Size)
+func (e *Decoder) DecodeConstantSizedArray(t types.ConstantSizedArray) (v values.ConstantSizedArray, err error) {
+	vals, err := e.decodeArray(t.ElementType, t.Size)
+	if err != nil {
+		return v, err
+	}
+
+	return values.NewConstantSizedArray(vals), nil
 }
 
 // decodeArray reads the XDR-encoded representation of a constant-sized array.
@@ -362,99 +385,69 @@ func (e *Decoder) decodeArray(t types.Type, size uint) ([]values.Value, error) {
 // The size of the dictionary is encoded as an unsigned integer, followed by
 // the dictionary keys, then elements, each represented as individually
 // XDR-encoded array elements.
-func (e *Decoder) DecodeDictionary(t types.Dictionary) (values.Dictionary, error) {
+func (e *Decoder) DecodeDictionary(t types.Dictionary) (v values.Dictionary, err error) {
 	size, _, err := e.dec.DecodeUint()
 	if err != nil {
-		return nil, err
+		return v, err
 	}
 
 	keys, err := e.decodeArray(t.KeyType, uint(size))
 	if err != nil {
-		return nil, err
+		return v, err
 	}
 
 	elements, err := e.decodeArray(t.ElementType, uint(size))
 	if err != nil {
-		return nil, err
+		return v, err
 	}
 
-	d := make(values.Dictionary, size)
+	pairs := make([]values.KeyValuePair, size)
 
 	for i := 0; i < int(size); i++ {
 		key := keys[i]
 		element := elements[i]
 
-		d[i] = values.KeyValuePair{
+		pairs[i] = values.KeyValuePair{
 			Key:   key,
 			Value: element,
 		}
 	}
 
-	return d, nil
+	return values.NewDictionary(pairs), nil
 }
 
 // DecodeComposite reads the XDR-encoded representation of a composite value.
 //
 // A composite is encoded as a fixed-length array of its field values.
-func (e *Decoder) DecodeComposite(t types.Composite) (values.Composite, error) {
-	fields := make([]values.Value, 0, len(t.Fields))
+func (e *Decoder) DecodeComposite(t types.Composite) (v values.Composite, err error) {
+	vals := make([]values.Value, len(t.Fields))
 
-	keys := make([]string, 0, len(t.Fields))
-	for key := range t.Fields {
-		keys = append(keys, key)
-	}
-
-	SortInEncodingOrder(keys)
-
-	for _, key := range keys {
-		value, err := e.Decode(t.Fields[key].Type)
+	for i, field := range t.Fields {
+		value, err := e.Decode(field.Type)
 		if err != nil {
-			return values.Composite{}, err
+			return v, err
 		}
 
-		fields = append(fields, value)
+		vals[i] = value
 	}
 
-	return values.Composite{Fields: fields}, nil
+	return values.NewComposite(vals), nil
 }
 
 // DecodeEvent reads the XDR-encoded representation of an event.
 //
 // An event is encoded as a fixed-length array of its field values.
-func (e *Decoder) DecodeEvent(t types.Event) (values.Event, error) {
-	fields := make([]values.Value, len(t.Fields))
+func (e *Decoder) DecodeEvent(t types.Event) (v values.Event, err error) {
+	vals := make([]values.Value, len(t.Fields))
 
 	for i, field := range t.Fields {
 		value, err := e.Decode(field.Type)
 		if err != nil {
-			return values.Event{}, err
+			return v, err
 		}
 
-		fields[i] = value
+		vals[i] = value
 	}
 
-	return values.Event{
-		Identifier: t.Identifier,
-		Fields:     fields,
-	}, nil
-}
-
-// DecodeOptional reads the XDR-encoded optional type representation.
-//
-// An optional is encoded as a union of boolean and actual value
-func (e *Decoder) DecodeOptional(t types.Optional) (values.Optional, error) {
-
-	hasValue, err := e.DecodeBool()
-	if err != nil {
-		return values.Optional{}, err
-	}
-
-	if hasValue {
-		value, err := e.Decode(t.Of)
-		if err != nil {
-			return values.Optional{}, err
-		}
-		return values.Optional{Value: value}, nil
-	}
-	return values.Optional{Value: nil}, nil
+	return values.NewEvent(vals), nil
 }

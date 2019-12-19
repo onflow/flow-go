@@ -5,12 +5,18 @@
     },
     "res": {
       "resource": {
-        "fields": {
-          "another_wrong_field%": "Int",
-          "my_friend_resource": {
-            "resource": "badly_named~~"
+        "fields": [
+          {
+            "name": "another_wrong_field%",
+            "type": "Int"
+          },
+          {
+            "name": "my_friend_resource",
+            "type": {
+              "resource": "badly_named~~"
+            }
           }
-        },
+        ],
         "initializers": [
           [
             {
@@ -23,12 +29,18 @@
     },
     "s": {
       "struct": {
-        "fields": {
-          "^^hello": "String",
-          "fellow_struct": {
-            "struct": "Wrooong name!!!!"
+        "fields": [
+          {
+            "name": "^^hello",
+            "type": "String"
+          },
+          {
+            "name": "fellow_struct",
+            "type": {
+              "struct": "Wrooong name!!!!"
+            }
           }
-        }
+        ]
       }
     },
     "f": {

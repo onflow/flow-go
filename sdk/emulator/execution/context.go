@@ -46,7 +46,7 @@ func (r *RuntimeContext) SetSigningAccounts(accounts []flow.Address) {
 	signingAccounts := make([]values.Address, len(accounts))
 
 	for i, account := range accounts {
-		signingAccounts[i] = values.Address(account)
+		signingAccounts[i] = values.NewAddress(account)
 	}
 
 	r.signingAccounts = signingAccounts
@@ -76,13 +76,13 @@ func (r *RuntimeContext) Logs() []string {
 }
 
 // GetValue gets a register value from the world state.
-func (r *RuntimeContext) GetValue(owner, controller, key values.Bytes) (values.Bytes, error) {
+func (r *RuntimeContext) GetValue(owner, controller, key []byte) ([]byte, error) {
 	v, _ := r.ledger.Get(fullKey(string(owner), string(controller), string(key)))
 	return v, nil
 }
 
 // SetValue sets a register value in the world state.
-func (r *RuntimeContext) SetValue(owner, controller, key, value values.Bytes) error {
+func (r *RuntimeContext) SetValue(owner, controller, key, value []byte) error {
 	r.ledger.Set(fullKey(string(owner), string(controller), string(key)), value)
 	return nil
 }
@@ -99,7 +99,7 @@ func (r *RuntimeContext) CreateAccount(publicKeys []values.Bytes) (values.Addres
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
 	accountIDBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
 
-	accountAddress := values.Address(flow.BytesToAddress(accountIDBytes))
+	accountAddress := flow.BytesToAddress(accountIDBytes)
 
 	accountID := accountAddress[:]
 
@@ -115,7 +115,7 @@ func (r *RuntimeContext) CreateAccount(publicKeys []values.Bytes) (values.Addres
 	r.Log("Creating new account\n")
 	r.Log(fmt.Sprintf("Address: %x", accountAddress))
 
-	return accountAddress, nil
+	return values.NewAddress(accountAddress), nil
 }
 
 // AddAccountKey adds a public key to an existing account.
@@ -123,7 +123,7 @@ func (r *RuntimeContext) CreateAccount(publicKeys []values.Bytes) (values.Addres
 // This function returns an error if the specified account does not exist or
 // if the key insertion fails.
 func (r *RuntimeContext) AddAccountKey(address values.Address, publicKey values.Bytes) error {
-	accountID := address[:]
+	accountID := address.Bytes()
 
 	bal, err := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
 	if err != nil {
@@ -148,8 +148,8 @@ func (r *RuntimeContext) AddAccountKey(address values.Address, publicKey values.
 // This function returns an error if the specified account does not exist, the
 // provided key is invalid, or if key deletion fails.
 func (r *RuntimeContext) RemoveAccountKey(address values.Address, index values.Int) (publicKey values.Bytes, err error) {
-	accountID := address[:]
-	i := index.ToInt()
+	accountID := address.Bytes()
+	i := index.Int()
 
 	bal, err := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
 	if err != nil {
@@ -161,11 +161,11 @@ func (r *RuntimeContext) RemoveAccountKey(address values.Address, index values.I
 
 	publicKeys, err := r.getAccountPublicKeys(accountID)
 	if err != nil {
-		return nil, err
+		return publicKey, err
 	}
 
 	if i < 0 || i > len(publicKeys)-1 {
-		return nil, fmt.Errorf("invalid key index %d, account has %d keys", i, len(publicKeys))
+		return publicKey, fmt.Errorf("invalid key index %d, account has %d keys", i, len(publicKeys))
 	}
 
 	removedKey := publicKeys[i]
@@ -174,7 +174,7 @@ func (r *RuntimeContext) RemoveAccountKey(address values.Address, index values.I
 
 	err = r.setAccountPublicKeys(accountID, publicKeys)
 	if err != nil {
-		return nil, err
+		return publicKey, err
 	}
 
 	return removedKey, nil
@@ -208,7 +208,7 @@ func (r *RuntimeContext) getAccountPublicKeys(accountID []byte) (publicKeys []va
 			return nil, fmt.Errorf("failed to retrieve key from account %s", accountID)
 		}
 
-		publicKeys[i] = publicKey
+		publicKeys[i] = values.NewBytes(publicKey)
 	}
 
 	return publicKeys, nil
@@ -327,7 +327,7 @@ func (r *RuntimeContext) GetAccount(address flow.Address) *flow.Account {
 //
 // This function returns an error if the import location is not an account address,
 // or if there is no code deployed at the specified address.
-func (r *RuntimeContext) ResolveImport(location runtime.Location) (values.Bytes, error) {
+func (r *RuntimeContext) ResolveImport(location runtime.Location) ([]byte, error) {
 	addressLocation, ok := location.(runtime.AddressLocation)
 	if !ok {
 		return nil, errors.New("import location must be an account address")
@@ -375,7 +375,7 @@ func (r *RuntimeContext) checkProgram(code []byte, address values.Address) error
 		return nil
 	}
 
-	location := runtime.AddressLocation(address[:])
+	location := runtime.AddressLocation(address.Bytes())
 
 	return r.checker(code, location)
 }

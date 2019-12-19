@@ -2,16 +2,28 @@
   "definitions": {
     "Album": {
       "resource": {
-        "fields": {
-          "artist": {
-            "struct": "Artist"
+        "fields": [
+          {
+            "name": "artist",
+            "type": {
+              "struct": "Artist"
+            }
           },
-          "name": "String",
-          "rating": {
-            "optional": "UInt8"
+          {
+            "name": "name",
+            "type": "String"
           },
-          "year": "UInt16"
-        },
+          {
+            "name": "rating",
+            "type": {
+              "optional": "UInt8"
+            }
+          },
+          {
+            "name": "year",
+            "type": "UInt16"
+          }
+        ],
         "initializers": [
           [
             {
@@ -40,17 +52,26 @@
     },
     "Artist": {
       "struct": {
-        "fields": {
-          "country": "String",
-          "members": {
-            "optional": {
-              "array": {
-                "of": "String"
+        "fields": [
+          {
+            "name": "country",
+            "type": "String"
+          },
+          {
+            "name": "members",
+            "type": {
+              "optional": {
+                "array": {
+                  "of": "String"
+                }
               }
             }
           },
-          "name": "String"
-        },
+          {
+            "name": "name",
+            "type": "String"
+          }
+        ],
         "initializers": [
           [
             {

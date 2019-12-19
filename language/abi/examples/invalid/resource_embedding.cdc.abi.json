@@ -2,11 +2,14 @@
   "definitions": {
     "AStruct": {
       "struct": {
-        "fields": {
-          "illegal_resource": {
-            "resource": "AResource"
+        "fields": [
+          {
+            "name": "illegal_resource",
+            "type": {
+              "resource": "AResource"
+            }
           }
-        }
+        ]
       }
     }
   }
