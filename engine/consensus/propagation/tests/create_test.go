@@ -23,7 +23,7 @@ func prepareNodesAndCollectionsConfigurable(N, M int) (
 	entries := make([]string, N)
 	for e := 0; e < N; e++ {
 		nodeID := unittest.IdentifierFixture()
-		entries[e] = fmt.Sprintf("consensus-%x@address%d=1000", nodeID, e+1)
+		entries[e] = fmt.Sprintf("consensus-%s@address%d=1000", nodeID, e+1)
 	}
 	_, nodes, err := createConnectedNodes(entries...)
 	if err != nil {
