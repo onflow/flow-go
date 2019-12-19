@@ -61,9 +61,9 @@ func MessageToTransaction(m *entities.Transaction) (flow.Transaction, error) {
 		ComputeLimit:       m.GetComputeLimit(),
 		PayerAccount:       flow.BytesToAddress(m.PayerAccount),
 		ScriptAccounts:     scriptAccounts,
+		Signatures:         signatures,
 	},
-		Signatures: signatures,
-		Status:     flow.TransactionStatus(m.GetStatus()),
+		Status: flow.TransactionStatus(m.GetStatus()),
 	}, nil
 }
 
