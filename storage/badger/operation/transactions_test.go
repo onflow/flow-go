@@ -24,11 +24,11 @@ func TestTransactionsInsertRetrieve(t *testing.T) {
 	require.Nil(t, err)
 
 	expected := unittest.TransactionFixture()
-	err = db.Update(operation.InsertTransaction(expected.Commit(), &expected))
+	err = db.Update(operation.InsertTransaction(expected.Fingerprint(), &expected))
 	require.Nil(t, err)
 
 	var actual flow.Transaction
-	err = db.View(operation.RetrieveTransaction(expected.Commit(), &actual))
+	err = db.View(operation.RetrieveTransaction(expected.Fingerprint(), &actual))
 	require.Nil(t, err)
 
 	assert.Equal(t, expected, actual)
