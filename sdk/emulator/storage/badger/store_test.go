@@ -108,7 +108,7 @@ func TestTransactions(t *testing.T) {
 	tx := unittest.TransactionFixture()
 
 	t.Run("should return error for not found", func(t *testing.T) {
-		_, err := store.TransactionByFingerprint(tx.Fingerprint())
+		_, err := store.TransactionByHash(tx.Hash())
 		if assert.Error(t, err) {
 			assert.IsType(t, storage.ErrNotFound{}, err)
 		}
@@ -119,7 +119,7 @@ func TestTransactions(t *testing.T) {
 		assert.NoError(t, err)
 
 		t.Run("should be able to get inserted tx", func(t *testing.T) {
-			storedTx, err := store.TransactionByFingerprint(tx.Fingerprint())
+			storedTx, err := store.TransactionByHash(tx.Hash())
 			require.Nil(t, err)
 			assert.Equal(t, tx, storedTx)
 		})
@@ -357,7 +357,7 @@ func TestPersistence(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, block, gotBlock)
 
-	gotTx, err := store.TransactionByFingerprint(tx.Fingerprint())
+	gotTx, err := store.TransactionByHash(tx.Hash())
 	assert.NoError(t, err)
 	assert.Equal(t, tx, gotTx)
 
