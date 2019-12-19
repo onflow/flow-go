@@ -19,6 +19,15 @@ func (checker *Checker) VisitCompositeDeclaration(declaration *ast.CompositeDecl
 //
 func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDeclaration, kind ContainerKind) {
 
+	// NOTE: visit nested interfaces first: this declares the members for the nested interface,
+	// which might be accessed by functions of this container composite
+
+	// DON'T use `nestedDeclarations`, because of non-deterministic order
+
+	for _, nestedInterface := range declaration.InterfaceDeclarations {
+		nestedInterface.Accept(checker)
+	}
+
 	compositeType := checker.Elaboration.CompositeDeclarationTypes[declaration]
 	if compositeType == nil {
 		panic(errors.NewUnreachableError())
@@ -202,12 +211,7 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 		)
 	})
 
-	// NOTE: visit interfaces first
 	// DON'T use `nestedDeclarations`, because of non-deterministic order
-
-	for _, nestedInterface := range declaration.InterfaceDeclarations {
-		nestedInterface.Accept(checker)
-	}
 
 	for _, nestedComposite := range declaration.CompositeDeclarations {
 		nestedComposite.Accept(checker)
@@ -392,7 +396,6 @@ func (checker *Checker) declareCompositeDeclaration(declaration *ast.CompositeDe
 		for _, nestedCompositeType := range nestedCompositeTypes {
 			compositeType.NestedTypes[nestedCompositeType.Identifier] = nestedCompositeType
 			nestedCompositeType.ContainerType = compositeType
-
 		}
 
 		// Declare nested composites' constructors as members of the containing composite

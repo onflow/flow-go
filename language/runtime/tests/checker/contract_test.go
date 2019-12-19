@@ -244,3 +244,62 @@ func TestCheckInvalidContractMoveIntoDictionaryLiteral(t *testing.T) {
 		})
 	}
 }
+
+func TestCheckContractNestedDeclarationOrderOutsideInside(t *testing.T) {
+
+	for _, isInterface := range []bool{true, false} {
+
+		interfaceKeyword := ""
+		if isInterface {
+			interfaceKeyword = "interface"
+		}
+
+		body := ""
+		if !isInterface {
+			body = "{}"
+		}
+
+		t.Run(interfaceKeyword, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      contract C {
+
+                          fun callGo(r: @R) {
+                              r.go()
+                              destroy r
+                          }
+
+                          resource %[1]s R {
+                              fun go() %[2]s
+                          }
+                      }
+                    `,
+					interfaceKeyword,
+					body,
+				),
+			)
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestCheckContractNestedDeclarationOrderInsideOutside(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      contract C {
+
+          fun go() {}
+
+          resource R {
+              fun callGo() {
+                  C.go()
+              }
+          }
+      }
+    `)
+
+	require.NoError(t, err)
+}
