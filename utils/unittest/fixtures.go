@@ -55,8 +55,8 @@ func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 		ComputeLimit:       10,
 		PayerAccount:       AddressFixture(),
 		ScriptAccounts:     []flow.Address{AddressFixture()},
-		Signatures:         []flow.AccountSignature{AccountSignatureFixture()},
-	}}
+	},
+		Signatures: []flow.AccountSignature{AccountSignatureFixture()}}
 	if len(n) > 0 {
 		n[0](&tx)
 	}
