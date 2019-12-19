@@ -54,6 +54,8 @@ type EntityList interface {
 	ByIndex(i uint64) Entity
 	// ByIndexWithProof returns an entity from the list by index and proof of membership
 	ByIndexWithProof(i uint64) (Entity, MembershipProof)
+	// returns the number of elements inside the list
+	Size() int
 }
 
 // EntitySet holds a set of entities (order doesn't matter)
@@ -66,4 +68,6 @@ type EntitySet interface {
 	Has(entityFingerprint Fingerprint) (bool, error)
 	// if the set has an specific member providing proof of membership
 	HasWithProof() (bool, MembershipProof, error)
+	// returns the number of elements inside the set
+	Size() int
 }

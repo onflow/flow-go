@@ -27,7 +27,7 @@ func TestTransactionsInsertRetrieve(t *testing.T) {
 	err = store.Insert(&expected)
 	require.Nil(t, err)
 
-	actual, err := store.ByHash(expected.Hash())
+	actual, err := store.ByFingerprint(expected.Fingerprint())
 	require.Nil(t, err)
 
 	assert.Equal(t, &expected, actual)
