@@ -10,6 +10,7 @@ import (
 	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
+	"github.com/dapperlabs/flow-go/sdk/emulator/types"
 )
 
 // A computer uses a runtime instance to execute transactions and scripts.
@@ -33,7 +34,7 @@ func newComputer(
 // the accounts that authorized the transaction.
 //
 // An error is returned if the transaction script cannot be parsed or reverts during execution.
-func (c *computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transaction) (TransactionResult, error) {
+func (c *computer) ExecuteTransaction(ledger *types.LedgerView, tx flow.Transaction) (TransactionResult, error) {
 	runtimeContext := execution.NewRuntimeContext(ledger)
 
 	runtimeContext.SetChecker(func(code []byte, location runtime.Location) error {
@@ -73,7 +74,7 @@ func (c *computer) ExecuteTransaction(ledger *flow.LedgerView, tx flow.Transacti
 // ExecuteScript executes a plain script in the runtime.
 //
 // This function initializes a new runtime context using the provided registers view.
-func (c *computer) ExecuteScript(view *flow.LedgerView, script []byte) (ScriptResult, error) {
+func (c *computer) ExecuteScript(view *types.LedgerView, script []byte) (ScriptResult, error) {
 	runtimeContext := execution.NewRuntimeContext(view)
 
 	scriptHash := hash.DefaultHasher.ComputeHash(script)
@@ -119,7 +120,7 @@ func convertEvents(values []values.Event, txHash crypto.Hash) []flow.Event {
 		}
 
 		events[i] = flow.Event{
-			Type:    value.Identifier,
+			Type:    value.Type().ID(),
 			TxHash:  txHash,
 			Index:   uint(i),
 			Payload: payload,

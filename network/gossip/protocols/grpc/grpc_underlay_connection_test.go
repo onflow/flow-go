@@ -14,6 +14,7 @@ import (
 
 // TestGRPCUnderlayConnection_Send tests if a message can be sent using the GRPC underlay
 func TestGRPCUnderlayConnection_Send(t *testing.T) {
+	t.Skipf(" Skipping this test since the underlay functionality is no longer needed")
 	var underlay gossip.Underlay = &GRPCUnderlay{}
 	address := ":0"
 	listener, err := net.Listen("tcp4", address)
@@ -44,6 +45,7 @@ func TestGRPCUnderlayConnection_Send(t *testing.T) {
 
 // TestGRPCUnderlayConnection_OnClosed tests if the onclosed callback gets called
 func TestGRPCUnderlayConnection_OnClosed(t *testing.T) {
+	t.Skipf(" Skipping this test since the underlay functionality is no longer needed")
 	var underlay gossip.Underlay = &GRPCUnderlay{}
 	// Setup the server call back function
 	ch := make(chan []byte)

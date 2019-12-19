@@ -173,10 +173,10 @@ func insertBlock(block types.Block) func(txn *badger.Txn) error {
 func (s Store) CommitBlock(
 	block types.Block,
 	transactions []flow.Transaction,
-	ledger flow.Ledger,
+	delta types.LedgerDelta,
 	events []flow.Event,
-) error {
-	return s.db.Update(func(txn *badger.Txn) error {
+) (err error) {
+	err = s.db.Update(func(txn *badger.Txn) error {
 		err := insertBlock(block)(txn)
 		if err != nil {
 			return err
@@ -189,18 +189,22 @@ func (s Store) CommitBlock(
 			}
 		}
 
-		err = s.insertLedger(block.Number, ledger)(txn)
+		err = s.insertLedgerDelta(block.Number, delta)(txn)
 		if err != nil {
 			return err
 		}
 
-		err = insertEvents(block.Number, events)(txn)
-		if err != nil {
-			return err
+		if events != nil {
+			err = insertEvents(block.Number, events)(txn)
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
 	})
+
+	return err
 }
 
 func (s *Store) TransactionByHash(txHash crypto.Hash) (tx flow.Transaction, err error) {
@@ -229,46 +233,54 @@ func insertTransaction(tx flow.Transaction) func(txn *badger.Txn) error {
 	}
 }
 
-func (s *Store) LedgerByNumber(blockNumber uint64) (flow.Ledger, error) {
-	s.ledgerChangeLog.RLock()
-	defer s.ledgerChangeLog.RUnlock()
+func (s *Store) LedgerViewByNumber(blockNumber uint64) *types.LedgerView {
+	return types.NewLedgerView(func(key string) (value []byte, err error) {
+		s.ledgerChangeLog.RLock()
+		defer s.ledgerChangeLog.RUnlock()
 
-	ledger := make(flow.Ledger)
+		lastChangedBlock := s.ledgerChangeLog.getMostRecentChange(key, blockNumber)
 
-	err := s.db.View(func(txn *badger.Txn) error {
-		for registerID, clist := range s.ledgerChangeLog.changelists() {
-			// Get the block at which the register last changed value. If no
-			// such block exists, skip this register.
-			lastChangedBlock := clist.search(blockNumber)
-			if lastChangedBlock == notFound {
-				continue
-			}
-
-			// Get the value of the register and add it to the ledger.
-			value, err := getTx(txn)(ledgerValueKey(registerID, lastChangedBlock))
+		err = s.db.View(func(txn *badger.Txn) error {
+			value, err = getTx(txn)(ledgerValueKey(key, lastChangedBlock))
 			if err != nil {
 				return err
 			}
-			ledger[registerID] = value
+			return nil
+		})
+
+		if err != nil {
+			// silence not found errors
+			if errors.Is(err, storage.ErrNotFound{}) {
+				return nil, nil
+			}
+
+			return nil, err
 		}
-		return nil
+
+		return value, nil
 	})
-	return ledger, err
 }
 
-func (s *Store) InsertLedger(blockNumber uint64, ledger flow.Ledger) error {
-	return s.db.Update(s.insertLedger(blockNumber, ledger))
+func (s *Store) InsertLedgerDelta(blockNumber uint64, delta types.LedgerDelta) error {
+	return s.db.Update(s.insertLedgerDelta(blockNumber, delta))
 }
 
-func (s *Store) insertLedger(blockNumber uint64, ledger flow.Ledger) func(txn *badger.Txn) error {
+func (s *Store) insertLedgerDelta(blockNumber uint64, delta types.LedgerDelta) func(txn *badger.Txn) error {
 	return func(txn *badger.Txn) error {
 		s.ledgerChangeLog.Lock()
 		defer s.ledgerChangeLog.Unlock()
 
-		for registerID, value := range ledger {
-			if err := txn.Set(ledgerValueKey(registerID, blockNumber), value); err != nil {
-				return err
+		for registerID, value := range delta.Updates() {
+			if value != nil {
+				// if register has an updated value, write it at this block
+				err := txn.Set(ledgerValueKey(registerID, blockNumber), value)
+				if err != nil {
+					return err
+				}
 			}
+
+			// otherwise register has been deleted, so record change
+			// and keep value as nil
 
 			// update the in-memory changelog
 			s.ledgerChangeLog.addChange(registerID, blockNumber)
@@ -278,12 +290,15 @@ func (s *Store) insertLedger(blockNumber uint64, ledger flow.Ledger) func(txn *b
 			if err != nil {
 				return err
 			}
+
 			if err := txn.Set(ledgerChangelogKey(registerID), encChangelist); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
+
+	return nil
 }
 
 func (s *Store) RetrieveEvents(eventType string, startBlock, endBlock uint64) (events []flow.Event, err error) {
