@@ -15,7 +15,7 @@ import (
 )
 
 func prepareNodesAndCollectionsConfigurable(N, M int) (
-	[]*mockPropagationNode, []*collection.GuaranteedCollection, error) {
+	[]*mockPropagationNode, []*flow.GuaranteedCollection, error) {
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -31,7 +31,7 @@ func prepareNodesAndCollectionsConfigurable(N, M int) (
 	}
 
 	// prepare M distinct collection hashes
-	gcs := make([]*collection.GuaranteedCollection, M)
+	gcs := make([]*flow.GuaranteedCollection, M)
 	for m := 0; m < M; m++ {
 		gcs[m] = randCollection()
 	}
@@ -39,7 +39,7 @@ func prepareNodesAndCollectionsConfigurable(N, M int) (
 }
 
 func prepareNodesAndCollections() (
-	[]*mockPropagationNode, []*collection.GuaranteedCollection, error) {
+	[]*mockPropagationNode, []*flow.GuaranteedCollection, error) {
 	N := 16  // 16 nodes
 	M := 100 // 100 collections
 	return prepareNodesAndCollectionsConfigurable(N, M)
@@ -96,9 +96,9 @@ func randHash() []byte {
 }
 
 // a utiliy func to generate a GuaranteedCollection with random hash
-func randCollection() *collection.GuaranteedCollection {
+func randCollection() *flow.GuaranteedCollection {
 	hash := randHash()
-	return &collection.GuaranteedCollection{
+	return &flow.GuaranteedCollection{
 		CollectionHash: hash,
 	}
 }

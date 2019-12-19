@@ -67,7 +67,7 @@ func (tx *Transaction) String() string {
 
 // Hash returns the canonical hash of this transaction.
 func (tx *Transaction) Hash() crypto.Hash {
-	return hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(tx))
+	return hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(tx.TransactionBody))
 }
 
 // NewTransaction initialize a transaction

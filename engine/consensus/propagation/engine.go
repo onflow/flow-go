@@ -90,7 +90,7 @@ func (e *Engine) Submit(event interface{}) {
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	var err error
 	switch ev := event.(type) {
-	case *collection.GuaranteedCollection:
+	case *flow.GuaranteedCollection:
 		err = e.onGuaranteedCollection(originID, ev)
 	default:
 		err = errors.Errorf("invalid event type (%T)", event)
@@ -103,7 +103,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // onGuaranteedCollection is called when a new guaranteed collection is received
 // from another node on the network.
-func (e *Engine) onGuaranteedCollection(originID flow.Identifier, coll *collection.GuaranteedCollection) error {
+func (e *Engine) onGuaranteedCollection(originID flow.Identifier, coll *flow.GuaranteedCollection) error {
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
@@ -132,7 +132,7 @@ func (e *Engine) onGuaranteedCollection(originID flow.Identifier, coll *collecti
 
 // processGuaranteedCollection will process a guaranteed collection within the
 // context of our local protocol state and memory pool.
-func (e *Engine) processGuaranteedCollection(coll *collection.GuaranteedCollection) error {
+func (e *Engine) processGuaranteedCollection(coll *flow.GuaranteedCollection) error {
 
 	// TODO: validate the guaranteed collection signature
 
@@ -147,7 +147,7 @@ func (e *Engine) processGuaranteedCollection(coll *collection.GuaranteedCollecti
 
 // propagateGuaranteedCollection will submit the guaranteed collection to the
 // network layer with all other consensus nodes as desired recipients.
-func (e *Engine) propagateGuaranteedCollection(coll *collection.GuaranteedCollection) error {
+func (e *Engine) propagateGuaranteedCollection(coll *flow.GuaranteedCollection) error {
 
 	// select all the collection nodes on the network as our targets
 	ids, err := e.state.Final().Identities(

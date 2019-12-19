@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // CollectionPool implements the collections memory pool of the consensus nodes,
@@ -25,18 +25,18 @@ func NewCollectionPool() (*CollectionPool, error) {
 }
 
 // Add adds a guaranteed collection to the mempool.
-func (m *CollectionPool) Add(coll *collection.GuaranteedCollection) error {
+func (m *CollectionPool) Add(coll *flow.GuaranteedCollection) error {
 	return m.mempool.Add(coll)
 }
 
 // Get returns the given collection from the pool.
-func (m *CollectionPool) Get(hash crypto.Hash) (*collection.GuaranteedCollection, error) {
+func (m *CollectionPool) Get(hash crypto.Hash) (*flow.GuaranteedCollection, error) {
 	item, err := m.mempool.Get(hash)
 	if err != nil {
 		return nil, err
 	}
 
-	coll, ok := item.(*collection.GuaranteedCollection)
+	coll, ok := item.(*flow.GuaranteedCollection)
 	if !ok {
 		return nil, fmt.Errorf("unable to convert item to guaranteed collection")
 	}
@@ -45,12 +45,12 @@ func (m *CollectionPool) Get(hash crypto.Hash) (*collection.GuaranteedCollection
 }
 
 // All returns all collections from the pool.
-func (m *CollectionPool) All() []*collection.GuaranteedCollection {
+func (m *CollectionPool) All() []*flow.GuaranteedCollection {
 	items := m.mempool.All()
 
-	colls := make([]*collection.GuaranteedCollection, len(items))
+	colls := make([]*flow.GuaranteedCollection, len(items))
 	for i, item := range items {
-		colls[i] = item.(*collection.GuaranteedCollection)
+		colls[i] = item.(*flow.GuaranteedCollection)
 	}
 
 	return colls

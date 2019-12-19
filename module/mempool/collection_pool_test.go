@@ -6,13 +6,13 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCollectionPool(t *testing.T) {
-	item := &collection.GuaranteedCollection{
+	item := &flow.GuaranteedCollection{
 		CollectionHash: crypto.Hash("DEADBEEF"),
 	}
 

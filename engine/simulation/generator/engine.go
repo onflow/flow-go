@@ -9,7 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Engine is a process for generating random collections.
@@ -78,7 +78,7 @@ GenerateLoop:
 			// generate a guaranteed collection with a random hash
 			hash := make([]byte, 32)
 			_, _ = rand.Read(hash)
-			coll := &collection.GuaranteedCollection{
+			coll := &flow.GuaranteedCollection{
 				CollectionHash: hash,
 			}
 

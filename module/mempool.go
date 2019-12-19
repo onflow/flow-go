@@ -4,7 +4,6 @@ package module
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -17,7 +16,7 @@ type CollectionPool interface {
 
 	// Add will add the given guaranteed collection to the memory pool; it will
 	// error if the guaranteed collection is already in the memory pool.
-	Add(coll *collection.GuaranteedCollection) error
+	Add(coll *flow.GuaranteedCollection) error
 
 	// Rem will remove the given guaranteed collection from the memory pool; it
 	// will return true if the guaranteed collection was known and removed.
@@ -25,7 +24,7 @@ type CollectionPool interface {
 
 	// Get will retrieve the given guaranteed collection from the memory pool;
 	// it will error if the guaranteed collection is not in the memory pool.
-	Get(hash crypto.Hash) (*collection.GuaranteedCollection, error)
+	Get(hash crypto.Hash) (*flow.GuaranteedCollection, error)
 
 	// Hash will return a fingerprint has representing the contents of the
 	// entire memory pool.
@@ -36,7 +35,7 @@ type CollectionPool interface {
 
 	// All will retrieve all collections that are currently in the memory pool
 	// as a slice.
-	All() []*collection.GuaranteedCollection
+	All() []*flow.GuaranteedCollection
 }
 
 // TransactionPool represents concurrency-safe memory pool for transactions.

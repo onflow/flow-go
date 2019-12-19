@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -164,7 +164,7 @@ func TestSubmitCollectionManyToManyRandom(t *testing.T) {
 
 // send one collection to one node.
 // extracted in order to be reused in different tests
-func sendOne(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg *sync.WaitGroup) {
+func sendOne(node *mockPropagationNode, gc *flow.GuaranteedCollection, wg *sync.WaitGroup) {
 	node.engine.Submit(gc)
 	node.net.FlushAll()
 	wg.Done()
