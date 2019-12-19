@@ -170,36 +170,11 @@ const jsonTypeVariable = "variable"
 
 func (encoder *Encoder) encode(t types.Type) interface{} {
 
-	switch v := (t).(type) {
+	if s := typeToJSONString(t); s != "" {
+		return s
+	}
 
-	case types.AnyStruct:
-		return "AnyStruct"
-	case types.AnyResource:
-		return "AnyResource"
-	case types.Bool:
-		return "Bool"
-	case types.Void:
-		return "Void"
-	case types.String:
-		return "String"
-	case types.Int:
-		return "Int"
-	case types.Int8:
-		return "Int8"
-	case types.Int16:
-		return "Int16"
-	case types.Int32:
-		return "Int32"
-	case types.Int64:
-		return "Int64"
-	case types.UInt8:
-		return "UInt8"
-	case types.UInt16:
-		return "UInt16"
-	case types.UInt32:
-		return "UInt32"
-	case types.UInt64:
-		return "UInt64"
+	switch v := (t).(type) {
 
 	case types.VariableSizedArray:
 		return arrayObject{array{Of: encoder.encode(v.ElementType)}}

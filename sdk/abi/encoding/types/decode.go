@@ -408,23 +408,6 @@ func toDictionary(data map[string]interface{}) (types.Type, error) {
 	}, nil
 }
 
-var jsonStringToType = map[string]types.Type{
-	"AnyStruct":   types.AnyStruct{},
-	"AnyResource": types.AnyResource{},
-	"Bool":        types.Bool{},
-	"Void":        types.Void{},
-	"String":      types.String{},
-	"Int":         types.Int{},
-	"Int8":        types.Int8{},
-	"Int16":       types.Int16{},
-	"Int32":       types.Int32{},
-	"Int64":       types.Int64{},
-	"UInt8":       types.UInt8{},
-	"UInt16":      types.UInt16{},
-	"UInt32":      types.UInt32{},
-	"UInt64":      types.UInt64{},
-}
-
 func toType(data interface{}, name string) (types.Type, error) {
 
 	switch v := data.(type) {
@@ -432,7 +415,7 @@ func toType(data interface{}, name string) (types.Type, error) {
 	// Simple string cases - "Int"
 	case string:
 
-		if typ, ok := jsonStringToType[v]; ok {
+		if typ := jsonStringToType(v); typ != nil {
 			return typ, nil
 		}
 
