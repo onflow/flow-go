@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -47,7 +47,7 @@ func TestPeersTableGetIP(t *testing.T) {
 
 	tt := []struct {
 		IP string
-		ID flow.Identifier
+		ID model.Identifier
 	}{
 		{IP: "127.0.0.1:1999", ID: id1},
 		{IP: "127.0.0.1:1998", ID: id2},
@@ -71,7 +71,7 @@ func TestPeersTableGetIPS(t *testing.T) {
 	id2 := unittest.IdentifierFixture()
 	id3 := unittest.IdentifierFixture()
 
-	pt.fromIDToIP = map[flow.Identifier]string{
+	pt.fromIDToIP = map[model.Identifier]string{
 		id1: "127.0.0.1:1999",
 		id2: "127.0.0.1:1998",
 		id3: "127.0.0.1:1997",
@@ -98,7 +98,7 @@ func TestPeersTableGetID(t *testing.T) {
 	id2 := unittest.IdentifierFixture()
 
 	tt := []struct {
-		ID flow.Identifier
+		ID model.Identifier
 		IP string
 	}{
 		{ID: id1, IP: "127.0.0.1:1999"},
@@ -123,13 +123,13 @@ func TestPeersTableGetIDS(t *testing.T) {
 	id2 := unittest.IdentifierFixture()
 	id3 := unittest.IdentifierFixture()
 
-	pt.fromIPToID = map[string]flow.Identifier{
+	pt.fromIPToID = map[string]model.Identifier{
 		"127.0.0.1:1999": id1,
 		"127.0.0.1:1998": id2,
 		"127.0.0.1:1997": id3,
 	}
 
-	IDs := []flow.Identifier{id1, id2, id3}
+	IDs := []model.Identifier{id1, id2, id3}
 
 	nIDs, err := pt.GetIDs("127.0.0.1:1999", "127.0.0.1:1998", "127.0.0.1:1997")
 	require.Nil(t, err, "failed to get ID from IP")

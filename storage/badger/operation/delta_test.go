@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -25,7 +26,7 @@ func TestDeltaInsertRetrieve(t *testing.T) {
 
 	number := uint64(9)
 	id := flow.Identity{
-		NodeID:  flow.Identifier{0x01},
+		NodeID:  model.Identifier{0x01},
 		Role:    flow.Role(2),
 		Address: "a",
 		Stake:   3,
@@ -49,13 +50,13 @@ func TestDeltasTraverse(t *testing.T) {
 	require.Nil(t, err)
 
 	ids := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Role: flow.Role(1), Address: "a1"},
-		{NodeID: flow.Identifier{0x02}, Role: flow.Role(2), Address: "a2"},
-		{NodeID: flow.Identifier{0x03}, Role: flow.Role(3), Address: "a3"},
-		{NodeID: flow.Identifier{0x04}, Role: flow.Role(4), Address: "a4"},
+		{NodeID: model.Identifier{0x01}, Role: flow.Role(1), Address: "a1"},
+		{NodeID: model.Identifier{0x02}, Role: flow.Role(2), Address: "a2"},
+		{NodeID: model.Identifier{0x03}, Role: flow.Role(3), Address: "a3"},
+		{NodeID: model.Identifier{0x04}, Role: flow.Role(4), Address: "a4"},
 	}
 
-	expected := map[flow.Identifier]int64{
+	expected := map[model.Identifier]int64{
 		ids[0].NodeID: 300,
 		ids[1].NodeID: 500,
 		ids[2].NodeID: 200,
@@ -99,8 +100,8 @@ func TestDeltasTraverse(t *testing.T) {
 		}
 	}
 
-	actual := make(map[flow.Identifier]int64)
-	process := func(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) error {
+	actual := make(map[model.Identifier]int64)
+	process := func(number uint64, role flow.Role, nodeID model.Identifier, delta int64) error {
 		actual[nodeID] += delta
 		return nil
 	}

@@ -3,6 +3,7 @@
 package protocol
 
 import (
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -20,7 +21,7 @@ type Snapshot interface {
 	// Identity attempts to retrieve the node with the given identifier at the
 	// selected point of the protocol state history. It will error if it doesn't
 	// exist or if its stake is zero.
-	Identity(nodeID flow.Identifier) (flow.Identity, error)
+	Identity(nodeID model.Identifier) (flow.Identity, error)
 
 	// Head returns the latest block at the selected point of the protocol state
 	// history. It can represent either a finalized or ambiguous block,

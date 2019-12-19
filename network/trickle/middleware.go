@@ -3,7 +3,7 @@
 package trickle
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model"
 )
 
 // Middleware represents the middleware layer, which manages the connections to
@@ -12,16 +12,16 @@ import (
 type Middleware interface {
 	Start(overlay Overlay)
 	Stop()
-	Send(nodeID flow.Identifier, msg interface{}) error
+	Send(nodeID model.Identifier, msg interface{}) error
 }
 
 // Overlay represents the interface that middleware uses to interact with the
 // overlay network layer.
 type Overlay interface {
 	Address() (string, error)
-	Handshake(conn Connection) (flow.Identifier, error)
-	Receive(nodeID flow.Identifier, msg interface{}) error
-	Cleanup(nodeID flow.Identifier) error
+	Handshake(conn Connection) (model.Identifier, error)
+	Receive(nodeID model.Identifier, msg interface{}) error
+	Cleanup(nodeID model.Identifier) error
 }
 
 // Connection represents an interface to read from & write to a connection.

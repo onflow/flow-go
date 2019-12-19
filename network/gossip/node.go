@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/cache"
 	"github.com/dapperlabs/flow-go/network/gossip/order"
@@ -46,7 +46,7 @@ type Node struct {
 	// QueueSize is the buffer size of the node for holding incoming Gossip Messages
 	// Once buffer of a node gets full, it does not accept incoming messages
 
-	id              flow.Identifier  // stores the local node identifier
+	id              model.Identifier // stores the local node identifier
 	address         *messages.Socket // stores the address of the node
 	peers           []string         // stores a list of other nodes' IPs
 	fanoutSet       []string         // stores the fanout set of th node
@@ -547,14 +547,14 @@ func (n *Node) Register(engineID uint8, engine network.Engine) (network.Conduit,
 		return nil, errors.Wrap(err, "could not add engnie to registry")
 	}
 
-	return &conduit{send: func(event interface{}, targetIDs ...flow.Identifier) error {
+	return &conduit{send: func(event interface{}, targetIDs ...model.Identifier) error {
 		return n.send(engineID, event, targetIDs...)
 	}}, nil
 }
 
 // send is the basic conduit function that gets wrapped for every engine
 // registered
-func (n *Node) send(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Node) send(engineID uint8, event interface{}, targetIDs ...model.Identifier) error {
 	eventBytes, err := n.codec.Encode(event)
 	if err != nil {
 		return errors.Wrap(err, "could not encode event")

@@ -6,27 +6,27 @@ import (
 	"encoding/hex"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
 // Topology implements a naive network state.
 type Topology struct {
 	sync.Mutex
-	peers map[flow.Identifier]*trickle.Peer
+	peers map[model.Identifier]*trickle.Peer
 }
 
 // New creates a new naive state implementation for the overlay layer.
 func New() (*Topology, error) {
 	t := &Topology{
-		peers: make(map[flow.Identifier]*trickle.Peer),
+		peers: make(map[model.Identifier]*trickle.Peer),
 	}
 	return t, nil
 }
 
 // Up will mark the current peer as being connected, initializing a new state
 // for now.
-func (t *Topology) Up(nodeID flow.Identifier) {
+func (t *Topology) Up(nodeID model.Identifier) {
 	t.Lock()
 	defer t.Unlock()
 
@@ -42,7 +42,7 @@ func (t *Topology) Up(nodeID flow.Identifier) {
 }
 
 // IsUp indicates whether the peer with given ID is currently connected.
-func (t *Topology) IsUp(nodeID flow.Identifier) bool {
+func (t *Topology) IsUp(nodeID model.Identifier) bool {
 	t.Lock()
 	defer t.Unlock()
 	_, ok := t.peers[nodeID]
@@ -50,14 +50,14 @@ func (t *Topology) IsUp(nodeID flow.Identifier) bool {
 }
 
 // Down will mark the given peer as disconnected, dropping its state for now.
-func (t *Topology) Down(nodeID flow.Identifier) {
+func (t *Topology) Down(nodeID model.Identifier) {
 	t.Lock()
 	defer t.Unlock()
 	delete(t.peers, nodeID)
 }
 
 // Seen marks an event as seen for the peer with given ID.
-func (t *Topology) Seen(nodeID flow.Identifier, eventID []byte) {
+func (t *Topology) Seen(nodeID model.Identifier, eventID []byte) {
 	t.Lock()
 	defer t.Unlock()
 	peer, ok := t.peers[nodeID]
@@ -69,7 +69,7 @@ func (t *Topology) Seen(nodeID flow.Identifier, eventID []byte) {
 }
 
 // HasSeen indicates whether a given peer has seen a event with a given eventID
-func (t *Topology) HasSeen(nodeID flow.Identifier, eventID []byte) bool {
+func (t *Topology) HasSeen(nodeID model.Identifier, eventID []byte) bool {
 	t.Lock()
 	defer t.Unlock()
 	peer, ok := t.peers[nodeID]

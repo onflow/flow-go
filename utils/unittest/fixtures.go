@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
@@ -107,8 +108,8 @@ func HashFixture(size int) crypto.Hash {
 	return hash
 }
 
-func IdentifierFixture() flow.Identifier {
-	var id flow.Identifier
+func IdentifierFixture() model.Identifier {
+	var id model.Identifier
 	_, _ = rand.Read(id[:])
 	return id
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -23,7 +24,7 @@ func TestRoleInsertRetrieve(t *testing.T) {
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 
-	nodeID := flow.Identifier{0x01}
+	nodeID := model.Identifier{0x01}
 	expected := flow.Role(13)
 
 	err = db.Update(InsertRole(nodeID, expected))

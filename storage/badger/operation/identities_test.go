@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -26,9 +27,9 @@ func TestIdentitiesInsertRetrieve(t *testing.T) {
 
 	hash := crypto.Hash{0x13, 0x37}
 	expected := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.Role(1), Stake: 1},
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.Role(2), Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.Role(3), Stake: 3},
+		{NodeID: model.Identifier{0x01}, Address: "a1", Role: flow.Role(1), Stake: 1},
+		{NodeID: model.Identifier{0x02}, Address: "a2", Role: flow.Role(2), Stake: 2},
+		{NodeID: model.Identifier{0x03}, Address: "a3", Role: flow.Role(3), Stake: 3},
 	}
 
 	err = db.Update(InsertIdentities(hash, expected))

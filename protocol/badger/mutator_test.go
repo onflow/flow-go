@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
@@ -26,9 +27,9 @@ func init() {
 func TestBootStrapValid(t *testing.T) {
 
 	ids := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.Role(1), Stake: 1},
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.Role(2), Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.Role(3), Stake: 3},
+		{NodeID: model.Identifier{0x01}, Address: "a1", Role: flow.Role(1), Stake: 1},
+		{NodeID: model.Identifier{0x02}, Address: "a2", Role: flow.Role(2), Stake: 2},
+		{NodeID: model.Identifier{0x03}, Address: "a3", Role: flow.Role(3), Stake: 3},
 	}
 
 	header := flow.Header{

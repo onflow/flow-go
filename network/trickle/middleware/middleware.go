@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/trickle"
 )
@@ -23,7 +23,7 @@ type Middleware struct {
 	codec network.Codec
 	ov    trickle.Overlay
 	slots chan struct{} // semaphore for outgoing connection slots
-	conns map[flow.Identifier]*Connection
+	conns map[model.Identifier]*Connection
 	ln    net.Listener
 	wg    *sync.WaitGroup
 	stop  chan struct{}
@@ -44,7 +44,7 @@ func New(log zerolog.Logger, codec network.Codec, conns uint, address string) (*
 		log:   log,
 		codec: codec,
 		slots: make(chan struct{}, conns),
-		conns: make(map[flow.Identifier]*Connection),
+		conns: make(map[model.Identifier]*Connection),
 		ln:    ln,
 		wg:    &sync.WaitGroup{},
 		stop:  make(chan struct{}),
@@ -72,7 +72,7 @@ func (m *Middleware) Stop() {
 }
 
 // Send will try to send the given message to the given peer.
-func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
+func (m *Middleware) Send(nodeID model.Identifier, msg interface{}) error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -259,7 +259,7 @@ func (m *Middleware) release(slots chan struct{}) {
 
 // add will add the given conn with the given address to our list in a
 // concurrency-safe manner.
-func (m *Middleware) add(nodeID flow.Identifier, conn *Connection) {
+func (m *Middleware) add(nodeID model.Identifier, conn *Connection) {
 	m.Lock()
 	defer m.Unlock()
 	m.conns[nodeID] = conn
@@ -267,7 +267,7 @@ func (m *Middleware) add(nodeID flow.Identifier, conn *Connection) {
 
 // remove will remove the connection with the given nodeID from the list in
 // a concurrency-safe manner.
-func (m *Middleware) remove(nodeID flow.Identifier) {
+func (m *Middleware) remove(nodeID model.Identifier) {
 	m.Lock()
 	defer m.Unlock()
 	delete(m.conns, nodeID)

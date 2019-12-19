@@ -3,7 +3,7 @@ package gossip
 import (
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/order"
 	"github.com/dapperlabs/flow-go/network/gossip/registry"
@@ -81,6 +81,6 @@ func WithStaticFanoutSize(staticFanoutSize int) Option {
 }
 
 // WithNodeID specifies the local node identitie.
-func WithNodeID(id flow.Identifier) Option {
+func WithNodeID(id model.Identifier) Option {
 	return func(n *Node) { n.id = id }
 }

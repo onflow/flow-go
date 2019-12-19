@@ -3,6 +3,7 @@
 package local
 
 import (
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -17,7 +18,7 @@ func New(id flow.Identity) (*Local, error) {
 	return l, nil
 }
 
-func (l *Local) NodeID() flow.Identifier {
+func (l *Local) NodeID() model.Identifier {
 	return l.me.NodeID
 }
 

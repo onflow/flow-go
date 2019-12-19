@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/model/trickle"
 	"github.com/dapperlabs/flow-go/model/trickle/peer"
@@ -138,7 +138,7 @@ func (n *Network) Address() (string, error) {
 
 // HandleHandshake implements a callback to validate new connections on the
 // overlay layer, allowing us to implement peer authentication on first contact.
-func (n *Network) Handshake(conn Connection) (flow.Identifier, error) {
+func (n *Network) Handshake(conn Connection) (model.Identifier, error) {
 
 	// initialize our own authentication message
 	out := &trickle.Auth{
@@ -146,36 +146,36 @@ func (n *Network) Handshake(conn Connection) (flow.Identifier, error) {
 	}
 	err := conn.Send(out)
 	if err != nil {
-		return flow.Identifier{}, errors.Wrap(err, "could not send outgoing auth")
+		return model.Identifier{}, errors.Wrap(err, "could not send outgoing auth")
 	}
 
 	// read their authentication message
 	msg, err := conn.Receive()
 	if err != nil {
-		return flow.Identifier{}, errors.Wrap(err, "could not receive incoming auth")
+		return model.Identifier{}, errors.Wrap(err, "could not receive incoming auth")
 	}
 
 	// type assert the response
 	in, ok := msg.(*trickle.Auth)
 	if !ok {
-		return flow.Identifier{}, errors.Errorf("invalid type for incoming auth (%T)", msg)
+		return model.Identifier{}, errors.Errorf("invalid type for incoming auth (%T)", msg)
 	}
 
 	// check if this node is ourselves
 	if in.NodeID == n.me.NodeID() {
-		return flow.Identifier{}, errors.New("connections to self forbidden")
+		return model.Identifier{}, errors.New("connections to self forbidden")
 	}
 
 	// check if we are already connected to this peer
 	ok = n.top.IsUp(in.NodeID)
 	if ok {
-		return flow.Identifier{}, errors.Errorf("node already connected (%s)", in.NodeID)
+		return model.Identifier{}, errors.Errorf("node already connected (%s)", in.NodeID)
 	}
 
 	// check if the committee has a node with the given ID
 	_, err = n.state.Final().Identity(in.NodeID)
 	if err != nil {
-		return flow.Identifier{}, errors.Errorf("unknown nodeID (%s)", in.NodeID)
+		return model.Identifier{}, errors.Errorf("unknown nodeID (%s)", in.NodeID)
 	}
 
 	// initialize the peer state using the address as its ID
@@ -186,7 +186,7 @@ func (n *Network) Handshake(conn Connection) (flow.Identifier, error) {
 
 // Cleanup implements a callback to handle peers that have been dropped
 // by the middleware layer.
-func (n *Network) Cleanup(nodeID flow.Identifier) error {
+func (n *Network) Cleanup(nodeID model.Identifier) error {
 
 	// drop the peer state using the ID we registered
 	n.top.Down(nodeID)
@@ -196,7 +196,7 @@ func (n *Network) Cleanup(nodeID flow.Identifier) error {
 
 // Receive provides a callback to handle the incoming message from the
 // given peer.
-func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
+func (n *Network) Receive(nodeID model.Identifier, msg interface{}) error {
 	var err error
 	switch m := msg.(type) {
 	case *trickle.Announce:
@@ -231,7 +231,7 @@ func (n *Network) pack(engineID uint8, event interface{}) ([]byte, []byte, error
 
 // submit will submit the given event for the given engine to the overlay layer
 // for processing; it is used by engines through conduits.
-func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...model.Identifier) error {
 
 	// pack the event to get payload and event ID
 	eventID, payload, err := n.pack(engineID, event)
@@ -248,7 +248,7 @@ func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Id
 }
 
 // gossip will cache the event and announce it to everyone wha hasn't seen it.
-func (n *Network) gossip(engineID uint8, eventID []byte, payload []byte, targetIDs ...flow.Identifier) error {
+func (n *Network) gossip(engineID uint8, eventID []byte, payload []byte, targetIDs ...model.Identifier) error {
 
 	// check if the event is already in the cache
 	ok := n.cache.Has(engineID, eventID)
@@ -287,7 +287,7 @@ func (n *Network) gossip(engineID uint8, eventID []byte, payload []byte, targetI
 
 // processAnnounce will check if we have already seen the announced event and
 // request it if it's new for us.
-func (n *Network) processAnnounce(nodeID flow.Identifier, ann *trickle.Announce) error {
+func (n *Network) processAnnounce(nodeID model.Identifier, ann *trickle.Announce) error {
 
 	// remember that this peer has this event
 	n.top.Seen(nodeID, ann.EventID)
@@ -312,7 +312,7 @@ func (n *Network) processAnnounce(nodeID flow.Identifier, ann *trickle.Announce)
 }
 
 // processRequest will process the given request and fulfill it.
-func (n *Network) processRequest(nodeID flow.Identifier, req *trickle.Request) error {
+func (n *Network) processRequest(nodeID model.Identifier, req *trickle.Request) error {
 
 	// check to find ID and payload in cache
 	res, ok := n.cache.Get(req.EngineID, req.EventID)
@@ -330,7 +330,7 @@ func (n *Network) processRequest(nodeID flow.Identifier, req *trickle.Request) e
 }
 
 // processResponse will process the payload of an event sent to us by a peer.
-func (n *Network) processResponse(nodeID flow.Identifier, res *trickle.Response) error {
+func (n *Network) processResponse(nodeID model.Identifier, res *trickle.Response) error {
 
 	// mark this event as seen for this peer (usually redundant)
 	n.top.Seen(nodeID, res.EventID)
@@ -381,7 +381,7 @@ func (n *Network) processEvent(res *trickle.Response) error {
 	return nil
 }
 
-func (n *Network) send(msg interface{}, nodeIDs ...flow.Identifier) error {
+func (n *Network) send(msg interface{}, nodeIDs ...model.Identifier) error {
 
 	// send the message through the peer connection
 	var result *multierror.Error
@@ -395,7 +395,7 @@ func (n *Network) send(msg interface{}, nodeIDs ...flow.Identifier) error {
 	return result.ErrorOrNil()
 }
 
-func (n *Network) isfor(nodeID flow.Identifier, res *trickle.Response) bool {
+func (n *Network) isfor(nodeID model.Identifier, res *trickle.Response) bool {
 
 	// if there are no targets, the message is for broadcasting
 	if len(res.TargetIDs) == 0 {

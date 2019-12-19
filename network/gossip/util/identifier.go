@@ -3,15 +3,15 @@ package util
 import (
 	"encoding/hex"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model"
 )
 
-func IDToString(id flow.Identifier) string {
+func IDToString(id model.Identifier) string {
 	return hex.EncodeToString(id[:])
 }
 
-func StringToID(blob string) flow.Identifier {
-	var id flow.Identifier
+func StringToID(blob string) model.Identifier {
+	var id model.Identifier
 	_, _ = hex.Decode(id[:], []byte(blob))
 	return id
 }

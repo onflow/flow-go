@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -133,7 +134,7 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 	return ids, err
 }
 
-func (s *Snapshot) Identity(nodeID flow.Identifier) (flow.Identity, error) {
+func (s *Snapshot) Identity(nodeID model.Identifier) (flow.Identity, error) {
 
 	// get the ids
 	ids, err := s.Identities(identity.HasNodeID(nodeID))
@@ -186,11 +187,11 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 	return &header, err
 }
 
-func computeFinalizedDeltas(tx *badger.Txn, boundary uint64, filters []flow.IdentityFilter) (map[flow.Identifier]int64, error) {
+func computeFinalizedDeltas(tx *badger.Txn, boundary uint64, filters []flow.IdentityFilter) (map[model.Identifier]int64, error) {
 
 	// define start and end prefixes for the range scan
-	deltas := make(map[flow.Identifier]int64)
-	err := operation.TraverseDeltas(0, boundary, filters, func(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) error {
+	deltas := make(map[model.Identifier]int64)
+	err := operation.TraverseDeltas(0, boundary, filters, func(number uint64, role flow.Role, nodeID model.Identifier, delta int64) error {
 		deltas[nodeID] += delta
 		return nil
 	})(tx)
