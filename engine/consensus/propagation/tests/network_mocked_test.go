@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -34,11 +34,11 @@ func TestSubmitCollectionOneToOne(t *testing.T) {
 	node1.net.FlushAll()
 
 	// inspect node2's mempool to check if node2's engine received the collection hash
-	coll, err := node2.pool.Get(gc.Hash())
+	coll, err := node2.pool.Get(gc.Fingerprint())
 	require.Nil(t, err)
 
 	// should match
-	require.Equal(t, coll.Hash(), gc.Hash())
+	require.Equal(t, coll.Fingerprint(), gc.Fingerprint())
 	terminate(node1, node2)
 }
 
@@ -65,7 +65,7 @@ func TestSubmitCollectionManyToManySynchronous(t *testing.T) {
 	gc3 := randCollection()
 
 	// check the collections are different
-	require.NotEqual(t, gc1.Hash(), gc2.Hash())
+	require.NotEqual(t, gc1.Fingerprint(), gc2.Fingerprint())
 
 	// send gc1 to node1, which will broadcast to other nodes synchronously
 	_ = node1.engine.ProcessLocal(gc1)
@@ -164,7 +164,7 @@ func TestSubmitCollectionManyToManyRandom(t *testing.T) {
 
 // send one collection to one node.
 // extracted in order to be reused in different tests
-func sendOne(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg *sync.WaitGroup) {
+func sendOne(node *mockPropagationNode, gc *flow.GuaranteedCollection, wg *sync.WaitGroup) {
 	_ = node.engine.ProcessLocal(gc)
 	node.net.FlushAll()
 	wg.Done()

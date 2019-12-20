@@ -9,7 +9,6 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -122,7 +121,7 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 		// each header, we reconstruct the block and then apply the related
 		// changes to the protocol state
 		var identities flow.IdentityList
-		var collections []*collection.GuaranteedCollection
+		var collections []*flow.GuaranteedCollection
 		for i := len(steps) - 1; i >= 0; i-- {
 
 			// get the identities

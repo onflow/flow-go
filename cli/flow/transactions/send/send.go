@@ -43,13 +43,13 @@ var Cmd = &cobra.Command{
 			}
 		}
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:         code,
 			Nonce:          conf.Nonce,
 			ComputeLimit:   10,
 			PayerAccount:   signer.Address,
 			ScriptAccounts: []flow.Address{signer.Address},
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, signer.PrivateKey)
 		if err != nil {

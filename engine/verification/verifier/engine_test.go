@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/model/verification"
@@ -110,7 +109,7 @@ func (suite *VerifierEngineTestSuit) TestSubmitHappyPath() {
 		Once()
 
 	// emitting an execution receipt form the execution node
-	_ = vrfy.ProcessLocal(&execution.ExecutionReceipt{})
+	_ = vrfy.ProcessLocal(&flow.ExecutionReceipt{})
 
 	suite.state.AssertExpectations(suite.T())
 	suite.con.AssertExpectations(suite.T())
@@ -137,7 +136,7 @@ func (suite *VerifierEngineTestSuit) TestProcessUnhappyInput() {
 	assert.NotNil(suite.T(), err, "failed recognizing non-execution receipt events")
 
 	// non-recoverable id
-	err = vrfy.Process(flow.Identifier{}, &execution.ExecutionReceipt{})
+	err = vrfy.Process(flow.Identifier{}, &flow.ExecutionReceipt{})
 	assert.NotNilf(suite.T(), err, "broken happy path: %s", err)
 
 	// asserting a single calls in unhappy path
@@ -168,7 +167,7 @@ func (suite *VerifierEngineTestSuit) TestProcessUnstakeEmit() {
 
 	// execution receipts should directly come from Execution Nodes,
 	// hence for all test cases a non-nil error should returned
-	err = vrfy.Process(unstakedID.NodeID, &execution.ExecutionReceipt{})
+	err = vrfy.Process(unstakedID.NodeID, &flow.ExecutionReceipt{})
 	assert.NotNil(suite.T(), err, "failed rejecting an unstaked id")
 	suite.state.AssertExpectations(suite.T())
 	suite.ss.AssertExpectations(suite.T())
@@ -228,7 +227,7 @@ func (suite *VerifierEngineTestSuit) TestProcessUnauthorizedEmits() {
 
 		// execution receipts should directly come from Execution Nodes,
 		// hence for all test cases a non-nil error should returned
-		err = vrfy.Process(id.NodeID, &execution.ExecutionReceipt{})
+		err = vrfy.Process(id.NodeID, &flow.ExecutionReceipt{})
 		assert.NotNil(suite.T(), err, "failed rejecting an faulty origin id")
 		suite.state.AssertExpectations(suite.T())
 		suite.ss.AssertExpectations(suite.T())
@@ -275,7 +274,7 @@ func (suite *VerifierEngineTestSuit) TestOnExecutionReceiptHappyPath() {
 		Once()
 
 	// emitting an execution receipt form the execution node
-	err = vrfy.Process(exeID.NodeID, &execution.ExecutionReceipt{})
+	err = vrfy.Process(exeID.NodeID, &flow.ExecutionReceipt{})
 	assert.Nil(suite.T(), err, "failed processing execution receipt")
 
 	suite.con.AssertExpectations(suite.T())
