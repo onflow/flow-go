@@ -26,7 +26,7 @@ func New(log zerolog.Logger, net module.Network, me module.Local) (*Engine, erro
 		me:   me,
 	}
 
-	con, err := net.Register(engine.Execution, &e)
+	con, err := net.Register(engine.ExecutionExecution, &e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}

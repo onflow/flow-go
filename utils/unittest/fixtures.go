@@ -40,6 +40,14 @@ func AccountSignatureFixture() flow.AccountSignature {
 	}
 }
 
+func BlockFixture() flow.Block {
+	return flow.Block{
+		Header:                BlockHeaderFixture(),
+		NewIdentities:         IdentityListFixture(32),
+		GuaranteedCollections: nil,
+	}
+}
+
 func BlockHeaderFixture() flow.Header {
 	return flow.Header{
 		Parent: crypto.Hash("parent"),

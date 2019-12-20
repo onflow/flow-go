@@ -24,10 +24,11 @@ const (
 	// ...
 
 	// Consensus 050-099
-	ConsensusPropagation = 50
+	ConsensusPropagation = 51
+	ConsensusExpulsion   = 52
 
 	// Execution 100-199
-	Execution           = 100
+	ExecutionExecution = 100
 
 	// Testing 200-255
 	SimulationGenerator = 200
