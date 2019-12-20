@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language/runtime/cmd"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -260,29 +261,44 @@ func TestCheckContractNestedDeclarationOrderOutsideInside(t *testing.T) {
 			body = "{}"
 		}
 
+		extraFunction := ""
+		if !isInterface {
+			extraFunction = `
+		      fun callGoNew() {
+                  let r <- create R()
+                  r.go()
+                  destroy r
+              }
+            `
+		}
+
 		t.Run(interfaceKeyword, func(t *testing.T) {
 
-			_, err := ParseAndCheck(t,
-				fmt.Sprintf(
-					`
-                      contract C {
+			code := fmt.Sprintf(
+				`
+                  contract C {
 
-                          fun callGo(r: @R) {
-                              r.go()
-                              destroy r
-                          }
-
-                          resource %[1]s R {
-                              fun go() %[2]s
-                          }
+                      fun callGoExisting(r: @R) {
+                          r.go()
+                          destroy r
                       }
-                    `,
-					interfaceKeyword,
-					body,
-				),
-			)
 
-			require.NoError(t, err)
+                      %[1]s
+
+                      resource %[2]s R {
+                          fun go() %[3]s
+                      }
+                  }
+                `,
+				extraFunction,
+				interfaceKeyword,
+				body,
+			)
+			_, err := ParseAndCheck(t, code)
+
+			if !assert.NoError(t, err) {
+				cmd.PrettyPrintError(err, "", map[string]string{"": code})
+			}
 		})
 	}
 }
@@ -305,7 +321,12 @@ func TestCheckContractNestedDeclarationOrderInsideOutside(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCheckMutualTypeUseInContract(t *testing.T) {
+// TestCheckContractNestedDeclarationsComplex tests
+// - Using inner types in functions outside (both type in parameter and constructor)
+// - Using outer functions in inner types' functions
+// - Mutually using sibling types
+//
+func TestCheckContractNestedDeclarationsComplex(t *testing.T) {
 
 	interfacePossibilities := []bool{true, false}
 
@@ -314,151 +335,155 @@ func TestCheckMutualTypeUseInContract(t *testing.T) {
 		common.CompositeKindResource,
 	}
 
-	for _, firstKind := range compositeKinds {
-		for _, firstIsInterface := range interfacePossibilities {
-			for _, secondKind := range compositeKinds {
-				for _, secondIsInterface := range interfacePossibilities {
+	for _, contractIsInterface := range interfacePossibilities {
+		for _, firstKind := range compositeKinds {
+			for _, firstIsInterface := range interfacePossibilities {
+				for _, secondKind := range compositeKinds {
+					for _, secondIsInterface := range interfacePossibilities {
 
-					firstInterfaceKeyword := ""
-					if firstIsInterface {
-						firstInterfaceKeyword = "interface"
-					}
+						contractInterfaceKeyword := ""
+						if contractIsInterface {
+							contractInterfaceKeyword = "interface"
+						}
 
-					secondInterfaceKeyword := ""
-					if secondIsInterface {
-						secondInterfaceKeyword = "interface"
-					}
+						firstInterfaceKeyword := ""
+						if firstIsInterface {
+							firstInterfaceKeyword = "interface"
+						}
 
-					testName := fmt.Sprintf(
-						"%s_%s/%s_%s",
-						firstKind.Keyword(),
-						firstInterfaceKeyword,
-						secondKind.Keyword(),
-						secondInterfaceKeyword,
-					)
+						secondInterfaceKeyword := ""
+						if secondIsInterface {
+							secondInterfaceKeyword = "interface"
+						}
 
-					firstBody := ""
-					if !firstIsInterface {
-						firstBody = fmt.Sprintf(
-							"{ %s b }",
-							secondKind.DestructionKeyword(),
+						testName := fmt.Sprintf(
+							"contract_%s/%s_%s/%s_%s",
+							contractInterfaceKeyword,
+							firstKind.Keyword(),
+							firstInterfaceKeyword,
+							secondKind.Keyword(),
+							secondInterfaceKeyword,
 						)
-					}
 
-					secondBody := ""
-					if !secondIsInterface {
-						secondBody = fmt.Sprintf(
-							"{ %s a }",
-							firstKind.DestructionKeyword(),
-						)
-					}
+						bodyUsingFirstOutside := ""
+						if !contractIsInterface {
+							if secondIsInterface {
+								bodyUsingFirstOutside = fmt.Sprintf(
+									"{ %s a }",
+									firstKind.DestructionKeyword(),
+								)
+							} else {
+								bodyUsingFirstOutside = fmt.Sprintf(
+									"{ a.localB(%[1]s %[2]s B()); %[3]s a }",
+									secondKind.MoveOperator(),
+									secondKind.ConstructionKeyword(),
+									firstKind.DestructionKeyword(),
+								)
+							}
+						}
 
-					t.Run(testName, func(t *testing.T) {
+						bodyUsingSecondOutside := ""
+						if !contractIsInterface {
+							if firstIsInterface {
+								bodyUsingSecondOutside = fmt.Sprintf(
+									"{ %s b }",
+									secondKind.DestructionKeyword(),
+								)
+							} else {
+								bodyUsingSecondOutside = fmt.Sprintf(
+									"{ b.localA(%[1]s %[2]s A()); %[3]s b }",
+									firstKind.MoveOperator(),
+									firstKind.ConstructionKeyword(),
+									secondKind.DestructionKeyword(),
+								)
+							}
+						}
 
-						_, err := ParseAndCheck(t,
-							fmt.Sprintf(
+						bodyUsingFirstInsideFirst := ""
+						bodyUsingSecondInsideFirst := ""
+						bodyUsingFirstInsideSecond := ""
+						bodyUsingSecondInsideSecond := ""
+
+						if !contractIsInterface && !firstIsInterface {
+							bodyUsingFirstInsideFirst = fmt.Sprintf(
+								"{ C.localBeforeA(%s a) }",
+								firstKind.MoveOperator(),
+							)
+							bodyUsingSecondInsideFirst = fmt.Sprintf(
+								"{ C.localBeforeB(%s b)  }",
+								secondKind.MoveOperator(),
+							)
+						}
+
+						if !contractIsInterface && !secondIsInterface {
+							bodyUsingFirstInsideSecond = fmt.Sprintf(
+								"{ C.qualifiedAfterA(%s a) }",
+								firstKind.MoveOperator(),
+							)
+							bodyUsingSecondInsideSecond = fmt.Sprintf(
+								"{ C.qualifiedAfterB(%s b)  }",
+								secondKind.MoveOperator(),
+							)
+						}
+
+						t.Run(testName, func(t *testing.T) {
+
+							code := fmt.Sprintf(
 								`
-                                  contract C {
-                                      %[1]s %[2]s A {
-                                          fun use(_ b: %[3]sB) %[4]s
+                                  contract %[1]s C {
+
+                                      fun qualifiedBeforeA(_ a: %[4]sC.A) %[12]s
+                                      fun localBeforeA(_ a: %[4]sA) %[12]s
+
+                                      fun qualifiedBeforeB(_ b: %[7]sC.B) %[13]s
+                                      fun localBeforeB(_ b: %[7]sB) %[13]s
+
+                                      %[2]s %[3]s A {
+                                          fun qualifiedB(_ b: %[7]sC.B) %[9]s
+                                          fun localB(_ b: %[7]sB) %[9]s
+
+                                          fun qualifiedA(_ a: %[4]sC.A) %[8]s
+                                          fun localA(_ a: %[4]sA) %[8]s
                                       }
 
                                       %[5]s %[6]s B {
-                                          fun use(_ a: %[7]sA) %[8]s
+                                          fun qualifiedA(_ a: %[4]sC.A) %[10]s
+                                          fun localA(_ a: %[4]sA) %[10]s
+
+                                          fun qualifiedB(_ b: %[7]sC.B) %[11]s
+                                          fun localB(_ b: %[7]sB) %[11]s
                                       }
+
+                                      fun qualifiedAfterA(_ a: %[4]sC.A) %[12]s
+                                      fun localAfterA(_ a: %[4]sA) %[12]s
+
+                                      fun qualifiedAfterB(_ b: %[7]sC.B) %[13]s
+                                      fun localAfterB(_ b: %[7]sB) %[13]s
                                   }
                                 `,
+								contractInterfaceKeyword,
 								firstKind.Keyword(),
 								firstInterfaceKeyword,
-								secondKind.Annotation(),
-								firstBody,
+								firstKind.Annotation(),
 								secondKind.Keyword(),
 								secondInterfaceKeyword,
-								firstKind.Annotation(),
-								secondBody,
-							),
-						)
+								secondKind.Annotation(),
+								bodyUsingFirstInsideFirst,
+								bodyUsingSecondInsideFirst,
+								bodyUsingFirstInsideSecond,
+								bodyUsingSecondInsideSecond,
+								bodyUsingFirstOutside,
+								bodyUsingSecondOutside,
+							)
+							_, err := ParseAndCheck(t, code)
 
-						require.NoError(t, err)
-					})
+							if !assert.NoError(t, err) {
+								cmd.PrettyPrintError(err, "", map[string]string{"": code})
+							}
+						})
+					}
 				}
 			}
 		}
 	}
-}
-
-func TestCheckContractInterfaceNestedAndMutualTypeUses(t *testing.T) {
-
-	_, err := ParseAndCheck(t, `
-      contract interface CI {
-
-          fun qualifiedBeforeA(_ a: @CI.A)
-		  fun localBeforeA(_ a: @A)
-
-          fun qualifiedBeforeB(_ b: @CI.B)
-		  fun localBeforeB(_ b: @B)
-
-          resource interface A {
-              fun qualifiedB(_ b: @CI.B)
-              fun localB(_ b: @B)
-
-              fun qualifiedA(_ a: @CI.A)
-              fun localA(_ a: @A)
-          }
-
-          resource interface B {
-              fun qualifiedA(_ a: @CI.A)
-              fun localA(_ a: @A)
-
-              fun qualifiedB(_ b: @CI.B)
-              fun localB(_ b: @B)
-          }
-
-          fun qualifiedAfterA(_ a: @CI.A)
-		  fun localAfterA(_ a: @A)
-
-          fun qualifiedAfterB(_ b: @CI.B)
-		  fun localAfterB(_ b: @B)
-      }
-    `)
-
-	require.NoError(t, err)
-}
-
-func TestCheckContractNestedAndMutualTypeUses(t *testing.T) {
-
-	_, err := ParseAndCheck(t, `
-      contract CI {
-
-          fun qualifiedBeforeA(_ a: @CI.A) { destroy a }
-		  fun localBeforeA(_ a: @A) { destroy a }
-
-          fun qualifiedBeforeB(_ b: @CI.B) { destroy b }
-		  fun localBeforeB(_ b: @B) { destroy b }
-
-          resource interface A {
-              fun qualifiedB(_ b: @CI.B)
-              fun localB(_ b: @B)
-
-              fun qualifiedA(_ a: @CI.A)
-              fun localA(_ a: @A)
-          }
-
-          resource B {
-              fun qualifiedA(_ a: @CI.A) { destroy a }
-              fun localA(_ a: @A) { destroy a }
-
-              fun qualifiedB(_ b: @CI.B) { destroy b }
-              fun localB(_ b: @B) { destroy b }
-          }
-
-          fun qualifiedAfterA(_ a: @CI.A) { destroy a }
-		  fun localAfterA(_ a: @A) { destroy a }
-
-          fun qualifiedAfterB(_ b: @CI.B) { destroy b }
-		  fun localAfterB(_ b: @B) { destroy b }
-      }
-    `)
-
-	require.NoError(t, err)
 }
