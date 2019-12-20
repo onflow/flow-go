@@ -52,7 +52,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 
 	// Declare nested types
 
-	checker.declareInterfaceNestedTypes(declaration, interfaceType)
+	checker.declareInterfaceNestedTypes(declaration)
 
 	checker.checkInitializers(
 		declaration.Members.Initializers(),
@@ -111,12 +111,14 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 // It is used when declaring the interface's members (`declareInterfaceMembers`)
 // and checking the interface declaration (`VisitInterfaceDeclaration`).
 //
-// It assumes the types were previously added to the elaboration in `InterfaceNestedDeclarations`.
+// It assumes the types were previously added to the elaboration in `InterfaceNestedDeclarations`,
+// and the type for the declaration was added to the elaboration in `InterfaceDeclarationTypes`.
 //
 func (checker *Checker) declareInterfaceNestedTypes(
 	declaration *ast.InterfaceDeclaration,
-	interfaceType *InterfaceType,
 ) {
+
+	interfaceType := checker.Elaboration.InterfaceDeclarationTypes[declaration]
 	nestedDeclarations := checker.Elaboration.InterfaceNestedDeclarations[declaration]
 
 	for name, nestedType := range interfaceType.NestedTypes {
@@ -271,7 +273,7 @@ func (checker *Checker) declareInterfaceMembers(declaration *ast.InterfaceDeclar
 
 	// Declare nested types
 
-	checker.declareInterfaceNestedTypes(declaration, interfaceType)
+	checker.declareInterfaceNestedTypes(declaration)
 
 	// Declare members
 
@@ -293,22 +295,12 @@ func (checker *Checker) declareInterfaceMembers(declaration *ast.InterfaceDeclar
 
 	// Declare nested declarations' members
 
-	nestedDeclarations := checker.Elaboration.InterfaceNestedDeclarations[declaration]
-	if nestedDeclarations == nil {
-		panic(errors.NewUnreachableError())
+	for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
+		checker.declareInterfaceMembers(nestedInterfaceDeclaration)
 	}
 
-	for _, nestedDeclaration := range nestedDeclarations {
-		switch nestedDeclaration := nestedDeclaration.(type) {
-		case *ast.InterfaceDeclaration:
-			checker.declareInterfaceMembers(nestedDeclaration)
-
-		case *ast.CompositeDeclaration:
-			checker.declareCompositeMembersAndValue(nestedDeclaration, ContainerKindInterface)
-
-		default:
-			panic(errors.NewUnreachableError())
-		}
+	for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+		checker.declareCompositeMembersAndValue(nestedCompositeDeclaration, ContainerKindInterface)
 	}
 }
 

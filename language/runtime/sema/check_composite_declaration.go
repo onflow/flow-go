@@ -62,7 +62,7 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 		defer checker.valueActivations.Leave()
 	}
 
-	checker.declareCompositeNestedTypesAndConstructors(declaration, compositeType, kind)
+	checker.declareCompositeNestedTypes(declaration, kind, true)
 
 	var initializationInfo *InitializationInfo
 
@@ -170,19 +170,22 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 	}
 }
 
-// declareCompositeNestedTypesAndConstructors declares the types nested in a composite,
-// and the constructors for them if `kind` is `ContainerKindComposite`.
+// declareCompositeNestedTypes declares the types nested in a composite,
+// and the constructors for them if `declareConstructors` is true
+// and `kind` is `ContainerKindComposite`.
 //
 // It is used when declaring the composite's members (`declareCompositeMembersAndValue`)
 // and checking the composite declaration (`visitCompositeDeclaration`).
 //
-// It assumes the types were previously added to the elaboration in `CompositeNestedDeclarations`.
+// It assumes the types were previously added to the elaboration in `CompositeNestedDeclarations`,
+// and the type for the declaration was added to the elaboration in `CompositeDeclarationTypes`.
 //
-func (checker *Checker) declareCompositeNestedTypesAndConstructors(
+func (checker *Checker) declareCompositeNestedTypes(
 	declaration *ast.CompositeDeclaration,
-	compositeType *CompositeType,
 	kind ContainerKind,
+	declareConstructors bool,
 ) {
+	compositeType := checker.Elaboration.CompositeDeclarationTypes[declaration]
 	nestedDeclarations := checker.Elaboration.CompositeNestedDeclarations[declaration]
 
 	for name, nestedType := range compositeType.NestedTypes {
@@ -204,10 +207,9 @@ func (checker *Checker) declareCompositeNestedTypesAndConstructors(
 		)
 		checker.report(err)
 
-		if kind == ContainerKindComposite {
+		if declareConstructors && kind == ContainerKindComposite {
 
-			// NOTE: Re-declare the value (e.g. constructor function for non-contract types;
-			// instance for contracts) for the nested composite declaration:
+			// NOTE: Re-declare the constructor function for the nested composite declaration:
 			// The constructor was previously declared in `declareCompositeMembersAndValue`
 			// for this nested declaration, but the value activation for it was only temporary,
 			// so that the constructor wouldn't be visible outside of the containing declaration
@@ -443,11 +445,9 @@ func (checker *Checker) declareCompositeMembersAndValue(
 		checker.valueActivations.Enter()
 		defer checker.valueActivations.Leave()
 
-		checker.declareCompositeNestedTypesAndConstructors(declaration, compositeType, kind)
+		checker.declareCompositeNestedTypes(declaration, kind, false)
 
-		// TODO: check conformances later?
-
-		// Check conformances
+		// Resolve conformances
 
 		conformances := checker.conformances(declaration, compositeType)
 		compositeType.Conformances = conformances
@@ -470,12 +470,20 @@ func (checker *Checker) declareCompositeMembersAndValue(
 		compositeType.ConstructorParameterTypeAnnotations =
 			checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())
 
-		// Declare nested composites' values (constructor/instance) as members of the containing composite
+		// Declare nested declarations' members
+
+		for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
+			checker.declareInterfaceMembers(nestedInterfaceDeclaration)
+		}
 
 		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+			checker.declareCompositeMembersAndValue(nestedCompositeDeclaration, kind)
+
+			// Declare nested composites' values (constructor/instance) as members of the containing composite
+
 			identifier := nestedCompositeDeclaration.Identifier
 
-			// Find the constructor declaration
+			// Find the value declaration
 			nestedCompositeDeclarationVariable :=
 				checker.valueActivations.Find(identifier.Identifier)
 
@@ -530,26 +538,6 @@ func (checker *Checker) declareCompositeMembersAndValue(
 			constructorArgumentLabels,
 		)
 		checker.report(err)
-	}
-
-	// Declare nested declarations' members
-
-	nestedDeclarations := checker.Elaboration.CompositeNestedDeclarations[declaration]
-	if nestedDeclarations == nil {
-		panic(errors.NewUnreachableError())
-	}
-
-	for _, nestedDeclaration := range nestedDeclarations {
-		switch nestedDeclaration := nestedDeclaration.(type) {
-		case *ast.InterfaceDeclaration:
-			checker.declareInterfaceMembers(nestedDeclaration)
-
-		case *ast.CompositeDeclaration:
-			checker.declareCompositeMembersAndValue(nestedDeclaration, kind)
-
-		default:
-			panic(errors.NewUnreachableError())
-		}
 	}
 }
 
