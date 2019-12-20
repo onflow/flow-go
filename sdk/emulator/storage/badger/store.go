@@ -207,9 +207,9 @@ func (s Store) CommitBlock(
 	return err
 }
 
-func (s *Store) TransactionByHash(hash crypto.Hash) (tx flow.Transaction, err error) {
+func (s *Store) TransactionByHash(txHash crypto.Hash) (tx flow.Transaction, err error) {
 	err = s.db.View(func(txn *badger.Txn) error {
-		encTx, err := getTx(txn)(transactionKey(hash))
+		encTx, err := getTx(txn)(transactionKey(txHash))
 		if err != nil {
 			return err
 		}

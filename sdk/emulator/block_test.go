@@ -17,14 +17,14 @@ func TestCommitBlock(t *testing.T) {
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
 
-	tx1 := flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-	}}
+	}
 
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
 	assert.NoError(t, err)
@@ -40,14 +40,14 @@ func TestCommitBlock(t *testing.T) {
 
 	assert.Equal(t, flow.TransactionPending, tx.Status)
 
-	tx2 := flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx2 := flow.Transaction{
 		Script:             []byte("invalid script"),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-	}}
+	}
 
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
 	assert.NoError(t, err)

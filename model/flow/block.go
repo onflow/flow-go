@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/collection"
 )
 
 type Block struct {
 	Header
 	NewIdentities         IdentityList
-	GuaranteedCollections []*GuaranteedCollection
+	GuaranteedCollections []*collection.GuaranteedCollection
 }
 
 func Genesis(ids IdentityList) *Block {

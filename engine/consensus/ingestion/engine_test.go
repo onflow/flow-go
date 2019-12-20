@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
@@ -26,7 +27,7 @@ func TestOnGuaranteedCollectionValid(t *testing.T) {
 	}
 
 	originID := unittest.IdentifierFixture()
-	coll := &flow.GuaranteedCollection{CollectionHash: unittest.HashFixture(32)}
+	coll := &collection.GuaranteedCollection{CollectionHash: unittest.HashFixture(32)}
 	id := unittest.IdentityFixture()
 	id.Role = flow.RoleCollection
 
@@ -54,7 +55,7 @@ func TestOnGuaranteedCollectionMissingIdentity(t *testing.T) {
 	}
 
 	originID := unittest.IdentifierFixture()
-	coll := &flow.GuaranteedCollection{CollectionHash: unittest.HashFixture(32)}
+	coll := &collection.GuaranteedCollection{CollectionHash: unittest.HashFixture(32)}
 	id := unittest.IdentityFixture()
 	id.Role = flow.RoleCollection
 
@@ -81,7 +82,7 @@ func TestOnGuaranteedCollectionInvalidRole(t *testing.T) {
 	}
 
 	originID := unittest.IdentifierFixture()
-	coll := &flow.GuaranteedCollection{CollectionHash: unittest.HashFixture(32)}
+	coll := &collection.GuaranteedCollection{CollectionHash: unittest.HashFixture(32)}
 	id := unittest.IdentityFixture()
 	id.Role = flow.RoleConsensus
 

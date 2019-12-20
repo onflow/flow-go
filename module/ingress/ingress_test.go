@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/convert"
@@ -35,8 +35,8 @@ func TestSubmitTransaction(t *testing.T) {
 		// should submit the transaction to the engine
 		engine.AssertCalled(t, "ProcessLocal", &tx)
 
-		// should return the fingerprint of the submitted transaction
-		assert.Equal(t, tx.Fingerprint(), flow.Fingerprint(res.Hash))
+		// should return the hash of the submitted transaction
+		assert.Equal(t, tx.Hash(), crypto.Hash(res.Hash))
 	})
 
 	t.Run("should pass through error", func(t *testing.T) {

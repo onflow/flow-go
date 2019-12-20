@@ -17,28 +17,28 @@ func TestPendingBlockBeforeExecution(t *testing.T) {
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
 
-	tx1 := flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-	}}
+	}
 
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
 	assert.NoError(t, err)
 
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
-	tx2 := flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx2 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-	}}
+	}
 
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
 	assert.NoError(t, err)
@@ -91,42 +91,42 @@ func TestPendingBlockDuringExecution(t *testing.T) {
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
 
-	tx1 := flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx1 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-	}}
+	}
 
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
 	assert.NoError(t, err)
 
 	tx1.AddSignature(b.RootAccountAddress(), sig)
 
-	tx2 := flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx2 := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-	}}
+	}
 
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
 	assert.NoError(t, err)
 
 	tx2.AddSignature(b.RootAccountAddress(), sig)
 
-	invalid := flow.Transaction{TransactionBody: flow.TransactionBody{
+	invalid := flow.Transaction{
 		Script:             []byte("invalid script"),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-	}}
+	}
 
 	sig, err = keys.SignTransaction(invalid, b.RootKey())
 	assert.NoError(t, err)
@@ -281,14 +281,14 @@ func TestPendingBlockCommit(t *testing.T) {
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
 
 	t.Run("CommitBlock", func(t *testing.T) {
-		tx1 := flow.Transaction{TransactionBody: flow.TransactionBody{
+		tx1 := flow.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 			ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-		}}
+		}
 
 		sig, err := keys.SignTransaction(tx1, b.RootKey())
 		assert.NoError(t, err)
@@ -314,14 +314,14 @@ func TestPendingBlockCommit(t *testing.T) {
 	})
 
 	t.Run("ExecuteAndCommitBlock", func(t *testing.T) {
-		tx1 := flow.Transaction{TransactionBody: flow.TransactionBody{
+		tx1 := flow.Transaction{
 			Script:             []byte(addTwoScript),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 			ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-		}}
+		}
 
 		sig, err := keys.SignTransaction(tx1, b.RootKey())
 		assert.NoError(t, err)

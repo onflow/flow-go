@@ -547,7 +547,7 @@ func (e *Engine) commitCandidate() error {
 	// remove all collections from the block from the mempool
 	removed := uint(0)
 	for _, gc := range candidate.GuaranteedCollections {
-		ok := e.pool.Rem(gc.Fingerprint())
+		ok := e.pool.Rem(gc.Hash())
 		if ok {
 			removed++
 		}

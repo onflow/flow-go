@@ -10,10 +10,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"crypto/rand"
-
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/model/flow"
+	exec "github.com/dapperlabs/flow-go/model/execution"
 )
 
 type ERStoreTestSuit struct {
@@ -163,7 +162,7 @@ func (suite *ERStoreTestSuit) TestGettingTwoERs() {
 	require.NotEqual(suite.T(), er1, er2)
 	require.NotEqual(suite.T(), er1.ExecutionResult, er2.ExecutionResult)
 
-	erlist := []*flow.ExecutionReceipt{er1, er2}
+	erlist := []*exec.ExecutionReceipt{er1, er2}
 
 	for _, er := range erlist {
 		// adding two ERs to the mempool
@@ -196,7 +195,7 @@ func (suite *ERStoreTestSuit) TestGettingTwoERsWithSharedResult() {
 	require.NotEqual(suite.T(), er1, er2)
 	require.Equal(suite.T(), er1.ExecutionResult, er2.ExecutionResult)
 
-	erlist := []*flow.ExecutionReceipt{er1, er2}
+	erlist := []*exec.ExecutionReceipt{er1, er2}
 
 	for _, er := range erlist {
 		// adding two ERs to the mempool
@@ -275,7 +274,7 @@ func (suite *ERStoreTestSuit) TestDeadlock() {
 // BlockHash
 // FinalStateCommitment
 // The rest of bytes are chosen as nil
-func randomER() *flow.ExecutionReceipt {
+func randomER() *exec.ExecutionReceipt {
 	previousER := make([]byte, 32)
 	blockHash := make([]byte, 32)
 	stateComm := make([]byte, 32)
@@ -284,12 +283,14 @@ func randomER() *flow.ExecutionReceipt {
 	rand.Read(blockHash)
 	rand.Read(stateComm)
 	rand.Read(executorSignature)
-	return &flow.ExecutionReceipt{
-		ExecutionResult: flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousExecutionResult: flow.Fingerprint(crypto.BytesToHash(previousER)),
-			Block:                   flow.Fingerprint(crypto.BytesToHash(previousER)),
-			FinalStateCommitment:    stateComm,
-		}},
+	return &exec.ExecutionReceipt{
+		ExecutionResult: exec.ExecutionResult{
+			PreviousExecutionResultHash: crypto.BytesToHash(previousER),
+			BlockHash:                   crypto.BytesToHash(blockHash),
+			FinalStateCommitment:        stateComm,
+			Chunks:                      nil,
+			Signatures:                  nil,
+		},
 		Spocks:            nil,
 		ExecutorSignature: executorSignature,
 	}

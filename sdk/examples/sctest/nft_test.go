@@ -37,25 +37,25 @@ func TestCreateNFT(t *testing.T) {
 
 	// Vault must be instantiated with a positive ID
 	t.Run("Cannot create token with negative ID", func(t *testing.T) {
-		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+		tx := flow.Transaction{
 			Script:         GenerateCreateNFTScript(contractAddr, -7),
 			Nonce:          GetNonce(),
 			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
-		}}
+		}
 
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, true)
 	})
 
 	t.Run("Should be able to create token", func(t *testing.T) {
-		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+		tx := flow.Transaction{
 			Script:         GenerateCreateNFTScript(contractAddr, 1),
 			Nonce:          GetNonce(),
 			ComputeLimit:   20,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
-		}}
+		}
 
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 	})
@@ -82,13 +82,13 @@ func TestTransferNFT(t *testing.T) {
 	assert.NoError(t, err)
 
 	// then deploy a NFT to the root account
-	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx := flow.Transaction{
 		Script:         GenerateCreateNFTScript(contractAddr, 1),
 		Nonce:          GetNonce(),
 		ComputeLimit:   20,
 		PayerAccount:   b.RootAccountAddress(),
 		ScriptAccounts: []flow.Address{b.RootAccountAddress()},
-	}}
+	}
 
 	SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
@@ -105,25 +105,25 @@ func TestTransferNFT(t *testing.T) {
 	bastianAddress, err := b.CreateAccount([]flow.AccountPublicKey{bastianPublicKey}, nil, GetNonce())
 
 	// then deploy an NFT to another account
-	tx = flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx = flow.Transaction{
 		Script:         GenerateCreateNFTScript(contractAddr, 2),
 		Nonce:          GetNonce(),
 		ComputeLimit:   20,
 		PayerAccount:   b.RootAccountAddress(),
 		ScriptAccounts: []flow.Address{bastianAddress},
-	}}
+	}
 
 	SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
 
 	// transfer an NFT
 	t.Run("Should be able to withdraw an NFT and deposit to another accounts collection", func(t *testing.T) {
-		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+		tx := flow.Transaction{
 			Script:         GenerateDepositScript(contractAddr, bastianAddress, 1),
 			Nonce:          GetNonce(),
 			ComputeLimit:   20,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
-		}}
+		}
 
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 
@@ -165,13 +165,13 @@ func TestTransferNFT(t *testing.T) {
 
 	// transfer an NFT
 	t.Run("Should be able to transfer an NFT to another accounts collection", func(t *testing.T) {
-		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+		tx := flow.Transaction{
 			Script:         GenerateTransferScript(contractAddr, b.RootAccountAddress(), 1),
 			Nonce:          GetNonce(),
 			ComputeLimit:   20,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{bastianAddress},
-		}}
+		}
 
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
 
@@ -192,13 +192,13 @@ func TestTransferNFT(t *testing.T) {
 
 	// transfer an NFT
 	t.Run("Should fail when trying to transfer a token that doesn't exist", func(t *testing.T) {
-		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+		tx := flow.Transaction{
 			Script:         GenerateTransferScript(contractAddr, b.RootAccountAddress(), 5),
 			Nonce:          GetNonce(),
 			ComputeLimit:   20,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{bastianAddress},
-		}}
+		}
 
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, true)
 

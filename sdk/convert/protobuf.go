@@ -54,7 +54,7 @@ func MessageToTransaction(m *entities.Transaction) (flow.Transaction, error) {
 		signatures[i] = MessageToAccountSignature(accountSig)
 	}
 
-	return flow.Transaction{TransactionBody: flow.TransactionBody{
+	return flow.Transaction{
 		Script:             m.GetScript(),
 		ReferenceBlockHash: m.ReferenceBlockHash,
 		Nonce:              m.GetNonce(),
@@ -62,8 +62,7 @@ func MessageToTransaction(m *entities.Transaction) (flow.Transaction, error) {
 		PayerAccount:       flow.BytesToAddress(m.PayerAccount),
 		ScriptAccounts:     scriptAccounts,
 		Signatures:         signatures,
-	},
-		Status: flow.TransactionStatus(m.GetStatus()),
+		Status:             flow.TransactionStatus(m.GetStatus()),
 	}, nil
 }
 

@@ -16,7 +16,7 @@ func TransactionForCluster(nClusters int, target flow.ClusterID) *flow.Transacti
 	// Bound to avoid infinite loop in case the routing algorithm is broken
 	for i := 0; i < 10000; i++ {
 		tx.Nonce++
-		id := protocol.Route(nClusters, tx.Fingerprint())
+		id := protocol.Route(nClusters, tx.Hash())
 		if id == target {
 			return &tx
 		}

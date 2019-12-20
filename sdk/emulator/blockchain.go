@@ -509,7 +509,7 @@ func (b *Blockchain) LastCreatedAccount() flow.Account {
 func (b *Blockchain) verifySignatures(tx flow.Transaction) error {
 	accountWeights := make(map[flow.Address]int)
 
-	encodedTx := tx.Singularity()
+	encodedTx := tx.Encode()
 
 	for _, accountSig := range tx.Signatures {
 		accountPublicKey, err := b.verifyAccountSignature(accountSig, encodedTx)
@@ -545,13 +545,13 @@ func (b *Blockchain) CreateAccount(
 		return flow.Address{}, err
 	}
 
-	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx := flow.Transaction{
 		Script:             createAccountScript,
 		ReferenceBlockHash: nil,
 		Nonce:              nonce,
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-	}}
+	}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
 	if err != nil {
@@ -580,14 +580,14 @@ func (b *Blockchain) UpdateAccountCode(
 ) error {
 	createAccountScript := templates.UpdateAccountCode(code)
 
-	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx := flow.Transaction{
 		Script:             createAccountScript,
 		ReferenceBlockHash: nil,
 		Nonce:              nonce,
 		ComputeLimit:       10,
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
 		PayerAccount:       b.RootAccountAddress(),
-	}}
+	}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
 	if err != nil {

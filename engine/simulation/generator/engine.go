@@ -9,7 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/network"
 )
 
@@ -63,7 +63,7 @@ GenerateLoop:
 			// generate a guaranteed collection with a random hash
 			hash := make([]byte, 32)
 			_, _ = rand.Read(hash)
-			coll := &flow.GuaranteedCollection{
+			coll := &collection.GuaranteedCollection{
 				CollectionHash: hash,
 			}
 

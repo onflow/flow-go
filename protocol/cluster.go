@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 )
@@ -26,17 +27,17 @@ func Cluster(nodes flow.IdentityList) flow.ClusterList {
 	return clusters
 }
 
-// Route routes a transaction to a cluster given its fingerprint and the number of
+// Route routes a transaction to a cluster given its hash and the number of
 // clusters in the system.
 //
 // For evenly distributed transaction hashes, this will evenly distribute
 // transaction between clusters.
-func Route(nClusters int, fingerprint flow.Fingerprint) flow.ClusterID {
+func Route(nClusters int, txHash crypto.Hash) flow.ClusterID {
 	if nClusters < 1 {
 		return flow.ClusterID(0)
 	}
 
-	txHashBigInt := new(big.Int).SetBytes(fingerprint[:])
+	txHashBigInt := new(big.Int).SetBytes(txHash[:])
 
 	clusterIDBigInt := new(big.Int).Mod(txHashBigInt, big.NewInt(int64(nClusters)))
 	clusterID := flow.ClusterID(clusterIDBigInt.Uint64())

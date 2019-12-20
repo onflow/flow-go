@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
@@ -80,7 +81,7 @@ func (b *Blocks) retrieveBlock(tx *badger.Txn, hash crypto.Hash) (*flow.Block, e
 	}
 
 	// get the guaranteed collections
-	var collections []*flow.GuaranteedCollection
+	var collections []*collection.GuaranteedCollection
 	err = operation.RetrieveCollections(hash, &collections)(tx)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not retrieve collections")

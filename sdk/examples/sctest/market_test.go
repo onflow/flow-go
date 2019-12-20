@@ -80,61 +80,61 @@ func TestCreateSale(t *testing.T) {
 	})
 
 	t.Run("Can create sale collection", func(t *testing.T) {
-		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+		tx := flow.Transaction{
 			Script:         GenerateCreateSaleScript(tokenAddr, marketAddr),
 			Nonce:          GetNonce(),
 			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{bastianAddress},
-		}}
+		}
 
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
 	})
 
 	t.Run("Can put an NFT up for sale", func(t *testing.T) {
-		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+		tx := flow.Transaction{
 			Script:         GenerateStartSaleScript(nftAddr, marketAddr, 1, 10),
 			Nonce:          GetNonce(),
 			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{bastianAddress},
-		}}
+		}
 
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), bastianPrivateKey}, []flow.Address{b.RootAccountAddress(), bastianAddress}, false)
 	})
 
 	t.Run("Cannot buy an NFT for less than the sale price", func(t *testing.T) {
-		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+		tx := flow.Transaction{
 			Script:         GenerateBuySaleScript(tokenAddr, nftAddr, marketAddr, bastianAddress, 1, 9),
 			Nonce:          GetNonce(),
 			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{joshAddress},
-		}}
+		}
 
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), joshPrivateKey}, []flow.Address{b.RootAccountAddress(), joshAddress}, true)
 	})
 
 	t.Run("Cannot buy an NFT that is not for sale", func(t *testing.T) {
-		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+		tx := flow.Transaction{
 			Script:         GenerateBuySaleScript(tokenAddr, nftAddr, marketAddr, bastianAddress, 2, 10),
 			Nonce:          GetNonce(),
 			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{joshAddress},
-		}}
+		}
 
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), joshPrivateKey}, []flow.Address{b.RootAccountAddress(), joshAddress}, true)
 	})
 
 	t.Run("Can buy an NFT that is for sale", func(t *testing.T) {
-		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+		tx := flow.Transaction{
 			Script:         GenerateBuySaleScript(tokenAddr, nftAddr, marketAddr, bastianAddress, 1, 10),
 			Nonce:          GetNonce(),
 			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{joshAddress},
-		}}
+		}
 
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), joshPrivateKey}, []flow.Address{b.RootAccountAddress(), joshAddress}, false)
 

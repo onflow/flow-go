@@ -5,6 +5,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/model/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/model/verification"
@@ -92,7 +93,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
-	case *flow.ExecutionReceipt:
+	case *execution.ExecutionReceipt:
 		return e.onExecutionReceipt(originID, ev)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
@@ -101,7 +102,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onExecutionReceipt receives an execution receipt (exrcpt), verifies that and emits
 // a result approval upon successful verification
-func (e *Engine) onExecutionReceipt(originID flow.Identifier, exrcpt *flow.ExecutionReceipt) error {
+func (e *Engine) onExecutionReceipt(originID flow.Identifier, exrcpt *execution.ExecutionReceipt) error {
 	// todo: add id of the ER once gets available
 	e.log.Info().
 		Hex("origin_id", originID[:]).

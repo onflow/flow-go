@@ -20,14 +20,14 @@ func TestExecuteScript(t *testing.T) {
 
 	accountAddress := b.RootAccountAddress()
 
-	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx := flow.Transaction{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       accountAddress,
 		ScriptAccounts:     []flow.Address{accountAddress},
-	}}
+	}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
 	assert.NoError(t, err)

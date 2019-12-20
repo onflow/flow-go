@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -97,7 +98,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
-	case *flow.GuaranteedCollection:
+	case *collection.GuaranteedCollection:
 		return e.onGuaranteedCollection(originID, ev)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
@@ -106,7 +107,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onGuaranteedCollection is used to process guaranteed collections received
 // from nodes that are not consensus nodes (notably collection nodes).
-func (e *Engine) onGuaranteedCollection(originID flow.Identifier, coll *flow.GuaranteedCollection) error {
+func (e *Engine) onGuaranteedCollection(originID flow.Identifier, coll *collection.GuaranteedCollection) error {
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).

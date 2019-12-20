@@ -6,13 +6,13 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCollectionPool(t *testing.T) {
-	item := &flow.GuaranteedCollection{
+	item := &collection.GuaranteedCollection{
 		CollectionHash: crypto.Hash("DEADBEEF"),
 	}
 
@@ -30,7 +30,7 @@ func TestCollectionPool(t *testing.T) {
 	})
 
 	t.Run("should be able to get", func(t *testing.T) {
-		got, err := pool.Get(item.Fingerprint())
+		got, err := pool.Get(item.Hash())
 		assert.NoError(t, err)
 		assert.Equal(t, item, got)
 	})
@@ -42,7 +42,7 @@ func TestCollectionPool(t *testing.T) {
 	})
 
 	t.Run("should be able to remove", func(t *testing.T) {
-		ok := pool.Rem(item.Fingerprint())
+		ok := pool.Rem(item.Hash())
 		assert.True(t, ok)
 	})
 }

@@ -29,7 +29,7 @@ func TestTransactionPool(t *testing.T) {
 	})
 
 	t.Run("should be able to get", func(t *testing.T) {
-		got, err := pool.Get(item.Fingerprint())
+		got, err := pool.Get(item.Hash())
 		assert.NoError(t, err)
 		assert.Equal(t, item, got)
 	})
@@ -41,7 +41,7 @@ func TestTransactionPool(t *testing.T) {
 	})
 
 	t.Run("should be able to remove", func(t *testing.T) {
-		ok := pool.Rem(item.Fingerprint())
+		ok := pool.Rem(item.Hash())
 		assert.True(t, ok)
 	})
 }

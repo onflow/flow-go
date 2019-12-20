@@ -23,7 +23,6 @@ type AccountPublicKey struct {
 	PublicKey crypto.PublicKey
 	SignAlgo  crypto.SigningAlgorithm
 	HashAlgo  crypto.HashingAlgorithm
-	SeqNumber uint64
 	Weight    int
 }
 

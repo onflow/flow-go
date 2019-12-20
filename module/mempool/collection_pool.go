@@ -5,7 +5,8 @@ package mempool
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/collection"
 )
 
 // CollectionPool implements the collections memory pool of the consensus nodes,
@@ -24,18 +25,18 @@ func NewCollectionPool() (*CollectionPool, error) {
 }
 
 // Add adds a guaranteed collection to the mempool.
-func (m *CollectionPool) Add(coll *flow.GuaranteedCollection) error {
+func (m *CollectionPool) Add(coll *collection.GuaranteedCollection) error {
 	return m.mempool.Add(coll)
 }
 
 // Get returns the given collection from the pool.
-func (m *CollectionPool) Get(fp flow.Fingerprint) (*flow.GuaranteedCollection, error) {
-	item, err := m.mempool.Get(fp)
+func (m *CollectionPool) Get(hash crypto.Hash) (*collection.GuaranteedCollection, error) {
+	item, err := m.mempool.Get(hash)
 	if err != nil {
 		return nil, err
 	}
 
-	coll, ok := item.(*flow.GuaranteedCollection)
+	coll, ok := item.(*collection.GuaranteedCollection)
 	if !ok {
 		return nil, fmt.Errorf("unable to convert item to guaranteed collection")
 	}
@@ -44,12 +45,12 @@ func (m *CollectionPool) Get(fp flow.Fingerprint) (*flow.GuaranteedCollection, e
 }
 
 // All returns all collections from the pool.
-func (m *CollectionPool) All() []*flow.GuaranteedCollection {
+func (m *CollectionPool) All() []*collection.GuaranteedCollection {
 	items := m.mempool.All()
 
-	colls := make([]*flow.GuaranteedCollection, len(items))
+	colls := make([]*collection.GuaranteedCollection, len(items))
 	for i, item := range items {
-		colls[i] = item.(*flow.GuaranteedCollection)
+		colls[i] = item.(*collection.GuaranteedCollection)
 	}
 
 	return colls
