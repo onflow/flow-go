@@ -17,13 +17,14 @@ const (
 
 	// Collection 010-029
 	CollectionIngest   = 10
-	CollectionProposal = 11
+	CollectionProposal = 50 // to consensus ingestion
 	CollectionProvider = 12
 
 	// Observation 030-049
 	// ...
 
 	// Consensus 050-099
+	ConsensusIngestion   = 50
 	ConsensusPropagation = 51
 	ConsensusExpulsion   = 52
 

@@ -37,7 +37,7 @@ func (u *Unit) Launch(launch func()) {
 	}
 	u.wg.Add(1)
 	go func() {
-		u.wg.Done()
+		defer u.wg.Done()
 		launch()
 	}()
 }

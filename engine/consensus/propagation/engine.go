@@ -51,16 +51,14 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For the propagation engine, we consider the engine up and running
-// when we have received the first guaranteed collection for the memory pool.
-// We thus start polling and wait until the memory pool has a size of at least
-// one.
+// upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// It closes the internal stop channel to signal all running go routines and
-// then waits for them to finish using the wait group.
+// For the propagation engine, it closes the channel when all submit goroutines
+// have ended.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
@@ -111,13 +109,11 @@ func (e *Engine) onGuaranteedCollection(originID flow.Identifier, coll *flow.Gua
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_hash", coll.Hash()).
-		Msg("fingerprint message received")
+		Msg("guaranteed collection received")
 
-	// process the guaranteed collection to make sure it's valid and new
-	err := e.processGuaranteedCollection(coll)
+	err := e.storeGuaranteedCollection(coll)
 	if err != nil {
-		return errors.Wrap(err, "could not process collection")
+		return errors.Wrap(err, "could not store collection")
 	}
 
 	// propagate the guaranteed collection to other relevant nodes
@@ -134,9 +130,9 @@ func (e *Engine) onGuaranteedCollection(originID flow.Identifier, coll *flow.Gua
 	return nil
 }
 
-// processGuaranteedCollection will process a guaranteed collection within the
+// storeGuaranteedCollection will store a guaranteed collection within the
 // context of our local protocol state and memory pool.
-func (e *Engine) processGuaranteedCollection(coll *flow.GuaranteedCollection) error {
+func (e *Engine) storeGuaranteedCollection(coll *flow.GuaranteedCollection) error {
 
 	// TODO: validate the guaranteed collection signature
 
@@ -145,6 +141,10 @@ func (e *Engine) processGuaranteedCollection(coll *flow.GuaranteedCollection) er
 	if err != nil {
 		return errors.Wrap(err, "could not add collection to mempool")
 	}
+
+	e.log.Info().
+		Hex("collection_hash", coll.Hash()).
+		Msg("guaranteed collection stored")
 
 	return nil
 }

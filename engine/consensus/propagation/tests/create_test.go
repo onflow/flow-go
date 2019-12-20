@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func prepareNodesAndCollectionsConfigurable(N, M int) (
+func prepareNodesAndCollections(N, M int) (
 	[]*mockPropagationNode, []*flow.GuaranteedCollection, error) {
 
 	rand.Seed(time.Now().UnixNano())

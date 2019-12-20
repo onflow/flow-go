@@ -5,6 +5,7 @@ package main
 import (
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/engine/consensus/expulsion"
+	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff"
 	"github.com/dapperlabs/flow-go/engine/simulation/generator"
@@ -33,6 +34,11 @@ func main() {
 			prop, err = propagation.New(node.Logger, node.Network, node.State, node.Me, pool)
 			node.MustNot(err).Msg("could not initialize propagation engine")
 			return prop
+		}).
+		CreateReadDoneAware("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Me)
+			node.MustNot(err).Msg("could not initialize ingestion engine")
+			return ing
 		}).
 		CreateReadDoneAware("coldstuff engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			cold, err := coldstuff.New(node.Logger, node.Network, exp, node.State, node.Me, pool)

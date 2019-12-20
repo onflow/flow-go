@@ -90,28 +90,28 @@ func TestProcessGuaranteedCollection(t *testing.T) {
 		collections = append(collections, coll)
 	}
 
-	// test processing of collections for the first time
+	// test storing of collections for the first time
 	for i, coll := range collections {
 		pool.On("Add", coll).Return(nil).Once()
-		err := e.processGuaranteedCollection(coll)
+		err := e.storeGuaranteedCollection(coll)
 		assert.Nilf(t, err, "collection %d", i)
 	}
 
-	// test processing of collections for the second time
+	// test storing of collections for the second time
 	for i, coll := range collections {
 		pool.On("Add", coll).Return(errors.New("dummy")).Once()
-		err := e.processGuaranteedCollection(coll)
+		err := e.storeGuaranteedCollection(coll)
 		assert.NotNilf(t, err, "collection %d", i)
 	}
 
 	// check that we only had the expected calls
 	pool.AssertExpectations(t)
 
-	// test processing of collections when the mempool fails
+	// test storing of collections when the mempool fails
 	for i, coll := range collections {
 		pool.On("Has", coll.Hash()).Return(false)
 		pool.On("Add", coll).Return(errors.New("dummy"))
-		err := e.processGuaranteedCollection(coll)
+		err := e.storeGuaranteedCollection(coll)
 		assert.NotNilf(t, err, "collection %d", i)
 	}
 }
