@@ -50,7 +50,9 @@ test: generate-bindata
 coverage:
 ifeq ($(COVER), true)
 	# file has to be called index.html
-	gocov convert $(COVER_PROFILE) | gocov-html > index.html
+	gocov convert $(COVER_PROFILE) > cover.json
+	./cover-summary.sh
+	gocov-html cover.json > index.html
 	# coverage.zip will automatically be picked up by teamcity
 	zip coverage.zip index.html
 endif
