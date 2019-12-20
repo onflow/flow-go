@@ -1,8 +1,6 @@
 package blocks
 
 import (
-	"sync"
-
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -15,19 +13,36 @@ import (
 
 // Engine manages execution of transactions
 type Engine struct {
+	unit    *engine.Unit
 	log     zerolog.Logger
 	conduit network.Conduit
 	me      module.Local
-	wg      *sync.WaitGroup
 	blocks  storage.Blocks
+}
+
+func (e *Engine) SubmitLocal(event interface{}) {
+	e.Submit(e.me.NodeID(), event)
+}
+
+func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+	e.unit.Launch(func() {
+		err := e.Process(originID, event)
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not process submitted event")
+		}
+	})
+}
+
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.Process(e.me.NodeID(), event)
 }
 
 func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks) (*Engine, error) {
 
 	eng := Engine{
+		unit:   engine.NewUnit(),
 		log:    logger,
 		me:     me,
-		wg:     &sync.WaitGroup{},
 		blocks: blocks,
 	}
 
@@ -44,36 +59,31 @@ func New(logger zerolog.Logger, net module.Network, me module.Local, blocks stor
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	ready := make(chan struct{})
-	go func() {
-		close(ready)
-	}()
-	return ready
+	return e.unit.Ready()
 }
 
 // Done returns a channel that will close when the engine has
 // successfully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	done := make(chan struct{})
-	go func() {
-		e.wg.Wait()
-		close(done)
-	}()
-	return done
+	return e.unit.Done()
 }
 
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	var err error
-	switch v := event.(type) {
-	case flow.Block:
-		err = e.handleBlock(v)
-	default:
-		err = errors.Errorf("invalid event type (%T)", event)
-	}
-	if err != nil {
-		return errors.Wrap(err, "could not process event")
-	}
-	return nil
+
+	return e.unit.Do(func() error {
+		var err error
+		switch v := event.(type) {
+		case flow.Block:
+			err = e.handleBlock(v)
+		default:
+			err = errors.Errorf("invalid event type (%T)", event)
+		}
+		if err != nil {
+			return errors.Wrap(err, "could not process event")
+		}
+		return nil
+	})
+
 }
 
 func (e *Engine) handleBlock(block flow.Block) error {
