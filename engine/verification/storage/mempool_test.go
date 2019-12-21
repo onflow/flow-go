@@ -9,30 +9,27 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"crypto/rand"
-
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type ERStoreTestSuit struct {
+type ERMempoolTestSuit struct {
 	suite.Suite
 	mempool verification.Mempool
 }
 
 // SetupTests initiates the test setups prior to each test
-func (suite *ERStoreTestSuit) SetupTest() {
+func (suite *ERMempoolTestSuit) SetupTest() {
 	suite.mempool = New()
 }
 
-func TestERStoreTestSuite(t *testing.T) {
-	suite.Run(t, new(ERStoreTestSuit))
+func TestERMempoolTestSuite(t *testing.T) {
+	suite.Run(t, new(ERMempoolTestSuit))
 }
 
 // TestPuttingEmptyER tests the Put method against adding a single Execution Receipt
-func (suite *ERStoreTestSuit) TestPuttingSingleER() {
-	er := randomER()
+func (suite *ERMempoolTestSuit) TestPuttingSingleER() {
+	er := verification.RandomERGen()
 	// number of results in mempool should be zero prior to any insertion
 	assert.Equal(suite.T(), suite.mempool.ResultsNum(), 0)
 
@@ -44,21 +41,22 @@ func (suite *ERStoreTestSuit) TestPuttingSingleER() {
 
 	// number of receipts corresponding to the specific execution result also should be
 	// equal to one after the successful insertion
-	assert.Equal(suite.T(), suite.mempool.ReceiptsCount(er.ExecutionResult.Hash()), 1)
+	assert.Equal(suite.T(), suite.mempool.ReceiptsCount(er.ExecutionResult.Fingerprint()), 1)
 }
 
 // TestPuttingEmptyER tests the Put method against adding two distinct Execution Receipts
 // with different results side
-func (suite *ERStoreTestSuit) TestPuttingTwoERs() {
+func (suite *ERMempoolTestSuit) TestPuttingTwoERs() {
 	// generating two random ERs
-	er1 := randomER()
-	er2 := randomER()
+	er1 := verification.RandomERGen()
+	er2 := verification.RandomERGen()
+
 
 	// two random ERs require to be distinct even in their result paer
 	require.NotEqual(suite.T(), er1, er2)
 	require.NotEqual(suite.T(), er1.ExecutionResult, er2.ExecutionResult)
 
-	// size of estore should be zero prior putting ER
+	// size of mempool should be zero prior putting ER
 	assert.Equal(suite.T(), suite.mempool.ResultsNum(), 0)
 
 	// adding two ERs
@@ -70,16 +68,17 @@ func (suite *ERStoreTestSuit) TestPuttingTwoERs() {
 
 	// number of receipts corresponding to each ERs also should be
 	// equal to one after the successful insertion
-	assert.Equal(suite.T(), suite.mempool.ReceiptsCount(er1.ExecutionResult.Hash()), 1)
-	assert.Equal(suite.T(), suite.mempool.ReceiptsCount(er2.ExecutionResult.Hash()), 1)
+	assert.Equal(suite.T(), suite.mempool.ReceiptsCount(er1.ExecutionResult.Fingerprint()), 1)
+	assert.Equal(suite.T(), suite.mempool.ReceiptsCount(er2.ExecutionResult.Fingerprint()), 1)
 }
 
 // TestPuttingTwoERsWithSharedResult tests the Put method against adding a two Execution Receipts with
 // the same execution result
-func (suite *ERStoreTestSuit) TestPuttingTwoERsWithSharedResult() {
+func (suite *ERMempoolTestSuit) TestPuttingTwoERsWithSharedResult() {
 	// generating two random ERs
-	er1 := randomER()
-	er2 := randomER()
+	er1 := verification.RandomERGen()
+	er2 := verification.RandomERGen()
+
 	// overriding the result part of er1 to er2 so making both
 	// of the same result
 	er2.ExecutionResult = er1.ExecutionResult
@@ -87,9 +86,9 @@ func (suite *ERStoreTestSuit) TestPuttingTwoERsWithSharedResult() {
 	// two random ERs require to be distinct but with the same result part
 	require.NotEqual(suite.T(), er1, er2)
 	require.Equal(suite.T(), er1.ExecutionResult, er2.ExecutionResult)
-	require.Equal(suite.T(), er1.ExecutionResult.Hash(), er2.ExecutionResult.Hash())
+	require.Equal(suite.T(), er1.ExecutionResult.Fingerprint(), er2.ExecutionResult.Fingerprint())
 
-	// size of estore should be zero prior putting ER
+	// size of mempool should be zero prior putting ER
 	assert.Equal(suite.T(), suite.mempool.ResultsNum(), 0)
 
 	// adding two ERs to the mempool
@@ -101,11 +100,11 @@ func (suite *ERStoreTestSuit) TestPuttingTwoERsWithSharedResult() {
 
 	// number of receipts corresponding to their share result also should be
 	// equal to two after the successful insertion
-	assert.Equal(suite.T(), suite.mempool.ReceiptsCount(er1.ExecutionResult.Hash()), 2)
+	assert.Equal(suite.T(), suite.mempool.ReceiptsCount(er1.ExecutionResult.Fingerprint()), 2)
 }
 
 // TestGettingResultWithNilInput tests both Getters of mempool for nil inputs
-func (suite *ERStoreTestSuit) TestGettingResultWithNilInput() {
+func (suite *ERMempoolTestSuit) TestGettingResultWithNilInput() {
 	list, err := suite.mempool.GetExecutionReceipts(nil)
 	assert.Nil(suite.T(), list)
 	assert.NotNil(suite.T(), err)
@@ -115,11 +114,11 @@ func (suite *ERStoreTestSuit) TestGettingResultWithNilInput() {
 	assert.NotNil(suite.T(), err)
 }
 
-// TestGettingNonMembership tests both Getters of mempool for inputs that do not exist in the mempool
-func (suite *ERStoreTestSuit) TestGettingNonMembership() {
+// TestGettingNonMembership tests both Getters of mempool for inputs that do not exist in it
+func (suite *ERMempoolTestSuit) TestGettingNonMembership() {
 	// generating a random ER that does not exist in the mempool
-	er := randomER()
-	hash := er.ExecutionResult.Hash()
+	er := verification.RandomERGen()
+	hash := er.ExecutionResult.Fingerprint()
 
 	// no ER should be in the mempool for looking up this hash
 	list, err := suite.mempool.GetExecutionReceipts(hash)
@@ -132,18 +131,19 @@ func (suite *ERStoreTestSuit) TestGettingNonMembership() {
 	assert.NotNil(suite.T(), err)
 }
 
+
 // TestGettingSingleER stores and then retrieves a single ER from the mempool
-func (suite *ERStoreTestSuit) TestGettingSingleER() {
+func (suite *ERMempoolTestSuit) TestGettingSingleER() {
 	// generating a random ER that does not exist in the mempool
-	er := randomER()
-	hash := er.ExecutionResult.Hash()
+	er := verification.RandomERGen()
+	hash := er.ExecutionResult.Fingerprint()
 
 	// storing ER in the mempool
 	suite.mempool.Put(er)
 
 	// retrieving er and its result from mempool
 	list, err := suite.mempool.GetExecutionReceipts(hash)
-	assert.Equal(suite.T(), *er, list[0])
+	assert.Equal(suite.T(), er, list[er.Hash().Hex()])
 	assert.Nil(suite.T(), err)
 
 	result, err := suite.mempool.GetExecutionResult(hash)
@@ -153,11 +153,10 @@ func (suite *ERStoreTestSuit) TestGettingSingleER() {
 }
 
 // TestGettingTwoERs stores and then retrieves two distinct ERs from the mempool
-func (suite *ERStoreTestSuit) TestGettingTwoERs() {
+func (suite *ERMempoolTestSuit) TestGettingTwoERs() {
 	// generating two random ERs
-	er1 := randomER()
-
-	er2 := randomER()
+	er1 := verification.RandomERGen()
+	er2 := verification.RandomERGen()
 
 	// two random ERs require to be distinct even in their result part
 	require.NotEqual(suite.T(), er1, er2)
@@ -171,10 +170,10 @@ func (suite *ERStoreTestSuit) TestGettingTwoERs() {
 	}
 
 	for _, er := range erlist {
-		hash := er.ExecutionResult.Hash()
+		hash := er.ExecutionResult.Fingerprint()
 		// retrieving the ER and its result from mempool
 		list, err := suite.mempool.GetExecutionReceipts(hash)
-		assert.Equal(suite.T(), *er, list[0])
+		assert.Equal(suite.T(), er, list[er.Hash().Hex()])
 		assert.Nil(suite.T(), err)
 
 		result, err := suite.mempool.GetExecutionResult(hash)
@@ -183,11 +182,12 @@ func (suite *ERStoreTestSuit) TestGettingTwoERs() {
 	}
 }
 
+
 // TestGettingTwoERsWithSharedResult stores and then retrieves two distinct ERs from the mempool
-func (suite *ERStoreTestSuit) TestGettingTwoERsWithSharedResult() {
+func (suite *ERMempoolTestSuit) TestGettingTwoERsWithSharedResult() {
 	// generating two random ERs
-	er1 := randomER()
-	er2 := randomER()
+	er1 := verification.RandomERGen()
+	er2 := verification.RandomERGen()
 	// overriding the result part of er1 to er2 so making both
 	// of the same result
 	er2.ExecutionResult = er1.ExecutionResult
@@ -203,11 +203,11 @@ func (suite *ERStoreTestSuit) TestGettingTwoERsWithSharedResult() {
 		suite.mempool.Put(er)
 	}
 
-	for index, er := range erlist {
-		hash := er.ExecutionResult.Hash()
+	for _, er := range erlist {
+		hash := er.ExecutionResult.Fingerprint()
 		// retrieving the ER and its result from mempool
 		list, err := suite.mempool.GetExecutionReceipts(hash)
-		assert.Equal(suite.T(), *er, list[index])
+		assert.Equal(suite.T(), er, list[er.Hash().Hex()])
 		assert.Nil(suite.T(), err)
 
 		result, err := suite.mempool.GetExecutionResult(hash)
@@ -216,14 +216,38 @@ func (suite *ERStoreTestSuit) TestGettingTwoERsWithSharedResult() {
 	}
 }
 
+
+
+// TestDuplicateER tests the Put method against adding two identical Execution Receipts sequentially
+// The second ER is expected not to be processed
+func (suite *ERMempoolTestSuit) TestDuplicateER() {
+	// generating a random ER
+	er:= verification.RandomERGen()
+
+
+	// size of mempool should be zero prior putting ER
+	assert.Equal(suite.T(), suite.mempool.ResultsNum(), 0)
+
+	// adding the same ER twice to the mempool
+	suite.mempool.Put(er)
+	suite.mempool.Put(er)
+
+	// adding two ERs with the same result part should make number of results equal to one
+	assert.Equal(suite.T(), suite.mempool.ResultsNum(), 1)
+
+	// number of receipts corresponding to their share result should be 1, in other word,
+	// the second put operation should not take an effect
+	assert.Equal(suite.T(), suite.mempool.ReceiptsCount(er.ExecutionResult.Fingerprint()), 1)
+}
+
 // TestDeadLock tests the implementation of mempool against indefinite waits
 // that may happen due to the mutex locks
 // The tests makes sure that several instances of each method of mempool are
 // able to be invoked, executed, and terminated within a bounded interval
-func (suite *ERStoreTestSuit) TestDeadlock() {
+func (suite *ERMempoolTestSuit) TestDeadlock() {
 	// generating a random ER that does not exist in the mempool
-	er := randomER()
-	hash := er.ExecutionResult.Hash()
+	er := verification.RandomERGen()
+	hash := er.ExecutionResult.Fingerprint()
 	wg := sync.WaitGroup{}
 
 	for i := 0; i < 10; i++ {
@@ -267,30 +291,4 @@ func (suite *ERStoreTestSuit) TestDeadlock() {
 	}
 
 	assert.True(suite.T(), testPassed)
-}
-
-// randomER generates a random ExecutionReceipt
-// The following fields of the generated receipt are chosen randomly
-// PreviousExecutionResultHash
-// BlockHash
-// FinalStateCommitment
-// The rest of bytes are chosen as nil
-func randomER() *flow.ExecutionReceipt {
-	previousER := make([]byte, 32)
-	blockHash := make([]byte, 32)
-	stateComm := make([]byte, 32)
-	executorSignature := make([]byte, 32)
-	rand.Read(previousER)
-	rand.Read(blockHash)
-	rand.Read(stateComm)
-	rand.Read(executorSignature)
-	return &flow.ExecutionReceipt{
-		ExecutionResult: flow.ExecutionResult{ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousExecutionResult: flow.Fingerprint(crypto.BytesToHash(previousER)),
-			Block:                   flow.Fingerprint(crypto.BytesToHash(previousER)),
-			FinalStateCommitment:    stateComm,
-		}},
-		Spocks:            nil,
-		ExecutorSignature: executorSignature,
-	}
 }
