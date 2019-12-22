@@ -1,8 +1,10 @@
 package libp2p
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"os"
 	"strings"
 	"testing"
@@ -172,6 +174,64 @@ func TestLibP2PNode_PubSub(t *testing.T) {
 	}
 }
 
+// TestLibP2PNode_P2P tests end-to-end a P2P message sending and receiving between two nodes
+func TestLibP2PNode_P2P(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var count = 2
+
+	nodes, err := createLibP2PNodes(ctx, t, count)
+	require.NoError(t, err)
+	defer func() {
+		if nodes != nil {
+			for _, n := range nodes {
+				n.Stop()
+			}
+		}
+	}()
+
+	// Peer 1 will be send a message to Peer 2
+	peer1 := nodes[0]
+	peer2 := nodes[1]
+
+	var ids []NodeAddress
+	// Get actual ip and port numbers on which the nodes were started
+	for _, n := range nodes {
+		ip, p := n.GetIPPort()
+		ids = append(ids, NodeAddress{name: n.name, ip: ip, port: p})
+	}
+
+	// Add the second node as a peer to the first node
+	require.NoError(t, peer1.AddPeers(ctx, ids[1:]))
+
+	// Create and register engines for each of the nodes
+	te1 := &TestEngine{t: t}
+	conduit1, err := peer1.Register(1, te1)
+	te2 := &TestEngine{t: t, ch: make(chan struct{})}
+	_, err = peer2.Register(1, te2)
+
+	// Create target byte array from the node name "node2" -> []byte
+	var target [32]byte
+	copy(target[:], ids[1].name)
+	targetID := flow.Identifier(target)
+
+	// Send the message to peer 2 using the conduit of peer 1
+	require.NoError(t, conduit1.Submit([]byte("hello"), targetID))
+
+	select {
+	case <-te2.ch:
+		// Assert that the message was received by peer 2
+		require.NotNil(t, te2.id)
+		require.NotNil(t, te2.event)
+		senderID := bytes.Trim(te2.id[:], "\x00")
+		senderIDStr := string(senderID)
+		assert.Equal(t, peer1.name, senderIDStr)
+		assert.Equal(t, "hello", fmt.Sprintf("%s", te2.event))
+	case <-time.After(3 * time.Second):
+		assert.Fail(t, "peer 1 failed to send a message to peer 2")
+	}
+}
+
 func createLibP2PNodes(ctx context.Context, t *testing.T, count int) (nodes []*P2PNode, err error) {
 	defer func() {
 		if err != nil && nodes != nil {
@@ -194,3 +254,30 @@ func createLibP2PNodes(ctx context.Context, t *testing.T, count int) (nodes []*P
 	}
 	return nodes, err
 }
+
+
+type TestEngine struct {
+	t *testing.T
+	id flow.Identifier
+	event interface{}
+	ch chan struct{}
+}
+
+func (te *TestEngine) SubmitLocal(event interface{}) {
+	panic("not implemented")
+}
+
+func (te *TestEngine) Submit(originID flow.Identifier, event interface{}) {
+	te.id = originID
+	te.event = event
+	te.ch <- struct{}{}
+}
+
+func (te *TestEngine) ProcessLocal(event interface{}) error {
+	panic("not implemented")
+}
+
+func (te *TestEngine) Process(originID flow.Identifier, event interface{}) error {
+	panic("not implemented")
+}
+
