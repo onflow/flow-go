@@ -10,7 +10,6 @@ import (
 var ConsensusLogger loggo.Logger
 
 type Reactor struct {
-	core       *core.ReactorCore
 	forkchoice forkchoice.ForkChoice
 
 	forkchoiceRequests chan uint64
@@ -20,7 +19,6 @@ type Reactor struct {
 
 func NewReactor(finalizer *core.ReactorCore, forkchoice forkchoice.ForkChoice) *Reactor {
 	return &Reactor{
-		core:               finalizer,
 		forkchoice:         forkchoice,
 		forkchoiceRequests: make(chan uint64, 10),
 		newQCs:             make(chan *def.QuorumCertificate, 10),
