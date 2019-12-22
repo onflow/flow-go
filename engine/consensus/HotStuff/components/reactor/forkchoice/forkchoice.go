@@ -12,7 +12,7 @@ var ForkChoiceLogger loggo.Logger
 // reactor.core with data
 type ForkChoice interface {
 	ProcessBlock(*def.Block)
-	ProcessQC(*def.QuorumCertificate)
+	ProcessQcFromVotes(*def.QuorumCertificate)
 
 	// IsKnownBlock returns true if the consensus reactor knows the specified block
 	IsKnownBlock([]byte, uint64) bool
