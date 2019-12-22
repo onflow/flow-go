@@ -2,12 +2,32 @@ package flow
 
 import (
 	"encoding/hex"
+	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
 )
 
 // Identifier represents a 32-byte unique identifier for a node.
 type Identifier [32]byte
+
+// HexStringToIdentifier converts a hex string to an identifier. The input
+// must be 64 characters long and contain only valid hex characters.
+func HexStringToIdentifier(hexString string) (Identifier, error) {
+	var identifier Identifier
+	i, err := hex.Decode(identifier[:], []byte(hexString))
+	if err != nil {
+		return identifier, err
+	}
+	if i != 32 {
+		return identifier, fmt.Errorf("malformed input, expected 32 bytes (64 characters), decoded %d", i)
+	}
+	return identifier, nil
+}
+
+// String returns the hex string representation of the identifier.
+func (id Identifier) String() string {
+	return hex.EncodeToString(id[:])
+}
 
 // Fingerprint is a hash of an entity to verify the content
 // TODO update this to be a fixed size array

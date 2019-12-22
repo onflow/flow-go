@@ -18,8 +18,8 @@ func TestSubmitCollectionOneToOne(t *testing.T) {
 	// create a mocked network for each node and connect them in a in-memory hub, so that events sent from one engine
 	// can be delivered directly to another engine on a different node
 	_, nodes, err := createConnectedNodes(
-		fmt.Sprintf("consensus-%x@address1=1000", unittest.IdentifierFixture()),
-		fmt.Sprintf("consensus-%x@address2=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address1=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address2=1000", unittest.IdentifierFixture()),
 	)
 	require.Nil(t, err)
 
@@ -48,9 +48,9 @@ func TestSubmitCollectionOneToOne(t *testing.T) {
 func TestSubmitCollectionManyToManySynchronous(t *testing.T) {
 
 	_, nodes, err := createConnectedNodes(
-		fmt.Sprintf("consensus-%x@address1=1000", unittest.IdentifierFixture()),
-		fmt.Sprintf("consensus-%x@address2=1000", unittest.IdentifierFixture()),
-		fmt.Sprintf("consensus-%x@address3=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address1=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address2=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address3=1000", unittest.IdentifierFixture()),
 	)
 	require.Nil(t, err)
 
@@ -94,9 +94,9 @@ func TestSubmitCollectionManyToManySynchronous(t *testing.T) {
 func TestSubmitCollectionManyToManyAsynchronous(t *testing.T) {
 
 	_, nodes, err := createConnectedNodes(
-		fmt.Sprintf("consensus-%x@address1=1000", unittest.IdentifierFixture()),
-		fmt.Sprintf("consensus-%x@address2=1000", unittest.IdentifierFixture()),
-		fmt.Sprintf("consensus-%x@address3=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address1=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address2=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address3=1000", unittest.IdentifierFixture()),
 	)
 	require.Nil(t, err)
 

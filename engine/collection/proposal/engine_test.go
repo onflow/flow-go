@@ -25,7 +25,7 @@ func TestStartStop(t *testing.T) {
 	hub := stub.NewNetworkHub()
 	stub := stub.NewNetwork(state, me, hub)
 
-	e, err := proposal.New(log, stub, me, state)
+	e, err := proposal.New(log, stub, state, me)
 	require.NoError(t, err)
 
 	t.Run("should start and stop promptly", func(t *testing.T) {
