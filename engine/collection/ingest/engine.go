@@ -120,7 +120,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) error {
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
-		Hex("tx_hash", tx.Hash()).
+		Hex("tx_hash", tx.Fingerprint()).
 		Logger()
 
 	log.Debug().Msg("transaction message received")
@@ -130,7 +130,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) e
 		return fmt.Errorf("invalid transaction: %w", err)
 	}
 
-	clusterID := protocol.Route(len(e.clusters), tx.Hash())
+	clusterID := protocol.Route(len(e.clusters), tx.Fingerprint())
 
 	// tx is routed to my cluster, add to mempool
 	if clusterID == e.clusterID {

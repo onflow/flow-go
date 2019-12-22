@@ -102,6 +102,7 @@ func (h Hash) Hex() string {
 	return hex.EncodeToString(h)
 }
 
+
 // Hasher interface
 
 type Hasher interface {

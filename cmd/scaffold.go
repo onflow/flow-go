@@ -142,6 +142,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.MustNot(err).Msg("could not parse node identifier")
 
 	allIdentities, err := state.Final().Identities()
+	fnb.MustNot(err).Msg("could not retrieve finalized identities")
 	fnb.Logger.Debug().Msgf("known nodes: %v", allIdentities)
 
 	id, err := state.Final().Identity(myID)

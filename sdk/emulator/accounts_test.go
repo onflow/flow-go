@@ -34,13 +34,13 @@ func TestCreateAccount(t *testing.T) {
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, nil)
 		require.NoError(t, err)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)
@@ -86,13 +86,13 @@ func TestCreateAccount(t *testing.T) {
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKeyA, publicKeyB}, nil)
 		assert.NoError(t, err)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)
@@ -141,13 +141,13 @@ func TestCreateAccount(t *testing.T) {
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKeyA, publicKeyB}, code)
 		assert.NoError(t, err)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)
@@ -182,13 +182,13 @@ func TestCreateAccount(t *testing.T) {
 		createAccountScript, err := templates.CreateAccount(nil, code)
 		assert.NoError(t, err)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)
@@ -228,13 +228,13 @@ func TestCreateAccount(t *testing.T) {
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, code)
 		assert.NoError(t, err)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)
@@ -285,13 +285,13 @@ func TestCreateAccount(t *testing.T) {
 		createAccountScript, err := templates.CreateAccount([]flow.AccountPublicKey{publicKey}, nil)
 		require.NoError(t, err)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)
@@ -321,13 +321,13 @@ func TestCreateAccount(t *testing.T) {
 		createAccountScript, err := templates.CreateAccount(nil, code)
 		assert.NoError(t, err)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             createAccountScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)
@@ -359,14 +359,14 @@ func TestAddAccountKey(t *testing.T) {
 		addKeyScript, err := templates.AddAccountKey(publicKey)
 		assert.NoError(t, err)
 
-		tx1 := flow.Transaction{
+		tx1 := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             addKeyScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 			ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx1, b.RootKey())
 		assert.NoError(t, err)
@@ -385,13 +385,13 @@ func TestAddAccountKey(t *testing.T) {
 
 		script := []byte("transaction { execute {} }")
 
-		tx2 := flow.Transaction{
+		tx2 := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-		}
+		}}
 
 		sig, err = keys.SignTransaction(tx2, privateKey)
 		assert.NoError(t, err)
@@ -424,14 +424,14 @@ func TestAddAccountKey(t *testing.T) {
 		addKeyScript, err := templates.AddAccountKey(publicKey)
 		assert.NoError(t, err)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             addKeyScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
 			ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)
@@ -459,14 +459,14 @@ func TestRemoveAccountKey(t *testing.T) {
 	assert.NoError(t, err)
 
 	// create transaction that adds publicKey to account keys
-	tx1 := flow.Transaction{
+	tx1 := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             addKeyScript,
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-	}
+	}}
 
 	// sign with root key
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
@@ -491,14 +491,14 @@ func TestRemoveAccountKey(t *testing.T) {
 	assert.Len(t, account.Keys, 2)
 
 	// create transaction that removes root key
-	tx2 := flow.Transaction{
+	tx2 := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-	}
+	}}
 
 	// sign with root key
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
@@ -523,14 +523,14 @@ func TestRemoveAccountKey(t *testing.T) {
 	assert.Len(t, account.Keys, 1)
 
 	// create transaction that removes remaining account key
-	tx3 := flow.Transaction{
+	tx3 := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-	}
+	}}
 
 	// sign with root key (that has been removed)
 	sig, err = keys.SignTransaction(tx3, b.RootKey())
@@ -551,14 +551,14 @@ func TestRemoveAccountKey(t *testing.T) {
 	assert.Len(t, account.Keys, 1)
 
 	// create transaction that removes remaining account key
-	tx4 := flow.Transaction{
+	tx4 := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             templates.RemoveAccountKey(0),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-	}
+	}}
 
 	// sign with remaining account key
 	sig, err = keys.SignTransaction(tx4, privateKey)
@@ -619,14 +619,14 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		assert.Equal(t, codeA, account.Code)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             templates.UpdateAccountCode(codeB),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
 			ScriptAccounts:     []flow.Address{accountAddressB},
-		}
+		}}
 
 		sigA, err := keys.SignTransaction(tx, privateKeyA)
 		assert.NoError(t, err)
@@ -668,14 +668,14 @@ func TestUpdateAccountCode(t *testing.T) {
 
 		assert.Equal(t, codeA, account.Code)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             templates.UpdateAccountCode(codeB),
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
 			ScriptAccounts:     []flow.Address{accountAddressB},
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, privateKeyA)
 		assert.NoError(t, err)
@@ -718,14 +718,14 @@ func TestUpdateAccountCode(t *testing.T) {
 			}
 		`, accountAddressB.Hex()))
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             unauthorizedUpdateAccountCodeScript,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       accountAddressA,
 			ScriptAccounts:     []flow.Address{accountAddressA},
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, privateKeyA)
 		assert.NoError(t, err)
@@ -780,13 +780,13 @@ func TestImportAccountCode(t *testing.T) {
 		}
 	`)
 
-	tx := flow.Transaction{
+	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             script,
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
-	}
+	}}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
 	assert.NoError(t, err)

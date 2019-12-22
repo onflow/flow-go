@@ -1,7 +1,6 @@
 package badger
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dgraph-io/badger/v2"
@@ -19,11 +18,11 @@ func NewTransactions(db *badger.DB) *Transactions {
 	return &t
 }
 
-func (t *Transactions) ByHash(hash crypto.Hash) (*flow.Transaction, error) {
+func (t *Transactions) ByFingerprint(fp flow.Fingerprint) (*flow.Transaction, error) {
 	var tx flow.Transaction
 
 	err := t.db.View(func(btx *badger.Txn) error {
-		err := operation.RetrieveTransaction(hash, &tx)(btx)
+		err := operation.RetrieveTransaction(fp, &tx)(btx)
 		if err != nil {
 			return errors.Wrap(err, "could not retrieve transaction")
 		}
@@ -35,7 +34,7 @@ func (t *Transactions) ByHash(hash crypto.Hash) (*flow.Transaction, error) {
 
 func (t *Transactions) Insert(tx *flow.Transaction) error {
 	return t.db.Update(func(btx *badger.Txn) error {
-		err := operation.InsertTransaction(tx.Hash(), tx)(btx)
+		err := operation.InsertTransaction(tx.Fingerprint(), tx)(btx)
 		if err != nil {
 			return errors.Wrap(err, "could not insert transaction")
 		}

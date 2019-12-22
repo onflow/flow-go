@@ -2,7 +2,6 @@
 
 package mock
 
-import crypto "github.com/dapperlabs/flow-go/crypto"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 
@@ -11,13 +10,13 @@ type Transactions struct {
 	mock.Mock
 }
 
-// ByHash provides a mock function with given fields: hash
-func (_m *Transactions) ByHash(hash crypto.Hash) (*flow.Transaction, error) {
-	ret := _m.Called(hash)
+// ByFingerprint provides a mock function with given fields: fingerprint
+func (_m *Transactions) ByFingerprint(fingerprint flow.Fingerprint) (*flow.Transaction, error) {
+	ret := _m.Called(fingerprint)
 
 	var r0 *flow.Transaction
-	if rf, ok := ret.Get(0).(func(crypto.Hash) *flow.Transaction); ok {
-		r0 = rf(hash)
+	if rf, ok := ret.Get(0).(func(flow.Fingerprint) *flow.Transaction); ok {
+		r0 = rf(fingerprint)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Transaction)
@@ -25,8 +24,8 @@ func (_m *Transactions) ByHash(hash crypto.Hash) (*flow.Transaction, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(crypto.Hash) error); ok {
-		r1 = rf(hash)
+	if rf, ok := ret.Get(1).(func(flow.Fingerprint) error); ok {
+		r1 = rf(fingerprint)
 	} else {
 		r1 = ret.Error(1)
 	}
