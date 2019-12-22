@@ -30,7 +30,7 @@ func (p *PubSubEventProcessor) OnMissingBlock(hash []byte, view uint64) {
 	}
 }
 
-func (p *PubSubEventProcessor) OnIncorporatedBlock(block *def.Block) {
+func (p *PubSubEventProcessor) OnBlockIncorporated(block *def.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.incorporatedBlockCons {
