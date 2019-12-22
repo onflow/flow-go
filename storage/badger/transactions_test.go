@@ -1,6 +1,7 @@
 package badger_test
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -15,7 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestTransactionsInsertRetrieve(t *testing.T) {
+func TestTransactions(t *testing.T) {
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
 	defer os.RemoveAll(dir)
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
@@ -31,4 +32,13 @@ func TestTransactionsInsertRetrieve(t *testing.T) {
 	require.Nil(t, err)
 
 	assert.Equal(t, &expected, actual)
+
+	err = store.Remove(expected.Hash())
+	require.NoError(t, err)
+
+	// should fail since this was just deleted
+	_, err = store.ByFingerprint(expected.Fingerprint())
+	if assert.Error(t, err) {
+		assert.True(t, errors.Is(err, badger.ErrKeyNotFound))
+	}
 }

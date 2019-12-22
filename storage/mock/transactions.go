@@ -46,3 +46,17 @@ func (_m *Transactions) Insert(tx *flow.Transaction) error {
 
 	return r0
 }
+
+// Remove provides a mock function with given fields: fingerprint
+func (_m *Transactions) Remove(fingerprint flow.Fingerprint) error {
+	ret := _m.Called(fingerprint)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Fingerprint) error); ok {
+		r0 = rf(fingerprint)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}

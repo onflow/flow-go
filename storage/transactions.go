@@ -11,4 +11,7 @@ type Transactions interface {
 
 	// Insert inserts the transaction, keyed by fingerprint.
 	Insert(tx *flow.Transaction) error
+
+	// Remove removes the transaction with the given hash, if it exists.
+	Remove(fingerprint flow.Fingerprint) error
 }

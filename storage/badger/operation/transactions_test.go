@@ -1,6 +1,7 @@
 package operation_test
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -16,7 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestTransactionsInsertRetrieve(t *testing.T) {
+func TestTransactions(t *testing.T) {
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
 	defer os.RemoveAll(dir)
@@ -30,6 +31,14 @@ func TestTransactionsInsertRetrieve(t *testing.T) {
 	var actual flow.Transaction
 	err = db.View(operation.RetrieveTransaction(expected.Fingerprint(), &actual))
 	require.Nil(t, err)
-
 	assert.Equal(t, expected, actual)
+
+	err = db.Update(operation.RemoveTransaction(expected.Hash()))
+	require.Nil(t, err)
+
+	err = db.View(operation.RetrieveTransaction(expected.Fingerprint(), &actual))
+	// should fail since this was just deleted
+	if assert.Error(t, err) {
+		assert.True(t, errors.Is(err, badger.ErrKeyNotFound))
+	}
 }
