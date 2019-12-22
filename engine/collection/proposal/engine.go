@@ -27,9 +27,8 @@ type Engine struct {
 	con   network.Conduit
 	me    module.Local
 	state protocol.State
-	//pool  *txpool.Pool // TODO replace with merkle tree
+	pool  module.TransactionPool
 	// TODO storage provider for transactions/guaranteed collections
-
 }
 
 func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State) (*Engine, error) {
@@ -38,7 +37,6 @@ func New(log zerolog.Logger, net module.Network, me module.Local, state protocol
 		log:   log.With().Str("engine", "proposal").Logger(),
 		me:    me,
 		state: state,
-		//pool:  pool,
 	}
 
 	con, err := net.Register(engine.CollectionProposal, e)

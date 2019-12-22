@@ -8,14 +8,13 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func prepareNodesAndCollectionsConfigurable(N, M int) (
-	[]*mockPropagationNode, []*collection.GuaranteedCollection, error) {
+func prepareNodesAndCollections(N, M int) (
+	[]*mockPropagationNode, []*flow.GuaranteedCollection, error) {
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -31,7 +30,7 @@ func prepareNodesAndCollectionsConfigurable(N, M int) (
 	}
 
 	// prepare M distinct collection hashes
-	gcs := make([]*collection.GuaranteedCollection, M)
+	gcs := make([]*flow.GuaranteedCollection, M)
 	for m := 0; m < M; m++ {
 		gcs[m] = randCollection()
 	}
@@ -89,9 +88,9 @@ func randHash() []byte {
 }
 
 // a utiliy func to generate a GuaranteedCollection with random hash
-func randCollection() *collection.GuaranteedCollection {
+func randCollection() *flow.GuaranteedCollection {
 	hash := randHash()
-	return &collection.GuaranteedCollection{
+	return &flow.GuaranteedCollection{
 		CollectionHash: hash,
 	}
 }

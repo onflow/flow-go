@@ -21,11 +21,11 @@ func NewTransactions(db *badger.DB) *Transactions {
 	return &t
 }
 
-func (t *Transactions) ByHash(hash crypto.Hash) (*flow.Transaction, error) {
+func (t *Transactions) ByFingerprint(fp flow.Fingerprint) (*flow.Transaction, error) {
 	var tx flow.Transaction
 
 	err := t.db.View(func(btx *badger.Txn) error {
-		err := operation.RetrieveTransaction(hash, &tx)(btx)
+		err := operation.RetrieveTransaction(fp, &tx)(btx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve transaction: %w", err)
 		}
@@ -37,7 +37,7 @@ func (t *Transactions) ByHash(hash crypto.Hash) (*flow.Transaction, error) {
 
 func (t *Transactions) Insert(tx *flow.Transaction) error {
 	return t.db.Update(func(btx *badger.Txn) error {
-		err := operation.InsertTransaction(tx.Hash(), tx)(btx)
+		err := operation.InsertTransaction(tx.Fingerprint(), tx)(btx)
 		if err != nil {
 			return fmt.Errorf("could not insert transaction: %w", err)
 		}

@@ -37,9 +37,9 @@ type MaksioConfig struct {
 func (fnb *FlowNodeBuilder) baseFlags() {
 	// bind configuration parameters
 	fnb.flags.StringVarP(&fnb.BaseConfig.NodeID, "nodeid", "n", "node1", "identity of our node")
-	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "Entries", "e", []string{"consensus-node1@address1=1000"}, "identity table Entries for all nodes")
-	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "Timeout", "t", 1*time.Minute, "how long to try connecting to the network")
-	fnb.flags.UintVarP(&fnb.BaseConfig.Connections, "Connections", "c", 0, "number of Connections to establish to peers")
+	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "entries", "e", []string{"consensus-node1@address1=1000"}, "identity table entries for all nodes")
+	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
+	fnb.flags.UintVarP(&fnb.BaseConfig.Connections, "connections", "c", 0, "number of connections to establish to peers")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", "data", "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 }
@@ -101,7 +101,9 @@ func (fnb *FlowNodeBuilder) initState() {
 	}
 
 	trueID, err := flow.HexStringToIdentifier(fnb.BaseConfig.NodeID)
+	fnb.MustNot(err).Msg("could not parse local node ID")
 	allIdentities, err := state.Final().Identities()
+	fnb.MustNot(err).Msg("could not retrieve finalized identities")
 	fnb.Logger.Debug().Msg(fmt.Sprintf("%v", allIdentities))
 
 	id, err := state.Final().Identity(trueID)
