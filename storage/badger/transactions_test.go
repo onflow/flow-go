@@ -37,7 +37,7 @@ func TestTransactions(t *testing.T) {
 	require.NoError(t, err)
 
 	// should fail since this was just deleted
-	_, err = store.ByHash(expected.Hash())
+	_, err = store.ByFingerprint(expected.Fingerprint())
 	if assert.Error(t, err) {
 		assert.True(t, errors.Is(err, badger.ErrKeyNotFound))
 	}

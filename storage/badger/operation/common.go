@@ -77,7 +77,16 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 // exist, this is a no-op.
 func remove(key []byte) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
-		err := tx.Delete(key)
+		// retrieve the item from the key-value store
+		_, err := tx.Get(key)
+		if err == badger.ErrKeyNotFound {
+			return fmt.Errorf("could not find key %x): %w", key, err)
+		}
+		if err != nil {
+			return fmt.Errorf("could not check key: %w", err)
+		}
+
+		err = tx.Delete(key)
 		return err
 	}
 }

@@ -1,8 +1,10 @@
 package operation
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dgraph-io/badger/v2"
+
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // InsertTransaction inserts a transaction keyed by transaction fingerprint.

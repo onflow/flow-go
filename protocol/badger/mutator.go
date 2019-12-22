@@ -24,7 +24,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 		// check that the new identities are valid
 		err := checkIdentitiesValidity(tx, genesis.NewIdentities)
 		if err != nil {
-			return fmt.Errorf("could not check identities validity; %w", err)
+			return fmt.Errorf("could not check identities validity: %w", err)
 		}
 
 		// initialize the boundary of the finalized state

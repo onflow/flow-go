@@ -36,7 +36,7 @@ func TestTransactions(t *testing.T) {
 	err = db.Update(operation.RemoveTransaction(expected.Hash()))
 	require.Nil(t, err)
 
-	err = db.View(operation.RetrieveTransaction(expected.Hash(), &actual))
+	err = db.View(operation.RetrieveTransaction(expected.Fingerprint(), &actual))
 	// should fail since this was just deleted
 	if assert.Error(t, err) {
 		assert.True(t, errors.Is(err, badger.ErrKeyNotFound))
