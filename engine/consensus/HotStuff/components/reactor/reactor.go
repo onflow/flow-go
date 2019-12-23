@@ -65,7 +65,7 @@ func (r *Reactor) run() {
 		case view := <-r.forkchoiceRequests:
 			r.forkchoice.OnForkChoiceTrigger(view)
 		case qc := <-r.newQCs:
-			r.forkchoice.ProcessQC(qc)
+			r.forkchoice.ProcessQcFromVotes(qc)
 		case block := <-r.newBlockProposals:
 			if r.forkchoice.IsProcessingNeeded(block.BlockMRH, block.View) {
 				r.forkchoice.ProcessBlock(block)

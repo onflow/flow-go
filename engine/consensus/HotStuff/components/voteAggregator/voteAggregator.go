@@ -16,7 +16,7 @@ import (
 type VoteAggregator struct {
 }
 
-func (v *VoteAggregator) OnIncorporatedBlock(block *def.Block) {
+func (v *VoteAggregator) OnBlockIncorporated(block *def.Block) {
 	panic("Implement me")
 }
 

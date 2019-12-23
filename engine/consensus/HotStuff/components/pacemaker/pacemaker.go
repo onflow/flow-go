@@ -5,7 +5,7 @@ import (
 )
 
 type Pacemaker interface {
-	OnIncorporatedBlock(*def.Block)
+	OnBlockIncorporated(*def.Block)
 	OnQcFromVotesIncorporated(*def.QuorumCertificate)
 
 	Run()
