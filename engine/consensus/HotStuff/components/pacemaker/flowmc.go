@@ -2,7 +2,6 @@ package pacemaker
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-consensus-research/hotstuff/roles/consensus/bft"
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/components/pacemaker/events"
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/components/pacemaker/primary"
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
@@ -10,7 +9,7 @@ import (
 	"time"
 )
 
-type BasicPacemaker struct {
+type FlowMC struct {
 	currentView uint64
 
 	primarySelector primary.Selector
@@ -24,11 +23,11 @@ type BasicPacemaker struct {
 	myNodeIndex uint
 }
 
-func NewBasicPacemaker() *BasicPacemaker {
-	return &BasicPacemaker{}
+func NewBasicPacemaker() *FlowMC {
+	return &FlowMC{}
 }
 
-func (p *BasicPacemaker) OnIncorporatedBlock(block *def.Block) {
+func (p *FlowMC) OnBlockIncorporated(block *def.Block) {
 	// inspired by https://content.pivotal.io/blog/a-channel-based-ring-buffer-in-go
 	select {
 	case p.incorporatedBlockEvents <- block:
@@ -38,7 +37,7 @@ func (p *BasicPacemaker) OnIncorporatedBlock(block *def.Block) {
 	}
 }
 
-func (p *BasicPacemaker) OnQcFromVotesIncorporated(qc *def.QuorumCertificate) {
+func (p *FlowMC) OnQcFromVotesIncorporated(qc *def.QuorumCertificate) {
 	select {
 	case p.incorporatedQcEvents <- qc:
 	default:
@@ -47,33 +46,33 @@ func (p *BasicPacemaker) OnQcFromVotesIncorporated(qc *def.QuorumCertificate) {
 	}
 }
 
-func (p *BasicPacemaker) runLeaderRound(view uint64) {
+func (p *FlowMC) runLeaderRound(view uint64) {
 	p.eventProcessor.OnForkChoiceTrigger(view)
 }
 
-func (p *BasicPacemaker) runReplicaRound(view uint64) {
+func (p *FlowMC) runReplicaRound(view uint64) {
 
 }
 
 // primaryForView returns true if I am primary for the specified view
-func (p *BasicPacemaker) primaryForView(view uint64) bool {
+func (p *FlowMC) primaryForView(view uint64) bool {
 	// ToDo: update to use identity component
 	return p.primarySelector.PrimaryAtView(p.currentView) == p.myNodeIndex
 }
 
 // OnReplicaTimeout is a hook which is called when the replica timeout occurs
-func (p *BasicPacemaker) onWaitingForBlockTimeout() {
+func (p *FlowMC) onWaitingForBlockTimeout() {
 	p.timeoutController.OnTimeout()
 	p.eventProcessor.OnWaitingForBlockTimeout(p.currentView)
 
 }
 
-func (p *BasicPacemaker) enterView(view uint64) {
+func (p *FlowMC) enterView(view uint64) {
 	p.currentView = view
 	p.eventProcessor.OnEnteringView(view)
 }
 
-func (p *BasicPacemaker) onIncorporatedBlock(block *def.Block) bool {
+func (p *FlowMC) onIncorporatedBlock(block *def.Block) bool {
 	if block.QC.View >= block.View { // sanity check
 		m := fmt.Sprintf("Internal error: received invalid block with block.qc.view=%d but block.view=%d", block.QC.View, block.View)
 		panic(m)
@@ -89,14 +88,14 @@ func (p *BasicPacemaker) onIncorporatedBlock(block *def.Block) bool {
 	return false
 }
 
-func (p *BasicPacemaker) onIncorporatedQC(qc *def.QuorumCertificate) bool {
+func (p *FlowMC) onIncorporatedQC(qc *def.QuorumCertificate) bool {
 	if qc.View >= p.currentView {
 		// fast forward
 		p.enterView(qc.View + 1)
 	}
 }
 
-func (p *BasicPacemaker) executeView(currentView uint64) uint64 {
+func (p *FlowMC) executeView(currentView uint64) uint64 {
 	var timer *time.Timer
 
 	p.eventProcessor.OnEnteringView(view)
@@ -127,7 +126,7 @@ func (p *BasicPacemaker) executeView(currentView uint64) uint64 {
 }
 
 
-func (p *BasicPacemaker) run() {
+func (p *FlowMC) run() {
 	var timer *time.Timer
 	for {
 		p.currentView += 1
@@ -171,7 +170,7 @@ func (p *BasicPacemaker) run() {
 	}
 }
 
-func (p *BasicPacemaker) Run() {
+func (p *FlowMC) Run() {
 	go p.run()
 }
 

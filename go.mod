@@ -59,6 +59,7 @@ require (
 	golang.org/x/net v0.0.0-20190912160710-24e19bdeb0f2 // indirect
 	golang.org/x/text v0.3.2
 	gonum.org/v1/gonum v0.0.0-20191018104224-74cb7b153f2c
+	google.golang.org/appengine v1.4.0 // indirect
 	google.golang.org/grpc v1.23.1
 	zombiezen.com/go/capnproto2 v2.17.0+incompatible
 )
