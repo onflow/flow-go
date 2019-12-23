@@ -199,6 +199,7 @@ func TestLibP2PNode_P2P(t *testing.T) {
 	// Get actual ip and port numbers on which the nodes were started
 	for _, n := range nodes {
 		ip, p := n.GetIPPort()
+		fmt.Printf("node: %s IP: %s port: %s\n", n.name, ip, p)
 		ids = append(ids, NodeAddress{name: n.name, ip: ip, port: p})
 	}
 
