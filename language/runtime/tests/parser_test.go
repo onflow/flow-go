@@ -4108,7 +4108,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 							EndPos:   Position{Offset: 195, Line: 11, Column: 8},
 						},
 					},
-					PreConditions: []*Condition{
+					PreConditions: &Conditions{
 						{
 							Kind: ConditionKindPre,
 							Test: &BinaryExpression{
@@ -4150,7 +4150,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 							},
 						},
 					},
-					PostConditions: []*Condition{
+					PostConditions: &Conditions{
 						{
 							Kind: ConditionKindPost,
 							Test: &BinaryExpression{
@@ -4367,7 +4367,7 @@ func TestParseConditionMessage(t *testing.T) {
 							EndPos:   Position{Offset: 134, Line: 7, Column: 8},
 						},
 					},
-					PreConditions: []*Condition{
+					PreConditions: &Conditions{
 						{
 							Kind: ConditionKindPre,
 							Test: &BinaryExpression{
@@ -6724,7 +6724,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							StartPos: Position{Offset: 46, Line: 6, Column: 6},
 						},
 					},
-					PreConditions: []*Condition{
+					PreConditions: &Conditions{
 						{
 							Kind: ConditionKindPre,
 							Test: &BinaryExpression{
@@ -6746,7 +6746,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							},
 						},
 					},
-					PostConditions: []*Condition{
+					PostConditions: &Conditions{
 						{
 							Kind: ConditionKindPost,
 							Test: &BinaryExpression{
@@ -6961,7 +6961,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							StartPos: Position{Offset: 46, Line: 6, Column: 6},
 						},
 					},
-					PreConditions: []*Condition{
+					PreConditions: &Conditions{
 						{
 							Kind: ConditionKindPre,
 							Test: &BinaryExpression{
@@ -6983,7 +6983,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							},
 						},
 					},
-					PostConditions: []*Condition{
+					PostConditions: &Conditions{
 						{
 							Kind: ConditionKindPost,
 							Test: &BinaryExpression{

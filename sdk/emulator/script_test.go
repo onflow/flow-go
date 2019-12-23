@@ -13,21 +13,21 @@ import (
 )
 
 func TestExecuteScript(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, counterAddress := deployAndGenerateAddTwoScript(t, b)
 
 	accountAddress := b.RootAccountAddress()
 
-	tx := flow.Transaction{
+	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       accountAddress,
 		ScriptAccounts:     []flow.Address{accountAddress},
-	}
+	}}
 
 	sig, err := keys.SignTransaction(tx, b.RootKey())
 	assert.NoError(t, err)

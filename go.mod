@@ -1,6 +1,6 @@
 module github.com/dapperlabs/flow-go
 
-go 1.12
+go 1.13
 
 require (
 	github.com/antlr/antlr4 v0.0.0-20190723154043-128983ff903e

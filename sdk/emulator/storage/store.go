@@ -37,23 +37,21 @@ type Store interface {
 	CommitBlock(
 		block types.Block,
 		transactions []flow.Transaction,
-		ledger flow.Ledger,
+		delta types.LedgerDelta,
 		events []flow.Event,
 	) error
 
 	// TransactionByHash gets the transaction with the given hash.
-	TransactionByHash(crypto.Hash) (flow.Transaction, error)
+	TransactionByHash(hash crypto.Hash) (flow.Transaction, error)
 
 	// InsertTransaction inserts a transaction.
 	InsertTransaction(flow.Transaction) error
 
-	// LedgerByNumber returns the ledger state at a given block.
-	LedgerByNumber(blockNumber uint64) (flow.Ledger, error)
+	// LedgerViewByNumber returns a view into the ledger state at a given block.
+	LedgerViewByNumber(blockNumber uint64) *types.LedgerView
 
-	// InsertLedger updates all registers in the ledger for the given block.
-	// Callers should only include registers in the ledger whose value changed
-	// in the given block to save space.
-	InsertLedger(blockNumber uint64, ledger flow.Ledger) error
+	// InsertLedgerDelta inserts a register delta at a given block.
+	InsertLedgerDelta(blockNumber uint64, delta types.LedgerDelta) error
 
 	// RetrieveEvents returns all events with the given type between startBlock and
 	// endBlock (inclusive). If eventType is empty, returns all events in the

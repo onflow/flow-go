@@ -258,8 +258,8 @@ func (checker *Checker) checkInterfaceSpecialFunctionBlock(
 				ImplementedKind: implementedKind,
 			},
 		)
-	} else if len(block.PreConditions) == 0 &&
-		len(block.PostConditions) == 0 {
+	} else if (block.PreConditions == nil || len(*block.PreConditions) == 0) &&
+		(block.PostConditions == nil || len(*block.PostConditions) == 0) {
 
 		checker.report(
 			&InvalidImplementationError{

@@ -7,12 +7,17 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// InsertTransaction inserts a transaction keyed by transaction hash.
-func InsertTransaction(hash crypto.Hash, tx *flow.Transaction) func(*badger.Txn) error {
-	return insert(makePrefix(codeTransaction, hash), tx)
+// InsertTransaction inserts a transaction keyed by transaction fingerprint.
+func InsertTransaction(fingerprint flow.Fingerprint, tx *flow.Transaction) func(*badger.Txn) error {
+	return insert(makePrefix(codeTransaction, fingerprint), tx)
 }
 
-// RetrieveTransactions retrieves a transaction by hash.
-func RetrieveTransaction(hash crypto.Hash, tx *flow.Transaction) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeTransaction, hash), tx)
+// RetrieveTransaction retrieves a transaction by fingerprint.
+func RetrieveTransaction(fingerprint flow.Fingerprint, tx *flow.Transaction) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeTransaction, fingerprint), tx)
+}
+
+// RemoveTransaction removes the transaction with the given hash.
+func RemoveTransaction(hash crypto.Hash) func(*badger.Txn) error {
+	return remove(makePrefix(codeTransaction, hash))
 }

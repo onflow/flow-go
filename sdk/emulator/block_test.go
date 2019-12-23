@@ -3,9 +3,8 @@ package emulator_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
@@ -13,19 +12,19 @@ import (
 )
 
 func TestCommitBlock(t *testing.T) {
-	b, err := emulator.NewEmulatedBlockchain()
+	b, err := emulator.NewBlockchain()
 	require.NoError(t, err)
 
 	addTwoScript, _ := deployAndGenerateAddTwoScript(t, b)
 
-	tx1 := flow.Transaction{
+	tx1 := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             []byte(addTwoScript),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-	}
+	}}
 
 	sig, err := keys.SignTransaction(tx1, b.RootKey())
 	assert.NoError(t, err)
@@ -41,14 +40,14 @@ func TestCommitBlock(t *testing.T) {
 
 	assert.Equal(t, flow.TransactionPending, tx.Status)
 
-	tx2 := flow.Transaction{
+	tx2 := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             []byte("invalid script"),
 		ReferenceBlockHash: nil,
 		Nonce:              getNonce(),
 		ComputeLimit:       10,
 		PayerAccount:       b.RootAccountAddress(),
 		ScriptAccounts:     []flow.Address{b.RootAccountAddress()},
-	}
+	}}
 
 	sig, err = keys.SignTransaction(tx2, b.RootKey())
 	assert.NoError(t, err)

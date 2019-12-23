@@ -45,8 +45,8 @@ func randomKey() flow.AccountPrivateKey {
 }
 
 // newEmulator returns a emulator object for testing
-func newEmulator() *emulator.EmulatedBlockchain {
-	b, err := emulator.NewEmulatedBlockchain()
+func newEmulator() *emulator.Blockchain {
+	b, err := emulator.NewBlockchain()
 	if err != nil {
 		panic(err)
 	}
@@ -60,7 +60,7 @@ func newEmulator() *emulator.EmulatedBlockchain {
 // This function asserts the correct result and commits the block if it passed
 func SignAndSubmit(
 	t *testing.T,
-	b *emulator.EmulatedBlockchain,
+	b *emulator.Blockchain,
 	tx flow.Transaction,
 	signingKeys []flow.AccountPrivateKey,
 	signingAddresses []flow.Address,
@@ -97,7 +97,7 @@ func SignAndSubmit(
 // and a NFT collection with 1 NFT each
 func setupUsersTokens(
 	t *testing.T,
-	b *emulator.EmulatedBlockchain,
+	b *emulator.Blockchain,
 	tokenAddr flow.Address,
 	nftAddr flow.Address,
 	signingKeys []flow.AccountPrivateKey,
@@ -105,23 +105,23 @@ func setupUsersTokens(
 ) {
 	// add array of signers to transaction
 	for i := 0; i < len(signingAddresses); i++ {
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:         GenerateCreateTokenScript(tokenAddr, 30),
 			Nonce:          GetNonce(),
 			ComputeLimit:   20,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{signingAddresses[i]},
-		}
+		}}
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), signingKeys[i]}, []flow.Address{b.RootAccountAddress(), signingAddresses[i]}, false)
 
 		// then deploy a NFT to the accounts
-		tx = flow.Transaction{
+		tx = flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:         GenerateCreateNFTScript(nftAddr, i+1),
 			Nonce:          GetNonce(),
 			ComputeLimit:   20,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{signingAddresses[i]},
-		}
+		}}
 		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey(), signingKeys[i]}, []flow.Address{b.RootAccountAddress(), signingAddresses[i]}, false)
 	}
 }

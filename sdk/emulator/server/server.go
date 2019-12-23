@@ -30,7 +30,7 @@ import (
 
 // EmulatorServer is a local server that runs a Flow Emulator instance.
 //
-// The server wraps an EmulatedBlockchain instance with the Observation gRPC interface.
+// The server wraps an emulated blockchain instance with the Observation gRPC interface.
 type EmulatorServer struct {
 	backend       *Backend
 	grpcServer    *grpc.Server
@@ -92,7 +92,7 @@ func NewEmulatorServer(logger *logrus.Logger, store storage.Store, conf *Config)
 		conf.HTTPPort = defaultHTTPPort
 	}
 
-	blockchain, err := emulator.NewEmulatedBlockchain(options...)
+	blockchain, err := emulator.NewBlockchain(options...)
 	if err != nil {
 		logger.WithError(err).Fatal("Failed to initialize blockchain")
 	}

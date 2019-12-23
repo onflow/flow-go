@@ -10,6 +10,8 @@
 
 # Coverage artifacts
 coverage.zip
+cover.json
+cover-summary
 index.html
 
 # Since we have tooling that uses node
