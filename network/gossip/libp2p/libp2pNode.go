@@ -352,7 +352,7 @@ func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Id
 		// Debug log the message length
 		p.logger.Debug().Str("peer", stream.Conn().RemotePeer().String()).
 			Str("message", message.String()).Int("length", len(b)).
-			Msg(" sent message")
+			Msg("sent message")
 
 		// Close the stream
 		err = stream.Close()
@@ -399,6 +399,7 @@ func (p *P2PNode) readData(s network.Stream) {
 		err = proto.Unmarshal(buff, message)
 		if err != nil {
 			p.logger.Error().Str("peer", s.Conn().RemotePeer().String()).Err(err)
+			return
 		}
 
 		// Extract sender id
@@ -406,6 +407,7 @@ func (p *P2PNode) readData(s network.Stream) {
 			p.logger.Debug().Str("peer", s.Conn().RemotePeer().String()).
 				Bytes("sender", message.SenderID).
 				Msg(" invalid sender id")
+			return
 		}
 		var senderID [32]byte
 		copy(senderID[:], message.SenderID)
@@ -416,10 +418,16 @@ func (p *P2PNode) readData(s network.Stream) {
 			p.logger.Debug().Str("peer", s.Conn().RemotePeer().String()).
 				Uint8("engine", uint8(message.EngineID)).
 				Msg(" dropping message since no engine to receive it was found")
-			continue
+			return
 		}
 		// call the engine with the message payload
-		en.Submit(senderID, message.Event)
+		err = en.Process(senderID, message.Event)
+		if err != nil {
+			p.logger.Error().
+				Uint8("engineid", uint8(message.EngineID)).
+				Str("peer", s.Conn().RemotePeer().String()).Err(err)
+			return
+		}
 	}
 }
 

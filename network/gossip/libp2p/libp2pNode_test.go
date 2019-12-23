@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -205,9 +206,9 @@ func TestLibP2PNode_P2P(t *testing.T) {
 	require.NoError(t, peer1.AddPeers(ctx, ids[1:]))
 
 	// Create and register engines for each of the nodes
-	te1 := &TestEngine{t: t}
+	te1 := &StubEngine{t: t}
 	conduit1, err := peer1.Register(1, te1)
-	te2 := &TestEngine{t: t, ch: make(chan struct{})}
+	te2 := &StubEngine{t: t, ch: make(chan struct{})}
 	_, err = peer2.Register(1, te2)
 
 	// Create target byte array from the node name "node2" -> []byte
@@ -255,29 +256,29 @@ func createLibP2PNodes(ctx context.Context, t *testing.T, count int) (nodes []*P
 	return nodes, err
 }
 
-
-type TestEngine struct {
-	t *testing.T
-	id flow.Identifier
+type StubEngine struct {
+	t     *testing.T
+	id    flow.Identifier
 	event interface{}
-	ch chan struct{}
+	ch    chan struct{}
 }
 
-func (te *TestEngine) SubmitLocal(event interface{}) {
-	panic("not implemented")
+func (te *StubEngine) SubmitLocal(event interface{}) {
+	require.Fail(te.t, "not implemented")
 }
 
-func (te *TestEngine) Submit(originID flow.Identifier, event interface{}) {
+func (te *StubEngine) Submit(originID flow.Identifier, event interface{}) {
+	require.Fail(te.t, "not implemented")
+}
+
+func (te *StubEngine) ProcessLocal(event interface{}) error {
+	require.Fail(te.t, "not implemented")
+	return fmt.Errorf(" unexpected method called")
+}
+
+func (te *StubEngine) Process(originID flow.Identifier, event interface{}) error {
 	te.id = originID
 	te.event = event
 	te.ch <- struct{}{}
+	return nil
 }
-
-func (te *TestEngine) ProcessLocal(event interface{}) error {
-	panic("not implemented")
-}
-
-func (te *TestEngine) Process(originID flow.Identifier, event interface{}) error {
-	panic("not implemented")
-}
-
