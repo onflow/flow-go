@@ -5,7 +5,6 @@ package mempool
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -30,8 +29,8 @@ func (m *TransactionPool) Add(tx *flow.Transaction) error {
 }
 
 // Get returns the given transaction from the pool.
-func (m *TransactionPool) Get(hash crypto.Hash) (*flow.Transaction, error) {
-	item, err := m.mempool.Get(hash)
+func (m *TransactionPool) Get(fp flow.Fingerprint) (*flow.Transaction, error) {
+	item, err := m.mempool.Get(fp)
 	if err != nil {
 		return nil, err
 	}

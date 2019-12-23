@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 func TestCollectionsInsertRetrieve(t *testing.T) {
@@ -25,7 +25,7 @@ func TestCollectionsInsertRetrieve(t *testing.T) {
 	require.Nil(t, err)
 
 	hash := crypto.Hash{0x13, 0x37}
-	expected := []*collection.GuaranteedCollection{
+	expected := []*flow.GuaranteedCollection{
 		{CollectionHash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x10}}},
 		{CollectionHash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x20}}},
 		{CollectionHash: crypto.Hash{0x03}, Signatures: []crypto.Signature{{0x30}}},
@@ -34,7 +34,7 @@ func TestCollectionsInsertRetrieve(t *testing.T) {
 	err = db.Update(InsertNewCollections(hash, expected))
 	require.Nil(t, err)
 
-	var actual []*collection.GuaranteedCollection
+	var actual []*flow.GuaranteedCollection
 	err = db.View(RetrieveCollections(hash, &actual))
 	require.Nil(t, err)
 

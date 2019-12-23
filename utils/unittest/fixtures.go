@@ -41,6 +41,14 @@ func AccountSignatureFixture() flow.AccountSignature {
 	}
 }
 
+func BlockFixture() flow.Block {
+	return flow.Block{
+		Header:                BlockHeaderFixture(),
+		NewIdentities:         IdentityListFixture(32),
+		GuaranteedCollections: nil,
+	}
+}
+
 func BlockHeaderFixture() flow.Header {
 	return flow.Header{
 		Parent: crypto.Hash("parent"),
@@ -68,15 +76,15 @@ func BlockFixture() flow.Block {
 }
 
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
-	tx := flow.Transaction{
+	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             []byte("pub fun main() {}"),
-		ReferenceBlockHash: HashFixture(32),
+		ReferenceBlockHash: flow.Fingerprint(HashFixture(32)),
 		Nonce:              1,
 		ComputeLimit:       10,
 		PayerAccount:       AddressFixture(),
 		ScriptAccounts:     []flow.Address{AddressFixture()},
 		Signatures:         []flow.AccountSignature{AccountSignatureFixture()},
-	}
+	}}
 	if len(n) > 0 {
 		n[0](&tx)
 	}

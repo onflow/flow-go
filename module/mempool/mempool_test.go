@@ -6,13 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
 )
 
 type hashable []byte
 
-func (h hashable) Hash() crypto.Hash {
-	return crypto.Hash(h)
+func (h hashable) Fingerprint() flow.Fingerprint {
+	return flow.Fingerprint(crypto.Hash(h))
 }
 
 func TestHash(t *testing.T) {
@@ -77,7 +78,7 @@ func TestInsert(t *testing.T) {
 		})
 
 		t.Run("should be able to get by hash", func(t *testing.T) {
-			gotItem, err := pool.Get(item1.Hash())
+			gotItem, err := pool.Get(item1.Fingerprint())
 			assert.NoError(t, err)
 			assert.Equal(t, item1, gotItem)
 		})
@@ -89,7 +90,7 @@ func TestInsert(t *testing.T) {
 		})
 
 		t.Run("should be able to remove", func(t *testing.T) {
-			ok := pool.Rem(item1.Hash())
+			ok := pool.Rem(item1.Fingerprint())
 			assert.True(t, ok)
 
 			size := pool.Size()

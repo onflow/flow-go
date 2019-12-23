@@ -369,7 +369,7 @@ DelLoop:
 // Hash will return the root hash of this patricia merkle tree.
 func (t *Tree) Hash() crypto.Hash {
 	hash := t.nodeHash(t.root)
-	return crypto.Hash(hash)
+	return hash
 }
 
 // merge will merge a child short node into a parent short node.

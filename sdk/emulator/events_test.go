@@ -45,13 +45,13 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)
@@ -152,13 +152,13 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`, address.Hex()))
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)

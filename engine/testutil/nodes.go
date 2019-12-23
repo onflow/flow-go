@@ -42,7 +42,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis
 	pool, err := mempool.NewTransactionPool()
 	require.NoError(t, err)
 
-	ingestionEngine, err := ingest.New(log, stub, me, state, pool)
+	ingestionEngine, err := ingest.New(log, stub, state, me, pool)
 	require.Nil(t, err)
 
 	return &mock.CollectionNode{

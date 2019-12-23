@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -18,8 +18,8 @@ func TestSubmitCollectionOneToOne(t *testing.T) {
 	// create a mocked network for each node and connect them in a in-memory hub, so that events sent from one engine
 	// can be delivered directly to another engine on a different node
 	_, nodes, err := createConnectedNodes(
-		fmt.Sprintf("consensus-%x@address1=1000", unittest.IdentifierFixture()),
-		fmt.Sprintf("consensus-%x@address2=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address1=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address2=1000", unittest.IdentifierFixture()),
 	)
 	require.Nil(t, err)
 
@@ -34,11 +34,11 @@ func TestSubmitCollectionOneToOne(t *testing.T) {
 	node1.net.FlushAll()
 
 	// inspect node2's mempool to check if node2's engine received the collection hash
-	coll, err := node2.pool.Get(gc.Hash())
+	coll, err := node2.pool.Get(gc.Fingerprint())
 	require.Nil(t, err)
 
 	// should match
-	require.Equal(t, coll.Hash(), gc.Hash())
+	require.Equal(t, coll.Fingerprint(), gc.Fingerprint())
 	terminate(node1, node2)
 }
 
@@ -48,9 +48,9 @@ func TestSubmitCollectionOneToOne(t *testing.T) {
 func TestSubmitCollectionManyToManySynchronous(t *testing.T) {
 
 	_, nodes, err := createConnectedNodes(
-		fmt.Sprintf("consensus-%x@address1=1000", unittest.IdentifierFixture()),
-		fmt.Sprintf("consensus-%x@address2=1000", unittest.IdentifierFixture()),
-		fmt.Sprintf("consensus-%x@address3=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address1=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address2=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address3=1000", unittest.IdentifierFixture()),
 	)
 	require.Nil(t, err)
 
@@ -65,7 +65,7 @@ func TestSubmitCollectionManyToManySynchronous(t *testing.T) {
 	gc3 := randCollection()
 
 	// check the collections are different
-	require.NotEqual(t, gc1.Hash(), gc2.Hash())
+	require.NotEqual(t, gc1.Fingerprint(), gc2.Fingerprint())
 
 	// send gc1 to node1, which will broadcast to other nodes synchronously
 	_ = node1.engine.ProcessLocal(gc1)
@@ -94,9 +94,9 @@ func TestSubmitCollectionManyToManySynchronous(t *testing.T) {
 func TestSubmitCollectionManyToManyAsynchronous(t *testing.T) {
 
 	_, nodes, err := createConnectedNodes(
-		fmt.Sprintf("consensus-%x@address1=1000", unittest.IdentifierFixture()),
-		fmt.Sprintf("consensus-%x@address2=1000", unittest.IdentifierFixture()),
-		fmt.Sprintf("consensus-%x@address3=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address1=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address2=1000", unittest.IdentifierFixture()),
+		fmt.Sprintf("consensus-%s@address3=1000", unittest.IdentifierFixture()),
 	)
 	require.Nil(t, err)
 
@@ -134,7 +134,7 @@ func TestSubmitCollectionManyToManyAsynchronous(t *testing.T) {
 
 func TestSubmitCollectionManyToManyRandom(t *testing.T) {
 
-	nodes, gcs, err := prepareNodesAndCollectionsConfigurable(5, 100)
+	nodes, gcs, err := prepareNodesAndCollections(5, 100)
 	require.Nil(t, err)
 
 	N := len(nodes)
@@ -164,7 +164,7 @@ func TestSubmitCollectionManyToManyRandom(t *testing.T) {
 
 // send one collection to one node.
 // extracted in order to be reused in different tests
-func sendOne(node *mockPropagationNode, gc *collection.GuaranteedCollection, wg *sync.WaitGroup) {
+func sendOne(node *mockPropagationNode, gc *flow.GuaranteedCollection, wg *sync.WaitGroup) {
 	_ = node.engine.ProcessLocal(gc)
 	node.net.FlushAll()
 	wg.Done()
