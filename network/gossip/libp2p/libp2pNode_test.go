@@ -177,6 +177,7 @@ func TestLibP2PNode_PubSub(t *testing.T) {
 
 // TestLibP2PNode_P2P tests end-to-end a P2P message sending and receiving between two nodes
 func TestLibP2PNode_P2P(t *testing.T) {
+	golog.SetAllLoggers(gologging.DEBUG)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var count = 2

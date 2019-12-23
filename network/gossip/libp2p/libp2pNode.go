@@ -167,6 +167,7 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers []NodeAddress) error {
 		p.libP2PHost.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.PermanentAddrTTL)
 		fmt.Printf(" Added node %s to %s\n", pInfo.ID, p.libP2PHost.ID())
 
+
 		fmt.Printf(" Connecting node %s to %s\n", pInfo.ID, p.libP2PHost.ID())
 		err = p.libP2PHost.Connect(ctx, pInfo)
 		if err != nil {
