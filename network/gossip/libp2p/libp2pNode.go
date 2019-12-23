@@ -160,7 +160,7 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers []NodeAddress) error {
 
 		// Add the destination's peer multiaddress in the peerstore.
 		// This will be used during connection and stream creation by libp2p.
-		p.libP2PHost.Peerstore().AddAddr(pInfo.ID, pInfo.Addrs[0], peerstore.PermanentAddrTTL)
+		p.libP2PHost.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.PermanentAddrTTL)
 
 		err = p.libP2PHost.Connect(ctx, pInfo)
 		if err != nil {

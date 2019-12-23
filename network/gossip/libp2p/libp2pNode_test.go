@@ -191,7 +191,7 @@ func TestLibP2PNode_P2P(t *testing.T) {
 		}
 	}()
 
-	// Peer 1 will be send a message to Peer 2
+	// Peer 1 will be sending a message to Peer 2
 	peer1 := nodes[0]
 	peer2 := nodes[1]
 
