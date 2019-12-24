@@ -57,7 +57,7 @@ func TestLibP2PNode_GetPeerInfo(t *testing.T) {
 func TestLibP2PNode_AddPeers(t *testing.T) {
 	//t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
 	// A longer timeout is needed to overcome timeouts - https://github.com/ipfs/go-ipfs/issues/5800
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// count value of 10 runs into this issue on localhost https://github.com/libp2p/go-libp2p-pubsub/issues/96
 	// since localhost connection have short deadlines
@@ -246,11 +246,12 @@ func createLibP2PNodes(ctx context.Context, t *testing.T, count int) (nodes []*P
 	l := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	for i := 1; i <= count; i++ {
 		var n = &P2PNode{}
-		var nodeID = NodeAddress{name: fmt.Sprintf("node%d", i), ip: "127.0.0.1", port: "0"}
+		var nodeID = NodeAddress{name: fmt.Sprintf("node%d", i), ip: "0.0.0.0", port: "0"}
 		err := n.Start(ctx, nodeID, l)
 		require.NoError(t, err)
 		require.Eventuallyf(t, func() bool {
 			ip, p := n.GetIPPort()
+			fmt.Printf("node on %s:%s\n",ip,p)
 			return ip != "" && p != ""
 		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("node%d didn't start", i))
 		nodes = append(nodes, n)
