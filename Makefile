@@ -42,9 +42,9 @@ endif
 .PHONY: test
 test: generate-bindata
 	# test all packages with Relic library enabled
-	GO111MODULE=on go test -v -run TestLibP2PNode_P2P ./network/gossip/libp2p
+	GO111MODULE=on go test -v -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	# test SDK package with Relic library disabled
-	# GO111MODULE=on go test -count 1 ./sdk/...
+	GO111MODULE=on go test -count 1 ./sdk/...
 
 .PHONY: coverage
 coverage:

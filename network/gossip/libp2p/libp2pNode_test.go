@@ -55,7 +55,7 @@ func TestLibP2PNode_GetPeerInfo(t *testing.T) {
 
 // TestLibP2PNode_AddPeers checks if nodes can be added as peers to a given node
 func TestLibP2PNode_AddPeers(t *testing.T) {
-	t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
+	//t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
 	// A longer timeout is needed to overcome timeouts - https://github.com/ipfs/go-ipfs/issues/5800
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -98,7 +98,7 @@ func TestLibP2PNode_AddPeers(t *testing.T) {
 
 // TestLibP2PNode_PubSub checks if nodes can subscribe to a topic and send and receive a message.
 func TestLibP2PNode_PubSub(t *testing.T) {
-	t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
+	//t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var count = 5
@@ -246,7 +246,7 @@ func createLibP2PNodes(ctx context.Context, t *testing.T, count int) (nodes []*P
 	l := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	for i := 1; i <= count; i++ {
 		var n = &P2PNode{}
-		var nodeID = NodeAddress{name: fmt.Sprintf("node%d", i), ip: "0.0.0.0", port: "0"}
+		var nodeID = NodeAddress{name: fmt.Sprintf("node%d", i), ip: "127.0.0.1", port: "0"}
 		err := n.Start(ctx, nodeID, l)
 		require.NoError(t, err)
 		require.Eventuallyf(t, func() bool {
