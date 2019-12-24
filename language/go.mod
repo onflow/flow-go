@@ -7,6 +7,7 @@ require (
 	github.com/c-bata/go-prompt v0.2.3
 	github.com/dapperlabs/flow-go v0.0.0-00010101000000-000000000000
 	github.com/dapperlabs/flow-go/crypto v0.0.0-00010101000000-000000000000 // indirect
+	github.com/dapperlabs/flow-go/protobuf v0.0.0-00010101000000-000000000000 // indirect
 	github.com/logrusorgru/aurora v0.0.0-20191116043053-66b7ad493a23
 	github.com/mattn/go-runewidth v0.0.7 // indirect
 	github.com/mattn/go-tty v0.0.3 // indirect
@@ -24,3 +25,5 @@ require (
 replace github.com/dapperlabs/flow-go => ../
 
 replace github.com/dapperlabs/flow-go/crypto => ../crypto
+
+replace github.com/dapperlabs/flow-go/protobuf => ../protobuf
