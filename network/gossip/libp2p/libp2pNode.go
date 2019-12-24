@@ -85,7 +85,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		libp2p.Transport(tcp.NewTCPTransport), // the default transport unnecessarily brings in a websocket listener
 	)
 
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Second * 2)
 	p.libP2PHost = host
 
 	// Set the callback to use for an incoming peer message
