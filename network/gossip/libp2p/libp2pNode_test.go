@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 	"testing"
@@ -32,6 +33,16 @@ func TestLibP2PNode_Start_Stop(t *testing.T) {
 	nodes, err := createLibP2PNodes(ctx, t, 1)
 	assert.NoError(t, err)
 	assert.NoError(t, nodes[0].Stop())
+}
+
+func checkClientConnection(t *testing.T, address string) {
+	timeout := 5 * time.Millisecond
+	assert.Eventually(t, func() bool {
+		con, err := net.DialTimeout("tcp", address, timeout)
+		defer con.Close()
+		return con != nil && err == nil
+	}, 4*timeout, 2*timeout)
+	fmt.Printf(" \n\n *** Able to connect to %s\n\n",address)
 }
 
 // TestLibP2PNode_GetPeerInfo checks that given a node name, the corresponding node id is consistently generated
@@ -254,6 +265,8 @@ func createLibP2PNodes(ctx context.Context, t *testing.T, count int) (nodes []*P
 			fmt.Printf("node on %s:%s\n",ip,p)
 			return ip != "" && p != ""
 		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("node%d didn't start", i))
+		ip, p := n.GetIPPort()
+		checkClientConnection(t, fmt.Sprintf("%s:%s", ip,p))
 		nodes = append(nodes, n)
 	}
 	return nodes, err
