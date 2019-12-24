@@ -7010,3 +7010,31 @@ func TestInterpretFunctionPostConditionWithBeforeInInterface(t *testing.T) {
 	_, err = inter.Invoke("test2")
 	assert.IsType(t, &interpreter.ConditionError{}, err)
 }
+
+func TestInterpretContractUseInNestedDeclaration(t *testing.T) {
+
+	_ = parseCheckAndInterpretWithOptions(t, `
+          pub contract C {
+
+              pub var i: Int
+
+              pub struct S {
+
+                  init() {
+                      C.i = C.i + 1
+                  }
+              }
+
+              init () {
+                  self.i = 0
+                  S()
+              }
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			Options: []interpreter.Option{
+				makeContractValueHandler(nil, nil, nil),
+			},
+		},
+	)
+}
