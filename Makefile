@@ -80,14 +80,14 @@ generate-mocks:
 	# GO111MODULE=on mockgen -destination=sdk/client/mocks/mock_client.go -package=mocks github.com/dapperlabs/flow-go/sdk/client RPCClient
 	# GO111MODULE=on mockgen -destination=sdk/emulator/mocks/blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator BlockchainAPI
 	# GO111MODULE=on mockgen -destination=sdk/emulator/storage/mocks/store.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator/storage Store
-	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
-	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
-	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
-	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
+	# mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
+	# mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
+	# mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
+	# mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
 
 .PHONY: generate-bindata
 generate-bindata:
-	go generate ./language/abi;
+	$(MAKE) -C language generate-bindata;
 
 .PHONY: check-generated-code
 check-generated-code:
