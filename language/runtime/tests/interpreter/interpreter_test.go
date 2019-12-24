@@ -7013,7 +7013,7 @@ func TestInterpretFunctionPostConditionWithBeforeInInterface(t *testing.T) {
 
 func TestInterpretContractUseInNestedDeclaration(t *testing.T) {
 
-	_ = parseCheckAndInterpretWithOptions(t, `
+	inter := parseCheckAndInterpretWithOptions(t, `
           pub contract C {
 
               pub var i: Int
@@ -7028,6 +7028,7 @@ func TestInterpretContractUseInNestedDeclaration(t *testing.T) {
               init () {
                   self.i = 0
                   S()
+                  S()
               }
           }
         `,
@@ -7036,5 +7037,13 @@ func TestInterpretContractUseInNestedDeclaration(t *testing.T) {
 				makeContractValueHandler(nil, nil, nil),
 			},
 		},
+	)
+
+	i := inter.Globals["C"].Value.(interpreter.MemberAccessibleValue).
+		GetMember(inter, interpreter.LocationRange{}, "i")
+
+	require.IsType(t,
+		interpreter.NewIntValue(2),
+		i,
 	)
 }
