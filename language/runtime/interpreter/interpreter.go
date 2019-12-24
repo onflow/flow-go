@@ -2043,8 +2043,9 @@ func (interpreter *Interpreter) declareCompositeValue(
 		contract := interpreter.contractValueHandler(interpreter, compositeType, constructor)
 		contract.NestedValues = members
 		value = contract
-		// NOTE: variable value is set in constructor function: it needs to be available
+		// NOTE: variable value is also set in the constructor function: it needs to be available
 		// for nested declarations, which might be invoked when the constructor is invoked
+		variable.Value = value
 	} else {
 		constructor.Members = members
 		value = constructor
