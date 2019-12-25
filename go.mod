@@ -3,8 +3,6 @@ module github.com/dapperlabs/flow-go
 go 1.13
 
 require (
-	github.com/antlr/antlr4 v0.0.0-20191217191749-ff67971f8580
-	github.com/c-bata/go-prompt v0.2.3
 	github.com/dapperlabs/flow-go/crypto v0.0.0-00010101000000-000000000000
 	github.com/dapperlabs/flow-go/language v0.0.0-00010101000000-000000000000
 	github.com/dapperlabs/flow-go/protobuf v0.0.0-00010101000000-000000000000
@@ -15,7 +13,6 @@ require (
 	github.com/dgraph-io/badger/v2 v2.0.0
 	github.com/ethereum/go-ethereum v1.9.2
 	github.com/go-test/deep v1.0.4
-	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
@@ -32,26 +29,18 @@ require (
 	github.com/logrusorgru/aurora v0.0.0-20191116043053-66b7ad493a23
 	github.com/magiconair/properties v1.8.0
 	github.com/multiformats/go-multiaddr v0.2.0
-	github.com/nsf/jsondiff v0.0.0-20190712045011-8443391ee9b6
 	github.com/onsi/gomega v1.7.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.9.3
 	github.com/psiemens/sconfig v0.0.0-20190623041652-6e01eb1354fc
-	github.com/raviqqe/hamt v0.0.0-20190615202029-864fb7caef85
-	github.com/rivo/uniseg v0.1.0
 	github.com/rs/zerolog v1.15.0
-	github.com/segmentio/fasthash v1.0.1
 	github.com/sirupsen/logrus v1.4.2
-	github.com/sourcegraph/jsonrpc2 v0.0.0-20191222043438-96c4efab7ee2
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.4.0
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
-	github.com/xeipuuv/gojsonschema v1.2.0
 	go.uber.org/atomic v1.4.0
 	golang.org/x/crypto v0.0.0-20191219195013-becbf705a915
-	golang.org/x/text v0.3.2
-	gonum.org/v1/gonum v0.6.1
 	google.golang.org/grpc v1.26.0
 	zombiezen.com/go/capnproto2 v2.17.0+incompatible
 )
