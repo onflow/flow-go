@@ -38,7 +38,7 @@ type Interface interface {
 	// Log logs a string.
 	Log(string)
 	// EmitEvent is called when an event is emitted by the runtime.
-	EmitEvent(values.Event)
+	EmitEvent(Event)
 }
 
 // Runtime is a runtime capable of executing the Flow programming language.
@@ -47,7 +47,7 @@ type Runtime interface {
 	//
 	// This function returns an error if the program has errors (e.g syntax errors, type errors),
 	// or if the execution fails.
-	ExecuteScript(script []byte, runtimeInterface Interface, location Location) (values.Value, error)
+	ExecuteScript(script []byte, runtimeInterface Interface, location Location) (Value, error)
 
 	// ExecuteTransaction executes the given transaction.
 	//
@@ -75,7 +75,7 @@ func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
 }
 
-func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (values.Value, error) {
+func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (Value, error) {
 	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
 
 	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
@@ -112,7 +112,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 
 	runtimeStorage.writeCached()
 
-	return value.(interpreter.ExportableValue).Export(), nil
+	return value, nil
 }
 
 func (r *interpreterRuntime) interpret(
@@ -385,21 +385,29 @@ func (r *interpreterRuntime) emitEvent(
 	event interpreter.EventValue,
 ) {
 	functionType := inter.Checker.GlobalValues[event.Identifier].Type.(*sema.SpecialFunctionType)
-	eventType := functionType.ReturnTypeAnnotation.Type.(*sema.EventType).Export(nil, nil)
+	eventType := functionType.ReturnTypeAnnotation.Type
 
-	eventValue := event.Export().(values.Event)
-	eventValue = eventValue.WithType(eventType)
+	fields := make([]Value, len(event.Fields))
+	for i, field := range event.Fields {
+		fields[i] = field.Value
+	}
+	eventValue := Event{
+		Type:   eventType,
+		Fields: fields,
+	}
 
 	runtimeInterface.EmitEvent(eventValue)
 }
 
 func (r *interpreterRuntime) emitAccountEvent(
-	eventType sema.EventType,
+	eventType *sema.EventType,
 	runtimeInterface Interface,
-	eventFields []values.Value,
+	eventFields []interpreter.Value,
 ) {
-	t := eventType.Export(nil, nil)
-	eventValue := values.NewEvent(eventFields).WithType(t)
+	eventValue := Event{
+		Type:   eventType,
+		Fields: eventFields,
+	}
 
 	runtimeInterface.EmitEvent(eventValue)
 }
@@ -448,7 +456,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 		)
 
 		r.emitAccountEvent(
-			stdlib.AccountCreatedEventType,
+			&stdlib.AccountCreatedEventType,
 			runtimeInterface,
 			[]values.Value{accountAddress},
 		)
@@ -474,9 +482,9 @@ func (r *interpreterRuntime) newAddAccountKeyFunction(runtimeInterface Interface
 		}
 
 		r.emitAccountEvent(
-			stdlib.AccountKeyAddedEventType,
+			&stdlib.AccountKeyAddedEventType,
 			runtimeInterface,
-			[]values.Value{accountAddressValue, publicKey},
+			[]Value{accountAddress, publicKey},
 		)
 
 		result := interpreter.VoidValue{}
@@ -499,9 +507,9 @@ func (r *interpreterRuntime) newRemoveAccountKeyFunction(runtimeInterface Interf
 		}
 
 		r.emitAccountEvent(
-			stdlib.AccountKeyAddedEventType,
+			&stdlib.AccountKeyAddedEventType,
 			runtimeInterface,
-			[]values.Value{accountAddressValue, publicKey},
+			[]Value{accountAddress, publicKey},
 		)
 
 		result := interpreter.VoidValue{}
@@ -540,9 +548,9 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(
 		)
 
 		r.emitAccountEvent(
-			stdlib.AccountCodeUpdatedEventType,
+			&stdlib.AccountCodeUpdatedEventType,
 			runtimeInterface,
-			[]values.Value{accountAddressValue, values.NewBytes(code)},
+			[]Value{accountAddress, code},
 		)
 
 		result := interpreter.VoidValue{}
