@@ -43,8 +43,6 @@ endif
 test: generate-bindata
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
-	# test SDK package with Relic library disabled
-	GO111MODULE=on go test -count 1 ./sdk/...
 
 .PHONY: coverage
 coverage:
@@ -58,14 +56,7 @@ ifeq ($(COVER), true)
 endif
 
 .PHONY: generate
-generate: generate-godoc generate-proto generate-mocks generate-bindata
-
-.PHONY: generate-godoc
-generate-godoc:
-	# godoc2md github.com/dapperlabs/flow-go/network/gossip > network/gossip/README.md
-	# godoc2md github.com/dapperlabs/flow-go/sdk > sdk/README.md
-	# godoc2md github.com/dapperlabs/flow-go/sdk/templates > sdk/templates/README.md
-	# godoc2md github.com/dapperlabs/flow-go/sdk/keys > sdk/keys/README.md
+generate: generate-proto generate-mocks generate-bindata
 
 .PHONY: generate-proto
 generate-proto:
@@ -77,9 +68,6 @@ generate-capnp:
 
 .PHONY: generate-mocks
 generate-mocks:
-	GO111MODULE=on mockgen -destination=sdk/client/mocks/mock_client.go -package=mocks github.com/dapperlabs/flow-go/sdk/client RPCClient
-	GO111MODULE=on mockgen -destination=sdk/emulator/mocks/blockchain_api.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator BlockchainAPI
-	GO111MODULE=on mockgen -destination=sdk/emulator/storage/mocks/store.go -package=mocks github.com/dapperlabs/flow-go/sdk/emulator/storage Store
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
@@ -115,22 +103,6 @@ docker-ci-team-city:
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.5 \
 		make ci
-
-cmd/flow/flow: crypto/*.go $(shell find  cli/ -name '*.go') $(shell find cmd -name '*.go') $(shell find model -name '*.go') $(shell find protobuf -name '*.go') $(shell find sdk -name '*.go')
-	GO111MODULE=on go build \
-	    -ldflags \
-	    "-X github.com/dapperlabs/flow-go/build.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/build.semver=$(VERSION)" \
-	    -o ./cmd/flow/flow ./cmd/flow
-
-sdk/abi/generation/generation: $(shell find sdk -name '*.go')
-	GO111MODULE=on go build \
-    	    -ldflags \
-    	    "-X github.com/dapperlabs/flow-go/cli/flow/version.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/cli/flow/version.version=$(VERSION)" \
-    	    -o ./sdk/abi/generation/generation ./sdk/abi/generation
-
-.PHONY: install-cli
-install-cli: cmd/flow/flow
-	cp cmd/flow/flow $$GOPATH/bin/
 
 .PHONY: docker-build-emulator
 docker-build-emulator:
