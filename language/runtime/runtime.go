@@ -467,7 +467,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 func (r *interpreterRuntime) newAddAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(invocation interpreter.Invocation) trampoline.Trampoline {
 		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
-		publicKeyValue := invocation.Arguments[0].(*interpreter.ArrayValue)
+		publicKeyValue := invocation.Arguments[1].(*interpreter.ArrayValue)
 
 		publicKey, err := toBytes(publicKeyValue)
 		if err != nil {
