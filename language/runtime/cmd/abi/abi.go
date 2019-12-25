@@ -82,7 +82,6 @@ func GetABIJSONFromCadenceFile(filename string, pretty bool) []byte {
 }
 
 func GetTypesFromCadenceFile(filename string) map[string]types.Type {
-
 	checker, _ := cmd.PrepareCheckerFromFile(filename)
 
 	exportedTypes := exportTypesFromChecker(checker)

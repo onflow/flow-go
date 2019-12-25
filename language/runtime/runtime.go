@@ -460,15 +460,16 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 			[]Value{accountAddress},
 		)
 
-		result := interpreter.AddressValue(accountAddress)
-		return trampoline.Done{Result: result}
+		return trampoline.Done{Result: accountAddress}
 	}
 }
 
 func (r *interpreterRuntime) newAddAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(invocation interpreter.Invocation) trampoline.Trampoline {
 		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
-		publicKey, err := toBytes(invocation.Arguments[1])
+		publicKeyValue := invocation.Arguments[0].(*interpreter.ArrayValue)
+
+		publicKey, err := toBytes(publicKeyValue)
 		if err != nil {
 			panic(fmt.Sprintf("addAccountKey requires the second parameter to be an array"))
 		}
@@ -481,7 +482,7 @@ func (r *interpreterRuntime) newAddAccountKeyFunction(runtimeInterface Interface
 		r.emitAccountEvent(
 			&stdlib.AccountKeyAddedEventType,
 			runtimeInterface,
-			[]Value{accountAddress, publicKey},
+			[]Value{accountAddress, publicKeyValue},
 		)
 
 		result := interpreter.VoidValue{}
@@ -499,10 +500,12 @@ func (r *interpreterRuntime) newRemoveAccountKeyFunction(runtimeInterface Interf
 			panic(err)
 		}
 
+		publicKeyValue := fromBytes(publicKey)
+
 		r.emitAccountEvent(
 			&stdlib.AccountKeyAddedEventType,
 			runtimeInterface,
-			[]Value{accountAddress, publicKey},
+			[]Value{accountAddress, publicKeyValue},
 		)
 
 		result := interpreter.VoidValue{}
@@ -538,10 +541,12 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(
 			invocation.Location.Position,
 		)
 
+		codeValue := fromBytes(code)
+
 		r.emitAccountEvent(
 			&stdlib.AccountCodeUpdatedEventType,
 			runtimeInterface,
-			[]Value{accountAddress, code},
+			[]Value{accountAddress, codeValue},
 		)
 
 		result := interpreter.VoidValue{}
@@ -819,4 +824,15 @@ func toBytes(value interpreter.Value) ([]byte, error) {
 	}
 
 	return result, nil
+}
+
+func fromBytes(buf []byte) *interpreter.ArrayValue {
+	values := make([]interpreter.Value, len(buf))
+	for i, b := range buf {
+		values[i] = interpreter.NewIntValue(int64(b))
+	}
+
+	return &interpreter.ArrayValue{
+		Values: values,
+	}
 }
