@@ -8,3 +8,5 @@ type Event struct {
 	Type   Type
 	Fields []Value
 }
+
+type Address = interpreter.AddressValue
