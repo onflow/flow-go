@@ -1,6 +1,0 @@
-{
-  "compilerOptions": {
-    "moduleResolution": "node",
-    "lib": ["es2015"]
-  }
-}

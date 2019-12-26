@@ -40,7 +40,7 @@ endif
 	GO111MODULE=on go get github.com/kevinburke/go-bindata/...@v3.11.0;
 
 .PHONY: test
-test: generate-bindata
+test:
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 
@@ -56,7 +56,7 @@ ifeq ($(COVER), true)
 endif
 
 .PHONY: generate
-generate: generate-proto generate-mocks generate-bindata
+generate: generate-proto generate-mocks
 
 .PHONY: generate-proto
 generate-proto:
@@ -72,10 +72,6 @@ generate-mocks:
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
-
-.PHONY: generate-bindata
-generate-bindata:
-	go generate ./language/abi;
 
 .PHONY: check-generated-code
 check-generated-code:
