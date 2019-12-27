@@ -13,13 +13,31 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-// Engine manages execution of transactions
+// An Engine receives and saves incoming blocks.
 type Engine struct {
 	unit    *engine.Unit
 	log     zerolog.Logger
 	conduit network.Conduit
 	me      module.Local
 	blocks  storage.Blocks
+}
+
+func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks) (*Engine, error) {
+	eng := Engine{
+		unit:   engine.NewUnit(),
+		log:    logger,
+		me:     me,
+		blocks: blocks,
+	}
+
+	con, err := net.Register(engine.ExecutionBlockIngestion, &eng)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not register engine")
+	}
+
+	eng.conduit = con
+
+	return &eng, nil
 }
 
 func (e *Engine) SubmitLocal(event interface{}) {
@@ -37,25 +55,6 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 
 func (e *Engine) ProcessLocal(event interface{}) error {
 	return e.Process(e.me.NodeID(), event)
-}
-
-func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks) (*Engine, error) {
-
-	eng := Engine{
-		unit:   engine.NewUnit(),
-		log:    logger,
-		me:     me,
-		blocks: blocks,
-	}
-
-	con, err := net.Register(engine.Execution, &eng)
-	if err != nil {
-		return nil, errors.Wrap(err, "could not register engine")
-	}
-
-	eng.conduit = con
-
-	return &eng, nil
 }
 
 // Ready returns a channel that will close when the engine has

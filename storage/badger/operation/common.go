@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -25,6 +24,7 @@ func insertNew(key []byte, entity interface{}) func(*badger.Txn) error {
 		if err == nil {
 			return storage.KeyAlreadyExistsErr
 		}
+
 		if !errors.Is(err, badger.ErrKeyNotFound) {
 			return fmt.Errorf("could not check key: %w", err)
 		}
@@ -38,7 +38,7 @@ func insertNew(key []byte, entity interface{}) func(*badger.Txn) error {
 		// insert the entity data into the DB
 		err = tx.Set(key, val)
 		if err != nil {
-			return errors.Wrap(err, "could not store data")
+			return fmt.Errorf("could not store data: %w", err)
 		}
 
 		return nil
@@ -54,17 +54,17 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		// check if the key already exists in the db
 		item, err := tx.Get(key)
 
-		//error other than key not found
+		// error other than key not found
 		if err != nil && err != badger.ErrKeyNotFound {
-			return errors.Wrap(err, "could not check key")
+			return fmt.Errorf("could not check key: %w", err)
 		}
 
 		val, errEnc := json.Marshal(entity)
 		if errEnc != nil {
-			return errors.Wrap(errEnc, "could not encode entity")
+			return fmt.Errorf("could not encode entity: %w", errEnc)
 		}
 
-		//value in a database
+		// value in a database
 		if err == nil {
 			err := item.Value(func(existingVal []byte) error {
 				if bytes.Equal(val, existingVal) {
@@ -99,6 +99,7 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 		if err == badger.ErrKeyNotFound {
 			return storage.NotFoundErr
 		}
+
 		if err != nil {
 			return fmt.Errorf("could not check key: %w", err)
 		}
@@ -149,6 +150,7 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 			if err == badger.ErrKeyNotFound {
 				return storage.NotFoundErr
 			}
+
 			return fmt.Errorf("could not load data: %w", err)
 		}
 

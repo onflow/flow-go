@@ -43,8 +43,8 @@ func AccountSignatureFixture() flow.AccountSignature {
 func BlockFixture() flow.Block {
 	return flow.Block{
 		Header:                BlockHeaderFixture(),
-		NewIdentities:         IdentityListFixture(32),
-		GuaranteedCollections: nil,
+		NewIdentities:         IdentityListFixture(3),
+		GuaranteedCollections: GuaranteedCollectionsFixture(3),
 	}
 }
 
@@ -64,14 +64,6 @@ func GuaranteedCollectionsFixture(n int) []*flow.GuaranteedCollection {
 		}
 	}
 	return ret
-}
-
-func BlockFixture() flow.Block {
-	return flow.Block{
-		Header:                BlockHeaderFixture(),
-		NewIdentities:         IdentityListFixture(3),
-		GuaranteedCollections: GuaranteedCollectionsFixture(3),
-	}
 }
 
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
