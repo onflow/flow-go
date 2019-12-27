@@ -75,4 +75,3 @@ func (r *Reactor) run() {
 		}
 	}
 }
-

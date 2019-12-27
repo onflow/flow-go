@@ -56,7 +56,6 @@ func (fc *NewestForkChoice) ProcessQC(qc *def.QuorumCertificate) {
 	fc.eventprocessor.OnIncorporatedQuorumCertificate(qc)
 }
 
-
 func NewNewestForkChoice(finalizer *core.ReactorCore, eventprocessor events.Processor) *NewestForkChoice {
 	return &NewestForkChoice{
 		finalizer:      finalizer,
@@ -65,6 +64,3 @@ func NewNewestForkChoice(finalizer *core.ReactorCore, eventprocessor events.Proc
 		eventprocessor: eventprocessor,
 	}
 }
-
-
-
