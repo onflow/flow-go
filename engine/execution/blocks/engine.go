@@ -1,6 +1,8 @@
 package blocks
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -92,5 +94,10 @@ func (e *Engine) handleBlock(block flow.Block) error {
 		Uint64("block_number", block.Number).
 		Msg("received block")
 
-	return e.blocks.Save(&block)
+	err := e.blocks.Save(&block)
+
+	if err != nil {
+		return fmt.Errorf("could not save block: %w", err)
+	}
+	return nil
 }
