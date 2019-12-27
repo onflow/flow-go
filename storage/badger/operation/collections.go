@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertNewCollections(hash crypto.Hash, collections []*collection.GuaranteedCollection) func(*badger.Txn) error {
+func InsertNewCollections(hash crypto.Hash, collections []*flow.GuaranteedCollection) func(*badger.Txn) error {
 	return insertNew(makePrefix(codeCollections, hash), collections)
 }
 

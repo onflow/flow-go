@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
@@ -48,10 +47,10 @@ func BlockHeaderFixture() flow.Header {
 	}
 }
 
-func GuaranteedCollectionsFixture(n int) []*collection.GuaranteedCollection {
-	ret := make([]*collection.GuaranteedCollection, n)
+func GuaranteedCollectionsFixture(n int) []*flow.GuaranteedCollection {
+	ret := make([]*flow.GuaranteedCollection, n)
 	for i := 0; i < n; i++ {
-		ret[i] = &collection.GuaranteedCollection{
+		ret[i] = &flow.GuaranteedCollection{
 			CollectionHash: []byte(fmt.Sprintf("hash %d", i)),
 			Signatures:     []crypto.Signature{[]byte(fmt.Sprintf("signature %d A", i)), []byte(fmt.Sprintf("signature %d B", i))},
 		}
