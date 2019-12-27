@@ -112,13 +112,13 @@ func (s *Server) submitTransaction(conn protocol.Conn, args ...interface{}) (int
 		return nil, fmt.Errorf("could not find document for URI %s", uri)
 	}
 
-	tx := flow.Transaction{
+	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:         []byte(doc.text),
 		Nonce:          s.getNextNonce(),
 		ComputeLimit:   10,
 		PayerAccount:   s.activeAccount,
 		ScriptAccounts: []flow.Address{s.activeAccount},
-	}
+	}}
 
 	err := s.sendTransactionHelper(conn, tx)
 	return nil, err
@@ -323,13 +323,13 @@ func (s *Server) updateAccountCode(conn protocol.Conn, args ...interface{}) (int
 	accountCode := []byte(doc.text)
 	script := templates.UpdateAccountCode(accountCode)
 
-	tx := flow.Transaction{
+	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:         script,
 		Nonce:          s.getNextNonce(),
 		ComputeLimit:   10,
 		PayerAccount:   s.activeAccount,
 		ScriptAccounts: []flow.Address{s.activeAccount},
-	}
+	}}
 
 	err := s.sendTransactionHelper(conn, tx)
 	return nil, err
@@ -407,13 +407,13 @@ func (s *Server) createAccountHelper(conn protocol.Conn) (addr flow.Address, err
 		return addr, fmt.Errorf("failed to generate account creation script: %w", err)
 	}
 
-	tx := flow.Transaction{
+	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:         script,
 		Nonce:          s.getNextNonce(),
 		ComputeLimit:   10,
 		PayerAccount:   s.activeAccount,
 		ScriptAccounts: []flow.Address{},
-	}
+	}}
 
 	err = s.sendTransactionHelper(conn, tx)
 	if err != nil {

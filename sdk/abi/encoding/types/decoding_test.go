@@ -9,6 +9,7 @@ import (
 
 	abiExamples "github.com/dapperlabs/flow-go/language/abi"
 	"github.com/dapperlabs/flow-go/language/runtime/cmd/abi"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestExamples(t *testing.T) {
@@ -34,7 +35,7 @@ func TestExamples(t *testing.T) {
 
 					typesFromCadence := abi.GetTypesFromCadenceCode(string(cdcAsset), cdcName)
 
-					assert.Equal(t, typesFromCadence, typesFromABI)
+					unittest.AssertEqualWithDiff(t, typesFromCadence, typesFromABI)
 				})
 			}
 		}

@@ -2,10 +2,10 @@ package ast
 
 import (
 	"encoding/gob"
-
-	"github.com/dapperlabs/flow-go/sdk/abi/values"
+	"fmt"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 // Identifier
@@ -95,13 +95,19 @@ func init() {
 
 // AddressLocation
 
+const AddressPrefix = "A"
+
 type AddressLocation []byte
 
 func (l AddressLocation) ID() LocationID {
-	return LocationID(l.ToAddress().Hex())
+	return LocationID(fmt.Sprintf(
+		"%s.%s",
+		AddressPrefix,
+		l.ToAddress().Hex(),
+	))
 }
 
-func (l AddressLocation) ToAddress() (addr values.Address) {
+func (l AddressLocation) ToAddress() values.Address {
 	return values.BytesToAddress(l)
 }
 

@@ -7,13 +7,14 @@ import (
 	"sync"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/merkle"
 )
 
 // Item defines the interface for items in the mempool.
 type Item interface {
-	// Hash should return the canonical hash for the item.
-	Hash() crypto.Hash
+	// Fingerprint should return the canonical hash for the item.
+	Fingerprint() flow.Fingerprint
 }
 
 // mempool implements a generic memory pool backed by a merkle tree.
@@ -33,10 +34,10 @@ func newMempool() *mempool {
 }
 
 // Has checks if we already contain the item with the given hash.
-func (m *mempool) Has(hash crypto.Hash) bool {
+func (m *mempool) Has(fp flow.Fingerprint) bool {
 	m.RLock()
 	defer m.RUnlock()
-	_, ok := m.tree.Get(hash)
+	_, ok := m.tree.Get(crypto.Hash(fp))
 	return ok
 }
 
@@ -44,35 +45,35 @@ func (m *mempool) Has(hash crypto.Hash) bool {
 func (m *mempool) Add(item Item) error {
 	m.Lock()
 	defer m.Unlock()
-	ok := m.tree.Put(item.Hash(), nil)
+	ok := m.tree.Put(crypto.Hash(item.Fingerprint()), nil)
 	if ok {
-		return fmt.Errorf("item already known (%x)", item.Hash())
+		return fmt.Errorf("item already known (%x)", item.Fingerprint())
 	}
-	m.items[fmt.Sprint(item.Hash())] = item
+	m.items[fmt.Sprint(item.Fingerprint())] = item
 	return nil
 }
 
 // Rem will remove the item with the given hash.
-func (m *mempool) Rem(hash crypto.Hash) bool {
+func (m *mempool) Rem(fp flow.Fingerprint) bool {
 	m.Lock()
 	defer m.Unlock()
-	ok := m.tree.Del(hash)
+	ok := m.tree.Del(crypto.Hash(fp))
 	if !ok {
 		return false
 	}
-	delete(m.items, fmt.Sprint(hash))
+	delete(m.items, fmt.Sprint(fp))
 	return true
 }
 
 // Get returns the given item from the pool.
-func (m *mempool) Get(hash crypto.Hash) (Item, error) {
+func (m *mempool) Get(fp flow.Fingerprint) (Item, error) {
 	m.RLock()
 	defer m.RUnlock()
-	_, ok := m.tree.Get(hash)
+	_, ok := m.tree.Get(crypto.Hash(fp))
 	if !ok {
-		return nil, fmt.Errorf("item not known (%x)", hash)
+		return nil, fmt.Errorf("item not known (%x)", fp)
 	}
-	coll := m.items[fmt.Sprint(hash)]
+	coll := m.items[fmt.Sprint(fp)]
 	return coll, nil
 }
 
