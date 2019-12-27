@@ -184,6 +184,7 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		if err == storage.NotFoundErr {
 			continue
 		}
+
 		if err == nil {
 			return fmt.Errorf("identity role already exists (%x: %s)", id.NodeID, role)
 		}
@@ -199,6 +200,7 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		if err == storage.NotFoundErr {
 			continue
 		}
+
 		if err == nil {
 			return fmt.Errorf("identity address already exists (%x: %s)", id.NodeID, address)
 		}

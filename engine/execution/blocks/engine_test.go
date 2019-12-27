@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	moduleMocks "github.com/dapperlabs/flow-go/module/mocks"
+	module "github.com/dapperlabs/flow-go/module/mocks"
 	network "github.com/dapperlabs/flow-go/network/mocks"
 	storage "github.com/dapperlabs/flow-go/storage/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -22,11 +22,11 @@ func TestBlockStorage(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	net := moduleMocks.NewMockNetwork(ctrl)
+	net := module.NewMockNetwork(ctrl)
 
 	// initialize the mocks and engine
 	conduit := network.NewMockConduit(ctrl)
-	me := moduleMocks.NewMockLocal(ctrl)
+	me := module.NewMockLocal(ctrl)
 
 	blocks := storage.NewMockBlocks(ctrl)
 	collections := storage.NewMockCollections(ctrl)

@@ -1,7 +1,7 @@
 package blocks
 
 import (
-	"sync"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -13,27 +13,24 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-// Engine manages execution of transactions
+// An Engine receives and saves incoming blocks.
 type Engine struct {
-	log         zerolog.Logger
+	unit *engine.Unitlog         zerolog.Logger
 	conduit     network.Conduit
 	me          module.Local
-	wg          *sync.WaitGroup
 	blocks      storage.Blocks
 	collections storage.Collections
 }
 
 func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections) (*Engine, error) {
-
 	eng := Engine{
-		log:         logger,
+		unit: engine.NewUnit(), log: logger,
 		me:          me,
-		wg:          &sync.WaitGroup{},
 		blocks:      blocks,
 		collections: collections,
 	}
 
-	con, err := net.Register(engine.Execution, &eng)
+	con, err := net.Register(engine.ExecutionBlockIngestion, &eng)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
@@ -43,41 +40,52 @@ func New(logger zerolog.Logger, net module.Network, me module.Local, blocks stor
 	return &eng, nil
 }
 
+func (e *Engine) SubmitLocal(event interface{}) {
+	e.Submit(e.me.NodeID(), event)
+}
+
+func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+	e.unit.Launch(func() {
+		err := e.Process(originID, event)
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not process submitted event")
+		}
+	})
+}
+
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.Process(e.me.NodeID(), event)
+}
+
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	ready := make(chan struct{})
-	go func() {
-		close(ready)
-	}()
-	return ready
+	return e.unit.Ready()
 }
 
 // Done returns a channel that will close when the engine has
 // successfully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	done := make(chan struct{})
-	go func() {
-		e.wg.Wait()
-		close(done)
-	}()
-	return done
+	return e.unit.Done()
 }
 
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	var err error
-	switch v := event.(type) {
-	case flow.Block:
-		err = e.handleBlock(v)
-	case flow.Collection:
-		err = e.handleCollection(v)
-	default:
-		err = errors.Errorf("invalid event type (%T)", event)
-	}
-	if err != nil {
-		return errors.Wrap(err, "could not process event")
-	}
-	return nil
+
+	return e.unit.Do(func() error {
+		var err error
+		switch v := event.(type) {
+		case flow.Block:
+			err = e.handleBlock(v)
+		case flow.Collection:
+			err = e.handleCollection(v)
+		default:
+			err = errors.Errorf("invalid event type (%T)", event)
+		}
+		if err != nil {
+			return errors.Wrap(err, "could not process event")
+		}
+		return nil
+	})
 }
 
 func (e *Engine) handleBlock(block flow.Block) error {
@@ -86,7 +94,12 @@ func (e *Engine) handleBlock(block flow.Block) error {
 		Uint64("block_number", block.Number).
 		Msg("received block")
 
-	return e.blocks.Save(&block)
+	err := e.blocks.Save(&block)
+
+	if err != nil {
+		return fmt.Errorf("could not save block: %w", err)
+	}
+	return nil
 }
 
 func (e *Engine) handleCollection(collection flow.Collection) error {
@@ -94,5 +107,9 @@ func (e *Engine) handleCollection(collection flow.Collection) error {
 		Hex("collection_hash", collection.Hash()).
 		Msg("received collection")
 
-	return e.collections.Insert(&collection)
+	err := e.collections.Insert(&collection)
+	if err != nil {
+		return fmt.Errorf("could not save collection: %w", err)
+	}
+	return nil
 }

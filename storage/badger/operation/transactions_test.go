@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -34,7 +36,7 @@ func TestTransactions(t *testing.T) {
 		err = db.View(operation.RetrieveTransaction(expected.Fingerprint(), &actual))
 		// should fail since this was just deleted
 		if assert.Error(t, err) {
-			assert.True(t, errors.Is(err, badger.ErrKeyNotFound))
+			assert.True(t, errors.Is(err, storage.NotFoundErr))
 		}
 	})
 }
