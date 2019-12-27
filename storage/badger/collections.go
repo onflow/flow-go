@@ -4,7 +4,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -21,7 +20,7 @@ func NewCollections(db *badger.DB) *Collections {
 	return b
 }
 
-func (c *Collections) ByHash(hash crypto.Hash) (*flow.Collection, error) {
+func (c *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, error) {
 
 	var collection flow.Collection
 

@@ -55,11 +55,11 @@ func TestCollectionStorage(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	net := moduleMocks.NewMockNetwork(ctrl)
+	net := module.NewMockNetwork(ctrl)
 
 	// initialize the mocks and engine
 	conduit := network.NewMockConduit(ctrl)
-	me := moduleMocks.NewMockLocal(ctrl)
+	me := module.NewMockLocal(ctrl)
 
 	blocks := storage.NewMockBlocks(ctrl)
 	collections := storage.NewMockCollections(ctrl)

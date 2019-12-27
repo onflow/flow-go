@@ -101,19 +101,19 @@ func (m *MockCollections) EXPECT() *MockCollectionsMockRecorder {
 	return m.recorder
 }
 
-// ByHash mocks base method
-func (m *MockCollections) ByHash(arg0 crypto.Hash) (*flow.Collection, error) {
+// ByFingerprint mocks base method
+func (m *MockCollections) ByFingerprint(arg0 flow.Fingerprint) (*flow.Collection, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ByHash", arg0)
+	ret := m.ctrl.Call(m, "ByFingerprint", arg0)
 	ret0, _ := ret[0].(*flow.Collection)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ByHash indicates an expected call of ByHash
-func (mr *MockCollectionsMockRecorder) ByHash(arg0 interface{}) *gomock.Call {
+// ByFingerprint indicates an expected call of ByFingerprint
+func (mr *MockCollectionsMockRecorder) ByFingerprint(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByHash", reflect.TypeOf((*MockCollections)(nil).ByHash), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByFingerprint", reflect.TypeOf((*MockCollections)(nil).ByFingerprint), arg0)
 }
 
 // Insert mocks base method

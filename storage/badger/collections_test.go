@@ -22,7 +22,7 @@ func TestCollectionRetrievalByHash(t *testing.T) {
 		err := collections.Insert(&collection)
 		require.NoError(t, err)
 
-		byHash, err := collections.ByHash(collection.Hash())
+		byHash, err := collections.ByFingerprint(collection.Fingerprint())
 		require.NoError(t, err)
 
 		assert.Equal(t, collection, *byHash)
@@ -40,7 +40,7 @@ func TestRetrievalByNonexistingHash(t *testing.T) {
 		err := collections.Insert(&collection)
 		require.NoError(t, err)
 
-		_, err = collections.ByHash([]byte("LOL"))
+		_, err = collections.ByFingerprint([]byte("LOL"))
 
 		assert.Equal(t, storage.NotFoundErr, err)
 	})

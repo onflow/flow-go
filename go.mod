@@ -8,14 +8,11 @@ require (
 	github.com/dave/jennifer v1.4.0
 	github.com/davecgh/go-xdr v0.0.0-20161123171359-e6a2ba005892
 	github.com/dchest/siphash v1.2.1
-	github.com/dgraph-io/badger v1.6.0
 	github.com/dgraph-io/badger/v2 v2.0.0
 	github.com/ethereum/go-ethereum v1.9.2
 	github.com/go-test/deep v1.0.4
-	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.2
-	github.com/google/go-cmp v0.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3

@@ -18,7 +18,7 @@ func TestGuaranteedCollectionsInsertRetrieve(t *testing.T) {
 
 	unittest.RunWithDB(t, func(db *badger.DB) {
 		hash := crypto.Hash{0x13, 0x37}
-		expected := []*collection.GuaranteedCollection{
+		expected := []*flow.GuaranteedCollection{
 			{CollectionHash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x10}}},
 			{CollectionHash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x20}}},
 			{CollectionHash: crypto.Hash{0x03}, Signatures: []crypto.Signature{{0x30}}},

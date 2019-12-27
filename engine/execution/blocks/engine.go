@@ -15,7 +15,8 @@ import (
 
 // An Engine receives and saves incoming blocks.
 type Engine struct {
-	unit *engine.Unitlog         zerolog.Logger
+	unit        *engine.Unit
+	log         zerolog.Logger
 	conduit     network.Conduit
 	me          module.Local
 	blocks      storage.Blocks
@@ -24,7 +25,8 @@ type Engine struct {
 
 func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections) (*Engine, error) {
 	eng := Engine{
-		unit: engine.NewUnit(), log: logger,
+		unit:        engine.NewUnit(),
+		log:         logger,
 		me:          me,
 		blocks:      blocks,
 		collections: collections,
@@ -104,7 +106,7 @@ func (e *Engine) handleBlock(block flow.Block) error {
 
 func (e *Engine) handleCollection(collection flow.Collection) error {
 	e.log.Debug().
-		Hex("collection_hash", collection.Hash()).
+		Hex("collection_hash", collection.Fingerprint()).
 		Msg("received collection")
 
 	err := e.collections.Insert(&collection)

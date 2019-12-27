@@ -1,8 +1,9 @@
 package badger
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"

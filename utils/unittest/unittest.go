@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"fmt"
 	"strings"
 	"testing"
 

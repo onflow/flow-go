@@ -78,14 +78,6 @@ func FlowCollectionFixture(n int) flow.Collection {
 	return flow.Collection{Transactions: col}
 }
 
-func BlockFixture() flow.Block {
-	return flow.Block{
-		Header:                BlockHeaderFixture(),
-		NewIdentities:         IdentityListFixture(3),
-		GuaranteedCollections: GuaranteedCollectionsFixture(3),
-	}
-}
-
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             []byte("pub fun main() {}"),

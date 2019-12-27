@@ -17,18 +17,18 @@ func InsertGuaranteedCollections(hash crypto.Hash, collections []*flow.Guarantee
 	return insert(makePrefix(codeGuaranteedCollection, hash), collections)
 }
 
-func RetrieveGuaranteedCollections(hash crypto.Hash, collections *[]*collection.GuaranteedCollection) func(*badger.Txn) error {
+func RetrieveGuaranteedCollections(hash crypto.Hash, collections *[]*flow.GuaranteedCollection) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeGuaranteedCollection, hash), collections)
 }
 
 func InsertNewFlowCollection(collection *flow.Collection) func(*badger.Txn) error {
-	return insertNew(makePrefix(codeCollection, collection.Hash()), collection)
+	return insertNew(makePrefix(codeCollection, collection.Fingerprint()), collection)
 }
 
 func InsertFlowCollection(collection *flow.Collection) func(*badger.Txn) error {
-	return insert(makePrefix(codeCollection, collection.Hash()), collection)
+	return insert(makePrefix(codeCollection, collection.Fingerprint()), collection)
 }
 
-func RetrieveFlowCollection(hash crypto.Hash, collection *flow.Collection) func(*badger.Txn) error {
+func RetrieveFlowCollection(hash flow.Fingerprint, collection *flow.Collection) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollection, hash), collection)
 }
