@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/hash"
 )
 
 type Spock []byte
@@ -25,3 +26,7 @@ func (er *ExecutionReceipt) Encode() []byte {
 	return b.Bytes()
 }
 
+// Hash returns the canonical hash of this execution receipt.
+func (er *ExecutionReceipt) Hash() crypto.Hash {
+	return hash.DefaultHasher.ComputeHash(er.Encode())
+}

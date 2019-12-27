@@ -13,7 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func prepareNodesAndCollectionsConfigurable(N, M int) (
+func prepareNodesAndCollections(N, M int) (
 	[]*mockPropagationNode, []*flow.GuaranteedCollection, error) {
 
 	rand.Seed(time.Now().UnixNano())
@@ -22,7 +22,7 @@ func prepareNodesAndCollectionsConfigurable(N, M int) (
 	entries := make([]string, N)
 	for e := 0; e < N; e++ {
 		nodeID := unittest.IdentifierFixture()
-		entries[e] = fmt.Sprintf("consensus-%x@address%d=1000", nodeID, e+1)
+		entries[e] = fmt.Sprintf("consensus-%s@address%d=1000", nodeID, e+1)
 	}
 	_, nodes, err := createConnectedNodes(entries...)
 	if err != nil {

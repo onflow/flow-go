@@ -66,28 +66,28 @@ func (ch *Chunk) String() string {
 
 // Note that this is the basic version of the List, we need to substitute it with something like Merkel tree at some point
 type ChunkList struct {
-	chunks []Chunk
+	Chunks []Chunk
 }
 
 func (cl *ChunkList) Fingerprint() Fingerprint {
 	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
-	for _, item := range cl.chunks {
+	for _, item := range cl.Chunks {
 		hasher.Add(item.Fingerprint())
 	}
 	return Fingerprint(hasher.SumHash())
 }
 
 func (cl *ChunkList) Append(ch Chunk) {
-	cl.chunks = append(cl.chunks, ch)
+	cl.Chunks = append(cl.Chunks, ch)
 }
 
 func (cl *ChunkList) Items() []Chunk {
-	return cl.chunks
+	return cl.Chunks
 }
 
 // ByFingerprint returns an entity from the list by entity fingerprint
 func (cl *ChunkList) ByFingerprint(c Fingerprint) Chunk {
-	for _, item := range cl.chunks {
+	for _, item := range cl.Chunks {
 		if bytes.Equal(item.Fingerprint(), c) {
 			return item
 		}
@@ -97,15 +97,15 @@ func (cl *ChunkList) ByFingerprint(c Fingerprint) Chunk {
 
 // ByIndex returns an entity from the list by index
 func (cl *ChunkList) ByIndex(i uint64) Chunk {
-	return cl.chunks[i]
+	return cl.Chunks[i]
 }
 
 // ByIndexWithProof returns an entity from the list by index and proof of membership
 func (cl *ChunkList) ByIndexWithProof(i uint64) (Chunk, MembershipProof) {
-	return cl.chunks[i], nil
+	return cl.Chunks[i], nil
 }
 
-// Size returns the number of chunks in the list
+// Size returns the number of Chunks in the list
 func (cl *ChunkList) Size() int {
-	return len(cl.chunks)
+	return len(cl.Chunks)
 }

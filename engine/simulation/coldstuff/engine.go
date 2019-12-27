@@ -27,6 +27,7 @@ type Engine struct {
 	unit      *engine.Unit
 	log       zerolog.Logger
 	con       network.Conduit
+	exp       network.Engine
 	state     protocol.State
 	me        module.Local
 	pool      module.CollectionPool
@@ -40,7 +41,7 @@ type Engine struct {
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool module.CollectionPool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, exp network.Engine, state protocol.State, me module.Local, pool module.CollectionPool) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{
@@ -539,6 +540,9 @@ func (e *Engine) commitCandidate() error {
 	if err != nil {
 		return errors.Wrap(err, "could not finalize state")
 	}
+
+	// hand the finalized block to expulsion engine to spread to all nodes
+	e.exp.Submit(e.round.Leader().NodeID, e.round.Candidate())
 
 	// remove all collections from the block from the mempool
 	removed := uint(0)

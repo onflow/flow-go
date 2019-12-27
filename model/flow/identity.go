@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -21,18 +20,6 @@ type Identity struct {
 	Address string
 	Role    Role
 	Stake   uint64
-}
-
-func HexStringToIdentifier(hexString string) (Identifier, error) {
-	var identifier Identifier
-	i, err := hex.Decode(identifier[:], []byte(hexString))
-	if err != nil {
-		return identifier, err
-	}
-	if i != 32 {
-		return identifier, fmt.Errorf("malformed input, expected 32 bytes (64 characters), decoded %d", i)
-	}
-	return identifier, nil
 }
 
 // ParseIdentity parses a string representation of an identity.
