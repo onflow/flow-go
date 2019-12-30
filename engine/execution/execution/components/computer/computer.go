@@ -18,21 +18,25 @@ type TransactionResult struct {
 }
 
 // A Computer uses the Cadence runtime to compute transaction results.
-type Computer struct {
+type Computer interface {
+	// ExecuteTransaction computes the result of a transaction.
+	ExecuteTransaction(tx *flow.Transaction) (*TransactionResult, error)
+}
+
+type computer struct {
 	runtime         runtime.Runtime
 	contextProvider context.Provider
 }
 
 // New initializes a new computer with a runtime and context provider.
-func New(runtime runtime.Runtime, contextProvider context.Provider) *Computer {
-	return &Computer{
+func New(runtime runtime.Runtime, contextProvider context.Provider) Computer {
+	return &computer{
 		runtime:         runtime,
 		contextProvider: contextProvider,
 	}
 }
 
-// ExecuteTransaction computes the result of a transaction.
-func (c *Computer) ExecuteTransaction(tx *flow.Transaction) (*TransactionResult, error) {
+func (c *computer) ExecuteTransaction(tx *flow.Transaction) (*TransactionResult, error) {
 	ctx := c.contextProvider.NewTransactionContext(tx)
 
 	location := runtime.TransactionLocation(tx.Hash())
