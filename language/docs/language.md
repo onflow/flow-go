@@ -4002,49 +4002,6 @@ some.e
 some.e = 5
 ```
 
-## Contracts
-
-A contract in Cadence is a collection of type definitions 
-of structs or resources,  data (its state), and code (its functions) 
-that lives in the contract storage area of an account in Flow.  
-Contracts are where all persistent composite types like structs, 
-resources, and events in Cadence have to be defined.  
-Therefore, an object of one of these types cannot exist 
-without having been defined in a deployed Cadence contract.  
-
-```
-// HelloWorldResource.cdc
-    
-pub contract HelloWorld {
-
-    // Declare a stored state variable in HelloWorld
-    //
-    pub let greeting: String
-
-    // Declare a function that can be called by anyone
-    // who imports the contract
-    //
-    pub fun hello(): String {
-        return greeting
-    }
-
-    // Declare a resource type definition that can be imported by anyone
-    // to use in their transaction
-    //
-    pub resource HelloAsset {
-        pub fun hello(): String {
-                return "Hello World!"
-        }
-    }
-}
-
-Contracts are like a composite type, but cannot be copied 
-or moved like resources or structs. They stay in an account's contract storage
-area and can only be updated or deleted by the account owner.
-
-There can be any number of contracts per account and they can include an arbitrary amount of data.
-
-Transactions and other contracts can interact with contracts by importing them at the beginning of a transaction or contract definition
 
 ## Interfaces
 
@@ -4957,6 +4914,176 @@ countRef.increment()
 let countObj = acct.storage[Counter]
 
 ```
+
+## Contracts
+
+A contract in Cadence is a collection of type definitions 
+of interfaces, structs, resources,  data (its state), and code (its functions) 
+that lives in the contract storage area of an account in Flow.  
+Contracts are where all persistent composite types like structs, 
+resources, and events in Cadence have to be defined.  
+Therefore, an object of one of these types cannot exist 
+without having been defined in a deployed Cadence contract.  
+
+One of the simplest forms of a contract would just be one with a state variable, 
+a function, and an `init` function that initializes the variable:
+
+```cadence,file=contract.cdc
+// HelloWorldResource.cdc
+    
+pub contract HelloWorld {
+
+    // Declare a stored state variable in HelloWorld
+    //
+    pub let greeting: String
+
+    // Declare a function that can be called by anyone
+    // who imports the contract
+    //
+    pub fun hello(): String {
+        return self.greeting
+    }
+
+    init() {
+        self.greeting = "Hello World!"
+    }
+}
+```
+This contract could be deployed to an account and live permenantely
+in the contract storage.  Transactions and other contracts 
+can interact with contracts by importing them at the beginning 
+of a transaction or contract definition.
+
+Anyone could call its `hello` function by importing
+the contract from the account it was deployed to and using the imported
+object to call the hello function.
+```cadence,file=contract_call.cdc
+import HelloWorld from 0x42
+
+// Invalid: The contract does not know where hello comes from
+//
+log(hello())        // Error
+
+// Valid: Using the imported contract object to call the hello
+// function
+//
+log(HelloWorld.hello())    // prints "Hello World!"
+
+// Valid: Using the imported contract object to read the greeting
+// field.
+log(HelloWorld.greeting)   // prints "Hello World!"
+
+// Invalid: Cannot call the init function after the contract has been created.
+//
+HelloWorld.init()    // Error
+```
+
+Contracts are like a composite type, but are stored differently than
+structs or resources and cannot be copied or moved like resources or structs.
+They stay in an account's contract storage
+area and can only be updated or deleted by the account owner
+with special commands.
+
+There can be any number of contracts per account 
+and they can include an arbitrary amount of data. This means that
+a contract can have any number of fields, functions, and type definitions,
+but they have to be in the contract and not another top-level definition.
+
+Another important feature of contracts is that instances of composite types
+that are defined in contracts can only be created within functions or types
+that are defined in that contract.  A random transaction cannot arbitrarily
+create instances of tokens that are defined in another contract.  A contract
+restricts the situations that the objects can be created in.
+
+
+```cadence,file=ft_contract.cdc
+// Invalid: Top-level declarations are restricted to only be contracts
+//          or contract interfaces.
+//
+pub resource Vault {}
+
+pub contract FungibleToken {
+
+    pub resource interface Receiver {
+
+        pub balance: Int
+
+        pub fun deposit(from: @Receiver) {
+            pre {
+                from.balance > 0:
+                    "Deposit balance needs to be positive!"
+            }
+            post {
+                self.balance == before(self.balance) + before(from.balance):
+                    "Incorrect amount removed"
+            }
+        }
+    }
+
+    pub resource Vault: Receiver {
+
+        // keeps track of the total balance of the accounts tokens
+        pub var balance: Int
+
+        init(balance: Int) {
+            self.balance = balance
+        }
+
+        // withdraw subtracts amount from the vaults balance and
+        // returns a vault object with the subtracted balance
+        pub fun withdraw(amount: Int): @Vault {
+            self.balance = self.balance - amount
+            return <-create Vault(balance: amount)
+        }
+
+        // deposit takes a vault object as a parameter and adds
+        // its balance to the balance of the Account's vault, then
+        // destroys the sent vault because its balance has been consumed
+        pub fun deposit(from: @Receiver) {
+            self.balance = self.balance + from.balance
+            destroy from
+        }
+    }
+}
+```
+This contract defines an interface and a resource
+that implements that interface.  But there is no way to create this resource,
+so it would not be usable.
+
+```cadence,file=contract_invalid_create.cdc
+import FungibleToken from 0x42
+
+
+// Invalid: Cannot create an instance of the `Vault` type outside
+// of the contract that defines `Vault`
+//
+let newVault <- create FungibleToken.Vault()
+```
+
+The contract would have to either define a function that creates new
+`Vault` instances or use its `init` function to create an instance and 
+store it in the owner's account storage. 
+
+This brings up another key feature of contracts in Cadence.  Contracts 
+can interact with an account's `storage` and `published` objects to store
+resources, structs, and references.  They do so by using the special 
+`self.account` object that is only accessible within the contract.
+
+Imagine that these were defined in the above `FungibleToken` contract.
+```cadence,file=ft_contract_additions.cdc
+
+    pub fun createVault(initialBalance: Int): @Vault {
+        return <-create Vault(balance: initialBalance)
+    }
+
+    init(balance: Int) {
+        self.account.storage[Vault] <- create Vault(balance: 1000)
+    }
+```
+Now, any account coule call the `createVault` function defined in the contract
+to create a `Vault` object.  Or the owner could call the `withdraw` function
+on their own `Vault` to send new vaults to others.
+
 
 
 ## Events
