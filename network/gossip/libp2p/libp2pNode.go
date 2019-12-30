@@ -5,12 +5,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
-	"sync"
-	"time"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/gogo/protobuf/proto"
+	"io/ioutil"
+	"sync"
 
 	flownetwork "github.com/dapperlabs/flow-go/network"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -84,8 +82,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		libp2p.Identity(key),
 		libp2p.Transport(tcp.NewTCPTransport), // the default transport unnecessarily brings in a websocket listener
 	)
-
-	time.Sleep(time.Second * 2)
+	
 	p.libP2PHost = host
 
 	// Set the callback to use for an incoming peer message

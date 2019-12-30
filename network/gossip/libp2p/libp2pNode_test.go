@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,23 +26,13 @@ import (
 
 // Workaround for https://github.com/stretchr/testify/pull/808
 const tickForAssertEventually = 100 * time.Millisecond
+var setupOnce sync.Once
+var nodes []*P2PNode
+var totalNodes = 10
 
 func TestLibP2PNode_Start_Stop(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	nodes, err := createLibP2PNodes(ctx, t, 1)
-	assert.NoError(t, err)
-	assert.NoError(t, nodes[0].Stop())
-}
-
-func checkClientConnection(t *testing.T, address string) {
-	timeout := 5 * time.Millisecond
-	assert.Eventually(t, func() bool {
-		con, err := net.DialTimeout("tcp", address, timeout)
-		defer con.Close()
-		return con != nil && err == nil
-	}, 4*timeout, 2*timeout)
-	fmt.Printf(" \n\n *** Able to connect to %s\n\n",address)
+	createLibP2PNodes(context.Background(), t)
+	//assert.NoError(t, nodes[0].Stop())
 }
 
 // TestLibP2PNode_GetPeerInfo checks that given a node name, the corresponding node id is consistently generated
@@ -66,23 +56,15 @@ func TestLibP2PNode_GetPeerInfo(t *testing.T) {
 
 // TestLibP2PNode_AddPeers checks if nodes can be added as peers to a given node
 func TestLibP2PNode_AddPeers(t *testing.T) {
-	//t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
+	// t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
 	// A longer timeout is needed to overcome timeouts - https://github.com/ipfs/go-ipfs/issues/5800
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := context.Background()
+	golog.SetAllLoggers(gologging.DEBUG)
 	// count value of 10 runs into this issue on localhost https://github.com/libp2p/go-libp2p-pubsub/issues/96
 	// since localhost connection have short deadlines
-	var count = 3
+
 	// Create nodes
-	nodes, err := createLibP2PNodes(ctx, t, count)
-	require.NoError(t, err)
-	defer func() {
-		if nodes != nil {
-			for _, n := range nodes {
-				n.Stop()
-			}
-		}
-	}()
+	createLibP2PNodes(ctx, t)
 	var ids []NodeAddress
 	// Get actual ip and port numbers on which the nodes were started
 	for _, n := range nodes[1:] {
@@ -93,7 +75,7 @@ func TestLibP2PNode_AddPeers(t *testing.T) {
 	require.NoError(t, nodes[0].AddPeers(ctx, ids))
 	actual := nodes[0].libP2PHost.Peerstore().Peers().Len()
 	// Check if all 9 nodes have been added as peers to the first node.
-	assert.Equal(t, count, actual, "peers expected: %d, found: %d", count, actual)
+	assert.Equal(t, totalNodes, actual, "peers expected: %d, found: %d", totalNodes, actual)
 
 	// Check if libp2p reports node 1 is connected to the other nodes
 	for _, a := range nodes[0].libP2PHost.Peerstore().Peers() {
@@ -109,27 +91,19 @@ func TestLibP2PNode_AddPeers(t *testing.T) {
 
 // TestLibP2PNode_PubSub checks if nodes can subscribe to a topic and send and receive a message.
 func TestLibP2PNode_PubSub(t *testing.T) {
-	//t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	var count = 5
-	golog.SetAllLoggers(gologging.INFO)
+	// t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
+	ctx := context.Background()
+
+	golog.SetAllLoggers(gologging.DEBUG)
 
 	// Step 1: Create nodes
-	nodes, err := createLibP2PNodes(ctx, t, count)
-	require.NoError(t, err)
-	defer func() {
-		if nodes != nil {
-			for _, n := range nodes {
-				n.Stop()
-			}
-		}
-	}()
+	createLibP2PNodes(ctx, t)
+
 
 	// Step 2: Subscribe to a flow topic
 	// A node will receive it's own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
-	ch := make(chan string, count)
+	ch := make(chan string, totalNodes)
 	for _, n := range nodes {
 		m := n.name
 		// callback that is registered
@@ -141,7 +115,7 @@ func TestLibP2PNode_PubSub(t *testing.T) {
 	}
 
 	// Step 3: Connect a node to it's neighbour (Daisy chain them (1->2, 2->3...9->10))
-	for i := 0; i < count-1; i++ {
+	for i := 0; i < totalNodes-1; i++ {
 		s := nodes[i]
 		d := nodes[i+1]
 		dip, dport := d.GetIPPort()
@@ -150,11 +124,11 @@ func TestLibP2PNode_PubSub(t *testing.T) {
 		assert.Eventuallyf(t, func() bool {
 			return network.Connected == s.libP2PHost.Network().Connectedness(d.libP2PHost.ID())
 		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf(" %s not connected with %s", s.name, d.name))
-		e := 2
-		if i%count == 0 {
-			e = 1
-		}
-		assert.Equal(t, e, len(s.ps.ListPeers(string(Consensus))))
+		//e := 2
+		//if i%totalNodes == 0 {
+		//	e = 1
+		//}
+		//assert.Equal(t, totalNodes, len(s.ps.ListPeers(string(Consensus))))
 	}
 
 	// Step 4: Wait for nodes to hearbeat
@@ -163,8 +137,8 @@ func TestLibP2PNode_PubSub(t *testing.T) {
 	// Step 5: Publish a message from the first node and verify all nodes get it.
 	// All nodes including node 0 - the sender, should receive it
 	nodes[0].Publish(ctx, Consensus, []byte("hello"))
-	recv := make(map[string]bool, count)
-	for i := 0; i < count; i++ {
+	recv := make(map[string]bool, totalNodes)
+	for i := 0; i < totalNodes; i++ {
 		select {
 		case res := <-ch:
 			recv[res] = true
@@ -188,20 +162,13 @@ func TestLibP2PNode_PubSub(t *testing.T) {
 
 // TestLibP2PNode_P2P tests end-to-end a P2P message sending and receiving between two nodes
 func TestLibP2PNode_P2P(t *testing.T) {
+	// TODO: Issue#1966
 	golog.SetAllLoggers(gologging.DEBUG)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	var count = 2
+	//t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
+	ctx := context.Background()
 
-	nodes, err := createLibP2PNodes(ctx, t, count)
-	require.NoError(t, err)
-	defer func() {
-		if nodes != nil {
-			for _, n := range nodes {
-				n.Stop()
-			}
-		}
-	}()
+	createLibP2PNodes(ctx, t)
+
 
 	// Peer 1 will be sending a message to Peer 2
 	peer1 := nodes[0]
@@ -211,7 +178,6 @@ func TestLibP2PNode_P2P(t *testing.T) {
 	// Get actual ip and port numbers on which the nodes were started
 	for _, n := range nodes {
 		ip, p := n.GetIPPort()
-		fmt.Printf("node: %s IP: %s port: %s\n", n.name, ip, p)
 		ids = append(ids, NodeAddress{name: n.name, ip: ip, port: p})
 	}
 
@@ -221,8 +187,10 @@ func TestLibP2PNode_P2P(t *testing.T) {
 	// Create and register engines for each of the nodes
 	te1 := &StubEngine{t: t}
 	conduit1, err := peer1.Register(1, te1)
+	require.NoError(t, err)
 	te2 := &StubEngine{t: t, ch: make(chan struct{})}
 	_, err = peer2.Register(1, te2)
+	require.NoError(t, err)
 
 	// Create target byte array from the node name "node2" -> []byte
 	var target [32]byte
@@ -246,30 +214,30 @@ func TestLibP2PNode_P2P(t *testing.T) {
 	}
 }
 
-func createLibP2PNodes(ctx context.Context, t *testing.T, count int) (nodes []*P2PNode, err error) {
-	defer func() {
-		if err != nil && nodes != nil {
-			for _, n := range nodes {
-				n.Stop()
+func createLibP2PNodes(ctx context.Context, t *testing.T) {
+	setupOnce.Do(func() {
+		var err error
+		defer func() {
+			if err != nil && nodes != nil {
+				for _, n := range nodes {
+					n.Stop()
+				}
 			}
+		}()
+		l := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+		for i := 1; i <= totalNodes; i++ {
+			var n = &P2PNode{}
+			var nodeID = NodeAddress{name: fmt.Sprintf("node%d", i), ip: "0.0.0.0", port: "0"}
+			err := n.Start(ctx, nodeID, l)
+			require.NoError(t, err)
+			require.Eventuallyf(t, func() bool {
+				ip, p := n.GetIPPort()
+				return ip != "" && p != ""
+			}, 5*time.Second, tickForAssertEventually, fmt.Sprintf("node%d didn't start", i))
+			nodes = append(nodes, n)
 		}
-	}()
-	l := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	for i := 1; i <= count; i++ {
-		var n = &P2PNode{}
-		var nodeID = NodeAddress{name: fmt.Sprintf("node%d", i), ip: "0.0.0.0", port: "0"}
-		err := n.Start(ctx, nodeID, l)
-		require.NoError(t, err)
-		require.Eventuallyf(t, func() bool {
-			ip, p := n.GetIPPort()
-			fmt.Printf("node on %s:%s\n",ip,p)
-			return ip != "" && p != ""
-		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("node%d didn't start", i))
-		ip, p := n.GetIPPort()
-		checkClientConnection(t, fmt.Sprintf("%s:%s", ip,p))
-		nodes = append(nodes, n)
-	}
-	return nodes, err
+		require.Len(t, nodes, totalNodes, " node counts not as expected")
+	})
 }
 
 type StubEngine struct {
