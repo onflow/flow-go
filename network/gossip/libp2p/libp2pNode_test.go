@@ -177,6 +177,8 @@ func TestLibP2PNode_PubSub(t *testing.T) {
 
 // TestLibP2PNode_P2P tests end-to-end a P2P message sending and receiving between two nodes
 func TestLibP2PNode_P2P(t *testing.T) {
+	// TODO: Issue#1966
+	t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var count = 2
@@ -199,7 +201,6 @@ func TestLibP2PNode_P2P(t *testing.T) {
 	// Get actual ip and port numbers on which the nodes were started
 	for _, n := range nodes {
 		ip, p := n.GetIPPort()
-		fmt.Printf("node: %s IP: %s port: %s\n", n.name, ip, p)
 		ids = append(ids, NodeAddress{name: n.name, ip: ip, port: p})
 	}
 

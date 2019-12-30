@@ -29,7 +29,7 @@ import (
 // A unique Libp2p protocol ID for Flow (https://docs.libp2p.io/concepts/protocols/)
 // All nodes communicate with each other using this protocol
 const (
-	FlowLibP2PProtocolID protocol.ID = "/flow/0.0.1"
+	FlowLibP2PProtocolID protocol.ID = "/flow/push/0.0.1"
 )
 
 // NodeAddress is used to define a libp2p node
@@ -52,7 +52,7 @@ type P2PNode struct {
 	engines    map[uint8]flownetwork.Engine       // map of engine id to engine instances
 	streams    map[uint8]network.Stream           // map of engine id to libp2p streams
 
-	//TODO abstract this out in a different class
+	//TODO abstract this out in a different class (Issue#1611)
 	inbound chan interface{}
 }
 
@@ -106,37 +106,6 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	return err
 }
 
-func (p *P2PNode) Send(ctx context.Context, peer NodeAddress, engineID uint8, msg interface{}) error {
-	peerInfo, err := GetPeerInfo(peer)
-	if err != nil {
-		return err
-	}
-	stream, err := p.libP2PHost.NewStream(ctx, peerInfo.ID)
-	if err != nil {
-		return err
-	}
-
-	// TODO: Add translation of flow network id to libp2p name or make them the same
-	var senderID [32]byte
-	copy(senderID[:], []byte(p.name))
-	message := &Message{SenderID: make([]byte, len(senderID)), Event: msg.([]byte), EngineID: uint32(engineID)}
-	b, err := proto.Marshal(message)
-	if err != nil {
-		return err
-	}
-
-	// TODO: Do something with the number of bytes written
-	_, err = stream.Write(b)
-	if err != nil {
-		return err
-	}
-	err = stream.Close()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // Stop stops the libp2p node.
 func (p *P2PNode) Stop() error {
 	p.Lock()
@@ -158,21 +127,14 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers []NodeAddress) error {
 			return err
 		}
 
-		for _, m := range pInfo.Addrs {
-			fmt.Printf(" %s\n", m.String())
-		}
 		// Add the destination's peer multiaddress in the peerstore.
 		// This will be used during connection and stream creation by libp2p.
-		fmt.Printf(" Adding node %s to %s\n", pInfo.ID, p.libP2PHost.ID())
 		p.libP2PHost.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.PermanentAddrTTL)
-		fmt.Printf(" Added node %s to %s\n", pInfo.ID, p.libP2PHost.ID())
 
-		fmt.Printf(" Connecting node %s to %s\n", pInfo.ID, p.libP2PHost.ID())
 		err = p.libP2PHost.Connect(ctx, pInfo)
 		if err != nil {
 			return err
 		}
-		fmt.Printf(" Connected node %s to %s\n", pInfo.ID, p.libP2PHost.ID())
 	}
 	return nil
 }
@@ -319,7 +281,7 @@ func (p *P2PNode) Register(engineID uint8, engine flownetwork.Engine) (flownetwo
 // The Target needs to be added as a peer before submitting the message.
 func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 	for _, t := range targetIDs {
-		// TODO: Yet to figure out the whole flow identifier to libp2p id mapping.
+		// TODO: Yet to figure out the whole flow identifier to libp2p id mapping (Issue#1968)
 
 		// Translate the target flow ID to the libp2p peer id
 		// Remove the extra 0s at the end
@@ -350,7 +312,6 @@ func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Id
 		}
 
 		// Send the message using the stream
-		// TODO: Do something with the return value of number of bytes written
 		_, err = stream.Write(b)
 		if err != nil {
 			return err
@@ -374,14 +335,14 @@ func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Id
 func (p *P2PNode) handleStream(s network.Stream) {
 	p.logger.Debug().Str("peer", s.Conn().RemotePeer().String()).Msg("received a new incoming stream")
 	go p.readData(s)
-	// TODO: Running with a receive-only (unidirectional) stream for now
+	// TODO: Running with a receive-only (unidirectional) stream for now (Issue#1955)
 	// go p.writeData(s)
 }
 
 // readData reads the data from the remote peer using the stream
 func (p *P2PNode) readData(s network.Stream) {
 	for {
-		// TODO: implement length-prefix framing to delineate protobuf message if exchanging more than one message
+		// TODO: implement length-prefix framing to delineate protobuf message if exchanging more than one message (Issue#1969)
 		// (protobuf has no inherent delimiter)
 		// Read incoming data into a buffer
 		buff, err := ioutil.ReadAll(s)
