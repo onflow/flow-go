@@ -40,4 +40,3 @@ type EnteringViewConsumer interface {
 type PassiveTillViewConsumer interface {
 	OnPassiveTillView(viewNumber uint64)
 }
-

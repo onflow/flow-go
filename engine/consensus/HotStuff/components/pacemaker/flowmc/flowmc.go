@@ -1,9 +1,9 @@
 package flowmc
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/components/pacemaker/events"
-	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/components/pacemaker/primary"
-	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/components/pacemaker/events"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/components/pacemaker/primary"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
 	"go.uber.org/atomic"
 )
 
