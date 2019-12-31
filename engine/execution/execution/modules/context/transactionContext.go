@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/dapperlabs/flow-go/engine/execution/execution/modules/ledger"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
@@ -14,7 +15,7 @@ import (
 type CheckerFunc func([]byte, runtime.Location) error
 
 type transactionContext struct {
-	ledger          *flow.LedgerView
+	ledger          *ledger.View
 	signingAccounts []values.Address
 	checker         CheckerFunc
 	logs            []string

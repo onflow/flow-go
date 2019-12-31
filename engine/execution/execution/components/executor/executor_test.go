@@ -7,15 +7,16 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	computer "github.com/dapperlabs/flow-go/engine/execution/execution/components/computer/mock"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/components/computer"
+	mockcomputer "github.com/dapperlabs/flow-go/engine/execution/execution/components/computer/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/components/executor"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 func TestExecutorExecuteBlock(t *testing.T) {
-	computer := &computer.Computer{}
+	comp := &mockcomputer.Computer{}
 
-	exe := executor.New(computer)
+	exe := executor.New(comp)
 
 	tx1 := &flow.Transaction{
 		TransactionBody: flow.TransactionBody{
@@ -46,12 +47,12 @@ func TestExecutorExecuteBlock(t *testing.T) {
 		},
 	}
 
-	computer.On(
+	comp.On(
 		"ExecuteTransaction",
-		mock.AnythingOfType("*flow.LedgerView"),
+		mock.AnythingOfType("*ledger.View"),
 		mock.AnythingOfType("*flow.Transaction"),
 	).
-		Return(nil, nil).
+		Return(&computer.TransactionResult{Error: nil}, nil).
 		Twice()
 
 	collections := []*flow.Collection{col}
@@ -64,5 +65,5 @@ func TestExecutorExecuteBlock(t *testing.T) {
 	chunk := chunks[0]
 	assert.EqualValues(t, chunk.TxCounts, 2)
 
-	computer.AssertExpectations(t)
+	comp.AssertExpectations(t)
 }

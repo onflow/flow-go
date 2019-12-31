@@ -6,6 +6,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/modules/context"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/modules/ledger"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -20,7 +21,7 @@ type TransactionResult struct {
 // A Computer uses the Cadence runtime to compute transaction results.
 type Computer interface {
 	// ExecuteTransaction computes the result of a transaction.
-	ExecuteTransaction(ledger *flow.LedgerView, tx *flow.Transaction) (*TransactionResult, error)
+	ExecuteTransaction(ledger *ledger.View, tx *flow.Transaction) (*TransactionResult, error)
 }
 
 type computer struct {
@@ -41,7 +42,7 @@ func New(runtime runtime.Runtime, contextProvider context.Provider) Computer {
 // Register updates are recorded in the provided ledger view. An error is returned
 // if an unexpected error occurs during execution. If the transaction reverts due to a normal runtime error,
 // the error is recorded in the transaction result.
-func (c *computer) ExecuteTransaction(ledger *flow.LedgerView, tx *flow.Transaction) (*TransactionResult, error) {
+func (c *computer) ExecuteTransaction(ledger *ledger.View, tx *flow.Transaction) (*TransactionResult, error) {
 	ctx := c.contextProvider.NewTransactionContext(tx, ledger)
 
 	location := runtime.TransactionLocation(tx.Hash())

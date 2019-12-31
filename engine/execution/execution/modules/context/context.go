@@ -1,6 +1,7 @@
 package context
 
 import (
+	"github.com/dapperlabs/flow-go/engine/execution/execution/modules/ledger"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
@@ -8,7 +9,7 @@ import (
 
 // A Provider generates execution contexts to be used for transaction execution.
 type Provider interface {
-	NewTransactionContext(tx *flow.Transaction, ledger *flow.LedgerView) TransactionContext
+	NewTransactionContext(tx *flow.Transaction, ledger *ledger.View) TransactionContext
 }
 
 // A TransactionContext is the runtime context used to execute a single transaction.
