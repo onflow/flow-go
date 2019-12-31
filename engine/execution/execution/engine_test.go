@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	executor "github.com/dapperlabs/flow-go/engine/execution/execution/components/executor/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
@@ -47,8 +48,8 @@ func TestExecutionEngineOnFinalizedBlock(t *testing.T) {
 		},
 		GuaranteedCollections: []*flow.GuaranteedCollection{
 			{
-				CollectionFingerprint: col.Fingerprint(),
-				Signatures:            nil,
+				CollectionHash: crypto.Hash(col.Fingerprint()),
+				Signatures:     nil,
 			},
 		},
 	}

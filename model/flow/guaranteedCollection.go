@@ -9,17 +9,17 @@ import (
 // GuaranteedCollection represents a signed hash for a collection, which is used
 // to announce collections to consensus nodes.
 type GuaranteedCollection struct {
-	CollectionFingerprint Fingerprint
-	Signatures            []crypto.Signature
+	CollectionHash crypto.Hash
+	Signatures     []crypto.Signature
 }
 
 // TODO we need to fix this later
 // Fingerprint returns the fingerprint of the Guaranteed collection.
 func (gc *GuaranteedCollection) Fingerprint() Fingerprint {
-	return gc.CollectionFingerprint
+	return Fingerprint(gc.CollectionHash)
 }
 
 // Hash returns the hash of the collection.
 func (gc *GuaranteedCollection) Hash() crypto.Hash {
-	return crypto.Hash(gc.CollectionFingerprint)
+	return crypto.Hash(gc.CollectionHash)
 }
