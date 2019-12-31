@@ -1,29 +1,46 @@
 package execution
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/components/executor"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // Engine manages execution of transactions
 type Engine struct {
-	unit *engine.Unit
-	log  zerolog.Logger
-	con  network.Conduit
-	me   module.Local
+	unit         *engine.Unit
+	log          zerolog.Logger
+	con          network.Conduit
+	me           module.Local
+	collections  storage.Collections
+	transactions storage.Transactions
+	executor     executor.Executor
 }
 
-func New(log zerolog.Logger, net module.Network, me module.Local) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	net module.Network,
+	me module.Local,
+	collections storage.Collections,
+	transactions storage.Transactions,
+	executor executor.Executor,
+) (*Engine, error) {
 
 	e := Engine{
-		unit: engine.NewUnit(),
-		log:  log,
-		me:   me,
+		unit:         engine.NewUnit(),
+		log:          log,
+		me:           me,
+		collections:  collections,
+		transactions: transactions,
+		executor:     executor,
 	}
 
 	con, err := net.Register(engine.ExecutionExecution, &e)
@@ -80,8 +97,74 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process processes events for the execution engine on the execution node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch event.(type) {
+	switch ev := event.(type) {
+	case *flow.Block:
+		return e.onFinalizedBlock(ev)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
+}
+
+// onFinalizedBlock is triggered when this engine receives a new finalized block.
+//
+// This function fetches the collections and transactions in the block and passes
+// them to the block executor for execution.
+func (e *Engine) onFinalizedBlock(block *flow.Block) error {
+	collections, err := e.getCollections(block.GuaranteedCollections)
+	if err != nil {
+		return fmt.Errorf("failed to load collections: %w", err)
+	}
+
+	transactions, err := e.getTransactions(collections)
+	if err != nil {
+		return fmt.Errorf("failed to load transactions: %w", err)
+	}
+
+	_, err = e.executor.ExecuteBlock(block, collections, transactions)
+	if err != nil {
+		return fmt.Errorf("failed to execute block: %w", err)
+	}
+
+	return nil
+}
+
+func (e *Engine) getCollections(cols []*flow.GuaranteedCollection) ([]*flow.Collection, error) {
+	collections := make([]*flow.Collection, len(cols))
+
+	for i, gc := range cols {
+		c, err := e.collections.ByFingerprint(gc.Fingerprint())
+		if err != nil {
+			return nil, fmt.Errorf("failed to load collection: %w", err)
+		}
+
+		collections[i] = c
+	}
+
+	return collections, nil
+}
+
+func (e *Engine) getTransactions(cols []*flow.Collection) ([]*flow.Transaction, error) {
+	txCount := 0
+
+	for _, c := range cols {
+		txCount += c.Size()
+	}
+
+	transactions := make([]*flow.Transaction, txCount)
+
+	i := 0
+
+	for _, c := range cols {
+		for _, f := range c.Transactions {
+			tx, err := e.transactions.ByFingerprint(f)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load transaction: %w", err)
+			}
+
+			transactions[i] = tx
+			i++
+		}
+	}
+
+	return transactions, nil
 }

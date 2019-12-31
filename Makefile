@@ -85,6 +85,7 @@ generate-mocks:
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/components/computer -case=underscore -output="./engine/execution/execution/components/computer/mock" -outpkg="mock"
+	mockery -name '.*' -dir=engine/execution/execution/components/executor -case=underscore -output="./engine/execution/execution/components/executor/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/modules/context -case=underscore -output="./engine/execution/execution/modules/context/mock" -outpkg="mock"
 
 .PHONY: generate-bindata
@@ -120,15 +121,15 @@ docker-ci-team-city:
 
 cmd/flow/flow: crypto/*.go $(shell find  cli/ -name '*.go') $(shell find cmd -name '*.go') $(shell find model -name '*.go') $(shell find protobuf -name '*.go') $(shell find sdk -name '*.go')
 	GO111MODULE=on go build \
-	    -ldflags \
-	    "-X github.com/dapperlabs/flow-go/build.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/build.semver=$(VERSION)" \
-	    -o ./cmd/flow/flow ./cmd/flow
+		-ldflags \
+		"-X github.com/dapperlabs/flow-go/build.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/build.semver=$(VERSION)" \
+		-o ./cmd/flow/flow ./cmd/flow
 
 sdk/abi/generation/generation: $(shell find sdk -name '*.go')
 	GO111MODULE=on go build \
-    	    -ldflags \
-    	    "-X github.com/dapperlabs/flow-go/cli/flow/version.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/cli/flow/version.version=$(VERSION)" \
-    	    -o ./sdk/abi/generation/generation ./sdk/abi/generation
+			-ldflags \
+			"-X github.com/dapperlabs/flow-go/cli/flow/version.commit=$(COMMIT) -X github.com/dapperlabs/flow-go/cli/flow/version.version=$(VERSION)" \
+			-o ./sdk/abi/generation/generation ./sdk/abi/generation
 
 .PHONY: install-cli
 install-cli: cmd/flow/flow
