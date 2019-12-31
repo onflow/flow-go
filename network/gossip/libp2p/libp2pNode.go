@@ -169,13 +169,7 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers []NodeAddress) error {
 
 
 		fmt.Printf(" Connecting node %s to %s\n", pInfo.ID, p.libP2PHost.ID())
-
-		for retries :=0; retries < 3;retries++ {
-			err = p.libP2PHost.Connect(ctx, pInfo)
-			if err == nil {
-				break
-			}
-		}
+		err = p.libP2PHost.Connect(ctx, pInfo)
 		if err != nil {
 			return err
 		}
