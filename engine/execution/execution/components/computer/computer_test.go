@@ -31,7 +31,9 @@ func TestExecuteTransaction(t *testing.T) {
 			},
 		}
 
-		prov.On("NewTransactionContext", tx).
+		ledger := flow.NewLedgerView(func(key string) ([]byte, error) { return nil, nil })
+
+		prov.On("NewTransactionContext", tx, ledger).
 			Return(ctx).
 			Once()
 
@@ -39,7 +41,7 @@ func TestExecuteTransaction(t *testing.T) {
 			Return([]values.Address{values.Address(unittest.AddressFixture())}).
 			Once()
 
-		result, err := c.ExecuteTransaction(tx)
+		result, err := c.ExecuteTransaction(ledger, tx)
 		assert.NoError(t, err)
 		assert.NoError(t, result.Error)
 
@@ -70,7 +72,9 @@ func TestExecuteTransaction(t *testing.T) {
 			},
 		}
 
-		prov.On("NewTransactionContext", tx).
+		ledger := flow.NewLedgerView(func(key string) ([]byte, error) { return nil, nil })
+
+		prov.On("NewTransactionContext", tx, ledger).
 			Return(ctx).
 			Once()
 
@@ -78,7 +82,7 @@ func TestExecuteTransaction(t *testing.T) {
 			Return([]values.Address{values.Address(unittest.AddressFixture())}).
 			Once()
 
-		result, err := c.ExecuteTransaction(tx)
+		result, err := c.ExecuteTransaction(ledger, tx)
 		assert.NoError(t, err)
 		assert.Error(t, result.Error)
 

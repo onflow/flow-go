@@ -11,13 +11,13 @@ type Computer struct {
 	mock.Mock
 }
 
-// ExecuteTransaction provides a mock function with given fields: tx
-func (_m *Computer) ExecuteTransaction(tx *flow.Transaction) (*computer.TransactionResult, error) {
-	ret := _m.Called(tx)
+// ExecuteTransaction provides a mock function with given fields: ledger, tx
+func (_m *Computer) ExecuteTransaction(ledger *flow.LedgerView, tx *flow.Transaction) (*computer.TransactionResult, error) {
+	ret := _m.Called(ledger, tx)
 
 	var r0 *computer.TransactionResult
-	if rf, ok := ret.Get(0).(func(*flow.Transaction) *computer.TransactionResult); ok {
-		r0 = rf(tx)
+	if rf, ok := ret.Get(0).(func(*flow.LedgerView, *flow.Transaction) *computer.TransactionResult); ok {
+		r0 = rf(ledger, tx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*computer.TransactionResult)
@@ -25,8 +25,8 @@ func (_m *Computer) ExecuteTransaction(tx *flow.Transaction) (*computer.Transact
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*flow.Transaction) error); ok {
-		r1 = rf(tx)
+	if rf, ok := ret.Get(1).(func(*flow.LedgerView, *flow.Transaction) error); ok {
+		r1 = rf(ledger, tx)
 	} else {
 		r1 = ret.Error(1)
 	}
