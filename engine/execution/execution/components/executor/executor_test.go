@@ -46,7 +46,11 @@ func TestExecutorExecuteBlock(t *testing.T) {
 		},
 	}
 
-	computer.On("ExecuteTransaction", mock.AnythingOfType("*flow.Transaction")).
+	computer.On(
+		"ExecuteTransaction",
+		mock.AnythingOfType("*flow.LedgerView"),
+		mock.AnythingOfType("*flow.Transaction"),
+	).
 		Return(nil, nil).
 		Twice()
 

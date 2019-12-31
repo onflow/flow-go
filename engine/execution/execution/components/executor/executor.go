@@ -47,7 +47,10 @@ func (e *executor) executeTransactions(txs []*flow.Transaction) ([]*flow.Chunk, 
 	results := make([]*computer.TransactionResult, len(txs))
 
 	for i, tx := range txs {
-		result, err := e.computer.ExecuteTransaction(tx)
+		// TODO: connect ledger to chunk cache - https://github.com/dapperlabs/flow-go/issues/1914
+		ledger := flow.NewLedgerView(func(key string) ([]byte, error) { return nil, nil })
+
+		result, err := e.computer.ExecuteTransaction(ledger, tx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute transaction: %w", err)
 		}
