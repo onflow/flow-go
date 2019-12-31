@@ -57,7 +57,7 @@ func TestLibP2PNode_GetPeerInfo(t *testing.T) {
 func TestLibP2PNode_AddPeers(t *testing.T) {
 	//t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
 	// A longer timeout is needed to overcome timeouts - https://github.com/ipfs/go-ipfs/issues/5800
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	// count value of 10 runs into this issue on localhost https://github.com/libp2p/go-libp2p-pubsub/issues/96
 	// since localhost connection have short deadlines
