@@ -58,7 +58,7 @@ func (e *executor) executeTransactions(txs []*flow.Transaction) ([]*flow.Chunk, 
 		results[i] = result
 	}
 
-	// TODO: for each chunk, store results and generate a state proof
+	// TODO: commit chunk to storage - https://github.com/dapperlabs/flow-go/issues/1915
 
 	// TODO: implement real chunking
 	// MVP uses single chunk per block
