@@ -28,7 +28,7 @@ import (
 const tickForAssertEventually = 100 * time.Millisecond
 var setupOnce sync.Once
 var nodes []*P2PNode
-var totalNodes = 10
+var totalNodes = 2
 
 func TestLibP2PNode_Start_Stop(t *testing.T) {
 	t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
@@ -60,7 +60,8 @@ func TestLibP2PNode_GetPeerInfo(t *testing.T) {
 func TestLibP2PNode_AddPeers(t *testing.T) {
 	//t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
 	// A longer timeout is needed to overcome timeouts - https://github.com/ipfs/go-ipfs/issues/5800
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Minute)
+	defer cancel()
 	golog.SetAllLoggers(gologging.DEBUG)
 	// count value of 10 runs into this issue on localhost https://github.com/libp2p/go-libp2p-pubsub/issues/96
 	// since localhost connection have short deadlines
@@ -238,6 +239,7 @@ func createLibP2PNodes(ctx context.Context, t *testing.T) {
 			}, 5*time.Second, tickForAssertEventually, fmt.Sprintf("node%d didn't start", i))
 			nodes = append(nodes, n)
 		}
+		time.Sleep(time.Second * 2)
 		require.Len(t, nodes, totalNodes, " node counts not as expected")
 	})
 }
