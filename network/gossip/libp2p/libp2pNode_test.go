@@ -72,8 +72,8 @@ func TestLibP2PNode_AddPeers(t *testing.T) {
 	var ids []NodeAddress
 	// Get actual ip and port numbers on which the nodes were started
 	for _, n := range nodes[1:] {
-		ip, p := n.GetIPPort()
-		ids = append(ids, NodeAddress{name: n.name, ip: ip, port: p})
+		_, p := n.GetIPPort()
+		ids = append(ids, NodeAddress{name: n.name, ip: "127.0.0.1", port: p})
 	}
 	// To the 1st node add the remaining 9 nodes as peers.
 	require.NoError(t, nodes[0].AddPeers(ctx, ids))
@@ -181,8 +181,8 @@ func TestLibP2PNode_P2P(t *testing.T) {
 	var ids []NodeAddress
 	// Get actual ip and port numbers on which the nodes were started
 	for _, n := range nodes {
-		_, p := n.GetIPPort()
-		ids = append(ids, NodeAddress{name: n.name, ip: "127.0.0.1", port: p})
+		ip, p := n.GetIPPort()
+		ids = append(ids, NodeAddress{name: n.name, ip: ip, port: p})
 	}
 
 	// Add the second node as a peer to the first node
