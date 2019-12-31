@@ -79,7 +79,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	host, err := libp2p.New(
 		ctx,
 		libp2p.ListenAddrs(sourceMultiAddr),
-		libp2p.NoSecurity,
+		//libp2p.NoSecurity,
 		libp2p.Identity(key),
 		libp2p.Transport(tcp.NewTCPTransport), // the default transport unnecessarily brings in a websocket listener
 	)
