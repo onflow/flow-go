@@ -5,7 +5,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/components/computer"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/components/executor"
-	context "github.com/dapperlabs/flow-go/engine/execution/execution/modules/context/mock"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/modules/context"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/module"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
@@ -19,11 +19,11 @@ func main() {
 
 			node.Logger.Info().Msg("initializing execution engine")
 
-			// TODO: replace mocks with real implementation
 			rt := runtime.NewInterpreterRuntime()
-			comp := computer.New(rt, &context.Provider{})
+			comp := computer.New(rt, context.NewProvider())
 			exec := executor.New(comp)
 
+			// TODO: replace mocks with real implementation
 			transactions := &storage.Transactions{}
 			collections := &storage.Collections{}
 
