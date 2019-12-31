@@ -236,7 +236,7 @@ func createLibP2PNodes(ctx context.Context, t *testing.T) {
 		l := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 		for i := 1; i <= totalNodes; i++ {
 			var n = &P2PNode{}
-			var nodeID = NodeAddress{name: fmt.Sprintf("node%d", i), ip: "0.0.0.0", port: "0"}
+			var nodeID = NodeAddress{name: fmt.Sprintf("node%d", i), ip: "127.0.0.1", port: "0"}
 			err := n.Start(ctx, nodeID, l)
 			require.NoError(t, err)
 			require.Eventuallyf(t, func() bool {
