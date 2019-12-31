@@ -1,7 +1,7 @@
 package pacemaker
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
 )
 
 type Pacemaker interface {
