@@ -63,6 +63,7 @@ func TestLibP2PNode_AddPeers(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3 * time.Minute)
 	defer cancel()
 	golog.SetAllLoggers(gologging.DEBUG)
+
 	// count value of 10 runs into this issue on localhost https://github.com/libp2p/go-libp2p-pubsub/issues/96
 	// since localhost connection have short deadlines
 
@@ -180,8 +181,8 @@ func TestLibP2PNode_P2P(t *testing.T) {
 	var ids []NodeAddress
 	// Get actual ip and port numbers on which the nodes were started
 	for _, n := range nodes {
-		ip, p := n.GetIPPort()
-		ids = append(ids, NodeAddress{name: n.name, ip: ip, port: p})
+		_, p := n.GetIPPort()
+		ids = append(ids, NodeAddress{name: n.name, ip: "127.0.0.1", port: p})
 	}
 
 	// Add the second node as a peer to the first node
