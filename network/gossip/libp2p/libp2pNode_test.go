@@ -28,7 +28,7 @@ import (
 const tickForAssertEventually = 100 * time.Millisecond
 var setupOnce sync.Once
 var nodes []*P2PNode
-var totalNodes = 2
+var totalNodes = 10
 
 func TestLibP2PNode_Start_Stop(t *testing.T) {
 	t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
@@ -245,7 +245,7 @@ func createLibP2PNodes(ctx context.Context, t *testing.T) {
 			}, 5*time.Second, tickForAssertEventually, fmt.Sprintf("node%d didn't start", i))
 			nodes = append(nodes, n)
 		}
-		time.Sleep(time.Second * 10)
+		time.Sleep(time.Second * 2)
 		require.Len(t, nodes, totalNodes, " node counts not as expected")
 	})
 }
