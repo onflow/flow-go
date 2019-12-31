@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/engine/execution/execution/components/computer"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/modules/ledger"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -48,9 +49,9 @@ func (e *executor) executeTransactions(txs []*flow.Transaction) ([]*flow.Chunk, 
 
 	for i, tx := range txs {
 		// TODO: connect ledger to chunk cache - https://github.com/dapperlabs/flow-go/issues/1914
-		ledger := flow.NewLedgerView(func(key string) ([]byte, error) { return nil, nil })
+		view := ledger.NewView(func(key string) ([]byte, error) { return nil, nil })
 
-		result, err := e.computer.ExecuteTransaction(ledger, tx)
+		result, err := e.computer.ExecuteTransaction(view, tx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute transaction: %w", err)
 		}
