@@ -66,6 +66,7 @@ func TestLibP2PNode_AddPeers(t *testing.T) {
 		3 * time.Minute,
 	)
 
+
 	golog.SetAllLoggers(gologging.DEBUG)
 
 	// count value of 10 runs into this issue on localhost https://github.com/libp2p/go-libp2p-pubsub/issues/96
@@ -244,7 +245,7 @@ func createLibP2PNodes(ctx context.Context, t *testing.T) {
 			}, 5*time.Second, tickForAssertEventually, fmt.Sprintf("node%d didn't start", i))
 			nodes = append(nodes, n)
 		}
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 10)
 		require.Len(t, nodes, totalNodes, " node counts not as expected")
 	})
 }
