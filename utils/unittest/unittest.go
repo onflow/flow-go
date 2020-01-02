@@ -60,9 +60,9 @@ func RunWithDB(t *testing.T, f func(*badger.DB)) {
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
-	f(db)
 	defer func() {
 		db.Close()
 		os.RemoveAll(dir)
 	}()
+	f(db)
 }
