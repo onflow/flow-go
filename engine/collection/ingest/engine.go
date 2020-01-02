@@ -135,8 +135,8 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) e
 	// tx is routed to my cluster, add to mempool
 	if clusterID == e.clusterID {
 		log.Debug().Msg("adding transaction to pool")
-		e.pool.Add(tx)
-		return nil
+		err = e.pool.Add(tx)
+		return err
 	}
 
 	// tx is routed to another cluster
