@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language/runtime/cmd"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
@@ -242,5 +244,246 @@ func TestCheckInvalidContractMoveIntoDictionaryLiteral(t *testing.T) {
 
 			assert.IsType(t, &sema.InvalidMoveError{}, errs[0])
 		})
+	}
+}
+
+func TestCheckContractNestedDeclarationOrderOutsideInside(t *testing.T) {
+
+	for _, isInterface := range []bool{true, false} {
+
+		interfaceKeyword := ""
+		if isInterface {
+			interfaceKeyword = "interface"
+		}
+
+		body := ""
+		if !isInterface {
+			body = "{}"
+		}
+
+		extraFunction := ""
+		if !isInterface {
+			extraFunction = `
+		      fun callGoNew() {
+                  let r <- create R()
+                  r.go()
+                  destroy r
+              }
+            `
+		}
+
+		t.Run(interfaceKeyword, func(t *testing.T) {
+
+			code := fmt.Sprintf(
+				`
+                  contract C {
+
+                      fun callGoExisting(r: @R) {
+                          r.go()
+                          destroy r
+                      }
+
+                      %[1]s
+
+                      resource %[2]s R {
+                          fun go() %[3]s
+                      }
+                  }
+                `,
+				extraFunction,
+				interfaceKeyword,
+				body,
+			)
+			_, err := ParseAndCheck(t, code)
+
+			if !assert.NoError(t, err) {
+				cmd.PrettyPrintError(err, "", map[string]string{"": code})
+			}
+		})
+	}
+}
+
+func TestCheckContractNestedDeclarationOrderInsideOutside(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      contract C {
+
+          fun go() {}
+
+          resource R {
+              fun callGo() {
+                  C.go()
+              }
+          }
+      }
+    `)
+
+	require.NoError(t, err)
+}
+
+// TestCheckContractNestedDeclarationsComplex tests
+// - Using inner types in functions outside (both type in parameter and constructor)
+// - Using outer functions in inner types' functions
+// - Mutually using sibling types
+//
+func TestCheckContractNestedDeclarationsComplex(t *testing.T) {
+
+	interfacePossibilities := []bool{true, false}
+
+	compositeKinds := []common.CompositeKind{
+		common.CompositeKindStructure,
+		common.CompositeKindResource,
+	}
+
+	for _, contractIsInterface := range interfacePossibilities {
+		for _, firstKind := range compositeKinds {
+			for _, firstIsInterface := range interfacePossibilities {
+				for _, secondKind := range compositeKinds {
+					for _, secondIsInterface := range interfacePossibilities {
+
+						contractInterfaceKeyword := ""
+						if contractIsInterface {
+							contractInterfaceKeyword = "interface"
+						}
+
+						firstInterfaceKeyword := ""
+						if firstIsInterface {
+							firstInterfaceKeyword = "interface"
+						}
+
+						secondInterfaceKeyword := ""
+						if secondIsInterface {
+							secondInterfaceKeyword = "interface"
+						}
+
+						testName := fmt.Sprintf(
+							"contract_%s/%s_%s/%s_%s",
+							contractInterfaceKeyword,
+							firstKind.Keyword(),
+							firstInterfaceKeyword,
+							secondKind.Keyword(),
+							secondInterfaceKeyword,
+						)
+
+						bodyUsingFirstOutside := ""
+						if !contractIsInterface {
+							if secondIsInterface {
+								bodyUsingFirstOutside = fmt.Sprintf(
+									"{ %s a }",
+									firstKind.DestructionKeyword(),
+								)
+							} else {
+								bodyUsingFirstOutside = fmt.Sprintf(
+									"{ a.localB(%[1]s %[2]s B()); %[3]s a }",
+									secondKind.MoveOperator(),
+									secondKind.ConstructionKeyword(),
+									firstKind.DestructionKeyword(),
+								)
+							}
+						}
+
+						bodyUsingSecondOutside := ""
+						if !contractIsInterface {
+							if firstIsInterface {
+								bodyUsingSecondOutside = fmt.Sprintf(
+									"{ %s b }",
+									secondKind.DestructionKeyword(),
+								)
+							} else {
+								bodyUsingSecondOutside = fmt.Sprintf(
+									"{ b.localA(%[1]s %[2]s A()); %[3]s b }",
+									firstKind.MoveOperator(),
+									firstKind.ConstructionKeyword(),
+									secondKind.DestructionKeyword(),
+								)
+							}
+						}
+
+						bodyUsingFirstInsideFirst := ""
+						bodyUsingSecondInsideFirst := ""
+						bodyUsingFirstInsideSecond := ""
+						bodyUsingSecondInsideSecond := ""
+
+						if !contractIsInterface && !firstIsInterface {
+							bodyUsingFirstInsideFirst = fmt.Sprintf(
+								"{ C.localBeforeA(%s a) }",
+								firstKind.MoveOperator(),
+							)
+							bodyUsingSecondInsideFirst = fmt.Sprintf(
+								"{ C.localBeforeB(%s b)  }",
+								secondKind.MoveOperator(),
+							)
+						}
+
+						if !contractIsInterface && !secondIsInterface {
+							bodyUsingFirstInsideSecond = fmt.Sprintf(
+								"{ C.qualifiedAfterA(%s a) }",
+								firstKind.MoveOperator(),
+							)
+							bodyUsingSecondInsideSecond = fmt.Sprintf(
+								"{ C.qualifiedAfterB(%s b)  }",
+								secondKind.MoveOperator(),
+							)
+						}
+
+						t.Run(testName, func(t *testing.T) {
+
+							code := fmt.Sprintf(
+								`
+                                  contract %[1]s C {
+
+                                      fun qualifiedBeforeA(_ a: %[4]sC.A) %[12]s
+                                      fun localBeforeA(_ a: %[4]sA) %[12]s
+
+                                      fun qualifiedBeforeB(_ b: %[7]sC.B) %[13]s
+                                      fun localBeforeB(_ b: %[7]sB) %[13]s
+
+                                      %[2]s %[3]s A {
+                                          fun qualifiedB(_ b: %[7]sC.B) %[9]s
+                                          fun localB(_ b: %[7]sB) %[9]s
+
+                                          fun qualifiedA(_ a: %[4]sC.A) %[8]s
+                                          fun localA(_ a: %[4]sA) %[8]s
+                                      }
+
+                                      %[5]s %[6]s B {
+                                          fun qualifiedA(_ a: %[4]sC.A) %[10]s
+                                          fun localA(_ a: %[4]sA) %[10]s
+
+                                          fun qualifiedB(_ b: %[7]sC.B) %[11]s
+                                          fun localB(_ b: %[7]sB) %[11]s
+                                      }
+
+                                      fun qualifiedAfterA(_ a: %[4]sC.A) %[12]s
+                                      fun localAfterA(_ a: %[4]sA) %[12]s
+
+                                      fun qualifiedAfterB(_ b: %[7]sC.B) %[13]s
+                                      fun localAfterB(_ b: %[7]sB) %[13]s
+                                  }
+                                `,
+								contractInterfaceKeyword,
+								firstKind.Keyword(),
+								firstInterfaceKeyword,
+								firstKind.Annotation(),
+								secondKind.Keyword(),
+								secondInterfaceKeyword,
+								secondKind.Annotation(),
+								bodyUsingFirstInsideFirst,
+								bodyUsingSecondInsideFirst,
+								bodyUsingFirstInsideSecond,
+								bodyUsingSecondInsideSecond,
+								bodyUsingFirstOutside,
+								bodyUsingSecondOutside,
+							)
+							_, err := ParseAndCheck(t, code)
+
+							if !assert.NoError(t, err) {
+								cmd.PrettyPrintError(err, "", map[string]string{"": code})
+							}
+						})
+					}
+				}
+			}
+		}
 	}
 }

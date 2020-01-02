@@ -287,29 +287,41 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 		checker.declareImportDeclaration(declaration)
 	}
 
-	// pre-declare interfaces, composites, and functions (check afterwards)
+	// Declare interface and composite types
 
 	for _, declaration := range program.InterfaceDeclarations() {
-		checker.declareInterfaceDeclaration(declaration)
+		checker.declareInterfaceType(declaration)
 	}
 
 	for _, declaration := range program.CompositeDeclarations() {
-		checker.declareCompositeDeclaration(declaration, ContainerKindComposite)
+		checker.declareCompositeType(declaration)
+	}
+
+	// Declare interfaces' and composites' members
+
+	for _, declaration := range program.InterfaceDeclarations() {
+		checker.declareInterfaceMembers(declaration)
+	}
+
+	for _, declaration := range program.CompositeDeclarations() {
+		checker.declareCompositeMembersAndValue(declaration, ContainerKindComposite)
+	}
+
+	// Declare events, functions, and transactions
+
+	for _, declaration := range program.EventDeclarations() {
+		checker.declareEventDeclaration(declaration)
 	}
 
 	for _, declaration := range program.FunctionDeclarations() {
 		checker.declareGlobalFunctionDeclaration(declaration)
 	}
 
-	for _, declaration := range program.EventDeclarations() {
-		checker.declareEventDeclaration(declaration)
-	}
-
 	for _, declaration := range program.TransactionDeclarations() {
 		checker.declareTransactionDeclaration(declaration)
 	}
 
-	// check all declarations
+	// Check all declarations
 
 	checker.checkTopLevelDeclarationValidity(program.Declarations)
 
