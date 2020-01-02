@@ -17,9 +17,10 @@ const (
 	codeHeader      = 20
 	codeIdentities  = 21
 	codeTransaction = 22
-	codeCollections = 23
+	codeCollection  = 23
 	codeHash        = 100
 	codeBoundary    = 101
+	codeBlockHashToCollections = 102
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

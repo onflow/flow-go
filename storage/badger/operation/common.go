@@ -152,7 +152,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 
 			// check if we have reached the end of our iteration
 			item := it.Item()
-			if bytes.Compare(item.Key(), end) > 0 {
+			if end != nil && bytes.Compare(item.Key(), end) > 0 {
 				break
 			}
 

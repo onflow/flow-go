@@ -17,25 +17,35 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func TestCollectionsInsertRetrieve(t *testing.T) {
+func TestCollectionsIndex(t *testing.T) {
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
 	defer os.RemoveAll(dir)
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 
-	hash := crypto.Hash{0x13, 0x37}
+	blockHash := crypto.Hash{0x13, 0x37}
 	expected := []*flow.GuaranteedCollection{
 		{CollectionHash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x10}}},
 		{CollectionHash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x20}}},
 		{CollectionHash: crypto.Hash{0x03}, Signatures: []crypto.Signature{{0x30}}},
 	}
 
-	err = db.Update(InsertCollections(hash, expected))
+	err = db.Update(func(tx *badger.Txn) error {
+		for _, coll := range expected {
+			if err := InsertCollection(coll.Fingerprint(), coll)(tx); err != nil {
+				return err
+			}
+			if err := IndexCollectionByBlockHash(blockHash, coll)(tx); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	require.Nil(t, err)
 
 	var actual []*flow.GuaranteedCollection
-	err = db.View(RetrieveCollections(hash, &actual))
+	err = db.View(RetrieveCollectionsByBlockHash(blockHash, &actual))
 	require.Nil(t, err)
 
 	assert.Equal(t, expected, actual)
