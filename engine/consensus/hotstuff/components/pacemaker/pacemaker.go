@@ -1,10 +1,13 @@
 package pacemaker
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+import (
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+)
 
 type Pacemaker interface {
-	OnIncorporatedBlock(*def.Block)
-	OnIncorporatedQuorumCertificate(*def.QuorumCertificate)
+	OnBlockIncorporated(*def.Block)
+	OnQcFromVotesIncorporated(*def.QuorumCertificate)
 
 	Run()
 }
+

@@ -9,12 +9,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertNewHeader(header *flow.Header) func(*badger.Txn) error {
-	return insertNew(makePrefix(codeHeader, header.Hash()), header)
-}
-
 func InsertHeader(header *flow.Header) func(*badger.Txn) error {
 	return insert(makePrefix(codeHeader, header.Hash()), header)
+}
+
+func PersistHeader(header *flow.Header) func(*badger.Txn) error {
+	return persist(makePrefix(codeHeader, header.Hash()), header)
 }
 
 func RetrieveHeader(hash crypto.Hash, header *flow.Header) func(*badger.Txn) error {

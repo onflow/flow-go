@@ -138,7 +138,7 @@ func (r *ReactorCore) addToMainChain(blockContainer, mainChainParent *BlockConta
 	r.mainChain.AddVertex(blockContainer)
 	r.updateLockedQc(blockContainer)
 	r.updateFinalisedBlockQc(blockContainer)
-	r.eventProcessor.OnIncorporatedBlock(blockContainer.Block())
+	r.eventProcessor.OnBlockIncorporated(blockContainer.Block())
 }
 
 // setMainChainProperties defines all fields in the BlockContainer

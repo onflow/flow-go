@@ -110,11 +110,11 @@ func (b *Blocks) Save(block *flow.Block) error {
 
 	err := b.db.Update(func(tx *badger.Txn) error {
 
-		err := operation.InsertHeader(&block.Header)(tx)
+		err := operation.PersistHeader(&block.Header)(tx)
 		if err != nil {
 			return errors.Wrap(err, "cannot save block")
 		}
-		err = operation.InsertIdentities(block.Hash(), block.NewIdentities)(tx)
+		err = operation.PersistIdentities(block.Hash(), block.NewIdentities)(tx)
 		if err != nil {
 			return errors.Wrap(err, "cannot save block")
 		}
@@ -122,7 +122,7 @@ func (b *Blocks) Save(block *flow.Block) error {
 		if err != nil {
 			return errors.Wrap(err, "cannot save block")
 		}
-		err = operation.InsertHash(block.Number, block.Hash())(tx)
+		err = operation.PersistHash(block.Number, block.Hash())(tx)
 		if err != nil {
 			return errors.Wrap(err, "cannot save block")
 		}

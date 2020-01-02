@@ -27,8 +27,8 @@ func fromDeltaKey(key []byte) (uint64, flow.Role, flow.Identifier) {
 	return number, role, nodeID
 }
 
-func InsertNewDelta(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) func(*badger.Txn) error {
-	return insertNew(toDeltaKey(number, role, nodeID), delta)
+func InsertDelta(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) func(*badger.Txn) error {
+	return insert(toDeltaKey(number, role, nodeID), delta)
 }
 
 func RetrieveDelta(number uint64, role flow.Role, nodeID flow.Identifier, delta *int64) func(*badger.Txn) error {

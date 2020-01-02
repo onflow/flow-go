@@ -15,7 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestHeaderInsertNewRetrieve(t *testing.T) {
+func TestHeaderInsertRetrieve(t *testing.T) {
 
 	unittest.RunWithDB(t, func(db *badger.DB) {
 		expected := flow.Header{
@@ -27,8 +27,8 @@ func TestHeaderInsertNewRetrieve(t *testing.T) {
 		}
 		hash := expected.Hash()
 
-		err := db.Update(InsertNewHeader(&expected))
-		require.Nil(t, err)
+	err = db.Update(InsertHeader(&expected))
+	require.Nil(t, err)
 
 		var actual flow.Header
 		err = db.View(RetrieveHeader(hash, &actual))

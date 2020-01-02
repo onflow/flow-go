@@ -30,7 +30,7 @@ func TestInsertValid(t *testing.T) {
 		key := []byte{0x01, 0x02, 0x03}
 		val := []byte(`{"ID":1337}`)
 
-		err := db.Update(insertNew(key, e))
+		err := db.Update(insert(key, e))
 		require.Nil(t, err)
 
 		var act []byte
@@ -53,21 +53,21 @@ func TestInsertDuplicate(t *testing.T) {
 		e2 := Entity{ID: 1338}
 		key := []byte{0x01, 0x02, 0x03}
 
-		//insert first time
-		err := db.Update(insertNew(key, e))
+		//persist first time
+		err := db.Update(insert(key, e))
 		require.NoError(t, err)
 
 		//Insert again
-		err = db.Update(insertNew(key, e))
+		err = db.Update(insert(key, e))
 		require.Error(t, err)
 		require.Equal(t, err, storage.KeyAlreadyExistsErr)
 
-		//insert again, but using different method
-		err = db.Update(insert(key, e))
+		//persist again, but using different method
+		err = db.Update(persist(key, e))
 		require.NoError(t, err)
 
 		//again with different data
-		err = db.Update(insert(key, e2))
+		err = db.Update(persist(key, e2))
 		require.Error(t, err)
 		require.Equal(t, err, storage.DifferentDataErr)
 

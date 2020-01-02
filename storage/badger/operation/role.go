@@ -8,8 +8,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertNewRole(nodeID flow.Identifier, role flow.Role) func(*badger.Txn) error {
-	return insertNew(makePrefix(codeRole, nodeID), role)
+func InsertRole(nodeID flow.Identifier, role flow.Role) func(*badger.Txn) error {
+	return insert(makePrefix(codeRole, nodeID), role)
 }
 
 func RetrieveRole(nodeID flow.Identifier, role *flow.Role) func(*badger.Txn) error {

@@ -6,8 +6,8 @@ import (
 	"github.com/dgraph-io/badger/v2"
 )
 
-func InsertNewBoundary(number uint64) func(*badger.Txn) error {
-	return insertNew(makePrefix(codeBoundary), number)
+func InsertBoundary(number uint64) func(*badger.Txn) error {
+	return insert(makePrefix(codeBoundary), number)
 }
 
 func UpdateBoundary(number uint64) func(*badger.Txn) error {

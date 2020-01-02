@@ -45,7 +45,7 @@ func TestFlowCollectionsInsertRetrieve(t *testing.T) {
 			{CollectionHash: crypto.Hash{0x03}, Signatures: []crypto.Signature{{0x30}}},
 		}
 
-		err := db.Update(InsertNewGuaranteedCollections(hash, expected))
+		err := db.Update(InsertGuaranteedCollections(hash, expected))
 		require.Nil(t, err)
 
 		var actual []*flow.GuaranteedCollection

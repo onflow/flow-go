@@ -17,7 +17,7 @@ func TestBoundaryInsertUpdateRetrieve(t *testing.T) {
 	unittest.RunWithDB(t, func(db *badger.DB) {
 		boundary := uint64(1337)
 
-		err := db.Update(InsertNewBoundary(boundary))
+		err := db.Update(InsertBoundary(boundary))
 		require.Nil(t, err)
 
 		var retrieved uint64

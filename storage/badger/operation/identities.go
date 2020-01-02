@@ -9,12 +9,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertNewIdentities(hash crypto.Hash, identities flow.IdentityList) func(*badger.Txn) error {
-	return insertNew(makePrefix(codeIdentities, hash), identities)
-}
-
 func InsertIdentities(hash crypto.Hash, identities flow.IdentityList) func(*badger.Txn) error {
 	return insert(makePrefix(codeIdentities, hash), identities)
+}
+
+func PersistIdentities(hash crypto.Hash, identities flow.IdentityList) func(*badger.Txn) error {
+	return persist(makePrefix(codeIdentities, hash), identities)
 }
 
 func RetrieveIdentities(hash crypto.Hash, identities *flow.IdentityList) func(*badger.Txn) error {

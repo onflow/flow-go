@@ -24,8 +24,8 @@ func TestDeltaInsertRetrieve(t *testing.T) {
 			Stake:   3,
 		}
 
-		err := db.Update(InsertNewDelta(number, id.Role, id.NodeID, int64(id.Stake)))
-		require.Nil(t, err)
+	err = db.Update(InsertDelta(number, id.Role, id.NodeID, int64(id.Stake)))
+	require.Nil(t, err)
 
 		var delta int64
 		err = db.View(RetrieveDelta(number, id.Role, id.NodeID, &delta))
@@ -81,13 +81,13 @@ func TestDeltasTraverse(t *testing.T) {
 			},
 		}
 
-		for _, v := range vectors {
-			for i, delta := range v.Deltas {
-				id := ids[i]
-				err := db.Update(InsertNewDelta(v.Number, id.Role, id.NodeID, delta))
-				require.Nil(t, err)
-			}
+	for _, v := range vectors {
+		for i, delta := range v.Deltas {
+			id := ids[i]
+			err = db.Update(InsertDelta(v.Number, id.Role, id.NodeID, delta))
+			require.Nil(t, err)
 		}
+	}
 
 		actual := make(map[flow.Identifier]int64)
 		process := func(number uint64, role flow.Role, nodeID flow.Identifier, delta int64) error {
