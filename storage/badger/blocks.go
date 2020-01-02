@@ -3,6 +3,8 @@
 package badger
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 
@@ -35,7 +37,7 @@ func (b *Blocks) ByHash(hash crypto.Hash) (*flow.Block, error) {
 			if err == storage.NotFoundErr {
 				return err
 			}
-			return errors.Wrap(err, "could not retrieve block")
+			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
 		return nil
@@ -112,19 +114,19 @@ func (b *Blocks) Save(block *flow.Block) error {
 
 		err := operation.PersistHeader(&block.Header)(tx)
 		if err != nil {
-			return errors.Wrap(err, "cannot save block")
+			return fmt.Errorf("cannot save block: %w", err)
 		}
 		err = operation.PersistIdentities(block.Hash(), block.NewIdentities)(tx)
 		if err != nil {
-			return errors.Wrap(err, "cannot save block")
+			return fmt.Errorf("cannot save block %w", err)
 		}
 		err = operation.PersistGuaranteedCollections(block.Hash(), block.GuaranteedCollections)(tx)
 		if err != nil {
-			return errors.Wrap(err, "cannot save block")
+			return fmt.Errorf("cannot save block %w", err)
 		}
 		err = operation.PersistHash(block.Number, block.Hash())(tx)
 		if err != nil {
-			return errors.Wrap(err, "cannot save block")
+			return fmt.Errorf("cannot save block %w", err)
 		}
 
 		return nil

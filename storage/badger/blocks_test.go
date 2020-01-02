@@ -1,10 +1,10 @@
 package badger_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	errors2 "github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -83,8 +83,9 @@ func TestStoringBlockWithDifferentDateButSameNumberTwice(t *testing.T) {
 		block2.Signatures = []crypto.Signature{[]byte("magic")}
 
 		err = blocks.Save(&block2)
-		realError := errors2.Cause(err)
 
-		require.Equal(t, storage.DifferentDataErr, realError)
+		realErr := errors.Unwrap(err)
+
+		require.Equal(t, storage.DifferentDataErr, realErr)
 	})
 }
