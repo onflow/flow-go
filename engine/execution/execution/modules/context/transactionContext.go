@@ -227,10 +227,6 @@ func (r *transactionContext) UpdateAccountCode(address values.Address, code valu
 	return nil
 }
 
-// ResolveImport imports code for the provided import location.
-//
-// This function returns an error if the import location is not an account address,
-// or if there is no code deployed at the specified address.
 func (r *transactionContext) ResolveImport(location runtime.Location) ([]byte, error) {
 	addressLocation, ok := location.(runtime.AddressLocation)
 	if !ok {
