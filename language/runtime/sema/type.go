@@ -1560,11 +1560,35 @@ func (t *CompositeType) String() string {
 }
 
 func (t *CompositeType) ID() string {
-	if t.Location == nil {
-		return t.Identifier
+	var sb strings.Builder
+	sb.WriteString(string(t.Location.ID()))
+
+	// Gather all identifiers: this, parent, grand-parent, etc.
+
+	identifiers := []string{t.Identifier}
+
+	containerType := t.ContainerType
+	for containerType != nil {
+		switch typedContainerType := containerType.(type) {
+		case *InterfaceType:
+			identifiers = append(identifiers, typedContainerType.Identifier)
+			containerType = typedContainerType.ContainerType
+		case *CompositeType:
+			identifiers = append(identifiers, typedContainerType.Identifier)
+			containerType = typedContainerType.ContainerType
+		default:
+			panic(errors.NewUnreachableError())
+		}
 	}
 
-	return fmt.Sprintf("%s.%s", t.Location.ID(), t.Identifier)
+	// Append all identifiers, in reverse order
+
+	for i := len(identifiers) - 1; i >= 0; i-- {
+		sb.WriteRune('.')
+		sb.WriteString(identifiers[i])
+	}
+
+	return sb.String()
 }
 
 func (t *CompositeType) Equal(other Type) bool {
@@ -1899,11 +1923,35 @@ func (t *InterfaceType) String() string {
 }
 
 func (t *InterfaceType) ID() string {
-	if t.Location == nil {
-		return t.Identifier
+	var sb strings.Builder
+	sb.WriteString(string(t.Location.ID()))
+
+	// Gather all identifiers: this, parent, grand-parent, etc.
+
+	identifiers := []string{t.Identifier}
+
+	containerType := t.ContainerType
+	for containerType != nil {
+		switch typedContainerType := containerType.(type) {
+		case *InterfaceType:
+			identifiers = append(identifiers, typedContainerType.Identifier)
+			containerType = typedContainerType.ContainerType
+		case *CompositeType:
+			identifiers = append(identifiers, typedContainerType.Identifier)
+			containerType = typedContainerType.ContainerType
+		default:
+			panic(errors.NewUnreachableError())
+		}
 	}
 
-	return fmt.Sprintf("%s.%s", t.Location.ID(), t.Identifier)
+	// Append all identifiers, in reverse order
+
+	for i := len(identifiers) - 1; i >= 0; i-- {
+		sb.WriteRune('.')
+		sb.WriteString(identifiers[i])
+	}
+
+	return sb.String()
 }
 
 func (t *InterfaceType) Equal(other Type) bool {
