@@ -13,10 +13,10 @@ import (
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-// insertNew will encode the given entity using JSON and will insert the resulting
+// insert will encode the given entity using JSON and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists.
-func insertNew(key []byte, entity interface{}) func(*badger.Txn) error {
+func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// check if the key already exists in the db
@@ -35,7 +35,7 @@ func insertNew(key []byte, entity interface{}) func(*badger.Txn) error {
 			return fmt.Errorf("could not encode entity: %w", err)
 		}
 
-		// insert the entity data into the DB
+		// persist the entity data into the DB
 		err = tx.Set(key, val)
 		if err != nil {
 			return fmt.Errorf("could not store data: %w", err)
@@ -45,10 +45,10 @@ func insertNew(key []byte, entity interface{}) func(*badger.Txn) error {
 	}
 }
 
-// insert will encode the given entity using JSON and will insert the resulting
+// persist will encode the given entity using JSON and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists and data under the key is different that one to be saved
-func insert(key []byte, entity interface{}) func(*badger.Txn) error {
+func persist(key []byte, entity interface{}) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		// check if the key already exists in the db
@@ -78,7 +78,7 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 			}
 		}
 
-		// insert the entity data into the DB
+		// persist the entity data into the DB
 		err = tx.Set(key, val)
 		if err != nil {
 			return fmt.Errorf("could not store data: %w", err)
@@ -110,7 +110,7 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 			return fmt.Errorf("could not encode entity: %w", err)
 		}
 
-		// insert the entity data into the DB
+		// persist the entity data into the DB
 		err = tx.Set(key, val)
 		if err != nil {
 			return fmt.Errorf("could not replace data: %w", err)

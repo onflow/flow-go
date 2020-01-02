@@ -9,12 +9,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertNewCollections(hash crypto.Hash, collections []*flow.GuaranteedCollection) func(*badger.Txn) error {
-	return insertNew(makePrefix(codeCollections, hash), collections)
-}
-
 func InsertCollections(hash crypto.Hash, collections []*flow.GuaranteedCollection) func(*badger.Txn) error {
 	return insert(makePrefix(codeCollections, hash), collections)
+}
+
+func PersistCollections(hash crypto.Hash, collections []*flow.GuaranteedCollection) func(*badger.Txn) error {
+	return persist(makePrefix(codeCollections, hash), collections)
 }
 
 func RetrieveCollections(hash crypto.Hash, collections *[]*flow.GuaranteedCollection) func(*badger.Txn) error {

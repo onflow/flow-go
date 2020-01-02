@@ -23,7 +23,7 @@ func TestBoundaryInsertUpdateRetrieve(t *testing.T) {
 
 	boundary := uint64(1337)
 
-	err = db.Update(InsertNewBoundary(boundary))
+	err = db.Update(InsertBoundary(boundary))
 	require.Nil(t, err)
 
 	var retrieved uint64

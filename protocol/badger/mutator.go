@@ -282,7 +282,7 @@ func initializeFinalizedBoundary(tx *badger.Txn, genesis *flow.Block) error {
 	}
 
 	// insert the initial finalized state boundary
-	err := operation.InsertNewBoundary(genesis.Number)(tx)
+	err := operation.InsertBoundary(genesis.Number)(tx)
 	if err != nil {
 		return fmt.Errorf("could not insert boundary: %w", err)
 	}
@@ -293,7 +293,7 @@ func initializeFinalizedBoundary(tx *badger.Txn, genesis *flow.Block) error {
 func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 
 	// insert the header into the DB
-	err := operation.InsertNewHeader(&block.Header)(tx)
+	err := operation.InsertHeader(&block.Header)(tx)
 	if err != nil {
 		return fmt.Errorf("could not insert header: %w", err)
 	}
@@ -303,13 +303,13 @@ func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 	// one, instead of only by block
 
 	// insert the identities into the DB
-	err = operation.InsertNewIdentities(block.Hash(), block.NewIdentities)(tx)
+	err = operation.InsertIdentities(block.Hash(), block.NewIdentities)(tx)
 	if err != nil {
 		return fmt.Errorf("could not insert identities: %w", err)
 	}
 
 	// insert the guaranteed collections into the DB
-	err = operation.InsertNewCollections(block.Hash(), block.GuaranteedCollections)(tx)
+	err = operation.InsertCollections(block.Hash(), block.GuaranteedCollections)(tx)
 	if err != nil {
 		return fmt.Errorf("could not insert collections: %w", err)
 	}
@@ -320,7 +320,7 @@ func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 func applyBlockChanges(tx *badger.Txn, block *flow.Block) error {
 
 	// insert the height to hash mapping for finalized block
-	err := operation.InsertNewHash(block.Number, block.Hash())(tx)
+	err := operation.InsertHash(block.Number, block.Hash())(tx)
 	if err != nil {
 		return fmt.Errorf("could not insert hash: %w", err)
 	}
@@ -335,19 +335,19 @@ func applyBlockChanges(tx *badger.Txn, block *flow.Block) error {
 	for _, id := range block.NewIdentities {
 
 		// insert the role
-		err := operation.InsertNewRole(id.NodeID, id.Role)(tx)
+		err := operation.InsertRole(id.NodeID, id.Role)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert role (%x): %w", id.NodeID, err)
 		}
 
 		// insert the address
-		err = operation.InsertNewAddress(id.NodeID, id.Address)(tx)
+		err = operation.InsertAddress(id.NodeID, id.Address)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert address (%x): %w", id.NodeID, err)
 		}
 
 		// insert the stake delta
-		err = operation.InsertNewDelta(block.Number, id.Role, id.NodeID, int64(id.Stake))(tx)
+		err = operation.InsertDelta(block.Number, id.Role, id.NodeID, int64(id.Stake))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert delta (%x): %w", id.NodeID, err)
 		}

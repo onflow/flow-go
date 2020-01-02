@@ -18,7 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func TestHeaderInsertNewRetrieve(t *testing.T) {
+func TestHeaderInsertRetrieve(t *testing.T) {
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
 	defer os.RemoveAll(dir)
@@ -34,7 +34,7 @@ func TestHeaderInsertNewRetrieve(t *testing.T) {
 	}
 	hash := expected.Hash()
 
-	err = db.Update(InsertNewHeader(&expected))
+	err = db.Update(InsertHeader(&expected))
 	require.Nil(t, err)
 
 	var actual flow.Header
