@@ -11,9 +11,9 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	//revive:disable
+	// revive:disable
 	. "github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	//revive:enable
+	// revive:enable
 )
 
 type controlReturn interface {
@@ -1963,14 +1963,10 @@ func (interpreter *Interpreter) declareCompositeValue(
 		}
 
 		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
-			interpreter.declareComposite(nestedCompositeDeclaration)
-		}
-
-		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
 
 			// Pass the lexical scope, which has the containing composite's value declared,
 			// to the nested declarations so they can refer to it, and update the lexical scope
-			// so the container's functions can refer to the nested constructors
+			// so the container's functions can refer to the nested composite's value
 
 			var nestedValue Value
 			lexicalScope, nestedValue =
@@ -2014,6 +2010,13 @@ func (interpreter *Interpreter) declareCompositeValue(
 				Owner: "",
 			}
 
+			if declaration.CompositeKind == common.CompositeKindContract {
+				// NOTE: set the variable value immediately, as the contract value
+				// needs to be available for nested declarations
+
+				variable.Value = value
+			}
+
 			var initializationTrampoline Trampoline = Done{}
 
 			if initializerFunction != nil {
@@ -2040,11 +2043,14 @@ func (interpreter *Interpreter) declareCompositeValue(
 		contract := interpreter.contractValueHandler(interpreter, compositeType, constructor)
 		contract.NestedValues = members
 		value = contract
+		// NOTE: variable value is also set in the constructor function: it needs to be available
+		// for nested declarations, which might be invoked when the constructor is invoked
+		variable.Value = value
 	} else {
-		value = constructor
 		constructor.Members = members
+		value = constructor
+		variable.Value = value
 	}
-	variable.Value = value
 
 	return lexicalScope, value
 }

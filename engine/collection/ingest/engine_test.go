@@ -73,9 +73,9 @@ func TestClusterRouting(t *testing.T) {
 		assert.NoError(t, err)
 
 		// transaction should be in target cluster's pool, not in other pool
-		assert.Equal(t, 1, ingressNode.Pool.Len())
-		assert.Equal(t, 0, otherNode1.Pool.Len())
-		assert.Equal(t, 0, otherNode2.Pool.Len())
+		assert.EqualValues(t, 1, ingressNode.Pool.Size())
+		assert.EqualValues(t, 0, otherNode1.Pool.Size())
+		assert.EqualValues(t, 0, otherNode2.Pool.Size())
 	})
 
 	t.Run("should route transactions for a different cluster", func(t *testing.T) {
@@ -109,9 +109,9 @@ func TestClusterRouting(t *testing.T) {
 		net.FlushAll()
 
 		// transaction should be in target cluster's pool, not in other pool
-		assert.Equal(t, 0, ingressNode.Pool.Len())
-		assert.Equal(t, 1, targetNode.Pool.Len())
-		assert.Equal(t, 0, otherNode.Pool.Len())
+		assert.EqualValues(t, 0, ingressNode.Pool.Size())
+		assert.EqualValues(t, 1, targetNode.Pool.Size())
+		assert.EqualValues(t, 0, otherNode.Pool.Size())
 	})
 
 	t.Run("should not route invalid transactions", func(t *testing.T) {
@@ -129,8 +129,8 @@ func TestClusterRouting(t *testing.T) {
 		assert.Error(t, err)
 
 		// the transaction should not be stored in the ingress, nor routed
-		assert.Equal(t, 0, ingressNode.Pool.Len())
-		assert.Equal(t, 0, otherNode1.Pool.Len())
-		assert.Equal(t, 0, otherNode2.Pool.Len())
+		assert.EqualValues(t, 0, ingressNode.Pool.Size())
+		assert.EqualValues(t, 0, otherNode1.Pool.Size())
+		assert.EqualValues(t, 0, otherNode2.Pool.Size())
 	})
 }

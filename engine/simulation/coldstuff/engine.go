@@ -4,7 +4,6 @@ package coldstuff
 
 import (
 	"bytes"
-	"sync"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -25,8 +24,10 @@ import (
 // collecting the first quorum. In order to keep nodes in sync, the quorum is
 // set at the totality of the stake in the network.
 type Engine struct {
+	unit      *engine.Unit
 	log       zerolog.Logger
 	con       network.Conduit
+	exp       network.Engine
 	state     protocol.State
 	me        module.Local
 	pool      module.CollectionPool
@@ -36,17 +37,15 @@ type Engine struct {
 	proposals chan proposalWrap
 	votes     chan voteWrap
 	commits   chan commitWrap
-	once      *sync.Once
-	wg        *sync.WaitGroup
-	stop      chan struct{}
 }
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool module.CollectionPool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, exp network.Engine, state protocol.State, me module.Local, pool module.CollectionPool) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{
+		unit:      engine.NewUnit(),
 		log:       log.With().Str("engine", "coldstuff").Logger(),
 		state:     state,
 		me:        me,
@@ -57,9 +56,6 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 		proposals: make(chan proposalWrap, 1),
 		votes:     make(chan voteWrap, 1),
 		commits:   make(chan commitWrap, 1),
-		once:      &sync.Once{},
-		wg:        &sync.WaitGroup{},
-		stop:      make(chan struct{}),
 	}
 
 	// register the engine with the network layer to get our conduit
@@ -76,70 +72,67 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 // Ready returns a channel that will close when the coldstuff engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	ready := make(chan struct{})
-	e.wg.Add(1)
-	go e.consent()
-	go func() {
-		close(ready)
-	}()
-	return ready
+	e.unit.Launch(e.consent)
+	return e.unit.Ready()
 }
 
 // Done returns a channel that will close when the coldstuff engine has
 // successfully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	done := make(chan struct{})
-	go func() {
-		e.abort()
-		e.wg.Wait()
-		close(done)
-	}()
-	return done
+	return e.unit.Done()
 }
 
-// Submit can be used to submit events for processing locally. It logs errors
-// internally and doesn't return them, so it can be used by other engines to
-// forward events in a non-blocking manner by using a goroutine.
-func (e *Engine) Submit(event interface{}) {
-	err := e.Process(e.me.NodeID(), event)
-	if err != nil {
-		e.log.Error().Err(err).Msg("could not process submitted event")
-	}
+// SubmitLocal submits an event originating on the local node.
+func (e *Engine) SubmitLocal(event interface{}) {
+	e.Submit(e.me.NodeID(), event)
 }
 
-// Process will process coldstuff consensus events from the given origin.
+// Submit submits the given event from the node with the given origin ID
+// for processing in a non-blocking manner. It returns instantly and logs
+// a potential processing error internally when done.
+func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+	e.unit.Launch(func() {
+		err := e.Process(originID, event)
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not process submitted event")
+		}
+	})
+}
+
+// ProcessLocal processes an event originating on the local node.
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.Process(e.me.NodeID(), event)
+}
+
+// Process processes the given event from the node with the given origin ID in
+// a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	var err error
+	return e.unit.Do(func() error {
+		return e.process(originID, event)
+	})
+}
+
+// process processes events for the proposal engine on the collection node.
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *coldstuff.BlockProposal:
 		e.proposals <- proposalWrap{originID: originID, block: ev.Block}
+		return nil
 	case *coldstuff.BlockVote:
 		e.votes <- voteWrap{originID: originID, hash: ev.Hash}
+		return nil
 	case *coldstuff.BlockCommit:
 		e.commits <- commitWrap{originID: originID, hash: ev.Hash}
+		return nil
 	default:
-		err = errors.Errorf("invalid event type (%T)", event)
+		return errors.Errorf("invalid event type (%T)", event)
 	}
-	if err != nil {
-		return errors.Wrap(err, "could not process event")
-	}
-	return nil
-}
-
-// abort will shut down the coldstuff engine if it wasn't already done before.
-func (e *Engine) abort() {
-	e.once.Do(func() {
-		close(e.stop)
-	})
 }
 
 // consent will start the consensus algorithm on the engine. As we need to
 // process events sequentially, all submissions are queued in channels and then
 // processed here.
 func (e *Engine) consent() {
-
-	// defer done on waitgroup to unblock shutdown when stopping
-	defer e.wg.Done()
 
 	localID := e.me.NodeID()
 	log := e.log.With().Hex("local_id", localID[:]).Logger()
@@ -163,7 +156,7 @@ ConsentLoop:
 		select {
 
 		// break the loop and shut down
-		case <-e.stop:
+		case <-e.unit.Quit():
 			break ConsentLoop
 
 		// start the next consensus round
@@ -548,10 +541,13 @@ func (e *Engine) commitCandidate() error {
 		return errors.Wrap(err, "could not finalize state")
 	}
 
+	// hand the finalized block to expulsion engine to spread to all nodes
+	e.exp.Submit(e.round.Leader().NodeID, e.round.Candidate())
+
 	// remove all collections from the block from the mempool
 	removed := uint(0)
 	for _, gc := range candidate.GuaranteedCollections {
-		ok := e.pool.Rem(gc.Hash())
+		ok := e.pool.Rem(gc.Fingerprint())
 		if ok {
 			removed++
 		}

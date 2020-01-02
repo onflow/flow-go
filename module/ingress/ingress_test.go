@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine/mock"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
 	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -25,7 +25,7 @@ func TestSubmitTransaction(t *testing.T) {
 	tx := unittest.TransactionFixture()
 
 	t.Run("should submit transaction to engine", func(t *testing.T) {
-		engine.On("Submit", &tx).Return(nil).Once()
+		engine.On("ProcessLocal", &tx).Return(nil).Once()
 
 		res, err := h.SendTransaction(context.Background(), &observation.SendTransactionRequest{
 			Transaction: convert.TransactionToMessage(tx),
@@ -33,15 +33,15 @@ func TestSubmitTransaction(t *testing.T) {
 		require.NoError(t, err)
 
 		// should submit the transaction to the engine
-		engine.AssertCalled(t, "Submit", &tx)
+		engine.AssertCalled(t, "ProcessLocal", &tx)
 
-		// should return the hash of the submitted transaction
-		assert.Equal(t, tx.Hash(), crypto.Hash(res.Hash))
+		// should return the fingerprint of the submitted transaction
+		assert.Equal(t, tx.Fingerprint(), flow.Fingerprint(res.Hash))
 	})
 
 	t.Run("should pass through error", func(t *testing.T) {
 		expected := errors.New("error")
-		engine.On("Submit", &tx).Return(expected).Once()
+		engine.On("ProcessLocal", &tx).Return(expected).Once()
 
 		res, err := h.SendTransaction(context.Background(), &observation.SendTransactionRequest{
 			Transaction: convert.TransactionToMessage(tx),
@@ -51,7 +51,7 @@ func TestSubmitTransaction(t *testing.T) {
 		}
 
 		// should submit the transaction to the engine
-		engine.AssertCalled(t, "Submit", &tx)
+		engine.AssertCalled(t, "ProcessLocal", &tx)
 
 		// should only return the error
 		assert.Nil(t, res)

@@ -8,14 +8,13 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func prepareNodesAndCollectionsConfigurable(N, M int) (
-	[]*mockPropagationNode, []*collection.GuaranteedCollection, error) {
+func prepareNodesAndCollections(N, M int) (
+	[]*mockPropagationNode, []*flow.GuaranteedCollection, error) {
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -23,7 +22,7 @@ func prepareNodesAndCollectionsConfigurable(N, M int) (
 	entries := make([]string, N)
 	for e := 0; e < N; e++ {
 		nodeID := unittest.IdentifierFixture()
-		entries[e] = fmt.Sprintf("consensus-%x@address%d=1000", nodeID, e+1)
+		entries[e] = fmt.Sprintf("consensus-%s@address%d=1000", nodeID, e+1)
 	}
 	_, nodes, err := createConnectedNodes(entries...)
 	if err != nil {
@@ -31,18 +30,11 @@ func prepareNodesAndCollectionsConfigurable(N, M int) (
 	}
 
 	// prepare M distinct collection hashes
-	gcs := make([]*collection.GuaranteedCollection, M)
+	gcs := make([]*flow.GuaranteedCollection, M)
 	for m := 0; m < M; m++ {
 		gcs[m] = randCollection()
 	}
 	return nodes, gcs, nil
-}
-
-func prepareNodesAndCollections() (
-	[]*mockPropagationNode, []*collection.GuaranteedCollection, error) {
-	N := 16  // 16 nodes
-	M := 100 // 100 collections
-	return prepareNodesAndCollectionsConfigurable(N, M)
 }
 
 // given a list of node entries, return a list of mock nodes and connect them all to a hub
@@ -96,9 +88,9 @@ func randHash() []byte {
 }
 
 // a utiliy func to generate a GuaranteedCollection with random hash
-func randCollection() *collection.GuaranteedCollection {
+func randCollection() *flow.GuaranteedCollection {
 	hash := randHash()
-	return &collection.GuaranteedCollection{
+	return &flow.GuaranteedCollection{
 		CollectionHash: hash,
 	}
 }

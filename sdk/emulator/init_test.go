@@ -3,7 +3,6 @@ package emulator_test
 import (
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"os"
 	"testing"
 
@@ -69,13 +68,13 @@ func TestInitialization(t *testing.T) {
 			counterAddress,
 		)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:         []byte(script),
 			Nonce:          getNonce(),
 			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)
@@ -142,7 +141,7 @@ func TestInitialization(t *testing.T) {
 			result, err := b.ExecuteScript([]byte(readScript))
 			assert.NoError(t, err)
 
-			assert.Equal(t, values.Int{Int: big.NewInt(1)}, result.Value)
+			assert.Equal(t, values.NewInt(1), result.Value)
 		})
 	})
 }

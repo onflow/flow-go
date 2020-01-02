@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -39,7 +38,7 @@ func TestOnGuaranteedCollection(t *testing.T) {
 	// create random collection
 	hash := make([]byte, 32)
 	_, _ = rand.Read(hash)
-	coll := &collection.GuaranteedCollection{CollectionHash: hash}
+	coll := &flow.GuaranteedCollection{CollectionHash: hash}
 
 	// NOTE: as this function relies on two other functions that have their own
 	// unit tests, we only set up and check the behaviour that proxies the
@@ -83,36 +82,36 @@ func TestProcessGuaranteedCollection(t *testing.T) {
 
 	// generate n random collections
 	n := 3
-	collections := make([]*collection.GuaranteedCollection, 0, n)
+	collections := make([]*flow.GuaranteedCollection, 0, n)
 	for i := 0; i < n; i++ {
 		hash := make([]byte, 32)
 		_, _ = rand.Read(hash)
-		coll := &collection.GuaranteedCollection{CollectionHash: hash}
+		coll := &flow.GuaranteedCollection{CollectionHash: hash}
 		collections = append(collections, coll)
 	}
 
-	// test processing of collections for the first time
+	// test storing of collections for the first time
 	for i, coll := range collections {
 		pool.On("Add", coll).Return(nil).Once()
-		err := e.processGuaranteedCollection(coll)
+		err := e.storeGuaranteedCollection(coll)
 		assert.Nilf(t, err, "collection %d", i)
 	}
 
-	// test processing of collections for the second time
+	// test storing of collections for the second time
 	for i, coll := range collections {
 		pool.On("Add", coll).Return(errors.New("dummy")).Once()
-		err := e.processGuaranteedCollection(coll)
+		err := e.storeGuaranteedCollection(coll)
 		assert.NotNilf(t, err, "collection %d", i)
 	}
 
 	// check that we only had the expected calls
 	pool.AssertExpectations(t)
 
-	// test processing of collections when the mempool fails
+	// test storing of collections when the mempool fails
 	for i, coll := range collections {
 		pool.On("Has", coll.Hash()).Return(false)
 		pool.On("Add", coll).Return(errors.New("dummy"))
-		err := e.processGuaranteedCollection(coll)
+		err := e.storeGuaranteedCollection(coll)
 		assert.NotNilf(t, err, "collection %d", i)
 	}
 }
@@ -134,11 +133,11 @@ func TestPropagateGuaranteedCollection(t *testing.T) {
 
 	// generate random collections
 	n := 3
-	collections := make([]*collection.GuaranteedCollection, 0, n)
+	collections := make([]*flow.GuaranteedCollection, 0, n)
 	for i := 0; i < n; i++ {
 		hash := make([]byte, 32)
 		_, _ = rand.Read(hash)
-		coll := &collection.GuaranteedCollection{CollectionHash: hash}
+		coll := &flow.GuaranteedCollection{CollectionHash: hash}
 		collections = append(collections, coll)
 	}
 

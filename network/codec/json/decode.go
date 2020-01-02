@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/coldstuff"
-	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
@@ -34,7 +34,7 @@ func decode(env Envelope) (interface{}, error) {
 		v = &trickle.Response{}
 
 	case CodeGuaranteedCollection:
-		v = &collection.GuaranteedCollection{}
+		v = &flow.GuaranteedCollection{}
 
 	case CodeBlockProposal:
 		v = &coldstuff.BlockProposal{}
