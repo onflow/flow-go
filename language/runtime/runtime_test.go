@@ -2112,7 +2112,7 @@ func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
 			return []values.Address{{0x1}}
 		},
 		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
-			key := string(AddressLocation(address.Hex()))
+			key := string(AddressLocation(address.Bytes()).ID())
 			accountCodes[key] = code
 			return nil
 		},
