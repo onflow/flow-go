@@ -77,7 +77,7 @@ check-generated-code:
 
 .PHONY: lint
 lint:
-	GO111MODULE=on revive -config revive.toml -exclude cli/flow/cadence/vscode/cadence_bin.go ./...
+	GO111MODULE=on revive -config revive.toml ./...
 
 .PHONY: ci
 ci: install-tools generate check-generated-code lint test coverage
