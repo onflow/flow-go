@@ -1942,10 +1942,6 @@ func (e *InvalidNestedTypeError) Error() string {
 
 func (*InvalidNestedTypeError) isSemanticError() {}
 
-func (e *InvalidNestedTypeError) SecondaryError() string {
-	return "not found in this scope"
-}
-
 func (e *InvalidNestedTypeError) StartPosition() ast.Position {
 	return e.Type.StartPosition()
 }
