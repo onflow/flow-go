@@ -635,14 +635,17 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 				result = typedResult.NestedTypes[identifier.Identifier]
 
 			default:
-				checker.report(
-					&InvalidNestedTypeError{
-						Type: &ast.NominalType{
-							Identifier:        t.Identifier,
-							NestedIdentifiers: resolvedIdentifiers,
+				if !typedResult.IsInvalidType() {
+					checker.report(
+						&InvalidNestedTypeError{
+							Type: &ast.NominalType{
+								Identifier:        t.Identifier,
+								NestedIdentifiers: resolvedIdentifiers,
+							},
 						},
-					},
-				)
+					)
+				}
+
 				return &InvalidType{}
 			}
 
