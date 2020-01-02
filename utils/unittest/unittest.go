@@ -61,6 +61,8 @@ func RunWithDB(t *testing.T, f func(*badger.DB)) {
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 	f(db)
-	db.Close()
-	os.RemoveAll(dir)
+	defer func() {
+		db.Close()
+		os.RemoveAll(dir)
+	}()
 }

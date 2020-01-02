@@ -109,7 +109,7 @@ func (e *Engine) handleCollection(collection flow.Collection) error {
 		Hex("collection_hash", collection.Fingerprint()).
 		Msg("received collection")
 
-	err := e.collections.Insert(&collection)
+	err := e.collections.Save(&collection)
 	if err != nil {
 		return fmt.Errorf("could not save collection: %w", err)
 	}

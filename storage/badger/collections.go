@@ -41,9 +41,9 @@ func (c *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, er
 	return &collection, err
 }
 
-func (c *Collections) Insert(collection *flow.Collection) error {
+func (c *Collections) Save(collection *flow.Collection) error {
 	return c.db.Update(func(tx *badger.Txn) error {
-		err := operation.InsertFlowCollection(collection)(tx)
+		err := operation.PersistFlowCollection(collection)(tx)
 		if err != nil {
 			return errors.Wrap(err, "could not insert flow collection")
 		}

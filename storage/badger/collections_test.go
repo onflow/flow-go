@@ -19,7 +19,7 @@ func TestCollectionRetrievalByHash(t *testing.T) {
 
 		collection := unittest.FlowCollectionFixture(2)
 
-		err := collections.Insert(&collection)
+		err := collections.Save(&collection)
 		require.NoError(t, err)
 
 		byHash, err := collections.ByFingerprint(collection.Fingerprint())
@@ -37,7 +37,7 @@ func TestRetrievalByNonexistingHash(t *testing.T) {
 
 		collection := unittest.FlowCollectionFixture(4)
 
-		err := collections.Insert(&collection)
+		err := collections.Save(&collection)
 		require.NoError(t, err)
 
 		_, err = collections.ByFingerprint([]byte("LOL"))
@@ -54,10 +54,10 @@ func TestStoringSameCollectionTwice(t *testing.T) {
 
 		collection := unittest.FlowCollectionFixture(3)
 
-		err := collections.Insert(&collection)
+		err := collections.Save(&collection)
 		require.NoError(t, err)
 
-		err = collections.Insert(&collection)
+		err = collections.Save(&collection)
 		require.NoError(t, err)
 	})
 }

@@ -77,7 +77,7 @@ func TestCollectionStorage(t *testing.T) {
 
 	collection := unittest.FlowCollectionFixture(1)
 
-	collections.EXPECT().Insert(gomock.Eq(&collection))
+	collections.EXPECT().Save(gomock.Eq(&collection))
 
 	err = engine.Process(identifier, collection)
 	assert.NoError(t, err)

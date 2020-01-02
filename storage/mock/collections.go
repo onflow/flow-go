@@ -33,8 +33,8 @@ func (_m *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, e
 	return r0, r1
 }
 
-// Insert provides a mock function with given fields: collection
-func (_m *Collections) Insert(collection *flow.Collection) error {
+// Save provides a mock function with given fields: collection
+func (_m *Collections) Save(collection *flow.Collection) error {
 	ret := _m.Called(collection)
 
 	var r0 error

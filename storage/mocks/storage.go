@@ -116,16 +116,16 @@ func (mr *MockCollectionsMockRecorder) ByFingerprint(arg0 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByFingerprint", reflect.TypeOf((*MockCollections)(nil).ByFingerprint), arg0)
 }
 
-// Insert mocks base method
-func (m *MockCollections) Insert(arg0 *flow.Collection) error {
+// Save mocks base method
+func (m *MockCollections) Save(arg0 *flow.Collection) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Insert", arg0)
+	ret := m.ctrl.Call(m, "Save", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Insert indicates an expected call of Insert
-func (mr *MockCollectionsMockRecorder) Insert(arg0 interface{}) *gomock.Call {
+// Save indicates an expected call of Save
+func (mr *MockCollectionsMockRecorder) Save(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Insert", reflect.TypeOf((*MockCollections)(nil).Insert), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockCollections)(nil).Save), arg0)
 }

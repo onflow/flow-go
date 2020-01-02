@@ -20,8 +20,8 @@ func TestHashInsertRetrieve(t *testing.T) {
 		number := uint64(1337)
 		expected := crypto.Hash{0x01, 0x02, 0x03}
 
-	err = db.Update(InsertHash(number, expected))
-	require.Nil(t, err)
+		err := db.Update(InsertHash(number, expected))
+		require.Nil(t, err)
 
 		var actual crypto.Hash
 		err = db.View(RetrieveHash(number, &actual))

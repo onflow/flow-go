@@ -9,6 +9,6 @@ type Collections interface {
 	// ByHash returns the transaction for the given block.
 	ByFingerprint(hash flow.Fingerprint) (*flow.Collection, error)
 
-	// Insert inserts the transaction, keyed by hash.
-	Insert(collection *flow.Collection) error
+	// Save inserts the transaction, keyed by hash.
+	Save(collection *flow.Collection) error
 }

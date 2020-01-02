@@ -9,7 +9,7 @@ type Transactions interface {
 	// ByFingerprint returns the transaction for the given fingerprint.
 	ByFingerprint(fingerprint flow.Fingerprint) (*flow.Transaction, error)
 
-	// Insert inserts the transaction, keyed by fingerprint.
+	// Save inserts the transaction, keyed by fingerprint.
 	Insert(tx *flow.Transaction) error
 
 	// Remove removes the transaction with the given hash, if it exists.

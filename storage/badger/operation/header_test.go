@@ -27,8 +27,8 @@ func TestHeaderInsertRetrieve(t *testing.T) {
 		}
 		hash := expected.Hash()
 
-	err = db.Update(InsertHeader(&expected))
-	require.Nil(t, err)
+		err := db.Update(InsertHeader(&expected))
+		require.Nil(t, err)
 
 		var actual flow.Header
 		err = db.View(RetrieveHeader(hash, &actual))

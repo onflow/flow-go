@@ -118,7 +118,7 @@ func (b *Blocks) Save(block *flow.Block) error {
 		if err != nil {
 			return errors.Wrap(err, "cannot save block")
 		}
-		err = operation.InsertGuaranteedCollections(block.Hash(), block.GuaranteedCollections)(tx)
+		err = operation.PersistGuaranteedCollections(block.Hash(), block.GuaranteedCollections)(tx)
 		if err != nil {
 			return errors.Wrap(err, "cannot save block")
 		}
