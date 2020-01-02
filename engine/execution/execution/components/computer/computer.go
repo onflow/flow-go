@@ -40,8 +40,8 @@ func New(runtime runtime.Runtime, contextProvider context.Provider) Computer {
 // ExecuteTransaction computes the result of a transaction.
 //
 // Register updates are recorded in the provided ledger view. An error is returned
-// if an unexpected error occurs during execution. If the transaction reverts due to a normal runtime error,
-// the error is recorded in the transaction result.
+// if an unexpected error occurs during execution. If the transaction reverts due to
+// a normal runtime error, the error is recorded in the transaction result.
 func (c *computer) ExecuteTransaction(ledger *ledger.View, tx *flow.Transaction) (*TransactionResult, error) {
 	ctx := c.contextProvider.NewTransactionContext(tx, ledger)
 
