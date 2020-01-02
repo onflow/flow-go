@@ -56,12 +56,12 @@ var Cmd = &cobra.Command{
 			cli.Exit(1, "Failed to generate transaction script")
 		}
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:       script,
 			Nonce:        1,
 			ComputeLimit: 10,
 			PayerAccount: signer.Address,
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, signer.PrivateKey)
 		if err != nil {

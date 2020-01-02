@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
+	"github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 )
 
@@ -30,12 +31,10 @@ type ExportableType interface {
 	Export(program *ast.Program, variable *Variable) types.Type
 }
 
-//Helper function to wrap a types in a variable if a variable is set
+// Helper function to wrap a types in a variable if a variable is set
 func wrapVariable(t types.Type, variable *Variable) types.Type {
 	if variable != nil {
-		return types.Variable{
-			Type: t,
-		}
+		return types.Variable{Type: t}
 	} else {
 		return t
 	}
@@ -278,9 +277,8 @@ func (t *OptionalType) IsInvalidType() bool {
 }
 
 func (t *OptionalType) Export(program *ast.Program, variable *Variable) types.Type {
-
 	return wrapVariable(types.Optional{
-		Of: t.Type.(ExportableType).Export(program, nil),
+		Type: t.Type.(ExportableType).Export(program, nil),
 	}, variable)
 }
 
@@ -1265,25 +1263,23 @@ func (t *FunctionType) Export(program *ast.Program, variable *Variable) types.Ty
 			panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
 		}()
 
-		parameterTypeAnnotations := make([]*types.Parameter, len(t.ParameterTypeAnnotations))
+		parameterTypeAnnotations := make([]types.Parameter, len(t.ParameterTypeAnnotations))
 
 		for i, annotation := range t.ParameterTypeAnnotations {
 
 			astParam := functionDeclaration.ParameterList.Parameters[i]
 
-			parameterTypeAnnotations[i] = &types.Parameter{
-				Field: types.Field{
-					Identifier: astParam.Identifier.Identifier,
-					Type:       annotation.Type.(ExportableType).Export(program, nil),
-				},
-				Label: astParam.Label,
+			parameterTypeAnnotations[i] = types.Parameter{
+				Label:      astParam.Label,
+				Identifier: astParam.Identifier.Identifier,
+				Type:       annotation.Type.(ExportableType).Export(program, nil),
 			}
 		}
 
 		return types.Function{
 			Parameters: parameterTypeAnnotations,
 			ReturnType: t.ReturnTypeAnnotation.Type.(ExportableType).Export(program, nil),
-		}
+		}.WithID(t.ID())
 	}
 }
 
@@ -1564,20 +1560,11 @@ func (t *CompositeType) String() string {
 }
 
 func (t *CompositeType) ID() string {
-	return fmt.Sprintf("%c.%s.%s", t.idPrefix(), t.Location.ID(), t.Identifier)
-}
-
-func (t *CompositeType) idPrefix() rune {
-	switch t.Kind {
-	case common.CompositeKindStructure:
-		return 'S'
-	case common.CompositeKindResource:
-		return 'R'
-	case common.CompositeKindContract:
-		return 'C'
-	default:
-		panic(errors.NewUnreachableError())
+	if t.Location == nil {
+		return t.Identifier
 	}
+
+	return fmt.Sprintf("%s.%s", t.Location.ID(), t.Identifier)
 }
 
 func (t *CompositeType) Equal(other Type) bool {
@@ -1593,20 +1580,15 @@ func (t *CompositeType) Equal(other Type) bool {
 func (t *CompositeType) exportAsPointer() types.Type {
 	switch t.Kind {
 	case common.CompositeKindStructure:
-		return types.StructPointer{
-			TypeName: t.Identifier,
-		}
+		return types.StructPointer{TypeName: t.Identifier}
 	case common.CompositeKindResource:
-		return types.ResourcePointer{
-			TypeName: t.Identifier,
-		}
+		return types.ResourcePointer{TypeName: t.Identifier}
 	}
 	panic(fmt.Sprintf("cannot convert type %v of unknown kind %v", t, t.Kind))
 }
 
 func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.Type {
-
-	//this type is exported as a field or parameter type, not main definition
+	// this type is exported as a field or parameter type, not main definition
 	if variable == nil {
 		return t.exportAsPointer()
 	}
@@ -1623,36 +1605,46 @@ func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.T
 			panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
 		}()
 
-		fieldTypes := map[string]*types.Field{}
+		fields := make([]types.Field, 0, len(t.Members))
 
-		for name, field := range t.Members {
-			fieldTypes[name] = &types.Field{
-				Identifier: name,
-				Type:       field.TypeAnnotation.Type.(ExportableType).Export(program, nil),
-			}
+		// TODO: do not sort fields before export, store in order declared
+		fieldNames := make([]string, 0, len(t.Members))
+		for identifer, _ := range t.Members {
+			fieldNames = append(fieldNames, identifer)
 		}
 
-		parameters := make([]*types.Parameter, len(t.ConstructorParameterTypeAnnotations))
+		values.SortInEncodingOrder(fieldNames)
 
-		//TODO For now we have only one initializer, so we just assume this here
+		for _, identifer := range fieldNames {
+			field := t.Members[identifer]
+
+			typ := field.TypeAnnotation.Type.(ExportableType).Export(program, nil)
+
+			fields = append(fields, types.Field{
+				Identifier: identifer,
+				Type:       typ,
+			})
+		}
+
+		parameters := make([]types.Parameter, len(t.ConstructorParameterTypeAnnotations))
+
+		// TODO: For now we have only one initializer, so we just assume this here
 		// as this is post SEMA we really hope AST list of params matches SEMA type one
 		for i, parameter := range compositeDeclaration.Members.Initializers()[0].ParameterList.Parameters {
 			semaType := t.ConstructorParameterTypeAnnotations[i].Type
 
-			parameters[i] = &types.Parameter{
-				Field: types.Field{
-					Identifier: parameter.Identifier.Identifier,
-					Type:       semaType.(ExportableType).Export(program, nil),
-				},
-				Label: parameter.Label,
+			parameters[i] = types.Parameter{
+				Label:      parameter.Label,
+				Identifier: parameter.Identifier.Identifier,
+				Type:       semaType.(ExportableType).Export(program, nil),
 			}
 		}
 
 		return types.Composite{
-			Fields:       fieldTypes,
-			Initializers: [][]*types.Parameter{parameters},
 			Identifier:   t.Identifier,
-		}
+			Fields:       fields,
+			Initializers: [][]types.Parameter{parameters},
+		}.WithID(t.ID())
 	}
 
 	switch t.Kind {
@@ -1907,20 +1899,11 @@ func (t *InterfaceType) String() string {
 }
 
 func (t *InterfaceType) ID() string {
-	return fmt.Sprintf("%s.%s.%s", t.idPrefix(), t.Location.ID(), t.Identifier)
-}
-
-func (t *InterfaceType) idPrefix() string {
-	switch t.CompositeKind {
-	case common.CompositeKindStructure:
-		return "SI"
-	case common.CompositeKindResource:
-		return "RI"
-	case common.CompositeKindContract:
-		return "CI"
-	default:
-		panic(errors.NewUnreachableError())
+	if t.Location == nil {
+		return t.Identifier
 	}
+
+	return fmt.Sprintf("%s.%s", t.Location.ID(), t.Identifier)
 }
 
 func (t *InterfaceType) Equal(other Type) bool {
@@ -2246,37 +2229,56 @@ type EventType struct {
 	ConstructorParameterTypeAnnotations []*TypeAnnotation
 }
 
-const EventTypeIDPrefix = 'E'
-
 func (*EventType) isType() {}
 
 func (t *EventType) Export(program *ast.Program, variable *Variable) types.Type {
 
-	eventDeclaration := func() *ast.EventDeclaration {
-		for _, fn := range program.EventDeclarations() {
-			if fn.Identifier.Identifier == variable.Identifier && fn.Identifier.Pos == *variable.Pos {
-				return fn
+	var parameters []types.Parameter
+
+	if program != nil && variable != nil {
+		eventDeclaration := func() *ast.EventDeclaration {
+			for _, fn := range program.EventDeclarations() {
+				if fn.Identifier.Identifier == variable.Identifier && fn.Identifier.Pos == *variable.Pos {
+					return fn
+				}
+			}
+
+			panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
+		}()
+
+		parameterList := eventDeclaration.ParameterList.Parameters
+
+		parameters = make([]types.Parameter, len(t.Fields))
+
+		for i, field := range t.Fields {
+			identifier := field.Identifier
+			typ := field.Type.(ExportableType).Export(program, nil)
+
+			parameters[i] = types.Parameter{
+				Label:      parameterList[i].Label,
+				Identifier: identifier,
+				Type:       typ,
 			}
 		}
+	}
 
-		panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
-	}()
-
-	fieldTypes := make([]*types.Parameter, len(t.Fields))
+	fields := make([]types.Field, len(t.Fields))
 
 	for i, field := range t.Fields {
-		fieldTypes[i] = &types.Parameter{
-			Field: types.Field{
-				Identifier: field.Identifier,
-				Type:       field.Type.(ExportableType).Export(program, nil),
-			},
-			Label: eventDeclaration.ParameterList.Parameters[i].Label,
+		identifier := field.Identifier
+		typ := field.Type.(ExportableType).Export(program, nil)
+
+		fields[i] = types.Field{
+			Identifier: identifier,
+			Type:       typ,
 		}
 	}
+
 	return types.Event{
-		Fields:     fieldTypes,
-		Identifier: t.Identifier,
-	}
+		Identifier:  t.Identifier,
+		Fields:      fields,
+		Initializer: parameters,
+	}.WithID(t.ID())
 }
 
 func (t *EventType) String() string {
@@ -2292,12 +2294,11 @@ func (t *EventType) String() string {
 }
 
 func (t *EventType) ID() string {
-	return fmt.Sprintf(
-		"%c.%s.%s",
-		EventTypeIDPrefix,
-		t.Location,
-		t.Identifier,
-	)
+	if t.Location == nil {
+		return t.Identifier
+	}
+
+	return fmt.Sprintf("%s.%s", t.Location.ID(), t.Identifier)
 }
 
 func (t *EventType) Equal(other Type) bool {

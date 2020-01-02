@@ -17,7 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
@@ -126,7 +126,7 @@ func (BoolValue) SetOwner(_ string) {
 }
 
 func (v BoolValue) Export() values.Value {
-	return values.Bool(v)
+	return values.NewBool(bool(v))
 }
 
 func (v BoolValue) Negate() BoolValue {
@@ -179,7 +179,7 @@ func (*StringValue) SetOwner(_ string) {
 }
 
 func (v *StringValue) Export() values.Value {
-	return values.String(v.Str)
+	return values.NewString(v.Str)
 }
 
 func (v *StringValue) String() string {
@@ -359,13 +359,13 @@ func (v *ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition
 
 func (v *ArrayValue) Export() values.Value {
 	// TODO: how to export constant-sized array?
-	result := make(values.VariableSizedArray, len(v.Values))
+	vals := make([]values.Value, len(v.Values))
 
 	for i, value := range v.Values {
-		result[i] = value.(ExportableValue).Export()
+		vals[i] = value.(ExportableValue).Export()
 	}
 
-	return result
+	return values.NewVariableSizedArray(vals)
 }
 
 func (v *ArrayValue) GobEncode() ([]byte, error) {
@@ -714,7 +714,7 @@ func (v Int8Value) KeyString() string {
 }
 
 func (v Int8Value) Export() values.Value {
-	return values.Int8(v)
+	return values.NewInt8(int8(v))
 }
 
 func (v Int8Value) IntValue() int {
@@ -805,7 +805,7 @@ func (v Int16Value) KeyString() string {
 }
 
 func (v Int16Value) Export() values.Int16 {
-	return values.Int16(v)
+	return values.NewInt16(int16(v))
 }
 
 func (v Int16Value) IntValue() int {
@@ -896,7 +896,7 @@ func (v Int32Value) KeyString() string {
 }
 
 func (v Int32Value) Export() values.Value {
-	return values.Int32(v)
+	return values.NewInt32(int32(v))
 }
 
 func (v Int32Value) IntValue() int {
@@ -987,7 +987,7 @@ func (v Int64Value) KeyString() string {
 }
 
 func (v Int64Value) Export() values.Value {
-	return values.Int64(v)
+	return values.NewInt64(int64(v))
 }
 
 func (v Int64Value) IntValue() int {
@@ -1078,7 +1078,7 @@ func (v UInt8Value) KeyString() string {
 }
 
 func (v UInt8Value) Export() values.Value {
-	return values.Uint8(v)
+	return values.NewUInt8(uint8(v))
 }
 
 func (v UInt8Value) IntValue() int {
@@ -1168,7 +1168,7 @@ func (v UInt16Value) KeyString() string {
 }
 
 func (v UInt16Value) Export() values.Value {
-	return values.Uint16(v)
+	return values.NewUInt16(uint16(v))
 }
 
 func (v UInt16Value) IntValue() int {
@@ -1258,7 +1258,7 @@ func (v UInt32Value) KeyString() string {
 }
 
 func (v UInt32Value) Export() values.Value {
-	return values.Uint32(v)
+	return values.NewUInt32(uint32(v))
 }
 
 func (v UInt32Value) IntValue() int {
@@ -1349,7 +1349,7 @@ func (v UInt64Value) KeyString() string {
 }
 
 func (v UInt64Value) Export() values.Value {
-	return values.Uint64(v)
+	return values.NewUInt64(uint64(v))
 }
 
 func (v UInt64Value) IntValue() int {
@@ -1496,20 +1496,20 @@ func (v *CompositeValue) SetOwner(owner string) {
 }
 
 func (v *CompositeValue) Export() values.Value {
-	fields := make([]values.Value, 0)
+	fields := make([]values.Value, len(v.Fields))
 
 	keys := make([]string, 0, len(v.Fields))
 	for key := range v.Fields {
 		keys = append(keys, key)
 	}
 
-	encoding.SortInEncodingOrder(keys)
+	encodingValues.SortInEncodingOrder(keys)
 
-	for _, key := range keys {
-		fields = append(fields, v.Fields[key].(ExportableValue).Export())
+	for i, key := range keys {
+		fields[i] = v.Fields[key].(ExportableValue).Export()
 	}
 
-	return values.Composite{Fields: fields}
+	return values.NewComposite(fields)
 }
 
 func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
@@ -1732,7 +1732,7 @@ func (v *DictionaryValue) Destroy(interpreter *Interpreter, location LocationPos
 }
 
 func (v *DictionaryValue) Export() values.Value {
-	d := make(values.Dictionary, v.Count())
+	pairs := make([]values.KeyValuePair, v.Count())
 
 	for i, keyValue := range v.Keys.Values {
 		key := dictionaryKey(keyValue)
@@ -1741,13 +1741,13 @@ func (v *DictionaryValue) Export() values.Value {
 		exportedKey := keyValue.(ExportableValue).Export()
 		exportedValue := value.(ExportableValue).Export()
 
-		d[i] = values.KeyValuePair{
+		pairs[i] = values.KeyValuePair{
 			Key:   exportedKey,
 			Value: exportedValue,
 		}
 	}
 
-	return d
+	return values.NewDictionary(pairs)
 }
 
 func (v *DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) Value {
@@ -1939,10 +1939,7 @@ func (v EventValue) Export() values.Value {
 		fields[i] = field.Value.(ExportableValue).Export()
 	}
 
-	return values.Event{
-		Identifier: v.Identifier,
-		Fields:     fields,
-	}
+	return values.NewEvent(fields)
 }
 
 func (v EventValue) Copy() Value {
@@ -1992,8 +1989,6 @@ type EventField struct {
 func (f EventField) String() string {
 	return fmt.Sprintf("%s: %s", f.Identifier, f.Value)
 }
-
-// ToValue
 
 // ToValue converts a Go value into an interpreter value
 func ToValue(value interface{}) (Value, error) {
@@ -2088,7 +2083,7 @@ func (NilValue) String() string {
 }
 
 func (v NilValue) Export() values.Value {
-	return values.Nil{}
+	return values.Optional{Value: nil}
 }
 
 // SomeValue
@@ -2141,6 +2136,10 @@ func (v *SomeValue) Destroy(interpreter *Interpreter, location LocationPosition)
 
 func (v *SomeValue) String() string {
 	return fmt.Sprint(v.Value)
+}
+
+func (v *SomeValue) Export() values.Value {
+	return values.Optional{Value: v.Value.(ExportableValue).Export()}
 }
 
 // AnyValue
@@ -2347,7 +2346,7 @@ func ConvertAddress(value Value) Value {
 func (AddressValue) isValue() {}
 
 func (v AddressValue) Export() values.Value {
-	return values.Address(v)
+	return values.NewAddress(v)
 }
 
 func (v AddressValue) Copy() Value {

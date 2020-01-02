@@ -3,110 +3,101 @@
 package mempool
 
 import (
-	"bytes"
-	"encoding/hex"
-	"sort"
+	"fmt"
 	"sync"
 
-	"github.com/dchest/siphash"
-	"github.com/pkg/errors"
-
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/collection"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage/merkle"
 )
 
-// Mempool implements the collections memory pool of the consensus nodes, used to
-// store guaranteed collections and to generate block payloads.
-type Mempool struct {
-	sync.Mutex
-	collections map[string]*collection.GuaranteedCollection
+// Item defines the interface for items in the mempool.
+type Item interface {
+	// Fingerprint should return the canonical hash for the item.
+	Fingerprint() flow.Fingerprint
 }
 
-// New creates a new memory pool for guaranteed collections.
-func New() (*Mempool, error) {
-	m := &Mempool{
-		collections: make(map[string]*collection.GuaranteedCollection),
+// mempool implements a generic memory pool backed by a merkle tree.
+type mempool struct {
+	sync.RWMutex
+	tree  *merkle.Tree
+	items map[string]Item
+}
+
+// newMempool creates a new memory pool.
+func newMempool() *mempool {
+	m := &mempool{
+		tree:  merkle.NewTree(),
+		items: make(map[string]Item),
 	}
-	return m, nil
+	return m
 }
 
-// Has checks if we know already know the guaranteed collection of the given
-// hash.
-func (m *Mempool) Has(hash crypto.Hash) bool {
-	m.Lock()
-	defer m.Unlock()
-	key := hex.EncodeToString(hash)
-	_, ok := m.collections[key]
+// Has checks if we already contain the item with the given hash.
+func (m *mempool) Has(fp flow.Fingerprint) bool {
+	m.RLock()
+	defer m.RUnlock()
+	_, ok := m.tree.Get(crypto.Hash(fp))
 	return ok
 }
 
-// Rem will remove the collection with the given hash.
-func (m *Mempool) Rem(hash crypto.Hash) bool {
+// Add adds the given item to the pool.
+func (m *mempool) Add(item Item) error {
 	m.Lock()
 	defer m.Unlock()
-	key := hex.EncodeToString(hash)
-	_, ok := m.collections[key]
-	delete(m.collections, key)
-	return ok
-}
-
-// Add adds the given guaranteed collection to the pool.
-func (m *Mempool) Add(coll *collection.GuaranteedCollection) error {
-	m.Lock()
-	defer m.Unlock()
-	key := hex.EncodeToString(coll.Hash)
-	_, ok := m.collections[key]
+	ok := m.tree.Put(crypto.Hash(item.Fingerprint()), nil)
 	if ok {
-		return errors.Errorf("collection already known (%s)", key)
+		return fmt.Errorf("item already known (%x)", item.Fingerprint())
 	}
-	m.collections[key] = coll
+	m.items[fmt.Sprint(item.Fingerprint())] = item
 	return nil
 }
 
-// Get returns the given collection from the pool.
-func (m *Mempool) Get(hash crypto.Hash) (*collection.GuaranteedCollection, error) {
+// Rem will remove the item with the given hash.
+func (m *mempool) Rem(fp flow.Fingerprint) bool {
 	m.Lock()
 	defer m.Unlock()
-	key := hex.EncodeToString(hash)
-	coll, ok := m.collections[key]
+	ok := m.tree.Del(crypto.Hash(fp))
 	if !ok {
-		return nil, errors.Errorf("could not find collection (%s)", key)
+		return false
 	}
+	delete(m.items, fmt.Sprint(fp))
+	return true
+}
+
+// Get returns the given item from the pool.
+func (m *mempool) Get(fp flow.Fingerprint) (Item, error) {
+	m.RLock()
+	defer m.RUnlock()
+	_, ok := m.tree.Get(crypto.Hash(fp))
+	if !ok {
+		return nil, fmt.Errorf("item not known (%x)", fp)
+	}
+	coll := m.items[fmt.Sprint(fp)]
 	return coll, nil
 }
 
-// Hash returns a hash of all collections in the mempool.
-func (m *Mempool) Hash() []byte {
-	m.Lock()
-	defer m.Unlock()
-	hash := siphash.New([]byte("flowcollmempoolx"))
-	collections := make([]*collection.GuaranteedCollection, 0, len(m.collections))
-	for _, coll := range m.collections {
-		collections = append(collections, coll)
-	}
-	sort.Slice(collections, func(i int, j int) bool {
-		return bytes.Compare(collections[i].Hash, collections[j].Hash) < 0
-	})
-	for _, coll := range collections {
-		_, _ = hash.Write(coll.Hash)
-	}
-	return hash.Sum(nil)
+// Hash returns a hash of all items in the mempool.
+func (m *mempool) Hash() crypto.Hash {
+	m.RLock()
+	defer m.RUnlock()
+	return m.tree.Hash()
 }
 
 // Size will return the size of the mempool.
-func (m *Mempool) Size() uint {
-	m.Lock()
-	defer m.Unlock()
-	return uint(len(m.collections))
+func (m *mempool) Size() uint {
+	m.RLock()
+	defer m.RUnlock()
+	return uint(len(m.items))
 }
 
-// All returns all collections from the pool.
-func (m *Mempool) All() []*collection.GuaranteedCollection {
-	m.Lock()
-	defer m.Unlock()
-	collections := make([]*collection.GuaranteedCollection, 0, len(m.collections))
-	for _, coll := range m.collections {
-		collections = append(collections, coll)
+// All returns all items from the pool.
+func (m *mempool) All() []Item {
+	m.RLock()
+	defer m.RUnlock()
+	items := make([]Item, 0, len(m.items))
+	for _, coll := range m.items {
+		items = append(items, coll)
 	}
-	return collections
+	return items
 }

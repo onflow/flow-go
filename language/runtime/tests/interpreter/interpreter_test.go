@@ -1807,16 +1807,16 @@ func TestInterpretStructureSelfUseInFunction(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
 
-    struct Test {
+      struct Test {
 
-        fun test() {
-            self
-        }
-    }
+          fun test() {
+              self
+          }
+      }
 
-    fun test() {
-        Test().test()
-    }
+      fun test() {
+          Test().test()
+      }
     `)
 
 	value, err := inter.Invoke("test")
@@ -1831,17 +1831,16 @@ func TestInterpretStructureSelfUseInFunction(t *testing.T) {
 func TestInterpretStructureConstructorUseInFunction(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
+      struct Test {
 
-    struct Test {
+          fun test() {
+              Test
+          }
+      }
 
-        fun test() {
-            Test
-        }
-    }
-
-    fun test() {
-        Test().test()
-    }
+      fun test() {
+          Test().test()
+      }
     `)
 
 	value, err := inter.Invoke("test")
@@ -3211,6 +3210,32 @@ func TestInterpretNestedOptionalComparisonMixed(t *testing.T) {
 	)
 }
 
+func TestInterpretOptionalSomeValueComparison(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+     let x: Int? = 1
+     let y = x == 1
+   `)
+
+	assert.Equal(t,
+		interpreter.BoolValue(true),
+		inter.Globals["y"].Value,
+	)
+}
+
+func TestInterpretOptionalNilValueComparison(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+     let x: Int? = nil
+     let y = x == 1
+   `)
+
+	assert.Equal(t,
+		interpreter.BoolValue(false),
+		inter.Globals["y"].Value,
+	)
+}
+
 func TestInterpretCompositeNilEquality(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKinds {
@@ -3235,7 +3260,7 @@ func TestInterpretCompositeNilEquality(t *testing.T) {
 				fmt.Sprintf(
 					`
                       pub %[1]s X {}
-                      
+
                       %[2]s
 
                       pub let y = %[3]s == nil
@@ -5092,7 +5117,7 @@ func TestInterpretStorage(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
@@ -5624,7 +5649,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 				}),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
@@ -5645,7 +5670,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 		&interpreter.ReferenceValue{
 			TargetStorageIdentifier: storageValue.Identifier,
 			// TODO: improve
-			TargetKey: rType.String(),
+			TargetKey: rType.ID(),
 		},
 		value,
 	)
@@ -5721,7 +5746,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
@@ -5804,7 +5829,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
@@ -5873,7 +5898,7 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
@@ -6263,19 +6288,19 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
 		},
 	)
 
-	const rTypeIdentifier = "R"
+	rType := inter.Checker.GlobalTypes["R"].Type
 
-	storageKey := interpreter.PrefixedStorageKey(rTypeIdentifier, interpreter.AccessLevelPrivate)
+	storageKey := interpreter.PrefixedStorageKey(rType.ID(), interpreter.AccessLevelPrivate)
 
 	originalValue := &interpreter.CompositeValue{
-		Identifier: rTypeIdentifier,
+		Identifier: rType.ID(),
 		Kind:       common.CompositeKindResource,
 		Fields:     map[string]interpreter.Value{},
 		Owner:      storageIdentifier1,
@@ -6402,19 +6427,19 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.String()
+						return indexingType.ID()
 					},
 				),
 			},
 		},
 	)
 
-	const rTypeIdentifier = "R"
+	rType := inter.Checker.GlobalTypes["R"].Type
 
-	storageKey := interpreter.PrefixedStorageKey(rTypeIdentifier, interpreter.AccessLevelPrivate)
+	storageKey := interpreter.PrefixedStorageKey(rType.ID(), interpreter.AccessLevelPrivate)
 
 	originalValue := &interpreter.CompositeValue{
-		Identifier: rTypeIdentifier,
+		Identifier: rType.ID(),
 		Kind:       common.CompositeKindResource,
 		Fields:     map[string]interpreter.Value{},
 		Owner:      storageIdentifier1,
@@ -6820,4 +6845,205 @@ func TestInterpretConformToImportedInterface(t *testing.T) {
 
 	_, err = inter.Invoke("test")
 	assert.IsType(t, &interpreter.ConditionError{}, err)
+}
+
+// See https://github.com/dapperlabs/flow-go/issues/1869
+//
+func TestInterpretPostConditionWithElaborationAccess(t *testing.T) {
+
+	storedValues := map[string]interpreter.OptionalValue{}
+
+	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+	//
+
+	getter := func(_ *interpreter.Interpreter, _ string, key string) interpreter.OptionalValue {
+		value, ok := storedValues[key]
+		if !ok {
+			return interpreter.NilValue{}
+		}
+		return value
+	}
+
+	setter := func(_ *interpreter.Interpreter, _ string, key string, value interpreter.OptionalValue) {
+		storedValues[key] = value
+	}
+
+	storageValue := interpreter.StorageValue{}
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+          pub resource R {}
+
+          pub fun test() {
+              post {
+                  storage[R] != nil
+              }
+              let oldR <- storage[R] <- create R()
+              destroy oldR
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
+				interpreter.WithStorageReadHandler(getter),
+				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandler(
+					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
+						return indexingType.ID()
+					},
+				),
+			},
+		},
+	)
+
+	_, err := inter.Invoke("test")
+	require.NoError(t, err)
+}
+
+func TestInterpretFunctionPostConditionInInterface(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      struct interface SI {
+          on: Bool
+
+          fun turnOn() {
+              post {
+                  self.on
+              }
+          }
+      }
+
+      struct S: SI {
+          var on: Bool
+
+          init() {
+              self.on = false
+          }
+
+          fun turnOn() {
+              self.on = true
+          }
+      }
+
+      struct S2: SI {
+          var on: Bool
+
+          init() {
+              self.on = false
+          }
+
+          fun turnOn() {
+              // incorrect
+          }
+      }
+
+      fun test() {
+          S().turnOn()
+      }
+
+      fun test2() {
+          S2().turnOn()
+      }
+    `)
+
+	_, err := inter.Invoke("test")
+	require.NoError(t, err)
+
+	_, err = inter.Invoke("test2")
+	assert.IsType(t, &interpreter.ConditionError{}, err)
+}
+
+func TestInterpretFunctionPostConditionWithBeforeInInterface(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      struct interface SI {
+          on: Bool
+
+          fun toggle() {
+              post {
+                  self.on != before(self.on)
+              }
+          }
+      }
+
+      struct S: SI {
+          var on: Bool
+
+          init() {
+              self.on = false
+          }
+
+          fun toggle() {
+              self.on = !self.on
+          }
+      }
+
+      struct S2: SI {
+          var on: Bool
+
+          init() {
+              self.on = false
+          }
+
+          fun toggle() {
+              // incorrect
+          }
+      }
+
+      fun test() {
+          S().toggle()
+      }
+
+      fun test2() {
+          S2().toggle()
+      }
+    `)
+
+	_, err := inter.Invoke("test")
+	require.NoError(t, err)
+
+	_, err = inter.Invoke("test2")
+	assert.IsType(t, &interpreter.ConditionError{}, err)
+}
+
+func TestInterpretContractUseInNestedDeclaration(t *testing.T) {
+
+	inter := parseCheckAndInterpretWithOptions(t, `
+          pub contract C {
+
+              pub var i: Int
+
+              pub struct S {
+
+                  init() {
+                      C.i = C.i + 1
+                  }
+              }
+
+              init () {
+                  self.i = 0
+                  S()
+                  S()
+              }
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			Options: []interpreter.Option{
+				makeContractValueHandler(nil, nil, nil),
+			},
+		},
+	)
+
+	i := inter.Globals["C"].Value.(interpreter.MemberAccessibleValue).
+		GetMember(inter, interpreter.LocationRange{}, "i")
+
+	require.IsType(t,
+		interpreter.NewIntValue(2),
+		i,
+	)
 }

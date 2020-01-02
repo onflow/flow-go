@@ -68,6 +68,22 @@
       ],
       "additionalProperties": false
     },
+    "field": {
+      "title": "Field",
+      "type": "object",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "description": "The field name (required)",
+          "$ref": "#/definitions/namePattern"
+        },
+        "type": {
+          "title": "Type",
+          "description": "The field type (required)",
+          "$ref": "#/definitions/type"
+        }
+      }
+    },
     "parameter": {
       "title": "Parameter",
       "type": "object",
@@ -156,12 +172,9 @@
           "type": "object",
           "properties": {
             "fields": {
-              "type": "object",
-              "additionalProperties": {
-                "$ref": "#/definitions/type"
-              },
-              "propertyNames": {
-                "$ref": "#/definitions/namePattern"
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/parameter"
               }
             },
             "initializers": {
@@ -190,12 +203,9 @@
           "type": "object",
           "properties": {
             "fields": {
-              "type": "object",
-              "additionalProperties": {
-                "$ref": "#/definitions/resourceType"
-              },
-              "propertyNames": {
-                "$ref": "#/definitions/namePattern"
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/parameter"
               }
             },
             "initializers": {
@@ -258,6 +268,9 @@
           "$ref": "#/definitions/builtinType"
         },
         {
+          "$ref": "#/definitions/anyStruct"
+        },
+        {
           "$ref": "#/definitions/arrayType"
         },
         {
@@ -271,6 +284,9 @@
         },
         {
           "$ref": "#/definitions/structReferenceType"
+        },
+        {
+          "$ref": "#/definitions/resourceReferenceType"
         }
       ]
     },
@@ -278,6 +294,12 @@
       "oneOf": [
         {
           "$ref": "#/definitions/builtinType"
+        },
+        {
+          "$ref": "#/definitions/anyStruct"
+        },
+        {
+          "$ref": "#/definitions/anyResource"
         },
         {
           "$ref": "#/definitions/resourceReferenceType"
@@ -349,7 +371,6 @@
       "type": "string",
       "enum": [
         "Address",
-        "Any",
         "Int8",
         "Int16",
         "Int32",
@@ -359,6 +380,18 @@
         "UInt32",
         "UInt64"
       ],
+      "additionalProperties": false
+    },
+    "anyStruct": {
+      "title": "Any structure type",
+      "type": "string",
+      "const": "AnyStruct",
+      "additionalProperties": false
+    },
+    "anyResource": {
+      "title": "Any resource type",
+      "type": "string",
+      "const": "AnyResource",
       "additionalProperties": false
     },
     "arrayType": {

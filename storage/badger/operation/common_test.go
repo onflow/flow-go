@@ -26,6 +26,7 @@ type Entity struct {
 func TestInsertValid(t *testing.T) {
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+	defer os.RemoveAll(dir)
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 
@@ -55,6 +56,7 @@ func TestInsertDuplicate(t *testing.T) {
 func TestUpdateValid(t *testing.T) {
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+	defer os.RemoveAll(dir)
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 
@@ -90,6 +92,7 @@ func TestUpdateMissing(t *testing.T) {
 func TestRetrieveValid(t *testing.T) {
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+	defer os.RemoveAll(dir)
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 
@@ -120,4 +123,44 @@ func TestScan(t *testing.T) {
 
 func TestTraverse(t *testing.T) {
 	// TODO
+}
+
+func TestRemove(t *testing.T) {
+	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+	defer os.RemoveAll(dir)
+	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
+	require.Nil(t, err)
+
+	key := []byte{0x01, 0x02, 0x03}
+	val := []byte(`{"ID":1337}`)
+
+	_ = db.Update(func(tx *badger.Txn) error {
+		err := tx.Set(key, val)
+		require.NoError(t, err)
+		return nil
+	})
+
+	t.Run("should be able to remove", func(t *testing.T) {
+		db.Update(func(txn *badger.Txn) error {
+			err = remove(key)(txn)
+			assert.NoError(t, err)
+
+			_, err = txn.Get(key)
+			assert.Error(t, err)
+			assert.IsType(t, badger.ErrKeyNotFound, err)
+
+			return nil
+		})
+	})
+
+	t.Run("should error when removing non-existant value", func(t *testing.T) {
+		nonexistantKey := append(key, 0x01)
+		db.Update(func(txn *badger.Txn) error {
+			err = remove(nonexistantKey)(txn)
+			assert.Error(t, err)
+			t.Log(err)
+			return nil
+		})
+	})
+
 }

@@ -28,6 +28,18 @@ type helloEngine struct {
 	sender flow.Identifier
 }
 
+func (he *helloEngine) SubmitLocal(event interface{}) {
+	panic("not implemented")
+}
+
+func (he *helloEngine) Submit(originID flow.Identifier, event interface{}) {
+	panic("not implemented")
+}
+
+func (he *helloEngine) ProcessLocal(event interface{}) error {
+	panic("not implemented")
+}
+
 func (he *helloEngine) Process(originID flow.Identifier, event interface{}) error {
 
 	str, ok := event.(string)

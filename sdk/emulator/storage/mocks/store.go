@@ -35,94 +35,48 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 	return m.recorder
 }
 
-// GetBlockByHash mocks base method
-func (m *MockStore) GetBlockByHash(arg0 crypto.Hash) (types.Block, error) {
+// BlockByHash mocks base method
+func (m *MockStore) BlockByHash(arg0 crypto.Hash) (types.Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlockByHash", arg0)
+	ret := m.ctrl.Call(m, "BlockByHash", arg0)
 	ret0, _ := ret[0].(types.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetBlockByHash indicates an expected call of GetBlockByHash
-func (mr *MockStoreMockRecorder) GetBlockByHash(arg0 interface{}) *gomock.Call {
+// BlockByHash indicates an expected call of BlockByHash
+func (mr *MockStoreMockRecorder) BlockByHash(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockByHash", reflect.TypeOf((*MockStore)(nil).GetBlockByHash), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlockByHash", reflect.TypeOf((*MockStore)(nil).BlockByHash), arg0)
 }
 
-// GetBlockByNumber mocks base method
-func (m *MockStore) GetBlockByNumber(arg0 uint64) (types.Block, error) {
+// BlockByNumber mocks base method
+func (m *MockStore) BlockByNumber(arg0 uint64) (types.Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBlockByNumber", arg0)
+	ret := m.ctrl.Call(m, "BlockByNumber", arg0)
 	ret0, _ := ret[0].(types.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetBlockByNumber indicates an expected call of GetBlockByNumber
-func (mr *MockStoreMockRecorder) GetBlockByNumber(arg0 interface{}) *gomock.Call {
+// BlockByNumber indicates an expected call of BlockByNumber
+func (mr *MockStoreMockRecorder) BlockByNumber(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockByNumber", reflect.TypeOf((*MockStore)(nil).GetBlockByNumber), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BlockByNumber", reflect.TypeOf((*MockStore)(nil).BlockByNumber), arg0)
 }
 
-// GetEvents mocks base method
-func (m *MockStore) GetEvents(arg0 string, arg1, arg2 uint64) ([]flow.Event, error) {
+// CommitBlock mocks base method
+func (m *MockStore) CommitBlock(arg0 types.Block, arg1 []flow.Transaction, arg2 types.LedgerDelta, arg3 []flow.Event) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetEvents", arg0, arg1, arg2)
-	ret0, _ := ret[0].([]flow.Event)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "CommitBlock", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
-// GetEvents indicates an expected call of GetEvents
-func (mr *MockStoreMockRecorder) GetEvents(arg0, arg1, arg2 interface{}) *gomock.Call {
+// CommitBlock indicates an expected call of CommitBlock
+func (mr *MockStoreMockRecorder) CommitBlock(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEvents", reflect.TypeOf((*MockStore)(nil).GetEvents), arg0, arg1, arg2)
-}
-
-// GetLatestBlock mocks base method
-func (m *MockStore) GetLatestBlock() (types.Block, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLatestBlock")
-	ret0, _ := ret[0].(types.Block)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetLatestBlock indicates an expected call of GetLatestBlock
-func (mr *MockStoreMockRecorder) GetLatestBlock() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLatestBlock", reflect.TypeOf((*MockStore)(nil).GetLatestBlock))
-}
-
-// GetLedger mocks base method
-func (m *MockStore) GetLedger(arg0 uint64) (flow.Ledger, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLedger", arg0)
-	ret0, _ := ret[0].(flow.Ledger)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetLedger indicates an expected call of GetLedger
-func (mr *MockStoreMockRecorder) GetLedger(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLedger", reflect.TypeOf((*MockStore)(nil).GetLedger), arg0)
-}
-
-// GetTransaction mocks base method
-func (m *MockStore) GetTransaction(arg0 crypto.Hash) (flow.Transaction, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetTransaction", arg0)
-	ret0, _ := ret[0].(flow.Transaction)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetTransaction indicates an expected call of GetTransaction
-func (mr *MockStoreMockRecorder) GetTransaction(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTransaction", reflect.TypeOf((*MockStore)(nil).GetTransaction), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CommitBlock", reflect.TypeOf((*MockStore)(nil).CommitBlock), arg0, arg1, arg2, arg3)
 }
 
 // InsertBlock mocks base method
@@ -140,22 +94,31 @@ func (mr *MockStoreMockRecorder) InsertBlock(arg0 interface{}) *gomock.Call {
 }
 
 // InsertEvents mocks base method
-func (m *MockStore) InsertEvents(arg0 uint64, arg1 ...flow.Event) error {
+func (m *MockStore) InsertEvents(arg0 uint64, arg1 []flow.Event) error {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{arg0}
-	for _, a := range arg1 {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "InsertEvents", varargs...)
+	ret := m.ctrl.Call(m, "InsertEvents", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // InsertEvents indicates an expected call of InsertEvents
-func (mr *MockStoreMockRecorder) InsertEvents(arg0 interface{}, arg1 ...interface{}) *gomock.Call {
+func (mr *MockStoreMockRecorder) InsertEvents(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{arg0}, arg1...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertEvents", reflect.TypeOf((*MockStore)(nil).InsertEvents), varargs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertEvents", reflect.TypeOf((*MockStore)(nil).InsertEvents), arg0, arg1)
+}
+
+// InsertLedgerDelta mocks base method
+func (m *MockStore) InsertLedgerDelta(arg0 uint64, arg1 types.LedgerDelta) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InsertLedgerDelta", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// InsertLedgerDelta indicates an expected call of InsertLedgerDelta
+func (mr *MockStoreMockRecorder) InsertLedgerDelta(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertLedgerDelta", reflect.TypeOf((*MockStore)(nil).InsertLedgerDelta), arg0, arg1)
 }
 
 // InsertTransaction mocks base method
@@ -172,16 +135,61 @@ func (mr *MockStoreMockRecorder) InsertTransaction(arg0 interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertTransaction", reflect.TypeOf((*MockStore)(nil).InsertTransaction), arg0)
 }
 
-// SetLedger mocks base method
-func (m *MockStore) SetLedger(arg0 uint64, arg1 flow.Ledger) error {
+// LatestBlock mocks base method
+func (m *MockStore) LatestBlock() (types.Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetLedger", arg0, arg1)
-	ret0, _ := ret[0].(error)
+	ret := m.ctrl.Call(m, "LatestBlock")
+	ret0, _ := ret[0].(types.Block)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LatestBlock indicates an expected call of LatestBlock
+func (mr *MockStoreMockRecorder) LatestBlock() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LatestBlock", reflect.TypeOf((*MockStore)(nil).LatestBlock))
+}
+
+// LedgerViewByNumber mocks base method
+func (m *MockStore) LedgerViewByNumber(arg0 uint64) *types.LedgerView {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LedgerViewByNumber", arg0)
+	ret0, _ := ret[0].(*types.LedgerView)
 	return ret0
 }
 
-// SetLedger indicates an expected call of SetLedger
-func (mr *MockStoreMockRecorder) SetLedger(arg0, arg1 interface{}) *gomock.Call {
+// LedgerViewByNumber indicates an expected call of LedgerViewByNumber
+func (mr *MockStoreMockRecorder) LedgerViewByNumber(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLedger", reflect.TypeOf((*MockStore)(nil).SetLedger), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LedgerViewByNumber", reflect.TypeOf((*MockStore)(nil).LedgerViewByNumber), arg0)
+}
+
+// RetrieveEvents mocks base method
+func (m *MockStore) RetrieveEvents(arg0 string, arg1, arg2 uint64) ([]flow.Event, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RetrieveEvents", arg0, arg1, arg2)
+	ret0, _ := ret[0].([]flow.Event)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RetrieveEvents indicates an expected call of RetrieveEvents
+func (mr *MockStoreMockRecorder) RetrieveEvents(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RetrieveEvents", reflect.TypeOf((*MockStore)(nil).RetrieveEvents), arg0, arg1, arg2)
+}
+
+// TransactionByHash mocks base method
+func (m *MockStore) TransactionByHash(arg0 crypto.Hash) (flow.Transaction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TransactionByHash", arg0)
+	ret0, _ := ret[0].(flow.Transaction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TransactionByHash indicates an expected call of TransactionByHash
+func (mr *MockStoreMockRecorder) TransactionByHash(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionByHash", reflect.TypeOf((*MockStore)(nil).TransactionByHash), arg0)
 }

@@ -6,13 +6,12 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/collection"
 )
 
 type Block struct {
 	Header
 	NewIdentities         IdentityList
-	GuaranteedCollections []*collection.GuaranteedCollection
+	GuaranteedCollections []*GuaranteedCollection
 }
 
 func Genesis(ids IdentityList) *Block {
@@ -38,7 +37,7 @@ func (b Block) Payload() crypto.Hash {
 		hasher.Add(id.Encode())
 	}
 	for _, gc := range b.GuaranteedCollections {
-		hasher.Add(gc.Hash)
+		hasher.Add(gc.Hash())
 	}
 	return hasher.SumHash()
 }

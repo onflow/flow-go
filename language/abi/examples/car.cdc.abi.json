@@ -2,11 +2,20 @@
   "definitions": {
     "Car": {
       "struct": {
-        "fields": {
-          "model": "String",
-          "make": "String",
-          "trim": "String"
-        },
+        "fields": [
+          {
+            "name": "make",
+            "type": "String"
+          },
+          {
+            "name": "model",
+            "type": "String"
+          },
+          {
+            "name": "trim",
+            "type": "String"
+          }
+        ],
         "initializers": [
           [
             {
@@ -17,17 +26,33 @@
         ]
       }
     },
+    "FenderBender": {
+      "event": [
+        {
+          "name": "place",
+          "type": "String",
+          "label": "where"
+        },
+        {
+          "name": "cost",
+          "type": "Int"
+        }
+      ]
+    },
     "Fleet": {
       "struct": {
-        "fields": {
-          "cars": {
-            "array": {
-              "of": {
-                "struct": "Car"
+        "fields": [
+          {
+            "name": "cars",
+            "type": {
+              "array": {
+                "of": {
+                  "struct": "Car"
+                }
               }
             }
           }
-        },
+        ],
         "initializers": [
           [
             {
@@ -55,19 +80,6 @@
           ]
         ]
       }
-    },
-    "FenderBender": {
-      "event": [
-        {
-          "name": "place",
-          "label": "where",
-          "type": "String"
-        },
-        {
-          "name": "cost",
-          "type": "Int"
-        }
-      ]
     },
     "speed": {
       "variable": "String"

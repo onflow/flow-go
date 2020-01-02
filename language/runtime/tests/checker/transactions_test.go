@@ -401,10 +401,9 @@ func TestCheckInvalidTransactionSelfMoveReturnFromFunction(t *testing.T) {
      }
    `)
 
-	errs := ExpectCheckerErrors(t, err, 2)
+	errs := ExpectCheckerErrors(t, err, 1)
 
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-	assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
+	assert.IsType(t, &sema.InvalidReturnValueError{}, errs[0])
 }
 
 func TestCheckInvalidTransactionSelfMoveIntoArrayLiteral(t *testing.T) {

@@ -18,11 +18,11 @@ import (
 
 type Interface interface {
 	// ResolveImport resolves an import of a program.
-	ResolveImport(Location) (values.Bytes, error)
+	ResolveImport(Location) ([]byte, error)
 	// GetValue gets a value for the given key in the storage, controlled and owned by the given accounts.
-	GetValue(owner, controller, key values.Bytes) (value values.Bytes, err error)
+	GetValue(owner, controller, key []byte) (value []byte, err error)
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
-	SetValue(owner, controller, key, value values.Bytes) (err error)
+	SetValue(owner, controller, key, value []byte) (err error)
 	// CreateAccount creates a new account with the given public keys and code.
 	CreateAccount(publicKeys []values.Bytes) (address values.Address, err error)
 	// AddAccountKey appends a key to an account.
@@ -288,8 +288,8 @@ func (r *interpreterRuntime) newInterpreter(
 	defaultOptions := []interpreter.Option{
 		interpreter.WithPredefinedValues(functions.ToValues()),
 		interpreter.WithOnEventEmittedHandler(
-			func(_ *interpreter.Interpreter, eventValue interpreter.EventValue) {
-				r.emitEvent(eventValue, runtimeInterface)
+			func(inter *interpreter.Interpreter, eventValue interpreter.EventValue) {
+				r.emitEvent(inter, runtimeInterface, eventValue)
 			},
 		),
 		interpreter.WithStorageReadHandler(
@@ -304,7 +304,7 @@ func (r *interpreterRuntime) newInterpreter(
 		),
 		interpreter.WithStorageKeyHandler(
 			func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-				return indexingType.String()
+				return indexingType.ID()
 			},
 		),
 		interpreter.WithInjectedCompositeFieldsHandler(
@@ -337,7 +337,6 @@ func (r *interpreterRuntime) newInterpreter(
 				_ interpreter.FunctionValue,
 			) *interpreter.CompositeValue {
 				// Load the contract from storage
-
 				return r.loadContract(compositeType, runtimeStorage)
 			},
 		),
@@ -391,41 +390,29 @@ func (r *interpreterRuntime) parse(script []byte) (program *ast.Program, err err
 }
 
 // emitEvent converts an event value to native Go types and emits it to the runtime interface.
-func (r *interpreterRuntime) emitEvent(eventValue interpreter.EventValue, runtimeInterface Interface) {
-	event := eventValue.Export().(values.Event)
+func (r *interpreterRuntime) emitEvent(
+	inter *interpreter.Interpreter,
+	runtimeInterface Interface,
+	event interpreter.EventValue,
+) {
+	functionType := inter.Checker.GlobalValues[event.Identifier].Type.(*sema.SpecialFunctionType)
+	eventType := functionType.ReturnTypeAnnotation.Type.(*sema.EventType).Export(nil, nil)
 
-	var identifier string
+	eventValue := event.Export().(values.Event)
+	eventValue = eventValue.WithType(eventType)
 
-	// TODO: can this be generalized for all types?
-	switch location := eventValue.Location.(type) {
-	case AddressLocation:
-		identifier = fmt.Sprintf("account.%s.%s", location.ID(), eventValue.Identifier)
-	case TransactionLocation:
-		identifier = fmt.Sprintf("tx.%s.%s", location.ID(), eventValue.Identifier)
-	case ScriptLocation:
-		identifier = fmt.Sprintf("script.%s.%s", location.ID(), eventValue.Identifier)
-	default:
-		panic(fmt.Sprintf("event definition from unsupported location: %s", location))
-	}
-
-	event.Identifier = identifier
-
-	runtimeInterface.EmitEvent(event)
+	runtimeInterface.EmitEvent(eventValue)
 }
 
 func (r *interpreterRuntime) emitAccountEvent(
 	eventType sema.EventType,
 	runtimeInterface Interface,
-	fields ...values.Value,
+	eventFields []values.Value,
 ) {
-	identifier := fmt.Sprintf("flow.%s", eventType.Identifier)
+	t := eventType.Export(nil, nil)
+	eventValue := values.NewEvent(eventFields).WithType(t)
 
-	event := values.Event{
-		Identifier: identifier,
-		Fields:     fields,
-	}
-
-	runtimeInterface.EmitEvent(event)
+	runtimeInterface.EmitEvent(eventValue)
 }
 
 func (r *interpreterRuntime) newCreateAccountFunction(
@@ -471,7 +458,11 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 			invocation.Location.Position,
 		)
 
-		r.emitAccountEvent(stdlib.AccountCreatedEventType, runtimeInterface, accountAddress)
+		r.emitAccountEvent(
+			stdlib.AccountCreatedEventType,
+			runtimeInterface,
+			[]values.Value{accountAddress},
+		)
 
 		result := interpreter.AddressValue(accountAddress)
 		return trampoline.Done{Result: result}
@@ -493,7 +484,11 @@ func (r *interpreterRuntime) newAddAccountKeyFunction(runtimeInterface Interface
 			panic(err)
 		}
 
-		r.emitAccountEvent(stdlib.AccountKeyAddedEventType, runtimeInterface, accountAddressValue, publicKey)
+		r.emitAccountEvent(
+			stdlib.AccountKeyAddedEventType,
+			runtimeInterface,
+			[]values.Value{accountAddressValue, publicKey},
+		)
 
 		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
@@ -514,7 +509,11 @@ func (r *interpreterRuntime) newRemoveAccountKeyFunction(runtimeInterface Interf
 			panic(err)
 		}
 
-		r.emitAccountEvent(stdlib.AccountKeyRemovedEventType, runtimeInterface, accountAddressValue, publicKey)
+		r.emitAccountEvent(
+			stdlib.AccountKeyAddedEventType,
+			runtimeInterface,
+			[]values.Value{accountAddressValue, publicKey},
+		)
 
 		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
@@ -551,7 +550,11 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(
 			invocation.Location.Position,
 		)
 
-		r.emitAccountEvent(stdlib.AccountCodeUpdatedEventType, runtimeInterface, accountAddressValue, code)
+		r.emitAccountEvent(
+			stdlib.AccountCodeUpdatedEventType,
+			runtimeInterface,
+			[]values.Value{accountAddressValue, values.NewBytes(code)},
+		)
 
 		result := interpreter.VoidValue{}
 		return trampoline.Done{Result: result}
@@ -798,7 +801,7 @@ func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpre
 func toBytes(value interpreter.Value) (values.Bytes, error) {
 	_, isNil := value.(interpreter.NilValue)
 	if isNil {
-		return nil, nil
+		return values.Bytes{}, nil
 	}
 
 	someValue, ok := value.(*interpreter.SomeValue)

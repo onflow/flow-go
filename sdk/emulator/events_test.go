@@ -7,36 +7,32 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/emulator"
-	"github.com/dapperlabs/flow-go/sdk/emulator/execution"
 	"github.com/dapperlabs/flow-go/sdk/keys"
 )
 
 func TestEventEmitted(t *testing.T) {
 	// event type definition that is reused in tests
 	myEventType := types.Event{
-		Fields: []*types.Parameter{
+		Fields: []types.Field{
 			{
-				Field: types.Field{
-					Identifier: "x",
-					Type:       types.Int{},
-				},
+				Identifier: "x",
+				Type:       types.Int{},
 			},
 			{
-				Field: types.Field{
-					Identifier: "y",
-					Type:       types.Int{},
-				},
+				Identifier: "y",
+				Type:       types.Int{},
 			},
 		},
 	}
 
 	t.Run("EmittedFromTransaction", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		script := []byte(`
@@ -49,21 +45,25 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`)
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		err = b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
 		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
+		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
 
 		block, err := b.CommitBlock()
 		require.NoError(t, err)
@@ -74,12 +74,14 @@ func TestEventEmitted(t *testing.T) {
 
 		actualEvent := events[0]
 
-		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
 
-		expectedType := fmt.Sprintf("tx.%s.MyEvent", tx.Hash().Hex())
+		location := runtime.TransactionLocation(tx.Hash())
+		expectedType := fmt.Sprintf("%s.MyEvent", location.ID())
+
 		expectedID := flow.Event{TxHash: tx.Hash(), Index: 0}.ID()
 
 		assert.Equal(t, expectedType, actualEvent.Type)
@@ -89,9 +91,7 @@ func TestEventEmitted(t *testing.T) {
 	})
 
 	t.Run("EmittedFromScript", func(t *testing.T) {
-		events := make([]flow.Event, 0)
-
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		script := []byte(`
@@ -102,18 +102,20 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`)
 
-		_, events, err = b.ExecuteScript(script)
+		result, err := b.ExecuteScript(script)
 		assert.NoError(t, err)
-		require.Len(t, events, 1)
+		require.Len(t, result.Events, 1)
 
-		actualEvent := events[0]
+		actualEvent := result.Events[0]
 
-		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)
 
-		expectedType := fmt.Sprintf("script.%s.MyEvent", execution.ScriptHash(script).Hex())
+		location := runtime.ScriptLocation(result.ScriptHash)
+		expectedType := fmt.Sprintf("%s.MyEvent", location.ID())
+
 		// NOTE: ID is undefined for events emitted from scripts
 
 		assert.Equal(t, expectedType, actualEvent.Type)
@@ -122,7 +124,7 @@ func TestEventEmitted(t *testing.T) {
 	})
 
 	t.Run("EmittedFromAccount", func(t *testing.T) {
-		b, err := emulator.NewEmulatedBlockchain()
+		b, err := emulator.NewBlockchain()
 		require.NoError(t, err)
 
 		accountScript := []byte(`
@@ -150,33 +152,39 @@ func TestEventEmitted(t *testing.T) {
 			}
 		`, address.Hex()))
 
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script:             script,
 			ReferenceBlockHash: nil,
 			Nonce:              getNonce(),
 			ComputeLimit:       10,
 			PayerAccount:       b.RootAccountAddress(),
-		}
+		}}
 
 		sig, err := keys.SignTransaction(tx, b.RootKey())
 		assert.NoError(t, err)
 
 		tx.AddSignature(b.RootAccountAddress(), sig)
 
-		err = b.SubmitTransaction(tx)
+		err = b.AddTransaction(tx)
 		assert.NoError(t, err)
+
+		result, err := b.ExecuteNextTransaction()
+		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
 
 		block, err := b.CommitBlock()
 		require.NoError(t, err)
 
-		expectedType := fmt.Sprintf("account.%s.MyEvent", address.Hex())
+		location := runtime.AddressLocation(address.Bytes())
+		expectedType := fmt.Sprintf("%s.MyEvent", location.ID())
+
 		events, err := b.GetEvents(expectedType, block.Number, block.Number)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 
 		actualEvent := events[0]
 
-		eventValue, err := encoding.Decode(myEventType, actualEvent.Payload)
+		eventValue, err := encodingValues.Decode(myEventType, actualEvent.Payload)
 		assert.NoError(t, err)
 
 		decodedEvent := eventValue.(values.Event)

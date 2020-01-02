@@ -12,6 +12,19 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
+func TestCheckInvalidReturnValue(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+       fun test() {
+           return 1
+       }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidReturnValueError{}, errs[0])
+}
+
 func TestCheckMissingReturnStatement(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `

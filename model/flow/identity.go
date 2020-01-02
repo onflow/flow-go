@@ -1,23 +1,18 @@
-// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package flow
 
 import (
-	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strconv"
 
 	"github.com/pkg/errors"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
 // rxid is the regex for parsing node identity entries.
 var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|observation)-([0-9a-fA-F]{64})@([\w\d]|[\w\d][\w\d\-]*[\w\d]\.*[\w\d]|[\w\d][\w\d\-]*[\w\d]:[\d]+)?=(\d{1,20})$`)
-
-// Identifier represents a 32-byte unique identifier for a node.
-type Identifier [32]byte
 
 // Identity represents a node identity.
 type Identity struct {
@@ -38,7 +33,10 @@ func ParseIdentity(identity string) (Identity, error) {
 
 	// none of these will error as they are checked by the regex
 	var nodeID Identifier
-	_, _ = hex.Decode(nodeID[:], []byte(matches[2]))
+	nodeID, err := HexStringToIdentifier(matches[2])
+	if err != nil {
+		return Identity{}, err
+	}
 	address := matches[3]
 	role, _ := ParseRole(matches[1])
 	stake, _ := strconv.ParseUint(matches[4], 10, 64)
@@ -92,6 +90,14 @@ func (il IdentityList) NodeIDs() []Identifier {
 		ids = append(ids, id.NodeID)
 	}
 	return ids
+}
+
+func (il IdentityList) Fingerprint() Fingerprint {
+	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
+	for _, item := range il {
+		hasher.Add(item.Encode())
+	}
+	return Fingerprint(hasher.SumHash())
 }
 
 // TotalStake returns the total stake of all given identities.

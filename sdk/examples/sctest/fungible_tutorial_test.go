@@ -35,7 +35,7 @@ func TestFungibleTokenTutorialContractCreation(t *testing.T) {
 	assert.NoError(t, err)
 
 	t.Run("Set up account 1", func(t *testing.T) {
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script: []byte(
 				fmt.Sprintf(
 					`
@@ -55,9 +55,9 @@ func TestFungibleTokenTutorialContractCreation(t *testing.T) {
 			ComputeLimit:   10,
 			PayerAccount:   b.RootAccountAddress(),
 			ScriptAccounts: []flow.Address{b.RootAccountAddress()},
-		}
+		}}
 
-		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
+		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{b.RootAccountAddress()}, false)
 	})
 
 	var account2Address flow.Address
@@ -71,7 +71,7 @@ func TestFungibleTokenTutorialContractCreation(t *testing.T) {
 	})
 
 	t.Run("Set up account 2", func(t *testing.T) {
-		tx := flow.Transaction{
+		tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 			Script: []byte(
 				fmt.Sprintf(
 					`
@@ -101,8 +101,8 @@ func TestFungibleTokenTutorialContractCreation(t *testing.T) {
 			ComputeLimit:   10,
 			PayerAccount:   account2Address,
 			ScriptAccounts: []flow.Address{account2Address},
-		}
+		}}
 
-		SignAndSubmit(tx, b, t, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{account2Address}, false)
+		SignAndSubmit(t, b, tx, []flow.AccountPrivateKey{b.RootKey()}, []flow.Address{account2Address}, false)
 	})
 }

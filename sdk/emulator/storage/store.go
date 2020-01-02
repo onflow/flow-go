@@ -21,37 +21,43 @@ import (
 // Implementations must be safe for use by multiple goroutines.
 type Store interface {
 
-	// GetBlockByHash returns the block with the given hash.
-	GetBlockByHash(crypto.Hash) (types.Block, error)
+	// BlockByHash returns the block with the given hash.
+	BlockByHash(crypto.Hash) (types.Block, error)
 
-	// GetBlockByNumber returns the block with the given number.
-	GetBlockByNumber(blockNumber uint64) (types.Block, error)
+	// BlockByNumber returns the block with the given number.
+	BlockByNumber(blockNumber uint64) (types.Block, error)
 
-	// GetLatestBlock returns the block with the highest block number.
-	GetLatestBlock() (types.Block, error)
+	// LatestBlock returns the block with the highest block number.
+	LatestBlock() (types.Block, error)
 
 	// InsertBlock inserts a block.
 	InsertBlock(types.Block) error
 
-	// GetTransaction gets the transaction with the given hash.
-	GetTransaction(crypto.Hash) (flow.Transaction, error)
+	// CommitBlock atomically saves the execution results for a block.
+	CommitBlock(
+		block types.Block,
+		transactions []flow.Transaction,
+		delta types.LedgerDelta,
+		events []flow.Event,
+	) error
+
+	// TransactionByHash gets the transaction with the given hash.
+	TransactionByHash(hash crypto.Hash) (flow.Transaction, error)
 
 	// InsertTransaction inserts a transaction.
 	InsertTransaction(flow.Transaction) error
 
-	// GetLedger returns the ledger state at a given block.
-	GetLedger(blockNumber uint64) (flow.Ledger, error)
+	// LedgerViewByNumber returns a view into the ledger state at a given block.
+	LedgerViewByNumber(blockNumber uint64) *types.LedgerView
 
-	// SetLedger updates all registers in the ledger for the given block.
-	// Callers should only include registers in the ledger whose value changed
-	// in the given block to save space.
-	SetLedger(blockNumber uint64, ledger flow.Ledger) error
+	// InsertLedgerDelta inserts a register delta at a given block.
+	InsertLedgerDelta(blockNumber uint64, delta types.LedgerDelta) error
 
-	// GetEvents returns all events with the given type between startBlock and
+	// RetrieveEvents returns all events with the given type between startBlock and
 	// endBlock (inclusive). If eventType is empty, returns all events in the
 	// range, regardless of type.
-	GetEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
+	RetrieveEvents(eventType string, startBlock, endBlock uint64) ([]flow.Event, error)
 
 	// InsertEvents inserts events for a block.
-	InsertEvents(blockNumber uint64, events ...flow.Event) error
+	InsertEvents(blockNumber uint64, events []flow.Event) error
 }

@@ -17,47 +17,11 @@
         }
       }
     },
-    "zipOf3": {
-      "function": {
-        "parameters": [
-          {
-            "name": "a",
-            "type": {
-              "array": {
-                "of": "AnyStruct",
-                "size": 3
-              }
-            }
-          },
-          {
-            "name": "b",
-            "type": {
-              "array": {
-                "of": "Int",
-                "size": 3
-              }
-            }
-          }
-        ],
-        "returnType": {
-          "array": {
-            "of": {
-              "array": {
-                "of": "AnyStruct",
-                "size": 2
-              }
-            },
-            "size": 3
-          }
-        }
-      }
-    },
-    "callAll":  {
+    "callAll": {
       "function": {
         "parameters": [
           {
             "name": "fs",
-            "label": "functions",
             "type": {
               "array": {
                 "of": {
@@ -68,7 +32,8 @@
                   }
                 }
               }
-            }
+            },
+            "label": "functions"
           }
         ],
         "returnType": {
@@ -80,7 +45,7 @@
         }
       }
     },
-    "forEach":  {
+    "forEach": {
       "function": {
         "parameters": [
           {
@@ -114,6 +79,41 @@
             "of": {
               "optional": "AnyStruct"
             }
+          }
+        }
+      }
+    },
+    "zipOf3": {
+      "function": {
+        "parameters": [
+          {
+            "name": "a",
+            "type": {
+              "array": {
+                "of": "AnyStruct",
+                "size": 3
+              }
+            }
+          },
+          {
+            "name": "b",
+            "type": {
+              "array": {
+                "of": "Int",
+                "size": 3
+              }
+            }
+          }
+        ],
+        "returnType": {
+          "array": {
+            "of": {
+              "array": {
+                "of": "AnyStruct",
+                "size": 2
+              }
+            },
+            "size": 3
           }
         }
       }

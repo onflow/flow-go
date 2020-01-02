@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/protobuf/sdk/entities"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding"
+	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/sdk/client"
@@ -137,7 +137,7 @@ func TestExecuteScript(t *testing.T) {
 	ctx := context.Background()
 
 	value := values.NewInt(42)
-	valueBytes, err := encoding.Encode(value)
+	valueBytes, err := encodingValues.Encode(value)
 	require.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
@@ -150,7 +150,7 @@ func TestExecuteScript(t *testing.T) {
 		b, err := c.ExecuteScript(ctx, []byte("pub fun main(): Int { return 1 }"))
 		assert.NoError(t, err)
 
-		value, err := encoding.Decode(types.Int{}, b)
+		value, err := encodingValues.Decode(types.Int{}, b)
 		assert.NoError(t, err)
 
 		assert.Equal(t, values.NewInt(42), value)
@@ -226,24 +226,18 @@ func TestGetEvents(t *testing.T) {
 	// declare event type used for decoding event payloads
 	mockEventType := types.Event{
 		Identifier: "Transfer",
-		Fields: []*types.Parameter{
+		Fields: []types.Field{
 			{
-				Field: types.Field{
-					Identifier: "to",
-					Type:       types.Address{},
-				},
+				Identifier: "to",
+				Type:       types.Address{},
 			},
 			{
-				Field: types.Field{
-					Identifier: "from",
-					Type:       types.Address{},
-				},
+				Identifier: "from",
+				Type:       types.Address{},
 			},
 			{
-				Field: types.Field{
-					Identifier: "amount",
-					Type:       types.Int{},
-				},
+				Identifier: "amount",
+				Type:       types.Int{},
 			},
 		},
 	}
@@ -252,13 +246,12 @@ func TestGetEvents(t *testing.T) {
 	from := values.Address(flow.ZeroAddress)
 	amount := values.NewInt(42)
 
-	mockEventValue := values.Event{
-		Identifier: "Transfer",
-		Fields:     []values.Value{to, from, amount},
-	}
+	mockEventValue := values.
+		NewEvent([]values.Value{to, from, amount}).
+		WithType(mockEventType)
 
 	// encode event payload from mock value
-	eventPayload, _ := encoding.Encode(mockEventValue)
+	eventPayload, _ := encodingValues.Encode(mockEventValue)
 
 	// Set up a mock event response
 	mockEvent := flow.Event{
@@ -284,7 +277,7 @@ func TestGetEvents(t *testing.T) {
 
 		actualEvent := events[0]
 
-		value, err := encoding.Decode(mockEventType, actualEvent.Payload)
+		value, err := encodingValues.Decode(mockEventType, actualEvent.Payload)
 		eventValue := value.(values.Event)
 
 		assert.Equal(t, actualEvent.Type, mockEvent.Type)

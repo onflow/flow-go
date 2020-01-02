@@ -20,24 +20,24 @@ type Store struct {
 }
 
 // New returns a new Badger Store.
-func New(opts ...Opt) (Store, error) {
+func New(opts ...Opt) (*Store, error) {
 	badgerOptions := getBadgerOptions(opts...)
 
 	db, err := badger.Open(badgerOptions)
 	if err != nil {
-		return Store{}, fmt.Errorf("could not open database: %w", err)
+		return nil, fmt.Errorf("could not open database: %w", err)
 	}
 
-	store := Store{db, newChangelog()}
+	store := &Store{db, newChangelog()}
 	if err = store.setup(); err != nil {
-		return Store{}, err
+		return nil, err
 	}
 
 	return store, nil
 }
 
 // setup sets up in-memory indexes and prepares the store for use.
-func (s Store) setup() error {
+func (s *Store) setup() error {
 	s.db.RLock()
 	defer s.db.RUnlock()
 
@@ -77,7 +77,8 @@ func (s Store) setup() error {
 	})
 }
 
-func (s Store) GetBlockByHash(blockHash crypto.Hash) (block types.Block, err error) {
+func (s *Store) BlockByHash(blockHash crypto.Hash) (block types.Block, err error) {
+
 	err = s.db.View(func(txn *badger.Txn) error {
 		// get block number by block hash
 		encBlockNumber, err := getTx(txn)(blockHashIndexKey(blockHash))
@@ -101,7 +102,7 @@ func (s Store) GetBlockByHash(blockHash crypto.Hash) (block types.Block, err err
 	return
 }
 
-func (s Store) GetBlockByNumber(blockNumber uint64) (block types.Block, err error) {
+func (s *Store) BlockByNumber(blockNumber uint64) (block types.Block, err error) {
 	err = s.db.View(func(txn *badger.Txn) error {
 		encBlock, err := getTx(txn)(blockKey(blockNumber))
 		if err != nil {
@@ -112,7 +113,7 @@ func (s Store) GetBlockByNumber(blockNumber uint64) (block types.Block, err erro
 	return
 }
 
-func (s Store) GetLatestBlock() (block types.Block, err error) {
+func (s *Store) LatestBlock() (block types.Block, err error) {
 	err = s.db.View(func(txn *badger.Txn) error {
 		// get latest block number
 		latestBlockNumber, err := getLatestBlockNumberTx(txn)
@@ -130,17 +131,21 @@ func (s Store) GetLatestBlock() (block types.Block, err error) {
 	return
 }
 
-func (s Store) InsertBlock(block types.Block) error {
-	encBlock, err := encodeBlock(block)
-	if err != nil {
-		return err
-	}
-	encBlockNumber, err := encodeUint64(block.Number)
-	if err != nil {
-		return err
-	}
+func (s *Store) InsertBlock(block types.Block) error {
+	return s.db.Update(insertBlock(block))
+}
 
-	return s.db.Update(func(txn *badger.Txn) error {
+func insertBlock(block types.Block) func(txn *badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		encBlock, err := encodeBlock(block)
+		if err != nil {
+			return err
+		}
+		encBlockNumber, err := encodeUint64(block.Number)
+		if err != nil {
+			return err
+		}
+
 		// get latest block number
 		latestBlockNumber, err := getLatestBlockNumberTx(txn)
 		if err != nil && !errors.Is(err, storage.ErrNotFound{}) {
@@ -160,13 +165,51 @@ func (s Store) InsertBlock(block types.Block) error {
 		if block.Number >= latestBlockNumber {
 			return txn.Set(latestBlockKey(), encBlockNumber)
 		}
+
 		return nil
-	})
+	}
 }
 
-func (s Store) GetTransaction(txHash crypto.Hash) (tx flow.Transaction, err error) {
+func (s Store) CommitBlock(
+	block types.Block,
+	transactions []flow.Transaction,
+	delta types.LedgerDelta,
+	events []flow.Event,
+) (err error) {
+	err = s.db.Update(func(txn *badger.Txn) error {
+		err := insertBlock(block)(txn)
+		if err != nil {
+			return err
+		}
+
+		for _, tx := range transactions {
+			err := insertTransaction(tx)(txn)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = s.insertLedgerDelta(block.Number, delta)(txn)
+		if err != nil {
+			return err
+		}
+
+		if events != nil {
+			err = insertEvents(block.Number, events)(txn)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	return err
+}
+
+func (s *Store) TransactionByHash(hash crypto.Hash) (tx flow.Transaction, err error) {
 	err = s.db.View(func(txn *badger.Txn) error {
-		encTx, err := getTx(txn)(transactionKey(txHash))
+		encTx, err := getTx(txn)(transactionKey(hash))
 		if err != nil {
 			return err
 		}
@@ -175,53 +218,69 @@ func (s Store) GetTransaction(txHash crypto.Hash) (tx flow.Transaction, err erro
 	return
 }
 
-func (s Store) InsertTransaction(tx flow.Transaction) error {
-	encTx, err := encodeTransaction(tx)
-	if err != nil {
-		return err
-	}
-
-	return s.db.Update(func(txn *badger.Txn) error {
-		return txn.Set(transactionKey(tx.Hash()), encTx)
-	})
+func (s *Store) InsertTransaction(tx flow.Transaction) error {
+	return s.db.Update(insertTransaction(tx))
 }
 
-func (s Store) GetLedger(blockNumber uint64) (flow.Ledger, error) {
-	s.ledgerChangeLog.RLock()
-	defer s.ledgerChangeLog.RUnlock()
+func insertTransaction(tx flow.Transaction) func(txn *badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		encTx, err := encodeTransaction(tx)
+		if err != nil {
+			return err
+		}
 
-	ledger := make(flow.Ledger)
+		return txn.Set(transactionKey(tx.Hash()), encTx)
+	}
+}
 
-	err := s.db.View(func(txn *badger.Txn) error {
-		for registerID, clist := range s.ledgerChangeLog.changelists() {
-			// Get the block at which the register last changed value. If no
-			// such block exists, skip this register.
-			lastChangedBlock := clist.search(blockNumber)
-			if lastChangedBlock == notFound {
-				continue
-			}
+func (s *Store) LedgerViewByNumber(blockNumber uint64) *types.LedgerView {
+	return types.NewLedgerView(func(key string) (value []byte, err error) {
+		s.ledgerChangeLog.RLock()
+		defer s.ledgerChangeLog.RUnlock()
 
-			// Get the value of the register and add it to the ledger.
-			value, err := getTx(txn)(ledgerValueKey(registerID, lastChangedBlock))
+		lastChangedBlock := s.ledgerChangeLog.getMostRecentChange(key, blockNumber)
+
+		err = s.db.View(func(txn *badger.Txn) error {
+			value, err = getTx(txn)(ledgerValueKey(key, lastChangedBlock))
 			if err != nil {
 				return err
 			}
-			ledger[registerID] = value
+			return nil
+		})
+
+		if err != nil {
+			// silence not found errors
+			if errors.Is(err, storage.ErrNotFound{}) {
+				return nil, nil
+			}
+
+			return nil, err
 		}
-		return nil
+
+		return value, nil
 	})
-	return ledger, err
 }
 
-func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
-	s.ledgerChangeLog.Lock()
-	defer s.ledgerChangeLog.Unlock()
+func (s *Store) InsertLedgerDelta(blockNumber uint64, delta types.LedgerDelta) error {
+	return s.db.Update(s.insertLedgerDelta(blockNumber, delta))
+}
 
-	return s.db.Update(func(txn *badger.Txn) error {
-		for registerID, value := range ledger {
-			if err := txn.Set(ledgerValueKey(registerID, blockNumber), value); err != nil {
-				return err
+func (s *Store) insertLedgerDelta(blockNumber uint64, delta types.LedgerDelta) func(txn *badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		s.ledgerChangeLog.Lock()
+		defer s.ledgerChangeLog.Unlock()
+
+		for registerID, value := range delta.Updates() {
+			if value != nil {
+				// if register has an updated value, write it at this block
+				err := txn.Set(ledgerValueKey(registerID, blockNumber), value)
+				if err != nil {
+					return err
+				}
 			}
+
+			// otherwise register has been deleted, so record change
+			// and keep value as nil
 
 			// update the in-memory changelog
 			s.ledgerChangeLog.addChange(registerID, blockNumber)
@@ -231,15 +290,18 @@ func (s Store) SetLedger(blockNumber uint64, ledger flow.Ledger) error {
 			if err != nil {
 				return err
 			}
+
 			if err := txn.Set(ledgerChangelogKey(registerID), encChangelist); err != nil {
 				return err
 			}
 		}
 		return nil
-	})
+	}
+
+	return nil
 }
 
-func (s Store) GetEvents(eventType string, startBlock, endBlock uint64) (events []flow.Event, err error) {
+func (s *Store) RetrieveEvents(eventType string, startBlock, endBlock uint64) (events []flow.Event, err error) {
 	// set up an iterator over all events
 	iterOpts := badger.DefaultIteratorOptions
 	iterOpts.Prefix = []byte(eventsKeyPrefix)
@@ -287,20 +349,24 @@ func (s Store) GetEvents(eventType string, startBlock, endBlock uint64) (events 
 	return
 }
 
-func (s Store) InsertEvents(blockNumber uint64, events ...flow.Event) error {
-	encEvents, err := encodeEvents(events)
-	if err != nil {
-		return err
-	}
+func (s *Store) InsertEvents(blockNumber uint64, events []flow.Event) error {
+	return s.db.Update(insertEvents(blockNumber, events))
+}
 
-	return s.db.Update(func(txn *badger.Txn) error {
+func insertEvents(blockNumber uint64, events []flow.Event) func(txn *badger.Txn) error {
+	return func(txn *badger.Txn) error {
+		encEvents, err := encodeEvents(events)
+		if err != nil {
+			return err
+		}
+
 		return txn.Set(eventsKey(blockNumber), encEvents)
-	})
+	}
 }
 
 // Close closes the underlying Badger database. It is necessary to close
 // a Store before exiting to ensure all writes are persisted to disk.
-func (s Store) Close() error {
+func (s *Store) Close() error {
 	return s.db.Close()
 }
 
