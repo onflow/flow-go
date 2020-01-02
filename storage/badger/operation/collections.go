@@ -11,11 +11,11 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertCollection(hash flow.Fingerprint, collection *flow.GuaranteedCollection) func(*badger.Txn) error {
+func InsertCollection(hash flow.Fingerprint, collection *flow.Collection) func(*badger.Txn) error {
 	return insert(makePrefix(codeCollection, hash), collection)
 }
 
-func RetrieveCollection(hash flow.Fingerprint, collection *flow.GuaranteedCollection) func(*badger.Txn) error {
+func RetrieveCollection(hash flow.Fingerprint, collection *flow.Collection) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollection, hash), collection)
 }
 
@@ -23,9 +23,17 @@ func RemoveCollection(hash flow.Fingerprint) func(*badger.Txn) error {
 	return remove(makePrefix(codeCollection, hash))
 }
 
-func IndexCollectionByBlockHash(blockHash crypto.Hash, collection *flow.GuaranteedCollection) func(*badger.Txn) error {
+func InsertGuaranteedCollection(hash flow.Fingerprint, gc *flow.GuaranteedCollection) func(*badger.Txn) error {
+	return insert(makePrefix(codeGuaranteedCollection, hash), gc)
+}
+
+func RetrieveGuaranteedCollection(hash flow.Fingerprint, gc *flow.GuaranteedCollection) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeGuaranteedCollection, hash), gc)
+}
+
+func IndexGuaranteedCollectionByBlockHash(blockHash crypto.Hash, collection *flow.GuaranteedCollection) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
-		err := insert(makePrefix(codeBlockHashToCollections, blockHash, collection.Hash()), collection.Fingerprint())(tx)
+		err := insert(makePrefix(codeBlockHashToCollections, blockHash, collection.Fingerprint()), collection.Fingerprint())(tx)
 		if err != nil {
 			return fmt.Errorf("failed to index collection by block hash: %w", err)
 		}
@@ -33,7 +41,7 @@ func IndexCollectionByBlockHash(blockHash crypto.Hash, collection *flow.Guarante
 	}
 }
 
-func RetrieveCollectionsByBlockHash(blockHash crypto.Hash, collections *[]*flow.GuaranteedCollection) func(*badger.Txn) error {
+func RetrieveGuaranteedCollectionByBlockHash(blockHash crypto.Hash, collections *[]*flow.GuaranteedCollection) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		iter := func() (checkFunc, createFunc, handleFunc) {
@@ -52,7 +60,7 @@ func RetrieveCollectionsByBlockHash(blockHash crypto.Hash, collections *[]*flow.
 				}
 
 				var collection flow.GuaranteedCollection
-				err := RetrieveCollection(hash, &collection)(tx)
+				err := RetrieveGuaranteedCollection(hash, &collection)(tx)
 				if err != nil {
 					return fmt.Errorf("failed to retrieve collection: %w", err)
 				}

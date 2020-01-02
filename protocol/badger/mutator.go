@@ -132,7 +132,7 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 			}
 
 			// get the guaranteed collections
-			err = operation.RetrieveCollectionsByBlockHash(s.hash, &collections)(tx)
+			err = operation.RetrieveGuaranteedCollectionByBlockHash(s.hash, &collections)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve collections (%x): %w", s.hash, err)
 			}
@@ -307,11 +307,11 @@ func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 
 	// insert the guaranteed collections into the DB
 	for _, coll := range block.GuaranteedCollections {
-		err = operation.InsertCollection(coll.Fingerprint(), coll)(tx)
+		err = operation.InsertGuaranteedCollection(coll.Fingerprint(), coll)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
-		err = operation.IndexCollectionByBlockHash(block.Hash(), coll)(tx)
+		err = operation.IndexGuaranteedCollectionByBlockHash(block.Hash(), coll)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
 		}

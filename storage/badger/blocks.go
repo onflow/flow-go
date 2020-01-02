@@ -81,7 +81,7 @@ func (b *Blocks) retrieveBlock(tx *badger.Txn, hash crypto.Hash) (*flow.Block, e
 
 	// get the guaranteed collections
 	var collections []*flow.GuaranteedCollection
-	err = operation.RetrieveCollectionsByBlockHash(hash, &collections)(tx)
+	err = operation.RetrieveGuaranteedCollectionByBlockHash(hash, &collections)(tx)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not retrieve collections")
 	}

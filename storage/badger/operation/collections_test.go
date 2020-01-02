@@ -17,7 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func TestCollectionsIndex(t *testing.T) {
+func TestIndexGuaranteedCollectionByBlockHash(t *testing.T) {
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
 	defer os.RemoveAll(dir)
@@ -33,10 +33,10 @@ func TestCollectionsIndex(t *testing.T) {
 
 	err = db.Update(func(tx *badger.Txn) error {
 		for _, coll := range expected {
-			if err := InsertCollection(coll.Fingerprint(), coll)(tx); err != nil {
+			if err := InsertGuaranteedCollection(coll.Fingerprint(), coll)(tx); err != nil {
 				return err
 			}
-			if err := IndexCollectionByBlockHash(blockHash, coll)(tx); err != nil {
+			if err := IndexGuaranteedCollectionByBlockHash(blockHash, coll)(tx); err != nil {
 				return err
 			}
 		}
@@ -45,7 +45,7 @@ func TestCollectionsIndex(t *testing.T) {
 	require.Nil(t, err)
 
 	var actual []*flow.GuaranteedCollection
-	err = db.View(RetrieveCollectionsByBlockHash(blockHash, &actual))
+	err = db.View(RetrieveGuaranteedCollectionByBlockHash(blockHash, &actual))
 	require.Nil(t, err)
 
 	assert.Equal(t, expected, actual)
