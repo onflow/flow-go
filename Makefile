@@ -98,14 +98,6 @@ docker-ci-team-city:
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.5 \
 		make ci
 
-.PHONY: docker-build-emulator
-docker-build-emulator:
-	docker build -f cmd/flow/emulator/Dockerfile -t gcr.io/dl-flow/emulator:latest -t "gcr.io/dl-flow/emulator:$(SHORT_COMMIT)" .
-
-docker-push-emulator:
-	docker push gcr.io/dl-flow/emulator:latest
-	docker push "gcr.io/dl-flow/emulator:$(SHORT_COMMIT)"
-
 .PHONY: docker-build-consensus
 docker-build-consensus:
 	docker build -f cmd/Dockerfile --build-arg TARGET=consensus -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" .
