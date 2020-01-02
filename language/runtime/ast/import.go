@@ -99,6 +99,10 @@ const AddressPrefix = "A"
 
 type AddressLocation []byte
 
+func (l AddressLocation) String() string {
+	return fmt.Sprintf("0x%x", []byte(l))
+}
+
 func (l AddressLocation) ID() LocationID {
 	return LocationID(fmt.Sprintf(
 		"%s.%s",
