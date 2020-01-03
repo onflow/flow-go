@@ -150,7 +150,6 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 			if err == badger.ErrKeyNotFound {
 				return storage.NotFoundErr
 			}
-
 			return fmt.Errorf("could not load data: %w", err)
 		}
 

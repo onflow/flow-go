@@ -15,19 +15,21 @@ import (
 
 // An Engine receives and saves incoming blocks.
 type Engine struct {
-	unit    *engine.Unit
-	log     zerolog.Logger
-	conduit network.Conduit
-	me      module.Local
-	blocks  storage.Blocks
+	unit        *engine.Unit
+	log         zerolog.Logger
+	conduit     network.Conduit
+	me          module.Local
+	blocks      storage.Blocks
+	collections storage.Collections
 }
 
-func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks) (*Engine, error) {
+func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections) (*Engine, error) {
 	eng := Engine{
-		unit:   engine.NewUnit(),
-		log:    logger,
-		me:     me,
-		blocks: blocks,
+		unit:        engine.NewUnit(),
+		log:         logger,
+		me:          me,
+		blocks:      blocks,
+		collections: collections,
 	}
 
 	con, err := net.Register(engine.ExecutionBlockIngestion, &eng)
@@ -76,6 +78,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		switch v := event.(type) {
 		case flow.Block:
 			err = e.handleBlock(v)
+		case flow.Collection:
+			err = e.handleCollection(v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
 		}
@@ -84,7 +88,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		}
 		return nil
 	})
-
 }
 
 func (e *Engine) handleBlock(block flow.Block) error {
@@ -97,6 +100,18 @@ func (e *Engine) handleBlock(block flow.Block) error {
 
 	if err != nil {
 		return fmt.Errorf("could not save block: %w", err)
+	}
+	return nil
+}
+
+func (e *Engine) handleCollection(collection flow.Collection) error {
+	e.log.Debug().
+		Hex("collection_hash", collection.Fingerprint()).
+		Msg("received collection")
+
+	err := e.collections.Save(&collection)
+	if err != nil {
+		return fmt.Errorf("could not save collection: %w", err)
 	}
 	return nil
 }
