@@ -33,6 +33,8 @@ func encode(v interface{}) (*Envelope, error) {
 
 	case *flow.GuaranteedCollection:
 		code = CodeGuaranteedCollection
+	case *flow.Transaction:
+		code = CodeTransaction
 
 	case *coldstuff.BlockProposal:
 		code = CodeBlockProposal
