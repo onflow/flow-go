@@ -16,7 +16,7 @@ import (
 
 func TestBlockRetrievalByNumber(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		blocks := badger2.NewBlocks(db)
 
 		block := unittest.BlockFixture()
@@ -34,7 +34,7 @@ func TestBlockRetrievalByNumber(t *testing.T) {
 
 func TestBlockRetrievalByNonexistingNumber(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		blocks := badger2.NewBlocks(db)
 
@@ -52,7 +52,7 @@ func TestBlockRetrievalByNonexistingNumber(t *testing.T) {
 
 func TestStoringSameBlockTwice(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		blocks := badger2.NewBlocks(db)
 
@@ -69,7 +69,7 @@ func TestStoringSameBlockTwice(t *testing.T) {
 
 func TestStoringBlockWithDifferentDateButSameNumberTwice(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		blocks := badger2.NewBlocks(db)
 

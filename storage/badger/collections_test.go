@@ -14,7 +14,7 @@ import (
 
 func TestCollectionRetrievalByHash(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		collections := badger2.NewCollections(db)
 
 		collection := unittest.FlowCollectionFixture(2)
@@ -29,9 +29,9 @@ func TestCollectionRetrievalByHash(t *testing.T) {
 	})
 }
 
-func TestRetrievalByNonexistingHash(t *testing.T) {
+func TestRetrievalByNonexistentHash(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		collections := badger2.NewCollections(db)
 
@@ -48,7 +48,7 @@ func TestRetrievalByNonexistingHash(t *testing.T) {
 
 func TestStoringSameCollectionTwice(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		collections := badger2.NewCollections(db)
 

@@ -15,7 +15,7 @@ import (
 
 func TestTransactions(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := unittest.TransactionFixture()
 		err := db.Update(InsertTransaction(expected.Fingerprint(), &expected))
 		require.Nil(t, err)

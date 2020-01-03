@@ -56,7 +56,7 @@ func AssertEqualWithDiff(t *testing.T, expected, actual interface{}) {
 	}
 }
 
-func RunWithDB(t *testing.T, f func(*badger.DB)) {
+func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)

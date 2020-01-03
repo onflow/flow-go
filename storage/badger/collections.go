@@ -26,7 +26,7 @@ func (c *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, er
 
 	err := c.db.View(func(tx *badger.Txn) error {
 
-		err := operation.RetrieveFlowCollection(hash, &collection)(tx)
+		err := operation.RetrieveCollection(hash, &collection)(tx)
 
 		if err != nil {
 			if err == storage.NotFoundErr {
@@ -43,7 +43,7 @@ func (c *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, er
 
 func (c *Collections) Save(collection *flow.Collection) error {
 	return c.db.Update(func(tx *badger.Txn) error {
-		err := operation.PersistFlowCollection(collection)(tx)
+		err := operation.PersistCollection(collection)(tx)
 		if err != nil {
 			return errors.Wrap(err, "could not insert flow collection")
 		}

@@ -25,7 +25,7 @@ type Entity struct {
 
 func TestInsertValid(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
 		val := []byte(`{"ID":1337}`)
@@ -47,7 +47,7 @@ func TestInsertValid(t *testing.T) {
 }
 
 func TestInsertDuplicate(t *testing.T) {
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		e := Entity{ID: 1337}
 		e2 := Entity{ID: 1338}
@@ -76,7 +76,7 @@ func TestInsertDuplicate(t *testing.T) {
 
 func TestUpdateValid(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
@@ -110,7 +110,7 @@ func TestUpdateMissing(t *testing.T) {
 
 func TestRetrieveValid(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		e := Entity{ID: 1337}
 		key := []byte{0x01, 0x02, 0x03}
@@ -146,7 +146,7 @@ func TestTraverse(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		key := []byte{0x01, 0x02, 0x03}
 		val := []byte(`{"ID":1337}`)
 

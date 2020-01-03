@@ -15,7 +15,7 @@ import (
 
 func TestRoleInsertRetrieve(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		nodeID := flow.Identifier{0x01}
 		expected := flow.Role(13)
 

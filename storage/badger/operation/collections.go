@@ -21,14 +21,14 @@ func RetrieveGuaranteedCollections(hash crypto.Hash, collections *[]*flow.Guaran
 	return retrieve(makePrefix(codeGuaranteedCollection, hash), collections)
 }
 
-func InsertFlowCollection(collection *flow.Collection) func(*badger.Txn) error {
+func InsertCollection(collection *flow.Collection) func(*badger.Txn) error {
 	return insert(makePrefix(codeCollection, collection.Fingerprint()), collection)
 }
 
-func PersistFlowCollection(collection *flow.Collection) func(*badger.Txn) error {
+func PersistCollection(collection *flow.Collection) func(*badger.Txn) error {
 	return persist(makePrefix(codeCollection, collection.Fingerprint()), collection)
 }
 
-func RetrieveFlowCollection(hash flow.Fingerprint, collection *flow.Collection) func(*badger.Txn) error {
+func RetrieveCollection(hash flow.Fingerprint, collection *flow.Collection) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollection, hash), collection)
 }

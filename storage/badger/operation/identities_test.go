@@ -17,7 +17,7 @@ import (
 
 func TestIdentitiesInsertRetrieve(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		hash := crypto.Hash{0x13, 0x37}
 		expected := flow.IdentityList{
 			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.Role(1), Stake: 1},

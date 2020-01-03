@@ -17,7 +17,7 @@ import (
 
 func TestHeaderInsertRetrieve(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := flow.Header{
 			Number:     1337,
 			Timestamp:  time.Now().UTC(),

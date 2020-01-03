@@ -15,7 +15,7 @@ import (
 
 func TestHashInsertRetrieve(t *testing.T) {
 
-	unittest.RunWithDB(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		number := uint64(1337)
 		expected := crypto.Hash{0x01, 0x02, 0x03}
