@@ -32,6 +32,7 @@ func TestExecuteTransaction(t *testing.T) {
 		}
 
 		result, err := vm.ExecuteTransaction(ledger, tx)
+
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
 		assert.NoError(t, result.Error)
@@ -61,6 +62,7 @@ func TestExecuteTransaction(t *testing.T) {
 		}
 
 		result, err := vm.ExecuteTransaction(ledger, tx)
+
 		assert.NoError(t, err)
 		assert.False(t, result.Succeeded())
 		assert.Error(t, result.Error)

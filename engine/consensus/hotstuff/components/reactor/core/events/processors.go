@@ -9,7 +9,7 @@ import (
 // and must handle repetition of the same events (with some processing overhead).
 type Processor interface {
 	OnMissingBlock(hash []byte, view uint64)
-	OnIncorporatedBlock(*def.Block)
+	OnBlockIncorporated(*def.Block)
 	OnSafeBlock(*def.Block)
 	OnFinalizedBlock(*def.Block)
 
@@ -26,13 +26,13 @@ type MissingBlockConsumer interface {
 	OnMissingBlock([]byte, uint64)
 }
 
-// IncorporatedBlockConsumer consumes the following type of event produced by reactor.core:
-// whenever a block has been incorporated into the consensus state (mainchain), the `OnIncorporatedBlock` event is triggered
+// BlockIncorporatedConsumer consumes the following type of event produced by reactor.core:
+// whenever a block has been incorporated into the consensus state (mainchain), the `OnBlockIncorporated` event is triggered
 // Prerequisites:
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
-type IncorporatedBlockConsumer interface {
-	OnIncorporatedBlock(*def.Block)
+type BlockIncorporatedConsumer interface {
+	OnBlockIncorporated(*def.Block)
 }
 
 // SafeBlockConsumer consumes the following type of event produced by reactor.core:
