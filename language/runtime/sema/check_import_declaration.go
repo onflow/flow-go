@@ -147,27 +147,29 @@ func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclarat
 	return nil
 }
 
-// EnsureLoaded finds or create a checker for the imported program and checks it
+// EnsureLoaded finds or create a checker for the imported program and checks it.
 //
 func (checker *Checker) EnsureLoaded(location ast.Location, loadProgram func() *ast.Program) (*Checker, *CheckerError) {
 	locationID := location.ID()
 
-	importChecker, ok := checker.ImportCheckers[locationID]
+	subChecker, ok := checker.allCheckers[locationID]
 	if ok {
-		return importChecker, nil
+		return subChecker, nil
 	}
 
-	if !ok || importChecker == nil {
+	if !ok || subChecker == nil {
 		var err error
-		importChecker, err = NewChecker(
+		subChecker, err = NewChecker(
 			loadProgram(),
 			location,
 			WithPredeclaredValues(checker.PredeclaredValues),
 			WithPredeclaredTypes(checker.PredeclaredTypes),
-			WithAccessCheckMode(checker.AccessCheckMode),
+			WithAccessCheckMode(checker.accessCheckMode),
+			WithValidTopLevelDeclarations(checker.validTopLevelDeclarations),
+			WithAllCheckers(checker.allCheckers),
 		)
 		if err == nil {
-			checker.ImportCheckers[locationID] = importChecker
+			checker.allCheckers[locationID] = subChecker
 		}
 	}
 
@@ -175,10 +177,10 @@ func (checker *Checker) EnsureLoaded(location ast.Location, loadProgram func() *
 	// If there is a checker error, return and import nothing
 
 	// NOTE: ignore generic `error` result, get internal *CheckerError
-	_ = importChecker.Check()
-	checkerErr := importChecker.CheckerError()
+	_ = subChecker.Check()
+	checkerErr := subChecker.CheckerError()
 
-	return importChecker, checkerErr
+	return subChecker, checkerErr
 }
 
 func (checker *Checker) handleMissingImports(missing map[ast.Identifier]bool, importLocation ast.Location) {

@@ -56,7 +56,7 @@ func TestCompositeType_ID(t *testing.T) {
 				},
 			}
 
-		assert.Equal(t, compositeInComposite.ID(), "x.A.B.C")
+		assert.Equal(t, compositeInComposite.ID(), TypeID("x.A.B.C"))
 	})
 
 	t.Run("composite in interface", func(t *testing.T) {
@@ -75,7 +75,7 @@ func TestCompositeType_ID(t *testing.T) {
 				},
 			}
 
-		assert.Equal(t, compositeInInterface.ID(), "x.A.B.C")
+		assert.Equal(t, compositeInInterface.ID(), TypeID("x.A.B.C"))
 	})
 }
 
@@ -97,7 +97,7 @@ func TestInterfaceType_ID(t *testing.T) {
 				},
 			}
 
-		assert.Equal(t, interfaceInComposite.ID(), "x.A.B.C")
+		assert.Equal(t, interfaceInComposite.ID(), TypeID("x.A.B.C"))
 	})
 
 	t.Run("interface in interface", func(t *testing.T) {
@@ -116,6 +116,6 @@ func TestInterfaceType_ID(t *testing.T) {
 				},
 			}
 
-		assert.Equal(t, interfaceInInterface.ID(), "x.A.B.C")
+		assert.Equal(t, interfaceInInterface.ID(), TypeID("x.A.B.C"))
 	})
 }

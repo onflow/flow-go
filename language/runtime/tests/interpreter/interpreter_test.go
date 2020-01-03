@@ -5117,7 +5117,7 @@ func TestInterpretStorage(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -5649,7 +5649,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 				}),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -5670,7 +5670,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 		&interpreter.ReferenceValue{
 			TargetStorageIdentifier: storageValue.Identifier,
 			// TODO: improve
-			TargetKey: rType.ID(),
+			TargetKey: string(rType.ID()),
 		},
 		value,
 	)
@@ -5746,7 +5746,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -5829,7 +5829,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -5898,7 +5898,7 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -6288,22 +6288,22 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
 		},
 	)
 
-	rType := inter.Checker.GlobalTypes["R"].Type
+	rType := inter.Checker.GlobalTypes["R"].Type.(*sema.CompositeType)
 
-	storageKey := interpreter.PrefixedStorageKey(rType.ID(), interpreter.AccessLevelPrivate)
+	storageKey := interpreter.PrefixedStorageKey(string(rType.ID()), interpreter.AccessLevelPrivate)
 
 	originalValue := &interpreter.CompositeValue{
-		Identifier: rType.ID(),
-		Kind:       common.CompositeKindResource,
-		Fields:     map[string]interpreter.Value{},
-		Owner:      storageIdentifier1,
+		TypeID: rType.ID(),
+		Kind:   common.CompositeKindResource,
+		Fields: map[string]interpreter.Value{},
+		Owner:  storageIdentifier1,
 	}
 
 	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
@@ -6427,22 +6427,22 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
 		},
 	)
 
-	rType := inter.Checker.GlobalTypes["R"].Type
+	rType := inter.Checker.GlobalTypes["R"].Type.(*sema.CompositeType)
 
-	storageKey := interpreter.PrefixedStorageKey(rType.ID(), interpreter.AccessLevelPrivate)
+	storageKey := interpreter.PrefixedStorageKey(string(rType.ID()), interpreter.AccessLevelPrivate)
 
 	originalValue := &interpreter.CompositeValue{
-		Identifier: rType.ID(),
-		Kind:       common.CompositeKindResource,
-		Fields:     map[string]interpreter.Value{},
-		Owner:      storageIdentifier1,
+		TypeID: rType.ID(),
+		Kind:   common.CompositeKindResource,
+		Fields: map[string]interpreter.Value{},
+		Owner:  storageIdentifier1,
 	}
 
 	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
@@ -6600,8 +6600,8 @@ func TestInterpretCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) 
 	)
 
 	assert.Equal(t,
-		"X",
-		x1.(*interpreter.CompositeValue).Identifier,
+		sema.TypeID("test.Test.X"),
+		x1.(*interpreter.CompositeValue).TypeID,
 	)
 
 	require.IsType(t,
@@ -6610,8 +6610,8 @@ func TestInterpretCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) 
 	)
 
 	assert.Equal(t,
-		"X",
-		x2.(*interpreter.CompositeValue).Identifier,
+		sema.TypeID("test.Test.X"),
+		x2.(*interpreter.CompositeValue).TypeID,
 	)
 }
 
@@ -6641,8 +6641,8 @@ func TestInterpretCompositeDeclarationNestedConstructor(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		"X",
-		x.(*interpreter.CompositeValue).Identifier,
+		sema.TypeID("test.Test.X"),
+		x.(*interpreter.CompositeValue).TypeID,
 	)
 }
 
@@ -6775,7 +6775,12 @@ func TestInterpretContractAccountFieldUse(t *testing.T) {
 			Options: []interpreter.Option{
 				makeContractValueHandler(nil, nil, nil),
 				interpreter.WithInjectedCompositeFieldsHandler(
-					func(_ *interpreter.Interpreter, _ ast.Location, _ string, _ common.CompositeKind) map[string]interpreter.Value {
+					func(
+						_ *interpreter.Interpreter,
+						_ ast.Location,
+						_ sema.TypeID,
+						_ common.CompositeKind,
+					) map[string]interpreter.Value {
 						return map[string]interpreter.Value{
 							"account": interpreter.NewAccountValue(addressValue),
 						}
@@ -6894,7 +6899,7 @@ func TestInterpretPostConditionWithElaborationAccess(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},

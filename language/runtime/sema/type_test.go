@@ -11,6 +11,8 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 )
 
+const testLocation = ast.StringLocation("test")
+
 func TestConstantSizedType_String(t *testing.T) {
 
 	ty := &ConstantSizedType{
@@ -132,14 +134,12 @@ func TestExportability(t *testing.T) {
 		identifier := "my_structure"
 
 		ty := &CompositeType{
-			Location:     nil,
-			Identifier:   identifier,
-			Kind:         common.CompositeKindStructure,
-			Conformances: nil,
+			Location:   testLocation,
+			Identifier: identifier,
+			Kind:       common.CompositeKindStructure,
 			Members: map[string]*Member{
 				"fieldA": {
-					ContainerType: nil,
-					Access:        0,
+					Access: 0,
 					Identifier: ast.Identifier{
 						Identifier: "fieldA",
 						Pos:        position,
@@ -147,7 +147,6 @@ func TestExportability(t *testing.T) {
 					TypeAnnotation:  &TypeAnnotation{Type: &IntType{}},
 					DeclarationKind: 0,
 					VariableKind:    ast.VariableKindVariable,
-					ArgumentLabels:  nil,
 				},
 			},
 			ConstructorParameterTypeAnnotations: []*TypeAnnotation{
@@ -224,6 +223,7 @@ func TestExportability(t *testing.T) {
 		}
 
 		ty := &EventType{
+			Location:   testLocation,
 			Identifier: "MagicEvent",
 			Fields: []EventFieldType{
 				{

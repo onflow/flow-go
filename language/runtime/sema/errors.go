@@ -45,6 +45,14 @@ func (e *unsupportedOperation) Error() string {
 	)
 }
 
+// MissingLocationError
+
+type MissingLocationError struct{}
+
+func (e *MissingLocationError) Error() string {
+	return "missing location"
+}
+
 // CheckerError
 
 type CheckerError struct {

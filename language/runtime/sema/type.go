@@ -15,13 +15,48 @@ import (
 	"github.com/dapperlabs/flow-go/sdk/abi/types"
 )
 
+func qualifiedIdentifier(identifier string, containerType Type) string {
+
+	// Gather all identifiers: this, parent, grand-parent, etc.
+
+	identifiers := []string{identifier}
+
+	for containerType != nil {
+		switch typedContainerType := containerType.(type) {
+		case *InterfaceType:
+			identifiers = append(identifiers, typedContainerType.Identifier)
+			containerType = typedContainerType.ContainerType
+		case *CompositeType:
+			identifiers = append(identifiers, typedContainerType.Identifier)
+			containerType = typedContainerType.ContainerType
+		default:
+			panic(errors.NewUnreachableError())
+		}
+	}
+
+	// Append all identifiers, in reverse order
+
+	var sb strings.Builder
+
+	for i := len(identifiers) - 1; i >= 0; i-- {
+		sb.WriteString(identifiers[i])
+		if i != 0 {
+			sb.WriteRune('.')
+		}
+	}
+
+	return sb.String()
+}
+
+type TypeID string
+
 type Type interface {
 	isType()
 	String() string
 	Equal(other Type) bool
 	IsResourceType() bool
 	IsInvalidType() bool
-	ID() string
+	ID() TypeID
 }
 
 type ExportableType interface {
@@ -103,7 +138,7 @@ func (*AnyStructType) String() string {
 	return "AnyStruct"
 }
 
-func (*AnyStructType) ID() string {
+func (*AnyStructType) ID() TypeID {
 	return "AnyStruct"
 }
 
@@ -133,7 +168,7 @@ func (*AnyResourceType) String() string {
 	return "AnyResource"
 }
 
-func (*AnyResourceType) ID() string {
+func (*AnyResourceType) ID() TypeID {
 	return "AnyResource"
 }
 
@@ -163,7 +198,7 @@ func (*NeverType) String() string {
 	return "Never"
 }
 
-func (*NeverType) ID() string {
+func (*NeverType) ID() TypeID {
 	return "Never"
 }
 
@@ -193,7 +228,7 @@ func (*VoidType) String() string {
 	return "Void"
 }
 
-func (*VoidType) ID() string {
+func (*VoidType) ID() TypeID {
 	return "Void"
 }
 
@@ -222,7 +257,7 @@ func (t *InvalidType) String() string {
 	return "<<invalid>>"
 }
 
-func (*InvalidType) ID() string {
+func (*InvalidType) ID() TypeID {
 	return "<<invalid>>"
 }
 
@@ -253,11 +288,12 @@ func (t *OptionalType) String() string {
 	return fmt.Sprintf("%s?", t.Type)
 }
 
-func (t *OptionalType) ID() string {
-	if t.Type == nil {
-		return "optional"
+func (t *OptionalType) ID() TypeID {
+	var id string
+	if t.Type != nil {
+		id = string(t.Type.ID())
 	}
-	return fmt.Sprintf("%s?", t.Type.ID())
+	return TypeID(fmt.Sprintf("%s?", id))
 }
 
 func (t *OptionalType) Equal(other Type) bool {
@@ -295,7 +331,7 @@ func (*BoolType) String() string {
 	return "Bool"
 }
 
-func (*BoolType) ID() string {
+func (*BoolType) ID() TypeID {
 	return "Bool"
 }
 
@@ -322,7 +358,7 @@ func (*CharacterType) String() string {
 	return "Character"
 }
 
-func (*CharacterType) ID() string {
+func (*CharacterType) ID() TypeID {
 	return "Character"
 }
 
@@ -352,7 +388,7 @@ func (*StringType) String() string {
 	return "String"
 }
 
-func (*StringType) ID() string {
+func (*StringType) ID() TypeID {
 	return "String"
 }
 
@@ -455,11 +491,11 @@ type IntegerType struct{}
 func (*IntegerType) isType() {}
 
 func (*IntegerType) String() string {
-	return "integer"
+	return "Integer"
 }
 
-func (*IntegerType) ID() string {
-	return "integer"
+func (*IntegerType) ID() TypeID {
+	return "Integer"
 }
 
 func (*IntegerType) Equal(other Type) bool {
@@ -496,7 +532,7 @@ func (*IntType) String() string {
 	return "Int"
 }
 
-func (*IntType) ID() string {
+func (*IntType) ID() TypeID {
 	return "Int"
 }
 
@@ -535,7 +571,7 @@ func (*Int8Type) String() string {
 	return "Int8"
 }
 
-func (*Int8Type) ID() string {
+func (*Int8Type) ID() TypeID {
 	return "Int8"
 }
 
@@ -576,7 +612,7 @@ func (*Int16Type) String() string {
 	return "Int16"
 }
 
-func (*Int16Type) ID() string {
+func (*Int16Type) ID() TypeID {
 	return "Int16"
 }
 
@@ -617,7 +653,7 @@ func (*Int32Type) String() string {
 	return "Int32"
 }
 
-func (*Int32Type) ID() string {
+func (*Int32Type) ID() TypeID {
 	return "Int32"
 }
 
@@ -658,7 +694,7 @@ func (*Int64Type) String() string {
 	return "Int64"
 }
 
-func (*Int64Type) ID() string {
+func (*Int64Type) ID() TypeID {
 	return "Int64"
 }
 
@@ -699,7 +735,7 @@ func (*UInt8Type) String() string {
 	return "UInt8"
 }
 
-func (*UInt8Type) ID() string {
+func (*UInt8Type) ID() TypeID {
 	return "UInt8"
 }
 
@@ -740,7 +776,7 @@ func (*UInt16Type) String() string {
 	return "UInt16"
 }
 
-func (*UInt16Type) ID() string {
+func (*UInt16Type) ID() TypeID {
 	return "UInt16"
 }
 
@@ -781,7 +817,7 @@ func (*UInt32Type) String() string {
 	return "UInt32"
 }
 
-func (*UInt32Type) ID() string {
+func (*UInt32Type) ID() TypeID {
 	return "UInt32"
 }
 
@@ -822,7 +858,7 @@ func (*UInt64Type) String() string {
 	return "UInt64"
 }
 
-func (*UInt64Type) ID() string {
+func (*UInt64Type) ID() TypeID {
 	return "UInt64"
 }
 
@@ -1115,8 +1151,8 @@ func (t *VariableSizedType) String() string {
 	return fmt.Sprintf("[%s]", t.Type)
 }
 
-func (t *VariableSizedType) ID() string {
-	return fmt.Sprintf("[%s]", t.Type.ID())
+func (t *VariableSizedType) ID() TypeID {
+	return TypeID(fmt.Sprintf("[%s]", t.Type.ID()))
 }
 
 func (t *VariableSizedType) Equal(other Type) bool {
@@ -1176,8 +1212,8 @@ func (t *ConstantSizedType) String() string {
 	return fmt.Sprintf("[%s; %d]", t.Type, t.Size)
 }
 
-func (t *ConstantSizedType) ID() string {
-	return fmt.Sprintf("[%s;%d]", t.Type.ID(), t.Size)
+func (t *ConstantSizedType) ID() TypeID {
+	return TypeID(fmt.Sprintf("[%s;%d]", t.Type.ID(), t.Size))
 }
 
 func (t *ConstantSizedType) Equal(other Type) bool {
@@ -1279,7 +1315,7 @@ func (t *FunctionType) Export(program *ast.Program, variable *Variable) types.Ty
 		return types.Function{
 			Parameters: parameterTypeAnnotations,
 			ReturnType: t.ReturnTypeAnnotation.Type.(ExportableType).Export(program, nil),
-		}.WithID(t.ID())
+		}.WithID(string(t.ID()))
 	}
 }
 
@@ -1307,20 +1343,16 @@ func (t *FunctionType) String() string {
 	)
 }
 
-func (t *FunctionType) ID() string {
+func (t *FunctionType) ID() TypeID {
 	var parameters strings.Builder
 	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
 		if i > 0 {
 			parameters.WriteString(",")
 		}
-		parameters.WriteString(parameterTypeAnnotation.Type.ID())
+		parameters.WriteString(string(parameterTypeAnnotation.Type.ID()))
 	}
 
-	return fmt.Sprintf(
-		"((%s):%s)",
-		parameters.String(),
-		t.ReturnTypeAnnotation,
-	)
+	return TypeID(fmt.Sprintf("((%s):%s)", parameters.String(), t.ReturnTypeAnnotation))
 }
 
 func (t *FunctionType) Equal(other Type) bool {
@@ -1559,36 +1591,12 @@ func (t *CompositeType) String() string {
 	return t.Identifier
 }
 
-func (t *CompositeType) ID() string {
-	var sb strings.Builder
-	sb.WriteString(string(t.Location.ID()))
+func (t *CompositeType) QualifiedIdentifier() string {
+	return qualifiedIdentifier(t.Identifier, t.ContainerType)
+}
 
-	// Gather all identifiers: this, parent, grand-parent, etc.
-
-	identifiers := []string{t.Identifier}
-
-	containerType := t.ContainerType
-	for containerType != nil {
-		switch typedContainerType := containerType.(type) {
-		case *InterfaceType:
-			identifiers = append(identifiers, typedContainerType.Identifier)
-			containerType = typedContainerType.ContainerType
-		case *CompositeType:
-			identifiers = append(identifiers, typedContainerType.Identifier)
-			containerType = typedContainerType.ContainerType
-		default:
-			panic(errors.NewUnreachableError())
-		}
-	}
-
-	// Append all identifiers, in reverse order
-
-	for i := len(identifiers) - 1; i >= 0; i-- {
-		sb.WriteRune('.')
-		sb.WriteString(identifiers[i])
-	}
-
-	return sb.String()
+func (t *CompositeType) ID() TypeID {
+	return TypeID(fmt.Sprintf("%s.%s", t.Location.ID(), t.QualifiedIdentifier()))
 }
 
 func (t *CompositeType) Equal(other Type) bool {
@@ -1668,7 +1676,7 @@ func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.T
 			Identifier:   t.Identifier,
 			Fields:       fields,
 			Initializers: [][]types.Parameter{parameters},
-		}.WithID(t.ID())
+		}.WithID(string(t.ID()))
 	}
 
 	switch t.Kind {
@@ -1723,7 +1731,7 @@ func (*AccountType) String() string {
 	return "Account"
 }
 
-func (*AccountType) ID() string {
+func (*AccountType) ID() TypeID {
 	return "Account"
 }
 
@@ -1791,7 +1799,7 @@ func (*PublicAccountType) String() string {
 	return "PublicAccount"
 }
 
-func (*PublicAccountType) ID() string {
+func (*PublicAccountType) ID() TypeID {
 	return "PublicAccount"
 }
 
@@ -1922,36 +1930,12 @@ func (t *InterfaceType) String() string {
 	return t.Identifier
 }
 
-func (t *InterfaceType) ID() string {
-	var sb strings.Builder
-	sb.WriteString(string(t.Location.ID()))
+func (t *InterfaceType) QualifiedIdentifier() string {
+	return qualifiedIdentifier(t.Identifier, t.ContainerType)
+}
 
-	// Gather all identifiers: this, parent, grand-parent, etc.
-
-	identifiers := []string{t.Identifier}
-
-	containerType := t.ContainerType
-	for containerType != nil {
-		switch typedContainerType := containerType.(type) {
-		case *InterfaceType:
-			identifiers = append(identifiers, typedContainerType.Identifier)
-			containerType = typedContainerType.ContainerType
-		case *CompositeType:
-			identifiers = append(identifiers, typedContainerType.Identifier)
-			containerType = typedContainerType.ContainerType
-		default:
-			panic(errors.NewUnreachableError())
-		}
-	}
-
-	// Append all identifiers, in reverse order
-
-	for i := len(identifiers) - 1; i >= 0; i-- {
-		sb.WriteRune('.')
-		sb.WriteString(identifiers[i])
-	}
-
-	return sb.String()
+func (t *InterfaceType) ID() TypeID {
+	return TypeID(fmt.Sprintf("%s.%s", t.Location.ID(), t.QualifiedIdentifier()))
 }
 
 func (t *InterfaceType) Equal(other Type) bool {
@@ -2005,12 +1989,12 @@ func (t *DictionaryType) Export(program *ast.Program, variable *Variable) types.
 	}, variable)
 }
 
-func (t *DictionaryType) ID() string {
-	return fmt.Sprintf(
+func (t *DictionaryType) ID() TypeID {
+	return TypeID(fmt.Sprintf(
 		"{%s:%s}",
 		t.KeyType.ID(),
 		t.ValueType.ID(),
-	)
+	))
 }
 
 func (t *DictionaryType) Equal(other Type) bool {
@@ -2174,7 +2158,7 @@ func (t *StorageType) String() string {
 	return "Storage"
 }
 
-func (t *StorageType) ID() string {
+func (t *StorageType) ID() TypeID {
 	return "Storage"
 }
 
@@ -2229,7 +2213,7 @@ func (t *ReferencesType) String() string {
 	return "References"
 }
 
-func (t *ReferencesType) ID() string {
+func (t *ReferencesType) ID() TypeID {
 	return "References"
 }
 
@@ -2326,7 +2310,7 @@ func (t *EventType) Export(program *ast.Program, variable *Variable) types.Type 
 		Identifier:  t.Identifier,
 		Fields:      fields,
 		Initializer: parameters,
-	}.WithID(t.ID())
+	}.WithID(string(t.ID()))
 }
 
 func (t *EventType) String() string {
@@ -2341,12 +2325,8 @@ func (t *EventType) String() string {
 	return fmt.Sprintf("%s(%s)", t.Identifier, fields.String())
 }
 
-func (t *EventType) ID() string {
-	if t.Location == nil {
-		return t.Identifier
-	}
-
-	return fmt.Sprintf("%s.%s", t.Location.ID(), t.Identifier)
+func (t *EventType) ID() TypeID {
+	return TypeID(fmt.Sprintf("%s.%s", t.Location.ID(), t.Identifier))
 }
 
 func (t *EventType) Equal(other Type) bool {
@@ -2418,11 +2398,12 @@ func (t *ReferenceType) String() string {
 	return fmt.Sprintf("&%s", t.Type)
 }
 
-func (t *ReferenceType) ID() string {
-	if t.Type == nil {
-		return "reference"
+func (t *ReferenceType) ID() TypeID {
+	var id string
+	if t.Type != nil {
+		id = string(t.Type.ID())
 	}
-	return fmt.Sprintf("&%s", t.Type.ID())
+	return TypeID(fmt.Sprintf("&%s", id))
 }
 
 func (t *ReferenceType) Equal(other Type) bool {
@@ -2491,7 +2472,7 @@ func (*AddressType) String() string {
 	return "Address"
 }
 
-func (*AddressType) ID() string {
+func (*AddressType) ID() TypeID {
 	return "Address"
 }
 
@@ -2742,7 +2723,7 @@ func (*TransactionType) String() string {
 	return "Transaction"
 }
 
-func (*TransactionType) ID() string {
+func (*TransactionType) ID() TypeID {
 	return "Transaction"
 }
 
