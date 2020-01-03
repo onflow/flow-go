@@ -63,10 +63,20 @@ func TestBlockExecutorExecuteBlock(t *testing.T) {
 		Return(&virtualmachine.TransactionResult{}, nil).
 		Twice()
 
+	ls.On(
+		"UpdateRegistersWithProof",
+		mock.AnythingOfType("[][]uint8"),
+		mock.AnythingOfType("[][]uint8"),
+	).
+		Return(nil, nil, nil)
+
 	chunks, err := exe.ExecuteBlock(block, collections, transactions)
 	assert.NoError(t, err)
 	assert.Len(t, chunks, 1)
 
 	chunk := chunks[0]
 	assert.EqualValues(t, chunk.TxCounts, 2)
+
+	vm.AssertExpectations(t)
+	ls.AssertExpectations(t)
 }
