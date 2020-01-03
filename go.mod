@@ -42,6 +42,7 @@ require (
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/sys v0.0.0-20191220142924-d4481acd189f // indirect
 	golang.org/x/text v0.3.2
+	golang.org/x/tools v0.0.0-20200102200121-6de373a2766c // indirect
 	gonum.org/v1/gonum v0.0.0-20191018104224-74cb7b153f2c
 	google.golang.org/grpc v1.26.0
 	zombiezen.com/go/capnproto2 v2.17.0+incompatible

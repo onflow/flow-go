@@ -43,7 +43,7 @@ func (v *VerifierEngineTestSuit) SetupTest() {
 	v.me = &mock.Local{}
 	v.ss = &protocol.Snapshot{}
 	log := zerolog.Logger{} // used as to log relevant
-	wg  := sync.WaitGroup{}
+	wg := sync.WaitGroup{}
 
 	// the mock verifier engine
 	v.e = &Engine{
@@ -123,7 +123,6 @@ func (v *VerifierEngineTestSuit) TestSubmitHappyPath() {
 		Return(nil).
 		Once()
 
-
 	// store of the engine should be empty prior to the submit
 	assert.Equal(v.T(), vrfy.store.ResultsNum(), 0)
 
@@ -139,7 +138,6 @@ func (v *VerifierEngineTestSuit) TestSubmitHappyPath() {
 	v.ss.AssertExpectations(v.T())
 	v.me.AssertExpectations(v.T())
 }
-
 
 // TestProcessUnhappyInput covers unhappy inputs for Process method
 func (v *VerifierEngineTestSuit) TestProcessUnhappyInput() {
@@ -170,7 +168,6 @@ func (v *VerifierEngineTestSuit) TestProcessUnhappyInput() {
 	v.ss.AssertExpectations(v.T())
 }
 
-
 // TestProcessUnstakeEmit tests the Process method of Verifier engine against
 // an unauthorized node emitting an execution receipt. The process method should
 // catch this injected fault by returning an error
@@ -178,7 +175,6 @@ func (v *VerifierEngineTestSuit) TestProcessUnstakeEmit() {
 	// creating a new engine
 	vrfy, err := New(v.e.log, v.net, v.e.state, v.me)
 	require.Nil(v.T(), err, "could not create an engine")
-
 
 	unstakedID := flow.Identity{
 		NodeID:  flow.Identifier{0x02, 0x02, 0x02, 0x02},
@@ -197,12 +193,10 @@ func (v *VerifierEngineTestSuit) TestProcessUnstakeEmit() {
 	err = vrfy.Process(unstakedID.NodeID, &flow.ExecutionReceipt{})
 	assert.NotNil(v.T(), err, "failed rejecting an unstaked id")
 
-
 	vrfy.wg.Wait()
 	v.state.AssertExpectations(v.T())
 	v.ss.AssertExpectations(v.T())
 }
-
 
 // TestProcessUnauthorizedEmits follows the unhappy path where staked nodes
 // rather than execution nodes send an execution receipt event
@@ -268,7 +262,6 @@ func (v *VerifierEngineTestSuit) TestProcessUnauthorizedEmits() {
 	}
 }
 
-
 // ConcurrencyTestSetup is a sub-test method. It is not invoked independently, rather
 // it is executed as part of other test methods. It provides some setups for those test methods.
 // On receiving a concurrency degree, and number of consensus nodes, consNum, it generates a mock verifier engine
@@ -277,7 +270,7 @@ func (v *VerifierEngineTestSuit) TestProcessUnauthorizedEmits() {
 // from the execution node and emit an empty result approval to all the consensus nodes. It then returns the
 // verifier engine and identity of the consensus nodes for more advance caller tests to use.
 // The concurrency degree is used to mock the reception of identical execution results
-func (v *VerifierEngineTestSuit) ConcurrencyTestSetup(degree, consNum int) (*flow.Identity, *Engine, *flow.ExecutionReceipt){
+func (v *VerifierEngineTestSuit) ConcurrencyTestSetup(degree, consNum int) (*flow.Identity, *Engine, *flow.ExecutionReceipt) {
 	// creating a new engine
 	vrfy, err := New(v.e.log, v.net, v.e.state, v.e.me)
 	require.Nil(v.T(), err, "could not create an engine")
@@ -330,7 +323,6 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentERs() {
 	// verifier node
 	const ConcurrencyDegree = 10
 
-
 	// mocks an execution ID and a verifier engine
 	// also mocks the reception of 10 concurrent identical execution results
 	// as well as a random execution receipt (er) and its mocked execution receipt
@@ -338,14 +330,14 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentERs() {
 
 	// emitting an execution receipt form the execution node
 	errCount := 0
-	for i := 0; i < ConcurrencyDegree; i++{
+	for i := 0; i < ConcurrencyDegree; i++ {
 		err := vrfy.Process(exeID.NodeID, er)
-		if err != nil{
+		if err != nil {
 			errCount++
 		}
 	}
 	// all ERs are the same, so only one of them should be processed
-	assert.Equal(v.T(), errCount, ConcurrencyDegree - 1)
+	assert.Equal(v.T(), errCount, ConcurrencyDegree-1)
 
 	vrfy.wg.Wait()
 	v.con.AssertExpectations(v.T())
@@ -376,7 +368,7 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentERsConcurrently()
 	// emitting an execution receipt form the execution node
 	errCount := 0
 	mu := sync.Mutex{}
-	for i := 0; i < ConcurrencyDegree; i++{
+	for i := 0; i < ConcurrencyDegree; i++ {
 		go func() {
 			err := vrfy.Process(exeID.NodeID, er)
 			if err != nil {
@@ -387,14 +379,13 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentERsConcurrently()
 		}()
 	}
 	// all ERs are the same, so only one of them should be processed
-	assert.Equal(v.T(), errCount, ConcurrencyDegree - 1)
+	assert.Equal(v.T(), errCount, ConcurrencyDegree-1)
 
 	vrfy.wg.Wait()
 	v.con.AssertExpectations(v.T())
 	v.ss.AssertExpectations(v.T())
 	v.state.AssertExpectations(v.T())
 }
-
 
 // TestProcessHappyPathConcurrentDifferentERs covers the happy path of the verifier engine on concurrently
 // receiving several valid execution receipts
@@ -429,15 +420,13 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentDifferentERs() {
 	v.state.On("Final").Return(v.ss).Times(ConcurrencyDegree)
 	v.ss.On("Identities", testifymock.Anything).Return(consIDs, nil).Times(ConcurrencyDegree)
 
-
-
-	testTable := [ConcurrencyDegree]struct{
+	testTable := [ConcurrencyDegree]struct {
 		receipt *flow.ExecutionReceipt
-		params []interface{} // parameters of the resulted Submit method of the engine corresponding to receipt
+		params  []interface{} // parameters of the resulted Submit method of the engine corresponding to receipt
 	}{}
 
 	// preparing the test table
-	for i := 0; i < ConcurrencyDegree; i++{
+	for i := 0; i < ConcurrencyDegree; i++ {
 		// generating a random execution receipt and its corresponding result approval
 		er := verification.RandomERGen()
 		restApprov := verification.RnadRAGen(er)
@@ -449,13 +438,12 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentDifferentERs() {
 		}
 
 		testTable[i].receipt = er
-		testTable[i].params  = params
+		testTable[i].params = params
 	}
-
 
 	// emitting an execution receipt form the execution node
 	errCount := 0
-	for i := 0; i < ConcurrencyDegree; i++{
+	for i := 0; i < ConcurrencyDegree; i++ {
 		// the happy path ends by the verifier engine emitting a
 		// result approval to ONLY all the consensus nodes
 		// since ERs distinct, distinct calls for submission should happen
@@ -464,7 +452,7 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentDifferentERs() {
 			Once()
 
 		err = vrfy.Process(exeID.NodeID, testTable[i].receipt)
-		if err != nil{
+		if err != nil {
 			errCount++
 		}
 	}
