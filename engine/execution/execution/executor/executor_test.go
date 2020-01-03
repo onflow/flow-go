@@ -8,17 +8,18 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
+	statemock "github.com/dapperlabs/flow-go/engine/execution/execution/state/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	vmmock "github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
-	ledger "github.com/dapperlabs/flow-go/storage/ledger/mock"
 )
 
 func TestBlockExecutorExecuteBlock(t *testing.T) {
 	vm := &vmmock.VirtualMachine{}
-	ls := &ledger.Storage{}
+	es := &statemock.ExecutionState{}
 
-	exe := executor.NewBlockExecutor(vm, ls)
+	exe := executor.NewBlockExecutor(vm, es)
 
 	tx1 := &flow.Transaction{
 		TransactionBody: flow.TransactionBody{
@@ -63,12 +64,22 @@ func TestBlockExecutorExecuteBlock(t *testing.T) {
 		Return(&virtualmachine.TransactionResult{}, nil).
 		Twice()
 
-	ls.On(
-		"UpdateRegistersWithProof",
-		mock.AnythingOfType("[][]uint8"),
-		mock.AnythingOfType("[][]uint8"),
+	es.On(
+		"NewView",
+		mock.AnythingOfType("flow.StateCommitment"),
 	).
-		Return(nil, nil, nil)
+		Return(
+			state.NewView(func(key string) (bytes []byte, e error) {
+				return nil, nil
+			})).
+		Once()
+
+	es.On(
+		"CommitDelta",
+		mock.AnythingOfType("state.Delta"),
+	).
+		Return(nil, nil).
+		Once()
 
 	chunks, err := exe.ExecuteBlock(block, collections, transactions)
 	assert.NoError(t, err)
@@ -78,5 +89,5 @@ func TestBlockExecutorExecuteBlock(t *testing.T) {
 	assert.EqualValues(t, chunk.TxCounts, 2)
 
 	vm.AssertExpectations(t)
-	ls.AssertExpectations(t)
+	es.AssertExpectations(t)
 }

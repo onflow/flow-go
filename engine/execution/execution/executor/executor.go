@@ -6,7 +6,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
 // An BlockExecutor executes the transactions in a block.
@@ -24,9 +23,7 @@ type blockExecutor struct {
 }
 
 // NewBlockExecutor creates a new block executor.
-func NewBlockExecutor(vm virtualmachine.VirtualMachine, ls ledger.Storage) BlockExecutor {
-	state := state.NewExecutionState(ls)
-
+func NewBlockExecutor(vm virtualmachine.VirtualMachine, state state.ExecutionState) BlockExecutor {
 	return &blockExecutor{
 		vm:    vm,
 		state: state,
