@@ -16,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
-	"github.com/dapperlabs/flow-go/sdk/convert"
 )
 
 // Config defines the configurable options for the ingress server.
@@ -98,7 +97,7 @@ func (h *handler) Ping(ctx context.Context, req *observation.PingRequest) (*obse
 // SendTransaction accepts new transactions and inputs them to the ingress
 // engine for validation and routing.
 func (h *handler) SendTransaction(ctx context.Context, req *observation.SendTransactionRequest) (*observation.SendTransactionResponse, error) {
-	tx, err := convert.MessageToTransaction(req.Transaction)
+	tx, err := MessageToTransaction(req.Transaction)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
 	}
