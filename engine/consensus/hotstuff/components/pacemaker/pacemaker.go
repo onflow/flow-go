@@ -10,4 +10,3 @@ type Pacemaker interface {
 
 	Run()
 }
-

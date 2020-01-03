@@ -24,8 +24,8 @@ func DefaultTimout() Timeout {
 	return Timeout{
 		TimoutController: DefaultTimoutController(),
 		activatedTimeout: activatedTimeout{
-			view:  0,
-			mode:  ReplicaTimeout,
+			view: 0,
+			mode: ReplicaTimeout,
 		},
 	}
 }
