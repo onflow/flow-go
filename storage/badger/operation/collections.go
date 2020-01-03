@@ -13,6 +13,10 @@ func InsertCollections(hash crypto.Hash, collections []*flow.GuaranteedCollectio
 	return insert(makePrefix(codeCollections, hash), collections)
 }
 
+func PersistCollections(hash crypto.Hash, collections []*flow.GuaranteedCollection) func(*badger.Txn) error {
+	return persist(makePrefix(codeCollections, hash), collections)
+}
+
 func RetrieveCollections(hash crypto.Hash, collections *[]*flow.GuaranteedCollection) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollections, hash), collections)
 }

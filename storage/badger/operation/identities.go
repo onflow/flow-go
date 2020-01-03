@@ -13,6 +13,10 @@ func InsertIdentities(hash crypto.Hash, identities flow.IdentityList) func(*badg
 	return insert(makePrefix(codeIdentities, hash), identities)
 }
 
+func PersistIdentities(hash crypto.Hash, identities flow.IdentityList) func(*badger.Txn) error {
+	return persist(makePrefix(codeIdentities, hash), identities)
+}
+
 func RetrieveIdentities(hash crypto.Hash, identities *flow.IdentityList) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeIdentities, hash), identities)
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -31,6 +32,9 @@ func (b *Blocks) ByHash(hash crypto.Hash) (*flow.Block, error) {
 		var err error
 		block, err = b.retrieveBlock(tx, hash)
 		if err != nil {
+			if err == storage.NotFoundErr {
+				return err
+			}
 			return errors.Wrap(err, "could not retrieve block")
 		}
 
@@ -49,11 +53,17 @@ func (b *Blocks) ByNumber(number uint64) (*flow.Block, error) {
 		var hash crypto.Hash
 		err := operation.RetrieveHash(number, &hash)(tx)
 		if err != nil {
+			if err == storage.NotFoundErr {
+				return err
+			}
 			return errors.Wrap(err, "could not retrieve hash")
 		}
 
 		block, err = b.retrieveBlock(tx, hash)
 		if err != nil {
+			if err == storage.NotFoundErr {
+				return err
+			}
 			return errors.Wrap(err, "could not retrieve block")
 		}
 
@@ -94,4 +104,31 @@ func (b *Blocks) retrieveBlock(tx *badger.Txn, hash crypto.Hash) (*flow.Block, e
 	}
 
 	return block, nil
+}
+
+func (b *Blocks) Save(block *flow.Block) error {
+
+	err := b.db.Update(func(tx *badger.Txn) error {
+
+		err := operation.PersistHeader(&block.Header)(tx)
+		if err != nil {
+			return errors.Wrap(err, "cannot save block")
+		}
+		err = operation.PersistIdentities(block.Hash(), block.NewIdentities)(tx)
+		if err != nil {
+			return errors.Wrap(err, "cannot save block")
+		}
+		err = operation.PersistCollections(block.Hash(), block.GuaranteedCollections)(tx)
+		if err != nil {
+			return errors.Wrap(err, "cannot save block")
+		}
+		err = operation.PersistHash(block.Number, block.Hash())(tx)
+		if err != nil {
+			return errors.Wrap(err, "cannot save block")
+		}
+
+		return nil
+	})
+	return err
+
 }
