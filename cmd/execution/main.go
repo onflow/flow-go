@@ -7,6 +7,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/storage/ledger"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 )
 
@@ -20,7 +21,10 @@ func main() {
 
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
-			blockExec := executor.NewBlockExecutor(vm)
+			ls, err := ledger.NewTrieStorage()
+			node.MustNot(err).Msg("could not initialize ledger trie storage")
+
+			blockExec := executor.NewBlockExecutor(vm, ls)
 
 			// TODO: replace mocks with real implementation
 			transactions := &storage.Transactions{}
