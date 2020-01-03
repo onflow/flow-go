@@ -22,7 +22,7 @@ type LedgerStorage interface {
 	// Get registers at specific StateCommitment by a list of register ids with proofs
 	GetRegistersWithProof(registerIDs []RegisterID, stateCommitment StateCommitment) (values []RegisterValue, proofs []StorageProof, err error)
 	// Batched atomic updates of a subset of registers at specific state with proofs
-	UpdateRegisterWithProof(registerIDs []RegisterID, values []RegisterValue) (newStateCommitment StateCommitment, proofs []StorageProof, err error)
+	UpdateRegistersWithProof(registerIDs []RegisterID, values []RegisterValue) (newStateCommitment StateCommitment, proofs []StorageProof, err error)
 }
 
 // LedgerVerifier should be designed as an standalone package to verify proofs of storage

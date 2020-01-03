@@ -71,9 +71,9 @@ func (f *FlowLedgerStorage) GetRegistersWithProof(registerIDs []RegisterID, stat
 	return values, proofs, err
 }
 
-// UpdateRegisterWithProof updates the values at the given registers
+// UpdateRegistersWithProof updates the values at the given registers
 // This is untrusted so a proof is generated
-func (f *FlowLedgerStorage) UpdateRegisterWithProof(registerIDs []RegisterID, values []RegisterValue) (newStateCommitment StateCommitment, proofs []StorageProof, err error) {
+func (f *FlowLedgerStorage) UpdateRegistersWithProof(registerIDs []RegisterID, values []RegisterValue) (newStateCommitment StateCommitment, proofs []StorageProof, err error) {
 	err = f.tree.Update(registerIDs, values)
 	if err != nil {
 		return nil, nil, err
