@@ -21,7 +21,7 @@ type executor struct {
 	computer computer.Computer
 }
 
-// New creates a new  block executor.
+// New creates a new block executor.
 func New(computer computer.Computer) Executor {
 	return &executor{
 		computer: computer,
