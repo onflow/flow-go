@@ -21,32 +21,6 @@ const (
 	cacheSize      = 50000
 )
 
-func newTestDB(tb testing.TB) databases.DAL {
-	db, err := lvldb.NewLvlDB(kvdbPath, tdbPath)
-	if err != nil {
-		tb.Fatalf("failed to initialize LvlDB instance: %s", err)
-	}
-
-	return db
-}
-
-func newTestSMT(
-	tb testing.TB,
-	height int,
-	cacheSize int,
-	interval int,
-	numHistoricalStates int,
-	numFullStates int) *SMT {
-	db := newTestDB(tb)
-
-	trie, err := NewSMT(db, height, cacheSize, interval, numHistoricalStates, numFullStates)
-	if err != nil {
-		tb.Fatalf("failed to initialize SMT instance: %s", err)
-	}
-
-	return trie
-}
-
 func TestSMTInitialization(t *testing.T) {
 	trie := newTestSMT(t, testHeight, cacheSize, 10, 100, 10)
 
@@ -3461,4 +3435,30 @@ func TestRead_HistoricalValuesPruned(t *testing.T) {
 	if err2 != nil {
 		t.Fatal(err2)
 	}
+}
+
+func newTestDB(tb testing.TB) databases.DAL {
+	db, err := lvldb.NewLvlDB(kvdbPath, tdbPath)
+	if err != nil {
+		tb.Fatalf("failed to initialize LvlDB instance: %s", err)
+	}
+
+	return db
+}
+
+func newTestSMT(
+	tb testing.TB,
+	height int,
+	cacheSize int,
+	interval int,
+	numHistoricalStates int,
+	numFullStates int) *SMT {
+	db := newTestDB(tb)
+
+	trie, err := NewSMT(db, height, cacheSize, interval, numHistoricalStates, numFullStates)
+	if err != nil {
+		tb.Fatalf("failed to initialize SMT instance: %s", err)
+	}
+
+	return trie
 }

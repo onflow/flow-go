@@ -20,7 +20,7 @@ func BenchmarkSMTCreation(b *testing.B) {
 
 func BenchmarkKVGen(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		GenerateRandomKVPairs(1000)
+		generateRandomKVPairs(1000)
 	}
 }
 
@@ -31,7 +31,7 @@ func BenchmarkUpdate(b *testing.B) {
 		b.Run(strconv.Itoa(mark), func(b *testing.B) {
 			s = newTestSMT(b, 255, 50000, 100, 1000, 100)
 			defer os.RemoveAll("./db/")
-			keys, values := GenerateRandomKVPairs(mark)
+			keys, values := generateRandomKVPairs(mark)
 
 			s.Update(keys, values)
 			s.database.SafeClose()
@@ -59,11 +59,11 @@ func BenchmarkReadSMT(b *testing.B) {
 	s = newTestSMT(b, 255, 50000, 100, 1000, 100)
 
 	defer os.RemoveAll("./db/")
-	keys, values := GenerateRandomKVPairs(1000)
+	keys, values := generateRandomKVPairs(1000)
 	s.Update(keys, values)
 	for _, mark := range benchmarks {
-		mark := mark //Workaround for scopelint issue
-		readKeys := GetRandomKeys(keys, mark.size)
+		mark := mark // Workaround for scopelint issue
+		readKeys := getRandomKeys(keys, mark.size)
 		b.Run(strconv.Itoa(mark.size), func(b *testing.B) {
 			_, _, err := s.Read(readKeys, mark.trusted, s.GetRoot().value)
 			if err != nil {
@@ -90,10 +90,10 @@ func BenchmarkVerifyProof(b *testing.B) {
 	s = newTestSMT(b, 255, 50000, 100, 1000, 100)
 
 	defer os.RemoveAll("./db/")
-	keys, values := GenerateRandomKVPairs(1000)
+	keys, values := generateRandomKVPairs(1000)
 	s.Update(keys, values)
 	for _, mark := range benchmarks {
-		readKeys := GetRandomKeys(keys, mark.size)
+		readKeys := getRandomKeys(keys, mark.size)
 		values, proofs, err := s.Read(readKeys, mark.trusted, s.GetRoot().value)
 		if err != nil {
 			b.Error(err)
@@ -125,16 +125,16 @@ func BenchmarkVerifyHistoricalStates(b *testing.B) {
 	new_smt := newTestSMT(b, 255, 50000, 100, 1000, 100)
 
 	defer os.RemoveAll("./db/")
-	keys, values := GenerateRandomKVPairs(1000)
+	keys, values := generateRandomKVPairs(1000)
 	new_smt.Update(keys, values)
 	oldRoot := new_smt.GetRoot().value
-	_, newvalues := GenerateRandomKVPairs(1000)
+	_, newvalues := generateRandomKVPairs(1000)
 	err := new_smt.Update(keys, newvalues)
 	if err != nil {
 		b.Error(err)
 	}
 	for _, mark := range benchmarks {
-		readKeys := GetRandomKeys(keys, mark.size)
+		readKeys := getRandomKeys(keys, mark.size)
 		values, proofs, read_err := new_smt.Read(readKeys, mark.trusted, oldRoot)
 		if err != nil {
 			b.Error(read_err)
@@ -154,7 +154,7 @@ func BenchmarkVerifyHistoricalStates(b *testing.B) {
 
 }
 
-func GenerateRandomKVPairs(num int) ([][]byte, [][]byte) {
+func generateRandomKVPairs(num int) ([][]byte, [][]byte) {
 	keys := make([][]byte, 0)
 	values := make([][]byte, 0)
 	var key []byte
@@ -209,7 +209,7 @@ func sortKeys(keys [][]byte) [][]byte {
 	return res
 }
 
-func GetRandomKeys(keys [][]byte, num int) [][]byte {
+func getRandomKeys(keys [][]byte, num int) [][]byte {
 	if len(keys) == num {
 		return keys
 	}
