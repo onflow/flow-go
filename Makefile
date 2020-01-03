@@ -38,7 +38,7 @@ endif
 	GO111MODULE=on go get github.com/kevinburke/go-bindata/...@v3.11.0;
 
 .PHONY: test
-test: generate-bindata generate-mocks
+test: generate-mocks
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 
