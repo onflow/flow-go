@@ -22,7 +22,8 @@ func main() {
 
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
-			ls, err := ledger.NewTrieStorage()
+
+			ls, err := ledger.NewTrieStorage("db/valuedb", "db/triedb")
 			node.MustNot(err).Msg("could not initialize ledger trie storage")
 
 			execState := state.NewExecutionState(ls)
