@@ -71,16 +71,12 @@ generate-mocks:
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
 
-.PHONY: check-generated-code
-check-generated-code:
-	./utils/scripts/check-generated-code.sh
-
 .PHONY: lint
 lint:
 	GO111MODULE=on revive -config revive.toml ./...
 
 .PHONY: ci
-ci: install-tools generate check-generated-code lint test coverage
+ci: install-tools lint test coverage
 
 .PHONY: docker-ci
 docker-ci:
