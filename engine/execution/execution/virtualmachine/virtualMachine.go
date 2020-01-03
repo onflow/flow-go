@@ -6,7 +6,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 type VirtualMachine interface {
@@ -30,9 +29,9 @@ func (vm *virtualMachine) SetBlock(b *flow.Block) {
 }
 
 func (vm *virtualMachine) newTransactionContext(ledger Ledger, tx *flow.Transaction) *transactionContext {
-	signingAccounts := make([]values.Address, len(tx.ScriptAccounts))
+	signingAccounts := make([]runtime.Address, len(tx.ScriptAccounts))
 	for i, addr := range tx.ScriptAccounts {
-		signingAccounts[i] = values.Address(addr)
+		signingAccounts[i] = runtime.Address(addr)
 	}
 
 	return &transactionContext{
