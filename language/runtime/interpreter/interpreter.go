@@ -1830,15 +1830,20 @@ func (interpreter *Interpreter) functionValueInvocationTrampoline(
 
 func (interpreter *Interpreter) invokeInterpretedFunction(
 	function InterpretedFunctionValue,
-	arguments []Value,
+	invocation Invocation,
 ) Trampoline {
 
-	// start a new activation record
-	// lexical scope: use the function declaration's activation record,
+	// Start a new activation record.
+	// Lexical scope: use the function declaration's activation record,
 	// not the current one (which would be dynamic scope)
 	interpreter.activations.Push(function.Activation)
 
-	return interpreter.invokeInterpretedFunctionActivated(function, arguments)
+	// Make `self` available, if any
+	if invocation.Self != nil {
+		interpreter.declareVariable(sema.SelfIdentifier, invocation.Self)
+	}
+
+	return interpreter.invokeInterpretedFunctionActivated(function, invocation.Arguments)
 }
 
 // NOTE: assumes the function's activation (or an extension of it) is pushed!
@@ -2087,6 +2092,8 @@ func (interpreter *Interpreter) declareCompositeValue(
 				Owner: "",
 			}
 
+			invocation.Self = value
+
 			if declaration.CompositeKind == common.CompositeKindContract {
 				// NOTE: set the variable value immediately, as the contract value
 				// needs to be available for nested declarations
@@ -2099,10 +2106,7 @@ func (interpreter *Interpreter) declareCompositeValue(
 			if initializerFunction != nil {
 				// NOTE: arguments are already properly boxed by invocation expression
 
-				initializationTrampoline =
-					interpreter.
-						bindSelf(*initializerFunction, value).
-						invoke(invocation)
+				initializationTrampoline = initializerFunction.invoke(invocation)
 			}
 
 			return initializationTrampoline.
@@ -2131,24 +2135,6 @@ func (interpreter *Interpreter) declareCompositeValue(
 	return lexicalScope, value
 }
 
-// bindSelf returns a function which binds `self` to the structure
-//
-func (interpreter *Interpreter) bindSelf(
-	function InterpretedFunctionValue,
-	structure *CompositeValue,
-) FunctionValue {
-	return NewHostFunctionValue(func(invocation Invocation) Trampoline {
-		// start a new activation record
-		// lexical scope: use the function declaration's activation record,
-		// not the current one (which would be dynamic scope)
-		interpreter.activations.Push(function.Activation)
-
-		// make `self` available
-		interpreter.declareVariable(sema.SelfIdentifier, structure)
-
-		return interpreter.invokeInterpretedFunctionActivated(function, invocation.Arguments)
-	})
-}
 
 func (interpreter *Interpreter) initializerFunction(
 	compositeDeclaration *ast.CompositeDeclaration,
@@ -2600,6 +2586,7 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 		func(invocation Invocation) Trampoline {
 			interpreter.activations.Push(lexicalScope)
 
+			invocation.Self = self
 			interpreter.declareVariable(sema.SelfIdentifier, self)
 
 			// NOTE: get current scope instead of using `lexicalScope`,

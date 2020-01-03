@@ -1438,13 +1438,15 @@ func (v *CompositeValue) Destroy(interpreter *Interpreter, location LocationPosi
 		return trampoline.Done{Result: VoidValue{}}
 	}
 
-	return interpreter.bindSelf(*destructor, v).
-		invoke(Invocation{
-			Arguments:     nil,
-			ArgumentTypes: nil,
-			Location:      location,
-			Interpreter:   interpreter,
-		})
+	invocation := Invocation{
+		Self:          v,
+		Arguments:     nil,
+		ArgumentTypes: nil,
+		Location:      location,
+		Interpreter:   interpreter,
+	}
+
+	return destructor.invoke(invocation)
 }
 
 func (*CompositeValue) isValue() {}
@@ -1558,10 +1560,10 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 
 	function, ok := v.Functions[name]
 	if ok {
-		if interpretedFunction, ok := function.(InterpretedFunctionValue); ok {
-			function = interpreter.bindSelf(interpretedFunction, v)
+		return BoundFunctionValue{
+			Self:     v,
+			Function: function,
 		}
-		return function
 	}
 
 	return nil
