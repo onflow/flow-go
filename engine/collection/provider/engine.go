@@ -9,9 +9,11 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // Engine is the collection provider engine, which responds to requests for
@@ -22,15 +24,16 @@ type Engine struct {
 	con   network.Conduit
 	me    module.Local
 	state protocol.State
-	// TODO storage provider for transactions/guaranteed collections
+	store storage.Collections
 }
 
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, store storage.Collections) (*Engine, error) {
 	e := &Engine{
 		unit:  engine.NewUnit(),
 		log:   log.With().Str("engine", "provider").Logger(),
 		me:    me,
 		state: state,
+		store: store,
 	}
 
 	con, err := net.Register(engine.CollectionProvider, e)
@@ -85,11 +88,43 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
+// SubmitGuaranteedCollection submits the guaranteed collection to all
+// consensus nodes.
+func (e *Engine) SubmitGuaranteedCollection(gc *flow.GuaranteedCollection) error {
+	identities, err := e.state.Final().Identities(identity.HasRole(flow.RoleConsensus))
+	if err != nil {
+		return fmt.Errorf("could not get consensus identities: %w", err)
+	}
+
+	err = e.con.Submit(gc, identities.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not submit guaranteed collection: %w", err)
+	}
+
+	return nil
+}
+
 // process processes events for the provider engine on the collection node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch event.(type) {
-	// TODO transactionRequest, transactionRangeRequest
+	switch ev := event.(type) {
+	case *CollectionRequest:
+		return e.onCollectionRequest(originID, ev)
+	case *SubmitGuaranteedCollection:
+		return e.onSubmitGuaranteedCollection(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+}
+
+func (e *Engine) onCollectionRequest(originID flow.Identifier, req *CollectionRequest) error {
+	// TODO
+	return nil
+}
+
+func (e *Engine) onSubmitGuaranteedCollection(originID flow.Identifier, req *SubmitGuaranteedCollection) error {
+	if originID != e.me.NodeID() {
+		return fmt.Errorf("invalid remote request to submit guaranteed collection [%s]", req.Coll.Fingerprint().Hex())
+	}
+
+	return e.SubmitGuaranteedCollection(&req.Coll)
 }
