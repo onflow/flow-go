@@ -1430,7 +1430,7 @@ func (v *CompositeValue) Destroy(interpreter *Interpreter, location LocationPosi
 
 	// if composite was deserialized, dynamically link in the destructor
 	if v.Destructor == nil {
-		v.Destructor = interpreter.typeCode[v.TypeID].destructorFunction
+		v.Destructor = interpreter.typeCodes.compositeCodes[v.TypeID].destructorFunction
 	}
 
 	destructor := v.Destructor
@@ -1539,7 +1539,7 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 	// and get injected fields
 
 	if v.Functions == nil {
-		v.Functions = interpreter.typeCode[v.TypeID].compositeFunctions
+		v.Functions = interpreter.typeCodes.compositeCodes[v.TypeID].compositeFunctions
 	}
 
 	if v.InjectedFields == nil && interpreter.injectedCompositeFieldsHandler != nil {

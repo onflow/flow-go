@@ -5450,15 +5450,17 @@ func TestInterpretInterfaceInitializer(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       struct interface I {
-          init() {
-              pre { false }
+          init(a a1: Bool) {
+              pre { a1 }
           }
       }
 
-      struct S: I {}
+      struct S: I {
+          init(a a2: Bool) {}
+      }
 
       fun test() {
-          S()
+          S(a: false)
       }
     `)
 
