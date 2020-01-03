@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	executor "github.com/dapperlabs/flow-go/engine/execution/execution/components/executor/mock"
+	executor "github.com/dapperlabs/flow-go/engine/execution/execution/executor/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 )
@@ -14,7 +14,7 @@ import (
 func TestExecutionEngineOnFinalizedBlock(t *testing.T) {
 	collections := &storage.Collections{}
 	transactions := &storage.Transactions{}
-	exec := &executor.Executor{}
+	exec := &executor.BlockExecutor{}
 
 	e := &Engine{
 		collections:  collections,

@@ -1,29 +1,28 @@
-package computer_test
+package virtualmachine_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/engine/execution/execution/components/computer"
-	context "github.com/dapperlabs/flow-go/engine/execution/execution/modules/context/mock"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/modules/ledger"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	vmmock "github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestExecuteTransaction(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
-	prov := &context.Provider{}
-	ctx := &context.TransactionContext{}
 
-	c := computer.New(rt, prov)
+	ledger := &vmmock.Ledger{}
+
+	vm := virtualmachine.New(rt)
 
 	t.Run("transaction success", func(t *testing.T) {
 		tx := &flow.Transaction{
 			TransactionBody: flow.TransactionBody{
+				ScriptAccounts: []flow.Address{unittest.AddressFixture()},
 				Script: []byte(`
                 transaction {
                   prepare(signer: Account) {}
@@ -32,22 +31,10 @@ func TestExecuteTransaction(t *testing.T) {
 			},
 		}
 
-		view := ledger.NewView(func(key string) ([]byte, error) { return nil, nil })
-
-		prov.On("NewTransactionContext", tx, view).
-			Return(ctx).
-			Once()
-
-		ctx.On("GetSigningAccounts").
-			Return([]values.Address{values.Address(unittest.AddressFixture())}).
-			Once()
-
-		result, err := c.ExecuteTransaction(view, tx)
+		result, err := vm.ExecuteTransaction(ledger, tx)
 		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
 		assert.NoError(t, result.Error)
-
-		prov.AssertExpectations(t)
-		ctx.AssertExpectations(t)
 	})
 
 	t.Run("transaction failure", func(t *testing.T) {
@@ -73,21 +60,9 @@ func TestExecuteTransaction(t *testing.T) {
 			},
 		}
 
-		view := ledger.NewView(func(key string) ([]byte, error) { return nil, nil })
-
-		prov.On("NewTransactionContext", tx, view).
-			Return(ctx).
-			Once()
-
-		ctx.On("GetSigningAccounts").
-			Return([]values.Address{values.Address(unittest.AddressFixture())}).
-			Once()
-
-		result, err := c.ExecuteTransaction(view, tx)
+		result, err := vm.ExecuteTransaction(ledger, tx)
 		assert.NoError(t, err)
+		assert.False(t, result.Succeeded())
 		assert.Error(t, result.Error)
-
-		prov.AssertExpectations(t)
-		ctx.AssertExpectations(t)
 	})
 }

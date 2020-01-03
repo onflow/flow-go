@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/engine/execution/execution/modules/ledger"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/ledger"
 )
 
 func TestView_Get(t *testing.T) {

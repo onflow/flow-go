@@ -3,9 +3,8 @@ package main
 import (
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/engine/execution/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/components/computer"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/components/executor"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/modules/context"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/module"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
@@ -20,8 +19,8 @@ func main() {
 			node.Logger.Info().Msg("initializing execution engine")
 
 			rt := runtime.NewInterpreterRuntime()
-			comp := computer.New(rt, context.NewProvider())
-			exec := executor.New(comp)
+			vm := virtualmachine.New(rt)
+			blockExec := executor.NewBlockExecutor(vm)
 
 			// TODO: replace mocks with real implementation
 			transactions := &storage.Transactions{}
@@ -33,7 +32,7 @@ func main() {
 				node.Me,
 				collections,
 				transactions,
-				exec,
+				blockExec,
 			)
 			node.MustNot(err).Msg("could not initialize execution engine")
 			return engine

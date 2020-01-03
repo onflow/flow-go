@@ -20,6 +20,10 @@ func NewView(readFunc GetRegisterFunc) *View {
 	}
 }
 
+func (r *View) NewChild() *View {
+	return NewView(r.Get)
+}
+
 // Get gets a register value from this view.
 //
 // This function will return an error if it fails to read from the underlying
