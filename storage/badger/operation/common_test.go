@@ -53,20 +53,20 @@ func TestInsertDuplicate(t *testing.T) {
 		e2 := Entity{ID: 1338}
 		key := []byte{0x01, 0x02, 0x03}
 
-		//persist first time
+		// persist first time
 		err := db.Update(insert(key, e))
 		require.NoError(t, err)
 
-		//Insert again
+		// Insert again
 		err = db.Update(insert(key, e))
 		require.Error(t, err)
 		require.Equal(t, err, storage.KeyAlreadyExistsErr)
 
-		//persist again, but using different method
+		// persist again, but using different method
 		err = db.Update(persist(key, e))
 		require.NoError(t, err)
 
-		//again with different data
+		// again with different data
 		err = db.Update(persist(key, e2))
 		require.Error(t, err)
 		require.Equal(t, err, storage.DifferentDataErr)

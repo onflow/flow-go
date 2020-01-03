@@ -17,5 +17,6 @@ type Blocks interface {
 	// for finalized blocks.
 	ByNumber(number uint64) (*flow.Block, error)
 
+	// Save stores the  block. If the exactly same block is already in a storage, return successfully
 	Save(*flow.Block) error
 }
