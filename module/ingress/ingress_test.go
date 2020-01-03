@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/protobuf/services/observation"
-	"github.com/dapperlabs/flow-go/sdk/convert"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -28,7 +27,7 @@ func TestSubmitTransaction(t *testing.T) {
 		engine.On("ProcessLocal", &tx).Return(nil).Once()
 
 		res, err := h.SendTransaction(context.Background(), &observation.SendTransactionRequest{
-			Transaction: convert.TransactionToMessage(tx),
+			Transaction: TransactionToMessage(tx),
 		})
 		require.NoError(t, err)
 
@@ -44,7 +43,7 @@ func TestSubmitTransaction(t *testing.T) {
 		engine.On("ProcessLocal", &tx).Return(expected).Once()
 
 		res, err := h.SendTransaction(context.Background(), &observation.SendTransactionRequest{
-			Transaction: convert.TransactionToMessage(tx),
+			Transaction: TransactionToMessage(tx),
 		})
 		if assert.Error(t, err) {
 			assert.Equal(t, expected, err)
