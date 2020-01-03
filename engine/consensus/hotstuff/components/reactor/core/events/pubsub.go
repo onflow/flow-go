@@ -11,7 +11,7 @@ import (
 // It allows thread-safe subscription to events
 type PubSubEventProcessor struct {
 	missingBlockCons      []MissingBlockConsumer
-	incorporatedBlockCons []IncorporatedBlockConsumer
+	incorporatedBlockCons []BlockIncorporatedConsumer
 	safeBlockCons         []SafeBlockConsumer
 	finalizedBlockCons    []FinalizedConsumer
 	doubleProposeCons     []DoubleProposalConsumer
@@ -30,11 +30,11 @@ func (p *PubSubEventProcessor) OnMissingBlock(hash []byte, view uint64) {
 	}
 }
 
-func (p *PubSubEventProcessor) OnIncorporatedBlock(block *def.Block) {
+func (p *PubSubEventProcessor) OnBlockIncorporated(block *def.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.incorporatedBlockCons {
-		subscriber.OnIncorporatedBlock(block)
+		subscriber.OnBlockIncorporated(block)
 	}
 }
 
@@ -72,9 +72,9 @@ func (p *PubSubEventProcessor) AddMissingBlockConsumer(cons MissingBlockConsumer
 	return p
 }
 
-// AddIncorporatedBlockConsumer adds a IncorporatedBlockConsumer to the PubSubEventProcessor;
+// AddIncorporatedBlockConsumer adds a BlockIncorporatedConsumer to the PubSubEventProcessor;
 // concurrency safe; returns self-reference for chaining
-func (p *PubSubEventProcessor) AddIncorporatedBlockConsumer(cons IncorporatedBlockConsumer) *PubSubEventProcessor {
+func (p *PubSubEventProcessor) AddIncorporatedBlockConsumer(cons BlockIncorporatedConsumer) *PubSubEventProcessor {
 	utils.EnsureNotNil(cons, "Event consumer")
 	p.lock.Lock()
 	defer p.lock.Unlock()
