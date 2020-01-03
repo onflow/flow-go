@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
 // An BlockExecutor executes the transactions in a block.
@@ -22,8 +23,8 @@ type blockExecutor struct {
 }
 
 // NewBlockExecutor creates a new block executor.
-func NewBlockExecutor(vm virtualmachine.VirtualMachine) BlockExecutor {
-	state := NewState()
+func NewBlockExecutor(vm virtualmachine.VirtualMachine, ls ledger.Storage) BlockExecutor {
+	state := NewState(ls)
 
 	return &blockExecutor{
 		vm:    vm,
@@ -52,7 +53,7 @@ func (e *blockExecutor) ExecuteBlock(
 func (e *blockExecutor) executeTransactions(txs []*flow.Transaction) ([]*flow.Chunk, error) {
 	// TODO: implement real chunking
 	// MVP uses single chunk per block
-	chunkView := e.state.NewView()
+	chunkView := e.state.NewView(nil)
 
 	for _, tx := range txs {
 		txView := chunkView.NewChild()
@@ -67,7 +68,10 @@ func (e *blockExecutor) executeTransactions(txs []*flow.Transaction) ([]*flow.Ch
 		}
 	}
 
-	endState := e.state.ApplyDelta(chunkView.Delta())
+	endState, err := e.state.CommitDelta(chunkView.Delta())
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply chunk delta: %w", err)
+	}
 
 	chunk := &flow.Chunk{
 		ChunkBody: flow.ChunkBody{

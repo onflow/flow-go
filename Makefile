@@ -69,6 +69,7 @@ generate-mocks:
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
+	mockery -name '.*' -dir=storage/ledger -case=underscore -output="./storage/ledger/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/executor -case=underscore -output="./engine/execution/execution/executor/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/virtualmachine -case=underscore -output="./engine/execution/execution/virtualmachine/mock" -outpkg="mock"

@@ -4,13 +4,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/dapperlabs/flow-go/engine/execution/execution/ledger"
 )
 
 func TestDelta_Get(t *testing.T) {
 	t.Run("ValueNotSet", func(t *testing.T) {
-		d := ledger.NewDelta()
+		d := NewDelta()
 
 		b, exists := d.Get("fruit")
 		assert.Nil(t, b)
@@ -18,7 +16,7 @@ func TestDelta_Get(t *testing.T) {
 	})
 
 	t.Run("ValueSet", func(t *testing.T) {
-		d := ledger.NewDelta()
+		d := NewDelta()
 
 		d.Set("fruit", []byte("apple"))
 
@@ -29,7 +27,7 @@ func TestDelta_Get(t *testing.T) {
 }
 
 func TestDelta_Set(t *testing.T) {
-	d := ledger.NewDelta()
+	d := NewDelta()
 
 	d.Set("fruit", []byte("apple"))
 
@@ -46,7 +44,7 @@ func TestDelta_Set(t *testing.T) {
 
 func TestDelta_Delete(t *testing.T) {
 	t.Run("ValueNotSet", func(t *testing.T) {
-		d := ledger.NewDelta()
+		d := NewDelta()
 
 		d.Delete("fruit")
 
@@ -56,7 +54,7 @@ func TestDelta_Delete(t *testing.T) {
 	})
 
 	t.Run("ValueSet", func(t *testing.T) {
-		d := ledger.NewDelta()
+		d := NewDelta()
 
 		d.Set("fruit", []byte("apple"))
 		d.Delete("fruit")
@@ -69,8 +67,8 @@ func TestDelta_Delete(t *testing.T) {
 
 func TestDelta_MergeWith(t *testing.T) {
 	t.Run("NoCollisions", func(t *testing.T) {
-		d1 := ledger.NewDelta()
-		d2 := ledger.NewDelta()
+		d1 := NewDelta()
+		d2 := NewDelta()
 
 		d1.Set("fruit", []byte("apple"))
 		d2.Set("vegetable", []byte("carrot"))
@@ -85,8 +83,8 @@ func TestDelta_MergeWith(t *testing.T) {
 	})
 
 	t.Run("OverwriteSetValue", func(t *testing.T) {
-		d1 := ledger.NewDelta()
-		d2 := ledger.NewDelta()
+		d1 := NewDelta()
+		d2 := NewDelta()
 
 		d1.Set("fruit", []byte("apple"))
 		d2.Set("fruit", []byte("orange"))
@@ -98,8 +96,8 @@ func TestDelta_MergeWith(t *testing.T) {
 	})
 
 	t.Run("OverwriteDeletedValue", func(t *testing.T) {
-		d1 := ledger.NewDelta()
-		d2 := ledger.NewDelta()
+		d1 := NewDelta()
+		d2 := NewDelta()
 
 		d1.Set("fruit", []byte("apple"))
 		d1.Delete("fruit")
@@ -113,8 +111,8 @@ func TestDelta_MergeWith(t *testing.T) {
 	})
 
 	t.Run("DeleteSetValue", func(t *testing.T) {
-		d1 := ledger.NewDelta()
-		d2 := ledger.NewDelta()
+		d1 := NewDelta()
+		d2 := NewDelta()
 
 		d1.Set("fruit", []byte("apple"))
 

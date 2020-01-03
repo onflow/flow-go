@@ -4,13 +4,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/dapperlabs/flow-go/engine/execution/execution/ledger"
 )
 
 func TestView_Get(t *testing.T) {
 	t.Run("ValueNotSet", func(t *testing.T) {
-		v := ledger.NewView(func(key string) ([]byte, error) {
+		v := NewView(func(key string) ([]byte, error) {
 			return nil, nil
 		})
 
@@ -20,7 +18,7 @@ func TestView_Get(t *testing.T) {
 	})
 
 	t.Run("ValueNotInCache", func(t *testing.T) {
-		v := ledger.NewView(func(key string) ([]byte, error) {
+		v := NewView(func(key string) ([]byte, error) {
 			if key == "fruit" {
 				return []byte("orange"), nil
 			}
@@ -34,7 +32,7 @@ func TestView_Get(t *testing.T) {
 	})
 
 	t.Run("ValueInCache", func(t *testing.T) {
-		v := ledger.NewView(func(key string) ([]byte, error) {
+		v := NewView(func(key string) ([]byte, error) {
 			if key == "fruit" {
 				return []byte("orange"), nil
 			}
@@ -51,7 +49,7 @@ func TestView_Get(t *testing.T) {
 }
 
 func TestView_Set(t *testing.T) {
-	v := ledger.NewView(func(key string) ([]byte, error) {
+	v := NewView(func(key string) ([]byte, error) {
 		return nil, nil
 	})
 
@@ -68,7 +66,7 @@ func TestView_Set(t *testing.T) {
 	assert.Equal(t, []byte("orange"), b2)
 
 	t.Run("AfterDelete", func(t *testing.T) {
-		v := ledger.NewView(func(key string) ([]byte, error) {
+		v := NewView(func(key string) ([]byte, error) {
 			return nil, nil
 		})
 
@@ -87,7 +85,7 @@ func TestView_Set(t *testing.T) {
 
 func TestView_Delete(t *testing.T) {
 	t.Run("ValueNotSet", func(t *testing.T) {
-		v := ledger.NewView(func(key string) ([]byte, error) {
+		v := NewView(func(key string) ([]byte, error) {
 			return nil, nil
 		})
 
@@ -106,7 +104,7 @@ func TestView_Delete(t *testing.T) {
 	})
 
 	t.Run("ValueInCache", func(t *testing.T) {
-		v := ledger.NewView(func(key string) ([]byte, error) {
+		v := NewView(func(key string) ([]byte, error) {
 			if key == "fruit" {
 				return []byte("orange"), nil
 			}
@@ -133,11 +131,11 @@ func TestView_Delete(t *testing.T) {
 
 func TestView_ApplyDelta(t *testing.T) {
 	t.Run("EmptyView", func(t *testing.T) {
-		v := ledger.NewView(func(key string) ([]byte, error) {
+		v := NewView(func(key string) ([]byte, error) {
 			return nil, nil
 		})
 
-		d := ledger.NewDelta()
+		d := NewDelta()
 		d.Set("fruit", []byte("apple"))
 		d.Set("vegetable", []byte("carrot"))
 
@@ -153,14 +151,14 @@ func TestView_ApplyDelta(t *testing.T) {
 	})
 
 	t.Run("EmptyDelta", func(t *testing.T) {
-		v := ledger.NewView(func(key string) ([]byte, error) {
+		v := NewView(func(key string) ([]byte, error) {
 			return nil, nil
 		})
 
 		v.Set("fruit", []byte("apple"))
 		v.Set("vegetable", []byte("carrot"))
 
-		d := ledger.NewDelta()
+		d := NewDelta()
 
 		v.ApplyDelta(d)
 
@@ -174,13 +172,13 @@ func TestView_ApplyDelta(t *testing.T) {
 	})
 
 	t.Run("NoCollisions", func(t *testing.T) {
-		v := ledger.NewView(func(key string) ([]byte, error) {
+		v := NewView(func(key string) ([]byte, error) {
 			return nil, nil
 		})
 
 		v.Set("fruit", []byte("apple"))
 
-		d := ledger.NewDelta()
+		d := NewDelta()
 		d.Set("vegetable", []byte("carrot"))
 
 		v.ApplyDelta(d)
@@ -195,13 +193,13 @@ func TestView_ApplyDelta(t *testing.T) {
 	})
 
 	t.Run("OverwriteSetValue", func(t *testing.T) {
-		v := ledger.NewView(func(key string) ([]byte, error) {
+		v := NewView(func(key string) ([]byte, error) {
 			return nil, nil
 		})
 
 		v.Set("fruit", []byte("apple"))
 
-		d := ledger.NewDelta()
+		d := NewDelta()
 		d.Set("fruit", []byte("orange"))
 
 		v.ApplyDelta(d)
@@ -212,14 +210,14 @@ func TestView_ApplyDelta(t *testing.T) {
 	})
 
 	t.Run("OverwriteDeletedValue", func(t *testing.T) {
-		v := ledger.NewView(func(key string) ([]byte, error) {
+		v := NewView(func(key string) ([]byte, error) {
 			return nil, nil
 		})
 
 		v.Set("fruit", []byte("apple"))
 		v.Delete("fruit")
 
-		d := ledger.NewDelta()
+		d := NewDelta()
 		d.Set("fruit", []byte("orange"))
 
 		v.ApplyDelta(d)
@@ -230,13 +228,13 @@ func TestView_ApplyDelta(t *testing.T) {
 	})
 
 	t.Run("DeleteSetValue", func(t *testing.T) {
-		v := ledger.NewView(func(key string) ([]byte, error) {
+		v := NewView(func(key string) ([]byte, error) {
 			return nil, nil
 		})
 
 		v.Set("fruit", []byte("apple"))
 
-		d := ledger.NewDelta()
+		d := NewDelta()
 		d.Delete("fruit")
 
 		v.ApplyDelta(d)

@@ -11,12 +11,14 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	vmmock "github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
+	ledger "github.com/dapperlabs/flow-go/storage/ledger/mock"
 )
 
 func TestBlockExecutorExecuteBlock(t *testing.T) {
 	vm := &vmmock.VirtualMachine{}
+	ls := &ledger.Storage{}
 
-	exe := executor.NewBlockExecutor(vm)
+	exe := executor.NewBlockExecutor(vm, ls)
 
 	tx1 := &flow.Transaction{
 		TransactionBody: flow.TransactionBody{
