@@ -7,7 +7,22 @@ import (
 	"math/rand"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
+	"github.com/libp2p/go-libp2p-core/peer"
 )
+
+// GetPeerID returns the LibP2P peer id derived from the given name
+// e.g. node1 will generate a peer id of QmUqrhCAbnT7jnhMnKY2d1Py9N5PfEvvHazuJfpzn5fFVB
+func GetPeerID(name string) (peer.ID, error) {
+	key, err := GetPublicKey(name)
+	if err != nil {
+		return "", err
+	}
+	id, err := peer.IDFromPublicKey(key.GetPublic())
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
 
 // GetPublicKey generates a ECDSA key pair using the given seed
 func GetPublicKey(seed string) (crypto.PrivKey, error) {

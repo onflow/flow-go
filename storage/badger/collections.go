@@ -66,7 +66,7 @@ func (c *Collections) TransactionsByFingerprint(hash flow.Fingerprint) ([]*flow.
 
 func (c *Collections) Insert(collection *flow.Collection) error {
 	return c.db.Update(func(tx *badger.Txn) error {
-		err := operation.InsertCollection(collection.Fingerprint(), collection)(tx)
+		err := operation.InsertCollection(collection)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
@@ -86,7 +86,7 @@ func (c *Collections) Remove(hash flow.Fingerprint) error {
 
 func (c *Collections) InsertGuarantee(gc *flow.GuaranteedCollection) error {
 	return c.db.Update(func(tx *badger.Txn) error {
-		err := operation.InsertGuaranteedCollection(gc.Fingerprint(), gc)(tx)
+		err := operation.InsertGuaranteedCollection(gc)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert guaranteed collection: %w", err)
 		}

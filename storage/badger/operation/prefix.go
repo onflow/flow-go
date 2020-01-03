@@ -11,16 +11,16 @@ import (
 )
 
 const (
-	codeRole        = 10
-	codeAddress     = 11
-	codeDelta       = 12
-	codeHeader      = 20
-	codeIdentities  = 21
-	codeTransaction = 22
-	codeCollection  = 23
-	codeGuaranteedCollection = 24
-	codeHash        = 100
-	codeBoundary    = 101
+	codeRole                   = 10
+	codeAddress                = 11
+	codeDelta                  = 12
+	codeHeader                 = 20
+	codeIdentities             = 21
+	codeTransaction            = 22
+	codeCollection             = 23
+	codeGuaranteedCollection   = 24
+	codeHash                   = 100 // block number to hash
+	codeBoundary               = 101
 	codeBlockHashToCollections = 102
 )
 

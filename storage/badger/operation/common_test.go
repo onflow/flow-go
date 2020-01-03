@@ -13,6 +13,8 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 func init() {
@@ -23,66 +25,97 @@ type Entity struct {
 	ID uint64
 }
 
-func TestInsertValid(t *testing.T) {
-
+func runWithDb(t *testing.T, f func(*badger.DB)) {
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	defer os.RemoveAll(dir)
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
+	f(db)
+	db.Close()
+	os.RemoveAll(dir)
+}
 
-	e := Entity{ID: 1337}
-	key := []byte{0x01, 0x02, 0x03}
-	val := []byte(`{"ID":1337}`)
+func TestInsertValid(t *testing.T) {
 
-	err = db.Update(insert(key, e))
-	require.Nil(t, err)
+	runWithDb(t, func(db *badger.DB) {
+		e := Entity{ID: 1337}
+		key := []byte{0x01, 0x02, 0x03}
+		val := []byte(`{"ID":1337}`)
 
-	var act []byte
-	_ = db.View(func(tx *badger.Txn) error {
-		item, err := tx.Get(key)
+		err := db.Update(insert(key, e))
 		require.Nil(t, err)
-		act, err = item.ValueCopy(nil)
-		require.Nil(t, err)
-		return nil
+
+		var act []byte
+		_ = db.View(func(tx *badger.Txn) error {
+			item, err := tx.Get(key)
+			require.Nil(t, err)
+			act, err = item.ValueCopy(nil)
+			require.Nil(t, err)
+			return nil
+		})
+
+		assert.Equal(t, act, val)
 	})
-
-	assert.Equal(t, act, val)
 }
 
 func TestInsertDuplicate(t *testing.T) {
-	// TODO
+	runWithDb(t, func(db *badger.DB) {
+
+		e := Entity{ID: 1337}
+		e2 := Entity{ID: 1338}
+		key := []byte{0x01, 0x02, 0x03}
+
+		// persist first time
+		err := db.Update(insert(key, e))
+		require.NoError(t, err)
+
+		// Insert again
+		err = db.Update(insert(key, e))
+		require.Error(t, err)
+		require.Equal(t, err, storage.KeyAlreadyExistsErr)
+
+		// persist again, but using different method
+		err = db.Update(persist(key, e))
+		require.NoError(t, err)
+
+		// again with different data
+		err = db.Update(persist(key, e2))
+		require.Error(t, err)
+		require.Equal(t, err, storage.DifferentDataErr)
+
+	})
+
 }
 
 func TestUpdateValid(t *testing.T) {
 
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	defer os.RemoveAll(dir)
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
-	require.Nil(t, err)
+	runWithDb(t, func(db *badger.DB) {
 
-	e := Entity{ID: 1337}
-	key := []byte{0x01, 0x02, 0x03}
-	val := []byte(`{"ID":1337}`)
+		e := Entity{ID: 1337}
+		key := []byte{0x01, 0x02, 0x03}
+		val := []byte(`{"ID":1337}`)
 
-	_ = db.Update(func(tx *badger.Txn) error {
-		err := tx.Set(key, []byte{})
+		_ = db.Update(func(tx *badger.Txn) error {
+			err := tx.Set(key, []byte{})
+			require.Nil(t, err)
+			return nil
+		})
+
+		err := db.Update(update(key, e))
 		require.Nil(t, err)
-		return nil
+
+		var act []byte
+		_ = db.View(func(tx *badger.Txn) error {
+			item, err := tx.Get(key)
+			require.Nil(t, err)
+			act, err = item.ValueCopy(nil)
+			require.Nil(t, err)
+			return nil
+		})
+
+		assert.Equal(t, act, val)
+
 	})
 
-	err = db.Update(update(key, e))
-	require.Nil(t, err)
-
-	var act []byte
-	_ = db.View(func(tx *badger.Txn) error {
-		item, err := tx.Get(key)
-		require.Nil(t, err)
-		act, err = item.ValueCopy(nil)
-		require.Nil(t, err)
-		return nil
-	})
-
-	assert.Equal(t, act, val)
 }
 
 func TestUpdateMissing(t *testing.T) {
@@ -91,26 +124,26 @@ func TestUpdateMissing(t *testing.T) {
 
 func TestRetrieveValid(t *testing.T) {
 
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	defer os.RemoveAll(dir)
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
-	require.Nil(t, err)
+	runWithDb(t, func(db *badger.DB) {
 
-	e := Entity{ID: 1337}
-	key := []byte{0x01, 0x02, 0x03}
-	val := []byte(`{"ID":1337}`)
+		e := Entity{ID: 1337}
+		key := []byte{0x01, 0x02, 0x03}
+		val := []byte(`{"ID":1337}`)
 
-	_ = db.Update(func(tx *badger.Txn) error {
-		err := tx.Set(key, val)
+		_ = db.Update(func(tx *badger.Txn) error {
+			err := tx.Set(key, val)
+			require.Nil(t, err)
+			return nil
+		})
+
+		var act Entity
+		err := db.View(retrieve(key, &act))
 		require.Nil(t, err)
-		return nil
+
+		assert.Equal(t, act, e)
+
 	})
 
-	var act Entity
-	err = db.View(retrieve(key, &act))
-	require.Nil(t, err)
-
-	assert.Equal(t, act, e)
 }
 
 func TestRetrieveMissing(t *testing.T) {

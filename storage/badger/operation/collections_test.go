@@ -32,7 +32,7 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 
 	err = db.Update(func(tx *badger.Txn) error {
 		for _, coll := range expected {
-			if err := InsertGuaranteedCollection(coll.Fingerprint(), coll)(tx); err != nil {
+			if err := InsertGuaranteedCollection(coll)(tx); err != nil {
 				return err
 			}
 			if err := IndexGuaranteedCollectionByBlockHash(blockHash, coll)(tx); err != nil {
@@ -68,7 +68,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 	// insert block 1
 	err = db.Update(func(tx *badger.Txn) error {
 		for _, coll := range expected1 {
-			if err := InsertGuaranteedCollection(coll.Fingerprint(), coll)(tx); err != nil {
+			if err := InsertGuaranteedCollection(coll)(tx); err != nil {
 				return err
 			}
 			if err := IndexGuaranteedCollectionByBlockHash(block1Hash, coll)(tx); err != nil {
@@ -82,7 +82,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 	// insert block 2
 	err = db.Update(func(tx *badger.Txn) error {
 		for _, coll := range expected2 {
-			if err := InsertGuaranteedCollection(coll.Fingerprint(), coll)(tx); err != nil {
+			if err := InsertGuaranteedCollection(coll)(tx); err != nil {
 				return err
 			}
 			if err := IndexGuaranteedCollectionByBlockHash(block2Hash, coll)(tx); err != nil {
@@ -124,7 +124,7 @@ func TestCollections(t *testing.T) {
 	})
 
 	t.Run("Insert", func(t *testing.T) {
-		err := db.Update(InsertCollection(expected.Fingerprint(), &expected))
+		err := db.Update(InsertCollection(&expected))
 		require.NoError(t, err)
 
 		var actual flow.Collection

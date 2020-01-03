@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -180,9 +181,10 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		// check for role
 		var role flow.Role
 		err := operation.RetrieveRole(id.NodeID, &role)(tx)
-		if errors.Is(err, badger.ErrKeyNotFound) {
+		if err == storage.NotFoundErr {
 			continue
 		}
+
 		if err == nil {
 			return fmt.Errorf("identity role already exists (%x: %s)", id.NodeID, role)
 		}
@@ -195,9 +197,10 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		// check for address
 		var address string
 		err := operation.RetrieveAddress(id.NodeID, &address)(tx)
-		if errors.Is(err, badger.ErrKeyNotFound) {
+		if err == storage.NotFoundErr {
 			continue
 		}
+
 		if err == nil {
 			return fmt.Errorf("identity address already exists (%x: %s)", id.NodeID, address)
 		}
@@ -307,7 +310,7 @@ func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 
 	// insert the guaranteed collections into the DB
 	for _, coll := range block.GuaranteedCollections {
-		err = operation.InsertGuaranteedCollection(coll.Fingerprint(), coll)(tx)
+		err = operation.InsertGuaranteedCollection(coll)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}

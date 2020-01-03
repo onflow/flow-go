@@ -11,8 +11,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertCollection(hash flow.Fingerprint, collection *flow.Collection) func(*badger.Txn) error {
-	return insert(makePrefix(codeCollection, hash), collection)
+func InsertCollection(collection *flow.Collection) func(*badger.Txn) error {
+	return insert(makePrefix(codeCollection, collection.Fingerprint()), collection)
 }
 
 func RetrieveCollection(hash flow.Fingerprint, collection *flow.Collection) func(*badger.Txn) error {
@@ -23,8 +23,12 @@ func RemoveCollection(hash flow.Fingerprint) func(*badger.Txn) error {
 	return remove(makePrefix(codeCollection, hash))
 }
 
-func InsertGuaranteedCollection(hash flow.Fingerprint, gc *flow.GuaranteedCollection) func(*badger.Txn) error {
-	return insert(makePrefix(codeGuaranteedCollection, hash), gc)
+func InsertGuaranteedCollection(gc *flow.GuaranteedCollection) func(*badger.Txn) error {
+	return insert(makePrefix(codeGuaranteedCollection, gc.Fingerprint()), gc)
+}
+
+func PersistGuaranteedCollection(gc *flow.GuaranteedCollection) func(*badger.Txn) error {
+	return persist(makePrefix(codeGuaranteedCollection, gc.Fingerprint()), gc)
 }
 
 func RetrieveGuaranteedCollection(hash flow.Fingerprint, gc *flow.GuaranteedCollection) func(*badger.Txn) error {
@@ -32,7 +36,7 @@ func RetrieveGuaranteedCollection(hash flow.Fingerprint, gc *flow.GuaranteedColl
 }
 
 func IndexGuaranteedCollectionByBlockHash(blockHash crypto.Hash, gc *flow.GuaranteedCollection) func(*badger.Txn) error {
-	return insert(makePrefix(codeBlockHashToCollections, blockHash, gc.Fingerprint()), gc.Fingerprint())
+	return persist(makePrefix(codeBlockHashToCollections, blockHash, gc.Fingerprint()), gc.Fingerprint())
 }
 
 func RetrieveGuaranteedCollectionsByBlockHash(blockHash crypto.Hash, collections *[]*flow.GuaranteedCollection) func(*badger.Txn) error {

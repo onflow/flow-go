@@ -12,6 +12,10 @@ func InsertHash(number uint64, hash crypto.Hash) func(*badger.Txn) error {
 	return insert(makePrefix(codeHash, number), hash)
 }
 
+func PersistHash(number uint64, hash crypto.Hash) func(*badger.Txn) error {
+	return persist(makePrefix(codeHash, number), hash)
+}
+
 func RetrieveHash(number uint64, hash *crypto.Hash) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeHash, number), hash)
 }
