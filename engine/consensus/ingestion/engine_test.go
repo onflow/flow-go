@@ -14,7 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestOnGuaranteedCollectionValid(t *testing.T) {
+func TestOnCollectionGuaranteeValid(t *testing.T) {
 
 	prop := &network.Engine{}
 	state := &protocol.State{}
@@ -26,7 +26,7 @@ func TestOnGuaranteedCollectionValid(t *testing.T) {
 	}
 
 	originID := unittest.IdentifierFixture()
-	coll := &flow.GuaranteedCollection{CollectionHash: unittest.HashFixture(32)}
+	coll := &flow.CollectionGuarantee{CollectionHash: unittest.HashFixture(32)}
 	id := unittest.IdentityFixture()
 	id.Role = flow.RoleCollection
 
@@ -34,7 +34,7 @@ func TestOnGuaranteedCollectionValid(t *testing.T) {
 	final.On("Identity", originID).Return(id, nil).Once()
 	prop.On("SubmitLocal", coll).Return().Once()
 
-	err := e.onGuaranteedCollection(originID, coll)
+	err := e.onCollectionGuarantee(originID, coll)
 	require.NoError(t, err)
 
 	state.AssertExpectations(t)
@@ -42,7 +42,7 @@ func TestOnGuaranteedCollectionValid(t *testing.T) {
 	prop.AssertExpectations(t)
 }
 
-func TestOnGuaranteedCollectionMissingIdentity(t *testing.T) {
+func TestOnCollectionGuaranteeMissingIdentity(t *testing.T) {
 
 	prop := &network.Engine{}
 	state := &protocol.State{}
@@ -54,14 +54,14 @@ func TestOnGuaranteedCollectionMissingIdentity(t *testing.T) {
 	}
 
 	originID := unittest.IdentifierFixture()
-	coll := &flow.GuaranteedCollection{CollectionHash: unittest.HashFixture(32)}
+	coll := &flow.CollectionGuarantee{CollectionHash: unittest.HashFixture(32)}
 	id := unittest.IdentityFixture()
 	id.Role = flow.RoleCollection
 
 	state.On("Final").Return(final).Once()
 	final.On("Identity", originID).Return(flow.Identity{}, errors.New("identity error")).Once()
 
-	err := e.onGuaranteedCollection(originID, coll)
+	err := e.onCollectionGuarantee(originID, coll)
 	require.Error(t, err)
 
 	state.AssertExpectations(t)
@@ -69,7 +69,7 @@ func TestOnGuaranteedCollectionMissingIdentity(t *testing.T) {
 	prop.AssertExpectations(t)
 }
 
-func TestOnGuaranteedCollectionInvalidRole(t *testing.T) {
+func TestOnCollectionGuaranteeInvalidRole(t *testing.T) {
 
 	prop := &network.Engine{}
 	state := &protocol.State{}
@@ -81,14 +81,14 @@ func TestOnGuaranteedCollectionInvalidRole(t *testing.T) {
 	}
 
 	originID := unittest.IdentifierFixture()
-	coll := &flow.GuaranteedCollection{CollectionHash: unittest.HashFixture(32)}
+	coll := &flow.CollectionGuarantee{CollectionHash: unittest.HashFixture(32)}
 	id := unittest.IdentityFixture()
 	id.Role = flow.RoleConsensus
 
 	state.On("Final").Return(final).Once()
 	final.On("Identity", originID).Return(id, nil).Once()
 
-	err := e.onGuaranteedCollection(originID, coll)
+	err := e.onCollectionGuarantee(originID, coll)
 	require.Error(t, err)
 
 	state.AssertExpectations(t)

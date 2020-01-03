@@ -13,16 +13,16 @@ type Collections interface {
 	// collection fingerprint.
 	TransactionsByFingerprint(hash flow.Fingerprint) ([]*flow.Transaction, error)
 
-	// Insert inserts the collection, keyed by fingerprint.
-	Insert(collection *flow.Collection) error
+	// Save inserts the collection, keyed by fingerprint.
+	Save(collection *flow.Collection) error
 
 	// Remove removes the collection.
 	Remove(hash flow.Fingerprint) error
 
 	// InsertGuarantee inserts the guarantee for the given collection, keyed by
 	// the collection fingerprint.
-	InsertGuarantee(gc *flow.GuaranteedCollection) error
+	InsertGuarantee(gc *flow.CollectionGuarantee) error
 
 	// GuaranteeByFingerprint returns the guarantee for the given collection.
-	GuaranteeByFingerprint(hash flow.Fingerprint) (*flow.GuaranteedCollection, error)
+	GuaranteeByFingerprint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error)
 }

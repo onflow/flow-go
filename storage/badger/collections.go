@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/ethereum/go-ethereum/signer/storage"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -30,7 +30,7 @@ func (c *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, er
 	})
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			return nil, storage.ErrNotFound
+			return nil, storage.NotFoundErr
 		}
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}
@@ -48,7 +48,7 @@ func (c *Collections) TransactionsByFingerprint(hash flow.Fingerprint) ([]*flow.
 		err := operation.RetrieveCollection(hash, &collection)(tx)
 		if err != nil {
 			if errors.Is(err, badger.ErrKeyNotFound) {
-				return storage.ErrNotFound
+				return storage.NotFoundErr
 			}
 			return fmt.Errorf("could not retrieve collection: %w", err)
 		}
@@ -58,12 +58,13 @@ func (c *Collections) TransactionsByFingerprint(hash flow.Fingerprint) ([]*flow.
 			err = operation.RetrieveTransaction(txHash, &transaction)(tx)
 			if err != nil {
 				if errors.Is(err, badger.ErrKeyNotFound) {
-					return storage.ErrNotFound
+					return storage.NotFoundErr
 				}
 				return fmt.Errorf("could not retrieve transaction: %w", err)
 			}
 
 			transactions = append(transactions, &transaction)
+
 		}
 
 		return nil
@@ -75,9 +76,9 @@ func (c *Collections) TransactionsByFingerprint(hash flow.Fingerprint) ([]*flow.
 	return transactions, nil
 }
 
-func (c *Collections) Insert(collection *flow.Collection) error {
+func (c *Collections) Save(collection *flow.Collection) error {
 	return c.db.Update(func(tx *badger.Txn) error {
-		err := operation.InsertCollection(collection)(tx)
+		err := operation.PersistCollection(collection)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
@@ -95,24 +96,24 @@ func (c *Collections) Remove(hash flow.Fingerprint) error {
 	})
 }
 
-func (c *Collections) InsertGuarantee(gc *flow.GuaranteedCollection) error {
+func (c *Collections) InsertGuarantee(gc *flow.CollectionGuarantee) error {
 	return c.db.Update(func(tx *badger.Txn) error {
-		err := operation.InsertGuaranteedCollection(gc)(tx)
+		err := operation.InsertCollectionGuarantee(gc)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert guaranteed collection: %w", err)
+			return fmt.Errorf("could not insert collection guarantee: %w", err)
 		}
 		return nil
 	})
 }
 
-func (c *Collections) GuaranteeByFingerprint(hash flow.Fingerprint) (*flow.GuaranteedCollection, error) {
-	var gc flow.GuaranteedCollection
+func (c *Collections) GuaranteeByFingerprint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error) {
+	var gc flow.CollectionGuarantee
 
 	err := c.db.View(func(tx *badger.Txn) error {
-		return operation.RetrieveGuaranteedCollection(hash, &gc)(tx)
+		return operation.RetrieveCollectionGuarantee(hash, &gc)(tx)
 	})
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve guaranteed collection: %w", err)
+		return nil, fmt.Errorf("could not retrieve collection guarantee: %w", err)
 	}
 
 	return &gc, nil

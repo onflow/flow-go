@@ -2,10 +2,6 @@ package badger_test
 
 import (
 	"errors"
-	"fmt"
-	"math/rand"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -18,20 +14,9 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func runWithDb(t *testing.T, f func(*badger.DB)) {
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
-	require.Nil(t, err)
-
-	f(db)
-
-	db.Close()
-	os.RemoveAll(dir)
-}
-
 func TestRetrievalByNumber(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		blocks := badgerstorage.NewBlocks(db)
 
 		block := unittest.BlockFixture()
@@ -47,9 +32,9 @@ func TestRetrievalByNumber(t *testing.T) {
 	})
 }
 
-func TestRetrievalByNonexistingNumber(t *testing.T) {
+func TestBlockRetrievalByNonexistingNumber(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		blocks := badgerstorage.NewBlocks(db)
 
@@ -67,7 +52,7 @@ func TestRetrievalByNonexistingNumber(t *testing.T) {
 
 func TestStoringSameBlockTwice(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		blocks := badgerstorage.NewBlocks(db)
 
@@ -84,7 +69,7 @@ func TestStoringSameBlockTwice(t *testing.T) {
 
 func TestStoringBlockWithDifferentDateButSameNumberTwice(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		blocks := badgerstorage.NewBlocks(db)
 

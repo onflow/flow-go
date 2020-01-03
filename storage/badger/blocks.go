@@ -90,18 +90,18 @@ func (b *Blocks) retrieveBlock(tx *badger.Txn, hash crypto.Hash) (*flow.Block, e
 		return nil, fmt.Errorf("could not retrieve identities: %w", err)
 	}
 
-	// get the guaranteed collections
-	var collections []*flow.GuaranteedCollection
-	err = operation.RetrieveGuaranteedCollectionsByBlockHash(hash, &collections)(tx)
+	// get the collection guarantees
+	var guarantees []*flow.CollectionGuarantee
+	err = operation.RetrieveCollectionGuaranteesByBlockHash(hash, &guarantees)(tx)
 	if err != nil {
-		return nil, fmt.Errorf("could not retreive guaranteed collections: %w", err)
+		return nil, fmt.Errorf("could not retreive collection guarantees: %w", err)
 	}
 
 	// create the block
 	block := &flow.Block{
-		Header:                header,
-		NewIdentities:         identities,
-		GuaranteedCollections: collections,
+		Header:               header,
+		NewIdentities:        identities,
+		CollectionGuarantees: guarantees,
 	}
 
 	return block, nil
@@ -121,12 +121,12 @@ func (b *Blocks) Save(block *flow.Block) error {
 			return fmt.Errorf("could not save block: %w", err)
 		}
 
-		for _, gc := range block.GuaranteedCollections {
-			err = operation.PersistGuaranteedCollection(gc)(tx)
+		for _, gc := range block.CollectionGuarantees {
+			err = operation.PersistCollectionGuarantee(gc)(tx)
 			if err != nil {
 				return fmt.Errorf("could not save guaranteed collection: %w", err)
 			}
-			err = operation.IndexGuaranteedCollectionByBlockHash(block.Hash(), gc)(tx)
+			err = operation.IndexCollectionGuaranteeByBlockHash(block.Hash(), gc)(tx)
 			if err != nil {
 				return fmt.Errorf("could not index guaranteed collection by block hash: %w", err)
 			}

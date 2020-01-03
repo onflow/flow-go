@@ -18,7 +18,7 @@ const (
 	codeIdentities             = 21
 	codeTransaction            = 22
 	codeCollection             = 23
-	codeGuaranteedCollection   = 24
+	codeCollectionGuarantee    = 24
 	codeHash                   = 100 // block number to hash
 	codeBoundary               = 101
 	codeBlockHashToCollections = 102

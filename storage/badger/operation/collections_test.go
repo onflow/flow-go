@@ -11,22 +11,23 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		blockHash := crypto.Hash{0x12, 0x34}
-		expected := []*flow.GuaranteedCollection{
+		expected := []*flow.CollectionGuarantee{
 			{CollectionHash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x10}}},
 			{CollectionHash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x20}}},
 		}
 
 		err := db.Update(func(tx *badger.Txn) error {
 			for _, coll := range expected {
-				if err := InsertGuaranteedCollection(coll)(tx); err != nil {
+				if err := InsertCollectionGuarantee(coll)(tx); err != nil {
 					return err
 				}
-				if err := IndexGuaranteedCollectionByBlockHash(blockHash, coll)(tx); err != nil {
+				if err := IndexCollectionGuaranteeByBlockHash(blockHash, coll)(tx); err != nil {
 					return err
 				}
 			}
@@ -34,8 +35,8 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		})
 		require.Nil(t, err)
 
-		var actual []*flow.GuaranteedCollection
-		err = db.View(RetrieveGuaranteedCollectionsByBlockHash(blockHash, &actual))
+		var actual []*flow.CollectionGuarantee
+		err = db.View(RetrieveCollectionGuaranteesByBlockHash(blockHash, &actual))
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)
@@ -43,23 +44,23 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 }
 
 func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		block1Hash := crypto.Hash{0x10}
 		block2Hash := crypto.Hash{0x20}
-		expected1 := []*flow.GuaranteedCollection{
+		expected1 := []*flow.CollectionGuarantee{
 			{CollectionHash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x1}}},
 		}
-		expected2 := []*flow.GuaranteedCollection{
+		expected2 := []*flow.CollectionGuarantee{
 			{CollectionHash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x2}}},
 		}
 
 		// insert block 1
 		err := db.Update(func(tx *badger.Txn) error {
 			for _, coll := range expected1 {
-				if err := InsertGuaranteedCollection(coll)(tx); err != nil {
+				if err := InsertCollectionGuarantee(coll)(tx); err != nil {
 					return err
 				}
-				if err := IndexGuaranteedCollectionByBlockHash(block1Hash, coll)(tx); err != nil {
+				if err := IndexCollectionGuaranteeByBlockHash(block1Hash, coll)(tx); err != nil {
 					return err
 				}
 			}
@@ -70,10 +71,10 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		// insert block 2
 		err = db.Update(func(tx *badger.Txn) error {
 			for _, coll := range expected2 {
-				if err := InsertGuaranteedCollection(coll)(tx); err != nil {
+				if err := InsertCollectionGuarantee(coll)(tx); err != nil {
 					return err
 				}
-				if err := IndexGuaranteedCollectionByBlockHash(block2Hash, coll)(tx); err != nil {
+				if err := IndexCollectionGuaranteeByBlockHash(block2Hash, coll)(tx); err != nil {
 					return err
 				}
 			}
@@ -82,14 +83,14 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		require.Nil(t, err)
 
 		t.Run("should retrieve collections for block", func(t *testing.T) {
-			var actual1 []*flow.GuaranteedCollection
-			err = db.View(RetrieveGuaranteedCollectionsByBlockHash(block1Hash, &actual1))
+			var actual1 []*flow.CollectionGuarantee
+			err = db.View(RetrieveCollectionGuaranteesByBlockHash(block1Hash, &actual1))
 			assert.NoError(t, err)
 			assert.Equal(t, expected1, actual1)
 
 			// get block 2
-			var actual2 []*flow.GuaranteedCollection
-			err = db.View(RetrieveGuaranteedCollectionsByBlockHash(block2Hash, &actual2))
+			var actual2 []*flow.CollectionGuarantee
+			err = db.View(RetrieveCollectionGuaranteesByBlockHash(block2Hash, &actual2))
 			assert.NoError(t, err)
 			assert.Equal(t, expected1, actual1)
 		})
@@ -97,7 +98,7 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 }
 
 func TestCollections(t *testing.T) {
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := flow.Collection{
 			Transactions: []flow.Fingerprint{[]byte{1}, []byte{2}},
 		}
@@ -108,7 +109,7 @@ func TestCollections(t *testing.T) {
 			assert.Error(t, err)
 		})
 
-		t.Run("Insert", func(t *testing.T) {
+		t.Run("Save", func(t *testing.T) {
 			err := db.Update(InsertCollection(&expected))
 			require.NoError(t, err)
 
@@ -128,5 +129,4 @@ func TestCollections(t *testing.T) {
 			assert.Error(t, err)
 		})
 	})
-
 }

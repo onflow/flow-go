@@ -12,7 +12,7 @@ import (
 )
 
 func TestCollectionPool(t *testing.T) {
-	item := &flow.GuaranteedCollection{
+	item := &flow.CollectionGuarantee{
 		CollectionHash: crypto.Hash("DEADBEEF"),
 	}
 

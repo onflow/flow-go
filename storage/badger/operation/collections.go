@@ -15,6 +15,10 @@ func InsertCollection(collection *flow.Collection) func(*badger.Txn) error {
 	return insert(makePrefix(codeCollection, collection.Fingerprint()), collection)
 }
 
+func PersistCollection(collection *flow.Collection) func(*badger.Txn) error {
+	return persist(makePrefix(codeCollection, collection.Fingerprint()), collection)
+}
+
 func RetrieveCollection(hash flow.Fingerprint, collection *flow.Collection) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollection, hash), collection)
 }
@@ -23,23 +27,23 @@ func RemoveCollection(hash flow.Fingerprint) func(*badger.Txn) error {
 	return remove(makePrefix(codeCollection, hash))
 }
 
-func InsertGuaranteedCollection(gc *flow.GuaranteedCollection) func(*badger.Txn) error {
-	return insert(makePrefix(codeGuaranteedCollection, gc.Fingerprint()), gc)
+func InsertCollectionGuarantee(gc *flow.CollectionGuarantee) func(*badger.Txn) error {
+	return insert(makePrefix(codeCollectionGuarantee, gc.Fingerprint()), gc)
 }
 
-func PersistGuaranteedCollection(gc *flow.GuaranteedCollection) func(*badger.Txn) error {
-	return persist(makePrefix(codeGuaranteedCollection, gc.Fingerprint()), gc)
+func PersistCollectionGuarantee(gc *flow.CollectionGuarantee) func(*badger.Txn) error {
+	return persist(makePrefix(codeCollectionGuarantee, gc.Fingerprint()), gc)
 }
 
-func RetrieveGuaranteedCollection(hash flow.Fingerprint, gc *flow.GuaranteedCollection) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeGuaranteedCollection, hash), gc)
+func RetrieveCollectionGuarantee(hash flow.Fingerprint, gc *flow.CollectionGuarantee) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeCollectionGuarantee, hash), gc)
 }
 
-func IndexGuaranteedCollectionByBlockHash(blockHash crypto.Hash, gc *flow.GuaranteedCollection) func(*badger.Txn) error {
+func IndexCollectionGuaranteeByBlockHash(blockHash crypto.Hash, gc *flow.CollectionGuarantee) func(*badger.Txn) error {
 	return persist(makePrefix(codeBlockHashToCollections, blockHash, gc.Fingerprint()), gc.Fingerprint())
 }
 
-func RetrieveGuaranteedCollectionsByBlockHash(blockHash crypto.Hash, collections *[]*flow.GuaranteedCollection) func(*badger.Txn) error {
+func RetrieveCollectionGuaranteesByBlockHash(blockHash crypto.Hash, collections *[]*flow.CollectionGuarantee) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		iter := func() (checkFunc, createFunc, handleFunc) {
@@ -58,8 +62,8 @@ func RetrieveGuaranteedCollectionsByBlockHash(blockHash crypto.Hash, collections
 					return fmt.Errorf("collection hash was not decoded")
 				}
 
-				var collection flow.GuaranteedCollection
-				err := RetrieveGuaranteedCollection(hash, &collection)(tx)
+				var collection flow.CollectionGuarantee
+				err := RetrieveCollectionGuarantee(hash, &collection)(tx)
 				if err != nil {
 					return fmt.Errorf("failed to retrieve collection: %w", err)
 				}
