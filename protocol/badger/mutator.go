@@ -132,7 +132,7 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 			}
 
 			// get the guaranteed collections
-			err = operation.RetrieveGuaranteedCollectionByBlockHash(s.hash, &collections)(tx)
+			err = operation.RetrieveGuaranteedCollectionsByBlockHash(s.hash, &collections)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve collections (%x): %w", s.hash, err)
 			}

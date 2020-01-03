@@ -155,6 +155,8 @@ func iterate(prefix []byte, start []byte, end []byte, iteration iterationFunc) f
 	return func(tx *badger.Txn) error {
 
 		opts := badger.DefaultIteratorOptions
+		// NOTE: this is an optimatization only, it does not enforce that all
+		// results in the iteration have this prefix.
 		if prefix != nil {
 			opts.Prefix = prefix
 		}
@@ -172,6 +174,11 @@ func iterate(prefix []byte, start []byte, end []byte, iteration iterationFunc) f
 			// check if we have reached the end of our iteration
 			item := it.Item()
 			if end != nil && bytes.Compare(item.Key(), end) > 0 {
+				break
+			}
+
+			// check that the prefix is valid
+			if prefix != nil && !it.ValidForPrefix(prefix) {
 				break
 			}
 
