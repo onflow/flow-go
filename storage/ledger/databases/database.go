@@ -19,6 +19,12 @@ type DAL interface {
 	// GetKVDB gets the key from the KVDB.
 	GetKVDB(key []byte) ([]byte, error)
 
+	// CopyDB returns a copy of this database.
+	CopyDB(stateRootIndex string) (DAL, error)
+
+	// PruneDB removes all values from this database that also exist in the provided database.
+	PruneDB(next DAL) error
+
 	// SafeClose attempts to safely close the databases.
 	SafeClose() (error, error)
 }

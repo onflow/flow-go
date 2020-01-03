@@ -7,10 +7,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/lvldb"
-	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/gammazero/deque"
 	"github.com/hashicorp/golang-lru"
+
+	"github.com/dapperlabs/flow-go/storage/ledger/databases"
+	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
 var EmptySlice []byte
@@ -28,20 +29,20 @@ type node struct {
 
 // SMT is a Basic Sparse Merkle Tree struct
 type SMT struct {
-	root                 *node                   // Root
-	defaultHashes        [256][]byte             // The zero hashes of the level of the tree
-	height               int                     // Height of the tree
-	database             *lvldb.LvlDb            // The Database Interface for the trie
-	historicalStates     map[string]*lvldb.LvlDb // Map of string representations of Historical States to Historical Database references
-	cachedBranches       map[string]*proofHolder // Map of string representationf of keys to proofs
-	historicalStateRoots deque.Deque             // FIFO queue of historical State Roots in historicalStates map
-	numHistoricalStates  int                     // Number of states to keep in historicalStates
-	snapshotInterval     int                     // When removing full states from historical states interval between full states
-	numFullStates        int                     // Number of Full States to keep in historicalStates
-	lruCache             *lru.Cache              // LRU cache of stringified keys to proofs
+	root                 *node                    // Root
+	defaultHashes        [256][]byte              // The zero hashes of the level of the tree
+	height               int                      // Height of the tree
+	database             databases.DAL            // The Database Interface for the trie
+	historicalStates     map[string]databases.DAL // Map of string representations of Historical States to Historical Database references
+	cachedBranches       map[string]*proofHolder  // Map of string representationf of keys to proofs
+	historicalStateRoots deque.Deque              // FIFO queue of historical State Roots in historicalStates map
+	numHistoricalStates  int                      // Number of states to keep in historicalStates
+	snapshotInterval     int                      // When removing full states from historical states interval between full states
+	numFullStates        int                      // Number of Full States to keep in historicalStates
+	lruCache             *lru.Cache               // LRU cache of stringified keys to proofs
 }
 
-// Hash hashes any input with SHA256
+// Hash hashes any input with SHA256.
 func Hash(data ...[]byte) []byte {
 	hasher := sha256.New()
 	for i := 0; i < len(data); i++ {
@@ -65,32 +66,37 @@ func newNode(value []byte, height int) *node {
 	return n
 }
 
-//GetValue returns the Value of the Node
+// GetValue returns the value of the node.
 func (n *node) GetValue() []byte {
 	return n.value
 }
 
-// GetHeight returns the height of the node
+// GetHeight returns the height of the node.
 func (n *node) GetHeight() int {
 	return n.height
 }
 
-// NewSMT creates a new Sparse Merkle Tree
-// Height must be greater than 1
-// Creates the default hashes and populates the tree
-func NewSMT(height int, cacheSize int, interval int, numHistoricalStates int, numFullStates int) (*SMT, error) {
-
+// NewSMT creates a new Sparse Merkle Tree.
+//
+// This function creates the default hashes and populates the tree.
+//
+// Note: height must be greater than 1.
+func NewSMT(
+	db databases.DAL,
+	height int,
+	cacheSize int,
+	interval int,
+	numHistoricalStates int,
+	numFullStates int,
+) (*SMT, error) {
 	if height < 1 {
 		return nil, errors.New("Height of SMT must be at least 1")
 	}
 
 	s := new(SMT)
+
+	s.database = db
 	s.height = height
-	data, err := lvldb.NewLvlDb()
-	if err != nil {
-		return nil, err
-	}
-	s.database = data
 
 	// Creates the Default hashes from base to level height
 	s.defaultHashes[0] = defaultLeafHash
@@ -100,15 +106,18 @@ func NewSMT(height int, cacheSize int, interval int, numHistoricalStates int, nu
 
 	// Set root to the highest level default node
 	s.root = newNode(s.defaultHashes[height-1], height-1)
-	s.historicalStates = make(map[string]*lvldb.LvlDb)
+	s.historicalStates = make(map[string]databases.DAL)
 	s.numHistoricalStates = numHistoricalStates
 	s.numFullStates = numFullStates
 	s.snapshotInterval = interval
 	s.cachedBranches = make(map[string]*proofHolder)
-	s.lruCache, err = lru.New(cacheSize)
+
+	lruCache, err := lru.New(cacheSize)
 	if err != nil {
 		return nil, err
 	}
+
+	s.lruCache = lruCache
 
 	return s, nil
 }
@@ -371,7 +380,7 @@ func (s *SMT) getStateIndex(stateRoot string) int {
 }
 
 // GetHistoricalProof reconstructs a proof of inclusion or exclusion for a value in a historical database then returns the flag and proof
-func (s *SMT) GetHistoricalProof(key []byte, root []byte, database *lvldb.LvlDb) ([]byte, [][]byte, uint8, bool, error) {
+func (s *SMT) GetHistoricalProof(key []byte, root []byte, database databases.DAL) ([]byte, [][]byte, uint8, bool, error) {
 	flag := make([]byte, s.GetHeight()/8)
 	proof := make([][]byte, 0)
 	proofLen := uint8(0)
@@ -471,8 +480,9 @@ func (s *SMT) GetHistoricalProof(key []byte, root []byte, database *lvldb.LvlDb)
 
 }
 
-//VerifyInclusionProof caculates the inclusion proof from a given root, flag, prooflist, and size
-//This function is exclusively for inclusive proofs
+// VerifyInclusionProof calculates the inclusion proof from a given root, flag, proof list, and size.
+//
+// This function is exclusively for inclusive proofs
 func VerifyInclusionProof(key []byte, value []byte, flag []byte, proof [][]byte, size uint8, root []byte, hashes [256][]byte, height int) bool {
 	// get index of proof we start our calculations from
 	proofIndex := 0
@@ -484,7 +494,7 @@ func VerifyInclusionProof(key []byte, value []byte, flag []byte, proof [][]byte,
 	// base case at the bottom of the trie
 	computed := Hash(key, value)
 	for i := int(size); i > 0; i-- {
-		//hashing is order dependant
+		// hashing is order dependant
 		if utils.IsBitSet(key, i-1) {
 			if !utils.IsBitSet(flag, i-1) {
 				computed = Hash(hashes[(height-1)-i], computed)

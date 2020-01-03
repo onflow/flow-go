@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"github.com/dapperlabs/flow-go/storage/ledger/databases/lvldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
@@ -10,8 +11,20 @@ type TrieStorage struct {
 }
 
 // NewTrieStorage creates a new trie-backed ledger storage.
-func NewTrieStorage() (*TrieStorage, error) {
-	tree, err := trie.NewSMT(255, 10000000, 1000, 1000000, 1000)
+func NewTrieStorage(kvdbPath, tdbPath string) (*TrieStorage, error) {
+	db, err := lvldb.NewLvlDB(kvdbPath, tdbPath)
+	if err != nil {
+		return nil, err
+	}
+
+	tree, err := trie.NewSMT(
+		db,
+		255,
+		10000000,
+		1000,
+		1000000,
+		1000,
+	)
 	if err != nil {
 		return nil, err
 	}

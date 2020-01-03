@@ -119,7 +119,7 @@ func (s *LvlDB) UpdateTrieDB() error {
 	return nil
 }
 
-func (s *LvlDB) CopyDB(stateRootIndex string) (*LvlDB, error) {
+func (s *LvlDB) CopyDB(stateRootIndex string) (databases.DAL, error) {
 	backup, err := NewBackupLvlDB(stateRootIndex)
 
 	if err != nil {
@@ -141,8 +141,10 @@ func (s *LvlDB) CopyDB(stateRootIndex string) (*LvlDB, error) {
 	return backup, nil
 }
 
-// PruneDB takes the current LvlDB instance and removed any key value pairs that also appear in the LvlDB instance next
-func (s *LvlDB) PruneDB(next *LvlDB) error {
+// PruneDB takes the current LvlDB instance and removes any key-value pairs that also appear in the next LvlDB instance.
+func (s *LvlDB) PruneDB(next databases.DAL) error {
+	nextLvlDB := next.(*LvlDB)
+
 	iterKVDB := s.kvdb.NewIterator(nil, nil)
 	defer iterKVDB.Release()
 
@@ -152,7 +154,7 @@ func (s *LvlDB) PruneDB(next *LvlDB) error {
 		// here we ignore the error because we don't care if the value is actually in the other db
 		// we only care if about the value retrieved from the next db and if it is equal to the
 		// value retrieved from our current db instance
-		val, _ := next.kvdb.Get(key, nil)
+		val, _ := nextLvlDB.kvdb.Get(key, nil)
 		oval, err2 := s.kvdb.Get(key, nil)
 
 		if err2 != nil {
@@ -180,7 +182,7 @@ func (s *LvlDB) PruneDB(next *LvlDB) error {
 		key := iterTDB.Key()
 
 		// see above rationale for ignoring error
-		val, _ := next.tdb.Get(key, nil)
+		val, _ := nextLvlDB.tdb.Get(key, nil)
 		oval, err2 := s.tdb.Get(key, nil)
 
 		if err2 != nil {

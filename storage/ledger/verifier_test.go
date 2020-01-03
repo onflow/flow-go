@@ -7,7 +7,7 @@ import (
 )
 
 func TestTrieUntrustedAndVerify(t *testing.T) {
-	f, err := NewTrieStorage()
+	f, err := NewTrieStorage(kvdbPath, tdbPath)
 	if err != nil {
 		t.Fatal(err)
 	}

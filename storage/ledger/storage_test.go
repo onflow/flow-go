@@ -8,8 +8,15 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
+const (
+	// kvdbPath is the path to the key-value database.
+	kvdbPath = "db/valuedb"
+	// tdbPath is the path to the trie database.
+	tdbPath = "db/triedb"
+)
+
 func TestNewTrieStorage(t *testing.T) {
-	f, err := NewTrieStorage()
+	f, err := NewTrieStorage(kvdbPath, tdbPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -18,7 +25,7 @@ func TestNewTrieStorage(t *testing.T) {
 }
 
 func TestTrieTrusted(t *testing.T) {
-	f, err := NewTrieStorage()
+	f, err := NewTrieStorage(kvdbPath, tdbPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +56,7 @@ func TestTrieTrusted(t *testing.T) {
 }
 
 func TestTrieUntrusted(t *testing.T) {
-	f, err := NewTrieStorage()
+	f, err := NewTrieStorage(kvdbPath, tdbPath)
 	if err != nil {
 		t.Fatal(err)
 	}
