@@ -51,6 +51,8 @@ func (e *blockExecutor) ExecuteBlock(
 func (e *blockExecutor) executeTransactions(txs []*flow.Transaction) ([]*flow.Chunk, error) {
 	// TODO: implement real chunking
 	// MVP uses single chunk per block
+
+	// TODO: get last state commitment from previous block
 	chunkView := e.state.NewView(nil)
 
 	for _, tx := range txs {
