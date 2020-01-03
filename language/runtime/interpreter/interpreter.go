@@ -100,7 +100,7 @@ type StorageKeyHandlerFunc func(
 type InjectedCompositeFieldsHandlerFunc func(
 	inter *Interpreter,
 	location ast.Location,
-	compositeIdentifier string,
+	typeID sema.TypeID,
 	compositeKind common.CompositeKind,
 ) map[string]Value
 
@@ -119,16 +119,19 @@ type ImportProgramHandlerFunc func(
 	location ast.Location,
 ) *ast.Program
 
+type typeCode struct {
+	compositeFunctions map[string]FunctionValue
+	destructorFunction *InterpretedFunctionValue
+}
+
 type Interpreter struct {
 	Checker                        *sema.Checker
 	PredefinedValues               map[string]Value
 	activations                    *activations.Activations
 	Globals                        map[string]*Variable
-	InterfaceDeclarations          map[*sema.InterfaceType]*ast.InterfaceDeclaration
-	CompositeDeclarations          map[*sema.CompositeType]*ast.CompositeDeclaration
-	CompositeFunctions             map[string]map[string]FunctionValue
-	DestructorFunctions            map[string]*InterpretedFunctionValue
-	SubInterpreters                map[ast.LocationID]*Interpreter
+	allInterpreters                map[ast.LocationID]*Interpreter
+	allCheckers                    map[ast.LocationID]*sema.Checker
+	typeCode                       map[sema.TypeID]typeCode
 	Transactions                   []*HostFunctionValue
 	onEventEmitted                 OnEventEmittedFunc
 	onStatement                    OnStatementFunc
@@ -240,21 +243,51 @@ func WithImportProgramHandler(handler ImportProgramHandlerFunc) Option {
 	}
 }
 
+// WithAllInterpreters returns an interpreter option which sets
+// the given map of interpreters as the map of all interpreters.
+//
+func WithAllInterpreters(allInterpreters map[ast.LocationID]*Interpreter) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetAllInterpreters(allInterpreters)
+		return nil
+	}
+}
+
+// WithAllCheckers returns an interpreter option which sets
+// the given map of checkers as the map of all checkers.
+//
+func WithAllCheckers(allCheckers map[ast.LocationID]*sema.Checker) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.SetAllCheckers(allCheckers)
+		return nil
+	}
+}
+
+// withTypeCode returns an interpreter option which sets the type code.
+//
+func withTypeCode(typeCode map[sema.TypeID]typeCode) Option {
+	return func(interpreter *Interpreter) error {
+		interpreter.setTypeCode(typeCode)
+		return nil
+	}
+}
+
 func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, error) {
 	interpreter := &Interpreter{
-		Checker:               checker,
-		activations:           &activations.Activations{},
-		Globals:               map[string]*Variable{},
-		InterfaceDeclarations: map[*sema.InterfaceType]*ast.InterfaceDeclaration{},
-		CompositeDeclarations: map[*sema.CompositeType]*ast.CompositeDeclaration{},
-		CompositeFunctions:    map[string]map[string]FunctionValue{},
-		DestructorFunctions:   map[string]*InterpretedFunctionValue{},
-		SubInterpreters:       map[ast.LocationID]*Interpreter{},
+		Checker:     checker,
+		activations: &activations.Activations{},
+		Globals:     map[string]*Variable{},
+	}
+
+	defaultOptions := []Option{
+		WithAllInterpreters(map[ast.LocationID]*Interpreter{}),
+		WithAllCheckers(map[ast.LocationID]*sema.Checker{}),
+		withTypeCode(map[sema.TypeID]typeCode{}),
 	}
 
 	interpreter.defineBaseFunctions()
 
-	for _, option := range options {
+	for _, option := range append(defaultOptions, options...) {
 		err := option(interpreter)
 		if err != nil {
 			return nil, err
@@ -311,6 +344,31 @@ func (interpreter *Interpreter) SetContractValueHandler(function ContractValueHa
 //
 func (interpreter *Interpreter) SetImportProgramHandler(function ImportProgramHandlerFunc) {
 	interpreter.importProgramHandler = function
+}
+
+// SetAllInterpreters sets the given map of interpreters as the map of all interpreters.
+//
+func (interpreter *Interpreter) SetAllInterpreters(allInterpreters map[ast.LocationID]*Interpreter) {
+	interpreter.allInterpreters = allInterpreters
+
+	// Register self
+	interpreter.allInterpreters[interpreter.Checker.Location.ID()] = interpreter
+}
+
+// SetAllCheckers sets the given map of checkers as the map of all checkers.
+//
+func (interpreter *Interpreter) SetAllCheckers(allCheckers map[ast.LocationID]*sema.Checker) {
+	interpreter.allCheckers = allCheckers
+
+	// Register self
+	checker := interpreter.Checker
+	interpreter.allCheckers[checker.Location.ID()] = checker
+}
+
+// setTypeCode sets the type code.
+//
+func (interpreter *Interpreter) setTypeCode(typeCode map[sema.TypeID]typeCode) {
+	interpreter.typeCode = typeCode
 }
 
 // locationRange returns a new location range for the given positioned element.
@@ -423,7 +481,7 @@ func (interpreter *Interpreter) interpret() Trampoline {
 func (interpreter *Interpreter) prepareInterpretation() {
 	program := interpreter.Checker.Program
 
-	// Pre-declare empty variables for all structures, interfaces, and function declarations
+	// Pre-declare empty variables for all interfaces, composites, and function declarations
 	for _, declaration := range program.InterfaceDeclarations() {
 		interpreter.declareVariable(declaration.Identifier.Identifier, nil)
 	}
@@ -739,7 +797,7 @@ func (interpreter *Interpreter) visitStatements(statements []ast.Statement) Tram
 	})
 }
 
-func (interpreter *Interpreter) VisitFunctionBlock(functionBlock *ast.FunctionBlock) ast.Repr {
+func (interpreter *Interpreter) VisitFunctionBlock(_ *ast.FunctionBlock) ast.Repr {
 	// NOTE: see visitBlock
 	panic(errors.NewUnreachableError())
 }
@@ -854,11 +912,11 @@ func (interpreter *Interpreter) VisitReturnStatement(statement *ast.ReturnStatem
 		})
 }
 
-func (interpreter *Interpreter) VisitBreakStatement(statement *ast.BreakStatement) ast.Repr {
+func (interpreter *Interpreter) VisitBreakStatement(_ *ast.BreakStatement) ast.Repr {
 	return Done{Result: loopBreak{}}
 }
 
-func (interpreter *Interpreter) VisitContinueStatement(statement *ast.ContinueStatement) ast.Repr {
+func (interpreter *Interpreter) VisitContinueStatement(_ *ast.ContinueStatement) ast.Repr {
 	return Done{Result: loopContinue{}}
 }
 
@@ -1488,7 +1546,7 @@ func (interpreter *Interpreter) VisitBoolExpression(expression *ast.BoolExpressi
 	return Done{Result: value}
 }
 
-func (interpreter *Interpreter) VisitNilExpression(expression *ast.NilExpression) ast.Repr {
+func (interpreter *Interpreter) VisitNilExpression(_ *ast.NilExpression) ast.Repr {
 	value := NilValue{}
 	return Done{Result: value}
 }
@@ -1991,29 +2049,35 @@ func (interpreter *Interpreter) declareCompositeValue(
 
 	initializerFunction := interpreter.initializerFunction(declaration, lexicalScope)
 
-	destructorFunction := interpreter.destructorFunction(declaration, lexicalScope)
-	interpreter.DestructorFunctions[identifier] = destructorFunction
+	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[declaration]
+	location := interpreter.Checker.Location
+	typeID := compositeType.ID()
 
+	destructorFunction := interpreter.destructorFunction(declaration, lexicalScope)
 	functions := interpreter.compositeFunctions(declaration, lexicalScope)
-	interpreter.CompositeFunctions[identifier] = functions
+
+	interpreter.typeCode[compositeType.ID()] = typeCode{
+		destructorFunction: destructorFunction,
+		compositeFunctions: functions,
+	}
 
 	constructor := NewHostFunctionValue(
 		func(invocation Invocation) Trampoline {
 
-			// TODO: is this necessary if CompositeValue loads injected fields?
+			// Load injected fields
 			var injectedFields map[string]Value
 			if interpreter.injectedCompositeFieldsHandler != nil {
 				injectedFields = interpreter.injectedCompositeFieldsHandler(
 					interpreter,
-					interpreter.Checker.Location,
-					identifier,
+					location,
+					typeID,
 					declaration.CompositeKind,
 				)
 			}
 
 			value := &CompositeValue{
-				Location:       interpreter.Checker.Location,
-				Identifier:     identifier,
+				Location:       location,
+				TypeID:         typeID,
 				Kind:           declaration.CompositeKind,
 				Fields:         map[string]Value{},
 				InjectedFields: injectedFields,
@@ -2052,7 +2116,6 @@ func (interpreter *Interpreter) declareCompositeValue(
 	// for all other composite kinds, the constructor is declared
 
 	if declaration.CompositeKind == common.CompositeKindContract {
-		compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[declaration]
 		contract := interpreter.contractValueHandler(interpreter, compositeType, constructor)
 		contract.NestedValues = members
 		value = contract
@@ -2099,46 +2162,50 @@ func (interpreter *Interpreter) initializerFunction(
 	var preConditions ast.Conditions
 	var postConditions ast.Conditions
 
-	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
-
-	for _, conformance := range compositeType.Conformances {
-		interfaceDeclaration := interpreter.InterfaceDeclarations[conformance]
-
-		// TODO: support multiple overloaded initializers
-
-		initializers := interfaceDeclaration.Members.Initializers()
-		if len(initializers) == 0 {
-			continue
-		}
-
-		firstInitializer := initializers[0]
-		if firstInitializer == nil || firstInitializer.FunctionBlock == nil {
-			continue
-		}
-
-		if firstInitializer.FunctionBlock.PreConditions != nil {
-			preConditions = append(
-				preConditions,
-				*firstInitializer.FunctionBlock.PreConditions...,
-			)
-		}
-
-		if firstInitializer.FunctionBlock.PostConditions != nil {
-
-			postConditionsRewrite :=
-				interpreter.Checker.Elaboration.PostConditionsRewrite[firstInitializer.FunctionBlock.PostConditions]
-
-			postConditions = append(
-				postConditions,
-				postConditionsRewrite.RewrittenPostConditions...,
-			)
-
-			beforeStatements = append(
-				beforeStatements,
-				postConditionsRewrite.BeforeStatements...,
-			)
-		}
-	}
+	// TODO:
+	//compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
+	//
+	//for _, conformance := range compositeType.Conformances {
+	//
+	//	interfaceDeclaration := interpreter.InterfaceDeclarations[conformance.Identifier]
+	//
+	//	// TODO: support multiple overloaded initializers
+	//
+	//	initializers := interfaceDeclaration.Members.Initializers()
+	//	if len(initializers) == 0 {
+	//		continue
+	//	}
+	//
+	//	firstInitializer := initializers[0]
+	//	if firstInitializer == nil || firstInitializer.FunctionBlock == nil {
+	//		continue
+	//	}
+	//
+	//	if firstInitializer.FunctionBlock.PreConditions != nil {
+	//		preConditions = append(
+	//			preConditions,
+	//			*firstInitializer.FunctionBlock.PreConditions...,
+	//		)
+	//	}
+	//
+	//	if firstInitializer.FunctionBlock.PostConditions != nil {
+	//
+	//		// TODO: look up in correct checker
+	//
+	//		postConditionsRewrite :=
+	//			interpreter.Checker.Elaboration.PostConditionsRewrite[firstInitializer.FunctionBlock.PostConditions]
+	//
+	//		postConditions = append(
+	//			postConditions,
+	//			postConditionsRewrite.RewrittenPostConditions...,
+	//		)
+	//
+	//		beforeStatements = append(
+	//			beforeStatements,
+	//			postConditionsRewrite.BeforeStatements...,
+	//		)
+	//	}
+	//}
 
 	var functionType *sema.FunctionType
 
@@ -2222,39 +2289,42 @@ func (interpreter *Interpreter) destructorFunction(
 	var preConditions ast.Conditions
 	var postConditions ast.Conditions
 
-	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
-
-	for _, conformance := range compositeType.Conformances {
-		interfaceDeclaration := interpreter.InterfaceDeclarations[conformance]
-
-		interfaceDestructor := interfaceDeclaration.Members.Destructor()
-		if interfaceDestructor == nil || interfaceDestructor.FunctionBlock == nil {
-			continue
-		}
-
-		if interfaceDestructor.FunctionBlock.PreConditions != nil {
-			preConditions = append(
-				preConditions,
-				*interfaceDestructor.FunctionBlock.PreConditions...,
-			)
-		}
-
-		if interfaceDestructor.FunctionBlock.PostConditions != nil {
-
-			postConditionsRewrite :=
-				interpreter.Checker.Elaboration.PostConditionsRewrite[interfaceDestructor.FunctionBlock.PostConditions]
-
-			postConditions = append(
-				postConditions,
-				postConditionsRewrite.RewrittenPostConditions...,
-			)
-
-			beforeStatements = append(
-				beforeStatements,
-				postConditionsRewrite.BeforeStatements...,
-			)
-		}
-	}
+	// TODO:
+	//compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
+	//
+	//for _, conformance := range compositeType.Conformances {
+	//	interfaceDeclaration := interpreter.InterfaceDeclarations[conformance.Identifier]
+	//
+	//	interfaceDestructor := interfaceDeclaration.Members.Destructor()
+	//	if interfaceDestructor == nil || interfaceDestructor.FunctionBlock == nil {
+	//		continue
+	//	}
+	//
+	//	if interfaceDestructor.FunctionBlock.PreConditions != nil {
+	//		preConditions = append(
+	//			preConditions,
+	//			*interfaceDestructor.FunctionBlock.PreConditions...,
+	//		)
+	//	}
+	//
+	//	if interfaceDestructor.FunctionBlock.PostConditions != nil {
+	//
+	//		// TODO: use correct checker
+	//
+	//		postConditionsRewrite :=
+	//			interpreter.Checker.Elaboration.PostConditionsRewrite[interfaceDestructor.FunctionBlock.PostConditions]
+	//
+	//		postConditions = append(
+	//			postConditions,
+	//			postConditionsRewrite.RewrittenPostConditions...,
+	//		)
+	//
+	//		beforeStatements = append(
+	//			beforeStatements,
+	//			postConditionsRewrite.BeforeStatements...,
+	//		)
+	//	}
+	//}
 
 	destructor := compositeDeclaration.Members.Destructor()
 
@@ -2332,6 +2402,7 @@ func (interpreter *Interpreter) compositeFunctions(
 	}
 
 	for _, functionDeclaration := range compositeDeclaration.Members.Functions {
+
 		functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
 
 		functions[functionDeclaration.Identifier.Identifier] =
@@ -2355,7 +2426,7 @@ func (interpreter *Interpreter) compositeFunction(
 	lexicalScope hamt.Map,
 ) InterpretedFunctionValue {
 
-	functionIdentifier := functionDeclaration.Identifier.Identifier
+	//functionIdentifier := functionDeclaration.Identifier.Identifier
 
 	// NOTE: gather all conformances' preconditions and rewritten postconditions,
 
@@ -2363,46 +2434,50 @@ func (interpreter *Interpreter) compositeFunction(
 	var preConditions ast.Conditions
 	var postConditions ast.Conditions
 
-	addConditionsFromMembers := func(members *ast.Members) {
-		functionsByIdentifier := members.FunctionsByIdentifier()
-		interfaceFunction, ok := functionsByIdentifier[functionIdentifier]
-		if !ok || interfaceFunction.FunctionBlock == nil {
-			return
-		}
-
-		if interfaceFunction.FunctionBlock.PreConditions != nil {
-			preConditions = append(
-				preConditions,
-				*interfaceFunction.FunctionBlock.PreConditions...,
-			)
-		}
-
-		if interfaceFunction.FunctionBlock.PostConditions != nil {
-
-			postConditionsRewrite :=
-				interpreter.Checker.Elaboration.PostConditionsRewrite[interfaceFunction.FunctionBlock.PostConditions]
-
-			postConditions = append(
-				postConditions,
-				postConditionsRewrite.RewrittenPostConditions...,
-			)
-
-			beforeStatements = append(
-				beforeStatements,
-				postConditionsRewrite.BeforeStatements...,
-			)
-		}
-	}
-
-	for _, conformance := range conformances {
-		interfaceDeclaration := interpreter.InterfaceDeclarations[conformance]
-		addConditionsFromMembers(interfaceDeclaration.Members)
-	}
-
-	for _, typeRequirement := range typeRequirements {
-		compositeDeclaration := interpreter.CompositeDeclarations[typeRequirement]
-		addConditionsFromMembers(compositeDeclaration.Members)
-	}
+	// TODO:
+	//addConditionsFromMembers := func(members *ast.Members) {
+	//	functionsByIdentifier := members.FunctionsByIdentifier()
+	//	interfaceFunction, ok := functionsByIdentifier[functionIdentifier]
+	//	if !ok || interfaceFunction.FunctionBlock == nil {
+	//		return
+	//	}
+	//
+	//	if interfaceFunction.FunctionBlock.PreConditions != nil {
+	//		preConditions = append(
+	//			preConditions,
+	//			*interfaceFunction.FunctionBlock.PreConditions...,
+	//		)
+	//	}
+	//
+	//	if interfaceFunction.FunctionBlock.PostConditions != nil {
+	//
+	//		// TODO: use correct checker
+	//
+	//		postConditionsRewrite :=
+	//			interpreter.Checker.Elaboration.PostConditionsRewrite[interfaceFunction.FunctionBlock.PostConditions]
+	//
+	//		postConditions = append(
+	//			postConditions,
+	//			postConditionsRewrite.RewrittenPostConditions...,
+	//		)
+	//
+	//		beforeStatements = append(
+	//			beforeStatements,
+	//			postConditionsRewrite.BeforeStatements...,
+	//		)
+	//	}
+	//}
+	//
+	//
+	//for _, conformance := range conformances {
+	//	interfaceDeclaration := interpreter.InterfaceDeclarations[conformance.Identifier]
+	//	addConditionsFromMembers(interfaceDeclaration.Members)
+	//}
+	//
+	//for _, typeRequirement := range typeRequirements {
+	//	compositeDeclaration := interpreter.CompositeDeclarations[typeRequirement.Identifier]
+	//	addConditionsFromMembers(compositeDeclaration.Members)
+	//}
 
 	// Append the function's pre-conditions and rewritten post-conditions, if any
 
@@ -2441,7 +2516,7 @@ func (interpreter *Interpreter) compositeFunction(
 	}
 }
 
-func (interpreter *Interpreter) VisitFieldDeclaration(field *ast.FieldDeclaration) ast.Repr {
+func (interpreter *Interpreter) VisitFieldDeclaration(_ *ast.FieldDeclaration) ast.Repr {
 	// fields can't be interpreted
 	panic(errors.NewUnreachableError())
 }
@@ -2566,13 +2641,14 @@ func (interpreter *Interpreter) unbox(value Value) Value {
 	}
 }
 
-func (interpreter *Interpreter) VisitInterfaceDeclaration(declaration *ast.InterfaceDeclaration) ast.Repr {
+func (interpreter *Interpreter) VisitInterfaceDeclaration(_ *ast.InterfaceDeclaration) ast.Repr {
 	return Done{}
 }
 
 func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDeclaration) {
-	interfaceType := interpreter.Checker.Elaboration.InterfaceDeclarationTypes[declaration]
-	interpreter.InterfaceDeclarations[interfaceType] = declaration
+	// TODO:
+	//interfaceType := interpreter.Checker.Elaboration.InterfaceDeclarationTypes[declaration]
+	//interpreter.InterfaceDeclarations[interfaceType.Identifier] = declaration
 
 	for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
 		interpreter.declareInterface(nestedInterfaceDeclaration)
@@ -2584,8 +2660,9 @@ func (interpreter *Interpreter) declareInterface(declaration *ast.InterfaceDecla
 }
 
 func (interpreter *Interpreter) declareComposite(declaration *ast.CompositeDeclaration) {
-	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[declaration]
-	interpreter.CompositeDeclarations[compositeType] = declaration
+	// TODO:
+	//compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[declaration]
+	//interpreter.CompositeDeclarations[compositeType.Identifier] = declaration
 
 	for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
 		interpreter.declareInterface(nestedInterfaceDeclaration)
@@ -2600,10 +2677,11 @@ func (interpreter *Interpreter) ensureLoaded(location ast.Location, loadProgram 
 	locationID := location.ID()
 
 	// If sub-interpreter already exists, return it
-	subInterpreter = interpreter.SubInterpreters[locationID]
+	subInterpreter = interpreter.allInterpreters[locationID]
 	if subInterpreter != nil {
 		return subInterpreter
 	}
+
 	// Create a new sub-interpreter and interpret the top-level declarations
 	var err error
 	var importedChecker *sema.Checker
@@ -2623,49 +2701,15 @@ func (interpreter *Interpreter) ensureLoaded(location ast.Location, loadProgram 
 		WithInjectedCompositeFieldsHandler(interpreter.injectedCompositeFieldsHandler),
 		WithContractValueHandler(interpreter.contractValueHandler),
 		WithImportProgramHandler(interpreter.importProgramHandler),
+		WithAllInterpreters(interpreter.allInterpreters),
+		WithAllCheckers(interpreter.allCheckers),
+		withTypeCode(interpreter.typeCode),
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	if subInterpreter.Checker.Location == nil {
-		subInterpreter.Checker.Location = location
-	}
-
-	interpreter.SubInterpreters[locationID] = subInterpreter
-
 	subInterpreter.runAllStatements(subInterpreter.interpret())
-
-	for subSubImportLocation, subSubInterpreter := range subInterpreter.SubInterpreters {
-		interpreter.SubInterpreters[subSubImportLocation] = subSubInterpreter
-	}
-
-	// TODO: improve imports: take location into account
-	//   see https://github.com/dapperlabs/flow-go/issues/1847
-
-	// Import all interface declarations from sub-interpreter
-
-	for interfaceType, interfaceDeclaration := range subInterpreter.InterfaceDeclarations {
-		interpreter.InterfaceDeclarations[interfaceType] = interfaceDeclaration
-	}
-
-	// Import all composite declarations from sub-interpreter
-
-	for compositeType, compositeDeclaration := range subInterpreter.CompositeDeclarations {
-		interpreter.CompositeDeclarations[compositeType] = compositeDeclaration
-	}
-
-	// Import all composite functions from sub-interpreter
-
-	for name, compositeFunctions := range subInterpreter.CompositeFunctions {
-		interpreter.CompositeFunctions[name] = compositeFunctions
-	}
-
-	// Import all destructor functions from the sub-interpreter
-
-	for name, destructorFunction := range subInterpreter.DestructorFunctions {
-		interpreter.DestructorFunctions[name] = destructorFunction
-	}
 
 	return subInterpreter
 }

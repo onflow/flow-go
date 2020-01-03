@@ -304,11 +304,17 @@ func (r *interpreterRuntime) newInterpreter(
 		),
 		interpreter.WithStorageKeyHandler(
 			func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-				return indexingType.ID()
+				return string(indexingType.ID())
 			},
 		),
 		interpreter.WithInjectedCompositeFieldsHandler(
-			func(_ *interpreter.Interpreter, location Location, compositeIdentifier string, compositeKind common.CompositeKind) map[string]interpreter.Value {
+			func(
+				_ *interpreter.Interpreter,
+				location Location,
+				_ sema.TypeID,
+				compositeKind common.CompositeKind,
+			) map[string]interpreter.Value {
+
 				switch compositeKind {
 				case common.CompositeKindContract:
 					var address []byte

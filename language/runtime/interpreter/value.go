@@ -1412,7 +1412,7 @@ func ConvertUInt64(value Value) Value {
 
 type CompositeValue struct {
 	Location       ast.Location
-	Identifier     string
+	TypeID         sema.TypeID
 	Kind           common.CompositeKind
 	Fields         map[string]Value
 	InjectedFields map[string]Value
@@ -1427,9 +1427,10 @@ func init() {
 }
 
 func (v *CompositeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
+
 	// if composite was deserialized, dynamically link in the destructor
 	if v.Destructor == nil {
-		v.Destructor = interpreter.DestructorFunctions[v.Identifier]
+		v.Destructor = interpreter.typeCode[v.TypeID].destructorFunction
 	}
 
 	destructor := v.Destructor
@@ -1467,7 +1468,7 @@ func (v *CompositeValue) Copy() Value {
 
 	return &CompositeValue{
 		Location:       v.Location,
-		Identifier:     v.Identifier,
+		TypeID:         v.TypeID,
 		Kind:           v.Kind,
 		Fields:         newFields,
 		InjectedFields: v.InjectedFields,
@@ -1523,24 +1524,29 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 		return value
 	}
 
-	// get correct interpreter
-	if v.Location != nil {
-		if !ast.LocationsMatch(interpreter.Checker.Location, v.Location) {
-			interpreter = interpreter.ensureLoaded(v.Location, func() *ast.Program {
-				return interpreter.importProgramHandler(interpreter, v.Location)
-			})
-		}
+	// Get the correct interpreter. The program code might need to be loaded.
+	// NOTE: standard library values have no location
+
+	if v.Location != nil && !ast.LocationsMatch(interpreter.Checker.Location, v.Location) {
+		interpreter = interpreter.ensureLoaded(v.Location, func() *ast.Program {
+			return interpreter.importProgramHandler(interpreter, v.Location)
+		})
 	}
 
-	// if composite was deserialized, dynamically link in the functions
+	// If the composite value was deserialized, dynamically link in the functions
 	// and get injected fields
 
 	if v.Functions == nil {
-		v.Functions = interpreter.CompositeFunctions[v.Identifier]
+		v.Functions = interpreter.typeCode[v.TypeID].compositeFunctions
 	}
 
 	if v.InjectedFields == nil && interpreter.injectedCompositeFieldsHandler != nil {
-		v.InjectedFields = interpreter.injectedCompositeFieldsHandler(interpreter, v.Location, v.Identifier, v.Kind)
+		v.InjectedFields = interpreter.injectedCompositeFieldsHandler(
+			interpreter,
+			v.Location,
+			v.TypeID,
+			v.Kind,
+		)
 	}
 
 	if v.InjectedFields != nil {
@@ -1576,7 +1582,7 @@ func (v *CompositeValue) GobEncode() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = encoder.Encode(v.Identifier)
+	err = encoder.Encode(v.TypeID)
 	if err != nil {
 		return nil, err
 	}
@@ -1599,7 +1605,7 @@ func (v *CompositeValue) GobDecode(buf []byte) error {
 	if err != nil {
 		return err
 	}
-	err = decoder.Decode(&v.Identifier)
+	err = decoder.Decode(&v.TypeID)
 	if err != nil {
 		return err
 	}
@@ -1617,7 +1623,7 @@ func (v *CompositeValue) GobDecode(buf []byte) error {
 
 func (v *CompositeValue) String() string {
 	var builder strings.Builder
-	builder.WriteString(v.Identifier)
+	builder.WriteString(string(v.TypeID))
 	builder.WriteString("(")
 	i := 0
 	for name, value := range v.Fields {
@@ -2384,7 +2390,7 @@ func NewAccountValue(address AddressValue) *CompositeValue {
 	storageIdentifier := address.Hex()
 
 	return &CompositeValue{
-		Identifier: (&sema.AccountType{}).ID(),
+		TypeID: (&sema.AccountType{}).ID(),
 		InjectedFields: map[string]Value{
 			"address":   address,
 			"storage":   StorageValue{Identifier: storageIdentifier},
@@ -2399,7 +2405,7 @@ func NewPublicAccountValue(address AddressValue) *CompositeValue {
 	storageIdentifier := address.Hex()
 
 	return &CompositeValue{
-		Identifier: (&sema.PublicAccountType{}).ID(),
+		TypeID: (&sema.PublicAccountType{}).ID(),
 		InjectedFields: map[string]Value{
 			"address":   address,
 			"published": PublishedValue{Identifier: storageIdentifier},
