@@ -31,26 +31,21 @@ func RetrieveGuaranteedCollection(hash flow.Fingerprint, gc *flow.GuaranteedColl
 	return retrieve(makePrefix(codeGuaranteedCollection, hash), gc)
 }
 
-func IndexGuaranteedCollectionByBlockHash(blockHash crypto.Hash, collection *flow.GuaranteedCollection) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		err := insert(makePrefix(codeBlockHashToCollections, blockHash, collection.Fingerprint()), collection.Fingerprint())(tx)
-		if err != nil {
-			return fmt.Errorf("failed to index collection by block hash: %w", err)
-		}
-		return nil
-	}
+func IndexGuaranteedCollectionByBlockHash(blockHash crypto.Hash, gc *flow.GuaranteedCollection) func(*badger.Txn) error {
+	return insert(makePrefix(codeBlockHashToCollections, blockHash, gc.Fingerprint()), gc.Fingerprint())
 }
 
-func RetrieveGuaranteedCollectionByBlockHash(blockHash crypto.Hash, collections *[]*flow.GuaranteedCollection) func(*badger.Txn) error {
+func RetrieveGuaranteedCollectionsByBlockHash(blockHash crypto.Hash, collections *[]*flow.GuaranteedCollection) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		iter := func() (checkFunc, createFunc, handleFunc) {
-			check := func([]byte) bool {
+			check := func(key []byte) bool {
 				return true
 			}
 
 			var hash flow.Fingerprint
 			create := func() interface{} {
+				hash = flow.Fingerprint{}
 				return &hash
 			}
 
@@ -73,6 +68,6 @@ func RetrieveGuaranteedCollectionByBlockHash(blockHash crypto.Hash, collections 
 			return check, create, handle
 		}
 
-		return iterate(makePrefix(codeBlockHashToCollections, blockHash), nil, iter)(tx)
+		return iterate(makePrefix(codeBlockHashToCollections, blockHash), nil, nil, iter)(tx)
 	}
 }
