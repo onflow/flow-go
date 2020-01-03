@@ -27,6 +27,9 @@ type FlowMC struct {
 }
 
 func New(id primary.ID, view uint64, primarySelector primary.Selector, eventProc events.Processor) *FlowMC {
+	if view < 1 {
+		panic("Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)")
+	}
 	return &FlowMC{
 		myNodeID:                      id,
 		currentView:                   view,
@@ -119,7 +122,7 @@ func (p *FlowMC) processBlock(block *def.Block) {
 	p.timeout.StartTimeout(p.currentView, VoteCollectionTimeout)
 }
 
-func (p *FlowMC) executeView() {
+func (p *FlowMC) ExecuteView() {
 	p.currentBlock = nil
 	p.timeout.StartTimeout(p.currentView, ReplicaTimeout)
 	p.eventProcessor.OnEnteringView(p.currentView)
@@ -151,6 +154,10 @@ func (p *FlowMC) executeView() {
 	}
 }
 
+func (p *FlowMC) CurrentView() uint64 {
+	return p.currentView
+}
+
 // OnReplicaTimeout is a hook which is called when the replica timeout occurs
 func (p *FlowMC) emitTimeoutEvent() {
 	switch p.timeout.Mode() {
@@ -165,7 +172,7 @@ func (p *FlowMC) emitTimeoutEvent() {
 
 func (p *FlowMC) run() {
 	for !p.stopSignaled.Load() {
-		p.executeView()
+		p.ExecuteView()
 	}
 }
 

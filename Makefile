@@ -70,6 +70,7 @@ generate-mocks:
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
+	mockery -name 'Processor' -dir="./engine/consensus/hotstuff/components/pacemaker/events" -case=underscore -output="./engine/consensus/hotstuff/components/pacemaker/mock" -outpkg="mock"
 
 .PHONY: lint
 lint:

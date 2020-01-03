@@ -36,7 +36,7 @@ func (t *Timeout) StartTimeout(view uint64, mode TimeoutMode) {
 	}
 	if t.activatedTimeout.view == view {
 		if !(t.activatedTimeout.mode == ReplicaTimeout && mode == VoteCollectionTimeout) {
-			panic("For same view can only transition from ReplicaTimeout to VoteCollectionTimeout")
+			panic("For same view: can only transition from ReplicaTimeout to VoteCollectionTimeout")
 		}
 		// we are transitioning from ReplicaTimeout to VoteCollectionTimeout
 		t.initTimeout(view, mode)
@@ -52,6 +52,7 @@ func (t *Timeout) View() uint64              { return t.activatedTimeout.view }
 
 func (t *Timeout) initTimeout(view uint64, mode TimeoutMode) {
 	t.activatedTimeout.view = view
+	t.activatedTimeout.mode = mode
 	switch mode {
 	case VoteCollectionTimeout:
 		t.activatedTimeout.timer = time.NewTimer(t.VoteCollectionTimeout())
