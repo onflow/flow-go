@@ -35,7 +35,7 @@ func (c *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, er
 
 func (c *Collections) TransactionsByFingerprint(hash flow.Fingerprint) ([]*flow.Transaction, error) {
 	var (
-		collection flow.Collection
+		collection   flow.Collection
 		transactions []*flow.Transaction
 	)
 
@@ -65,7 +65,7 @@ func (c *Collections) TransactionsByFingerprint(hash flow.Fingerprint) ([]*flow.
 }
 
 func (c *Collections) Insert(collection *flow.Collection) error {
-	return c.db.Update(func (tx *badger.Txn) error {
+	return c.db.Update(func(tx *badger.Txn) error {
 		err := operation.InsertCollection(collection.Fingerprint(), collection)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
@@ -94,7 +94,7 @@ func (c *Collections) InsertGuarantee(gc *flow.GuaranteedCollection) error {
 	})
 }
 
-func (c *Collections) RetrieveGuarantee(hash flow.Fingerprint) (*flow.GuaranteedCollection, error) {
+func (c *Collections) GuaranteeByFingerprint(hash flow.Fingerprint) (*flow.GuaranteedCollection, error) {
 	var gc flow.GuaranteedCollection
 
 	err := c.db.View(func(tx *badger.Txn) error {
