@@ -41,13 +41,15 @@ endif
 test:
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
+	$(MAKE) -C crypto test
+	$(MAKE) -C language test
 
 .PHONY: coverage
 coverage:
 ifeq ($(COVER), true)
+	# Cover summary has to produce cover.json
+	COVER_PROFILE=$(COVER_PROFILE) ./cover-summary.sh
 	# file has to be called index.html
-	gocov convert $(COVER_PROFILE) > cover.json
-	./cover-summary.sh
 	gocov-html cover.json > index.html
 	# coverage.zip will automatically be picked up by teamcity
 	zip coverage.zip index.html
