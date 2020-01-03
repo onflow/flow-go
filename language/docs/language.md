@@ -2743,7 +2743,7 @@ create SomeResource()
 The constructor function may require parameters
 if the [initializer](#composite-data-type-fields) of the composite data type requires them.
 
-Composite data types can only be declared globally and not locally in functions.
+Composite data types can only be declared within smart contracts and not locally in functions.
 They can also not be nested.
 
 ### Composite Data Type Fields
@@ -4925,10 +4925,38 @@ resources, and events in Cadence have to be defined.
 Therefore, an object of one of these types cannot exist 
 without having been defined in a deployed Cadence contract.  
 
+Contracts are types.  They are similar to composite types, 
+but are stored differently than
+structs or resources and cannot be copied or moved like resources or structs.
+They stay in an account's contract storage
+area and can only be updated or deleted by the account owner
+with special commands.
+
+Contracts are declared using the `contract` keyword. The keyword is followed
+by the name of the contract.
+
+```cadence,file=contract.cdc
+pub contract SomeContract {
+    // ...
+}
+```
+
+Contracts cannot be nested in each other.
+
+```cadence,file=contract_invalidnesting.cdc
+pub contract Invalid {
+
+    // Invalid: Contracts cannot be nested in any other type.
+    //
+    pub contract Nested {
+        // ...
+    }
+}
+
 One of the simplest forms of a contract would just be one with a state variable, 
 a function, and an `init` function that initializes the variable:
 
-```cadence,file=contract.cdc
+```cadence,file=contract_hello.cdc
 // HelloWorldResource.cdc
     
 pub contract HelloWorld {
@@ -4954,7 +4982,10 @@ in the contract storage.  Transactions and other contracts
 can interact with contracts by importing them at the beginning 
 of a transaction or contract definition.
 
-Anyone could call its `hello` function by importing
+Currently, contracts cannot be easily instantiated within Cadence code.
+They need to be deployed to an account with a special transaction.
+
+Anyone could call the above contract's `hello` function by importing
 the contract from the account it was deployed to and using the imported
 object to call the hello function.
 ```cadence,file=contract_call.cdc
@@ -4978,11 +5009,6 @@ log(HelloWorld.greeting)   // prints "Hello World!"
 HelloWorld.init()    // Error
 ```
 
-Contracts are like a composite type, but are stored differently than
-structs or resources and cannot be copied or moved like resources or structs.
-They stay in an account's contract storage
-area and can only be updated or deleted by the account owner
-with special commands.
 
 There can be any number of contracts per account 
 and they can include an arbitrary amount of data. This means that
@@ -5002,6 +5028,7 @@ restricts the situations that the objects can be created in.
 //
 pub resource Vault {}
 
+// Valid
 pub contract FungibleToken {
 
     pub resource interface Receiver {
@@ -5046,8 +5073,8 @@ pub contract FungibleToken {
     }
 }
 ```
-This contract defines an interface and a resource
-that implements that interface.  But there is no way to create this resource,
+This contract defines an resource interface `Receiver` and a resource `Vault`
+that implements that interface.  Currently, there is no way to create this resource,
 so it would not be usable.
 
 ```cadence,file=contract_invalid_create.cdc
@@ -5057,7 +5084,7 @@ import FungibleToken from 0x42
 // Invalid: Cannot create an instance of the `Vault` type outside
 // of the contract that defines `Vault`
 //
-let newVault <- create FungibleToken.Vault()
+let newVault <- create FungibleToken.Vault(balance: 10)
 ```
 
 The contract would have to either define a function that creates new
@@ -5080,10 +5107,20 @@ Imagine that these were defined in the above `FungibleToken` contract.
         self.account.storage[Vault] <- create Vault(balance: 1000)
     }
 ```
-Now, any account coule call the `createVault` function defined in the contract
+Now, any account could call the `createVault` function defined in the contract
 to create a `Vault` object.  Or the owner could call the `withdraw` function
 on their own `Vault` to send new vaults to others.
 
+```cadence,file=ft_contract_tx.cdc
+import FungibleToken from 0x42
+
+
+// Valid: Create an instance of the `Vault` type by calling the contract's
+// `createVault` function.
+//
+let newVault <- create FungibleToken.createVault(initialBalance: 10)
+
+```
 
 
 ## Events
