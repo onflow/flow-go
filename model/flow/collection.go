@@ -55,7 +55,7 @@ func (c *Collection) ID() Identifier {
 	return id
 }
 
-// Note that this is the basic version of the List, we need to substitute it with something like Merkel tree at some point
+// Note that this is the basic version of the List, we need to substitute it with something like Merkle tree at some point
 type CollectionList struct {
 	collections []Collection
 }
