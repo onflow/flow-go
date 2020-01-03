@@ -9,7 +9,6 @@ import (
 	context "github.com/dapperlabs/flow-go/engine/execution/execution/modules/context/mock"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/abi/values"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -36,7 +35,7 @@ func TestExecuteTransaction(t *testing.T) {
 			Once()
 
 		ctx.On("GetSigningAccounts").
-			Return([]values.Address{values.Address(unittest.AddressFixture())}).
+			Return([]runtime.Address{runtime.Address(unittest.AddressFixture())}).
 			Once()
 
 		result, err := c.ExecuteTransaction(tx)
@@ -75,7 +74,7 @@ func TestExecuteTransaction(t *testing.T) {
 			Once()
 
 		ctx.On("GetSigningAccounts").
-			Return([]values.Address{values.Address(unittest.AddressFixture())}).
+			Return([]runtime.Address{runtime.Address(unittest.AddressFixture())}).
 			Once()
 
 		result, err := c.ExecuteTransaction(tx)
