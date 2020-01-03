@@ -35,15 +35,7 @@ func (s *state) NewView(commitment flow.StateCommitment) *View {
 }
 
 func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
-	updates := delta.Updates()
-
-	ids := make([]ledger.RegisterID, 0, len(updates))
-	values := make([]ledger.RegisterValue, 0, len(updates))
-
-	for id, value := range delta.Updates() {
-		ids = append(ids, ledger.RegisterID(id))
-		values = append(values, value)
-	}
+	ids, values := delta.RegisterUpdates()
 
 	commitment, _, err := s.ls.UpdateRegistersWithProof(ids, values)
 	if err != nil {

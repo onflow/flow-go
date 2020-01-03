@@ -1,5 +1,7 @@
 package state
 
+import "github.com/dapperlabs/flow-go/storage/ledger"
+
 // A Delta is a record of ledger mutations.
 type Delta map[string][]byte
 
@@ -26,9 +28,17 @@ func (d Delta) Delete(key string) {
 	d[key] = nil
 }
 
-// Updates returns all registers that were updated by this delta.
-func (d Delta) Updates() map[string][]byte {
-	return d
+// RegisterUpdates returns all registers that were updated by this delta.
+func (d Delta) RegisterUpdates() ([]ledger.RegisterID, []ledger.RegisterValue) {
+	ids := make([]ledger.RegisterID, 0, len(d))
+	values := make([]ledger.RegisterValue, 0, len(d))
+
+	for id, value := range d {
+		ids = append(ids, ledger.RegisterID(id))
+		values = append(values, value)
+	}
+
+	return ids, values
 }
 
 // HasBeenDeleted returns true if the given key has been deleted in this delta.
