@@ -122,7 +122,7 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 		// each header, we reconstruct the block and then apply the related
 		// changes to the protocol state
 		var identities flow.IdentityList
-		var collections []*flow.CollectionGuarantee
+		var guarantees []*flow.CollectionGuarantee
 		for i := len(steps) - 1; i >= 0; i-- {
 
 			// get the identities
@@ -132,17 +132,17 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 				return fmt.Errorf("could not retrieve identities (%x): %w", s.hash, err)
 			}
 
-			// get the guaranteed collections
-			err = operation.RetrieveCollectionGuarantees(s.hash, &collections)(tx)
+			// get the collection guarantees
+			err = operation.RetrieveCollectionGuarantees(s.hash, &guarantees)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve collections (%x): %w", s.hash, err)
+				return fmt.Errorf("could not retrieve guarantees (%x): %w", s.hash, err)
 			}
 
 			// reconstruct block
 			block := flow.Block{
 				Header:               header,
 				NewIdentities:        identities,
-				CollectionGuarantees: collections,
+				CollectionGuarantees: guarantees,
 			}
 
 			// insert the deltas
@@ -308,7 +308,7 @@ func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 		return fmt.Errorf("could not insert identities: %w", err)
 	}
 
-	// insert the guaranteed collections into the DB
+	// insert the collection guarantees into the DB
 	err = operation.InsertCollectionGuarantees(block.Hash(), block.CollectionGuarantees)(tx)
 	if err != nil {
 		return fmt.Errorf("could not insert collections: %w", err)

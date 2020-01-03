@@ -1,14 +1,10 @@
 package badger_test
 
 import (
-	"fmt"
-	"math/rand"
-	"os"
-	"path/filepath"
+	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	errors2 "github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,20 +14,9 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func runWithDb(t *testing.T, f func(*badger.DB)) {
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
-	require.Nil(t, err)
+func TestBlockRetrievalByNumber(t *testing.T) {
 
-	f(db)
-
-	db.Close()
-	os.RemoveAll(dir)
-}
-
-func TestRetrievalByNumber(t *testing.T) {
-
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		blocks := badger2.NewBlocks(db)
 
 		block := unittest.BlockFixture()
@@ -47,9 +32,9 @@ func TestRetrievalByNumber(t *testing.T) {
 	})
 }
 
-func TestRetrievalByNonexistingNumber(t *testing.T) {
+func TestBlockRetrievalByNonexistingNumber(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		blocks := badger2.NewBlocks(db)
 
@@ -67,7 +52,7 @@ func TestRetrievalByNonexistingNumber(t *testing.T) {
 
 func TestStoringSameBlockTwice(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		blocks := badger2.NewBlocks(db)
 
@@ -84,7 +69,7 @@ func TestStoringSameBlockTwice(t *testing.T) {
 
 func TestStoringBlockWithDifferentDateButSameNumberTwice(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		blocks := badger2.NewBlocks(db)
 
@@ -98,8 +83,9 @@ func TestStoringBlockWithDifferentDateButSameNumberTwice(t *testing.T) {
 		block2.Signatures = []crypto.Signature{[]byte("magic")}
 
 		err = blocks.Save(&block2)
-		realError := errors2.Cause(err)
 
-		require.Equal(t, storage.DifferentDataErr, realError)
+		realErr := errors.Unwrap(err)
+
+		require.Equal(t, storage.DifferentDataErr, realErr)
 	})
 }

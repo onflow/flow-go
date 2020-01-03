@@ -45,6 +45,18 @@ func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 	return ret
 }
 
+func FlowCollectionFixture(n int) flow.Collection {
+	col := make([]flow.Fingerprint, 0)
+
+	for i := 0; i < n; i++ {
+		TransactionFixture(func(t *flow.Transaction) {
+			t.Script = []byte(fmt.Sprintf("pub fun main() { print(\"%d\")}", i))
+		})
+	}
+
+	return flow.Collection{Transactions: col}
+}
+
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             []byte("pub fun main() {}"),
