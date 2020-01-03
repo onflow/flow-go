@@ -5,41 +5,70 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/databases"
+	"github.com/dapperlabs/flow-go/storage/ledger/databases/lvldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
-const TEST_HEIGHT = 256
-const TEST_HASH_LENGTH = 32
-const CACHE_SIZE = 50000
+const (
+	// kvdbPath is the path to the key-value database.
+	kvdbPath = "db/valuedb"
+	// tdbPath is the path to the trie database.
+	tdbPath = "db/triedb"
 
-func TestSMTInitialzation(t *testing.T) {
+	testHeight     = 256
+	testHashLength = 32
+	cacheSize      = 50000
+)
 
-	testTrie, err := NewSMT(TEST_HEIGHT, CACHE_SIZE, 10, 100, 10)
-
+func newTestDB(tb testing.TB) databases.DAL {
+	db, err := lvldb.NewLvlDB(kvdbPath, tdbPath)
 	if err != nil {
-		t.Error(err)
-		t.Fatalf("Error was returned, something went wrong during creation.")
+		tb.Fatalf("failed to initialize LvlDB instance: %s", err)
 	}
 
-	if testTrie.GetHeight() != TEST_HEIGHT {
-		t.Errorf("Height is %d; want %d", testTrie.GetHeight(), TEST_HEIGHT)
+	return db
+}
+
+func newTestSMT(
+	tb testing.TB,
+	height int,
+	cacheSize int,
+	interval int,
+	numHistoricalStates int,
+	numFullStates int) *SMT {
+	db := newTestDB(tb)
+
+	trie, err := NewSMT(db, height, cacheSize, interval, numHistoricalStates, numFullStates)
+	if err != nil {
+		tb.Fatalf("failed to initialize SMT instance: %s", err)
 	}
 
-	hashes := testTrie.GetDefaultHashes()
+	return trie
+}
 
-	for i := 0; i < testTrie.GetHeight(); i++ {
+func TestSMTInitialization(t *testing.T) {
+	trie := newTestSMT(t, testHeight, cacheSize, 10, 100, 10)
+
+	if trie.GetHeight() != testHeight {
+		t.Errorf("Height is %d; want %d", trie.GetHeight(), testHeight)
+	}
+
+	hashes := trie.GetDefaultHashes()
+
+	for i := 0; i < trie.GetHeight(); i++ {
 		if len(hashes[i]) != 32 {
-			t.Errorf("Length of hash at position %d is %d, should be %d", i, len(hashes[i]), TEST_HASH_LENGTH)
+			t.Errorf("Length of hash at position %d is %d, should be %d", i, len(hashes[i]), testHashLength)
 		}
 	}
 
-	currentNode := testTrie.GetRoot()
+	currentNode := trie.GetRoot()
 
-	if len(currentNode.value) != TEST_HASH_LENGTH {
+	if len(currentNode.value) != testHashLength {
 		t.Errorf("Root should be a hash")
 	}
 
-	err1, err2 := testTrie.database.SafeClose()
+	err1, err2 := trie.database.SafeClose()
 	if err1 != nil {
 		t.Fatal(err1)
 	}
@@ -49,21 +78,20 @@ func TestSMTInitialzation(t *testing.T) {
 }
 
 func TestSMTHeightTooSmall(t *testing.T) {
+	db := newTestDB(t)
+	defer db.SafeClose()
 
-	_, err := NewSMT(-1, CACHE_SIZE, 10, 100, 10)
-
+	_, err := NewSMT(db, -1, cacheSize, 10, 100, 10)
 	if err == nil {
-		t.Fatalf("Height Error should have been thrown")
+		t.Fatalf("Height error should have been thrown")
 	}
 }
 
 func TestInteriorNode(t *testing.T) {
-	s := make([]byte, 5)
-	trie, err := NewSMT(255, CACHE_SIZE, 10, 100, 10)
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
+	trie := newTestSMT(t, 255, cacheSize, 10, 100, 10)
 	trie.database.NewBatch()
+
+	s := make([]byte, 5)
 
 	ln := newNode(Hash(s), 254)
 	rn := newNode(Hash(s), 254)
@@ -85,10 +113,7 @@ func TestInteriorNode(t *testing.T) {
 }
 
 func TestInteriorNodeLRNil(t *testing.T) {
-	trie, err := NewSMT(255, CACHE_SIZE, 10, 100, 10)
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
+	trie := newTestSMT(t, 255, cacheSize, 10, 100, 10)
 	trie.database.NewBatch()
 
 	res := trie.interiorNode(nil, nil, 200)
@@ -107,13 +132,10 @@ func TestInteriorNodeLRNil(t *testing.T) {
 }
 
 func TestInteriorNodeLNil(t *testing.T) {
-	s := make([]byte, 5)
-
-	trie, err := NewSMT(255, CACHE_SIZE, 10, 100, 10)
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
+	trie := newTestSMT(t, 255, cacheSize, 10, 100, 10)
 	trie.database.NewBatch()
+
+	s := make([]byte, 5)
 
 	rn := newNode(Hash(s), 200)
 	rn.value = Hash(s)
@@ -135,13 +157,10 @@ func TestInteriorNodeLNil(t *testing.T) {
 }
 
 func TestInteriorNodeRNil(t *testing.T) {
-	s := make([]byte, 5)
-
-	trie, err := NewSMT(255, CACHE_SIZE, 10, 100, 10)
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
+	trie := newTestSMT(t, 255, cacheSize, 10, 100, 10)
 	trie.database.NewBatch()
+
+	s := make([]byte, 5)
 
 	ln := newNode(Hash(s), 200)
 	ln.value = Hash(s)
@@ -163,11 +182,8 @@ func TestInteriorNodeRNil(t *testing.T) {
 }
 
 func TestInsertIntoKey(t *testing.T) {
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	key1 := make([]byte, 1)
 	value1 := []byte{'a'}
@@ -201,7 +217,7 @@ func TestInsertIntoKey(t *testing.T) {
 	keys = append(keys, key1, key2, key4)
 	values = append(values, value1, value2, value4)
 
-	keys, _, err = trie.insertIntoKeys(key3, keys, values)
+	keys, _, err := trie.insertIntoKeys(key3, keys, values)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,11 +246,8 @@ func TestInsertIntoKey(t *testing.T) {
 }
 
 func TestInsertToEndofKeys(t *testing.T) {
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	key1 := make([]byte, 1)
 	value1 := []byte{'a'}
@@ -268,10 +281,11 @@ func TestInsertToEndofKeys(t *testing.T) {
 	keys = append(keys, key1, key2, key3)
 	values = append(values, value1, value2, value3)
 
-	keys, _, err = trie.insertIntoKeys(key4, keys, values)
+	keys, _, err := trie.insertIntoKeys(key4, keys, values)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if !bytes.Equal(keys[3], key4) {
 		t.Errorf("Incorrect Insert")
 		for _, key := range keys {
@@ -283,6 +297,7 @@ func TestInsertToEndofKeys(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if !(len(keys) == 4) {
 		t.Errorf("Incorrect Insert")
 		for _, key := range keys {
@@ -318,12 +333,9 @@ func TestUpdateAtomicallySingleValUpdateAndRead(t *testing.T) {
 	keys = append(keys, key)
 	values = append(values, value)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
 
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 	res, err := trie.UpdateAtomically(trie.GetRoot(), keys, values, 7)
 	if err != nil {
 		t.Fatalf("Trie Write failed")
@@ -374,12 +386,7 @@ func TestUpdateAtomicallyMultiValUpdateAndRead(t *testing.T) {
 
 	values = append(values, value1, value2, value3, value4)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
-
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
@@ -453,12 +460,7 @@ func TestTrustedRead(t *testing.T) {
 
 	values = append(values, value1, value2, value3, value4)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
-
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
@@ -506,12 +508,7 @@ func TestFailedRead(t *testing.T) {
 
 	keys = append(keys, key1, key2)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
-
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
 
 	_, _, read_err := trie.Read(keys, true, trie.root.GetValue())
@@ -548,12 +545,8 @@ func TestGetProofFlags_MultipleValueTree(t *testing.T) {
 
 	values = append(values, value1, value2, value3)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 10, 10)
+	trie := newTestSMT(t, 8, cacheSize, 10, 10, 10)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
@@ -630,12 +623,8 @@ func TestGetProofAndVerifyInclusionProof_SingleValueTreeLeft(t *testing.T) {
 	keys = append(keys, key1)
 	values = append(values, value1)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
@@ -680,12 +669,8 @@ func TestGetProof_SingleValueTreeConstructedLeft(t *testing.T) {
 
 	values = append(values, value1)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
@@ -743,12 +728,8 @@ func TestGetProofAndVerifyInclusionProof_SingleValueTreeRight(t *testing.T) {
 	keys = append(keys, key1)
 	values = append(values, value1)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
@@ -799,12 +780,8 @@ func TestGetProof_MultipleValueTree(t *testing.T) {
 
 	values = append(values, value1, value2, value3)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
@@ -871,16 +848,12 @@ func TestGetProof_MultipleStaggeredUpdates(t *testing.T) {
 
 	values = append(values, value1)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
 
-	err = trie.Update(keys, values)
+	err := trie.Update(keys, values)
 	if err != nil {
 		t.Errorf("Update failed")
 		t.Fatal(err)
@@ -982,12 +955,8 @@ func TestGetProof_MultipleValueTreeDeeper(t *testing.T) {
 	keys = append(keys, key1, key2)
 	values = append(values, value1, value2)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
@@ -1048,12 +1017,8 @@ func TestNonInclusionProof_MultipleValueTree(t *testing.T) {
 
 	values = append(values, value1, value2, value3)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
@@ -1092,12 +1057,8 @@ func TestNonInclusionProof_MultipleValueTree(t *testing.T) {
 
 }
 func TestNonInclusionProof_EmptyTree(t *testing.T) {
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	nonIncludedKey := make([]byte, 1)
 	utils.SetBit(nonIncludedKey, 2)
@@ -1135,12 +1096,8 @@ func TestNonInclusionProof_SingleValueTree(t *testing.T) {
 
 	values = append(values, value1)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
@@ -1198,12 +1155,8 @@ func TestNonInclusionProof_IncludedKey(t *testing.T) {
 
 	values = append(values, value1, value2, value3)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
@@ -1271,12 +1224,8 @@ func TestHistoricalState(t *testing.T) {
 
 	values = append(values, value1, value2, value3)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
 
@@ -1294,19 +1243,16 @@ func TestHistoricalState(t *testing.T) {
 	trie.Update(keys, newvalues)
 
 	hv1, err := trie.historicalStates[sOldRoot2].GetKVDB(key1)
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	hv2, err := trie.historicalStates[sOldRoot2].GetKVDB(key2)
-
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	hv3, err := trie.historicalStates[sOldRoot2].GetKVDB(key3)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1359,12 +1305,8 @@ func TestGetHistoricalProofs(t *testing.T) {
 
 	values = append(values, value1, value2, value3)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
 	trie.Update(keys, values)
@@ -1481,12 +1423,8 @@ func TestGetHistoricalProofs_NonInclusion(t *testing.T) {
 
 	values = append(values, value1, value2, value3)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 	trie.database.NewBatch()
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
 
@@ -1593,11 +1531,7 @@ func TestRead_HistoricalValues(t *testing.T) {
 
 	values = append(values, value1, value2, value3)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 
 	trie.database.NewBatch()
 
@@ -1709,11 +1643,7 @@ func TestRead_HistoricalValuesTrusted(t *testing.T) {
 
 	values = append(values, value1, value2, value3)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 10, 100, 5)
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
+	trie := newTestSMT(t, 8, cacheSize, 10, 100, 5)
 
 	trie.database.NewBatch()
 
@@ -1793,18 +1723,13 @@ func TestGetHistoricalValues_Pruned(t *testing.T) {
 
 	values = append(values, value1, value2, value3)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 6, 6, 2)
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
+	trie := newTestSMT(t, 8, cacheSize, 6, 6, 2)
 
 	trie.database.NewBatch()
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
 
-	err = trie.Update(keys, values)
-
+	err := trie.Update(keys, values)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1822,7 +1747,6 @@ func TestGetHistoricalValues_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1855,7 +1779,6 @@ func TestGetHistoricalValues_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1870,7 +1793,6 @@ func TestGetHistoricalValues_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1886,7 +1808,6 @@ func TestGetHistoricalValues_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
 	err = trie.Update(keys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2011,18 +1932,13 @@ func TestGetProof_Pruned(t *testing.T) {
 
 	values = append(values, value1, value2, value3)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 6, 6, 2)
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
+	trie := newTestSMT(t, 8, cacheSize, 6, 6, 2)
 
 	trie.database.NewBatch()
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
 
-	err = trie.Update(keys, values)
-
+	err := trie.Update(keys, values)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2040,7 +1956,6 @@ func TestGetProof_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2073,7 +1988,6 @@ func TestGetProof_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2088,7 +2002,6 @@ func TestGetProof_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2104,7 +2017,6 @@ func TestGetProof_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
 	err = trie.Update(keys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2241,18 +2153,12 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 
 	values = append(values, value1, value2, value3, value4, value5)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 6, 6, 2)
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
-
+	trie := newTestSMT(t, 8, cacheSize, 6, 6, 2)
 	trie.database.NewBatch()
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
 
-	err = trie.Update(keys, values)
-
+	err := trie.Update(keys, values)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2270,7 +2176,6 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2315,7 +2220,6 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2330,7 +2234,6 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2378,7 +2281,6 @@ func TestGetProof_Pruned_LargerTrie(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
 	err = trie.Update(newkeys2, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2624,18 +2526,13 @@ func TestTrustedRead_Pruned(t *testing.T) {
 
 	values = append(values, value1, value2, value3, value4, value5)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 6, 6, 1)
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
+	trie := newTestSMT(t, 8, cacheSize, 6, 6, 1)
 
 	trie.database.NewBatch()
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
 
-	err = trie.Update(keys, values)
-
+	err := trie.Update(keys, values)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2653,7 +2550,6 @@ func TestTrustedRead_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2671,7 +2567,6 @@ func TestTrustedRead_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2686,7 +2581,6 @@ func TestTrustedRead_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2704,7 +2598,6 @@ func TestTrustedRead_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
 	err = trie.Update(newkeys2, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2805,12 +2698,7 @@ func TestKVDB_Pruned(t *testing.T) {
 
 	values = append(values, value1, value2, value3, value4, value5)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 6, 6, 2)
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
-
+	trie := newTestSMT(t, 8, cacheSize, 6, 6, 2)
 	trie.database.NewBatch()
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
@@ -2818,8 +2706,7 @@ func TestKVDB_Pruned(t *testing.T) {
 	expectedValues1 := make([][]byte, 0)
 	expectedValues1 = append(expectedValues1, value1, value2, value3, value4, value5)
 
-	err = trie.Update(keys, values)
-
+	err := trie.Update(keys, values)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2855,7 +2742,6 @@ func TestKVDB_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2873,7 +2759,6 @@ func TestKVDB_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2891,7 +2776,6 @@ func TestKVDB_Pruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
 	err = trie.Update(newkeys2, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3101,11 +2985,7 @@ func TestKVDB_Pruned2(t *testing.T) {
 
 	values = append(values, value1, value2, value3, value4, value5)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 6, 6, 6)
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
+	trie := newTestSMT(t, 8, cacheSize, 6, 6, 6)
 
 	trie.database.NewBatch()
 
@@ -3114,8 +2994,7 @@ func TestKVDB_Pruned2(t *testing.T) {
 	expectedValues1 := make([][]byte, 0)
 	expectedValues1 = append(expectedValues1, value1, value2, value3, value4, value5)
 
-	err = trie.Update(keys, values)
-
+	err := trie.Update(keys, values)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3151,7 +3030,6 @@ func TestKVDB_Pruned2(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3169,7 +3047,6 @@ func TestKVDB_Pruned2(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3187,7 +3064,6 @@ func TestKVDB_Pruned2(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
 	err = trie.Update(newkeys2, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3415,18 +3291,13 @@ func TestRead_HistoricalValuesPruned(t *testing.T) {
 
 	values = append(values, value1, value2, value3, value4, value5)
 
-	trie, err := NewSMT(8, CACHE_SIZE, 6, 6, 6)
-
-	if err != nil {
-		t.Fatalf("Trie Instanciation failed")
-	}
+	trie := newTestSMT(t, 8, cacheSize, 6, 6, 6)
 
 	trie.database.NewBatch()
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
 
-	err = trie.Update(keys, values)
-
+	err := trie.Update(keys, values)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3444,7 +3315,6 @@ func TestRead_HistoricalValuesPruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3476,7 +3346,6 @@ func TestRead_HistoricalValuesPruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3491,7 +3360,6 @@ func TestRead_HistoricalValuesPruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2)
 
 	err = trie.Update(newkeys, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3509,7 +3377,6 @@ func TestRead_HistoricalValuesPruned(t *testing.T) {
 	newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
 	err = trie.Update(newkeys2, newvalues)
-
 	if err != nil {
 		t.Fatal(err)
 	}

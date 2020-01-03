@@ -13,7 +13,7 @@ var s *SMT
 
 func BenchmarkSMTCreation(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		s, _ = NewSMT(255, 50000, 100, 1000, 100)
+		s = newTestSMT(b, 255, 50000, 100, 1000, 100)
 		s.database.SafeClose()
 	}
 }
@@ -27,13 +27,9 @@ func BenchmarkKVGen(b *testing.B) {
 func BenchmarkUpdate(b *testing.B) {
 	benchmarks := []int{10, 20, 30, 40} //, 100, 1000, 5000, 10000}
 	for _, mark := range benchmarks {
-		mark := mark //Workaround for scopelint issue
+		mark := mark // Workaround for scopelint issue
 		b.Run(strconv.Itoa(mark), func(b *testing.B) {
-
-			s, err := NewSMT(255, 50000, 100, 1000, 100)
-			if err != nil {
-				b.Error(err)
-			}
+			s = newTestSMT(b, 255, 50000, 100, 1000, 100)
 			defer os.RemoveAll("./db/")
 			keys, values := GenerateRandomKVPairs(mark)
 
@@ -56,14 +52,12 @@ func BenchmarkReadSMT(b *testing.B) {
 		{50, false},
 		{100, false},
 		{1000, false},
-		//{10000, true},
-		//{10000, false},
+		// {10000, true},
+		// {10000, false},
 	}
 
-	s, err := NewSMT(255, 50000, 100, 1000, 100)
-	if err != nil {
-		b.Error(err)
-	}
+	s = newTestSMT(b, 255, 50000, 100, 1000, 100)
+
 	defer os.RemoveAll("./db/")
 	keys, values := GenerateRandomKVPairs(1000)
 	s.Update(keys, values)
@@ -93,10 +87,8 @@ func BenchmarkVerifyProof(b *testing.B) {
 		{1000, false},
 	}
 
-	s, err := NewSMT(255, 50000, 100, 1000, 100)
-	if err != nil {
-		b.Error(err)
-	}
+	s = newTestSMT(b, 255, 50000, 100, 1000, 100)
+
 	defer os.RemoveAll("./db/")
 	keys, values := GenerateRandomKVPairs(1000)
 	s.Update(keys, values)
@@ -117,7 +109,6 @@ func BenchmarkVerifyProof(b *testing.B) {
 	}
 
 	s.database.SafeClose()
-
 }
 
 func BenchmarkVerifyHistoricalStates(b *testing.B) {
@@ -131,16 +122,14 @@ func BenchmarkVerifyHistoricalStates(b *testing.B) {
 		{1000, false},
 	}
 
-	new_smt, err := NewSMT(255, 50000, 100, 1000, 100)
+	new_smt := newTestSMT(b, 255, 50000, 100, 1000, 100)
+
 	defer os.RemoveAll("./db/")
-	if err != nil {
-		b.Error(err)
-	}
 	keys, values := GenerateRandomKVPairs(1000)
 	new_smt.Update(keys, values)
 	oldRoot := new_smt.GetRoot().value
 	_, newvalues := GenerateRandomKVPairs(1000)
-	err = new_smt.Update(keys, newvalues)
+	err := new_smt.Update(keys, newvalues)
 	if err != nil {
 		b.Error(err)
 	}
