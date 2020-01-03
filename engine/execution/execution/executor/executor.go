@@ -3,6 +3,7 @@ package executor
 import (
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
@@ -19,12 +20,12 @@ type BlockExecutor interface {
 
 type blockExecutor struct {
 	vm    virtualmachine.VirtualMachine
-	state State
+	state state.ExecutionState
 }
 
 // NewBlockExecutor creates a new block executor.
 func NewBlockExecutor(vm virtualmachine.VirtualMachine, ls ledger.Storage) BlockExecutor {
-	state := NewState(ls)
+	state := state.NewExecutionState(ls)
 
 	return &blockExecutor{
 		vm:    vm,

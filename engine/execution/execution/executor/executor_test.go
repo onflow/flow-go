@@ -57,7 +57,7 @@ func TestBlockExecutorExecuteBlock(t *testing.T) {
 
 	vm.On(
 		"ExecuteTransaction",
-		mock.AnythingOfType("*ledger.View"),
+		mock.AnythingOfType("*state.View"),
 		mock.AnythingOfType("*flow.Transaction"),
 	).
 		Return(&virtualmachine.TransactionResult{}, nil).

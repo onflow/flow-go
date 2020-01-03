@@ -1,27 +1,27 @@
-package executor
+package state
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
-type State interface {
-	NewView(flow.StateCommitment) *ledger.View
-	CommitDelta(ledger.Delta) (flow.StateCommitment, error)
+type ExecutionState interface {
+	NewView(flow.StateCommitment) *View
+	CommitDelta(Delta) (flow.StateCommitment, error)
 }
 
 type state struct {
 	ls ledger.Storage
 }
 
-func NewState(ls ledger.Storage) State {
+func NewExecutionState(ls ledger.Storage) ExecutionState {
 	return &state{
 		ls: ls,
 	}
 }
 
-func (s *state) NewView(commitment flow.StateCommitment) *ledger.View {
-	return ledger.NewView(func(key string) ([]byte, error) {
+func (s *state) NewView(commitment flow.StateCommitment) *View {
+	return NewView(func(key string) ([]byte, error) {
 		values, err := s.ls.GetRegisters(
 			[]ledger.RegisterID{[]byte(key)},
 			ledger.StateCommitment(commitment),
@@ -34,7 +34,7 @@ func (s *state) NewView(commitment flow.StateCommitment) *ledger.View {
 	})
 }
 
-func (s *state) CommitDelta(delta ledger.Delta) (flow.StateCommitment, error) {
+func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
 	updates := delta.Updates()
 
 	ids := make([]ledger.RegisterID, 0, len(updates))

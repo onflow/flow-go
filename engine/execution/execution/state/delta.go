@@ -1,4 +1,4 @@
-package ledger
+package state
 
 // A Delta is a record of ledger mutations.
 type Delta map[string][]byte
