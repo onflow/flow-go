@@ -1,7 +1,7 @@
 package voter
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
 	"go.uber.org/atomic"
 )
 

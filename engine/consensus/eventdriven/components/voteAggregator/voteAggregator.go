@@ -1,8 +1,8 @@
 package voteAggregator
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/defConAct"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/defConAct"
 )
 
 // VoteAggregator aggregates incoming votes and generates a QC if possible.

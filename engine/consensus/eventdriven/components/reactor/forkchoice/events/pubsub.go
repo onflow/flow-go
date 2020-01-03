@@ -1,10 +1,10 @@
 package events
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/utils"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/utils"
 )
 
 // PubSubEventProcessor implements core.Processor

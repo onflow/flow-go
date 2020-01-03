@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/utils"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/utils"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/juju/loggo"
 )

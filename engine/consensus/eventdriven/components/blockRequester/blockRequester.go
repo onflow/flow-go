@@ -1,6 +1,6 @@
 package blockRequester
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+import "github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
 
 // BlockRequester
 type BlockRequester struct {

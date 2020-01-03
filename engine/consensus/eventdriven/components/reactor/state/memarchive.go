@@ -1,6 +1,6 @@
 package state
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+import "github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
 
 type memArchive struct {
 	blocksByHash map[string]*def.Block

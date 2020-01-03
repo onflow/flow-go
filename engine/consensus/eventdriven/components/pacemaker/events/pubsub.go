@@ -1,8 +1,9 @@
 package events
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/utils"
 	"sync"
+
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/utils"
 )
 
 // PubSubEventProcessor implements pacemaker.events.Processor

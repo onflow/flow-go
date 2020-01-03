@@ -3,9 +3,9 @@ package core
 import (
 	"bytes"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/components/reactor/core/events"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/components/reactor/state/forrest"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/reactor/core/events"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/reactor/state/forrest"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
 )
 
 // ReactorCore implements HotStuff finalization logic

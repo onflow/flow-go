@@ -3,8 +3,8 @@ package def
 import (
 	"bytes"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/crypto"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/utils"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/crypto"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/utils"
 )
 
 type BlockProposal struct {

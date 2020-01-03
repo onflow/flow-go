@@ -1,6 +1,6 @@
 package events
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+import "github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
 
 // Processor consumes events produced by forkchoice.ForkChoice
 // Implementation must be concurrency safe; Non-blocking;

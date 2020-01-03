@@ -1,7 +1,7 @@
 package events
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
 )
 
 // Processor consumes events produced by reactor.core

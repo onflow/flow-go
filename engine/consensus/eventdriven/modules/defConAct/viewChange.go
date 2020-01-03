@@ -1,8 +1,8 @@
 package defConAct
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/crypto"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/crypto"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
 )
 
 type ViewChange struct {

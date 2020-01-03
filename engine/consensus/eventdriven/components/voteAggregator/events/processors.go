@@ -1,8 +1,8 @@
 package events
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/defConAct"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/defConAct"
 )
 
 // Processor consumes events produced by voteAggregator

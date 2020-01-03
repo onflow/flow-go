@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"crypto/sha256"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/crypto"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/utils"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/crypto"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/utils"
 )
 
 // NOTE: renamed QC to QuorumCertificate for consistency

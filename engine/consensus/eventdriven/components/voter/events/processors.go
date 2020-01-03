@@ -1,6 +1,6 @@
 package voterEvents
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/defConAct"
+import "github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/defConAct"
 
 type Processor interface {
 	OnSentVote(*defConAct.Vote)

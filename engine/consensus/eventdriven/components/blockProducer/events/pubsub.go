@@ -1,10 +1,11 @@
 package blockProducerEvents
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/utils"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/utils"
+
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
 )
 
 // PubSubEventProcessor implements BlockProducer.Processor

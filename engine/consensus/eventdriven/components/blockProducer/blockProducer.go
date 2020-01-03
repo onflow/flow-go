@@ -1,6 +1,6 @@
 package blockProducer
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+import "github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
 
 // BlockProducer needs to know when a block needs to be produced (OnForkChoiceGenerated),
 // the current view (OnEnteringView), and the payload from the mempool

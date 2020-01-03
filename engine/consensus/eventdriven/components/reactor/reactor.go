@@ -1,9 +1,9 @@
 package reactor
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/components/reactor/core"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/components/reactor/forkchoice"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/reactor/core"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/reactor/forkchoice"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
 	"github.com/juju/loggo"
 )
 

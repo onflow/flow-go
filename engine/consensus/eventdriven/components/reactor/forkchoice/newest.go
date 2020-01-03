@@ -1,9 +1,9 @@
 package forkchoice
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/components/reactor/core"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/components/reactor/forkchoice/events"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/reactor/core"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/reactor/forkchoice/events"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
 )
 
 // NewestForkChoice implements HotStuff's original fork choice rule:

@@ -1,6 +1,6 @@
 package defConAct
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/crypto"
+import "github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/crypto"
 
 type Vote struct {
 	// TODO: Why is view here?

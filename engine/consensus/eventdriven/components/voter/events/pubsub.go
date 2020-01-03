@@ -1,10 +1,10 @@
 package voterEvents
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/utils"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/defConAct"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/defConAct"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/utils"
 )
 
 // PubSubEventProcessor implements voteAggregator.Processor
