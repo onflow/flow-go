@@ -32,7 +32,7 @@ func (fc *NewestForkChoice) OnForkChoiceTrigger(view uint64) {
 
 func (fc *NewestForkChoice) ProcessBlock(block *def.Block) {
 	fc.finalizer.ProcessBlock(block)
-	fc.ProcessQC(block.QC)
+	fc.updateQC(block.QC)
 }
 
 func (fc *NewestForkChoice) IsProcessingNeeded(blockMRH []byte, blockView uint64) bool {
@@ -43,19 +43,26 @@ func (fc *NewestForkChoice) IsKnownBlock(blockMRH []byte, blockView uint64) bool
 	return fc.finalizer.IsKnownBlock(blockMRH, blockView)
 }
 
-// updatePreferredQc updates `preferredQc` according to the fork-choice rule.
+// ProcessQcFromVotes updates `preferredQc` according to the fork-choice rule.
+func (fc *NewestForkChoice) ProcessQcFromVotes(qc *def.QuorumCertificate) {
+	if fc.updateQC(qc) {
+		fc.eventprocessor.OnQcFromVotesIncorporated(qc)
+	}
+}
+
+// updateQC updates `preferredQc` according to the fork-choice rule.
 // Currently, the method implements 'Chained HotStuff Protocol' where the fork-choice
 // rule is: "build on newest QC"
-func (fc *NewestForkChoice) ProcessQC(qc *def.QuorumCertificate) {
+// Returns true if and only if preferredQc was updated
+func (fc *NewestForkChoice) updateQC(qc *def.QuorumCertificate) bool {
 	// r.preferredQc is called 'GenericQC' in 'Chained HotStuff Protocol' https://arxiv.org/abs/1803.05069v6
 	if qc.View <= fc.preferredQc.View {
-		return
+		return false
 	}
 	// We are implementing relaxed HotStuff rule which uses the newest QC (see Event-driven HotStuff)
 	fc.preferredQc = qc
-	fc.eventprocessor.OnIncorporatedQuorumCertificate(qc)
+	return true
 }
-
 
 func NewNewestForkChoice(finalizer *core.ReactorCore, eventprocessor events.Processor) *NewestForkChoice {
 	return &NewestForkChoice{
@@ -65,6 +72,3 @@ func NewNewestForkChoice(finalizer *core.ReactorCore, eventprocessor events.Proc
 		eventprocessor: eventprocessor,
 	}
 }
-
-
-

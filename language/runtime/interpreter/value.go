@@ -17,8 +17,6 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	encodingValues "github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
-	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 type Value interface {
@@ -26,10 +24,6 @@ type Value interface {
 	Copy() Value
 	GetOwner() string
 	SetOwner(owner string)
-}
-
-type ExportableValue interface {
-	Export() values.Value
 }
 
 // ValueIndexableValue
@@ -94,10 +88,6 @@ func (VoidValue) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
-func (VoidValue) Export() values.Value {
-	return values.Void{}
-}
-
 func (VoidValue) String() string {
 	return "()"
 }
@@ -123,10 +113,6 @@ func (BoolValue) GetOwner() string {
 
 func (BoolValue) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
-}
-
-func (v BoolValue) Export() values.Value {
-	return values.NewBool(bool(v))
 }
 
 func (v BoolValue) Negate() BoolValue {
@@ -176,10 +162,6 @@ func (*StringValue) GetOwner() string {
 
 func (*StringValue) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
-}
-
-func (v *StringValue) Export() values.Value {
-	return values.NewString(v.Str)
 }
 
 func (v *StringValue) String() string {
@@ -355,17 +337,6 @@ func (v *ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition
 		})
 	}
 	return result
-}
-
-func (v *ArrayValue) Export() values.Value {
-	// TODO: how to export constant-sized array?
-	vals := make([]values.Value, len(v.Values))
-
-	for i, value := range v.Values {
-		vals[i] = value.(ExportableValue).Export()
-	}
-
-	return values.NewVariableSizedArray(vals)
 }
 
 func (v *ArrayValue) GobEncode() ([]byte, error) {
@@ -607,10 +578,6 @@ func (IntValue) SetOwner(_ string) {
 	// NO-OP: value cannot be owned
 }
 
-func (v IntValue) Export() values.Value {
-	return values.NewIntFromBig(big.NewInt(0).Set(v.Int))
-}
-
 func (v IntValue) IntValue() int {
 	// TODO: handle overflow
 	return int(v.Int.Int64())
@@ -713,10 +680,6 @@ func (v Int8Value) KeyString() string {
 	return strconv.FormatInt(int64(v), 10)
 }
 
-func (v Int8Value) Export() values.Value {
-	return values.NewInt8(int8(v))
-}
-
 func (v Int8Value) IntValue() int {
 	return int(v)
 }
@@ -802,10 +765,6 @@ func (v Int16Value) String() string {
 
 func (v Int16Value) KeyString() string {
 	return strconv.FormatInt(int64(v), 10)
-}
-
-func (v Int16Value) Export() values.Int16 {
-	return values.NewInt16(int16(v))
 }
 
 func (v Int16Value) IntValue() int {
@@ -895,10 +854,6 @@ func (v Int32Value) KeyString() string {
 	return strconv.FormatInt(int64(v), 10)
 }
 
-func (v Int32Value) Export() values.Value {
-	return values.NewInt32(int32(v))
-}
-
 func (v Int32Value) IntValue() int {
 	return int(v)
 }
@@ -984,10 +939,6 @@ func (v Int64Value) String() string {
 
 func (v Int64Value) KeyString() string {
 	return strconv.FormatInt(int64(v), 10)
-}
-
-func (v Int64Value) Export() values.Value {
-	return values.NewInt64(int64(v))
 }
 
 func (v Int64Value) IntValue() int {
@@ -1077,10 +1028,6 @@ func (v UInt8Value) KeyString() string {
 	return strconv.FormatUint(uint64(v), 10)
 }
 
-func (v UInt8Value) Export() values.Value {
-	return values.NewUInt8(uint8(v))
-}
-
 func (v UInt8Value) IntValue() int {
 	return int(v)
 }
@@ -1165,10 +1112,6 @@ func (v UInt16Value) String() string {
 
 func (v UInt16Value) KeyString() string {
 	return strconv.FormatUint(uint64(v), 10)
-}
-
-func (v UInt16Value) Export() values.Value {
-	return values.NewUInt16(uint16(v))
 }
 
 func (v UInt16Value) IntValue() int {
@@ -1257,10 +1200,6 @@ func (v UInt32Value) KeyString() string {
 	return strconv.FormatUint(uint64(v), 10)
 }
 
-func (v UInt32Value) Export() values.Value {
-	return values.NewUInt32(uint32(v))
-}
-
 func (v UInt32Value) IntValue() int {
 	return int(v)
 }
@@ -1346,10 +1285,6 @@ func (v UInt64Value) String() string {
 
 func (v UInt64Value) KeyString() string {
 	return strconv.FormatUint(uint64(v), 10)
-}
-
-func (v UInt64Value) Export() values.Value {
-	return values.NewUInt64(uint64(v))
 }
 
 func (v UInt64Value) IntValue() int {
@@ -1493,23 +1428,6 @@ func (v *CompositeValue) SetOwner(owner string) {
 	for _, value := range v.Fields {
 		value.SetOwner(owner)
 	}
-}
-
-func (v *CompositeValue) Export() values.Value {
-	fields := make([]values.Value, len(v.Fields))
-
-	keys := make([]string, 0, len(v.Fields))
-	for key := range v.Fields {
-		keys = append(keys, key)
-	}
-
-	encodingValues.SortInEncodingOrder(keys)
-
-	for i, key := range keys {
-		fields[i] = v.Fields[key].(ExportableValue).Export()
-	}
-
-	return values.NewComposite(fields)
 }
 
 func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
@@ -1731,25 +1649,6 @@ func (v *DictionaryValue) Destroy(interpreter *Interpreter, location LocationPos
 	return result
 }
 
-func (v *DictionaryValue) Export() values.Value {
-	pairs := make([]values.KeyValuePair, v.Count())
-
-	for i, keyValue := range v.Keys.Values {
-		key := dictionaryKey(keyValue)
-		value := v.Entries[key]
-
-		exportedKey := keyValue.(ExportableValue).Export()
-		exportedValue := value.(ExportableValue).Export()
-
-		pairs[i] = values.KeyValuePair{
-			Key:   exportedKey,
-			Value: exportedValue,
-		}
-	}
-
-	return values.NewDictionary(pairs)
-}
-
 func (v *DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) Value {
 	value, ok := v.Entries[dictionaryKey(keyValue)]
 	if !ok {
@@ -1932,16 +1831,6 @@ type EventValue struct {
 
 func (EventValue) isValue() {}
 
-func (v EventValue) Export() values.Value {
-	fields := make([]values.Value, len(v.Fields))
-
-	for i, field := range v.Fields {
-		fields[i] = field.Value.(ExportableValue).Export()
-	}
-
-	return values.NewEvent(fields)
-}
-
 func (v EventValue) Copy() Value {
 	fields := make([]EventField, len(v.Fields))
 	for i, field := range v.Fields {
@@ -2082,10 +1971,6 @@ func (NilValue) String() string {
 	return "nil"
 }
 
-func (v NilValue) Export() values.Value {
-	return values.Optional{Value: nil}
-}
-
 // SomeValue
 
 type SomeValue struct {
@@ -2136,10 +2021,6 @@ func (v *SomeValue) Destroy(interpreter *Interpreter, location LocationPosition)
 
 func (v *SomeValue) String() string {
 	return fmt.Sprint(v.Value)
-}
-
-func (v *SomeValue) Export() values.Value {
-	return values.Optional{Value: v.Value.(ExportableValue).Export()}
 }
 
 // AnyValue
@@ -2345,10 +2226,6 @@ func ConvertAddress(value Value) Value {
 
 func (AddressValue) isValue() {}
 
-func (v AddressValue) Export() values.Value {
-	return values.NewAddress(v)
-}
-
 func (v AddressValue) Copy() Value {
 	return v
 }
@@ -2375,7 +2252,7 @@ func (v AddressValue) Equal(other Value) BoolValue {
 }
 
 func (v AddressValue) Hex() string {
-	return v.Export().(values.Address).Hex()
+	return fmt.Sprintf("%x", [common.AddressLength]byte(v))
 }
 
 // AccountValue

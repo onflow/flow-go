@@ -27,11 +27,5 @@
 # Cryptography Stream
 /crypto/** @tarakby
 
-# Emulator Stream
-/sdk/emulator/** @mrbrianhobo @psiemens @jordanschalm
-
-# SDK Stream
-/sdk/** @mrbrianhobo @psiemens @jordanschalm
-
 # Language Stream
 /language/** @turbolent

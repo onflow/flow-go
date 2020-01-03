@@ -19,11 +19,11 @@ func NewPubSubEventProcessor() *PubSubEventProcessor {
 	return &PubSubEventProcessor{}
 }
 
-func (p *PubSubEventProcessor) OnIncorporatedQuorumCertificate(qc *def.QuorumCertificate) {
+func (p *PubSubEventProcessor) OnQcFromVotesIncorporated(qc *def.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.incorporatedQcCons {
-		subscriber.OnIncorporatedQuorumCertificate(qc)
+		subscriber.OnQcFromVotesIncorporated(qc)
 	}
 }
 

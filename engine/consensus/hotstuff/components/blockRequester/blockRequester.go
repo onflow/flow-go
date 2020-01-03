@@ -11,8 +11,8 @@ func (br *BlockRequester) OnMissingBlock(blockMRH []byte, blockView uint64) {
 	panic("Implement me")
 }
 
-// OnIncorporatedBlock marks `block` as no longer outstanding
+// OnBlockIncorporated marks `block` as no longer outstanding
 // in case the BlockRequester was previously requesting it
-func (br *BlockRequester) OnIncorporatedBlock(block *def.Block) {
+func (br *BlockRequester) OnBlockIncorporated(block *def.Block) {
 	panic("Implement me")
 }

@@ -35,4 +35,3 @@ func (p *PubSubEventProcessor) AddSentVoteConsumer(cons SentVoteConsumer) *PubSu
 	p.sentVoteConsumers = append(p.sentVoteConsumers, cons)
 	return p
 }
-
