@@ -29,7 +29,8 @@ const (
 	ConsensusExpulsion   = 52
 
 	// Execution 100-199
-	ExecutionExecution = 100
+	ExecutionExecution      = 100
+	ExecutionBlockIngestion = 101
 
 	// Testing 200-255
 	SimulationGenerator = 200
