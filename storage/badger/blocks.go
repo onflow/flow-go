@@ -89,18 +89,18 @@ func (b *Blocks) retrieveBlock(tx *badger.Txn, hash crypto.Hash) (*flow.Block, e
 		return nil, errors.Wrap(err, "could not retrieve identities")
 	}
 
-	// get the guaranteed collections
-	var collections []*flow.GuaranteedCollection
-	err = operation.RetrieveCollections(hash, &collections)(tx)
+	// get the collection guarantees
+	var collections []*flow.CollectionGuarantee
+	err = operation.RetrieveCollectionGuarantees(hash, &collections)(tx)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not retrieve collections")
 	}
 
 	// create the block
 	block := &flow.Block{
-		Header:                header,
-		NewIdentities:         identities,
-		GuaranteedCollections: collections,
+		Header:               header,
+		NewIdentities:        identities,
+		CollectionGuarantees: collections,
 	}
 
 	return block, nil
@@ -118,7 +118,7 @@ func (b *Blocks) Save(block *flow.Block) error {
 		if err != nil {
 			return errors.Wrap(err, "cannot save block")
 		}
-		err = operation.PersistCollections(block.Hash(), block.GuaranteedCollections)(tx)
+		err = operation.PersistCollectionGuarantees(block.Hash(), block.CollectionGuarantees)(tx)
 		if err != nil {
 			return errors.Wrap(err, "cannot save block")
 		}

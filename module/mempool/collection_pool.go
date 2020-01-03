@@ -8,49 +8,49 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// CollectionPool implements the collections memory pool of the consensus nodes,
+// CollectionGuaranteePool implements the collections memory pool of the consensus nodes,
 // used to store guaranteed collections and to generate block payloads.
-type CollectionPool struct {
+type CollectionGuaranteePool struct {
 	*mempool
 }
 
 // NewCollectionPool creates a new memory pool for guaranteed collections.
-func NewCollectionPool() (*CollectionPool, error) {
-	m := &CollectionPool{
+func NewCollectionPool() (*CollectionGuaranteePool, error) {
+	m := &CollectionGuaranteePool{
 		mempool: newMempool(),
 	}
 
 	return m, nil
 }
 
-// Add adds a guaranteed collection to the mempool.
-func (m *CollectionPool) Add(coll *flow.GuaranteedCollection) error {
-	return m.mempool.Add(coll)
+// Add adds a guaranteed collection guarantee to the mempool.
+func (m *CollectionGuaranteePool) Add(guarantee *flow.CollectionGuarantee) error {
+	return m.mempool.Add(guarantee)
 }
 
-// Get returns the given collection from the pool.
-func (m *CollectionPool) Get(fp flow.Fingerprint) (*flow.GuaranteedCollection, error) {
+// Get returns the given collection guarantee from the pool.
+func (m *CollectionGuaranteePool) Get(fp flow.Fingerprint) (*flow.CollectionGuarantee, error) {
 	item, err := m.mempool.Get(fp)
 	if err != nil {
 		return nil, err
 	}
 
-	coll, ok := item.(*flow.GuaranteedCollection)
+	guarantee, ok := item.(*flow.CollectionGuarantee)
 	if !ok {
 		return nil, fmt.Errorf("unable to convert item to guaranteed collection")
 	}
 
-	return coll, nil
+	return guarantee, nil
 }
 
-// All returns all collections from the pool.
-func (m *CollectionPool) All() []*flow.GuaranteedCollection {
+// All returns all collection guarantees from the pool.
+func (m *CollectionGuaranteePool) All() []*flow.CollectionGuarantee {
 	items := m.mempool.All()
 
-	colls := make([]*flow.GuaranteedCollection, len(items))
+	guarantees := make([]*flow.CollectionGuarantee, len(items))
 	for i, item := range items {
-		colls[i] = item.(*flow.GuaranteedCollection)
+		guarantees[i] = item.(*flow.CollectionGuarantee)
 	}
 
-	return colls
+	return guarantees
 }

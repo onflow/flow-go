@@ -60,10 +60,10 @@ GenerateLoop:
 		select {
 		case <-time.After(time.Duration(dur)):
 
-			// generate a guaranteed collection with a random hash
+			// generate a collection guarantee with a random hash
 			hash := make([]byte, 32)
 			_, _ = rand.Read(hash)
-			coll := &flow.GuaranteedCollection{
+			coll := &flow.CollectionGuarantee{
 				CollectionHash: hash,
 			}
 
