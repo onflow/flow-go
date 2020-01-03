@@ -83,7 +83,7 @@ func TestTrieUntrusted(t *testing.T) {
 
 	keys, values := makeTestKeys()
 
-	newRoot, _, err := f.UpdateRegisterWithProof(keys, values)
+	newRoot, _, err := f.UpdateRegistersWithProof(keys, values)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestTrieUntrustedandVerify(t *testing.T) {
 
 	keys, values := makeTestKeys()
 
-	newRoot, proofs, err := f.UpdateRegisterWithProof(keys, values)
+	newRoot, proofs, err := f.UpdateRegistersWithProof(keys, values)
 
 	if err != nil {
 		t.Fatal(err)
