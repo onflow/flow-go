@@ -8,34 +8,8 @@ import (
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
-func makeTestKeys() ([][]byte, [][]byte) {
-	key1 := make([]byte, 1)
-	value1 := []byte{'a'}
-
-	key2 := make([]byte, 1)
-	value2 := []byte{'b'}
-	utils.SetBit(key2, 5)
-
-	key3 := make([]byte, 1)
-	value3 := []byte{'c'}
-	utils.SetBit(key3, 0)
-
-	key4 := make([]byte, 1)
-	value4 := []byte{'d'}
-	utils.SetBit(key4, 0)
-	utils.SetBit(key4, 5)
-
-	keys := make([][]byte, 0)
-	values := make([][]byte, 0)
-
-	keys = append(keys, key1, key2, key3, key4)
-	values = append(values, value1, value2, value3, value4)
-
-	return keys, values
-}
-
-func TestRegisterCreation(t *testing.T) {
-	f, err := NewFlowLedgerStorage()
+func TestNewTrieStorage(t *testing.T) {
+	f, err := NewTrieStorage()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +18,7 @@ func TestRegisterCreation(t *testing.T) {
 }
 
 func TestTrieTrusted(t *testing.T) {
-	f, err := NewFlowLedgerStorage()
+	f, err := NewTrieStorage()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +49,7 @@ func TestTrieTrusted(t *testing.T) {
 }
 
 func TestTrieUntrusted(t *testing.T) {
-	f, err := NewFlowLedgerStorage()
+	f, err := NewTrieStorage()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,29 +79,28 @@ func TestTrieUntrusted(t *testing.T) {
 
 }
 
-func TestTrieUntrustedandVerify(t *testing.T) {
-	f, err := NewFlowLedgerStorage()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll("./db/")
+func makeTestKeys() ([][]byte, [][]byte) {
+	key1 := make([]byte, 1)
+	value1 := []byte{'a'}
 
-	keys, values := makeTestKeys()
+	key2 := make([]byte, 1)
+	value2 := []byte{'b'}
+	utils.SetBit(key2, 5)
 
-	newRoot, proofs, err := f.UpdateRegistersWithProof(keys, values)
+	key3 := make([]byte, 1)
+	value3 := []byte{'c'}
+	utils.SetBit(key3, 0)
 
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(f.tree.GetRoot().GetValue(), newRoot) {
-		t.Fatalf("Something in UpdateRegister went wrong")
-	}
+	key4 := make([]byte, 1)
+	value4 := []byte{'d'}
+	utils.SetBit(key4, 0)
+	utils.SetBit(key4, 5)
 
-	v := NewFlowLedgerVerifier(f.tree.GetHeight(), f.tree.GetDefaultHashes())
-	_, err = v.VerifyRegistersProof(keys, f.tree.GetRoot().GetValue(), values, proofs)
-	if err != nil {
-		t.Fatal(err)
-	}
+	keys := make([][]byte, 0)
+	values := make([][]byte, 0)
 
-	f.CloseStorage()
+	keys = append(keys, key1, key2, key3, key4)
+	values = append(values, value1, value2, value3, value4)
+
+	return keys, values
 }

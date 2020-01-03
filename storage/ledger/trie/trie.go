@@ -627,25 +627,28 @@ func (s *SMT) GetRoot() *node {
 	return s.root
 }
 
-// GetDefaultHashes returns the Default Hashes of the SMT
+// GetDefaultHashes returns the default hashes of the SMT.
+//
+// For each tree level N, there is a default hash equal to the chained
+// hashing of the default value N times.
 func (s *SMT) GetDefaultHashes() [256][]byte {
 	return s.defaultHashes
 }
 
 func (s *SMT) insertIntoKeys(insert []byte, keys [][]byte, values [][]byte) ([][]byte, [][]byte, error) {
-
 	for i, key := range keys {
 		if bytes.Equal(insert, key) {
 			return keys, values, nil
 		}
+
 		if bytes.Compare(insert, key) < 0 {
-			//Insert the key into the keys
+			// Insert the key into the keys
 			newkeys := make([][]byte, 0)
 			newkeys = append(newkeys, keys[:i]...)
 			newkeys = append(newkeys, insert)
 			newkeys = append(newkeys, keys[i:]...)
 
-			//Insert the old value into values
+			// Insert the old value into values
 			newvalues := make([][]byte, 0)
 			newvalues = append(newvalues, values[:i]...)
 			oldVal, err := s.database.GetKVDB(insert)
