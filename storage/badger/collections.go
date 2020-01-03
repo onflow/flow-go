@@ -1,9 +1,11 @@
 package badger
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/ethereum/go-ethereum/signer/storage"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -27,6 +29,9 @@ func (c *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, er
 		return operation.RetrieveCollection(hash, &collection)(tx)
 	})
 	if err != nil {
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			return nil, storage.ErrNotFound
+		}
 		return nil, fmt.Errorf("could not retrieve collection: %w", err)
 	}
 
@@ -42,6 +47,9 @@ func (c *Collections) TransactionsByFingerprint(hash flow.Fingerprint) ([]*flow.
 	err := c.db.View(func(tx *badger.Txn) error {
 		err := operation.RetrieveCollection(hash, &collection)(tx)
 		if err != nil {
+			if errors.Is(err, badger.ErrKeyNotFound) {
+				return storage.ErrNotFound
+			}
 			return fmt.Errorf("could not retrieve collection: %w", err)
 		}
 
@@ -49,6 +57,9 @@ func (c *Collections) TransactionsByFingerprint(hash flow.Fingerprint) ([]*flow.
 			var transaction flow.Transaction
 			err = operation.RetrieveTransaction(txHash, &transaction)(tx)
 			if err != nil {
+				if errors.Is(err, badger.ErrKeyNotFound) {
+					return storage.ErrNotFound
+				}
 				return fmt.Errorf("could not retrieve transaction: %w", err)
 			}
 
