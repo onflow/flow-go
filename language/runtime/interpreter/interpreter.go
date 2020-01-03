@@ -2155,116 +2155,38 @@ func (interpreter *Interpreter) initializerFunction(
 	lexicalScope hamt.Map,
 ) *InterpretedFunctionValue {
 
-	// NOTE: gather all conformances' preconditions and rewritten postconditions,
-	// even if the composite declaration does not have an initializer
-
-	var beforeStatements []ast.Statement
-	var preConditions ast.Conditions
-	var postConditions ast.Conditions
-
-	// TODO:
-	//compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
-	//
-	//for _, conformance := range compositeType.Conformances {
-	//
-	//	interfaceDeclaration := interpreter.InterfaceDeclarations[conformance.Identifier]
-	//
-	//	// TODO: support multiple overloaded initializers
-	//
-	//	initializers := interfaceDeclaration.Members.Initializers()
-	//	if len(initializers) == 0 {
-	//		continue
-	//	}
-	//
-	//	firstInitializer := initializers[0]
-	//	if firstInitializer == nil || firstInitializer.FunctionBlock == nil {
-	//		continue
-	//	}
-	//
-	//	if firstInitializer.FunctionBlock.PreConditions != nil {
-	//		preConditions = append(
-	//			preConditions,
-	//			*firstInitializer.FunctionBlock.PreConditions...,
-	//		)
-	//	}
-	//
-	//	if firstInitializer.FunctionBlock.PostConditions != nil {
-	//
-	//		// TODO: look up in correct checker
-	//
-	//		postConditionsRewrite :=
-	//			interpreter.Checker.Elaboration.PostConditionsRewrite[firstInitializer.FunctionBlock.PostConditions]
-	//
-	//		postConditions = append(
-	//			postConditions,
-	//			postConditionsRewrite.RewrittenPostConditions...,
-	//		)
-	//
-	//		beforeStatements = append(
-	//			beforeStatements,
-	//			postConditionsRewrite.BeforeStatements...,
-	//		)
-	//	}
-	//}
-
-	var functionType *sema.FunctionType
+	// TODO: support multiple overloaded initializers
 
 	initializers := compositeDeclaration.Members.Initializers()
 	var initializer *ast.SpecialFunctionDeclaration
-	if len(initializers) > 0 {
-		// TODO: support multiple overloaded initializers
-
-		initializer = initializers[0]
-
-		functionType = interpreter.Checker.Elaboration.SpecialFunctionTypes[initializer].FunctionType
-	} else if len(preConditions) > 0 || len(postConditions) > 0 {
-
-		// no initializer, but preconditions or postconditions from conformances,
-
-		functionType = emptyFunctionType
-	}
-
-	// no initializer in the composite declaration and also
-	// no preconditions or postconditions in the conformances: no need for initializer
-
-	if functionType == nil {
+	if len(initializers) == 0 {
 		return nil
 	}
 
-	// Append the function's pre-conditions and rewritten post-conditions, if any
+	initializer = initializers[0]
+	functionType := interpreter.Checker.Elaboration.SpecialFunctionTypes[initializer].FunctionType
 
-	var parameterList *ast.ParameterList
-	var statements []ast.Statement
+	parameterList := initializer.ParameterList
 
-	if initializer != nil {
-		parameterList = initializer.ParameterList
-		statements = initializer.FunctionBlock.Statements
-
-		if initializer.FunctionBlock.PreConditions != nil {
-			preConditions = append(
-				preConditions,
-				*initializer.FunctionBlock.PreConditions...,
-			)
-		}
-
-		if initializer.FunctionBlock.PostConditions != nil {
-
-			postConditionsRewrite :=
-				interpreter.Checker.Elaboration.PostConditionsRewrite[initializer.FunctionBlock.PostConditions]
-
-			postConditions = append(
-				postConditions,
-				postConditionsRewrite.RewrittenPostConditions...,
-			)
-
-			beforeStatements = append(
-				beforeStatements,
-				postConditionsRewrite.BeforeStatements...,
-			)
-		}
+	var preConditions ast.Conditions
+	if initializer.FunctionBlock.PreConditions != nil {
+		preConditions = *initializer.FunctionBlock.PreConditions
 	}
 
-	result := InterpretedFunctionValue{
+	statements := initializer.FunctionBlock.Statements
+
+	var beforeStatements []ast.Statement
+	var postConditions ast.Conditions
+
+	if initializer.FunctionBlock.PostConditions != nil {
+		postConditionsRewrite :=
+			interpreter.Checker.Elaboration.PostConditionsRewrite[initializer.FunctionBlock.PostConditions]
+
+		beforeStatements = postConditionsRewrite.BeforeStatements
+		postConditions = postConditionsRewrite.RewrittenPostConditions
+	}
+
+	return &InterpretedFunctionValue{
 		Interpreter:      interpreter,
 		ParameterList:    parameterList,
 		Type:             functionType,
@@ -2274,7 +2196,6 @@ func (interpreter *Interpreter) initializerFunction(
 		Statements:       statements,
 		PostConditions:   postConditions,
 	}
-	return &result
 }
 
 func (interpreter *Interpreter) destructorFunction(
@@ -2282,91 +2203,31 @@ func (interpreter *Interpreter) destructorFunction(
 	lexicalScope hamt.Map,
 ) *InterpretedFunctionValue {
 
-	// NOTE: gather all conformances' preconditions and rewritten postconditions,
-	// even if the composite declaration does not have a destructor
-
-	var beforeStatements []ast.Statement
-	var preConditions ast.Conditions
-	var postConditions ast.Conditions
-
-	// TODO:
-	//compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
-	//
-	//for _, conformance := range compositeType.Conformances {
-	//	interfaceDeclaration := interpreter.InterfaceDeclarations[conformance.Identifier]
-	//
-	//	interfaceDestructor := interfaceDeclaration.Members.Destructor()
-	//	if interfaceDestructor == nil || interfaceDestructor.FunctionBlock == nil {
-	//		continue
-	//	}
-	//
-	//	if interfaceDestructor.FunctionBlock.PreConditions != nil {
-	//		preConditions = append(
-	//			preConditions,
-	//			*interfaceDestructor.FunctionBlock.PreConditions...,
-	//		)
-	//	}
-	//
-	//	if interfaceDestructor.FunctionBlock.PostConditions != nil {
-	//
-	//		// TODO: use correct checker
-	//
-	//		postConditionsRewrite :=
-	//			interpreter.Checker.Elaboration.PostConditionsRewrite[interfaceDestructor.FunctionBlock.PostConditions]
-	//
-	//		postConditions = append(
-	//			postConditions,
-	//			postConditionsRewrite.RewrittenPostConditions...,
-	//		)
-	//
-	//		beforeStatements = append(
-	//			beforeStatements,
-	//			postConditionsRewrite.BeforeStatements...,
-	//		)
-	//	}
-	//}
-
 	destructor := compositeDeclaration.Members.Destructor()
-
-	// If there is no destructor in the resource declaration
-	// and if there are also no preconditions and postconditions in the conformances,
-	// then there is no need for a destructor
-
-	if destructor == nil && len(preConditions) == 0 && len(postConditions) == 0 {
+	if destructor == nil {
 		return nil
 	}
 
-	// Append the destructor's pre-conditions and rewritten post-conditions, if any
+	statements := destructor.FunctionBlock.Statements
 
-	var statements []ast.Statement
-	if destructor != nil {
-		statements = destructor.FunctionBlock.Statements
+	var preConditions ast.Conditions
 
-		if destructor.FunctionBlock.PreConditions != nil {
-			preConditions = append(
-				preConditions,
-				*destructor.FunctionBlock.PreConditions...,
-			)
-		}
-
-		if destructor.FunctionBlock.PostConditions != nil {
-
-			postConditionsRewrite :=
-				interpreter.Checker.Elaboration.PostConditionsRewrite[destructor.FunctionBlock.PostConditions]
-
-			postConditions = append(
-				postConditions,
-				postConditionsRewrite.RewrittenPostConditions...,
-			)
-
-			beforeStatements = append(
-				beforeStatements,
-				postConditionsRewrite.BeforeStatements...,
-			)
-		}
+	if destructor.FunctionBlock.PreConditions != nil {
+		preConditions = *destructor.FunctionBlock.PreConditions
 	}
 
-	result := InterpretedFunctionValue{
+	var beforeStatements []ast.Statement
+	var postConditions ast.Conditions
+
+	if destructor.FunctionBlock.PostConditions != nil {
+		postConditionsRewrite :=
+			interpreter.Checker.Elaboration.PostConditionsRewrite[destructor.FunctionBlock.PostConditions]
+
+		postConditions = postConditionsRewrite.RewrittenPostConditions
+		beforeStatements = postConditionsRewrite.BeforeStatements
+	}
+
+	return &InterpretedFunctionValue{
 		Interpreter:      interpreter,
 		Type:             emptyFunctionType,
 		Activation:       lexicalScope,
@@ -2375,7 +2236,6 @@ func (interpreter *Interpreter) destructorFunction(
 		Statements:       statements,
 		PostConditions:   postConditions,
 	}
-	return &result
 }
 
 func (interpreter *Interpreter) compositeFunctions(
@@ -2426,92 +2286,35 @@ func (interpreter *Interpreter) compositeFunction(
 	lexicalScope hamt.Map,
 ) InterpretedFunctionValue {
 
-	//functionIdentifier := functionDeclaration.Identifier.Identifier
-
-	// NOTE: gather all conformances' preconditions and rewritten postconditions,
-
-	var beforeStatements []ast.Statement
 	var preConditions ast.Conditions
-	var postConditions ast.Conditions
-
-	// TODO:
-	//addConditionsFromMembers := func(members *ast.Members) {
-	//	functionsByIdentifier := members.FunctionsByIdentifier()
-	//	interfaceFunction, ok := functionsByIdentifier[functionIdentifier]
-	//	if !ok || interfaceFunction.FunctionBlock == nil {
-	//		return
-	//	}
-	//
-	//	if interfaceFunction.FunctionBlock.PreConditions != nil {
-	//		preConditions = append(
-	//			preConditions,
-	//			*interfaceFunction.FunctionBlock.PreConditions...,
-	//		)
-	//	}
-	//
-	//	if interfaceFunction.FunctionBlock.PostConditions != nil {
-	//
-	//		// TODO: use correct checker
-	//
-	//		postConditionsRewrite :=
-	//			interpreter.Checker.Elaboration.PostConditionsRewrite[interfaceFunction.FunctionBlock.PostConditions]
-	//
-	//		postConditions = append(
-	//			postConditions,
-	//			postConditionsRewrite.RewrittenPostConditions...,
-	//		)
-	//
-	//		beforeStatements = append(
-	//			beforeStatements,
-	//			postConditionsRewrite.BeforeStatements...,
-	//		)
-	//	}
-	//}
-	//
-	//
-	//for _, conformance := range conformances {
-	//	interfaceDeclaration := interpreter.InterfaceDeclarations[conformance.Identifier]
-	//	addConditionsFromMembers(interfaceDeclaration.Members)
-	//}
-	//
-	//for _, typeRequirement := range typeRequirements {
-	//	compositeDeclaration := interpreter.CompositeDeclarations[typeRequirement.Identifier]
-	//	addConditionsFromMembers(compositeDeclaration.Members)
-	//}
-
-	// Append the function's pre-conditions and rewritten post-conditions, if any
 
 	if functionDeclaration.FunctionBlock.PreConditions != nil {
-		preConditions = append(
-			preConditions,
-			*functionDeclaration.FunctionBlock.PreConditions...,
-		)
+		preConditions = *functionDeclaration.FunctionBlock.PreConditions
 	}
+
+	var beforeStatements []ast.Statement
+	var postConditions ast.Conditions
 
 	if functionDeclaration.FunctionBlock.PostConditions != nil {
 
 		postConditionsRewrite :=
 			interpreter.Checker.Elaboration.PostConditionsRewrite[functionDeclaration.FunctionBlock.PostConditions]
 
-		postConditions = append(
-			postConditions,
-			postConditionsRewrite.RewrittenPostConditions...,
-		)
-
-		beforeStatements = append(
-			beforeStatements,
-			postConditionsRewrite.BeforeStatements...,
-		)
+		beforeStatements = postConditionsRewrite.BeforeStatements
+		postConditions = postConditionsRewrite.RewrittenPostConditions
 	}
+
+	parameterList := functionDeclaration.ParameterList
+	statements := functionDeclaration.FunctionBlock.Statements
 
 	return InterpretedFunctionValue{
 		Interpreter:      interpreter,
-		ParameterList:    functionDeclaration.ParameterList,
+		ParameterList:    parameterList,
 		Type:             functionType,
 		Activation:       lexicalScope,
 		BeforeStatements: beforeStatements,
 		PreConditions:    preConditions,
-		Statements:       functionDeclaration.FunctionBlock.Statements,
+		Statements:       statements,
 		PostConditions:   postConditions,
 	}
 }
