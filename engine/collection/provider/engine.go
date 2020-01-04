@@ -88,9 +88,9 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// SubmitGuaranteedCollection submits the guaranteed collection to all
+// SubmitCollectionGuarantee submits the guaranteed collection to all
 // consensus nodes.
-func (e *Engine) SubmitGuaranteedCollection(gc *flow.GuaranteedCollection) error {
+func (e *Engine) SubmitCollectionGuarantee(gc *flow.CollectionGuarantee) error {
 	identities, err := e.state.Final().Identities(identity.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get consensus identities: %w", err)
@@ -109,8 +109,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *CollectionRequest:
 		return e.onCollectionRequest(originID, ev)
-	case *SubmitGuaranteedCollection:
-		return e.onSubmitGuaranteedCollection(originID, ev)
+	case *SubmitCollectionGuarantee:
+		return e.onSubmitCollectionGuarantee(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -121,10 +121,10 @@ func (e *Engine) onCollectionRequest(originID flow.Identifier, req *CollectionRe
 	return nil
 }
 
-func (e *Engine) onSubmitGuaranteedCollection(originID flow.Identifier, req *SubmitGuaranteedCollection) error {
+func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *SubmitCollectionGuarantee) error {
 	if originID != e.me.NodeID() {
-		return fmt.Errorf("invalid remote request to submit guaranteed collection [%s]", req.Coll.Fingerprint().Hex())
+		return fmt.Errorf("invalid remote request to submit collection guarantee [%s]", req.Guarantee.Fingerprint().Hex())
 	}
 
-	return e.SubmitGuaranteedCollection(&req.Coll)
+	return e.SubmitCollectionGuarantee(&req.Guarantee)
 }

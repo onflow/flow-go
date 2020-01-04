@@ -15,8 +15,8 @@ type CollectionResponse struct {
 	Transactions []flow.TransactionBody
 }
 
-// SubmitGuaranteedCollection is a request to submit the given guaranteed
-// collection to consensus nodes. Only valid as a node-local message.
-type SubmitGuaranteedCollection struct {
-	Coll flow.GuaranteedCollection
+// SubmitCollectionGuarantee is a request to submit the given collection
+// guarantee to consensus nodes. Only valid as a node-local message.
+type SubmitCollectionGuarantee struct {
+	Guarantee flow.CollectionGuarantee
 }
