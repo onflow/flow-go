@@ -10,13 +10,13 @@ type Collections struct {
 	mock.Mock
 }
 
-// ByFingerprint provides a mock function with given fields: fingerprint
-func (_m *Collections) ByFingerprint(fingerprint flow.Fingerprint) (*flow.Collection, error) {
-	ret := _m.Called(fingerprint)
+// ByFingerprint provides a mock function with given fields: hash
+func (_m *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, error) {
+	ret := _m.Called(hash)
 
 	var r0 *flow.Collection
 	if rf, ok := ret.Get(0).(func(flow.Fingerprint) *flow.Collection); ok {
-		r0 = rf(fingerprint)
+		r0 = rf(hash)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Collection)
@@ -25,7 +25,7 @@ func (_m *Collections) ByFingerprint(fingerprint flow.Fingerprint) (*flow.Collec
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Fingerprint) error); ok {
-		r1 = rf(fingerprint)
+		r1 = rf(hash)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -33,27 +33,13 @@ func (_m *Collections) ByFingerprint(fingerprint flow.Fingerprint) (*flow.Collec
 	return r0, r1
 }
 
-// Insert provides a mock function with given fields: tx
-func (_m *Collections) Insert(tx *flow.Collection) error {
-	ret := _m.Called(tx)
+// Save provides a mock function with given fields: collection
+func (_m *Collections) Save(collection *flow.Collection) error {
+	ret := _m.Called(collection)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(*flow.Collection) error); ok {
-		r0 = rf(tx)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// Remove provides a mock function with given fields: fingerprint
-func (_m *Collections) Remove(fingerprint flow.Fingerprint) error {
-	ret := _m.Called(fingerprint)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Fingerprint) error); ok {
-		r0 = rf(fingerprint)
+		r0 = rf(collection)
 	} else {
 		r0 = ret.Error(0)
 	}

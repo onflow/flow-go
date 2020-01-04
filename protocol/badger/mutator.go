@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -132,7 +133,7 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 			}
 
 			// get the guaranteed collections
-			err = operation.RetrieveCollections(s.hash, &collections)(tx)
+			err = operation.RetrieveGuaranteedCollections(s.hash, &collections)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve collections (%x): %w", s.hash, err)
 			}
@@ -180,9 +181,10 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		// check for role
 		var role flow.Role
 		err := operation.RetrieveRole(id.NodeID, &role)(tx)
-		if errors.Is(err, badger.ErrKeyNotFound) {
+		if err == storage.NotFoundErr {
 			continue
 		}
+
 		if err == nil {
 			return fmt.Errorf("identity role already exists (%x: %s)", id.NodeID, role)
 		}
@@ -195,9 +197,10 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		// check for address
 		var address string
 		err := operation.RetrieveAddress(id.NodeID, &address)(tx)
-		if errors.Is(err, badger.ErrKeyNotFound) {
+		if err == storage.NotFoundErr {
 			continue
 		}
+
 		if err == nil {
 			return fmt.Errorf("identity address already exists (%x: %s)", id.NodeID, address)
 		}
@@ -306,7 +309,7 @@ func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 	}
 
 	// insert the guaranteed collections into the DB
-	err = operation.InsertCollections(block.Hash(), block.GuaranteedCollections)(tx)
+	err = operation.InsertGuaranteedCollections(block.Hash(), block.GuaranteedCollections)(tx)
 	if err != nil {
 		return fmt.Errorf("could not insert collections: %w", err)
 	}
