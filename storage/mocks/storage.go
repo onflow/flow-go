@@ -116,6 +116,49 @@ func (mr *MockCollectionsMockRecorder) ByFingerprint(arg0 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByFingerprint", reflect.TypeOf((*MockCollections)(nil).ByFingerprint), arg0)
 }
 
+// GuaranteeByFingerprint mocks base method
+func (m *MockCollections) GuaranteeByFingerprint(arg0 flow.Fingerprint) (*flow.CollectionGuarantee, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GuaranteeByFingerprint", arg0)
+	ret0, _ := ret[0].(*flow.CollectionGuarantee)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GuaranteeByFingerprint indicates an expected call of GuaranteeByFingerprint
+func (mr *MockCollectionsMockRecorder) GuaranteeByFingerprint(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GuaranteeByFingerprint", reflect.TypeOf((*MockCollections)(nil).GuaranteeByFingerprint), arg0)
+}
+
+// InsertGuarantee mocks base method
+func (m *MockCollections) InsertGuarantee(arg0 *flow.CollectionGuarantee) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InsertGuarantee", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// InsertGuarantee indicates an expected call of InsertGuarantee
+func (mr *MockCollectionsMockRecorder) InsertGuarantee(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertGuarantee", reflect.TypeOf((*MockCollections)(nil).InsertGuarantee), arg0)
+}
+
+// Remove mocks base method
+func (m *MockCollections) Remove(arg0 flow.Fingerprint) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Remove", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Remove indicates an expected call of Remove
+func (mr *MockCollectionsMockRecorder) Remove(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockCollections)(nil).Remove), arg0)
+}
+
 // Save mocks base method
 func (m *MockCollections) Save(arg0 *flow.Collection) error {
 	m.ctrl.T.Helper()
@@ -128,4 +171,19 @@ func (m *MockCollections) Save(arg0 *flow.Collection) error {
 func (mr *MockCollectionsMockRecorder) Save(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockCollections)(nil).Save), arg0)
+}
+
+// TransactionsByFingerprint mocks base method
+func (m *MockCollections) TransactionsByFingerprint(arg0 flow.Fingerprint) ([]*flow.Transaction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TransactionsByFingerprint", arg0)
+	ret0, _ := ret[0].([]*flow.Transaction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TransactionsByFingerprint indicates an expected call of TransactionsByFingerprint
+func (mr *MockCollectionsMockRecorder) TransactionsByFingerprint(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionsByFingerprint", reflect.TypeOf((*MockCollections)(nil).TransactionsByFingerprint), arg0)
 }

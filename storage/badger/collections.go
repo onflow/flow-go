@@ -1,8 +1,10 @@
 package badger
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
@@ -14,39 +16,105 @@ type Collections struct {
 }
 
 func NewCollections(db *badger.DB) *Collections {
-	b := &Collections{
+	c := Collections{
 		db: db,
 	}
-	return b
+	return &c
 }
 
 func (c *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, error) {
-
 	var collection flow.Collection
 
 	err := c.db.View(func(tx *badger.Txn) error {
+		return operation.RetrieveCollection(hash, &collection)(tx)
+	})
+	if err != nil {
+		if errors.Is(err, badger.ErrKeyNotFound) {
+			return nil, storage.NotFoundErr
+		}
+		return nil, fmt.Errorf("could not retrieve collection: %w", err)
+	}
 
+	return &collection, nil
+}
+
+func (c *Collections) TransactionsByFingerprint(hash flow.Fingerprint) ([]*flow.Transaction, error) {
+	var (
+		collection   flow.Collection
+		transactions []*flow.Transaction
+	)
+
+	err := c.db.View(func(tx *badger.Txn) error {
 		err := operation.RetrieveCollection(hash, &collection)(tx)
-
 		if err != nil {
-			if err == storage.NotFoundErr {
-				return err
+			if errors.Is(err, badger.ErrKeyNotFound) {
+				return storage.NotFoundErr
 			}
-			return errors.Wrap(err, "could not retrieve flow collection")
+			return fmt.Errorf("could not retrieve collection: %w", err)
+		}
+
+		for _, txHash := range collection.Transactions {
+			var transaction flow.Transaction
+			err = operation.RetrieveTransaction(txHash, &transaction)(tx)
+			if err != nil {
+				if errors.Is(err, badger.ErrKeyNotFound) {
+					return storage.NotFoundErr
+				}
+				return fmt.Errorf("could not retrieve transaction: %w", err)
+			}
+
+			transactions = append(transactions, &transaction)
+
 		}
 
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return &collection, err
+	return transactions, nil
 }
 
 func (c *Collections) Save(collection *flow.Collection) error {
 	return c.db.Update(func(tx *badger.Txn) error {
 		err := operation.PersistCollection(collection)(tx)
 		if err != nil {
-			return errors.Wrap(err, "could not insert flow collection")
+			return fmt.Errorf("could not insert collection: %w", err)
 		}
 		return nil
 	})
+}
+
+func (c *Collections) Remove(hash flow.Fingerprint) error {
+	return c.db.Update(func(tx *badger.Txn) error {
+		err := operation.RemoveCollection(hash)(tx)
+		if err != nil {
+			return fmt.Errorf("could not remove collection: %w", err)
+		}
+		return nil
+	})
+}
+
+func (c *Collections) InsertGuarantee(gc *flow.CollectionGuarantee) error {
+	return c.db.Update(func(tx *badger.Txn) error {
+		err := operation.InsertCollectionGuarantee(gc)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert collection guarantee: %w", err)
+		}
+		return nil
+	})
+}
+
+func (c *Collections) GuaranteeByFingerprint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error) {
+	var gc flow.CollectionGuarantee
+
+	err := c.db.View(func(tx *badger.Txn) error {
+		return operation.RetrieveCollectionGuarantee(hash, &gc)(tx)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve collection guarantee: %w", err)
+	}
+
+	return &gc, nil
 }
