@@ -41,6 +41,7 @@ func (s *state) NewView(commitment flow.StateCommitment) *View {
 func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
 	ids, values := delta.RegisterUpdates()
 
+	// TODO: update CommitDelta to also return proofs
 	commitment, _, err := s.ls.UpdateRegistersWithProof(ids, values)
 	if err != nil {
 		return nil, err
