@@ -11,30 +11,18 @@ type VirtualMachine struct {
 	mock.Mock
 }
 
-// ExecuteTransaction provides a mock function with given fields: ledger, tx
-func (_m *VirtualMachine) ExecuteTransaction(ledger virtualmachine.Ledger, tx *flow.Transaction) (*virtualmachine.TransactionResult, error) {
-	ret := _m.Called(ledger, tx)
+// NewBlockContext provides a mock function with given fields: b
+func (_m *VirtualMachine) NewBlockContext(b *flow.Block) virtualmachine.BlockContext {
+	ret := _m.Called(b)
 
-	var r0 *virtualmachine.TransactionResult
-	if rf, ok := ret.Get(0).(func(virtualmachine.Ledger, *flow.Transaction) *virtualmachine.TransactionResult); ok {
-		r0 = rf(ledger, tx)
+	var r0 virtualmachine.BlockContext
+	if rf, ok := ret.Get(0).(func(*flow.Block) virtualmachine.BlockContext); ok {
+		r0 = rf(b)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*virtualmachine.TransactionResult)
+			r0 = ret.Get(0).(virtualmachine.BlockContext)
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(virtualmachine.Ledger, *flow.Transaction) error); ok {
-		r1 = rf(ledger, tx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// SetBlock provides a mock function with given fields: b
-func (_m *VirtualMachine) SetBlock(b *flow.Block) {
-	_m.Called(b)
+	return r0
 }
