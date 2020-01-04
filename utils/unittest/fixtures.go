@@ -38,8 +38,8 @@ func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 	ret := make([]*flow.CollectionGuarantee, n)
 	for i := 0; i < n; i++ {
 		ret[i] = &flow.CollectionGuarantee{
-			CollectionHash: []byte(fmt.Sprintf("hash %d", i)),
-			Signatures:     []crypto.Signature{[]byte(fmt.Sprintf("signature %d A", i)), []byte(fmt.Sprintf("signature %d B", i))},
+			Hash:       []byte(fmt.Sprintf("hash %d", i)),
+			Signatures: []crypto.Signature{[]byte(fmt.Sprintf("signature %d A", i)), []byte(fmt.Sprintf("signature %d B", i))},
 		}
 	}
 	return ret

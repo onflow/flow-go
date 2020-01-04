@@ -91,6 +91,6 @@ func randHash() []byte {
 func randCollectionGuarantee() *flow.CollectionGuarantee {
 	hash := randHash()
 	return &flow.CollectionGuarantee{
-		CollectionHash: hash,
+		Hash: hash,
 	}
 }

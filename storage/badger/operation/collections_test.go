@@ -18,8 +18,8 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		blockHash := crypto.Hash{0x12, 0x34}
 		expected := []*flow.CollectionGuarantee{
-			{CollectionHash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x10}}},
-			{CollectionHash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x20}}},
+			{Hash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x10}}},
+			{Hash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x20}}},
 		}
 
 		err := db.Update(func(tx *badger.Txn) error {
@@ -48,10 +48,10 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		block1Hash := crypto.Hash{0x10}
 		block2Hash := crypto.Hash{0x20}
 		expected1 := []*flow.CollectionGuarantee{
-			{CollectionHash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x1}}},
+			{Hash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x1}}},
 		}
 		expected2 := []*flow.CollectionGuarantee{
-			{CollectionHash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x2}}},
+			{Hash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x2}}},
 		}
 
 		// insert block 1
