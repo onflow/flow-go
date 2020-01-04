@@ -13,7 +13,7 @@ import (
 
 func TestCollectionPool(t *testing.T) {
 	item := &flow.CollectionGuarantee{
-		CollectionHash: crypto.Hash("DEADBEEF"),
+		Hash: crypto.Hash("DEADBEEF"),
 	}
 
 	pool, err := mempool.NewCollectionPool()

@@ -37,7 +37,7 @@ func (b Block) Payload() crypto.Hash {
 		hasher.Add(id.Encode())
 	}
 	for _, guarantee := range b.CollectionGuarantees {
-		hasher.Add(guarantee.Hash())
+		hasher.Add(guarantee.Hash)
 	}
 	return hasher.SumHash()
 }
