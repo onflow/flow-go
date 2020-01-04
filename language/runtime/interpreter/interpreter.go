@@ -121,11 +121,14 @@ type ImportProgramHandlerFunc func(
 
 type compositeCode struct {
 	compositeFunctions map[string]FunctionValue
-	destructorFunction *InterpretedFunctionValue
+	destructorFunction FunctionValue
 }
 
+type FunctionWrapper = func(inner FunctionValue) FunctionValue
+
 type interfaceCode struct {
-	initializerFunctionWrapper func(FunctionValue) FunctionValue
+	initializerFunctionWrapper FunctionWrapper
+	destructorFunctionWrapper  FunctionWrapper
 }
 
 type typeCodes struct {
@@ -2066,25 +2069,45 @@ func (interpreter *Interpreter) declareCompositeValue(
 	typeID := compositeType.ID()
 
 	var initializerFunction FunctionValue
-	compositeInitializeFunction := interpreter.compositeInitializerFunction(declaration, lexicalScope)
-	if compositeInitializeFunction != nil {
-		initializerFunction = *compositeInitializeFunction
+	compositeInitializerFunction := interpreter.compositeInitializerFunction(declaration, lexicalScope)
+	if compositeInitializerFunction != nil {
+		initializerFunction = *compositeInitializerFunction
 	}
+
+	var destructorFunction FunctionValue
+	compositeDestructorFunction := interpreter.compositeDestructorFunction(declaration, lexicalScope)
+	if compositeDestructorFunction != nil {
+		destructorFunction = *compositeDestructorFunction
+	}
+
+	functions := interpreter.compositeFunctions(declaration, lexicalScope)
 
 	// TODO: include type requirements
 	for i := len(compositeType.Conformances) - 1; i >= 0; i-- {
 		conformance := compositeType.Conformances[i]
 
+		// TODO: recurse: include conformances' conformances
+
+		interfaceCode := interpreter.typeCodes.interfaceCodes[conformance.ID()]
+
+		// Wrap initializer in conformance's initializer condition code
+
 		initializerFunctionWrapper :=
-			interpreter.typeCodes.interfaceCodes[conformance.ID()].initializerFunctionWrapper
+			interfaceCode.initializerFunctionWrapper
 
 		if initializerFunctionWrapper != nil {
 			initializerFunction = initializerFunctionWrapper(initializerFunction)
 		}
-	}
 
-	destructorFunction := interpreter.compositeDestructorFunction(declaration, lexicalScope)
-	functions := interpreter.compositeFunctions(declaration, lexicalScope)
+		// Wrap destructor in conformance's destructor condition code
+
+		destructorFunctionWrapper :=
+			interfaceCode.destructorFunctionWrapper
+
+		if destructorFunctionWrapper != nil {
+			destructorFunction = destructorFunctionWrapper(destructorFunction)
+		}
+	}
 
 	interpreter.typeCodes.compositeCodes[compositeType.ID()] = compositeCode{
 		destructorFunction: destructorFunction,
@@ -2209,7 +2232,6 @@ func (interpreter *Interpreter) compositeInitializerFunction(
 		PostConditions:   rewrittenPostConditions,
 	}
 }
-
 
 func (interpreter *Interpreter) compositeDestructorFunction(
 	compositeDeclaration *ast.CompositeDeclaration,
@@ -2490,17 +2512,19 @@ func (interpreter *Interpreter) declareInterface(
 	typeID := interfaceType.ID()
 
 	initializerFunctionWrapper := interpreter.interfaceInitializerFunctionWrapper(declaration, lexicalScope)
+	destructorFunctionWrapper := interpreter.interfaceDestructorFunctionWrapper(declaration, lexicalScope)
 
 
 	interpreter.typeCodes.interfaceCodes[typeID] = interfaceCode{
 		initializerFunctionWrapper: initializerFunctionWrapper,
+		destructorFunctionWrapper:  destructorFunctionWrapper,
 	}
 }
 
 func (interpreter *Interpreter) interfaceInitializerFunctionWrapper(
 	declaration *ast.InterfaceDeclaration,
 	lexicalScope hamt.Map,
-) func(innerFunction FunctionValue) FunctionValue {
+) FunctionWrapper {
 
 	// TODO: support multiple overloaded initializers
 
@@ -2514,18 +2538,45 @@ func (interpreter *Interpreter) interfaceInitializerFunctionWrapper(
 		return nil
 	}
 
+	return interpreter.functionConditionsWrapper(
+		firstInitializer.FunctionDeclaration,
+		lexicalScope,
+	)
+}
+
+func (interpreter *Interpreter) interfaceDestructorFunctionWrapper(
+	declaration *ast.InterfaceDeclaration,
+	lexicalScope hamt.Map,
+) FunctionWrapper {
+
+	destructor := declaration.Members.Destructor()
+	if destructor == nil {
+		return nil
+	}
+
+	return interpreter.functionConditionsWrapper(
+		destructor.FunctionDeclaration,
+		lexicalScope,
+	)
+}
+
+func (interpreter *Interpreter) functionConditionsWrapper(
+	declaration *ast.FunctionDeclaration,
+	lexicalScope hamt.Map,
+) FunctionWrapper {
+
 	var preConditions ast.Conditions
-	if firstInitializer.FunctionBlock.PreConditions != nil {
-		preConditions = *firstInitializer.FunctionBlock.PreConditions
+	if declaration.FunctionBlock.PreConditions != nil {
+		preConditions = *declaration.FunctionBlock.PreConditions
 	}
 
 	var beforeStatements []ast.Statement
 	var rewrittenPostConditions ast.Conditions
 
-	if firstInitializer.FunctionBlock.PostConditions != nil {
+	if declaration.FunctionBlock.PostConditions != nil {
 
 		postConditionsRewrite :=
-			interpreter.Checker.Elaboration.PostConditionsRewrite[firstInitializer.FunctionBlock.PostConditions]
+			interpreter.Checker.Elaboration.PostConditionsRewrite[declaration.FunctionBlock.PostConditions]
 
 		beforeStatements = postConditionsRewrite.BeforeStatements
 		rewrittenPostConditions = postConditionsRewrite.RewrittenPostConditions
@@ -2538,9 +2589,9 @@ func (interpreter *Interpreter) interfaceInitializerFunctionWrapper(
 			// not the current one (which would be dynamic scope)
 			interpreter.activations.Push(lexicalScope)
 
-			if firstInitializer.ParameterList != nil {
+			if declaration.ParameterList != nil {
 				interpreter.bindFunctionInvocationParameters(
-					firstInitializer.ParameterList,
+					declaration.ParameterList,
 					invocation.Arguments,
 				)
 			}

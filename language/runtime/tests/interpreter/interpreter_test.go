@@ -6172,7 +6172,7 @@ func TestInterpretOptionalChainingFunctionRead(t *testing.T) {
 	)
 
 	assert.IsType(t,
-		interpreter.HostFunctionValue{},
+		interpreter.BoundFunctionValue{},
 		inter.Globals["x2"].Value.(*interpreter.SomeValue).Value,
 	)
 }

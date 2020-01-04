@@ -1418,7 +1418,7 @@ type CompositeValue struct {
 	InjectedFields map[string]Value
 	NestedValues   map[string]Value
 	Functions      map[string]FunctionValue
-	Destructor     *InterpretedFunctionValue
+	Destructor     FunctionValue
 	Owner          string
 }
 
