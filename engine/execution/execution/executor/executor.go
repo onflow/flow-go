@@ -36,9 +36,9 @@ func (e *blockExecutor) ExecuteBlock(
 	collections []*flow.Collection,
 	transactions []*flow.Transaction,
 ) ([]*flow.Chunk, error) {
-	e.vm.SetBlock(block)
+	blockContext := e.vm.NewBlockContext(block)
 
-	chunks, err := e.executeTransactions(transactions)
+	chunks, err := e.executeTransactions(blockContext, transactions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -48,7 +48,10 @@ func (e *blockExecutor) ExecuteBlock(
 	return chunks, nil
 }
 
-func (e *blockExecutor) executeTransactions(txs []*flow.Transaction) ([]*flow.Chunk, error) {
+func (e *blockExecutor) executeTransactions(
+	blockContext virtualmachine.BlockContext,
+	txs []*flow.Transaction,
+) ([]*flow.Chunk, error) {
 	// TODO: implement real chunking
 	// MVP uses single chunk per block
 
@@ -58,7 +61,7 @@ func (e *blockExecutor) executeTransactions(txs []*flow.Transaction) ([]*flow.Ch
 	for _, tx := range txs {
 		txView := chunkView.NewChild()
 
-		result, err := e.vm.ExecuteTransaction(txView, tx)
+		result, err := blockContext.ExecuteTransaction(txView, tx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute transaction: %w", err)
 		}
