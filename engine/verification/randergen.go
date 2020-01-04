@@ -43,7 +43,7 @@ func RandomERGen() *flow.ExecutionReceipt {
 // for it.
 // In the current implementation, it just attaches hash of the ER to
 // the RA, and leaves the other fields of the RA empty.
-func RnadRAGen(receipt *flow.ExecutionReceipt) *flow.ResultApproval {
+func RandomRAGen(receipt *flow.ExecutionReceipt) *flow.ResultApproval {
 	return &flow.ResultApproval{
 		Body: flow.ResultApprovalBody{
 			ExecutionResultHash:  receipt.ExecutionResult.Fingerprint(),
