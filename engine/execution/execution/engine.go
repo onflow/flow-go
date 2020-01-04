@@ -99,17 +99,17 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.Block:
-		return e.onFinalizedBlock(ev)
+		return e.onBlock(ev)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// onFinalizedBlock is triggered when this engine receives a new finalized block.
+// onBlock is triggered when this engine receives a new block.
 //
 // This function fetches the collections and transactions in the block and passes
 // them to the block executor for execution.
-func (e *Engine) onFinalizedBlock(block *flow.Block) error {
+func (e *Engine) onBlock(block *flow.Block) error {
 	collections, err := e.getCollections(block.GuaranteedCollections)
 	if err != nil {
 		return fmt.Errorf("failed to load collections: %w", err)

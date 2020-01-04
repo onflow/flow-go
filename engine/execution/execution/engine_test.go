@@ -11,7 +11,7 @@ import (
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 )
 
-func TestExecutionEngineOnFinalizedBlock(t *testing.T) {
+func TestExecutionEngine_OnBlock(t *testing.T) {
 	collections := &storage.Collections{}
 	transactions := &storage.Transactions{}
 	exec := &executor.Executor{}
@@ -70,7 +70,7 @@ func TestExecutionEngineOnFinalizedBlock(t *testing.T) {
 		Return(nil, nil).
 		Once()
 
-	err := e.onFinalizedBlock(block)
+	err := e.onBlock(block)
 	require.NoError(t, err)
 
 	collections.AssertExpectations(t)
