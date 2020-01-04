@@ -15,6 +15,7 @@ import (
 
 func TestBlockExecutorExecuteBlock(t *testing.T) {
 	vm := &vmmock.VirtualMachine{}
+	bc := &vmmock.BlockContext{}
 
 	exe := executor.NewBlockExecutor(vm)
 
@@ -50,10 +51,11 @@ func TestBlockExecutorExecuteBlock(t *testing.T) {
 	collections := []*flow.Collection{col}
 	transactions := []*flow.Transaction{tx1, tx2}
 
-	vm.On("SetBlock", block).
+	vm.On("NewBlockContext", block).
+		Return(bc).
 		Once()
 
-	vm.On(
+	bc.On(
 		"ExecuteTransaction",
 		mock.AnythingOfType("*ledger.View"),
 		mock.AnythingOfType("*flow.Transaction"),
@@ -67,4 +69,7 @@ func TestBlockExecutorExecuteBlock(t *testing.T) {
 
 	chunk := chunks[0]
 	assert.EqualValues(t, chunk.TxCounts, 2)
+
+	vm.AssertExpectations(t)
+	bc.AssertExpectations(t)
 }

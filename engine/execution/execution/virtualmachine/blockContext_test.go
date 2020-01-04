@@ -12,12 +12,15 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestExecuteTransaction(t *testing.T) {
+func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
 
 	ledger := &vmmock.Ledger{}
 
+	b := unittest.BlockFixture()
+
 	vm := virtualmachine.New(rt)
+	bc := vm.NewBlockContext(&b)
 
 	t.Run("transaction success", func(t *testing.T) {
 		tx := &flow.Transaction{
@@ -31,7 +34,7 @@ func TestExecuteTransaction(t *testing.T) {
 			},
 		}
 
-		result, err := vm.ExecuteTransaction(ledger, tx)
+		result, err := bc.ExecuteTransaction(ledger, tx)
 
 		assert.NoError(t, err)
 		assert.True(t, result.Succeeded())
@@ -61,7 +64,7 @@ func TestExecuteTransaction(t *testing.T) {
 			},
 		}
 
-		result, err := vm.ExecuteTransaction(ledger, tx)
+		result, err := bc.ExecuteTransaction(ledger, tx)
 
 		assert.NoError(t, err)
 		assert.False(t, result.Succeeded())
