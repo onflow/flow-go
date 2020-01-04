@@ -90,15 +90,15 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // SubmitCollectionGuarantee submits the guaranteed collection to all
 // consensus nodes.
-func (e *Engine) SubmitCollectionGuarantee(gc *flow.CollectionGuarantee) error {
+func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
 	identities, err := e.state.Final().Identities(identity.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get consensus identities: %w", err)
 	}
 
-	err = e.con.Submit(gc, identities.NodeIDs()...)
+	err = e.con.Submit(guarantee, identities.NodeIDs()...)
 	if err != nil {
-		return fmt.Errorf("could not submit guaranteed collection: %w", err)
+		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}
 
 	return nil
