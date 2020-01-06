@@ -2608,6 +2608,10 @@ func (interpreter *Interpreter) functionConditionsWrapper(
 				)
 			}
 
+			if invocation.Self != nil {
+				interpreter.declareVariable(sema.SelfIdentifier, invocation.Self)
+			}
+
 			// NOTE: The `inner` initializer might be nil.
 			//   This is the case if the conforming type did not declare an initializer.
 
