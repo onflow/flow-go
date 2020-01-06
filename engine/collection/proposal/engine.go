@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // The period at which the engine will propose a new collection based on the
@@ -22,13 +23,15 @@ const proposalPeriod = time.Second * 5
 // Engine is the collection proposal engine, which packages pending
 // transactions into collections and sends them to consensus nodes.
 type Engine struct {
-	unit  *engine.Unit
-	log   zerolog.Logger
-	con   network.Conduit
-	me    module.Local
-	state protocol.State
-	pool  module.TransactionPool
-	// TODO storage provider for transactions/guaranteed collections
+	unit         *engine.Unit
+	log          zerolog.Logger
+	con          network.Conduit
+	me           module.Local
+	state        protocol.State
+	pool         module.TransactionPool
+	transactions storage.Transactions
+	collections  storage.Collections
+	guarantees   storage.Guarantees
 }
 
 func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
@@ -107,7 +110,25 @@ func (e *Engine) propose() {
 	for {
 		select {
 		case <-ticker.C:
-			// TODO propose a new block and send to consensus nodes
+			// get all transactions from mempool
+			// form collection
+			// store transactions
+			// store collection
+			// store collection guarantee
+			if e.pool.Size() == 0 {
+				continue
+			}
+
+			transactions := e.pool.All()
+			coll := flow.CollectionFromTransactions(transactions)
+
+			err := e.collections.Save(coll)
+			if err != nil {
+				e.log.Err(err).Msg("failed to save collection")
+				continue
+			}
+
+			err = e.transactions.
 		case <-e.unit.Quit():
 			return
 		}
