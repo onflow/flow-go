@@ -2307,9 +2307,13 @@ func (interpreter *Interpreter) interfaceFunctionWrappers(
 	functionWrappers := map[string]FunctionWrapper{}
 
 	for _, functionDeclaration := range interfaceDeclaration.Members.Functions {
+
+		functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
+
 		name := functionDeclaration.Identifier.Identifier
 		functionWrapper := interpreter.functionConditionsWrapper(
 			functionDeclaration,
+			functionType.ReturnTypeAnnotation.Type,
 			lexicalScope,
 		)
 		if functionWrapper == nil {
@@ -2548,6 +2552,7 @@ func (interpreter *Interpreter) interfaceInitializerFunctionWrapper(
 
 	return interpreter.functionConditionsWrapper(
 		firstInitializer.FunctionDeclaration,
+		&sema.VoidType{},
 		lexicalScope,
 	)
 }
@@ -2564,12 +2569,14 @@ func (interpreter *Interpreter) interfaceDestructorFunctionWrapper(
 
 	return interpreter.functionConditionsWrapper(
 		destructor.FunctionDeclaration,
+		&sema.VoidType{},
 		lexicalScope,
 	)
 }
 
 func (interpreter *Interpreter) functionConditionsWrapper(
 	declaration *ast.FunctionDeclaration,
+	returnType sema.Type,
 	lexicalScope hamt.Map,
 ) FunctionWrapper {
 
@@ -2612,16 +2619,23 @@ func (interpreter *Interpreter) functionConditionsWrapper(
 				interpreter.declareVariable(sema.SelfIdentifier, invocation.Self)
 			}
 
-			// NOTE: The `inner` initializer might be nil.
-			//   This is the case if the conforming type did not declare an initializer.
+			// NOTE: The `inner` function might be nil.
+			//   This is the case if the conforming type did not declare an function.
 
 			var body Trampoline = Done{}
 			if inner != nil {
 				// NOTE: It is important to wrap the invocation in a trampoline,
-				//  so the inner initializer function isn't invoked here
+				//  so the inner function isn't invoked here
 
 				body = More(func() Trampoline {
-					return inner.invoke(invocation)
+
+					// NOTE: It is important to actually return the value returned
+					//   from the inner function, otherwise it is lost
+
+					return inner.invoke(invocation).
+						Map(func(returnValue interface{}) interface{} {
+							return functionReturn{returnValue.(Value)}
+						})
 				})
 			}
 
@@ -2630,7 +2644,7 @@ func (interpreter *Interpreter) functionConditionsWrapper(
 				preConditions,
 				body,
 				rewrittenPostConditions,
-				&sema.VoidType{},
+				returnType,
 			)
 
 			return functionBlockTrampoline.

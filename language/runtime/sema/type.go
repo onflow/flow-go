@@ -1267,8 +1267,19 @@ type InvokableType interface {
 type FunctionType struct {
 	ParameterTypeAnnotations []*TypeAnnotation
 	ReturnTypeAnnotation     *TypeAnnotation
-	GetReturnType            func(argumentTypes []Type) Type
+	ReturnTypeGetter         func(argumentTypes []Type) Type
 	RequiredArgumentCount    *int
+}
+
+func (t *FunctionType) ReturnType(argumentTypes []Type) Type {
+	parameterTypeAnnotations := t.ParameterTypeAnnotations
+	if len(argumentTypes) == len(parameterTypeAnnotations) &&
+		t.ReturnTypeGetter != nil {
+
+		return t.ReturnTypeGetter(argumentTypes)
+	}
+
+	return t.ReturnTypeAnnotation.Type
 }
 
 func (*FunctionType) isType() {}

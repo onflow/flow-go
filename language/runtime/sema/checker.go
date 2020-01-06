@@ -22,7 +22,7 @@ var beforeType = &FunctionType{
 	ReturnTypeAnnotation: NewTypeAnnotation(
 		&AnyStructType{},
 	),
-	GetReturnType: func(argumentTypes []Type) Type {
+	ReturnTypeGetter: func(argumentTypes []Type) Type {
 		return argumentTypes[0]
 	},
 }
