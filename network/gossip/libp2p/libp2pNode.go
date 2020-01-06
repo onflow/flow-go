@@ -8,22 +8,21 @@ import (
 	"io/ioutil"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/gogo/protobuf/proto"
-
-	flownetwork "github.com/dapperlabs/flow-go/network"
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/protocol"
-
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+	flownetwork "github.com/dapperlabs/flow-go/network"
 )
 
 // A unique Libp2p protocol ID for Flow (https://docs.libp2p.io/concepts/protocols/)
@@ -79,7 +78,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	host, err := libp2p.New(
 		ctx,
 		libp2p.ListenAddrs(sourceMultiAddr),
-		libp2p.NoSecurity,
+		//libp2p.NoSecurity,
 		libp2p.Identity(key),
 		libp2p.Transport(tcp.NewTCPTransport), // the default transport unnecessarily brings in a websocket listener
 	)
@@ -261,10 +260,10 @@ func (p *P2PNode) Register(engineID uint8, engine flownetwork.Engine) (flownetwo
 	p.Lock()
 	defer p.Unlock()
 	// check if the engine engineID is already taken
-	_, found := p.engines[engineID]
-	if found {
+	if _, found := p.engines[engineID]; found {
 		return nil, errors.Errorf("engine already registered (%d)", engine)
 	}
+
 	// register engine with provided engineID
 	p.engines[engineID] = engine
 
@@ -276,7 +275,7 @@ func (p *P2PNode) Register(engineID uint8, engine flownetwork.Engine) (flownetwo
 	return conduit, nil
 }
 
-// submit will submit the given event for the given engine to the overlay layer
+// submit method submits the given event for the given engine to the overlay layer
 // for processing; it is used by engines through conduits.
 // The Target needs to be added as a peer before submitting the message.
 func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
@@ -291,18 +290,22 @@ func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Id
 		// Get the libp2p id from the node name
 		peerID, err := GetPeerID(flowIDStr)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "could not get peer ID for %s", flowIDStr)
 		}
 
 		var senderID [32]byte
 		// Convert node name to self to sender ID
 		copy(senderID[:], p.name)
 		// Compose the message payload
-		message := &Message{SenderID: senderID[:], Event: event.([]byte), EngineID: uint32(engineID)}
+		message := &Message{
+			SenderID: senderID[:],
+			Event:    event.([]byte),
+			EngineID: uint32(engineID),
+		}
 		// Get the ProtoBuf representation of the message
 		b, err := proto.Marshal(message)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "could not marshal message: %v", message)
 		}
 
 		// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
