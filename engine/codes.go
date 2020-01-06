@@ -27,7 +27,7 @@ const (
 	ConsensusPropagation = 50
 	ConsensusExpulsion   = 51
 
-	ConsensusIngest = 12
+	ConsensusIngestion = 12
 
 	// Execution 100-199
 	ExecutionExecution      = 100
