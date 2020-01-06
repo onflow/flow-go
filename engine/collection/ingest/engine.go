@@ -39,9 +39,14 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 	clusters := protocol.Cluster(identities)
 	clusterID := clusters.ClusterIDFor(me.NodeID())
 
+	logger := log.With().
+		Str("engine", "ingest").
+		Str("my_cluster", clusterID.String()).
+		Logger()
+
 	e := &Engine{
 		unit:      engine.NewUnit(),
-		log:       log.With().Str("engine", "ingest").Logger(),
+		log:       logger,
 		me:        me,
 		state:     state,
 		clusters:  clusters,
