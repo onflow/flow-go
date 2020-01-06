@@ -1732,6 +1732,25 @@ func (t *CompositeType) InterfaceType() *InterfaceType {
 	}
 }
 
+func (t *CompositeType) TypeRequirements() []*CompositeType {
+
+	var typeRequirements []*CompositeType
+
+	if containerComposite, ok := t.ContainerType.(*CompositeType); ok {
+		for _, conformance := range containerComposite.Conformances {
+			ty := conformance.NestedTypes[t.Identifier]
+			typeRequirement, ok := ty.(*CompositeType)
+			if !ok {
+				continue
+			}
+
+			typeRequirements = append(typeRequirements, typeRequirement)
+		}
+	}
+
+	return typeRequirements
+}
+
 // AccountType
 
 type AccountType struct{}
