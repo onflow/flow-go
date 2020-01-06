@@ -18,11 +18,4 @@ type Collections interface {
 
 	// Remove removes the collection.
 	Remove(hash flow.Fingerprint) error
-
-	// InsertGuarantee inserts the guarantee for the given collection, keyed by
-	// the collection fingerprint.
-	InsertGuarantee(gc *flow.CollectionGuarantee) error
-
-	// GuaranteeByFingerprint returns the guarantee for the given collection.
-	GuaranteeByFingerprint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error)
 }

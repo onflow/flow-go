@@ -33,43 +33,6 @@ func (_m *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, e
 	return r0, r1
 }
 
-// GuaranteeByFingerprint provides a mock function with given fields: hash
-func (_m *Collections) GuaranteeByFingerprint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error) {
-	ret := _m.Called(hash)
-
-	var r0 *flow.CollectionGuarantee
-	if rf, ok := ret.Get(0).(func(flow.Fingerprint) *flow.CollectionGuarantee); ok {
-		r0 = rf(hash)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.CollectionGuarantee)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Fingerprint) error); ok {
-		r1 = rf(hash)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// InsertGuarantee provides a mock function with given fields: gc
-func (_m *Collections) InsertGuarantee(gc *flow.CollectionGuarantee) error {
-	ret := _m.Called(gc)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.CollectionGuarantee) error); ok {
-		r0 = rf(gc)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // Remove provides a mock function with given fields: hash
 func (_m *Collections) Remove(hash flow.Fingerprint) error {
 	ret := _m.Called(hash)
