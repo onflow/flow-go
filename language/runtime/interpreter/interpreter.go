@@ -129,6 +129,7 @@ type FunctionWrapper = func(inner FunctionValue) FunctionValue
 type interfaceCode struct {
 	initializerFunctionWrapper FunctionWrapper
 	destructorFunctionWrapper  FunctionWrapper
+	functionWrappers           map[string]FunctionWrapper
 }
 
 type typeCodes struct {
@@ -2107,6 +2108,12 @@ func (interpreter *Interpreter) declareCompositeValue(
 		if destructorFunctionWrapper != nil {
 			destructorFunction = destructorFunctionWrapper(destructorFunction)
 		}
+
+		// Wrap functions in conformance's condition code
+
+		for name, functionWrapper := range interfaceCode.functionWrappers {
+			functions[name] = functionWrapper(functions[name])
+		}
 	}
 
 	interpreter.typeCodes.compositeCodes[compositeType.ID()] = compositeCode{
@@ -2280,32 +2287,11 @@ func (interpreter *Interpreter) compositeFunctions(
 
 	functions := map[string]FunctionValue{}
 
-	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[compositeDeclaration]
-
-	var typeRequirements []*sema.CompositeType
-
-	if containerComposite, ok := compositeType.ContainerType.(*sema.CompositeType); ok {
-		for _, conformance := range containerComposite.Conformances {
-			ty := conformance.NestedTypes[compositeDeclaration.Identifier.Identifier]
-			typeRequirement, ok := ty.(*sema.CompositeType)
-			if !ok {
-				continue
-			}
-
-			typeRequirements = append(typeRequirements, typeRequirement)
-		}
-	}
-
 	for _, functionDeclaration := range compositeDeclaration.Members.Functions {
-
-		functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
-
-		functions[functionDeclaration.Identifier.Identifier] =
+		name := functionDeclaration.Identifier.Identifier
+		functions[name] =
 			interpreter.compositeFunction(
 				functionDeclaration,
-				compositeType.Conformances,
-				typeRequirements,
-				functionType,
 				lexicalScope,
 			)
 	}
@@ -2313,13 +2299,34 @@ func (interpreter *Interpreter) compositeFunctions(
 	return functions
 }
 
+func (interpreter *Interpreter) interfaceFunctionWrappers(
+	interfaceDeclaration *ast.InterfaceDeclaration,
+	lexicalScope hamt.Map,
+) map[string]FunctionWrapper {
+
+	functionWrappers := map[string]FunctionWrapper{}
+
+	for _, functionDeclaration := range interfaceDeclaration.Members.Functions {
+		name := functionDeclaration.Identifier.Identifier
+		functionWrapper := interpreter.functionConditionsWrapper(
+			functionDeclaration,
+			lexicalScope,
+		)
+		if functionWrapper == nil {
+			continue
+		}
+		functionWrappers[name] = functionWrapper
+	}
+
+	return functionWrappers
+}
+
 func (interpreter *Interpreter) compositeFunction(
 	functionDeclaration *ast.FunctionDeclaration,
-	conformances []*sema.InterfaceType,
-	typeRequirements []*sema.CompositeType,
-	functionType *sema.FunctionType,
 	lexicalScope hamt.Map,
 ) InterpretedFunctionValue {
+
+	functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
 
 	var preConditions ast.Conditions
 
@@ -2513,11 +2520,12 @@ func (interpreter *Interpreter) declareInterface(
 
 	initializerFunctionWrapper := interpreter.interfaceInitializerFunctionWrapper(declaration, lexicalScope)
 	destructorFunctionWrapper := interpreter.interfaceDestructorFunctionWrapper(declaration, lexicalScope)
-
+	functionWrappers := interpreter.interfaceFunctionWrappers(declaration, lexicalScope)
 
 	interpreter.typeCodes.interfaceCodes[typeID] = interfaceCode{
 		initializerFunctionWrapper: initializerFunctionWrapper,
 		destructorFunctionWrapper:  destructorFunctionWrapper,
+		functionWrappers:           functionWrappers,
 	}
 }
 
@@ -2564,6 +2572,10 @@ func (interpreter *Interpreter) functionConditionsWrapper(
 	declaration *ast.FunctionDeclaration,
 	lexicalScope hamt.Map,
 ) FunctionWrapper {
+
+	if declaration.FunctionBlock == nil {
+		return nil
+	}
 
 	var preConditions ast.Conditions
 	if declaration.FunctionBlock.PreConditions != nil {
