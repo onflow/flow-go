@@ -3827,12 +3827,21 @@ func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
 
 	inter := parseCheckAndInterpretWithOptions(t,
 		`
+
+          pub struct interface Also {
+             pub fun test(x: Int) {
+                 pre {
+                     x >= 0: "x >= 0"
+                 }
+             }
+          }
+
           pub contract interface Test {
 
               pub struct Nested {
                   pub fun test(x: Int) {
                       pre {
-                          x > 0: "x must be positive"
+                          x >= 1: "x >= 1"
                       }
                   }
               }
@@ -3840,10 +3849,10 @@ func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
 
           pub contract TestImpl: Test {
 
-              pub struct Nested {
+              pub struct Nested: Also {
                   pub fun test(x: Int) {
                       pre {
-                          x < 2: "x must be smaller than 2"
+                          x < 2: "x < 2"
                       }
                   }
               }
@@ -3860,25 +3869,45 @@ func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
 		},
 	)
 
-	_, err := inter.Invoke("test", big.NewInt(0))
-	assert.IsType(t,
-		&interpreter.ConditionError{},
-		err,
-	)
+	t.Run("-1", func(t *testing.T) {
+		_, err := inter.Invoke("test", big.NewInt(-1))
+		require.IsType(t,
+			&interpreter.ConditionError{},
+			err,
+		)
 
-	value, err := inter.Invoke("test", big.NewInt(1))
-	require.NoError(t, err)
+		// NOTE: The type requirement condition (`Test.Nested`) is evaluated first,
+		//  before the type's conformances (`Also`)
 
-	assert.IsType(t,
-		interpreter.VoidValue{},
-		value,
-	)
+		assert.Equal(t, err.(*interpreter.ConditionError).Message, "x >= 1")
+	})
 
-	_, err = inter.Invoke("test", big.NewInt(2))
-	assert.IsType(t,
-		&interpreter.ConditionError{},
-		err,
-	)
+	t.Run("0", func(t *testing.T) {
+		_, err := inter.Invoke("test", big.NewInt(0))
+		assert.IsType(t,
+			&interpreter.ConditionError{},
+			err,
+		)
+		assert.Equal(t, err.(*interpreter.ConditionError).Message, "x >= 1")
+	})
+
+	t.Run("1", func(t *testing.T) {
+		value, err := inter.Invoke("test", big.NewInt(1))
+		require.NoError(t, err)
+
+		assert.IsType(t,
+			interpreter.VoidValue{},
+			value,
+		)
+	})
+
+	t.Run("2", func(t *testing.T) {
+		_, err := inter.Invoke("test", big.NewInt(2))
+		assert.IsType(t,
+			&interpreter.ConditionError{},
+			err,
+		)
+	})
 }
 
 func TestInterpretImport(t *testing.T) {
