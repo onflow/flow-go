@@ -20,6 +20,9 @@ crypto/relic:
 crypto/relic/build: crypto/relic
 	./crypto/relic_build.sh
 
+cmd/collection/collection:
+	go build -o cmd/collection/collection cmd/collection/main.go
+
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
 ifeq ($(UNAME), Linux)
