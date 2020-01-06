@@ -2085,18 +2085,12 @@ func (interpreter *Interpreter) declareCompositeValue(
 
 	functions := interpreter.compositeFunctions(declaration, lexicalScope)
 
-	// TODO: include type requirements
-	for i := len(compositeType.Conformances) - 1; i >= 0; i-- {
-		conformance := compositeType.Conformances[i]
-
-		// TODO: recurse: include conformances' conformances
-
-		interfaceCode := interpreter.typeCodes.interfaceCodes[conformance.ID()]
+	wrapFunctions := func(code wrapperCode) {
 
 		// Wrap initializer in conformance's initializer condition code
 
 		initializerFunctionWrapper :=
-			interfaceCode.initializerFunctionWrapper
+			code.initializerFunctionWrapper
 
 		if initializerFunctionWrapper != nil {
 			initializerFunction = initializerFunctionWrapper(initializerFunction)
@@ -2105,7 +2099,7 @@ func (interpreter *Interpreter) declareCompositeValue(
 		// Wrap destructor in conformance's destructor condition code
 
 		destructorFunctionWrapper :=
-			interfaceCode.destructorFunctionWrapper
+			code.destructorFunctionWrapper
 
 		if destructorFunctionWrapper != nil {
 			destructorFunction = destructorFunctionWrapper(destructorFunction)
@@ -2113,9 +2107,30 @@ func (interpreter *Interpreter) declareCompositeValue(
 
 		// Wrap functions in conformance's condition code
 
-		for name, functionWrapper := range interfaceCode.functionWrappers {
+		for name, functionWrapper := range code.functionWrappers {
 			functions[name] = functionWrapper(functions[name])
 		}
+	}
+
+	// NOTE: First the conditions of the type requirements are evaluated,
+	//  then the conditions of this composite's conformances
+	//
+	// Because the conditions are wrappers, they have to be applied
+	// in reverse order: first the conformances, then the type requirements;
+	// each conformances and type requirements in reverse order as well.
+
+	for i := len(compositeType.Conformances) - 1; i >= 0; i-- {
+		conformance := compositeType.Conformances[i]
+
+		wrapFunctions(interpreter.typeCodes.interfaceCodes[conformance.ID()])
+	}
+
+	typeRequirements := compositeType.TypeRequirements()
+
+	for i := len(typeRequirements) - 1; i >= 0; i-- {
+		typeRequirement := typeRequirements[i]
+
+		wrapFunctions(interpreter.typeCodes.typeRequirementCodes[typeRequirement.ID()])
 	}
 
 	interpreter.typeCodes.compositeCodes[compositeType.ID()] = concreteTypeCode{
