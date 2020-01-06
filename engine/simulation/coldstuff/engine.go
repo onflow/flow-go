@@ -30,7 +30,7 @@ type Engine struct {
 	exp       network.Engine
 	state     protocol.State
 	me        module.Local
-	pool      module.CollectionPool
+	pool      module.CollectionGuaranteePool
 	round     Round
 	interval  time.Duration
 	timeout   time.Duration
@@ -41,7 +41,7 @@ type Engine struct {
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, net module.Network, exp network.Engine, state protocol.State, me module.Local, pool module.CollectionPool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, exp network.Engine, state protocol.State, me module.Local, pool module.CollectionGuaranteePool) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{
@@ -248,9 +248,9 @@ func (e *Engine) sendProposal() error {
 	// create a block with the current mempool collections as payload
 	collections := e.pool.All()
 	candidate := &flow.Block{
-		Header:                header,
-		NewIdentities:         flow.IdentityList{},
-		GuaranteedCollections: collections,
+		Header:               header,
+		NewIdentities:        flow.IdentityList{},
+		CollectionGuarantees: collections,
 	}
 
 	// fill in the header payload hash
@@ -292,7 +292,7 @@ func (e *Engine) waitForVotes() error {
 	log := e.log.With().
 		Uint64("number", candidate.Number).
 		Hex("hash", candidate.Hash()).
-		Int("collections", len(candidate.GuaranteedCollections)).
+		Int("collections", len(candidate.CollectionGuarantees)).
 		Str("action", "wait_votes").
 		Logger()
 
@@ -365,7 +365,7 @@ func (e *Engine) sendCommit() error {
 	log := e.log.With().
 		Uint64("number", candidate.Number).
 		Hex("hash", candidate.Hash()).
-		Int("collections", len(candidate.GuaranteedCollections)).
+		Int("collections", len(candidate.CollectionGuarantees)).
 		Str("action", "send_commit").
 		Logger()
 
@@ -433,7 +433,7 @@ func (e *Engine) waitForProposal() error {
 
 			log.Info().
 				Uint64("number", block.Number).
-				Int("collections", len(block.GuaranteedCollections)).
+				Int("collections", len(block.CollectionGuarantees)).
 				Hex("hash", block.Hash()).
 				Msg("block proposal received")
 
@@ -455,7 +455,7 @@ func (e *Engine) voteOnProposal() error {
 	log := e.log.With().
 		Uint64("number", candidate.Number).
 		Hex("hash", candidate.Hash()).
-		Int("collections", len(candidate.GuaranteedCollections)).
+		Int("collections", len(candidate.CollectionGuarantees)).
 		Str("action", "send_vote").
 		Logger()
 
@@ -484,7 +484,7 @@ func (e *Engine) waitForCommit() error {
 	log := e.log.With().
 		Uint64("number", candidate.Number).
 		Hex("hash", candidate.Hash()).
-		Int("collections", len(candidate.GuaranteedCollections)).
+		Int("collections", len(candidate.CollectionGuarantees)).
 		Str("action", "wait_commit").
 		Logger()
 
@@ -525,7 +525,7 @@ func (e *Engine) commitCandidate() error {
 	log := e.log.With().
 		Uint64("number", candidate.Number).
 		Hex("hash", candidate.Hash()).
-		Int("collections", len(candidate.GuaranteedCollections)).
+		Int("collections", len(candidate.CollectionGuarantees)).
 		Str("action", "exec_commit").
 		Logger()
 
@@ -546,7 +546,7 @@ func (e *Engine) commitCandidate() error {
 
 	// remove all collections from the block from the mempool
 	removed := uint(0)
-	for _, gc := range candidate.GuaranteedCollections {
+	for _, gc := range candidate.CollectionGuarantees {
 		ok := e.pool.Rem(gc.Fingerprint())
 		if ok {
 			removed++

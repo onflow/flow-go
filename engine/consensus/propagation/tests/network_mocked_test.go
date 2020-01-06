@@ -27,7 +27,7 @@ func TestSubmitCollectionOneToOne(t *testing.T) {
 	node2 := nodes[1]
 
 	// prepare a random collection hash
-	gc := randCollection()
+	gc := randCollectionGuarantee()
 
 	// node1's engine receives a collection hash
 	_ = node1.engine.ProcessLocal(gc)
@@ -59,10 +59,10 @@ func TestSubmitCollectionManyToManySynchronous(t *testing.T) {
 	node2 := nodes[1]
 	node3 := nodes[2]
 
-	// prepare 3 different GuaranteedCollections: gc1, gc2, gc3
-	gc1 := randCollection()
-	gc2 := randCollection()
-	gc3 := randCollection()
+	// prepare 3 different CollectionGuarantees: gc1, gc2, gc3
+	gc1 := randCollectionGuarantee()
+	gc2 := randCollectionGuarantee()
+	gc3 := randCollectionGuarantee()
 
 	// check the collections are different
 	require.NotEqual(t, gc1.Fingerprint(), gc2.Fingerprint())
@@ -105,10 +105,10 @@ func TestSubmitCollectionManyToManyAsynchronous(t *testing.T) {
 	node2 := nodes[1]
 	node3 := nodes[2]
 
-	// prepare 3 different GuaranteedCollections: gc1, gc2, gc3
-	gc1 := randCollection()
-	gc2 := randCollection()
-	gc3 := randCollection()
+	// prepare 3 different CollectionGuarantees: gc1, gc2, gc3
+	gc1 := randCollectionGuarantee()
+	gc2 := randCollectionGuarantee()
+	gc3 := randCollectionGuarantee()
 
 	// send different collection to different nodes concurrently
 	var wg sync.WaitGroup
@@ -164,8 +164,8 @@ func TestSubmitCollectionManyToManyRandom(t *testing.T) {
 
 // send one collection to one node.
 // extracted in order to be reused in different tests
-func sendOne(node *mockPropagationNode, gc *flow.GuaranteedCollection, wg *sync.WaitGroup) {
-	_ = node.engine.ProcessLocal(gc)
+func sendOne(node *mockPropagationNode, guarantee *flow.CollectionGuarantee, wg *sync.WaitGroup) {
+	_ = node.engine.ProcessLocal(guarantee)
 	node.net.FlushAll()
 	wg.Done()
 }
