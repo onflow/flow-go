@@ -31,8 +31,8 @@ func encode(v interface{}) (*Envelope, error) {
 	case *trickle.Response:
 		code = CodeResponse
 
-	case *flow.GuaranteedCollection:
-		code = CodeGuaranteedCollection
+	case *flow.CollectionGuarantee:
+		code = CodeCollectionGuarantee
 	case *flow.Transaction:
 		code = CodeTransaction
 
