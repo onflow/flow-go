@@ -119,22 +119,23 @@ type ImportProgramHandlerFunc func(
 	location ast.Location,
 ) *ast.Program
 
-type compositeCode struct {
+type concreteTypeCode struct {
 	compositeFunctions map[string]FunctionValue
 	destructorFunction FunctionValue
 }
 
 type FunctionWrapper = func(inner FunctionValue) FunctionValue
 
-type interfaceCode struct {
+type wrapperCode struct {
 	initializerFunctionWrapper FunctionWrapper
 	destructorFunctionWrapper  FunctionWrapper
 	functionWrappers           map[string]FunctionWrapper
 }
 
 type typeCodes struct {
-	compositeCodes map[sema.TypeID]compositeCode
-	interfaceCodes map[sema.TypeID]interfaceCode
+	compositeCodes       map[sema.TypeID]concreteTypeCode
+	interfaceCodes       map[sema.TypeID]wrapperCode
+	typeRequirementCodes map[sema.TypeID]wrapperCode
 }
 
 type Interpreter struct {
@@ -296,8 +297,9 @@ func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, err
 		WithAllInterpreters(map[ast.LocationID]*Interpreter{}),
 		WithAllCheckers(map[ast.LocationID]*sema.Checker{}),
 		withTypeCodes(typeCodes{
-			compositeCodes: map[sema.TypeID]compositeCode{},
-			interfaceCodes: map[sema.TypeID]interfaceCode{},
+			compositeCodes:       map[sema.TypeID]concreteTypeCode{},
+			interfaceCodes:       map[sema.TypeID]wrapperCode{},
+			typeRequirementCodes: map[sema.TypeID]wrapperCode{},
 		}),
 	}
 
@@ -2116,7 +2118,7 @@ func (interpreter *Interpreter) declareCompositeValue(
 		}
 	}
 
-	interpreter.typeCodes.compositeCodes[compositeType.ID()] = compositeCode{
+	interpreter.typeCodes.compositeCodes[compositeType.ID()] = concreteTypeCode{
 		destructorFunction: destructorFunction,
 		compositeFunctions: functions,
 	}
@@ -2299,14 +2301,14 @@ func (interpreter *Interpreter) compositeFunctions(
 	return functions
 }
 
-func (interpreter *Interpreter) interfaceFunctionWrappers(
-	interfaceDeclaration *ast.InterfaceDeclaration,
+func (interpreter *Interpreter) functionWrappers(
+	members *ast.Members,
 	lexicalScope hamt.Map,
 ) map[string]FunctionWrapper {
 
 	functionWrappers := map[string]FunctionWrapper{}
 
-	for _, functionDeclaration := range interfaceDeclaration.Members.Functions {
+	for _, functionDeclaration := range members.Functions {
 
 		functionType := interpreter.Checker.Elaboration.FunctionDeclarationFunctionTypes[functionDeclaration]
 
@@ -2517,30 +2519,67 @@ func (interpreter *Interpreter) declareInterface(
 			interpreter.declareInterface(nestedInterfaceDeclaration, lexicalScope)
 		}
 
+		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+			interpreter.declareTypeRequirement(nestedCompositeDeclaration, lexicalScope)
+		}
 	})()
 
 	interfaceType := interpreter.Checker.Elaboration.InterfaceDeclarationTypes[declaration]
 	typeID := interfaceType.ID()
 
-	initializerFunctionWrapper := interpreter.interfaceInitializerFunctionWrapper(declaration, lexicalScope)
-	destructorFunctionWrapper := interpreter.interfaceDestructorFunctionWrapper(declaration, lexicalScope)
-	functionWrappers := interpreter.interfaceFunctionWrappers(declaration, lexicalScope)
+	initializerFunctionWrapper := interpreter.initializerFunctionWrapper(declaration.Members, lexicalScope)
+	destructorFunctionWrapper := interpreter.destructorFunctionWrapper(declaration.Members, lexicalScope)
+	functionWrappers := interpreter.functionWrappers(declaration.Members, lexicalScope)
 
-	interpreter.typeCodes.interfaceCodes[typeID] = interfaceCode{
+	interpreter.typeCodes.interfaceCodes[typeID] = wrapperCode{
 		initializerFunctionWrapper: initializerFunctionWrapper,
 		destructorFunctionWrapper:  destructorFunctionWrapper,
 		functionWrappers:           functionWrappers,
 	}
 }
 
-func (interpreter *Interpreter) interfaceInitializerFunctionWrapper(
-	declaration *ast.InterfaceDeclaration,
+func (interpreter *Interpreter) declareTypeRequirement(
+	declaration *ast.CompositeDeclaration,
+	lexicalScope hamt.Map,
+) {
+	// Evaluate nested declarations in a new scope, so values
+	// of nested declarations won't be visible after the containing declaration
+
+	(func() {
+		interpreter.activations.PushCurrent()
+		defer interpreter.activations.Pop()
+
+		for _, nestedInterfaceDeclaration := range declaration.InterfaceDeclarations {
+			interpreter.declareInterface(nestedInterfaceDeclaration, lexicalScope)
+		}
+
+		for _, nestedCompositeDeclaration := range declaration.CompositeDeclarations {
+			interpreter.declareTypeRequirement(nestedCompositeDeclaration, lexicalScope)
+		}
+	})()
+
+	compositeType := interpreter.Checker.Elaboration.CompositeDeclarationTypes[declaration]
+	typeID := compositeType.ID()
+
+	initializerFunctionWrapper := interpreter.initializerFunctionWrapper(declaration.Members, lexicalScope)
+	destructorFunctionWrapper := interpreter.destructorFunctionWrapper(declaration.Members, lexicalScope)
+	functionWrappers := interpreter.functionWrappers(declaration.Members, lexicalScope)
+
+	interpreter.typeCodes.typeRequirementCodes[typeID] = wrapperCode{
+		initializerFunctionWrapper: initializerFunctionWrapper,
+		destructorFunctionWrapper:  destructorFunctionWrapper,
+		functionWrappers:           functionWrappers,
+	}
+}
+
+func (interpreter *Interpreter) initializerFunctionWrapper(
+	members *ast.Members,
 	lexicalScope hamt.Map,
 ) FunctionWrapper {
 
 	// TODO: support multiple overloaded initializers
 
-	initializers := declaration.Members.Initializers()
+	initializers := members.Initializers()
 	if len(initializers) == 0 {
 		return nil
 	}
@@ -2557,12 +2596,12 @@ func (interpreter *Interpreter) interfaceInitializerFunctionWrapper(
 	)
 }
 
-func (interpreter *Interpreter) interfaceDestructorFunctionWrapper(
-	declaration *ast.InterfaceDeclaration,
+func (interpreter *Interpreter) destructorFunctionWrapper(
+	members *ast.Members,
 	lexicalScope hamt.Map,
 ) FunctionWrapper {
 
-	destructor := declaration.Members.Destructor()
+	destructor := members.Destructor()
 	if destructor == nil {
 		return nil
 	}
