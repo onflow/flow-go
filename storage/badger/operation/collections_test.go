@@ -14,42 +14,42 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestGuaranteedCollectionsInsertRetrieve(t *testing.T) {
+func TestCollectionGuaranteesInsertRetrieve(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		hash := crypto.Hash{0x13, 0x37}
-		expected := []*flow.GuaranteedCollection{
-			{CollectionHash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x10}}},
-			{CollectionHash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x20}}},
-			{CollectionHash: crypto.Hash{0x03}, Signatures: []crypto.Signature{{0x30}}},
+		expected := []*flow.CollectionGuarantee{
+			{Hash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x10}}},
+			{Hash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x20}}},
+			{Hash: crypto.Hash{0x03}, Signatures: []crypto.Signature{{0x30}}},
 		}
 
-		err := db.Update(InsertGuaranteedCollections(hash, expected))
+		err := db.Update(InsertCollectionGuarantees(hash, expected))
 		require.Nil(t, err)
 
-		var actual []*flow.GuaranteedCollection
-		err = db.View(RetrieveGuaranteedCollections(hash, &actual))
+		var actual []*flow.CollectionGuarantee
+		err = db.View(RetrieveCollectionGuarantees(hash, &actual))
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)
 	})
 }
 
-func TestFlowCollectionsInsertRetrieve(t *testing.T) {
+func TestCollectionsInsertRetrieve(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		hash := crypto.Hash{0x13, 0x37}
-		expected := []*flow.GuaranteedCollection{
-			{CollectionHash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x10}}},
-			{CollectionHash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x20}}},
-			{CollectionHash: crypto.Hash{0x03}, Signatures: []crypto.Signature{{0x30}}},
+		expected := []*flow.CollectionGuarantee{
+			{Hash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x10}}},
+			{Hash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x20}}},
+			{Hash: crypto.Hash{0x03}, Signatures: []crypto.Signature{{0x30}}},
 		}
 
-		err := db.Update(InsertGuaranteedCollections(hash, expected))
+		err := db.Update(InsertCollectionGuarantees(hash, expected))
 		require.Nil(t, err)
 
-		var actual []*flow.GuaranteedCollection
-		err = db.View(RetrieveGuaranteedCollections(hash, &actual))
+		var actual []*flow.CollectionGuarantee
+		err = db.View(RetrieveCollectionGuarantees(hash, &actual))
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)
