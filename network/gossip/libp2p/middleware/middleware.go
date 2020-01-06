@@ -136,16 +136,16 @@ func (m *Middleware) connect() {
 	// make sure we free up the connection slot once we drop the peer
 	defer m.release(m.slots)
 
-	// get an address to connect to
-	flowIdentity, address, err := m.ov.Address()
+	// get an identity to connect to
+	flowIdentity, err := m.ov.Identity()
 	if err != nil {
 		log.Error().Err(err).Msg("could not get address")
 		return
 	}
 
-	log = log.With().Str("flowIdentity", flowIdentity.String()).Str("address", address).Logger()
+	log = log.With().Str("flowIdentity", flowIdentity.String()).Str("address", flowIdentity.Address).Logger()
 
-	ip, port, err := net.SplitHostPort(address)
+	ip, port, err := net.SplitHostPort(flowIdentity.Address)
 	if err != nil {
 		log.Error().Err(err).Msg("could not parse address")
 		return
