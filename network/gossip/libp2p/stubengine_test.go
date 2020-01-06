@@ -79,13 +79,13 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 	peer1 := nodes[0]
 	peer2 := nodes[1]
 
-	// Get actual ip and port numbers on which the node starts
+	// Get actual IP and Port numbers on which the node starts
 	// for node 2
 	ip2, port2 := peer2.GetIPPort()
 	id2 := NodeAddress{
-		name: peer2.name,
-		ip:   ip2,
-		port: port2,
+		Name: peer2.name,
+		IP:   ip2,
+		Port: port2,
 	}
 
 	// Add the second node as a peer to the first node
@@ -108,9 +108,9 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 	require.NoError(s.Suite.T(), err)
 
 	// Generates node2 Flow Identifier
-	// Create target byte array from the node name "node2" -> []byte
+	// Create target byte array from the node Name "node2" -> []byte
 	var target [32]byte
-	copy(target[:], id2.name)
+	copy(target[:], id2.Name)
 	targetID := flow.Identifier(target)
 
 	// Send the message to peer 2 using the conduit of peer 1

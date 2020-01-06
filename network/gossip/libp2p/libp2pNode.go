@@ -2,7 +2,6 @@
 package libp2p
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -33,16 +32,16 @@ const (
 
 // NodeAddress is used to define a libp2p node
 type NodeAddress struct {
-	// name is the friendly node name e.g. "node1" (not to be confused with the libp2p node id)
-	name string
-	ip   string
-	port string
+	// Name is the friendly node Name e.g. "node1" (not to be confused with the libp2p node id)
+	Name string
+	IP   string
+	Port string
 }
 
 // P2PNode manages the the libp2p node.
 type P2PNode struct {
 	sync.Mutex
-	name       string                             // friendly human readable name of the node
+	name       string                             // friendly human readable Name of the node
 	libP2PHost host.Host                          // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
 	logger     zerolog.Logger                     // for logging
 	ps         *pubsub.PubSub                     // the reference to the pubsub instance
@@ -56,10 +55,10 @@ type P2PNode struct {
 }
 
 // Start starts a libp2p node on the given address.
-func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger) error {
+func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, handler network.StreamHandler) error {
 	p.Lock()
 	defer p.Unlock()
-	p.name = n.name
+	p.name = n.Name
 	p.logger = logger
 	addr := getLocationMultiaddrString(n)
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(addr)
@@ -67,7 +66,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		return err
 	}
 
-	key, err := GetPublicKey(n.name)
+	key, err := GetPublicKey(n.Name)
 	if err != nil {
 		err = errors.Wrapf(err, "could not generate public key for %s", p.name)
 		return err
@@ -85,7 +84,11 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	p.libP2PHost = host
 
 	// Set the callback to use for an incoming peer message
-	host.SetStreamHandler(FlowLibP2PProtocolID, p.handleStream)
+	if handler == nil {
+		host.SetStreamHandler(FlowLibP2PProtocolID, p.handleStream)
+	} else {
+		host.SetStreamHandler(FlowLibP2PProtocolID, handler)
+	}
 
 	// Creating a new PubSub instance of the type GossipSub
 	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost)
@@ -99,7 +102,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	p.engines = make(map[uint8]flownetwork.Engine)
 
 	if err == nil {
-		p.logger.Debug().Str("name", p.name).Msg("libp2p node started successfully")
+		p.logger.Debug().Str("Name", p.name).Msg("libp2p node started successfully")
 	}
 
 	return err
@@ -111,7 +114,7 @@ func (p *P2PNode) Stop() error {
 	defer p.Unlock()
 	err := p.libP2PHost.Close()
 	if err == nil {
-		p.logger.Debug().Str("name", p.name).Msg("libp2p node stopped successfully")
+		p.logger.Debug().Str("Name", p.name).Msg("libp2p node stopped successfully")
 	}
 	return err
 }
@@ -138,11 +141,29 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers []NodeAddress) error {
 	return nil
 }
 
+func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stream, error) {
+
+	// Add node address as a peer
+	err := p.AddPeers(context.Background(), []NodeAddress{n})
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the PeerID
+	peerID, err := GetPeerID(n.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
+	return p.libP2PHost.NewStream(context.Background(), peerID, FlowLibP2PProtocolID)
+}
+
 // GetPeerInfo generates the address of a Node/Peer given its address in a deterministic and consistent way.
 // Libp2p uses the hash of the public key of node as its id (https://docs.libp2p.io/reference/glossary/#multihash)
 // Since the public key of a node may not be available to other nodes, for now a simple scheme of naming nodes can be
 // used e.g. "node1, node2,... nodex" to helps nodes address each other.
-// An MD5 hash of such of the node name is used as a seed to a deterministic crypto algorithm to generate the
+// An MD5 hash of such of the node Name is used as a seed to a deterministic crypto algorithm to generate the
 // public key from which libp2p derives the node id
 func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
 	addr := getLocationMultiaddrString(p)
@@ -150,7 +171,7 @@ func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
 	if err != nil {
 		return peer.AddrInfo{}, err
 	}
-	id, err := GetPeerID(p.name)
+	id, err := GetPeerID(p.Name)
 	if err != nil {
 		return peer.AddrInfo{}, err
 	}
@@ -199,7 +220,7 @@ func (p *P2PNode) Subscribe(ctx context.Context, topic FlowTopic, callback func(
 	p.subs[topic] = s
 	go pubSubHandler(ctx, s, callback, p.logger)
 
-	p.logger.Debug().Str("topic", string(topic)).Str("name", p.name).Msg("subscribed to topic")
+	p.logger.Debug().Str("topic", string(topic)).Str("Name", p.name).Msg("subscribed to topic")
 	return err
 }
 
@@ -240,7 +261,7 @@ func (p *P2PNode) UnSubscribe(topic FlowTopic) error {
 	p.topics[topic] = nil
 	delete(p.topics, topic)
 
-	p.logger.Debug().Str("topic", string(topic)).Str("name", p.name).Msg("unsubscribed from topic")
+	p.logger.Debug().Str("topic", string(topic)).Str("Name", p.name).Msg("unsubscribed from topic")
 	return err
 }
 
@@ -280,21 +301,12 @@ func (p *P2PNode) Register(engineID uint8, engine flownetwork.Engine) (flownetwo
 // The Target needs to be added as a peer before submitting the message.
 func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 	for _, t := range targetIDs {
-		// TODO: Yet to figure out the whole flow identifier to libp2p id mapping (Issue#1968)
-
-		// Translate the target flow ID to the libp2p peer id
-		// Remove the extra 0s at the end
-		flowID := bytes.Trim(t[:], "\x00")
-		// Translate the bytes to the node name
-		flowIDStr := string(flowID)
-		// Get the libp2p id from the node name
-		peerID, err := GetPeerID(flowIDStr)
+		peerID, err := GetLibP2PIDFromFlowID(t)
 		if err != nil {
-			return errors.Wrapf(err, "could not get peer ID for %s", flowIDStr)
+			return err
 		}
-
 		var senderID [32]byte
-		// Convert node name to self to sender ID
+		// Convert node Name to self to sender ID
 		copy(senderID[:], p.name)
 		// Compose the message payload
 		message := &Message{
@@ -404,5 +416,5 @@ func (p *P2PNode) readData(s network.Stream) {
 
 // GetLocationMultiaddr returns a Multiaddress string (https://docs.libp2p.io/concepts/addressing/) given a node address
 func getLocationMultiaddrString(id NodeAddress) string {
-	return fmt.Sprintf("/ip4/%s/tcp/%s", id.ip, id.port)
+	return fmt.Sprintf("/ip4/%s/tcp/%s", id.IP, id.Port)
 }
