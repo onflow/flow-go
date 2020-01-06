@@ -137,13 +137,13 @@ func (m *Middleware) connect() {
 	defer m.release(m.slots)
 
 	// get an address to connect to
-	flowID, address, err := m.ov.Address()
+	flowIdentity, address, err := m.ov.Address()
 	if err != nil {
 		log.Error().Err(err).Msg("could not get address")
 		return
 	}
 
-	log = log.With().Str("flowID", flowID.String()).Str("address", address).Logger()
+	log = log.With().Str("flowIdentity", flowIdentity.String()).Str("address", address).Logger()
 
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
@@ -151,7 +151,7 @@ func (m *Middleware) connect() {
 		return
 	}
 	// Create a new NodeAddress
-	nodeAddress := libp2p.NodeAddress{Name: flowID.String(), IP: ip, Port: port}
+	nodeAddress := libp2p.NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port}
 	// Add it as a peer
 	stream, err := m.libP2PNode.CreateStream(context.Background(), nodeAddress)
 	if err != nil {

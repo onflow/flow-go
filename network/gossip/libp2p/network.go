@@ -114,25 +114,25 @@ func (n *Network) Register(engineID uint8, engine network.Engine) (network.Condu
 
 // Address implements a callback to provide the overlay layer with the
 // addresses we want to establish new connections to.
-func (n *Network) Address() (string, error) {
+func (n *Network) Address() (flow.Identity, error) {
 
 	// get a list of other nodes that are not us, and we are not connected to
 	nodeIDs := n.top.Peers().NodeIDs()
 	nodeIDs = append(nodeIDs, n.me.NodeID())
 	ids, err := n.state.Final().Identities(identity.Not(identity.HasNodeID(nodeIDs...)))
 	if err != nil {
-		return "", errors.Wrap(err, "could not get identities")
+		return flow.Identity{}, errors.Wrap(err, "could not get identities")
 	}
 
 	// if we don't have nodes available, we can't do anything
 	if len(ids) == 0 {
-		return "", errors.New("no identities available")
+		return flow.Identity{}, errors.New("no identities available")
 	}
 
 	// select a random identity from the list
 	id := ids[rand.Int()%len(ids)]
 
-	return id.Address, nil
+	return id, nil
 }
 
 // HandleHandshake implements a callback to validate new connections on the
