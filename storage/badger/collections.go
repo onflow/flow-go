@@ -95,26 +95,3 @@ func (c *Collections) Remove(hash flow.Fingerprint) error {
 		return nil
 	})
 }
-
-func (c *Collections) InsertGuarantee(gc *flow.CollectionGuarantee) error {
-	return c.db.Update(func(tx *badger.Txn) error {
-		err := operation.InsertCollectionGuarantee(gc)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert collection guarantee: %w", err)
-		}
-		return nil
-	})
-}
-
-func (c *Collections) GuaranteeByFingerprint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error) {
-	var gc flow.CollectionGuarantee
-
-	err := c.db.View(func(tx *badger.Txn) error {
-		return operation.RetrieveCollectionGuarantee(hash, &gc)(tx)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve collection guarantee: %w", err)
-	}
-
-	return &gc, nil
-}

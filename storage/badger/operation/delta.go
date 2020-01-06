@@ -59,5 +59,5 @@ func TraverseDeltas(from uint64, to uint64, filters []flow.IdentityFilter, proce
 		}
 		return check, create, handle
 	}
-	return iterate(nil, makePrefix(codeDelta, from), makePrefix(codeDelta, to+1), iteration)
+	return iterate(makePrefix(codeDelta, from), makePrefix(codeDelta, to+1), iteration)
 }
