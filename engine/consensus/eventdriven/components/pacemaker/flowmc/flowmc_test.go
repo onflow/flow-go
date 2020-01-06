@@ -2,9 +2,9 @@ package flowmc
 
 import (
 	"fmt"
-	mockproc "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/components/pacemaker/mock"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/components/pacemaker/primary"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/modules/def"
+	mockproc "github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/pacemaker/mock"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/pacemaker/primary"
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
