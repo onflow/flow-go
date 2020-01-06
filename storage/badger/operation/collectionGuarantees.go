@@ -58,6 +58,6 @@ func RetrieveCollectionGuaranteesByBlockHash(blockHash crypto.Hash, collections 
 			return check, create, handle
 		}
 
-		return iterate(makePrefix(codeBlockHashToCollections, blockHash), nil, nil, iter)(tx)
+		return traverse(makePrefix(codeBlockHashToCollections, blockHash), iter)(tx)
 	}
 }
