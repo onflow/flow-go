@@ -1,5 +1,6 @@
-// Package provider implements an engine for responding to requests for
-// transactions that have been formed into collections and guaranteed.
+// Package provider implements an engine for providing access to resources held
+// by the collection node, including collections, collection guarantees, and
+// transactions.
 package provider
 
 import (
@@ -10,14 +11,15 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
-// Engine is the collection provider engine, which responds to requests for
-// transactions that have been guaranteed.
+// Engine is the collection provider engine, which provides access to resources
+// held by the collection node.
 type Engine struct {
 	unit  *engine.Unit
 	log   zerolog.Logger
@@ -107,21 +109,21 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 // process processes events for the provider engine on the collection node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
-	case *CollectionRequest:
+	case *messages.CollectionRequest:
 		return e.onCollectionRequest(originID, ev)
-	case *SubmitCollectionGuarantee:
+	case *messages.SubmitCollectionGuarantee:
 		return e.onSubmitCollectionGuarantee(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
-func (e *Engine) onCollectionRequest(originID flow.Identifier, req *CollectionRequest) error {
+func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.CollectionRequest) error {
 	// TODO
 	return nil
 }
 
-func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *SubmitCollectionGuarantee) error {
+func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *messages.SubmitCollectionGuarantee) error {
 	if originID != e.me.NodeID() {
 		return fmt.Errorf("invalid remote request to submit collection guarantee [%s]", req.Guarantee.Fingerprint().Hex())
 	}

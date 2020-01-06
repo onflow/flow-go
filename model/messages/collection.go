@@ -1,6 +1,8 @@
-package provider
+package messages
 
-import "github.com/dapperlabs/flow-go/model/flow"
+import (
+	"github.com/dapperlabs/flow-go/model/flow"
+)
 
 // CollectionRequest request all transactions from a collection with the given
 // fingerprint.

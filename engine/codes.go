@@ -27,7 +27,7 @@ const (
 	ConsensusPropagation = 50
 	ConsensusExpulsion   = 51
 
-	ConsensusIngestion = 12
+	ConsensusIngestion = CollectionProvider
 
 	// Execution 100-199
 	ExecutionExecution      = 100
