@@ -13,57 +13,54 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func TestBlockExecutorExecuteBlock(t *testing.T) {
+func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	vm := &vmmock.VirtualMachine{}
 	bc := &vmmock.BlockContext{}
 
 	exe := executor.NewBlockExecutor(vm)
 
-	tx1 := &flow.Transaction{
-		TransactionBody: flow.TransactionBody{
-			Script: []byte("transaction { execute {} }"),
-		},
+	tx1 := flow.TransactionBody{
+		Script: []byte("transaction { execute {} }"),
 	}
 
-	tx2 := &flow.Transaction{
-		TransactionBody: flow.TransactionBody{
-			Script: []byte("transaction { execute {} }"),
-		},
+	tx2 := flow.TransactionBody{
+		Script: []byte("transaction { execute {} }"),
 	}
 
-	col := &flow.Collection{Transactions: []flow.Fingerprint{
-		tx1.Fingerprint(),
-		tx2.Fingerprint(),
-	}}
+	col := flow.Collection{Transactions: []flow.TransactionBody{tx1, tx2}}
 
-	block := &flow.Block{
+	block := flow.Block{
 		Header: flow.Header{
 			Number: 42,
 		},
-		GuaranteedCollections: []*flow.GuaranteedCollection{
+		CollectionGuarantees: []*flow.CollectionGuarantee{
 			{
-				CollectionHash: crypto.Hash(col.Fingerprint()),
-				Signatures:     nil,
+				Hash:       crypto.Hash(col.Fingerprint()),
+				Signatures: nil,
 			},
 		},
 	}
 
-	collections := []*flow.Collection{col}
-	transactions := []*flow.Transaction{tx1, tx2}
+	transactions := []flow.TransactionBody{tx1, tx2}
 
-	vm.On("NewBlockContext", block).
+	executableBlock := executor.ExecutableBlock{
+		Block:        block,
+		Transactions: transactions,
+	}
+
+	vm.On("NewBlockContext", &block).
 		Return(bc).
 		Once()
 
 	bc.On(
 		"ExecuteTransaction",
 		mock.AnythingOfType("*ledger.View"),
-		mock.AnythingOfType("*flow.Transaction"),
+		mock.AnythingOfType("flow.TransactionBody"),
 	).
 		Return(&virtualmachine.TransactionResult{}, nil).
 		Twice()
 
-	chunks, err := exe.ExecuteBlock(block, collections, transactions)
+	chunks, err := exe.ExecuteBlock(executableBlock)
 	assert.NoError(t, err)
 	assert.Len(t, chunks, 1)
 

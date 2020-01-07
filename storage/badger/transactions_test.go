@@ -12,7 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	storage "github.com/dapperlabs/flow-go/storage/badger"
+	"github.com/dapperlabs/flow-go/storage"
+	badgerstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -22,7 +23,7 @@ func TestTransactions(t *testing.T) {
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 
-	store := storage.NewTransactions(db)
+	store := badgerstorage.NewTransactions(db)
 
 	expected := unittest.TransactionFixture()
 	err = store.Insert(&expected)
@@ -39,6 +40,6 @@ func TestTransactions(t *testing.T) {
 	// should fail since this was just deleted
 	_, err = store.ByFingerprint(expected.Fingerprint())
 	if assert.Error(t, err) {
-		assert.True(t, errors.Is(err, badger.ErrKeyNotFound))
+		assert.True(t, errors.Is(err, storage.NotFoundErr))
 	}
 }

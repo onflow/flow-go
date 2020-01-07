@@ -7,13 +7,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// An BlockExecutor executes the transactions in a block.
+// A BlockExecutor executes the transactions in a block.
 type BlockExecutor interface {
-	ExecuteBlock(
-		block *flow.Block,
-		collections []*flow.Collection,
-		transactions []*flow.Transaction,
-	) ([]*flow.Chunk, error)
+	ExecuteBlock(block ExecutableBlock) ([]flow.Chunk, error)
 }
 
 type blockExecutor struct {
@@ -33,13 +29,11 @@ func NewBlockExecutor(vm virtualmachine.VirtualMachine) BlockExecutor {
 
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *blockExecutor) ExecuteBlock(
-	block *flow.Block,
-	collections []*flow.Collection,
-	transactions []*flow.Transaction,
-) ([]*flow.Chunk, error) {
-	blockContext := e.vm.NewBlockContext(block)
+	block ExecutableBlock,
+) ([]flow.Chunk, error) {
+	blockContext := e.vm.NewBlockContext(&block.Block)
 
-	chunks, err := e.executeTransactions(blockContext, transactions)
+	chunks, err := e.executeTransactions(blockContext, block.Transactions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -51,8 +45,8 @@ func (e *blockExecutor) ExecuteBlock(
 
 func (e *blockExecutor) executeTransactions(
 	blockContext virtualmachine.BlockContext,
-	txs []*flow.Transaction,
-) ([]*flow.Chunk, error) {
+	txs []flow.TransactionBody,
+) ([]flow.Chunk, error) {
 	// TODO: implement real chunking
 	// MVP uses single chunk per block
 	chunkView := e.state.NewView()
@@ -72,7 +66,9 @@ func (e *blockExecutor) executeTransactions(
 
 	endState := e.state.ApplyDelta(chunkView.Delta())
 
-	chunk := &flow.Chunk{
+	// TODO: implement real chunking
+	// MVP uses single chunk per block
+	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			FirstTxIndex: 0,
 			TxCounts:     uint32(len(txs)),
@@ -92,5 +88,5 @@ func (e *blockExecutor) executeTransactions(
 		EndState: endState,
 	}
 
-	return []*flow.Chunk{chunk}, nil
+	return []flow.Chunk{chunk}, nil
 }

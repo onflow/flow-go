@@ -2,11 +2,16 @@ package unittest
 
 import (
 	"fmt"
+	"math/rand"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/dgraph-io/badger/v2"
 	"github.com/go-test/deep"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func ExpectPanic(expectedMsg string, t *testing.T) {
@@ -49,4 +54,15 @@ func AssertEqualWithDiff(t *testing.T, expected, actual interface{}) {
 			"actual  : %s\n\n"+
 			"%s", expected, actual, s.String()))
 	}
+}
+
+func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
+	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
+	require.Nil(t, err)
+	defer func() {
+		db.Close()
+		os.RemoveAll(dir)
+	}()
+	f(db)
 }
