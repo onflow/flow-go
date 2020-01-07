@@ -2087,7 +2087,7 @@ func (interpreter *Interpreter) declareCompositeValue(
 
 	wrapFunctions := func(code wrapperCode) {
 
-		// Wrap initializer in conformance's initializer condition code
+		// Wrap initializer
 
 		initializerFunctionWrapper :=
 			code.initializerFunctionWrapper
@@ -2096,7 +2096,7 @@ func (interpreter *Interpreter) declareCompositeValue(
 			initializerFunction = initializerFunctionWrapper(initializerFunction)
 		}
 
-		// Wrap destructor in conformance's destructor condition code
+		// Wrap destructor
 
 		destructorFunctionWrapper :=
 			code.destructorFunctionWrapper
@@ -2105,7 +2105,7 @@ func (interpreter *Interpreter) declareCompositeValue(
 			destructorFunction = destructorFunctionWrapper(destructorFunction)
 		}
 
-		// Wrap functions in conformance's condition code
+		// Wrap functions
 
 		for name, functionWrapper := range code.functionWrappers {
 			functions[name] = functionWrapper(functions[name])
