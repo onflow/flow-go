@@ -2038,6 +2038,7 @@ func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
 	  pub contract TestContract: TestContractInterface {
 
 	      pub resource R: TestContractInterface.RInterface {
+
 	          pub fun check(a: Int, b: Int) {
 	              pre { a < 3 }
                   post { b < 3 }
@@ -2134,13 +2135,16 @@ func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
 	err = runtime.ExecuteTransaction(setupCode, runtimeInterface, utils.TestLocation)
 	require.NoError(t, err)
 
-	// TODO: properly link interface functions
-	err = runtime.ExecuteTransaction(makeUseCode(1), runtimeInterface, nil)
-	require.Error(t, err)
-	//
-	//err = runtime.ExecuteTransaction(makeUseCode(3), runtimeInterface, nil)
-	//require.Error(t, err)
-	//
-	//err = runtime.ExecuteTransaction(makeUseCode(2), runtimeInterface, nil)
-	//require.NoError(t, err)
+	for a := 1; a <= 3; a++ {
+		for b := 1; b <= 3; b++ {
+			t.Run(fmt.Sprintf("%d/%d", a, b), func(t *testing.T) {
+				err = runtime.ExecuteTransaction(makeUseCode(a, b), runtimeInterface, utils.TestLocation)
+				if a == 2 && b == 2 {
+					assert.NoError(t, err)
+				} else {
+					assert.Error(t, err)
+				}
+			})
+		}
+	}
 }
