@@ -12,6 +12,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
+	networkmodel "github.com/dapperlabs/flow-go/model/libp2p/network"
+	"github.com/dapperlabs/flow-go/model/libp2p/peer"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/cache"
@@ -111,7 +113,7 @@ func (n *Network) Register(engineID uint8, engine network.Engine) (network.Condu
 
 // Address implements a callback to provide the overlay layer with the
 // addresses we want to establish new connections to.
-func (n *Network) Address() (flow.Identity, error) {
+func (n *Network) Identity() (flow.Identity, error) {
 
 	// get a list of other nodes that are not us, and we are not connected to
 	nodeIDs := n.top.Peers().NodeIDs()
@@ -135,7 +137,6 @@ func (n *Network) Address() (flow.Identity, error) {
 // Cleanup implements a callback to handle peers that have been dropped
 // by the middleware layer.
 func (n *Network) Cleanup(nodeID flow.Identifier) error {
-
 	// drop the peer state using the ID we registered
 	n.top.Down(nodeID)
 
@@ -151,19 +152,18 @@ func (n *Network) Handshake(conn Connection) (flow.Identifier, error) {
 }
 
 // genNetworkMessage uses the codec to encode an event into a NetworkMessage
-func (n *Network) genNetworkMessage(engineID uint8, event interface{}, targetIDs ...flow.Identifier) (NetworkMessage, error) {
-
+func (n *Network) genNetworkMessage(engineID uint8, event interface{}, targetIDs ...flow.Identifier) (*networkmodel.NetworkMessage, error) {
 	// encode the payload using the configured codec
 	payload, err := n.codec.Encode(event)
 	if err != nil {
-		return NetworkMessage{}, errors.Wrap(err, "could not encode event")
+		return nil, errors.Wrap(err, "could not encode event")
 	}
 
 	// use a hash with an engine-specific salt to get the payload hash
 	sip := siphash.New([]byte("libp2ppacking" + fmt.Sprintf("%03d", engineID)))
 
 	// casting event structure
-	e := NetworkMessage{
+	e := &networkmodel.NetworkMessage{
 		EngineID:  engineID,
 		EventID:   sip.Sum(payload),
 		OriginID:  n.me.NodeID(),
@@ -177,21 +177,29 @@ func (n *Network) genNetworkMessage(engineID uint8, event interface{}, targetIDs
 // submit will submit the given event for the given engine to the overlay layer
 // for processing; it is used by engines through conduits.
 func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
-
-	// GenerateNetworkMessage the event to get payload and event ID
-	eventID, payload, err := n.genNetworkMessage(engineID, event)
+	// genNetworkMessage the event to get payload and event ID
+	message, err := n.genNetworkMessage(engineID, event)
 	if err != nil {
-		return errors.Wrap(err, "could not GenerateNetworkMessage event")
+		return errors.Wrap(err, "could not cast the event into NetworkMessage")
 	}
+	// gossip
 
-	//err = n.mw.Send(engineID, eventID, payload, targetIDs...)
 	// checks if the event is already in the cache
-	ok := n.cache.Has(engineID, eventID)
+	ok := n.cache.Has(engineID, message.EventID)
 	if ok {
 		// returns nil and terminates sending the message since
 		// the message already submitted to the network
 		return nil
 	}
+	// storing event in the cache
+	n.cache.Set(engineID, message.EventID, message)
+
+	// get all peers that haven't seen it yet
+	nodeIDs := n.top.Peers(peer.Not(peer.HasSeen(message.EventID))).NodeIDs()
+	if len(nodeIDs) == 0 {
+		return nil
+	}
+	err = n.send(message, nodeIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not gossip event")
 	}
@@ -199,8 +207,10 @@ func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Id
 	return nil
 }
 
+// send sends the message to the set of target ids through the middleware
+// send is the last method within the pipeline of message shipping in network layer
+// once it is called, the message slips through the network layer towards the middleware
 func (n *Network) send(msg interface{}, nodeIDs ...flow.Identifier) error {
-
 	// send the message through the peer connection
 	var result *multierror.Error
 	for _, nodeID := range nodeIDs {

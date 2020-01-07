@@ -7,19 +7,19 @@ import (
 	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/trickle"
+	libp2p2 "github.com/dapperlabs/flow-go/model/libp2p"
 )
 
 // Topology implements a naive network state.
 type Topology struct {
 	sync.Mutex
-	peers map[flow.Identifier]*trickle.Peer
+	peers map[flow.Identifier]*libp2p2.Peer
 }
 
 // New creates a new naive state implementation for the overlay layer.
 func New() (*Topology, error) {
 	t := &Topology{
-		peers: make(map[flow.Identifier]*trickle.Peer),
+		peers: make(map[flow.Identifier]*libp2p2.Peer),
 	}
 	return t, nil
 }
@@ -35,7 +35,7 @@ func (t *Topology) Up(nodeID flow.Identifier) {
 		return
 	}
 
-	t.peers[nodeID] = &trickle.Peer{
+	t.peers[nodeID] = &libp2p2.Peer{
 		ID:   nodeID,
 		Seen: make(map[string]struct{}),
 	}
@@ -89,10 +89,10 @@ func (t *Topology) Count() uint {
 }
 
 // Peers returns a filtered list of peers.
-func (t *Topology) Peers(filters ...trickle.PeerFilter) trickle.PeerList {
+func (t *Topology) Peers(filters ...libp2p2.PeerFilter) libp2p2.PeerList {
 	t.Lock()
 	defer t.Unlock()
-	var peers trickle.PeerList
+	var peers libp2p2.PeerList
 Outer:
 	for _, peer := range t.peers {
 		for _, filter := range filters {
