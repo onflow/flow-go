@@ -3,9 +3,10 @@
 package middleware
 
 import (
+	"sync"
+
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
@@ -81,9 +82,11 @@ func (c *Connection) Receive() (interface{}, error) {
 // onde background routine to handle sending messages, so that the actual
 // middleware layer can function without blocking.
 func (c *Connection) Process(nodeID flow.Identifier) {
+	done := make(chan struct{})
 	c.log = c.log.With().Hex("node_id", nodeID[:]).Logger()
 	go c.recv()
 	go c.send()
+	<-done
 }
 
 // stop will stop by closing the done channel and closing the connection.
@@ -113,13 +116,13 @@ RecvLoop:
 		msg, err := c.Receive()
 		if isClosedErr(err) {
 			//fmt.Println(err)
-			//c.log.Debug().Msg("connection closed, stopping reads")
-			//c.stop()
+			c.log.Debug().Msg("connection closed, stopping reads")
+			c.stop()
 			continue
 		}
 		if err != nil {
-			//c.log.Error().Err(err).Msg("could not read data, stopping reads")
-			//c.stop()
+			c.log.Error().Err(err).Msg("could not read data, stopping reads")
+			c.stop()
 			continue
 		}
 

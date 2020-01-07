@@ -11,27 +11,6 @@ type Overlay struct {
 	mock.Mock
 }
 
-// Address provides a mock function with given fields:
-func (_m *Overlay) Address() (flow.Identity, error) {
-	ret := _m.Called()
-
-	var r0 flow.Identity
-	if rf, ok := ret.Get(0).(func() flow.Identity); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(flow.Identity)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // Cleanup provides a mock function with given fields: nodeID
 func (_m *Overlay) Cleanup(nodeID flow.Identifier) error {
 	ret := _m.Called(nodeID)
@@ -62,6 +41,27 @@ func (_m *Overlay) Handshake(conn libp2p.Connection) (flow.Identifier, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func(libp2p.Connection) error); ok {
 		r1 = rf(conn)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// Identity provides a mock function with given fields:
+func (_m *Overlay) Identity() (flow.Identity, error) {
+	ret := _m.Called()
+
+	var r0 flow.Identity
+	if rf, ok := ret.Get(0).(func() flow.Identity); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(flow.Identity)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}
