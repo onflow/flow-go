@@ -72,6 +72,8 @@ generate-mocks:
 	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/dapperlabs/flow-go/storage Blocks,Collections
 	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/dapperlabs/flow-go/module Network,Local
 	GO111MODULE=on mockgen -destination=network/mocks/conduit.go -package=mocks github.com/dapperlabs/flow-go/network Conduit
+	GO111MODULE=on mockgen -destination=network/mocks/engine.go -package=mocks github.com/dapperlabs/flow-go/network Engine
+	GO111MODULE=on mockgen -destination=engine/execution/execution/mocks/execution.go -package=mocks github.com/dapperlabs/flow-go/engine/execution/execution ExecutionEngine
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"

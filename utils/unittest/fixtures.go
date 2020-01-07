@@ -58,7 +58,15 @@ func FlowCollectionFixture(n int) flow.Collection {
 }
 
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
-	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx := flow.Transaction{TransactionBody: TransactionBodyFixture()}
+	if len(n) > 0 {
+		n[0](&tx)
+	}
+	return tx
+}
+
+func TransactionBodyFixture() flow.TransactionBody {
+	return flow.TransactionBody{
 		Script:             []byte("pub fun main() {}"),
 		ReferenceBlockHash: flow.Fingerprint(HashFixture(32)),
 		Nonce:              1,
@@ -66,11 +74,7 @@ func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 		PayerAccount:       AddressFixture(),
 		ScriptAccounts:     []flow.Address{AddressFixture()},
 		Signatures:         []flow.AccountSignature{AccountSignatureFixture()},
-	}}
-	if len(n) > 0 {
-		n[0](&tx)
 	}
-	return tx
 }
 
 func HashFixture(size int) crypto.Hash {

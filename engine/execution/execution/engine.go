@@ -10,6 +10,10 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 )
 
+type ExecutionEngine interface {
+	ExecuteBlock(block CompleteBlock) error
+}
+
 // Engine manages execution of transactions
 type Engine struct {
 	unit *engine.Unit

@@ -34,6 +34,10 @@ type TransactionBody struct {
 	Signatures []AccountSignature
 }
 
+func (tb *TransactionBody) Fingerprint() Fingerprint {
+	return Fingerprint(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(tb)))
+}
+
 // Transaction is the smallest unit of task.
 type Transaction struct {
 	// Body of the transaction
