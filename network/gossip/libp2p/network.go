@@ -26,7 +26,7 @@ import (
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	log     zerolog.Logger
+	logger  zerolog.Logger
 	codec   network.Codec
 	state   protocol.State
 	me      module.Local
@@ -53,7 +53,7 @@ func NewNetwork(log zerolog.Logger, codec network.Codec, state protocol.State, m
 	}
 
 	o := &Network{
-		log:     log,
+		logger:  log,
 		codec:   codec,
 		state:   state,
 		me:      me,

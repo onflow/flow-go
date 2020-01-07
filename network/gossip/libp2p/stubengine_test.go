@@ -90,7 +90,6 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 
 	// Add the second node as a peer to the first node
 	require.NoError(s.Suite.T(), peer1.AddPeers(s.ctx, []NodeAddress{id2}))
-
 	// Create and register engines for each of the nodes
 	// test engine1
 	te1 := &StubEngine{

@@ -4,7 +4,6 @@ package libp2p
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"sync"
 
 	"github.com/gogo/protobuf/proto"
@@ -19,6 +18,8 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // A unique Libp2p protocol ID for Flow (https://docs.libp2p.io/concepts/protocols/)
@@ -81,10 +82,9 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	// Set the callback to use for an incoming peer message
 	if handler == nil {
-		host.SetStreamHandler(FlowLibP2PProtocolID, p.handleStream)
-	} else {
-		host.SetStreamHandler(FlowLibP2PProtocolID, handler)
+		return errors.New("could not start libp2pnode with a missing handler")
 	}
+	host.SetStreamHandler(FlowLibP2PProtocolID, handler)
 
 	// Creating a new PubSub instance of the type GossipSub
 	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost)
@@ -97,7 +97,9 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	p.subs = make(map[FlowTopic]*pubsub.Subscription)
 
 	if err == nil {
-		p.logger.Debug().Str("Name", p.name).Msg("libp2p node started successfully")
+		ip, port := p.GetIPPort()
+		p.logger.Debug().Str("Name", p.name).Str("address", fmt.Sprintf("%s:%s", ip, port)).
+			Msg("libp2p node started successfully")
 	}
 
 	return err
@@ -139,7 +141,7 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers []NodeAddress) error {
 func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stream, error) {
 
 	// Add node address as a peer
-	err := p.AddPeers(context.Background(), []NodeAddress{n})
+	err := p.AddPeers(ctx, []NodeAddress{n})
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +153,7 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 	}
 
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
-	return p.libP2PHost.NewStream(context.Background(), peerID, FlowLibP2PProtocolID)
+	return p.libP2PHost.NewStream(ctx, peerID, FlowLibP2PProtocolID)
 }
 
 // GetPeerInfo generates the address of a Node/Peer given its address in a deterministic and consistent way.
@@ -176,8 +178,6 @@ func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
 
 // GetIPPort returns the IP and Port the libp2p node is listening on.
 func (p *P2PNode) GetIPPort() (ip string, port string) {
-	p.Lock()
-	defer p.Unlock()
 	for _, a := range p.libP2PHost.Network().ListenAddresses() {
 		if ip, e := a.ValueForProtocol(multiaddr.P_IP4); e == nil {
 			if p, e := a.ValueForProtocol(multiaddr.P_TCP); e == nil {
@@ -269,72 +269,54 @@ func (p *P2PNode) Publish(ctx context.Context, t FlowTopic, data []byte) error {
 	return ps.Publish(ctx, data)
 }
 
-// handleStream is the callback that gets called for each remote peer that makes a direct 1-1 connection
-func (p *P2PNode) handleStream(s network.Stream) {
-	p.logger.Debug().Str("peer", s.Conn().RemotePeer().String()).Msg("received a new incoming stream")
-	go p.readData(s)
-	// TODO: Running with a receive-only (unidirectional) stream for now (Issue#1955)
-	// go p.writeData(s)
-}
-
-// readData reads the data from the remote peer using the stream
-func (p *P2PNode) readData(s network.Stream) {
-	for {
-		// TODO: implement length-prefix framing to delineate protobuf message if exchanging more than one message (Issue#1969)
-		// (protobuf has no inherent delimiter)
-		// Read incoming data into a buffer
-		buff, err := ioutil.ReadAll(s)
+// submit method submits the given event for the given engine to the overlay layer
+// for processing; it is used by engines through conduits.
+// The Target needs to be added as a peer before submitting the message.
+func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+	for _, t := range targetIDs {
+		peerID, err := GetLibP2PIDFromFlowID(t)
 		if err != nil {
-			p.logger.Error().Str("peer", s.Conn().RemotePeer().String()).Err(err)
-			s.Close()
-			return
-		}
-
-		// ioutil.ReadAll continues to read even after an EOF is encountered.
-		// Close connection and return in that case (This is not an error)
-		if len(buff) <= 0 {
-			s.Close()
-			return
-		}
-		p.logger.Debug().Str("peer", s.Conn().RemotePeer().
-			String()).Bytes("message", buff).Int("length", len(buff)).
-			Msg("received message")
-
-		// Unmarshal the buff to a message
-		message := &Message{}
-		err = proto.Unmarshal(buff, message)
-		if err != nil {
-			p.logger.Error().Str("peer", s.Conn().RemotePeer().String()).Err(err)
-			return
-		}
-
-		// Extract sender id
-		if len(message.SenderID) < 32 {
-			p.logger.Debug().Str("peer", s.Conn().RemotePeer().String()).
-				Bytes("sender", message.SenderID).
-				Msg(" invalid sender id")
-			return
+			return err
 		}
 		var senderID [32]byte
-		copy(senderID[:], message.SenderID)
-
-		// Extract engine id and find the registered engine
-		en, found := p.engines[uint8(message.EngineID)]
-		if !found {
-			p.logger.Debug().Str("peer", s.Conn().RemotePeer().String()).
-				Uint8("engine", uint8(message.EngineID)).
-				Msg(" dropping message since no engine to receive it was found")
-			return
+		// Convert node Name to self to sender ID
+		copy(senderID[:], p.name)
+		// Compose the message payload
+		message := &Message{
+			SenderID: senderID[:],
+			Event:    event.([]byte),
+			EngineID: uint32(engineID),
 		}
-		// call the engine with the message payload
-		err = en.Process(senderID, message.Event)
+		// Get the ProtoBuf representation of the message
+		b, err := proto.Marshal(message)
 		if err != nil {
-			p.logger.Error().
-				Uint8("engineid", uint8(message.EngineID)).
-				Str("peer", s.Conn().RemotePeer().String()).Err(err)
-			return
+			return errors.Wrapf(err, "could not marshal message: %v", message)
+		}
+
+		// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
+		stream, err := p.libP2PHost.NewStream(context.Background(), peerID, FlowLibP2PProtocolID)
+		if err != nil {
+			return err
+		}
+
+		// Send the message using the stream
+		_, err = stream.Write(b)
+		if err != nil {
+			return err
+		}
+
+		// Debug log the message length
+		p.logger.Debug().Str("peer", stream.Conn().RemotePeer().String()).
+			Str("message", message.String()).Int("length", len(b)).
+			Msg("sent message")
+
+		// Close the stream
+		err = stream.Close()
+		if err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 // GetLocationMultiaddr returns a Multiaddress string (https://docs.libp2p.io/concepts/addressing/) given a node address
