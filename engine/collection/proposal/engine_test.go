@@ -20,8 +20,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// testdeps contains all dependencies of a test case, initialized by WithEngine
-type testdeps struct {
+// testcontext contains the context for a test case.
+type testcontext struct {
 	state       *mockprotocol.State
 	me          *mockmodule.Local
 	net         *stub.Network
@@ -33,35 +33,35 @@ type testdeps struct {
 
 // WithEngine initializes the dependencies for a test case, then runs the test
 // case with the dependencies and initialized engine.
-func WithEngine(t *testing.T, run func(testdeps, *Engine)) {
-	var deps testdeps
+func WithEngine(t *testing.T, run func(testcontext, *Engine)) {
+	var ctx testcontext
 
 	log := zerolog.New(os.Stderr)
 
-	deps.state = new(mockprotocol.State)
-	deps.me = new(mockmodule.Local)
-	deps.me.On("NodeID").Return(flow.Identifier{})
+	ctx.state = new(mockprotocol.State)
+	ctx.me = new(mockmodule.Local)
+	ctx.me.On("NodeID").Return(flow.Identifier{})
 
 	hub := stub.NewNetworkHub()
-	deps.net = stub.NewNetwork(deps.state, deps.me, hub)
+	ctx.net = stub.NewNetwork(ctx.state, ctx.me, hub)
 
 	conf := Config{
 		ProposalPerid: time.Millisecond,
 	}
 
-	deps.provider = new(mocknetwork.Engine)
-	deps.pool = new(mockmodule.TransactionPool)
-	deps.collections = new(mockstorage.Collections)
-	deps.guarantees = new(mockstorage.Guarantees)
+	ctx.provider = new(mocknetwork.Engine)
+	ctx.pool = new(mockmodule.TransactionPool)
+	ctx.collections = new(mockstorage.Collections)
+	ctx.guarantees = new(mockstorage.Guarantees)
 
-	e, err := New(log, conf, deps.net, deps.me, deps.state, deps.provider, deps.pool, deps.collections, deps.guarantees)
+	e, err := New(log, conf, ctx.net, ctx.me, ctx.state, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees)
 	require.NoError(t, err)
 
-	run(deps, e)
+	run(ctx, e)
 }
 
 func TestStartStop(t *testing.T) {
-	WithEngine(t, func(_ testdeps, e *Engine) {
+	WithEngine(t, func(_ testcontext, e *Engine) {
 		ready := e.Ready()
 
 		select {
@@ -83,36 +83,36 @@ func TestStartStop(t *testing.T) {
 func TestProposalEngine(t *testing.T) {
 
 	t.Run("should propose collection when txpool is non-empty", func(t *testing.T) {
-		WithEngine(t, func(test testdeps, e *Engine) {
+		WithEngine(t, func(ctx testcontext, e *Engine) {
 
 			tx := unittest.TransactionFixture()
 
-			test.pool.On("Size").Return(uint(1)).Once()
-			test.pool.On("All").Return([]*flow.Transaction{&tx}).Once()
-			test.collections.On("Save", mock.Anything).Return(nil).Once()
-			test.guarantees.On("Save", mock.Anything).Return(nil).Once()
-			test.provider.On("ProcessLocal", mock.Anything).Return(nil).Once()
+			ctx.pool.On("Size").Return(uint(1)).Once()
+			ctx.pool.On("All").Return([]*flow.Transaction{&tx}).Once()
+			ctx.collections.On("Save", mock.Anything).Return(nil).Once()
+			ctx.guarantees.On("Save", mock.Anything).Return(nil).Once()
+			ctx.provider.On("ProcessLocal", mock.Anything).Return(nil).Once()
 
 			err := e.createProposal()
 			assert.NoError(t, err)
 
 			// should submit guarantee for proposed collection
-			test.provider.AssertCalled(t, "ProcessLocal", mock.AnythingOfType("*messages.SubmitCollectionGuarantee"))
+			ctx.provider.AssertCalled(t, "ProcessLocal", mock.AnythingOfType("*messages.SubmitCollectionGuarantee"))
 		})
 
 	})
 
 	t.Run("should not propose collection when txpool is empty", func(t *testing.T) {
-		WithEngine(t, func(test testdeps, e *Engine) {
+		WithEngine(t, func(ctx testcontext, e *Engine) {
 
-			test.pool.On("Size").Return(uint(0)).Once()
+			ctx.pool.On("Size").Return(uint(0)).Once()
 
 			// should return an error and not submit a guarantee to provider engine
 			err := e.createProposal()
 			if assert.Error(t, err) {
 				assert.True(t, errors.Is(err, ErrEmptyTxpool))
 			}
-			test.provider.AssertNotCalled(t, "ProcessLocal", mock.Anything)
+			ctx.provider.AssertNotCalled(t, "ProcessLocal", mock.Anything)
 		})
 	})
 }
