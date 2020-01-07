@@ -7,8 +7,7 @@ type EventHandler struct {
 	voteAggregator        *VoteAggregator
 	voter                 *Voter
 	missingBlockRequester *MissingBlockRequester
-	forkChoice            *ForkChoice
-	incorperatedBlocks    *IncorperatedBlocks
+	forkChoice            *Reactor
 	validator             *Validator
 	blockProducer         BlockProducer
 	protocolState         ProtocolState

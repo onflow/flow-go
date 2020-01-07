@@ -1,7 +1,6 @@
 package libp2p
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -9,149 +8,173 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-
+	golog "github.com/ipfs/go-log"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
-	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-
-	golog "github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 	gologging "github.com/whyrusleeping/go-logging"
 )
 
 // Workaround for https://github.com/stretchr/testify/pull/808
 const tickForAssertEventually = 100 * time.Millisecond
 
-func TestLibP2PNode_Start_Stop(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	nodes, err := createLibP2PNodes(ctx, t, 1)
-	assert.NoError(t, err)
-	assert.NoError(t, nodes[0].Stop())
+type LibP2PNodeTestSuite struct {
+	suite.Suite
+	ctx    context.Context
+	cancel context.CancelFunc // used to cancel the context
 }
 
-// TestLibP2PNode_GetPeerInfo checks that given a node name, the corresponding node id is consistently generated
-// e.g. Node name: "node1" always generates the libp2p node id QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N
-func TestLibP2PNode_GetPeerInfo(t *testing.T) {
-	var nodes []NodeAddress
-	var ps []peer.AddrInfo
+// TestLibP2PNodesTestSuite runs all the test methods in this test suit
+func TestLibP2PNodesTestSuite(t *testing.T) {
+	suite.Run(t, new(LibP2PNodeTestSuite))
+}
+
+// SetupTests initiates the test setups prior to each test
+func (l *LibP2PNodeTestSuite) SetupTest() {
+	l.ctx, l.cancel = context.WithCancel(context.Background())
+}
+
+func (l *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
+	defer l.cancel()
+
+	// creates a single
+	nodes := l.CreateNodes(1)
+
+	// stops the created node
+	assert.NoError(l.Suite.T(), nodes[0].Stop())
+}
+
+// TestGetPeerInfo evaluates the deterministic translation between the nodes address and
+// their libp2p info. It generates an address, and checks whether repeated translations
+// yields the same info or not.
+func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
 	for i := 0; i < 10; i++ {
+		// creates node-i address
+		address := NodeAddress{
+			name: fmt.Sprintf("node%d", i),
+			ip:   "1.1.1.1",
+			port: "0",
+		}
+
+		// translates node-i address into info
+		info, err := GetPeerInfo(address)
+		require.NoError(l.Suite.T(), err)
+
+		// repeats the translation for node-i
 		for j := 0; j < 10; j++ {
-			nodes = append(nodes, NodeAddress{name: fmt.Sprintf("node%d", j), ip: "1.1.1.1", port: "0"})
-			p, err := GetPeerInfo(nodes[j])
-			require.NoError(t, err)
-			if i == 0 {
-				ps = append(ps, p)
-			} else {
-				assert.Equal(t, ps[j].ID.String(), p.ID.String(), fmt.Sprintf(" node ids not consistently generated"))
-			}
+			rinfo, err := GetPeerInfo(address)
+			require.NoError(l.Suite.T(), err)
+			assert.True(l.Suite.T(), rinfo.String() == info.String(), fmt.Sprintf("inconsistent id generated"))
 		}
 	}
 }
 
-// TestLibP2PNode_AddPeers checks if nodes can be added as peers to a given node
-func TestLibP2PNode_AddPeers(t *testing.T) {
-	t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
-	// A longer timeout is needed to overcome timeouts - https://github.com/ipfs/go-ipfs/issues/5800
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-	// count value of 10 runs into this issue on localhost https://github.com/libp2p/go-libp2p-pubsub/issues/96
+// TestAddPeers checks if nodes can be added as peers to a given node
+func (l *LibP2PNodeTestSuite) TestAddPeers() {
+	defer l.cancel()
+
+	// count value of 10 runs into this issue on localhost
+	// https://github.com/libp2p/go-libp2p-pubsub/issues/96
 	// since localhost connection have short deadlines
-	var count = 3
-	// Create nodes
-	nodes, err := createLibP2PNodes(ctx, t, count)
-	require.NoError(t, err)
-	defer func() {
-		if nodes != nil {
-			for _, n := range nodes {
-				n.Stop()
-			}
-		}
-	}()
-	var ids []NodeAddress
+	count := 3
+
+	// Creates nodes
+	nodes := l.CreateNodes(count)
+	defer l.StopNodes(nodes)
+
+	ids := make([]NodeAddress, 0)
 	// Get actual ip and port numbers on which the nodes were started
 	for _, n := range nodes[1:] {
 		ip, p := n.GetIPPort()
 		ids = append(ids, NodeAddress{name: n.name, ip: ip, port: p})
 	}
-	// To the 1st node add the remaining 9 nodes as peers.
-	require.NoError(t, nodes[0].AddPeers(ctx, ids))
-	actual := nodes[0].libP2PHost.Peerstore().Peers().Len()
-	// Check if all 9 nodes have been added as peers to the first node.
-	assert.Equal(t, count, actual, "peers expected: %d, found: %d", count, actual)
 
-	// Check if libp2p reports node 1 is connected to the other nodes
-	for _, a := range nodes[0].libP2PHost.Peerstore().Peers() {
+	// Adds the remaining nodes to the first node as its set of peers
+	require.NoError(l.Suite.T(), nodes[0].AddPeers(l.ctx, ids))
+	actual := nodes[0].libP2PHost.Peerstore().Peers().Len()
+
+	// Checks if all 9 nodes have been added as peers to the first node
+	assert.True(l.Suite.T(), count == actual, "inconsistent peers number expected: %d, found: %d", count, actual)
+
+	// Checks whether the first node is connected to the rest
+	for _, peer := range nodes[0].libP2PHost.Peerstore().Peers() {
 		// A node is also a peer to itself but not marked as connected, hence skip checking that.
-		if nodes[0].libP2PHost.ID().String() == a.String() {
+		if nodes[0].libP2PHost.ID().String() == peer.String() {
 			continue
 		}
-		assert.Eventuallyf(t, func() bool {
-			return network.Connected == nodes[0].libP2PHost.Network().Connectedness(a)
-		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf(" node 0 not connected with %s", a.String()))
+		assert.Eventuallyf(l.Suite.T(), func() bool {
+			return network.Connected == nodes[0].libP2PHost.Network().Connectedness(peer)
+		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf(" first node is not connected to %s", peer.String()))
 	}
 }
 
-// TestLibP2PNode_PubSub checks if nodes can subscribe to a topic and send and receive a message.
-func TestLibP2PNode_PubSub(t *testing.T) {
-	t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	var count = 5
+// TestPubSub checks if nodes can subscribe to a topic and send and receive a message
+func (l *LibP2PNodeTestSuite) TestPubSub() {
+	defer l.cancel()
+	count := 5
 	golog.SetAllLoggers(gologging.INFO)
 
-	// Step 1: Create nodes
-	nodes, err := createLibP2PNodes(ctx, t, count)
-	require.NoError(t, err)
-	defer func() {
-		if nodes != nil {
-			for _, n := range nodes {
-				n.Stop()
-			}
-		}
-	}()
+	// Step 1: Creates nodes
+	nodes := l.CreateNodes(count)
+	defer l.StopNodes(nodes)
 
-	// Step 2: Subscribe to a flow topic
-	// A node will receive it's own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
+	// Step 2: Subscribes to a Flow topic
+	// A node will receive its own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
 	ch := make(chan string, count)
 	for _, n := range nodes {
 		m := n.name
-		// callback that is registered
-		cb := func(msg []byte) {
-			assert.Equal(t, []byte("hello"), msg)
+		// Defines a callback to be called whenever a message is received
+		callback := func(msg []byte) {
+			assert.Equal(l.Suite.T(), []byte("hello"), msg)
 			ch <- m
 		}
-		require.NoError(t, n.Subscribe(ctx, Consensus, cb))
+
+		// Subscribes to "Consensus" topic with the defined callback
+		require.NoError(l.Suite.T(), n.Subscribe(l.ctx, Consensus, callback))
 	}
 
-	// Step 3: Connect a node to it's neighbour (Daisy chain them (1->2, 2->3...9->10))
+	// Step 3: Connects each node i to its subsequent node i+1 in a chain
 	for i := 0; i < count-1; i++ {
-		s := nodes[i]
-		d := nodes[i+1]
-		dip, dport := d.GetIPPort()
-		nd := &NodeAddress{name: d.name, ip: dip, port: dport}
-		require.NoError(t, s.AddPeers(ctx, []NodeAddress{*nd}))
-		assert.Eventuallyf(t, func() bool {
-			return network.Connected == s.libP2PHost.Network().Connectedness(d.libP2PHost.ID())
-		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf(" %s not connected with %s", s.name, d.name))
-		e := 2
-		if i%count == 0 {
-			e = 1
+		// defines this node on the chain
+		this := nodes[i]
+
+		// defines next node to this on the chain
+		next := nodes[i+1]
+		nextIP, nextPort := next.GetIPPort()
+		nextAddr := &NodeAddress{
+			name: next.name,
+			ip:   nextIP,
+			port: nextPort,
 		}
-		assert.Equal(t, e, len(s.ps.ListPeers(string(Consensus))))
+
+		// adds next node as the peer to this node and verifies their connection
+		require.NoError(l.Suite.T(), this.AddPeers(l.ctx, []NodeAddress{*nextAddr}))
+		assert.Eventuallyf(l.Suite.T(), func() bool {
+			return network.Connected == this.libP2PHost.Network().Connectedness(next.libP2PHost.ID())
+		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf(" %s not connected with %s", this.name, next.name))
+
+		// Number of connected peers on the chain should be always 2 except for the
+		// first and last nodes that should be one
+		peerNum := 2
+		if i == 0 || i == count {
+			peerNum = 1
+		}
+		assert.Equal(l.Suite.T(), peerNum, len(this.ps.ListPeers(string(Consensus))))
 	}
 
-	// Step 4: Wait for nodes to hearbeat
+	// Step 4: Waits for nodes to heartbeat each other
 	time.Sleep(2 * time.Second)
 
-	// Step 5: Publish a message from the first node and verify all nodes get it.
+	// Step 5: Publish a message from the first node on the chain
+	// and verify all nodes get it.
 	// All nodes including node 0 - the sender, should receive it
-	nodes[0].Publish(ctx, Consensus, []byte("hello"))
+	require.NoError(l.Suite.T(), nodes[0].Publish(l.ctx, Consensus, []byte("hello")))
+
+	// A hash set to keep track of the nodes who received the message
 	recv := make(map[string]bool, count)
 	for i := 0; i < count; i++ {
 		select {
@@ -164,123 +187,55 @@ func TestLibP2PNode_PubSub(t *testing.T) {
 					missing = append(missing, n.name)
 				}
 			}
-			assert.Fail(t, " messages not received by nodes: "+strings.Join(missing, ", "))
+			assert.Fail(l.Suite.T(), " messages not received by nodes: "+strings.Join(missing, ", "))
 			break
 		}
 	}
 
-	// Step 6: Unsubscribe all nodes from the topic
+	// Step 6: Unsubscribes all nodes from the topic
 	for _, n := range nodes {
-		assert.NoError(t, n.UnSubscribe(Consensus))
+		assert.NoError(l.Suite.T(), n.UnSubscribe(Consensus))
 	}
 }
 
-// TestLibP2PNode_P2P tests end-to-end a P2P message sending and receiving between two nodes
-func TestLibP2PNode_P2P(t *testing.T) {
-	// TODO: Issue#1966
-	t.Skip(" A libp2p issue causes this test to fail once in a while. Ignoring test")
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	var count = 2
-
-	nodes, err := createLibP2PNodes(ctx, t, count)
-	require.NoError(t, err)
-	defer func() {
-		if nodes != nil {
-			for _, n := range nodes {
-				n.Stop()
-			}
-		}
-	}()
-
-	// Peer 1 will be sending a message to Peer 2
-	peer1 := nodes[0]
-	peer2 := nodes[1]
-
-	var ids []NodeAddress
-	// Get actual ip and port numbers on which the nodes were started
-	for _, n := range nodes {
-		ip, p := n.GetIPPort()
-		ids = append(ids, NodeAddress{name: n.name, ip: ip, port: p})
-	}
-
-	// Add the second node as a peer to the first node
-	require.NoError(t, peer1.AddPeers(ctx, ids[1:]))
-
-	// Create and register engines for each of the nodes
-	te1 := &StubEngine{t: t}
-	conduit1, err := peer1.Register(1, te1)
-	te2 := &StubEngine{t: t, ch: make(chan struct{})}
-	_, err = peer2.Register(1, te2)
-
-	// Create target byte array from the node name "node2" -> []byte
-	var target [32]byte
-	copy(target[:], ids[1].name)
-	targetID := flow.Identifier(target)
-
-	// Send the message to peer 2 using the conduit of peer 1
-	require.NoError(t, conduit1.Submit([]byte("hello"), targetID))
-
-	select {
-	case <-te2.ch:
-		// Assert that the message was received by peer 2
-		require.NotNil(t, te2.id)
-		require.NotNil(t, te2.event)
-		senderID := bytes.Trim(te2.id[:], "\x00")
-		senderIDStr := string(senderID)
-		assert.Equal(t, peer1.name, senderIDStr)
-		assert.Equal(t, "hello", fmt.Sprintf("%s", te2.event))
-	case <-time.After(3 * time.Second):
-		assert.Fail(t, "peer 1 failed to send a message to peer 2")
-	}
-}
-
-func createLibP2PNodes(ctx context.Context, t *testing.T, count int) (nodes []*P2PNode, err error) {
+// CreateNodes creates a number of libp2pnodes equal to the count
+// it also asserts the correctness of nodes creations
+// a single error in creating one node terminates the entire test
+func (l *LibP2PNodeTestSuite) CreateNodes(count int) (nodes []*P2PNode) {
+	// keeps track of errors on creating a node
+	var err error
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	defer func() {
 		if err != nil && nodes != nil {
-			for _, n := range nodes {
-				n.Stop()
-			}
+			// stops all nodes upon an error in starting even one single node
+			l.StopNodes(nodes)
 		}
 	}()
-	l := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+
+	// creating nodes
 	for i := 1; i <= count; i++ {
-		var n = &P2PNode{}
-		var nodeID = NodeAddress{name: fmt.Sprintf("node%d", i), ip: "0.0.0.0", port: "0"}
-		err := n.Start(ctx, nodeID, l)
-		require.NoError(t, err)
-		require.Eventuallyf(t, func() bool {
+		n := &P2PNode{}
+		nodeID := NodeAddress{
+			name: fmt.Sprintf("node%d", i),
+			ip:   "0.0.0.0", // localhost
+			port: "0",       // random port number
+		}
+		err := n.Start(l.ctx, nodeID, logger)
+		require.NoError(l.Suite.T(), err)
+		require.Eventuallyf(l.Suite.T(), func() bool {
 			ip, p := n.GetIPPort()
 			return ip != "" && p != ""
-		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("node%d didn't start", i))
+		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %d", i))
 		nodes = append(nodes, n)
 	}
-	return nodes, err
+	return nodes
 }
 
-type StubEngine struct {
-	t     *testing.T
-	id    flow.Identifier
-	event interface{}
-	ch    chan struct{}
-}
-
-func (te *StubEngine) SubmitLocal(event interface{}) {
-	require.Fail(te.t, "not implemented")
-}
-
-func (te *StubEngine) Submit(originID flow.Identifier, event interface{}) {
-	require.Fail(te.t, "not implemented")
-}
-
-func (te *StubEngine) ProcessLocal(event interface{}) error {
-	require.Fail(te.t, "not implemented")
-	return fmt.Errorf(" unexpected method called")
-}
-
-func (te *StubEngine) Process(originID flow.Identifier, event interface{}) error {
-	te.id = originID
-	te.event = event
-	te.ch <- struct{}{}
-	return nil
+// StopNodes stop all nodes in the input slice
+func (l *LibP2PNodeTestSuite) StopNodes(nodes []*P2PNode) {
+	if nodes != nil {
+		for _, n := range nodes {
+			assert.NoError(l.Suite.T(), n.Stop())
+		}
+	}
 }

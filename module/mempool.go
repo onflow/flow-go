@@ -7,24 +7,24 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// CollectionPool represents concurrency-safe memory pool for guaranteed collections.
-type CollectionPool interface {
+// CollectionGuaranteePool represents concurrency-safe memory pool for guaranteed collections.
+type CollectionGuaranteePool interface {
 
-	// Has checks whether the guaranteed collection with the given hash is
+	// Has checks whether the collection guarantee with the given hash is
 	// currently in the memory pool.
 	Has(fp flow.Fingerprint) bool
 
-	// Add will add the given guaranteed collection to the memory pool; it will
+	// Add will add the given collection guarantee to the memory pool; it will
 	// error if the guaranteed collection is already in the memory pool.
-	Add(coll *flow.GuaranteedCollection) error
+	Add(guarantee *flow.CollectionGuarantee) error
 
-	// Rem will remove the given guaranteed collection from the memory pool; it
-	// will return true if the guaranteed collection was known and removed.
+	// Rem will remove the given collection guarantees from the memory pool; it
+	// will return true if the collection guarantees was known and removed.
 	Rem(fp flow.Fingerprint) bool
 
-	// Get will retrieve the given guaranteed collection from the memory pool;
+	// Get will retrieve the given collection guarantees from the memory pool;
 	// it will error if the guaranteed collection is not in the memory pool.
-	Get(fp flow.Fingerprint) (*flow.GuaranteedCollection, error)
+	Get(fp flow.Fingerprint) (*flow.CollectionGuarantee, error)
 
 	// Hash will return a fingerprint has representing the contents of the
 	// entire memory pool.
@@ -33,9 +33,9 @@ type CollectionPool interface {
 	// Size will return the current size of the memory pool.
 	Size() uint
 
-	// All will retrieve all collections that are currently in the memory pool
-	// as a slice.
-	All() []*flow.GuaranteedCollection
+	// All will retrieve all collection guarantees that are currently in the
+	// memory pool as a slice.
+	All() []*flow.CollectionGuarantee
 }
 
 // TransactionPool represents concurrency-safe memory pool for transactions.

@@ -7,6 +7,9 @@ type Processor interface {
 	OnForkChoiceTrigger(uint64)
 	OnEnteringView(uint64)
 	OnPassiveTillView(uint64)
+
+	OnWaitingForBlockTimeout(uint64)
+	OnWaitingForVotesTimeout(uint64)
 }
 
 // GenerateForkChoiceTiggerConsumer consumes events of type `OnForkChoiceTrigger`

@@ -3,6 +3,8 @@
 package badger
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 
@@ -35,7 +37,7 @@ func (b *Blocks) ByHash(hash crypto.Hash) (*flow.Block, error) {
 			if err == storage.NotFoundErr {
 				return err
 			}
-			return errors.Wrap(err, "could not retrieve block")
+			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
 		return nil
@@ -89,18 +91,18 @@ func (b *Blocks) retrieveBlock(tx *badger.Txn, hash crypto.Hash) (*flow.Block, e
 		return nil, errors.Wrap(err, "could not retrieve identities")
 	}
 
-	// get the guaranteed collections
-	var collections []*flow.GuaranteedCollection
-	err = operation.RetrieveCollections(hash, &collections)(tx)
+	// get the collection guarantees
+	var guarantees []*flow.CollectionGuarantee
+	err = operation.RetrieveCollectionGuarantees(hash, &guarantees)(tx)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not retrieve collections")
+		return nil, errors.Wrap(err, "could not retrieve collection guarantees")
 	}
 
 	// create the block
 	block := &flow.Block{
-		Header:                header,
-		NewIdentities:         identities,
-		GuaranteedCollections: collections,
+		Header:               header,
+		NewIdentities:        identities,
+		CollectionGuarantees: guarantees,
 	}
 
 	return block, nil
@@ -112,19 +114,19 @@ func (b *Blocks) Save(block *flow.Block) error {
 
 		err := operation.PersistHeader(&block.Header)(tx)
 		if err != nil {
-			return errors.Wrap(err, "cannot save block")
+			return fmt.Errorf("cannot save block: %w", err)
 		}
 		err = operation.PersistIdentities(block.Hash(), block.NewIdentities)(tx)
 		if err != nil {
-			return errors.Wrap(err, "cannot save block")
+			return fmt.Errorf("cannot save block %w", err)
 		}
-		err = operation.PersistCollections(block.Hash(), block.GuaranteedCollections)(tx)
+		err = operation.PersistCollectionGuarantees(block.Hash(), block.CollectionGuarantees)(tx)
 		if err != nil {
-			return errors.Wrap(err, "cannot save block")
+			return fmt.Errorf("cannot save block %w", err)
 		}
 		err = operation.PersistHash(block.Number, block.Hash())(tx)
 		if err != nil {
-			return errors.Wrap(err, "cannot save block")
+			return fmt.Errorf("cannot save block %w", err)
 		}
 
 		return nil
