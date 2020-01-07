@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -11,7 +12,7 @@ import (
 // A BlockContext is used to execute transactions in the context of a block.
 type BlockContext interface {
 	// ExecuteTransaction computes the result of a transaction.
-	ExecuteTransaction(ledger Ledger, tx *flow.Transaction) (*TransactionResult, error)
+	ExecuteTransaction(ledger Ledger, tx flow.TransactionBody) (*TransactionResult, error)
 }
 
 type blockContext struct {
@@ -19,7 +20,7 @@ type blockContext struct {
 	block *flow.Block
 }
 
-func (bc *blockContext) newTransactionContext(ledger Ledger, tx *flow.Transaction) *transactionContext {
+func (bc *blockContext) newTransactionContext(ledger Ledger, tx flow.TransactionBody) *transactionContext {
 	signingAccounts := make([]runtime.Address, len(tx.ScriptAccounts))
 	for i, addr := range tx.ScriptAccounts {
 		signingAccounts[i] = runtime.Address(addr)
@@ -36,8 +37,8 @@ func (bc *blockContext) newTransactionContext(ledger Ledger, tx *flow.Transactio
 // Register updates are recorded in the provided ledger view. An error is returned
 // if an unexpected error occurs during execution. If the transaction reverts due to
 // a normal runtime error, the error is recorded in the transaction result.
-func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx *flow.Transaction) (*TransactionResult, error) {
-	location := runtime.TransactionLocation(tx.Hash())
+func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx flow.TransactionBody) (*TransactionResult, error) {
+	location := runtime.TransactionLocation(tx.Fingerprint())
 
 	ctx := bc.newTransactionContext(ledger, tx)
 
@@ -46,7 +47,7 @@ func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx *flow.Transaction) 
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts
 			return &TransactionResult{
-				TxHash: tx.Hash(),
+				TxHash: crypto.Hash(tx.Fingerprint()),
 				Error:  err,
 			}, nil
 		}
@@ -56,7 +57,7 @@ func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx *flow.Transaction) 
 	}
 
 	return &TransactionResult{
-		TxHash: tx.Hash(),
+		TxHash: crypto.Hash(tx.Fingerprint()),
 		Error:  nil,
 	}, nil
 }
