@@ -8,45 +8,36 @@ import (
 	"github.com/dapperlabs/flow-go/model/hash"
 )
 
-// Collection is set of transactions (transaction set)
+// Collection is set of transactions.
 type Collection struct {
+	Transactions []TransactionBody
+}
+
+// LightCollection is a collection containing references to the constituent
+// transactions rather than full transaction bodies. It is used for indexing
+// transactions by collection and for computing the collection fingerprint.
+type LightCollection struct {
 	Transactions []Fingerprint
+}
+
+func (lc *LightCollection) Fingerprint() Fingerprint {
+	return Fingerprint(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(lc)))
+}
+
+// Light returns the light, reference-only version of the collection.
+func (c Collection) Light() *LightCollection {
+	lc := LightCollection{Transactions: make([]Fingerprint, len(c.Transactions))}
+
+	for i := 0; i < len(c.Transactions); i++ {
+		lc.Transactions[i] = c.Transactions[i].Fingerprint()
+	}
+
+	return &lc
 }
 
 // Fingerprint returns the canonical hash of this collection.
 func (c *Collection) Fingerprint() Fingerprint {
-	return Fingerprint(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(c)))
-}
-
-// AddItem adds another entityID to the collection
-func (c *Collection) Add(item Entity) {
-	c.Transactions = append(c.Transactions, item.Fingerprint())
-}
-
-// GetItem returns a single item from the collection with the proof that this item is located at this index
-func (c *Collection) GetItem(index uint64) (fingerprint Fingerprint, proof []byte) {
-	return c.Transactions[index], nil
-}
-
-// GetItem returns a range of elements from the collection
-// and provides an aggregated proof
-func (c *Collection) GetItems(startIndex uint64, length uint64) (fingerprints []Fingerprint, proof []byte) {
-	return c.Transactions[startIndex : startIndex+length], nil
-}
-
-// Reset resets all transactions inside the collection
-func (c *Collection) Reset() {
-	c.Transactions = make([]Fingerprint, 0)
-}
-
-// IsEmpty returns true if the collection is empty
-func (c Collection) IsEmpty() bool {
-	return len(c.Transactions) == 0
-}
-
-// Size returns len of transaction slice
-func (c *Collection) Size() int {
-	return len(c.Transactions)
+	return c.Light().Fingerprint()
 }
 
 func (c *Collection) ID() Identifier {
