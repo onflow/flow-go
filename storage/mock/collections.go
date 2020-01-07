@@ -60,26 +60,3 @@ func (_m *Collections) Save(collection *flow.Collection) error {
 
 	return r0
 }
-
-// TransactionsByFingerprint provides a mock function with given fields: hash
-func (_m *Collections) TransactionsByFingerprint(hash flow.Fingerprint) ([]*flow.Transaction, error) {
-	ret := _m.Called(hash)
-
-	var r0 []*flow.Transaction
-	if rf, ok := ret.Get(0).(func(flow.Fingerprint) []*flow.Transaction); ok {
-		r0 = rf(hash)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.Transaction)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Fingerprint) error); ok {
-		r1 = rf(hash)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}

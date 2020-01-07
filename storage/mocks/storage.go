@@ -143,18 +143,3 @@ func (mr *MockCollectionsMockRecorder) Save(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockCollections)(nil).Save), arg0)
 }
-
-// TransactionsByFingerprint mocks base method
-func (m *MockCollections) TransactionsByFingerprint(arg0 flow.Fingerprint) ([]*flow.Transaction, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TransactionsByFingerprint", arg0)
-	ret0, _ := ret[0].([]*flow.Transaction)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// TransactionsByFingerprint indicates an expected call of TransactionsByFingerprint
-func (mr *MockCollectionsMockRecorder) TransactionsByFingerprint(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TransactionsByFingerprint", reflect.TypeOf((*MockCollections)(nil).TransactionsByFingerprint), arg0)
-}
