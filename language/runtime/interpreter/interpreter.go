@@ -2719,13 +2719,17 @@ func (interpreter *Interpreter) ensureLoaded(location ast.Location, loadProgram 
 	}
 
 	// Create a new sub-interpreter and interpret the top-level declarations
-	var err error
+	var checkerErr *sema.CheckerError
 	var importedChecker *sema.Checker
-	importedChecker, err = interpreter.Checker.EnsureLoaded(location, loadProgram)
+	importedChecker, checkerErr = interpreter.Checker.EnsureLoaded(location, loadProgram)
 	if importedChecker == nil {
 		panic("missing checker")
 	}
+	if checkerErr != nil {
+		panic(checkerErr)
+	}
 
+	var err error
 	subInterpreter, err = NewInterpreter(
 		importedChecker,
 		WithPredefinedValues(interpreter.PredefinedValues),
