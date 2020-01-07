@@ -19,9 +19,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-
-	"github.com/dapperlabs/flow-go/model/flow"
-	flownetwork "github.com/dapperlabs/flow-go/network"
 )
 
 // A unique Libp2p protocol ID for Flow (https://docs.libp2p.io/concepts/protocols/)
@@ -47,7 +44,6 @@ type P2PNode struct {
 	ps         *pubsub.PubSub                     // the reference to the pubsub instance
 	topics     map[FlowTopic]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs       map[FlowTopic]*pubsub.Subscription // map of a topic string to an actual subscription
-	engines    map[uint8]flownetwork.Engine       // map of engine id to engine instances
 	streams    map[uint8]network.Stream           // map of engine id to libp2p streams
 
 	//TODO abstract this out in a different class (Issue#1611)
@@ -99,7 +95,6 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	p.topics = make(map[FlowTopic]*pubsub.Topic)
 	p.subs = make(map[FlowTopic]*pubsub.Subscription)
-	p.engines = make(map[uint8]flownetwork.Engine)
 
 	if err == nil {
 		p.logger.Debug().Str("Name", p.name).Msg("libp2p node started successfully")
@@ -272,78 +267,6 @@ func (p *P2PNode) Publish(ctx context.Context, t FlowTopic, data []byte) error {
 		return fmt.Errorf("topic not found")
 	}
 	return ps.Publish(ctx, data)
-}
-
-// Register will register the given engine with the given unique engine engineID,
-// returning a conduit to directly submit messages to the message bus of the
-// engine.
-func (p *P2PNode) Register(engineID uint8, engine flownetwork.Engine) (flownetwork.Conduit, error) {
-	p.Lock()
-	defer p.Unlock()
-	// check if the engine engineID is already taken
-	if _, found := p.engines[engineID]; found {
-		return nil, errors.Errorf("engine already registered (%d)", engine)
-	}
-
-	// register engine with provided engineID
-	p.engines[engineID] = engine
-
-	// create the conduit
-	conduit := &Conduit{
-		engineID: engineID,
-		submit:   p.submit,
-	}
-	return conduit, nil
-}
-
-// submit method submits the given event for the given engine to the overlay layer
-// for processing; it is used by engines through conduits.
-// The Target needs to be added as a peer before submitting the message.
-func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
-	for _, t := range targetIDs {
-		peerID, err := GetLibP2PIDFromFlowID(t)
-		if err != nil {
-			return err
-		}
-		var senderID [32]byte
-		// Convert node Name to self to sender ID
-		copy(senderID[:], p.name)
-		// Compose the message payload
-		message := &Message{
-			SenderID: senderID[:],
-			Event:    event.([]byte),
-			EngineID: uint32(engineID),
-		}
-		// Get the ProtoBuf representation of the message
-		b, err := proto.Marshal(message)
-		if err != nil {
-			return errors.Wrapf(err, "could not marshal message: %v", message)
-		}
-
-		// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
-		stream, err := p.libP2PHost.NewStream(context.Background(), peerID, FlowLibP2PProtocolID)
-		if err != nil {
-			return err
-		}
-
-		// Send the message using the stream
-		_, err = stream.Write(b)
-		if err != nil {
-			return err
-		}
-
-		// Debug log the message length
-		p.logger.Debug().Str("peer", stream.Conn().RemotePeer().String()).
-			Str("message", message.String()).Int("length", len(b)).
-			Msg("sent message")
-
-		// Close the stream
-		err = stream.Close()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // handleStream is the callback that gets called for each remote peer that makes a direct 1-1 connection

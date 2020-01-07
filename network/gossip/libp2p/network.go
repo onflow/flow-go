@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"hash"
 	"math/rand"
+	"sync"
 
 	"github.com/dchest/siphash"
 	"github.com/hashicorp/go-multierror"
@@ -24,6 +25,7 @@ import (
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
+	sync.RWMutex
 	log     zerolog.Logger
 	codec   network.Codec
 	state   protocol.State
@@ -89,6 +91,8 @@ func (n *Network) Done() <-chan struct{} {
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
 func (n *Network) Register(engineID uint8, engine network.Engine) (network.Conduit, error) {
+	n.Lock()
+	defer n.Unlock()
 
 	// check if the engine engineID is already taken
 	_, ok := n.engines[engineID]
@@ -174,8 +178,9 @@ func (n *Network) genNetworkMessage(engineID uint8, event interface{}, targetIDs
 	return e, nil
 }
 
-// submit will submit the given event for the given engine to the overlay layer
+// submit method submits the given event for the given engine to the overlay layer
 // for processing; it is used by engines through conduits.
+// The Target needs to be added as a peer before submitting the message.
 func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 	// genNetworkMessage the event to get payload and event ID
 	message, err := n.genNetworkMessage(engineID, event)

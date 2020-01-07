@@ -8,14 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
-
+	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
-	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 )
 
 // Middleware handles the input & output on the direct connections we have to
