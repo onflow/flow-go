@@ -11,20 +11,20 @@ type Executor struct {
 }
 
 // ExecuteBlock provides a mock function with given fields: block, collections, transactions
-func (_m *Executor) ExecuteBlock(block *flow.Block, collections []*flow.Collection, transactions []*flow.Transaction) ([]*flow.Chunk, error) {
+func (_m *Executor) ExecuteBlock(block flow.Block, collections []flow.Collection, transactions []flow.TransactionBody) ([]flow.Chunk, error) {
 	ret := _m.Called(block, collections, transactions)
 
-	var r0 []*flow.Chunk
-	if rf, ok := ret.Get(0).(func(*flow.Block, []*flow.Collection, []*flow.Transaction) []*flow.Chunk); ok {
+	var r0 []flow.Chunk
+	if rf, ok := ret.Get(0).(func(flow.Block, []flow.Collection, []flow.TransactionBody) []flow.Chunk); ok {
 		r0 = rf(block, collections, transactions)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.Chunk)
+			r0 = ret.Get(0).([]flow.Chunk)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*flow.Block, []*flow.Collection, []*flow.Transaction) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.Block, []flow.Collection, []flow.TransactionBody) error); ok {
 		r1 = rf(block, collections, transactions)
 	} else {
 		r1 = ret.Error(1)

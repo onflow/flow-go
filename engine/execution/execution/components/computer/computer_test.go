@@ -20,14 +20,12 @@ func TestExecuteTransaction(t *testing.T) {
 	c := computer.New(rt, prov)
 
 	t.Run("transaction success", func(t *testing.T) {
-		tx := &flow.Transaction{
-			TransactionBody: flow.TransactionBody{
-				Script: []byte(`
+		tx := flow.TransactionBody{
+			Script: []byte(`
                 transaction {
                   prepare(signer: Account) {}
                 }
             `),
-			},
 		}
 
 		prov.On("NewTransactionContext", tx).
@@ -47,9 +45,8 @@ func TestExecuteTransaction(t *testing.T) {
 	})
 
 	t.Run("transaction failure", func(t *testing.T) {
-		tx := &flow.Transaction{
-			TransactionBody: flow.TransactionBody{
-				Script: []byte(`
+		tx := flow.TransactionBody{
+			Script: []byte(`
                 transaction {
                   var x: Int
 
@@ -66,7 +63,6 @@ func TestExecuteTransaction(t *testing.T) {
                   }
                 }
             `),
-			},
 		}
 
 		prov.On("NewTransactionContext", tx).

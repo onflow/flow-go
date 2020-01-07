@@ -7,7 +7,7 @@ import (
 
 // A Provider generates execution contexts to be used for transaction execution.
 type Provider interface {
-	NewTransactionContext(tx *flow.Transaction) TransactionContext
+	NewTransactionContext(tx flow.TransactionBody) TransactionContext
 }
 
 type TransactionContext interface {

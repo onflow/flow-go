@@ -12,11 +12,11 @@ type Provider struct {
 }
 
 // NewTransactionContext provides a mock function with given fields: tx
-func (_m *Provider) NewTransactionContext(tx *flow.Transaction) context.TransactionContext {
+func (_m *Provider) NewTransactionContext(tx flow.TransactionBody) context.TransactionContext {
 	ret := _m.Called(tx)
 
 	var r0 context.TransactionContext
-	if rf, ok := ret.Get(0).(func(*flow.Transaction) context.TransactionContext); ok {
+	if rf, ok := ret.Get(0).(func(flow.TransactionBody) context.TransactionContext); ok {
 		r0 = rf(tx)
 	} else {
 		if ret.Get(0) != nil {

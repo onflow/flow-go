@@ -16,13 +16,12 @@ import (
 
 // Engine manages execution of transactions
 type Engine struct {
-	unit         *engine.Unit
-	log          zerolog.Logger
-	con          network.Conduit
-	me           module.Local
-	collections  storage.Collections
-	transactions storage.Transactions
-	executor     executor.Executor
+	unit        *engine.Unit
+	log         zerolog.Logger
+	con         network.Conduit
+	me          module.Local
+	collections storage.Collections
+	executor    executor.Executor
 }
 
 func New(
@@ -30,17 +29,15 @@ func New(
 	net module.Network,
 	me module.Local,
 	collections storage.Collections,
-	transactions storage.Transactions,
 	executor executor.Executor,
 ) (*Engine, error) {
 
 	e := Engine{
-		unit:         engine.NewUnit(),
-		log:          log,
-		me:           me,
-		collections:  collections,
-		transactions: transactions,
-		executor:     executor,
+		unit:        engine.NewUnit(),
+		log:         log,
+		me:          me,
+		collections: collections,
+		executor:    executor,
 	}
 
 	con, err := net.Register(engine.ExecutionExecution, &e)
@@ -110,7 +107,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // This function fetches the collections and transactions in the block and passes
 // them to the block executor for execution.
 func (e *Engine) onBlock(block *flow.Block) error {
-	collections, err := e.getCollections(block.GuaranteedCollections)
+	collections, err := e.getCollections(block.CollectionGuarantees)
 	if err != nil {
 		return fmt.Errorf("failed to load collections: %w", err)
 	}
@@ -120,7 +117,7 @@ func (e *Engine) onBlock(block *flow.Block) error {
 		return fmt.Errorf("failed to load transactions: %w", err)
 	}
 
-	_, err = e.executor.ExecuteBlock(block, collections, transactions)
+	_, err = e.executor.ExecuteBlock(*block, collections, transactions)
 	if err != nil {
 		return fmt.Errorf("failed to execute block: %w", err)
 	}
@@ -128,8 +125,8 @@ func (e *Engine) onBlock(block *flow.Block) error {
 	return nil
 }
 
-func (e *Engine) getCollections(cols []*flow.GuaranteedCollection) ([]*flow.Collection, error) {
-	collections := make([]*flow.Collection, len(cols))
+func (e *Engine) getCollections(cols []*flow.CollectionGuarantee) ([]flow.Collection, error) {
+	collections := make([]flow.Collection, len(cols))
 
 	for i, gc := range cols {
 		c, err := e.collections.ByFingerprint(gc.Fingerprint())
@@ -137,30 +134,25 @@ func (e *Engine) getCollections(cols []*flow.GuaranteedCollection) ([]*flow.Coll
 			return nil, fmt.Errorf("failed to load collection: %w", err)
 		}
 
-		collections[i] = c
+		collections[i] = *c
 	}
 
 	return collections, nil
 }
 
-func (e *Engine) getTransactions(cols []*flow.Collection) ([]*flow.Transaction, error) {
+func (e *Engine) getTransactions(cols []flow.Collection) ([]flow.TransactionBody, error) {
 	txCount := 0
 
 	for _, c := range cols {
-		txCount += c.Size()
+		txCount += len(c.Transactions)
 	}
 
-	transactions := make([]*flow.Transaction, txCount)
+	transactions := make([]flow.TransactionBody, txCount)
 
 	i := 0
 
 	for _, c := range cols {
-		for _, f := range c.Transactions {
-			tx, err := e.transactions.ByFingerprint(f)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load transaction: %w", err)
-			}
-
+		for _, tx := range c.Transactions {
 			transactions[i] = tx
 			i++
 		}

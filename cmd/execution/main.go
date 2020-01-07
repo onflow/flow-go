@@ -24,7 +24,6 @@ func main() {
 			comp := computer.New(rt, &context.Provider{})
 			exec := executor.New(comp)
 
-			transactions := &storage.Transactions{}
 			collections := &storage.Collections{}
 
 			engine, err := execution.New(
@@ -32,7 +31,6 @@ func main() {
 				node.Network,
 				node.Me,
 				collections,
-				transactions,
 				exec,
 			)
 			node.MustNot(err).Msg("could not initialize execution engine")

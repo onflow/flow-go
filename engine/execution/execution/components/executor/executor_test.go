@@ -17,41 +17,34 @@ func TestExecutorExecuteBlock(t *testing.T) {
 
 	exe := executor.New(computer)
 
-	tx1 := &flow.Transaction{
-		TransactionBody: flow.TransactionBody{
-			Script: []byte("transaction { execute {} }"),
-		},
+	tx1 := flow.TransactionBody{
+		Script: []byte("transaction { execute {} }"),
 	}
 
-	tx2 := &flow.Transaction{
-		TransactionBody: flow.TransactionBody{
-			Script: []byte("transaction { execute {} }"),
-		},
+	tx2 := flow.TransactionBody{
+		Script: []byte("transaction { execute {} }"),
 	}
 
-	col := &flow.Collection{Transactions: []flow.Fingerprint{
-		tx1.Fingerprint(),
-		tx2.Fingerprint(),
-	}}
+	col := flow.Collection{Transactions: []flow.TransactionBody{tx1, tx2}}
 
-	block := &flow.Block{
+	block := flow.Block{
 		Header: flow.Header{
 			Number: 42,
 		},
-		GuaranteedCollections: []*flow.GuaranteedCollection{
+		CollectionGuarantees: []*flow.CollectionGuarantee{
 			{
-				CollectionHash: crypto.Hash(col.Fingerprint()),
-				Signatures:     nil,
+				Hash:       crypto.Hash(col.Fingerprint()),
+				Signatures: nil,
 			},
 		},
 	}
 
-	computer.On("ExecuteTransaction", mock.AnythingOfType("*flow.Transaction")).
+	computer.On("ExecuteTransaction", mock.AnythingOfType("flow.TransactionBody")).
 		Return(nil, nil).
 		Twice()
 
-	collections := []*flow.Collection{col}
-	transactions := []*flow.Transaction{tx1, tx2}
+	collections := []flow.Collection{col}
+	transactions := []flow.TransactionBody{tx1, tx2}
 
 	chunks, err := exe.ExecuteBlock(block, collections, transactions)
 	assert.NoError(t, err)
