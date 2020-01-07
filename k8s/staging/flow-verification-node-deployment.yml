@@ -148,10 +148,15 @@ spec:
           volumeMounts:
             - name: badger-volume
               mountPath: /flowdb
+
+          # The current liveness and readiness probes use the /metrics endpoint, which is non-ideal and MVP only
+          # These probes should eventually make use of the gRPC server's Ping function, or should at least
+          # be moved over to a /live endpoint that has some introspection into the gRPC's liveness/readiness
+
           # Readiness Probe
           readinessProbe:
             httpGet:
-              path: /live
+              path: /metrics
               port: http
             initialDelaySeconds: 5
             successThreshold: 1
@@ -159,7 +164,7 @@ spec:
           # Liveness Probe
           livenessProbe:
             httpGet:
-              path: /live
+              path: /metrics
               port: http
             initialDelaySeconds: 30
             periodSeconds: 30
