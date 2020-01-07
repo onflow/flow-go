@@ -6,9 +6,13 @@ import (
 
 // Collections represents persistent storage for collections.
 type Collections interface {
-	// ByHash returns the transaction for the given block.
+	// ByFingerprint returns the collection with the given fingerprint.
 	ByFingerprint(hash flow.Fingerprint) (*flow.Collection, error)
 
-	// Save inserts the transaction, keyed by hash.
+	// Save inserts the collection keyed by fingerprint and all constituent
+	// transactions.
 	Save(collection *flow.Collection) error
+
+	// Remove removes the collection and all constituent transactions.
+	Remove(hash flow.Fingerprint) error
 }

@@ -10,14 +10,14 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/storage"
-	badger2 "github.com/dapperlabs/flow-go/storage/badger"
+	badgerstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestBlockRetrievalByNumber(t *testing.T) {
+func TestRetrievalByNumber(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		blocks := badger2.NewBlocks(db)
+		blocks := badgerstorage.NewBlocks(db)
 
 		block := unittest.BlockFixture()
 		block.Number = 21
@@ -36,7 +36,7 @@ func TestBlockRetrievalByNonexistingNumber(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		blocks := badger2.NewBlocks(db)
+		blocks := badgerstorage.NewBlocks(db)
 
 		block := unittest.BlockFixture()
 		block.Number = 21
@@ -54,7 +54,7 @@ func TestStoringSameBlockTwice(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		blocks := badger2.NewBlocks(db)
+		blocks := badgerstorage.NewBlocks(db)
 
 		block := unittest.BlockFixture()
 		block.Number = 21
@@ -71,7 +71,7 @@ func TestStoringBlockWithDifferentDateButSameNumberTwice(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		blocks := badger2.NewBlocks(db)
+		blocks := badgerstorage.NewBlocks(db)
 
 		block := unittest.BlockFixture()
 		block.Number = 21
@@ -84,8 +84,6 @@ func TestStoringBlockWithDifferentDateButSameNumberTwice(t *testing.T) {
 
 		err = blocks.Save(&block2)
 
-		realErr := errors.Unwrap(err)
-
-		require.Equal(t, storage.DifferentDataErr, realErr)
+		assert.True(t, errors.Is(err, storage.DifferentDataErr))
 	})
 }

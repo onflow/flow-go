@@ -189,22 +189,86 @@ type handleFunc func() error
 // of values, the initialization of entities and the processing.
 type iterationFunc func() (checkFunc, createFunc, handleFunc)
 
-// iterate will start iteration at the start prefix and keep iterating through
-// the badger DB up to and including the end prefix. On each iteration it will
-// call the iteration function to initialize functions specific to processing
-// the given key-value pair.
+// iterate iterates over a range of keys defined by a start and end key.
+//
+// The start key is the first key in the iteration and the lexicographically
+// smallest key in the iteration. The end key is last key in the iteration
+// and the lexicographically largest key in the iteration.
+//
+// On each iteration, it will call the iteration function to initialize
+// functions specific to processing the given key-value pair.
 func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
 		it := tx.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
+
 		for it.Seek(start); it.Valid(); it.Next() {
 
-			// check if we have reached the end of our iteration
 			item := it.Item()
-			if bytes.Compare(item.Key(), end) > 0 {
+
+			// check if we have reached the end of our iteration
+			if end != nil && bytes.Compare(item.Key(), end) > 0 {
 				break
 			}
+
+			// initialize processing functions for iteration
+			check, create, handle := iteration()
+
+			// check if we should process the item at all
+			key := item.Key()
+			ok := check(key)
+			if !ok {
+				continue
+			}
+
+			// process the actual item
+			err := item.Value(func(val []byte) error {
+
+				// decode into the entity
+				entity := create()
+				err := json.Unmarshal(val, entity)
+				if err != nil {
+					return fmt.Errorf("could not decode entity: %w", err)
+				}
+
+				// process the entity
+				err = handle()
+				if err != nil {
+					return fmt.Errorf("could not handle entity: %w", err)
+				}
+
+				return nil
+			})
+			if err != nil {
+				return fmt.Errorf("could not process value: %w", err)
+			}
+		}
+
+		return nil
+	}
+}
+
+// traverse iterates over a range of keys defined by a prefix.
+//
+// The prefix must be shared by all keys in the iteration.
+//
+// On each iteration, it will call the iteration function to initialize
+// functions specific to processing the given key-value pair.
+func traverse(prefix []byte, iteration iterationFunc) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+
+		opts := badger.DefaultIteratorOptions
+		// NOTE: this is an optimization only, it does not enforce that all
+		// results in the iteration have this prefix.
+		opts.Prefix = prefix
+
+		it := tx.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+
+			item := it.Item()
 
 			// initialize processing functions for iteration
 			check, create, handle := iteration()
