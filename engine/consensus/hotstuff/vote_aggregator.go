@@ -7,10 +7,10 @@ import (
 )
 
 type VoteAggregator struct {
-	lock          sync.RWMutex
-	pendingVotes  map[types.MRH][]*types.Vote
-	createdQC     map[types.MRH]*types.QuorumCertificate
-	protocolState ProtocolState
+	lock         sync.RWMutex
+	pendingVotes map[types.MRH][]*types.Vote
+	createdQC    map[types.MRH]*types.QuorumCertificate
+	viewState    ViewState
 }
 
 func (va *VoteAggregator) Store(v *types.Vote) {
