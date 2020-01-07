@@ -16,9 +16,9 @@ import (
 func main() {
 
 	var (
-		pool module.CollectionPool
+		pool module.CollectionGuaranteePool
 		prop *propagation.Engine
-		exp *expulsion.Engine
+		exp  *expulsion.Engine
 		err  error
 	)
 

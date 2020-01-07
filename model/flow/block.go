@@ -10,8 +10,8 @@ import (
 
 type Block struct {
 	Header
-	NewIdentities         IdentityList
-	GuaranteedCollections []*GuaranteedCollection
+	NewIdentities        IdentityList
+	CollectionGuarantees []*CollectionGuarantee
 }
 
 func Genesis(ids IdentityList) *Block {
@@ -36,8 +36,8 @@ func (b Block) Payload() crypto.Hash {
 	for _, id := range b.NewIdentities {
 		hasher.Add(id.Encode())
 	}
-	for _, gc := range b.GuaranteedCollections {
-		hasher.Add(gc.Hash())
+	for _, guarantee := range b.CollectionGuarantees {
+		hasher.Add(guarantee.Hash)
 	}
 	return hasher.SumHash()
 }

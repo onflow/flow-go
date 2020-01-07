@@ -23,8 +23,7 @@ func main() {
 			comp := computer.New(rt, context.NewProvider())
 			exec := executor.New(comp)
 
-			// TODO: replace mocks with real implementation
-			transactions := &storage.Transactions{}
+			// TODO: replace mock with real implementation
 			collections := &storage.Collections{}
 
 			engine, err := execution.New(
@@ -32,7 +31,6 @@ func main() {
 				node.Network,
 				node.Me,
 				collections,
-				transactions,
 				exec,
 			)
 			node.MustNot(err).Msg("could not initialize execution engine")

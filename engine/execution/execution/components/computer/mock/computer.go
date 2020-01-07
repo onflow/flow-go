@@ -13,11 +13,11 @@ type Computer struct {
 }
 
 // ExecuteTransaction provides a mock function with given fields: _a0, tx
-func (_m *Computer) ExecuteTransaction(_a0 *ledger.View, tx *flow.Transaction) (*computer.TransactionResult, error) {
+func (_m *Computer) ExecuteTransaction(_a0 *ledger.View, tx flow.TransactionBody) (*computer.TransactionResult, error) {
 	ret := _m.Called(_a0, tx)
 
 	var r0 *computer.TransactionResult
-	if rf, ok := ret.Get(0).(func(*ledger.View, *flow.Transaction) *computer.TransactionResult); ok {
+	if rf, ok := ret.Get(0).(func(*ledger.View, flow.TransactionBody) *computer.TransactionResult); ok {
 		r0 = rf(_a0, tx)
 	} else {
 		if ret.Get(0) != nil {
@@ -26,7 +26,7 @@ func (_m *Computer) ExecuteTransaction(_a0 *ledger.View, tx *flow.Transaction) (
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*ledger.View, *flow.Transaction) error); ok {
+	if rf, ok := ret.Get(1).(func(*ledger.View, flow.TransactionBody) error); ok {
 		r1 = rf(_a0, tx)
 	} else {
 		r1 = ret.Error(1)

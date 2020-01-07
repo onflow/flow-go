@@ -20,14 +20,14 @@ import (
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
-func TestOnGuaranteedCollection(t *testing.T) {
+func TestOnCollectionGuarantee(t *testing.T) {
 
 	// initialize the mocks and engine
 	con := &network.Conduit{}
 	state := &protocol.State{}
 	ss := &protocol.Snapshot{}
 	me := &module.Local{}
-	pool := &module.CollectionPool{}
+	pool := &module.CollectionGuaranteePool{}
 	e := &Engine{
 		con:   con,
 		state: state,
@@ -38,7 +38,7 @@ func TestOnGuaranteedCollection(t *testing.T) {
 	// create random collection
 	hash := make([]byte, 32)
 	_, _ = rand.Read(hash)
-	coll := &flow.GuaranteedCollection{CollectionHash: hash}
+	coll := &flow.CollectionGuarantee{Hash: hash}
 
 	// NOTE: as this function relies on two other functions that have their own
 	// unit tests, we only set up and check the behaviour that proxies the
@@ -51,13 +51,13 @@ func TestOnGuaranteedCollection(t *testing.T) {
 	state.On("Final").Return(ss).Once()
 	ss.On("Identities", mock.Anything, mock.Anything).Return(flow.IdentityList{}, nil).Once()
 	con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once()
-	err := e.onGuaranteedCollection(flow.Identifier{}, coll)
+	err := e.onCollectionGuarantee(flow.Identifier{}, coll)
 	assert.Nil(t, err)
 	con.AssertExpectations(t)
 
 	// check that we don't propagate if processing fails
 	pool.On("Add", mock.Anything).Return(errors.New("dummy")).Once()
-	err = e.onGuaranteedCollection(flow.Identifier{}, coll)
+	err = e.onCollectionGuarantee(flow.Identifier{}, coll)
 	assert.NotNil(t, err)
 	con.AssertExpectations(t)
 
@@ -67,40 +67,40 @@ func TestOnGuaranteedCollection(t *testing.T) {
 	state.On("Final").Return(ss).Once()
 	ss.On("Identities", mock.Anything, mock.Anything).Return(flow.IdentityList{}, nil).Once()
 	con.On("Submit", mock.Anything, mock.Anything).Return(errors.New("dummy")).Once()
-	err = e.onGuaranteedCollection(flow.Identifier{}, coll)
+	err = e.onCollectionGuarantee(flow.Identifier{}, coll)
 	assert.NotNil(t, err)
 	con.AssertExpectations(t)
 }
 
-func TestProcessGuaranteedCollection(t *testing.T) {
+func TestProcessCollectionGuarantee(t *testing.T) {
 
 	// initialize mocks and engine
-	pool := &module.CollectionPool{}
+	pool := &module.CollectionGuaranteePool{}
 	e := Engine{
 		pool: pool,
 	}
 
 	// generate n random collections
 	n := 3
-	collections := make([]*flow.GuaranteedCollection, 0, n)
+	collections := make([]*flow.CollectionGuarantee, 0, n)
 	for i := 0; i < n; i++ {
 		hash := make([]byte, 32)
 		_, _ = rand.Read(hash)
-		coll := &flow.GuaranteedCollection{CollectionHash: hash}
+		coll := &flow.CollectionGuarantee{Hash: hash}
 		collections = append(collections, coll)
 	}
 
 	// test storing of collections for the first time
 	for i, coll := range collections {
 		pool.On("Add", coll).Return(nil).Once()
-		err := e.storeGuaranteedCollection(coll)
+		err := e.storeCollectionGuarantee(coll)
 		assert.Nilf(t, err, "collection %d", i)
 	}
 
 	// test storing of collections for the second time
 	for i, coll := range collections {
 		pool.On("Add", coll).Return(errors.New("dummy")).Once()
-		err := e.storeGuaranteedCollection(coll)
+		err := e.storeCollectionGuarantee(coll)
 		assert.NotNilf(t, err, "collection %d", i)
 	}
 
@@ -109,14 +109,14 @@ func TestProcessGuaranteedCollection(t *testing.T) {
 
 	// test storing of collections when the mempool fails
 	for i, coll := range collections {
-		pool.On("Has", coll.Hash()).Return(false)
+		pool.On("Has", coll.Hash).Return(false)
 		pool.On("Add", coll).Return(errors.New("dummy"))
-		err := e.storeGuaranteedCollection(coll)
+		err := e.storeCollectionGuarantee(coll)
 		assert.NotNilf(t, err, "collection %d", i)
 	}
 }
 
-func TestPropagateGuaranteedCollection(t *testing.T) {
+func TestPropagateCollectionGuarantee(t *testing.T) {
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -133,11 +133,11 @@ func TestPropagateGuaranteedCollection(t *testing.T) {
 
 	// generate random collections
 	n := 3
-	collections := make([]*flow.GuaranteedCollection, 0, n)
+	collections := make([]*flow.CollectionGuarantee, 0, n)
 	for i := 0; i < n; i++ {
 		hash := make([]byte, 32)
 		_, _ = rand.Read(hash)
-		coll := &flow.GuaranteedCollection{CollectionHash: hash}
+		coll := &flow.CollectionGuarantee{Hash: hash}
 		collections = append(collections, coll)
 	}
 
@@ -197,7 +197,7 @@ func TestPropagateGuaranteedCollection(t *testing.T) {
 			params = append(params, targetID.NodeID)
 		}
 		con.On("Submit", params...).Return(nil).Once()
-		err := e.propagateGuaranteedCollection(coll)
+		err := e.propagateCollectionGuarantee(coll)
 		assert.Nilf(t, err, "collection %d", i)
 	}
 
