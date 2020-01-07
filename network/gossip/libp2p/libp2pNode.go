@@ -102,7 +102,9 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	p.engines = make(map[uint8]flownetwork.Engine)
 
 	if err == nil {
-		p.logger.Debug().Str("Name", p.name).Msg("libp2p node started successfully")
+		ip, port := p.GetIPPort()
+		p.logger.Debug().Str("Name", p.name).Str("address", fmt.Sprintf("%s:%s", ip, port)).
+			Msg("libp2p node started successfully")
 	}
 
 	return err
@@ -144,7 +146,7 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers []NodeAddress) error {
 func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stream, error) {
 
 	// Add node address as a peer
-	err := p.AddPeers(context.Background(), []NodeAddress{n})
+	err := p.AddPeers(ctx, []NodeAddress{n})
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +158,7 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 	}
 
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
-	return p.libP2PHost.NewStream(context.Background(), peerID, FlowLibP2PProtocolID)
+	return p.libP2PHost.NewStream(ctx, peerID, FlowLibP2PProtocolID)
 }
 
 // GetPeerInfo generates the address of a Node/Peer given its address in a deterministic and consistent way.
@@ -181,8 +183,6 @@ func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
 
 // GetIPPort returns the IP and Port the libp2p node is listening on.
 func (p *P2PNode) GetIPPort() (ip string, port string) {
-	p.Lock()
-	defer p.Unlock()
 	for _, a := range p.libP2PHost.Network().ListenAddresses() {
 		if ip, e := a.ValueForProtocol(multiaddr.P_IP4); e == nil {
 			if p, e := a.ValueForProtocol(multiaddr.P_TCP); e == nil {
