@@ -101,7 +101,7 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 		return // ignore proposals below finalized view
 	}
 
-	if eh.forkChoice.CanIncorperate(blockProposal) == false {
+	if eh.forkChoice.CanIncorporate(blockProposal) == false {
 		// the proposal is not incorperated (meaning, its QC doesn't exist in the block tree)
 		eh.missingBlockRequester.FetchMissingBlock(blockProposal.Block.View, blockProposal.Block.BlockMRH())
 		return
