@@ -145,7 +145,7 @@ func (e *Engine) propose() {
 // createProposal creates a new proposal
 func (e *Engine) createProposal() error {
 	if e.pool.Size() == 0 {
-		return fmt.Errorf("transaction pool empty")
+		return ErrEmptyTxpool
 	}
 
 	transactions := e.pool.All()
@@ -162,7 +162,7 @@ func (e *Engine) createProposal() error {
 		return fmt.Errorf("could not save proposed collection guarantee: %w", err)
 	}
 
-	err = e.provider.ProcessLocal(messages.SubmitCollectionGuarantee{Guarantee: guarantee})
+	err = e.provider.ProcessLocal(&messages.SubmitCollectionGuarantee{Guarantee: guarantee})
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}
