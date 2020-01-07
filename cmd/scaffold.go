@@ -14,12 +14,14 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
+	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/trickle"
 	"github.com/dapperlabs/flow-go/network/trickle/middleware"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 )
 
+// BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
 	NodeID      string
 	Entries     []string
@@ -27,10 +29,7 @@ type BaseConfig struct {
 	Connections uint
 	datadir     string
 	level       string
-}
-
-type MaksioConfig struct {
-	BaseConfig
+	metricsPort uint
 }
 
 type namedReadyFn struct {
@@ -43,6 +42,7 @@ type namedDoneObject struct {
 	name string
 }
 
+// FlowNodeBuilder is the builder struct used for all flow nodes
 type FlowNodeBuilder struct {
 	BaseConfig   BaseConfig
 	flags        *pflag.FlagSet
@@ -65,6 +65,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.UintVarP(&fnb.BaseConfig.Connections, "connections", "c", 0, "number of connections to establish to peers")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", "data", "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
+	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -81,6 +82,14 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		fnb.MustNot(err).Msg("could not initialize trickle network")
 		fnb.Network = net
 		return net
+	})
+}
+
+func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
+	fnb.Component("metrics server", func(builder *FlowNodeBuilder) module.ReadyDoneAware {
+		fnb.Logger.Info().Msg("initializing metrics server")
+		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort)
+		return server
 	})
 }
 
@@ -239,6 +248,8 @@ func FlowNode(name string) *FlowNodeBuilder {
 	builder.baseFlags()
 
 	builder.enqueueNetworkInit()
+
+	builder.enqueueMetricsServerInit()
 
 	return builder
 }
