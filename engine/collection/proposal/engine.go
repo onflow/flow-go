@@ -19,7 +19,7 @@ import (
 
 type Config struct {
 	// ProposalPeriod the interval at which the engine will propose a collection.
-	ProposalPerid time.Duration
+	ProposalPeriod time.Duration
 }
 
 // Engine is the collection proposal engine, which packages pending
@@ -124,7 +124,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 func (e *Engine) propose() {
 
-	ticker := time.NewTicker(e.conf.ProposalPerid)
+	ticker := time.NewTicker(e.conf.ProposalPeriod)
 
 	for {
 		select {

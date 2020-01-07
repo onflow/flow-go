@@ -46,7 +46,7 @@ func WithEngine(t *testing.T, run func(testcontext, *Engine)) {
 	ctx.net = stub.NewNetwork(ctx.state, ctx.me, hub)
 
 	conf := Config{
-		ProposalPerid: time.Millisecond,
+		ProposalPeriod: time.Millisecond,
 	}
 
 	ctx.provider = new(mocknetwork.Engine)
