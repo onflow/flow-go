@@ -451,7 +451,6 @@ func TestCheckFieldInitializationWithPotentialNeverCallInElse(t *testing.T) {
 						stdlib.PanicFunction,
 					}.ToValueDeclarations(),
 				),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
 	)
@@ -480,7 +479,6 @@ func TestCheckFieldInitializationWithPotentialNeverCallInNilCoalescing(t *testin
 						stdlib.PanicFunction,
 					}.ToValueDeclarations(),
 				),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
 	)
