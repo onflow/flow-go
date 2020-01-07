@@ -138,7 +138,7 @@ func (m *Middleware) connect() {
 	// get an identity to connect to
 	flowIdentity, err := m.ov.Identity()
 	if err != nil {
-		log.Error().Err(err).Msg("could not get address")
+		log.Error().Err(err).Msg("could not get flow ID")
 		return
 	}
 

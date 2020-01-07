@@ -3,10 +3,9 @@
 package middleware
 
 import (
-	"sync"
-
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"sync"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
@@ -113,13 +112,14 @@ RecvLoop:
 		// if we have a message on the connection, receive it
 		msg, err := c.Receive()
 		if isClosedErr(err) {
-			c.log.Debug().Msg("connection closed, stopping reads")
-			c.stop()
+			//fmt.Println(err)
+			//c.log.Debug().Msg("connection closed, stopping reads")
+			//c.stop()
 			continue
 		}
 		if err != nil {
-			c.log.Error().Err(err).Msg("could not read data, stopping reads")
-			c.stop()
+			//c.log.Error().Err(err).Msg("could not read data, stopping reads")
+			//c.stop()
 			continue
 		}
 
