@@ -829,11 +829,13 @@ func (checker *Checker) checkTypeRequirement(
 			}
 		}
 		if !found {
-			checker.report(&MissingConformanceError{
-				CompositeType: declaredCompositeType,
-				InterfaceType: requiredConformance,
-				Range:         ast.NewRangeFromPositioned(compositeDeclaration.Identifier),
-			})
+			checker.report(
+				&MissingConformanceError{
+					CompositeType: declaredCompositeType,
+					InterfaceType: requiredConformance,
+					Range:         ast.NewRangeFromPositioned(compositeDeclaration.Identifier),
+				},
+			)
 		}
 	}
 
