@@ -112,7 +112,7 @@ type ContractValueHandlerFunc func(
 	constructor FunctionValue,
 ) *CompositeValue
 
-// ImportProgramHandlerFunc us a function that handles imports of programs.
+// ImportProgramHandlerFunc is a function that handles imports of programs.
 //
 type ImportProgramHandlerFunc func(
 	inter *Interpreter,
