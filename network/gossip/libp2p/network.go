@@ -147,9 +147,52 @@ func (n *Network) Cleanup(nodeID flow.Identifier) error {
 	return nil
 }
 
-func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
+func (n *Network) Receive(nodeID flow.Identifier, payload interface{}) error {
+
+	// TODO do type assettion
+
+
+	var err error
+	// Convert message payload to a known message type
+	msg, err := n.codec.Decode(payload.([]byte))
+	if err != nil {
+		return errors.Wrap(err, "could not decode event")
+	}
+
+	switch m := msg.(type) {
+	case *networkmodel.NetworkMessage:
+		n.processNetworkMessage(nodeID, m)
+	default:
+		err = errors.Errorf("invalid message type (%T)", m)
+	}
+	if err != nil {
+		return errors.Wrap(err, "could not process message")
+	}
+	return nil
+
 	return errors.New("method not implemented")
 }
+
+func (n *Network) processNetworkMessage(nodeID flow.Identifier, message *networkmodel.NetworkMessage) error {
+
+	// Extract engine id and find the registered engine
+	en, found := n.engines[uint8(message.EngineID)]
+	if !found {
+		n.logger.Debug().Str("sender", nodeID.String()).
+			Uint8("engine", uint8(message.EngineID)).
+			Msg(" dropping message since no engine to receive it was found")
+		return fmt.Errorf("could not find the engine: %d", message.EngineID)
+	}
+	// call the engine with the message payload
+	err := en.Process(message.OriginID, message.Payload)
+	if err != nil {
+		n.logger.Error().
+			Uint8("engineid", uint8(message.EngineID)).Str("sender", nodeID.String()).Err(err)
+		return err
+	}
+	return nil
+}
+
 
 func (n *Network) Handshake(conn Connection) (flow.Identifier, error) {
 	return flow.Identifier{}, errors.New("method not implemented")

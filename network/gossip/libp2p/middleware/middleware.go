@@ -4,6 +4,7 @@ package middleware
 
 import (
 	"context"
+	"github.com/golang/protobuf/proto"
 	"net"
 	"sync"
 	"time"
@@ -95,14 +96,48 @@ func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 	default:
 	}
 
+	pmsg, err := m.createOutboundMessage(nodeID, msg)
+	if err != nil {
+		return err
+	}
+
 	// whichever comes first, sending the message or ending the provided context
 	select {
 	case <-conn.done:
 		return errors.Errorf("connection has closed (node_id: %s)", nodeID)
-	case conn.outbound <- msg:
+	case conn.outbound <- pmsg:
 		return nil
 	}
 }
+
+func (m *Middleware) createOutboundMessage(nodeID flow.Identifier, msg interface{}) ([]byte, error) {
+
+	// Compose the message payload
+	message := &libp2p.Message{
+		SenderID: nodeID[:],
+		Event:    msg.([]byte),
+	}
+	// Get the ProtoBuf representation of the message
+	pmsg, err := proto.Marshal(message)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not marshal message: %v", message)
+	}
+
+	return pmsg, err
+}
+
+func (m *Middleware) createInboundMessage(msg interface{}) (interface{}, error) {
+
+	// Unmarshal the buff to a message
+	message := &libp2p.Message{}
+	b := msg.([]byte)
+	err := proto.Unmarshal(b, message)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not unmarshal message: %v", string(b))
+	}
+	return message.Event, nil
+}
+
 
 func (m *Middleware) rotate() {
 	defer m.wg.Done()
@@ -231,9 +266,14 @@ ProcessLoop:
 		case <-conn.done:
 			break ProcessLoop
 		case msg := <-conn.inbound:
-			err = m.ov.Receive(nodeID, msg)
+			payload, err := m.createInboundMessage(msg)
 			if err != nil {
-				log.Error().Err(err).Msg("could not receive message")
+				log.Error().Err(err).Msg("could not extract payload ")
+				continue ProcessLoop
+			}
+			err = m.ov.Receive(nodeID, payload)
+			if err != nil {
+				log.Error().Err(err).Msg("could not deliver payload")
 				continue ProcessLoop
 			}
 		}

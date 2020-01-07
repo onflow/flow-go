@@ -285,7 +285,6 @@ func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Id
 		message := &Message{
 			SenderID: senderID[:],
 			Event:    event.([]byte),
-			EngineID: uint32(engineID),
 		}
 		// Get the ProtoBuf representation of the message
 		b, err := proto.Marshal(message)
