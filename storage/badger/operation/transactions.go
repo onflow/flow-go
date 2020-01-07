@@ -8,8 +8,13 @@ import (
 )
 
 // InsertTransaction inserts a transaction keyed by transaction fingerprint.
-func InsertTransaction(fingerprint flow.Fingerprint, tx *flow.Transaction) func(*badger.Txn) error {
-	return insert(makePrefix(codeTransaction, fingerprint), tx)
+func InsertTransaction(tx *flow.Transaction) func(*badger.Txn) error {
+	return insert(makePrefix(codeTransaction, tx.Fingerprint()), tx)
+}
+
+// PersistTransaction persists a transaction keyed by transaction fingerprint.
+func PersistTransaction(tx *flow.Transaction) func(*badger.Txn) error {
+	return persist(makePrefix(codeTransaction, tx.Fingerprint()), tx)
 }
 
 // RetrieveTransaction retrieves a transaction by fingerprint.

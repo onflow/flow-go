@@ -30,8 +30,7 @@ func main() {
 
 			blockExec := executor.NewBlockExecutor(vm, execState)
 
-			// TODO: replace mocks with real implementation
-			transactions := &storage.Transactions{}
+			// TODO: replace mock with real implementation
 			collections := &storage.Collections{}
 
 			engine, err := execution.New(
@@ -39,7 +38,6 @@ func main() {
 				node.Network,
 				node.Me,
 				collections,
-				transactions,
 				blockExec,
 			)
 			node.MustNot(err).Msg("could not initialize execution engine")

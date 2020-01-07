@@ -23,15 +23,13 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	bc := vm.NewBlockContext(&b)
 
 	t.Run("transaction success", func(t *testing.T) {
-		tx := &flow.Transaction{
-			TransactionBody: flow.TransactionBody{
-				ScriptAccounts: []flow.Address{unittest.AddressFixture()},
-				Script: []byte(`
+		tx := flow.TransactionBody{
+			ScriptAccounts: []flow.Address{unittest.AddressFixture()},
+			Script: []byte(`
                 transaction {
                   prepare(signer: Account) {}
                 }
             `),
-			},
 		}
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
@@ -42,9 +40,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	})
 
 	t.Run("transaction failure", func(t *testing.T) {
-		tx := &flow.Transaction{
-			TransactionBody: flow.TransactionBody{
-				Script: []byte(`
+		tx := flow.TransactionBody{
+			Script: []byte(`
                 transaction {
                   var x: Int
 
@@ -61,7 +58,6 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                   }
                 }
             `),
-			},
 		}
 
 		result, err := bc.ExecuteTransaction(ledger, tx)

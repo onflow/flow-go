@@ -34,20 +34,23 @@ endif
 	GO111MODULE=on go get zombiezen.com/go/capnproto2@v0.0.0-20190505172156-0c36f8f86ab2; \
 	GO111MODULE=on go get github.com/mgechev/revive@master; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v0.0.0-20181123154057-e78b021dcbb5; \
+	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
 	GO111MODULE=on go get github.com/kevinburke/go-bindata/...@v3.11.0;
 
 .PHONY: test
-test:
+test: generate-mocks
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
+	$(MAKE) -C crypto test
+	$(MAKE) -C language test
 
 .PHONY: coverage
 coverage:
 ifeq ($(COVER), true)
+	# Cover summary has to produce cover.json
+	COVER_PROFILE=$(COVER_PROFILE) ./cover-summary.sh
 	# file has to be called index.html
-	gocov convert $(COVER_PROFILE) > cover.json
-	./cover-summary.sh
 	gocov-html cover.json > index.html
 	# coverage.zip will automatically be picked up by teamcity
 	zip coverage.zip index.html
@@ -66,6 +69,9 @@ generate-capnp:
 
 .PHONY: generate-mocks
 generate-mocks:
+	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/dapperlabs/flow-go/storage Blocks,Collections
+	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/dapperlabs/flow-go/module Network,Local
+	GO111MODULE=on mockgen -destination=network/mocks/conduit.go -package=mocks github.com/dapperlabs/flow-go/network Conduit
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
@@ -74,6 +80,7 @@ generate-mocks:
 	mockery -name '.*' -dir=engine/execution/execution/executor -case=underscore -output="./engine/execution/execution/executor/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/state -case=underscore -output="./engine/execution/execution/state/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/virtualmachine -case=underscore -output="./engine/execution/execution/virtualmachine/mock" -outpkg="mock"
+	mockery -name 'Processor' -dir="./engine/consensus/eventdriven/components/pacemaker/events" -case=underscore -output="./engine/consensus/eventdriven/components/pacemaker/mock" -outpkg="mock"
 
 .PHONY: lint
 lint:

@@ -12,11 +12,11 @@ type BlockContext struct {
 }
 
 // ExecuteTransaction provides a mock function with given fields: ledger, tx
-func (_m *BlockContext) ExecuteTransaction(ledger virtualmachine.Ledger, tx *flow.Transaction) (*virtualmachine.TransactionResult, error) {
+func (_m *BlockContext) ExecuteTransaction(ledger virtualmachine.Ledger, tx flow.TransactionBody) (*virtualmachine.TransactionResult, error) {
 	ret := _m.Called(ledger, tx)
 
 	var r0 *virtualmachine.TransactionResult
-	if rf, ok := ret.Get(0).(func(virtualmachine.Ledger, *flow.Transaction) *virtualmachine.TransactionResult); ok {
+	if rf, ok := ret.Get(0).(func(virtualmachine.Ledger, flow.TransactionBody) *virtualmachine.TransactionResult); ok {
 		r0 = rf(ledger, tx)
 	} else {
 		if ret.Get(0) != nil {
@@ -25,7 +25,7 @@ func (_m *BlockContext) ExecuteTransaction(ledger virtualmachine.Ledger, tx *flo
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(virtualmachine.Ledger, *flow.Transaction) error); ok {
+	if rf, ok := ret.Get(1).(func(virtualmachine.Ledger, flow.TransactionBody) error); ok {
 		r1 = rf(ledger, tx)
 	} else {
 		r1 = ret.Error(1)
