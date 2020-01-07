@@ -69,8 +69,6 @@ type SemanticError interface {
 
 // RedeclarationError
 
-// TODO: show previous declaration
-
 type RedeclarationError struct {
 	Kind        common.DeclarationKind
 	Name        string
@@ -91,6 +89,35 @@ func (e *RedeclarationError) StartPosition() ast.Position {
 func (e *RedeclarationError) EndPosition() ast.Position {
 	length := len(e.Name)
 	return e.Pos.Shifted(length - 1)
+}
+
+func (e *RedeclarationError) ErrorNotes() []errors.ErrorNote {
+	if e.PreviousPos == nil {
+		return nil
+	}
+
+	previousStartPos := *e.PreviousPos
+	length := len(e.Name)
+	previousEndPos := previousStartPos.Shifted(length - 1)
+
+	return []errors.ErrorNote{
+		RedeclarationNote{
+			Range: ast.Range{
+				StartPos: previousStartPos,
+				EndPos:   previousEndPos,
+			},
+		},
+	}
+}
+
+// RedeclarationNote
+
+type RedeclarationNote struct {
+	ast.Range
+}
+
+func (n RedeclarationNote) Message() string {
+	return "previously declared here"
 }
 
 // NotDeclaredError
