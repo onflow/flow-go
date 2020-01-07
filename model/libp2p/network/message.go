@@ -1,4 +1,4 @@
-package libp2p
+package network
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
