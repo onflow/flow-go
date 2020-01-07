@@ -7,7 +7,7 @@ import (
 )
 
 type VoteAggregator struct {
-	lock         sync.RWMutex
+	sync.RWMutex
 	pendingVotes map[types.MRH][]*types.Vote
 	createdQC    map[types.MRH]*types.QuorumCertificate
 	viewState    ViewState

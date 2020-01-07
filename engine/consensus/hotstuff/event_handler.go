@@ -8,7 +8,7 @@ type EventHandler struct {
 	voter                 *Voter
 	missingBlockRequester *MissingBlockRequester
 	forkChoice            *ForkChoice
-	unincorperatedBlocks  *UnincorperatedBlocks
+	unincorporatedBlocks  *UnincorporatedBlocks
 	validator             *Validator
 	blockProposalProducer BlockProposalProducer
 	viewState             ViewState
@@ -86,7 +86,7 @@ func (eh *EventHandler) processIncorperatedBlock(block *types.BlockProposal) {
 
 func (eh *EventHandler) onBlockFinalized(finalizedBlock *types.BlockProposal) {
 	go eh.voteAggregator.PruneByView(finalizedBlock.Block.View)
-	go eh.unincorperatedBlocks.PruneByView(finalizedBlock.Block.View)
+	go eh.unincorporatedBlocks.PruneByView(finalizedBlock.Block.View)
 }
 
 func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposal) {
@@ -96,7 +96,7 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 
 	if eh.forkChoice.CanIncorperate(blockProposal) == false {
 		// the proposal is not incorperated (meaning, its QC doesn't exist in the block tree)
-		eh.unincorperatedBlocks.Store(blockProposal)
+		eh.unincorporatedBlocks.Store(blockProposal)
 		eh.missingBlockRequester.FetchMissingBlock(blockProposal.Block.View, blockProposal.Block.BlockMRH())
 		return
 	}
@@ -134,7 +134,7 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 	}
 
 	// To handle: 10, 12, 11
-	pendingProposal := eh.incorperatedBlocks.ExtractByView(eh.paceMaker.CurView())
+	pendingProposal := eh.unincorporatedBlocks.ExtractByView(eh.paceMaker.CurView())
 	if pendingProposal != nil {
 		eh.OnReceiveBlockProposal(pendingProposal)
 	}
