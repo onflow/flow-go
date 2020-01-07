@@ -13,7 +13,7 @@ func NewProvider() Provider {
 
 type provider struct{}
 
-func (p *provider) NewTransactionContext(tx *flow.Transaction, ledger *ledger.View) TransactionContext {
+func (p *provider) NewTransactionContext(tx flow.TransactionBody, ledger *ledger.View) TransactionContext {
 	signingAccounts := make([]runtime.Address, len(tx.ScriptAccounts))
 	for i, addr := range tx.ScriptAccounts {
 		signingAccounts[i] = runtime.Address(addr)

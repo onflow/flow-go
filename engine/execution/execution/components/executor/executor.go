@@ -10,11 +10,7 @@ import (
 
 // An Executor executes the transactions in a block.
 type Executor interface {
-	ExecuteBlock(
-		block *flow.Block,
-		collections []*flow.Collection,
-		transactions []*flow.Transaction,
-	) ([]*flow.Chunk, error)
+	ExecuteBlock(block ExecutableBlock) ([]flow.Chunk, error)
 }
 
 type executor struct {
@@ -30,13 +26,11 @@ func New(computer computer.Computer) Executor {
 
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *executor) ExecuteBlock(
-	block *flow.Block,
-	collections []*flow.Collection,
-	transactions []*flow.Transaction,
-) ([]*flow.Chunk, error) {
+	block ExecutableBlock,
+) ([]flow.Chunk, error) {
 	// TODO: validate block, collections and transactions
 
-	chunks, err := e.executeTransactions(transactions)
+	chunks, err := e.executeTransactions(block.Transactions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -44,7 +38,7 @@ func (e *executor) ExecuteBlock(
 	return chunks, nil
 }
 
-func (e *executor) executeTransactions(txs []*flow.Transaction) ([]*flow.Chunk, error) {
+func (e *executor) executeTransactions(txs []flow.TransactionBody) ([]flow.Chunk, error) {
 	cache := ledger.NewExecutionCache()
 
 	// TODO: implement real chunking
@@ -66,7 +60,9 @@ func (e *executor) executeTransactions(txs []*flow.Transaction) ([]*flow.Chunk, 
 
 	// TODO: commit chunk to storage - https://github.com/dapperlabs/flow-go/issues/1915
 
-	chunk := &flow.Chunk{
+	// TODO: implement real chunking
+	// MVP uses single chunk per block
+	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			FirstTxIndex: 0,
 			TxCounts:     uint32(len(txs)),
@@ -86,5 +82,5 @@ func (e *executor) executeTransactions(txs []*flow.Transaction) ([]*flow.Chunk, 
 		EndState: nil,
 	}
 
-	return []*flow.Chunk{chunk}, nil
+	return []flow.Chunk{chunk}, nil
 }

@@ -21,7 +21,7 @@ type TransactionResult struct {
 // A Computer uses the Cadence runtime to compute transaction results.
 type Computer interface {
 	// ExecuteTransaction computes the result of a transaction.
-	ExecuteTransaction(ledger *ledger.View, tx *flow.Transaction) (*TransactionResult, error)
+	ExecuteTransaction(ledger *ledger.View, tx flow.TransactionBody) (*TransactionResult, error)
 }
 
 type computer struct {
@@ -42,17 +42,17 @@ func New(runtime runtime.Runtime, contextProvider context.Provider) Computer {
 // Register updates are recorded in the provided ledger view. An error is returned
 // if an unexpected error occurs during execution. If the transaction reverts due to
 // a normal runtime error, the error is recorded in the transaction result.
-func (c *computer) ExecuteTransaction(ledger *ledger.View, tx *flow.Transaction) (*TransactionResult, error) {
+func (c *computer) ExecuteTransaction(ledger *ledger.View, tx flow.TransactionBody) (*TransactionResult, error) {
 	ctx := c.contextProvider.NewTransactionContext(tx, ledger)
 
-	location := runtime.TransactionLocation(tx.Hash())
+	location := runtime.TransactionLocation(tx.Fingerprint())
 
 	err := c.runtime.ExecuteTransaction(tx.Script, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts
 			return &TransactionResult{
-				TxHash: tx.Hash(),
+				TxHash: crypto.Hash(tx.Fingerprint()),
 				Error:  err,
 			}, nil
 		}
@@ -62,7 +62,7 @@ func (c *computer) ExecuteTransaction(ledger *ledger.View, tx *flow.Transaction)
 	}
 
 	return &TransactionResult{
-		TxHash: tx.Hash(),
+		TxHash: crypto.Hash(tx.Fingerprint()),
 		Error:  nil,
 	}, nil
 }
