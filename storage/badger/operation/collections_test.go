@@ -15,32 +15,30 @@ import (
 
 func TestCollections(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := flow.Collection{
-			Transactions: []flow.Fingerprint{[]byte{1}, []byte{2}},
-		}
+		expected := unittest.CollectionFixture(2).Light()
 
 		t.Run("Retrieve nonexistant", func(t *testing.T) {
-			var actual flow.Collection
+			var actual flow.LightCollection
 			err := db.View(RetrieveCollection(expected.Fingerprint(), &actual))
 			assert.Error(t, err)
 		})
 
 		t.Run("Save", func(t *testing.T) {
-			err := db.Update(InsertCollection(&expected))
+			err := db.Update(InsertCollection(expected))
 			require.NoError(t, err)
 
-			var actual flow.Collection
+			var actual flow.LightCollection
 			err = db.View(RetrieveCollection(expected.Fingerprint(), &actual))
 			assert.NoError(t, err)
 
-			assert.Equal(t, expected, actual)
+			assert.Equal(t, expected, &actual)
 		})
 
 		t.Run("Remove", func(t *testing.T) {
 			err := db.Update(RemoveCollection(expected.Fingerprint()))
 			require.NoError(t, err)
 
-			var actual flow.Collection
+			var actual flow.LightCollection
 			err = db.View(RetrieveCollection(expected.Fingerprint(), &actual))
 			assert.Error(t, err)
 		})
