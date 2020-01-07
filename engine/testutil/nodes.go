@@ -25,18 +25,12 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) *mock.CollectionNode {
+func GenericNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) mock.GenericNode {
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
-
-	me, err := local.New(identity)
-	require.NoError(t, err)
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.NoError(t, err)
-
-	store := storage.NewCollections(db)
 
 	state, err := protocol.NewState(db)
 	require.NoError(t, err)
@@ -44,26 +38,46 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis
 	err = state.Mutate().Bootstrap(genesis)
 	require.NoError(t, err)
 
+	me, err := local.New(identity)
+	require.NoError(t, err)
+
 	stub := stub.NewNetwork(state, me, hub)
+
+	return mock.GenericNode{
+		Log:   log,
+		DB:    db,
+		State: state,
+		Me:    me,
+		Net:   stub,
+	}
+}
+
+// CollectionNode returns a mock collection node.
+func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) mock.CollectionNode {
+
+	node := GenericNode(t, hub, identity, genesis)
+
 	pool, err := mempool.NewTransactionPool()
 	require.NoError(t, err)
 
-	ingestionEngine, err := collectioningest.New(log, stub, state, me, pool)
+	collections := storage.NewCollections(node.DB)
+
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Me, pool)
 	require.Nil(t, err)
 
-	providerEngine, err := provider.New(log, stub, state, me, store)
+	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Me, collections)
 
-	return &mock.CollectionNode{
-		State:           state,
-		Me:              me,
+	return mock.CollectionNode{
+		GenericNode:     node,
 		Pool:            pool,
+		Collections:     collections,
 		IngestionEngine: ingestionEngine,
 		ProviderEngine:  providerEngine,
 	}
 }
 
 // CollectionNodes returns n collection nodes connected to the given hub.
-func CollectionNodes(t *testing.T, hub *stub.Hub, n int) []*mock.CollectionNode {
+func CollectionNodes(t *testing.T, hub *stub.Hub, n int) []mock.CollectionNode {
 	identities := unittest.IdentityListFixture(n, func(node *flow.Identity) {
 		node.Role = flow.RoleCollection
 	})
@@ -73,7 +87,7 @@ func CollectionNodes(t *testing.T, hub *stub.Hub, n int) []*mock.CollectionNode 
 
 	genesis := mock.Genesis(identities)
 
-	nodes := make([]*mock.CollectionNode, n)
+	nodes := make([]mock.CollectionNode, n)
 	for i := 0; i < n; i++ {
 		nodes[i] = CollectionNode(t, hub, identities[i], genesis)
 	}
@@ -81,42 +95,28 @@ func CollectionNodes(t *testing.T, hub *stub.Hub, n int) []*mock.CollectionNode 
 	return nodes
 }
 
-func ConsensusNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) *mock.ConsensusNode {
-	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
+func ConsensusNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) mock.ConsensusNode {
 
-	me, err := local.New(identity)
-	require.NoError(t, err)
+	node := GenericNode(t, hub, identity, genesis)
 
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
-	require.NoError(t, err)
-
-	state, err := protocol.NewState(db)
-	require.NoError(t, err)
-
-	err = state.Mutate().Bootstrap(genesis)
-	require.NoError(t, err)
-
-	stub := stub.NewNetwork(state, me, hub)
 	pool, err := mempool.NewCollectionPool()
 	require.NoError(t, err)
 
-	propagationEngine, err := propagation.New(log, stub, state, me, pool)
+	propagationEngine, err := propagation.New(node.Log, node.Net, node.State, node.Me, pool)
 	require.NoError(t, err)
 
-	ingestionEngine, err := consensusingest.New(log, stub, propagationEngine, state, me)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Net, propagationEngine, node.State, node.Me)
 	require.Nil(t, err)
 
-	return &mock.ConsensusNode{
-		State:             state,
-		Me:                me,
+	return mock.ConsensusNode{
+		GenericNode:       node,
 		Pool:              pool,
 		PropagationEngine: propagationEngine,
 		IngestionEngine:   ingestionEngine,
 	}
 }
 
-func ConsensusNodes(t *testing.T, hub *stub.Hub, n int) []*mock.ConsensusNode {
+func ConsensusNodes(t *testing.T, hub *stub.Hub, n int) []mock.ConsensusNode {
 	identities := unittest.IdentityListFixture(n, func(node *flow.Identity) {
 		node.Role = flow.RoleConsensus
 	})
@@ -126,7 +126,7 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, n int) []*mock.ConsensusNode {
 
 	genesis := mock.Genesis(identities)
 
-	nodes := make([]*mock.ConsensusNode, n)
+	nodes := make([]mock.ConsensusNode, n)
 	for i := 0; i < n; i++ {
 		nodes[i] = ConsensusNode(t, hub, identities[i], genesis)
 	}
