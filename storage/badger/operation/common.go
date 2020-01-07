@@ -9,6 +9,8 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // insert will encode the given entity using JSON and will insert the resulting
@@ -20,8 +22,9 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		// check if the key already exists in the db
 		_, err := tx.Get(key)
 		if err == nil {
-			return fmt.Errorf("key already exists (%x)", key)
+			return storage.KeyAlreadyExistsErr
 		}
+
 		if !errors.Is(err, badger.ErrKeyNotFound) {
 			return fmt.Errorf("could not check key: %w", err)
 		}
@@ -32,7 +35,50 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 			return fmt.Errorf("could not encode entity: %w", err)
 		}
 
-		// insert the entity data into the DB
+		// persist the entity data into the DB
+		err = tx.Set(key, val)
+		if err != nil {
+			return fmt.Errorf("could not store data: %w", err)
+		}
+
+		return nil
+	}
+}
+
+// persist will encode the given entity using JSON and will insert the resulting
+// binary data in the badger DB under the provided key. It will error if the
+// key already exists and data under the key is different than the one to be saved
+func persist(key []byte, entity interface{}) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+
+		// check if the key already exists in the db
+		item, err := tx.Get(key)
+
+		// error other than key not found
+		if err != nil && err != badger.ErrKeyNotFound {
+			return fmt.Errorf("could not check key: %w", err)
+		}
+
+		val, errEnc := json.Marshal(entity)
+		if errEnc != nil {
+			return fmt.Errorf("could not encode entity: %w", errEnc)
+		}
+
+		// value in a database
+		if err == nil {
+			err := item.Value(func(existingVal []byte) error {
+				if bytes.Equal(val, existingVal) {
+					return nil
+				} else {
+					return storage.DifferentDataErr
+				}
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		// persist the entity data into the DB
 		err = tx.Set(key, val)
 		if err != nil {
 			return fmt.Errorf("could not store data: %w", err)
@@ -51,8 +97,9 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 		// retrieve the item from the key-value store
 		_, err := tx.Get(key)
 		if err == badger.ErrKeyNotFound {
-			return fmt.Errorf("could not find key %x): %w", key, err)
+			return storage.NotFoundErr
 		}
+
 		if err != nil {
 			return fmt.Errorf("could not check key: %w", err)
 		}
@@ -63,7 +110,7 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 			return fmt.Errorf("could not encode entity: %w", err)
 		}
 
-		// insert the entity data into the DB
+		// persist the entity data into the DB
 		err = tx.Set(key, val)
 		if err != nil {
 			return fmt.Errorf("could not replace data: %w", err)
@@ -100,6 +147,9 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 		// retrieve the item from the key-value store
 		item, err := tx.Get(key)
 		if err != nil {
+			if err == badger.ErrKeyNotFound {
+				return storage.NotFoundErr
+			}
 			return fmt.Errorf("could not load data: %w", err)
 		}
 

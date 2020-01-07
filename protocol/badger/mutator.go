@@ -11,6 +11,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -121,7 +122,7 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 		// each header, we reconstruct the block and then apply the related
 		// changes to the protocol state
 		var identities flow.IdentityList
-		var collections []*flow.GuaranteedCollection
+		var guarantees []*flow.CollectionGuarantee
 		for i := len(steps) - 1; i >= 0; i-- {
 
 			// get the identities
@@ -131,17 +132,17 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 				return fmt.Errorf("could not retrieve identities (%x): %w", s.hash, err)
 			}
 
-			// get the guaranteed collections
-			err = operation.RetrieveCollections(s.hash, &collections)(tx)
+			// get the collection guarantees
+			err = operation.RetrieveCollectionGuarantees(s.hash, &guarantees)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve collections (%x): %w", s.hash, err)
+				return fmt.Errorf("could not retrieve guarantees (%x): %w", s.hash, err)
 			}
 
 			// reconstruct block
 			block := flow.Block{
-				Header:                header,
-				NewIdentities:         identities,
-				GuaranteedCollections: collections,
+				Header:               header,
+				NewIdentities:        identities,
+				CollectionGuarantees: guarantees,
 			}
 
 			// insert the deltas
@@ -180,9 +181,10 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		// check for role
 		var role flow.Role
 		err := operation.RetrieveRole(id.NodeID, &role)(tx)
-		if errors.Is(err, badger.ErrKeyNotFound) {
+		if err == storage.NotFoundErr {
 			continue
 		}
+
 		if err == nil {
 			return fmt.Errorf("identity role already exists (%x: %s)", id.NodeID, role)
 		}
@@ -195,9 +197,10 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		// check for address
 		var address string
 		err := operation.RetrieveAddress(id.NodeID, &address)(tx)
-		if errors.Is(err, badger.ErrKeyNotFound) {
+		if err == storage.NotFoundErr {
 			continue
 		}
+
 		if err == nil {
 			return fmt.Errorf("identity address already exists (%x: %s)", id.NodeID, address)
 		}
@@ -274,7 +277,7 @@ func initializeFinalizedBoundary(tx *badger.Txn, genesis *flow.Block) error {
 	}
 
 	// genesis should have no collections
-	if len(genesis.GuaranteedCollections) > 0 {
+	if len(genesis.CollectionGuarantees) > 0 {
 		return errors.New("genesis should not contain collections")
 	}
 
@@ -305,8 +308,8 @@ func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 		return fmt.Errorf("could not insert identities: %w", err)
 	}
 
-	// insert the guaranteed collections into the DB
-	err = operation.InsertCollections(block.Hash(), block.GuaranteedCollections)(tx)
+	// insert the collection guarantees into the DB
+	err = operation.InsertCollectionGuarantees(block.Hash(), block.CollectionGuarantees)(tx)
 	if err != nil {
 		return fmt.Errorf("could not insert collections: %w", err)
 	}

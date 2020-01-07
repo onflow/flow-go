@@ -13,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 type Interface interface {
@@ -24,21 +23,21 @@ type Interface interface {
 	// SetValue sets a value for the given key in the storage, controlled and owned by the given accounts.
 	SetValue(owner, controller, key, value []byte) (err error)
 	// CreateAccount creates a new account with the given public keys and code.
-	CreateAccount(publicKeys []values.Bytes) (address values.Address, err error)
+	CreateAccount(publicKeys [][]byte) (address Address, err error)
 	// AddAccountKey appends a key to an account.
-	AddAccountKey(address values.Address, publicKey values.Bytes) error
+	AddAccountKey(address Address, publicKey []byte) error
 	// RemoveAccountKey removes a key from an account by index.
-	RemoveAccountKey(address values.Address, index values.Int) (publicKey values.Bytes, err error)
+	RemoveAccountKey(address Address, index int) (publicKey []byte, err error)
 	// CheckCode checks the validity of the code.
-	CheckCode(address values.Address, code values.Bytes) (err error)
+	CheckCode(address Address, code []byte) (err error)
 	// UpdateAccountCode updates the code associated with an account.
-	UpdateAccountCode(address values.Address, code values.Bytes, checkPermission bool) (err error)
+	UpdateAccountCode(address Address, code []byte, checkPermission bool) (err error)
 	// GetSigningAccounts returns the signing accounts.
-	GetSigningAccounts() []values.Address
+	GetSigningAccounts() []Address
 	// Log logs a string.
 	Log(string)
 	// EmitEvent is called when an event is emitted by the runtime.
-	EmitEvent(values.Event)
+	EmitEvent(Event)
 }
 
 // Runtime is a runtime capable of executing the Flow programming language.
@@ -47,7 +46,7 @@ type Runtime interface {
 	//
 	// This function returns an error if the program has errors (e.g syntax errors, type errors),
 	// or if the execution fails.
-	ExecuteScript(script []byte, runtimeInterface Interface, location Location) (values.Value, error)
+	ExecuteScript(script []byte, runtimeInterface Interface, location Location) (Value, error)
 
 	// ExecuteTransaction executes the given transaction.
 	//
@@ -75,7 +74,7 @@ func NewInterpreterRuntime() Runtime {
 	return &interpreterRuntime{}
 }
 
-func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (values.Value, error) {
+func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Interface, location Location) (Value, error) {
 	runtimeStorage := newInterpreterRuntimeStorage(runtimeInterface)
 
 	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
@@ -112,7 +111,7 @@ func (r *interpreterRuntime) ExecuteScript(script []byte, runtimeInterface Inter
 
 	runtimeStorage.writeCached()
 
-	return value.(interpreter.ExportableValue).Export(), nil
+	return value, nil
 }
 
 func (r *interpreterRuntime) interpret(
@@ -402,21 +401,29 @@ func (r *interpreterRuntime) emitEvent(
 	event interpreter.EventValue,
 ) {
 	functionType := inter.Checker.GlobalValues[event.Identifier].Type.(*sema.SpecialFunctionType)
-	eventType := functionType.ReturnTypeAnnotation.Type.(*sema.EventType).Export(nil, nil)
+	eventType := functionType.ReturnTypeAnnotation.Type
 
-	eventValue := event.Export().(values.Event)
-	eventValue = eventValue.WithType(eventType)
+	fields := make([]Value, len(event.Fields))
+	for i, field := range event.Fields {
+		fields[i] = field.Value
+	}
+	eventValue := Event{
+		Type:   eventType,
+		Fields: fields,
+	}
 
 	runtimeInterface.EmitEvent(eventValue)
 }
 
 func (r *interpreterRuntime) emitAccountEvent(
-	eventType sema.EventType,
+	eventType *sema.EventType,
 	runtimeInterface Interface,
-	eventFields []values.Value,
+	eventFields []interpreter.Value,
 ) {
-	t := eventType.Export(nil, nil)
-	eventValue := values.NewEvent(eventFields).WithType(t)
+	eventValue := Event{
+		Type:   eventType,
+		Fields: eventFields,
+	}
 
 	runtimeInterface.EmitEvent(eventValue)
 }
@@ -430,7 +437,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 
 		pkArray := invocation.Arguments[0].(*interpreter.ArrayValue)
 		pkValues := pkArray.Values
-		publicKeys := make([]values.Bytes, len(pkValues))
+		publicKeys := make([][]byte, len(pkValues))
 
 		for i, pkVal := range pkValues {
 			publicKey, err := toBytes(pkVal)
@@ -465,35 +472,34 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 		)
 
 		r.emitAccountEvent(
-			stdlib.AccountCreatedEventType,
+			&stdlib.AccountCreatedEventType,
 			runtimeInterface,
-			[]values.Value{accountAddress},
+			[]Value{accountAddress},
 		)
 
-		result := interpreter.AddressValue(accountAddress)
-		return trampoline.Done{Result: result}
+		return trampoline.Done{Result: accountAddress}
 	}
 }
 
 func (r *interpreterRuntime) newAddAccountKeyFunction(runtimeInterface Interface) interpreter.HostFunction {
 	return func(invocation interpreter.Invocation) trampoline.Trampoline {
 		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
-		publicKey, err := toBytes(invocation.Arguments[1])
+		publicKeyValue := invocation.Arguments[1].(*interpreter.ArrayValue)
+
+		publicKey, err := toBytes(publicKeyValue)
 		if err != nil {
 			panic(fmt.Sprintf("addAccountKey requires the second parameter to be an array"))
 		}
 
-		accountAddressValue := accountAddress.Export().(values.Address)
-
-		err = runtimeInterface.AddAccountKey(accountAddressValue, publicKey)
+		err = runtimeInterface.AddAccountKey(accountAddress, publicKey)
 		if err != nil {
 			panic(err)
 		}
 
 		r.emitAccountEvent(
-			stdlib.AccountKeyAddedEventType,
+			&stdlib.AccountKeyAddedEventType,
 			runtimeInterface,
-			[]values.Value{accountAddressValue, publicKey},
+			[]Value{accountAddress, publicKeyValue},
 		)
 
 		result := interpreter.VoidValue{}
@@ -506,19 +512,17 @@ func (r *interpreterRuntime) newRemoveAccountKeyFunction(runtimeInterface Interf
 		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
 		index := invocation.Arguments[1].(interpreter.IntValue)
 
-		accountAddressValue := accountAddress.Export().(values.Address)
-
-		indexValue := index.Export().(values.Int)
-
-		publicKey, err := runtimeInterface.RemoveAccountKey(accountAddressValue, indexValue)
+		publicKey, err := runtimeInterface.RemoveAccountKey(accountAddress, index.IntValue())
 		if err != nil {
 			panic(err)
 		}
 
+		publicKeyValue := fromBytes(publicKey)
+
 		r.emitAccountEvent(
-			stdlib.AccountKeyAddedEventType,
+			&stdlib.AccountKeyAddedEventType,
 			runtimeInterface,
-			[]values.Value{accountAddressValue, publicKey},
+			[]Value{accountAddress, publicKeyValue},
 		)
 
 		result := interpreter.VoidValue{}
@@ -543,23 +547,23 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(
 		constructorArguments := invocation.Arguments[requiredArgumentCount:]
 		constructorArgumentTypes := invocation.ArgumentTypes[requiredArgumentCount:]
 
-		accountAddressValue := accountAddress.Export().(values.Address)
-
 		r.updateAccountCode(
 			runtimeInterface,
 			runtimeStorage,
 			code,
-			accountAddressValue,
+			accountAddress,
 			constructorArguments,
 			constructorArgumentTypes,
 			true,
 			invocation.Location.Position,
 		)
 
+		codeValue := fromBytes(code)
+
 		r.emitAccountEvent(
-			stdlib.AccountCodeUpdatedEventType,
+			&stdlib.AccountCodeUpdatedEventType,
 			runtimeInterface,
-			[]values.Value{accountAddressValue, values.NewBytes(code)},
+			[]Value{accountAddress, codeValue},
 		)
 
 		result := interpreter.VoidValue{}
@@ -571,7 +575,7 @@ func (r *interpreterRuntime) updateAccountCode(
 	runtimeInterface Interface,
 	runtimeStorage *interpreterRuntimeStorage,
 	code []byte,
-	accountAddress values.Address,
+	accountAddress Address,
 	constructorArguments []interpreter.Value,
 	constructorArgumentTypes []sema.Type,
 	checkPermission bool,
@@ -653,7 +657,7 @@ func (r *interpreterRuntime) updateAccountCode(
 
 func (r *interpreterRuntime) writeContract(
 	runtimeStorage *interpreterRuntimeStorage,
-	accountAddress values.Address,
+	accountAddress Address,
 	contractValue interpreter.OptionalValue,
 ) {
 	addressHex := flow.BytesToAddress(accountAddress[:]).Hex()
@@ -804,10 +808,10 @@ func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpre
 	}
 }
 
-func toBytes(value interpreter.Value) (values.Bytes, error) {
+func toBytes(value interpreter.Value) ([]byte, error) {
 	_, isNil := value.(interpreter.NilValue)
 	if isNil {
-		return values.Bytes{}, nil
+		return nil, nil
 	}
 
 	someValue, ok := value.(*interpreter.SomeValue)
@@ -837,4 +841,15 @@ func toBytes(value interpreter.Value) (values.Bytes, error) {
 	}
 
 	return result, nil
+}
+
+func fromBytes(buf []byte) *interpreter.ArrayValue {
+	values := make([]interpreter.Value, len(buf))
+	for i, b := range buf {
+		values[i] = interpreter.NewIntValue(int64(b))
+	}
+
+	return &interpreter.ArrayValue{
+		Values: values,
+	}
 }

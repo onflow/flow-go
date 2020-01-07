@@ -11,21 +11,20 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/language/runtime/tests/utils"
-	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 type testRuntimeInterface struct {
 	resolveImport      func(Location) ([]byte, error)
 	getValue           func(controller, owner, key []byte) (value []byte, err error)
 	setValue           func(controller, owner, key, value []byte) (err error)
-	createAccount      func(publicKeys []values.Bytes) (address values.Address, err error)
-	addAccountKey      func(address values.Address, publicKey values.Bytes) error
-	removeAccountKey   func(address values.Address, index values.Int) (publicKey values.Bytes, err error)
-	checkCode          func(address values.Address, code values.Bytes) (err error)
-	updateAccountCode  func(address values.Address, code values.Bytes, checkPermission bool) (err error)
-	getSigningAccounts func() []values.Address
+	createAccount      func(publicKeys [][]byte) (address Address, err error)
+	addAccountKey      func(address Address, publicKey []byte) error
+	removeAccountKey   func(address Address, index int) (publicKey []byte, err error)
+	checkCode          func(address Address, code []byte) (err error)
+	updateAccountCode  func(address Address, code []byte, checkPermission bool) (err error)
+	getSigningAccounts func() []Address
 	log                func(string)
-	emitEvent          func(values.Event)
+	emitEvent          func(Event)
 }
 
 func (i *testRuntimeInterface) ResolveImport(location Location) ([]byte, error) {
@@ -40,27 +39,27 @@ func (i *testRuntimeInterface) SetValue(controller, owner, key, value []byte) (e
 	return i.setValue(controller, owner, key, value)
 }
 
-func (i *testRuntimeInterface) CreateAccount(publicKeys []values.Bytes) (address values.Address, err error) {
+func (i *testRuntimeInterface) CreateAccount(publicKeys [][]byte) (address Address, err error) {
 	return i.createAccount(publicKeys)
 }
 
-func (i *testRuntimeInterface) AddAccountKey(address values.Address, publicKey values.Bytes) error {
+func (i *testRuntimeInterface) AddAccountKey(address Address, publicKey []byte) error {
 	return i.addAccountKey(address, publicKey)
 }
 
-func (i *testRuntimeInterface) RemoveAccountKey(address values.Address, index values.Int) (publicKey values.Bytes, err error) {
+func (i *testRuntimeInterface) RemoveAccountKey(address Address, index int) (publicKey []byte, err error) {
 	return i.removeAccountKey(address, index)
 }
 
-func (i *testRuntimeInterface) CheckCode(address values.Address, code values.Bytes) (err error) {
+func (i *testRuntimeInterface) CheckCode(address Address, code []byte) (err error) {
 	return i.checkCode(address, code)
 }
 
-func (i *testRuntimeInterface) UpdateAccountCode(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+func (i *testRuntimeInterface) UpdateAccountCode(address Address, code []byte, checkPermission bool) (err error) {
 	return i.updateAccountCode(address, code, checkPermission)
 }
 
-func (i *testRuntimeInterface) GetSigningAccounts() []values.Address {
+func (i *testRuntimeInterface) GetSigningAccounts() []Address {
 	if i.getSigningAccounts == nil {
 		return nil
 	}
@@ -71,7 +70,7 @@ func (i *testRuntimeInterface) Log(message string) {
 	i.log(message)
 }
 
-func (i *testRuntimeInterface) EmitEvent(event values.Event) {
+func (i *testRuntimeInterface) EmitEvent(event Event) {
 	i.emitEvent(event)
 }
 
@@ -111,7 +110,7 @@ func TestRuntimeImport(t *testing.T) {
 	value, err := runtime.ExecuteScript(script, runtimeInterface, utils.TestLocation)
 	require.NoError(t, err)
 
-	assert.Equal(t, values.NewInt(42), value)
+	assert.Equal(t, interpreter.NewIntValue(42), value)
 }
 
 func TestRuntimeInvalidTransactionArgumentAccount(t *testing.T) {
@@ -125,8 +124,8 @@ func TestRuntimeInvalidTransactionArgumentAccount(t *testing.T) {
     `)
 
 	runtimeInterface := &testRuntimeInterface{
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{{42}}
+		getSigningAccounts: func() []Address {
+			return []Address{{42}}
 		},
 	}
 
@@ -154,8 +153,8 @@ func TestRuntimeTransactionWithAccount(t *testing.T) {
 		setValue: func(controller, owner, key, value []byte) (err error) {
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{{42}}
+		getSigningAccounts: func() []Address {
+			return []Address{{42}}
 		},
 		log: func(message string) {
 			loggedMessage = message
@@ -290,8 +289,8 @@ func TestRuntimeStorage(t *testing.T) {
 					storedValues[string(key)] = value
 					return nil
 				},
-				getSigningAccounts: func() []values.Address {
-					return []values.Address{{42}}
+				getSigningAccounts: func() []Address {
+					return []Address{{42}}
 				},
 				log: func(message string) {
 					loggedMessages = append(loggedMessages, message)
@@ -383,8 +382,8 @@ func TestRuntimeStorageMultipleTransactionsResourceWithArray(t *testing.T) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{{42}}
+		getSigningAccounts: func() []Address {
+			return []Address{{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -465,8 +464,8 @@ func TestRuntimeStorageMultipleTransactionsResourceFunction(t *testing.T) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{{42}}
+		getSigningAccounts: func() []Address {
+			return []Address{{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -548,8 +547,8 @@ func TestRuntimeStorageMultipleTransactionsResourceField(t *testing.T) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{{42}}
+		getSigningAccounts: func() []Address {
+			return []Address{{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -629,8 +628,8 @@ func TestRuntimeCompositeFunctionInvocationFromImportingProgram(t *testing.T) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{{42}}
+		getSigningAccounts: func() []Address {
+			return []Address{{42}}
 		},
 	}
 
@@ -703,8 +702,8 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{{42}}
+		getSigningAccounts: func() []Address {
+			return []Address{{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -783,8 +782,8 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{{42}}
+		getSigningAccounts: func() []Address {
+			return []Address{{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -879,8 +878,8 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{{42}}
+		getSigningAccounts: func() []Address {
+			return []Address{{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -938,8 +937,8 @@ func TestRuntimeSyntaxError(t *testing.T) {
     `)
 
 	runtimeInterface := &testRuntimeInterface{
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{{42}}
+		getSigningAccounts: func() []Address {
+			return []Address{{42}}
 		},
 	}
 
@@ -1010,8 +1009,8 @@ func TestRuntimeStorageChanges(t *testing.T) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{{42}}
+		getSigningAccounts: func() []Address {
+			return []Address{{42}}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -1043,8 +1042,8 @@ func TestRuntimeAccountAddress(t *testing.T) {
 	address := interpreter.AddressValue{42}
 
 	runtimeInterface := &testRuntimeInterface{
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{address.Export().(values.Address)}
+		getSigningAccounts: func() []Address {
+			return []Address{address}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -1073,7 +1072,7 @@ func TestRuntimePublicAccountAddress(t *testing.T) {
 	address := interpreter.NewAddressValueFromBytes([]byte{0x42})
 
 	runtimeInterface := &testRuntimeInterface{
-		getSigningAccounts: func() []values.Address {
+		getSigningAccounts: func() []Address {
 			return nil
 		},
 		log: func(message string) {
@@ -1134,7 +1133,7 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
 
 	var loggedMessages []string
 
-	storedValues := map[string]values.Bytes{}
+	storedValues := map[string][]byte{}
 
 	runtimeInterface := &testRuntimeInterface{
 		resolveImport: func(location Location) ([]byte, error) {
@@ -1152,8 +1151,8 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{address.Export().(values.Address)}
+		getSigningAccounts: func() []Address {
+			return []Address{address}
 		},
 		log: func(message string) {
 			loggedMessages = append(loggedMessages, message)
@@ -1181,8 +1180,8 @@ func TestRuntimeTransactionWithUpdateAccountCodeEmpty(t *testing.T) {
       }
     `)
 
-	var accountCode values.Bytes
-	var events []values.Event
+	var accountCode []byte
+	var events []Event
 
 	runtimeInterface := &testRuntimeInterface{
 		getValue: func(controller, owner, key []byte) (value []byte, err error) {
@@ -1191,14 +1190,14 @@ func TestRuntimeTransactionWithUpdateAccountCodeEmpty(t *testing.T) {
 		setValue: func(controller, owner, key, value []byte) (err error) {
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{{42}}
+		getSigningAccounts: func() []Address {
+			return []Address{{42}}
 		},
-		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+		updateAccountCode: func(address Address, code []byte, checkPermission bool) (err error) {
 			accountCode = code
 			return nil
 		},
-		emitEvent: func(event values.Event) {
+		emitEvent: func(event Event) {
 			events = append(events, event)
 		},
 	}
@@ -1223,8 +1222,8 @@ func TestRuntimeTransactionWithCreateAccountEmpty(t *testing.T) {
       }
     `)
 
-	var accountCode values.Bytes
-	var events []values.Event
+	var accountCode []byte
+	var events []Event
 
 	runtimeInterface := &testRuntimeInterface{
 		getValue: func(controller, owner, key []byte) (value []byte, err error) {
@@ -1233,14 +1232,14 @@ func TestRuntimeTransactionWithCreateAccountEmpty(t *testing.T) {
 		setValue: func(controller, owner, key, value []byte) (err error) {
 			return nil
 		},
-		createAccount: func(publicKeys []values.Bytes) (address values.Address, err error) {
-			return values.Address{42}, nil
+		createAccount: func(publicKeys [][]byte) (address Address, err error) {
+			return Address{42}, nil
 		},
-		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+		updateAccountCode: func(address Address, code []byte, checkPermission bool) (err error) {
 			accountCode = code
 			return nil
 		},
-		emitEvent: func(event values.Event) {
+		emitEvent: func(event Event) {
 			events = append(events, event)
 		},
 	}
@@ -1279,7 +1278,7 @@ func TestRuntimeCyclicImport(t *testing.T) {
 				return nil, fmt.Errorf("unknown import location: %s", location)
 			}
 		},
-		getSigningAccounts: func() []values.Address {
+		getSigningAccounts: func() []Address {
 			return nil
 		},
 	}
@@ -1303,14 +1302,14 @@ func ArrayValueFromBytes(bytes []byte) *interpreter.ArrayValue {
 
 func TestRuntimeTransactionWithContractDeployment(t *testing.T) {
 
-	expectSuccess := func(t *testing.T, err error, accountCode values.Bytes, events []values.Event) {
+	expectSuccess := func(t *testing.T, err error, accountCode []byte, events []Event) {
 		require.NoError(t, err)
 
 		assert.NotNil(t, accountCode)
 		assert.Len(t, events, 1)
 	}
 
-	expectFailure := func(t *testing.T, err error, accountCode values.Bytes, events []values.Event) {
+	expectFailure := func(t *testing.T, err error, accountCode []byte, events []Event) {
 		require.Error(t, err)
 
 		assert.Nil(t, accountCode)
@@ -1326,7 +1325,7 @@ func TestRuntimeTransactionWithContractDeployment(t *testing.T) {
 		name      string
 		contract  string
 		arguments []argument
-		check     func(t *testing.T, err error, accountCode values.Bytes, events []values.Event)
+		check     func(t *testing.T, err error, accountCode []byte, events []Event)
 	}
 
 	tests := []test{
@@ -1417,8 +1416,8 @@ func TestRuntimeTransactionWithContractDeployment(t *testing.T) {
 
 				runtime := NewInterpreterRuntime()
 
-				var accountCode values.Bytes
-				var events []values.Event
+				var accountCode []byte
+				var events []Event
 
 				runtimeInterface := &testRuntimeInterface{
 					getValue: func(controller, owner, key []byte) (value []byte, err error) {
@@ -1427,14 +1426,14 @@ func TestRuntimeTransactionWithContractDeployment(t *testing.T) {
 					setValue: func(controller, owner, key, value []byte) (err error) {
 						return nil
 					},
-					getSigningAccounts: func() []values.Address {
-						return []values.Address{{42}}
+					getSigningAccounts: func() []Address {
+						return []Address{{42}}
 					},
-					updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+					updateAccountCode: func(address Address, code []byte, checkPermission bool) (err error) {
 						accountCode = code
 						return nil
 					},
-					emitEvent: func(event values.Event) {
+					emitEvent: func(event Event) {
 						events = append(events, event)
 					},
 				}
@@ -1479,8 +1478,8 @@ func TestRuntimeTransactionWithContractDeployment(t *testing.T) {
 
 				runtime := NewInterpreterRuntime()
 
-				var accountCode values.Bytes
-				var events []values.Event
+				var accountCode []byte
+				var events []Event
 
 				runtimeInterface := &testRuntimeInterface{
 					getValue: func(controller, owner, key []byte) (value []byte, err error) {
@@ -1489,14 +1488,14 @@ func TestRuntimeTransactionWithContractDeployment(t *testing.T) {
 					setValue: func(controller, owner, key, value []byte) (err error) {
 						return nil
 					},
-					createAccount: func(publicKeys []values.Bytes) (address values.Address, err error) {
-						return values.Address{42}, nil
+					createAccount: func(publicKeys [][]byte) (address Address, err error) {
+						return Address{42}, nil
 					},
-					updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+					updateAccountCode: func(address Address, code []byte, checkPermission bool) (err error) {
 						accountCode = code
 						return nil
 					},
-					emitEvent: func(event values.Event) {
+					emitEvent: func(event Event) {
 						events = append(events, event)
 					},
 				}
@@ -1513,7 +1512,7 @@ func TestRuntimeContractAccount(t *testing.T) {
 
 	runtime := NewInterpreterRuntime()
 
-	addressValue := values.Address{
+	addressValue := Address{
 		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xCA, 0xDE,
 	}
 
@@ -1564,8 +1563,8 @@ func TestRuntimeContractAccount(t *testing.T) {
 	))
 
 	storedValues := map[string][]byte{}
-	var accountCode values.Bytes
-	var events []values.Event
+	var accountCode []byte
+	var events []Event
 
 	runtimeInterface := &testRuntimeInterface{
 		resolveImport: func(_ Location) (bytes []byte, err error) {
@@ -1578,14 +1577,14 @@ func TestRuntimeContractAccount(t *testing.T) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{addressValue}
+		getSigningAccounts: func() []Address {
+			return []Address{addressValue}
 		},
-		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+		updateAccountCode: func(address Address, code []byte, checkPermission bool) (err error) {
 			accountCode = code
 			return nil
 		},
-		emitEvent: func(event values.Event) {
+		emitEvent: func(event Event) {
 			events = append(events, event)
 		},
 	}
@@ -1613,7 +1612,7 @@ func TestRuntimeContractAccount(t *testing.T) {
 func TestRuntimeContractNestedResource(t *testing.T) {
 	runtime := NewInterpreterRuntime()
 
-	addressValue := values.Address{
+	addressValue := Address{
 		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
 	}
 
@@ -1657,7 +1656,7 @@ func TestRuntimeContractNestedResource(t *testing.T) {
 	))
 
 	storedValues := map[string][]byte{}
-	var accountCode values.Bytes
+	var accountCode []byte
 	var loggedMessage string
 
 	runtimeInterface := &testRuntimeInterface{
@@ -1671,14 +1670,14 @@ func TestRuntimeContractNestedResource(t *testing.T) {
 			storedValues[string(key)] = value
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{addressValue}
+		getSigningAccounts: func() []Address {
+			return []Address{addressValue}
 		},
-		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+		updateAccountCode: func(address Address, code []byte, checkPermission bool) (err error) {
 			accountCode = code
 			return nil
 		},
-		emitEvent: func(event values.Event) {},
+		emitEvent: func(event Event) {},
 		log: func(message string) {
 			loggedMessage = message
 		},
@@ -1797,11 +1796,11 @@ func TestRuntimeFungibleTokenUpdateAccountCode(t *testing.T) {
 
 	runtime := NewInterpreterRuntime()
 
-	address1Value := values.Address{
+	address1Value := Address{
 		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
 	}
 
-	address2Value := values.Address{
+	address2Value := Address{
 		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2,
 	}
 
@@ -1850,8 +1849,8 @@ func TestRuntimeFungibleTokenUpdateAccountCode(t *testing.T) {
     `)
 
 	storedValues := map[string][]byte{}
-	accountCodes := map[string]values.Bytes{}
-	var events []values.Event
+	accountCodes := map[string][]byte{}
+	var events []Event
 
 	storageKey := func(owner, controller, key string) string {
 		return strings.Join([]string{owner, controller, key}, "|")
@@ -1871,15 +1870,15 @@ func TestRuntimeFungibleTokenUpdateAccountCode(t *testing.T) {
 			storedValues[storageKey(string(controller), string(owner), string(key))] = value
 			return nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{signerAccount}
+		getSigningAccounts: func() []Address {
+			return []Address{signerAccount}
 		},
-		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+		updateAccountCode: func(address Address, code []byte, checkPermission bool) (err error) {
 			key := string(AddressLocation(address[:]).ID())
 			accountCodes[key] = code
 			return nil
 		},
-		emitEvent: func(event values.Event) {
+		emitEvent: func(event Event) {
 			events = append(events, event)
 		},
 	}
@@ -1900,11 +1899,11 @@ func TestRuntimeFungibleTokenCreateAccount(t *testing.T) {
 
 	runtime := NewInterpreterRuntime()
 
-	address1Value := values.Address{
+	address1Value := Address{
 		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
 	}
 
-	address2Value := values.Address{
+	address2Value := Address{
 		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x2,
 	}
 
@@ -1953,8 +1952,8 @@ func TestRuntimeFungibleTokenCreateAccount(t *testing.T) {
     `)
 
 	storedValues := map[string][]byte{}
-	accountCodes := map[string]values.Bytes{}
-	var events []values.Event
+	accountCodes := map[string][]byte{}
+	var events []Event
 
 	storageKey := func(owner, controller, key string) string {
 		return strings.Join([]string{owner, controller, key}, "|")
@@ -1974,18 +1973,18 @@ func TestRuntimeFungibleTokenCreateAccount(t *testing.T) {
 			storedValues[storageKey(string(controller), string(owner), string(key))] = value
 			return nil
 		},
-		createAccount: func(publicKeys []values.Bytes) (address values.Address, err error) {
+		createAccount: func(publicKeys [][]byte) (address Address, err error) {
 			return address2Value, nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{signerAccount}
+		getSigningAccounts: func() []Address {
+			return []Address{signerAccount}
 		},
-		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
+		updateAccountCode: func(address Address, code []byte, checkPermission bool) (err error) {
 			key := string(AddressLocation(address[:]).ID())
 			accountCodes[key] = code
 			return nil
 		},
-		emitEvent: func(event values.Event) {
+		emitEvent: func(event Event) {
 			events = append(events, event)
 		},
 	}
@@ -2087,8 +2086,8 @@ func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
 	}
 
 	storedValues := map[string][]byte{}
-	accountCodes := map[string]values.Bytes{}
-	var events []values.Event
+	accountCodes := map[string][]byte{}
+	var events []Event
 
 	storageKey := func(owner, controller, key string) string {
 		return strings.Join([]string{owner, controller, key}, "|")
@@ -2108,20 +2107,20 @@ func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
 			storedValues[storageKey(string(controller), string(owner), string(key))] = value
 			return nil
 		},
-		createAccount: func(publicKeys []values.Bytes) (address values.Address, err error) {
-			result := values.BytesToAddress([]byte{nextAccount})
+		createAccount: func(publicKeys [][]byte) (address Address, err error) {
+			result := interpreter.NewAddressValueFromBytes([]byte{nextAccount})
 			nextAccount++
 			return result, nil
 		},
-		getSigningAccounts: func() []values.Address {
-			return []values.Address{{0x1}}
+		getSigningAccounts: func() []Address {
+			return []Address{{0x1}}
 		},
-		updateAccountCode: func(address values.Address, code values.Bytes, checkPermission bool) (err error) {
-			key := string(AddressLocation(address.Bytes()).ID())
+		updateAccountCode: func(address Address, code []byte, checkPermission bool) (err error) {
+			key := string(AddressLocation(address[:]).ID())
 			accountCodes[key] = code
 			return nil
 		},
-		emitEvent: func(event values.Event) {
+		emitEvent: func(event Event) {
 			events = append(events, event)
 		},
 	}

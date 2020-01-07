@@ -11,8 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
-	"github.com/dapperlabs/flow-go/sdk/abi/encoding/values"
-	"github.com/dapperlabs/flow-go/sdk/abi/types"
 )
 
 func qualifiedIdentifier(identifier string, containerType Type) string {
@@ -57,22 +55,6 @@ type Type interface {
 	IsResourceType() bool
 	IsInvalidType() bool
 	ID() TypeID
-}
-
-type ExportableType interface {
-	//TODO once https://github.com/dapperlabs/flow-go/issues/1589 is done
-	// we can stop requiring AST tree to fetch extra names
-	// and Variable to be able to locate this type
-	Export(program *ast.Program, variable *Variable) types.Type
-}
-
-// Helper function to wrap a types in a variable if a variable is set
-func wrapVariable(t types.Type, variable *Variable) types.Type {
-	if variable != nil {
-		return types.Variable{Type: t}
-	} else {
-		return t
-	}
 }
 
 // ValueIndexableType
@@ -147,10 +129,6 @@ func (*AnyStructType) Equal(other Type) bool {
 	return ok
 }
 
-func (*AnyStructType) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.AnyStruct{}, variable)
-}
-
 func (*AnyStructType) IsResourceType() bool {
 	return false
 }
@@ -175,10 +153,6 @@ func (*AnyResourceType) ID() TypeID {
 func (*AnyResourceType) Equal(other Type) bool {
 	_, ok := other.(*AnyResourceType)
 	return ok
-}
-
-func (*AnyResourceType) AnyResourceType(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.AnyResource{}, variable)
 }
 
 func (*AnyResourceType) IsResourceType() bool {
@@ -219,10 +193,6 @@ func (*NeverType) IsInvalidType() bool {
 type VoidType struct{}
 
 func (*VoidType) isType() {}
-
-func (*VoidType) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Void{}, variable)
-}
 
 func (*VoidType) String() string {
 	return "Void"
@@ -312,20 +282,10 @@ func (t *OptionalType) IsInvalidType() bool {
 	return t.Type.IsInvalidType()
 }
 
-func (t *OptionalType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Optional{
-		Type: t.Type.(ExportableType).Export(program, nil),
-	}, variable)
-}
-
 // BoolType represents the boolean type
 type BoolType struct{}
 
 func (*BoolType) isType() {}
-
-func (*BoolType) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Bool{}, variable)
-}
 
 func (*BoolType) String() string {
 	return "Bool"
@@ -379,10 +339,6 @@ func (*CharacterType) IsInvalidType() bool {
 type StringType struct{}
 
 func (*StringType) isType() {}
-
-func (*StringType) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.String{}, variable)
-}
 
 func (*StringType) String() string {
 	return "String"
@@ -524,10 +480,6 @@ type IntType struct{}
 
 func (*IntType) isType() {}
 
-func (*IntType) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int{}, variable)
-}
-
 func (*IntType) String() string {
 	return "Int"
 }
@@ -562,10 +514,6 @@ func (*IntType) Max() *big.Int {
 type Int8Type struct{}
 
 func (*Int8Type) isType() {}
-
-func (*Int8Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int8{}, variable)
-}
 
 func (*Int8Type) String() string {
 	return "Int8"
@@ -604,10 +552,6 @@ type Int16Type struct{}
 
 func (*Int16Type) isType() {}
 
-func (*Int16Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int16{}, variable)
-}
-
 func (*Int16Type) String() string {
 	return "Int16"
 }
@@ -644,10 +588,6 @@ func (*Int16Type) Max() *big.Int {
 type Int32Type struct{}
 
 func (*Int32Type) isType() {}
-
-func (*Int32Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int32{}, variable)
-}
 
 func (*Int32Type) String() string {
 	return "Int32"
@@ -686,10 +626,6 @@ type Int64Type struct{}
 
 func (*Int64Type) isType() {}
 
-func (*Int64Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Int64{}, variable)
-}
-
 func (*Int64Type) String() string {
 	return "Int64"
 }
@@ -726,10 +662,6 @@ func (*Int64Type) Max() *big.Int {
 type UInt8Type struct{}
 
 func (*UInt8Type) isType() {}
-
-func (*UInt8Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.UInt8{}, variable)
-}
 
 func (*UInt8Type) String() string {
 	return "UInt8"
@@ -768,10 +700,6 @@ type UInt16Type struct{}
 
 func (*UInt16Type) isType() {}
 
-func (*UInt16Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.UInt16{}, variable)
-}
-
 func (*UInt16Type) String() string {
 	return "UInt16"
 }
@@ -809,10 +737,6 @@ type UInt32Type struct{}
 
 func (*UInt32Type) isType() {}
 
-func (*UInt32Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.UInt32{}, variable)
-}
-
 func (*UInt32Type) String() string {
 	return "UInt32"
 }
@@ -849,10 +773,6 @@ func (*UInt32Type) Max() *big.Int {
 type UInt64Type struct{}
 
 func (*UInt64Type) isType() {}
-
-func (*UInt64Type) Export(_ *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.UInt64{}, variable)
-}
 
 func (*UInt64Type) String() string {
 	return "UInt64"
@@ -1141,12 +1061,6 @@ type VariableSizedType struct {
 func (*VariableSizedType) isType()      {}
 func (*VariableSizedType) isArrayType() {}
 
-func (t *VariableSizedType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.VariableSizedArray{
-		ElementType: t.Type.(ExportableType).Export(program, nil),
-	}, variable)
-}
-
 func (t *VariableSizedType) String() string {
 	return fmt.Sprintf("[%s]", t.Type)
 }
@@ -1200,13 +1114,6 @@ type ConstantSizedType struct {
 
 func (*ConstantSizedType) isType()      {}
 func (*ConstantSizedType) isArrayType() {}
-
-func (t *ConstantSizedType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.ConstantSizedArray{
-		Size:        uint(t.Size),
-		ElementType: t.Type.(ExportableType).Export(program, nil),
-	}, variable)
-}
 
 func (t *ConstantSizedType) String() string {
 	return fmt.Sprintf("[%s; %d]", t.Type, t.Size)
@@ -1283,52 +1190,6 @@ func (t *FunctionType) ReturnType(argumentTypes []Type) Type {
 }
 
 func (*FunctionType) isType() {}
-
-func (t *FunctionType) Export(program *ast.Program, variable *Variable) types.Type {
-
-	// we have function type rather than named functions with params
-	if variable == nil {
-		parameterTypes := make([]types.Type, len(t.ParameterTypeAnnotations))
-
-		for i, annotation := range t.ParameterTypeAnnotations {
-			parameterTypes[i] = annotation.Type.(ExportableType).Export(program, nil)
-		}
-
-		return types.FunctionType{
-			ParameterTypes: parameterTypes,
-			ReturnType:     t.ReturnTypeAnnotation.Type.(ExportableType).Export(program, nil),
-		}
-
-	} else {
-		functionDeclaration := func() *ast.FunctionDeclaration {
-			for _, fn := range program.FunctionDeclarations() {
-				if fn.Identifier.Identifier == variable.Identifier && fn.Identifier.Pos == *variable.Pos {
-					return fn
-				}
-			}
-
-			panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
-		}()
-
-		parameterTypeAnnotations := make([]types.Parameter, len(t.ParameterTypeAnnotations))
-
-		for i, annotation := range t.ParameterTypeAnnotations {
-
-			astParam := functionDeclaration.ParameterList.Parameters[i]
-
-			parameterTypeAnnotations[i] = types.Parameter{
-				Label:      astParam.Label,
-				Identifier: astParam.Identifier.Identifier,
-				Type:       annotation.Type.(ExportableType).Export(program, nil),
-			}
-		}
-
-		return types.Function{
-			Parameters: parameterTypeAnnotations,
-			ReturnType: t.ReturnTypeAnnotation.Type.(ExportableType).Export(program, nil),
-		}.WithID(string(t.ID()))
-	}
-}
 
 func (t *FunctionType) InvocationFunctionType() *FunctionType {
 	return t
@@ -1618,89 +1479,6 @@ func (t *CompositeType) Equal(other Type) bool {
 
 	return otherStructure.Kind == t.Kind &&
 		otherStructure.Identifier == t.Identifier
-}
-
-func (t *CompositeType) exportAsPointer() types.Type {
-	switch t.Kind {
-	case common.CompositeKindStructure:
-		return types.StructPointer{TypeName: t.Identifier}
-	case common.CompositeKindResource:
-		return types.ResourcePointer{TypeName: t.Identifier}
-	}
-	panic(fmt.Sprintf("cannot convert type %v of unknown kind %v", t, t.Kind))
-}
-
-func (t *CompositeType) Export(program *ast.Program, variable *Variable) types.Type {
-	// this type is exported as a field or parameter type, not main definition
-	if variable == nil {
-		return t.exportAsPointer()
-	}
-
-	convert := func() types.Composite {
-
-		compositeDeclaration := func() *ast.CompositeDeclaration {
-			for _, cd := range program.CompositeDeclarations() {
-				if cd.Identifier.Identifier == variable.Identifier &&
-					cd.Identifier.Pos == *variable.Pos {
-					return cd
-				}
-			}
-			panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
-		}()
-
-		fields := make([]types.Field, 0, len(t.Members))
-
-		// TODO: do not sort fields before export, store in order declared
-		fieldNames := make([]string, 0, len(t.Members))
-		for identifer, _ := range t.Members {
-			fieldNames = append(fieldNames, identifer)
-		}
-
-		values.SortInEncodingOrder(fieldNames)
-
-		for _, identifer := range fieldNames {
-			field := t.Members[identifer]
-
-			typ := field.TypeAnnotation.Type.(ExportableType).Export(program, nil)
-
-			fields = append(fields, types.Field{
-				Identifier: identifer,
-				Type:       typ,
-			})
-		}
-
-		parameters := make([]types.Parameter, len(t.ConstructorParameterTypeAnnotations))
-
-		// TODO: For now we have only one initializer, so we just assume this here
-		// as this is post SEMA we really hope AST list of params matches SEMA type one
-		for i, parameter := range compositeDeclaration.Members.Initializers()[0].ParameterList.Parameters {
-			semaType := t.ConstructorParameterTypeAnnotations[i].Type
-
-			parameters[i] = types.Parameter{
-				Label:      parameter.Label,
-				Identifier: parameter.Identifier.Identifier,
-				Type:       semaType.(ExportableType).Export(program, nil),
-			}
-		}
-
-		return types.Composite{
-			Identifier:   t.Identifier,
-			Fields:       fields,
-			Initializers: [][]types.Parameter{parameters},
-		}.WithID(string(t.ID()))
-	}
-
-	switch t.Kind {
-	case common.CompositeKindStructure:
-		return types.Struct{
-			Composite: convert(),
-		}
-	case common.CompositeKindResource:
-		return types.Resource{
-			Composite: convert(),
-		}
-	}
-	panic(fmt.Sprintf("cannot convert type %v of unknown kind %v", t, t.Kind))
 }
 
 func (t *CompositeType) HasMembers() bool {
@@ -2012,13 +1790,6 @@ func (t *DictionaryType) String() string {
 	)
 }
 
-func (t *DictionaryType) Export(program *ast.Program, variable *Variable) types.Type {
-	return wrapVariable(types.Dictionary{
-		KeyType:     t.KeyType.(ExportableType).Export(program, nil),
-		ElementType: t.ValueType.(ExportableType).Export(program, nil),
-	}, variable)
-}
-
 func (t *DictionaryType) ID() TypeID {
 	return TypeID(fmt.Sprintf(
 		"{%s:%s}",
@@ -2292,56 +2063,6 @@ type EventType struct {
 }
 
 func (*EventType) isType() {}
-
-func (t *EventType) Export(program *ast.Program, variable *Variable) types.Type {
-
-	var parameters []types.Parameter
-
-	if program != nil && variable != nil {
-		eventDeclaration := func() *ast.EventDeclaration {
-			for _, fn := range program.EventDeclarations() {
-				if fn.Identifier.Identifier == variable.Identifier && fn.Identifier.Pos == *variable.Pos {
-					return fn
-				}
-			}
-
-			panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
-		}()
-
-		parameterList := eventDeclaration.ParameterList.Parameters
-
-		parameters = make([]types.Parameter, len(t.Fields))
-
-		for i, field := range t.Fields {
-			identifier := field.Identifier
-			typ := field.Type.(ExportableType).Export(program, nil)
-
-			parameters[i] = types.Parameter{
-				Label:      parameterList[i].Label,
-				Identifier: identifier,
-				Type:       typ,
-			}
-		}
-	}
-
-	fields := make([]types.Field, len(t.Fields))
-
-	for i, field := range t.Fields {
-		identifier := field.Identifier
-		typ := field.Type.(ExportableType).Export(program, nil)
-
-		fields[i] = types.Field{
-			Identifier: identifier,
-			Type:       typ,
-		}
-	}
-
-	return types.Event{
-		Identifier:  t.Identifier,
-		Fields:      fields,
-		Initializer: parameters,
-	}.WithID(string(t.ID()))
-}
 
 func (t *EventType) String() string {
 	var fields strings.Builder

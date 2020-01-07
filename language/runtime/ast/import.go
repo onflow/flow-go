@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
-	"github.com/dapperlabs/flow-go/sdk/abi/values"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Identifier
@@ -111,8 +111,8 @@ func (l AddressLocation) ID() LocationID {
 	))
 }
 
-func (l AddressLocation) ToAddress() values.Address {
-	return values.BytesToAddress(l)
+func (l AddressLocation) ToAddress() flow.Address {
+	return flow.BytesToAddress(l)
 }
 
 func init() {
