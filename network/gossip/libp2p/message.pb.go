@@ -24,7 +24,7 @@ const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 type Message struct {
 	SenderID             []byte   `protobuf:"bytes,3,opt,name=SenderID,proto3" json:"SenderID,omitempty"`
 	EngineID             uint32   `protobuf:"varint,2,opt,name=EngineID,proto3" json:"EngineID,omitempty"`
-	Event                []byte   `protobuf:"bytes,1,opt,name=Event,proto3" json:"Event,omitempty"`
+	Event                []byte   `protobuf:"bytes,1,opt,name=NetworkMessage,proto3" json:"NetworkMessage,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`

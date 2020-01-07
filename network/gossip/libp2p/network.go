@@ -150,29 +150,38 @@ func (n *Network) Handshake(conn Connection) (flow.Identifier, error) {
 	return flow.Identifier{}, errors.New("method not implemented")
 }
 
-// pack will use the codec to encode an event and return both the payload
-// hash and the payload.
-func (n *Network) pack(engineID uint8, event interface{}) ([]byte, []byte, error) {
+// genNetworkMessage uses the codec to encode an event into a NetworkMessage
+func (n *Network) genNetworkMessage(engineID uint8, event interface{}, targetIDs ...flow.Identifier) (NetworkMessage, error) {
 
 	// encode the payload using the configured codec
 	payload, err := n.codec.Encode(event)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "could not encode event")
+		return NetworkMessage{}, errors.Wrap(err, "could not encode event")
 	}
 
 	// use a hash with an engine-specific salt to get the payload hash
-	sip := siphash.New([]byte("trickleengine" + fmt.Sprintf("%03d", engineID)))
-	return sip.Sum(payload), payload, nil
+	sip := siphash.New([]byte("libp2ppacking" + fmt.Sprintf("%03d", engineID)))
+
+	// casting event structure
+	e := NetworkMessage{
+		EngineID:  engineID,
+		EventID:   sip.Sum(payload),
+		OriginID:  n.me.NodeID(),
+		TargetIDs: targetIDs,
+		Payload:   payload,
+	}
+
+	return e, nil
 }
 
 // submit will submit the given event for the given engine to the overlay layer
 // for processing; it is used by engines through conduits.
 func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 
-	// pack the event to get payload and event ID
-	eventID, payload, err := n.pack(engineID, event)
+	// GenerateNetworkMessage the event to get payload and event ID
+	eventID, payload, err := n.genNetworkMessage(engineID, event)
 	if err != nil {
-		return errors.Wrap(err, "could not pack event")
+		return errors.Wrap(err, "could not GenerateNetworkMessage event")
 	}
 
 	//err = n.mw.Send(engineID, eventID, payload, targetIDs...)
