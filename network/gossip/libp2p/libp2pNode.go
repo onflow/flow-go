@@ -4,7 +4,6 @@ package libp2p
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"sync"
 
 	"github.com/gogo/protobuf/proto"
@@ -21,7 +20,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	flownetwork "github.com/dapperlabs/flow-go/network"
 )
 
 // A unique Libp2p protocol ID for Flow (https://docs.libp2p.io/concepts/protocols/)
@@ -47,7 +45,6 @@ type P2PNode struct {
 	ps         *pubsub.PubSub                     // the reference to the pubsub instance
 	topics     map[FlowTopic]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs       map[FlowTopic]*pubsub.Subscription // map of a topic string to an actual subscription
-	engines    map[uint8]flownetwork.Engine       // map of engine id to engine instances
 	streams    map[uint8]network.Stream           // map of engine id to libp2p streams
 
 	//TODO abstract this out in a different class (Issue#1611)
@@ -85,10 +82,9 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	// Set the callback to use for an incoming peer message
 	if handler == nil {
-		host.SetStreamHandler(FlowLibP2PProtocolID, p.handleStream)
-	} else {
-		host.SetStreamHandler(FlowLibP2PProtocolID, handler)
+		return errors.New("could not start libp2pnode with a missing handler")
 	}
+	host.SetStreamHandler(FlowLibP2PProtocolID, handler)
 
 	// Creating a new PubSub instance of the type GossipSub
 	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost)
@@ -99,7 +95,6 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	p.topics = make(map[FlowTopic]*pubsub.Topic)
 	p.subs = make(map[FlowTopic]*pubsub.Subscription)
-	p.engines = make(map[uint8]flownetwork.Engine)
 
 	if err == nil {
 		ip, port := p.GetIPPort()
@@ -274,28 +269,6 @@ func (p *P2PNode) Publish(ctx context.Context, t FlowTopic, data []byte) error {
 	return ps.Publish(ctx, data)
 }
 
-// Register will register the given engine with the given unique engine engineID,
-// returning a conduit to directly submit messages to the message bus of the
-// engine.
-func (p *P2PNode) Register(engineID uint8, engine flownetwork.Engine) (flownetwork.Conduit, error) {
-	p.Lock()
-	defer p.Unlock()
-	// check if the engine engineID is already taken
-	if _, found := p.engines[engineID]; found {
-		return nil, errors.Errorf("engine already registered (%d)", engine)
-	}
-
-	// register engine with provided engineID
-	p.engines[engineID] = engine
-
-	// create the conduit
-	conduit := &Conduit{
-		engineID: engineID,
-		submit:   p.submit,
-	}
-	return conduit, nil
-}
-
 // submit method submits the given event for the given engine to the overlay layer
 // for processing; it is used by engines through conduits.
 // The Target needs to be added as a peer before submitting the message.
@@ -344,74 +317,6 @@ func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Id
 		}
 	}
 	return nil
-}
-
-// handleStream is the callback that gets called for each remote peer that makes a direct 1-1 connection
-func (p *P2PNode) handleStream(s network.Stream) {
-	p.logger.Debug().Str("peer", s.Conn().RemotePeer().String()).Msg("received a new incoming stream")
-	go p.readData(s)
-	// TODO: Running with a receive-only (unidirectional) stream for now (Issue#1955)
-	// go p.writeData(s)
-}
-
-// readData reads the data from the remote peer using the stream
-func (p *P2PNode) readData(s network.Stream) {
-	for {
-		// TODO: implement length-prefix framing to delineate protobuf message if exchanging more than one message (Issue#1969)
-		// (protobuf has no inherent delimiter)
-		// Read incoming data into a buffer
-		buff, err := ioutil.ReadAll(s)
-		if err != nil {
-			p.logger.Error().Str("peer", s.Conn().RemotePeer().String()).Err(err)
-			s.Close()
-			return
-		}
-
-		// ioutil.ReadAll continues to read even after an EOF is encountered.
-		// Close connection and return in that case (This is not an error)
-		if len(buff) <= 0 {
-			s.Close()
-			return
-		}
-		p.logger.Debug().Str("peer", s.Conn().RemotePeer().
-			String()).Bytes("message", buff).Int("length", len(buff)).
-			Msg("received message")
-
-		// Unmarshal the buff to a message
-		message := &Message{}
-		err = proto.Unmarshal(buff, message)
-		if err != nil {
-			p.logger.Error().Str("peer", s.Conn().RemotePeer().String()).Err(err)
-			return
-		}
-
-		// Extract sender id
-		if len(message.SenderID) < 32 {
-			p.logger.Debug().Str("peer", s.Conn().RemotePeer().String()).
-				Bytes("sender", message.SenderID).
-				Msg(" invalid sender id")
-			return
-		}
-		var senderID [32]byte
-		copy(senderID[:], message.SenderID)
-
-		// Extract engine id and find the registered engine
-		en, found := p.engines[uint8(message.EngineID)]
-		if !found {
-			p.logger.Debug().Str("peer", s.Conn().RemotePeer().String()).
-				Uint8("engine", uint8(message.EngineID)).
-				Msg(" dropping message since no engine to receive it was found")
-			return
-		}
-		// call the engine with the message payload
-		err = en.Process(senderID, message.Event)
-		if err != nil {
-			p.logger.Error().
-				Uint8("engineid", uint8(message.EngineID)).
-				Str("peer", s.Conn().RemotePeer().String()).Err(err)
-			return
-		}
-	}
 }
 
 // GetLocationMultiaddr returns a Multiaddress string (https://docs.libp2p.io/concepts/addressing/) given a node address

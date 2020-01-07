@@ -8,14 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
-
+	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
-	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 )
 
 // Middleware handles the input & output on the direct connections we have to
@@ -136,23 +135,22 @@ func (m *Middleware) connect() {
 	// make sure we free up the connection slot once we drop the peer
 	defer m.release(m.slots)
 
-	// get an address to connect to
-	flowID, err := m.ov.Address()
+	// get an identity to connect to
+	flowIdentity, err := m.ov.Identity()
 	if err != nil {
 		log.Error().Err(err).Msg("could not get flow ID")
 		return
 	}
 
+	log = log.With().Str("flowIdentity", flowIdentity.String()).Str("address", flowIdentity.Address).Logger()
 
-	log = log.With().Str("flowID", flowID.NodeID.String()).Str("address", flowID.Address).Logger()
-
-	ip, port, err := net.SplitHostPort(flowID.Address)
+	ip, port, err := net.SplitHostPort(flowIdentity.Address)
 	if err != nil {
 		log.Error().Err(err).Msg("could not parse address")
 		return
 	}
 	// Create a new NodeAddress
-	nodeAddress := libp2p.NodeAddress{Name: flowID.NodeID.String(), IP: ip, Port: port}
+	nodeAddress := libp2p.NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port}
 	// Add it as a peer
 	stream, err := m.libP2PNode.CreateStream(context.Background(), nodeAddress)
 	if err != nil {

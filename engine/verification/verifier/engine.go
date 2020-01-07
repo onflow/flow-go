@@ -19,13 +19,13 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit  *engine.Unit    // used to control startup/shutdown
-	log   zerolog.Logger  // used to log relevant actions
-	con   network.Conduit // used for inter-node communication within the network
-	me    module.Local    // used to access local node information
-	state protocol.State  // used to access the  protocol state
-	store storage.ERMempool   // used to maintain an in-memory store for execution receipts
-	wg    sync.WaitGroup  // used to keep track of the number of threads
+	unit  *engine.Unit      // used to control startup/shutdown
+	log   zerolog.Logger    // used to log relevant actions
+	con   network.Conduit   // used for inter-node communication within the network
+	me    module.Local      // used to access local node information
+	state protocol.State    // used to access the  protocol state
+	store storage.ERMempool // used to maintain an in-memory store for execution receipts
+	wg    sync.WaitGroup    // used to keep track of the number of threads
 	mu    sync.Mutex
 }
 
@@ -51,7 +51,6 @@ func New(loger zerolog.Logger, net module.Network, state protocol.State, me modu
 
 	return e, nil
 }
-
 
 // Ready returns a channel that is closed when the verifier engine is ready.
 func (e *Engine) Ready() <-chan struct{} {
@@ -134,7 +133,7 @@ func (e *Engine) onExecutionReceipt(originID flow.Identifier, receipt *flow.Exec
 
 	// storing the execution receipt in the store of the engine
 	isUnique := e.store.Put(receipt)
-	if !isUnique{
+	if !isUnique {
 		return errors.New("received duplicate execution receipt")
 	}
 
@@ -145,7 +144,6 @@ func (e *Engine) onExecutionReceipt(originID flow.Identifier, receipt *flow.Exec
 	return nil
 }
 
-
 // verify is an internal component of the verifier engine.
 // It receives an execution receipt and does the core verification process.
 // The origin ID indicates the node which originally submitted the event to
@@ -154,7 +152,6 @@ func (e *Engine) onExecutionReceipt(originID flow.Identifier, receipt *flow.Exec
 // and submits that to the network
 func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt) {
 	// todo core verification happens here
-
 
 	// extracting list of consensus nodes' ids
 	consIDs, err := e.state.Final().
@@ -170,8 +167,8 @@ func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt
 
 	// emitting a result approval to all consensus nodes
 	resApprov := &flow.ResultApproval{
-		Body:              flow.ResultApprovalBody{
-			ExecutionResultHash: receipt.ExecutionResult.Fingerprint(),
+		Body: flow.ResultApprovalBody{
+			ExecutionResultHash:  receipt.ExecutionResult.Fingerprint(),
 			AttestationSignature: nil,
 			ChunkIndexList:       nil,
 			Proof:                nil,
@@ -187,7 +184,7 @@ func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt
 
 // broadcastResultApproval receives a ResultApproval and list of consensus nodes IDs, and broadcasts
 // the result approval to the consensus nodes
-func (e *Engine) broadcastResultApproval(resApprov *flow.ResultApproval, consIDs *flow.IdentityList){
+func (e *Engine) broadcastResultApproval(resApprov *flow.ResultApproval, consIDs *flow.IdentityList) {
 	err := e.con.Submit(resApprov, consIDs.NodeIDs()...)
 	if err != nil {
 		// todo this error needs more advance handling after MVP
