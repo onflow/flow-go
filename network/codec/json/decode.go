@@ -33,8 +33,8 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeResponse:
 		v = &trickle.Response{}
 
-	case CodeGuaranteedCollection:
-		v = &flow.GuaranteedCollection{}
+	case CodeCollectionGuarantee:
+		v = &flow.CollectionGuarantee{}
 
 	case CodeBlockProposal:
 		v = &coldstuff.BlockProposal{}

@@ -75,7 +75,7 @@ func TestCollectionStorage(t *testing.T) {
 
 	identifier := unittest.IdentifierFixture()
 
-	collection := unittest.FlowCollectionFixture(1)
+	collection := unittest.CollectionFixture(1)
 
 	collections.EXPECT().Save(gomock.Eq(&collection))
 

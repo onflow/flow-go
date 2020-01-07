@@ -37,7 +37,7 @@ func (t *Transactions) ByFingerprint(fp flow.Fingerprint) (*flow.Transaction, er
 
 func (t *Transactions) Insert(tx *flow.Transaction) error {
 	return t.db.Update(func(btx *badger.Txn) error {
-		err := operation.InsertTransaction(tx.Fingerprint(), tx)(btx)
+		err := operation.InsertTransaction(tx)(btx)
 		if err != nil {
 			return fmt.Errorf("could not insert transaction: %w", err)
 		}

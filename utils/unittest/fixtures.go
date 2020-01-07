@@ -21,9 +21,9 @@ func AccountSignatureFixture() flow.AccountSignature {
 
 func BlockFixture() flow.Block {
 	return flow.Block{
-		Header:                BlockHeaderFixture(),
-		NewIdentities:         IdentityListFixture(3),
-		GuaranteedCollections: GuaranteedCollectionsFixture(3),
+		Header:               BlockHeaderFixture(),
+		NewIdentities:        IdentityListFixture(3),
+		CollectionGuarantees: CollectionGuaranteesFixture(3),
 	}
 }
 
@@ -34,27 +34,28 @@ func BlockHeaderFixture() flow.Header {
 	}
 }
 
-func GuaranteedCollectionsFixture(n int) []*flow.GuaranteedCollection {
-	ret := make([]*flow.GuaranteedCollection, n)
+func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
+	ret := make([]*flow.CollectionGuarantee, n)
 	for i := 0; i < n; i++ {
-		ret[i] = &flow.GuaranteedCollection{
-			CollectionHash: []byte(fmt.Sprintf("hash %d", i)),
-			Signatures:     []crypto.Signature{[]byte(fmt.Sprintf("signature %d A", i)), []byte(fmt.Sprintf("signature %d B", i))},
+		ret[i] = &flow.CollectionGuarantee{
+			Hash:       []byte(fmt.Sprintf("hash %d", i)),
+			Signatures: []crypto.Signature{[]byte(fmt.Sprintf("signature %d A", i)), []byte(fmt.Sprintf("signature %d B", i))},
 		}
 	}
 	return ret
 }
 
-func FlowCollectionFixture(n int) flow.Collection {
-	col := make([]flow.Fingerprint, 0)
+func CollectionFixture(n int) flow.Collection {
+	transactions := make([]flow.TransactionBody, n)
 
 	for i := 0; i < n; i++ {
-		TransactionFixture(func(t *flow.Transaction) {
-			t.Script = []byte(fmt.Sprintf("pub fun main() { print(\"%d\")}", i))
+		tx := TransactionFixture(func(t *flow.Transaction) {
+			t.Nonce = uint64(i + 1)
 		})
+		transactions[i] = tx.TransactionBody
 	}
 
-	return flow.Collection{Transactions: col}
+	return flow.Collection{Transactions: transactions}
 }
 
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
