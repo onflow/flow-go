@@ -716,8 +716,12 @@ func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member
 	// Check type
 
 	// TODO: subtype?
-	if !compositeMember.TypeAnnotation.Type.
-		Equal(interfaceMember.TypeAnnotation.Type) {
+	compositeMemberType := compositeMember.TypeAnnotation.Type
+	interfaceMemberType := interfaceMember.TypeAnnotation.Type
+
+	if !compositeMemberType.IsInvalidType() &&
+		!interfaceMemberType.IsInvalidType() &&
+		!compositeMemberType.Equal(interfaceMemberType) {
 
 		return false
 	}
