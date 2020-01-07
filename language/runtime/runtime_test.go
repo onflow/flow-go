@@ -2125,23 +2125,44 @@ func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
 		},
 	}
 
-	err := runtime.ExecuteTransaction(makeDeployTransaction(contractInterfaceCode), runtimeInterface, utils.TestLocation)
+	err := runtime.ExecuteTransaction(
+		makeDeployTransaction(contractInterfaceCode),
+		runtimeInterface,
+		utils.TestLocation,
+	)
 	require.NoError(t, err)
 
-	err = runtime.ExecuteTransaction(makeDeployTransaction(contractCode), runtimeInterface, utils.TestLocation)
+	err = runtime.ExecuteTransaction(
+		makeDeployTransaction(contractCode),
+		runtimeInterface,
+		utils.TestLocation,
+	)
 	require.NoError(t, err)
 
-	err = runtime.ExecuteTransaction(setupCode, runtimeInterface, utils.TestLocation)
+	err = runtime.ExecuteTransaction(
+		setupCode,
+		runtimeInterface,
+		utils.TestLocation,
+	)
 	require.NoError(t, err)
 
 	for a := 1; a <= 3; a++ {
 		for b := 1; b <= 3; b++ {
+
 			t.Run(fmt.Sprintf("%d/%d", a, b), func(t *testing.T) {
-				err = runtime.ExecuteTransaction(makeUseCode(a, b), runtimeInterface, utils.TestLocation)
+
+				err = runtime.ExecuteTransaction(
+					makeUseCode(a, b),
+					runtimeInterface,
+					utils.TestLocation,
+				)
+
 				if a == 2 && b == 2 {
 					assert.NoError(t, err)
 				} else {
-					assert.Error(t, err)
+					require.Error(t, err)
+					require.IsType(t, Error{}, err)
+					assert.IsType(t, &interpreter.ConditionError{}, err.(Error).Err)
 				}
 			})
 		}
