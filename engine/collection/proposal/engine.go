@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -23,23 +24,37 @@ const proposalPeriod = time.Second * 5
 // Engine is the collection proposal engine, which packages pending
 // transactions into collections and sends them to consensus nodes.
 type Engine struct {
-	unit         *engine.Unit
-	log          zerolog.Logger
-	con          network.Conduit
-	me           module.Local
-	state        protocol.State
-	pool         module.TransactionPool
-	transactions storage.Transactions
-	collections  storage.Collections
-	guarantees   storage.Guarantees
+	unit        *engine.Unit
+	log         zerolog.Logger
+	con         network.Conduit
+	me          module.Local
+	state       protocol.State
+	provider    network.Engine // provider engine to propagate guarantees
+	pool        module.TransactionPool
+	collections storage.Collections
+	guarantees  storage.Guarantees
 }
 
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	net module.Network,
+	me module.Local,
+	state protocol.State,
+	provider *provider.Engine,
+	pool module.TransactionPool,
+	collections storage.Collections,
+	guarantees storage.Guarantees,
+) (*Engine, error) {
+
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log.With().Str("engine", "proposal").Logger(),
-		me:    me,
-		state: state,
+		unit:        engine.NewUnit(),
+		log:         log.With().Str("engine", "proposal").Logger(),
+		me:          me,
+		state:       state,
+		provider:    provider,
+		pool:        pool,
+		collections: collections,
+		guarantees:  guarantees,
 	}
 
 	con, err := net.Register(engine.CollectionProposal, e)
@@ -122,13 +137,15 @@ func (e *Engine) propose() {
 			transactions := e.pool.All()
 			coll := flow.CollectionFromTransactions(transactions)
 
-			err := e.collections.Save(coll)
+			err := e.collections.Save(&coll)
 			if err != nil {
 				e.log.Err(err).Msg("failed to save collection")
 				continue
 			}
 
-			err = e.transactions.
+			guarantee := coll.Guarantee()
+			err = e.guarantees.Save(&guarantee)
+
 		case <-e.unit.Quit():
 			return
 		}
