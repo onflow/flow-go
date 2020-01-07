@@ -12,5 +12,5 @@ type Guarantees interface {
 
 	// ByFingerprint retrieves the collection guarantee by the collection
 	// fingerprint.
-	ByFingerPrint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error)
+	ByFingerprint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error)
 }
