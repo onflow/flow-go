@@ -34,6 +34,15 @@ func (_m *Guarantees) ByFingerPrint(hash flow.Fingerprint) (*flow.CollectionGuar
 }
 
 // Save provides a mock function with given fields: guarantee
-func (_m *Guarantees) Save(guarantee *flow.CollectionGuarantee) {
-	_m.Called(guarantee)
+func (_m *Guarantees) Save(guarantee *flow.CollectionGuarantee) error {
+	ret := _m.Called(guarantee)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.CollectionGuarantee) error); ok {
+		r0 = rf(guarantee)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
