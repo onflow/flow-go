@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
-	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -24,8 +22,8 @@ func TestInvalidTransaction(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
 	t.Run("missing field", func(t *testing.T) {
-		genesis := mock.Genesis(flow.IdentityList{identity})
-		node := testutil.CollectionNode(t, hub, identity, genesis)
+		genesis := unittest.Genesis(flow.IdentityList{identity})
+		node := unittest.NewCollectionNode(t, hub, identity, genesis)
 
 		tx := unittest.TransactionFixture()
 		tx.Script = nil
@@ -50,7 +48,7 @@ func TestClusterRouting(t *testing.T) {
 
 	t.Run("should not route transactions for my cluster", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, N)
+		nodes := unittest.NewCollectionNodeSet(t, hub, N)
 
 		state := nodes[0].State
 		identities, err := state.AtNumber(0).Identities()
@@ -67,7 +65,7 @@ func TestClusterRouting(t *testing.T) {
 		otherNode1, otherNode2 := nodes[1], nodes[2]
 
 		// get a transaction that will be routed to the target cluster
-		tx := testutil.TransactionForCluster(N, targetCluster)
+		tx := unittest.TransactionForCluster(N, targetCluster)
 
 		err = ingressNode.IngestionEngine.Process(ingressNode.Me.NodeID(), tx)
 		assert.NoError(t, err)
@@ -80,7 +78,7 @@ func TestClusterRouting(t *testing.T) {
 
 	t.Run("should route transactions for a different cluster", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, N)
+		nodes := unittest.NewCollectionNodeSet(t, hub, N)
 
 		state := nodes[0].State
 		identities, err := state.AtNumber(0).Identities()
@@ -98,7 +96,7 @@ func TestClusterRouting(t *testing.T) {
 		otherNode := nodes[2]
 
 		// get a transaction that will be routed to the target cluster
-		tx := testutil.TransactionForCluster(N, targetCluster)
+		tx := unittest.TransactionForCluster(N, targetCluster)
 
 		err = ingressNode.IngestionEngine.Process(ingressNode.Me.NodeID(), tx)
 		assert.NoError(t, err)
@@ -116,7 +114,7 @@ func TestClusterRouting(t *testing.T) {
 
 	t.Run("should not route invalid transactions", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, N)
+		nodes := unittest.NewCollectionNodeSet(t, hub, N)
 
 		ingressNode := nodes[0]
 		otherNode1, otherNode2 := nodes[1], nodes[2]

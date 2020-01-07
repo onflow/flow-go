@@ -10,8 +10,8 @@ type Guarantees struct {
 	mock.Mock
 }
 
-// ByFingerPrint provides a mock function with given fields: hash
-func (_m *Guarantees) ByFingerPrint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error) {
+// ByFingerprint provides a mock function with given fields: hash
+func (_m *Guarantees) ByFingerprint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error) {
 	ret := _m.Called(hash)
 
 	var r0 *flow.CollectionGuarantee

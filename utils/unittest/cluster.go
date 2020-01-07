@@ -1,17 +1,16 @@
-package testutil
+package unittest
 
 import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/protocol"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 // TransactionForCluster generates a transaction that will be assigned to the
 // target cluster ID.
 func TransactionForCluster(nClusters int, target flow.ClusterID) *flow.Transaction {
-	tx := unittest.TransactionFixture()
+	tx := TransactionFixture()
 
 	// Bound to avoid infinite loop in case the routing algorithm is broken
 	for i := 0; i < 10000; i++ {

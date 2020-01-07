@@ -10,8 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
@@ -32,10 +30,10 @@ func TestSubmitCollectionGuarantee(t *testing.T) {
 		})
 		identities := flow.IdentityList{collID, consID}
 
-		genesis := mock.Genesis(identities)
+		genesis := unittest.Genesis(identities)
 
-		collNode := testutil.CollectionNode(t, hub, collID, genesis)
-		consNode := testutil.ConsensusNode(t, hub, consID, genesis)
+		collNode := unittest.NewCollectionNode(t, hub, collID, genesis)
+		consNode := unittest.NewConsensusNode(t, hub, consID, genesis)
 
 		guarantee := unittest.CollectionGuaranteeFixture()
 
@@ -66,10 +64,10 @@ func TestCollectionRequest(t *testing.T) {
 		})
 
 		identities := flow.IdentityList{collID, requesterID}
-		genesis := mock.Genesis(identities)
+		genesis := unittest.Genesis(identities)
 
-		collNode := testutil.CollectionNode(t, hub, collID, genesis)
-		requesterNode := testutil.GenericNode(t, hub, requesterID, genesis)
+		collNode := unittest.NewCollectionNode(t, hub, collID, genesis)
+		requesterNode := unittest.NewGenericNode(t, hub, requesterID, genesis)
 
 		// set up a mock requester engine that will receive and verify the collection response
 		requesterEngine := new(mocknetwork.Engine)
@@ -113,9 +111,9 @@ func TestCollectionRequest(t *testing.T) {
 		})
 
 		identities := flow.IdentityList{collID}
-		genesis := mock.Genesis(identities)
+		genesis := unittest.Genesis(identities)
 
-		collNode := testutil.CollectionNode(t, hub, collID, genesis)
+		collNode := unittest.NewCollectionNode(t, hub, collID, genesis)
 
 		// create request with invalid/nonexistent fingerprint
 		req := &messages.CollectionRequest{Fingerprint: flow.Fingerprint{}}
