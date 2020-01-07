@@ -117,7 +117,12 @@ func (e *Engine) onBlock(block *flow.Block) error {
 		return fmt.Errorf("failed to load transactions: %w", err)
 	}
 
-	_, err = e.executor.ExecuteBlock(*block, collections, transactions)
+	executableBlock := executor.ExecutableBlock{
+		Block:        *block,
+		Transactions: transactions,
+	}
+
+	_, err = e.executor.ExecuteBlock(executableBlock)
 	if err != nil {
 		return fmt.Errorf("failed to execute block: %w", err)
 	}

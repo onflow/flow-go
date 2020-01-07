@@ -2,6 +2,7 @@
 
 package mock
 
+import executor "github.com/dapperlabs/flow-go/engine/execution/execution/components/executor"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 
@@ -10,13 +11,13 @@ type Executor struct {
 	mock.Mock
 }
 
-// ExecuteBlock provides a mock function with given fields: block, collections, transactions
-func (_m *Executor) ExecuteBlock(block flow.Block, collections []flow.Collection, transactions []flow.TransactionBody) ([]flow.Chunk, error) {
-	ret := _m.Called(block, collections, transactions)
+// ExecuteBlock provides a mock function with given fields: block
+func (_m *Executor) ExecuteBlock(block executor.ExecutableBlock) ([]flow.Chunk, error) {
+	ret := _m.Called(block)
 
 	var r0 []flow.Chunk
-	if rf, ok := ret.Get(0).(func(flow.Block, []flow.Collection, []flow.TransactionBody) []flow.Chunk); ok {
-		r0 = rf(block, collections, transactions)
+	if rf, ok := ret.Get(0).(func(executor.ExecutableBlock) []flow.Chunk); ok {
+		r0 = rf(block)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]flow.Chunk)
@@ -24,8 +25,8 @@ func (_m *Executor) ExecuteBlock(block flow.Block, collections []flow.Collection
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Block, []flow.Collection, []flow.TransactionBody) error); ok {
-		r1 = rf(block, collections, transactions)
+	if rf, ok := ret.Get(1).(func(executor.ExecutableBlock) error); ok {
+		r1 = rf(block)
 	} else {
 		r1 = ret.Error(1)
 	}

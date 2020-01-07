@@ -6,14 +6,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	executor "github.com/dapperlabs/flow-go/engine/execution/execution/components/executor/mock"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/components/executor"
+	executormock "github.com/dapperlabs/flow-go/engine/execution/execution/components/executor/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 )
 
 func TestExecutionEngine_OnBlock(t *testing.T) {
 	collections := &storage.Collections{}
-	exec := &executor.Executor{}
+	exec := &executormock.Executor{}
 
 	e := &Engine{
 		collections: collections,
@@ -30,10 +31,7 @@ func TestExecutionEngine_OnBlock(t *testing.T) {
 
 	col := flow.Collection{Transactions: []flow.TransactionBody{tx1, tx2}}
 
-	txs := []flow.TransactionBody{tx1, tx2}
-	cols := []flow.Collection{col}
-
-	block := &flow.Block{
+	block := flow.Block{
 		Header: flow.Header{
 			Number: 42,
 		},
@@ -45,15 +43,22 @@ func TestExecutionEngine_OnBlock(t *testing.T) {
 		},
 	}
 
+	transactions := []flow.TransactionBody{tx1, tx2}
+
+	executableBlock := executor.ExecutableBlock{
+		Block:        block,
+		Transactions: transactions,
+	}
+
 	collections.On("ByFingerprint", col.Fingerprint()).
 		Return(&col, nil).
 		Once()
 
-	exec.On("ExecuteBlock", *block, cols, txs).
+	exec.On("ExecuteBlock", executableBlock).
 		Return(nil, nil).
 		Once()
 
-	err := e.onBlock(block)
+	err := e.onBlock(&block)
 	require.NoError(t, err)
 
 	collections.AssertExpectations(t)

@@ -9,11 +9,7 @@ import (
 
 // An Executor executes the transactions in a block.
 type Executor interface {
-	ExecuteBlock(
-		block flow.Block,
-		collections []flow.Collection,
-		transactions []flow.TransactionBody,
-	) ([]flow.Chunk, error)
+	ExecuteBlock(block ExecutableBlock) ([]flow.Chunk, error)
 }
 
 type executor struct {
@@ -29,13 +25,11 @@ func New(computer computer.Computer) Executor {
 
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *executor) ExecuteBlock(
-	block flow.Block,
-	collections []flow.Collection,
-	transactions []flow.TransactionBody,
+	block ExecutableBlock,
 ) ([]flow.Chunk, error) {
 	// TODO: validate block, collections and transactions
 
-	chunks, err := e.executeTransactions(transactions)
+	chunks, err := e.executeTransactions(block.Transactions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}

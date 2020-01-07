@@ -39,14 +39,18 @@ func TestExecutorExecuteBlock(t *testing.T) {
 		},
 	}
 
+	transactions := []flow.TransactionBody{tx1, tx2}
+
+	executableBlock := executor.ExecutableBlock{
+		Block:        block,
+		Transactions: transactions,
+	}
+
 	computer.On("ExecuteTransaction", mock.AnythingOfType("flow.TransactionBody")).
 		Return(nil, nil).
 		Twice()
 
-	collections := []flow.Collection{col}
-	transactions := []flow.TransactionBody{tx1, tx2}
-
-	chunks, err := exe.ExecuteBlock(block, collections, transactions)
+	chunks, err := exe.ExecuteBlock(executableBlock)
 	assert.NoError(t, err)
 	assert.Len(t, chunks, 1)
 
