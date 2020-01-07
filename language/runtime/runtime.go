@@ -351,6 +351,12 @@ func (r *interpreterRuntime) newInterpreter(
 				if err != nil {
 					panic(err)
 				}
+
+				err = program.ResolveImports(importResolver)
+				if err != nil {
+					panic(err)
+				}
+
 				return program
 			},
 		),
