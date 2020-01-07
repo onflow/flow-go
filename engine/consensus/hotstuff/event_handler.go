@@ -77,7 +77,7 @@ func (eh *EventHandler) processIncorperatedBlock(block *types.BlockProposal) {
 
 	// check if there is pending votes to build a QC as a leader
 	if eh.paceMaker.CurView() == block.Block.View && eh.protocolState.IsSelfLeaderForView(block.Block.View) {
-		newQC := eh.voteAggregator.BuildQCForBlockProposal(block)
+		newQC := eh.voteAggregator.BuildQCOnReceivingBlock(block.Block)
 		if newQC != nil {
 			eh.processNewQC(newQC)
 		}
@@ -97,7 +97,7 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 	if eh.forkChoice.CanIncorperate(blockProposal) == false {
 		// the proposal is not incorperated (meaning, its QC doesn't exist in the block tree)
 		eh.incorperatedBlocks.Store(blockProposal)
-		eh.missingBlockRequester.FetchMissingBlock(blockProposal.Block.View, blockProposal.Block.BlockMRH())
+		eh.missingBlockRequester.FetchMissingBlock(blockProposal.Block.View, blockProposal.Block.BlockMRH)
 		return
 	}
 
@@ -143,17 +143,18 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 func (eh *EventHandler) onReceiveVote(vote *types.Vote) {
 	blockProposal := eh.forkChoice.FindBlockProposalByViewAndBlockMRH(vote.View, vote.BlockMRH)
 	if blockProposal == nil {
-		eh.voteAggregator.Store(vote)
-		eh.missingBlockRequester.FetchMissingBlock(vote.View, vote.BlockMRH)
+		if eh.validator.ValidatePendingVote(vote) {
+			eh.voteAggregator.StorePendingVote(vote)
+			eh.missingBlockRequester.FetchMissingBlock(vote.View, vote.BlockMRH)
+		}
 		return
 	}
-
-	newQC := eh.voteAggregator.StoreAndMakeQCForIncorporatedVote(vote, blockProposal)
-	if newQC == nil {
-		return // if a QC has been made before or the vote was invalid
+	if eh.validator.ValidateIncorporatedVote(vote, blockProposal) {
+		eh.voteAggregator.StoreIncorporatedVote(vote)
+		if newQC := eh.voteAggregator.MakeQCForBlock(blockProposal.Block); newQC != nil {
+			eh.processNewQC(newQC)
+		}
 	}
-
-	eh.processNewQC(newQC)
 }
 
 func (eh *EventHandler) onLocalTimeout(timeout *types.Timeout) {

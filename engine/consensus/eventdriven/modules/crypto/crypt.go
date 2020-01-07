@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/rand"
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/types"
 	"time"
 )
 
@@ -12,33 +13,23 @@ const timeToAggregate10000PubKeys uint = 45000
 const sigLength uint = 48
 const PubKeyLength uint = 96
 
-type Signature struct {
-	RawSignature []byte
-	SignerIdx    uint32
-}
-
 type AggregatedPubKey struct {
 	RawPubKey []byte
 }
 
-type AggregatedSignature struct {
-	RawSignature []byte
-	Signers      []bool
-}
-
-func SignMsg(msg interface{}, signerIdx uint32) *Signature {
-	rawSig := []byte{}
+func SignMsg(msg interface{}, signerIdx uint32) *types.Signature {
+	rawSig := [32]byte{}
 	// Fill rawSig with random data
-	rand.Read(rawSig)
+	rand.Read(rawSig[:])
 	time.Sleep(time.Duration(timeToSignSingle) * time.Microsecond)
 
-	return &Signature{
+	return &types.Signature{
 		RawSignature: rawSig,
 		SignerIdx:    signerIdx,
 	}
 }
 
-func VerifySig(rawData interface{}, sig *Signature) bool {
+func VerifySig(rawData interface{}, sig *types.Signature) bool {
 	time.Sleep(time.Duration(timeToVerifySingle) * time.Microsecond)
 
 	return true
@@ -57,7 +48,7 @@ func AggregatePubKeys(pubKeys [][]byte) *AggregatedPubKey {
 	}
 }
 
-func AggregateSigs(sigs []*Signature, signersBitfieldLength uint32) *AggregatedSignature {
+func AggregateSigs(sigs []*types.Signature, signersBitfieldLength uint32) *types.AggregatedSignature {
 	rawSig := make([]byte, sigLength)
 	signers := make([]bool, signersBitfieldLength)
 	// Fill rawSig with random data
@@ -72,13 +63,13 @@ func AggregateSigs(sigs []*Signature, signersBitfieldLength uint32) *AggregatedS
 	timeToAggregateSigs := (timeToAggregate10000Sigs * uint(len(sigs))) / 10000
 	time.Sleep(time.Duration(timeToAggregateSigs) * time.Microsecond)
 
-	return &AggregatedSignature{
+	return &types.AggregatedSignature{
 		RawSignature: rawSig,
 		Signers:      signers,
 	}
 }
 
-func VerifyAggregatedSig(rawData interface{}, aggregatedSig *AggregatedSignature, aggregatedPubKey *AggregatedPubKey) bool {
+func VerifyAggregatedSig(rawData interface{}, aggregatedSig *types.AggregatedSignature, aggregatedPubKey *AggregatedPubKey) bool {
 	time.Sleep(time.Duration(timeToVerifySingle) * time.Microsecond)
 
 	return true

@@ -1,3 +1,6 @@
 package types
 
-type AggregatedSignature struct{}
+type AggregatedSignature struct {
+	RawSignature []byte
+	Signers      []bool
+}
