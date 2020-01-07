@@ -116,6 +116,20 @@ func (mr *MockCollectionsMockRecorder) ByFingerprint(arg0 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByFingerprint", reflect.TypeOf((*MockCollections)(nil).ByFingerprint), arg0)
 }
 
+// Remove mocks base method
+func (m *MockCollections) Remove(arg0 flow.Fingerprint) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Remove", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Remove indicates an expected call of Remove
+func (mr *MockCollectionsMockRecorder) Remove(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockCollections)(nil).Remove), arg0)
+}
+
 // Save mocks base method
 func (m *MockCollections) Save(arg0 *flow.Collection) error {
 	m.ctrl.T.Helper()

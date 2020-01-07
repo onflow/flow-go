@@ -34,6 +34,10 @@ type TransactionBody struct {
 	Signatures []AccountSignature
 }
 
+func (tb *TransactionBody) Fingerprint() Fingerprint {
+	return Fingerprint(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(tb)))
+}
+
 // Transaction is the smallest unit of task.
 type Transaction struct {
 	// Body of the transaction
@@ -64,9 +68,9 @@ func (tx *Transaction) Singularity() []byte {
 }
 
 // Fingerprint hashes the transaction body
-// Fingerprint provides a meseaure to check the integrity of the content
+// Fingerprint provides a measure to check the integrity of the content
 func (tx *Transaction) Fingerprint() Fingerprint {
-	return Fingerprint(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(tx.TransactionBody)))
+	return tx.TransactionBody.Fingerprint()
 }
 
 // ID returns an Identifier (unique id) for this transaction
