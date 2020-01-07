@@ -9,13 +9,10 @@ type Collections interface {
 	// ByFingerprint returns the collection with the given fingerprint.
 	ByFingerprint(hash flow.Fingerprint) (*flow.Collection, error)
 
-	// TransactionsByFingerprint returns the collection's transactions by the
-	// collection fingerprint.
-	TransactionsByFingerprint(hash flow.Fingerprint) ([]*flow.Transaction, error)
-
-	// Save inserts the collection, keyed by fingerprint.
+	// Save inserts the collection keyed by fingerprint and all constituent
+	// transactions.
 	Save(collection *flow.Collection) error
 
-	// Remove removes the collection.
+	// Remove removes the collection and all constituent transactions.
 	Remove(hash flow.Fingerprint) error
 }

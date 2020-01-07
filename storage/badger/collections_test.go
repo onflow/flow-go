@@ -17,52 +17,56 @@ import (
 func TestGetCollectionTransactions(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		txStore := badgerstorage.NewTransactions(db)
-		collStore := badgerstorage.NewCollections(db)
+		transactions := badgerstorage.NewTransactions(db)
+		collections := badgerstorage.NewCollections(db)
 
-		tx1 := unittest.TransactionFixture(func(t *flow.Transaction) {
-			t.Nonce = 1
+		coll := unittest.CollectionFixture(2)
+
+		t.Run("should be able to save collection", func(t *testing.T) {
+			err := collections.Save(&coll)
+			assert.NoError(t, err)
 		})
-		tx2 := unittest.TransactionFixture(func(t *flow.Transaction) {
-			t.Nonce = 2
+
+		t.Run("should be able to read collection", func(t *testing.T) {
+			actual, err := collections.ByFingerprint(coll.Fingerprint())
+			assert.NoError(t, err)
+			assert.Equal(t, &coll, actual)
 		})
-		collection := flow.Collection{
-			Transactions: []flow.Fingerprint{tx1.Fingerprint(), tx2.Fingerprint()},
-		}
 
-		err := txStore.Insert(&tx1)
-		assert.NoError(t, err)
-		err = txStore.Insert(&tx2)
-		assert.NoError(t, err)
-		err = collStore.Save(&collection)
-		assert.NoError(t, err)
+		t.Run("should be able to read transactions individually", func(t *testing.T) {
+			expected1 := coll.Transactions[0]
+			expected2 := coll.Transactions[1]
 
-		actual, err := collStore.ByFingerprint(collection.Fingerprint())
-		assert.NoError(t, err)
-		assert.Equal(t, &collection, actual)
+			actual1, err := transactions.ByFingerprint(expected1.Fingerprint())
+			assert.NoError(t, err)
+			assert.Equal(t, expected1, actual1.TransactionBody)
 
-		transactions, err := collStore.TransactionsByFingerprint(collection.Fingerprint())
-		assert.NoError(t, err)
-		assert.Len(t, transactions, 2)
-		assert.Equal(t, tx1, *transactions[0])
-		assert.Equal(t, tx2, *transactions[1])
+			actual2, err := transactions.ByFingerprint(expected2.Fingerprint())
+			assert.NoError(t, err)
+			assert.Equal(t, expected2, actual2.TransactionBody)
+		})
 	})
 }
 
-func TestCollectionRetrievalByHash(t *testing.T) {
+// Make sure collection storage still works if transactions have already been
+// individually stored.
+func TestStoringTransactionsTwice(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		transactions := badgerstorage.NewTransactions(db)
 		collections := badgerstorage.NewCollections(db)
 
-		collection := unittest.FlowCollectionFixture(2)
+		coll := unittest.CollectionFixture(2)
+		tx1 := flow.Transaction{TransactionBody: coll.Transactions[0]}
+		tx2 := flow.Transaction{TransactionBody: coll.Transactions[1]}
 
-		err := collections.Save(&collection)
-		require.NoError(t, err)
+		err := transactions.Insert(&tx1)
+		assert.NoError(t, err)
+		err = transactions.Insert(&tx2)
+		assert.NoError(t, err)
 
-		byHash, err := collections.ByFingerprint(collection.Fingerprint())
-		require.NoError(t, err)
-
-		assert.Equal(t, collection, *byHash)
+		err = collections.Save(&coll)
+		assert.NoError(t, err)
 	})
 }
 
@@ -72,7 +76,7 @@ func TestRetrievalByNonexistentHash(t *testing.T) {
 
 		collections := badgerstorage.NewCollections(db)
 
-		collection := unittest.FlowCollectionFixture(4)
+		collection := unittest.CollectionFixture(4)
 
 		err := collections.Save(&collection)
 		require.NoError(t, err)
@@ -89,7 +93,7 @@ func TestStoringSameCollectionTwice(t *testing.T) {
 
 		collections := badgerstorage.NewCollections(db)
 
-		collection := unittest.FlowCollectionFixture(3)
+		collection := unittest.CollectionFixture(3)
 
 		err := collections.Save(&collection)
 		require.NoError(t, err)
