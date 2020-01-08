@@ -3,13 +3,15 @@
 package middleware
 
 import (
+	"bufio"
 	"fmt"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"io/ioutil"
 	"sync"
 
 	"github.com/dapperlabs/flow-go/network"
+	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 )
 
@@ -21,7 +23,7 @@ type Connection struct {
 	enc      network.Encoder
 	dec      network.Decoder
 	inbound  chan interface{}
-	outbound chan interface{}
+	outbound chan *libp2p.Message
 	once     *sync.Once
 	done     chan struct{}
 }
@@ -44,7 +46,7 @@ func NewConnection(log zerolog.Logger, codec network.Codec, stream libp2pnetwork
 		enc:      enc,
 		dec:      dec,
 		inbound:  make(chan interface{}),
-		outbound: make(chan interface{}),
+		outbound: make(chan *libp2p.Message),
 		once:     &sync.Once{},
 		done:     make(chan struct{}),
 	}
@@ -55,6 +57,7 @@ func NewConnection(log zerolog.Logger, codec network.Codec, stream libp2pnetwork
 // Send will encode the given opaque message using the injected encoder and
 // write it to this peer's network connection.
 func (c *Connection) Send(msg interface{}) error {
+
 	// Send the message using the stream
 	b := msg.([]byte)
 	_, err := c.stream.Write(b)
@@ -109,29 +112,41 @@ RecvLoop:
 			// TODO: implement length-prefix framing to delineate protobuf message if exchanging more than one message (Issue#1969)
 			// (protobuf has no inherent delimiter)
 			// Read incoming data into a buffer
-			fmt.Println("calling readall")
-			buff, err := ioutil.ReadAll(c.stream)
-			if err != nil {
-				c.log.Error().Str("peer", c.stream.Conn().RemotePeer().String()).Err(err)
-				c.stream.Close()
-				return
-			}
-		     fmt.Printf(" Got buff %d\n", len(buff))
-			// ioutil.ReadAll continues to read even after an EOF is encountered.
-			// Close connection and return in that case (This is not an error)
-			if len(buff) <= 0 {
-				c.stream.Close()
-				return
-			}
-			c.log.Debug().Str("peer", c.stream.Conn().RemotePeer().
-				String()).Bytes("message", buff).Int("length", len(buff)).
-				Msg("received message")
 
-			fmt.Printf(" pushing to channel ")
+			//_, err := c.stream.Read(buff)
+		    r := ggio.NewDelimitedReader(c.stream, 1<<20)
+			msg := new(libp2p.Message)
 
 
-		// stash the received message into the inbound queue for handling
-		c.inbound <- buff
+				err := r.ReadMsg(msg)
+				if err != nil {
+					fmt.Println(err)
+				}
+				fmt.Println(msg)
+
+
+			//buff, err := ioutil.ReadAll(c.stream)
+		//	if err != nil {
+		//		c.log.Error().Str("peer", c.stream.Conn().RemotePeer().String()).Err(err)
+		//		c.stream.Close()
+		//		return
+		//	}
+		//
+		//	// ioutil.ReadAll continues to read even after an EOF is encountered.
+		//	// Close connection and return in that case (This is not an error)
+		//	if len(buff) == 0 {
+		//		//c.stream.Close()
+		//		continue RecvLoop
+		//	}
+		//	c.log.Debug().Str("peer", c.stream.Conn().RemotePeer().
+		//		String()).Bytes("message", buff).Int("length", len(buff)).
+		//		Msg("received message")
+		//
+		//	fmt.Printf(" pushing to channel ")
+		//
+		//
+		//// stash the received message into the inbound queue for handling
+		//c.inbound <- buff
 	}
 
 	// close and drain the inbound channel
@@ -153,7 +168,18 @@ SendLoop:
 
 			// if we have a message in the outbound queue, write it to the connection
 		case msg := <-c.outbound:
-			err := c.Send(msg)
+			bufw := bufio.NewWriter(c.stream)
+			wc := ggio.NewDelimitedWriter(bufw)
+
+
+				err := wc.WriteMsg(msg)
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				bufw.Flush()
+
+			//err := c.Send(msg)
 			if isClosedErr(err) {
 				c.log.Debug().Msg("connection closed, stopping writes")
 				c.stop()
