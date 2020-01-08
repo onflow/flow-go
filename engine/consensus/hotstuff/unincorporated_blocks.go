@@ -8,7 +8,7 @@ func (u *UnincorporatedBlocks) Store(blockProposal *types.BlockProposal) {
 	panic("TODO")
 }
 
-func (u *UnincorporatedBlocks) ExtractByView(view uint64) *types.BlockProposal {
+func (u *UnincorporatedBlocks) ExtractByView(view uint64) (*types.BlockProposal, bool) {
 	panic("TODO")
 }
 
