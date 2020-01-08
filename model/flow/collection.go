@@ -8,11 +8,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/hash"
 )
 
-// Collection is set of transactions.
-type Collection struct {
-	Transactions []TransactionBody
-}
-
 // LightCollection is a collection containing references to the constituent
 // transactions rather than full transaction bodies. It is used for indexing
 // transactions by collection and for computing the collection fingerprint.
@@ -24,6 +19,23 @@ func (lc *LightCollection) Fingerprint() Fingerprint {
 	return Fingerprint(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(lc)))
 }
 
+// Collection is set of transactions.
+type Collection struct {
+	Transactions []TransactionBody
+}
+
+// CollectionFromTransactions creates a new collection from the list of
+// transactions.
+func CollectionFromTransactions(transactions []*Transaction) Collection {
+	coll := Collection{Transactions: make([]TransactionBody, 0, len(transactions))}
+
+	for _, tx := range transactions {
+		coll.Transactions = append(coll.Transactions, tx.TransactionBody)
+	}
+
+	return coll
+}
+
 // Light returns the light, reference-only version of the collection.
 func (c Collection) Light() *LightCollection {
 	lc := LightCollection{Transactions: make([]Fingerprint, len(c.Transactions))}
@@ -33,6 +45,13 @@ func (c Collection) Light() *LightCollection {
 	}
 
 	return &lc
+}
+
+// Guarantee returns a collection guarantee for this collection.
+func (c *Collection) Guarantee() CollectionGuarantee {
+	return CollectionGuarantee{
+		Hash: crypto.Hash(c.Fingerprint()),
+	}
 }
 
 // Fingerprint returns the canonical hash of this collection.

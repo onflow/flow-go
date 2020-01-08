@@ -37,6 +37,10 @@ func (s *state) NewView(commitment flow.StateCommitment) *View {
 			return nil, err
 		}
 
+		if len(values) == 0 {
+			return nil, nil
+		}
+
 		return values[0], nil
 	})
 }

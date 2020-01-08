@@ -8,9 +8,9 @@ import (
 type Guarantees interface {
 
 	// Save inserts the collection guarantee.
-	Save(guarantee *flow.CollectionGuarantee)
+	Save(guarantee *flow.CollectionGuarantee) error
 
 	// ByFingerprint retrieves the collection guarantee by the collection
 	// fingerprint.
-	ByFingerPrint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error)
+	ByFingerprint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error)
 }

@@ -34,6 +34,13 @@ func BlockHeaderFixture() flow.Header {
 	}
 }
 
+func CollectionGuaranteeFixture() *flow.CollectionGuarantee {
+	return &flow.CollectionGuarantee{
+		Hash:       []byte{1, 2, 3, 4},
+		Signatures: []crypto.Signature{[]byte{1, 2, 3, 4}},
+	}
+}
+
 func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 	ret := make([]*flow.CollectionGuarantee, n)
 	for i := 0; i < n; i++ {
@@ -88,14 +95,18 @@ func IdentifierFixture() flow.Identifier {
 	return id
 }
 
-// IdentityFixture returns a
-func IdentityFixture() flow.Identity {
-	return flow.Identity{
+// IdentityFixture returns a node identity.
+func IdentityFixture(opts ...func(*flow.Identity)) flow.Identity {
+	id := flow.Identity{
 		NodeID:  IdentifierFixture(),
 		Address: "address",
 		Role:    flow.RoleConsensus,
 		Stake:   1000,
 	}
+	for _, apply := range opts {
+		apply(&id)
+	}
+	return id
 }
 
 // IdentityListFixture returns a list of node identity objects. The identities
