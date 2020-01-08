@@ -124,11 +124,9 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 func (e *Engine) propose() {
 
-	ticker := time.NewTicker(e.conf.ProposalPeriod)
-
 	for {
 		select {
-		case <-ticker.C:
+		case <-time.After(e.conf.ProposalPeriod):
 
 			err := e.createProposal()
 			if err != nil {
