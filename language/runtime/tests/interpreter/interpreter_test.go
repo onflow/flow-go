@@ -1696,9 +1696,12 @@ func TestInterpretHostFunctionWithVariableArguments(t *testing.T) {
 
 func TestInterpretCompositeDeclaration(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
 
-		if compositeKind == common.CompositeKindContract {
+		switch compositeKind {
+		case common.CompositeKindContract,
+			common.CompositeKindEvent:
+
 			continue
 		}
 
@@ -3238,7 +3241,11 @@ func TestInterpretOptionalNilValueComparison(t *testing.T) {
 
 func TestInterpretCompositeNilEquality(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		if compositeKind == common.CompositeKindEvent {
+			continue
+		}
 
 		var setupCode, identifier string
 		if compositeKind == common.CompositeKindContract {
@@ -3474,9 +3481,13 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 
 func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
 
 		if compositeKind == common.CompositeKindContract {
+			continue
+		}
+
+		if !compositeKind.SupportsInterfaces() {
 			continue
 		}
 
@@ -3514,7 +3525,11 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 
 func TestInterpretInterfaceFieldUse(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
+
+		if !compositeKind.SupportsInterfaces() {
+			continue
+		}
 
 		var setupCode, identifier string
 		if compositeKind == common.CompositeKindContract {
@@ -3582,7 +3597,11 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 
 func TestInterpretInterfaceFunctionUse(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
+
+		if !compositeKind.SupportsInterfaces() {
+			continue
+		}
 
 		var setupCode, identifier string
 		if compositeKind == common.CompositeKindContract {
@@ -3638,7 +3657,11 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 
 func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
+
+		if !compositeKind.SupportsInterfaces() {
+			continue
+		}
 
 		var setupCode, tearDownCode, identifier string
 
@@ -3728,7 +3751,11 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 		2: &interpreter.ConditionError{},
 	}
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
+
+		if !compositeKind.SupportsInterfaces() {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
