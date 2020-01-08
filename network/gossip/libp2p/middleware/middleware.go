@@ -111,7 +111,7 @@ func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 	}
 }
 
-func (m *Middleware) createOutboundMessage(nodeID flow.Identifier, msg interface{}) ([]byte, error) {
+func (m *Middleware) createOutboundMessage(nodeID flow.Identifier, msg interface{}) (*libp2p.Message, error) {
 
 	// Compose the message payload
 	message := &libp2p.Message{
@@ -119,12 +119,12 @@ func (m *Middleware) createOutboundMessage(nodeID flow.Identifier, msg interface
 		Event:    msg.([]byte),
 	}
 	// Get the ProtoBuf representation of the message
-	pmsg, err := proto.Marshal(message)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not marshal message: %v", message)
-	}
+	//pmsg, err := proto.Marshal(message)
+	//if err != nil {
+	//	return nil, errors.Wrapf(err, "could not marshal message: %v", message)
+	//}
 
-	return pmsg, err
+	return message, nil
 }
 
 func (m *Middleware) createInboundMessage(msg interface{}) (*flow.Identifier, interface{}, error) {

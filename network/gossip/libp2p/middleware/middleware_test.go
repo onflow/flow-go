@@ -23,6 +23,9 @@ func TestSendAndReceive(t *testing.T) {
 	msg := []byte("hello")
 	time.Sleep(4 * time.Second)
 	mws[0].Send(ids[count-1], msg)
+	time.Sleep(time.Second * 10)
+	mws[0].Send(ids[count-1], msg)
+
 	time.Sleep(time.Minute * 10)
 }
 
