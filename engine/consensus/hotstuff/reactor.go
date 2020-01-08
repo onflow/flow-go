@@ -11,17 +11,14 @@ type Reactor interface {
 	FinalizedView() uint64
 	IsSafeNode(block *types.BlockProposal) bool
 
-	AddBlock(*types.BlockProposal) // ToDo rename to AddBlock
-	ProcessQcFromVotes(*types.QuorumCertificate)
-
 	// IsKnownBlock returns true if the consensus reactor knows the specified block
 	IsKnownBlock([]byte, uint64) bool
 
 	// IsProcessingNeeded returns true if consensus reactor should process the specified block
 	IsProcessingNeeded([]byte, uint64) bool
 
-
-
+	AddBlock(*types.BlockProposal)
+	ProcessQcFromVotes(*types.QuorumCertificate)
 
 	// MakeForkChoice prompts the ForkChoice to generate a fork choice.
 	// The fork choice is a qc that should be used for building the primaries block

@@ -21,10 +21,12 @@ func (p *PaceMaker) UpdateQC(qc *types.QuorumCertificate) *types.NewViewEvent {
 	panic("TODO")
 }
 
+// ToDo change to ProcessedBlockForView(view uint64)
 func (p *PaceMaker) UpdateBlock(block *types.BlockProposal) *types.NewViewEvent {
 	panic("TODO")
 }
 
+// ToDo change to ProcessedQcForView(view uint64)
 func (p *PaceMaker) OnLocalTimeout(timeout *types.Timeout) *types.NewViewEvent {
 	panic("TODO")
 }
