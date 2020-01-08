@@ -7,16 +7,17 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/components/computer"
-	mockcomputer "github.com/dapperlabs/flow-go/engine/execution/execution/components/computer/mock"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/components/executor"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	vmmock "github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func TestExecutorExecuteBlock(t *testing.T) {
-	comp := &mockcomputer.Computer{}
+func TestBlockExecutor_ExecuteBlock(t *testing.T) {
+	vm := &vmmock.VirtualMachine{}
+	bc := &vmmock.BlockContext{}
 
-	exe := executor.New(comp)
+	exe := executor.NewBlockExecutor(vm)
 
 	tx1 := flow.TransactionBody{
 		Script: []byte("transaction { execute {} }"),
@@ -47,12 +48,16 @@ func TestExecutorExecuteBlock(t *testing.T) {
 		Transactions: transactions,
 	}
 
-	comp.On(
+	vm.On("NewBlockContext", &block).
+		Return(bc).
+		Once()
+
+	bc.On(
 		"ExecuteTransaction",
 		mock.AnythingOfType("*ledger.View"),
 		mock.AnythingOfType("flow.TransactionBody"),
 	).
-		Return(&computer.TransactionResult{Error: nil}, nil).
+		Return(&virtualmachine.TransactionResult{}, nil).
 		Twice()
 
 	chunks, err := exe.ExecuteBlock(executableBlock)
@@ -62,5 +67,6 @@ func TestExecutorExecuteBlock(t *testing.T) {
 	chunk := chunks[0]
 	assert.EqualValues(t, chunk.TxCounts, 2)
 
-	comp.AssertExpectations(t)
+	vm.AssertExpectations(t)
+	bc.AssertExpectations(t)
 }

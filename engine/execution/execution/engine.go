@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/components/executor"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -21,7 +21,7 @@ type Engine struct {
 	con         network.Conduit
 	me          module.Local
 	collections storage.Collections
-	executor    executor.Executor
+	executor    executor.BlockExecutor
 }
 
 func New(
@@ -29,7 +29,7 @@ func New(
 	net module.Network,
 	me module.Local,
 	collections storage.Collections,
-	executor executor.Executor,
+	executor executor.BlockExecutor,
 ) (*Engine, error) {
 
 	e := Engine{
