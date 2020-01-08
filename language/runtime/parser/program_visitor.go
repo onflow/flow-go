@@ -283,9 +283,6 @@ func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) int
 			&ast.SpecialFunctionDeclaration{
 				DeclarationKind: common.DeclarationKindInitializer,
 				FunctionDeclaration: &ast.FunctionDeclaration{
-					Identifier: ast.Identifier{
-						Identifier: common.DeclarationKindInitializer.Keywords(),
-					},
 					ParameterList: parameterList,
 					StartPos:      parameterList.StartPos,
 				},
