@@ -163,118 +163,96 @@ func FlowBuiltInFunctions(impls FlowBuiltinImpls) StandardLibraryFunctions {
 
 // built-in event types
 
-var AccountCreatedEventType = &sema.CompositeType{
-	Kind:       common.CompositeKindEvent,
-	Location:   flowLocation,
-	Identifier: "AccountCreated",
-	Members: map[string]*sema.Member{
-		"address": sema.NewCheckedMember(&sema.Member{
-			// TODO:
-			ContainerType:   nil,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: "address"},
-			TypeAnnotation:  sema.NewTypeAnnotation(&sema.StringType{}),
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		}),
-	},
-	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
-		{
-			IsResource: false,
-			Type:       &sema.StringType{},
-		},
-	},
+type flowEventTypeParameter struct {
+	Identifier string
+	Type       sema.Type
 }
 
-var AccountKeyAddedEventType = &sema.CompositeType{
-	Kind:       common.CompositeKindEvent,
-	Location:   flowLocation,
-	Identifier: "AccountKeyAdded",
-	// TODO:
-	//Fields: []sema.EventFieldType{
-	//	{
-	//		Identifier: "address",
-	//		Type:       &sema.StringType{},
-	//	},
-	//	{
-	//		Identifier: "publicKey",
-	//		Type: &sema.VariableSizedType{
-	//			Type: &sema.IntType{},
-	//		},
-	//	},
-	//},
-	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+func newFlowEventType(identifier string, parameters []flowEventTypeParameter) *sema.CompositeType {
+
+	eventType := &sema.CompositeType{
+		Kind:       common.CompositeKindEvent,
+		Location:   flowLocation,
+		Identifier: identifier,
+		Members:    map[string]*sema.Member{},
+	}
+
+	for _, parameter := range parameters {
+		typeAnnotation := sema.NewTypeAnnotation(parameter.Type)
+
+		eventType.Members[parameter.Identifier] =
+			sema.NewCheckedMember(&sema.Member{
+				ContainerType:   eventType,
+				Access:          ast.AccessPublic,
+				Identifier:      ast.Identifier{Identifier: parameter.Identifier},
+				TypeAnnotation:  typeAnnotation,
+				DeclarationKind: common.DeclarationKindField,
+				VariableKind:    ast.VariableKindConstant,
+			})
+
+		eventType.ConstructorParameterTypeAnnotations = append(
+			eventType.ConstructorParameterTypeAnnotations,
+			typeAnnotation,
+		)
+	}
+
+	return eventType
+}
+
+var AccountCreatedEventType = newFlowEventType(
+	"AccountCreated",
+	[]flowEventTypeParameter{
 		{
-			IsResource: false,
+			Identifier: "address",
+			Type:       &sema.StringType{},
+		},
+	},
+)
+
+var AccountKeyAddedEventType = newFlowEventType(
+	"AccountKeyAdded",
+	[]flowEventTypeParameter{
+		{
+			Identifier: "address",
 			Type:       &sema.StringType{},
 		},
 		{
-			IsResource: false,
+			Identifier: "publicKey",
 			Type: &sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},
 		},
 	},
-}
+)
 
-var AccountKeyRemovedEventType = &sema.CompositeType{
-	Kind:       common.CompositeKindEvent,
-	Location:   flowLocation,
-	Identifier: "AccountKeyRemoved",
-	// TODO:
-	//Fields: []sema.EventFieldType{
-	//	{
-	//		Identifier: "address",
-	//		Type:       &sema.StringType{},
-	//	},
-	//	{
-	//		Identifier: "publicKey",
-	//		Type: &sema.VariableSizedType{
-	//			Type: &sema.IntType{},
-	//		},
-	//	},
-	//},
-	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+var AccountKeyRemovedEventType = newFlowEventType(
+	"AccountKeyRemoved",
+	[]flowEventTypeParameter{
 		{
-			IsResource: false,
+			Identifier: "address",
 			Type:       &sema.StringType{},
 		},
 		{
-			IsResource: false,
+			Identifier: "publicKey",
 			Type: &sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},
 		},
 	},
-}
+)
 
-var AccountCodeUpdatedEventType = &sema.CompositeType{
-	Kind:       common.CompositeKindEvent,
-	Location:   flowLocation,
-	Identifier: "AccountCodeUpdated",
-	// TODO:
-	//Fields: []sema.EventFieldType{
-	//	{
-	//		Identifier: "address",
-	//		Type:       &sema.StringType{},
-	//	},
-	//	{
-	//		Identifier: "codeHash",
-	//		Type: &sema.VariableSizedType{
-	//			Type: &sema.IntType{},
-	//		},
-	//	},
-	//},
-	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
+var AccountCodeUpdatedEventType = newFlowEventType(
+	"AccountCodeUpdated",
+	[]flowEventTypeParameter{
 		{
-			IsResource: false,
+			Identifier: "address",
 			Type:       &sema.StringType{},
 		},
 		{
-			IsResource: false,
+			Identifier: "codeHash",
 			Type: &sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},
 		},
 	},
-}
+)
