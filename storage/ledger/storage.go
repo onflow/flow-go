@@ -34,6 +34,10 @@ func NewTrieStorage(kvdbPath, tdbPath string) (*TrieStorage, error) {
 	}, nil
 }
 
+func (f *TrieStorage) LatestStateCommitment() StateCommitment {
+	return f.tree.GetRoot().GetValue()
+}
+
 // GetRegisters read the values at the given registers at the given StateCommitment
 // This is trusted so no proof is generated
 func (f *TrieStorage) GetRegisters(registerIDs []RegisterID, stateCommitment StateCommitment) (values []RegisterValue, err error) {

@@ -34,6 +34,22 @@ func (_m *ExecutionState) CommitDelta(_a0 state.Delta) (flow.StateCommitment, er
 	return r0, r1
 }
 
+// LatestStateCommitment provides a mock function with given fields:
+func (_m *ExecutionState) LatestStateCommitment() flow.StateCommitment {
+	ret := _m.Called()
+
+	var r0 flow.StateCommitment
+	if rf, ok := ret.Get(0).(func() flow.StateCommitment); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.StateCommitment)
+		}
+	}
+
+	return r0
+}
+
 // NewView provides a mock function with given fields: _a0
 func (_m *ExecutionState) NewView(_a0 flow.StateCommitment) *state.View {
 	ret := _m.Called(_a0)

@@ -25,20 +25,15 @@ require (
 	github.com/libp2p/go-tcp-transport v0.1.1
 	github.com/magiconair/properties v1.8.1
 	github.com/multiformats/go-multiaddr v0.2.0
-	github.com/onsi/ginkgo v1.10.1 // indirect
-	github.com/onsi/gomega v1.8.1 // indirect
-	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/pkg/term v0.0.0-20190109203006-aa71e9d9e942 // indirect
 	github.com/rs/zerolog v1.15.0
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
-	github.com/tinylib/msgp v1.1.1 // indirect
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 	go.uber.org/atomic v1.4.0
 	golang.org/x/crypto v0.0.0-20191219195013-becbf705a915
-	golang.org/x/net v0.0.0-20190912160710-24e19bdeb0f2 // indirect
 	google.golang.org/grpc v1.26.0
 	zombiezen.com/go/capnproto2 v2.17.0+incompatible
 )

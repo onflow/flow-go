@@ -49,8 +49,8 @@ func (e *blockExecutor) executeTransactions(
 	// TODO: implement real chunking
 	// MVP uses single chunk per block
 
-	// TODO: get last state commitment from previous block
-	chunkView := e.state.NewView(nil)
+	// TODO: get last state commitment from previous block - https://github.com/dapperlabs/flow-go/issues/2025
+	chunkView := e.state.NewView(e.state.LatestStateCommitment())
 
 	for _, tx := range txs {
 		txView := chunkView.NewChild()

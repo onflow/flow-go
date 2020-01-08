@@ -11,6 +11,8 @@ type ExecutionState interface {
 	NewView(flow.StateCommitment) *View
 	// CommitDelta commits a register delta and returns the new state commitment.
 	CommitDelta(Delta) (flow.StateCommitment, error)
+	// LatestStateCommitment returns the latest execution state commitment.
+	LatestStateCommitment() flow.StateCommitment
 }
 
 type state struct {
@@ -48,4 +50,8 @@ func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
 	}
 
 	return flow.StateCommitment(commitment), nil
+}
+
+func (s *state) LatestStateCommitment() flow.StateCommitment {
+	return flow.StateCommitment(s.ls.LatestStateCommitment())
 }
