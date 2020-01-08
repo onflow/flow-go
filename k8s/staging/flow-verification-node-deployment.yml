@@ -118,7 +118,7 @@ spec:
             - "--nodeid"
             - "1234567890123456789012345678901234567890123456789012345678901234"
             - "--entries"
-            - "verification-1234567890123456789012345678901234567890123456789012345678901234@localhost:8000=1000"
+            - "verification-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000" # PORT 3569
 
           # Ports exposed can be named so other resources can reference
           # them by name and not have to hard code numbers
