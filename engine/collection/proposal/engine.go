@@ -3,6 +3,7 @@
 package proposal
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -129,9 +130,10 @@ func (e *Engine) propose() {
 		case <-time.After(e.conf.ProposalPeriod):
 
 			err := e.createProposal()
-			if err != nil {
-				e.log.Err(err).Msg("failed to create new proposal")
-				continue
+			if errors.Is(err, ErrEmptyTxpool) {
+				e.log.Debug().Msg("skipping collection proposal due to empty txpool")
+			} else if err != nil {
+				e.log.Error().Err(err).Msg("failed to create new proposal")
 			}
 
 		case <-e.unit.Quit():
