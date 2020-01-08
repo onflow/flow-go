@@ -39,18 +39,23 @@ func (e *executor) ExecuteBlock(
 }
 
 func (e *executor) executeTransactions(txs []flow.TransactionBody) ([]flow.Chunk, error) {
-	results := make([]*computer.TransactionResult, len(txs))
+	cache := ledger.NewExecutionCache()
 
-	for i, tx := range txs {
-		// TODO: connect ledger to chunk cache - https://github.com/dapperlabs/flow-go/issues/1914
-		view := ledger.NewView(func(key string) ([]byte, error) { return nil, nil })
+	// TODO: implement real chunking
+	// MVP uses single chunk per block
+	cache.StartNewChunk()
+
+	for _, tx := range txs {
+		view := cache.NewTransactionView()
 
 		result, err := e.computer.ExecuteTransaction(view, tx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute transaction: %w", err)
 		}
 
-		results[i] = result
+		if result.Error == nil {
+			cache.ApplyTransactionDelta(view.Delta())
+		}
 	}
 
 	// TODO: commit chunk to storage - https://github.com/dapperlabs/flow-go/issues/1915
