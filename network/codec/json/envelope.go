@@ -15,6 +15,7 @@ const (
 	CodeResponse
 
 	CodeCollectionGuarantee
+	CodeTransaction
 
 	CodeBlockProposal
 	CodeBlockVote
