@@ -7,8 +7,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"io/ioutil"
+	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 )
@@ -55,12 +56,16 @@ func NewConnection(log zerolog.Logger, codec network.Codec, stream libp2pnetwork
 // Send will encode the given opaque message using the injected encoder and
 // write it to this peer's network connection.
 func (c *Connection) Send(msg interface{}) error {
-
-	// encode the message onto the connection stream
-	err := c.enc.Encode(msg)
+	// Send the message using the stream
+	b := msg.([]byte)
+	_, err := c.stream.Write(b)
 	if err != nil {
-		return errors.Wrap(err, "could not encode message")
+		return err
 	}
+	// Debug log the message length
+	c.log.Debug().Str("peer", c.stream.Conn().RemotePeer().String()).
+		Str("message", string(b)).Int("length", len(b)).
+		Msg("sent message")
 
 	return nil
 }
@@ -78,16 +83,6 @@ func (c *Connection) Receive() (interface{}, error) {
 	return msg, nil
 }
 
-// Process will start one background routine to handle receiving messages and
-// onde background routine to handle sending messages, so that the actual
-// middleware layer can function without blocking.
-func (c *Connection) Process(nodeID flow.Identifier) {
-	done := make(chan struct{})
-	c.log = c.log.With().Hex("node_id", nodeID[:]).Logger()
-	go c.recv()
-	go c.send()
-	<-done
-}
 
 // stop will stop by closing the done channel and closing the connection.
 func (c *Connection) stop() {
@@ -99,7 +94,7 @@ func (c *Connection) stop() {
 
 // recv must be run in a goroutine and takes care of continuously receiving
 // messages from the peer connection until the connection fails.
-func (c *Connection) recv() {
+func (c *Connection) ReceiveLoop() {
 
 RecvLoop:
 	for {
@@ -112,22 +107,29 @@ RecvLoop:
 		default:
 		}
 
-		// if we have a message on the connection, receive it
-		msg, err := c.Receive()
-		if isClosedErr(err) {
-			//fmt.Println(err)
-			c.log.Debug().Msg("connection closed, stopping reads")
-			c.stop()
-			continue
-		}
-		if err != nil {
-			c.log.Error().Err(err).Msg("could not read data, stopping reads")
-			c.stop()
-			continue
-		}
+			// TODO: implement length-prefix framing to delineate protobuf message if exchanging more than one message (Issue#1969)
+			// (protobuf has no inherent delimiter)
+			// Read incoming data into a buffer
+			buff, err := ioutil.ReadAll(c.stream)
+			if err != nil {
+				c.log.Error().Str("peer", c.stream.Conn().RemotePeer().String()).Err(err)
+				c.stream.Close()
+				return
+			}
+
+			// ioutil.ReadAll continues to read even after an EOF is encountered.
+			// Close connection and return in that case (This is not an error)
+			if len(buff) <= 0 {
+				c.stream.Close()
+				return
+			}
+			c.log.Debug().Str("peer", c.stream.Conn().RemotePeer().
+				String()).Bytes("message", buff).Int("length", len(buff)).
+				Msg("received message")
+
 
 		// stash the received message into the inbound queue for handling
-		c.inbound <- msg
+		c.inbound <- buff
 	}
 
 	// close and drain the inbound channel
@@ -136,7 +138,7 @@ RecvLoop:
 
 // send must be run in a goroutine and takes care of continuously sending
 // messages to the peer until the message queue is closed.
-func (c *Connection) send() {
+func (c *Connection) SendLoop() {
 
 SendLoop:
 	for {
