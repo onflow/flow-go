@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestSendAndReceive(t *testing.T) {
@@ -19,7 +20,7 @@ func TestSendAndReceive(t *testing.T) {
 	require.Len(t, ids, count)
 	require.Len(t, mws, count)
 	msg := json.Envelope{ Code: json.CodeRequest, Data: []byte(`{"key": "hello", "value": "world"}`)}
-	//time.Sleep(10 * time.Minute)
+	time.Sleep(10 * time.Minute)
 	mws[0].Send(ids[count-1], msg)
 }
 
