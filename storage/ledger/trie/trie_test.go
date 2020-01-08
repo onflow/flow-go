@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
-	"github.com/dapperlabs/flow-go/storage/ledger/databases/lvldb"
+	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
 
@@ -3438,7 +3438,7 @@ func TestRead_HistoricalValuesPruned(t *testing.T) {
 }
 
 func newTestDB(tb testing.TB) databases.DAL {
-	db, err := lvldb.NewLvlDB(kvdbPath, tdbPath)
+	db, err := leveldb.NewLevelDB(kvdbPath, tdbPath)
 	if err != nil {
 		tb.Fatalf("failed to initialize LvlDB instance: %s", err)
 	}

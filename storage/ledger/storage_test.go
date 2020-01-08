@@ -2,88 +2,79 @@ package ledger
 
 import (
 	"bytes"
-	"os"
 	"testing"
 
+	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
-)
-
-const (
-	// kvdbPath is the path to the key-value database.
-	kvdbPath = "db/valuedb"
-	// tdbPath is the path to the trie database.
-	tdbPath = "db/triedb"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestNewTrieStorage(t *testing.T) {
-	f, err := NewTrieStorage(kvdbPath, tdbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll("./db/")
-	f.CloseStorage()
+	unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
+		_, err := NewTrieStorage(db)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
 }
 
 func TestTrieTrusted(t *testing.T) {
-	f, err := NewTrieStorage(kvdbPath, tdbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll("./db/")
-
-	keys, values := makeTestKeys()
-
-	newRoot, err := f.UpdateRegisters(keys, values)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(f.tree.GetRoot().GetValue(), newRoot) {
-		t.Fatalf("Something in UpdateRegister went wrong")
-	}
-
-	newValues, err := f.GetRegisters(keys, f.tree.GetRoot().GetValue())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for i, val := range newValues {
-		if !bytes.Equal(values[i], val) {
-			t.Fatalf("Something in GetRegister went wrong")
+	unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
+		f, err := NewTrieStorage(db)
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
 
-	f.CloseStorage()
+		keys, values := makeTestKeys()
 
+		newRoot, err := f.UpdateRegisters(keys, values)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(f.tree.GetRoot().GetValue(), newRoot) {
+			t.Fatalf("Something in UpdateRegister went wrong")
+		}
+
+		newValues, err := f.GetRegisters(keys, f.tree.GetRoot().GetValue())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, val := range newValues {
+			if !bytes.Equal(values[i], val) {
+				t.Fatalf("Something in GetRegister went wrong")
+			}
+		}
+	})
 }
 
 func TestTrieUntrusted(t *testing.T) {
-	f, err := NewTrieStorage(kvdbPath, tdbPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll("./db/")
-
-	keys, values := makeTestKeys()
-
-	newRoot, _, err := f.UpdateRegistersWithProof(keys, values)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(f.tree.GetRoot().GetValue(), newRoot) {
-		t.Fatalf("Something in UpdateRegister went wrong")
-	}
-
-	newValues, _, err := f.GetRegistersWithProof(keys, f.tree.GetRoot().GetValue())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for i, val := range newValues {
-		if !bytes.Equal(values[i], val) {
-			t.Fatalf("Something in GetRegister went wrong")
+	unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
+		f, err := NewTrieStorage(db)
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
 
-	f.CloseStorage()
+		keys, values := makeTestKeys()
 
+		newRoot, _, err := f.UpdateRegistersWithProof(keys, values)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(f.tree.GetRoot().GetValue(), newRoot) {
+			t.Fatalf("Something in UpdateRegister went wrong")
+		}
+
+		newValues, _, err := f.GetRegistersWithProof(keys, f.tree.GetRoot().GetValue())
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, val := range newValues {
+			if !bytes.Equal(values[i], val) {
+				t.Fatalf("Something in GetRegister went wrong")
+			}
+		}
+	})
 }
 
 func makeTestKeys() ([][]byte, [][]byte) {
