@@ -21,6 +21,7 @@ type MiddlewareTestSuit struct {
 	suite.Suite
 	size int           // used to determine number of middlewares under test
 	mws  []*Middleware // used to keep track of middlewares under test
+	ov   []*mock.Overlay
 	ids  []flow.Identifier
 }
 
@@ -33,20 +34,19 @@ func TestMiddlewareTestSuit(t *testing.T) {
 func (m *MiddlewareTestSuit) SetupTest() {
 	m.size = 2 // operates on two middlewares
 	m.ids, m.mws = m.createAndStartMiddleWares(m.size)
+	require.Len(m.Suite.T(), m.ids, m.size)
+	require.Len(m.Suite.T(), m.mws, m.size)
 }
 
 func (m *MiddlewareTestSuit) TestSendAndReceive() {
-	count := 2
-	ids, mws := m.createAndStartMiddleWares(count)
-	require.Len(m.Suite.T(), ids, count)
-	require.Len(m.Suite.T(), mws, count)
 	msg := []byte("hello")
 	time.Sleep(4 * time.Second)
-	mws[0].Send(ids[count-1], msg)
+	m.mws[0].Send(m.ids[m.size-1], msg)
 	time.Sleep(time.Second * 10)
-	mws[0].Send(ids[count-1], msg)
-
-	time.Sleep(time.Minute * 10)
+	m.mws[0].Send(m.ids[m.size-1], msg)
+	for i := 0; i < m.size; i++ {
+		m.ov[i].AssertExpectations(m.T())
+	}
 }
 
 func (m *MiddlewareTestSuit) createAndStartMiddleWares(count int) ([]flow.Identifier, []*Middleware) {
@@ -74,7 +74,6 @@ func (m *MiddlewareTestSuit) createAndStartMiddleWares(count int) ([]flow.Identi
 	}
 
 	// mocks an overlay (i.e., network) for each middleware
-	var overlays []*mock.Overlay
 	for i := 0; i < count; i++ {
 		overlay := &mock.Overlay{}
 		target := i + 1
@@ -95,12 +94,12 @@ func (m *MiddlewareTestSuit) createAndStartMiddleWares(count int) ([]flow.Identi
 
 		// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
 		overlay.On("Receive", mockery.Anything).Return(nil).Once()
-		overlays = append(overlays, overlay)
+		m.ov = append(m.ov, overlay)
 	}
 
 	// starting the middleware
 	for i := 0; i < count; i++ {
-		mws[i].Start(overlays[i])
+		mws[i].Start(m.ov[i])
 		time.Sleep(1 * time.Second)
 	}
 	return ids, mws

@@ -5,18 +5,15 @@ package middleware
 import (
 	"bufio"
 	"fmt"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
-	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/network"
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 )
 
 // Connection represents a direct connection to another peer on the flow
@@ -112,23 +109,21 @@ RecvLoop:
 		default:
 		}
 
-			// TODO: implement length-prefix framing to delineate protobuf message if exchanging more than one message (Issue#1969)
-			// (protobuf has no inherent delimiter)
-			// Read incoming data into a buffer
+		// TODO: implement length-prefix framing to delineate protobuf message if exchanging more than one message (Issue#1969)
+		// (protobuf has no inherent delimiter)
+		// Read incoming data into a buffer
 
-			//_, err := c.stream.Read(buff)
-		    r := ggio.NewDelimitedReader(c.stream, 1<<20)
-			msg := new(libp2p.Message)
+		//_, err := c.stream.Read(buff)
+		r := ggio.NewDelimitedReader(c.stream, 1<<20)
+		msg := new(libp2p.Message)
 
+		err := r.ReadMsg(msg)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(msg)
 
-				err := r.ReadMsg(msg)
-				if err != nil {
-					fmt.Println(err)
-				}
-				fmt.Println(msg)
-
-
-			//buff, err := ioutil.ReadAll(c.stream)
+		//buff, err := ioutil.ReadAll(c.stream)
 		//	if err != nil {
 		//		c.log.Error().Str("peer", c.stream.Conn().RemotePeer().String()).Err(err)
 		//		c.stream.Close()
@@ -174,13 +169,12 @@ SendLoop:
 			bufw := bufio.NewWriter(c.stream)
 			wc := ggio.NewDelimitedWriter(bufw)
 
+			err := wc.WriteMsg(msg)
+			if err != nil {
+				fmt.Println(err)
+			}
 
-				err := wc.WriteMsg(msg)
-				if err != nil {
-					fmt.Println(err)
-				}
-
-				bufw.Flush()
+			bufw.Flush()
 
 			//err := c.Send(msg)
 			if isClosedErr(err) {
