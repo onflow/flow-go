@@ -79,9 +79,8 @@ generate-mocks:
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
-	mockery -name '.*' -dir=engine/execution/execution/components/computer -case=underscore -output="./engine/execution/execution/components/computer/mock" -outpkg="mock"
-	mockery -name '.*' -dir=engine/execution/execution/components/executor -case=underscore -output="./engine/execution/execution/components/executor/mock" -outpkg="mock"
-	mockery -name '.*' -dir=engine/execution/execution/modules/context -case=underscore -output="./engine/execution/execution/modules/context/mock" -outpkg="mock"
+	mockery -name '.*' -dir=engine/execution/execution/executor -case=underscore -output="./engine/execution/execution/executor/mock" -outpkg="mock"
+	mockery -name '.*' -dir=engine/execution/execution/virtualmachine -case=underscore -output="./engine/execution/execution/virtualmachine/mock" -outpkg="mock"
 	mockery -name 'Processor' -dir="./engine/consensus/eventdriven/components/pacemaker/events" -case=underscore -output="./engine/consensus/eventdriven/components/pacemaker/mock" -outpkg="mock"
 
 .PHONY: lint

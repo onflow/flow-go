@@ -1,11 +1,10 @@
-package context
+package virtualmachine
 
 import (
 	"fmt"
 	"math/big"
 	"strings"
 
-	"github.com/dapperlabs/flow-go/engine/execution/execution/modules/ledger"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -13,7 +12,7 @@ import (
 type CheckerFunc func([]byte, runtime.Location) error
 
 type transactionContext struct {
-	ledger          *ledger.View
+	ledger          Ledger
 	signingAccounts []runtime.Address
 	checker         CheckerFunc
 	logs            []string
