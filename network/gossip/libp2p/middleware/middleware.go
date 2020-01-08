@@ -301,7 +301,7 @@ func (m *Middleware) handleOutgoing(flowID flow.Identifier, s libp2pnetwork.Stre
 	log.Info().Msg("connection established")
 
 	// kick off the send loop
-	go conn.SendLoop()
+	conn.SendLoop()
 }
 
 // release will release one resource on the given semaphore.
