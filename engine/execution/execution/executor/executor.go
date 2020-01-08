@@ -30,9 +30,7 @@ func NewBlockExecutor(vm virtualmachine.VirtualMachine, state state.ExecutionSta
 func (e *blockExecutor) ExecuteBlock(
 	block ExecutableBlock,
 ) ([]flow.Chunk, error) {
-	blockContext := e.vm.NewBlockContext(&block.Block)
-
-	chunks, err := e.executeTransactions(blockContext, block.Transactions)
+	chunks, err := e.executeTransactions(block.Block, block.Transactions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -43,12 +41,15 @@ func (e *blockExecutor) ExecuteBlock(
 }
 
 func (e *blockExecutor) executeTransactions(
-	blockContext virtualmachine.BlockContext,
+	block flow.Block,
 	txs []flow.TransactionBody,
 ) ([]flow.Chunk, error) {
-	// TODO: (post-MVP) get last state commitment from previous block
-	// https://github.com/dapperlabs/flow-go/issues/2025
-	startState := e.state.LatestStateCommitment()
+	blockContext := e.vm.NewBlockContext(&block)
+
+	startState, err := e.state.StateCommitmentByBlockHash(block.Parent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch starting state commitment: %w", err)
+	}
 
 	chunkView := e.state.NewView(startState)
 
