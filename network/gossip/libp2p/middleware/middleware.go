@@ -191,6 +191,11 @@ func (m *Middleware) connect() {
 		return
 	}
 
+	// If this node is already added, noop
+	if m.exists(flowIdentity.NodeID) {
+		return
+	}
+
 	log = log.With().Str("flowIdentity", flowIdentity.String()).Str("address", flowIdentity.Address).Logger()
 
 	ip, port, err := net.SplitHostPort(flowIdentity.Address)
@@ -310,6 +315,14 @@ func (m *Middleware) add(nodeID flow.Identifier, conn *Connection) {
 	m.Lock()
 	defer m.Unlock()
 	m.conns[nodeID] = conn
+}
+
+// exists will check if the connection already exists in a concurrency-safe manner.
+func (m *Middleware) exists(nodeID flow.Identifier) bool {
+	m.Lock()
+	defer m.Unlock()
+	_, ok := m.conns[nodeID]
+	return ok
 }
 
 // remove will remove the connection with the given nodeID from the list in
