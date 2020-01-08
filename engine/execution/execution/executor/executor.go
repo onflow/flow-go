@@ -46,11 +46,11 @@ func (e *blockExecutor) executeTransactions(
 	blockContext virtualmachine.BlockContext,
 	txs []flow.TransactionBody,
 ) ([]flow.Chunk, error) {
-	// TODO: implement real chunking
-	// MVP uses single chunk per block
+	// TODO: (post-MVP) get last state commitment from previous block
+	// https://github.com/dapperlabs/flow-go/issues/2025
+	startState := e.state.LatestStateCommitment()
 
-	// TODO: get last state commitment from previous block - https://github.com/dapperlabs/flow-go/issues/2025
-	chunkView := e.state.NewView(e.state.LatestStateCommitment())
+	chunkView := e.state.NewView(startState)
 
 	for _, tx := range txs {
 		txView := chunkView.NewChild()
@@ -70,7 +70,7 @@ func (e *blockExecutor) executeTransactions(
 		return nil, fmt.Errorf("failed to apply chunk delta: %w", err)
 	}
 
-	// TODO: implement real chunking
+	// TODO: (post-MVP) implement real chunking
 	// MVP uses single chunk per block
 	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
@@ -79,7 +79,7 @@ func (e *blockExecutor) executeTransactions(
 			// TODO: compute chunk tx collection hash
 			ChunkTxCollection: nil,
 			// TODO: include start state commitment
-			StartState: nil,
+			StartState: startState,
 			// TODO: include event collection hash
 			EventCollection: nil,
 			// TODO: record gas used
