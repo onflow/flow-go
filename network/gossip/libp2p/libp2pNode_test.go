@@ -220,7 +220,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int) (nodes []*P2PNode) {
 			IP:   "0.0.0.0", // localhost
 			Port: "0",       // random Port number
 		}
-		err := n.Start(l.ctx, nodeID, logger, func(stream network.Stream){
+		err := n.Start(l.ctx, nodeID, logger, func(stream network.Stream) {
 		})
 		require.NoError(l.Suite.T(), err)
 		require.Eventuallyf(l.Suite.T(), func() bool {

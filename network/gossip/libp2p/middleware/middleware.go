@@ -152,7 +152,6 @@ func (m *Middleware) createInboundMessage(msg interface{}) (*flow.Identifier, in
 	return &id, message.Event, nil
 }
 
-
 func (m *Middleware) rotate() {
 	defer m.wg.Done()
 

@@ -4,18 +4,15 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/network/codec/json"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/mock"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"os"
-	"testing"
-	"time"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/network/codec/json"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/mock"
 )
 
 func TestSendAndReceive(t *testing.T) {
@@ -23,8 +20,8 @@ func TestSendAndReceive(t *testing.T) {
 	ids, mws := createAndStartMiddleWares(t, count)
 	require.Len(t, ids, count)
 	require.Len(t, mws, count)
-	msg := json.Envelope{ Code: json.CodeRequest, Data: []byte(`{"key": "hello", "value": "world"}`)}
-	time.Sleep(10 * time.Minute)
+	msg := json.Envelope{Code: json.CodeRequest, Data: []byte(`{"key": "hello", "value": "world"}`)}
+	//time.Sleep(10 * time.Minute)
 	mws[0].Send(ids[count-1], msg)
 }
 
@@ -55,7 +52,7 @@ func createAndStartMiddleWares(t *testing.T, count int) ([]flow.Identifier, []*M
 			target = 0
 		}
 		ip, port := mws[target].libP2PNode.GetIPPort()
-		flowID := flow.Identity{NodeID: ids[target], Address: fmt.Sprintf("%s:%s", ip,port)}
+		flowID := flow.Identity{NodeID: ids[target], Address: fmt.Sprintf("%s:%s", ip, port)}
 		overlay.On("Identity").Return(flowID, nil)
 		overlay.On("Handshake", mockery.Anything).Return(flowID.NodeID, nil)
 		overlay.On("Receive", mockery.Anything).Return(nil).Run(func(args mockery.Arguments) {

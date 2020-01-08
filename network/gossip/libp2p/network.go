@@ -151,7 +151,6 @@ func (n *Network) Receive(nodeID flow.Identifier, payload interface{}) error {
 
 	// TODO do type assettion
 
-
 	var err error
 	// Convert message payload to a known message type
 	msg, err := n.codec.Decode(payload.([]byte))
@@ -192,7 +191,6 @@ func (n *Network) processNetworkMessage(nodeID flow.Identifier, message *network
 	}
 	return nil
 }
-
 
 func (n *Network) Handshake(conn Connection) (flow.Identifier, error) {
 	return flow.Identifier{}, errors.New("method not implemented")

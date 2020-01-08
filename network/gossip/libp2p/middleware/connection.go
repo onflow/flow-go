@@ -83,7 +83,6 @@ func (c *Connection) Receive() (interface{}, error) {
 	return msg, nil
 }
 
-
 // stop will stop by closing the done channel and closing the connection.
 func (c *Connection) stop() {
 	c.once.Do(func() {
@@ -107,26 +106,25 @@ RecvLoop:
 		default:
 		}
 
-			// TODO: implement length-prefix framing to delineate protobuf message if exchanging more than one message (Issue#1969)
-			// (protobuf has no inherent delimiter)
-			// Read incoming data into a buffer
-			buff, err := ioutil.ReadAll(c.stream)
-			if err != nil {
-				c.log.Error().Str("peer", c.stream.Conn().RemotePeer().String()).Err(err)
-				c.stream.Close()
-				return
-			}
+		// TODO: implement length-prefix framing to delineate protobuf message if exchanging more than one message (Issue#1969)
+		// (protobuf has no inherent delimiter)
+		// Read incoming data into a buffer
+		buff, err := ioutil.ReadAll(c.stream)
+		if err != nil {
+			c.log.Error().Str("peer", c.stream.Conn().RemotePeer().String()).Err(err)
+			c.stream.Close()
+			return
+		}
 
-			// ioutil.ReadAll continues to read even after an EOF is encountered.
-			// Close connection and return in that case (This is not an error)
-			if len(buff) <= 0 {
-				c.stream.Close()
-				return
-			}
-			c.log.Debug().Str("peer", c.stream.Conn().RemotePeer().
-				String()).Bytes("message", buff).Int("length", len(buff)).
-				Msg("received message")
-
+		// ioutil.ReadAll continues to read even after an EOF is encountered.
+		// Close connection and return in that case (This is not an error)
+		if len(buff) <= 0 {
+			c.stream.Close()
+			return
+		}
+		c.log.Debug().Str("peer", c.stream.Conn().RemotePeer().
+			String()).Bytes("message", buff).Int("length", len(buff)).
+			Msg("received message")
 
 		// stash the received message into the inbound queue for handling
 		c.inbound <- buff
