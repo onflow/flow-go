@@ -10,6 +10,8 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/storage"
+	badgerstorage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 func main() {
@@ -17,6 +19,7 @@ func main() {
 	var (
 		ingressConfig ingress.Config
 		pool          module.TransactionPool
+		store         storage.Collections
 		ingestEngine  *ingest.Engine
 		err           error
 	)
@@ -25,6 +28,8 @@ func main() {
 		Create(func(node *cmd.FlowNodeBuilder) {
 			pool, err = mempool.NewTransactionPool()
 			node.MustNot(err).Msg("could not initialize transaction pool")
+
+			store = badgerstorage.NewCollections(node.DB)
 		}).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.StringVarP(&ingressConfig.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
@@ -53,7 +58,7 @@ func main() {
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing provider engine")
 
-			eng, err := provider.New(node.Logger, node.Network, node.State, node.Me)
+			eng, err := provider.New(node.Logger, node.Network, node.State, node.Me, store)
 			node.MustNot(err).Msg("could not initialize proposal engine")
 			return eng
 		}).

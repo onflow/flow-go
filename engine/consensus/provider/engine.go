@@ -1,6 +1,6 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package expulsion
+package provider
 
 import (
 	"github.com/pkg/errors"
@@ -15,13 +15,13 @@ import (
 	"github.com/dapperlabs/flow-go/protocol"
 )
 
-// Engine represents the expulsion engine, used to spread block proposals across
+// Engine represents the provider engine, used to spread block proposals across
 // the flow system, to non-consensus nodes. It makes sense to use a separate
 // engine to isolate the consensus algorithm from other processes, which allows
 // to create a different underlying protocol for consensus nodes, which have a
 // higher priority to receive block proposals, and other nodes
 type Engine struct {
-	unit  *engine.Unit    // used for concurrenty & shutdown
+	unit  *engine.Unit    // used for concurrency & shutdown
 	log   zerolog.Logger  // used to log relevant actions with context
 	con   network.Conduit // used to talk to other nodes on the network
 	state protocol.State  // used to access the  protocol state
@@ -40,7 +40,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ConsensusExpulsion, e)
+	con, err := net.Register(engine.ConsensusProvider, e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}

@@ -16,26 +16,27 @@ const (
 	// ...
 
 	// Collection 010-029
-	CollectionIngest   = 10
-	CollectionProposal = 50 // to consensus ingestion
-	CollectionProvider = 12
+	CollectionProvider = 10
+	CollectionIngest   = 11
+	CollectionProposal = 12
 
 	// Observation 030-049
 	// ...
 
 	// Consensus 050-099
-	ConsensusIngestion   = 50
+	ConsensusProvider    = 50
 	ConsensusPropagation = 51
-	ConsensusExpulsion   = 52
+
+	ConsensusReceiver = CollectionProvider
 
 	// Execution 100-199
 	ExecutionExecution      = 100
 	ExecutionBlockIngestion = 101
 
+	// Verification 150-199
+	VerificationVerifier = 150
+
 	// Testing 200-255
 	SimulationGenerator = 200
 	SimulationColdstuff = 201
-
-	// Verification 150-199
-	VerificationVerifier = 150
 )
