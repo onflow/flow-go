@@ -3,6 +3,7 @@ package executor
 import (
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -14,13 +15,11 @@ type BlockExecutor interface {
 
 type blockExecutor struct {
 	vm    virtualmachine.VirtualMachine
-	state State
+	state state.ExecutionState
 }
 
 // NewBlockExecutor creates a new block executor.
-func NewBlockExecutor(vm virtualmachine.VirtualMachine) BlockExecutor {
-	state := NewState()
-
+func NewBlockExecutor(vm virtualmachine.VirtualMachine, state state.ExecutionState) BlockExecutor {
 	return &blockExecutor{
 		vm:    vm,
 		state: state,
@@ -49,7 +48,9 @@ func (e *blockExecutor) executeTransactions(
 ) ([]flow.Chunk, error) {
 	// TODO: implement real chunking
 	// MVP uses single chunk per block
-	chunkView := e.state.NewView()
+
+	// TODO: get last state commitment from previous block
+	chunkView := e.state.NewView(nil)
 
 	for _, tx := range txs {
 		txView := chunkView.NewChild()
@@ -64,7 +65,10 @@ func (e *blockExecutor) executeTransactions(
 		}
 	}
 
-	endState := e.state.ApplyDelta(chunkView.Delta())
+	endState, err := e.state.CommitDelta(chunkView.Delta())
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply chunk delta: %w", err)
+	}
 
 	// TODO: implement real chunking
 	// MVP uses single chunk per block

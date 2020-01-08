@@ -1,4 +1,4 @@
-package ledger
+package state
 
 // GetRegisterFunc is a function that returns the value for a register.
 type GetRegisterFunc func(key string) ([]byte, error)

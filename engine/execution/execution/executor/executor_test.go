@@ -8,6 +8,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
+	statemock "github.com/dapperlabs/flow-go/engine/execution/execution/state/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	vmmock "github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -16,8 +18,9 @@ import (
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	vm := &vmmock.VirtualMachine{}
 	bc := &vmmock.BlockContext{}
+	es := &statemock.ExecutionState{}
 
-	exe := executor.NewBlockExecutor(vm)
+	exe := executor.NewBlockExecutor(vm, es)
 
 	tx1 := flow.TransactionBody{
 		Script: []byte("transaction { execute {} }"),
@@ -54,11 +57,28 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	bc.On(
 		"ExecuteTransaction",
-		mock.AnythingOfType("*ledger.View"),
+		mock.AnythingOfType("*state.View"),
 		mock.AnythingOfType("flow.TransactionBody"),
 	).
 		Return(&virtualmachine.TransactionResult{}, nil).
 		Twice()
+
+	es.On(
+		"NewView",
+		mock.AnythingOfType("flow.StateCommitment"),
+	).
+		Return(
+			state.NewView(func(key string) (bytes []byte, e error) {
+				return nil, nil
+			})).
+		Once()
+
+	es.On(
+		"CommitDelta",
+		mock.AnythingOfType("state.Delta"),
+	).
+		Return(nil, nil).
+		Once()
 
 	chunks, err := exe.ExecuteBlock(executableBlock)
 	assert.NoError(t, err)
@@ -69,4 +89,5 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	vm.AssertExpectations(t)
 	bc.AssertExpectations(t)
+	es.AssertExpectations(t)
 }
