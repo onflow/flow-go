@@ -21,21 +21,21 @@ import (
 // Engine is the collection provider engine, which provides access to resources
 // held by the collection node.
 type Engine struct {
-	unit  *engine.Unit
-	log   zerolog.Logger
-	con   network.Conduit
-	me    module.Local
-	state protocol.State
-	store storage.Collections
+	unit        *engine.Unit
+	log         zerolog.Logger
+	con         network.Conduit
+	me          module.Local
+	state       protocol.State
+	collections storage.Collections
 }
 
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, store storage.Collections) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, collections storage.Collections) (*Engine, error) {
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log.With().Str("engine", "provider").Logger(),
-		me:    me,
-		state: state,
-		store: store,
+		unit:        engine.NewUnit(),
+		log:         log.With().Str("engine", "provider").Logger(),
+		me:          me,
+		state:       state,
+		collections: collections,
 	}
 
 	con, err := net.Register(engine.CollectionProvider, e)
@@ -55,7 +55,6 @@ func (e *Engine) Ready() <-chan struct{} {
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// TODO describe conditions under which engine is done
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
@@ -119,7 +118,21 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.CollectionRequest) error {
-	// TODO
+	coll, err := e.collections.ByFingerprint(req.Fingerprint)
+	if err != nil {
+		return fmt.Errorf("could not retrieve requested collection: %w", err)
+	}
+
+	res := messages.CollectionResponse{
+		Fingerprint:  coll.Fingerprint(),
+		Transactions: coll.Transactions,
+	}
+
+	err = e.con.Submit(&res, originID)
+	if err != nil {
+		return fmt.Errorf("could not respond to collection requester: %w", err)
+	}
+
 	return nil
 }
 
