@@ -39,9 +39,14 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 	clusters := protocol.Cluster(identities)
 	clusterID := clusters.ClusterIDFor(me.NodeID())
 
+	logger := log.With().
+		Str("engine", "ingest").
+		Str("my_cluster", clusterID.String()).
+		Logger()
+
 	e := &Engine{
 		unit:      engine.NewUnit(),
-		log:       log.With().Str("engine", "ingest").Logger(),
+		log:       logger,
 		me:        me,
 		state:     state,
 		clusters:  clusters,
@@ -135,8 +140,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) e
 	// tx is routed to my cluster, add to mempool
 	if clusterID == e.clusterID {
 		log.Debug().Msg("adding transaction to pool")
-		e.pool.Add(tx)
-		return nil
+		return e.pool.Add(tx)
 	}
 
 	// tx is routed to another cluster

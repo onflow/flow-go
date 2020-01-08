@@ -35,6 +35,8 @@ func decode(env Envelope) (interface{}, error) {
 
 	case CodeCollectionGuarantee:
 		v = &flow.CollectionGuarantee{}
+	case CodeTransaction:
+		v = &flow.Transaction{}
 
 	case CodeBlockProposal:
 		v = &coldstuff.BlockProposal{}

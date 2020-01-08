@@ -9,49 +9,38 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestCollectionGuaranteesInsertRetrieve(t *testing.T) {
-
+func TestCollections(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		hash := crypto.Hash{0x13, 0x37}
-		expected := []*flow.CollectionGuarantee{
-			{Hash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x10}}},
-			{Hash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x20}}},
-			{Hash: crypto.Hash{0x03}, Signatures: []crypto.Signature{{0x30}}},
-		}
+		expected := unittest.CollectionFixture(2).Light()
 
-		err := db.Update(InsertCollectionGuarantees(hash, expected))
-		require.Nil(t, err)
+		t.Run("Retrieve nonexistant", func(t *testing.T) {
+			var actual flow.LightCollection
+			err := db.View(RetrieveCollection(expected.Fingerprint(), &actual))
+			assert.Error(t, err)
+		})
 
-		var actual []*flow.CollectionGuarantee
-		err = db.View(RetrieveCollectionGuarantees(hash, &actual))
-		require.Nil(t, err)
+		t.Run("Save", func(t *testing.T) {
+			err := db.Update(InsertCollection(expected))
+			require.NoError(t, err)
 
-		assert.Equal(t, expected, actual)
-	})
-}
+			var actual flow.LightCollection
+			err = db.View(RetrieveCollection(expected.Fingerprint(), &actual))
+			assert.NoError(t, err)
 
-func TestCollectionsInsertRetrieve(t *testing.T) {
+			assert.Equal(t, expected, &actual)
+		})
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		hash := crypto.Hash{0x13, 0x37}
-		expected := []*flow.CollectionGuarantee{
-			{Hash: crypto.Hash{0x01}, Signatures: []crypto.Signature{{0x10}}},
-			{Hash: crypto.Hash{0x02}, Signatures: []crypto.Signature{{0x20}}},
-			{Hash: crypto.Hash{0x03}, Signatures: []crypto.Signature{{0x30}}},
-		}
+		t.Run("Remove", func(t *testing.T) {
+			err := db.Update(RemoveCollection(expected.Fingerprint()))
+			require.NoError(t, err)
 
-		err := db.Update(InsertCollectionGuarantees(hash, expected))
-		require.Nil(t, err)
-
-		var actual []*flow.CollectionGuarantee
-		err = db.View(RetrieveCollectionGuarantees(hash, &actual))
-		require.Nil(t, err)
-
-		assert.Equal(t, expected, actual)
+			var actual flow.LightCollection
+			err = db.View(RetrieveCollection(expected.Fingerprint(), &actual))
+			assert.Error(t, err)
+		})
 	})
 }
