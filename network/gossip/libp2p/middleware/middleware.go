@@ -4,6 +4,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"github.com/golang/protobuf/proto"
 	"net"
 	"sync"
@@ -126,16 +127,29 @@ func (m *Middleware) createOutboundMessage(nodeID flow.Identifier, msg interface
 	return pmsg, err
 }
 
-func (m *Middleware) createInboundMessage(msg interface{}) (interface{}, error) {
+func (m *Middleware) createInboundMessage(msg interface{}) (*flow.Identifier, interface{}, error) {
 
 	// Unmarshal the buff to a message
 	message := &libp2p.Message{}
 	b := msg.([]byte)
 	err := proto.Unmarshal(b, message)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not unmarshal message: %v", string(b))
+		return nil, nil, errors.Wrapf(err, "could not unmarshal message: %v", string(b))
 	}
-	return message.Event, nil
+
+	// Extract sender id
+	if len(message.SenderID) < 32 {
+		m.log.Debug().
+			Bytes("sender", message.SenderID).
+			Msg(" invalid sender id")
+		err = fmt.Errorf("invalid sender id")
+		return nil, nil, err
+	}
+	var senderID [32]byte
+	copy(senderID[:], message.SenderID)
+	var id flow.Identifier
+	id = senderID
+	return &id, message.Event, nil
 }
 
 
@@ -198,7 +212,7 @@ func (m *Middleware) connect() {
 
 	// this is a blocking call so that the deferred cleanups run only after we are
 	// done handling this peer
-	m.handle(stream)
+	m.handleOutgoing(flowIdentity.NodeID, stream)
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
@@ -222,12 +236,12 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 		return
 	}
 
-	// this is a blocking call, so that the defered resource cleanup happens after
+	// this is a blocking call, so that the deferred resource cleanup happens after
 	// we are done handling the connection
-	m.handle(s)
+	m.handleIncoming(s)
 }
 
-func (m *Middleware) handle(s libp2pnetwork.Stream) {
+func (m *Middleware) handleIncoming(s libp2pnetwork.Stream) {
 
 	log := m.log.With().
 		Str("local_addr", s.Conn().LocalPeer().String()).
@@ -237,27 +251,10 @@ func (m *Middleware) handle(s libp2pnetwork.Stream) {
 	// initialize the encoder/decoder and create the connection handler
 	conn := NewConnection(log, m.codec, s)
 
-	// execute the initial handshake
-	nodeID, err := m.ov.Handshake(conn)
-	if isClosedErr(err) {
-		log.Debug().Msg("connection aborted remotely")
-		return
-	}
-	if err != nil {
-		log.Error().Err(err).Msg("could not execute handshake")
-		return
-	}
-
-	log = log.With().Hex("node_id", nodeID[:]).Logger()
-
-	// register the peer with the returned peer ID
-	m.add(nodeID, conn)
-	defer m.remove(nodeID)
-
 	log.Info().Msg("connection established")
 
 	// start processing messages in the background
-	conn.Process(nodeID)
+	conn.ReceiveLoop()
 
 	// process incoming messages for as long as the peer is running
 ProcessLoop:
@@ -266,12 +263,12 @@ ProcessLoop:
 		case <-conn.done:
 			break ProcessLoop
 		case msg := <-conn.inbound:
-			payload, err := m.createInboundMessage(msg)
+			nodeID, payload, err := m.createInboundMessage(msg)
 			if err != nil {
-				log.Error().Err(err).Msg("could not extract payload ")
+				log.Error().Err(err).Msg("could not extract payload")
 				continue ProcessLoop
 			}
-			err = m.ov.Receive(nodeID, payload)
+			err = m.ov.Receive(*nodeID, payload)
 			if err != nil {
 				log.Error().Err(err).Msg("could not deliver payload")
 				continue ProcessLoop
@@ -280,6 +277,26 @@ ProcessLoop:
 	}
 
 	log.Info().Msg("connection closed")
+}
+
+func (m *Middleware) handleOutgoing(flowID flow.Identifier, s libp2pnetwork.Stream) {
+
+	log := m.log.With().
+		Str("local_addr", s.Conn().LocalPeer().String()).
+		Str("remote_addr", s.Conn().RemotePeer().String()).
+		Logger()
+
+	// initialize the encoder/decoder and create the connection handler
+	conn := NewConnection(log, m.codec, s)
+
+	// cache the connection against the node id
+	m.add(flowID, conn)
+	defer m.remove(flowID)
+
+	log.Info().Msg("connection established")
+
+	// kick off the send loop
+	go conn.SendLoop()
 }
 
 // release will release one resource on the given semaphore.

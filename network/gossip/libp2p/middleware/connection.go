@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 )
@@ -82,14 +81,6 @@ func (c *Connection) Receive() (interface{}, error) {
 	return msg, nil
 }
 
-// Process will start one background routine to handle receiving messages and
-// onde background routine to handle sending messages, so that the actual
-// middleware layer can function without blocking.
-func (c *Connection) Process(nodeID flow.Identifier) {
-	c.log = c.log.With().Hex("node_id", nodeID[:]).Logger()
-	go c.recv()
-	go c.send()
-}
 
 // stop will stop by closing the done channel and closing the connection.
 func (c *Connection) stop() {
@@ -101,7 +92,7 @@ func (c *Connection) stop() {
 
 // recv must be run in a goroutine and takes care of continuously receiving
 // messages from the peer connection until the connection fails.
-func (c *Connection) recv() {
+func (c *Connection) ReceiveLoop() {
 
 RecvLoop:
 	for {
@@ -145,7 +136,7 @@ RecvLoop:
 
 // send must be run in a goroutine and takes care of continuously sending
 // messages to the peer until the message queue is closed.
-func (c *Connection) send() {
+func (c *Connection) SendLoop() {
 
 SendLoop:
 	for {

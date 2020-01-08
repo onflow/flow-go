@@ -53,12 +53,10 @@ func createAndStartMiddleWares(t *testing.T, count int) ([]flow.Identifier, []*M
 		flowID := flow.Identity{NodeID: ids[target], Address: fmt.Sprintf("%s:%s", ip,port)}
 		overlay.On("Identity").Return(flowID, nil)
 		overlay.On("Handshake", mockery.Anything).Return(flowID.NodeID, nil)
-		overlay.On("Receive", mockery.Anything).Return(nil).Once().Run(func(args mockery.Arguments) {
+		overlay.On("Receive", mockery.Anything).Return(nil).Run(func(args mockery.Arguments) {
 			fmt.Printf(" Recd: %s from %s", args[1], args[0])
 		})
 		overlays = append(overlays, overlay)
-
-		overlay.AssertExpectations(t)
 	}
 
 	for i:=0;i<count;i++ {
