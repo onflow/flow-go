@@ -1,7 +1,16 @@
 package flow
 
+import (
+	"strconv"
+)
+
 // ClusterID is the unique ID of a given collection node cluster.
 type ClusterID int
+
+// String returns the string representation of the Cluster ID.
+func (id ClusterID) String() string {
+	return strconv.Itoa(int(id))
+}
 
 // ClusterList is a set of clusters, keyed by ID. Each cluster must contain at
 // least one node. All nodes are collection nodes.
