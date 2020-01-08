@@ -36,13 +36,15 @@ type Engine struct {
 
 func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections, state protocol.State, executionEngine execution.ExecutionEngine) (*Engine, error) {
 	eng := Engine{
-		unit:        engine.NewUnit(),
-		log:         logger,
-		me:          me,
-		blocks:      blocks,
-		collections: collections,
-		state:       state,
-		execution:   executionEngine,
+		unit:               engine.NewUnit(),
+		log:                logger,
+		me:                 me,
+		blocks:             blocks,
+		collections:        collections,
+		state:              state,
+		execution:          executionEngine,
+		pendingBlocks:      map[string]execution.CompleteBlock{},
+		pendingCollections: map[string]string{},
 	}
 
 	con, err := net.Register(engine.ExecutionBlockIngestion, &eng)
@@ -170,7 +172,7 @@ func (e *Engine) handleBlock(block flow.Block) error {
 		}
 
 		for _, collection := range block.CollectionGuarantees {
-			hash := string(collection.Hash)
+			hash := string(collection.Fingerprint())
 			e.pendingCollections[hash] = blockHash
 			completeBlock.CompleteCollections[hash] = execution.CompleteCollection{
 				Collection:   *collection,
@@ -203,15 +205,15 @@ func (e *Engine) handleCollectionResponse(collectionResponse provider.Collection
 
 	if blockHash, ok := e.pendingCollections[hash]; ok {
 		if block, ok := e.pendingBlocks[blockHash]; ok {
-			if completeCollection, ok := block.CompleteCollections[hash]; !ok {
-				completeCollection.Transactions = collectionResponse.Transactions
-
-				return e.checkForCompleteness(block)
+			if completeCollection, ok := block.CompleteCollections[hash]; ok {
+				if completeCollection.Transactions == nil {
+					completeCollection.Transactions = collectionResponse.Transactions
+					return e.checkForCompleteness(block)
+				}
 			}
 		} else {
 			return fmt.Errorf("cannot handle collection: internal inconsistency - pending collection pointing to non-existing block")
 		}
-
 	}
 
 	return nil

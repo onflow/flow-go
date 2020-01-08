@@ -14,12 +14,22 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	network "github.com/dapperlabs/flow-go/network/mocks"
+	protocol "github.com/dapperlabs/flow-go/protocol/mocks"
 	storage "github.com/dapperlabs/flow-go/storage/mocks"
 
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine)) {
+var (
+	collectionIdentity = unittest.IdentityFixture()
+	myIdentity         = unittest.IdentityFixture()
+)
+
+func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine)) {
+
+	collectionIdentity.Role = flow.RoleCollection
+	myIdentity.Role = flow.RoleExecution
+
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -36,6 +46,16 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 	blocks := storage.NewMockBlocks(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	execution := executionMock.NewMockExecutionEngine(ctrl)
+	state := protocol.NewMockState(ctrl)
+
+	snapshot := protocol.NewMockSnapshot(ctrl)
+
+	identityList := flow.IdentityList{myIdentity, collectionIdentity}
+
+	state.EXPECT().Final().Return(snapshot).AnyTimes()
+	snapshot.EXPECT().Identities(gomock.Any()).DoAndReturn(func(f flow.IdentityFilter) (flow.IdentityList, error) {
+		return identityList.Filter(f), nil
+	})
 
 	log := zerolog.Logger{}
 
@@ -44,10 +64,10 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 	net.EXPECT().Register(gomock.Eq(uint8(engine2.ExecutionBlockIngestion)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engine2.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 
-	engine, err := New(log, net, me, blocks, collections, execution)
+	engine, err := New(log, net, me, blocks, collections, state, execution)
 	require.NoError(t, err)
 
-	f(t, engine, blocks, collections, conduit, collectionConduit, execution)
+	f(t, engine, blocks, collections, state, conduit, collectionConduit, execution)
 }
 
 // TODO Currently those tests check if objects are stored directly
@@ -55,76 +75,56 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 // tests will have to change to reflect this
 func TestBlockStorage(t *testing.T) {
 
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine) {
-
-		identifier := unittest.IdentifierFixture()
+	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine) {
 
 		block := unittest.BlockFixture()
 
 		blocks.EXPECT().Save(gomock.Eq(&block))
+		collectionConduit.EXPECT().Submit(gomock.Any(), gomock.Any()).Times(len(block.CollectionGuarantees))
 
-		err := engine.Process(identifier, block)
-		assert.NoError(t, err)
-	})
-
-}
-
-func TestCollectionStorage(t *testing.T) {
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine) {
-
-		identifier := unittest.IdentifierFixture()
-
-		collection := unittest.FlowCollectionFixture(1)
-
-		collections.EXPECT().Save(gomock.Eq(&collection))
-
-		err := engine.Process(identifier, collection)
+		err := engine.Process(myIdentity.NodeID, block)
 		assert.NoError(t, err)
 	})
 }
 
 func TestCollectionRequests(t *testing.T) {
 
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine) {
+	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine) {
 
-		collectionIdentity := unittest.IdentityFixture()
-		collectionIdentity.Role = flow.RoleCollection
+		//collectionIdentity := unittest.IdentityFixture()
+		//collectionIdentity.Role = flow.RoleCollection
 
 		block := unittest.BlockFixture()
 		//To make sure we always have collection if the block fixture changes
-		block.GuaranteedCollections = unittest.GuaranteedCollectionsFixture(5)
+		block.CollectionGuarantees = unittest.CollectionGuaranteesFixture(5)
 
 		blocks.EXPECT().Save(gomock.Eq(&block))
+		for _, col := range block.CollectionGuarantees {
+			collectionConduit.EXPECT().Submit(gomock.Eq(provider.CollectionRequest{Fingerprint: col.Fingerprint()}), gomock.Eq(collectionIdentity.NodeID))
+		}
 
 		err := engine.ProcessLocal(block)
 		require.NoError(t, err)
-
-		for _, col := range block.GuaranteedCollections {
-			collectionConduit.EXPECT().Submit(gomock.Eq(provider.CollectionRequest{Fingerprint: col.Fingerprint()}), gomock.Eq(collectionIdentity))
-		}
 	})
 }
 
 func TestValidatingCollectionResponse(t *testing.T) {
 
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine) {
-
-		collectionIdentity := unittest.IdentityFixture()
-		collectionIdentity.Role = flow.RoleCollection
+	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine) {
 
 		block := unittest.BlockFixture()
-		block.GuaranteedCollections = unittest.GuaranteedCollectionsFixture(1)
+		block.CollectionGuarantees = unittest.CollectionGuaranteesFixture(1)
 
 		blocks.EXPECT().Save(gomock.Eq(&block))
 
-		fingerprint := block.GuaranteedCollections[0].Fingerprint()
+		fingerprint := block.CollectionGuarantees[0].Fingerprint()
+
+		collectionConduit.EXPECT().Submit(gomock.Eq(provider.CollectionRequest{Fingerprint: fingerprint}), gomock.Eq(collectionIdentity.NodeID)).Return(nil)
 
 		err := engine.ProcessLocal(block)
 		require.NoError(t, err)
 
 		tx := unittest.TransactionBodyFixture()
-
-		collectionConduit.EXPECT().Submit(gomock.Eq(provider.CollectionRequest{Fingerprint: fingerprint}), gomock.Eq(collectionIdentity)).Return(nil)
 
 		rightResponse := provider.CollectionResponse{
 			Fingerprint:  fingerprint,
@@ -143,52 +143,41 @@ func TestValidatingCollectionResponse(t *testing.T) {
 		// no interaction with conduit for finished block
 		// </TODO enable>
 
-		engine.Submit(collectionIdentity.NodeID, rightResponse)
-
 		execution.EXPECT().ExecuteBlock(gomock.Any())
+
+		err = engine.ProcessLocal(rightResponse)
+		require.NoError(t, err)
 	})
 }
 
 func TestForwardingToExecution(t *testing.T) {
 
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine) {
-
-		collectionIdentity := unittest.IdentityFixture()
-		collectionIdentity.Role = flow.RoleCollection
+	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine) {
 
 		block := unittest.BlockFixture()
-		block.GuaranteedCollections = unittest.GuaranteedCollectionsFixture(3)
+		block.CollectionGuarantees = unittest.CollectionGuaranteesFixture(3)
 
 		blocks.EXPECT().Save(gomock.Eq(&block))
 
-		fingerprint := block.GuaranteedCollections[0].Fingerprint()
+		for _, col := range block.CollectionGuarantees {
+			collectionConduit.EXPECT().Submit(gomock.Eq(provider.CollectionRequest{Fingerprint: col.Fingerprint()}), gomock.Eq(collectionIdentity.NodeID))
+		}
 
 		err := engine.ProcessLocal(block)
 		require.NoError(t, err)
 
 		tx := unittest.TransactionBodyFixture()
 
-		collectionConduit.EXPECT().Submit(gomock.Eq(provider.CollectionRequest{Fingerprint: fingerprint}), gomock.Eq(collectionIdentity)).Return(nil)
-
-		rightResponse := provider.CollectionResponse{
-			Fingerprint:  fingerprint,
-			Transactions: []flow.TransactionBody{tx},
-		}
-
-		// TODO Enable wrong response sending once we have a way to hash collection
-
-		// wrongResponse := provider.CollectionResponse{
-		//	Fingerprint:  fingerprint,
-		//	Transactions: []flow.TransactionBody{tx},
-		// }
-
-		// engine.Submit(collectionIdentity.NodeID, wrongResponse)
-
-		// no interaction with conduit for finished block
-		// </TODO enable>
-
-		engine.Submit(collectionIdentity.NodeID, rightResponse)
-
 		execution.EXPECT().ExecuteBlock(gomock.Any())
+
+		for _, col := range block.CollectionGuarantees {
+			rightResponse := provider.CollectionResponse{
+				Fingerprint:  col.Fingerprint(),
+				Transactions: []flow.TransactionBody{tx},
+			}
+
+			err := engine.ProcessLocal(rightResponse)
+			require.NoError(t, err)
+		}
 	})
 }
