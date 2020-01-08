@@ -13,6 +13,10 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
+	"github.com/pkg/errors"
+	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/network"
 )
 
 // Connection represents a direct connection to another peer on the flow
@@ -97,7 +101,7 @@ func (c *Connection) stop() {
 // recv must be run in a goroutine and takes care of continuously receiving
 // messages from the peer connection until the connection fails.
 func (c *Connection) ReceiveLoop() {
-fmt.Println("starting recv")
+	fmt.Println("starting recv")
 RecvLoop:
 	for {
 		// check if we should stop

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -56,7 +57,7 @@ func createAndStartMiddleWares(t *testing.T, count int) ([]flow.Identifier, []*M
 			target = 0
 		}
 		ip, port := mws[target].libP2PNode.GetIPPort()
-		flowID := flow.Identity{NodeID: ids[target], Address: fmt.Sprintf("%s:%s", ip,port), Role:flow.RoleCollection}
+		flowID := flow.Identity{NodeID: ids[target], Address: fmt.Sprintf("%s:%s", ip, port), Role: flow.RoleCollection}
 		overlay.On("Identity").Return(flowID, nil)
 		// overlay.On("Handshake", mockery.Anything).Return(flowID.NodeID, nil)
 		overlay.On("Receive", mockery.Anything).Return(nil).Once().Run(func(args mockery.Arguments) {
