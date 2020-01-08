@@ -14,12 +14,12 @@ type EventLoop struct {
 func (el *EventLoop) loop() {
 	for {
 		select {
+		case to := <-el.localTimeouts:
+			el.eventHandler.OnLocalTimeout(to)
 		case b := <-el.blockproposals:
 			el.eventHandler.OnReceiveBlockProposal(b)
 		case v := <-el.votes:
 			el.eventHandler.OnReceiveVote(v)
-		case to := <-el.localTimeouts:
-			el.eventHandler.OnLocalTimeout(to)
 		case req := <-el.blockreqs:
 			el.eventHandler.OnBlockRequest(req)
 		}

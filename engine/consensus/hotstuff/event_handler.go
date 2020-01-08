@@ -7,12 +7,21 @@ type EventHandler struct {
 	voteAggregator        *VoteAggregator
 	voter                 *Voter
 	missingBlockRequester *MissingBlockRequester
-	forkChoice            *Reactor
+	reactor            *Reactor
 	validator             *Validator
 	blockProducer         BlockProducer
 	protocolState         ProtocolState
 	network               Network
+	blockFinalizer 		BlockFinalizer
+
+	internalState stateValue
 }
+
+type stateValue int
+const (
+	WaitingForBlock stateValue = iota
+	WaitingForVotes stateValue = iota
+)
 
 func (eh *EventHandler) OnReceiveBlockProposal(block *types.BlockProposal) {
 	eh.onReceiveBlockProposal(block)
@@ -30,38 +39,73 @@ func (eh *EventHandler) OnBlockRequest(req *types.BlockProposalRequest) {
 	eh.onBlockRequest(req)
 }
 
-func (eh *EventHandler) onNewViewEntered(newView *types.NewViewEvent) {
-	view := newView.View
-	proposal := eh.forkChoice.FindBlockForView(view)
-	if proposal == nil && eh.protocolState.IsSelfLeaderForView(view) {
-		// no need to check qc from voteaggregator, because it has been checked
-		qcForNewBlock := eh.forkChoice.GetQCForNextBlock(view)
-		proposal = eh.blockProducer.MakeBlockWithQC(qcForNewBlock)
-		go eh.network.BroadcastProposal(proposal)
-	}
+func (eh *EventHandler) onEnteringNewView() {
+	eh.pruneInMemoryState()
+	eh.internalState = WaitingForBlock
 
-	if proposal != nil {
-		eh.onReceiveBlockProposal(proposal)
+	eh.proposeIfLeaderForCurrentView()
+
+	currentBlock := eh.selectBlockProposalForCurrentView()
+	if currentBlock == nil {
+		return
 	}
+	eh.processBlockForCurrentView(currentBlock)
 }
 
-func (eh *EventHandler) onGenericQCUpdated(qc *types.QuorumCertificate) {
-	eh.paceMaker.UpdateValidQC(qc)
+// proposeIfLeaderForCurrentView generates a block proposal if this replica is the primary for the current view
+// (otherwise no-op). The proposal is broadcast it to the entire network and stored in `Reactor`.
+// Call MODIFIES internal state of Reactor!
+func (eh *EventHandler) proposeIfLeaderForCurrentView() {
+	curView := eh.paceMaker.CurView()
+	if ! eh.protocolState.IsSelfLeaderForView(curView) {
+		return
+	}
+
+	// no need to check qc from voteaggregator, because it has been checked
+	qcForNewBlock := eh.reactor.MakeForkChoice(curView)
+	proposal := eh.blockProducer.MakeBlockWithQC(curView, qcForNewBlock)
+	go eh.network.BroadcastProposal(proposal)
+	eh.reactor.AddBlock(proposal)
+}
+
+
+// selectBlockProposalForCurrentView selects a single BlockProposal from reactor whose view matches the current view.
+// Contracts:
+//  * [expected] any known blocks that are attached to the main chain
+//    (including a potential proposal for the current view) must be stored in reactor
+//  * [guaranteed] internal state is unmodified.
+// Note:
+// For the view we are primary, it cannot happen that there are multiple proposals, for the following reason.
+// This replica is the only one allowed to propose blocks for the respective view. Assuming that this replica is honest,
+// only one valid block is proposed (proposals for the same view by other replicas are invalid, as they are not primary).
+func (eh *EventHandler) selectBlockProposalForCurrentView() *types.BlockProposal {
+	proposalsAtView := eh.reactor.BlocksForView(eh.paceMaker.CurView())
+	if len(proposalsAtView) == 0 {
+		return nil
+	}
+	return proposalsAtView[0]
+}
+
+func (eh *EventHandler) pruneInMemoryState() {
+	finalizedView := eh.reactor.FinalizedView()
+	eh.voteAggregator.PruneByView(finalizedView)
+}
+
+func (eh *EventHandler) processBlockForCurrentView(block *types.BlockProposal) {
+	eh.internalState = WaitingForVotes
+
 }
 
 func (eh *EventHandler) processNewQC(qc *types.QuorumCertificate) {
 	// a invalid block might have valid QC, so update the QC first regardless the block is valid or not
-	genericQCUpdated, finalizedBlock := eh.forkChoice.UpdateValidQC(qc)
-
-	if genericQCUpdated {
-		eh.onGenericQCUpdated(qc)
-	}
+	genericQCUpdated, finalizedBlock := eh.reactor.UpdateValidQC(qc)
+	eh.paceMaker.UpdateQC(qc)
 
 	if finalizedBlock != nil {
 		eh.onBlockFinalized(finalizedBlock)
 	}
 
-	newView := eh.paceMaker.UpdateValidQC(qc)
+	newView := eh.paceMaker.UpdateQC(qc)
 	if newView != nil {
 		eh.onNewViewEntered(newView)
 	}
@@ -85,43 +129,50 @@ func (eh *EventHandler) processIncorperatedBlock(block *types.BlockProposal) {
 
 func (eh *EventHandler) onBlockFinalized(finalizedBlock *types.BlockProposal) {
 	go eh.voteAggregator.PruneByView(finalizedBlock.Block.View)
-	go eh.incorperatedBlocks.PruneByView(finalizedBlock.Block.View)
 }
 
-func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposal) {
-	if blockProposal.Block.View <= eh.forkChoice.FinalizedView() {
+
+
+func (eh *EventHandler) onReceiveBlockProposal(receivedProposal *types.BlockProposal) {
+	if receivedProposal.Block.View <= eh.reactor.FinalizedView() {
 		return // ignore proposals below finalized view
 	}
-
-	if eh.forkChoice.CanIncorperate(blockProposal) == false {
-		// the proposal is not incorperated (meaning, its QC doesn't exist in the block tree)
-		eh.incorperatedBlocks.Store(blockProposal)
-		eh.missingBlockRequester.FetchMissingBlock(blockProposal.Block.View, blockProposal.Block.BlockMRH())
+	if !eh.validator.ValidateQC(receivedProposal.QC()) {
+		// ToDo Slash
 		return
 	}
 
-	// the proposal is incorperatable
+	if eh.paceMaker.UpdateQC(receivedProposal.QC()) != nil {
+		eh.onEnteringNewView()
+	}
 
-	if !eh.validator.ValidateQC(blockProposal.Block.QC) {
+
+	eh.reactor.AddBlock(receivedProposal)
+	currentViewProposal := eh.blockProposalForCurrentView(receivedProposal)
+	if currentViewProposal == nil {
 		return
 	}
 
-	eh.processNewQC(blockProposal.Block.QC)
-
-	if eh.validator.ValidateBlock(blockProposal.Block.QC, blockProposal) == false {
-		return // ignore invalid block
+	// check if there is pending votes to build a QC as a leader
+	if eh.paceMaker.CurView() == block.Block.View && eh.protocolState.IsSelfLeaderForView(block.Block.View) {
+		newQC := eh.voteAggregator.BuildQCForBlockProposal(block)
+		if newQC != nil {
+			eh.processNewQC(newQC)
+		}
 	}
 
-	incorperatedBlock := eh.forkChoice.AddNewBlock(blockProposal)
+
+
+	incorperatedBlock := eh.reactor.AddNewBlock(receivedProposal)
 	if incorperatedBlock != nil {
 		eh.processIncorperatedBlock(incorperatedBlock)
 	}
 
-	if eh.forkChoice.IsSafeNode(blockProposal) == false {
+	if eh.reactor.IsSafeNode(receivedProposal) == false {
 		return
 	}
 
-	myVote, voteCollector := eh.voter.ShouldVoteForNewProposal(blockProposal, eh.paceMaker.CurView())
+	myVote, voteCollector := eh.voter.ShouldVoteForNewProposal(receivedProposal, eh.paceMaker.CurView())
 	if myVote == nil {
 		return // exit if i should not vote
 	}
@@ -140,7 +191,7 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 }
 
 func (eh *EventHandler) onReceiveVote(vote *types.Vote) {
-	blockProposal := eh.forkChoice.FindBlockProposalByViewAndBlockMRH(vote.View, vote.BlockMRH)
+	blockProposal := eh.reactor.FindBlockProposalByViewAndBlockMRH(vote.View, vote.BlockMRH)
 	if blockProposal == nil {
 		eh.voteAggregator.Store(vote)
 		eh.missingBlockRequester.FetchMissingBlock(vote.View, vote.BlockMRH)
@@ -163,7 +214,7 @@ func (eh *EventHandler) onLocalTimeout(timeout *types.Timeout) {
 }
 
 func (eh *EventHandler) onBlockRequest(req *types.BlockProposalRequest) {
-	blockProposal := eh.forkChoice.FindBlockProposalByViewAndBlockMRH(req.View, req.BlockMRH)
+	blockProposal := eh.reactor.FindBlockProposalByViewAndBlockMRH(req.View, req.BlockMRH)
 	if blockProposal != nil {
 		eh.network.RespondBlockProposalRequest(req, blockProposal)
 	}

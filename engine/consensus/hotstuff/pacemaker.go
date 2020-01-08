@@ -17,7 +17,7 @@ func (p *PaceMaker) CurView() uint64 {
 	return p.curView
 }
 
-func (p *PaceMaker) UpdateValidQC(qc *types.QuorumCertificate) *types.NewViewEvent {
+func (p *PaceMaker) UpdateQC(qc *types.QuorumCertificate) *types.NewViewEvent {
 	panic("TODO")
 }
 
