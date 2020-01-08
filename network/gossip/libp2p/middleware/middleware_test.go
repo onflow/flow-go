@@ -20,9 +20,10 @@ func TestSendAndReceive(t *testing.T) {
 	ids, mws := createAndStartMiddleWares(t, count)
 	require.Len(t, ids, count)
 	require.Len(t, mws, count)
-	msg := json.Envelope{Code: json.CodeRequest, Data: []byte(`{"key": "hello", "value": "world"}`)}
-	//time.Sleep(10 * time.Minute)
+	msg := []byte("hello")
+	time.Sleep(4 * time.Second)
 	mws[0].Send(ids[count-1], msg)
+	time.Sleep(time.Minute * 10)
 }
 
 func createAndStartMiddleWares(t *testing.T, count int) ([]flow.Identifier, []*Middleware) {
@@ -52,10 +53,10 @@ func createAndStartMiddleWares(t *testing.T, count int) ([]flow.Identifier, []*M
 			target = 0
 		}
 		ip, port := mws[target].libP2PNode.GetIPPort()
-		flowID := flow.Identity{NodeID: ids[target], Address: fmt.Sprintf("%s:%s", ip, port)}
+		flowID := flow.Identity{NodeID: ids[target], Address: fmt.Sprintf("%s:%s", ip,port), Role:flow.RoleCollection}
 		overlay.On("Identity").Return(flowID, nil)
-		overlay.On("Handshake", mockery.Anything).Return(flowID.NodeID, nil)
-		overlay.On("Receive", mockery.Anything).Return(nil).Run(func(args mockery.Arguments) {
+		// overlay.On("Handshake", mockery.Anything).Return(flowID.NodeID, nil)
+		overlay.On("Receive", mockery.Anything).Return(nil).Once().Run(func(args mockery.Arguments) {
 			fmt.Printf(" Recd: %s from %s", args[1], args[0])
 		})
 		overlays = append(overlays, overlay)
@@ -63,6 +64,7 @@ func createAndStartMiddleWares(t *testing.T, count int) ([]flow.Identifier, []*M
 
 	for i := 0; i < count; i++ {
 		mws[i].Start(overlays[i])
+		time.Sleep(1 * time.Second)
 	}
 
 	return ids, mws

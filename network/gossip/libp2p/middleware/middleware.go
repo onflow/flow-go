@@ -223,22 +223,22 @@ func (m *Middleware) connect() {
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	m.wg.Add(1)
 	defer m.wg.Done()
-	log := m.log.With().
-		Str("local_addr", s.Conn().LocalPeer().String()).
-		Str("remote_addr", s.Conn().RemotePeer().String()).
-		Logger()
+	//log := m.log.With().
+	//	Str("local_addr", s.Conn().LocalPeer().String()).
+	//	Str("remote_addr", s.Conn().RemotePeer().String()).
+	//	Logger()
 
 	// make sure we close the connection when we are done handling the peer
 	defer s.Close()
 
 	// get a free connection slot and make sure to free it after we drop the peer
-	select {
-	case m.slots <- struct{}{}:
-		defer m.release(m.slots)
-	default:
-		log.Debug().Msg("connection slots full")
-		return
-	}
+	//select {
+	//case m.slots <- struct{}{}:
+	//	defer m.release(m.slots)
+	//default:
+	//	log.Debug().Msg("connection slots full")
+	//	return
+	//}
 
 	// this is a blocking call, so that the deferred resource cleanup happens after
 	// we are done handling the connection
@@ -300,7 +300,7 @@ func (m *Middleware) handleOutgoing(flowID flow.Identifier, s libp2pnetwork.Stre
 	log.Info().Msg("connection established")
 
 	// kick off the send loop
-	go conn.SendLoop()
+	conn.SendLoop()
 }
 
 // release will release one resource on the given semaphore.

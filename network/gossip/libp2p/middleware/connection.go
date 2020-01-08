@@ -3,8 +3,7 @@
 package middleware
 
 import (
-	"sync"
-
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"io/ioutil"
@@ -67,6 +66,7 @@ func (c *Connection) Send(msg interface{}) error {
 		Str("message", string(b)).Int("length", len(b)).
 		Msg("sent message")
 
+	c.stream.Close()
 	return nil
 }
 
@@ -94,10 +94,9 @@ func (c *Connection) stop() {
 // recv must be run in a goroutine and takes care of continuously receiving
 // messages from the peer connection until the connection fails.
 func (c *Connection) ReceiveLoop() {
-
+fmt.Println("starting recv")
 RecvLoop:
 	for {
-
 		// check if we should stop
 		select {
 		case <-c.done:
@@ -106,25 +105,29 @@ RecvLoop:
 		default:
 		}
 
-		// TODO: implement length-prefix framing to delineate protobuf message if exchanging more than one message (Issue#1969)
-		// (protobuf has no inherent delimiter)
-		// Read incoming data into a buffer
-		buff, err := ioutil.ReadAll(c.stream)
-		if err != nil {
-			c.log.Error().Str("peer", c.stream.Conn().RemotePeer().String()).Err(err)
-			c.stream.Close()
-			return
-		}
+			// TODO: implement length-prefix framing to delineate protobuf message if exchanging more than one message (Issue#1969)
+			// (protobuf has no inherent delimiter)
+			// Read incoming data into a buffer
+			fmt.Println("calling readall")
+			buff, err := ioutil.ReadAll(c.stream)
+			if err != nil {
+				c.log.Error().Str("peer", c.stream.Conn().RemotePeer().String()).Err(err)
+				c.stream.Close()
+				return
+			}
+		     fmt.Printf(" Got buff %d\n", len(buff))
+			// ioutil.ReadAll continues to read even after an EOF is encountered.
+			// Close connection and return in that case (This is not an error)
+			if len(buff) <= 0 {
+				c.stream.Close()
+				return
+			}
+			c.log.Debug().Str("peer", c.stream.Conn().RemotePeer().
+				String()).Bytes("message", buff).Int("length", len(buff)).
+				Msg("received message")
 
-		// ioutil.ReadAll continues to read even after an EOF is encountered.
-		// Close connection and return in that case (This is not an error)
-		if len(buff) <= 0 {
-			c.stream.Close()
-			return
-		}
-		c.log.Debug().Str("peer", c.stream.Conn().RemotePeer().
-			String()).Bytes("message", buff).Int("length", len(buff)).
-			Msg("received message")
+			fmt.Printf(" pushing to channel ")
+
 
 		// stash the received message into the inbound queue for handling
 		c.inbound <- buff
