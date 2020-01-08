@@ -7,10 +7,9 @@ import (
 )
 
 type PaceMaker struct {
-	curView   uint64
-	highestQC *types.QuorumCertificate
-	timeout   *time.Timer
-	Timeouts  chan<- *types.Timeout
+	curView  uint64
+	timeout  *time.Timer
+	Timeouts chan<- *types.Timeout
 }
 
 func (p *PaceMaker) CurView() uint64 {
