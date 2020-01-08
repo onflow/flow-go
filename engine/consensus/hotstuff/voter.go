@@ -6,6 +6,6 @@ type Voter struct {
 	protocolState ProtocolState
 }
 
-func (v *Voter) ShouldVoteForNewProposal(b *types.BlockProposal, curView uint64) (myVote *types.Vote, voteCollectorIdx uint32) {
+func (v *Voter) ConsiderVoting(block *types.BlockProposal, curView uint64) *types.Vote {
 	panic("TODO")
 }
