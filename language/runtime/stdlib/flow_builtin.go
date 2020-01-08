@@ -2,6 +2,7 @@ package stdlib
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 )
@@ -162,14 +163,20 @@ func FlowBuiltInFunctions(impls FlowBuiltinImpls) StandardLibraryFunctions {
 
 // built-in event types
 
-var AccountCreatedEventType = sema.EventType{
+var AccountCreatedEventType = &sema.CompositeType{
+	Kind:       common.CompositeKindEvent,
 	Location:   flowLocation,
 	Identifier: "AccountCreated",
-	Fields: []sema.EventFieldType{
-		{
-			Identifier: "address",
-			Type:       &sema.StringType{},
-		},
+	Members: map[string]*sema.Member{
+		"address": sema.NewCheckedMember(&sema.Member{
+			// TODO:
+			ContainerType:   nil,
+			Access:          ast.AccessPublic,
+			Identifier:      ast.Identifier{Identifier: "address"},
+			TypeAnnotation:  sema.NewTypeAnnotation(&sema.StringType{}),
+			DeclarationKind: common.DeclarationKindField,
+			VariableKind:    ast.VariableKindConstant,
+		}),
 	},
 	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
 		{
@@ -179,21 +186,23 @@ var AccountCreatedEventType = sema.EventType{
 	},
 }
 
-var AccountKeyAddedEventType = sema.EventType{
+var AccountKeyAddedEventType = &sema.CompositeType{
+	Kind:       common.CompositeKindEvent,
 	Location:   flowLocation,
 	Identifier: "AccountKeyAdded",
-	Fields: []sema.EventFieldType{
-		{
-			Identifier: "address",
-			Type:       &sema.StringType{},
-		},
-		{
-			Identifier: "publicKey",
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
-		},
-	},
+	// TODO:
+	//Fields: []sema.EventFieldType{
+	//	{
+	//		Identifier: "address",
+	//		Type:       &sema.StringType{},
+	//	},
+	//	{
+	//		Identifier: "publicKey",
+	//		Type: &sema.VariableSizedType{
+	//			Type: &sema.IntType{},
+	//		},
+	//	},
+	//},
 	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
 		{
 			IsResource: false,
@@ -208,21 +217,23 @@ var AccountKeyAddedEventType = sema.EventType{
 	},
 }
 
-var AccountKeyRemovedEventType = sema.EventType{
+var AccountKeyRemovedEventType = &sema.CompositeType{
+	Kind:       common.CompositeKindEvent,
 	Location:   flowLocation,
 	Identifier: "AccountKeyRemoved",
-	Fields: []sema.EventFieldType{
-		{
-			Identifier: "address",
-			Type:       &sema.StringType{},
-		},
-		{
-			Identifier: "publicKey",
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
-		},
-	},
+	// TODO:
+	//Fields: []sema.EventFieldType{
+	//	{
+	//		Identifier: "address",
+	//		Type:       &sema.StringType{},
+	//	},
+	//	{
+	//		Identifier: "publicKey",
+	//		Type: &sema.VariableSizedType{
+	//			Type: &sema.IntType{},
+	//		},
+	//	},
+	//},
 	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
 		{
 			IsResource: false,
@@ -237,21 +248,23 @@ var AccountKeyRemovedEventType = sema.EventType{
 	},
 }
 
-var AccountCodeUpdatedEventType = sema.EventType{
+var AccountCodeUpdatedEventType = &sema.CompositeType{
+	Kind:       common.CompositeKindEvent,
 	Location:   flowLocation,
 	Identifier: "AccountCodeUpdated",
-	Fields: []sema.EventFieldType{
-		{
-			Identifier: "address",
-			Type:       &sema.StringType{},
-		},
-		{
-			Identifier: "codeHash",
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
-		},
-	},
+	// TODO:
+	//Fields: []sema.EventFieldType{
+	//	{
+	//		Identifier: "address",
+	//		Type:       &sema.StringType{},
+	//	},
+	//	{
+	//		Identifier: "codeHash",
+	//		Type: &sema.VariableSizedType{
+	//			Type: &sema.IntType{},
+	//		},
+	//	},
+	//},
 	ConstructorParameterTypeAnnotations: []*sema.TypeAnnotation{
 		{
 			IsResource: false,

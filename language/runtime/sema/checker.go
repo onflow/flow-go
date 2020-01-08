@@ -341,10 +341,6 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 
 	// Declare events, functions, and transactions
 
-	for _, declaration := range program.EventDeclarations() {
-		checker.declareEventDeclaration(declaration)
-	}
-
 	for _, declaration := range program.FunctionDeclarations() {
 		checker.declareGlobalFunctionDeclaration(declaration)
 	}

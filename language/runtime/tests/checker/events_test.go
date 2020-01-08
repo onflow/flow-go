@@ -13,26 +13,27 @@ import (
 )
 
 func TestCheckEventDeclaration(t *testing.T) {
+
 	t.Run("ValidEvent", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
-			event Transfer(to: Int, from: Int)
-		`)
+            event Transfer(to: Int, from: Int)
+        `)
 
 		require.NoError(t, err)
 	})
 
 	t.Run("InvalidEventNonPrimitiveType", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
-			struct Token {
-			  let ID: String
-			
-			  init(ID: String) {
-				self.ID = ID
-			  }
-			}
-			
-			event Transfer(token: Token)
-		`)
+            struct Token {
+              let ID: String
+
+              init(ID: String) {
+                self.ID = ID
+              }
+            }
+
+            event Transfer(token: Token)
+        `)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 
@@ -41,37 +42,42 @@ func TestCheckEventDeclaration(t *testing.T) {
 
 	t.Run("RedeclaredEvent", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
-			event Transfer(to: Int, from: Int)
-			event Transfer(to: Int)
+            event Transfer(to: Int, from: Int)
+            event Transfer(to: Int)
 		`)
 
-		errs := ExpectCheckerErrors(t, err, 1)
+		// NOTE: two redeclaration errors: one for type, one for function
+
+		errs := ExpectCheckerErrors(t, err, 2)
 
 		assert.IsType(t, &sema.RedeclarationError{}, errs[0])
+		assert.IsType(t, &sema.RedeclarationError{}, errs[1])
+
 	})
 }
 
 func TestCheckEmitEvent(t *testing.T) {
+
 	t.Run("ValidEvent", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
-			event Transfer(to: Int, from: Int)
-			
-			fun test() {
-			  emit Transfer(to: 1, from: 2)
-			}
-		`)
+            event Transfer(to: Int, from: Int)
+
+            fun test() {
+                emit Transfer(to: 1, from: 2)
+            }
+        `)
 
 		require.NoError(t, err)
 	})
 
 	t.Run("MissingEmitStatement", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
-			event Transfer(to: Int, from: Int)
-			
-			fun test() {
-			  Transfer(to: 1, from: 2)
-			}
-		`)
+            event Transfer(to: Int, from: Int)
+
+            fun test() {
+                Transfer(to: 1, from: 2)
+            }
+        `)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 
@@ -80,12 +86,12 @@ func TestCheckEmitEvent(t *testing.T) {
 
 	t.Run("EmitNonEvent", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
-			fun notAnEvent(): Int { return 1 }			
-			
-			fun test() {
-			  emit notAnEvent()
-			}
-		`)
+            fun notAnEvent(): Int { return 1 }
+
+            fun test() {
+                emit notAnEvent()
+            }
+        `)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 
@@ -94,10 +100,10 @@ func TestCheckEmitEvent(t *testing.T) {
 
 	t.Run("EmitNotDeclared", func(t *testing.T) {
 		_, err := ParseAndCheck(t, `
-			fun test() {
-			  emit notAnEvent()
-			}
-		`)
+            fun test() {
+              emit notAnEvent()
+            }
+        `)
 
 		errs := ExpectCheckerErrors(t, err, 1)
 
@@ -106,17 +112,17 @@ func TestCheckEmitEvent(t *testing.T) {
 
 	t.Run("EmitImported", func(t *testing.T) {
 		checker, err := ParseAndCheck(t, `
-			pub event Transfer(to: Int, from: Int)
-		`)
+            pub event Transfer(to: Int, from: Int)
+        `)
 		require.Nil(t, err)
 
 		_, err = ParseAndCheckWithOptions(t, `
-			import Transfer from "imported"
+              import Transfer from "imported"
 
-			pub fun test() {
-				emit Transfer(to: 1, from: 2)
-			}
-			`,
+              pub fun test() {
+                  emit Transfer(to: 1, from: 2)
+              }
+            `,
 			ParseAndCheckOptions{
 				ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
 					return checker.Program, nil
@@ -124,8 +130,8 @@ func TestCheckEmitEvent(t *testing.T) {
 			},
 		)
 
-		errs := ExpectCheckerErrors(t, err, 2)
-		assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
-		assert.IsType(t, &sema.EmitImportedEventError{}, errs[1])
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.EmitImportedEventError{}, errs[0])
 	})
 }

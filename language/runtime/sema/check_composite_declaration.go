@@ -86,7 +86,6 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 		declaration.Members.Fields,
 		compositeType,
 		declaration.DeclarationKind(),
-		declaration.Identifier.Identifier,
 		compositeType.ConstructorParameterTypeAnnotations,
 		kind,
 		initializationInfo,
@@ -293,9 +292,13 @@ func (checker *Checker) declareNestedDeclarations(
 			identifier ast.Identifier,
 		) {
 
-			if nestedCompositeKind != common.CompositeKindResource &&
-				nestedCompositeKind != common.CompositeKindStructure {
+			switch nestedCompositeKind {
+			case common.CompositeKindResource,
+				common.CompositeKindStructure,
+				common.CompositeKindEvent:
+				break
 
+			default:
 				checker.report(
 					&InvalidNestedDeclarationError{
 						NestedDeclarationKind:    nestedDeclarationKind,
@@ -303,7 +306,6 @@ func (checker *Checker) declareNestedDeclarations(
 						Range:                    ast.NewRangeFromPositioned(identifier),
 					},
 				)
-
 			}
 		}
 
@@ -504,7 +506,7 @@ func (checker *Checker) declareCompositeMembersAndValue(
 	constructorType.Members = declarationMembers
 
 	// If the composite is a contract, declare a value – the contract is a singleton.
-	// For all other kinds of composites, declare constructor.
+	// For all other kinds, declare constructor.
 
 	// NOTE: perform declarations after the nested scope, so they are visible after the declaration
 
@@ -528,6 +530,19 @@ func (checker *Checker) declareCompositeMembersAndValue(
 			compositeType.Members[name] = declarationMember
 		}
 	} else {
+
+		// Resource and event constructors are effectively always private,
+		// i.e. they should be only constructable by the locations that declare them.
+		//
+		// Instead of enforcing this be declaring the access as private here,
+		// we allow the declared access level and check the construction in the respective
+		// construction expressions, i.e. create expressions for resources
+		// and emit statements for events.
+		//
+		// This improves the user experience for the developer:
+		// If the access would be enforced as private, an import of the composite
+		// would fail with an "not declared" error.
+
 		_, err := checker.valueActivations.Declare(
 			declaration.Identifier.Identifier,
 			constructorType,
@@ -825,11 +840,13 @@ func (checker *Checker) checkTypeRequirement(
 			}
 		}
 		if !found {
-			checker.report(&MissingConformanceError{
-				CompositeType: declaredCompositeType,
-				InterfaceType: requiredConformance,
-				Range:         ast.NewRangeFromPositioned(compositeDeclaration.Identifier),
-			})
+			checker.report(
+				&MissingConformanceError{
+					CompositeType: declaredCompositeType,
+					InterfaceType: requiredConformance,
+					Range:         ast.NewRangeFromPositioned(compositeDeclaration.Identifier),
+				},
+			)
 		}
 	}
 
@@ -996,7 +1013,6 @@ func (checker *Checker) checkInitializers(
 	fields []*ast.FieldDeclaration,
 	containerType Type,
 	containerDeclarationKind common.DeclarationKind,
-	containerTypeIdentifier string,
 	initializerParameterTypeAnnotations []*TypeAnnotation,
 	containerKind ContainerKind,
 	initializationInfo *InitializationInfo,
@@ -1020,10 +1036,22 @@ func (checker *Checker) checkInitializers(
 		containerKind,
 		initializationInfo,
 	)
+
+	// If the initializer is for an event,
+	// ensure all parameters are valid
+
+	if compositeType, ok := containerType.(*CompositeType); ok &&
+		compositeType.Kind == common.CompositeKindEvent {
+
+		checker.checkEventParameters(
+			initializer.ParameterList,
+			initializerParameterTypeAnnotations,
+		)
+	}
 }
 
-// checkNoInitializerNoFields checks that if there are no initializers
-// there are also no fields – otherwise the fields will be uninitialized.
+// checkNoInitializerNoFields checks that if there are no initializers,
+// then there should also be no fields. Otherwise the fields will be uninitialized.
 // In interfaces this is allowed.
 //
 func (checker *Checker) checkNoInitializerNoFields(
@@ -1031,11 +1059,16 @@ func (checker *Checker) checkNoInitializerNoFields(
 	containerType Type,
 	containerKind ContainerKind,
 ) {
+	// If there are no fields, or the container is an interface,
+	// no initializer needs to be declared
+
 	if len(fields) == 0 || containerKind == ContainerKindInterface {
 		return
 	}
 
-	// report error for first field
+	// An initializer should be declared but does not exist.
+	// Report an error for the first field
+
 	firstField := fields[0]
 
 	checker.report(
@@ -1092,7 +1125,12 @@ func (checker *Checker) checkSpecialFunction(
 		}
 
 	case ContainerKindComposite:
-		if specialFunction.FunctionBlock == nil {
+		// Event declarations have an empty initializer as it is synthesized
+
+		compositeType := containerType.(*CompositeType)
+		if compositeType.Kind != common.CompositeKindEvent &&
+			specialFunction.FunctionBlock == nil {
+
 			checker.report(
 				&MissingFunctionBodyError{
 					Pos: specialFunction.EndPosition(),

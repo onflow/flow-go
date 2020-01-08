@@ -110,22 +110,27 @@ func (checker *Checker) checkFunction(
 		checker.checkTypeAnnotation(functionType.ReturnTypeAnnotation, returnTypePosition)
 	}
 
-	if functionBlock != nil {
-		checker.functionActivations.WithFunction(
-			functionType,
-			checker.valueActivations.Depth(),
-			func() {
-				// NOTE: important to begin scope in function activation, so that
-				//   variable declarations will have proper function activation
-				//   associated to it, and declare parameters in this new scope
-				checker.enterValueScope()
-				defer checker.leaveValueScope(checkResourceLoss)
+	// NOTE: Always declare the function parameters, even if the function body is empty.
+	// For example, event declarations have an initializer with an empty body,
+	// but their parameters (e.g. duplication) needs to still be checked.
 
-				checker.declareParameters(parameterList, functionType.ParameterTypeAnnotations)
+	checker.functionActivations.WithFunction(
+		functionType,
+		checker.valueActivations.Depth(),
+		func() {
+			// NOTE: important to begin scope in function activation, so that
+			//   variable declarations will have proper function activation
+			//   associated to it, and declare parameters in this new scope
 
-				functionActivation := checker.functionActivations.Current()
-				functionActivation.InitializationInfo = initializationInfo
+			checker.enterValueScope()
+			defer checker.leaveValueScope(checkResourceLoss)
 
+			checker.declareParameters(parameterList, functionType.ParameterTypeAnnotations)
+
+			functionActivation := checker.functionActivations.Current()
+			functionActivation.InitializationInfo = initializationInfo
+
+			if functionBlock != nil {
 				checker.visitFunctionBlock(
 					functionBlock,
 					functionType.ReturnTypeAnnotation,
@@ -136,13 +141,13 @@ func (checker *Checker) checkFunction(
 					returnType := functionType.ReturnTypeAnnotation.Type
 					checker.checkFunctionExits(functionBlock, returnType)
 				}
+			}
 
-				if initializationInfo != nil {
-					checker.checkFieldMembersInitialized(initializationInfo)
-				}
-			},
-		)
-	}
+			if initializationInfo != nil {
+				checker.checkFieldMembersInitialized(initializationInfo)
+			}
+		},
+	)
 }
 
 // checkFunctionExits checks that the given function block exits

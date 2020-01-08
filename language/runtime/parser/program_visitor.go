@@ -273,18 +273,35 @@ func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) int
 	access := ctx.Access().Accept(v).(ast.Access)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
-	var parameterList *ast.ParameterList
+	var specialFunctions []*ast.SpecialFunctionDeclaration
+
 	parameterListContext := ctx.ParameterList()
 	if parameterListContext != nil {
-		parameterList = parameterListContext.Accept(v).(*ast.ParameterList)
+		parameterList := parameterListContext.Accept(v).(*ast.ParameterList)
+
+		specialFunctions = append(specialFunctions,
+			&ast.SpecialFunctionDeclaration{
+				DeclarationKind: common.DeclarationKindInitializer,
+				FunctionDeclaration: &ast.FunctionDeclaration{
+					Identifier: ast.Identifier{
+						Identifier: common.DeclarationKindInitializer.Keywords(),
+					},
+					ParameterList: parameterList,
+					StartPos:      parameterList.StartPos,
+				},
+			},
+		)
 	}
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
-	return &ast.EventDeclaration{
+	return &ast.CompositeDeclaration{
 		Access:        access,
+		CompositeKind: common.CompositeKindEvent,
 		Identifier:    identifier,
-		ParameterList: parameterList,
+		Members: &ast.Members{
+			SpecialFunctions: specialFunctions,
+		},
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,

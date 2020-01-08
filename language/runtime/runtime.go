@@ -422,7 +422,7 @@ func (r *interpreterRuntime) emitEvent(
 }
 
 func (r *interpreterRuntime) emitAccountEvent(
-	eventType *sema.EventType,
+	eventType *sema.CompositeType,
 	runtimeInterface Interface,
 	eventFields []interpreter.Value,
 ) {
@@ -478,7 +478,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 		)
 
 		r.emitAccountEvent(
-			&stdlib.AccountCreatedEventType,
+			stdlib.AccountCreatedEventType,
 			runtimeInterface,
 			[]Value{accountAddress},
 		)
@@ -503,7 +503,7 @@ func (r *interpreterRuntime) newAddAccountKeyFunction(runtimeInterface Interface
 		}
 
 		r.emitAccountEvent(
-			&stdlib.AccountKeyAddedEventType,
+			stdlib.AccountKeyAddedEventType,
 			runtimeInterface,
 			[]Value{accountAddress, publicKeyValue},
 		)
@@ -526,7 +526,7 @@ func (r *interpreterRuntime) newRemoveAccountKeyFunction(runtimeInterface Interf
 		publicKeyValue := fromBytes(publicKey)
 
 		r.emitAccountEvent(
-			&stdlib.AccountKeyAddedEventType,
+			stdlib.AccountKeyRemovedEventType,
 			runtimeInterface,
 			[]Value{accountAddress, publicKeyValue},
 		)
@@ -567,7 +567,7 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(
 		codeValue := fromBytes(code)
 
 		r.emitAccountEvent(
-			&stdlib.AccountCodeUpdatedEventType,
+			stdlib.AccountCodeUpdatedEventType,
 			runtimeInterface,
 			[]Value{accountAddress, codeValue},
 		)

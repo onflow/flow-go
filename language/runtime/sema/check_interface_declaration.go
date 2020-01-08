@@ -59,7 +59,6 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.Members.Fields,
 		interfaceType,
 		declaration.DeclarationKind(),
-		declaration.Identifier.Identifier,
 		interfaceType.InitializerParameterTypeAnnotations,
 		kind,
 		nil,

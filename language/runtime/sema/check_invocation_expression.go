@@ -8,8 +8,10 @@ import (
 func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.InvocationExpression) ast.Repr {
 	typ := checker.checkInvocationExpression(invocationExpression)
 
-	// events cannot be invoked without an emit statement
-	if _, isEventType := typ.(*EventType); isEventType {
+	// Events cannot be invoked without an emit statement
+
+	compositeType, isCompositeType := typ.(*CompositeType)
+	if isCompositeType && compositeType.Kind == common.CompositeKindEvent {
 		checker.report(
 			&InvalidEventUsageError{
 				Range: ast.NewRangeFromPositioned(invocationExpression),
