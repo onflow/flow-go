@@ -165,5 +165,9 @@ func (e *Engine) createProposal() error {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}
 
+	for _, tx := range transactions {
+		e.pool.Rem(tx.Fingerprint())
+	}
+
 	return nil
 }
