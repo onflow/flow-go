@@ -8,7 +8,6 @@ type EventHandler struct {
 	voter                 *Voter
 	missingBlockRequester *MissingBlockRequester
 	forkChoice            *ForkChoice
-	unincorporatedBlocks  *UnincorporatedBlocks
 	validator             *Validator
 	blockProposalProducer BlockProposalProducer
 	viewState             ViewState
@@ -53,19 +52,15 @@ func (eh *EventHandler) onNewViewEntered(newView *types.NewViewEvent) {
 	}
 }
 
-func (eh *EventHandler) onGenericQCUpdated(qc *types.QuorumCertificate) {
-	eh.paceMaker.UpdateValidQC(qc)
-}
-
 func (eh *EventHandler) processNewQC(qc *types.QuorumCertificate) {
 	// an invalid block might have valid QC, so update the QC first regardless the block is valid or not
 	genericQCUpdated, finalizedBlocks := eh.forkChoice.UpdateValidQC(qc)
 
-	if genericQCUpdated {
-		eh.onGenericQCUpdated(qc)
-	}
-
 	eh.onBlocksFinalized(finalizedBlocks)
+
+	if !genericQCUpdated {
+		return
+	}
 
 	newView, updated := eh.paceMaker.UpdateValidQC(qc)
 	if updated {
@@ -99,7 +94,6 @@ func (eh *EventHandler) onBlocksFinalized(finalizedBlocks []*types.BlockProposal
 	// only the last finalized block is needed to prune by view
 	lastFinalized := finalizedBlocks[len(finalizedBlocks)-1]
 	eh.voteAggregator.PruneByView(lastFinalized.Block.View)
-	eh.unincorporatedBlocks.PruneByView(lastFinalized.Block.View)
 }
 
 func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposal) {
@@ -109,7 +103,6 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 
 	if eh.forkChoice.CanIncorperate(blockProposal) == false {
 		// the proposal is not incorperated (meaning, its QC doesn't exist in the block tree)
-		eh.unincorporatedBlocks.Store(blockProposal)
 		eh.missingBlockRequester.FetchMissingBlock(blockProposal.Block.View, blockProposal.Block.BlockMRH())
 		return
 	}
@@ -144,12 +137,6 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 		eh.onReceiveVote(myVote) // if I'm collecting my own vote, then pass it to myself directly
 	} else {
 		eh.network.SendVote(myVote, voteCollector)
-	}
-
-	// To handle: 10, 12, 11
-	pendingProposal, extracted := eh.unincorporatedBlocks.ExtractByView(eh.paceMaker.CurView())
-	if extracted {
-		eh.OnReceiveBlockProposal(pendingProposal)
 	}
 }
 
