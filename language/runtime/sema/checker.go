@@ -824,11 +824,12 @@ func (checker *Checker) recordVariableDeclarationOccurrence(name string, variabl
 }
 
 func (checker *Checker) recordFieldDeclarationOrigin(
-	field *ast.FieldDeclaration,
+	identifier ast.Identifier,
+	startPos, endPos ast.Position,
 	fieldType Type,
 ) *Origin {
-	startPosition := field.Identifier.StartPosition()
-	endPosition := field.Identifier.EndPosition()
+	startPosition := identifier.StartPosition()
+	endPosition := identifier.EndPosition()
 
 	origin := &Origin{
 		Type:            fieldType,
@@ -838,8 +839,8 @@ func (checker *Checker) recordFieldDeclarationOrigin(
 	}
 
 	checker.Occurrences.Put(
-		field.StartPos,
-		field.EndPos,
+		startPos,
+		endPos,
 		origin,
 	)
 

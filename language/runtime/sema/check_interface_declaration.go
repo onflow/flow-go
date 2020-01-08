@@ -276,7 +276,7 @@ func (checker *Checker) declareInterfaceMembers(declaration *ast.InterfaceDeclar
 
 	// Declare members
 
-	members, origins := checker.membersAndOrigins(
+	members, origins := checker.nonEventMembersAndOrigins(
 		interfaceType,
 		declaration.Members.Fields,
 		declaration.Members.Functions,

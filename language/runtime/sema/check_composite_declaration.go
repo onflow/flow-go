@@ -454,23 +454,36 @@ func (checker *Checker) declareCompositeMembersAndValue(
 		conformances := checker.conformances(declaration, compositeType)
 		compositeType.Conformances = conformances
 
-		// Declare members
-
-		members, origins := checker.membersAndOrigins(
-			compositeType,
-			declaration.Members.Fields,
-			declaration.Members.Functions,
-			kind != ContainerKindInterface,
-		)
-
-		compositeType.Members = members
-		checker.memberOrigins[compositeType] = origins
-
 		// NOTE: determine initializer parameter types while nested types are in scope,
 		// and after declaring nested types as the initializer may use nested type in parameters
 
+		initializers := declaration.Members.Initializers()
 		compositeType.ConstructorParameterTypeAnnotations =
-			checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())
+			checker.initializerParameterTypeAnnotations(initializers)
+
+		// Declare members
+
+		var members map[string]*Member
+		var origins map[string]*Origin
+
+		// Event members are derived from the initializer's parameter list
+
+		if declaration.CompositeKind == common.CompositeKindEvent {
+			members, origins = checker.eventMembersAndOrigins(
+				initializers[0],
+				compositeType,
+			)
+		} else {
+			members, origins = checker.nonEventMembersAndOrigins(
+				compositeType,
+				declaration.Members.Fields,
+				declaration.Members.Functions,
+				kind != ContainerKindInterface,
+			)
+		}
+
+		compositeType.Members = members
+		checker.memberOrigins[compositeType] = origins
 
 		// Declare nested declarations' members
 
@@ -902,7 +915,7 @@ func (checker *Checker) compositeConstructorType(
 	return constructorFunctionType, argumentLabels
 }
 
-func (checker *Checker) membersAndOrigins(
+func (checker *Checker) nonEventMembersAndOrigins(
 	containerType Type,
 	fields []*ast.FieldDeclaration,
 	functions []*ast.FunctionDeclaration,
@@ -963,7 +976,12 @@ func (checker *Checker) membersAndOrigins(
 		}
 
 		origins[identifier] =
-			checker.recordFieldDeclarationOrigin(field, fieldTypeAnnotation.Type)
+			checker.recordFieldDeclarationOrigin(
+				field.Identifier,
+				field.StartPos,
+				field.EndPos,
+				fieldTypeAnnotation.Type,
+			)
 
 		if requireVariableKind &&
 			field.VariableKind == ast.VariableKindNotSpecified {
@@ -1006,6 +1024,44 @@ func (checker *Checker) membersAndOrigins(
 	}
 
 	return members, origins
+}
+
+func (checker *Checker) eventMembersAndOrigins(
+	initializer *ast.SpecialFunctionDeclaration,
+	containerType *CompositeType,
+) (
+	members map[string]*Member,
+	origins map[string]*Origin,
+) {
+	parameters := initializer.ParameterList.Parameters
+
+	members = make(map[string]*Member, len(parameters))
+	origins = make(map[string]*Origin, len(parameters))
+
+	for i, parameter := range parameters {
+		typeAnnotation := containerType.ConstructorParameterTypeAnnotations[i]
+
+		identifier := parameter.Identifier
+
+		members[identifier.Identifier] = &Member{
+			ContainerType:   containerType,
+			Access:          ast.AccessPublic,
+			Identifier:      identifier,
+			DeclarationKind: common.DeclarationKindField,
+			TypeAnnotation:  typeAnnotation,
+			VariableKind:    ast.VariableKindConstant,
+		}
+
+		origins[identifier.Identifier] =
+			checker.recordFieldDeclarationOrigin(
+				identifier,
+				parameter.StartPos,
+				parameter.EndPos,
+				typeAnnotation.Type,
+			)
+	}
+
+	return
 }
 
 func (checker *Checker) checkInitializers(

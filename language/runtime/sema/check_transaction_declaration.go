@@ -185,7 +185,7 @@ func (checker *Checker) visitTransactionExecuteFunction(
 func (checker *Checker) declareTransactionDeclaration(declaration *ast.TransactionDeclaration) {
 	transactionType := &TransactionType{}
 
-	members, origins := checker.membersAndOrigins(
+	members, origins := checker.nonEventMembersAndOrigins(
 		transactionType,
 		declaration.Fields,
 		nil,
