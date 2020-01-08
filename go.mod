@@ -26,6 +26,7 @@ require (
 	github.com/magiconair/properties v1.8.1
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/pkg/errors v0.8.1
+	github.com/pkg/term v0.0.0-20190109203006-aa71e9d9e942 // indirect
 	github.com/rs/zerolog v1.15.0
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.4.0
