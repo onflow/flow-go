@@ -18,31 +18,35 @@ type TransactionResult struct {
 }
 
 // A Computer uses the Cadence runtime to compute transaction results.
-type Computer struct {
+type Computer interface {
+	// ExecuteTransaction computes the result of a transaction.
+	ExecuteTransaction(tx flow.TransactionBody) (*TransactionResult, error)
+}
+
+type computer struct {
 	runtime         runtime.Runtime
 	contextProvider context.Provider
 }
 
 // New initializes a new computer with a runtime and context provider.
-func New(runtime runtime.Runtime, contextProvider context.Provider) *Computer {
-	return &Computer{
+func New(runtime runtime.Runtime, contextProvider context.Provider) Computer {
+	return &computer{
 		runtime:         runtime,
 		contextProvider: contextProvider,
 	}
 }
 
-// ExecuteTransaction computes the result of a transaction.
-func (c *Computer) ExecuteTransaction(tx *flow.Transaction) (*TransactionResult, error) {
+func (c *computer) ExecuteTransaction(tx flow.TransactionBody) (*TransactionResult, error) {
 	ctx := c.contextProvider.NewTransactionContext(tx)
 
-	location := runtime.TransactionLocation(tx.Hash())
+	location := runtime.TransactionLocation(tx.Fingerprint())
 
 	err := c.runtime.ExecuteTransaction(tx.Script, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts
 			return &TransactionResult{
-				TxHash: tx.Hash(),
+				TxHash: crypto.Hash(tx.Fingerprint()),
 				Error:  err,
 			}, nil
 		}
@@ -52,7 +56,7 @@ func (c *Computer) ExecuteTransaction(tx *flow.Transaction) (*TransactionResult,
 	}
 
 	return &TransactionResult{
-		TxHash: tx.Hash(),
+		TxHash: crypto.Hash(tx.Fingerprint()),
 		Error:  nil,
 	}, nil
 }
