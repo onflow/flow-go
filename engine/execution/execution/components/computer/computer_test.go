@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution/execution/components/computer"
 	context "github.com/dapperlabs/flow-go/engine/execution/execution/modules/context/mock"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/modules/ledger"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -28,7 +29,9 @@ func TestExecuteTransaction(t *testing.T) {
             `),
 		}
 
-		prov.On("NewTransactionContext", tx).
+		view := ledger.NewView(func(key string) ([]byte, error) { return nil, nil })
+
+		prov.On("NewTransactionContext", tx, view).
 			Return(ctx).
 			Once()
 
@@ -36,7 +39,7 @@ func TestExecuteTransaction(t *testing.T) {
 			Return([]runtime.Address{runtime.Address(unittest.AddressFixture())}).
 			Once()
 
-		result, err := c.ExecuteTransaction(tx)
+		result, err := c.ExecuteTransaction(view, tx)
 		assert.NoError(t, err)
 		assert.NoError(t, result.Error)
 
@@ -65,7 +68,9 @@ func TestExecuteTransaction(t *testing.T) {
             `),
 		}
 
-		prov.On("NewTransactionContext", tx).
+		view := ledger.NewView(func(key string) ([]byte, error) { return nil, nil })
+
+		prov.On("NewTransactionContext", tx, view).
 			Return(ctx).
 			Once()
 
@@ -73,7 +78,7 @@ func TestExecuteTransaction(t *testing.T) {
 			Return([]runtime.Address{runtime.Address(unittest.AddressFixture())}).
 			Once()
 
-		result, err := c.ExecuteTransaction(tx)
+		result, err := c.ExecuteTransaction(view, tx)
 		assert.NoError(t, err)
 		assert.Error(t, result.Error)
 

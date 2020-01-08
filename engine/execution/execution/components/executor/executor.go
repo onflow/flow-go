@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/engine/execution/execution/components/computer"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/modules/ledger"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -41,7 +42,10 @@ func (e *executor) executeTransactions(txs []flow.TransactionBody) ([]flow.Chunk
 	results := make([]*computer.TransactionResult, len(txs))
 
 	for i, tx := range txs {
-		result, err := e.computer.ExecuteTransaction(tx)
+		// TODO: connect ledger to chunk cache - https://github.com/dapperlabs/flow-go/issues/1914
+		view := ledger.NewView(func(key string) ([]byte, error) { return nil, nil })
+
+		result, err := e.computer.ExecuteTransaction(view, tx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute transaction: %w", err)
 		}
@@ -49,7 +53,7 @@ func (e *executor) executeTransactions(txs []flow.TransactionBody) ([]flow.Chunk
 		results[i] = result
 	}
 
-	// TODO: for each chunk, store results and generate a state proof
+	// TODO: commit chunk to storage - https://github.com/dapperlabs/flow-go/issues/1915
 
 	// TODO: implement real chunking
 	// MVP uses single chunk per block

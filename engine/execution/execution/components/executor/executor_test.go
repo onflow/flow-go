@@ -7,15 +7,16 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	computer "github.com/dapperlabs/flow-go/engine/execution/execution/components/computer/mock"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/components/computer"
+	mockcomputer "github.com/dapperlabs/flow-go/engine/execution/execution/components/computer/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/components/executor"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 func TestExecutorExecuteBlock(t *testing.T) {
-	computer := &computer.Computer{}
+	comp := &mockcomputer.Computer{}
 
-	exe := executor.New(computer)
+	exe := executor.New(comp)
 
 	tx1 := flow.TransactionBody{
 		Script: []byte("transaction { execute {} }"),
@@ -46,8 +47,12 @@ func TestExecutorExecuteBlock(t *testing.T) {
 		Transactions: transactions,
 	}
 
-	computer.On("ExecuteTransaction", mock.AnythingOfType("flow.TransactionBody")).
-		Return(nil, nil).
+	comp.On(
+		"ExecuteTransaction",
+		mock.AnythingOfType("*ledger.View"),
+		mock.AnythingOfType("flow.TransactionBody"),
+	).
+		Return(&computer.TransactionResult{Error: nil}, nil).
 		Twice()
 
 	chunks, err := exe.ExecuteBlock(executableBlock)
@@ -57,5 +62,5 @@ func TestExecutorExecuteBlock(t *testing.T) {
 	chunk := chunks[0]
 	assert.EqualValues(t, chunk.TxCounts, 2)
 
-	computer.AssertExpectations(t)
+	comp.AssertExpectations(t)
 }
