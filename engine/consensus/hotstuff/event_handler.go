@@ -1,13 +1,16 @@
 package hotstuff
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+import (
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"time"
+)
 
 type EventHandler struct {
-	paceMaker             *PaceMaker
+	paceMaker             PaceMaker
 	voteAggregator        *VoteAggregator
 	voter                 *Voter
 	missingBlockRequester *MissingBlockRequester
-	reactor            Reactor
+	reactor               Reactor
 	validator             *Validator
 	blockProposalProducer BlockProposalProducer
 	viewState             ViewState
@@ -17,6 +20,7 @@ type EventHandler struct {
 }
 
 type stateValue int
+
 const (
 	WaitingForBlock stateValue = iota
 	WaitingForVotes stateValue = iota
@@ -36,6 +40,10 @@ func (eh *EventHandler) OnLocalTimeout() {
 
 func (eh *EventHandler) OnBlockRequest(req *types.BlockProposalRequest) {
 	eh.onBlockRequest(req)
+}
+
+func (eh *EventHandler) TimeoutChannel() <-chan time.Time {
+	return eh.paceMaker.TimeoutChannel()
 }
 
 func (eh *EventHandler) startNewView() {
@@ -65,7 +73,6 @@ func (eh *EventHandler) proposeIfLeaderForCurrentView() {
 		return
 	}
 
-	// no need to check qc from voteaggregator, because it has been checked
 	qcForNewBlock := eh.reactor.MakeForkChoice(curView)
 	proposal := eh.blockProposalProducer.MakeBlockProposal(curView, qcForNewBlock)
 	go eh.network.BroadcastProposal(proposal)
@@ -82,7 +89,7 @@ func (eh *EventHandler) proposeIfLeaderForCurrentView() {
 // This replica is the only one allowed to propose blocks for the respective view. Assuming that this replica is honest,
 // only one valid block is proposed (proposals for the same view by other replicas are invalid, as they are not primary).
 func (eh *EventHandler) selectBlockProposalForCurrentView() *types.BlockProposal {
-	proposalsAtView := eh.reactor.BlocksForView(eh.paceMaker.CurView())
+	proposalsAtView := eh.reactor.GetBlocksForView(eh.paceMaker.CurView())
 	if len(proposalsAtView) == 0 {
 		return nil
 	}
@@ -99,7 +106,7 @@ func (eh *EventHandler) processBlockForCurrentView(block *types.BlockProposal) {
 	// not leader for next view -> state transition to EnteringView(curView+1)
 	if !eh.viewState.IsSelf(nextLeader) { // ToDo this should be its own function
 		vote := eh.considerVoting(block) // vote can be nil, if we don't want to vote for block
-		eh.sendVote(vote, nextLeader) // gracefully handles nil votes
+		eh.sendVote(vote, nextLeader)    // gracefully handles nil votes
 
 		// informing PaceMaker about block for current view should transition to new view
 		if _, wasViewUpdated := eh.paceMaker.UpdateBlock(block); wasViewUpdated { // sanity check that state transition took place
@@ -113,7 +120,6 @@ func (eh *EventHandler) processBlockForCurrentView(block *types.BlockProposal) {
 	eh.commenceWaitingForVotes(block) // CAUTION: this is a state transition;
 	// no more processing should be done here
 }
-
 
 func (eh *EventHandler) considerVoting(block *types.BlockProposal) *types.Vote {
 	if eh.reactor.IsSafeNode(block) {
@@ -134,7 +140,7 @@ func (eh *EventHandler) sendVote(vote *types.Vote, nextLeader types.ID) {
 // so we can incorporate our own vote for the block we just processed.
 func (eh *EventHandler) commenceWaitingForVotes(block *types.BlockProposal) {
 	eh.internalState = WaitingForVotes
-	_, wasViewUpdated := eh.paceMaker.UpdateBlock(block) // this should solely update the timeout but not the current View
+	_, wasViewUpdated := eh.paceMaker.UpdateBlock(block)            // this should solely update the timeout but not the current View
 	if wasViewUpdated || (block.View() != eh.paceMaker.CurView()) { // sanity check
 		panic("Internal Error: expecting pacemaker to not change view when commencing vote collection")
 	}
@@ -143,40 +149,71 @@ func (eh *EventHandler) commenceWaitingForVotes(block *types.BlockProposal) {
 	if vote == nil {
 		return // Remain in state "WaitingForVotes" 
 	}
-	eh.processVote(vote) // CAUTION: this is a state transition;
+	eh.processVoteForCurrentView(vote) // CAUTION: this is a state transition;
 	// no more processing should be done here
 }
 
 // onReceiveVote enters state "ProcessingVote". Gracefully handles (ignores) nil votes.
 // ToDo: split function into three different ones processing votes for past view, current view, future view
 func (eh *EventHandler) processVote(vote *types.Vote) {
-	if vote == nil {
-		return
+	if vote.View == eh.paceMaker.CurView() {
+		eh.processVoteForCurrentView(vote) // CAUTION: this might result in a state transition;
+		// no more processing should be done here
+	} else {
+		eh.processVoteForDifferentView(vote) // CAUTION: this might result in a state transition;
+		// no more processing should be done here
 	}
-	proposal, found := eh.reactor.FindBlockProposalByViewAndBlockMRH(vote.View, vote.BlockMRH)
-	if !found {
+}
+
+func (eh *EventHandler) processVoteForCurrentView(vote *types.Vote) {
+	proposal, votedBlockFound := eh.reactor.GetBlock(vote.View, vote.BlockMRH)
+
+	if eh.internalState != WaitingForVotes { // NOT waiting for votes implies: we are still waiting for block
+		if votedBlockFound { // sanity check: the block the vote is for should be unknown
+			panic("Internal Error: We are NOT YET in state 'WaitingForVotes' but there block for current view is already known!")
+		}
 		eh.voteAggregator.Store(vote)
 		eh.missingBlockRequester.FetchMissingBlock(vote.View, vote.BlockMRH)
 		return
 	}
 
+	// we are in internal state 'WaitingForVotes'. This implies the block the vote is for should be known
+	if !votedBlockFound { // sanity check
+		panic("Internal Error: In internal state 'WaitingForVotes' but there is no block for current view!")
+	}
+	qc, constructed := eh.voteAggregator.StoreVoteAndBuildQC(vote, proposal)
+	if !constructed { // we don't have enough votes
+		return
+	}
+	eh.processQC(qc) // CAUTION: this results in a state transition;
+	// no more processing should be done here
+}
+
+func (eh *EventHandler) processVoteForDifferentView(vote *types.Vote) {
+	proposal, found := eh.reactor.GetBlock(vote.View, vote.BlockMRH)
+	if !found {
+		eh.voteAggregator.Store(vote)
+		eh.missingBlockRequester.FetchMissingBlock(vote.View, vote.BlockMRH)
+		return
+	}
 	qc, constructed := eh.voteAggregator.StoreVoteAndBuildQC(vote, proposal)
 	if !constructed {
-		return // if a QC has been made before or we don't have enough votes
+		return
 	}
+	// Note: The QC constructed will be for the same view as the vote.
+	// If vote was for past view, the qc will be for a past view. Hence, NOT trigger the PaceMaker to transition to new view
 	eh.processQC(qc) // CAUTION: this might result in a state transition;
 	// no more processing should be done here
 }
 
 func (eh *EventHandler) processQC(qc *types.QuorumCertificate) {
 	eh.reactor.AddQC(qc)
-	if _, viewUpdated := eh.paceMaker.UpdateQC(qc); !viewUpdated{
+	if _, viewUpdated := eh.paceMaker.UpdateQC(qc); !viewUpdated {
 		return
 	}
 	eh.startNewView() // CAUTION: this is a state transition;
 	// no more processing should be done here
 }
-
 
 func (eh *EventHandler) onReceiveBlockProposal(receivedProposal *types.BlockProposal) {
 	if receivedProposal.Block.View <= eh.reactor.FinalizedView() {
@@ -205,7 +242,7 @@ func (eh *EventHandler) onReceiveBlockProposal(receivedProposal *types.BlockProp
 }
 
 func (eh *EventHandler) onLocalTimeout() {
-	if _, viewUpdated := eh.paceMaker.OnLocalTimeout(); !viewUpdated { // sanity check
+	if _, viewUpdated := eh.paceMaker.OnTimeout(); !viewUpdated { // sanity check
 		panic("Internal Error: expecting pacemaker to not change view on timeout")
 	}
 	eh.startNewView() // CAUTION: this is a state transition;
@@ -213,7 +250,7 @@ func (eh *EventHandler) onLocalTimeout() {
 }
 
 func (eh *EventHandler) onBlockRequest(req *types.BlockProposalRequest) {
-	if proposal, found := eh.reactor.FindBlockProposalByViewAndBlockMRH(req.View, req.BlockMRH); found {
+	if proposal, found := eh.reactor.GetBlock(req.View, req.BlockMRH); found {
 		eh.network.RespondBlockProposalRequest(req, proposal)
 	}
 }

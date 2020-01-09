@@ -1,13 +1,10 @@
 package hotstuff
 
 import (
-	"sync"
-
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
 type VoteAggregator struct {
-	sync.RWMutex
 	pendingVotes map[types.MRH][]*types.Vote
 	createdQC    map[types.MRH]*types.QuorumCertificate
 	viewState    ViewState

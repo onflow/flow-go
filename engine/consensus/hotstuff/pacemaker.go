@@ -6,26 +6,10 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
-type PaceMaker struct {
-	curView  uint64
-	timeout  *time.Timer
-	Timeouts chan<- *types.Timeout
-}
-
-func (p *PaceMaker) CurView() uint64 {
-	return p.curView
-}
-
-func (p *PaceMaker) UpdateQC(qc *types.QuorumCertificate) (*types.NewViewEvent, bool) {
-	panic("TODO")
-}
-
-// ToDo change to ProcessedBlockForView(view uint64)
-func (p *PaceMaker) UpdateBlock(block *types.BlockProposal) (*types.NewViewEvent, bool) {
-	panic("TODO")
-}
-
-// ToDo change to ProcessedQcForView(view uint64)
-func (p *PaceMaker) OnLocalTimeout() (*types.NewViewEvent, bool) {
-	panic("TODO")
+type PaceMaker interface {
+	CurView() uint64
+	TimeoutChannel() <-chan time.Time
+	UpdateQC(qc *types.QuorumCertificate) (*types.NewViewEvent, bool)
+	UpdateBlock(block *types.BlockProposal) (*types.NewViewEvent, bool)
+	OnTimeout() (*types.NewViewEvent, bool)
 }
