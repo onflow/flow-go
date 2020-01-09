@@ -5563,22 +5563,27 @@ func TestInterpretEmitEvent(t *testing.T) {
 
 	expectedEvents := []*interpreter.CompositeValue{
 		{
+			Kind:     common.CompositeKindEvent,
 			Location: TestLocation,
 			TypeID:   inter.Checker.GlobalTypes["Transfer"].Type.ID(),
 			Fields: map[string]interpreter.Value{
 				"to":   interpreter.NewIntValue(1),
 				"from": interpreter.NewIntValue(2),
 			},
+			Functions: map[string]interpreter.FunctionValue{},
 		},
 		{
+			Kind:     common.CompositeKindEvent,
 			Location: TestLocation,
 			TypeID:   inter.Checker.GlobalTypes["Transfer"].Type.ID(),
 			Fields: map[string]interpreter.Value{
 				"to":   interpreter.NewIntValue(3),
 				"from": interpreter.NewIntValue(4),
 			},
+			Functions: map[string]interpreter.FunctionValue{},
 		},
 		{
+			Kind:     common.CompositeKindEvent,
 			Location: TestLocation,
 			TypeID:   inter.Checker.GlobalTypes["TransferAmount"].Type.ID(),
 			Fields: map[string]interpreter.Value{
@@ -5586,6 +5591,7 @@ func TestInterpretEmitEvent(t *testing.T) {
 				"from":   interpreter.NewIntValue(2),
 				"amount": interpreter.NewIntValue(100),
 			},
+			Functions: map[string]interpreter.FunctionValue{},
 		},
 	}
 
