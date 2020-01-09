@@ -116,7 +116,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// RequestCollection can be used
+// RequestCollection submits a request for the given collection to collection nodes.
 func (e *Engine) RequestCollection(hash flow.Fingerprint) error {
 	collectionNodes, err := e.state.Final().Identities(identity.HasRole(flow.RoleCollection))
 	if err != nil {
