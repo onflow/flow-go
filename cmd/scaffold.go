@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -21,9 +23,12 @@ import (
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 )
 
+const notSet = "not set"
+
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
 	NodeID      string
+	NodeName    string
 	Entries     []string
 	Timeout     time.Duration
 	Connections uint
@@ -59,7 +64,8 @@ type FlowNodeBuilder struct {
 
 func (fnb *FlowNodeBuilder) baseFlags() {
 	// bind configuration parameters
-	fnb.flags.StringVarP(&fnb.BaseConfig.NodeID, "nodeid", "n", "node1", "identity of our node")
+	fnb.flags.StringVarP(&fnb.BaseConfig.NodeID, "nodeid", "id", notSet, "identity of our node")
+	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
 	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "entries", "e", []string{"consensus-node1@address1=1000"}, "identity table entries for all nodes")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.UintVarP(&fnb.BaseConfig.Connections, "connections", "c", 0, "number of connections to establish to peers")
@@ -147,6 +153,11 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 	}
 
+	if fnb.BaseConfig.NodeID == notSet {
+		h := sha256.New()
+		h.Write([]byte(fnb.BaseConfig.NodeName))
+		fnb.BaseConfig.NodeID = hex.EncodeToString(h.Sum(nil))
+	}
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.NodeID)
 	fnb.MustNot(err).Msg("could not parse node identifier")
 

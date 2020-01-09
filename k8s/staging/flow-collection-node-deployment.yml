@@ -86,12 +86,14 @@ spec:
       containers:
         - name: flow-test-net
           # No tag, will be attached by teamcity
-          image: gcr.io/dl-flow/collection
+          image: gcr.io/dl-flow/collection:5b3dcf31
           args: 
-            - "--nodeid"
-            - "000000000000000000000000000000000000000000000000000000000000001${POD_NAME##*-}"
-            - "--entries"
-            - "collection-000000000000000000000000000000000000000000000000000000000000001${POD_NAME##*-}@localhost:3569=1000" # PORT 3569
+            - '--nodename'
+            - '$(POD_NAME)'
+            - '--entries'
+            - '$(NODE_ENTRIES)'
+            - '--datadir'
+            - '/flowdb'
 
           # Ports exposed can be named so other resources can reference
           # them by name and not have to hard code numbers
@@ -114,7 +116,12 @@ spec:
             - name: POD_NAME
               valueFrom:
                 fieldRef:
-                  fieldPath: metadata.name   
+                  fieldPath: metadata.name
+            - name: NODE_ENTRIES
+              valueFrom:
+                configMapKeyRef:
+                  name: flow-node-config-map
+                  key: entries
 
           # Resource requests and contraints
           resources:

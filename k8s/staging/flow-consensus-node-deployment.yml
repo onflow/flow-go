@@ -87,10 +87,12 @@ spec:
           # No tag, will be attached by teamcity
           image: gcr.io/dl-flow/consensus
           args: 
-            - "--nodeid"
-            - "0000000000000000000000000000000000000000000000000000000000001${POD_NAME##*-}00"
-            - "--entries"
-            - "consensus-0000000000000000000000000000000000000000000000000000000000001${POD_NAME##*-}00@localhost:3569=1000" # PORT 3569
+            - '--nodename'
+            - '$(POD_NAME)'
+            - '--entries'
+            - '$(NODE_ENTRIES)'
+            - '--datadir'
+            - '/flowdb'
 
           # Ports exposed can be named so other resources can reference
           # them by name and not have to hard code numbers
@@ -108,6 +110,15 @@ spec:
           env:
             - name: ENV
               value: STAGING
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_ENTRIES
+              valueFrom:
+                configMapKeyRef:
+                  name: flow-node-config-map
+                  key: entries
 
           # Resource requests and contraints
           resources:
