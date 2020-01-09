@@ -8,104 +8,103 @@ import (
 	schemas "zombiezen.com/go/capnproto2/schemas"
 )
 
-type GuaranteedCollection struct{ capnp.Struct }
+type CollectionGuarantee struct{ capnp.Struct }
 
-// GuaranteedCollection_TypeID is the unique identifier for the type GuaranteedCollection.
-const GuaranteedCollection_TypeID = 0xc45eaaad82049c1b
+// CollectionGuarantee_TypeID is the unique identifier for the type CollectionGuarantee.
+const CollectionGuarantee_TypeID = 0xc59c1f6bfae69525
 
-func NewGuaranteedCollection(s *capnp.Segment) (GuaranteedCollection, error) {
+func NewCollectionGuarantee(s *capnp.Segment) (CollectionGuarantee, error) {
 	st, err := capnp.NewStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
-	return GuaranteedCollection{st}, err
+	return CollectionGuarantee{st}, err
 }
 
-func NewRootGuaranteedCollection(s *capnp.Segment) (GuaranteedCollection, error) {
+func NewRootCollectionGuarantee(s *capnp.Segment) (CollectionGuarantee, error) {
 	st, err := capnp.NewRootStruct(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2})
-	return GuaranteedCollection{st}, err
+	return CollectionGuarantee{st}, err
 }
 
-func ReadRootGuaranteedCollection(msg *capnp.Message) (GuaranteedCollection, error) {
+func ReadRootCollectionGuarantee(msg *capnp.Message) (CollectionGuarantee, error) {
 	root, err := msg.RootPtr()
-	return GuaranteedCollection{root.Struct()}, err
+	return CollectionGuarantee{root.Struct()}, err
 }
 
-func (s GuaranteedCollection) String() string {
-	str, _ := text.Marshal(0xc45eaaad82049c1b, s.Struct)
+func (s CollectionGuarantee) String() string {
+	str, _ := text.Marshal(0xc59c1f6bfae69525, s.Struct)
 	return str
 }
 
-func (s GuaranteedCollection) Hash() ([]byte, error) {
+func (s CollectionGuarantee) Hash() ([]byte, error) {
 	p, err := s.Struct.Ptr(0)
 	return []byte(p.Data()), err
 }
 
-func (s GuaranteedCollection) HasHash() bool {
+func (s CollectionGuarantee) HasHash() bool {
 	p, err := s.Struct.Ptr(0)
 	return p.IsValid() || err != nil
 }
 
-func (s GuaranteedCollection) SetHash(v []byte) error {
+func (s CollectionGuarantee) SetHash(v []byte) error {
 	return s.Struct.SetData(0, v)
 }
 
-func (s GuaranteedCollection) Signature() ([]byte, error) {
+func (s CollectionGuarantee) Signature() ([]byte, error) {
 	p, err := s.Struct.Ptr(1)
 	return []byte(p.Data()), err
 }
 
-func (s GuaranteedCollection) HasSignature() bool {
+func (s CollectionGuarantee) HasSignature() bool {
 	p, err := s.Struct.Ptr(1)
 	return p.IsValid() || err != nil
 }
 
-func (s GuaranteedCollection) SetSignature(v []byte) error {
+func (s CollectionGuarantee) SetSignature(v []byte) error {
 	return s.Struct.SetData(1, v)
 }
 
-// GuaranteedCollection_List is a list of GuaranteedCollection.
-type GuaranteedCollection_List struct{ capnp.List }
+// CollectionGuarantee_List is a list of CollectionGuarantee.
+type CollectionGuarantee_List struct{ capnp.List }
 
-// NewGuaranteedCollection creates a new list of GuaranteedCollection.
-func NewGuaranteedCollection_List(s *capnp.Segment, sz int32) (GuaranteedCollection_List, error) {
+// NewCollectionGuarantee creates a new list of CollectionGuarantee.
+func NewCollectionGuarantee_List(s *capnp.Segment, sz int32) (CollectionGuarantee_List, error) {
 	l, err := capnp.NewCompositeList(s, capnp.ObjectSize{DataSize: 0, PointerCount: 2}, sz)
-	return GuaranteedCollection_List{l}, err
+	return CollectionGuarantee_List{l}, err
 }
 
-func (s GuaranteedCollection_List) At(i int) GuaranteedCollection {
-	return GuaranteedCollection{s.List.Struct(i)}
+func (s CollectionGuarantee_List) At(i int) CollectionGuarantee {
+	return CollectionGuarantee{s.List.Struct(i)}
 }
 
-func (s GuaranteedCollection_List) Set(i int, v GuaranteedCollection) error {
+func (s CollectionGuarantee_List) Set(i int, v CollectionGuarantee) error {
 	return s.List.SetStruct(i, v.Struct)
 }
 
-func (s GuaranteedCollection_List) String() string {
-	str, _ := text.MarshalList(0xc45eaaad82049c1b, s.List)
+func (s CollectionGuarantee_List) String() string {
+	str, _ := text.MarshalList(0xc59c1f6bfae69525, s.List)
 	return str
 }
 
-// GuaranteedCollection_Promise is a wrapper for a GuaranteedCollection promised by a client call.
-type GuaranteedCollection_Promise struct{ *capnp.Pipeline }
+// CollectionGuarantee_Promise is a wrapper for a CollectionGuarantee promised by a client call.
+type CollectionGuarantee_Promise struct{ *capnp.Pipeline }
 
-func (p GuaranteedCollection_Promise) Struct() (GuaranteedCollection, error) {
+func (p CollectionGuarantee_Promise) Struct() (CollectionGuarantee, error) {
 	s, err := p.Pipeline.Struct()
-	return GuaranteedCollection{s}, err
+	return CollectionGuarantee{s}, err
 }
 
-const schema_ca5023959d73b9b5 = "x\xda2\x90ct`2d\x9d\xce\xce\xc0\x10\x18\xc1" +
-	"\xca\xf6_z\x0eK\xd3\xdaUqG\x18\x04\x15\x18\xff" +
-	"o\xddY<w\xaar\xc0)\x06V&v\x06\x06\xe3" +
-	"\x8d\xcc\xab\x18\x85O2\xb330\x08\x1fe.gx" +
-	"\xf1\xbf89#57Q?\x995\xb1\xa0$13" +
-	"O?9?''5\xb9$3?O/9\xb1 " +
-	"\xaf\xc0\xca\xbd4\xb1(1\xaf$55\xc5\x19,\xc5" +
-	"\x0f\x92\x0b`d\x0c\xe4`fa``ad`\x10" +
-	"\xd4\xd4b`\x08Taf\x0c4`b\x14dd\x14" +
-	"a\x04\x09\xea\x0610\x04\xea03\x06Z01\xf2" +
-	"g$\x16g0\xf2201\xf220\xfe/\xceL" +
-	"\xcfK,)-b`L\x85\x89\x01\x02\x00\x00\xff\xff" +
-	"kW1%"
+const schema_ca5023959d73b9b5 = "x\xda\x120w`\x12d\x8dg`\x08dae\xfb" +
+	"\xaf:\xf5\xd9\xafl\xf99G\x19\x04\x15\x18\xffo\xdd" +
+	"Y<w\xaar\xc0)\x06V&v\x06\x06C\xd1E" +
+	"\x8c\x82\xba\xec\x0c\x0c\x82\x9a\xe5\x0c\x8c\xff\x8b\x933R" +
+	"s\x13\xf5\x93Y\x13\x0bJ\x123\xf3\xf4\x93\xf3sr" +
+	"R\x93K2\xf3\xf3\xf4\x92\x13\x0b\xf2\x0a\xac\x9c\xe1\x02" +
+	"\xee\xa5\x89E\x89y\xec%\xa9\xa9\x01\x8c\x8c\x81\x1c\xcc" +
+	",\x0c\x0c,\x8c s\xb4\x18\x18\x02U\x98\x19\x03\x0d" +
+	"\x98\x18\x05\x19\x19E\x18A\x82\xbaA\x0c\x0c\x81:\xcc" +
+	"\x8c\x81\x16L\x8c\xfc\x19\x89\xc5\x19\x8c\xbc\x0cL\x8c\xbc" +
+	" \x1b3\xd3\xf3\x12KJ\x8b\x18\x18Sab\x80\x00" +
+	"\x00\x00\xff\xffr#-\xfb"
 
 func init() {
 	schemas.Register(schema_ca5023959d73b9b5,
-		0xc45eaaad82049c1b)
+		0xc59c1f6bfae69525)
 }

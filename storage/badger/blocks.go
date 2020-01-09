@@ -3,8 +3,9 @@
 package badger
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -35,7 +36,7 @@ func (b *Blocks) ByHash(hash crypto.Hash) (*flow.Block, error) {
 			if err == storage.NotFoundErr {
 				return err
 			}
-			return errors.Wrap(err, "could not retrieve block")
+			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
 		return nil
@@ -56,7 +57,7 @@ func (b *Blocks) ByNumber(number uint64) (*flow.Block, error) {
 			if err == storage.NotFoundErr {
 				return err
 			}
-			return errors.Wrap(err, "could not retrieve hash")
+			return fmt.Errorf("could not retrieve hash: %w", err)
 		}
 
 		block, err = b.retrieveBlock(tx, hash)
@@ -64,7 +65,7 @@ func (b *Blocks) ByNumber(number uint64) (*flow.Block, error) {
 			if err == storage.NotFoundErr {
 				return err
 			}
-			return errors.Wrap(err, "could not retrieve block")
+			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
 		return nil
@@ -79,28 +80,28 @@ func (b *Blocks) retrieveBlock(tx *badger.Txn, hash crypto.Hash) (*flow.Block, e
 	var header flow.Header
 	err := operation.RetrieveHeader(hash, &header)(tx)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not retrieve header")
+		return nil, fmt.Errorf("could not retrieve header: %w", err)
 	}
 
 	// get the new identities
 	var identities flow.IdentityList
 	err = operation.RetrieveIdentities(hash, &identities)(tx)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not retrieve identities")
+		return nil, fmt.Errorf("could not retrieve identities: %w", err)
 	}
 
-	// get the guaranteed collections
-	var collections []*flow.GuaranteedCollection
-	err = operation.RetrieveCollections(hash, &collections)(tx)
+	// get the collection guarantees
+	var guarantees []*flow.CollectionGuarantee
+	err = operation.RetrieveCollectionGuaranteesByBlockHash(hash, &guarantees)(tx)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not retrieve collections")
+		return nil, fmt.Errorf("could not retreive collection guarantees: %w", err)
 	}
 
 	// create the block
 	block := &flow.Block{
-		Header:                header,
-		NewIdentities:         identities,
-		GuaranteedCollections: collections,
+		Header:               header,
+		NewIdentities:        identities,
+		CollectionGuarantees: guarantees,
 	}
 
 	return block, nil
@@ -112,19 +113,28 @@ func (b *Blocks) Save(block *flow.Block) error {
 
 		err := operation.PersistHeader(&block.Header)(tx)
 		if err != nil {
-			return errors.Wrap(err, "cannot save block")
+			return fmt.Errorf("could not save header: %w", err)
 		}
+
 		err = operation.PersistIdentities(block.Hash(), block.NewIdentities)(tx)
 		if err != nil {
-			return errors.Wrap(err, "cannot save block")
+			return fmt.Errorf("could not save block: %w", err)
 		}
-		err = operation.PersistCollections(block.Hash(), block.GuaranteedCollections)(tx)
-		if err != nil {
-			return errors.Wrap(err, "cannot save block")
+
+		for _, gc := range block.CollectionGuarantees {
+			err = operation.PersistCollectionGuarantee(gc)(tx)
+			if err != nil {
+				return fmt.Errorf("could not save guaranteed collection: %w", err)
+			}
+			err = operation.IndexCollectionGuaranteeByBlockHash(block.Hash(), gc)(tx)
+			if err != nil {
+				return fmt.Errorf("could not index guaranteed collection by block hash: %w", err)
+			}
 		}
+
 		err = operation.PersistHash(block.Number, block.Hash())(tx)
 		if err != nil {
-			return errors.Wrap(err, "cannot save block")
+			return fmt.Errorf("could not save block hash: %w", err)
 		}
 
 		return nil

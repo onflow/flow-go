@@ -2,7 +2,6 @@
 
 package mock
 
-import crypto "github.com/dapperlabs/flow-go/crypto"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 
@@ -11,12 +10,12 @@ type Collections struct {
 	mock.Mock
 }
 
-// ByHash provides a mock function with given fields: hash
-func (_m *Collections) ByHash(hash crypto.Hash) (*flow.Collection, error) {
+// ByFingerprint provides a mock function with given fields: hash
+func (_m *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, error) {
 	ret := _m.Called(hash)
 
 	var r0 *flow.Collection
-	if rf, ok := ret.Get(0).(func(crypto.Hash) *flow.Collection); ok {
+	if rf, ok := ret.Get(0).(func(flow.Fingerprint) *flow.Collection); ok {
 		r0 = rf(hash)
 	} else {
 		if ret.Get(0) != nil {
@@ -25,7 +24,7 @@ func (_m *Collections) ByHash(hash crypto.Hash) (*flow.Collection, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(crypto.Hash) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.Fingerprint) error); ok {
 		r1 = rf(hash)
 	} else {
 		r1 = ret.Error(1)
@@ -34,8 +33,22 @@ func (_m *Collections) ByHash(hash crypto.Hash) (*flow.Collection, error) {
 	return r0, r1
 }
 
-// Insert provides a mock function with given fields: collection
-func (_m *Collections) Insert(collection *flow.Collection) error {
+// Remove provides a mock function with given fields: hash
+func (_m *Collections) Remove(hash flow.Fingerprint) error {
+	ret := _m.Called(hash)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Fingerprint) error); ok {
+		r0 = rf(hash)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Save provides a mock function with given fields: collection
+func (_m *Collections) Save(collection *flow.Collection) error {
 	ret := _m.Called(collection)
 
 	var r0 error

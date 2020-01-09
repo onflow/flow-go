@@ -7,10 +7,10 @@ import (
 )
 
 type VoteAggregator struct {
-	lock          sync.RWMutex
-	pendingVotes  map[types.MRH][]*types.Vote
-	createdQC     map[types.MRH]*types.QuorumCertificate
-	protocolState ProtocolState
+	sync.RWMutex
+	pendingVotes map[types.MRH][]*types.Vote
+	createdQC    map[types.MRH]*types.QuorumCertificate
+	viewState    ViewState
 }
 
 func (va *VoteAggregator) Store(v *types.Vote) {
@@ -18,11 +18,11 @@ func (va *VoteAggregator) Store(v *types.Vote) {
 }
 
 // only returns a QC if there is enough votes and it never makes such QC before
-func (va *VoteAggregator) StoreAndMakeQCForIncorporatedVote(v *types.Vote, b *types.BlockProposal) *types.QuorumCertificate {
+func (va *VoteAggregator) StoreAndMakeQCForIncorporatedVote(v *types.Vote, b *types.BlockProposal) (*types.QuorumCertificate, bool) {
 	panic("TODO")
 }
 
-func (va *VoteAggregator) BuildQCForBlockProposal(b *types.BlockProposal) *types.QuorumCertificate {
+func (va *VoteAggregator) BuildQCForBlockProposal(b *types.BlockProposal) (*types.QuorumCertificate, bool) {
 	panic("TODO")
 }
 

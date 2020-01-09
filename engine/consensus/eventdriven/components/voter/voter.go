@@ -9,11 +9,11 @@ import (
 // Specifically, Voter processes on OnSafeBlock events from reactor/core/eventprocessor
 type Voter struct {
 	// enable or disable Voter, e.g. for when catching up blocks
-	enabled atomic.Bool
+	enabled *atomic.Bool
 }
 
 func NewVoter(enabled bool) *Voter {
-	return &Voter{enabled: *atomic.NewBool(enabled)}
+	return &Voter{enabled: atomic.NewBool(enabled)}
 }
 
 func (v *Voter) Enable()  { v.enabled.Store(true) }
