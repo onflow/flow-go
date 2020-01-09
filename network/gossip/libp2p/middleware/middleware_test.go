@@ -38,12 +38,42 @@ func (m *MiddlewareTestSuit) SetupTest() {
 	require.Len(m.Suite.T(), m.mws, m.size)
 }
 
+// TestSendAndReceive sends a single message from one middleware to the other
+// middleware, and checks the reception
 func (m *MiddlewareTestSuit) TestSendAndReceive() {
 	msg := []byte("hello")
-	time.Sleep(4 * time.Second)
-	m.mws[0].Send(m.ids[m.size-1], msg)
-	time.Sleep(time.Second * 10)
-	m.mws[0].Send(m.ids[m.size-1], msg)
+	err := m.mws[0].Send(m.ids[m.size-1], msg)
+	require.NoError(m.Suite.T(), err)
+
+	// generates and mocks an overlay for each middleware
+	for i := 0; i < m.size; i++ {
+		target := i + 1
+		if i == m.size-1 {
+			target = 0
+		}
+		ip, port := m.mws[target].libP2PNode.GetIPPort()
+
+		// mocks an identity
+		flowID := flow.Identity{
+			NodeID:  m.ids[target],
+			Address: fmt.Sprintf("%s:%s", ip, port),
+			Role:    flow.RoleCollection,
+		}
+
+		// mocks Overlay.Identity for middleware.Overlay.Identity()
+		m.ov[i].On("Identity").Return(flowID, nil).Once()
+
+		// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
+		m.ov[i].On("Receive", mockery.Anything).Return(nil).Once()
+	}
+
+	// starting the middleware
+	for i := 0; i < m.size; i++ {
+		m.mws[i].Start(m.ov[i])
+		time.Sleep(1 * time.Second)
+	}
+
+	// evaluates the mock calls
 	for i := 0; i < m.size; i++ {
 		m.ov[i].AssertExpectations(m.T())
 	}
@@ -76,31 +106,13 @@ func (m *MiddlewareTestSuit) createAndStartMiddleWares(count int) ([]flow.Identi
 	// mocks an overlay (i.e., network) for each middleware
 	for i := 0; i < count; i++ {
 		overlay := &mock.Overlay{}
-		target := i + 1
-		if i == count-1 {
-			target = 0
-		}
-		ip, port := mws[target].libP2PNode.GetIPPort()
-
-		// mocks an identity
-		flowID := flow.Identity{
-			NodeID:  ids[target],
-			Address: fmt.Sprintf("%s:%s", ip, port),
-			Role:    flow.RoleCollection,
-		}
-
-		// mocks Overlay.Identity for middleware.Overlay.Identity()
-		overlay.On("Identity").Return(flowID, nil).Once()
-
-		// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
-		overlay.On("Receive", mockery.Anything).Return(nil).Once()
+		//// mocks Overlay.Identity for middleware.Overlay.Identity()
+		//overlay.On("Identity").Return(flowID, nil).Once()
+		//
+		//// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
+		//overlay.On("Receive", mockery.Anything).Return(nil).Once()
 		m.ov = append(m.ov, overlay)
 	}
 
-	// starting the middleware
-	for i := 0; i < count; i++ {
-		mws[i].Start(m.ov[i])
-		time.Sleep(1 * time.Second)
-	}
 	return ids, mws
 }
