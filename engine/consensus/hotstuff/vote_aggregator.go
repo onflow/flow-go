@@ -17,8 +17,11 @@ func (va *VoteAggregator) Store(v *types.Vote) {
 	panic("TODO")
 }
 
-// only returns a QC if there is enough votes and it never makes such QC before
-func (va *VoteAggregator) StoreAndMakeQCForIncorporatedVote(v *types.Vote, b *types.BlockProposal) (*types.QuorumCertificate, bool) {
+// StoreVoteAndBuildQC adds the vote to the VoteAggregator internal memory and returns a QC if there are enough votes.
+// The VoteAggregator builds a QC as soon as the number of votes allow this.
+// While subsequent votes (past the required threshold) are not included in the QC anymore,
+// VoteAggregator ALWAYS returns a QC is possible.
+func (va *VoteAggregator) StoreVoteAndBuildQC(v *types.Vote, b *types.BlockProposal) (*types.QuorumCertificate, bool) {
 	panic("TODO")
 }
 

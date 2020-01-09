@@ -26,6 +26,6 @@ func (p *PaceMaker) UpdateBlock(block *types.BlockProposal) (*types.NewViewEvent
 }
 
 // ToDo change to ProcessedQcForView(view uint64)
-func (p *PaceMaker) OnLocalTimeout(timeout *types.Timeout) (*types.NewViewEvent, bool) {
+func (p *PaceMaker) OnLocalTimeout() (*types.NewViewEvent, bool) {
 	panic("TODO")
 }

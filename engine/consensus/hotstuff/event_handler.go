@@ -30,8 +30,8 @@ func (eh *EventHandler) OnReceiveVote(vote *types.Vote) {
 	eh.processVote(vote)
 }
 
-func (eh *EventHandler) OnLocalTimeout(timeout *types.Timeout) {
-	eh.onLocalTimeout(timeout)
+func (eh *EventHandler) OnLocalTimeout() {
+	eh.onLocalTimeout()
 }
 
 func (eh *EventHandler) OnBlockRequest(req *types.BlockProposalRequest) {
@@ -61,13 +61,13 @@ func (eh *EventHandler) pruneInMemoryState() {
 // Call MODIFIES internal state of Reactor!
 func (eh *EventHandler) proposeIfLeaderForCurrentView() {
 	curView := eh.paceMaker.CurView()
-	if ! eh.protocolState.IsSelfLeaderForView(curView) {
+	if ! eh.viewState.IsSelfLeaderForView(curView) {
 		return
 	}
 
 	// no need to check qc from voteaggregator, because it has been checked
 	qcForNewBlock := eh.reactor.MakeForkChoice(curView)
-	proposal := eh.blockProducer.MakeBlockWithQC(curView, qcForNewBlock)
+	proposal := eh.blockProposalProducer.MakeBlockProposal(curView, qcForNewBlock)
 	go eh.network.BroadcastProposal(proposal)
 	eh.reactor.AddBlock(proposal)
 }
@@ -94,15 +94,15 @@ func (eh *EventHandler) processBlockForCurrentView(block *types.BlockProposal) {
 	if block.View() != eh.paceMaker.CurView() { // sanity check
 		panic("Internal Error: expecting block for current view")
 	}
-	nextLeader := eh.protocolState.LeaderForView(eh.paceMaker.CurView() + 1)
+	nextLeader := eh.viewState.LeaderForView(eh.paceMaker.CurView() + 1)
 
 	// not leader for next view -> state transition to EnteringView(curView+1)
-	if !eh.protocolState.IsSelf(nextLeader) { // ToDo this should be its own function
+	if !eh.viewState.IsSelf(nextLeader) { // ToDo this should be its own function
 		vote := eh.considerVoting(block) // vote can be nil, if we don't want to vote for block
 		eh.sendVote(vote, nextLeader) // gracefully handles nil votes
 
 		// informing PaceMaker about block for current view should transition to new view
-		if eh.paceMaker.UpdateBlock(block) == nil { // sanity check that state transition took place
+		if _, wasViewUpdated := eh.paceMaker.UpdateBlock(block); wasViewUpdated { // sanity check that state transition took place
 			panic("We are not primary for the next view and completed processing block for current view. But pacemaker did not increment view!")
 		}
 		eh.startNewView() // CAUTION: this is a state transition; no more processing should be done here
@@ -134,8 +134,8 @@ func (eh *EventHandler) sendVote(vote *types.Vote, nextLeader types.ID) {
 // so we can incorporate our own vote for the block we just processed.
 func (eh *EventHandler) commenceWaitingForVotes(block *types.BlockProposal) {
 	eh.internalState = WaitingForVotes
-	newView := eh.paceMaker.UpdateBlock(block) // this should solely update the timeout but not the current View
-	if (newView != nil) || (block.View() != eh.paceMaker.CurView()) { // sanity check
+	_, wasViewUpdated := eh.paceMaker.UpdateBlock(block) // this should solely update the timeout but not the current View
+	if wasViewUpdated || (block.View() != eh.paceMaker.CurView()) { // sanity check
 		panic("Internal Error: expecting pacemaker to not change view when commencing vote collection")
 	}
 
@@ -147,29 +147,30 @@ func (eh *EventHandler) commenceWaitingForVotes(block *types.BlockProposal) {
 	// no more processing should be done here
 }
 
-// onReceiveVote enters state "ProcessingVote". Gracefully handles (ignores) nil votes. 
+// onReceiveVote enters state "ProcessingVote". Gracefully handles (ignores) nil votes.
+// ToDo: split function into three different ones processing votes for past view, current view, future view
 func (eh *EventHandler) processVote(vote *types.Vote) {
 	if vote == nil {
 		return
 	}
-	blockProposal := eh.reactor.FindBlockProposalByViewAndBlockMRH(vote.View, vote.BlockMRH)
-	if blockProposal == nil {
+	proposal, found := eh.reactor.FindBlockProposalByViewAndBlockMRH(vote.View, vote.BlockMRH)
+	if !found {
 		eh.voteAggregator.Store(vote)
 		eh.missingBlockRequester.FetchMissingBlock(vote.View, vote.BlockMRH)
 		return
 	}
 
-	newQC := eh.voteAggregator.StoreAndMakeQCForIncorporatedVote(vote, blockProposal)
-	if newQC == nil {
+	qc, constructed := eh.voteAggregator.StoreVoteAndBuildQC(vote, proposal)
+	if !constructed {
 		return // if a QC has been made before or we don't have enough votes
 	}
-	eh.processQC(newQC) // CAUTION: this might result in a state transition;
+	eh.processQC(qc) // CAUTION: this might result in a state transition;
 	// no more processing should be done here
 }
 
 func (eh *EventHandler) processQC(qc *types.QuorumCertificate) {
-	eh.reactor.ProcessQcFromVotes(qc)
-	if eh.paceMaker.UpdateQC(qc) == nil {
+	eh.reactor.AddQC(qc)
+	if _, viewUpdated := eh.paceMaker.UpdateQC(qc); !viewUpdated{
 		return
 	}
 	eh.startNewView() // CAUTION: this is a state transition;
@@ -186,7 +187,7 @@ func (eh *EventHandler) onReceiveBlockProposal(receivedProposal *types.BlockProp
 	if !eh.validator.ValidateBlock(receivedProposal) {
 		// ToDo Slash
 		if !eh.validator.ValidateQC(receivedProposal.QC()) {
-			if eh.paceMaker.UpdateQC(receivedProposal.QC()) != nil {
+			if _, viewUpdated := eh.paceMaker.UpdateQC(receivedProposal.QC()); viewUpdated {
 				eh.startNewView()
 				return // CAUTION: this might result in a state transition;
 				// no more processing should be done here
@@ -203,8 +204,8 @@ func (eh *EventHandler) onReceiveBlockProposal(receivedProposal *types.BlockProp
 	// no more processing should be done here
 }
 
-func (eh *EventHandler) onLocalTimeout(timeout *types.Timeout) {
-	if eh.paceMaker.OnLocalTimeout(timeout) == nil { // sanity check
+func (eh *EventHandler) onLocalTimeout() {
+	if _, viewUpdated := eh.paceMaker.OnLocalTimeout(); !viewUpdated { // sanity check
 		panic("Internal Error: expecting pacemaker to not change view on timeout")
 	}
 	eh.startNewView() // CAUTION: this is a state transition;
@@ -212,8 +213,7 @@ func (eh *EventHandler) onLocalTimeout(timeout *types.Timeout) {
 }
 
 func (eh *EventHandler) onBlockRequest(req *types.BlockProposalRequest) {
-	blockProposal := eh.reactor.FindBlockProposalByViewAndBlockMRH(req.View, req.BlockMRH)
-	if blockProposal != nil {
-		eh.network.RespondBlockProposalRequest(req, blockProposal)
+	if proposal, found := eh.reactor.FindBlockProposalByViewAndBlockMRH(req.View, req.BlockMRH); found {
+		eh.network.RespondBlockProposalRequest(req, proposal)
 	}
 }
