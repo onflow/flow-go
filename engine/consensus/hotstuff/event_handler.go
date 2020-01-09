@@ -71,7 +71,7 @@ func (eh *EventHandler) processNewQC(qc *types.QuorumCertificate) {
 }
 
 // QC has been processed
-func (eh *EventHandler) processIncorperatedBlock(block *types.BlockProposal) {
+func (eh *EventHandler) processIncorporatedBlock(block *types.BlockProposal) {
 	newView, updated := eh.paceMaker.UpdateBlock(block)
 	if updated {
 		eh.onNewViewEntered(newView)
@@ -104,7 +104,7 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 	}
 
 	if eh.forkChoice.CanIncorperate(blockProposal) == false {
-		// the proposal is not incorperated (meaning, its QC doesn't exist in the block tree)
+		// the proposal is not incorporated (meaning, its QC doesn't exist in the block tree)
 		eh.missingBlockRequester.FetchMissingBlock(blockProposal.Block.View, blockProposal.Block.BlockMRH())
 		return
 	}
@@ -121,26 +121,21 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 		return // ignore invalid block
 	}
 
-	incorperatedBlock, added := eh.forkChoice.AddNewProposal(blockProposal)
+	incorporatedBlock, added := eh.forkChoice.AddNewProposal(blockProposal)
 	if added {
-		eh.processIncorperatedBlock(incorperatedBlock)
+		eh.processIncorporatedBlock(incorporatedBlock)
 	}
 
-	if eh.isConActor {
-		if eh.forkChoice.IsSafeNode(blockProposal) == false || eh.paceMaker.CurView() != blockProposal.Block.View {
-			return
-		}
+	if eh.forkChoice.IsSafeNode(blockProposal) == false || eh.paceMaker.CurView() != blockProposal.Block.View || eh.isConActor {
+		return
+	}
 
-		myVote := eh.voter.ProduceVote(blockProposal)
-		if myVote == nil {
-			return // exit if i should not vote
-		}
+	myVote := eh.voter.ProduceVote(blockProposal)
 
-		if eh.protocolState.IsSelf(myVote.View, myVote.Signature.SignerIdx) {
-			eh.onReceiveVote(myVote) // if I'm collecting my own vote, then pass it to myself directly
-		} else {
-			eh.network.SendVote(myVote, myVote.Signature.SignerIdx)
-		}
+	if eh.protocolState.IsSelf(myVote.View, myVote.Signature.SignerIdx) {
+		eh.onReceiveVote(myVote) // if I'm collecting my own vote, then pass it to myself directly
+	} else {
+		eh.network.SendVote(myVote, myVote.Signature.SignerIdx)
 	}
 }
 
