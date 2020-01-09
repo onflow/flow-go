@@ -123,12 +123,7 @@ func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.Col
 		return fmt.Errorf("could not retrieve requested collection: %w", err)
 	}
 
-	res := messages.CollectionResponse{
-		Fingerprint:  coll.Fingerprint(),
-		Transactions: coll.Transactions,
-	}
-
-	err = e.con.Submit(&res, originID)
+	err = e.con.Submit(coll, originID)
 	if err != nil {
 		return fmt.Errorf("could not respond to collection requester: %w", err)
 	}

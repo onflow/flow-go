@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -73,7 +72,6 @@ func TestCollectionRequest(t *testing.T) {
 
 		// set up a mock requester engine that will receive and verify the collection response
 		requesterEngine := new(mocknetwork.Engine)
-		requesterEngine.On("Process", collID.NodeID, testifymock.Anything).Return(nil).Once()
 		con, err := requesterNode.Net.Register(engine.CollectionProvider, requesterEngine)
 		assert.NoError(t, err)
 
@@ -81,6 +79,9 @@ func TestCollectionRequest(t *testing.T) {
 		coll := unittest.CollectionFixture(3)
 		err = collNode.Collections.Save(&coll)
 		assert.NoError(t, err)
+
+		// expect that the requester will receive the collection
+		requesterEngine.On("Process", collID.NodeID, &coll).Return(nil).Once()
 
 		// send a request for the collection
 		req := messages.CollectionRequest{Fingerprint: coll.Fingerprint()}
@@ -97,12 +98,8 @@ func TestCollectionRequest(t *testing.T) {
 		require.True(t, ok)
 		net.FlushAll()
 
-		// the requester engine should have received the right collection
-		res := &messages.CollectionResponse{
-			Fingerprint:  coll.Fingerprint(),
-			Transactions: coll.Transactions,
-		}
-		requesterEngine.AssertCalled(t, "Process", collID.NodeID, res)
+		//assert we received the right collection
+		requesterEngine.AssertExpectations(t)
 	})
 
 	t.Run("should return error for non-existent collection", func(t *testing.T) {
