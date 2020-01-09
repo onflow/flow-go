@@ -9,6 +9,7 @@ require (
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.0
 	github.com/ethereum/go-ethereum v1.9.9
+	github.com/gammazero/deque v0.0.0-20190521012701-46e4ffb7a622
 	github.com/go-test/deep v1.0.4
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.3.1
@@ -28,6 +29,7 @@ require (
 	github.com/rs/zerolog v1.15.0
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.4.0
+	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
 	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
 	go.uber.org/atomic v1.4.0
 	golang.org/x/crypto v0.0.0-20191219195013-becbf705a915

@@ -33,6 +33,20 @@ func (_m *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, e
 	return r0, r1
 }
 
+// Remove provides a mock function with given fields: hash
+func (_m *Collections) Remove(hash flow.Fingerprint) error {
+	ret := _m.Called(hash)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Fingerprint) error); ok {
+		r0 = rf(hash)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Save provides a mock function with given fields: collection
 func (_m *Collections) Save(collection *flow.Collection) error {
 	ret := _m.Called(collection)

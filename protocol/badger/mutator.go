@@ -133,7 +133,8 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 			}
 
 			// get the collection guarantees
-			err = operation.RetrieveCollectionGuarantees(s.hash, &guarantees)(tx)
+			err = operation.RetrieveCollectionGuaranteesByBlockHash(s.hash, &guarantees)(tx)
+
 			if err != nil {
 				return fmt.Errorf("could not retrieve guarantees (%x): %w", s.hash, err)
 			}
@@ -309,9 +310,15 @@ func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 	}
 
 	// insert the collection guarantees into the DB
-	err = operation.InsertCollectionGuarantees(block.Hash(), block.CollectionGuarantees)(tx)
-	if err != nil {
-		return fmt.Errorf("could not insert collections: %w", err)
+	for _, coll := range block.CollectionGuarantees {
+		err = operation.InsertCollectionGuarantee(coll)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert collection guarantee: %w", err)
+		}
+		err = operation.IndexCollectionGuaranteeByBlockHash(block.Hash(), coll)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index collection guarantee: %w", err)
+		}
 	}
 
 	return nil
