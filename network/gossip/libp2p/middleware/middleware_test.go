@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -35,6 +36,9 @@ func (m *MiddlewareTestSuit) SetupTest() {
 	m.ids, m.mws = m.createAndStartMiddleWares(m.size)
 	require.Len(m.Suite.T(), m.ids, m.size)
 	require.Len(m.Suite.T(), m.mws, m.size)
+
+	// starts middlewares
+	m.StartMiddlewares()
 }
 
 // StartMiddleware creates mock overlays for each middleware, and starts the middlewares
@@ -57,8 +61,6 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 		// mocks Overlay.Identity for middleware.Overlay.Identity()
 		m.ov[i].On("Identity").Return(flowID, nil).Once()
 
-		//// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
-		//m.ov[i].On("Receive", mockery.Anything, mockery.Anything).Return(nil).Once()
 	}
 
 	// starting the middleware
@@ -67,9 +69,19 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 		time.Sleep(1 * time.Second)
 	}
 
-	//msg := []byte("hello")
-	//err := m.mws[0].Send(m.ids[m.size-1], msg)
-	//require.NoError(m.Suite.T(), err)
+	for i := 0; i < m.size; i++ {
+		m.ov[i].AssertExpectations(m.T())
+	}
+}
+
+func (m *MiddlewareTestSuit) TestSendOneMessage() {
+	// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
+	m.ov[m.size-1].On("Receive", mockery.Anything, mockery.Anything).Return(nil).Once()
+
+	msg := []byte("hello")
+	err := m.mws[0].Send(m.ids[m.size-1], msg)
+	require.NoError(m.Suite.T(), err)
+
 	//
 	//err = m.mws[m.size-1].Send(m.ids[0], msg)
 	//require.NoError(m.Suite.T(), err)
