@@ -1571,10 +1571,18 @@ func TestInterpretHostFunction(t *testing.T) {
 	testFunction := stdlib.NewStandardLibraryFunction(
 		"test",
 		&sema.FunctionType{
-			ParameterTypeAnnotations: sema.NewTypeAnnotations(
-				&sema.IntType{},
-				&sema.IntType{},
-			),
+			Parameters: []*sema.Parameter{
+				{
+					Label:          sema.ArgumentLabelNotRequired,
+					Identifier:     "a",
+					TypeAnnotation: sema.NewTypeAnnotation(&sema.IntType{}),
+				},
+				{
+					Label:          sema.ArgumentLabelNotRequired,
+					Identifier:     "b",
+					TypeAnnotation: sema.NewTypeAnnotation(&sema.IntType{}),
+				},
+			},
 			ReturnTypeAnnotation: sema.NewTypeAnnotation(
 				&sema.IntType{},
 			),
@@ -1635,9 +1643,13 @@ func TestInterpretHostFunctionWithVariableArguments(t *testing.T) {
 	testFunction := stdlib.NewStandardLibraryFunction(
 		"test",
 		&sema.FunctionType{
-			ParameterTypeAnnotations: sema.NewTypeAnnotations(
-				&sema.IntType{},
-			),
+			Parameters: []*sema.Parameter{
+				{
+					Label:          sema.ArgumentLabelNotRequired,
+					Identifier:     "value",
+					TypeAnnotation: sema.NewTypeAnnotation(&sema.IntType{}),
+				},
+			},
 			ReturnTypeAnnotation: sema.NewTypeAnnotation(
 				&sema.IntType{},
 			),
@@ -5525,74 +5537,55 @@ func TestInterpretInterfaceInitializer(t *testing.T) {
 }
 
 func TestInterpretEmitEvent(t *testing.T) {
-	var actualEvents []interpreter.EventValue
+	var actualEvents []*interpreter.CompositeValue
 
 	inter := parseCheckAndInterpret(t,
 		`
-            event Transfer(to: Int, from: Int)
-            event TransferAmount(to: Int, from: Int, amount: Int)
+          event Transfer(to: Int, from: Int)
+          event TransferAmount(to: Int, from: Int, amount: Int)
 
-            fun test() {
+          fun test() {
               emit Transfer(to: 1, from: 2)
               emit Transfer(to: 3, from: 4)
               emit TransferAmount(to: 1, from: 2, amount: 100)
-            }
-            `,
+          }
+        `,
 	)
 
-	inter.SetOnEventEmittedHandler(func(_ *interpreter.Interpreter, event interpreter.EventValue) {
-		actualEvents = append(actualEvents, event)
-	})
+	inter.SetOnEventEmittedHandler(
+		func(_ *interpreter.Interpreter, event *interpreter.CompositeValue, eventType *sema.CompositeType) {
+			actualEvents = append(actualEvents, event)
+		},
+	)
 
 	_, err := inter.Invoke("test")
 	require.NoError(t, err)
 
-	expectedEvents := []interpreter.EventValue{
+	expectedEvents := []*interpreter.CompositeValue{
 		{
-			"Transfer",
-			[]interpreter.EventField{
-				{
-					Identifier: "to",
-					Value:      interpreter.NewIntValue(1),
-				},
-				{
-					Identifier: "from",
-					Value:      interpreter.NewIntValue(2),
-				},
+			Location: TestLocation,
+			TypeID:   inter.Checker.GlobalTypes["Transfer"].Type.ID(),
+			Fields: map[string]interpreter.Value{
+				"to":   interpreter.NewIntValue(1),
+				"from": interpreter.NewIntValue(2),
 			},
-			TestLocation,
 		},
 		{
-			"Transfer",
-			[]interpreter.EventField{
-				{
-					Identifier: "to",
-					Value:      interpreter.NewIntValue(3),
-				},
-				{
-					Identifier: "from",
-					Value:      interpreter.NewIntValue(4),
-				},
+			Location: TestLocation,
+			TypeID:   inter.Checker.GlobalTypes["Transfer"].Type.ID(),
+			Fields: map[string]interpreter.Value{
+				"to":   interpreter.NewIntValue(3),
+				"from": interpreter.NewIntValue(4),
 			},
-			TestLocation,
 		},
 		{
-			"TransferAmount",
-			[]interpreter.EventField{
-				{
-					Identifier: "to",
-					Value:      interpreter.NewIntValue(1),
-				},
-				{
-					Identifier: "from",
-					Value:      interpreter.NewIntValue(2),
-				},
-				{
-					Identifier: "amount",
-					Value:      interpreter.NewIntValue(100),
-				},
+			Location: TestLocation,
+			TypeID:   inter.Checker.GlobalTypes["TransferAmount"].Type.ID(),
+			Fields: map[string]interpreter.Value{
+				"to":     interpreter.NewIntValue(1),
+				"from":   interpreter.NewIntValue(2),
+				"amount": interpreter.NewIntValue(100),
 			},
-			TestLocation,
 		},
 	}
 

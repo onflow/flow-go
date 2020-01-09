@@ -1829,64 +1829,6 @@ type DictionaryEntryValues struct {
 	Value Value
 }
 
-// EventValue
-
-type EventValue struct {
-	Identifier string
-	Fields     []EventField
-	Location   ast.Location
-}
-
-func (EventValue) isValue() {}
-
-func (v EventValue) Copy() Value {
-	fields := make([]EventField, len(v.Fields))
-	for i, field := range v.Fields {
-		fields[i] = EventField{
-			Identifier: field.Identifier,
-			Value:      field.Value.Copy(),
-		}
-	}
-
-	return EventValue{
-		Identifier: v.Identifier,
-		Fields:     fields,
-		Location:   v.Location,
-	}
-}
-
-func (EventValue) GetOwner() string {
-	// value is never owned
-	return ""
-}
-
-func (EventValue) SetOwner(_ string) {
-	// NO-OP: value cannot be owned
-}
-
-func (v EventValue) String() string {
-	var fields strings.Builder
-	for i, field := range v.Fields {
-		if i > 0 {
-			fields.WriteString(", ")
-		}
-		fields.WriteString(field.String())
-	}
-
-	return fmt.Sprintf("%s(%s)", v.Identifier, fields.String())
-}
-
-// EventField
-
-type EventField struct {
-	Identifier string
-	Value      Value
-}
-
-func (f EventField) String() string {
-	return fmt.Sprintf("%s: %s", f.Identifier, f.Value)
-}
-
 // ToValue converts a Go value into an interpreter value
 func ToValue(value interface{}) (Value, error) {
 	// TODO: support more types

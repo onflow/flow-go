@@ -22,9 +22,11 @@ func TestConstantSizedType_String_OfFunctionType(t *testing.T) {
 
 	ty := &ConstantSizedType{
 		Type: &FunctionType{
-			ParameterTypeAnnotations: NewTypeAnnotations(
-				&Int8Type{},
-			),
+			Parameters: []*Parameter{
+				{
+					TypeAnnotation: NewTypeAnnotation(&Int8Type{}),
+				},
+			},
 			ReturnTypeAnnotation: NewTypeAnnotation(
 				&Int16Type{},
 			),
@@ -51,9 +53,11 @@ func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
 
 	ty := &VariableSizedType{
 		Type: &FunctionType{
-			ParameterTypeAnnotations: NewTypeAnnotations(
-				&Int8Type{},
-			),
+			Parameters: []*Parameter{
+				{
+					TypeAnnotation: NewTypeAnnotation(&Int8Type{}),
+				},
+			},
 			ReturnTypeAnnotation: NewTypeAnnotation(
 				&Int16Type{},
 			),

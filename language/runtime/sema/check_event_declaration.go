@@ -9,13 +9,11 @@ import (
 //
 func (checker *Checker) checkEventParameters(
 	parameterList *ast.ParameterList,
-	parameterTypeAnnotations []*TypeAnnotation,
+	parameters []*Parameter,
 ) {
 
 	for i, parameter := range parameterList.Parameters {
-		parameterTypeAnnotation := parameterTypeAnnotations[i]
-
-		parameterType := parameterTypeAnnotation.Type
+		parameterType := parameters[i].TypeAnnotation.Type
 
 		if !parameterType.IsInvalidType() &&
 			!isValidEventParameterType(parameterType) {

@@ -105,7 +105,8 @@ func (checker *Checker) checkFunction(
 	// check argument labels
 	checker.checkArgumentLabels(parameterList)
 
-	checker.checkParameters(parameterList, functionType.ParameterTypeAnnotations)
+	checker.checkParameters(parameterList, functionType.Parameters)
+
 	if functionType.ReturnTypeAnnotation != nil {
 		checker.checkTypeAnnotation(functionType.ReturnTypeAnnotation, returnTypePosition)
 	}
@@ -125,7 +126,7 @@ func (checker *Checker) checkFunction(
 			checker.enterValueScope()
 			defer checker.leaveValueScope(checkResourceLoss)
 
-			checker.declareParameters(parameterList, functionType.ParameterTypeAnnotations)
+			checker.declareParameters(parameterList, functionType.Parameters)
 
 			functionActivation := checker.functionActivations.Current()
 			functionActivation.InitializationInfo = initializationInfo
@@ -176,10 +177,14 @@ func (checker *Checker) checkFunctionExits(functionBlock *ast.FunctionBlock, ret
 	)
 }
 
-func (checker *Checker) checkParameters(parameterList *ast.ParameterList, parameterTypeAnnotations []*TypeAnnotation) {
+func (checker *Checker) checkParameters(parameterList *ast.ParameterList, parameters []*Parameter) {
 	for i, parameter := range parameterList.Parameters {
-		parameterTypeAnnotation := parameterTypeAnnotations[i]
-		checker.checkTypeAnnotation(parameterTypeAnnotation, parameter.TypeAnnotation.StartPos)
+		parameterTypeAnnotation := parameters[i].TypeAnnotation
+
+		checker.checkTypeAnnotation(
+			parameterTypeAnnotation,
+			parameter.TypeAnnotation.StartPos,
+		)
 	}
 }
 
@@ -245,7 +250,7 @@ func (checker *Checker) checkArgumentLabels(parameterList *ast.ParameterList) {
 //
 func (checker *Checker) declareParameters(
 	parameterList *ast.ParameterList,
-	parameterTypeAnnotations []*TypeAnnotation,
+	parameters []*Parameter,
 ) {
 	depth := checker.valueActivations.Depth()
 
@@ -267,8 +272,7 @@ func (checker *Checker) declareParameters(
 			continue
 		}
 
-		parameterTypeAnnotation := parameterTypeAnnotations[i]
-		parameterType := parameterTypeAnnotation.Type
+		parameterType := parameters[i].TypeAnnotation.Type
 
 		variable := &Variable{
 			Identifier:      identifier.Identifier,

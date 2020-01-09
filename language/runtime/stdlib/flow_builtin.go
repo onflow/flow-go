@@ -15,20 +15,30 @@ var flowLocation = ast.StringLocation("flow")
 
 // TODO: improve types
 var createAccountFunctionType = &sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// publicKeys
-		&sema.VariableSizedType{
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
+	Parameters: []*sema.Parameter{
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "publicKeys",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.VariableSizedType{
+					Type: &sema.VariableSizedType{
+						Type: &sema.IntType{},
+					},
+				},
+			),
 		},
-		// code
-		&sema.OptionalType{
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "code",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.OptionalType{
+					Type: &sema.VariableSizedType{
+						Type: &sema.IntType{},
+					},
+				},
+			),
 		},
-	),
+	},
 	// address
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
 		&sema.AddressType{},
@@ -41,14 +51,24 @@ var createAccountFunctionType = &sema.FunctionType{
 }
 
 var addAccountKeyFunctionType = &sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// address
-		&sema.AddressType{},
-		// key
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
+	Parameters: []*sema.Parameter{
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "address",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.AddressType{},
+			),
 		},
-	),
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "key",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.VariableSizedType{
+					Type: &sema.IntType{},
+				},
+			),
+		},
+	},
 	// nothing
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
 		&sema.VoidType{},
@@ -56,12 +76,22 @@ var addAccountKeyFunctionType = &sema.FunctionType{
 }
 
 var removeAccountKeyFunctionType = &sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// address
-		&sema.AddressType{},
-		// index
-		&sema.IntType{},
-	),
+	Parameters: []*sema.Parameter{
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "address",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.AddressType{},
+			),
+		},
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "index",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.IntType{},
+			),
+		},
+	},
 	// nothing
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
 		&sema.VoidType{},
@@ -69,14 +99,24 @@ var removeAccountKeyFunctionType = &sema.FunctionType{
 }
 
 var updateAccountCodeFunctionType = &sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// address
-		&sema.AddressType{},
-		// code
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
+	Parameters: []*sema.Parameter{
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "address",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.AddressType{},
+			),
 		},
-	),
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "code",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.VariableSizedType{
+					Type: &sema.IntType{},
+				},
+			),
+		},
+	},
 	// nothing
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
 		&sema.VoidType{},
@@ -89,19 +129,30 @@ var updateAccountCodeFunctionType = &sema.FunctionType{
 }
 
 var getAccountFunctionType = &sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// address
-		&sema.AddressType{},
-	),
+	Parameters: []*sema.Parameter{
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "address",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.AddressType{},
+			),
+		},
+	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
 		&sema.PublicAccountType{},
 	),
 }
 
 var logFunctionType = &sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		&sema.AnyStructType{},
-	),
+	Parameters: []*sema.Parameter{
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "value",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.AnyStructType{},
+			),
+		},
+	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
 		&sema.VoidType{},
 	),
@@ -163,12 +214,7 @@ func FlowBuiltInFunctions(impls FlowBuiltinImpls) StandardLibraryFunctions {
 
 // built-in event types
 
-type flowEventTypeParameter struct {
-	Identifier string
-	Type       sema.Type
-}
-
-func newFlowEventType(identifier string, parameters []flowEventTypeParameter) *sema.CompositeType {
+func newFlowEventType(identifier string, parameters ...*sema.Parameter) *sema.CompositeType {
 
 	eventType := &sema.CompositeType{
 		Kind:       common.CompositeKindEvent,
@@ -178,21 +224,20 @@ func newFlowEventType(identifier string, parameters []flowEventTypeParameter) *s
 	}
 
 	for _, parameter := range parameters {
-		typeAnnotation := sema.NewTypeAnnotation(parameter.Type)
 
 		eventType.Members[parameter.Identifier] =
 			sema.NewCheckedMember(&sema.Member{
 				ContainerType:   eventType,
 				Access:          ast.AccessPublic,
 				Identifier:      ast.Identifier{Identifier: parameter.Identifier},
-				TypeAnnotation:  typeAnnotation,
+				TypeAnnotation:  parameter.TypeAnnotation,
 				DeclarationKind: common.DeclarationKindField,
 				VariableKind:    ast.VariableKindConstant,
 			})
 
-		eventType.ConstructorParameterTypeAnnotations = append(
-			eventType.ConstructorParameterTypeAnnotations,
-			typeAnnotation,
+		eventType.ConstructorParameters = append(
+			eventType.ConstructorParameters,
+			parameter,
 		)
 	}
 
@@ -201,58 +246,64 @@ func newFlowEventType(identifier string, parameters []flowEventTypeParameter) *s
 
 var AccountCreatedEventType = newFlowEventType(
 	"AccountCreated",
-	[]flowEventTypeParameter{
-		{
-			Identifier: "address",
-			Type:       &sema.StringType{},
-		},
+	&sema.Parameter{
+		Identifier: "address",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.StringType{},
+		),
 	},
 )
 
 var AccountKeyAddedEventType = newFlowEventType(
 	"AccountKeyAdded",
-	[]flowEventTypeParameter{
-		{
-			Identifier: "address",
-			Type:       &sema.StringType{},
-		},
-		{
-			Identifier: "publicKey",
-			Type: &sema.VariableSizedType{
+	&sema.Parameter{
+		Identifier: "address",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.StringType{},
+		),
+	},
+	&sema.Parameter{
+		Identifier: "publicKey",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},
-		},
+		),
 	},
 )
 
 var AccountKeyRemovedEventType = newFlowEventType(
 	"AccountKeyRemoved",
-	[]flowEventTypeParameter{
-		{
-			Identifier: "address",
-			Type:       &sema.StringType{},
-		},
-		{
-			Identifier: "publicKey",
-			Type: &sema.VariableSizedType{
+	&sema.Parameter{
+		Identifier: "address",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.StringType{},
+		),
+	},
+	&sema.Parameter{
+		Identifier: "publicKey",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},
-		},
+		),
 	},
 )
 
 var AccountCodeUpdatedEventType = newFlowEventType(
 	"AccountCodeUpdated",
-	[]flowEventTypeParameter{
-		{
-			Identifier: "address",
-			Type:       &sema.StringType{},
-		},
-		{
-			Identifier: "codeHash",
-			Type: &sema.VariableSizedType{
+	&sema.Parameter{
+		Identifier: "address",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.StringType{},
+		),
+	},
+	&sema.Parameter{
+		Identifier: "codeHash",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VariableSizedType{
 				Type: &sema.IntType{},
 			},
-		},
+		),
 	},
 )

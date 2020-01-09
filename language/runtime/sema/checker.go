@@ -16,9 +16,13 @@ const BeforeIdentifier = "before"
 const ResultIdentifier = "result"
 
 var beforeType = &FunctionType{
-	ParameterTypeAnnotations: NewTypeAnnotations(
-		&AnyStructType{},
-	),
+	Parameters: []*Parameter{
+		{
+			Label:          ArgumentLabelNotRequired,
+			Identifier:     "value",
+			TypeAnnotation: NewTypeAnnotation(&AnyStructType{}),
+		},
+	},
 	ReturnTypeAnnotation: NewTypeAnnotation(
 		&AnyStructType{},
 	),
@@ -711,19 +715,21 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 		}
 
 	case *ast.FunctionType:
-		var parameterTypeAnnotations []*TypeAnnotation
+		var parameters []*Parameter
 		for _, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
 			parameterTypeAnnotation := checker.ConvertTypeAnnotation(parameterTypeAnnotation)
-			parameterTypeAnnotations = append(parameterTypeAnnotations,
-				parameterTypeAnnotation,
+			parameters = append(parameters,
+				&Parameter{
+					TypeAnnotation: parameterTypeAnnotation,
+				},
 			)
 		}
 
 		returnTypeAnnotation := checker.ConvertTypeAnnotation(t.ReturnTypeAnnotation)
 
 		return &FunctionType{
-			ParameterTypeAnnotations: parameterTypeAnnotations,
-			ReturnTypeAnnotation:     returnTypeAnnotation,
+			Parameters:           parameters,
+			ReturnTypeAnnotation: returnTypeAnnotation,
 		}
 
 	case *ast.OptionalType:
@@ -771,32 +777,37 @@ func (checker *Checker) functionType(
 	parameterList *ast.ParameterList,
 	returnTypeAnnotation *ast.TypeAnnotation,
 ) *FunctionType {
-	convertedParameterTypeAnnotations :=
-		checker.parameterTypeAnnotations(parameterList)
-
+	convertedParameters := checker.parameters(parameterList)
 	convertedReturnTypeAnnotation :=
 		checker.ConvertTypeAnnotation(returnTypeAnnotation)
 
 	return &FunctionType{
-		ParameterTypeAnnotations: convertedParameterTypeAnnotations,
-		ReturnTypeAnnotation:     convertedReturnTypeAnnotation,
+		Parameters:           convertedParameters,
+		ReturnTypeAnnotation: convertedReturnTypeAnnotation,
 	}
 }
 
-func (checker *Checker) parameterTypeAnnotations(parameterList *ast.ParameterList) []*TypeAnnotation {
+func (checker *Checker) parameters(parameterList *ast.ParameterList) []*Parameter {
 
-	parameterTypeAnnotations := make([]*TypeAnnotation, len(parameterList.Parameters))
+	parameters := make([]*Parameter, len(parameterList.Parameters))
 
 	for i, parameter := range parameterList.Parameters {
 		convertedParameterType := checker.ConvertType(parameter.TypeAnnotation.Type)
 
-		parameterTypeAnnotations[i] = &TypeAnnotation{
-			IsResource: parameter.TypeAnnotation.IsResource,
-			Type:       convertedParameterType,
+		// NOTE: copying resource annotation from source type annotation as-is,
+		// so a potential error is properly reported
+
+		parameters[i] = &Parameter{
+			Label:      parameter.Label,
+			Identifier: parameter.Identifier.Identifier,
+			TypeAnnotation: &TypeAnnotation{
+				IsResource: parameter.TypeAnnotation.IsResource,
+				Type:       convertedParameterType,
+			},
 		}
 	}
 
-	return parameterTypeAnnotations
+	return parameters
 }
 
 func (checker *Checker) recordVariableReferenceOccurrence(startPos, endPos ast.Position, variable *Variable) {

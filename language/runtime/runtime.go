@@ -173,7 +173,7 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	// check parameter count
 
 	signingAccountsCount := len(signingAccountAddresses)
-	transactionFunctionParameterCount := len(transactionFunctionType.ParameterTypeAnnotations)
+	transactionFunctionParameterCount := len(transactionFunctionType.Parameters)
 	if signingAccountsCount != transactionFunctionParameterCount {
 		return newError(InvalidTransactionParameterCountError{
 			Expected: transactionFunctionParameterCount,
@@ -183,8 +183,8 @@ func (r *interpreterRuntime) ExecuteTransaction(
 
 	// check parameter types
 
-	for _, parameterTypeAnnotation := range transactionFunctionType.ParameterTypeAnnotations {
-		parameterType := parameterTypeAnnotation.Type
+	for _, parameter := range transactionFunctionType.Parameters {
+		parameterType := parameter.TypeAnnotation.Type
 
 		if !parameterType.Equal(&sema.AccountType{}) {
 			return newError(InvalidTransactionParameterTypeError{
@@ -196,7 +196,7 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	signingAccounts := make([]interface{}, signingAccountsCount)
 
 	for i, address := range signingAccountAddresses {
-		signingAccounts[i] = interpreter.NewAccountValue(interpreter.AddressValue(address))
+		signingAccounts[i] = interpreter.NewAccountValue(address)
 	}
 
 	_, err = r.interpret(
@@ -287,8 +287,12 @@ func (r *interpreterRuntime) newInterpreter(
 	defaultOptions := []interpreter.Option{
 		interpreter.WithPredefinedValues(functions.ToValues()),
 		interpreter.WithOnEventEmittedHandler(
-			func(inter *interpreter.Interpreter, eventValue interpreter.EventValue) {
-				r.emitEvent(inter, runtimeInterface, eventValue)
+			func(
+				inter *interpreter.Interpreter,
+				eventValue *interpreter.CompositeValue,
+				eventType *sema.CompositeType,
+			) {
+				r.emitEvent(inter, runtimeInterface, eventValue, eventType)
 			},
 		),
 		interpreter.WithStorageReadHandler(
@@ -402,17 +406,17 @@ func (r *interpreterRuntime) parse(script []byte) (program *ast.Program, err err
 
 // emitEvent converts an event value to native Go types and emits it to the runtime interface.
 func (r *interpreterRuntime) emitEvent(
-	inter *interpreter.Interpreter,
+	_ *interpreter.Interpreter,
 	runtimeInterface Interface,
-	event interpreter.EventValue,
+	event *interpreter.CompositeValue,
+	eventType *sema.CompositeType,
 ) {
-	functionType := inter.Checker.GlobalValues[event.Identifier].Type.(*sema.SpecialFunctionType)
-	eventType := functionType.ReturnTypeAnnotation.Type
+	fields := make([]Value, len(eventType.ConstructorParameters))
 
-	fields := make([]Value, len(event.Fields))
-	for i, field := range event.Fields {
-		fields[i] = field.Value
+	for i, parameter := range eventType.ConstructorParameters {
+		fields[i] = event.Fields[parameter.Identifier]
 	}
+
 	eventValue := Event{
 		Type:   eventType,
 		Fields: fields,
@@ -706,10 +710,10 @@ func (r *interpreterRuntime) instantiateContract(
 	interpreter.Value,
 	error,
 ) {
-	parameterTypes := make([]sema.Type, len(contractType.ConstructorParameterTypeAnnotations))
+	parameterTypes := make([]sema.Type, len(contractType.ConstructorParameters))
 
-	for i, constructorParameterTypeAnnotation := range contractType.ConstructorParameterTypeAnnotations {
-		parameterTypes[i] = constructorParameterTypeAnnotation.Type
+	for i, constructorParameter := range contractType.ConstructorParameters {
+		parameterTypes[i] = constructorParameter.TypeAnnotation.Type
 	}
 
 	// Check argument count
@@ -798,7 +802,7 @@ func (r *interpreterRuntime) instantiateContract(
 	return contract, err
 }
 
-func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
+func (r *interpreterRuntime) newGetAccountFunction(_ Interface) interpreter.HostFunction {
 	return func(invocation interpreter.Invocation) trampoline.Trampoline {
 		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
 		publicAccount := interpreter.NewPublicAccountValue(accountAddress)

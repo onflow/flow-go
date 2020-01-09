@@ -15,11 +15,19 @@ import (
 func TestCheckEventDeclaration(t *testing.T) {
 
 	t.Run("ValidEvent", func(t *testing.T) {
-		_, err := ParseAndCheck(t, `
+		checker, err := ParseAndCheck(t, `
             event Transfer(to: Int, from: Int)
         `)
 
 		require.NoError(t, err)
+
+		transferType := checker.GlobalTypes["Transfer"].Type
+
+		require.IsType(t, &sema.CompositeType{}, transferType)
+		require.Len(t, transferType.(*sema.CompositeType).Members, 2)
+
+		assert.Equal(t, &sema.IntType{}, transferType.(*sema.CompositeType).Members["to"].TypeAnnotation.Type)
+		assert.Equal(t, &sema.IntType{}, transferType.(*sema.CompositeType).Members["from"].TypeAnnotation.Type)
 	})
 
 	t.Run("InvalidEventNonPrimitiveType", func(t *testing.T) {

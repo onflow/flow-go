@@ -27,6 +27,8 @@ func (checker *Checker) VisitEmitStatement(statement *ast.EmitStatement) ast.Rep
 		return nil
 	}
 
+	checker.Elaboration.EmitStatementEventTypes[statement] = compositeType
+
 	// Check that the emitted event is declared in the same location
 
 	if !ast.LocationsMatch(compositeType.Location, checker.Location) {
