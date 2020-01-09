@@ -12,7 +12,6 @@ type EventHandler struct {
 	blockProducer         BlockProducer
 	protocolState         ProtocolState
 	network               Network
-	blockFinalizer 		BlockFinalizer
 
 	internalState stateValue
 }
