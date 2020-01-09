@@ -5,7 +5,6 @@ package middleware
 import (
 	"context"
 	"fmt"
-	"github.com/golang/protobuf/proto"
 	"net"
 	"sync"
 	"time"
@@ -27,7 +26,7 @@ type Middleware struct {
 	codec      network.Codec
 	ov         libp2p.Overlay
 	slots      chan struct{} // semaphore for outgoing connection slots
-	conns      map[flow.Identifier]*Connection
+	conns      map[flow.Identifier]*WriteConnection
 	wg         *sync.WaitGroup
 	libP2PNode *libp2p.P2PNode
 	stop       chan struct{}
@@ -50,7 +49,7 @@ func New(log zerolog.Logger, codec network.Codec, conns uint, address string, fl
 		log:        log,
 		codec:      codec,
 		slots:      make(chan struct{}, conns),
-		conns:      make(map[flow.Identifier]*Connection),
+		conns:      make(map[flow.Identifier]*WriteConnection),
 		libP2PNode: p2p,
 		wg:         &sync.WaitGroup{},
 		stop:       make(chan struct{}),
@@ -97,10 +96,7 @@ func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 	default:
 	}
 
-	pmsg, err := m.createOutboundMessage(nodeID, msg)
-	if err != nil {
-		return err
-	}
+	pmsg := m.createOutboundMessage(nodeID, msg)
 
 	// whichever comes first, sending the message or ending the provided context
 	select {
@@ -111,45 +107,30 @@ func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 	}
 }
 
-func (m *Middleware) createOutboundMessage(nodeID flow.Identifier, msg interface{}) (*libp2p.Message, error) {
-
+func (m *Middleware) createOutboundMessage(nodeID flow.Identifier, msg interface{}) *libp2p.Message {
 	// Compose the message payload
 	message := &libp2p.Message{
 		SenderID: nodeID[:],
 		Event:    msg.([]byte),
 	}
-	// Get the ProtoBuf representation of the message
-	//pmsg, err := proto.Marshal(message)
-	//if err != nil {
-	//	return nil, errors.Wrapf(err, "could not marshal message: %v", message)
-	//}
-
-	return message, nil
+	return message
 }
 
-func (m *Middleware) createInboundMessage(msg interface{}) (*flow.Identifier, interface{}, error) {
-
-	// Unmarshal the buff to a message
-	message := &libp2p.Message{}
-	b := msg.([]byte)
-	err := proto.Unmarshal(b, message)
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "could not unmarshal message: %v", string(b))
-	}
+func (m *Middleware) createInboundMessage(msg *libp2p.Message) (*flow.Identifier, interface{}, error) {
 
 	// Extract sender id
-	if len(message.SenderID) < 32 {
+	if len(msg.SenderID) < 32 {
 		m.log.Debug().
-			Bytes("sender", message.SenderID).
+			Bytes("sender", msg.SenderID).
 			Msg(" invalid sender id")
-		err = fmt.Errorf("invalid sender id")
+		err := fmt.Errorf("invalid sender id")
 		return nil, nil, err
 	}
 	var senderID [32]byte
-	copy(senderID[:], message.SenderID)
+	copy(senderID[:], msg.SenderID)
 	var id flow.Identifier
 	id = senderID
-	return &id, message.Event, nil
+	return &id, msg.Event, nil
 }
 
 func (m *Middleware) rotate() {
@@ -192,6 +173,7 @@ func (m *Middleware) connect() {
 
 	// If this node is already added, noop
 	if m.exists(flowIdentity.NodeID) {
+		log.Debug().Str("flowIdentity", flowIdentity.String()).Msg("node already added")
 		return
 	}
 
@@ -220,32 +202,14 @@ func (m *Middleware) connect() {
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
+// this is a blocking call, so that the deferred resource cleanup happens after
+// we are done handling the connection
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	m.wg.Add(1)
 	defer m.wg.Done()
-	//log := m.log.With().
-	//	Str("local_addr", s.Conn().LocalPeer().String()).
-	//	Str("remote_addr", s.Conn().RemotePeer().String()).
-	//	Logger()
 
 	// make sure we close the connection when we are done handling the peer
 	defer s.Close()
-
-	// get a free connection slot and make sure to free it after we drop the peer
-	//select {
-	//case m.slots <- struct{}{}:
-	//	defer m.release(m.slots)
-	//default:
-	//	log.Debug().Msg("connection slots full")
-	//	return
-	//}
-
-	// this is a blocking call, so that the deferred resource cleanup happens after
-	// we are done handling the connection
-	m.handleIncoming(s)
-}
-
-func (m *Middleware) handleIncoming(s libp2pnetwork.Stream) {
 
 	log := m.log.With().
 		Str("local_addr", s.Conn().LocalPeer().String()).
@@ -253,20 +217,22 @@ func (m *Middleware) handleIncoming(s libp2pnetwork.Stream) {
 		Logger()
 
 	// initialize the encoder/decoder and create the connection handler
-	conn := NewConnection(log, m.codec, s)
+	conn := NewReadConnection(log, s)
 
-	log.Info().Msg("connection established")
+	log.Info().Msg("incoming connection established")
 
 	// start processing messages in the background
-	conn.ReceiveLoop()
+	go conn.ReceiveLoop()
 
 	// process incoming messages for as long as the peer is running
 ProcessLoop:
 	for {
 		select {
 		case <-conn.done:
+			log.Info().Msg("breaking loop")
 			break ProcessLoop
 		case msg := <-conn.inbound:
+			log.Info().Msg("got message")
 			nodeID, payload, err := m.createInboundMessage(msg)
 			if err != nil {
 				log.Error().Err(err).Msg("could not extract payload")
@@ -290,8 +256,8 @@ func (m *Middleware) handleOutgoing(flowID flow.Identifier, s libp2pnetwork.Stre
 		Str("remote_addr", s.Conn().RemotePeer().String()).
 		Logger()
 
-	// initialize the encoder/decoder and create the connection handler
-	conn := NewConnection(log, m.codec, s)
+	// create the write connection handler
+	conn := NewWriteConnection(log, s)
 
 	// cache the connection against the node id
 	m.add(flowID, conn)
@@ -310,7 +276,7 @@ func (m *Middleware) release(slots chan struct{}) {
 
 // add will add the given conn with the given address to our list in a
 // concurrency-safe manner.
-func (m *Middleware) add(nodeID flow.Identifier, conn *Connection) {
+func (m *Middleware) add(nodeID flow.Identifier, conn *WriteConnection) {
 	m.Lock()
 	defer m.Unlock()
 	m.conns[nodeID] = conn
