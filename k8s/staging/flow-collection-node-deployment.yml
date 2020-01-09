@@ -2,12 +2,12 @@ apiVersion: v1
 kind: Service
 
 metadata:
-  name: flow-verification-node-v1
+  name: flow-collection-node-v1
   namespace: flow
 
   labels:
     app: flow-test-net
-    node: verification
+    node: collection
     env: staging
     owner: Kan
     version: v1
@@ -16,7 +16,7 @@ spec:
   type: ClusterIP
   selector:
     app: flow-test-net
-    node: verification
+    node: collection
     env: staging
     version: v1
 
@@ -32,30 +32,11 @@ spec:
 
 ---
 
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  labels:
-    app: flow-test-net
-    node: verification
-  name: flow-verification-node-claim
-  namespace: flow
-spec:
-  accessModes:
-  - ReadWriteOnce
-  dataSource: null
-  resources:
-    requests:
-      storage: 20Gi
-  storageClassName: standard
-
----
-
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   # This is the full name of your deployment. It must be unique
-  name: flow-verification-node-v1
+  name: flow-collection-node-v1
   namespace: flow
 
   # Best practice labels:
@@ -66,17 +47,18 @@ metadata:
   #   version: the major version of this service (v1/v2/v1beta1)
   labels:
     app: flow-test-net
-    node: verification
+    node: collection
     env: staging
     owner: Kan
     version: v1
 
 spec:
-  replicas: 1
+  replicas: 3
+  serviceName: flow-collection-node-v1
   selector:
     matchLabels:
       app: flow-test-net
-      node: verification
+      node: collection
       env: staging
       version: v1
 
@@ -92,7 +74,7 @@ spec:
 
       labels:
         app: flow-test-net
-        node: verification
+        node: collection
         env: staging
         owner: Kan
         version: v1
@@ -104,12 +86,12 @@ spec:
       containers:
         - name: flow-test-net
           # No tag, will be attached by teamcity
-          image: gcr.io/dl-flow/verification
+          image: gcr.io/dl-flow/collection
           args: 
             - "--nodeid"
-            - "000000000000000000000000000000000000000000000000000000001${POD_NAME##*-}000000"
+            - "000000000000000000000000000000000000000000000000000000000000001${POD_NAME##*-}"
             - "--entries"
-            - "verification-000000000000000000000000000000000000000000000000000000001${POD_NAME##*-}000000@localhost:3569=1000" # PORT 3569
+            - "collection-000000000000000000000000000000000000000000000000000000000000001${POD_NAME##*-}@localhost:3569=1000" # PORT 3569
 
           # Ports exposed can be named so other resources can reference
           # them by name and not have to hard code numbers
@@ -127,6 +109,12 @@ spec:
           env:
             - name: ENV
               value: STAGING
+            # Cannot get ordinal index yet from metadata at this time: https://github.com/kubernetes/kubernetes/pull/83101/files
+            # Have to parse out from pod name
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name   
 
           # Resource requests and contraints
           resources:
@@ -163,4 +151,15 @@ spec:
       volumes:
         - name: badger-volume
           persistentVolumeClaim:
-            claimName: flow-verification-node-claim
+            claimName: flow-collection-node-claim
+
+  volumeClaimTemplates:
+    - metadata:
+        name: badger-volume
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+        storageClassName: standard
