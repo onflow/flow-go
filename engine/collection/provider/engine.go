@@ -123,7 +123,10 @@ func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.Col
 		return fmt.Errorf("could not retrieve requested collection: %w", err)
 	}
 
-	err = e.con.Submit(coll, originID)
+	res := &messages.CollectionResponse{
+		Collection: *coll,
+	}
+	err = e.con.Submit(res, originID)
 	if err != nil {
 		return fmt.Errorf("could not respond to collection requester: %w", err)
 	}

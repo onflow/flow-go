@@ -81,7 +81,10 @@ func TestCollectionRequest(t *testing.T) {
 		assert.NoError(t, err)
 
 		// expect that the requester will receive the collection
-		requesterEngine.On("Process", collID.NodeID, &coll).Return(nil).Once()
+		expectedRes := &messages.CollectionResponse{
+			Collection: coll,
+		}
+		requesterEngine.On("Process", collID.NodeID, expectedRes).Return(nil).Once()
 
 		// send a request for the collection
 		req := messages.CollectionRequest{Fingerprint: coll.Fingerprint()}
