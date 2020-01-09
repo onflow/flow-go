@@ -32,25 +32,6 @@ spec:
 
 ---
 
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  labels:
-    app: flow-test-net
-    node: execution
-  name: flow-execution-node-claim
-  namespace: flow
-spec:
-  accessModes:
-  - ReadWriteOnce
-  dataSource: null
-  resources:
-    requests:
-      storage: 100Gi
-  storageClassName: standard
-
----
-
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -160,7 +141,14 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 30
             successThreshold: 1
-      volumes:
-        - name: badger-volume
-          persistentVolumeClaim:
-            claimName: flow-execution-node-claim
+
+  volumeClaimTemplates:
+    - metadata:
+        name: badger-volume
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 100Gi
+        storageClassName: standard

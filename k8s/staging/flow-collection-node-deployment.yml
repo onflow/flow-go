@@ -148,10 +148,6 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 30
             successThreshold: 1
-      volumes:
-        - name: badger-volume
-          persistentVolumeClaim:
-            claimName: flow-collection-node-claim
 
   volumeClaimTemplates:
     - metadata:
