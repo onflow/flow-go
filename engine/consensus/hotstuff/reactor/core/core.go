@@ -50,6 +50,24 @@ func (r *ReactorCore) IsKnownBlock(blockMRH []byte, blockView uint64) bool {
 	return r.mainChain.HasVertex(blockMRH, blockView) || r.cache.HasVertex(blockMRH, blockView)
 }
 
+func (r *ReactorCore) GetBlocksForView(view uint64) []*types.BlockProposal {
+	vertexIterator := r.mainChain.GetVerticesAtLevel(view)
+	l := make([]*types.BlockProposal, 0, 1) // in the vast majority of cases, there will only be one proposal for a particular view
+	for vertexIterator.HasNext() {
+		v := vertexIterator.NextVertex().(*BlockContainer)
+		l = append(l, v.Block())
+	}
+	return l
+}
+
+func (r *ReactorCore) GetBlock(blockMRH []byte, view uint64) (*types.BlockProposal, bool) {
+	blockContainer, hasBlock := r.mainChain.GetVertex(blockMRH, view)
+	if !hasBlock {
+		return nil, false
+	}
+	return blockContainer.(*BlockContainer).Block(), true
+}
+
 // IsProcessingNeeded performs basic checks whether or not block needs processing
 // only considering the block's height and Hash
 // Returns false if any of the following conditions applies
@@ -61,6 +79,18 @@ func (r *ReactorCore) IsProcessingNeeded(blockMRH []byte, blockView uint64) bool
 	}
 	return true
 }
+
+// IsSafeNode returns true if block is safe to vote for
+// (according to the definition in https://arxiv.org/abs/1803.05069v6).
+// Returns false for unknown blocks.
+func (r *ReactorCore) IsSafeBlock(block *types.BlockProposal) bool {
+	blockContainer, hasBlock := r.mainChain.GetVertex(block.BlockMRH(), block.View())
+	if !hasBlock {
+		return false
+	}
+	return r.isSafeBlock(blockContainer.(*BlockContainer))
+}
+
 
 // isSafeBlock should only be called on blocks that are connected to the main chain.
 // Function returns true iff block is safe to vote for block.

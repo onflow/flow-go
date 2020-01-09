@@ -12,7 +12,7 @@ var ForkChoiceLogger loggo.Logger
 // reactor.core with data
 type ForkChoice interface {
 	ProcessBlock(proposal *types.BlockProposal)
-	ProcessQcFromVotes(*types.QuorumCertificate)
+	ProcessQc(*types.QuorumCertificate)
 
 	// IsKnownBlock returns true if the consensus reactor knows the specified block
 	IsKnownBlock([]byte, uint64) bool
@@ -20,7 +20,7 @@ type ForkChoice interface {
 	// IsProcessingNeeded returns true if consensus reactor should process the specified block
 	IsProcessingNeeded([]byte, uint64) bool
 
-	// OnForkChoiceTrigger prompts the ForkChoice to generate a fork choice
+	// MakeForkChoice prompts the ForkChoice to generate a fork choice
 	// and publish it via emitting an OnForkChoiceGenerated event
-	OnForkChoiceTrigger(viewNumber uint64)
+	MakeForkChoice(viewNumber uint64) *types.QuorumCertificate
 }

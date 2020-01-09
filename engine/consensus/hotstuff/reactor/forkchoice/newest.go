@@ -1,6 +1,7 @@
 package forkchoice
 
 import (
+	"fmt"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/reactor/core"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/reactor/forkchoice/events"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
@@ -19,15 +20,15 @@ type NewestForkChoice struct {
 	eventprocessor events.Processor
 }
 
-func (fc *NewestForkChoice) OnForkChoiceTrigger(view uint64) {
+func (fc *NewestForkChoice) MakeForkChoice(view uint64) *types.QuorumCertificate {
 	choice := fc.preferredQc
-	if choice.View <= view {
-		fc.eventprocessor.OnForkChoiceGenerated(view, choice)
-
-	} else {
-		ForkChoiceLogger.Warningf("Dropped ForkChoiceTrigger for view %d as the result was already stale", view)
+	if choice.View > view {
+		message := fmt.Sprintf("ForkChoice slected qc with view %d which is larger than requested view %d", choice.View, view)
+		ForkChoiceLogger.Warningf(message)
+		panic(message)
 	}
-	return
+	fc.eventprocessor.OnForkChoiceGenerated(view, choice)
+	return choice
 }
 
 func (fc *NewestForkChoice) ProcessBlock(block *types.BlockProposal) {
@@ -43,8 +44,8 @@ func (fc *NewestForkChoice) IsKnownBlock(blockMRH []byte, blockView uint64) bool
 	return fc.finalizer.IsKnownBlock(blockMRH, blockView)
 }
 
-// ProcessQcFromVotes updates `preferredQc` according to the fork-choice rule.
-func (fc *NewestForkChoice) ProcessQcFromVotes(qc *types.QuorumCertificate) {
+// ProcessQc updates `preferredQc` according to the fork-choice rule.
+func (fc *NewestForkChoice) ProcessQc(qc *types.QuorumCertificate) {
 	if fc.updateQC(qc) {
 		fc.eventprocessor.OnQcFromVotesIncorporated(qc)
 	}

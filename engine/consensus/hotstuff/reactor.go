@@ -29,10 +29,11 @@ type Reactor interface {
 	FinalizedView() uint64
 
 	// FinalizedBlock returns the finalized block with the largest view number
-	FinalizedBlock() uint64
+	FinalizedBlock() *types.BlockProposal
 
 	// IsSafeNode returns true if block is safe to vote for
-	// (according to the definition in https://arxiv.org/abs/1803.05069v6)
+	// (according to the definition in https://arxiv.org/abs/1803.05069v6).
+	// Returns false for unknown blocks.
 	IsSafeNode(block *types.BlockProposal) bool
 
 	// IsKnownBlock returns true if the consensus reactor knows the specified block
