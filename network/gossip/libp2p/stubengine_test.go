@@ -1,14 +1,10 @@
-package libp2p
-
+//package libp2p
 //
 //import (
-//	"bytes"
 //	"context"
 //	"fmt"
 //	"testing"
-//	"time"
 //
-//	"github.com/stretchr/testify/assert"
 //	"github.com/stretchr/testify/require"
 //	"github.com/stretchr/testify/suite"
 //
@@ -19,6 +15,7 @@ package libp2p
 //// driving the engines with libp2p
 //type StubEngine struct {
 //	t        *testing.T
+//	net      Network
 //	originID flow.Identifier // used to keep track of the source originID of the events
 //	event    interface{}     // used to keep track of the events that the node receives
 //	received chan struct{}   // used as an indicator on reception of messages for testing
@@ -66,66 +63,66 @@ package libp2p
 //	s.ctx, s.cancel = context.WithCancel(context.Background())
 //}
 //
-//// TestLibP2PNode_P2P tests end-to-end a P2P message sending and receiving between two nodes
-//func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
-//	// cancelling the context of test suite
-//	defer s.cancel()
-//	const Count = 2
-//
-//	// creating libp2p nodes
-//	nodes := s.CreateNodes(Count)
-//	defer s.StopNodes(nodes)
-//
-//	// Peer 1 will be sending a message to Peer 2
-//	peer1 := nodes[0]
-//	peer2 := nodes[1]
-//
-//	// Get actual IP and Port numbers on which the node starts
-//	// for node 2
-//	ip2, port2 := peer2.GetIPPort()
-//	id2 := NodeAddress{
-//		Name: peer2.name,
-//		IP:   ip2,
-//		Port: port2,
-//	}
-//
-//	// Add the second node as a peer to the first node
-//	require.NoError(s.Suite.T(), peer1.AddPeers(s.ctx, []NodeAddress{id2}))
-//	// Create and register engines for each of the nodes
-//	// test engine1
-//	te1 := &StubEngine{
-//		t: s.Suite.T(),
-//	}
-//	conduit1, err := peer1.Register(1, te1)
-//	require.NoError(s.Suite.T(), err)
-//
-//	// test engine 2
-//	te2 := &StubEngine{
-//		t:        s.Suite.T(),
-//		received: make(chan struct{}),
-//	}
-//	_, err = peer2.Register(1, te2)
-//	require.NoError(s.Suite.T(), err)
-//
-//	// Generates node2 Flow Identifier
-//	// Create target byte array from the node Name "node2" -> []byte
-//	var target [32]byte
-//	copy(target[:], id2.Name)
-//	targetID := flow.Identifier(target)
-//
-//	// Send the message to peer 2 using the conduit of peer 1
-//	require.NoError(s.Suite.T(), conduit1.Submit([]byte("hello"), targetID))
-//
-//	select {
-//	case <-te2.received:
-//		// Asserts that the message was received by peer 2
-//		require.NotNil(s.Suite.T(), te2.originID)
-//		require.NotNil(s.Suite.T(), te2.event)
-//		senderID := bytes.Trim(te2.originID[:], "\x00")
-//		senderIDStr := string(senderID)
-//		assert.Equal(s.Suite.T(), peer1.name, senderIDStr)
-//		assert.Equal(s.Suite.T(), "hello", fmt.Sprintf("%s", te2.event))
-//	case <-time.After(3 * time.Second):
-//		assert.Fail(s.Suite.T(), "peer 1 failed to send a message to peer 2")
-//	}
-//}
+////// TestLibP2PNode_P2P tests end-to-end a P2P message sending and receiving between two nodes
+////func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
+////	// cancelling the context of test suite
+////	defer s.cancel()
+////	const Count = 2
+////
+////	// creating libp2p nodes
+////	nodes := s.CreateNodes(Count)
+////	defer s.StopNodes(nodes)
+////
+////	// Peer 1 will be sending a message to Peer 2
+////	peer1 := nodes[0]
+////	peer2 := nodes[1]
+////
+////	// Get actual IP and Port numbers on which the node starts
+////	// for node 2
+////	ip2, port2 := peer2.GetIPPort()
+////	id2 := NodeAddress{
+////		Name: peer2.name,
+////		IP:   ip2,
+////		Port: port2,
+////	}
+////
+////	// Add the second node as a peer to the first node
+////	require.NoError(s.Suite.T(), peer1.AddPeers(s.ctx, []NodeAddress{id2}))
+////	// Create and register engines for each of the nodes
+////	// test engine1
+////	te1 := &StubEngine{
+////		t: s.Suite.T(),
+////	}
+////	conduit1, err := peer1.Register(1, te1)
+////	require.NoError(s.Suite.T(), err)
+////
+////	// test engine 2
+////	te2 := &StubEngine{
+////		t:        s.Suite.T(),
+////		received: make(chan struct{}),
+////	}
+////	_, err = peer2.Register(1, te2)
+////	require.NoError(s.Suite.T(), err)
+////
+////	// Generates node2 Flow Identifier
+////	// Create target byte array from the node Name "node2" -> []byte
+////	var target [32]byte
+////	copy(target[:], id2.Name)
+////	targetID := flow.Identifier(target)
+////
+////	// Send the message to peer 2 using the conduit of peer 1
+////	require.NoError(s.Suite.T(), conduit1.Submit([]byte("hello"), targetID))
+////
+////	select {
+////	case <-te2.received:
+////		// Asserts that the message was received by peer 2
+////		require.NotNil(s.Suite.T(), te2.originID)
+////		require.NotNil(s.Suite.T(), te2.event)
+////		senderID := bytes.Trim(te2.originID[:], "\x00")
+////		senderIDStr := string(senderID)
+////		assert.Equal(s.Suite.T(), peer1.name, senderIDStr)
+////		assert.Equal(s.Suite.T(), "hello", fmt.Sprintf("%s", te2.event))
+////	case <-time.After(3 * time.Second):
+////		assert.Fail(s.Suite.T(), "peer 1 failed to send a message to peer 2")
+////	}
+////}
