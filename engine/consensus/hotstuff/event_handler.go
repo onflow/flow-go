@@ -140,18 +140,17 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 }
 
 func (eh *EventHandler) onReceiveVote(vote *types.Vote) {
-	if blockProposal, found := eh.forkChoice.FindProposalByViewAndBlockMRH(vote.View, vote.BlockMRH); found == false {
+	blockProposal, found := eh.forkChoice.FindProposalByViewAndBlockMRH(vote.View, vote.BlockMRH)
+	if found == false {
 		if eh.validator.ValidatePendingVote(vote) {
-			eh.voteAggregator.StorePendingVote(vote)
+			eh.voteAggregator.Store(vote, true)
 			eh.missingBlockRequester.FetchMissingBlock(vote.View, vote.BlockMRH)
 		}
 		return
-	} else {
-		if eh.validator.ValidateIncorporatedVote(vote, blockProposal) {
-			eh.voteAggregator.StoreIncorporatedVote(vote)
-			if newQC, built := eh.voteAggregator.MakeQCForBlock(blockProposal.Block); built == true {
-				eh.processNewQC(newQC)
-			}
+	}
+	if eh.validator.ValidateIncorporatedVote(vote, blockProposal) {
+		if newQC, built := eh.voteAggregator.StoreVoteAndBuildQC(vote, blockProposal.Block); built == true {
+			eh.processNewQC(newQC)
 		}
 	}
 }
