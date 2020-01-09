@@ -1,17 +1,17 @@
 package hotstuff
 
 import (
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
-	"github.com/dapperlabs/flow-go/protocol"
+	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 	"sync"
-
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
 type VoteAggregator struct {
-	lock  sync.RWMutex
-	state protocol.State
+	lock          sync.RWMutex
+	protocolState protocol.State
+	viewState     ViewState
 	// For pruning
 	viewToBlockMRH map[uint64]types.MRH
 	// keeps track of votes whose blocks can not be found
@@ -37,29 +37,29 @@ func (va *VoteAggregator) StoreIncorporatedVote(vote *types.Vote) {
 }
 
 // MakeQCForBlock only returns a QC if there are enough votes or the QC for the block has been made before
-func (va *VoteAggregator) MakeQCForBlock(block *types.Block) *types.QuorumCertificate {
+func (va *VoteAggregator) MakeQCForBlock(block *types.Block) (*types.QuorumCertificate, bool) {
 	if _, hasBuiltQC := va.createdQC[block.BlockMRH]; hasBuiltQC {
-		return nil
+		return nil, false
 	}
-	if identities, err := va.state.AtHash(block.BlockMRH[:]).Identities(identity.HasRole(flow.RoleConsensus)); err != nil {
+	if identities, err := va.protocolState.AtHash(block.BlockMRH[:]).Identities(identity.HasRole(flow.RoleConsensus)); err != nil {
 		qc := va.checkThresholdAndGenerateQC(block, identities)
-		return qc
+		return qc, true
 	} else {
 		panic("can't get stake for the block")
-		return nil
+		return nil, false
 	}
 }
 
 // BuildQCOnReceivingBlock handles pending votes if there are any and then try to make a QC
 // returns nil if there are no pending votes or the accumulated stakes are not enough to build a QC
-func (va *VoteAggregator) BuildQCOnReceivingBlock(block *types.Block) *types.QuorumCertificate {
+func (va *VoteAggregator) BuildQCOnReceivingBlock(block *types.Block) (*types.QuorumCertificate, bool) {
 	if _, hasPendingVotes := va.pendingVotes[block.BlockMRH]; hasPendingVotes {
 		va.handlePendingVotesForBlock(block.BlockMRH)
 		return va.MakeQCForBlock(block)
 	}
 
 	// there are no pending votes, no need to create a QC
-	return nil
+	return nil, false
 }
 
 // garbage collection by view
@@ -80,7 +80,7 @@ func (va *VoteAggregator) handlePendingVotesForBlock(blockMRH types.MRH) {
 }
 
 func (va *VoteAggregator) accumulateStakes(vote *types.Vote) {
-	if identities, err := va.state.AtHash(vote.BlockMRH[:]).Identities(identity.HasRole(flow.RoleConsensus)); err != nil {
+	if identities, err := va.protocolState.AtHash(vote.BlockMRH[:]).Identities(identity.HasRole(flow.RoleConsensus)); err != nil {
 		voteSender := identities.Get(uint(vote.Signature.SignerIdx))
 		va.blockHashToIncorporatedStakes[vote.BlockMRH] += voteSender.Stake
 	}
@@ -88,7 +88,7 @@ func (va *VoteAggregator) accumulateStakes(vote *types.Vote) {
 
 // build a QC when reaching the vote threshold
 func (va *VoteAggregator) checkThresholdAndGenerateQC(block *types.Block, identities flow.IdentityList) *types.QuorumCertificate {
-	voteThreshold := identities.TotalStake()*2/3 + 1
+	voteThreshold := uint64(float32(identities.TotalStake())*va.viewState.ThresholdStake()) + 1
 	// upon receipt of sufficient votes (in terms of stake)
 	if va.blockHashToIncorporatedStakes[block.BlockMRH] >= voteThreshold {
 		sigs := getSigsSliceFromVotes(va.pendingVotes[block.BlockMRH])
@@ -103,7 +103,7 @@ func (va *VoteAggregator) checkThresholdAndGenerateQC(block *types.Block, identi
 func getSigsSliceFromVotes(votes []*types.Vote) []*types.Signature {
 	var signatures = make([]*types.Signature, len(votes))
 	for i, vote := range votes {
-		signatures[i] = &vote.Signature
+		signatures[i] = vote.Signature
 	}
 
 	return signatures

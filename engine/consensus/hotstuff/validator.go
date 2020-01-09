@@ -3,7 +3,7 @@ package hotstuff
 import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 
 type Validator struct {
-	protocolState ProtocolState
+	viewState ViewState
 }
 
 func (v *Validator) ValidateQC(qc *types.QuorumCertificate) bool {

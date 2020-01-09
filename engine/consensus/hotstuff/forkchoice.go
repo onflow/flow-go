@@ -17,11 +17,11 @@ func (fc *ForkChoice) GetQCForNextBlock(view uint64) *types.QuorumCertificate {
 	panic("TODO")
 }
 
-func (fc *ForkChoice) FindBlockForView(view uint64) *types.BlockProposal {
+func (fc *ForkChoice) FindProposalsByView(view uint64) []*types.BlockProposal {
 	panic("TODO")
 }
 
-func (fc *ForkChoice) FindBlockProposalByViewAndBlockMRH(view uint64, blockMRH types.MRH) *types.BlockProposal {
+func (fc *ForkChoice) FindProposalByViewAndBlockMRH(view uint64, blockMRH types.MRH) (*types.BlockProposal, bool) {
 	panic("TODO")
 }
 
@@ -42,10 +42,10 @@ func (fc *ForkChoice) CanIncorperate(bp *types.BlockProposal) bool {
 
 // Updates
 
-func (fc *ForkChoice) UpdateValidQC(qc *types.QuorumCertificate) (genericQCUpdated bool, finalizedBlock *types.BlockProposal) {
+func (fc *ForkChoice) UpdateValidQC(qc *types.QuorumCertificate) (genericQCUpdated bool, finalizedBlocks []*types.BlockProposal) {
 	panic("TODO")
 }
 
-func (fc *ForkChoice) AddNewBlock(bp *types.BlockProposal) (incorperatedBlock *types.BlockProposal) {
+func (fc *ForkChoice) AddNewProposal(bp *types.BlockProposal) (incorperatedBlock *types.BlockProposal, added bool) {
 	panic("TODO")
 }

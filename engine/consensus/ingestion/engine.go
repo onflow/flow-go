@@ -39,7 +39,7 @@ func New(log zerolog.Logger, net module.Network, prop network.Engine, state prot
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.CollectionProposal, e)
+	con, err := net.Register(engine.CollectionProvider, e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
@@ -97,20 +97,20 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
-	case *flow.GuaranteedCollection:
-		return e.onGuaranteedCollection(originID, ev)
+	case *flow.CollectionGuarantee:
+		return e.onCollectionGuarantee(originID, ev)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// onGuaranteedCollection is used to process guaranteed collections received
+// onCollectionGuarantee is used to process collection guarantees received
 // from nodes that are not consensus nodes (notably collection nodes).
-func (e *Engine) onGuaranteedCollection(originID flow.Identifier, coll *flow.GuaranteedCollection) error {
+func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_hash", coll.Hash()).
+		Hex("collection_hash", guarantee.Hash).
 		Msg("guaranteed collection received")
 
 	// get the identity of the origin node, so we can check if it's a valid
@@ -132,11 +132,11 @@ func (e *Engine) onGuaranteedCollection(originID flow.Identifier, coll *flow.Gua
 	// submit the collection to the propagation engine - this is non-blocking
 	// we could just validate it here and add it to the memory pool directly,
 	// but then we would duplicate the validation logic
-	e.prop.SubmitLocal(coll)
+	e.prop.SubmitLocal(guarantee)
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_hash", coll.Hash()).
+		Hex("collection_hash", guarantee.Hash).
 		Msg("guaranteed collection forwarded")
 
 	return nil

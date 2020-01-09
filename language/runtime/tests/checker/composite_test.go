@@ -1829,3 +1829,78 @@ func TestCheckInvalidStructureInitializerWithMissingBody(t *testing.T) {
 
 	assert.IsType(t, &sema.MissingFunctionBodyError{}, errs[0])
 }
+
+func TestCheckMutualTypeUseTopLevel(t *testing.T) {
+
+	interfacePossibilities := []bool{true, false}
+
+	for _, firstKind := range common.CompositeKinds {
+		for _, firstIsInterface := range interfacePossibilities {
+			for _, secondKind := range common.CompositeKinds {
+				for _, secondIsInterface := range interfacePossibilities {
+
+					firstInterfaceKeyword := ""
+					if firstIsInterface {
+						firstInterfaceKeyword = "interface"
+					}
+
+					secondInterfaceKeyword := ""
+					if secondIsInterface {
+						secondInterfaceKeyword = "interface"
+					}
+
+					testName := fmt.Sprintf(
+						"%s_%s/%s_%s",
+						firstKind.Keyword(),
+						firstInterfaceKeyword,
+						secondKind.Keyword(),
+						secondInterfaceKeyword,
+					)
+
+					firstBody := ""
+					if !firstIsInterface {
+						firstBody = fmt.Sprintf(
+							"{ %s b }",
+							secondKind.DestructionKeyword(),
+						)
+					}
+
+					secondBody := ""
+					if !secondIsInterface {
+						secondBody = fmt.Sprintf(
+							"{ %s a }",
+							firstKind.DestructionKeyword(),
+						)
+					}
+
+					t.Run(testName, func(t *testing.T) {
+
+						_, err := ParseAndCheck(t,
+							fmt.Sprintf(
+								`
+                                  %[1]s %[2]s A {
+                                      fun use(_ b: %[3]sB) %[4]s
+                                  }
+
+                                  %[5]s %[6]s B {
+                                      fun use(_ a: %[7]sA) %[8]s
+                                  }
+                                `,
+								firstKind.Keyword(),
+								firstInterfaceKeyword,
+								secondKind.Annotation(),
+								firstBody,
+								secondKind.Keyword(),
+								secondInterfaceKeyword,
+								firstKind.Annotation(),
+								secondBody,
+							),
+						)
+
+						require.NoError(t, err)
+					})
+				}
+			}
+		}
+	}
+}

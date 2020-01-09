@@ -5,8 +5,9 @@ package operation
 import (
 	"testing"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/dapperlabs/flow-go/crypto"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )

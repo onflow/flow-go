@@ -4,9 +4,9 @@ package main
 
 import (
 	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/engine/consensus/expulsion"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
+	"github.com/dapperlabs/flow-go/engine/consensus/provider"
 	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff"
 	"github.com/dapperlabs/flow-go/engine/simulation/generator"
 	"github.com/dapperlabs/flow-go/module"
@@ -16,9 +16,9 @@ import (
 func main() {
 
 	var (
-		pool module.CollectionPool
+		pool module.CollectionGuaranteePool
 		prop *propagation.Engine
-		exp *expulsion.Engine
+		prov *provider.Engine
 		err  error
 	)
 
@@ -27,12 +27,12 @@ func main() {
 			pool, err = mempool.NewCollectionPool()
 			node.MustNot(err).Msg("could not initialize engine mempool")
 		}).
-		Component("expulsion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing expulsion engine")
+		Component("provider engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			node.Logger.Info().Msg("initializing provider engine")
 
-			exp, err = expulsion.New(node.Logger, node.Network, node.State, node.Me)
-			node.MustNot(err).Msg("could not initialize expulsion engine")
-			return exp
+			prov, err = provider.New(node.Logger, node.Network, node.State, node.Me)
+			node.MustNot(err).Msg("could not initialize provider engine")
+			return prov
 		}).
 		Component("propagation engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing propagation engine")
@@ -42,7 +42,7 @@ func main() {
 			return prop
 		}).
 		Component("coldstuff engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			cold, err := coldstuff.New(node.Logger, node.Network, exp, node.State, node.Me, pool)
+			cold, err := coldstuff.New(node.Logger, node.Network, prov, node.State, node.Me, pool)
 			node.MustNot(err).Msg("could not initialize coldstuff engine")
 			return cold
 		}).

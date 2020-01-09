@@ -1,38 +1,23 @@
 package badger_test
 
 import (
-	"fmt"
-	"math/rand"
-	"os"
-	"path/filepath"
+	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-	errors2 "github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/storage"
-	badger2 "github.com/dapperlabs/flow-go/storage/badger"
+	badgerstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func runWithDb(t *testing.T, f func(*badger.DB)) {
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
-	require.Nil(t, err)
-
-	f(db)
-
-	db.Close()
-	os.RemoveAll(dir)
-}
-
 func TestRetrievalByNumber(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
-		blocks := badger2.NewBlocks(db)
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		blocks := badgerstorage.NewBlocks(db)
 
 		block := unittest.BlockFixture()
 		block.Number = 21
@@ -47,11 +32,11 @@ func TestRetrievalByNumber(t *testing.T) {
 	})
 }
 
-func TestRetrievalByNonexistingNumber(t *testing.T) {
+func TestBlockRetrievalByNonexistingNumber(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		blocks := badger2.NewBlocks(db)
+		blocks := badgerstorage.NewBlocks(db)
 
 		block := unittest.BlockFixture()
 		block.Number = 21
@@ -67,9 +52,9 @@ func TestRetrievalByNonexistingNumber(t *testing.T) {
 
 func TestStoringSameBlockTwice(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		blocks := badger2.NewBlocks(db)
+		blocks := badgerstorage.NewBlocks(db)
 
 		block := unittest.BlockFixture()
 		block.Number = 21
@@ -84,9 +69,9 @@ func TestStoringSameBlockTwice(t *testing.T) {
 
 func TestStoringBlockWithDifferentDateButSameNumberTwice(t *testing.T) {
 
-	runWithDb(t, func(db *badger.DB) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		blocks := badger2.NewBlocks(db)
+		blocks := badgerstorage.NewBlocks(db)
 
 		block := unittest.BlockFixture()
 		block.Number = 21
@@ -98,8 +83,7 @@ func TestStoringBlockWithDifferentDateButSameNumberTwice(t *testing.T) {
 		block2.Signatures = []crypto.Signature{[]byte("magic")}
 
 		err = blocks.Save(&block2)
-		realError := errors2.Cause(err)
 
-		require.Equal(t, storage.DifferentDataErr, realError)
+		assert.True(t, errors.Is(err, storage.DifferentDataErr))
 	})
 }

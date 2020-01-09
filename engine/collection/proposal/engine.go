@@ -3,6 +3,7 @@
 package proposal
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,33 +11,55 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
-// The period at which the engine will propose a new collection based on the
-// contents of the txpool.
-const proposalPeriod = time.Second * 5
+type Config struct {
+	// ProposalPeriod the interval at which the engine will propose a collection.
+	ProposalPeriod time.Duration
+}
 
 // Engine is the collection proposal engine, which packages pending
 // transactions into collections and sends them to consensus nodes.
 type Engine struct {
-	unit  *engine.Unit
-	log   zerolog.Logger
-	con   network.Conduit
-	me    module.Local
-	state protocol.State
-	pool  module.TransactionPool
-	// TODO storage provider for transactions/guaranteed collections
+	unit        *engine.Unit
+	conf        Config
+	log         zerolog.Logger
+	con         network.Conduit
+	me          module.Local
+	state       protocol.State
+	provider    network.Engine // provider engine to propagate guarantees
+	pool        module.TransactionPool
+	collections storage.Collections
+	guarantees  storage.Guarantees
 }
 
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	conf Config,
+	net module.Network,
+	me module.Local,
+	state protocol.State,
+	provider network.Engine,
+	pool module.TransactionPool,
+	collections storage.Collections,
+	guarantees storage.Guarantees,
+) (*Engine, error) {
+
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log.With().Str("engine", "proposal").Logger(),
-		me:    me,
-		state: state,
+		unit:        engine.NewUnit(),
+		conf:        conf,
+		log:         log.With().Str("engine", "proposal").Logger(),
+		me:          me,
+		state:       state,
+		provider:    provider,
+		pool:        pool,
+		collections: collections,
+		guarantees:  guarantees,
 	}
 
 	con, err := net.Register(engine.CollectionProposal, e)
@@ -102,14 +125,51 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 func (e *Engine) propose() {
 
-	ticker := time.NewTicker(proposalPeriod)
-
 	for {
 		select {
-		case <-ticker.C:
-			// TODO propose a new block and send to consensus nodes
+		case <-time.After(e.conf.ProposalPeriod):
+
+			err := e.createProposal()
+			if errors.Is(err, ErrEmptyTxpool) {
+				e.log.Debug().Msg("skipping collection proposal due to empty txpool")
+			} else if err != nil {
+				e.log.Error().Err(err).Msg("failed to create new proposal")
+			}
+
 		case <-e.unit.Quit():
 			return
 		}
 	}
+}
+
+// createProposal creates a new proposal
+func (e *Engine) createProposal() error {
+	if e.pool.Size() == 0 {
+		return ErrEmptyTxpool
+	}
+
+	transactions := e.pool.All()
+	coll := flow.CollectionFromTransactions(transactions)
+
+	err := e.collections.Save(&coll)
+	if err != nil {
+		return fmt.Errorf("could not save proposed collection: %w", err)
+	}
+
+	guarantee := coll.Guarantee()
+	err = e.guarantees.Save(&guarantee)
+	if err != nil {
+		return fmt.Errorf("could not save proposed collection guarantee: %w", err)
+	}
+
+	err = e.provider.ProcessLocal(&messages.SubmitCollectionGuarantee{Guarantee: guarantee})
+	if err != nil {
+		return fmt.Errorf("could not submit collection guarantee: %w", err)
+	}
+
+	for _, tx := range transactions {
+		e.pool.Rem(tx.Fingerprint())
+	}
+
+	return nil
 }
