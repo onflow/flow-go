@@ -236,9 +236,9 @@ func (checker *Checker) importVariables(
 	explicitlyImported := map[string]ast.Identifier{}
 
 	var variables map[string]*Variable
-	identifierLength := len(requestedIdentifiers)
-	if identifierLength > 0 {
-		variables = make(map[string]*Variable, identifierLength)
+	identifiersCount := len(requestedIdentifiers)
+	if identifiersCount > 0 {
+		variables = make(map[string]*Variable, identifiersCount)
 		for _, identifier := range requestedIdentifiers {
 			name := identifier.Identifier
 			variable := availableVariables[name]
