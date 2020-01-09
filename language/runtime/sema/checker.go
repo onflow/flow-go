@@ -183,7 +183,7 @@ func NewChecker(program *ast.Program, location ast.Location, options ...Option) 
 	return checker, nil
 }
 
-// SetAllCheckers sets he given map of checkers as the map of all checkers.
+// SetAllCheckers sets the given map of checkers as the map of all checkers.
 //
 func (checker *Checker) SetAllCheckers(allCheckers map[ast.LocationID]*Checker) {
 	checker.allCheckers = allCheckers

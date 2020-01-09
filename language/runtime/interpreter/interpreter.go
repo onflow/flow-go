@@ -2674,7 +2674,7 @@ func (interpreter *Interpreter) functionConditionsWrapper(
 			}
 
 			// NOTE: The `inner` function might be nil.
-			//   This is the case if the conforming type did not declare an function.
+			//   This is the case if the conforming type did not declare a function.
 
 			var body Trampoline = Done{}
 			if inner != nil {

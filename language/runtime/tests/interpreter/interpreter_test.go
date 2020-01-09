@@ -3888,7 +3888,7 @@ func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
 			&interpreter.ConditionError{},
 			err,
 		)
-		assert.Equal(t, err.(*interpreter.ConditionError).Message, "x >= 1")
+		assert.Equal(t, "x >= 1", err.(*interpreter.ConditionError).Message)
 	})
 
 	t.Run("1", func(t *testing.T) {
