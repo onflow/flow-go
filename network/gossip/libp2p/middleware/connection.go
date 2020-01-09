@@ -5,14 +5,8 @@ package middleware
 import (
 	"sync"
 
-	"github.com/rs/zerolog"
-
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 )
 
 // Connection represents a direct connection to another peer on the flow
