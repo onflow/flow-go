@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -36,7 +37,13 @@ func (m *Server) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	go func() {
 		if err := m.server.ListenAndServe(); err != nil {
-			m.log.Debug().Err(err).Msg("metrics server shutdown")
+			// http.ErrServerClosed is returned when Close or Shutdown is called
+			// we don't consider this an error, so print this with debug level instead
+			if errors.Is(err, http.ErrServerClosed) {
+				m.log.Debug().Err(err).Msg("metrics server shutdown")
+			} else {
+				m.log.Err(err).Msg("error shutting down metrics server")
+			}
 		}
 	}()
 	go func() {
