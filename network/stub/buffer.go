@@ -29,7 +29,7 @@ func NewBuffer() *Buffer {
 	}
 }
 
-// Save stores a pending message to the buffer
+// Persist stores a pending message to the buffer
 func (b *Buffer) Save(from flow.Identifier, engineID uint8, event interface{}, targetIDs []flow.Identifier) {
 	b.Lock()
 	defer b.Unlock()

@@ -66,6 +66,9 @@ func (e *blockExecutor) executeTransactions(
 	}
 
 	endState, err := e.state.CommitDelta(chunkView.Delta())
+
+	//TODO save this state
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply chunk delta: %w", err)
 	}

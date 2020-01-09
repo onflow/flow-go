@@ -9,7 +9,7 @@ type Collections interface {
 	// ByFingerprint returns the collection with the given fingerprint.
 	ByFingerprint(hash flow.Fingerprint) (*flow.Collection, error)
 
-	// Save inserts the collection keyed by fingerprint and all constituent
+	// Persist inserts the collection keyed by fingerprint and all constituent
 	// transactions.
 	Save(collection *flow.Collection) error
 

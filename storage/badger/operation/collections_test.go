@@ -23,7 +23,7 @@ func TestCollections(t *testing.T) {
 			assert.Error(t, err)
 		})
 
-		t.Run("Save", func(t *testing.T) {
+		t.Run("Persist", func(t *testing.T) {
 			err := db.Update(InsertCollection(expected))
 			require.NoError(t, err)
 
