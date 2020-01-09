@@ -64,7 +64,7 @@ type FlowNodeBuilder struct {
 
 func (fnb *FlowNodeBuilder) baseFlags() {
 	// bind configuration parameters
-	fnb.flags.StringVarP(&fnb.BaseConfig.NodeID, "nodeid", "id", notSet, "identity of our node")
+	fnb.flags.StringVar(&fnb.BaseConfig.NodeID, "nodeid", notSet, "identity of our node")
 	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
 	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "entries", "e", []string{"consensus-node1@address1=1000"}, "identity table entries for all nodes")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
