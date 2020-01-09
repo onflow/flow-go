@@ -23,7 +23,7 @@ type Reactor interface {
 
 	// GetBlock returns (BlockProposal, true) if the block with view and blockMRH was found (both values need to match)
 	// or (nil, false) otherwise.
-	GetBlock(view uint64, blockMRH types.MRH) (*types.BlockProposal, bool)
+	GetBlock(view uint64, blockMRH []byte) (*types.BlockProposal, bool)
 
 	// FinalizedView returns the largest view number where a finalized block is known
 	FinalizedView() uint64

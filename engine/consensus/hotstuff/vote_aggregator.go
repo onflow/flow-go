@@ -5,8 +5,8 @@ import (
 )
 
 type VoteAggregator struct {
-	pendingVotes map[types.MRH][]*types.Vote
-	createdQC    map[types.MRH]*types.QuorumCertificate
+	pendingVotes map[string][]*types.Vote
+	createdQC    map[string]*types.QuorumCertificate
 	viewState    ViewState
 }
 
