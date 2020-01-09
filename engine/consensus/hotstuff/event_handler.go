@@ -28,7 +28,7 @@ func (eh *EventHandler) OnReceiveBlockProposal(block *types.BlockProposal) {
 }
 
 func (eh *EventHandler) OnReceiveVote(vote *types.Vote) {
-	eh.onReceiveVote(vote)
+	eh.processVote(vote)
 }
 
 func (eh *EventHandler) OnLocalTimeout(timeout *types.Timeout) {
@@ -170,9 +170,11 @@ func (eh *EventHandler) processVote(vote *types.Vote) {
 
 func (eh *EventHandler) processQC(qc *types.QuorumCertificate) {
 	eh.reactor.ProcessQcFromVotes(qc)
-	if eh.paceMaker.UpdateQC(qc) != nil {
-		eh.startNewView()
+	if eh.paceMaker.UpdateQC(qc) == nil {
+		return
 	}
+	eh.startNewView() // CAUTION: this is a state transition;
+	// no more processing should be done here
 }
 
 
@@ -181,7 +183,7 @@ func (eh *EventHandler) onReceiveBlockProposal(receivedProposal *types.BlockProp
 		return // ignore proposals below finalized view
 	}
 
-	// to the best we can with invalid block
+	// do the best we can with invalid block
 	if !eh.validator.ValidateBlock(receivedProposal) {
 		// ToDo Slash
 		if !eh.validator.ValidateQC(receivedProposal.QC()) {
@@ -195,20 +197,19 @@ func (eh *EventHandler) onReceiveBlockProposal(receivedProposal *types.BlockProp
 	}
 
 	eh.reactor.AddBlock(receivedProposal)
-	if receivedProposal.View() != eh.paceMaker.CurView() { // sanity check
+	if (receivedProposal.View() != eh.paceMaker.CurView()) || (eh.internalState != WaitingForBlock) {
 		return
 	}
 	eh.processBlockForCurrentView(receivedProposal) // CAUTION: this might result in a state transition;
 	// no more processing should be done here
 }
 
-
-
 func (eh *EventHandler) onLocalTimeout(timeout *types.Timeout) {
-	newView := eh.paceMaker.OnLocalTimeout(timeout)
-	if newView != nil {
-		eh.onNewViewEntered(newView)
+	if eh.paceMaker.OnLocalTimeout(timeout) == nil { // sanity check
+		panic("Internal Error: expecting pacemaker to not change view on timeout")
 	}
+	eh.startNewView() // CAUTION: this is a state transition;
+	// no more processing should be done here
 }
 
 func (eh *EventHandler) onBlockRequest(req *types.BlockProposalRequest) {
