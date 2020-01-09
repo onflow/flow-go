@@ -116,6 +116,14 @@ docker-build-consensus:
 docker-build-execution:
 	docker build -f cmd/Dockerfile --build-arg TARGET=execution -t gcr.io/dl-flow/execution:latest -t "gcr.io/dl-flow/execution:$(SHORT_COMMIT)" .
 
+.PHONY: docker-build-verification
+docker-build-verification:
+	docker build -f cmd/Dockerfile --build-arg TARGET=verification -t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" .
+
+.PHONY: docker-run-verification
+docker-run-verification:
+	docker run -p 8080:8080 -p 3569:3569 gcr.io/dl-flow/verification:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries verification-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
+
 # Builds the VS Code extension
 .PHONY: build-vscode-extension
 build-vscode-extension:
