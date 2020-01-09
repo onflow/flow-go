@@ -1,9 +1,9 @@
 package forkchoice
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/reactor/core"
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/reactor/forkchoice/events"
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/reactor/core"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/reactor/forkchoice/events"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
 // NewestForkChoice implements HotStuff's original fork choice rule:
@@ -12,7 +12,7 @@ type NewestForkChoice struct {
 	finalizer *core.ReactorCore
 	qcCache   QcCache
 
-	preferredQc *def.QuorumCertificate
+	preferredQc *types.QuorumCertificate
 	// This is called 'GenericQC' in 'Chained HotStuff Protocol' https://arxiv.org/abs/1803.05069v6
 	// preferredQc is the QC for the preferred block according to the fork-choice rule
 
@@ -30,9 +30,9 @@ func (fc *NewestForkChoice) OnForkChoiceTrigger(view uint64) {
 	return
 }
 
-func (fc *NewestForkChoice) ProcessBlock(block *def.Block) {
+func (fc *NewestForkChoice) ProcessBlock(block *types.BlockProposal) {
 	fc.finalizer.ProcessBlock(block)
-	fc.updateQC(block.QC)
+	fc.updateQC(block.QC())
 }
 
 func (fc *NewestForkChoice) IsProcessingNeeded(blockMRH []byte, blockView uint64) bool {
@@ -44,7 +44,7 @@ func (fc *NewestForkChoice) IsKnownBlock(blockMRH []byte, blockView uint64) bool
 }
 
 // ProcessQcFromVotes updates `preferredQc` according to the fork-choice rule.
-func (fc *NewestForkChoice) ProcessQcFromVotes(qc *def.QuorumCertificate) {
+func (fc *NewestForkChoice) ProcessQcFromVotes(qc *types.QuorumCertificate) {
 	if fc.updateQC(qc) {
 		fc.eventprocessor.OnQcFromVotesIncorporated(qc)
 	}
@@ -54,7 +54,7 @@ func (fc *NewestForkChoice) ProcessQcFromVotes(qc *def.QuorumCertificate) {
 // Currently, the method implements 'Chained HotStuff Protocol' where the fork-choice
 // rule is: "build on newest QC"
 // Returns true if and only if preferredQc was updated
-func (fc *NewestForkChoice) updateQC(qc *def.QuorumCertificate) bool {
+func (fc *NewestForkChoice) updateQC(qc *types.QuorumCertificate) bool {
 	// r.preferredQc is called 'GenericQC' in 'Chained HotStuff Protocol' https://arxiv.org/abs/1803.05069v6
 	if qc.View <= fc.preferredQc.View {
 		return false

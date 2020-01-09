@@ -1,10 +1,10 @@
 package events
 
 import (
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/utils"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/utils"
 )
 
 // PubSubEventProcessor implements core.Processor
@@ -30,7 +30,7 @@ func (p *PubSubEventProcessor) OnMissingBlock(hash []byte, view uint64) {
 	}
 }
 
-func (p *PubSubEventProcessor) OnBlockIncorporated(block *def.Block) {
+func (p *PubSubEventProcessor) OnBlockIncorporated(block *types.BlockProposal) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.incorporatedBlockCons {
@@ -38,7 +38,7 @@ func (p *PubSubEventProcessor) OnBlockIncorporated(block *def.Block) {
 	}
 }
 
-func (p *PubSubEventProcessor) OnSafeBlock(block *def.Block) {
+func (p *PubSubEventProcessor) OnSafeBlock(block *types.BlockProposal) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.safeBlockCons {
@@ -46,7 +46,7 @@ func (p *PubSubEventProcessor) OnSafeBlock(block *def.Block) {
 	}
 }
 
-func (p *PubSubEventProcessor) OnFinalizedBlock(block *def.Block) {
+func (p *PubSubEventProcessor) OnFinalizedBlock(block *types.BlockProposal) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.finalizedBlockCons {
@@ -54,7 +54,7 @@ func (p *PubSubEventProcessor) OnFinalizedBlock(block *def.Block) {
 	}
 }
 
-func (p *PubSubEventProcessor) OnDoubleProposeDetected(block1, block2 *def.Block) {
+func (p *PubSubEventProcessor) OnDoubleProposeDetected(block1, block2 *types.BlockProposal) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.doubleProposeCons {

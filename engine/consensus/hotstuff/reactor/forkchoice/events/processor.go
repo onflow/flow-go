@@ -1,16 +1,18 @@
 package events
 
-import "github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
+import (
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+)
 
 // Processor consumes events produced by forkchoice.ForkChoice
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type Processor interface {
-	OnQcFromVotesIncorporated(*def.QuorumCertificate)
+	OnQcFromVotesIncorporated(*types.QuorumCertificate)
 
 	// The `viewNumber` specifies the view to the block that should be built and `qc` the
 	// quorum certificate that is supposed to be in the block.
-	OnForkChoiceGenerated(viewNumber uint64, qc *def.QuorumCertificate)
+	OnForkChoiceGenerated(viewNumber uint64, qc *types.QuorumCertificate)
 }
 
 // IncorporatedQuorumCertificateProcessor consumes the following type of event produced by forkchoice.ForkChoice
@@ -19,7 +21,7 @@ type Processor interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type IncorporatedQuorumCertificateConsumer interface {
-	OnQcFromVotesIncorporated(*def.QuorumCertificate)
+	OnQcFromVotesIncorporated(*types.QuorumCertificate)
 }
 
 // ForkChoiceProcessor consumes the following type of event produced by forkchoice.ForkChoice
@@ -30,5 +32,5 @@ type IncorporatedQuorumCertificateConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type ForkChoiceGeneratedConsumer interface {
-	OnForkChoiceGenerated(viewNumber uint64, qc *def.QuorumCertificate)
+	OnForkChoiceGenerated(viewNumber uint64, qc *types.QuorumCertificate)
 }

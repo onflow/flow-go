@@ -3,21 +3,20 @@ package forkchoice
 import (
 	"bytes"
 	"fmt"
-
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
-type QcSet map[string]*def.QuorumCertificate
+type QcSet map[string]*types.QuorumCertificate
 
 type QcCache struct {
-	qcAtView   map[uint64]*def.QuorumCertificate
+	qcAtView   map[uint64]*types.QuorumCertificate
 	LowestView uint64
 }
 
 // NewQcCache initializes a QcCache
 func NewQcCache() QcCache {
 	return QcCache{
-		qcAtView: make(map[uint64]*def.QuorumCertificate),
+		qcAtView: make(map[uint64]*types.QuorumCertificate),
 	}
 }
 
@@ -39,7 +38,7 @@ func (cache *QcCache) PruneAtView(view uint64) {
 // * checks for inconsistencies:
 //   if QC for same Block-Merkle-Root-Hash (blockMRH) but different view exists => panic
 //   (instead of leaving the data structure in an inconsistent state).
-func (cache *QcCache) AddQC(qc *def.QuorumCertificate) {
+func (cache *QcCache) AddQC(qc *types.QuorumCertificate) {
 	if qc.View < cache.LowestView {
 		return
 	}
@@ -56,7 +55,7 @@ func (cache *QcCache) AddQC(qc *def.QuorumCertificate) {
 
 // GetQC returns (<QuorumCertificate>, true) if the QC for given view was found
 // and (nil, false) otherwise
-func (cache *QcCache) GetQC(view uint64) (*def.QuorumCertificate, bool) {
+func (cache *QcCache) GetQC(view uint64) (*types.QuorumCertificate, bool) {
 	if view < cache.LowestView {
 		return nil, false
 	}
@@ -69,7 +68,7 @@ func (cache *QcCache) GetQC(view uint64) (*def.QuorumCertificate, bool) {
 
 // GetQCForBlock returns (<QuorumCertificate>, true) if the QC for given block was found
 // and (nil, false) otherwise
-func (cache *QcCache) GetQCForBlock(blockMRH []byte, blockView uint64) (*def.QuorumCertificate, bool) {
+func (cache *QcCache) GetQCForBlock(blockMRH []byte, blockView uint64) (*types.QuorumCertificate, bool) {
 	if blockView < cache.LowestView {
 		return nil, false
 	}

@@ -3,9 +3,9 @@ package types
 type Block struct {
 	View        uint64
 	QC          *QuorumCertificate
-	PayloadHash MRH
+	PayloadHash []byte
 }
 
-func (b *Block) BlockMRH() MRH {
+func (b *Block) BlockMRH() []byte {
 	panic("TODO")
 }

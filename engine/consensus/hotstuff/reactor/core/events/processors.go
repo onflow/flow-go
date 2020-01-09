@@ -1,17 +1,20 @@
 package events
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
 // Processor consumes events produced by reactor.core
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type Processor interface {
-	OnFinalizedBlock(*def.Block)
+	OnMissingBlock(hash []byte, view uint64)
+	OnBlockIncorporated(proposal *types.BlockProposal)
+	OnSafeBlock(*types.BlockProposal)
+	OnFinalizedBlock(*types.BlockProposal)
 
 	// Detected slashing conditions:
-	OnDoubleProposeDetected(*def.Block, *def.Block)
+	OnDoubleProposeDetected(*types.BlockProposal, *types.BlockProposal)
 }
 
 // MissingBlockConsumer consumes the following type of event produced by reactor.core:
@@ -29,7 +32,7 @@ type MissingBlockConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type BlockIncorporatedConsumer interface {
-	OnBlockIncorporated(*def.Block)
+	OnBlockIncorporated(*types.BlockProposal)
 }
 
 // SafeBlockConsumer consumes the following type of event produced by reactor.core:
@@ -38,7 +41,7 @@ type BlockIncorporatedConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type SafeBlockConsumer interface {
-	OnSafeBlock(*def.Block)
+	OnSafeBlock(*types.BlockProposal)
 }
 
 // FinalizedConsumer consumes the following type of event produced by reactor.core:
@@ -47,7 +50,7 @@ type SafeBlockConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type FinalizedConsumer interface {
-	OnFinalizedBlock(*def.Block)
+	OnFinalizedBlock(*types.BlockProposal)
 }
 
 // DoubleProposalConsumer consumes the following type of event produced by reactor.core:
@@ -56,5 +59,5 @@ type FinalizedConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type DoubleProposalConsumer interface {
-	OnDoubleProposeDetected(*def.Block, *def.Block)
+	OnDoubleProposeDetected(*types.BlockProposal, *types.BlockProposal)
 }

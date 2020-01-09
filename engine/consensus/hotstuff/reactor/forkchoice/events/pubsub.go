@@ -1,10 +1,10 @@
 package events
 
 import (
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/utils"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/utils"
 )
 
 // PubSubEventProcessor implements core.Processor
@@ -19,7 +19,7 @@ func NewPubSubEventProcessor() *PubSubEventProcessor {
 	return &PubSubEventProcessor{}
 }
 
-func (p *PubSubEventProcessor) OnQcFromVotesIncorporated(qc *def.QuorumCertificate) {
+func (p *PubSubEventProcessor) OnQcFromVotesIncorporated(qc *types.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.incorporatedQcCons {
@@ -27,7 +27,7 @@ func (p *PubSubEventProcessor) OnQcFromVotesIncorporated(qc *def.QuorumCertifica
 	}
 }
 
-func (p *PubSubEventProcessor) OnForkChoiceGenerated(viewNumber uint64, qc *def.QuorumCertificate) {
+func (p *PubSubEventProcessor) OnForkChoiceGenerated(viewNumber uint64, qc *types.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.forkChoiceCons {

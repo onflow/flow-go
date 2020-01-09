@@ -2,10 +2,10 @@ package core
 
 import (
 	"bytes"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/reactor/core/events"
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/reactor/state/forrest"
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/def"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/reactor/core/events"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/reactor/state/forrest"
 )
 
 // ReactorCore implements HotStuff finalization logic
@@ -16,23 +16,23 @@ type ReactorCore struct {
 	cache     forrest.LeveledForrest
 
 	// LockedBlockQC is the QC that POINTS TO the the most recently locked block
-	LockedBlockQC *def.QuorumCertificate
+	LockedBlockQC *types.QuorumCertificate
 
 	// lastFinalizedBlockQC is the QC that POINTS TO the most recently finalized locked block
-	LastFinalizedBlockQC *def.QuorumCertificate
+	LastFinalizedBlockQC *types.QuorumCertificate
 
 	// LastSafeBlockView is the view number of the last safe block
 	LastSafeBlockView uint64
 }
 
-func New(rootBlock *def.Block, rootQc *def.QuorumCertificate, eventProcessor events.Processor) *ReactorCore {
+func New(rootBlock *types.BlockProposal, rootQc *types.QuorumCertificate, eventProcessor events.Processor) *ReactorCore {
 	if rootBlock == nil {
 		panic("finalizedRootBlock cannot be nil")
 	}
 	if eventProcessor == nil {
 		panic("eventProcessor cannot be nil")
 	}
-	if !bytes.Equal(rootQc.BlockMRH, rootBlock.BlockMRH) || (rootQc.View != rootBlock.View) {
+	if !bytes.Equal(rootQc.BlockMRH, rootBlock.BlockMRH()) || (rootQc.View != rootBlock.View()) {
 		panic("rootQc must be for rootBlock")
 	}
 
@@ -42,7 +42,7 @@ func New(rootBlock *def.Block, rootQc *def.QuorumCertificate, eventProcessor eve
 		cache:                *forrest.NewLeveledForrest(),
 		LockedBlockQC:        rootQc,
 		LastFinalizedBlockQC: rootQc,
-		LastSafeBlockView:    rootBlock.View,
+		LastSafeBlockView:    rootBlock.View(),
 	}
 }
 
@@ -87,8 +87,8 @@ func (r *ReactorCore) isSafeBlock(block *BlockContainer) bool {
 // (though, it will potentially cause some duplicate processing).
 // CAUTION: method assumes that `block` is well-formed (i.e. all fields are set)
 // ToDo when adding block to mainchain: check COMPLIANCE with rules for chain evolution (otherwise leave in cache)
-func (r *ReactorCore) ProcessBlock(block *def.Block) {
-	if !r.IsProcessingNeeded(block.BlockMRH, block.View) {
+func (r *ReactorCore) ProcessBlock(block *types.BlockProposal) {
+	if !r.IsProcessingNeeded(block.BlockMRH(), block.View()) {
 		// ToDo: we can probably skip this check as
 		//  - check is most likely performed in higher-level code
 		//  - even if not checked, LeveledForrest handles repeated additions
@@ -96,10 +96,11 @@ func (r *ReactorCore) ProcessBlock(block *def.Block) {
 		return
 	}
 	bc := &BlockContainer{block: block}
-	mainChainParent, hasParentInMainchain := r.mainChain.GetVertex(block.QC.BlockMRH, block.QC.View)
+	mainChainParent, hasParentInMainchain := r.mainChain.GetVertex(block.QC().BlockMRH, block.QC().View)
 	if !hasParentInMainchain { //if parent not in mainchain: add block to cache and return
 		r.cache.AddVertex(bc)
-		r.eventProcessor.OnMissingBlock(block.BlockMRH, block.View)
+		r.eventProcessor.OnMissingBlock(block.BlockMRH(), block.View())
+		panic("Encountered Missing Block")
 		return
 	}
 
@@ -205,16 +206,16 @@ func (r *ReactorCore) updateFinalisedBlockQc(block *BlockContainer) {
 // finalizeUpToBlock finalizes all block up to (and including) the block pointed to by `blockQC`.
 // Finalization starts with the child of `LastFinalizedBlockQC` (explicitly checked);
 // and calls OnFinalizedBlock
-func (r *ReactorCore) finalizeUpToBlock(blockQC *def.QuorumCertificate) {
+func (r *ReactorCore) finalizeUpToBlock(blockQC *types.QuorumCertificate) {
 	if blockQC.View <= r.LastFinalizedBlockQC.View {
 		// Sanity check: the previously last Finalized Block must be an ancestor of `block`
-		if !bytes.Equal(r.LastFinalizedBlockQC.BlockMRH, blockQC.Hash) {
+		if !bytes.Equal(r.LastFinalizedBlockQC.BlockMRH, blockQC.BlockMRH) {
 			panic("Internal Error: About to finalize a block which CONFLICTS with last finalized block!")
 		}
 		return
 	}
 	// get Block
-	blockVertex, _ := r.mainChain.GetVertex(blockQC.Hash, blockQC.View)
+	blockVertex, _ := r.mainChain.GetVertex(blockQC.BlockMRH, blockQC.View)
 	blockContainer := blockVertex.(*BlockContainer)
 
 	// finalize Parent, i.e. the block pointed to by the block's QC
