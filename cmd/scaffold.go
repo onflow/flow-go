@@ -99,6 +99,14 @@ func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
 	})
 }
 
+func (fnb *FlowNodeBuilder) initNodeID() {
+	if fnb.BaseConfig.NodeID == notSet {
+		h := sha256.New()
+		h.Write([]byte(fnb.BaseConfig.NodeName))
+		fnb.BaseConfig.NodeID = hex.EncodeToString(h.Sum(nil))
+	}
+}
+
 func (fnb *FlowNodeBuilder) initLogger() {
 	// configure logger with standard level, node ID and UTC timestamp
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
@@ -153,11 +161,6 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 	}
 
-	if fnb.BaseConfig.NodeID == notSet {
-		h := sha256.New()
-		h.Write([]byte(fnb.BaseConfig.NodeName))
-		fnb.BaseConfig.NodeID = hex.EncodeToString(h.Sum(nil))
-	}
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.NodeID)
 	fnb.MustNot(err).Msg("could not parse node identifier")
 
@@ -279,6 +282,8 @@ func (fnb *FlowNodeBuilder) Run() {
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
+
+	fnb.initNodeID()
 
 	fnb.initLogger()
 
