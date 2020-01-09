@@ -21,11 +21,8 @@ func TestSendAndReceive(t *testing.T) {
 	require.Len(t, ids, count)
 	require.Len(t, mws, count)
 	msg := []byte("hello")
-	time.Sleep(4 * time.Second)
 	mws[0].Send(ids[count-1], msg)
-	time.Sleep(time.Second * 10)
 	mws[0].Send(ids[count-1], msg)
-
 	time.Sleep(time.Second * 10)
 }
 
@@ -59,7 +56,7 @@ func createAndStartMiddleWares(t *testing.T, count int) ([]flow.Identifier, []*M
 		flowID := flow.Identity{NodeID: ids[target], Address: fmt.Sprintf("%s:%s", ip, port), Role: flow.RoleCollection}
 		overlay.On("Identity").Return(flowID, nil)
 		// overlay.On("Handshake", mockery.Anything).Return(flowID.NodeID, nil)
-		overlay.On("Receive", mockery.Anything).Return(nil).Once().Run(func(args mockery.Arguments) {
+		overlay.On("Receive", mockery.Anything, mockery.Anything).Return(nil).Twice().Run(func(args mockery.Arguments) {
 			fmt.Printf(" Recd: %s from %s", args[1], args[0])
 		})
 		overlays = append(overlays, overlay)

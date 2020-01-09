@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/protobuf/proto"
-
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -118,29 +116,21 @@ func (m *Middleware) createOutboundMessage(nodeID flow.Identifier, msg interface
 	return message
 }
 
-func (m *Middleware) createInboundMessage(msg interface{}) (*flow.Identifier, interface{}, error) {
-
-	// Unmarshal the buff to a message
-	message := &libp2p.Message{}
-	b := msg.([]byte)
-	err := proto.Unmarshal(b, message)
-	if err != nil {
-		return nil, nil, errors.Wrapf(err, "could not unmarshal message: %v", string(b))
-	}
+func (m *Middleware) createInboundMessage(msg *libp2p.Message) (*flow.Identifier, interface{}, error) {
 
 	// Extract sender id
-	if len(message.SenderID) < 32 {
+	if len(msg.SenderID) < 32 {
 		m.log.Debug().
-			Bytes("sender", message.SenderID).
+			Bytes("sender", msg.SenderID).
 			Msg(" invalid sender id")
-		err = fmt.Errorf("invalid sender id")
+		err := fmt.Errorf("invalid sender id")
 		return nil, nil, err
 	}
 	var senderID [32]byte
-	copy(senderID[:], message.SenderID)
+	copy(senderID[:], msg.SenderID)
 	var id flow.Identifier
 	id = senderID
-	return &id, message.Event, nil
+	return &id, msg.Event, nil
 }
 
 func (m *Middleware) rotate() {
@@ -229,18 +219,20 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	// initialize the encoder/decoder and create the connection handler
 	conn := NewReadConnection(log, s)
 
-	log.Info().Msg("connection established")
+	log.Info().Msg("incoming connection established")
 
 	// start processing messages in the background
-	conn.ReceiveLoop()
+	go conn.ReceiveLoop()
 
 	// process incoming messages for as long as the peer is running
 ProcessLoop:
 	for {
 		select {
 		case <-conn.done:
+			log.Info().Msg("breaking loop")
 			break ProcessLoop
 		case msg := <-conn.inbound:
+			log.Info().Msg("got message")
 			nodeID, payload, err := m.createInboundMessage(msg)
 			if err != nil {
 				log.Error().Err(err).Msg("could not extract payload")
