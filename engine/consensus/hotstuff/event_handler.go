@@ -9,9 +9,9 @@ type EventHandler struct {
 	missingBlockRequester *MissingBlockRequester
 	reactor            Reactor
 	validator             *Validator
-	blockProducer         BlockProducer
-	protocolState         ProtocolState
-	network               Network
+	blockProposalProducer BlockProposalProducer
+	viewState             ViewState
+	network               NetworkSender
 
 	internalState stateValue
 }
