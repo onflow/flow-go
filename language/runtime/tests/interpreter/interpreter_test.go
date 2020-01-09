@@ -3927,7 +3927,7 @@ func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
 			&interpreter.ConditionError{},
 			err,
 		)
-		assert.Equal(t, err.(*interpreter.ConditionError).Message, "x >= 1")
+		assert.Equal(t, "x >= 1", err.(*interpreter.ConditionError).Message)
 	})
 
 	t.Run("1", func(t *testing.T) {
@@ -7108,4 +7108,124 @@ func TestInterpretContractUseInNestedDeclaration(t *testing.T) {
 		interpreter.NewIntValue(2),
 		i,
 	)
+}
+
+func TestInterpretResourceInterfaceInitializerAndDestructorPreConditions(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+
+      resource interface RI {
+
+          x: Int
+
+          init(_ x: Int) {
+              pre { x > 1: "invalid init" }
+          }
+
+          destroy() {
+              pre { self.x < 3: "invalid destroy" }
+          }
+      }
+
+      resource R: RI {
+
+          let x: Int
+
+          init(_ x: Int) {
+              self.x = x
+          }
+      }
+
+      fun test(_ x: Int) {
+          let r <- create R(x)
+          destroy r
+      }
+    `)
+
+	t.Run("1", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(1))
+		require.Error(t, err)
+
+		require.IsType(t, &interpreter.ConditionError{}, err)
+		assert.Equal(t, "invalid init", err.(*interpreter.ConditionError).Message)
+	})
+
+	t.Run("2", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(2))
+		require.NoError(t, err)
+	})
+
+	t.Run("3", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(3))
+		require.Error(t, err)
+
+		require.IsType(t, &interpreter.ConditionError{}, err)
+		assert.Equal(t, "invalid destroy", err.(*interpreter.ConditionError).Message)
+	})
+}
+
+func TestInterpretResourceTypeRequirementInitializerAndDestructorPreConditions(t *testing.T) {
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+          pub contract interface CI {
+
+              pub resource R {
+
+                  pub x: Int
+
+                  init(_ x: Int) {
+                      pre { x > 1: "invalid init" }
+                  }
+
+                  destroy() {
+                      pre { self.x < 3: "invalid destroy" }
+                  }
+              }
+          }
+
+          pub contract C: CI {
+
+              pub resource R {
+
+                  pub let x: Int
+
+                  init(_ x: Int) {
+                      self.x = x
+                  }
+              }
+          }
+
+          pub fun test(_ x: Int) {
+              let r <- create C.R(x)
+              destroy r
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			Options: []interpreter.Option{
+				makeContractValueHandler(nil, nil, nil),
+			},
+		},
+	)
+
+	t.Run("1", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(1))
+		require.Error(t, err)
+
+		require.IsType(t, &interpreter.ConditionError{}, err)
+		assert.Equal(t, "invalid init", err.(*interpreter.ConditionError).Message)
+	})
+
+	t.Run("2", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(2))
+		require.NoError(t, err)
+	})
+
+	t.Run("3", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(3))
+		require.Error(t, err)
+
+		require.IsType(t, &interpreter.ConditionError{}, err)
+		assert.Equal(t, "invalid destroy", err.(*interpreter.ConditionError).Message)
+	})
 }
