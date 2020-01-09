@@ -30,8 +30,9 @@ const (
 	ConsensusReceiver = CollectionProvider
 
 	// Execution 100-199
-	ExecutionExecution      = 100
-	ExecutionBlockIngestion = 101
+	ExecutionExecution       = 100
+	ExecutionBlockIngestion  = 101
+	ExecutionReceiptProvider = 102
 
 	// Verification 150-199
 	VerificationVerifier = 150
