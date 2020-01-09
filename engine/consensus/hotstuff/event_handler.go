@@ -9,9 +9,9 @@ type EventHandler struct {
 	missingBlockRequester *MissingBlockRequester
 	forkChoice            *ForkChoice
 	validator             *Validator
-	blockProducer         BlockProducer
+	blockProposalProducer BlockProposalProducer
 	viewState             ViewState
-	network               Network
+	network               NetworkSender
 	// Flag to turn on/off consensus acts (voting, block production etc)
 	isConActor bool
 }
