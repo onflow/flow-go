@@ -55,7 +55,7 @@ func TestExecutionEngine_OnBlock(t *testing.T) {
 		Once()
 
 	exec.On("ExecuteBlock", executableBlock).
-		Return(nil, nil).
+		Return(flow.ExecutionResult{}, nil).
 		Once()
 
 	err := e.onBlock(&block)

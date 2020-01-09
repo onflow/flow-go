@@ -10,7 +10,7 @@ import (
 
 // A BlockExecutor executes the transactions in a block.
 type BlockExecutor interface {
-	ExecuteBlock(block ExecutableBlock) ([]flow.Chunk, error)
+	ExecuteBlock(block ExecutableBlock) (flow.ExecutionResult, error)
 }
 
 type blockExecutor struct {
@@ -29,15 +29,26 @@ func NewBlockExecutor(vm virtualmachine.VirtualMachine, state state.ExecutionSta
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *blockExecutor) ExecuteBlock(
 	block ExecutableBlock,
-) ([]flow.Chunk, error) {
+) (flow.ExecutionResult, error) {
 	chunks, err := e.executeTransactions(block.Block, block.Transactions)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute transactions: %w", err)
+		return flow.ExecutionResult{}, fmt.Errorf("failed to execute transactions: %w", err)
 	}
 
 	// TODO: compute block fees & reward payments
 
-	return chunks, nil
+	finalChunk := chunks[len(chunks)-1]
+
+	return flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousExecutionResult: block.PreviousExecutionResult,
+			Block:                   flow.Fingerprint(block.Block.Hash()),
+			FinalStateCommitment:    finalChunk.EndState,
+			Chunks: flow.ChunkList{
+				Chunks: chunks,
+			},
+		},
+	}, nil
 }
 
 func (e *blockExecutor) executeTransactions(
@@ -79,8 +90,7 @@ func (e *blockExecutor) executeTransactions(
 			TxCounts:     uint32(len(txs)),
 			// TODO: compute chunk tx collection hash
 			ChunkTxCollection: nil,
-			// TODO: include start state commitment
-			StartState: startState,
+			StartState:        startState,
 			// TODO: include event collection hash
 			EventCollection: nil,
 			// TODO: record gas used
@@ -88,8 +98,7 @@ func (e *blockExecutor) executeTransactions(
 			// TODO: record first tx gas used
 			FirstTransactionComputationUsed: 0,
 		},
-		Index: 0,
-		// TODO: include end state commitment
+		Index:    0,
 		EndState: endState,
 	}
 
