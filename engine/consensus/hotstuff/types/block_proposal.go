@@ -3,7 +3,7 @@ package types
 type BlockProposal struct {
 	Block            *Block
 	ConsensusPayload *ConsensusPayload
-	Signature        *Signature
+	Signature        *Signature // CAUTION: this is sign(Block), i.e. it does NOT include ConsensusPayload
 }
 
 func (b *BlockProposal) QC() *QuorumCertificate { return b.Block.QC }

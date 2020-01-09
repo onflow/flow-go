@@ -46,7 +46,7 @@ type Reactor interface {
 	// and pruning of older blocks.
 	// Handles duplicated addition of blocks (at the potential cost of additional computation time).
 	// PREREQUISITE:
-	//Reactor must be able to connect `block` to its latest finalized block (without missing interim ancestors).
+	// Reactor must be able to connect `block` to its latest finalized block (without missing interim ancestors).
 	AddBlock(block *types.BlockProposal)
 
 	// AddQC adds a quorum certificate to Reactor.
