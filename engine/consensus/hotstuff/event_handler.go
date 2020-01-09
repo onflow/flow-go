@@ -13,6 +13,8 @@ type EventHandler struct {
 	blockProducer         BlockProducer
 	protocolState         ProtocolState
 	network               Network
+	// Flag to turn on/off consensus acts (voting, block production etc)
+	isConActor bool
 }
 
 func (eh *EventHandler) OnReceiveBlockProposal(block *types.BlockProposal) {
@@ -118,19 +120,21 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 		eh.processIncorperatedBlock(incorperatedBlock)
 	}
 
-	if eh.forkChoice.IsSafeNode(blockProposal) == false {
-		return
-	}
+	if eh.isConActor {
+		if eh.forkChoice.IsSafeNode(blockProposal) == false || eh.paceMaker.CurView() != blockProposal.Block.View {
+			return
+		}
 
-	myVote, voteCollector := eh.voter.ShouldVoteForNewProposal(blockProposal, eh.paceMaker.CurView())
-	if myVote == nil {
-		return // exit if i should not vote
-	}
+		myVote := eh.voter.ProduceVote(blockProposal)
+		if myVote == nil {
+			return // exit if i should not vote
+		}
 
-	if eh.protocolState.IsSelf(myVote.View, voteCollector) {
-		eh.onReceiveVote(myVote) // if I'm collecting my own vote, then pass it to myself directly
-	} else {
-		eh.network.SendVote(myVote, voteCollector)
+		if eh.protocolState.IsSelf(myVote.View, myVote.Signature.SignerIdx) {
+			eh.onReceiveVote(myVote) // if I'm collecting my own vote, then pass it to myself directly
+		} else {
+			eh.network.SendVote(myVote, myVote.Signature.SignerIdx)
+		}
 	}
 
 	// To handle: 10, 12, 11

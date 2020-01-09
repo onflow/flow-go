@@ -1,11 +1,16 @@
 package hotstuff
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+import (
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+)
 
 type Voter struct {
-	protocolState ProtocolState
+	signer Signer
 }
 
-func (v *Voter) ShouldVoteForNewProposal(b *types.BlockProposal, curView uint64) (myVote *types.Vote, voteCollectorIdx uint32) {
-	panic("TODO")
+func (v *Voter) ProduceVote(bp *types.BlockProposal) (myVote *types.Vote) {
+	unsignedVote := types.NewVote(bp.Block.View, bp.Block.BlockMRH())
+	vote := v.signer.SignVote(unsignedVote)
+
+	return vote
 }
