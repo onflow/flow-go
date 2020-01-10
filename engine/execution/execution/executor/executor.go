@@ -101,6 +101,8 @@ func (e *blockExecutor) executeTransactions(
 func generateExecutionResultForBlock(block ExecutableBlock, chunks []flow.Chunk) flow.ExecutionResult {
 	var finalStateCommitment flow.StateCommitment
 
+	// If block is not empty, set final state to the final state of the last chunk.
+	// Otherwise, set to the final state of the previous execution result.
 	if len(chunks) > 0 {
 		finalChunk := chunks[len(chunks)-1]
 		finalStateCommitment = finalChunk.EndState
