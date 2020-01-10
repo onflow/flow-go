@@ -80,8 +80,8 @@ func (m *MiddlewareTestSuit) TestMultiPing() {
 	// two distinct messages
 	m.MultiPing(2)
 
-	// 100 distinct messages
-	m.MultiPing(100)
+	// 10 distinct messages
+	m.MultiPing(10)
 }
 
 // StartMiddleware creates mock overlays for each middleware, and starts the middlewares
@@ -221,6 +221,7 @@ func (m *MiddlewareTestSuit) TestEcho() {
 	}
 }
 
+// createMiddelwares creates middlewares with mock overlay for each middleware
 func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []*Middleware) {
 	var mws []*Middleware
 	var ids []flow.Identifier
