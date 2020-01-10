@@ -1381,7 +1381,7 @@ func (v *CompositeValue) Destroy(interpreter *Interpreter, location LocationPosi
 		Interpreter:   interpreter,
 	}
 
-	return destructor.invoke(invocation)
+	return destructor.Invoke(invocation)
 }
 
 func (*CompositeValue) isValue() {}
