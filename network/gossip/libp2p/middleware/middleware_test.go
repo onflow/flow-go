@@ -43,32 +43,32 @@ func (m *MiddlewareTestSuit) SetupTest() {
 	m.StartMiddlewares()
 }
 
-// TestSendOneMessageRawReception tests the middleware for solely the
-// reception of a single message by a node that is sent from another node
+// TestPingRawReception tests the middleware for solely the
+// reception of a single ping message by a node that is sent from another node
 // it does not evaluate the type and content of the message
-func (m *MiddlewareTestSuit) TestSendOneMessageRawReception() {
-	m.SendOneMessage(mockery.Anything, mockery.Anything)
+func (m *MiddlewareTestSuit) TestPingRawReception() {
+	m.Ping(mockery.Anything, mockery.Anything)
 }
 
-// TestSendOneMessageRawReception tests the middleware for solely the
-// reception of a single message by a node that is sent from another node
-// it evaluates the type but NOT the content of the message
-func (m *MiddlewareTestSuit) TestSendOneMessageTypeReception() {
-	m.SendOneMessage(mockery.Anything, mockery.AnythingOfType("[]uint8"))
+// TestPingTypeReception tests the middleware against type of received payload
+// upon reception at the receiver side
+// it does not evaluate content of the payload
+// it does not evaluate anything related to the sender id
+func (m *MiddlewareTestSuit) TestPingTypeReception() {
+	m.Ping(mockery.Anything, mockery.AnythingOfType("[]uint8"))
 }
 
-// TestSendOneMessageRawReception tests the middleware for solely the
-// reception of a single message by a node that is sent from another node
-// it evaluates the type but NOT the content of the message
-func (m *MiddlewareTestSuit) TestSendOneMessageIDType() {
-	m.SendOneMessage(mockery.AnythingOfType("flow.Identifier"), []byte("Hello, World!"))
+// TestPingIDType tests the middleware against both the type of sender id
+// and content of the payload of the event upon reception at the receiver side
+// it does not evaluate the actual value of the sender ID
+func (m *MiddlewareTestSuit) TestPingIDType() {
+	m.Ping(mockery.AnythingOfType("flow.Identifier"), []byte("Hello, World!"))
 }
 
-// TestSendOneMessageRawReception tests the middleware for solely the
-// reception of a single message by a node that is sent from another node
-// it evaluates the type but NOT the content of the message
-func (m *MiddlewareTestSuit) TestSendOneMessageContentReception() {
-	m.SendOneMessage(flow.Identifier{}, []byte("Hello, World!"))
+// TestPingContentReception tests the middleware against both
+// the payload and sender ID of the event upon reception at the receiver side
+func (m *MiddlewareTestSuit) TestPingContentReception() {
+	m.Ping(m.mws[0].me, []byte("Hello, World!"))
 }
 
 // StartMiddleware creates mock overlays for each middleware, and starts the middlewares
@@ -104,18 +104,14 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 	}
 }
 
-// SendOneMessage
-func (m *MiddlewareTestSuit) SendOneMessage(expectID, expectPayload interface{}) {
+// Ping sends a message from the first middleware of the test suit to the last one
+// expectID and expectPayload are what we expect the receiver side to evaluate the
+// incoming ping against, it can be mocked or typed data
+func (m *MiddlewareTestSuit) Ping(expectID, expectPayload interface{}) {
 
 	ch := make(chan struct{})
 	// extracts sender id based on the mock option
 	var err error
-	switch expectID.(type) {
-	case flow.Identifier:
-		expectID = m.ids[0]
-	default:
-	}
-
 	// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
 	m.ov[m.size-1].On("Receive", expectID, expectPayload).Return(nil).Once().
 		Run(func(args mockery.Arguments) {
