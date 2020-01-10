@@ -126,13 +126,13 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 		eh.processIncorporatedBlock(incorporatedBlock)
 	}
 
-	if eh.forkChoice.IsSafeNode(blockProposal) == false || eh.paceMaker.CurView() != blockProposal.Block.View || eh.isConActor {
+	if eh.forkChoice.IsSafeNode(blockProposal) || eh.paceMaker.CurView() != blockProposal.Block.View || !eh.isConActor {
 		return
 	}
 
 	myVote := eh.voter.ProduceVote(blockProposal)
 
-	if eh.protocolState.IsSelf(myVote.View, myVote.Signature.SignerIdx) {
+	if eh.viewState.IsSelfLeaderForView(myVote.View + 1) {
 		eh.onReceiveVote(myVote) // if I'm collecting my own vote, then pass it to myself directly
 	} else {
 		eh.network.SendVote(myVote, myVote.Signature.SignerIdx)
