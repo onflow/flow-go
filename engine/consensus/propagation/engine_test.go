@@ -150,7 +150,7 @@ func TestPropagateCollectionGuarantee(t *testing.T) {
 	}
 	ids = append(ids, id)
 
-	// generae another 1000 node ids
+	// generate another 1000 node ids
 	var targetIDs flow.IdentityList
 	for i := 0; i < 1000; i++ {
 		var nodeID flow.Identifier
