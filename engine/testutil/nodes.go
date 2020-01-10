@@ -16,13 +16,11 @@ import (
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
-	"github.com/dapperlabs/flow-go/engine/verification/receiver"
 	verificationmempool "github.com/dapperlabs/flow-go/engine/verification/storage"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -139,43 +137,17 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, n int) []mock.ConsensusNode {
 	return nodes
 }
 
-type VerificationNodeOpt func(node *mock.VerificationNode)
-
-func WithVerifierEngine(eng network.Engine) VerificationNodeOpt {
-	return func(node *mock.VerificationNode) {
-		node.VerifierEngine = eng
-	}
-}
-
-func VerificationNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block, opts ...VerificationNodeOpt) mock.VerificationNode {
+func VerificationNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) mock.VerificationNode {
 
 	var err error
 	node := mock.VerificationNode{
 		GenericNode: GenericNode(t, hub, identity, genesis),
 	}
 
-	for _, opt := range opts {
-		opt(&node)
-	}
+	node.Pool = verificationmempool.New()
 
-	if node.Pool == nil {
-		node.Pool = verificationmempool.New()
-	}
-
-	if node.VerifierEngine == nil {
-		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, node.Pool)
-		require.NoError(t, err)
-	}
-
-	if node.CollectionReceiverEngine == nil {
-		node.CollectionReceiverEngine, err = receiver.NewCollectionReceiver(node.Log, node.Net, node.Me, node.State, node.Pool, node.VerifierEngine)
-		require.NoError(t, err)
-	}
-
-	if node.ExecutionReceiverEngine == nil {
-		node.ExecutionReceiverEngine, err = receiver.NewExecutionReceiver(node.Log, node.Net, node.Me, node.State, node.Pool, node.VerifierEngine)
-		require.NoError(t, err)
-	}
+	node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, node.Pool)
+	require.NoError(t, err)
 
 	return node
 }
