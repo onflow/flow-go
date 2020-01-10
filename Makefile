@@ -82,10 +82,11 @@ generate-mocks:
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
+	mockery -name '.*' -dir=storage/ledger -case=underscore -output="./storage/ledger/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
-	mockery -name '.*' -dir=engine/execution/execution/components/computer -case=underscore -output="./engine/execution/execution/components/computer/mock" -outpkg="mock"
-	mockery -name '.*' -dir=engine/execution/execution/components/executor -case=underscore -output="./engine/execution/execution/components/executor/mock" -outpkg="mock"
-	mockery -name '.*' -dir=engine/execution/execution/modules/context -case=underscore -output="./engine/execution/execution/modules/context/mock" -outpkg="mock"
+	mockery -name '.*' -dir=engine/execution/execution/executor -case=underscore -output="./engine/execution/execution/executor/mock" -outpkg="mock"
+	mockery -name '.*' -dir=engine/execution/execution/state -case=underscore -output="./engine/execution/execution/state/mock" -outpkg="mock"
+	mockery -name '.*' -dir=engine/execution/execution/virtualmachine -case=underscore -output="./engine/execution/execution/virtualmachine/mock" -outpkg="mock"
 	mockery -name 'Processor' -dir="./engine/consensus/eventdriven/components/pacemaker/events" -case=underscore -output="./engine/consensus/eventdriven/components/pacemaker/mock" -outpkg="mock"
 
 .PHONY: lint
@@ -118,6 +119,14 @@ docker-build-consensus:
 .PHONY: docker-build-execution
 docker-build-execution:
 	docker build -f cmd/Dockerfile --build-arg TARGET=execution -t gcr.io/dl-flow/execution:latest -t "gcr.io/dl-flow/execution:$(SHORT_COMMIT)" .
+
+.PHONY: docker-build-verification
+docker-build-verification:
+	docker build -f cmd/Dockerfile --build-arg TARGET=verification -t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" .
+
+.PHONY: docker-run-verification
+docker-run-verification:
+	docker run -p 8080:8080 -p 3569:3569 gcr.io/dl-flow/verification:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries verification-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
 # Builds the VS Code extension
 .PHONY: build-vscode-extension

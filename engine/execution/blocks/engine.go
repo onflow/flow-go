@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // An Engine receives and saves incoming blocks.
@@ -147,12 +148,13 @@ func (e *Engine) checkForCompleteness(block execution.CompleteBlock) error {
 }
 
 func (e *Engine) handleBlock(block flow.Block) error {
+
 	e.log.Debug().
-		Hex("block_hash", block.Hash()).
+		Hex("block_id", logging.ID(block)).
 		Uint64("block_number", block.Number).
 		Msg("received block")
 
-	err := e.blocks.Save(&block)
+	err := e.blocks.Store(&block)
 	if err != nil {
 		return fmt.Errorf("could not save block: %w", err)
 	}
@@ -193,13 +195,8 @@ func (e *Engine) handleBlock(block flow.Block) error {
 
 func (e *Engine) handleCollectionResponse(collectionResponse provider.CollectionResponse) error {
 	e.log.Debug().
-		Hex("collection_hash", collectionResponse.Fingerprint).
+		Hex("collection_id", logging.ID(collection)).
 		Msg("received collection")
-
-	//err := e.collections.Save(&collection)
-	//if err != nil {
-	//	return fmt.Errorf("could not save collection: %w", err)
-	//}
 
 	hash := string(collectionResponse.Fingerprint)
 

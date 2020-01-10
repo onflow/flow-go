@@ -167,7 +167,11 @@ func TestCheckInvalidNestedOptionalComparison(t *testing.T) {
 
 func TestCheckCompositeNilEquality(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		if compositeKind == common.CompositeKindEvent {
+			continue
+		}
 
 		var setupCode, identifier string
 
@@ -209,7 +213,11 @@ func TestCheckCompositeNilEquality(t *testing.T) {
 
 func TestCheckInvalidCompositeNilEquality(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		if compositeKind == common.CompositeKindEvent {
+			continue
+		}
 
 		var setupCode, firstIdentifier, secondIdentifier string
 		if compositeKind == common.CompositeKindContract {
@@ -229,17 +237,23 @@ func TestCheckInvalidCompositeNilEquality(t *testing.T) {
 			secondIdentifier = "y"
 		}
 
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(compositeKind.Name(), func(t *testing.T) {
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s X {}
+                      %[1]s X %[2]s
 
-                      %[2]s
+                      %[3]s
 
-                      let a = %[3]s == %[4]s
+                      let a = %[4]s == %[5]s
                     `,
 					compositeKind.Keyword(),
+					body,
 					setupCode,
 					firstIdentifier,
 					secondIdentifier,

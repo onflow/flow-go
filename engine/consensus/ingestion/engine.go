@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine represents the ingestion engine, used to funnel collections from a
@@ -39,7 +40,7 @@ func New(log zerolog.Logger, net module.Network, prop network.Engine, state prot
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.CollectionProposal, e)
+	con, err := net.Register(engine.CollectionProvider, e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
@@ -110,7 +111,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_hash", guarantee.Hash).
+		Hex("collection_id", logging.ID(guarantee)).
 		Msg("guaranteed collection received")
 
 	// get the identity of the origin node, so we can check if it's a valid
@@ -136,7 +137,7 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_hash", guarantee.Hash).
+		Hex("collection_id", logging.ID(guarantee)).
 		Msg("guaranteed collection forwarded")
 
 	return nil

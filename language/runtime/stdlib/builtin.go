@@ -16,10 +16,17 @@ import (
 var AssertFunction = NewStandardLibraryFunction(
 	"assert",
 	&sema.FunctionType{
-		ParameterTypeAnnotations: sema.NewTypeAnnotations(
-			&sema.BoolType{},
-			&sema.StringType{},
-		),
+		Parameters: []*sema.Parameter{
+			{
+				Label:          sema.ArgumentLabelNotRequired,
+				Identifier:     "condition",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.BoolType{}),
+			},
+			{
+				Identifier:     "message",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.StringType{}),
+			},
+		},
 		ReturnTypeAnnotation: sema.NewTypeAnnotation(
 			&sema.VoidType{},
 		),
@@ -76,9 +83,13 @@ func (e PanicError) ImportLocation() ast.Location {
 var PanicFunction = NewStandardLibraryFunction(
 	"panic",
 	&sema.FunctionType{
-		ParameterTypeAnnotations: sema.NewTypeAnnotations(
-			&sema.StringType{},
-		),
+		Parameters: []*sema.Parameter{
+			{
+				Label:          sema.ArgumentLabelNotRequired,
+				Identifier:     "message",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.StringType{}),
+			},
+		},
 		ReturnTypeAnnotation: sema.NewTypeAnnotation(
 			&sema.NeverType{},
 		),
@@ -106,9 +117,13 @@ var BuiltinFunctions = StandardLibraryFunctions{
 var LogFunction = NewStandardLibraryFunction(
 	"log",
 	&sema.FunctionType{
-		ParameterTypeAnnotations: sema.NewTypeAnnotations(
-			&sema.AnyStructType{},
-		),
+		Parameters: []*sema.Parameter{
+			{
+				Label:          sema.ArgumentLabelNotRequired,
+				Identifier:     "value",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.AnyStructType{}),
+			},
+		},
 		ReturnTypeAnnotation: sema.NewTypeAnnotation(
 			&sema.VoidType{},
 		),

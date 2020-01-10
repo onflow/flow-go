@@ -19,27 +19,27 @@ func TestCollections(t *testing.T) {
 
 		t.Run("Retrieve nonexistant", func(t *testing.T) {
 			var actual flow.LightCollection
-			err := db.View(RetrieveCollection(expected.Fingerprint(), &actual))
+			err := db.View(RetrieveCollection(expected.ID(), &actual))
 			assert.Error(t, err)
 		})
 
 		t.Run("Save", func(t *testing.T) {
-			err := db.Update(InsertCollection(expected))
+			err := db.Update(InsertCollection(&expected))
 			require.NoError(t, err)
 
 			var actual flow.LightCollection
-			err = db.View(RetrieveCollection(expected.Fingerprint(), &actual))
+			err = db.View(RetrieveCollection(expected.ID(), &actual))
 			assert.NoError(t, err)
 
-			assert.Equal(t, expected, &actual)
+			assert.Equal(t, expected, actual)
 		})
 
 		t.Run("Remove", func(t *testing.T) {
-			err := db.Update(RemoveCollection(expected.Fingerprint()))
+			err := db.Update(RemoveCollection(expected.ID()))
 			require.NoError(t, err)
 
 			var actual flow.LightCollection
-			err = db.View(RetrieveCollection(expected.Fingerprint(), &actual))
+			err = db.View(RetrieveCollection(expected.ID(), &actual))
 			assert.Error(t, err)
 		})
 	})

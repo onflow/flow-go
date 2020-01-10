@@ -11,22 +11,22 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/collection/ingest"
+	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
+	"github.com/dapperlabs/flow-go/engine/collection/provider"
+	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
+	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) *mock.CollectionNode {
+func GenericNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) mock.GenericNode {
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
-
-	me, err := local.New(identity)
-	require.NoError(t, err)
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
@@ -38,23 +38,47 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis
 	err = state.Mutate().Bootstrap(genesis)
 	require.NoError(t, err)
 
+	me, err := local.New(identity)
+	require.NoError(t, err)
+
 	stub := stub.NewNetwork(state, me, hub)
+
+	return mock.GenericNode{
+		Log:   log,
+		DB:    db,
+		State: state,
+		Me:    me,
+		Net:   stub,
+	}
+}
+
+// CollectionNode returns a mock collection node.
+func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) mock.CollectionNode {
+
+	node := GenericNode(t, hub, identity, genesis)
+
 	pool, err := mempool.NewTransactionPool()
 	require.NoError(t, err)
 
-	ingestionEngine, err := ingest.New(log, stub, state, me, pool)
+	collections := storage.NewCollections(node.DB)
+
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Me, pool)
 	require.Nil(t, err)
 
-	return &mock.CollectionNode{
-		State:           state,
-		Me:              me,
-		IngestionEngine: ingestionEngine,
+	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Me, collections)
+	require.Nil(t, err)
+
+	return mock.CollectionNode{
+		GenericNode:     node,
 		Pool:            pool,
+		Collections:     collections,
+		IngestionEngine: ingestionEngine,
+		ProviderEngine:  providerEngine,
 	}
 }
 
 // CollectionNodes returns n collection nodes connected to the given hub.
-func CollectionNodes(t *testing.T, hub *stub.Hub, n int) []*mock.CollectionNode {
+func CollectionNodes(t *testing.T, hub *stub.Hub, n int) []mock.CollectionNode {
 	identities := unittest.IdentityListFixture(n, func(node *flow.Identity) {
 		node.Role = flow.RoleCollection
 	})
@@ -64,9 +88,48 @@ func CollectionNodes(t *testing.T, hub *stub.Hub, n int) []*mock.CollectionNode 
 
 	genesis := mock.Genesis(identities)
 
-	nodes := make([]*mock.CollectionNode, n)
+	nodes := make([]mock.CollectionNode, n)
 	for i := 0; i < n; i++ {
 		nodes[i] = CollectionNode(t, hub, identities[i], genesis)
+	}
+
+	return nodes
+}
+
+func ConsensusNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) mock.ConsensusNode {
+
+	node := GenericNode(t, hub, identity, genesis)
+
+	pool, err := mempool.NewGuaranteePool()
+	require.NoError(t, err)
+
+	propagationEngine, err := propagation.New(node.Log, node.Net, node.State, node.Me, pool)
+	require.NoError(t, err)
+
+	ingestionEngine, err := consensusingest.New(node.Log, node.Net, propagationEngine, node.State, node.Me)
+	require.Nil(t, err)
+
+	return mock.ConsensusNode{
+		GenericNode:       node,
+		Pool:              pool,
+		PropagationEngine: propagationEngine,
+		IngestionEngine:   ingestionEngine,
+	}
+}
+
+func ConsensusNodes(t *testing.T, hub *stub.Hub, n int) []mock.ConsensusNode {
+	identities := unittest.IdentityListFixture(n, func(node *flow.Identity) {
+		node.Role = flow.RoleConsensus
+	})
+	for _, id := range identities {
+		t.Log(id.String())
+	}
+
+	genesis := mock.Genesis(identities)
+
+	nodes := make([]mock.ConsensusNode, n)
+	for i := 0; i < n; i++ {
+		nodes[i] = ConsensusNode(t, hub, identities[i], genesis)
 	}
 
 	return nodes

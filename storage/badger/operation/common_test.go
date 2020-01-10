@@ -60,7 +60,7 @@ func TestInsertDuplicate(t *testing.T) {
 		// Save again
 		err = db.Update(insert(key, e))
 		require.Error(t, err)
-		require.Equal(t, err, storage.KeyAlreadyExistsErr)
+		require.Equal(t, err, storage.ErrAlreadyExists)
 
 		// persist again, but using different method
 		err = db.Update(persist(key, e))
@@ -69,7 +69,7 @@ func TestInsertDuplicate(t *testing.T) {
 		// again with different data
 		err = db.Update(persist(key, e2))
 		require.Error(t, err)
-		require.Equal(t, err, storage.DifferentDataErr)
+		require.Equal(t, err, storage.ErrDataMismatch)
 
 	})
 }
@@ -157,7 +157,7 @@ func TestRemove(t *testing.T) {
 		})
 
 		t.Run("should be able to remove", func(t *testing.T) {
-			db.Update(func(txn *badger.Txn) error {
+			_ = db.Update(func(txn *badger.Txn) error {
 				err := remove(key)(txn)
 				assert.NoError(t, err)
 
@@ -171,10 +171,9 @@ func TestRemove(t *testing.T) {
 
 		t.Run("should error when removing non-existant value", func(t *testing.T) {
 			nonexistantKey := append(key, 0x01)
-			db.Update(func(txn *badger.Txn) error {
+			_ = db.Update(func(txn *badger.Txn) error {
 				err := remove(nonexistantKey)(txn)
 				assert.Error(t, err)
-				t.Log(err)
 				return nil
 			})
 		})

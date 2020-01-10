@@ -95,44 +95,44 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch ev := event.(type) {
+	switch entity := event.(type) {
 	case *flow.CollectionGuarantee:
-		return e.onCollectionGuarantee(originID, ev)
+		return e.onGuarantee(originID, entity)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// onCollectionGuarantee is called when a new collection guarantee is received
+// onGuarantee is called when a new collection guarantee is received
 // from another node on the network.
-func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
+func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
 		Msg("collection guarantee received")
 
-	err := e.storeCollectionGuarantee(guarantee)
+	err := e.storeGuarantee(guarantee)
 	if err != nil {
 		return errors.Wrap(err, "could not store collection")
 	}
 
 	// propagate the collection guarantee to other relevant nodes
-	err = e.propagateCollectionGuarantee(guarantee)
+	err = e.propagateGuarantee(guarantee)
 	if err != nil {
 		return errors.Wrap(err, "could not broadcast collection")
 	}
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_hash", guarantee.Hash).
+		Hex("collection_id", logging.ID(guarantee)).
 		Msg("collection guarantee processed")
 
 	return nil
 }
 
-// storeCollectionGuarantee will store a collection guarantee within the
+// storeGuarantee will store a collection guarantee within the
 // context of our local protocol state and memory pool.
-func (e *Engine) storeCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
+func (e *Engine) storeGuarantee(guarantee *flow.CollectionGuarantee) error {
 
 	// TODO: validate the collection guarantee signature
 
@@ -143,15 +143,15 @@ func (e *Engine) storeCollectionGuarantee(guarantee *flow.CollectionGuarantee) e
 	}
 
 	e.log.Info().
-		Hex("collection_hash", guarantee.Hash).
+		Hex("collection_id", logging.ID(guarantee)).
 		Msg("collection guarantee stored")
 
 	return nil
 }
 
-// propagateCollectionGuarantee will submit the collection guarantee to the
+// propagateGuarantee will submit the collection guarantee to the
 // network layer with all other consensus nodes as desired recipients.
-func (e *Engine) propagateCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
+func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
 
 	// select all the collection nodes on the network as our targets
 	ids, err := e.state.Final().Identities(
@@ -170,8 +170,8 @@ func (e *Engine) propagateCollectionGuarantee(guarantee *flow.CollectionGuarante
 	}
 
 	e.log.Info().
-		Strs("target_ids", logging.HexSlice(targetIDs)).
-		Hex("collection_hash", guarantee.Hash).
+		Strs("target_ids", logging.IDs(targetIDs)).
+		Hex("collection_id", logging.ID(guarantee)).
 		Msg("guaranteed collection propagated")
 
 	return nil

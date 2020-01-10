@@ -79,7 +79,7 @@ func TestBlockStorage(t *testing.T) {
 
 		block := unittest.BlockFixture()
 
-		blocks.EXPECT().Save(gomock.Eq(&block))
+		blocks.EXPECT().Store(gomock.Eq(&block))
 		collectionConduit.EXPECT().Submit(gomock.Any(), gomock.Any()).Times(len(block.CollectionGuarantees))
 
 		err := engine.Process(myIdentity.NodeID, block)

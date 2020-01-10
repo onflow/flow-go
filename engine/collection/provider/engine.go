@@ -1,5 +1,6 @@
-// Package provider implements an engine for responding to requests for
-// transactions that have been formed into collections and guaranteed.
+// Package provider implements an engine for providing access to resources held
+// by the collection node, including collections, collection guarantees, and
+// transactions.
 package provider
 
 import (
@@ -9,28 +10,32 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
-// Engine is the collection provider engine, which responds to requests for
-// transactions that have been guaranteed.
+// Engine is the collection provider engine, which provides access to resources
+// held by the collection node.
 type Engine struct {
-	unit  *engine.Unit
-	log   zerolog.Logger
-	con   network.Conduit
-	me    module.Local
-	state protocol.State
-	// TODO storage provider for transactions/guaranteed collections
+	unit        *engine.Unit
+	log         zerolog.Logger
+	con         network.Conduit
+	me          module.Local
+	state       protocol.State
+	collections storage.Collections
 }
 
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, collections storage.Collections) (*Engine, error) {
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log.With().Str("engine", "provider").Logger(),
-		me:    me,
-		state: state,
+		unit:        engine.NewUnit(),
+		log:         log.With().Str("engine", "provider").Logger(),
+		me:          me,
+		state:       state,
+		collections: collections,
 	}
 
 	con, err := net.Register(engine.CollectionProvider, e)
@@ -50,7 +55,6 @@ func (e *Engine) Ready() <-chan struct{} {
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// TODO describe conditions under which engine is done
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
@@ -85,11 +89,55 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
+// SubmitCollectionGuarantee submits the guaranteed collection to all
+// consensus nodes.
+func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
+	identities, err := e.state.Final().Identities(identity.HasRole(flow.RoleConsensus))
+	if err != nil {
+		return fmt.Errorf("could not get consensus identities: %w", err)
+	}
+
+	err = e.con.Submit(guarantee, identities.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not submit collection guarantee: %w", err)
+	}
+
+	return nil
+}
+
 // process processes events for the provider engine on the collection node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch event.(type) {
-	// TODO transactionRequest, transactionRangeRequest
+	switch ev := event.(type) {
+	case *messages.CollectionRequest:
+		return e.onCollectionRequest(originID, ev)
+	case *messages.SubmitCollectionGuarantee:
+		return e.onSubmitCollectionGuarantee(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+}
+
+func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.CollectionRequest) error {
+	coll, err := e.collections.ByID(req.CollectionID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve requested collection: %w", err)
+	}
+
+	res := &messages.CollectionResponse{
+		Collection: *coll,
+	}
+	err = e.con.Submit(res, originID)
+	if err != nil {
+		return fmt.Errorf("could not respond to collection requester: %w", err)
+	}
+
+	return nil
+}
+
+func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *messages.SubmitCollectionGuarantee) error {
+	if originID != e.me.NodeID() {
+		return fmt.Errorf("invalid remote request to submit collection guarantee [%x]", req.Guarantee.ID())
+	}
+
+	return e.SubmitCollectionGuarantee(&req.Guarantee)
 }

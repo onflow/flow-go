@@ -7,10 +7,10 @@ import (
 // Guarantees represents persistent storage for collection guarantees.
 type Guarantees interface {
 
-	// Save inserts the collection guarantee.
-	Save(guarantee *flow.CollectionGuarantee)
+	// Store inserts the collection guarantee.
+	Store(guarantee *flow.CollectionGuarantee) error
 
-	// ByFingerprint retrieves the collection guarantee by the collection
+	// ByID retrieves the collection guarantee by the collection
 	// fingerprint.
-	ByFingerPrint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error)
+	ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error)
 }

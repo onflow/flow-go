@@ -16,22 +16,21 @@ import (
 )
 
 func TestHeaderInsertRetrieve(t *testing.T) {
-
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := flow.Header{
-			Number:     1337,
-			Timestamp:  time.Now().UTC(),
-			Parent:     crypto.Hash([]byte("parent")),
-			Payload:    crypto.Hash([]byte("payload")),
-			Signatures: []crypto.Signature{{0x99}},
+			Number:      1337,
+			Timestamp:   time.Now().UTC(),
+			ParentID:    flow.Identifier{0x11},
+			PayloadHash: flow.Identifier{0x22},
+			Signatures:  []crypto.Signature{{0x99}},
 		}
-		hash := expected.Hash()
+		blockID := expected.ID()
 
 		err := db.Update(InsertHeader(&expected))
 		require.Nil(t, err)
 
 		var actual flow.Header
-		err = db.View(RetrieveHeader(hash, &actual))
+		err = db.View(RetrieveHeader(blockID, &actual))
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)
