@@ -7,7 +7,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/protocol"
 )
 
@@ -24,27 +24,27 @@ func NewState(db *badger.DB) (*State, error) {
 
 func (s *State) Final() protocol.Snapshot {
 	sn := &Snapshot{
-		state:  s,
-		number: math.MaxUint64,
-		hash:   nil,
+		state:   s,
+		number:  math.MaxUint64,
+		blockID: flow.ZeroID,
 	}
 	return sn
 }
 
 func (s *State) AtNumber(number uint64) protocol.Snapshot {
 	sn := &Snapshot{
-		state:  s,
-		number: number,
-		hash:   nil,
+		state:   s,
+		number:  number,
+		blockID: flow.ZeroID,
 	}
 	return sn
 }
 
-func (s *State) AtHash(hash crypto.Hash) protocol.Snapshot {
+func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
 	sn := &Snapshot{
-		state:  s,
-		number: 0,
-		hash:   hash,
+		state:   s,
+		number:  0,
+		blockID: blockID,
 	}
 	return sn
 }

@@ -4,16 +4,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type hashable []byte
 
-func (h hashable) Fingerprint() flow.Fingerprint {
-	return flow.Fingerprint(crypto.Hash(h))
+func (h hashable) ID() flow.Identifier {
+	return flow.HashToID(h)
 }
 
 func TestHash(t *testing.T) {
@@ -67,34 +66,35 @@ func TestHash(t *testing.T) {
 
 func TestInsert(t *testing.T) {
 	item1 := hashable("DEAD")
+	item2 := hashable("AGAIN")
 
 	t.Run("should be able to insert and retrieve", func(t *testing.T) {
 		pool := newMempool()
 		_ = pool.Add(item1)
+		_ = pool.Add(item2)
 
 		t.Run("should be able to get size", func(t *testing.T) {
 			size := pool.Size()
-			assert.EqualValues(t, 1, size)
+			assert.EqualValues(t, uint(2), size)
 		})
 
-		t.Run("should be able to get by hash", func(t *testing.T) {
-			gotItem, err := pool.Get(item1.Fingerprint())
+		t.Run("should be able to get first", func(t *testing.T) {
+			gotItem, err := pool.Get(item1.ID())
 			assert.NoError(t, err)
 			assert.Equal(t, item1, gotItem)
 		})
 
-		t.Run("should be able to get all", func(t *testing.T) {
-			items := pool.All()
-			require.Len(t, items, 1)
-			assert.Equal(t, item1, items[0])
+		t.Run("should be able to remove first", func(t *testing.T) {
+			ok := pool.Rem(item1.ID())
+			assert.True(t, ok)
+			size := pool.Size()
+			assert.EqualValues(t, uint(1), size)
 		})
 
-		t.Run("should be able to remove", func(t *testing.T) {
-			ok := pool.Rem(item1.Fingerprint())
-			assert.True(t, ok)
-
-			size := pool.Size()
-			assert.EqualValues(t, 0, size)
+		t.Run("should be able to retrieve all", func(t *testing.T) {
+			items := pool.All()
+			require.Len(t, items, 1)
+			assert.Equal(t, item2, items[0])
 		})
 	})
 }

@@ -1,7 +1,6 @@
 package state
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 )
@@ -13,7 +12,7 @@ type ExecutionState interface {
 	// CommitDelta commits a register delta and returns the new state commitment.
 	CommitDelta(Delta) (flow.StateCommitment, error)
 	// StateCommitmentByBlockHash returns the final state commitment for the provided block hash.
-	StateCommitmentByBlockHash(crypto.Hash) (flow.StateCommitment, error)
+	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
 }
 
 type state struct {
@@ -57,7 +56,7 @@ func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
 	return flow.StateCommitment(commitment), nil
 }
 
-func (s *state) StateCommitmentByBlockHash(crypto.Hash) (flow.StateCommitment, error) {
+func (s *state) StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error) {
 	// TODO: (post-MVP) get last state commitment from previous block
 	// https://github.com/dapperlabs/flow-go/issues/2025
 	return flow.StateCommitment(s.ls.LatestStateCommitment()), nil

@@ -53,7 +53,7 @@ func NewNetwork(log zerolog.Logger, codec network.Codec, state protocol.State, m
 	}
 
 	o := &Network{
-		log:     log,
+		log:     log.With().Str("component", "overlay").Logger(),
 		codec:   codec,
 		state:   state,
 		me:      me,

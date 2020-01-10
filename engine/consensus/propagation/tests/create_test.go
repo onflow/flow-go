@@ -7,7 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -32,7 +31,7 @@ func prepareNodesAndCollections(N, M int) (
 	// prepare M distinct collection hashes
 	gcs := make([]*flow.CollectionGuarantee, M)
 	for m := 0; m < M; m++ {
-		gcs[m] = randCollectionGuarantee()
+		gcs[m] = unittest.CollectionGuaranteeFixture()
 	}
 	return nodes, gcs, nil
 }
@@ -52,16 +51,25 @@ func createConnectedNodes(nodeEntries ...string) (*stub.Hub, []*mockPropagationN
 		identities = append(identities, id)
 	}
 
+	content := flow.Content{
+		Identities: identities,
+		Guarantees: nil,
+	}
+
+	payload := content.Payload()
+
 	header := flow.Header{
-		Number:    0,
-		Timestamp: time.Now().UTC(),
-		Parent:    crypto.ZeroHash,
+		Number:      0,
+		Timestamp:   time.Now().UTC(),
+		ParentID:    flow.ZeroID,
+		PayloadHash: payload.Root(),
 	}
+
 	genesis := flow.Block{
-		Header:        header,
-		NewIdentities: identities,
+		Header:  header,
+		Payload: payload,
+		Content: content,
 	}
-	genesis.Header.Payload = genesis.Payload()
 
 	hub := stub.NewNetworkHub()
 
@@ -75,22 +83,4 @@ func createConnectedNodes(nodeEntries ...string) (*stub.Hub, []*mockPropagationN
 	}
 
 	return hub, nodes, nil
-}
-
-// a utility func to return a random collection hash
-func randHash() []byte {
-	hash := make([]byte, 32)
-	_, err := rand.Read(hash)
-	if err != nil {
-		panic(err.Error()) // should never error
-	}
-	return hash
-}
-
-// a utility func to generate a CollectionGuarantee with random hash
-func randCollectionGuarantee() *flow.CollectionGuarantee {
-	hash := randHash()
-	return &flow.CollectionGuarantee{
-		Hash: hash,
-	}
 }

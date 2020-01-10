@@ -89,9 +89,9 @@ func TestProposalEngine(t *testing.T) {
 
 			ctx.pool.On("Size").Return(uint(1)).Once()
 			ctx.pool.On("All").Return([]*flow.Transaction{&tx}).Once()
-			ctx.pool.On("Rem", tx.Fingerprint()).Return(true).Once()
-			ctx.collections.On("Save", mock.Anything).Return(nil).Once()
-			ctx.guarantees.On("Save", mock.Anything).Return(nil).Once()
+			ctx.pool.On("Rem", tx.ID()).Return(true).Once()
+			ctx.collections.On("Store", mock.Anything).Return(nil).Once()
+			ctx.guarantees.On("Store", mock.Anything).Return(nil).Once()
 			ctx.provider.On("ProcessLocal", mock.AnythingOfType("*messages.SubmitCollectionGuarantee")).Return(nil).Once()
 
 			err := e.createProposal()

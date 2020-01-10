@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	statemock "github.com/dapperlabs/flow-go/engine/execution/execution/state/mock"
@@ -32,16 +31,20 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	col := flow.Collection{Transactions: []flow.TransactionBody{tx1, tx2}}
 
+	content := flow.Content{
+		Guarantees: []*flow.CollectionGuarantee{
+			{
+				CollectionID: col.ID(),
+				Signatures:   nil,
+			},
+		},
+	}
+
 	block := flow.Block{
 		Header: flow.Header{
 			Number: 42,
 		},
-		CollectionGuarantees: []*flow.CollectionGuarantee{
-			{
-				Hash:       crypto.Hash(col.Fingerprint()),
-				Signatures: nil,
-			},
-		},
+		Content: content,
 	}
 
 	transactions := []flow.TransactionBody{tx1, tx2}
@@ -63,7 +66,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Return(&virtualmachine.TransactionResult{}, nil).
 		Twice()
 
-	es.On("StateCommitmentByBlockHash", block.Parent).
+	es.On("StateCommitmentByBlockID", block.ParentID).
 		Return(
 			flow.StateCommitment{
 				235, 123, 148, 153, 55, 102, 49, 115,
