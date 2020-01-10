@@ -2,7 +2,6 @@ package verifier
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -28,10 +27,9 @@ type Engine struct {
 	exeChannel network.Conduit   // used to get resources from execution nodes
 	me         module.Local      // used to access local node information
 	state      protocol.State    // used to access the  protocol state
+	blocks     mempool.Blocks    // used to store blocks in memory
 	receipts   mempool.Receipts  // used to store execution receipts in memory
 	approvals  mempool.Approvals // used to store result approvals in memory
-	wg         sync.WaitGroup    // used to keep track of the number of threads
-	mu         sync.Mutex
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -42,6 +40,7 @@ func New(
 	me module.Local,
 	receipts mempool.Receipts,
 	approvals mempool.Approvals,
+	blocks mempool.Blocks,
 ) (*Engine, error) {
 	e := &Engine{
 		unit:      engine.NewUnit(),
@@ -50,6 +49,7 @@ func New(
 		me:        me,
 		receipts:  receipts,
 		approvals: approvals,
+		blocks:    blocks,
 	}
 
 	var err error
@@ -114,19 +114,19 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *flow.ExecutionReceipt:
-		return e.onExecutionReceipt(originID, resource)
+		return e.handleExecutionReceipt(originID, resource)
 	case *flow.Collection:
-		return e.onCollection(originID, resource)
+		return e.handleCollection(originID, resource)
 	case *messages.CollectionResponse:
-		return e.onCollection(originID, &resource.Collection)
+		return e.handleCollection(originID, &resource.Collection)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// onExecutionReceipt receives an execution receipt (exrcpt), verifies that and emits
+// handleExecutionReceipt receives an execution receipt (exrcpt), verifies that and emits
 // a result approval upon successful verification
-func (e *Engine) onExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
@@ -153,21 +153,37 @@ func (e *Engine) onExecutionReceipt(originID flow.Identifier, receipt *flow.Exec
 	// storing the execution receipt in the store of the engine
 	err = e.receipts.Add(receipt)
 	if err != nil {
-		return fmt.Errorf("received duplicate execution receipt: %w", err)
+		return fmt.Errorf("could not store execution receipt: %w", err)
 	}
 
 	// starting the core verification in a separate thread
-	// TODO use engine unit
-	e.wg.Add(1)
-	go e.verify(originID, receipt)
+	e.unit.Launch(func() {
+		e.verify(originID, receipt)
+	})
 
 	return nil
 }
 
-// onCollection handles receipt of a new collection, either via push or after
+// handleBlock handles an incoming block.
+func (e *Engine) handleBlock(block *flow.Block) error {
+
+	e.log.Debug().
+		Hex("block_id", logging.ID(block)).
+		Uint64("block_number", block.Number).
+		Msg("received block")
+
+	err := e.blocks.Add(block)
+	if err != nil {
+		return fmt.Errorf("could not store block: %w", err)
+	}
+
+	return nil
+}
+
+// handleCollection handles receipt of a new collection, either via push or after
 // a request. It ensures the sender is valid and notifies the main verification
 // process.
-func (e *Engine) onCollection(originID flow.Identifier, coll *flow.Collection) error {
+func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
@@ -225,7 +241,6 @@ func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt
 		e.log.Error().
 			Str("error: ", err.Error()).
 			Msg("could not load the consensus nodes ids")
-		e.wg.Done()
 		return
 	}
 

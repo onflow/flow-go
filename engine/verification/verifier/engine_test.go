@@ -89,11 +89,11 @@ func (v *TestSuite) TestProcessLocalHappyPath() {
 	//mocking state for me.NodeID for internal call in ProcessLocal method
 	v.me.On("NodeID").Return(vnMe.NodeID).Once()
 
-	// mocking for Final().Identities(Identity(originID)) in onExecutionReceipt method
+	// mocking for Final().Identities(Identity(originID)) in handleExecutionReceipt method
 	v.state.On("Final").Return(v.ss).Once()
 	v.ss.On("Identity", vnMe.NodeID).Return(vnMe, nil).Once()
 
-	//mocking state for me.NodeID for internal call in onExecutionReceipt method
+	//mocking state for me.NodeID for internal call in handleExecutionReceipt method
 	v.me.On("NodeID").Return(vnMe.NodeID).Once()
 
 	// a set of mock staked consensus nodes
@@ -134,7 +134,7 @@ func (v *TestSuite) TestProcessLocalHappyPath() {
 // TestProcessUnhappyInput covers unhappy inputs for Process method
 // including nil event, empty event, and non-existing IDs
 func (v *TestSuite) TestProcessUnhappyInput() {
-	// mocking state for Final().Identity(flow.Identifier{}) call in onExecutionReceipt
+	// mocking state for Final().Identity(flow.Identifier{}) call in handleExecutionReceipt
 	v.state.On("Final").Return(v.ss).Once()
 	v.ss.On("Identity", flow.Identifier{}).Return(flow.Identity{}, errors.New("non-nil")).Once()
 
@@ -174,7 +174,7 @@ func (v *TestSuite) TestProcessUnstakeEmit() {
 		Stake:   0,
 	}
 
-	// mocking state for Final().Identity(unstakedID.NodeID) call in onExecutionReceipt
+	// mocking state for Final().Identity(unstakedID.NodeID) call in handleExecutionReceipt
 	v.state.On("Final").Return(v.ss).Once()
 	v.ss.On("Identity", unstakedID.NodeID).
 		Return(flow.Identity{}, errors.New("non-nil")).Once()
@@ -229,11 +229,11 @@ func (v *TestSuite) TestProcessUnauthorizedEmits() {
 			Address: "mock-address",
 			Role:    tc.role,
 		}
-		// mocking state for Final().Identity(originID) call in onExecutionReceipt method
+		// mocking state for Final().Identity(originID) call in handleExecutionReceipt method
 		v.state.On("Final").Return(v.ss).Once()
 		v.ss.On("Identity", id.NodeID).Return(id, nil).Once()
 
-		//mocking state for e.me.NodeID(vnMe.NodeID) call in onExecutionReceipt method
+		//mocking state for e.me.NodeID(vnMe.NodeID) call in handleExecutionReceipt method
 		v.me.On("NodeID").Return(vnMe.NodeID).Once()
 
 		// execution receipts should directly come from Execution Nodes,
@@ -269,7 +269,7 @@ func (v *TestSuite) ConcurrencyTestSetup(degree, consNum int) (*flow.Identity, *
 		Role:    flow.RoleExecution,
 	}
 
-	// mocking state fo Final().Identity(originID) call in onExecutionReceipt method
+	// mocking state fo Final().Identity(originID) call in handleExecutionReceipt method
 	v.state.On("Final").Return(v.ss).Times(degree)
 	v.ss.On("Identity", exeID.NodeID).Return(exeID, nil).Times(degree)
 
@@ -386,7 +386,7 @@ func (v *TestSuite) TestProcessHappyPathConcurrentDifferentERs() {
 		Role:    flow.RoleExecution,
 	}
 
-	// mocking state for Final().Identity(originID) in onExecutionReceipt method
+	// mocking state for Final().Identity(originID) in handleExecutionReceipt method
 	v.state.On("Final").Return(v.ss).Times(ConcurrencyDegree)
 	v.ss.On("Identity", exeID.NodeID).Return(exeID, nil).Times(ConcurrencyDegree)
 
@@ -450,7 +450,7 @@ func (v *TestSuite) TestProcessHappyPath() {
 		Role:    flow.RoleExecution,
 	}
 
-	// mocking state fo Final().Identity(originID) call in onExecutionReceipt method
+	// mocking state fo Final().Identity(originID) call in handleExecutionReceipt method
 	v.state.On("Final").Return(v.ss).Once()
 	v.ss.On("Identity", exeID.NodeID).Return(exeID, nil).Once()
 

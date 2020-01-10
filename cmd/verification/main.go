@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 func main() {
@@ -14,6 +15,7 @@ func main() {
 		err       error
 		receipts  mempool.Receipts
 		approvals mempool.Approvals
+		blocks    storage.Blocks
 	)
 
 	cmd.FlowNode("verification").
