@@ -58,19 +58,6 @@ func (m *MiddlewareTestSuit) TestPingTypeReception() {
 	m.Ping(mockery.Anything, mockery.AnythingOfType("[]uint8"))
 }
 
-// TestMultiPing tests the middleware against type of received payload
-// of distinct messages that are sent concurrently from a node to another
-func (m *MiddlewareTestSuit) TestMultiPing() {
-	// one distinct message
-	m.MultiPing(1)
-
-	// two distinct messages
-	m.MultiPing(2)
-
-	// 100 distinct messages
-	m.MultiPing(100)
-}
-
 // TestPingIDType tests the middleware against both the type of sender id
 // and content of the payload of the event upon reception at the receiver side
 // it does not evaluate the actual value of the sender ID
@@ -82,6 +69,19 @@ func (m *MiddlewareTestSuit) TestPingIDType() {
 // the payload and sender ID of the event upon reception at the receiver side
 func (m *MiddlewareTestSuit) TestPingContentReception() {
 	m.Ping(m.mws[0].me, []byte("Hello, World!"))
+}
+
+// TestMultiPing tests the middleware against type of received payload
+// of distinct messages that are sent concurrently from a node to another
+func (m *MiddlewareTestSuit) TestMultiPing() {
+	// one distinct message
+	m.MultiPing(1)
+
+	// two distinct messages
+	m.MultiPing(2)
+
+	// 100 distinct messages
+	m.MultiPing(100)
 }
 
 // StartMiddleware creates mock overlays for each middleware, and starts the middlewares
@@ -173,6 +173,45 @@ func (m *MiddlewareTestSuit) MultiPing(count int) {
 			require.NoError(m.Suite.T(), err)
 		}()
 	}
+
+	wg.Wait()
+
+	// evaluates the mock calls
+	for i := 1; i < m.size; i++ {
+		m.ov[i].AssertExpectations(m.T())
+	}
+}
+
+// TestEcho sends an echo message from first middleware to the last middleware
+// the last middleware echos back the message. The test evaluates the correctness
+// of the message reception as well as its content
+func (m *MiddlewareTestSuit) TestEcho() {
+
+	wg := sync.WaitGroup{}
+	// extracts sender id based on the mock option
+	var err error
+
+	wg.Add(2)
+	// mocks Overlay.Receive for middleware.Overlay.Receive(*nodeID, payload)
+	firstNode := 0
+	lastNode := m.size - 1
+
+	// last node
+	m.ov[lastNode].On("Receive", m.mws[firstNode].me, []byte("hello")).Return(nil).Once().
+		Run(func(args mockery.Arguments) {
+			wg.Done()
+			// echos back the same message back to the sender
+			m.mws[lastNode].Send(m.mws[firstNode].me, []byte("hello back"))
+		})
+
+	// first node
+	m.ov[firstNode].On("Receive", m.mws[lastNode].me, []byte("hello back")).Return(nil).Once().
+		Run(func(args mockery.Arguments) {
+			wg.Done()
+		})
+
+	err = m.mws[firstNode].Send(m.ids[lastNode], []byte("hello"))
+	require.NoError(m.Suite.T(), err)
 
 	wg.Wait()
 
