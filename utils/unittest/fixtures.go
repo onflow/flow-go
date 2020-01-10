@@ -126,3 +126,15 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 
 	return nodes
 }
+
+func ExecutionResultFixture() flow.ExecutionResult {
+	return flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousExecutionResult: nil,
+			Block:                   flow.Fingerprint(HashFixture(32)),
+			FinalStateCommitment:    nil,
+			Chunks:                  flow.ChunkList{},
+		},
+		Signatures: nil,
+	}
+}
