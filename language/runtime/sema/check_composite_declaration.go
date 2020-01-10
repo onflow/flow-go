@@ -850,11 +850,11 @@ func (checker *Checker) compositeConstructorType(
 	compositeDeclaration *ast.CompositeDeclaration,
 	compositeType *CompositeType,
 ) (
-	functionType *SpecialFunctionType,
+	constructorFunctionType *SpecialFunctionType,
 	argumentLabels []string,
 ) {
 
-	functionType = &SpecialFunctionType{
+	constructorFunctionType = &SpecialFunctionType{
 		FunctionType: &FunctionType{
 			ReturnTypeAnnotation: NewTypeAnnotation(compositeType),
 		},
@@ -868,12 +868,21 @@ func (checker *Checker) compositeConstructorType(
 
 		argumentLabels = firstInitializer.ParameterList.ArgumentLabels()
 
-		functionType.ParameterTypeAnnotations = compositeType.ConstructorParameterTypeAnnotations
+		constructorFunctionType.ParameterTypeAnnotations = compositeType.ConstructorParameterTypeAnnotations
 
-		checker.Elaboration.SpecialFunctionTypes[firstInitializer] = functionType
+		// NOTE: Don't use `constructorFunctionType`, as it has a return type.
+		//   The initializer itself has a `Void` return type.
+
+		checker.Elaboration.SpecialFunctionTypes[firstInitializer] =
+			&SpecialFunctionType{
+				FunctionType: &FunctionType{
+					ParameterTypeAnnotations: constructorFunctionType.ParameterTypeAnnotations,
+					ReturnTypeAnnotation:     NewTypeAnnotation(&VoidType{}),
+				},
+			}
 	}
 
-	return functionType, argumentLabels
+	return constructorFunctionType, argumentLabels
 }
 
 func (checker *Checker) membersAndOrigins(

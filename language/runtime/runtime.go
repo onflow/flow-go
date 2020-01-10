@@ -282,6 +282,8 @@ func (r *interpreterRuntime) newInterpreter(
 	options []interpreter.Option,
 ) (*interpreter.Interpreter, error) {
 
+	importResolver := r.importResolver(runtimeInterface)
+
 	defaultOptions := []interpreter.Option{
 		interpreter.WithPredefinedValues(functions.ToValues()),
 		interpreter.WithOnEventEmittedHandler(
@@ -301,11 +303,17 @@ func (r *interpreterRuntime) newInterpreter(
 		),
 		interpreter.WithStorageKeyHandler(
 			func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-				return indexingType.ID()
+				return string(indexingType.ID())
 			},
 		),
 		interpreter.WithInjectedCompositeFieldsHandler(
-			func(_ *interpreter.Interpreter, location Location, compositeIdentifier string, compositeKind common.CompositeKind) map[string]interpreter.Value {
+			func(
+				_ *interpreter.Interpreter,
+				location Location,
+				_ sema.TypeID,
+				compositeKind common.CompositeKind,
+			) map[string]interpreter.Value {
+
 				switch compositeKind {
 				case common.CompositeKindContract:
 					var address []byte
@@ -335,6 +343,21 @@ func (r *interpreterRuntime) newInterpreter(
 			) *interpreter.CompositeValue {
 				// Load the contract from storage
 				return r.loadContract(compositeType, runtimeStorage)
+			},
+		),
+		interpreter.WithImportProgramHandler(
+			func(inter *interpreter.Interpreter, location ast.Location) *ast.Program {
+				program, err := importResolver(location)
+				if err != nil {
+					panic(err)
+				}
+
+				err = program.ResolveImports(importResolver)
+				if err != nil {
+					panic(err)
+				}
+
+				return program
 			},
 		),
 	}

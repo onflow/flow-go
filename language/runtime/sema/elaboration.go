@@ -19,6 +19,7 @@ type Elaboration struct {
 	FunctionExpressionFunctionType      map[*ast.FunctionExpression]*FunctionType
 	InvocationExpressionArgumentTypes   map[*ast.InvocationExpression][]Type
 	InvocationExpressionParameterTypes  map[*ast.InvocationExpression][]Type
+	InvocationExpressionReturnTypes     map[*ast.InvocationExpression]Type
 	InterfaceDeclarationTypes           map[*ast.InterfaceDeclaration]*InterfaceType
 	CastingStaticValueTypes             map[*ast.CastingExpression]Type
 	CastingTargetTypes                  map[*ast.CastingExpression]Type
@@ -59,6 +60,7 @@ func NewElaboration() *Elaboration {
 		FunctionExpressionFunctionType:         map[*ast.FunctionExpression]*FunctionType{},
 		InvocationExpressionArgumentTypes:      map[*ast.InvocationExpression][]Type{},
 		InvocationExpressionParameterTypes:     map[*ast.InvocationExpression][]Type{},
+		InvocationExpressionReturnTypes:        map[*ast.InvocationExpression]Type{},
 		InterfaceDeclarationTypes:              map[*ast.InterfaceDeclaration]*InterfaceType{},
 		CastingStaticValueTypes:                map[*ast.CastingExpression]Type{},
 		CastingTargetTypes:                     map[*ast.CastingExpression]Type{},

@@ -68,6 +68,7 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 	var returnType Type = &InvalidType{}
 
 	argumentTypes := checker.checkInvocationArguments(invocationExpression, functionType, invokableType)
+	checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression] = argumentTypes
 
 	// If the invocation refers directly to the name of the function as stated in the declaration,
 	// or the invocation refers to a function of a composite (member),
@@ -87,17 +88,10 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 		)
 	}
 
+	returnType = functionType.ReturnType(argumentTypes)
+	checker.Elaboration.InvocationExpressionReturnTypes[invocationExpression] = returnType
+
 	parameterTypeAnnotations := functionType.ParameterTypeAnnotations
-	if len(argumentTypes) == len(parameterTypeAnnotations) &&
-		functionType.GetReturnType != nil {
-
-		returnType = functionType.GetReturnType(argumentTypes)
-	} else {
-		returnType = functionType.ReturnTypeAnnotation.Type
-	}
-
-	checker.Elaboration.InvocationExpressionArgumentTypes[invocationExpression] = argumentTypes
-
 	parameterTypes := make([]Type, len(parameterTypeAnnotations))
 	for i, parameterTypeAnnotation := range parameterTypeAnnotations {
 		parameterTypes[i] = parameterTypeAnnotation.Type

@@ -3827,12 +3827,21 @@ func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
 
 	inter := parseCheckAndInterpretWithOptions(t,
 		`
+
+          pub struct interface Also {
+             pub fun test(x: Int) {
+                 pre {
+                     x >= 0: "x >= 0"
+                 }
+             }
+          }
+
           pub contract interface Test {
 
               pub struct Nested {
                   pub fun test(x: Int) {
                       pre {
-                          x > 0: "x must be positive"
+                          x >= 1: "x >= 1"
                       }
                   }
               }
@@ -3840,10 +3849,10 @@ func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
 
           pub contract TestImpl: Test {
 
-              pub struct Nested {
+              pub struct Nested: Also {
                   pub fun test(x: Int) {
                       pre {
-                          x < 2: "x must be smaller than 2"
+                          x < 2: "x < 2"
                       }
                   }
               }
@@ -3860,25 +3869,45 @@ func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
 		},
 	)
 
-	_, err := inter.Invoke("test", big.NewInt(0))
-	assert.IsType(t,
-		&interpreter.ConditionError{},
-		err,
-	)
+	t.Run("-1", func(t *testing.T) {
+		_, err := inter.Invoke("test", big.NewInt(-1))
+		require.IsType(t,
+			&interpreter.ConditionError{},
+			err,
+		)
 
-	value, err := inter.Invoke("test", big.NewInt(1))
-	require.NoError(t, err)
+		// NOTE: The type requirement condition (`Test.Nested`) is evaluated first,
+		//  before the type's conformances (`Also`)
 
-	assert.IsType(t,
-		interpreter.VoidValue{},
-		value,
-	)
+		assert.Equal(t, err.(*interpreter.ConditionError).Message, "x >= 1")
+	})
 
-	_, err = inter.Invoke("test", big.NewInt(2))
-	assert.IsType(t,
-		&interpreter.ConditionError{},
-		err,
-	)
+	t.Run("0", func(t *testing.T) {
+		_, err := inter.Invoke("test", big.NewInt(0))
+		assert.IsType(t,
+			&interpreter.ConditionError{},
+			err,
+		)
+		assert.Equal(t, "x >= 1", err.(*interpreter.ConditionError).Message)
+	})
+
+	t.Run("1", func(t *testing.T) {
+		value, err := inter.Invoke("test", big.NewInt(1))
+		require.NoError(t, err)
+
+		assert.IsType(t,
+			interpreter.VoidValue{},
+			value,
+		)
+	})
+
+	t.Run("2", func(t *testing.T) {
+		_, err := inter.Invoke("test", big.NewInt(2))
+		assert.IsType(t,
+			&interpreter.ConditionError{},
+			err,
+		)
+	})
 }
 
 func TestInterpretImport(t *testing.T) {
@@ -5117,7 +5146,7 @@ func TestInterpretStorage(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -5450,15 +5479,17 @@ func TestInterpretInterfaceInitializer(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       struct interface I {
-          init() {
-              pre { false }
+          init(a a1: Bool) {
+              pre { a1 }
           }
       }
 
-      struct S: I {}
+      struct S: I {
+          init(a a2: Bool) {}
+      }
 
       fun test() {
-          S()
+          S(a: false)
       }
     `)
 
@@ -5649,7 +5680,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 				}),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -5670,7 +5701,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 		&interpreter.ReferenceValue{
 			TargetStorageIdentifier: storageValue.Identifier,
 			// TODO: improve
-			TargetKey: rType.ID(),
+			TargetKey: string(rType.ID()),
 		},
 		value,
 	)
@@ -5746,7 +5777,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -5829,7 +5860,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -5898,7 +5929,7 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -6170,7 +6201,7 @@ func TestInterpretOptionalChainingFunctionRead(t *testing.T) {
 	)
 
 	assert.IsType(t,
-		interpreter.HostFunctionValue{},
+		interpreter.BoundFunctionValue{},
 		inter.Globals["x2"].Value.(*interpreter.SomeValue).Value,
 	)
 }
@@ -6288,22 +6319,22 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
 		},
 	)
 
-	rType := inter.Checker.GlobalTypes["R"].Type
+	rType := inter.Checker.GlobalTypes["R"].Type.(*sema.CompositeType)
 
-	storageKey := interpreter.PrefixedStorageKey(rType.ID(), interpreter.AccessLevelPrivate)
+	storageKey := interpreter.PrefixedStorageKey(string(rType.ID()), interpreter.AccessLevelPrivate)
 
 	originalValue := &interpreter.CompositeValue{
-		Identifier: rType.ID(),
-		Kind:       common.CompositeKindResource,
-		Fields:     map[string]interpreter.Value{},
-		Owner:      storageIdentifier1,
+		TypeID: rType.ID(),
+		Kind:   common.CompositeKindResource,
+		Fields: map[string]interpreter.Value{},
+		Owner:  storageIdentifier1,
 	}
 
 	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
@@ -6427,22 +6458,22 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
 		},
 	)
 
-	rType := inter.Checker.GlobalTypes["R"].Type
+	rType := inter.Checker.GlobalTypes["R"].Type.(*sema.CompositeType)
 
-	storageKey := interpreter.PrefixedStorageKey(rType.ID(), interpreter.AccessLevelPrivate)
+	storageKey := interpreter.PrefixedStorageKey(string(rType.ID()), interpreter.AccessLevelPrivate)
 
 	originalValue := &interpreter.CompositeValue{
-		Identifier: rType.ID(),
-		Kind:       common.CompositeKindResource,
-		Fields:     map[string]interpreter.Value{},
-		Owner:      storageIdentifier1,
+		TypeID: rType.ID(),
+		Kind:   common.CompositeKindResource,
+		Fields: map[string]interpreter.Value{},
+		Owner:  storageIdentifier1,
 	}
 
 	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
@@ -6600,8 +6631,8 @@ func TestInterpretCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) 
 	)
 
 	assert.Equal(t,
-		"X",
-		x1.(*interpreter.CompositeValue).Identifier,
+		sema.TypeID("test.Test.X"),
+		x1.(*interpreter.CompositeValue).TypeID,
 	)
 
 	require.IsType(t,
@@ -6610,8 +6641,8 @@ func TestInterpretCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) 
 	)
 
 	assert.Equal(t,
-		"X",
-		x2.(*interpreter.CompositeValue).Identifier,
+		sema.TypeID("test.Test.X"),
+		x2.(*interpreter.CompositeValue).TypeID,
 	)
 }
 
@@ -6641,8 +6672,8 @@ func TestInterpretCompositeDeclarationNestedConstructor(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		"X",
-		x.(*interpreter.CompositeValue).Identifier,
+		sema.TypeID("test.Test.X"),
+		x.(*interpreter.CompositeValue).TypeID,
 	)
 }
 
@@ -6775,7 +6806,12 @@ func TestInterpretContractAccountFieldUse(t *testing.T) {
 			Options: []interpreter.Option{
 				makeContractValueHandler(nil, nil, nil),
 				interpreter.WithInjectedCompositeFieldsHandler(
-					func(_ *interpreter.Interpreter, _ ast.Location, _ string, _ common.CompositeKind) map[string]interpreter.Value {
+					func(
+						_ *interpreter.Interpreter,
+						_ ast.Location,
+						_ sema.TypeID,
+						_ common.CompositeKind,
+					) map[string]interpreter.Value {
 						return map[string]interpreter.Value{
 							"account": interpreter.NewAccountValue(addressValue),
 						}
@@ -6894,7 +6930,7 @@ func TestInterpretPostConditionWithElaborationAccess(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -7046,4 +7082,124 @@ func TestInterpretContractUseInNestedDeclaration(t *testing.T) {
 		interpreter.NewIntValue(2),
 		i,
 	)
+}
+
+func TestInterpretResourceInterfaceInitializerAndDestructorPreConditions(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+
+      resource interface RI {
+
+          x: Int
+
+          init(_ x: Int) {
+              pre { x > 1: "invalid init" }
+          }
+
+          destroy() {
+              pre { self.x < 3: "invalid destroy" }
+          }
+      }
+
+      resource R: RI {
+
+          let x: Int
+
+          init(_ x: Int) {
+              self.x = x
+          }
+      }
+
+      fun test(_ x: Int) {
+          let r <- create R(x)
+          destroy r
+      }
+    `)
+
+	t.Run("1", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(1))
+		require.Error(t, err)
+
+		require.IsType(t, &interpreter.ConditionError{}, err)
+		assert.Equal(t, "invalid init", err.(*interpreter.ConditionError).Message)
+	})
+
+	t.Run("2", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(2))
+		require.NoError(t, err)
+	})
+
+	t.Run("3", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(3))
+		require.Error(t, err)
+
+		require.IsType(t, &interpreter.ConditionError{}, err)
+		assert.Equal(t, "invalid destroy", err.(*interpreter.ConditionError).Message)
+	})
+}
+
+func TestInterpretResourceTypeRequirementInitializerAndDestructorPreConditions(t *testing.T) {
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+          pub contract interface CI {
+
+              pub resource R {
+
+                  pub x: Int
+
+                  init(_ x: Int) {
+                      pre { x > 1: "invalid init" }
+                  }
+
+                  destroy() {
+                      pre { self.x < 3: "invalid destroy" }
+                  }
+              }
+          }
+
+          pub contract C: CI {
+
+              pub resource R {
+
+                  pub let x: Int
+
+                  init(_ x: Int) {
+                      self.x = x
+                  }
+              }
+          }
+
+          pub fun test(_ x: Int) {
+              let r <- create C.R(x)
+              destroy r
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			Options: []interpreter.Option{
+				makeContractValueHandler(nil, nil, nil),
+			},
+		},
+	)
+
+	t.Run("1", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(1))
+		require.Error(t, err)
+
+		require.IsType(t, &interpreter.ConditionError{}, err)
+		assert.Equal(t, "invalid init", err.(*interpreter.ConditionError).Message)
+	})
+
+	t.Run("2", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(2))
+		require.NoError(t, err)
+	})
+
+	t.Run("3", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(3))
+		require.Error(t, err)
+
+		require.IsType(t, &interpreter.ConditionError{}, err)
+		assert.Equal(t, "invalid destroy", err.(*interpreter.ConditionError).Message)
+	})
 }
