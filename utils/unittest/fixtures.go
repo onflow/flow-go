@@ -131,9 +131,7 @@ func StateCommitmentFixture() flow.StateCommitment {
 func ChunkFixture() *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
-			FirstTxIndex:                    0,
-			TxCounts:                        42,
-			ChunkTxCollection:               nil,
+			CollectionIndex:                 42,
 			StartState:                      StateCommitmentFixture(),
 			EventCollection:                 IdentifierFixture(),
 			TotalComputationUsed:            4200,
