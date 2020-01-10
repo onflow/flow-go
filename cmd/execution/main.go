@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/receipts"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage/ledger"
@@ -15,10 +16,27 @@ import (
 
 func main() {
 
+	var (
+		receiptsEng *receipts.Engine
+		err         error
+	)
+
 	cmd.
 		FlowNode("execution").
-		Component("execution engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+		Component("receipts engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			node.Logger.Info().Msg("initializing receipts engine")
 
+			receiptsEng, err = receipts.New(
+				node.Logger,
+				node.Network,
+				node.State,
+				node.Me,
+			)
+			node.MustNot(err).Msg("could not initialize execution engine")
+
+			return receiptsEng
+		}).
+		Component("execution engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing execution engine")
 
 			rt := runtime.NewInterpreterRuntime()
@@ -37,15 +55,17 @@ func main() {
 			// TODO: replace mock with real implementation
 			collections := &storage.Collections{}
 
-			engine, err := execution.New(
+			executionEng, err := execution.New(
 				node.Logger,
 				node.Network,
 				node.Me,
+				receiptsEng,
 				collections,
 				blockExec,
 			)
 			node.MustNot(err).Msg("could not initialize execution engine")
-			return engine
+
+			return executionEng
 		}).Run()
 
 }
