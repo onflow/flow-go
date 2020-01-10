@@ -3,20 +3,24 @@ package execution
 import (
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	executormock "github.com/dapperlabs/flow-go/engine/execution/execution/executor/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
+	network "github.com/dapperlabs/flow-go/network/mock"
 	storage "github.com/dapperlabs/flow-go/storage/mock"
 )
 
 func TestExecutionEngine_OnBlock(t *testing.T) {
 	collections := &storage.Collections{}
 	exec := &executormock.BlockExecutor{}
+	receipts := &network.Engine{}
 
 	e := &Engine{
+		receipts:    receipts,
 		collections: collections,
 		executor:    exec,
 	}
@@ -50,13 +54,11 @@ func TestExecutionEngine_OnBlock(t *testing.T) {
 		Transactions: transactions,
 	}
 
-	collections.On("ByFingerprint", col.Fingerprint()).
-		Return(&col, nil).
-		Once()
+	receipts.On("SubmitLocal", mock.AnythingOfType("*flow.ExecutionResult"))
+	collections.On("ByFingerprint", col.Fingerprint()).Return(&col, nil)
 
 	exec.On("ExecuteBlock", executableBlock).
-		Return(flow.ExecutionResult{}, nil).
-		Once()
+		Return(&flow.ExecutionResult{}, nil)
 
 	err := e.onBlock(&block)
 	require.NoError(t, err)
