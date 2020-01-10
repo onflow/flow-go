@@ -87,7 +87,7 @@ spec:
       containers:
         - name: flow-test-net
           # No tag, will be attached by teamcity
-          image: gcr.io/dl-flow/collection
+          image: gcr.io/dl-flow/collection:c9f0a7fd
           args: 
             - '--nodename'
             - '$(POD_NAME)'
@@ -95,6 +95,8 @@ spec:
             - '$(NODE_ENTRIES)'
             - '--datadir'
             - '/flowdb'
+            - '--bootstrap'
+            - 'true'
 
           # Ports exposed can be named so other resources can reference
           # them by name and not have to hard code numbers

@@ -35,6 +35,7 @@ type BaseConfig struct {
 	datadir     string
 	level       string
 	metricsPort uint
+	bootstrap   bool
 }
 
 type namedReadyFn struct {
@@ -72,6 +73,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", "data", "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
+	fnb.flags.BoolVar(&fnb.BaseConfig.bootstrap, "bootstrap", false, "flag for if we should bootstrap the database")
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -138,7 +140,7 @@ func (fnb *FlowNodeBuilder) initState() {
 
 	//check if database is initialized
 	lsm, vlog := fnb.DB.Size()
-	if vlog > 0 || lsm > 0 {
+	if (vlog > 0 || lsm > 0) && !fnb.BaseConfig.bootstrap {
 		fnb.Logger.Debug().Msg("using existing database")
 
 	} else {
