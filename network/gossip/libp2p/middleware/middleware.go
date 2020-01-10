@@ -134,6 +134,7 @@ func (m *Middleware) createInboundMessage(msg *libp2p.Message) (*flow.Identifier
 	return &id, msg.Event, nil
 }
 
+// rotate periodically creates connection to peers
 func (m *Middleware) rotate() {
 	defer m.wg.Done()
 
@@ -157,6 +158,7 @@ Loop:
 	}
 }
 
+// connect creates an outbound stream
 func (m *Middleware) connect() {
 	defer m.wg.Done()
 
