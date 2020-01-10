@@ -35,7 +35,7 @@ type BaseConfig struct {
 	datadir     string
 	level       string
 	metricsPort uint
-	bootstrap   bool
+	listenAddr  string
 }
 
 type namedReadyFn struct {
@@ -73,7 +73,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", "data", "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
-	fnb.flags.BoolVar(&fnb.BaseConfig.bootstrap, "bootstrap", false, "flag for if we should bootstrap the database")
+	fnb.flags.StringVarP(&fnb.BaseConfig.listenAddr, "listenaddr", "a", "localhost:3569", "address to listen on")
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -83,7 +83,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 
 		codec := json.NewCodec()
 
-		mw, err := middleware.New(fnb.Logger, codec, fnb.BaseConfig.Connections, fnb.Me.Address())
+		mw, err := middleware.New(fnb.Logger, codec, fnb.BaseConfig.Connections, fnb.BaseConfig.listenAddr)
 		fnb.MustNot(err).Msg("could not initialize trickle middleware")
 
 		net, err := trickle.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, mw)
@@ -140,7 +140,7 @@ func (fnb *FlowNodeBuilder) initState() {
 
 	//check if database is initialized
 	lsm, vlog := fnb.DB.Size()
-	if (vlog > 0 || lsm > 0) && !fnb.BaseConfig.bootstrap {
+	if vlog > 0 || lsm > 0 {
 		fnb.Logger.Debug().Msg("using existing database")
 
 	} else {
