@@ -6,7 +6,6 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/storage"
 )
 
 func main() {
@@ -15,7 +14,7 @@ func main() {
 		err       error
 		receipts  mempool.Receipts
 		approvals mempool.Approvals
-		blocks    storage.Blocks
+		blocks    mempool.Blocks
 	)
 
 	cmd.FlowNode("verification").
@@ -29,7 +28,7 @@ func main() {
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing verifier engine")
 
-			vrfy, err := verifier.New(node.Logger, node.Network, node.State, node.Me, receipts, approvals)
+			vrfy, err := verifier.New(node.Logger, node.Network, node.State, node.Me, receipts, approvals, blocks)
 			node.MustNot(err).Msg("could not initialize verifier engine")
 			return vrfy
 		}).
