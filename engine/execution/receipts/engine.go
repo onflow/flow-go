@@ -75,7 +75,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		var err error
 		switch v := event.(type) {
 		case flow.ExecutionResult:
-			err = e.handleExecutionResult(v)
+			err = e.onExecutionResult(v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
 		}
@@ -86,7 +86,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-func (e *Engine) handleExecutionResult(result flow.ExecutionResult) error {
+func (e *Engine) onExecutionResult(result flow.ExecutionResult) error {
 	e.log.Debug().
 		// TODO: replace with proper ID
 		Hex("block_id", result.Block).
