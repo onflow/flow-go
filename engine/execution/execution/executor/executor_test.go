@@ -94,7 +94,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	assert.Len(t, result.Chunks.Chunks, 1)
 
 	chunk := result.Chunks.Chunks[0]
-	assert.EqualValues(t, chunk.CollectionIndex, 0)
+	assert.EqualValues(t, 0, chunk.CollectionIndex)
 
 	vm.AssertExpectations(t)
 	bc.AssertExpectations(t)
