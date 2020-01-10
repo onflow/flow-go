@@ -16,7 +16,7 @@ import (
 // Connection represents a direct connection to another peer on the flow
 // network.
 type Connection struct {
-	log      zerolog.Logger
+	Log      zerolog.Logger
 	conn     net.Conn
 	enc      network.Encoder
 	dec      network.Decoder
@@ -39,7 +39,7 @@ func NewConnection(log zerolog.Logger, codec network.Codec, conn net.Conn) *Conn
 	dec := codec.NewDecoder(conn)
 
 	c := Connection{
-		log:      log,
+		Log:      log,
 		conn:     conn,
 		enc:      enc,
 		dec:      dec,
@@ -82,7 +82,7 @@ func (c *Connection) Receive() (interface{}, error) {
 // onde background routine to handle sending messages, so that the actual
 // middleware layer can function without blocking.
 func (c *Connection) Process(nodeID flow.Identifier) {
-	c.log = c.log.With().Hex("node_id", nodeID[:]).Logger()
+	c.Log = c.Log.With().Hex("node_id", nodeID[:]).Logger()
 	go c.recv()
 	go c.send()
 }
@@ -105,7 +105,7 @@ RecvLoop:
 		// check if we should stop
 		select {
 		case <-c.done:
-			c.log.Debug().Msg("exiting receive routine")
+			c.Log.Debug().Msg("exiting receive routine")
 			break RecvLoop
 		default:
 		}
@@ -113,12 +113,12 @@ RecvLoop:
 		// if we have a message on the connection, receive it
 		msg, err := c.Receive()
 		if isClosedErr(err) {
-			c.log.Debug().Msg("connection closed, stopping reads")
+			c.Log.Debug().Msg("connection closed, stopping reads")
 			c.stop()
 			continue
 		}
 		if err != nil {
-			c.log.Error().Err(err).Msg("could not read data, stopping reads")
+			c.Log.Error().Err(err).Msg("could not read data, stopping reads")
 			c.stop()
 			continue
 		}
@@ -143,19 +143,19 @@ SendLoop:
 
 		// check if we should stop
 		case <-c.done:
-			c.log.Debug().Msg("exiting send routine")
+			c.Log.Debug().Msg("exiting send routine")
 			break SendLoop
 
 			// if we have a message in the outbound queue, write it to the connection
 		case msg := <-c.outbound:
 			err := c.Send(msg)
 			if isClosedErr(err) {
-				c.log.Debug().Msg("connection closed, stopping writes")
+				c.Log.Debug().Msg("connection closed, stopping writes")
 				c.stop()
 				continue
 			}
 			if err != nil {
-				c.log.Error().Err(err).Msg("could not send data, stopping writes")
+				c.Log.Error().Err(err).Msg("could not send data, stopping writes")
 				c.stop()
 				continue
 			}

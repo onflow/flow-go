@@ -54,9 +54,9 @@ func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
 	for i := 0; i < 10; i++ {
 		// creates node-i address
 		address := NodeAddress{
-			name: fmt.Sprintf("node%d", i),
-			ip:   "1.1.1.1",
-			port: "0",
+			Name: fmt.Sprintf("node%d", i),
+			IP:   "1.1.1.1",
+			Port: "0",
 		}
 
 		// translates node-i address into info
@@ -86,10 +86,10 @@ func (l *LibP2PNodeTestSuite) TestAddPeers() {
 	defer l.StopNodes(nodes)
 
 	ids := make([]NodeAddress, 0)
-	// Get actual ip and port numbers on which the nodes were started
+	// Get actual IP and Port numbers on which the nodes were started
 	for _, n := range nodes[1:] {
 		ip, p := n.GetIPPort()
-		ids = append(ids, NodeAddress{name: n.name, ip: ip, port: p})
+		ids = append(ids, NodeAddress{Name: n.name, IP: ip, Port: p})
 	}
 
 	// Adds the remaining nodes to the first node as its set of peers
@@ -146,9 +146,9 @@ func (l *LibP2PNodeTestSuite) TestPubSub() {
 		next := nodes[i+1]
 		nextIP, nextPort := next.GetIPPort()
 		nextAddr := &NodeAddress{
-			name: next.name,
-			ip:   nextIP,
-			port: nextPort,
+			Name: next.name,
+			IP:   nextIP,
+			Port: nextPort,
 		}
 
 		// adds next node as the peer to this node and verifies their connection
@@ -216,11 +216,12 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int) (nodes []*P2PNode) {
 	for i := 1; i <= count; i++ {
 		n := &P2PNode{}
 		nodeID := NodeAddress{
-			name: fmt.Sprintf("node%d", i),
-			ip:   "0.0.0.0", // localhost
-			port: "0",       // random port number
+			Name: fmt.Sprintf("node%d", i),
+			IP:   "0.0.0.0", // localhost
+			Port: "0",       // random Port number
 		}
-		err := n.Start(l.ctx, nodeID, logger)
+		err := n.Start(l.ctx, nodeID, logger, func(stream network.Stream) {
+		})
 		require.NoError(l.Suite.T(), err)
 		require.Eventuallyf(l.Suite.T(), func() bool {
 			ip, p := n.GetIPPort()
