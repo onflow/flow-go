@@ -8,7 +8,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
-	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -46,6 +45,7 @@ type ConsensusNode struct {
 // VerificationNode implements an in-process verification node for tests.
 type VerificationNode struct {
 	GenericNode
-	Pool           verification.Mempool
+	Receipts       mempool.Receipts
+	Approvals      mempool.Approvals
 	VerifierEngine *verifier.Engine
 }
