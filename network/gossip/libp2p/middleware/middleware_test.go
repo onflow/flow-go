@@ -3,13 +3,13 @@ package middleware
 import (
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -56,6 +56,16 @@ func (m *MiddlewareTestSuit) TestPingRawReception() {
 // it does not evaluate anything related to the sender id
 func (m *MiddlewareTestSuit) TestPingTypeReception() {
 	m.Ping(mockery.Anything, mockery.AnythingOfType("[]uint8"))
+}
+
+// TestPingTypeReception tests the middleware against type of received payload
+// upon reception at the receiver side
+// it does not evaluate content of the payload
+// it does not evaluate anything related to the sender id
+func (m *MiddlewareTestSuit) TestMultiPing() {
+	m.MultiPing(1)
+
+	m.MultiPing(100)
 }
 
 // TestPingIDType tests the middleware against both the type of sender id
@@ -134,6 +144,34 @@ func (m *MiddlewareTestSuit) Ping(expectID, expectPayload interface{}) {
 	case <-time.After(3 * time.Second):
 		assert.Fail(m.T(), "peer 1 failed to send a message to peer 2")
 	}
+
+	// evaluates the mock calls
+	for i := 1; i < m.size; i++ {
+		m.ov[i].AssertExpectations(m.T())
+	}
+}
+
+// Ping sends count-many distinct messages concurrently from the first middleware of the test suit to the last one
+// It evaluates the correctness of reception of the content of the messages, as well as the sender ID
+func (m *MiddlewareTestSuit) MultiPing(count int) {
+	wg := sync.WaitGroup{}
+	// extracts sender id based on the mock option
+	var err error
+	// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		msg := []byte(fmt.Sprintf("hello from: %d", i))
+		m.ov[m.size-1].On("Receive", m.mws[0].me, msg).Return(nil).Once().
+			Run(func(args mockery.Arguments) {
+				wg.Done()
+			})
+		go func() {
+			err = m.mws[0].Send(m.ids[m.size-1], msg)
+			require.NoError(m.Suite.T(), err)
+		}()
+	}
+
+	wg.Wait()
 
 	// evaluates the mock calls
 	for i := 1; i < m.size; i++ {
