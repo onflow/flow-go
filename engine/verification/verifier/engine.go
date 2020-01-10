@@ -8,11 +8,11 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -22,27 +22,34 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit       *engine.Unit         // used to control startup/shutdown
-	log        zerolog.Logger       // used to log relevant actions
-	colChannel network.Conduit      // used to get resources from collection nodes
-	exeChannel network.Conduit      // used to get resources from execution nodes
-	me         module.Local         // used to access local node information
-	state      protocol.State       // used to access the  protocol state
-	pool       verification.Mempool // used to maintain an in-memory pool for execution receipts
-	wg         sync.WaitGroup       // used to keep track of the number of threads
+	unit       *engine.Unit      // used to control startup/shutdown
+	log        zerolog.Logger    // used to log relevant actions
+	colChannel network.Conduit   // used to get resources from collection nodes
+	exeChannel network.Conduit   // used to get resources from execution nodes
+	me         module.Local      // used to access local node information
+	state      protocol.State    // used to access the  protocol state
+	receipts   mempool.Receipts  // used to store execution receipts in memory
+	approvals  mempool.Approvals // used to store result approvals in memory
+	wg         sync.WaitGroup    // used to keep track of the number of threads
 	mu         sync.Mutex
 }
 
 // New creates and returns a new instance of a verifier engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool verification.Mempool) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	net module.Network,
+	state protocol.State,
+	me module.Local,
+	receipts mempool.Receipts,
+	approvals mempool.Approvals,
+) (*Engine, error) {
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log,
-		state: state,
-		me:    me,
-		pool:  pool,
-		wg:    sync.WaitGroup{},
-		mu:    sync.Mutex{},
+		unit:      engine.NewUnit(),
+		log:       log,
+		state:     state,
+		me:        me,
+		receipts:  receipts,
+		approvals: approvals,
 	}
 
 	var err error
@@ -144,9 +151,9 @@ func (e *Engine) onExecutionReceipt(originID flow.Identifier, receipt *flow.Exec
 	}
 
 	// storing the execution receipt in the store of the engine
-	isUnique := e.pool.Put(receipt)
-	if !isUnique {
-		return errors.New("received duplicate execution receipt")
+	err = e.receipts.Add(receipt)
+	if err != nil {
+		return fmt.Errorf("received duplicate execution receipt: %w", err)
 	}
 
 	// starting the core verification in a separate thread

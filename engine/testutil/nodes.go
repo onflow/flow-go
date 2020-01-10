@@ -16,7 +16,6 @@ import (
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
-	verificationmempool "github.com/dapperlabs/flow-go/engine/verification/storage"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
@@ -144,9 +143,13 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genes
 		GenericNode: GenericNode(t, hub, identity, genesis),
 	}
 
-	node.Pool = verificationmempool.New()
+	node.Receipts, err = stdmap.NewReceipts()
+	require.Nil(t, err)
 
-	node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, node.Pool)
+	node.Approvals, err = stdmap.NewApprovals()
+	require.Nil(t, err)
+
+	node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, node.Receipts, node.Approvals)
 	require.NoError(t, err)
 
 	return node
