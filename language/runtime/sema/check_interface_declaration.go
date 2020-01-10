@@ -59,8 +59,7 @@ func (checker *Checker) VisitInterfaceDeclaration(declaration *ast.InterfaceDecl
 		declaration.Members.Fields,
 		interfaceType,
 		declaration.DeclarationKind(),
-		declaration.Identifier.Identifier,
-		interfaceType.InitializerParameterTypeAnnotations,
+		interfaceType.InitializerParameters,
 		kind,
 		nil,
 	)
@@ -277,7 +276,7 @@ func (checker *Checker) declareInterfaceMembers(declaration *ast.InterfaceDeclar
 
 	// Declare members
 
-	members, origins := checker.membersAndOrigins(
+	members, origins := checker.nonEventMembersAndOrigins(
 		interfaceType,
 		declaration.Members.Fields,
 		declaration.Members.Functions,
@@ -290,8 +289,8 @@ func (checker *Checker) declareInterfaceMembers(declaration *ast.InterfaceDeclar
 	// NOTE: determine initializer parameter types while nested types are in scope,
 	// and after declaring nested types as the initializer may use nested type in parameters
 
-	interfaceType.InitializerParameterTypeAnnotations =
-		checker.initializerParameterTypeAnnotations(declaration.Members.Initializers())
+	interfaceType.InitializerParameters =
+		checker.initializerParameters(declaration.Members.Initializers())
 
 	// Declare nested declarations' members
 

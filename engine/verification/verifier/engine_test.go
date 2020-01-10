@@ -57,8 +57,8 @@ func (v *VerifierEngineTestSuit) SetupTest() {
 // making sure that encoding works correctly
 func (v *VerifierEngineTestSuit) TestEncodeResultApproval() {
 	resApprove := flow.ResultApproval{}
-	fp := resApprove.Fingerprint()
-	require.NotNil(v.T(), fp, "nil fingerprint")
+	resultID := resApprove.ID()
+	require.NotEqual(v.T(), resultID, flow.ZeroID, "nil fingerprint")
 }
 
 // TestNewEngine verifies the establishment of the network registration upon
@@ -423,7 +423,7 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentDifferentERs() {
 		}
 	}
 	// all ERs are the same, so only one of them should be processed
-	assert.Equal(v.T(), errCount, 0)
+	assert.Equal(v.T(), 0, errCount)
 
 	vrfy.wg.Wait()
 	v.con.AssertExpectations(v.T())
@@ -475,39 +475,6 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPath() {
 	v.con.AssertExpectations(v.T())
 	v.ss.AssertExpectations(v.T())
 	v.state.AssertExpectations(v.T())
-}
-
-// generateMockIdentities generates and returns set of random nodes with different roles
-// the distribution of the roles is uniforms but not guaranteed
-// size: total number of nodes
-func generateMockIdentities(size int) flow.IdentityList {
-	var identities flow.IdentityList
-	for i := 0; i < size; i++ {
-		// creating mock identities as a random byte array
-		var nodeID flow.Identifier
-		rand.Read(nodeID[:])
-		address := fmt.Sprintf("address%d", i)
-		var role flow.Role
-		switch rand.Intn(5) {
-		case 0:
-			role = flow.RoleCollection
-		case 1:
-			role = flow.RoleConsensus
-		case 2:
-			role = flow.RoleExecution
-		case 3:
-			role = flow.RoleVerification
-		case 4:
-			role = flow.RoleObservation
-		}
-		id := flow.Identity{
-			NodeID:  nodeID,
-			Address: address,
-			Role:    role,
-		}
-		identities = append(identities, id)
-	}
-	return identities
 }
 
 // generateMockConsensusIDs generates and returns set of random consensus nodes

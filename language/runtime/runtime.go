@@ -64,6 +64,12 @@ var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 type ImportResolver = func(location Location) (program *ast.Program, e error)
 
+var validTopLevelDeclarations = []common.DeclarationKind{
+	common.DeclarationKindImport,
+	common.DeclarationKindContract,
+	common.DeclarationKindContractInterface,
+}
+
 const contractKey = "contract"
 
 // interpreterRuntime is a interpreter-based version of the Flow runtime.
@@ -173,7 +179,7 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	// check parameter count
 
 	signingAccountsCount := len(signingAccountAddresses)
-	transactionFunctionParameterCount := len(transactionFunctionType.ParameterTypeAnnotations)
+	transactionFunctionParameterCount := len(transactionFunctionType.Parameters)
 	if signingAccountsCount != transactionFunctionParameterCount {
 		return newError(InvalidTransactionParameterCountError{
 			Expected: transactionFunctionParameterCount,
@@ -183,8 +189,8 @@ func (r *interpreterRuntime) ExecuteTransaction(
 
 	// check parameter types
 
-	for _, parameterTypeAnnotation := range transactionFunctionType.ParameterTypeAnnotations {
-		parameterType := parameterTypeAnnotation.Type
+	for _, parameter := range transactionFunctionType.Parameters {
+		parameterType := parameter.TypeAnnotation.Type
 
 		if !parameterType.Equal(&sema.AccountType{}) {
 			return newError(InvalidTransactionParameterTypeError{
@@ -196,7 +202,7 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	signingAccounts := make([]interface{}, signingAccountsCount)
 
 	for i, address := range signingAccountAddresses {
-		signingAccounts[i] = interpreter.NewAccountValue(interpreter.AddressValue(address))
+		signingAccounts[i] = interpreter.NewAccountValue(address)
 	}
 
 	_, err = r.interpret(
@@ -282,11 +288,17 @@ func (r *interpreterRuntime) newInterpreter(
 	options []interpreter.Option,
 ) (*interpreter.Interpreter, error) {
 
+	importResolver := r.importResolver(runtimeInterface)
+
 	defaultOptions := []interpreter.Option{
 		interpreter.WithPredefinedValues(functions.ToValues()),
 		interpreter.WithOnEventEmittedHandler(
-			func(inter *interpreter.Interpreter, eventValue interpreter.EventValue) {
-				r.emitEvent(inter, runtimeInterface, eventValue)
+			func(
+				inter *interpreter.Interpreter,
+				eventValue *interpreter.CompositeValue,
+				eventType *sema.CompositeType,
+			) {
+				r.emitEvent(inter, runtimeInterface, eventValue, eventType)
 			},
 		),
 		interpreter.WithStorageReadHandler(
@@ -301,11 +313,17 @@ func (r *interpreterRuntime) newInterpreter(
 		),
 		interpreter.WithStorageKeyHandler(
 			func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-				return indexingType.ID()
+				return string(indexingType.ID())
 			},
 		),
 		interpreter.WithInjectedCompositeFieldsHandler(
-			func(_ *interpreter.Interpreter, location Location, compositeIdentifier string, compositeKind common.CompositeKind) map[string]interpreter.Value {
+			func(
+				_ *interpreter.Interpreter,
+				location Location,
+				_ sema.TypeID,
+				compositeKind common.CompositeKind,
+			) map[string]interpreter.Value {
+
 				switch compositeKind {
 				case common.CompositeKindContract:
 					var address []byte
@@ -335,6 +353,21 @@ func (r *interpreterRuntime) newInterpreter(
 			) *interpreter.CompositeValue {
 				// Load the contract from storage
 				return r.loadContract(compositeType, runtimeStorage)
+			},
+		),
+		interpreter.WithImportProgramHandler(
+			func(inter *interpreter.Interpreter, location ast.Location) *ast.Program {
+				program, err := importResolver(location)
+				if err != nil {
+					panic(err)
+				}
+
+				err = program.ResolveImports(importResolver)
+				if err != nil {
+					panic(err)
+				}
+
+				return program
 			},
 		),
 	}
@@ -379,17 +412,17 @@ func (r *interpreterRuntime) parse(script []byte) (program *ast.Program, err err
 
 // emitEvent converts an event value to native Go types and emits it to the runtime interface.
 func (r *interpreterRuntime) emitEvent(
-	inter *interpreter.Interpreter,
+	_ *interpreter.Interpreter,
 	runtimeInterface Interface,
-	event interpreter.EventValue,
+	event *interpreter.CompositeValue,
+	eventType *sema.CompositeType,
 ) {
-	functionType := inter.Checker.GlobalValues[event.Identifier].Type.(*sema.SpecialFunctionType)
-	eventType := functionType.ReturnTypeAnnotation.Type
+	fields := make([]Value, len(eventType.ConstructorParameters))
 
-	fields := make([]Value, len(event.Fields))
-	for i, field := range event.Fields {
-		fields[i] = field.Value
+	for i, parameter := range eventType.ConstructorParameters {
+		fields[i] = event.Fields[parameter.Identifier]
 	}
+
 	eventValue := Event{
 		Type:   eventType,
 		Fields: fields,
@@ -399,7 +432,7 @@ func (r *interpreterRuntime) emitEvent(
 }
 
 func (r *interpreterRuntime) emitAccountEvent(
-	eventType *sema.EventType,
+	eventType *sema.CompositeType,
 	runtimeInterface Interface,
 	eventFields []interpreter.Value,
 ) {
@@ -455,7 +488,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 		)
 
 		r.emitAccountEvent(
-			&stdlib.AccountCreatedEventType,
+			stdlib.AccountCreatedEventType,
 			runtimeInterface,
 			[]Value{accountAddress},
 		)
@@ -480,7 +513,7 @@ func (r *interpreterRuntime) newAddAccountKeyFunction(runtimeInterface Interface
 		}
 
 		r.emitAccountEvent(
-			&stdlib.AccountKeyAddedEventType,
+			stdlib.AccountKeyAddedEventType,
 			runtimeInterface,
 			[]Value{accountAddress, publicKeyValue},
 		)
@@ -503,7 +536,7 @@ func (r *interpreterRuntime) newRemoveAccountKeyFunction(runtimeInterface Interf
 		publicKeyValue := fromBytes(publicKey)
 
 		r.emitAccountEvent(
-			&stdlib.AccountKeyAddedEventType,
+			stdlib.AccountKeyRemovedEventType,
 			runtimeInterface,
 			[]Value{accountAddress, publicKeyValue},
 		)
@@ -544,7 +577,7 @@ func (r *interpreterRuntime) newUpdateAccountCodeFunction(
 		codeValue := fromBytes(code)
 
 		r.emitAccountEvent(
-			&stdlib.AccountCodeUpdatedEventType,
+			stdlib.AccountCodeUpdatedEventType,
 			runtimeInterface,
 			[]Value{accountAddress, codeValue},
 		)
@@ -573,15 +606,7 @@ func (r *interpreterRuntime) updateAccountCode(
 		location,
 		functions,
 		[]sema.Option{
-			sema.WithValidTopLevelDeclarations(
-				[]common.DeclarationKind{
-					common.DeclarationKindImport,
-					common.DeclarationKindContract,
-					common.DeclarationKindContractInterface,
-					// TODO: remove?
-					common.DeclarationKindEvent,
-				},
-			),
+			sema.WithValidTopLevelDeclarations(validTopLevelDeclarations),
 		},
 	)
 	if err != nil {
@@ -683,10 +708,10 @@ func (r *interpreterRuntime) instantiateContract(
 	interpreter.Value,
 	error,
 ) {
-	parameterTypes := make([]sema.Type, len(contractType.ConstructorParameterTypeAnnotations))
+	parameterTypes := make([]sema.Type, len(contractType.ConstructorParameters))
 
-	for i, constructorParameterTypeAnnotation := range contractType.ConstructorParameterTypeAnnotations {
-		parameterTypes[i] = constructorParameterTypeAnnotation.Type
+	for i, constructorParameter := range contractType.ConstructorParameters {
+		parameterTypes[i] = constructorParameter.TypeAnnotation.Type
 	}
 
 	// Check argument count
@@ -775,7 +800,7 @@ func (r *interpreterRuntime) instantiateContract(
 	return contract, err
 }
 
-func (r *interpreterRuntime) newGetAccountFunction(runtimeInterface Interface) interpreter.HostFunction {
+func (r *interpreterRuntime) newGetAccountFunction(_ Interface) interpreter.HostFunction {
 	return func(invocation interpreter.Invocation) trampoline.Trampoline {
 		accountAddress := invocation.Arguments[0].(interpreter.AddressValue)
 		publicAccount := interpreter.NewPublicAccountValue(accountAddress)

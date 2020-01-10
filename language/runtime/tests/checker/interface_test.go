@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -22,17 +23,28 @@ func constructorArguments(compositeKind common.CompositeKind) string {
 
 func TestCheckInvalidLocalInterface(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			body := "{}"
+			if kind == common.CompositeKindEvent {
+				body = "()"
+			}
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
                       fun test() {
-                          %s interface Test {}
+                          %[1]s interface Test %[2]s
                       }
                     `,
 					kind.Keyword(),
+					body,
 				),
 			)
 
@@ -45,7 +57,7 @@ func TestCheckInvalidLocalInterface(t *testing.T) {
 
 func TestCheckInterfaceWithFunction(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -67,7 +79,7 @@ func TestCheckInterfaceWithFunction(t *testing.T) {
 
 func TestCheckInterfaceWithFunctionImplementationAndConditions(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -93,7 +105,7 @@ func TestCheckInterfaceWithFunctionImplementationAndConditions(t *testing.T) {
 
 func TestCheckInvalidInterfaceWithFunctionImplementation(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -118,7 +130,7 @@ func TestCheckInvalidInterfaceWithFunctionImplementation(t *testing.T) {
 
 func TestCheckInvalidInterfaceWithFunctionImplementationNoConditions(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -143,7 +155,7 @@ func TestCheckInvalidInterfaceWithFunctionImplementationNoConditions(t *testing.
 
 func TestCheckInterfaceWithInitializer(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -164,7 +176,7 @@ func TestCheckInterfaceWithInitializer(t *testing.T) {
 
 func TestCheckInvalidInterfaceWithInitializerImplementation(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -189,7 +201,7 @@ func TestCheckInvalidInterfaceWithInitializerImplementation(t *testing.T) {
 
 func TestCheckInterfaceWithInitializerImplementationAndConditions(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -214,17 +226,29 @@ func TestCheckInterfaceWithInitializerImplementationAndConditions(t *testing.T) 
 
 func TestCheckInterfaceUse(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheckWithOptions(t,
 				fmt.Sprintf(
 					`
-                      pub %[1]s interface Test {}
+                      pub %[1]s interface Test %[2]s
 
-                      pub let test: %[2]sTest %[3]s panic("")
+                      pub let test: %[3]sTest %[4]s panic("")
                     `,
 					kind.Keyword(),
+
+					body,
 					kind.Annotation(),
 					kind.TransferOperator(),
 				),
@@ -246,7 +270,16 @@ func TestCheckInterfaceUse(t *testing.T) {
 
 func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		if !compositeKind.SupportsInterfaces() {
+			continue
+		}
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
 
 		var useCode string
 		if compositeKind != common.CompositeKindContract {
@@ -264,13 +297,14 @@ func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s interface Test {}
+                      %[1]s interface Test %[2]s
 
-                      %[1]s TestImpl: Test {}
+                      %[1]s TestImpl: Test %[2]s
 
-                      %[2]s
+                      %[3]s
 	                `,
 					compositeKind.Keyword(),
+					body,
 					useCode,
 				))
 
@@ -281,12 +315,31 @@ func TestCheckInterfaceConformanceNoRequirements(t *testing.T) {
 
 func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T) {
 
-	for _, firstKind := range common.CompositeKinds {
-		for _, secondKind := range common.CompositeKinds {
+	for _, firstKind := range common.AllCompositeKinds {
+
+		if !firstKind.SupportsInterfaces() {
+			continue
+		}
+
+		for _, secondKind := range common.AllCompositeKinds {
+
+			if !secondKind.SupportsInterfaces() {
+				continue
+			}
 
 			// only test incompatible combinations
 			if firstKind == secondKind {
 				continue
+			}
+
+			firstBody := "{}"
+			if firstKind == common.CompositeKindEvent {
+				firstBody = "()"
+			}
+
+			secondBody := "{}"
+			if secondKind == common.CompositeKindEvent {
+				secondBody = "()"
 			}
 
 			testName := fmt.Sprintf(
@@ -313,14 +366,16 @@ func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T
 				checker, err := ParseAndCheck(t,
 					fmt.Sprintf(
 						`
-                          %[1]s interface Test {}
+                          %[1]s interface Test %[2]s
 
-                          %[2]s TestImpl: Test {}
+                          %[3]s TestImpl: Test %[4]s
 
-                          %[3]s
+                          %[5]s
 	                    `,
 						firstKind.Keyword(),
+						firstBody,
 						secondKind.Keyword(),
+						secondBody,
 						useCode,
 					),
 				)
@@ -342,7 +397,11 @@ func TestCheckInvalidInterfaceConformanceIncompatibleCompositeKinds(t *testing.T
 
 func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		if !compositeKind.SupportsInterfaces() {
+			continue
+		}
 
 		var useCode string
 		if compositeKind != common.CompositeKindContract {
@@ -355,19 +414,25 @@ func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
 			)
 		}
 
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			checker, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s interface Test {}
+                      %[1]s interface Test %[2]s
 
                       // NOTE: not declaring conformance
-                      %[1]s TestImpl {}
+                      %[1]s TestImpl %[2]s
 
-                      %[2]s
+                      %[3]s
 	                `,
 					compositeKind.Keyword(),
+					body,
 					useCode,
 				),
 			)
@@ -390,15 +455,26 @@ func TestCheckInvalidInterfaceConformanceUndeclared(t *testing.T) {
 
 func TestCheckInvalidCompositeInterfaceConformanceNonInterface(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %s TestImpl: Int {}
+                      %[1]s TestImpl: Int %[2]s
 	                `,
 					kind.Keyword(),
+					body,
 				),
 			)
 
@@ -411,7 +487,7 @@ func TestCheckInvalidCompositeInterfaceConformanceNonInterface(t *testing.T) {
 
 func TestCheckInterfaceFieldUse(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 
 		if compositeKind == common.CompositeKindContract {
 			// Contracts cannot be instantiated
@@ -453,7 +529,7 @@ func TestCheckInterfaceFieldUse(t *testing.T) {
 
 func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 
 		if compositeKind == common.CompositeKindContract {
 			// Contracts cannot be instantiated
@@ -495,7 +571,7 @@ func TestCheckInvalidInterfaceUndeclaredFieldUse(t *testing.T) {
 
 func TestCheckInterfaceFunctionUse(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 
 		var setupCode, identifier string
 		if compositeKind != common.CompositeKindContract {
@@ -543,7 +619,7 @@ func TestCheckInterfaceFunctionUse(t *testing.T) {
 
 func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 
 		if compositeKind == common.CompositeKindContract {
 			continue
@@ -583,7 +659,7 @@ func TestCheckInvalidInterfaceUndeclaredFunctionUse(t *testing.T) {
 
 func TestCheckInvalidInterfaceConformanceInitializerExplicitMismatch(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -610,7 +686,7 @@ func TestCheckInvalidInterfaceConformanceInitializerExplicitMismatch(t *testing.
 
 func TestCheckInvalidInterfaceConformanceInitializerImplicitMismatch(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -636,7 +712,7 @@ func TestCheckInvalidInterfaceConformanceInitializerImplicitMismatch(t *testing.
 
 func TestCheckInvalidInterfaceConformanceMissingFunction(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -661,7 +737,7 @@ func TestCheckInvalidInterfaceConformanceMissingFunction(t *testing.T) {
 
 func TestCheckInvalidInterfaceConformanceFunctionMismatch(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -690,7 +766,7 @@ func TestCheckInvalidInterfaceConformanceFunctionMismatch(t *testing.T) {
 
 func TestCheckInvalidInterfaceConformanceFunctionPrivateAccessModifier(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -719,20 +795,39 @@ func TestCheckInvalidInterfaceConformanceFunctionPrivateAccessModifier(t *testin
 
 func TestCheckInvalidInterfaceConformanceMissingField(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
+		var interfaceBody string
+		if kind == common.CompositeKindEvent {
+			interfaceBody = "(x: Int)"
+		} else {
+			interfaceBody = "{ x: Int }"
+		}
+
+		var conformanceBody string
+		if kind == common.CompositeKindEvent {
+			conformanceBody = "()"
+		} else {
+			conformanceBody = "{}"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s interface Test {
-                           x: Int
-                      }
+                      %[1]s interface Test %[2]s
 
-                      %[1]s TestImpl: Test {}
+                      %[1]s TestImpl: Test %[3]s
 
 	                `,
 					kind.Keyword(),
+					interfaceBody,
+					conformanceBody,
 				),
 			)
 
@@ -745,7 +840,7 @@ func TestCheckInvalidInterfaceConformanceMissingField(t *testing.T) {
 
 func TestCheckInvalidInterfaceConformanceFieldTypeMismatch(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -775,7 +870,7 @@ func TestCheckInvalidInterfaceConformanceFieldTypeMismatch(t *testing.T) {
 
 func TestCheckInvalidInterfaceConformanceFieldPrivateAccessModifier(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -806,7 +901,7 @@ func TestCheckInvalidInterfaceConformanceFieldPrivateAccessModifier(t *testing.T
 
 func TestCheckInvalidInterfaceConformanceFieldMismatchAccessModifier(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -837,7 +932,7 @@ func TestCheckInvalidInterfaceConformanceFieldMismatchAccessModifier(t *testing.
 
 func TestCheckInterfaceConformanceFieldMorePermissiveAccessModifier(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -866,7 +961,7 @@ func TestCheckInterfaceConformanceFieldMorePermissiveAccessModifier(t *testing.T
 
 func TestCheckInvalidInterfaceConformanceKindFieldFunctionMismatch(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -895,7 +990,7 @@ func TestCheckInvalidInterfaceConformanceKindFieldFunctionMismatch(t *testing.T)
 
 func TestCheckInvalidInterfaceConformanceKindFunctionFieldMismatch(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -926,7 +1021,7 @@ func TestCheckInvalidInterfaceConformanceKindFunctionFieldMismatch(t *testing.T)
 
 func TestCheckInvalidInterfaceConformanceFieldKindLetVarMismatch(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -957,7 +1052,7 @@ func TestCheckInvalidInterfaceConformanceFieldKindLetVarMismatch(t *testing.T) {
 
 func TestCheckInvalidInterfaceConformanceFieldKindVarLetMismatch(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -988,19 +1083,30 @@ func TestCheckInvalidInterfaceConformanceFieldKindVarLetMismatch(t *testing.T) {
 
 func TestCheckInvalidInterfaceConformanceRepetition(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s interface X {}
+                      %[1]s interface X %[2]s
 
-                      %[1]s interface Y {}
+                      %[1]s interface Y %[2]s
 
                       %[1]s TestImpl: X, Y, X {}
 	                `,
 					kind.Keyword(),
+					body,
 				),
 			)
 
@@ -1013,17 +1119,28 @@ func TestCheckInvalidInterfaceConformanceRepetition(t *testing.T) {
 
 func TestCheckInvalidInterfaceTypeAsValue(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %s interface X {}
+                      %[1]s interface X %[2]s
 
                       let x = X
 	                `,
 					kind.Keyword(),
+					body,
 				),
 			)
 
@@ -1036,8 +1153,8 @@ func TestCheckInvalidInterfaceTypeAsValue(t *testing.T) {
 
 func TestCheckInterfaceWithFieldHavingStructType(t *testing.T) {
 
-	for _, firstKind := range common.CompositeKinds {
-		for _, secondKind := range common.CompositeKinds {
+	for _, firstKind := range common.CompositeKindsWithBody {
+		for _, secondKind := range common.CompositeKindsWithBody {
 
 			testName := fmt.Sprintf(
 				"%s/%s",
@@ -1082,8 +1199,8 @@ func TestCheckInterfaceWithFieldHavingStructType(t *testing.T) {
 
 func TestCheckInterfaceWithFunctionHavingStructType(t *testing.T) {
 
-	for _, firstKind := range common.CompositeKinds {
-		for _, secondKind := range common.CompositeKinds {
+	for _, firstKind := range common.CompositeKindsWithBody {
+		for _, secondKind := range common.CompositeKindsWithBody {
 
 			testName := fmt.Sprintf(
 				"%s/%s",
@@ -1134,7 +1251,7 @@ func TestCheckInterfaceSelfUse(t *testing.T) {
 		common.DeclarationKindFunction,
 	}
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 		for _, declarationKind := range declarationKinds {
 
 			testName := fmt.Sprintf("%s %s", compositeKind, declarationKind)
@@ -1143,8 +1260,12 @@ func TestCheckInterfaceSelfUse(t *testing.T) {
 			switch declarationKind {
 			case common.DeclarationKindInitializer:
 				innerDeclaration = declarationKind.Keywords()
+
 			case common.DeclarationKindFunction:
 				innerDeclaration = fmt.Sprintf("%s test", declarationKind.Keywords())
+
+			default:
+				panic(errors.NewUnreachableError())
 			}
 
 			t.Run(testName, func(t *testing.T) {

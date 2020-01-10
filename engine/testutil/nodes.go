@@ -70,6 +70,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis
 	require.Nil(t, err)
 
 	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Me, collections)
+	require.Nil(t, err)
 
 	return mock.CollectionNode{
 		GenericNode:     node,
@@ -103,7 +104,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis 
 
 	node := GenericNode(t, hub, identity, genesis)
 
-	pool, err := mempool.NewCollectionPool()
+	pool, err := mempool.NewGuaranteePool()
 	require.NoError(t, err)
 
 	propagationEngine, err := propagation.New(node.Log, node.Net, node.State, node.Me, pool)

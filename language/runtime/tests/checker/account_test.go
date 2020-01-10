@@ -26,7 +26,6 @@ func ParseAndCheckAccount(t *testing.T, code string) (*sema.Checker, error) {
 				sema.WithPredeclaredValues(map[string]sema.ValueDeclaration{
 					"account": accountValueDeclaration,
 				}),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
 	)

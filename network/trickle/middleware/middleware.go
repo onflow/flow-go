@@ -41,7 +41,7 @@ func New(log zerolog.Logger, codec network.Codec, conns uint, address string) (*
 
 	// create the node entity and inject dependencies & config
 	m := &Middleware{
-		log:   log,
+		log:   log.With().Str("component", "middleware").Logger(),
 		codec: codec,
 		slots: make(chan struct{}, conns),
 		conns: make(map[flow.Identifier]*Connection),

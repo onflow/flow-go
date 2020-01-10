@@ -31,12 +31,12 @@ func Cluster(nodes flow.IdentityList) flow.ClusterList {
 //
 // For evenly distributed transaction hashes, this will evenly distribute
 // transaction between clusters.
-func Route(nClusters int, fingerprint flow.Fingerprint) flow.ClusterID {
+func Route(nClusters int, txID flow.Identifier) flow.ClusterID {
 	if nClusters < 1 {
 		return flow.ClusterID(0)
 	}
 
-	txHashBigInt := new(big.Int).SetBytes(fingerprint[:])
+	txHashBigInt := new(big.Int).SetBytes(txID[:])
 
 	clusterIDBigInt := new(big.Int).Mod(txHashBigInt, big.NewInt(int64(nClusters)))
 	clusterID := flow.ClusterID(clusterIDBigInt.Uint64())

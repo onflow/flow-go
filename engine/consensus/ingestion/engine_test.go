@@ -26,7 +26,7 @@ func TestOnCollectionGuaranteeValid(t *testing.T) {
 	}
 
 	originID := unittest.IdentifierFixture()
-	coll := &flow.CollectionGuarantee{Hash: unittest.HashFixture(32)}
+	coll := &flow.CollectionGuarantee{CollectionID: unittest.IdentifierFixture()}
 	id := unittest.IdentityFixture()
 	id.Role = flow.RoleCollection
 
@@ -54,7 +54,7 @@ func TestOnCollectionGuaranteeMissingIdentity(t *testing.T) {
 	}
 
 	originID := unittest.IdentifierFixture()
-	coll := &flow.CollectionGuarantee{Hash: unittest.HashFixture(32)}
+	coll := &flow.CollectionGuarantee{CollectionID: unittest.IdentifierFixture()}
 	id := unittest.IdentityFixture()
 	id.Role = flow.RoleCollection
 
@@ -81,7 +81,7 @@ func TestOnCollectionGuaranteeInvalidRole(t *testing.T) {
 	}
 
 	originID := unittest.IdentifierFixture()
-	coll := &flow.CollectionGuarantee{Hash: unittest.HashFixture(32)}
+	coll := &flow.CollectionGuarantee{CollectionID: unittest.IdentifierFixture()}
 	id := unittest.IdentityFixture()
 	id.Role = flow.RoleConsensus
 

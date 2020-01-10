@@ -49,3 +49,26 @@ func (_m *ExecutionState) NewView(_a0 flow.StateCommitment) *state.View {
 
 	return r0
 }
+
+// StateCommitmentByBlockID provides a mock function with given fields: _a0
+func (_m *ExecutionState) StateCommitmentByBlockID(_a0 flow.Identifier) (flow.StateCommitment, error) {
+	ret := _m.Called(_a0)
+
+	var r0 flow.StateCommitment
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.StateCommitment); ok {
+		r0 = rf(_a0)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.StateCommitment)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}

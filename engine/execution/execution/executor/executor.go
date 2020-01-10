@@ -30,9 +30,7 @@ func NewBlockExecutor(vm virtualmachine.VirtualMachine, state state.ExecutionSta
 func (e *blockExecutor) ExecuteBlock(
 	block ExecutableBlock,
 ) ([]flow.Chunk, error) {
-	blockContext := e.vm.NewBlockContext(&block.Block)
-
-	chunks, err := e.executeTransactions(blockContext, block.Transactions)
+	chunks, err := e.executeTransactions(block.Block, block.Transactions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -43,14 +41,17 @@ func (e *blockExecutor) ExecuteBlock(
 }
 
 func (e *blockExecutor) executeTransactions(
-	blockContext virtualmachine.BlockContext,
+	block flow.Block,
 	txs []flow.TransactionBody,
 ) ([]flow.Chunk, error) {
-	// TODO: implement real chunking
-	// MVP uses single chunk per block
+	blockContext := e.vm.NewBlockContext(&block)
 
-	// TODO: get last state commitment from previous block
-	chunkView := e.state.NewView(nil)
+	startState, err := e.state.StateCommitmentByBlockID(block.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch starting state commitment: %w", err)
+	}
+
+	chunkView := e.state.NewView(startState)
 
 	for _, tx := range txs {
 		txView := chunkView.NewChild()
@@ -70,7 +71,7 @@ func (e *blockExecutor) executeTransactions(
 		return nil, fmt.Errorf("failed to apply chunk delta: %w", err)
 	}
 
-	// TODO: implement real chunking
+	// TODO: (post-MVP) implement real chunking
 	// MVP uses single chunk per block
 	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
@@ -79,9 +80,9 @@ func (e *blockExecutor) executeTransactions(
 			// TODO: compute chunk tx collection hash
 			ChunkTxCollection: nil,
 			// TODO: include start state commitment
-			StartState: nil,
+			StartState: startState,
 			// TODO: include event collection hash
-			EventCollection: nil,
+			EventCollection: flow.ZeroID,
 			// TODO: record gas used
 			TotalComputationUsed: 0,
 			// TODO: record first tx gas used

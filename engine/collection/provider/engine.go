@@ -118,17 +118,15 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.CollectionRequest) error {
-	coll, err := e.collections.ByFingerprint(req.Fingerprint)
+	coll, err := e.collections.ByID(req.CollectionID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve requested collection: %w", err)
 	}
 
-	res := messages.CollectionResponse{
-		Fingerprint:  coll.Fingerprint(),
-		Transactions: coll.Transactions,
+	res := &messages.CollectionResponse{
+		Collection: *coll,
 	}
-
-	err = e.con.Submit(&res, originID)
+	err = e.con.Submit(res, originID)
 	if err != nil {
 		return fmt.Errorf("could not respond to collection requester: %w", err)
 	}
@@ -138,7 +136,7 @@ func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.Col
 
 func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *messages.SubmitCollectionGuarantee) error {
 	if originID != e.me.NodeID() {
-		return fmt.Errorf("invalid remote request to submit collection guarantee [%s]", req.Guarantee.Fingerprint().Hex())
+		return fmt.Errorf("invalid remote request to submit collection guarantee [%x]", req.Guarantee.ID())
 	}
 
 	return e.SubmitCollectionGuarantee(&req.Guarantee)

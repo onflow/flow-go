@@ -154,18 +154,28 @@ func TestCheckInvalidImportedError(t *testing.T) {
 
 func TestCheckImportTypes(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		if !compositeKind.SupportsInterfaces() {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
+
+			body := "{}"
+			if compositeKind == common.CompositeKindEvent {
+				body = "()"
+			}
 
 			checker, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                       pub %[1]s Test {}
+                       pub %[1]s Test %[2]s
 
-                       pub %[1]s interface TestInterface {}
+                       pub %[1]s interface TestInterface %[2]s
                     `,
 					compositeKind.Keyword(),
+					body,
 				),
 			)
 

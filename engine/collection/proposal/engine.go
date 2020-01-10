@@ -150,13 +150,13 @@ func (e *Engine) createProposal() error {
 	transactions := e.pool.All()
 	coll := flow.CollectionFromTransactions(transactions)
 
-	err := e.collections.Save(&coll)
+	err := e.collections.Store(&coll)
 	if err != nil {
 		return fmt.Errorf("could not save proposed collection: %w", err)
 	}
 
 	guarantee := coll.Guarantee()
-	err = e.guarantees.Save(&guarantee)
+	err = e.guarantees.Store(&guarantee)
 	if err != nil {
 		return fmt.Errorf("could not save proposed collection guarantee: %w", err)
 	}
@@ -167,7 +167,7 @@ func (e *Engine) createProposal() error {
 	}
 
 	for _, tx := range transactions {
-		e.pool.Rem(tx.Fingerprint())
+		e.pool.Rem(tx.ID())
 	}
 
 	return nil
