@@ -91,7 +91,13 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 			mock.Anything,
 			targetIDs[0].NodeID,
 			targetIDs[1].NodeID,
-		).Return(nil)
+		).
+			Run(func(args mock.Arguments) {
+				// check the receipt is properly formed
+				receipt := args[0].(*flow.ExecutionReceipt)
+				assert.Equal(t, result, receipt.ExecutionResult)
+			}).
+			Return(nil)
 
 		err := e.onExecutionResult(result)
 		assert.NoError(t, err)
