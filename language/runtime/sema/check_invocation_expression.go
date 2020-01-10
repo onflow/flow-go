@@ -8,8 +8,10 @@ import (
 func (checker *Checker) VisitInvocationExpression(invocationExpression *ast.InvocationExpression) ast.Repr {
 	typ := checker.checkInvocationExpression(invocationExpression)
 
-	// events cannot be invoked without an emit statement
-	if _, isEventType := typ.(*EventType); isEventType {
+	// Events cannot be invoked without an emit statement
+
+	compositeType, isCompositeType := typ.(*CompositeType)
+	if isCompositeType && compositeType.Kind == common.CompositeKindEvent {
 		checker.report(
 			&InvalidEventUsageError{
 				Range: ast.NewRangeFromPositioned(invocationExpression),
@@ -91,10 +93,10 @@ func (checker *Checker) checkInvocationExpression(invocationExpression *ast.Invo
 	returnType = functionType.ReturnType(argumentTypes)
 	checker.Elaboration.InvocationExpressionReturnTypes[invocationExpression] = returnType
 
-	parameterTypeAnnotations := functionType.ParameterTypeAnnotations
-	parameterTypes := make([]Type, len(parameterTypeAnnotations))
-	for i, parameterTypeAnnotation := range parameterTypeAnnotations {
-		parameterTypes[i] = parameterTypeAnnotation.Type
+	parameters := functionType.Parameters
+	parameterTypes := make([]Type, len(parameters))
+	for i, parameter := range parameters {
+		parameterTypes[i] = parameter.TypeAnnotation.Type
 	}
 	checker.Elaboration.InvocationExpressionParameterTypes[invocationExpression] = parameterTypes
 
@@ -245,7 +247,7 @@ func (checker *Checker) checkInvocationArguments(
 	argumentCount := len(invocationExpression.Arguments)
 
 	// check the invocation's argument count matches the function's parameter count
-	parameterCount := len(functionType.ParameterTypeAnnotations)
+	parameterCount := len(functionType.Parameters)
 	if argumentCount != parameterCount {
 
 		// TODO: improve
@@ -272,7 +274,7 @@ func (checker *Checker) checkInvocationArguments(
 	for i := 0; i < minCount; i++ {
 		// ensure the type of the argument matches the type of the parameter
 
-		parameterType := functionType.ParameterTypeAnnotations[i].Type
+		parameterType := functionType.Parameters[i].TypeAnnotation.Type
 		argument := invocationExpression.Arguments[i]
 
 		argumentTypes[i] = checker.checkInvocationArgument(argument, parameterType)

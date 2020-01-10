@@ -56,6 +56,7 @@ func (checker *Checker) VisitTransactionDeclaration(declaration *ast.Transaction
 }
 
 // checkTransactionFields validates the field declarations for a transaction.
+//
 func (checker *Checker) checkTransactionFields(declaration *ast.TransactionDeclaration) {
 	for _, field := range declaration.Fields {
 		if field.Access != ast.AccessNotSpecified {
@@ -73,6 +74,7 @@ func (checker *Checker) checkTransactionFields(declaration *ast.TransactionDecla
 // checkTransactionBlocks checks that a transaction contains the required prepare and execute blocks.
 //
 // An execute block is always required, but a prepare block is only required if fields are present.
+//
 func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDeclaration) {
 	if declaration.Prepare != nil {
 		// parser allows any identifier so it must be checked here
@@ -111,6 +113,7 @@ func (checker *Checker) checkTransactionBlocks(declaration *ast.TransactionDecla
 }
 
 // visitTransactionPrepareFunction visits and checks the prepare function of a transaction.
+//
 func (checker *Checker) visitTransactionPrepareFunction(
 	prepareFunction *ast.SpecialFunctionDeclaration,
 	transactionType *TransactionType,
@@ -136,25 +139,26 @@ func (checker *Checker) visitTransactionPrepareFunction(
 
 	checker.checkTransactionPrepareFunctionParameters(
 		prepareFunction.ParameterList,
-		prepareFunctionType.ParameterTypeAnnotations,
+		prepareFunctionType.Parameters,
 	)
 }
 
 // checkTransactionPrepareFunctionParameters checks that the parameters are each of type Account.
+//
 func (checker *Checker) checkTransactionPrepareFunctionParameters(
 	parameterList *ast.ParameterList,
-	parameterTypeAnnotations []*TypeAnnotation,
+	parameters []*Parameter,
 ) {
 	for i, parameter := range parameterList.Parameters {
-		parameterTypeAnnotation := parameterTypeAnnotations[i]
+		parameterType := parameters[i].TypeAnnotation.Type
 
-		t := parameterTypeAnnotation.Type
-
-		if !IsSubType(t, &AccountType{}) {
-			checker.report(&InvalidTransactionPrepareParameterType{
-				Type:  t,
-				Range: ast.NewRangeFromPositioned(parameter.TypeAnnotation),
-			})
+		if !IsSubType(parameterType, &AccountType{}) {
+			checker.report(
+				&InvalidTransactionPrepareParameterType{
+					Type:  parameterType,
+					Range: ast.NewRangeFromPositioned(parameter.TypeAnnotation),
+				},
+			)
 		}
 	}
 
@@ -185,7 +189,7 @@ func (checker *Checker) visitTransactionExecuteFunction(
 func (checker *Checker) declareTransactionDeclaration(declaration *ast.TransactionDeclaration) {
 	transactionType := &TransactionType{}
 
-	members, origins := checker.membersAndOrigins(
+	members, origins := checker.nonEventMembersAndOrigins(
 		transactionType,
 		declaration.Fields,
 		nil,
@@ -194,13 +198,13 @@ func (checker *Checker) declareTransactionDeclaration(declaration *ast.Transacti
 
 	checker.memberOrigins[transactionType] = origins
 
-	var prepareParameterTypeAnnotations []*TypeAnnotation
+	var prepareParameters []*Parameter
 	if declaration.Prepare != nil {
-		prepareParameterTypeAnnotations = checker.parameterTypeAnnotations(declaration.Prepare.ParameterList)
+		prepareParameters = checker.parameters(declaration.Prepare.ParameterList)
 	}
 
 	transactionType.Members = members
-	transactionType.prepareParameterTypeAnnotations = prepareParameterTypeAnnotations
+	transactionType.prepareParameters = prepareParameters
 
 	checker.Elaboration.TransactionDeclarationTypes[declaration] = transactionType
 	checker.TransactionTypes = append(checker.TransactionTypes, transactionType)

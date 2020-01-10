@@ -60,7 +60,8 @@ type getterSetter struct {
 //
 type OnEventEmittedFunc func(
 	inter *Interpreter,
-	event EventValue,
+	event *CompositeValue,
+	eventType *sema.CompositeType,
 )
 
 // OnStatementFunc is a function that is triggered when a statement is about to be executed.
@@ -629,8 +630,8 @@ func (interpreter *Interpreter) prepareInvoke(
 
 	// ensures the invocation's argument count matches the function's parameter count
 
-	parameterTypeAnnotations := functionType.ParameterTypeAnnotations
-	parameterCount := len(parameterTypeAnnotations)
+	parameters := functionType.Parameters
+	parameterCount := len(parameters)
 	argumentCount := len(argumentValues)
 
 	if argumentCount != parameterCount {
@@ -647,7 +648,7 @@ func (interpreter *Interpreter) prepareInvoke(
 
 	preparedArguments := make([]Value, len(arguments))
 	for i, argument := range argumentValues {
-		parameterType := parameterTypeAnnotations[i].Type
+		parameterType := parameters[i].TypeAnnotation.Type
 		// TODO: value type is not known, reject for now
 		switch parameterType.(type) {
 		case *sema.AnyStructType, *sema.AnyResourceType:
@@ -2088,9 +2089,21 @@ func (interpreter *Interpreter) declareCompositeValue(
 	typeID := compositeType.ID()
 
 	var initializerFunction FunctionValue
-	compositeInitializerFunction := interpreter.compositeInitializerFunction(declaration, lexicalScope)
-	if compositeInitializerFunction != nil {
-		initializerFunction = *compositeInitializerFunction
+	if declaration.CompositeKind == common.CompositeKindEvent {
+		initializerFunction = NewHostFunctionValue(
+			func(invocation Invocation) Trampoline {
+				for i, argument := range invocation.Arguments {
+					parameter := compositeType.ConstructorParameters[i]
+					invocation.Self.Fields[parameter.Identifier] = argument
+				}
+				return Done{}
+			},
+		)
+	} else {
+		compositeInitializerFunction := interpreter.compositeInitializerFunction(declaration, lexicalScope)
+		if compositeInitializerFunction != nil {
+			initializerFunction = *compositeInitializerFunction
+		}
 	}
 
 	var destructorFunction FunctionValue
@@ -2909,51 +2922,14 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 	interpreter.Transactions = append(interpreter.Transactions, &transactionFunction)
 }
 
-func (interpreter *Interpreter) VisitEventDeclaration(declaration *ast.EventDeclaration) ast.Repr {
-	interpreter.declareEventConstructor(declaration)
-
-	// NOTE: no result, so it does *not* act like a return-statement
-	return Done{}
-}
-
-// declareEventConstructor declares the constructor function for an event type.
-//
-// The constructor is assigned to a variable with the same identifier as the event type itself.
-// For example, this allows an event instance for event type MyEvent(x: Int) to be created
-// by calling MyEvent(x: 2).
-func (interpreter *Interpreter) declareEventConstructor(declaration *ast.EventDeclaration) {
-	identifier := declaration.Identifier.Identifier
-
-	eventType := interpreter.Checker.Elaboration.EventDeclarationTypes[declaration]
-
-	variable := interpreter.findOrDeclareVariable(identifier)
-	variable.Value = NewHostFunctionValue(
-		func(invocation Invocation) Trampoline {
-			fields := make([]EventField, len(eventType.Fields))
-			for i, field := range eventType.Fields {
-				fields[i] = EventField{
-					Identifier: field.Identifier,
-					Value:      invocation.Arguments[i],
-				}
-			}
-
-			value := EventValue{
-				Identifier: eventType.Identifier,
-				Fields:     fields,
-				Location:   interpreter.Checker.Location,
-			}
-
-			return Done{Result: value}
-		},
-	)
-}
-
 func (interpreter *Interpreter) VisitEmitStatement(statement *ast.EmitStatement) ast.Repr {
 	return statement.InvocationExpression.Accept(interpreter).(Trampoline).
 		FlatMap(func(result interface{}) Trampoline {
-			event := result.(EventValue)
+			event := result.(*CompositeValue)
 
-			interpreter.onEventEmitted(interpreter, event)
+			eventType := interpreter.Checker.Elaboration.EmitStatementEventTypes[statement]
+
+			interpreter.onEventEmitted(interpreter, event, eventType)
 
 			// NOTE: no result, so it does *not* act like a return-statement
 			return Done{}

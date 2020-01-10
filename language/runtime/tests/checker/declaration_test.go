@@ -463,15 +463,19 @@ func TestCheckInvalidTopLevelContractRestriction(t *testing.T) {
 func TestCheckInvalidLocalDeclarations(t *testing.T) {
 
 	tests := map[string]string{
-		"event":       `event Test()`,
 		"transaction": `transaction { execute {} }`,
 		"import":      `import 0x1`,
 	}
 
 	// composites and interfaces
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
 		for _, isInterface := range []bool{true, false} {
+
+			if !kind.SupportsInterfaces() && isInterface {
+				continue
+			}
+
 			interfaceKeyword := ""
 			if isInterface {
 				interfaceKeyword = "interface"
@@ -483,10 +487,17 @@ func TestCheckInvalidLocalDeclarations(t *testing.T) {
 
 				interfaceKeyword,
 			)
+
+			body := "{}"
+			if kind == common.CompositeKindEvent {
+				body = "()"
+			}
+
 			tests[name] = fmt.Sprintf(
-				`%s %s Test {}`,
+				`%s %s Test %s`,
 				kind.Keyword(),
 				interfaceKeyword,
+				body,
 			)
 		}
 	}

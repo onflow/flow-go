@@ -85,7 +85,11 @@ type RedeclarationError struct {
 }
 
 func (e *RedeclarationError) Error() string {
-	return fmt.Sprintf("cannot redeclare %s: `%s` is already declared", e.Kind.Name(), e.Name)
+	return fmt.Sprintf(
+		"cannot redeclare %s: `%s` is already declared",
+		e.Kind.Name(),
+		e.Name,
+	)
 }
 
 func (*RedeclarationError) isSemanticError() {}
@@ -386,7 +390,7 @@ type InvalidBinaryOperandsError struct {
 
 func (e *InvalidBinaryOperandsError) Error() string {
 	return fmt.Sprintf(
-		"cannot apply binary operation %s to different types: `%s`, `%s`",
+		"cannot apply binary operation %s to types: `%s`, `%s`",
 		e.Operation.Symbol(),
 		e.LeftType,
 		e.RightType,
@@ -726,8 +730,8 @@ type MemberMismatch struct {
 }
 
 type InitializerMismatch struct {
-	CompositeParameterTypes []*TypeAnnotation
-	InterfaceParameterTypes []*TypeAnnotation
+	CompositeParameters []*Parameter
+	InterfaceParameters []*Parameter
 }
 
 // TODO: improve error message:
