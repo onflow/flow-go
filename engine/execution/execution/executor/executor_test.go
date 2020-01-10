@@ -65,7 +65,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Return(&virtualmachine.TransactionResult{}, nil).
 		Twice()
 
-	es.On("StateCommitmentByBlockHash", block.Parent).
+	es.On("StateCommitmentByBlockID", block.ParentID).
 		Return(unittest.StateCommitmentFixture(), nil)
 
 	es.On(

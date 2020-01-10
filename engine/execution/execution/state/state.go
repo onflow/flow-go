@@ -11,7 +11,7 @@ type ExecutionState interface {
 	NewView(flow.StateCommitment) *View
 	// CommitDelta commits a register delta and returns the new state commitment.
 	CommitDelta(Delta) (flow.StateCommitment, error)
-	// StateCommitmentByBlockHash returns the final state commitment for the provided block hash.
+	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
 }
 
