@@ -127,6 +127,7 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 	}
 
 	if eh.forkChoice.IsSafeNode(blockProposal) || eh.paceMaker.CurView() != blockProposal.Block.View || !eh.isConActor {
+		// TODO: log this event
 		return
 	}
 
