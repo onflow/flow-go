@@ -81,7 +81,7 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 
 				// NOTE: value and declaration type are already checked for invalidity
 
-				if !checker.IsTypeCompatible(declaration.Value, valueType, declarationType) {
+				if !checker.checkTypeCompatibility(declaration.Value, valueType, declarationType) {
 
 					checker.report(
 						&TypeMismatchError{

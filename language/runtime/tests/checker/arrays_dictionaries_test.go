@@ -768,7 +768,7 @@ func TestCheckConstantSizedArrayDeclaration(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
+func TestCheckInvalidConstantSizedArrayDeclarationCountMismatchTooMany(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       fun test() {
@@ -776,9 +776,10 @@ func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
       }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	assert.IsType(t, &sema.ConstantSizedArrayLiteralSizeError{}, errs[0])
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 }
 
 func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {

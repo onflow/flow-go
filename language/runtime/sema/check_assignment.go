@@ -159,7 +159,7 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 	// check value type is subtype of variable type
 	if !valueType.IsInvalidType() &&
 		!variable.Type.IsInvalidType() &&
-		!checker.IsTypeCompatible(valueExpression, valueType, variable.Type) {
+		!checker.checkTypeCompatibility(valueExpression, valueType, variable.Type) {
 
 		checker.report(
 			&TypeMismatchError{
@@ -187,7 +187,7 @@ func (checker *Checker) visitIndexExpressionAssignment(
 
 	if !valueType.IsInvalidType() &&
 		!elementType.IsInvalidType() &&
-		!checker.IsTypeCompatible(valueExpression, valueType, elementType) {
+		!checker.checkTypeCompatibility(valueExpression, valueType, elementType) {
 
 		checker.report(
 			&TypeMismatchError{
@@ -225,7 +225,7 @@ func (checker *Checker) visitMemberExpressionAssignment(
 
 	if !valueType.IsInvalidType() &&
 		!member.TypeAnnotation.Type.IsInvalidType() &&
-		!checker.IsTypeCompatible(valueExpression, valueType, member.TypeAnnotation.Type) {
+		!checker.checkTypeCompatibility(valueExpression, valueType, member.TypeAnnotation.Type) {
 
 		checker.report(
 			&TypeMismatchError{
