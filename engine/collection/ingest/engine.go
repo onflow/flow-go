@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine is the transaction ingestion engine, which ensures that new
@@ -125,7 +126,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) error {
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
-		Hex("tx_hash", tx.Fingerprint()).
+		Hex("tx_id", logging.ID(tx)).
 		Logger()
 
 	log.Debug().Msg("transaction message received")
@@ -135,7 +136,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) e
 		return fmt.Errorf("invalid transaction: %w", err)
 	}
 
-	clusterID := protocol.Route(len(e.clusters), tx.Fingerprint())
+	clusterID := protocol.Route(len(e.clusters), tx.ID())
 
 	// tx is routed to my cluster, add to mempool
 	if clusterID == e.clusterID {

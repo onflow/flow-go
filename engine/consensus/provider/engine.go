@@ -7,12 +7,12 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine represents the provider engine, used to spread block proposals across
@@ -28,13 +28,13 @@ type Engine struct {
 	me    module.Local    // used to access local node information
 }
 
-// New creates a new block expulsion engine.
+// New creates a new block provider engine.
 func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:  engine.NewUnit(),
-		log:   log.With().Str("engine", "expulsion").Logger(),
+		log:   log.With().Str("engine", "provider").Logger(),
 		state: state,
 		me:    me,
 	}
@@ -51,7 +51,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
-// started. For the expulsion engine, we consider the engine up and running
+// started. For the provider engine, we consider the engine up and running
 // upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready()
@@ -94,14 +94,13 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // process processes the given ingestion engine event. Events that are given
-// to this function originate within the expulsion engine on the node with the
+// to this function originate within the provider engine on the node with the
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	var err error
-	switch ev := event.(type) {
-	// TODO: replace with real block proposal model
-	case *coldstuff.BlockProposal:
-		err = e.onBlockProposal(originID, ev)
+	switch entity := event.(type) {
+	case *flow.Block:
+		err = e.onBlock(originID, entity)
 	default:
 		err = errors.Errorf("invalid event type (%T)", event)
 	}
@@ -111,38 +110,37 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
-// onBlockProposal is used to process block proposals in regards to syncing
-// non-consensus nodes on the network. It does not do any validation on the
-// proposal itself, so should be called by the consensus engine only for valid
-// block proposals.
-func (e *Engine) onBlockProposal(originID flow.Identifier, candidate *coldstuff.BlockProposal) error {
+// onBlock is used when a block has been finalized locally and we want to
+// broadcast it to the network.
+func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("block_hash", candidate.Block.Hash()).
-		Msg("block proposal received")
+		Hex("block_id", logging.ID(block)).
+		Msg("block block received")
 
 	// currently, only accept blocks that come from our local consensus
-	if originID != e.me.NodeID() {
-		return errors.Errorf("non-local block proposal (nodeID: %x)", originID)
+	localID := e.me.NodeID()
+	if originID != localID {
+		return errors.Errorf("non-local block (nodeID: %x)", originID)
 	}
 
 	// get all non-consensus nodes in the system
-	targetIDs, err := e.state.Final().Identities(identity.Not(identity.HasRole(flow.RoleConsensus)))
+	identities, err := e.state.Final().Identities(identity.Not(identity.HasNodeID(localID)))
 	if err != nil {
 		return errors.Wrap(err, "could not retrieve target identities")
 	}
 
 	// submit the block proposal to the targets
-	err = e.con.Submit(candidate, targetIDs.NodeIDs()...)
+	err = e.con.Submit(block, identities.NodeIDs()...)
 	if err != nil {
 		return errors.Wrap(err, "could not send block proposal")
 	}
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("block_hash", candidate.Block.Hash()).
-		Msg("block proposal propagated")
+		Hex("block_id", logging.ID(block)).
+		Msg("block sent")
 
 	return nil
 }

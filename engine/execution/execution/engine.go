@@ -110,12 +110,12 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // This function fetches the collections and transactions in the block and passes
 // them to the block executor for execution.
 func (e *Engine) onBlock(block *flow.Block) error {
-	collections, err := e.getCollections(block.CollectionGuarantees)
+	guarantees, err := e.getCollections(block.Guarantees)
 	if err != nil {
-		return fmt.Errorf("failed to load collections: %w", err)
+		return fmt.Errorf("failed to load guarantees: %w", err)
 	}
 
-	transactions, err := e.getTransactions(collections)
+	transactions, err := e.getTransactions(guarantees)
 	if err != nil {
 		return fmt.Errorf("failed to load transactions: %w", err)
 	}
@@ -138,22 +138,22 @@ func (e *Engine) onBlock(block *flow.Block) error {
 	return nil
 }
 
-func (e *Engine) getCollections(cols []*flow.CollectionGuarantee) ([]flow.Collection, error) {
-	collections := make([]flow.Collection, len(cols))
+func (e *Engine) getCollections(guarantees []*flow.CollectionGuarantee) ([]*flow.Collection, error) {
+	collections := make([]*flow.Collection, len(guarantees))
 
-	for i, gc := range cols {
-		c, err := e.collections.ByFingerprint(gc.Fingerprint())
+	for i, guarantee := range guarantees {
+		c, err := e.collections.ByID(guarantee.ID())
 		if err != nil {
 			return nil, fmt.Errorf("failed to load collection: %w", err)
 		}
 
-		collections[i] = *c
+		collections[i] = c
 	}
 
 	return collections, nil
 }
 
-func (e *Engine) getTransactions(cols []flow.Collection) ([]flow.TransactionBody, error) {
+func (e *Engine) getTransactions(cols []*flow.Collection) ([]flow.TransactionBody, error) {
 	txCount := 0
 
 	for _, c := range cols {

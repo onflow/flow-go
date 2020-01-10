@@ -29,8 +29,8 @@ func (m *TransactionPool) Add(tx *flow.Transaction) error {
 }
 
 // Get returns the given transaction from the pool.
-func (m *TransactionPool) Get(fp flow.Fingerprint) (*flow.Transaction, error) {
-	item, err := m.mempool.Get(fp)
+func (m *TransactionPool) Get(txID flow.Identifier) (*flow.Transaction, error) {
+	item, err := m.mempool.Get(txID)
 	if err != nil {
 		return nil, err
 	}
@@ -45,12 +45,11 @@ func (m *TransactionPool) Get(fp flow.Fingerprint) (*flow.Transaction, error) {
 
 // All returns all transactions from the pool.
 func (m *TransactionPool) All() []*flow.Transaction {
+
 	items := m.mempool.All()
-
-	transactions := make([]*flow.Transaction, len(items))
-
-	for i, item := range items {
-		transactions[i] = item.(*flow.Transaction)
+	transactions := make([]*flow.Transaction, 0, len(items))
+	for _, item := range items {
+		transactions = append(transactions, item.(*flow.Transaction))
 	}
 
 	return transactions

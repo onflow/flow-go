@@ -6,12 +6,13 @@ import (
 
 // Transactions represents persistent storage for transactions.
 type Transactions interface {
-	// ByFingerprint returns the transaction for the given fingerprint.
-	ByFingerprint(fingerprint flow.Fingerprint) (*flow.Transaction, error)
 
-	// Insert inserts the transaction, keyed by fingerprint.
-	Insert(tx *flow.Transaction) error
+	// Store inserts the transaction, keyed by fingerprint.
+	Store(tx *flow.Transaction) error
 
 	// Remove removes the transaction with the given hash, if it exists.
-	Remove(fingerprint flow.Fingerprint) error
+	Remove(txID flow.Identifier) error
+
+	// ByID returns the transaction for the given fingerprint.
+	ByID(txID flow.Identifier) (*flow.Transaction, error)
 }

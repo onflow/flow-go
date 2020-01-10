@@ -10,13 +10,13 @@ type Guarantees struct {
 	mock.Mock
 }
 
-// ByFingerprint provides a mock function with given fields: hash
-func (_m *Guarantees) ByFingerprint(hash flow.Fingerprint) (*flow.CollectionGuarantee, error) {
-	ret := _m.Called(hash)
+// ByID provides a mock function with given fields: collID
+func (_m *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
+	ret := _m.Called(collID)
 
 	var r0 *flow.CollectionGuarantee
-	if rf, ok := ret.Get(0).(func(flow.Fingerprint) *flow.CollectionGuarantee); ok {
-		r0 = rf(hash)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.CollectionGuarantee); ok {
+		r0 = rf(collID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.CollectionGuarantee)
@@ -24,8 +24,8 @@ func (_m *Guarantees) ByFingerprint(hash flow.Fingerprint) (*flow.CollectionGuar
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Fingerprint) error); ok {
-		r1 = rf(hash)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(collID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -33,8 +33,8 @@ func (_m *Guarantees) ByFingerprint(hash flow.Fingerprint) (*flow.CollectionGuar
 	return r0, r1
 }
 
-// Save provides a mock function with given fields: guarantee
-func (_m *Guarantees) Save(guarantee *flow.CollectionGuarantee) error {
+// Store provides a mock function with given fields: guarantee
+func (_m *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
 	ret := _m.Called(guarantee)
 
 	var r0 error

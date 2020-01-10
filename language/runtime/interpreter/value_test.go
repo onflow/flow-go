@@ -36,11 +36,11 @@ func TestToExpression(t *testing.T) {
 
 func newTestCompositeValue(owner string) *CompositeValue {
 	return &CompositeValue{
-		Location:   utils.TestLocation,
-		Identifier: "Test",
-		Kind:       common.CompositeKindStructure,
-		Fields:     map[string]Value{},
-		Owner:      owner,
+		Location: utils.TestLocation,
+		TypeID:   "Test",
+		Kind:     common.CompositeKindStructure,
+		Fields:   map[string]Value{},
+		Owner:    owner,
 	}
 }
 
@@ -249,7 +249,7 @@ func TestOwnerNewAny(t *testing.T) {
 	value := newTestCompositeValue(oldOwner)
 	valueType := &sema.CompositeType{
 		Location:   value.Location,
-		Identifier: value.Identifier,
+		Identifier: string(value.TypeID),
 		Kind:       value.Kind,
 	}
 
@@ -268,7 +268,7 @@ func TestSetOwnerAny(t *testing.T) {
 	value := newTestCompositeValue(oldOwner)
 	valueType := &sema.CompositeType{
 		Location:   value.Location,
-		Identifier: value.Identifier,
+		Identifier: string(value.TypeID),
 		Kind:       value.Kind,
 	}
 
@@ -289,7 +289,7 @@ func TestSetOwnerAnyCopy(t *testing.T) {
 	value := newTestCompositeValue(oldOwner)
 	valueType := &sema.CompositeType{
 		Location:   value.Location,
-		Identifier: value.Identifier,
+		Identifier: string(value.TypeID),
 		Kind:       value.Kind,
 	}
 
