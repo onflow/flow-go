@@ -10,7 +10,7 @@ import (
 
 // A BlockExecutor executes the transactions in a block.
 type BlockExecutor interface {
-	ExecuteBlock(block ExecutableBlock) (flow.ExecutionResult, error)
+	ExecuteBlock(block ExecutableBlock) (*flow.ExecutionResult, error)
 }
 
 type blockExecutor struct {
@@ -29,17 +29,17 @@ func NewBlockExecutor(vm virtualmachine.VirtualMachine, state state.ExecutionSta
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *blockExecutor) ExecuteBlock(
 	block ExecutableBlock,
-) (flow.ExecutionResult, error) {
+) (*flow.ExecutionResult, error) {
 	chunks, err := e.executeTransactions(block.Block, block.Transactions)
 	if err != nil {
-		return flow.ExecutionResult{}, fmt.Errorf("failed to execute transactions: %w", err)
+		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
 
 	// TODO: compute block fees & reward payments
 
 	result := generateExecutionResultForBlock(block, chunks)
 
-	return result, nil
+	return &result, nil
 }
 
 func (e *blockExecutor) executeTransactions(
