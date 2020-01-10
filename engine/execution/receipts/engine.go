@@ -74,7 +74,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		var err error
 		switch v := event.(type) {
-		case flow.ExecutionResult:
+		case *flow.ExecutionResult:
 			err = e.onExecutionResult(v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
@@ -86,7 +86,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-func (e *Engine) onExecutionResult(result flow.ExecutionResult) error {
+func (e *Engine) onExecutionResult(result *flow.ExecutionResult) error {
 	e.log.Debug().
 		// TODO: replace with proper ID
 		Hex("block_id", result.Block).
@@ -95,7 +95,7 @@ func (e *Engine) onExecutionResult(result flow.ExecutionResult) error {
 		Msg("received execution result")
 
 	receipt := &flow.ExecutionReceipt{
-		ExecutionResult: result,
+		ExecutionResult: *result,
 		// TODO: include SPoCKs
 		Spocks: nil,
 		// TODO: sign execution receipt
@@ -106,6 +106,7 @@ func (e *Engine) onExecutionResult(result flow.ExecutionResult) error {
 	if err != nil {
 		return fmt.Errorf("could not broadcast receipt: %w", err)
 	}
+
 	return nil
 }
 
