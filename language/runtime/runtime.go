@@ -64,6 +64,12 @@ var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
 
 type ImportResolver = func(location Location) (program *ast.Program, e error)
 
+var validTopLevelDeclarations = []common.DeclarationKind{
+	common.DeclarationKindImport,
+	common.DeclarationKindContract,
+	common.DeclarationKindContractInterface,
+}
+
 const contractKey = "contract"
 
 // interpreterRuntime is a interpreter-based version of the Flow runtime.
@@ -600,15 +606,7 @@ func (r *interpreterRuntime) updateAccountCode(
 		location,
 		functions,
 		[]sema.Option{
-			sema.WithValidTopLevelDeclarations(
-				[]common.DeclarationKind{
-					common.DeclarationKindImport,
-					common.DeclarationKindContract,
-					common.DeclarationKindContractInterface,
-					// TODO: remove?
-					common.DeclarationKindEvent,
-				},
-			),
+			sema.WithValidTopLevelDeclarations(validTopLevelDeclarations),
 		},
 	)
 	if err != nil {
