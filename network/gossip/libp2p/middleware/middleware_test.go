@@ -126,7 +126,9 @@ func (m *MiddlewareTestSuit) Ping(expectID, expectPayload interface{}) {
 	// extracts sender id based on the mock option
 	var err error
 	// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
-	m.ov[m.size-1].On("Receive", expectID, expectPayload).Return(nil).Once().
+	firstNode := 0
+	lastNode := m.size - 1
+	m.ov[lastNode].On("Receive", expectID, expectPayload).Return(nil).Once().
 		Run(func(args mockery.Arguments) {
 			ch <- struct{}{}
 		})
@@ -139,7 +141,7 @@ func (m *MiddlewareTestSuit) Ping(expectID, expectPayload interface{}) {
 		msg = []byte("hello")
 	}
 
-	err = m.mws[0].Send(m.ids[m.size-1], msg)
+	err = m.mws[firstNode].Send(m.ids[lastNode], msg)
 	require.NoError(m.Suite.T(), err)
 
 	select {
@@ -161,15 +163,17 @@ func (m *MiddlewareTestSuit) MultiPing(count int) {
 	// extracts sender id based on the mock option
 	var err error
 	// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
+	firstNode := 0
+	lastNode := m.size - 1
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		msg := []byte(fmt.Sprintf("hello from: %d", i))
-		m.ov[m.size-1].On("Receive", m.mws[0].me, msg).Return(nil).Once().
+		m.ov[lastNode].On("Receive", m.mws[firstNode].me, msg).Return(nil).Once().
 			Run(func(args mockery.Arguments) {
 				wg.Done()
 			})
 		go func() {
-			err = m.mws[0].Send(m.ids[m.size-1], msg)
+			err = m.mws[firstNode].Send(m.ids[lastNode], msg)
 			require.NoError(m.Suite.T(), err)
 		}()
 	}
