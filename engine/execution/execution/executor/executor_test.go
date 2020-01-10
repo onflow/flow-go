@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	vmmock "github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
@@ -64,13 +65,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Twice()
 
 	es.On("StateCommitmentByBlockHash", block.Parent).
-		Return(
-			flow.StateCommitment{
-				235, 123, 148, 153, 55, 102, 49, 115,
-				139, 193, 91, 66, 17, 209, 10, 68,
-				90, 169, 31, 94, 135, 33, 250, 250,
-				180, 198, 51, 74, 53, 22, 62, 234,
-			}, nil).
+		Return(unittest.StateCommitmentFixture(), nil).
 		Once()
 
 	es.On(
