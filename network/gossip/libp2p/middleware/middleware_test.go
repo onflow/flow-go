@@ -43,6 +43,34 @@ func (m *MiddlewareTestSuit) SetupTest() {
 	m.StartMiddlewares()
 }
 
+// TestSendOneMessageRawReception tests the middleware for solely the
+// reception of a single message by a node that is sent from another node
+// it does not evaluate the type and content of the message
+func (m *MiddlewareTestSuit) TestSendOneMessageRawReception() {
+	m.SendOneMessage(mockery.Anything, mockery.Anything)
+}
+
+// TestSendOneMessageRawReception tests the middleware for solely the
+// reception of a single message by a node that is sent from another node
+// it evaluates the type but NOT the content of the message
+func (m *MiddlewareTestSuit) TestSendOneMessageTypeReception() {
+	m.SendOneMessage(mockery.Anything, mockery.AnythingOfType("[]uint8"))
+}
+
+// TestSendOneMessageRawReception tests the middleware for solely the
+// reception of a single message by a node that is sent from another node
+// it evaluates the type but NOT the content of the message
+func (m *MiddlewareTestSuit) TestSendOneMessageIDType() {
+	m.SendOneMessage(mockery.AnythingOfType("flow.Identifier"), []byte("Hello, World!"))
+}
+
+// TestSendOneMessageRawReception tests the middleware for solely the
+// reception of a single message by a node that is sent from another node
+// it evaluates the type but NOT the content of the message
+func (m *MiddlewareTestSuit) TestSendOneMessageContentReception() {
+	m.SendOneMessage(flow.Identifier{}, []byte("Hello, World!"))
+}
+
 // StartMiddleware creates mock overlays for each middleware, and starts the middlewares
 func (m *MiddlewareTestSuit) StartMiddlewares() {
 	// generates and mocks an overlay for each middleware
@@ -76,17 +104,33 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 	}
 }
 
-func (m *MiddlewareTestSuit) TestSendOneMessage() {
+// SendOneMessage
+func (m *MiddlewareTestSuit) SendOneMessage(expectID, expectPayload interface{}) {
 
 	ch := make(chan struct{})
+	// extracts sender id based on the mock option
+	var err error
+	switch expectID.(type) {
+	case flow.Identifier:
+		expectID = m.ids[0]
+	default:
+	}
+
 	// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
-	m.ov[m.size-1].On("Receive", mockery.Anything, mockery.Anything).Return(nil).Once().
+	m.ov[m.size-1].On("Receive", expectID, expectPayload).Return(nil).Once().
 		Run(func(args mockery.Arguments) {
 			ch <- struct{}{}
 		})
 
-	msg := []byte("hello")
-	err := m.mws[0].Send(m.ids[m.size-1], msg)
+	var msg []byte
+	switch x := expectPayload.(type) {
+	case []byte:
+		msg = x
+	default:
+		msg = []byte("hello")
+	}
+
+	err = m.mws[0].Send(m.ids[m.size-1], msg)
 	require.NoError(m.Suite.T(), err)
 
 	select {

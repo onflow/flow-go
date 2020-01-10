@@ -30,12 +30,12 @@ type Middleware struct {
 	wg         *sync.WaitGroup
 	libP2PNode *libp2p.P2PNode
 	stop       chan struct{}
+	me         flow.Identifier
 }
 
 // New creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
 func New(log zerolog.Logger, codec network.Codec, conns uint, address string, flowID flow.Identifier) (*Middleware, error) {
-
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -53,6 +53,7 @@ func New(log zerolog.Logger, codec network.Codec, conns uint, address string, fl
 		libP2PNode: p2p,
 		wg:         &sync.WaitGroup{},
 		stop:       make(chan struct{}),
+		me:         flowID,
 	}
 
 	// Start the libp2p node
@@ -96,7 +97,7 @@ func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 	default:
 	}
 
-	pmsg := m.createOutboundMessage(nodeID, msg)
+	pmsg := m.createOutboundMessage(msg)
 
 	// whichever comes first, sending the message or ending the provided context
 	select {
@@ -107,10 +108,10 @@ func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 	}
 }
 
-func (m *Middleware) createOutboundMessage(nodeID flow.Identifier, msg interface{}) *libp2p.Message {
+func (m *Middleware) createOutboundMessage(msg interface{}) *libp2p.Message {
 	// Compose the message payload
 	message := &libp2p.Message{
-		SenderID: nodeID[:],
+		SenderID: m.me[:],
 		Event:    msg.([]byte),
 	}
 	return message
