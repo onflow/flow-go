@@ -231,7 +231,26 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 // If the submission was successful it generates a result approval for the incoming ExecutionReceipt
 // and submits that to the network
 func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt) {
-	// todo core verification happens here
+
+	result := receipt.ExecutionResult
+	blockID := result.BlockID
+
+	log := e.log.With().
+		Hex("block_id", blockID[:]).
+		Hex("result_id", logging.ID(result)).
+		Logger()
+
+	// request block if not available
+	block, err := e.blocks.Get(blockID)
+	if err != nil {
+		// TODO should request the block here
+		log.Error().
+			Err(err).
+			Msg("could not get block")
+	}
+	// request collection if not available
+	// TODO dependent on chunk model change
+	_ = block
 
 	// extracting list of consensus nodes' ids
 	consIDs, err := e.state.Final().
