@@ -37,13 +37,13 @@ func MessageToTransaction(m *entities.Transaction) (flow.Transaction, error) {
 	}
 
 	return flow.Transaction{TransactionBody: flow.TransactionBody{
-		Script:             m.GetScript(),
-		ReferenceBlockHash: m.ReferenceBlockHash,
-		Nonce:              m.GetNonce(),
-		ComputeLimit:       m.GetComputeLimit(),
-		PayerAccount:       flow.BytesToAddress(m.PayerAccount),
-		ScriptAccounts:     scriptAccounts,
-		Signatures:         signatures,
+		Script:           m.GetScript(),
+		ReferenceBlockID: flow.HashToID(m.ReferenceBlockHash),
+		Nonce:            m.GetNonce(),
+		ComputeLimit:     m.GetComputeLimit(),
+		PayerAccount:     flow.BytesToAddress(m.PayerAccount),
+		ScriptAccounts:   scriptAccounts,
+		Signatures:       signatures,
 	},
 		Status: flow.TransactionStatus(m.GetStatus()),
 	}, nil
@@ -62,7 +62,7 @@ func TransactionToMessage(t flow.Transaction) *entities.Transaction {
 
 	return &entities.Transaction{
 		Script:             t.Script,
-		ReferenceBlockHash: t.ReferenceBlockHash,
+		ReferenceBlockHash: t.ReferenceBlockID[:],
 		Nonce:              t.Nonce,
 		ComputeLimit:       t.ComputeLimit,
 		PayerAccount:       t.PayerAccount.Bytes(),

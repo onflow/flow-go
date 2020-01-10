@@ -46,7 +46,7 @@ func (e *blockExecutor) executeTransactions(
 ) ([]flow.Chunk, error) {
 	blockContext := e.vm.NewBlockContext(&block)
 
-	startState, err := e.state.StateCommitmentByBlockHash(block.Parent)
+	startState, err := e.state.StateCommitmentByBlockID(block.ParentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch starting state commitment: %w", err)
 	}
@@ -87,7 +87,7 @@ func (e *blockExecutor) executeTransactions(
 			// TODO: include start state commitment
 			StartState: startState,
 			// TODO: include event collection hash
-			EventCollection: nil,
+			EventCollection: flow.ZeroID,
 			// TODO: record gas used
 			TotalComputationUsed: 0,
 			// TODO: record first tx gas used

@@ -44,7 +44,7 @@ func TestBlockStorage(t *testing.T) {
 
 	block := unittest.BlockFixture()
 
-	blocks.EXPECT().Save(gomock.Eq(&block))
+	blocks.EXPECT().Store(gomock.Eq(&block))
 
 	err = engine.Process(identifier, block)
 	assert.NoError(t, err)
@@ -77,7 +77,7 @@ func TestCollectionStorage(t *testing.T) {
 
 	collection := unittest.CollectionFixture(1)
 
-	collections.EXPECT().Save(gomock.Eq(&collection))
+	collections.EXPECT().Store(gomock.Eq(&collection))
 
 	err = engine.Process(identifier, collection)
 	assert.NoError(t, err)

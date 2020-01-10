@@ -1,8 +1,8 @@
 package unittest
 
 import (
-	"crypto/rand"
 	"fmt"
+	"math/rand"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -20,46 +20,54 @@ func AccountSignatureFixture() flow.AccountSignature {
 }
 
 func BlockFixture() flow.Block {
+	content := flow.Content{
+		Identities: IdentityListFixture(32),
+		Guarantees: CollectionGuaranteesFixture(16),
+	}
+	payload := content.Payload()
+	header := BlockHeaderFixture()
+	header.PayloadHash = payload.Root()
 	return flow.Block{
-		Header:               BlockHeaderFixture(),
-		NewIdentities:        IdentityListFixture(3),
-		CollectionGuarantees: CollectionGuaranteesFixture(3),
+		Header:  header,
+		Payload: payload,
+		Content: content,
 	}
 }
 
 func BlockHeaderFixture() flow.Header {
 	return flow.Header{
-		Parent: crypto.Hash("parent"),
-		Number: 100,
+		ParentID: IdentifierFixture(),
+		Number:   rand.Uint64(),
 	}
 }
 
 func CollectionGuaranteeFixture() *flow.CollectionGuarantee {
 	return &flow.CollectionGuarantee{
-		Hash:       []byte{1, 2, 3, 4},
-		Signatures: []crypto.Signature{[]byte{1, 2, 3, 4}},
+		CollectionID: IdentifierFixture(),
+		Signatures:   SignaturesFixture(16),
 	}
 }
 
 func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
-	ret := make([]*flow.CollectionGuarantee, n)
-	for i := 0; i < n; i++ {
-		ret[i] = &flow.CollectionGuarantee{
-			Hash:       []byte(fmt.Sprintf("hash %d", i)),
-			Signatures: []crypto.Signature{[]byte(fmt.Sprintf("signature %d A", i)), []byte(fmt.Sprintf("signature %d B", i))},
+	ret := make([]*flow.CollectionGuarantee, 0, n)
+	for i := 1; i <= n; i++ {
+		cg := flow.CollectionGuarantee{
+			CollectionID: flow.Identifier{byte(i)},
+			Signatures:   []crypto.Signature{[]byte(fmt.Sprintf("signature %d A", i)), []byte(fmt.Sprintf("signature %d B", i))},
 		}
+		ret = append(ret, &cg)
 	}
 	return ret
 }
 
 func CollectionFixture(n int) flow.Collection {
-	transactions := make([]flow.TransactionBody, n)
+	transactions := make([]flow.TransactionBody, 0, n)
 
 	for i := 0; i < n; i++ {
 		tx := TransactionFixture(func(t *flow.Transaction) {
-			t.Nonce = uint64(i + 1)
+			t.Nonce = rand.Uint64()
 		})
-		transactions[i] = tx.TransactionBody
+		transactions = append(transactions, tx.TransactionBody)
 	}
 
 	return flow.Collection{Transactions: transactions}
@@ -131,4 +139,34 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	}
 
 	return nodes
+}
+
+func SignatureFixture() crypto.Signature {
+	sig := make([]byte, 32)
+	_, _ = rand.Read(sig)
+	return sig
+}
+
+func SignaturesFixture(n int) []crypto.Signature {
+	var sigs []crypto.Signature
+	for i := 0; i < n; i++ {
+		sigs = append(sigs, SignatureFixture())
+	}
+	return sigs
+}
+
+func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
+	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+		Script:           []byte("pub fun main() {}"),
+		ReferenceBlockID: IdentifierFixture(),
+		Nonce:            rand.Uint64(),
+		ComputeLimit:     10,
+		PayerAccount:     AddressFixture(),
+		ScriptAccounts:   []flow.Address{AddressFixture()},
+		Signatures:       []flow.AccountSignature{AccountSignatureFixture()},
+	}}
+	if len(n) > 0 {
+		n[0](&tx)
+	}
+	return tx
 }

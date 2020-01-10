@@ -10,13 +10,13 @@ type Transactions struct {
 	mock.Mock
 }
 
-// ByFingerprint provides a mock function with given fields: fingerprint
-func (_m *Transactions) ByFingerprint(fingerprint flow.Fingerprint) (*flow.Transaction, error) {
-	ret := _m.Called(fingerprint)
+// ByID provides a mock function with given fields: txID
+func (_m *Transactions) ByID(txID flow.Identifier) (*flow.Transaction, error) {
+	ret := _m.Called(txID)
 
 	var r0 *flow.Transaction
-	if rf, ok := ret.Get(0).(func(flow.Fingerprint) *flow.Transaction); ok {
-		r0 = rf(fingerprint)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Transaction); ok {
+		r0 = rf(txID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Transaction)
@@ -24,8 +24,8 @@ func (_m *Transactions) ByFingerprint(fingerprint flow.Fingerprint) (*flow.Trans
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Fingerprint) error); ok {
-		r1 = rf(fingerprint)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(txID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -33,13 +33,13 @@ func (_m *Transactions) ByFingerprint(fingerprint flow.Fingerprint) (*flow.Trans
 	return r0, r1
 }
 
-// Insert provides a mock function with given fields: tx
-func (_m *Transactions) Insert(tx *flow.Transaction) error {
-	ret := _m.Called(tx)
+// Remove provides a mock function with given fields: txID
+func (_m *Transactions) Remove(txID flow.Identifier) error {
+	ret := _m.Called(txID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Transaction) error); ok {
-		r0 = rf(tx)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(txID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -47,13 +47,13 @@ func (_m *Transactions) Insert(tx *flow.Transaction) error {
 	return r0
 }
 
-// Remove provides a mock function with given fields: fingerprint
-func (_m *Transactions) Remove(fingerprint flow.Fingerprint) error {
-	ret := _m.Called(fingerprint)
+// Store provides a mock function with given fields: tx
+func (_m *Transactions) Store(tx *flow.Transaction) error {
+	ret := _m.Called(tx)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Fingerprint) error); ok {
-		r0 = rf(fingerprint)
+	if rf, ok := ret.Get(0).(func(*flow.Transaction) error); ok {
+		r0 = rf(tx)
 	} else {
 		r0 = ret.Error(0)
 	}

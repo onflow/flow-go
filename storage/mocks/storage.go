@@ -5,7 +5,6 @@
 package mocks
 
 import (
-	crypto "github.com/dapperlabs/flow-go/crypto"
 	flow "github.com/dapperlabs/flow-go/model/flow"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
@@ -34,19 +33,19 @@ func (m *MockBlocks) EXPECT() *MockBlocksMockRecorder {
 	return m.recorder
 }
 
-// ByHash mocks base method
-func (m *MockBlocks) ByHash(arg0 crypto.Hash) (*flow.Block, error) {
+// ByID mocks base method
+func (m *MockBlocks) ByID(arg0 flow.Identifier) (*flow.Block, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ByHash", arg0)
+	ret := m.ctrl.Call(m, "ByID", arg0)
 	ret0, _ := ret[0].(*flow.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ByHash indicates an expected call of ByHash
-func (mr *MockBlocksMockRecorder) ByHash(arg0 interface{}) *gomock.Call {
+// ByID indicates an expected call of ByID
+func (mr *MockBlocksMockRecorder) ByID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByHash", reflect.TypeOf((*MockBlocks)(nil).ByHash), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByID", reflect.TypeOf((*MockBlocks)(nil).ByID), arg0)
 }
 
 // ByNumber mocks base method
@@ -64,18 +63,18 @@ func (mr *MockBlocksMockRecorder) ByNumber(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByNumber", reflect.TypeOf((*MockBlocks)(nil).ByNumber), arg0)
 }
 
-// Save mocks base method
-func (m *MockBlocks) Save(arg0 *flow.Block) error {
+// Store mocks base method
+func (m *MockBlocks) Store(arg0 *flow.Block) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Save", arg0)
+	ret := m.ctrl.Call(m, "Store", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Save indicates an expected call of Save
-func (mr *MockBlocksMockRecorder) Save(arg0 interface{}) *gomock.Call {
+// Store indicates an expected call of Store
+func (mr *MockBlocksMockRecorder) Store(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockBlocks)(nil).Save), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockBlocks)(nil).Store), arg0)
 }
 
 // MockCollections is a mock of Collections interface
@@ -101,23 +100,23 @@ func (m *MockCollections) EXPECT() *MockCollectionsMockRecorder {
 	return m.recorder
 }
 
-// ByFingerprint mocks base method
-func (m *MockCollections) ByFingerprint(arg0 flow.Fingerprint) (*flow.Collection, error) {
+// ByID mocks base method
+func (m *MockCollections) ByID(arg0 flow.Identifier) (*flow.Collection, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ByFingerprint", arg0)
+	ret := m.ctrl.Call(m, "ByID", arg0)
 	ret0, _ := ret[0].(*flow.Collection)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ByFingerprint indicates an expected call of ByFingerprint
-func (mr *MockCollectionsMockRecorder) ByFingerprint(arg0 interface{}) *gomock.Call {
+// ByID indicates an expected call of ByID
+func (mr *MockCollectionsMockRecorder) ByID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByFingerprint", reflect.TypeOf((*MockCollections)(nil).ByFingerprint), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByID", reflect.TypeOf((*MockCollections)(nil).ByID), arg0)
 }
 
 // Remove mocks base method
-func (m *MockCollections) Remove(arg0 flow.Fingerprint) error {
+func (m *MockCollections) Remove(arg0 flow.Identifier) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Remove", arg0)
 	ret0, _ := ret[0].(error)
@@ -130,16 +129,16 @@ func (mr *MockCollectionsMockRecorder) Remove(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockCollections)(nil).Remove), arg0)
 }
 
-// Save mocks base method
-func (m *MockCollections) Save(arg0 *flow.Collection) error {
+// Store mocks base method
+func (m *MockCollections) Store(arg0 *flow.Collection) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Save", arg0)
+	ret := m.ctrl.Call(m, "Store", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// Save indicates an expected call of Save
-func (mr *MockCollectionsMockRecorder) Save(arg0 interface{}) *gomock.Call {
+// Store indicates an expected call of Store
+func (mr *MockCollectionsMockRecorder) Store(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockCollections)(nil).Save), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Store", reflect.TypeOf((*MockCollections)(nil).Store), arg0)
 }

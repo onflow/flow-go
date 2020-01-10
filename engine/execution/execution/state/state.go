@@ -17,7 +17,7 @@ type ExecutionState interface {
 	// CommitDelta commits a register delta and returns the new state commitment.
 	CommitDelta(Delta) (flow.StateCommitment, error)
 	// StateCommitmentByBlockHash returns the final state commitment for the provided block hash.
-	StateCommitmentByBlockHash(crypto.Hash) (flow.StateCommitment, error)
+	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
 
 	// PersistStateCommitment saves a state commitment under given hash
 	PersistStateCommitment(crypto.Hash, *flow.StateCommitment) error
@@ -66,12 +66,12 @@ func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
 	return flow.StateCommitment(commitment), nil
 }
 
-func (s *state) StateCommitmentByBlockHash(hash crypto.Hash) (flow.StateCommitment, error) {
-	commitment, err := s.commitments.ByHash(hash)
+func (s *state) StateCommitmentByBlockID(id flow.Identifier) (flow.StateCommitment, error) {
+	commitment, err := s.commitments.ByHash(id)
 	if err != nil {
 		if errors.Is(err, storage.NotFoundErr) {
 			//TODO ? Shouldn't happen in MVP, in multi-node should query a state from other nodes
-			panic(fmt.Sprintf("storage commitment for hash %v does not exist", hash))
+			panic(fmt.Sprintf("storage commitment for id %v does not exist", id))
 		} else {
 			return nil, err
 		}

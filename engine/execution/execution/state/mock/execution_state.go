@@ -2,7 +2,6 @@
 
 package mock
 
-import crypto "github.com/dapperlabs/flow-go/crypto"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 import state "github.com/dapperlabs/flow-go/engine/execution/execution/state"
@@ -51,26 +50,12 @@ func (_m *ExecutionState) NewView(_a0 flow.StateCommitment) *state.View {
 	return r0
 }
 
-// PersistStateCommitment provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionState) PersistStateCommitment(_a0 crypto.Hash, _a1 *flow.StateCommitment) error {
-	ret := _m.Called(_a0, _a1)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(crypto.Hash, *flow.StateCommitment) error); ok {
-		r0 = rf(_a0, _a1)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// StateCommitmentByBlockHash provides a mock function with given fields: _a0
-func (_m *ExecutionState) StateCommitmentByBlockHash(_a0 crypto.Hash) (flow.StateCommitment, error) {
+// StateCommitmentByBlockID provides a mock function with given fields: _a0
+func (_m *ExecutionState) StateCommitmentByBlockID(_a0 flow.Identifier) (flow.StateCommitment, error) {
 	ret := _m.Called(_a0)
 
 	var r0 flow.StateCommitment
-	if rf, ok := ret.Get(0).(func(crypto.Hash) flow.StateCommitment); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.StateCommitment); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
@@ -79,7 +64,7 @@ func (_m *ExecutionState) StateCommitmentByBlockHash(_a0 crypto.Hash) (flow.Stat
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(crypto.Hash) error); ok {
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
 		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)

@@ -27,18 +27,18 @@ func TestSubmitCollectionOneToOne(t *testing.T) {
 	node2 := nodes[1]
 
 	// prepare a random collection hash
-	gc := randCollectionGuarantee()
+	guarantee := unittest.CollectionGuaranteeFixture()
 
 	// node1's engine receives a collection hash
-	_ = node1.engine.ProcessLocal(gc)
+	_ = node1.engine.ProcessLocal(guarantee)
 	node1.net.FlushAll()
 
 	// inspect node2's mempool to check if node2's engine received the collection hash
-	coll, err := node2.pool.Get(gc.Fingerprint())
+	coll, err := node2.pool.Get(guarantee.ID())
 	require.Nil(t, err)
 
 	// should match
-	require.Equal(t, coll.Fingerprint(), gc.Fingerprint())
+	require.Equal(t, coll.ID(), guarantee.ID())
 	terminate(node1, node2)
 }
 
@@ -59,24 +59,24 @@ func TestSubmitCollectionManyToManySynchronous(t *testing.T) {
 	node2 := nodes[1]
 	node3 := nodes[2]
 
-	// prepare 3 different CollectionGuarantees: gc1, gc2, gc3
-	gc1 := randCollectionGuarantee()
-	gc2 := randCollectionGuarantee()
-	gc3 := randCollectionGuarantee()
+	// prepare 3 different CollectionGuarantees: guarantee1, guarantee2, guarantee3
+	guarantee1 := unittest.CollectionGuaranteeFixture()
+	guarantee2 := unittest.CollectionGuaranteeFixture()
+	guarantee3 := unittest.CollectionGuaranteeFixture()
 
 	// check the collections are different
-	require.NotEqual(t, gc1.Fingerprint(), gc2.Fingerprint())
+	require.NotEqual(t, guarantee1.ID(), guarantee2.ID())
 
-	// send gc1 to node1, which will broadcast to other nodes synchronously
-	_ = node1.engine.ProcessLocal(gc1)
+	// send guarantee1 to node1, which will broadcast to other nodes synchronously
+	_ = node1.engine.ProcessLocal(guarantee1)
 	node1.net.FlushAll()
 
-	// send gc2 to node2, which will broadcast to other nodes synchronously
-	_ = node1.engine.ProcessLocal(gc2)
+	// send guarantee2 to node2, which will broadcast to other nodes synchronously
+	_ = node1.engine.ProcessLocal(guarantee2)
 	node1.net.FlushAll()
 
-	// send gc3 to node3, which will broadcast to other nodes synchronously
-	_ = node3.engine.ProcessLocal(gc3)
+	// send guarantee3 to node3, which will broadcast to other nodes synchronously
+	_ = node3.engine.ProcessLocal(guarantee3)
 	node1.net.FlushAll()
 
 	// now, check that all 3 nodes should have the same mempool state
@@ -105,19 +105,19 @@ func TestSubmitCollectionManyToManyAsynchronous(t *testing.T) {
 	node2 := nodes[1]
 	node3 := nodes[2]
 
-	// prepare 3 different CollectionGuarantees: gc1, gc2, gc3
-	gc1 := randCollectionGuarantee()
-	gc2 := randCollectionGuarantee()
-	gc3 := randCollectionGuarantee()
+	// prepare 3 different CollectionGuarantees: guarantee1, guarantee2, guarantee3
+	guarantee1 := unittest.CollectionGuaranteeFixture()
+	guarantee2 := unittest.CollectionGuaranteeFixture()
+	guarantee3 := unittest.CollectionGuaranteeFixture()
 
 	// send different collection to different nodes concurrently
 	var wg sync.WaitGroup
 	wg.Add(1)
-	go sendOne(node1, gc1, &wg)
+	go sendOne(node1, guarantee1, &wg)
 	wg.Add(1)
-	go sendOne(node2, gc2, &wg)
+	go sendOne(node2, guarantee2, &wg)
 	wg.Add(1)
-	go sendOne(node3, gc3, &wg)
+	go sendOne(node3, guarantee3, &wg)
 	wg.Wait()
 
 	// now, check that all 3 nodes should have the same mempool state
@@ -134,19 +134,19 @@ func TestSubmitCollectionManyToManyAsynchronous(t *testing.T) {
 
 func TestSubmitCollectionManyToManyRandom(t *testing.T) {
 
-	nodes, gcs, err := prepareNodesAndCollections(5, 100)
+	nodes, guarantees, err := prepareNodesAndCollections(5, 100)
 	require.Nil(t, err)
 
 	N := len(nodes)
-	M := len(gcs)
+	M := len(guarantees)
 	t.Logf("preparing %v nodes to send %v messages concurrently", N, M)
 
 	// send each collection concurrently to a random node
 	var wg sync.WaitGroup
-	for _, gc := range gcs {
+	for _, guarantee := range guarantees {
 		wg.Add(1)
 		randNodeIndex := rand.Intn(N)
-		go sendOne(nodes[randNodeIndex], gc, &wg)
+		go sendOne(nodes[randNodeIndex], guarantee, &wg)
 	}
 	wg.Wait()
 
