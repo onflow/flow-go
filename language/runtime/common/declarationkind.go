@@ -40,6 +40,7 @@ func (k DeclarationKind) IsTypeDeclaration() bool {
 	case DeclarationKindStructure,
 		DeclarationKindResource,
 		DeclarationKindContract,
+		DeclarationKindEvent,
 		DeclarationKindStructureInterface,
 		DeclarationKindResourceInterface,
 		DeclarationKindContractInterface:

@@ -33,7 +33,6 @@ func ParseAndCheckReferences(t *testing.T, referencesIsAssignable bool, code str
 		ParseAndCheckOptions{
 			Options: []sema.Option{
 				sema.WithPredeclaredValues(newReferencesTestValueDeclarations(referencesIsAssignable)),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
 	)

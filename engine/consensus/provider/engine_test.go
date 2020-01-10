@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/coldstuff"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
@@ -29,12 +28,11 @@ func TestOnBlockProposalValid(t *testing.T) {
 		con:   con,
 	}
 
-	candidate := unittest.BlockFixture()
+	block := unittest.BlockFixture()
 	identities := unittest.IdentityListFixture(100)
 	localID := identities[0].NodeID
-	proposal := &coldstuff.BlockProposal{Block: &candidate}
 
-	params := []interface{}{proposal}
+	params := []interface{}{&block}
 	for _, id := range identities[1:] {
 		params = append(params, id.NodeID)
 	}
@@ -44,7 +42,7 @@ func TestOnBlockProposalValid(t *testing.T) {
 	final.On("Identities", mock.Anything).Return(identities[1:], nil).Once()
 	con.On("Submit", params...).Return(nil).Once()
 
-	err := e.onBlockProposal(localID, proposal)
+	err := e.onBlock(localID, &block)
 	require.NoError(t, err)
 
 	me.AssertExpectations(t)
@@ -66,15 +64,14 @@ func TestOnBlockProposalRemoteOrigin(t *testing.T) {
 		con:   con,
 	}
 
-	candidate := unittest.BlockFixture()
+	block := unittest.BlockFixture()
 	identities := unittest.IdentityListFixture(100)
 	localID := identities[0].NodeID
 	remoteID := identities[1].NodeID
-	proposal := &coldstuff.BlockProposal{Block: &candidate}
 
 	me.On("NodeID").Return(localID)
 
-	err := e.onBlockProposal(remoteID, proposal)
+	err := e.onBlock(remoteID, &block)
 	require.Error(t, err)
 
 	me.AssertExpectations(t)
@@ -96,16 +93,15 @@ func TestOnBlockProposalIdentitiesError(t *testing.T) {
 		con:   con,
 	}
 
-	candidate := unittest.BlockFixture()
+	block := unittest.BlockFixture()
 	identities := unittest.IdentityListFixture(100)
 	localID := identities[0].NodeID
-	proposal := &coldstuff.BlockProposal{Block: &candidate}
 
 	me.On("NodeID").Return(localID)
 	state.On("Final").Return(final).Once()
 	final.On("Identities", mock.Anything).Return(nil, errors.New("no identities")).Once()
 
-	err := e.onBlockProposal(localID, proposal)
+	err := e.onBlock(localID, &block)
 	require.Error(t, err)
 
 	me.AssertExpectations(t)
@@ -127,12 +123,11 @@ func TestOnBlockProposalSubmitFail(t *testing.T) {
 		con:   con,
 	}
 
-	candidate := unittest.BlockFixture()
+	block := unittest.BlockFixture()
 	identities := unittest.IdentityListFixture(100)
 	localID := identities[0].NodeID
-	proposal := &coldstuff.BlockProposal{Block: &candidate}
 
-	params := []interface{}{proposal}
+	params := []interface{}{&block}
 	for _, id := range identities[1:] {
 		params = append(params, id.NodeID)
 	}
@@ -142,7 +137,7 @@ func TestOnBlockProposalSubmitFail(t *testing.T) {
 	final.On("Identities", mock.Anything).Return(identities[1:], nil).Once()
 	con.On("Submit", params...).Return(errors.New("submit failed")).Once()
 
-	err := e.onBlockProposal(localID, proposal)
+	err := e.onBlock(localID, &block)
 	require.Error(t, err)
 
 	me.AssertExpectations(t)

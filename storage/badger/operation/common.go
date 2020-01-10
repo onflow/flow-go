@@ -22,7 +22,7 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		// check if the key already exists in the db
 		_, err := tx.Get(key)
 		if err == nil {
-			return storage.KeyAlreadyExistsErr
+			return storage.ErrAlreadyExists
 		}
 
 		if !errors.Is(err, badger.ErrKeyNotFound) {
@@ -70,7 +70,7 @@ func persist(key []byte, entity interface{}) func(*badger.Txn) error {
 				if bytes.Equal(val, existingVal) {
 					return nil
 				} else {
-					return storage.DifferentDataErr
+					return storage.ErrDataMismatch
 				}
 			})
 			if err != nil {
@@ -97,7 +97,7 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 		// retrieve the item from the key-value store
 		_, err := tx.Get(key)
 		if err == badger.ErrKeyNotFound {
-			return storage.NotFoundErr
+			return storage.ErrNotFound
 		}
 
 		if err != nil {
@@ -148,7 +148,7 @@ func retrieve(key []byte, entity interface{}) func(*badger.Txn) error {
 		item, err := tx.Get(key)
 		if err != nil {
 			if err == badger.ErrKeyNotFound {
-				return storage.NotFoundErr
+				return storage.ErrNotFound
 			}
 			return fmt.Errorf("could not load data: %w", err)
 		}

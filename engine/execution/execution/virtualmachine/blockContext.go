@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -38,7 +37,8 @@ func (bc *blockContext) newTransactionContext(ledger Ledger, tx flow.Transaction
 // if an unexpected error occurs during execution. If the transaction reverts due to
 // a normal runtime error, the error is recorded in the transaction result.
 func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx flow.TransactionBody) (*TransactionResult, error) {
-	location := runtime.TransactionLocation(tx.Fingerprint())
+	txID := tx.ID()
+	location := runtime.TransactionLocation(txID[:])
 
 	ctx := bc.newTransactionContext(ledger, tx)
 
@@ -47,8 +47,8 @@ func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx flow.TransactionBod
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts
 			return &TransactionResult{
-				TxHash: crypto.Hash(tx.Fingerprint()),
-				Error:  err,
+				TxID:  txID,
+				Error: err,
 			}, nil
 		}
 
@@ -57,7 +57,7 @@ func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx flow.TransactionBod
 	}
 
 	return &TransactionResult{
-		TxHash: crypto.Hash(tx.Fingerprint()),
-		Error:  nil,
+		TxID:  txID,
+		Error: nil,
 	}, nil
 }

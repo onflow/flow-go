@@ -13,17 +13,17 @@ import (
 // by the collections.
 
 func InsertCollection(collection *flow.LightCollection) func(*badger.Txn) error {
-	return insert(makePrefix(codeCollection, collection.Fingerprint()), collection)
+	return insert(makePrefix(codeCollection, collection.ID()), collection)
 }
 
 func PersistCollection(collection *flow.LightCollection) func(*badger.Txn) error {
-	return persist(makePrefix(codeCollection, collection.Fingerprint()), collection)
+	return persist(makePrefix(codeCollection, collection.ID()), collection)
 }
 
-func RetrieveCollection(hash flow.Fingerprint, collection *flow.LightCollection) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeCollection, hash), collection)
+func RetrieveCollection(collID flow.Identifier, collection *flow.LightCollection) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeCollection, collID), collection)
 }
 
-func RemoveCollection(hash flow.Fingerprint) func(*badger.Txn) error {
-	return remove(makePrefix(codeCollection, hash))
+func RemoveCollection(collID flow.Identifier) func(*badger.Txn) error {
+	return remove(makePrefix(codeCollection, collID))
 }

@@ -22,32 +22,32 @@ func NewCollections(db *badger.DB) *Collections {
 	return &c
 }
 
-func (c *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, error) {
+func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 	var (
 		light      flow.LightCollection
 		collection flow.Collection
 	)
 
 	err := c.db.View(func(btx *badger.Txn) error {
-		err := operation.RetrieveCollection(hash, &light)(btx)
+		err := operation.RetrieveCollection(collID, &light)(btx)
 		if err != nil {
 			if errors.Is(err, badger.ErrKeyNotFound) {
-				return storage.NotFoundErr
+				return storage.ErrNotFound
 			}
 			return fmt.Errorf("could not retrieve collection: %w", err)
 		}
 
-		for _, txHash := range light.Transactions {
-			var transaction flow.Transaction
-			err = operation.RetrieveTransaction(txHash, &transaction)(btx)
+		for _, txID := range light.Transactions {
+			var tx flow.TransactionBody
+			err = operation.RetrieveTransaction(txID, &tx)(btx)
 			if err != nil {
 				if errors.Is(err, badger.ErrKeyNotFound) {
-					return storage.NotFoundErr
+					return storage.ErrNotFound
 				}
 				return fmt.Errorf("could not retrieve transaction: %w", err)
 			}
 
-			collection.Transactions = append(collection.Transactions, transaction.TransactionBody)
+			collection.Transactions = append(collection.Transactions, tx)
 		}
 
 		return nil
@@ -59,16 +59,15 @@ func (c *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, er
 	return &collection, nil
 }
 
-func (c *Collections) Save(collection *flow.Collection) error {
+func (c *Collections) Store(collection *flow.Collection) error {
 	return c.db.Update(func(btx *badger.Txn) error {
-		err := operation.PersistCollection(collection.Light())(btx)
+		light := collection.Light()
+		err := operation.PersistCollection(&light)(btx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
 
-		for _, txBody := range collection.Transactions {
-			tx := flow.Transaction{TransactionBody: txBody}
-
+		for _, tx := range collection.Transactions {
 			err = operation.PersistTransaction(&tx)(btx)
 			if err != nil {
 				return err
@@ -79,9 +78,9 @@ func (c *Collections) Save(collection *flow.Collection) error {
 	})
 }
 
-func (c *Collections) Remove(hash flow.Fingerprint) error {
+func (c *Collections) Remove(collID flow.Identifier) error {
 	return c.db.Update(func(btx *badger.Txn) error {
-		err := operation.RemoveCollection(hash)(btx)
+		err := operation.RemoveCollection(collID)(btx)
 		if err != nil {
 			return fmt.Errorf("could not remove collection: %w", err)
 		}

@@ -148,6 +148,7 @@ memberOrNestedDeclaration
     | functionDeclaration
     | interfaceDeclaration
     | compositeDeclaration
+    | eventDeclaration
     ;
 
 compositeKind

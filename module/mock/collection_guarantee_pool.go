@@ -41,13 +41,13 @@ func (_m *CollectionGuaranteePool) All() []*flow.CollectionGuarantee {
 	return r0
 }
 
-// Get provides a mock function with given fields: fp
-func (_m *CollectionGuaranteePool) Get(fp flow.Fingerprint) (*flow.CollectionGuarantee, error) {
-	ret := _m.Called(fp)
+// Get provides a mock function with given fields: collID
+func (_m *CollectionGuaranteePool) Get(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
+	ret := _m.Called(collID)
 
 	var r0 *flow.CollectionGuarantee
-	if rf, ok := ret.Get(0).(func(flow.Fingerprint) *flow.CollectionGuarantee); ok {
-		r0 = rf(fp)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.CollectionGuarantee); ok {
+		r0 = rf(collID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.CollectionGuarantee)
@@ -55,8 +55,8 @@ func (_m *CollectionGuaranteePool) Get(fp flow.Fingerprint) (*flow.CollectionGua
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Fingerprint) error); ok {
-		r1 = rf(fp)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(collID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -64,13 +64,13 @@ func (_m *CollectionGuaranteePool) Get(fp flow.Fingerprint) (*flow.CollectionGua
 	return r0, r1
 }
 
-// Has provides a mock function with given fields: fp
-func (_m *CollectionGuaranteePool) Has(fp flow.Fingerprint) bool {
-	ret := _m.Called(fp)
+// Has provides a mock function with given fields: collID
+func (_m *CollectionGuaranteePool) Has(collID flow.Identifier) bool {
+	ret := _m.Called(collID)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Fingerprint) bool); ok {
-		r0 = rf(fp)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
+		r0 = rf(collID)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -94,13 +94,13 @@ func (_m *CollectionGuaranteePool) Hash() crypto.Hash {
 	return r0
 }
 
-// Rem provides a mock function with given fields: fp
-func (_m *CollectionGuaranteePool) Rem(fp flow.Fingerprint) bool {
-	ret := _m.Called(fp)
+// Rem provides a mock function with given fields: collID
+func (_m *CollectionGuaranteePool) Rem(collID flow.Identifier) bool {
+	ret := _m.Called(collID)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Fingerprint) bool); ok {
-		r0 = rf(fp)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
+		r0 = rf(collID)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
