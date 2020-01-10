@@ -11,7 +11,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/codec/json"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
 )
 
 // StubEngine is a simple engine that is used for testing the correctness of
@@ -71,8 +70,8 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 	// cancelling the context of test suite
 	defer s.cancel()
 
-	targetID1 := flow.Identifier(byte(0))
-	mw1, err := middleware.New(zerolog.Logger{}, json.NewCodec(), uint(0), "0.0.0.0:0", targetID1)
+	targetID1 := flow.Identifier{}
+	mw1, err := New(zerolog.Logger{}, json.NewCodec(), uint(0), "0.0.0.0:0", targetID1)
 	require.NoError(s.Suite.T(), err)
 
 	_, err = NewNetwork(zerolog.Logger{}, json.NewCodec(), nil, nil, mw1)

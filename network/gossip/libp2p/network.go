@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/cache"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/topology"
 	"github.com/dapperlabs/flow-go/protocol"
 )
@@ -30,7 +31,7 @@ type Network struct {
 	codec   network.Codec
 	state   protocol.State
 	me      module.Local
-	mw      Middleware
+	mw      middleware.Middleware
 	cache   *cache.Cache
 	top     *topology.Topology
 	sip     hash.Hash
@@ -40,7 +41,7 @@ type Network struct {
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & cache interfaces to track volatile information.
-func NewNetwork(log zerolog.Logger, codec network.Codec, state protocol.State, me module.Local, mw Middleware) (*Network, error) {
+func NewNetwork(log zerolog.Logger, codec network.Codec, state protocol.State, me module.Local, mw middleware.Middleware) (*Network, error) {
 
 	top, err := topology.New()
 	if err != nil {

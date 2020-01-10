@@ -1,16 +1,14 @@
-package middleware
+package libp2p
 
 import (
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
-
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 )
 
 type ReadConnection struct {
 	*Connection
-	inbound chan *libp2p.Message
+	inbound chan *Message
 }
 
 // NewConnection creates a new connection to a peer on the flow network, using
@@ -19,7 +17,7 @@ func NewReadConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *ReadCon
 	connection := NewConnection(log, stream)
 	c := ReadConnection{
 		Connection: connection,
-		inbound:    make(chan *libp2p.Message),
+		inbound:    make(chan *Message),
 	}
 	return &c
 }
@@ -38,7 +36,7 @@ RecvLoop:
 		default:
 		}
 
-		msg := new(libp2p.Message)
+		msg := new(Message)
 
 		err := r.ReadMsg(msg)
 		if err != nil {

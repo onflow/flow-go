@@ -1,12 +1,11 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package middleware
+package libp2p
 
 import (
 	"bufio"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/rs/zerolog"
 
 	ggio "github.com/gogo/protobuf/io"
@@ -17,7 +16,7 @@ import (
 // network.
 type WriteConnection struct {
 	*Connection
-	outbound chan *libp2p.Message
+	outbound chan *Message
 }
 
 // NewConnection creates a new connection to a peer on the flow network, using
@@ -27,7 +26,7 @@ func NewWriteConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *WriteC
 	c := NewConnection(log, stream)
 	wc := WriteConnection{
 		Connection: c,
-		outbound:   make(chan *libp2p.Message),
+		outbound:   make(chan *Message),
 	}
 	return &wc
 }
