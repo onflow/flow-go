@@ -19,7 +19,6 @@ type Middleware interface {
 // overlay network layer.
 type Overlay interface {
 	Identity() (flow.Identity, error)
-	Handshake(conn Connection) (flow.Identifier, error)
 	Receive(nodeID flow.Identifier, msg interface{}) error
 	Cleanup(nodeID flow.Identifier) error
 }

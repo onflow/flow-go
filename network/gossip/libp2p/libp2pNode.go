@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/gogo/protobuf/proto"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -44,10 +42,6 @@ type P2PNode struct {
 	ps         *pubsub.PubSub                     // the reference to the pubsub instance
 	topics     map[FlowTopic]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs       map[FlowTopic]*pubsub.Subscription // map of a topic string to an actual subscription
-	streams    map[uint8]network.Stream           // map of engine id to libp2p streams
-
-	//TODO abstract this out in a different class (Issue#1611)
-	inbound chan interface{}
 }
 
 // Start starts a libp2p node on the given address.
@@ -109,7 +103,9 @@ func (p *P2PNode) Stop() error {
 	p.Lock()
 	defer p.Unlock()
 	err := p.libP2PHost.Close()
-	if err == nil {
+	if err != nil {
+		p.logger.Error().Err(err).Str("Name", p.name).Msg("libp2p node did not stop successfully")
+	} else {
 		p.logger.Debug().Str("Name", p.name).Msg("libp2p node stopped successfully")
 	}
 	return err
@@ -137,6 +133,7 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers []NodeAddress) error {
 	return nil
 }
 
+// CreateStream adds node n as a peer and creates a new stream with it
 func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stream, error) {
 
 	// Add node address as a peer
@@ -266,55 +263,6 @@ func (p *P2PNode) Publish(ctx context.Context, t FlowTopic, data []byte) error {
 		return fmt.Errorf("topic not found")
 	}
 	return ps.Publish(ctx, data)
-}
-
-// submit method submits the given event for the given engine to the overlay layer
-// for processing; it is used by engines through conduits.
-// The Target needs to be added as a peer before submitting the message.
-func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
-	for _, t := range targetIDs {
-		peerID, err := GetLibP2PIDFromFlowID(t)
-		if err != nil {
-			return err
-		}
-		var senderID [32]byte
-		// Convert node Name to self to sender ID
-		copy(senderID[:], p.name)
-		// Compose the message payload
-		message := &Message{
-			SenderID: senderID[:],
-			Event:    event.([]byte),
-		}
-		// Get the ProtoBuf representation of the message
-		b, err := proto.Marshal(message)
-		if err != nil {
-			return errors.Wrapf(err, "could not marshal message: %v", message)
-		}
-
-		// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
-		stream, err := p.libP2PHost.NewStream(context.Background(), peerID, FlowLibP2PProtocolID)
-		if err != nil {
-			return err
-		}
-
-		// Send the message using the stream
-		_, err = stream.Write(b)
-		if err != nil {
-			return err
-		}
-
-		// Debug log the message length
-		p.logger.Debug().Str("peer", stream.Conn().RemotePeer().String()).
-			Str("message", message.String()).Int("length", len(b)).
-			Msg("sent message")
-
-		// Close the stream
-		err = stream.Close()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // GetLocationMultiaddr returns a Multiaddress string (https://docs.libp2p.io/concepts/addressing/) given a node address

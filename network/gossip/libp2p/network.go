@@ -143,7 +143,6 @@ func (n *Network) Identity() (flow.Identity, error) {
 func (n *Network) Cleanup(nodeID flow.Identifier) error {
 	// drop the peer state using the ID we registered
 	n.top.Down(nodeID)
-
 	return nil
 }
 
@@ -190,10 +189,6 @@ func (n *Network) processNetworkMessage(nodeID flow.Identifier, message *network
 		return err
 	}
 	return nil
-}
-
-func (n *Network) Handshake(conn Connection) (flow.Identifier, error) {
-	return flow.Identifier{}, errors.New("method not implemented")
 }
 
 // genNetworkMessage uses the codec to encode an event into a NetworkMessage
