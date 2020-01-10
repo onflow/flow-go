@@ -41,13 +41,13 @@ func (_m *TransactionPool) All() []*flow.Transaction {
 	return r0
 }
 
-// Get provides a mock function with given fields: fp
-func (_m *TransactionPool) Get(fp flow.Fingerprint) (*flow.Transaction, error) {
-	ret := _m.Called(fp)
+// Get provides a mock function with given fields: txID
+func (_m *TransactionPool) Get(txID flow.Identifier) (*flow.Transaction, error) {
+	ret := _m.Called(txID)
 
 	var r0 *flow.Transaction
-	if rf, ok := ret.Get(0).(func(flow.Fingerprint) *flow.Transaction); ok {
-		r0 = rf(fp)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Transaction); ok {
+		r0 = rf(txID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Transaction)
@@ -55,8 +55,8 @@ func (_m *TransactionPool) Get(fp flow.Fingerprint) (*flow.Transaction, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Fingerprint) error); ok {
-		r1 = rf(fp)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(txID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -64,13 +64,13 @@ func (_m *TransactionPool) Get(fp flow.Fingerprint) (*flow.Transaction, error) {
 	return r0, r1
 }
 
-// Has provides a mock function with given fields: fp
-func (_m *TransactionPool) Has(fp flow.Fingerprint) bool {
-	ret := _m.Called(fp)
+// Has provides a mock function with given fields: txID
+func (_m *TransactionPool) Has(txID flow.Identifier) bool {
+	ret := _m.Called(txID)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Fingerprint) bool); ok {
-		r0 = rf(fp)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
+		r0 = rf(txID)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -94,13 +94,13 @@ func (_m *TransactionPool) Hash() crypto.Hash {
 	return r0
 }
 
-// Rem provides a mock function with given fields: fp
-func (_m *TransactionPool) Rem(fp flow.Fingerprint) bool {
-	ret := _m.Called(fp)
+// Rem provides a mock function with given fields: txID
+func (_m *TransactionPool) Rem(txID flow.Identifier) bool {
+	ret := _m.Called(txID)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Fingerprint) bool); ok {
-		r0 = rf(fp)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
+		r0 = rf(txID)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}

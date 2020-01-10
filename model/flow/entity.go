@@ -3,12 +3,7 @@ package flow
 import (
 	"encoding/hex"
 	"fmt"
-
-	"github.com/dapperlabs/flow-go/crypto"
 )
-
-// Identifier represents a 32-byte unique identifier for a node.
-type Identifier [32]byte
 
 // HexStringToIdentifier converts a hex string to an identifier. The input
 // must be 64 characters long and contain only valid hex characters.
@@ -29,15 +24,6 @@ func (id Identifier) String() string {
 	return hex.EncodeToString(id[:])
 }
 
-// Fingerprint is a hash of an entity to verify the content
-// TODO update this to be a fixed size array
-type Fingerprint crypto.Hash
-
-// Hex returns the hex string representation of the fingerprint.
-func (fp Fingerprint) Hex() string {
-	return hex.EncodeToString(fp)
-}
-
 // Entity defines how flow entities should be defined
 // Entities are flat data structures holding multiple data fields.
 // Entities don't includes nested entities, they only include pointers to
@@ -45,49 +31,55 @@ func (fp Fingerprint) Hex() string {
 // of keeping an slice of entity object itself. This simplifies storage, signature and validation
 // of entities.
 type Entity interface {
-	// ID returns a unique id for this entity,
-	// Note that ID is built based on the immutable and rudimentary
-	// part of the content, it doesn't hold the state of the entity.
+
+	// ID returns a unique id for this entity using a hash of the immutable
+	// fields of the entity.
 	ID() Identifier
-	// Body returns the body party of the entity; critical properties
-	// that requires validation upon receiving. In other words, properties
-	// outside of the body is controlled locally and is not trustable by other nodes.
-	Body() interface{}
-	// Fingerprint returns a proof (some sort of root hash) for content of the body.
-	Fingerprint() Fingerprint
+
+	// Checksum returns a unique checksum for the entity, including the mutable
+	// data such as signatures.
+	Checksum() Identifier
 }
 
-// MembershipProof contains proof that an entity is part of a EntityList
-type MembershipProof []byte
+// Proof contains proof that an entity is part of a EntityList
+type Proof []byte
 
 // EntityList is a list of entities of the same type
 type EntityList interface {
-	// Append an entity to the list
-	Append(e Entity) error
-	// Items return all entities
-	Items() []Entity
-	// Fingerprint returns a proof (some sort of root hash) on the content in the list
-	Fingerprint() Fingerprint
-	// ByFingerprint returns an entity from the list by entity commit
-	ByFingerprint(f Fingerprint) Entity
+	EntitySet
+
+	// HasIndex checks if the list has an entity at the given index.
+	HasIndex(i uint) bool
+
 	// ByIndex returns an entity from the list by index
-	ByIndex(i uint64) Entity
+	ByIndex(i uint) (Entity, bool)
+
 	// ByIndexWithProof returns an entity from the list by index and proof of membership
-	ByIndexWithProof(i uint64) (Entity, MembershipProof)
-	// returns the number of elements inside the list
-	Size() int
+	ByIndexWithProof(i uint) (Entity, Proof, bool)
 }
 
 // EntitySet holds a set of entities (order doesn't matter)
 type EntitySet interface {
-	// Add an entity to the set
-	Add(e Entity) error
-	// Fingerprint returns some sort of root hash of the items in the set
-	Fingerprint() Fingerprint
-	// if the set has an specific member
-	Has(entityFingerprint Fingerprint) (bool, error)
+
+	// Insert adds an entity to the data structure.
+	Insert(Entity) bool
+
+	// Remove removes an entity from the data structure.
+	Remove(Entity) bool
+
+	// Items returns all items of the collection.
+	Items() []Entity
+
+	// Size returns the number of entities in the data structure.
+	Size() uint
+
+	// Fingerprint returns a unique identifier for all entities of the data
+	// structure.
+	Fingerprint() Identifier
+
+	// ByID returns the entity with the given fingerprint.
+	ByID(id Identifier) (Entity, bool)
+
 	// if the set has an specific member providing proof of membership
-	HasWithProof() (bool, MembershipProof, error)
-	// returns the number of elements inside the set
-	Size() int
+	ByIDWithProof(id Identifier) (bool, Proof, error)
 }

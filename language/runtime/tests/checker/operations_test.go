@@ -221,7 +221,11 @@ func TestCheckConcatenatingExpression(t *testing.T) {
 
 func TestCheckInvalidCompositeEquality(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		if compositeKind == common.CompositeKindEvent {
+			continue
+		}
 
 		t.Run(compositeKind.Name(), func(t *testing.T) {
 
@@ -262,7 +266,6 @@ func TestCheckInvalidCompositeEquality(t *testing.T) {
 			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[0])
-
 		})
 	}
 }

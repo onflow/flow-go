@@ -32,11 +32,11 @@ type mockPropagationNode struct {
 
 // newMockPropagationNode creates a mocked node with a real engine in it, and "plug" the node into a mocked hub.
 func newMockPropagationNode(hub *stub.Hub, genesis *flow.Block, nodeIndex int) (*mockPropagationNode, error) {
-	if nodeIndex >= len(genesis.NewIdentities) {
+	if nodeIndex >= len(genesis.Identities) {
 		return nil, errors.Errorf("nodeIndex is out of range: %v", nodeIndex)
 	}
 
-	id := genesis.NewIdentities[nodeIndex]
+	id := genesis.Identities[nodeIndex]
 	me, err := local.New(id)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not initialize local")
@@ -45,7 +45,7 @@ func newMockPropagationNode(hub *stub.Hub, genesis *flow.Block, nodeIndex int) (
 	// only log error logs
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 
-	pool, err := mempool.NewCollectionPool()
+	pool, err := mempool.NewGuaranteePool()
 	if err != nil {
 		return nil, errors.Wrap(err, "could not initialize mempool")
 	}

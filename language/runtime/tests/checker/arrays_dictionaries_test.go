@@ -594,19 +594,30 @@ func TestCheckEmptyDictionaryCall(t *testing.T) {
 
 func TestCheckArraySubtyping(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			body := "{}"
+			if kind == common.CompositeKindEvent {
+				body = "()"
+			}
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s interface I {}
-                      %[1]s S: I {}
+                      %[1]s interface I %[2]s
+                      %[1]s S: I %[2]s
 
-                      let xs: %[2]s[S] %[3]s []
-                      let ys: %[2]s[I] %[3]s xs
+                      let xs: %[3]s[S] %[4]s []
+                      let ys: %[3]s[I] %[4]s xs
 	                `,
 					kind.Keyword(),
+					body,
 					kind.Annotation(),
 					kind.TransferOperator(),
 				),
@@ -631,19 +642,30 @@ func TestCheckInvalidArraySubtyping(t *testing.T) {
 
 func TestCheckDictionarySubtyping(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			body := "{}"
+			if kind == common.CompositeKindEvent {
+				body = "()"
+			}
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s interface I {}
-                      %[1]s S: I {}
+                      %[1]s interface I %[2]s
+                      %[1]s S: I %[2]s
 
-                      let xs: %[2]s{String: S} %[3]s {}
-                      let ys: %[2]s{String: I} %[3]s xs
+                      let xs: %[3]s{String: S} %[4]s {}
+                      let ys: %[3]s{String: I} %[4]s xs
 	                `,
 					kind.Keyword(),
+					body,
 					kind.Annotation(),
 					kind.TransferOperator(),
 				),
