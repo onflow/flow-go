@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -18,16 +19,16 @@ import (
 // Engine is the propagation engine, which makes sure that new collections are
 // propagated to the other consensus nodes on the network.
 type Engine struct {
-	unit  *engine.Unit                   // used to control startup/shutdown
-	log   zerolog.Logger                 // used to log relevant actions with context
-	con   network.Conduit                // used to talk to other nodes on the network
-	state protocol.State                 // used to access the  protocol state
-	me    module.Local                   // used to access local node information
-	pool  module.CollectionGuaranteePool // holds collection guarantees in memory
+	unit  *engine.Unit       // used to control startup/shutdown
+	log   zerolog.Logger     // used to log relevant actions with context
+	con   network.Conduit    // used to talk to other nodes on the network
+	state protocol.State     // used to access the  protocol state
+	me    module.Local       // used to access local node information
+	pool  mempool.Guarantees // holds collection guarantees in memory
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool module.CollectionGuaranteePool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool mempool.Guarantees) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{

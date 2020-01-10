@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -28,13 +29,13 @@ type Engine struct {
 	blocks   storage.Blocks
 	state    protocol.State
 	me       module.Local
-	pool     module.CollectionGuaranteePool
+	pool     mempool.Guarantees
 	interval time.Duration
 }
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, prov network.Engine, blocks storage.Blocks, state protocol.State, me module.Local, pool module.CollectionGuaranteePool) (*Engine, error) {
+func New(log zerolog.Logger, prov network.Engine, blocks storage.Blocks, state protocol.State, me module.Local, pool mempool.Guarantees) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{

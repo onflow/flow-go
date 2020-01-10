@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -27,11 +28,11 @@ type Engine struct {
 	state     protocol.State
 	clusters  flow.ClusterList
 	clusterID flow.ClusterID // my cluster ID
-	pool      module.TransactionPool
+	pool      mempool.Transactions
 }
 
 // New creates a new collection ingest engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool module.TransactionPool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool mempool.Transactions) (*Engine, error) {
 	identities, err := state.Final().Identities(identity.HasRole(flow.RoleCollection))
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)
@@ -124,6 +125,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // onTransaction handles receipt of a new transaction. This can be submitted
 // from outside the system or routed from another collection node.
 func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) error {
+
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Hex("tx_id", logging.ID(tx)).

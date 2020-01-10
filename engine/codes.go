@@ -26,15 +26,17 @@ const (
 	// Consensus 050-099
 	ConsensusProvider    = 50
 	ConsensusPropagation = 51
-
-	ConsensusReceiver = CollectionProvider
+	ConsensusMatching    = 52
+	ConsensusReceiver    = CollectionProvider
 
 	// Execution 100-199
 	ExecutionExecution      = 100
 	ExecutionBlockIngestion = 101
+	ExecutionProvider       = ConsensusMatching
 
 	// Verification 150-199
 	VerificationVerifier = 150
+	VerificationProvider = ConsensusMatching
 
 	// Testing 200-255
 	SimulationGenerator = 200
