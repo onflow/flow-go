@@ -16,46 +16,52 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mock"
+	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
-// VerifierEngineTestSuit encloses functionality testings of Verifier Engine
-type VerifierEngineTestSuit struct {
+// TestSuite encloses functionality testings of Verifier Engine
+type TestSuite struct {
 	suite.Suite
-	net   *mock.Network      // used as an instance of networking layer for the mock engine
-	state *protocol.State    // used as a mock protocol state of nodes for verification engine
-	ss    *protocol.Snapshot // used as a mock representation of the snapshot of system (part of State)
-	me    *mock.Local        // used as a mock representation of the mock verification node (owning the verifier engine)
-	con   *network.Conduit   // used as a mock instance of conduit that connects engine to network
+	net     *module.Network    // used as an instance of networking layer for the mock engine
+	state   *protocol.State    // used as a mock protocol state of nodes for verification engine
+	ss      *protocol.Snapshot // used as a mock representation of the snapshot of system (part of State)
+	me      *module.Local      // used as a mock representation of the mock verification node (owning the verifier engine)
+	pool    verification.Mempool
+	colChan *network.Conduit // used as a mock instance of conduit for collection channel
+	exeChan *network.Conduit // used as mock instance of conduit for execution channel
 }
 
 // TestVerifierEngineTestSuite is the constructor of the TestSuite of the verifier engine
-// Invoking this method executes all the subsequent tests methods of VerifierEngineTestSuit type
+// Invoking this method executes all the subsequent tests methods of TestSuite type
 func TestVerifierEngineTestSuite(t *testing.T) {
-	suite.Run(t, new(VerifierEngineTestSuit))
+	suite.Run(t, new(TestSuite))
 }
 
 // SetupTests initiates the test setups prior to each test
-func (v *VerifierEngineTestSuit) SetupTest() {
+func (v *TestSuite) SetupTest() {
 	// initializing test suite fields
 	v.state = &protocol.State{}
-	v.con = &network.Conduit{}
-	v.net = &mock.Network{}
-	v.me = &mock.Local{}
+	v.colChan = &network.Conduit{}
+	v.exeChan = &network.Conduit{}
+	v.net = &module.Network{}
+	v.me = &module.Local{}
 	v.ss = &protocol.Snapshot{}
 
 	// mocking the network registration of the engine
 	// all subsequent tests are expected to have a call on Register method
-	v.net.On("Register", uint8(engine.VerificationVerifier), testifymock.AnythingOfType("*verifier.Engine")).
-		Return(v.con, nil).
+	v.net.On("Register", engine.CollectionProvider, testifymock.Anything).
+		Return(v.colChan, nil).
+		Once()
+	v.net.On("Register", engine.ExecutionProvider, testifymock.Anything).
+		Return(v.exeChan, nil).
 		Once()
 }
 
 // TestEncodeResultApproval tests encoding of result approvals
 // making sure that encoding works correctly
-func (v *VerifierEngineTestSuit) TestEncodeResultApproval() {
+func (v *TestSuite) TestEncodeResultApproval() {
 	resApprove := flow.ResultApproval{}
 	resultID := resApprove.ID()
 	require.NotEqual(v.T(), resultID, flow.ZeroID, "nil fingerprint")
@@ -64,7 +70,7 @@ func (v *VerifierEngineTestSuit) TestEncodeResultApproval() {
 // TestNewEngine verifies the establishment of the network registration upon
 // creation of an instance of verifier.Engine using the New method
 // It also returns an instance of new engine to be used in the later tests
-func (v *VerifierEngineTestSuit) TestNewEngine() *Engine {
+func (v *TestSuite) TestNewEngine() *Engine {
 	// creating a new engine
 	e, err := New(zerolog.Logger{}, v.net, v.state, v.me)
 	require.Nil(v.T(), err, "could not create an engine")
@@ -74,7 +80,7 @@ func (v *VerifierEngineTestSuit) TestNewEngine() *Engine {
 
 // TestProcessLocalHappyPath covers the happy path of submitting a valid execution receipt to
 // a single verifier engine till a result approval is emitted to all the consensus nodes
-func (v *VerifierEngineTestSuit) TestProcessLocalHappyPath() {
+func (v *TestSuite) TestProcessLocalHappyPath() {
 	// creating a new engine
 	vrfy := v.TestNewEngine()
 	//mocking the identity of the verification node under test
@@ -127,7 +133,7 @@ func (v *VerifierEngineTestSuit) TestProcessLocalHappyPath() {
 
 // TestProcessUnhappyInput covers unhappy inputs for Process method
 // including nil event, empty event, and non-existing IDs
-func (v *VerifierEngineTestSuit) TestProcessUnhappyInput() {
+func (v *TestSuite) TestProcessUnhappyInput() {
 	// mocking state for Final().Identity(flow.Identifier{}) call in onExecutionReceipt
 	v.state.On("Final").Return(v.ss).Once()
 	v.ss.On("Identity", flow.Identifier{}).Return(flow.Identity{}, errors.New("non-nil")).Once()
@@ -157,7 +163,7 @@ func (v *VerifierEngineTestSuit) TestProcessUnhappyInput() {
 // TestProcessUnstakeEmit tests the Process method of Verifier engine against
 // an unauthorized node emitting an execution receipt. The process method should
 // catch this injected fault by returning an error
-func (v *VerifierEngineTestSuit) TestProcessUnstakeEmit() {
+func (v *TestSuite) TestProcessUnstakeEmit() {
 	// creating a new engine
 	vrfy := v.TestNewEngine()
 
@@ -185,7 +191,7 @@ func (v *VerifierEngineTestSuit) TestProcessUnstakeEmit() {
 
 // TestProcessUnauthorizedEmits follows the unhappy path where staked nodes
 // rather than execution nodes send an execution receipt event
-func (v *VerifierEngineTestSuit) TestProcessUnauthorizedEmits() {
+func (v *TestSuite) TestProcessUnauthorizedEmits() {
 	// creating a new engine
 	vrfy := v.TestNewEngine()
 
@@ -252,7 +258,7 @@ func (v *VerifierEngineTestSuit) TestProcessUnauthorizedEmits() {
 // Submit method of the verifier engine.
 // 5- It generates a valid execution receipt and mocks the verifier node accept that from the generated execution node ID
 // in step (2), and emit a result approval to the consensus committee generated in step (4).
-func (v *VerifierEngineTestSuit) ConcurrencyTestSetup(degree, consNum int) (*flow.Identity, *Engine, *flow.ExecutionReceipt) {
+func (v *TestSuite) ConcurrencyTestSetup(degree, consNum int) (*flow.Identity, *Engine, *flow.ExecutionReceipt) {
 	// creating a new engine
 	vrfy := v.TestNewEngine()
 
@@ -293,7 +299,7 @@ func (v *VerifierEngineTestSuit) ConcurrencyTestSetup(degree, consNum int) (*flo
 // TestProcessHappyPathConcurrentERs covers the happy path of the verifier engine on concurrently
 // receiving a valid execution receipt several times. The execution receipts are coming from a single
 // execution node. The expected behavior is to verify only a single copy of those receipts while dismissing the rest.
-func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentERs() {
+func (v *TestSuite) TestProcessHappyPathConcurrentERs() {
 	// ConcurrencyDegree defines the number of concurrent identical ER that are submitted to the
 	// verifier node
 	const ConcurrencyDegree = 10
@@ -324,7 +330,7 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentERs() {
 // receiving a valid execution receipt several times each over a different threads
 // In other words, this test concerns invoking the Process method over threads
 // The expected behavior is to verify only a single copy of those receipts while dismissing the rest
-func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentERsConcurrently() {
+func (v *TestSuite) TestProcessHappyPathConcurrentERsConcurrently() {
 	// Todo this test is currently broken as it assumes the Process method of engine to
 	// be called sequentially and not over a thread
 	// We skip it as it is not required for MVP
@@ -365,7 +371,7 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentERsConcurrently()
 // TestProcessHappyPathConcurrentDifferentERs covers the happy path of the verifier engine on concurrently
 // receiving several valid execution receipts.
 // The expected behavior is to verify all of them and emit one submission of result approval per input receipt
-func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentDifferentERs() {
+func (v *TestSuite) TestProcessHappyPathConcurrentDifferentERs() {
 	// ConcurrencyDegree defines the number of concurrent identical ER that are submitted to the
 	// verifier node
 	const ConcurrencyDegree = 10
@@ -433,7 +439,7 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentDifferentERs() {
 
 // TestProcessHappyPath covers the happy path of the verifier engine on receiving a valid execution receipt
 // The expected behavior is to verify the receipt and emit a result approval to all consensus nodes
-func (v *VerifierEngineTestSuit) TestProcessHappyPath() {
+func (v *TestSuite) TestProcessHappyPath() {
 	// creating a new engine
 	vrfy := v.TestNewEngine()
 
