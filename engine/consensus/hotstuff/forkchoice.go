@@ -1,6 +1,8 @@
 package hotstuff
 
 import (
+	"bytes"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
@@ -52,8 +54,24 @@ func (fc *ForkChoice) FinalizedView() uint64 {
 	return fc.finalizedBlock.Block.View
 }
 
-func (fc *ForkChoice) IsSafeNode(block *types.BlockProposal) bool {
-	return block.Block.QC.View >= fc.lockedBlock.Block.QC.View
+func (fc *ForkChoice) LockedQC() *types.QuorumCertificate {
+	return fc.lockedBlock.Block.QC
+}
+
+// LockedView is the view number of the locked QC
+func (fc *ForkChoice) LockedView() uint64 {
+	return fc.LockedQC().View
+}
+
+func (fc *ForkChoice) IsSafeNode(proposal *types.BlockProposal) bool {
+	qc := proposal.Block.QC
+	if qc.View > fc.LockedView() {
+		return true
+	}
+	if qc.View < fc.LockedView() {
+		return false
+	}
+	return bytes.Equal(qc.BlockMRH, fc.LockedQC().BlockMRH)
 }
 
 // return true only if the following conditions are all true
@@ -66,18 +84,23 @@ func (fc *ForkChoice) CanIncorporate(bp *types.BlockProposal) bool {
 // Updates
 
 func (fc *ForkChoice) UpdateValidQC(qc *types.QuorumCertificate) (highestQCUpdated bool, finalizedBlocks []*types.BlockProposal) {
+	// updateHighestQC
+	// updateLockedQC
+	// updateFinalizedBlock
 	if qc.View > fc.highestQC.View {
 		fc.highestQC = qc
 		highestQCUpdated = true
 	}
-	if qc.View > fc.finalizedBlock.View {
+	if qc.View > fc.finalizedBlock.View() {
 		parent, grantParent, greatGrantParent := fc.incorporatedBlocks.FindThreeParentsOf(qc.BlockMRH)
-		if parent != nil && grantParent != nil && greatGrantParent != nil {
+		finalizedQC, finalized := isFinalized(parent, grantParent, greatGrantParent)
+		if finalized {
+			finalizedBlocks := fc.findFinalizedBlocks(finalizedQC)
 		}
 	}
 }
 
 func (fc *ForkChoice) AddNewProposal(bp *types.BlockProposal) (incorperatedBlock *types.BlockProposal, added bool) {
 	// TODO: UpdateValidQC
-	return fc.incorporatedBlocks.AddIncorporatableVertex(p)
+	return fc.incorporatedBlocks.AddIncorporatableVertex(bp)
 }
