@@ -415,7 +415,6 @@ func TestCheckTopLevelContractRestriction(t *testing.T) {
 						common.DeclarationKindImport,
 					},
 				),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
 	)
@@ -450,7 +449,6 @@ func TestCheckInvalidTopLevelContractRestriction(t *testing.T) {
 								common.DeclarationKindImport,
 							},
 						),
-						sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 					},
 				},
 			)

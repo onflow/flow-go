@@ -26,11 +26,7 @@ type ParseCheckAndInterpretOptions struct {
 }
 
 func parseCheckAndInterpret(t *testing.T, code string) *interpreter.Interpreter {
-	return parseCheckAndInterpretWithOptions(t, code, ParseCheckAndInterpretOptions{
-		CheckerOptions: []sema.Option{
-			sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
-		},
-	})
+	return parseCheckAndInterpretWithOptions(t, code, ParseCheckAndInterpretOptions{})
 }
 
 func parseCheckAndInterpretWithOptions(
@@ -75,7 +71,7 @@ func constructorArguments(compositeKind common.CompositeKind, arguments string) 
 	return fmt.Sprintf("(%s)", arguments)
 }
 
-// makeContractValueHandler creates a interpreter option which
+// makeContractValueHandler creates an interpreter option which
 // sets the ContractValueHandler.
 // The handler immediately invokes the constructor with the given arguments.
 //
@@ -6542,7 +6538,6 @@ func TestInterpretOptionalChainingFieldReadAndNilCoalescing(t *testing.T) {
 		ParseCheckAndInterpretOptions{
 			CheckerOptions: []sema.Option{
 				sema.WithPredeclaredValues(valueDeclarations),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 			Options: []interpreter.Option{
 				interpreter.WithPredefinedValues(predefinedValues()),
@@ -6580,7 +6575,6 @@ func TestInterpretOptionalChainingFunctionCallAndNilCoalescing(t *testing.T) {
 		ParseCheckAndInterpretOptions{
 			CheckerOptions: []sema.Option{
 				sema.WithPredeclaredValues(valueDeclarations),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 			Options: []interpreter.Option{
 				interpreter.WithPredefinedValues(predefinedValues()),
@@ -6865,9 +6859,6 @@ func TestInterpretConformToImportedInterface(t *testing.T) {
 					location,
 				)
 				return checkerImported.Program, nil
-			},
-			Options: []sema.Option{
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
 	)

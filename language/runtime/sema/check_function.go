@@ -187,6 +187,10 @@ func (checker *Checker) checkTypeAnnotation(typeAnnotation *TypeAnnotation, pos 
 }
 
 func (checker *Checker) checkResourceAnnotation(ty Type, isResourceMove bool, pos ast.Position) {
+	if ty.IsInvalidType() {
+		return
+	}
+
 	if ty.IsResourceType() {
 		if !isResourceMove {
 			checker.report(
