@@ -1,6 +1,9 @@
 package hotstuff
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+import (
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/flow"
+)
 
 type Validator struct {
 	viewState ViewState
@@ -14,10 +17,10 @@ func (v *Validator) ValidateBlock(qc *types.QuorumCertificate, bp *types.BlockPr
 	panic("TODO")
 }
 
-func (v *Validator) ValidateIncorporatedVote(vote *types.Vote, bp *types.BlockProposal) bool {
+func (v *Validator) ValidateIncorporatedVote(vote *types.Vote, bp *types.BlockProposal, identities flow.IdentityList) (bool, error) {
 	panic("TODO")
 }
 
-func (v *Validator) ValidatePendingVote(vote *types.Vote) bool {
+func (v *Validator) ValidatePendingVote(vote *types.Vote) (bool, error) {
 	panic("TODO")
 }
