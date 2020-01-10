@@ -10,11 +10,9 @@ type CollectionRequest struct {
 	CollectionID flow.Identifier
 }
 
-// CollectionResponse is a response to previously sent CollectionRequest which
-// contains transactions payload.
+// CollectionResponse is a response to a request for a collection.
 type CollectionResponse struct {
-	CollectionID flow.Identifier
-	Transactions []flow.TransactionBody
+	Collection flow.Collection
 }
 
 // SubmitCollectionGuarantee is a request to submit the given collection

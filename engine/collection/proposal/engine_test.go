@@ -112,12 +112,16 @@ func TestProposalEngine(t *testing.T) {
 
 			ctx.pool.On("Size").Return(uint(0)).Once()
 
-			// should return an error and not submit a guarantee to provider engine
+			// should return an error
 			err := e.createProposal()
 			if assert.Error(t, err) {
 				assert.True(t, errors.Is(err, ErrEmptyTxpool))
 			}
+
+			// should not submit proposal to provider
 			ctx.provider.AssertNotCalled(t, "ProcessLocal", mock.Anything)
+			// should not remove anything from txpool
+			ctx.pool.AssertNotCalled(t, "Rem", mock.Anything)
 		})
 	})
 }
