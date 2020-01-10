@@ -71,7 +71,7 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 	defer s.cancel()
 
 	targetID1 := flow.Identifier{}
-	mw1, err := New(zerolog.Logger{}, json.NewCodec(), uint(0), "0.0.0.0:0", targetID1)
+	mw1, err := NewMiddleware(zerolog.Logger{}, json.NewCodec(), uint(0), "0.0.0.0:0", targetID1)
 	require.NoError(s.Suite.T(), err)
 
 	_, err = NewNetwork(zerolog.Logger{}, json.NewCodec(), nil, nil, mw1)

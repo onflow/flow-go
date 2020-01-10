@@ -16,7 +16,7 @@ type Topology struct {
 	peers map[flow.Identifier]*libp2p2.Peer
 }
 
-// New creates a new naive state implementation for the overlay layer.
+// NewMiddleware creates a new naive state implementation for the overlay layer.
 func New() (*Topology, error) {
 	t := &Topology{
 		peers: make(map[flow.Identifier]*libp2p2.Peer),

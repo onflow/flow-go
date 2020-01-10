@@ -62,7 +62,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		return err
 	}
 
-	// libp2p.New constructs a new libp2p Host.
+	// libp2p.NewMiddleware constructs a new libp2p Host.
 	// Other options can be added here.
 	host, err := libp2p.New(
 		ctx,

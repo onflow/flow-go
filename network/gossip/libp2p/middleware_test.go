@@ -244,7 +244,7 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 		codec := json.NewCodec()
 
 		// creates new middleware
-		mw, err := New(logger, codec, uint(count-1), "0.0.0.0:0", targetID)
+		mw, err := NewMiddleware(logger, codec, uint(count-1), "0.0.0.0:0", targetID)
 		require.NoError(m.Suite.T(), err)
 
 		mws = append(mws, mw)
