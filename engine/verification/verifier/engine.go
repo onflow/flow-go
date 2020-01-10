@@ -1,15 +1,17 @@
 package verifier
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/verification/storage"
+	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -20,35 +22,39 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit  *engine.Unit      // used to control startup/shutdown
-	log   zerolog.Logger    // used to log relevant actions
-	con   network.Conduit   // used for inter-node communication within the network
-	me    module.Local      // used to access local node information
-	state protocol.State    // used to access the  protocol state
-	store storage.ERMempool // used to maintain an in-memory store for execution receipts
-	wg    sync.WaitGroup    // used to keep track of the number of threads
-	mu    sync.Mutex
+	unit       *engine.Unit         // used to control startup/shutdown
+	log        zerolog.Logger       // used to log relevant actions
+	colChannel network.Conduit      // used to get resources from collection nodes
+	exeChannel network.Conduit      // used to get resources from execution nodes
+	me         module.Local         // used to access local node information
+	state      protocol.State       // used to access the  protocol state
+	pool       verification.Mempool // used to maintain an in-memory pool for execution receipts
+	wg         sync.WaitGroup       // used to keep track of the number of threads
+	mu         sync.Mutex
 }
 
 // New creates and returns a new instance of a verifier engine
-func New(loger zerolog.Logger, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
+func New(loger zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool verification.Mempool) (*Engine, error) {
 	e := &Engine{
 		unit:  engine.NewUnit(),
 		log:   loger,
 		state: state,
 		me:    me,
-		store: *storage.New(),
+		pool:  pool,
 		wg:    sync.WaitGroup{},
 		mu:    sync.Mutex{},
 	}
 
-	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.VerificationVerifier, e)
+	var err error
+	e.colChannel, err = net.Register(engine.CollectionProvider, e)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register engine")
+		return nil, fmt.Errorf("could not register engine on collection provider channel: %w", err)
 	}
 
-	e.con = con
+	e.exeChannel, err = net.Register(engine.ExecutionProvider, e)
+	if err != nil {
+		return nil, fmt.Errorf("could not register engine on execution provider channel: %w", err)
+	}
 
 	return e, nil
 }
@@ -102,6 +108,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.ExecutionReceipt:
 		return e.onExecutionReceipt(originID, ev)
+	case *flow.Collection:
+		return e.onCollection(originID, ev)
+	case *messages.CollectionResponse:
+		return e.onCollection(originID, ev.)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
@@ -133,7 +143,7 @@ func (e *Engine) onExecutionReceipt(originID flow.Identifier, receipt *flow.Exec
 	}
 
 	// storing the execution receipt in the store of the engine
-	isUnique := e.store.Put(receipt)
+	isUnique := e.pool.Put(receipt)
 	if !isUnique {
 		return errors.New("received duplicate execution receipt")
 	}

@@ -10,13 +10,12 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
-	protocol "github.com/dapperlabs/flow-go/protocol/badger"
+	"github.com/dapperlabs/flow-go/protocol"
 )
 
 type Engine struct {
@@ -26,20 +25,29 @@ type Engine struct {
 	me          module.Local
 	state       protocol.State
 	pool        verification.Mempool
-	verifierEng verifier.Engine
+	verifierEng network.Engine
 }
 
 // NewCollectionReceiver returns a new engine bound to the collection provider bus.
 //
 // This engine will only be able to receive, handle, and request resources from
 // collection nodes.
-func NewCollectionReceiver(log zerolog.Logger, net module.Network, me module.Local, pool verification.Mempool) (*Engine, error) {
+func NewCollectionReceiver(
+	log zerolog.Logger,
+	net module.Network,
+	me module.Local,
+	state protocol.State,
+	pool verification.Mempool,
+	verifierEng network.Engine,
+) (*Engine, error) {
 
 	e := &Engine{
-		unit: engine.NewUnit(),
-		log:  log.With().Str("engine", "receiver").Str("resource", "collection").Logger(),
-		me:   me,
-		pool: pool,
+		unit:        engine.NewUnit(),
+		log:         log.With().Str("engine", "receiver").Str("resource", "collection").Logger(),
+		me:          me,
+		state:       state,
+		verifierEng: verifierEng,
+		pool:        pool,
 	}
 
 	con, err := net.Register(engine.VerificationCollectionReceiver, e)
@@ -56,13 +64,15 @@ func NewCollectionReceiver(log zerolog.Logger, net module.Network, me module.Loc
 //
 // This engine will only be able to receive, handle, and request resources from
 // execution nodes.
-func NewExecutionReceiver(log zerolog.Logger, net module.Network, me module.Local, pool verification.Mempool) (*Engine, error) {
+func NewExecutionReceiver(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, pool verification.Mempool, verifierEng network.Engine) (*Engine, error) {
 
 	e := &Engine{
-		unit: engine.NewUnit(),
-		log:  log.With().Str("engine", "receiver").Str("resource", "collection").Logger(),
-		me:   me,
-		pool: pool,
+		unit:        engine.NewUnit(),
+		log:         log.With().Str("engine", "receiver").Str("resource", "execution").Logger(),
+		me:          me,
+		state:       state,
+		verifierEng: verifierEng,
+		pool:        pool,
 	}
 
 	con, err := net.Register(engine.VerificationExecutionReceiver, e)
@@ -120,7 +130,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) RequestCollection(hash flow.Fingerprint) error {
 	collectionNodes, err := e.state.Final().Identities(identity.HasRole(flow.RoleCollection))
 	if err != nil {
-		return fmt.Errorf("could not get collection identities: %w")
+		return fmt.Errorf("could not get collection identities: %w", err)
 	}
 
 	req := &messages.CollectionRequest{Fingerprint: hash}

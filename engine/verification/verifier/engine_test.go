@@ -110,13 +110,13 @@ func (v *VerifierEngineTestSuit) TestProcessLocalHappyPath() {
 		Once()
 
 	// store of the engine should be empty prior to the submit
-	assert.Equal(v.T(), vrfy.store.ResultsNum(), 0)
+	assert.Equal(v.T(), vrfy.pool.ResultsNum(), 0)
 
 	// emitting an execution receipt form the execution node
 	_ = vrfy.ProcessLocal(er)
 
 	// store of the engine should be of size one prior to the submit
-	assert.Equal(v.T(), vrfy.store.ResultsNum(), 1)
+	assert.Equal(v.T(), vrfy.pool.ResultsNum(), 1)
 
 	vrfy.wg.Wait()
 	v.state.AssertExpectations(v.T())

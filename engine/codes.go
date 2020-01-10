@@ -35,10 +35,7 @@ const (
 	ExecutionBlockIngestion = 102
 
 	// Verification 150-199
-	VerificationVerifier = 150
-
-	VerificationCollectionReceiver = CollectionProvider
-	VerificationExecutionReceiver  = ExecutionProvider
+	VerificationProvider = 150
 
 	// Testing 200-255
 	SimulationGenerator = 200
