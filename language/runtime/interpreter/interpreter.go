@@ -119,21 +119,37 @@ type ImportProgramHandlerFunc func(
 	location ast.Location,
 ) *ast.Program
 
-type concreteTypeCode struct {
+// compositeTypeCode contains the the "prepared" / "callable" "code"
+// for the functions and the destructor of a composite
+// (contract, struct, resource, event).
+//
+// As there is no support for inheritance of concrete types,
+// these are the "leaf" nodes in the call chain, and are functions.
+//
+type compositeTypeCode struct {
 	compositeFunctions map[string]FunctionValue
 	destructorFunction FunctionValue
 }
 
 type FunctionWrapper = func(inner FunctionValue) FunctionValue
 
+// wrapperCode contains the "prepared" / "callable" "code"
+// for inherited types (interfaces and type requirements).
+//
+// These are "branch" nodes in the call chain, and are function wrappers,
+// i.e. they wrap the functions / function wrappers that inherit them.
+//
 type wrapperCode struct {
 	initializerFunctionWrapper FunctionWrapper
 	destructorFunctionWrapper  FunctionWrapper
 	functionWrappers           map[string]FunctionWrapper
 }
 
+// typeCodes is the value which stores the "prepared" / "callable" "code"
+// of all composite types, interface types, and type requirements.
+//
 type typeCodes struct {
-	compositeCodes       map[sema.TypeID]concreteTypeCode
+	compositeCodes       map[sema.TypeID]compositeTypeCode
 	interfaceCodes       map[sema.TypeID]wrapperCode
 	typeRequirementCodes map[sema.TypeID]wrapperCode
 }
@@ -297,7 +313,7 @@ func NewInterpreter(checker *sema.Checker, options ...Option) (*Interpreter, err
 		WithAllInterpreters(map[ast.LocationID]*Interpreter{}),
 		WithAllCheckers(map[ast.LocationID]*sema.Checker{}),
 		withTypeCodes(typeCodes{
-			compositeCodes:       map[sema.TypeID]concreteTypeCode{},
+			compositeCodes:       map[sema.TypeID]compositeTypeCode{},
 			interfaceCodes:       map[sema.TypeID]wrapperCode{},
 			typeRequirementCodes: map[sema.TypeID]wrapperCode{},
 		}),
@@ -2133,7 +2149,7 @@ func (interpreter *Interpreter) declareCompositeValue(
 		wrapFunctions(interpreter.typeCodes.typeRequirementCodes[typeRequirement.ID()])
 	}
 
-	interpreter.typeCodes.compositeCodes[compositeType.ID()] = concreteTypeCode{
+	interpreter.typeCodes.compositeCodes[compositeType.ID()] = compositeTypeCode{
 		destructorFunction: destructorFunction,
 		compositeFunctions: functions,
 	}
