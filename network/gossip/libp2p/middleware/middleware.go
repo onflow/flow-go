@@ -26,7 +26,7 @@ type Middleware struct {
 	codec      network.Codec
 	ov         libp2p.Overlay
 	slots      chan struct{} // semaphore for outgoing connection slots
-	conns      map[flow.Identifier]*WriteConnection
+	cc         *ConnectionCache
 	wg         *sync.WaitGroup
 	libP2PNode *libp2p.P2PNode
 	stop       chan struct{}
@@ -49,7 +49,7 @@ func New(log zerolog.Logger, codec network.Codec, conns uint, address string, fl
 		log:        log,
 		codec:      codec,
 		slots:      make(chan struct{}, conns),
-		conns:      make(map[flow.Identifier]*WriteConnection),
+		cc:         NewConnectionCache(),
 		libP2PNode: p2p,
 		wg:         &sync.WaitGroup{},
 		stop:       make(chan struct{}),
@@ -73,10 +73,10 @@ func (m *Middleware) Start(ov libp2p.Overlay) {
 func (m *Middleware) Stop() {
 	close(m.stop)
 	m.libP2PNode.Stop()
-	for _, conn := range m.conns {
+	for _, conn := range m.cc.GetAll() {
 		conn.stop()
 	}
-	//m.wg.Wait()
+	m.wg.Wait()
 }
 
 // Send will try to send the given message to the given peer.
@@ -84,8 +84,8 @@ func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 	m.Lock()
 	defer m.Unlock()
 
-	// get the conn from our list
-	conn, ok := m.conns[nodeID]
+	// get the conn from the conn cache
+	conn, ok := m.cc.Get(nodeID)
 	if !ok {
 		return errors.Errorf("connection not found (node_id: %s)", nodeID)
 	}
@@ -173,7 +173,7 @@ func (m *Middleware) connect() {
 	}
 
 	// If this node is already added, noop
-	if m.exists(flowIdentity.NodeID) {
+	if m.cc.Exists(flowIdentity.NodeID) {
 		log.Debug().Str("flowIdentity", flowIdentity.String()).Msg("node already added")
 		return
 	}
@@ -197,9 +197,22 @@ func (m *Middleware) connect() {
 	// make sure we close the stream once the handling is done
 	defer stream.Close()
 
-	// this is a blocking call so that the deferred cleanups run only after we are
-	// done handling this peer
-	m.handleOutgoing(flowIdentity.NodeID, stream)
+	clog := m.log.With().
+		Str("local_addr", stream.Conn().LocalPeer().String()).
+		Str("remote_addr", stream.Conn().RemotePeer().String()).
+		Logger()
+
+	// create the write connection handler
+	conn := NewWriteConnection(clog, stream)
+
+	// cache the connection against the node id and remove it when done
+	m.cc.Add(flowIdentity.NodeID, conn)
+	defer m.cc.Remove(flowIdentity.NodeID)
+
+	log.Info().Msg("connection established")
+
+	// kick off the send loop
+	conn.SendLoop()
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
@@ -250,51 +263,7 @@ ProcessLoop:
 	log.Info().Msg("connection closed")
 }
 
-func (m *Middleware) handleOutgoing(flowID flow.Identifier, s libp2pnetwork.Stream) {
-
-	log := m.log.With().
-		Str("local_addr", s.Conn().LocalPeer().String()).
-		Str("remote_addr", s.Conn().RemotePeer().String()).
-		Logger()
-
-	// create the write connection handler
-	conn := NewWriteConnection(log, s)
-
-	// cache the connection against the node id
-	m.add(flowID, conn)
-	defer m.remove(flowID)
-
-	log.Info().Msg("connection established")
-
-	// kick off the send loop
-	conn.SendLoop()
-}
-
 // release will release one resource on the given semaphore.
 func (m *Middleware) release(slots chan struct{}) {
 	<-slots
-}
-
-// add will add the given conn with the given address to our list in a
-// concurrency-safe manner.
-func (m *Middleware) add(nodeID flow.Identifier, conn *WriteConnection) {
-	m.Lock()
-	defer m.Unlock()
-	m.conns[nodeID] = conn
-}
-
-// exists will check if the connection already exists in a concurrency-safe manner.
-func (m *Middleware) exists(nodeID flow.Identifier) bool {
-	m.Lock()
-	defer m.Unlock()
-	_, ok := m.conns[nodeID]
-	return ok
-}
-
-// remove will remove the connection with the given nodeID from the list in
-// a concurrency-safe manner.
-func (m *Middleware) remove(nodeID flow.Identifier) {
-	m.Lock()
-	defer m.Unlock()
-	delete(m.conns, nodeID)
 }
