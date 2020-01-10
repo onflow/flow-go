@@ -14,7 +14,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	networkmodel "github.com/dapperlabs/flow-go/model/libp2p/network"
-	"github.com/dapperlabs/flow-go/model/libp2p/peer"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/cache"
@@ -237,11 +236,11 @@ func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Id
 	n.cache.Set(engineID, message.EventID, message)
 
 	// get all peers that haven't seen it yet
-	nodeIDs := n.top.Peers(peer.Not(peer.HasSeen(message.EventID))).NodeIDs()
-	if len(nodeIDs) == 0 {
-		return nil
-	}
-	err = n.send(message, nodeIDs...)
+	//nodeIDs := n.top.Peers(peer.Not(peer.HasSeen(message.EventID))).NodeIDs()
+	//if len(nodeIDs) == 0 {
+	//	return nil
+	//}
+	err = n.send(message, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not gossip event")
 	}

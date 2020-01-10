@@ -9,12 +9,15 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p"
+	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
+	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
 // StubEngine is a simple engine that is used for testing the correctness of
@@ -41,6 +44,8 @@ func (l Local) Address() string {
 
 type StubEngineTestSuite struct {
 	LibP2PNodeTestSuite
+	state *protocol.State
+	me    *mock.Local
 }
 
 // SubmitLocal is implemented for a valid type assertion to Engine
@@ -95,19 +100,27 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 		var nodeID [32]byte
 		nodeID[0] = byte(i + 1)
 		ID := flow.Identifier(nodeID)
+		ids = append(ids, ID)
+	}
 
-		// creating middleware of node-1
-		mw, err := NewMiddleware(zerolog.Logger{}, json.NewCodec(), uint(0), "0.0.0.0:0", ID)
+	for i := 0; i < count; i++ {
+		// creating middleware of nodes
+		mw, err := NewMiddleware(zerolog.Logger{}, json.NewCodec(), uint(0), "0.0.0.0:0", ids[i])
 		require.NoError(s.Suite.T(), err)
 
+		state := &protocol.State{}
+		snapshot := &protocol.Snapshot{}
+		state.On("Final").Return(snapshot).Once()
+		snapshot.On("Identities", mockery.Anything).Return(ids[(i+1)%count], nil).Once()
 		// creating network of node-1
-		net, err := NewNetwork(zerolog.Logger{}, json.NewCodec(), nil, Local{me: ID}, mw)
+		net, err := NewNetwork(zerolog.Logger{}, json.NewCodec(), state, Local{me: ids[i]}, mw)
 		require.NoError(s.Suite.T(), err)
 
 		nets = append(nets, net)
-		ids = append(ids, ID)
 
-		<-net.Ready()
+		done := net.Ready()
+		<-done
+		time.Sleep(1 * time.Second)
 	}
 
 	// Step 4: Waits for nodes to heartbeat each other
