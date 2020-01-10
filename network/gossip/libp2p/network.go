@@ -220,7 +220,7 @@ func (n *Network) genNetworkMessage(engineID uint8, event interface{}, targetIDs
 // The Target needs to be added as a peer before submitting the message.
 func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 	// genNetworkMessage the event to get payload and event ID
-	message, err := n.genNetworkMessage(engineID, event)
+	message, err := n.genNetworkMessage(engineID, event, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not cast the event into NetworkMessage")
 	}

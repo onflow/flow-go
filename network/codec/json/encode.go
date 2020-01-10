@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/libp2p"
 	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
@@ -30,6 +31,8 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeRequest
 	case *trickle.Response:
 		code = CodeResponse
+	case *libp2p.Echo:
+		code = Echo
 
 	case *flow.GuaranteedCollection:
 		code = CodeGuaranteedCollection

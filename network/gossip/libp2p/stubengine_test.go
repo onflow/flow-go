@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/libp2p"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 )
 
@@ -24,6 +25,18 @@ type StubEngine struct {
 	originID flow.Identifier
 	event    interface{}   // used to keep track of the events that the node receives
 	received chan struct{} // used as an indicator on reception of messages for testing
+}
+
+type Local struct {
+	me flow.Identifier
+}
+
+func (l Local) NodeID() flow.Identifier {
+	return l.me
+}
+
+func (l Local) Address() string {
+	return ""
 }
 
 type StubEngineTestSuite struct {
@@ -88,12 +101,17 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 		require.NoError(s.Suite.T(), err)
 
 		// creating network of node-1
-		net, err := NewNetwork(zerolog.Logger{}, json.NewCodec(), nil, nil, mw)
+		net, err := NewNetwork(zerolog.Logger{}, json.NewCodec(), nil, Local{me: ID}, mw)
 		require.NoError(s.Suite.T(), err)
 
 		nets = append(nets, net)
 		ids = append(ids, ID)
+
+		<-net.Ready()
 	}
+
+	// Step 4: Waits for nodes to heartbeat each other
+	time.Sleep(2 * time.Second)
 
 	// test engine1
 	te1 := &StubEngine{
@@ -112,7 +130,10 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 	require.NoError(s.Suite.T(), err)
 
 	// Send the message to node 2 using the conduit of node 1
-	require.NoError(s.Suite.T(), c1.Submit("hello", ids[1]))
+	event := &libp2p.Echo{
+		Text: "hello",
+	}
+	require.NoError(s.Suite.T(), c1.Submit(event, ids[1]))
 
 	select {
 	case <-te2.received:

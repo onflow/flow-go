@@ -13,6 +13,7 @@ const (
 	CodeAnnounce
 	CodeRequest
 	CodeResponse
+	Echo
 
 	CodeGuaranteedCollection
 
