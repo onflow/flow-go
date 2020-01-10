@@ -2,14 +2,13 @@ package flow
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
 type ExecutionResultBody struct {
-	PreviousExecutionResult Fingerprint     // commit of the previous ER
-	Block                   Fingerprint     // commit of the current block
-	FinalStateCommitment    StateCommitment // final state commitment
-	Chunks                  ChunkList
+	PreviousResultID     Identifier      // commit of the previous ER
+	BlockID              Identifier      // commit of the current block
+	FinalStateCommitment StateCommitment // final state commitment
+	Chunks               ChunkList
 }
 
 type ExecutionResult struct {
@@ -17,7 +16,10 @@ type ExecutionResult struct {
 	Signatures []crypto.Signature
 }
 
-func (er *ExecutionResult) Fingerprint() Fingerprint {
-	return encoding.DefaultEncoder.MustEncode(er.ExecutionResultBody)
+func (er ExecutionResult) ID() Identifier {
+	return MakeID(er.ExecutionResultBody)
 }
 
+func (er ExecutionResult) Checksum() Identifier {
+	return MakeID(er)
+}

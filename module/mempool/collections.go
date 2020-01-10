@@ -14,8 +14,8 @@ type CollectionGuaranteePool struct {
 	*mempool
 }
 
-// NewCollectionPool creates a new memory pool for guaranteed collections.
-func NewCollectionPool() (*CollectionGuaranteePool, error) {
+// NewGuaranteePool creates a new memory pool for guaranteed collections.
+func NewGuaranteePool() (*CollectionGuaranteePool, error) {
 	m := &CollectionGuaranteePool{
 		mempool: newMempool(),
 	}
@@ -29,8 +29,8 @@ func (m *CollectionGuaranteePool) Add(guarantee *flow.CollectionGuarantee) error
 }
 
 // Get returns the given collection guarantee from the pool.
-func (m *CollectionGuaranteePool) Get(fp flow.Fingerprint) (*flow.CollectionGuarantee, error) {
-	item, err := m.mempool.Get(fp)
+func (m *CollectionGuaranteePool) Get(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
+	item, err := m.mempool.Get(collID)
 	if err != nil {
 		return nil, err
 	}
@@ -43,13 +43,13 @@ func (m *CollectionGuaranteePool) Get(fp flow.Fingerprint) (*flow.CollectionGuar
 	return guarantee, nil
 }
 
-// All returns all collection guarantees from the pool.
+// All returns all collections from the pool.
 func (m *CollectionGuaranteePool) All() []*flow.CollectionGuarantee {
-	items := m.mempool.All()
 
-	guarantees := make([]*flow.CollectionGuarantee, len(items))
-	for i, item := range items {
-		guarantees[i] = item.(*flow.CollectionGuarantee)
+	items := m.mempool.All()
+	guarantees := make([]*flow.CollectionGuarantee, 0, len(items))
+	for _, item := range items {
+		guarantees = append(guarantees, item.(*flow.CollectionGuarantee))
 	}
 
 	return guarantees

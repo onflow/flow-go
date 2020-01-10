@@ -47,7 +47,7 @@ func TestSubmitCollectionGuarantee(t *testing.T) {
 		net.FlushAll()
 
 		assert.Eventually(t, func() bool {
-			has := consNode.Pool.Has(guarantee.Fingerprint())
+			has := consNode.Pool.Has(guarantee.ID())
 			return has
 		}, time.Millisecond*5, time.Millisecond)
 	})
@@ -77,7 +77,7 @@ func TestCollectionRequest(t *testing.T) {
 
 		// save a collection to the store
 		coll := unittest.CollectionFixture(3)
-		err = collNode.Collections.Save(&coll)
+		err = collNode.Collections.Store(&coll)
 		assert.NoError(t, err)
 
 		// expect that the requester will receive the collection
@@ -87,7 +87,7 @@ func TestCollectionRequest(t *testing.T) {
 		requesterEngine.On("Process", collID.NodeID, expectedRes).Return(nil).Once()
 
 		// send a request for the collection
-		req := messages.CollectionRequest{Fingerprint: coll.Fingerprint()}
+		req := messages.CollectionRequest{CollectionID: coll.ID()}
 		err = con.Submit(&req, collID.NodeID)
 		assert.NoError(t, err)
 
@@ -118,12 +118,12 @@ func TestCollectionRequest(t *testing.T) {
 		collNode := testutil.CollectionNode(t, hub, collID, genesis)
 
 		// create request with invalid/nonexistent fingerprint
-		req := &messages.CollectionRequest{Fingerprint: flow.Fingerprint{}}
+		req := &messages.CollectionRequest{CollectionID: flow.ZeroID}
 
 		// provider should return error
 		err := collNode.ProviderEngine.ProcessLocal(req)
 		if assert.Error(t, err) {
-			assert.True(t, errors.Is(err, storage.NotFoundErr))
+			assert.True(t, errors.Is(err, storage.ErrNotFound))
 		}
 	})
 }

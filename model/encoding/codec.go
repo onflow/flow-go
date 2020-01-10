@@ -1,7 +1,7 @@
 package encoding
 
 import (
-	"github.com/dapperlabs/flow-go/model/encoding/rlp"
+	"github.com/dapperlabs/flow-go/model/encoding/json"
 )
 
 // Encoder encodes and decodes values to and from bytes.
@@ -28,4 +28,4 @@ type Encoder interface {
 }
 
 // DefaultEncoder is the default encoder used by Flow.
-var DefaultEncoder Encoder = rlp.NewEncoder()
+var DefaultEncoder Encoder = json.NewEncoder()

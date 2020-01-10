@@ -9,7 +9,6 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -17,9 +16,9 @@ import (
 
 // Snapshot represents a read-only immutable snapshot of the protocol state.
 type Snapshot struct {
-	state  *State
-	number uint64
-	hash   crypto.Hash
+	state   *State
+	number  uint64
+	blockID flow.Identifier
 }
 
 // Identities retrieves all active ids at the given snapshot and
@@ -59,18 +58,18 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 		if head.Number > boundary {
 
 			// get the final block we want to reach
-			var final crypto.Hash
-			err = operation.RetrieveHash(boundary, &final)(tx)
+			var finalID flow.Identifier
+			err = operation.RetrieveBlockID(boundary, &finalID)(tx)
 			if err != nil {
 				return errors.Wrap(err, "could not get final hash")
 			}
 
 			// track back from head block to latest finalized block
-			for !head.Hash().Equal(final) {
+			for head.ID() != finalID {
 
 				// get the identities for pending block
 				var ids flow.IdentityList
-				err = operation.RetrieveIdentities(head.Hash(), &ids)(tx)
+				err = operation.RetrieveIdentities(head.ID(), &ids)(tx)
 				if err != nil {
 					return errors.Wrap(err, "could not add deltas")
 				}
@@ -86,7 +85,7 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 				}
 
 				// set the head to the parent
-				err = operation.RetrieveHeader(head.Parent, &head)(tx)
+				err = operation.RetrieveHeader(head.ParentID, &head)(tx)
 				if err != nil {
 					return errors.Wrap(err, "could not retrieve parent")
 				}
@@ -161,17 +160,17 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 		}
 
 		// check if hash is nil and try to get it from height
-		if s.hash == nil {
-			err := operation.RetrieveHash(s.number, &s.hash)(tx)
+		if s.blockID == flow.ZeroID {
+			err := operation.RetrieveBlockID(s.number, &s.blockID)(tx)
 			if err != nil {
 				return errors.Wrapf(err, "could not retrieve hash (%d)", s.number)
 			}
 		}
 
 		// get the height for our desired target hash
-		err := operation.RetrieveHeader(s.hash, head)(tx)
+		err := operation.RetrieveHeader(s.blockID, head)(tx)
 		if err != nil {
-			return errors.Wrapf(err, "could not retrieve header (%x)", s.hash)
+			return errors.Wrapf(err, "could not retrieve header (%x)", s.blockID)
 		}
 
 		return nil

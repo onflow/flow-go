@@ -13,13 +13,48 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 )
 
+func qualifiedIdentifier(identifier string, containerType Type) string {
+
+	// Gather all identifiers: this, parent, grand-parent, etc.
+
+	identifiers := []string{identifier}
+
+	for containerType != nil {
+		switch typedContainerType := containerType.(type) {
+		case *InterfaceType:
+			identifiers = append(identifiers, typedContainerType.Identifier)
+			containerType = typedContainerType.ContainerType
+		case *CompositeType:
+			identifiers = append(identifiers, typedContainerType.Identifier)
+			containerType = typedContainerType.ContainerType
+		default:
+			panic(errors.NewUnreachableError())
+		}
+	}
+
+	// Append all identifiers, in reverse order
+
+	var sb strings.Builder
+
+	for i := len(identifiers) - 1; i >= 0; i-- {
+		sb.WriteString(identifiers[i])
+		if i != 0 {
+			sb.WriteRune('.')
+		}
+	}
+
+	return sb.String()
+}
+
+type TypeID string
+
 type Type interface {
 	isType()
 	String() string
 	Equal(other Type) bool
 	IsResourceType() bool
 	IsInvalidType() bool
-	ID() string
+	ID() TypeID
 }
 
 // ValueIndexableType
@@ -68,14 +103,6 @@ func NewTypeAnnotation(ty Type) *TypeAnnotation {
 	}
 }
 
-func NewTypeAnnotations(types ...Type) []*TypeAnnotation {
-	typeAnnotations := make([]*TypeAnnotation, len(types))
-	for i, ty := range types {
-		typeAnnotations[i] = NewTypeAnnotation(ty)
-	}
-	return typeAnnotations
-}
-
 // AnyStructType represents the top type of all non-resource types
 type AnyStructType struct{}
 
@@ -85,7 +112,7 @@ func (*AnyStructType) String() string {
 	return "AnyStruct"
 }
 
-func (*AnyStructType) ID() string {
+func (*AnyStructType) ID() TypeID {
 	return "AnyStruct"
 }
 
@@ -111,7 +138,7 @@ func (*AnyResourceType) String() string {
 	return "AnyResource"
 }
 
-func (*AnyResourceType) ID() string {
+func (*AnyResourceType) ID() TypeID {
 	return "AnyResource"
 }
 
@@ -137,7 +164,7 @@ func (*NeverType) String() string {
 	return "Never"
 }
 
-func (*NeverType) ID() string {
+func (*NeverType) ID() TypeID {
 	return "Never"
 }
 
@@ -163,7 +190,7 @@ func (*VoidType) String() string {
 	return "Void"
 }
 
-func (*VoidType) ID() string {
+func (*VoidType) ID() TypeID {
 	return "Void"
 }
 
@@ -192,7 +219,7 @@ func (t *InvalidType) String() string {
 	return "<<invalid>>"
 }
 
-func (*InvalidType) ID() string {
+func (*InvalidType) ID() TypeID {
 	return "<<invalid>>"
 }
 
@@ -223,11 +250,12 @@ func (t *OptionalType) String() string {
 	return fmt.Sprintf("%s?", t.Type)
 }
 
-func (t *OptionalType) ID() string {
-	if t.Type == nil {
-		return "optional"
+func (t *OptionalType) ID() TypeID {
+	var id string
+	if t.Type != nil {
+		id = string(t.Type.ID())
 	}
-	return fmt.Sprintf("%s?", t.Type.ID())
+	return TypeID(fmt.Sprintf("%s?", id))
 }
 
 func (t *OptionalType) Equal(other Type) bool {
@@ -255,7 +283,7 @@ func (*BoolType) String() string {
 	return "Bool"
 }
 
-func (*BoolType) ID() string {
+func (*BoolType) ID() TypeID {
 	return "Bool"
 }
 
@@ -282,7 +310,7 @@ func (*CharacterType) String() string {
 	return "Character"
 }
 
-func (*CharacterType) ID() string {
+func (*CharacterType) ID() TypeID {
 	return "Character"
 }
 
@@ -308,7 +336,7 @@ func (*StringType) String() string {
 	return "String"
 }
 
-func (*StringType) ID() string {
+func (*StringType) ID() TypeID {
 	return "String"
 }
 
@@ -340,9 +368,13 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 			VariableKind:    ast.VariableKindConstant,
 			TypeAnnotation: NewTypeAnnotation(
 				&FunctionType{
-					ParameterTypeAnnotations: NewTypeAnnotations(
-						&StringType{},
-					),
+					Parameters: []*Parameter{
+						{
+							Label:          ArgumentLabelNotRequired,
+							Identifier:     "other",
+							TypeAnnotation: NewTypeAnnotation(&StringType{}),
+						},
+					},
 					ReturnTypeAnnotation: NewTypeAnnotation(
 						&StringType{},
 					),
@@ -359,10 +391,16 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 			VariableKind:    ast.VariableKindConstant,
 			TypeAnnotation: NewTypeAnnotation(
 				&FunctionType{
-					ParameterTypeAnnotations: NewTypeAnnotations(
-						&IntType{},
-						&IntType{},
-					),
+					Parameters: []*Parameter{
+						{
+							Identifier:     "from",
+							TypeAnnotation: NewTypeAnnotation(&IntType{}),
+						},
+						{
+							Identifier:     "upTo",
+							TypeAnnotation: NewTypeAnnotation(&IntType{}),
+						},
+					},
 					ReturnTypeAnnotation: NewTypeAnnotation(
 						&StringType{},
 					),
@@ -390,7 +428,7 @@ func (t *StringType) isValueIndexableType() bool {
 	return true
 }
 
-func (t *StringType) ElementType(isAssignment bool) Type {
+func (t *StringType) ElementType(_ bool) Type {
 	return &CharacterType{}
 }
 
@@ -411,11 +449,11 @@ type IntegerType struct{}
 func (*IntegerType) isType() {}
 
 func (*IntegerType) String() string {
-	return "integer"
+	return "Integer"
 }
 
-func (*IntegerType) ID() string {
-	return "integer"
+func (*IntegerType) ID() TypeID {
+	return "Integer"
 }
 
 func (*IntegerType) Equal(other Type) bool {
@@ -448,7 +486,7 @@ func (*IntType) String() string {
 	return "Int"
 }
 
-func (*IntType) ID() string {
+func (*IntType) ID() TypeID {
 	return "Int"
 }
 
@@ -483,7 +521,7 @@ func (*Int8Type) String() string {
 	return "Int8"
 }
 
-func (*Int8Type) ID() string {
+func (*Int8Type) ID() TypeID {
 	return "Int8"
 }
 
@@ -520,7 +558,7 @@ func (*Int16Type) String() string {
 	return "Int16"
 }
 
-func (*Int16Type) ID() string {
+func (*Int16Type) ID() TypeID {
 	return "Int16"
 }
 
@@ -557,7 +595,7 @@ func (*Int32Type) String() string {
 	return "Int32"
 }
 
-func (*Int32Type) ID() string {
+func (*Int32Type) ID() TypeID {
 	return "Int32"
 }
 
@@ -594,7 +632,7 @@ func (*Int64Type) String() string {
 	return "Int64"
 }
 
-func (*Int64Type) ID() string {
+func (*Int64Type) ID() TypeID {
 	return "Int64"
 }
 
@@ -631,7 +669,7 @@ func (*UInt8Type) String() string {
 	return "UInt8"
 }
 
-func (*UInt8Type) ID() string {
+func (*UInt8Type) ID() TypeID {
 	return "UInt8"
 }
 
@@ -668,7 +706,7 @@ func (*UInt16Type) String() string {
 	return "UInt16"
 }
 
-func (*UInt16Type) ID() string {
+func (*UInt16Type) ID() TypeID {
 	return "UInt16"
 }
 
@@ -705,7 +743,7 @@ func (*UInt32Type) String() string {
 	return "UInt32"
 }
 
-func (*UInt32Type) ID() string {
+func (*UInt32Type) ID() TypeID {
 	return "UInt32"
 }
 
@@ -742,7 +780,7 @@ func (*UInt64Type) String() string {
 	return "UInt64"
 }
 
-func (*UInt64Type) ID() string {
+func (*UInt64Type) ID() TypeID {
 	return "UInt64"
 }
 
@@ -797,9 +835,13 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			VariableKind:    ast.VariableKindConstant,
 			TypeAnnotation: NewTypeAnnotation(
 				&FunctionType{
-					ParameterTypeAnnotations: NewTypeAnnotations(
-						elementType,
-					),
+					Parameters: []*Parameter{
+						{
+							Label:          ArgumentLabelNotRequired,
+							Identifier:     "element",
+							TypeAnnotation: NewTypeAnnotation(elementType),
+						},
+					},
 					ReturnTypeAnnotation: NewTypeAnnotation(
 						&VoidType{},
 					),
@@ -840,8 +882,12 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			VariableKind:    ast.VariableKindConstant,
 			TypeAnnotation: NewTypeAnnotation(
 				&FunctionType{
-					ParameterTypeAnnotations: []*TypeAnnotation{
-						typeAnnotation,
+					Parameters: []*Parameter{
+						{
+							Label:          ArgumentLabelNotRequired,
+							Identifier:     "other",
+							TypeAnnotation: typeAnnotation,
+						},
 					},
 					ReturnTypeAnnotation: typeAnnotation,
 				},
@@ -866,10 +912,17 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			VariableKind:    ast.VariableKindConstant,
 			TypeAnnotation: NewTypeAnnotation(
 				&FunctionType{
-					ParameterTypeAnnotations: NewTypeAnnotations(
-						&IntegerType{},
-						elementType,
-					),
+					Parameters: []*Parameter{
+						{
+							Identifier:     "at",
+							TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
+						},
+						{
+							Label:          ArgumentLabelNotRequired,
+							Identifier:     "element",
+							TypeAnnotation: NewTypeAnnotation(elementType),
+						},
+					},
 					ReturnTypeAnnotation: NewTypeAnnotation(
 						&VoidType{},
 					),
@@ -896,9 +949,12 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			VariableKind:    ast.VariableKindConstant,
 			TypeAnnotation: NewTypeAnnotation(
 				&FunctionType{
-					ParameterTypeAnnotations: NewTypeAnnotations(
-						&IntegerType{},
-					),
+					Parameters: []*Parameter{
+						{
+							Identifier:     "at",
+							TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
+						},
+					},
 					ReturnTypeAnnotation: NewTypeAnnotation(
 						elementType,
 					),
@@ -992,9 +1048,13 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			VariableKind:    ast.VariableKindConstant,
 			TypeAnnotation: NewTypeAnnotation(
 				&FunctionType{
-					ParameterTypeAnnotations: NewTypeAnnotations(
-						elementType,
-					),
+					Parameters: []*Parameter{
+						{
+							Label:          ArgumentLabelNotRequired,
+							Identifier:     "element",
+							TypeAnnotation: NewTypeAnnotation(elementType),
+						},
+					},
 					ReturnTypeAnnotation: NewTypeAnnotation(
 						&BoolType{},
 					),
@@ -1029,8 +1089,8 @@ func (t *VariableSizedType) String() string {
 	return fmt.Sprintf("[%s]", t.Type)
 }
 
-func (t *VariableSizedType) ID() string {
-	return fmt.Sprintf("[%s]", t.Type.ID())
+func (t *VariableSizedType) ID() TypeID {
+	return TypeID(fmt.Sprintf("[%s]", t.Type.ID()))
 }
 
 func (t *VariableSizedType) Equal(other Type) bool {
@@ -1062,7 +1122,7 @@ func (t *VariableSizedType) isValueIndexableType() bool {
 	return true
 }
 
-func (t *VariableSizedType) ElementType(isAssignment bool) Type {
+func (t *VariableSizedType) ElementType(_ bool) Type {
 	return t.Type
 }
 
@@ -1083,8 +1143,8 @@ func (t *ConstantSizedType) String() string {
 	return fmt.Sprintf("[%s; %d]", t.Type, t.Size)
 }
 
-func (t *ConstantSizedType) ID() string {
-	return fmt.Sprintf("[%s;%d]", t.Type.ID(), t.Size)
+func (t *ConstantSizedType) ID() TypeID {
+	return TypeID(fmt.Sprintf("[%s;%d]", t.Type.ID(), t.Size))
 }
 
 func (t *ConstantSizedType) Equal(other Type) bool {
@@ -1117,7 +1177,7 @@ func (t *ConstantSizedType) isValueIndexableType() bool {
 	return true
 }
 
-func (t *ConstantSizedType) ElementType(isAssignment bool) Type {
+func (t *ConstantSizedType) ElementType(_ bool) Type {
 	return t.Type
 }
 
@@ -1133,13 +1193,52 @@ type InvokableType interface {
 	CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression)
 }
 
+// Parameter
+
+type Parameter struct {
+	Label          string
+	Identifier     string
+	TypeAnnotation *TypeAnnotation
+}
+
+func (t *Parameter) String() string {
+	if t.Label != "" {
+		return fmt.Sprintf(
+			"%s %s: %s",
+			t.Label,
+			t.Identifier,
+			t.TypeAnnotation.String(),
+		)
+	}
+
+	if t.Identifier != "" {
+		return fmt.Sprintf(
+			"%s: %s",
+			t.Identifier,
+			t.TypeAnnotation.String(),
+		)
+	}
+
+	return t.TypeAnnotation.String()
+}
+
 // FunctionType
 
 type FunctionType struct {
-	ParameterTypeAnnotations []*TypeAnnotation
-	ReturnTypeAnnotation     *TypeAnnotation
-	GetReturnType            func(argumentTypes []Type) Type
-	RequiredArgumentCount    *int
+	Parameters            []*Parameter
+	ReturnTypeAnnotation  *TypeAnnotation
+	ReturnTypeGetter      func(argumentTypes []Type) Type
+	RequiredArgumentCount *int
+}
+
+func (t *FunctionType) ReturnType(argumentTypes []Type) Type {
+	if len(argumentTypes) == len(t.Parameters) &&
+		t.ReturnTypeGetter != nil {
+
+		return t.ReturnTypeGetter(argumentTypes)
+	}
+
+	return t.ReturnTypeAnnotation.Type
 }
 
 func (*FunctionType) isType() {}
@@ -1148,17 +1247,17 @@ func (t *FunctionType) InvocationFunctionType() *FunctionType {
 	return t
 }
 
-func (*FunctionType) CheckArgumentExpressions(checker *Checker, argumentExpressions []ast.Expression) {
+func (*FunctionType) CheckArgumentExpressions(_ *Checker, _ []ast.Expression) {
 	// NO-OP: no checks for normal functions
 }
 
 func (t *FunctionType) String() string {
 	var parameters strings.Builder
-	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+	for i, parameter := range t.Parameters {
 		if i > 0 {
 			parameters.WriteString(", ")
 		}
-		parameters.WriteString(parameterTypeAnnotation.String())
+		parameters.WriteString(parameter.String())
 	}
 
 	return fmt.Sprintf(
@@ -1168,35 +1267,33 @@ func (t *FunctionType) String() string {
 	)
 }
 
-func (t *FunctionType) ID() string {
+// NOTE: parameter names and argument labels are *not* part of the ID!
+func (t *FunctionType) ID() TypeID {
 	var parameters strings.Builder
-	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+	for i, parameter := range t.Parameters {
 		if i > 0 {
 			parameters.WriteString(",")
 		}
-		parameters.WriteString(parameterTypeAnnotation.Type.ID())
+		parameters.WriteString(string(parameter.TypeAnnotation.Type.ID()))
 	}
 
-	return fmt.Sprintf(
-		"((%s):%s)",
-		parameters.String(),
-		t.ReturnTypeAnnotation,
-	)
+	return TypeID(fmt.Sprintf("((%s):%s)", parameters.String(), t.ReturnTypeAnnotation))
 }
 
+// NOTE: parameter names and argument labels are intentionally *not* considered!
 func (t *FunctionType) Equal(other Type) bool {
 	otherFunction, ok := other.(*FunctionType)
 	if !ok {
 		return false
 	}
 
-	if len(t.ParameterTypeAnnotations) != len(otherFunction.ParameterTypeAnnotations) {
+	if len(t.Parameters) != len(otherFunction.Parameters) {
 		return false
 	}
 
-	for i, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
-		otherParameterType := otherFunction.ParameterTypeAnnotations[i]
-		if !parameterTypeAnnotation.Equal(otherParameterType) {
+	for i, parameter := range t.Parameters {
+		otherParameter := otherFunction.Parameters[i]
+		if !parameter.TypeAnnotation.Equal(otherParameter.TypeAnnotation) {
 			return false
 		}
 	}
@@ -1213,8 +1310,8 @@ func (t *FunctionType) IsInvalidType() bool {
 		return true
 	}
 
-	for _, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
-		if parameterTypeAnnotation.Type.IsInvalidType() {
+	for _, parameter := range t.Parameters {
+		if parameter.TypeAnnotation.Type.IsInvalidType() {
 			return true
 		}
 	}
@@ -1354,8 +1451,14 @@ func initIntegerFunctions() {
 			name: typeName,
 			invokableType: &CheckedFunctionType{
 				FunctionType: &FunctionType{
-					ParameterTypeAnnotations: []*TypeAnnotation{{Type: &IntegerType{}}},
-					ReturnTypeAnnotation:     &TypeAnnotation{Type: integerType},
+					Parameters: []*Parameter{
+						{
+							Label:          ArgumentLabelNotRequired,
+							Identifier:     "value",
+							TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
+						},
+					},
+					ReturnTypeAnnotation: &TypeAnnotation{Type: integerType},
 				},
 				ArgumentExpressionsCheck: integerFunctionArgumentExpressionsChecker(integerType),
 			},
@@ -1376,8 +1479,14 @@ func initAddressFunction() {
 		name: typeName,
 		invokableType: &CheckedFunctionType{
 			FunctionType: &FunctionType{
-				ParameterTypeAnnotations: []*TypeAnnotation{{Type: &IntegerType{}}},
-				ReturnTypeAnnotation:     &TypeAnnotation{Type: addressType},
+				Parameters: []*Parameter{
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "value",
+						TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
+					},
+				},
+				ReturnTypeAnnotation: &TypeAnnotation{Type: addressType},
 			},
 			ArgumentExpressionsCheck: func(checker *Checker, argumentExpressions []ast.Expression) {
 				intExpression, ok := argumentExpressions[0].(*ast.IntExpression)
@@ -1409,9 +1518,9 @@ type CompositeType struct {
 	Conformances []*InterfaceType
 	Members      map[string]*Member
 	// TODO: add support for overloaded initializers
-	ConstructorParameterTypeAnnotations []*TypeAnnotation
-	NestedTypes                         map[string]Type
-	ContainerType                       Type
+	ConstructorParameters []*Parameter
+	NestedTypes           map[string]Type
+	ContainerType         Type
 }
 
 func (*CompositeType) isType() {}
@@ -1420,12 +1529,12 @@ func (t *CompositeType) String() string {
 	return t.Identifier
 }
 
-func (t *CompositeType) ID() string {
-	if t.Location == nil {
-		return t.Identifier
-	}
+func (t *CompositeType) QualifiedIdentifier() string {
+	return qualifiedIdentifier(t.Identifier, t.ContainerType)
+}
 
-	return fmt.Sprintf("%s.%s", t.Location.ID(), t.Identifier)
+func (t *CompositeType) ID() TypeID {
+	return TypeID(fmt.Sprintf("%s.%s", t.Location.ID(), t.QualifiedIdentifier()))
 }
 
 func (t *CompositeType) Equal(other Type) bool {
@@ -1457,14 +1566,33 @@ func (t *CompositeType) IsInvalidType() bool {
 
 func (t *CompositeType) InterfaceType() *InterfaceType {
 	return &InterfaceType{
-		Location:                            t.Location,
-		Identifier:                          t.Identifier,
-		CompositeKind:                       t.Kind,
-		Members:                             t.Members,
-		InitializerParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
-		ContainerType:                       t.ContainerType,
-		NestedTypes:                         t.NestedTypes,
+		Location:              t.Location,
+		Identifier:            t.Identifier,
+		CompositeKind:         t.Kind,
+		Members:               t.Members,
+		InitializerParameters: t.ConstructorParameters,
+		ContainerType:         t.ContainerType,
+		NestedTypes:           t.NestedTypes,
 	}
+}
+
+func (t *CompositeType) TypeRequirements() []*CompositeType {
+
+	var typeRequirements []*CompositeType
+
+	if containerComposite, ok := t.ContainerType.(*CompositeType); ok {
+		for _, conformance := range containerComposite.Conformances {
+			ty := conformance.NestedTypes[t.Identifier]
+			typeRequirement, ok := ty.(*CompositeType)
+			if !ok {
+				continue
+			}
+
+			typeRequirements = append(typeRequirements, typeRequirement)
+		}
+	}
+
+	return typeRequirements
 }
 
 // AccountType
@@ -1477,7 +1605,7 @@ func (*AccountType) String() string {
 	return "Account"
 }
 
-func (*AccountType) ID() string {
+func (*AccountType) ID() TypeID {
 	return "Account"
 }
 
@@ -1545,7 +1673,7 @@ func (*PublicAccountType) String() string {
 	return "PublicAccount"
 }
 
-func (*PublicAccountType) ID() string {
+func (*PublicAccountType) ID() TypeID {
 	return "PublicAccount"
 }
 
@@ -1630,7 +1758,7 @@ func NewCheckedMember(member *Member) *Member {
 		functionType := invokableType.InvocationFunctionType()
 
 		if member.ArgumentLabels != nil &&
-			len(member.ArgumentLabels) != len(functionType.ParameterTypeAnnotations) {
+			len(member.ArgumentLabels) != len(functionType.Parameters) {
 
 			panic(fmt.Sprintf(
 				"member `%s.%s` has incorrect argument label count",
@@ -1665,9 +1793,9 @@ type InterfaceType struct {
 	CompositeKind common.CompositeKind
 	Members       map[string]*Member
 	// TODO: add support for overloaded initializers
-	InitializerParameterTypeAnnotations []*TypeAnnotation
-	ContainerType                       Type
-	NestedTypes                         map[string]Type
+	InitializerParameters []*Parameter
+	ContainerType         Type
+	NestedTypes           map[string]Type
 }
 
 func (*InterfaceType) isType() {}
@@ -1676,12 +1804,12 @@ func (t *InterfaceType) String() string {
 	return t.Identifier
 }
 
-func (t *InterfaceType) ID() string {
-	if t.Location == nil {
-		return t.Identifier
-	}
+func (t *InterfaceType) QualifiedIdentifier() string {
+	return qualifiedIdentifier(t.Identifier, t.ContainerType)
+}
 
-	return fmt.Sprintf("%s.%s", t.Location.ID(), t.Identifier)
+func (t *InterfaceType) ID() TypeID {
+	return TypeID(fmt.Sprintf("%s.%s", t.Location.ID(), t.QualifiedIdentifier()))
 }
 
 func (t *InterfaceType) Equal(other Type) bool {
@@ -1728,12 +1856,12 @@ func (t *DictionaryType) String() string {
 	)
 }
 
-func (t *DictionaryType) ID() string {
-	return fmt.Sprintf(
+func (t *DictionaryType) ID() TypeID {
+	return TypeID(fmt.Sprintf(
 		"{%s:%s}",
 		t.KeyType.ID(),
 		t.ValueType.ID(),
-	)
+	))
 }
 
 func (t *DictionaryType) Equal(other Type) bool {
@@ -1829,10 +1957,17 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			VariableKind:    ast.VariableKindConstant,
 			TypeAnnotation: NewTypeAnnotation(
 				&FunctionType{
-					ParameterTypeAnnotations: NewTypeAnnotations(
-						t.KeyType,
-						t.ValueType,
-					),
+					Parameters: []*Parameter{
+						{
+							Identifier:     "key",
+							TypeAnnotation: NewTypeAnnotation(t.KeyType),
+						},
+						{
+							Label:          ArgumentLabelNotRequired,
+							Identifier:     "value",
+							TypeAnnotation: NewTypeAnnotation(t.ValueType),
+						},
+					},
 					ReturnTypeAnnotation: NewTypeAnnotation(
 						&OptionalType{
 							Type: t.ValueType,
@@ -1852,9 +1987,12 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			VariableKind:    ast.VariableKindConstant,
 			TypeAnnotation: NewTypeAnnotation(
 				&FunctionType{
-					ParameterTypeAnnotations: NewTypeAnnotations(
-						t.KeyType,
-					),
+					Parameters: []*Parameter{
+						{
+							Identifier:     "key",
+							TypeAnnotation: NewTypeAnnotation(t.KeyType),
+						},
+					},
 					ReturnTypeAnnotation: NewTypeAnnotation(
 						&OptionalType{
 							Type: t.ValueType,
@@ -1874,7 +2012,7 @@ func (t *DictionaryType) isValueIndexableType() bool {
 	return true
 }
 
-func (t *DictionaryType) ElementType(isAssignment bool) Type {
+func (t *DictionaryType) ElementType(_ bool) Type {
 	return &OptionalType{Type: t.ValueType}
 }
 
@@ -1897,7 +2035,7 @@ func (t *StorageType) String() string {
 	return "Storage"
 }
 
-func (t *StorageType) ID() string {
+func (t *StorageType) ID() TypeID {
 	return "Storage"
 }
 
@@ -1934,7 +2072,7 @@ func (t *StorageType) IsAssignable() bool {
 	return true
 }
 
-func (t *StorageType) ElementType(indexingType Type, isAssignment bool) Type {
+func (t *StorageType) ElementType(indexingType Type, _ bool) Type {
 	// NOTE: like dictionary
 	return &OptionalType{Type: indexingType}
 }
@@ -1952,7 +2090,7 @@ func (t *ReferencesType) String() string {
 	return "References"
 }
 
-func (t *ReferencesType) ID() string {
+func (t *ReferencesType) ID() TypeID {
 	return "References"
 }
 
@@ -1974,7 +2112,7 @@ func (t *ReferencesType) IsInvalidType() bool {
 
 func (t *ReferencesType) isTypeIndexableType() {}
 
-func (t *ReferencesType) ElementType(indexingType Type, isAssignment bool) Type {
+func (t *ReferencesType) ElementType(indexingType Type, _ bool) Type {
 	// NOTE: like dictionary
 	return &OptionalType{Type: indexingType}
 }
@@ -1991,92 +2129,6 @@ func (t *ReferencesType) IsValidIndexingType(indexingType Type) (isValid bool, e
 	return true, ""
 }
 
-// EventType
-
-type EventType struct {
-	Location                            ast.Location
-	Identifier                          string
-	Fields                              []EventFieldType
-	ConstructorParameterTypeAnnotations []*TypeAnnotation
-}
-
-func (*EventType) isType() {}
-
-func (t *EventType) String() string {
-	var fields strings.Builder
-	for i, field := range t.Fields {
-		if i > 0 {
-			fields.WriteString(", ")
-		}
-		fields.WriteString(field.String())
-	}
-
-	return fmt.Sprintf("%s(%s)", t.Identifier, fields.String())
-}
-
-func (t *EventType) ID() string {
-	if t.Location == nil {
-		return t.Identifier
-	}
-
-	return fmt.Sprintf("%s.%s", t.Location.ID(), t.Identifier)
-}
-
-func (t *EventType) Equal(other Type) bool {
-	otherEvent, ok := other.(*EventType)
-	if !ok {
-		return false
-	}
-
-	if t.Identifier != otherEvent.Identifier {
-		return false
-	}
-
-	if len(t.Fields) != len(otherEvent.Fields) {
-		return false
-	}
-
-	for i, field := range t.Fields {
-		otherField := otherEvent.Fields[i]
-		if !field.Equal(otherField) {
-			return false
-		}
-	}
-
-	return true
-}
-
-func (t *EventType) ConstructorFunctionType() *SpecialFunctionType {
-	return &SpecialFunctionType{
-		FunctionType: &FunctionType{
-			ParameterTypeAnnotations: t.ConstructorParameterTypeAnnotations,
-			ReturnTypeAnnotation:     NewTypeAnnotation(t),
-		},
-	}
-}
-
-func (*EventType) IsResourceType() bool {
-	return false
-}
-
-func (*EventType) IsInvalidType() bool {
-	return false
-}
-
-type EventFieldType struct {
-	Identifier string
-	Type       Type
-}
-
-func (t EventFieldType) String() string {
-	return fmt.Sprintf("%s: %s", t.Identifier, t.Type)
-}
-
-func (t EventFieldType) Equal(other EventFieldType) bool {
-	return t.Identifier == other.Identifier &&
-		t.Type.Equal(other.Type)
-}
-
 // ReferenceType represents the reference to a value
 type ReferenceType struct {
 	Type Type
@@ -2091,11 +2143,12 @@ func (t *ReferenceType) String() string {
 	return fmt.Sprintf("&%s", t.Type)
 }
 
-func (t *ReferenceType) ID() string {
-	if t.Type == nil {
-		return "reference"
+func (t *ReferenceType) ID() TypeID {
+	var id string
+	if t.Type != nil {
+		id = string(t.Type.ID())
 	}
-	return fmt.Sprintf("&%s", t.Type.ID())
+	return TypeID(fmt.Sprintf("&%s", id))
 }
 
 func (t *ReferenceType) Equal(other Type) bool {
@@ -2164,7 +2217,7 @@ func (*AddressType) String() string {
 	return "Address"
 }
 
-func (*AddressType) ID() string {
+func (*AddressType) ID() TypeID {
 	return "Address"
 }
 
@@ -2383,8 +2436,8 @@ func IsNilType(ty Type) bool {
 }
 
 type TransactionType struct {
-	Members                         map[string]*Member
-	prepareParameterTypeAnnotations []*TypeAnnotation
+	Members           map[string]*Member
+	prepareParameters []*Parameter
 }
 
 func (t *TransactionType) EntryPointFunctionType() *FunctionType {
@@ -2394,8 +2447,8 @@ func (t *TransactionType) EntryPointFunctionType() *FunctionType {
 func (t *TransactionType) PrepareFunctionType() *SpecialFunctionType {
 	return &SpecialFunctionType{
 		FunctionType: &FunctionType{
-			ParameterTypeAnnotations: t.prepareParameterTypeAnnotations,
-			ReturnTypeAnnotation:     NewTypeAnnotation(&VoidType{}),
+			Parameters:           t.prepareParameters,
+			ReturnTypeAnnotation: NewTypeAnnotation(&VoidType{}),
 		},
 	}
 }
@@ -2403,8 +2456,8 @@ func (t *TransactionType) PrepareFunctionType() *SpecialFunctionType {
 func (*TransactionType) ExecuteFunctionType() *SpecialFunctionType {
 	return &SpecialFunctionType{
 		FunctionType: &FunctionType{
-			ParameterTypeAnnotations: []*TypeAnnotation{},
-			ReturnTypeAnnotation:     NewTypeAnnotation(&VoidType{}),
+			Parameters:           []*Parameter{},
+			ReturnTypeAnnotation: NewTypeAnnotation(&VoidType{}),
 		},
 	}
 }
@@ -2415,11 +2468,11 @@ func (*TransactionType) String() string {
 	return "Transaction"
 }
 
-func (*TransactionType) ID() string {
+func (*TransactionType) ID() TypeID {
 	return "Transaction"
 }
 
-func (*TransactionType) Equal(other Type) bool {
+func (*TransactionType) Equal(_ Type) bool {
 	// transaction types are not equatable
 	return false
 }
