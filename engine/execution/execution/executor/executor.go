@@ -30,47 +30,44 @@ func NewBlockExecutor(vm virtualmachine.VirtualMachine, state state.ExecutionSta
 func (e *blockExecutor) ExecuteBlock(
 	block *ExecutableBlock,
 ) (*flow.ExecutionResult, error) {
-	chunks, err := e.executeBlock(block)
+	chunks, endState, err := e.executeBlock(block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
 
 	// TODO: compute block fees & reward payments
 
-	result := generateExecutionResultForBlock(block, chunks)
+	result := generateExecutionResultForBlock(block, chunks, endState)
 
 	return &result, nil
 }
 
 func (e *blockExecutor) executeBlock(
 	block *ExecutableBlock,
-) ([]*flow.Chunk, error) {
+) (chunk []*flow.Chunk, endState flow.StateCommitment, err error) {
 	blockCtx := e.vm.NewBlockContext(block.Block)
 
-	var (
-		startState flow.StateCommitment
-		err        error
-	)
+	var startState flow.StateCommitment
 
 	// get initial start state from parent block
 	startState, err = e.state.StateCommitmentByBlockID(block.Block.ParentID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch starting state commitment: %w", err)
+		return nil, nil, fmt.Errorf("failed to fetch starting state commitment: %w", err)
 	}
 
 	chunks := make([]*flow.Chunk, len(block.Collections))
 
 	for i, collection := range block.Collections {
-		chunk, endstate, err := e.executeCollection(i, blockCtx, startState, collection)
+		chunk, endState, err := e.executeCollection(i, blockCtx, startState, collection)
 		if err != nil {
-			return nil, fmt.Errorf("failed to execute collection: %w", err)
+			return nil, nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
 
 		chunks[i] = chunk
-		startState = endstate
+		startState = endState
 	}
 
-	return chunks, nil
+	return chunks, endState, nil
 }
 
 func (e *blockExecutor) executeCollection(
@@ -123,23 +120,16 @@ func (e *blockExecutor) executeCollection(
 
 // generateExecutionResultForBlock creates a new execution result for a block from
 // the provided chunk results.
-func generateExecutionResultForBlock(block *ExecutableBlock, chunks []*flow.Chunk) flow.ExecutionResult {
-	var finalStateCommitment flow.StateCommitment
-
-	// If block is not empty, set final state to the final state of the last chunk.
-	// Otherwise, set to the final state of the previous execution result.
-	if len(chunks) > 0 {
-		finalChunk := chunks[len(chunks)-1]
-		finalStateCommitment = finalChunk.EndState
-	} else {
-		finalStateCommitment = block.PreviousExecutionResult.FinalStateCommitment
-	}
-
+func generateExecutionResultForBlock(
+	block *ExecutableBlock,
+	chunks []*flow.Chunk,
+	endState flow.StateCommitment,
+) flow.ExecutionResult {
 	return flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID:     block.PreviousExecutionResult.ID(),
+			PreviousResultID:     block.PreviousResultID,
 			BlockID:              block.Block.ID(),
-			FinalStateCommitment: finalStateCommitment,
+			FinalStateCommitment: endState,
 			Chunks:               flow.ChunkList{chunks},
 		},
 	}

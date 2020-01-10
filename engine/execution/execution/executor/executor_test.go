@@ -58,7 +58,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				Transactions: transactions,
 			},
 		},
-		PreviousExecutionResult: &flow.ExecutionResult{},
+		PreviousResultID: flow.ZeroID,
 	}
 
 	vm.On("NewBlockContext", &block).Return(bc)

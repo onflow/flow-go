@@ -130,7 +130,7 @@ func (e *Engine) onBlock(block *flow.Block) error {
 			},
 		},
 		// TODO: populate this field from previous block
-		PreviousExecutionResult: &flow.ExecutionResult{},
+		PreviousResultID: flow.ZeroID,
 	}
 
 	result, err := e.executor.ExecuteBlock(executableBlock)

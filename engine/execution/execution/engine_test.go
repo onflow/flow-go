@@ -60,7 +60,7 @@ func TestExecutionEngine_OnBlock(t *testing.T) {
 				Transactions: transactions,
 			},
 		},
-		PreviousExecutionResult: &flow.ExecutionResult{},
+		PreviousResultID: flow.ZeroID,
 	}
 
 	receipts.On("SubmitLocal", mock.AnythingOfType("*flow.ExecutionResult"))
