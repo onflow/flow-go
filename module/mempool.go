@@ -12,7 +12,7 @@ type CollectionGuaranteePool interface {
 
 	// Has checks whether the collection guarantee with the given hash is
 	// currently in the memory pool.
-	Has(fp flow.Fingerprint) bool
+	Has(collID flow.Identifier) bool
 
 	// Add will add the given collection guarantee to the memory pool; it will
 	// error if the guaranteed collection is already in the memory pool.
@@ -20,11 +20,11 @@ type CollectionGuaranteePool interface {
 
 	// Rem will remove the given collection guarantees from the memory pool; it
 	// will return true if the collection guarantees was known and removed.
-	Rem(fp flow.Fingerprint) bool
+	Rem(collID flow.Identifier) bool
 
 	// Get will retrieve the given collection guarantees from the memory pool;
 	// it will error if the guaranteed collection is not in the memory pool.
-	Get(fp flow.Fingerprint) (*flow.CollectionGuarantee, error)
+	Get(collID flow.Identifier) (*flow.CollectionGuarantee, error)
 
 	// Hash will return a fingerprint has representing the contents of the
 	// entire memory pool.
@@ -33,8 +33,8 @@ type CollectionGuaranteePool interface {
 	// Size will return the current size of the memory pool.
 	Size() uint
 
-	// All will retrieve all collection guarantees that are currently in the
-	// memory pool as a slice.
+	// All will retrieve all collections that are currently in the memory pool
+	// as a slice.
 	All() []*flow.CollectionGuarantee
 }
 
@@ -42,7 +42,7 @@ type CollectionGuaranteePool interface {
 type TransactionPool interface {
 	// Has checks whether the transaction with the given hash is currently in
 	// the memory pool.
-	Has(fp flow.Fingerprint) bool
+	Has(txID flow.Identifier) bool
 
 	// Add will add the given transaction to the memory pool; it will error if
 	// the transaction is already in the memory pool.
@@ -50,11 +50,11 @@ type TransactionPool interface {
 
 	// Rem will remove the given transaction from the memory pool; it will
 	// will return true if the transaction was known and removed.
-	Rem(fp flow.Fingerprint) bool
+	Rem(txID flow.Identifier) bool
 
 	// Get will retrieve the given transaction from the memory pool; it will
 	// error if the transaction is not in the memory pool.
-	Get(fp flow.Fingerprint) (*flow.Transaction, error)
+	Get(txID flow.Identifier) (*flow.Transaction, error)
 
 	// Hash will return a fingerprint has representing the contents of the
 	// entire memory pool.

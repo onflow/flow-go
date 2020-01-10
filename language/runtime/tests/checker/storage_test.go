@@ -27,7 +27,6 @@ func ParseAndCheckStorage(t *testing.T, code string) (*sema.Checker, error) {
 				sema.WithPredeclaredValues(map[string]sema.ValueDeclaration{
 					"storage": storageValueDeclaration,
 				}),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
 	)

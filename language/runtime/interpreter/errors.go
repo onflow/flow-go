@@ -33,7 +33,7 @@ type NotDeclaredError struct {
 
 func (e *NotDeclaredError) Error() string {
 	return fmt.Sprintf(
-		"cannot find %s `%s` in this scope",
+		"cannot find %s in this scope: `%s`",
 		e.ExpectedKind.Name(),
 		e.Name,
 	)

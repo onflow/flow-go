@@ -16,18 +16,24 @@ import (
 
 func TestCheckFailableCastingWithResourceAnnotation(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      let test %[2]s %[3]s T%[4]s as? @T
+                      let test %[3]s %[4]s T%[5]s as? @T
                     `,
 					compositeKind.Keyword(),
+					body,
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
@@ -45,7 +51,6 @@ func TestCheckFailableCastingWithResourceAnnotation(t *testing.T) {
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
 
 			case common.CompositeKindStructure, common.CompositeKindContract:
-
 				errs := ExpectCheckerErrors(t, err, 2)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
@@ -53,6 +58,12 @@ func TestCheckFailableCastingWithResourceAnnotation(t *testing.T) {
 				// TODO: add support for non-Any types in failable casting
 
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[1])
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -62,19 +73,27 @@ func TestCheckFailableCastingWithResourceAnnotation(t *testing.T) {
 }
 
 func TestCheckFunctionDeclarationParameterWithResourceAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+
+	for _, kind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       fun test(r: @T) {
-                          %[2]s r
+                          %[3]s r
                       }
                     `,
 					kind.Keyword(),
+					body,
 					kind.DestructionKeyword(),
 				),
 			)
@@ -83,7 +102,10 @@ func TestCheckFunctionDeclarationParameterWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract,
+				common.CompositeKindEvent:
+
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
@@ -96,19 +118,27 @@ func TestCheckFunctionDeclarationParameterWithResourceAnnotation(t *testing.T) {
 }
 
 func TestCheckFunctionDeclarationParameterWithoutResourceAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+
+	for _, kind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       fun test(r: T) {
-                          %[2]s r
+                          %[3]s r
                       }
                     `,
 					kind.Keyword(),
+					body,
 					kind.DestructionKeyword(),
 				),
 			)
@@ -119,7 +149,10 @@ func TestCheckFunctionDeclarationParameterWithoutResourceAnnotation(t *testing.T
 
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract,
+				common.CompositeKindEvent:
+
 				require.NoError(t, err)
 
 			default:
@@ -131,20 +164,26 @@ func TestCheckFunctionDeclarationParameterWithoutResourceAnnotation(t *testing.T
 
 func TestCheckFunctionDeclarationReturnTypeWithResourceAnnotation(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       fun test(): @T {
-                          return %[2]s %[3]s T%[4]s
+                          return %[3]s %[4]s T%[5]s
                       }
                     `,
 					compositeKind.Keyword(),
+					body,
 					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
@@ -165,6 +204,13 @@ func TestCheckFunctionDeclarationReturnTypeWithResourceAnnotation(t *testing.T) 
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
+
+			case common.CompositeKindEvent:
+
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -175,10 +221,15 @@ func TestCheckFunctionDeclarationReturnTypeWithResourceAnnotation(t *testing.T) 
 
 func TestCheckFunctionDeclarationReturnTypeWithoutResourceAnnotation(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
 
 		if compositeKind == common.CompositeKindContract {
 			continue
+		}
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
 		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
@@ -186,13 +237,14 @@ func TestCheckFunctionDeclarationReturnTypeWithoutResourceAnnotation(t *testing.
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       fun test(): T {
-                          return %[2]s %[3]s T%[4]s
+                          return %[3]s %[4]s T%[5]s
                       }
                     `,
 					compositeKind.Keyword(),
+					body,
 					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
@@ -205,8 +257,13 @@ func TestCheckFunctionDeclarationReturnTypeWithoutResourceAnnotation(t *testing.
 
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
-				require.NoError(t, err)
+			case common.CompositeKindStructure,
+				common.CompositeKindContract:
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -217,18 +274,24 @@ func TestCheckFunctionDeclarationReturnTypeWithoutResourceAnnotation(t *testing.
 
 func TestCheckVariableDeclarationWithResourceAnnotation(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      let test: @T %[2]s %[3]s T%[4]s
+                      let test: @T %[3]s %[4]s T%[5]s
                     `,
 					compositeKind.Keyword(),
+					body,
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
@@ -250,6 +313,12 @@ func TestCheckVariableDeclarationWithResourceAnnotation(t *testing.T) {
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
 
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[1])
+
 			default:
 				panic(errors.NewUnreachableError())
 			}
@@ -259,10 +328,15 @@ func TestCheckVariableDeclarationWithResourceAnnotation(t *testing.T) {
 
 func TestCheckVariableDeclarationWithoutResourceAnnotation(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
 
 		if compositeKind == common.CompositeKindContract {
 			continue
+		}
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
 		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
@@ -270,11 +344,12 @@ func TestCheckVariableDeclarationWithoutResourceAnnotation(t *testing.T) {
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      let test: T %[2]s %[3]s T%[4]s
+                      let test: T %[3]s %[4]s T%[5]s
                     `,
 					compositeKind.Keyword(),
+					body,
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
@@ -287,8 +362,15 @@ func TestCheckVariableDeclarationWithoutResourceAnnotation(t *testing.T) {
 
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract:
+
 				require.NoError(t, err)
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -299,7 +381,8 @@ func TestCheckVariableDeclarationWithoutResourceAnnotation(t *testing.T) {
 
 func TestCheckFieldDeclarationWithResourceAnnotation(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			destructor := ""
@@ -360,7 +443,7 @@ func TestCheckFieldDeclarationWithResourceAnnotation(t *testing.T) {
 }
 
 func TestCheckFieldDeclarationWithoutResourceAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			destructor := ""
@@ -417,19 +500,27 @@ func TestCheckFieldDeclarationWithoutResourceAnnotation(t *testing.T) {
 }
 
 func TestCheckFunctionExpressionParameterWithResourceAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+
+	for _, kind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       let test = fun (r: @T) {
-                          %[2]s r
+                          %[3]s r
                       }
                     `,
 					kind.Keyword(),
+					body,
 					kind.DestructionKeyword(),
 				),
 			)
@@ -438,7 +529,10 @@ func TestCheckFunctionExpressionParameterWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract,
+				common.CompositeKindEvent:
+
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
@@ -451,19 +545,27 @@ func TestCheckFunctionExpressionParameterWithResourceAnnotation(t *testing.T) {
 }
 
 func TestCheckFunctionExpressionParameterWithoutResourceAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+
+	for _, kind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       let test = fun (r: T) {
-                          %[2]s r
+                          %[3]s r
                       }
                     `,
 					kind.Keyword(),
+					body,
 					kind.DestructionKeyword(),
 				),
 			)
@@ -475,7 +577,10 @@ func TestCheckFunctionExpressionParameterWithoutResourceAnnotation(t *testing.T)
 
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract,
+				common.CompositeKindEvent:
+
 				require.NoError(t, err)
 
 			default:
@@ -486,20 +591,27 @@ func TestCheckFunctionExpressionParameterWithoutResourceAnnotation(t *testing.T)
 }
 
 func TestCheckFunctionExpressionReturnTypeWithResourceAnnotation(t *testing.T) {
-	for _, compositeKind := range common.CompositeKinds {
+
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       let test = fun (): @T {
-                          return %[2]s %[3]s T%[4]s
+                          return %[3]s %[4]s T%[5]s
                       }
                     `,
 					compositeKind.Keyword(),
+					body,
 					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
@@ -521,6 +633,12 @@ func TestCheckFunctionExpressionReturnTypeWithResourceAnnotation(t *testing.T) {
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
 				assert.IsType(t, &sema.InvalidMoveError{}, errs[1])
 
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[1])
+
 			default:
 				panic(errors.NewUnreachableError())
 			}
@@ -529,10 +647,16 @@ func TestCheckFunctionExpressionReturnTypeWithResourceAnnotation(t *testing.T) {
 }
 
 func TestCheckFunctionExpressionReturnTypeWithoutResourceAnnotation(t *testing.T) {
-	for _, compositeKind := range common.CompositeKinds {
+
+	for _, compositeKind := range common.AllCompositeKinds {
 
 		if compositeKind == common.CompositeKindContract {
 			continue
+		}
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
 		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
@@ -540,13 +664,14 @@ func TestCheckFunctionExpressionReturnTypeWithoutResourceAnnotation(t *testing.T
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       let test = fun (): T {
-                          return %[2]s %[3]s T%[4]s
+                          return %[3]s %[4]s T%[5]s
                       }
                     `,
 					compositeKind.Keyword(),
+					body,
 					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
@@ -559,8 +684,15 @@ func TestCheckFunctionExpressionReturnTypeWithoutResourceAnnotation(t *testing.T
 
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract:
+
 				require.NoError(t, err)
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -570,19 +702,27 @@ func TestCheckFunctionExpressionReturnTypeWithoutResourceAnnotation(t *testing.T
 }
 
 func TestCheckFunctionTypeParameterWithResourceAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+
+	for _, kind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       let test: ((@T): Void) = fun (r: @T) {
-                          %[2]s r
+                          %[3]s r
                       }
                     `,
 					kind.Keyword(),
+					body,
 					kind.DestructionKeyword(),
 				),
 			)
@@ -591,7 +731,10 @@ func TestCheckFunctionTypeParameterWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract,
+				common.CompositeKindEvent:
+
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
@@ -604,19 +747,27 @@ func TestCheckFunctionTypeParameterWithResourceAnnotation(t *testing.T) {
 }
 
 func TestCheckFunctionTypeParameterWithoutResourceAnnotation(t *testing.T) {
-	for _, kind := range common.CompositeKinds {
+
+	for _, kind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       let test: ((T): Void) = fun (r: T) {
-                          %[2]s r
+                          %[3]s r
                       }
                     `,
 					kind.Keyword(),
+					body,
 					kind.DestructionKeyword(),
 				),
 			)
@@ -627,7 +778,10 @@ func TestCheckFunctionTypeParameterWithoutResourceAnnotation(t *testing.T) {
 
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract,
+				common.CompositeKindEvent:
+
 				require.NoError(t, err)
 
 			default:
@@ -639,10 +793,15 @@ func TestCheckFunctionTypeParameterWithoutResourceAnnotation(t *testing.T) {
 
 func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
 
 		if compositeKind == common.CompositeKindContract {
 			continue
+		}
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
 		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
@@ -650,13 +809,14 @@ func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       let test: ((): @T) = fun (): @T {
-                          return %[2]s %[3]s T%[4]s
+                          return %[3]s %[4]s T%[5]s
                       }
                     `,
 					compositeKind.Keyword(),
+					body,
 					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
@@ -667,10 +827,18 @@ func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
 			case common.CompositeKindResource:
 				require.NoError(t, err)
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract:
+
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.InvalidResourceAnnotationError{}, errs[0])
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[1])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -680,10 +848,16 @@ func TestCheckFunctionTypeReturnTypeWithResourceAnnotation(t *testing.T) {
 }
 
 func TestCheckFunctionTypeReturnTypeWithoutResourceAnnotation(t *testing.T) {
-	for _, compositeKind := range common.CompositeKinds {
+
+	for _, compositeKind := range common.AllCompositeKinds {
 
 		if compositeKind == common.CompositeKindContract {
 			continue
+		}
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
 		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
@@ -691,13 +865,14 @@ func TestCheckFunctionTypeReturnTypeWithoutResourceAnnotation(t *testing.T) {
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
                       let test: ((): T) = fun (): T {
-                          return %[2]s %[3]s T%[4]s
+                          return %[3]s %[4]s T%[5]s
                       }
                     `,
 					compositeKind.Keyword(),
+					body,
 					compositeKind.MoveOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
@@ -710,8 +885,15 @@ func TestCheckFunctionTypeReturnTypeWithoutResourceAnnotation(t *testing.T) {
 
 				assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[0])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract:
+
 				require.NoError(t, err)
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -721,18 +903,25 @@ func TestCheckFunctionTypeReturnTypeWithoutResourceAnnotation(t *testing.T) {
 }
 
 func TestCheckFailableCastingWithoutResourceAnnotation(t *testing.T) {
-	for _, compositeKind := range common.CompositeKinds {
+
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if compositeKind == common.CompositeKindEvent {
+			body = "()"
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s T {}
+                      %[1]s T %[2]s
 
-                      let test %[2]s %[3]s T%[4]s as? T
+                      let test %[3]s %[4]s T%[5]s as? T
                     `,
 					compositeKind.Keyword(),
+					body,
 					compositeKind.TransferOperator(),
 					compositeKind.ConstructionKeyword(),
 					constructorArguments(compositeKind),
@@ -750,12 +939,19 @@ func TestCheckFailableCastingWithoutResourceAnnotation(t *testing.T) {
 				// TODO: add support for non-Any types in failable downcasting
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[2])
 
-			case common.CompositeKindStructure, common.CompositeKindContract:
+			case common.CompositeKindStructure,
+				common.CompositeKindContract:
+
 				// TODO: add support for non-Any types in failable casting
 
 				errs := ExpectCheckerErrors(t, err, 1)
 
 				assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
+
+			case common.CompositeKindEvent:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidEventUsageError{}, errs[0])
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -1974,7 +2170,7 @@ func TestCheckResourceWithMoveAndReturnInIfStatementThenBranch(t *testing.T) {
 func TestCheckResourceNesting(t *testing.T) {
 	interfacePossibilities := []bool{true, false}
 
-	for _, innerCompositeKind := range common.CompositeKinds {
+	for _, innerCompositeKind := range common.AllCompositeKinds {
 
 		// Don't test contract fields/parameters: contracts can't be passed by value
 		if innerCompositeKind == common.CompositeKindContract {
@@ -1982,26 +2178,25 @@ func TestCheckResourceNesting(t *testing.T) {
 		}
 
 		for _, innerIsInterface := range interfacePossibilities {
-			for _, outerCompositeKind := range common.CompositeKinds {
+
+			if !innerCompositeKind.SupportsInterfaces() && innerIsInterface {
+				continue
+			}
+
+			for _, outerCompositeKind := range common.CompositeKindsWithBody {
 				for _, outerIsInterface := range interfacePossibilities {
 
-					testName := fmt.Sprintf(
-						"%s %v/%s %v",
-						innerCompositeKind.Keyword(),
+					if !outerCompositeKind.SupportsInterfaces() && outerIsInterface {
+						continue
+					}
+
+					testResourceNesting(
+						t,
+						innerCompositeKind,
 						innerIsInterface,
-						outerCompositeKind.Keyword(),
+						outerCompositeKind,
 						outerIsInterface,
 					)
-
-					t.Run(testName, func(t *testing.T) {
-						testResourceNesting(
-							t,
-							innerCompositeKind,
-							innerIsInterface,
-							outerCompositeKind,
-							outerIsInterface,
-						)
-					})
 				}
 			}
 		}
@@ -2025,79 +2220,101 @@ func testResourceNesting(
 		outerInterfaceKeyword = "interface"
 	}
 
-	// Prepare the initializer, if needed.
-	// `outerCompositeKind` is the container composite kind.
-	// If it is concrete, i.e. not an interface, it needs an initializer.
-
-	initializer := ""
-	if !outerIsInterface {
-		initializer = fmt.Sprintf(
-			`
-              init(t: %[1]sT) {
-                  self.t %[2]s t
-              }
-            `,
-			innerCompositeKind.Annotation(),
-			innerCompositeKind.TransferOperator(),
-		)
-	}
-
-	destructor := ""
-	if !outerIsInterface &&
-		outerCompositeKind == common.CompositeKindResource &&
-		innerCompositeKind == common.CompositeKindResource {
-
-		destructor = `
-          destroy() {
-              destroy self.t
-          }
-        `
-	}
-
-	// Prepare the full program defining an empty composite,
-	// and a second composite which contains the first
-
-	program := fmt.Sprintf(
-		`
-          %[1]s %[2]s T {}
-
-          %[3]s %[4]s U {
-              let t: %[5]sT
-              %[6]s
-              %[7]s
-          }
-        `,
+	testName := fmt.Sprintf(
+		"%s %s/%s %s",
 		innerCompositeKind.Keyword(),
 		innerInterfaceKeyword,
 		outerCompositeKind.Keyword(),
 		outerInterfaceKeyword,
-		innerCompositeKind.Annotation(),
-		initializer,
-		destructor,
 	)
 
-	_, err := ParseAndCheck(t, program)
+	t.Run(testName, func(t *testing.T) {
 
-	switch outerCompositeKind {
-	case common.CompositeKindStructure, common.CompositeKindContract:
-		switch innerCompositeKind {
-		case common.CompositeKindStructure, common.CompositeKindContract:
-			require.NoError(t, err)
+		// Prepare the initializer, if needed.
+		// `outerCompositeKind` is the container composite kind.
+		// If it is concrete, i.e. not an interface, it needs an initializer.
+
+		initializer := ""
+		if !outerIsInterface {
+			initializer = fmt.Sprintf(
+				`
+                  init(t: %[1]sT) {
+                      self.t %[2]s t
+                  }
+                `,
+				innerCompositeKind.Annotation(),
+				innerCompositeKind.TransferOperator(),
+			)
+		}
+
+		destructor := ""
+		if !outerIsInterface &&
+			outerCompositeKind == common.CompositeKindResource &&
+			innerCompositeKind == common.CompositeKindResource {
+
+			destructor = `
+              destroy() {
+                  destroy self.t
+              }
+            `
+		}
+
+		innerBody := "{}"
+		if innerCompositeKind == common.CompositeKindEvent {
+			innerBody = "()"
+		}
+
+		// Prepare the full program defining an empty composite,
+		// and a second composite which contains the first
+
+		program := fmt.Sprintf(
+			`
+              %[1]s %[2]s T %[3]s
+
+              %[4]s %[5]s U {
+                  let t: %[6]sT
+                  %[7]s
+                  %[8]s
+              }
+            `,
+			innerCompositeKind.Keyword(),
+			innerInterfaceKeyword,
+			innerBody,
+			outerCompositeKind.Keyword(),
+			outerInterfaceKeyword,
+			innerCompositeKind.Annotation(),
+			initializer,
+			destructor,
+		)
+
+		_, err := ParseAndCheck(t, program)
+
+		switch outerCompositeKind {
+		case common.CompositeKindStructure,
+			common.CompositeKindContract:
+
+			switch innerCompositeKind {
+			case common.CompositeKindStructure,
+				common.CompositeKindEvent:
+
+				require.NoError(t, err)
+
+			case common.CompositeKindResource:
+				errs := ExpectCheckerErrors(t, err, 1)
+
+				assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[0])
+
+			default:
+				panic(errors.NewUnreachableError())
+			}
 
 		case common.CompositeKindResource:
-			errs := ExpectCheckerErrors(t, err, 1)
-			assert.IsType(t, &sema.InvalidResourceFieldError{}, errs[0])
+			require.NoError(t, err)
 
 		default:
 			panic(errors.NewUnreachableError())
 		}
-
-	case common.CompositeKindResource:
-		require.NoError(t, err)
-
-	default:
-		panic(errors.NewUnreachableError())
-	}
+	})
 }
 
 // TestCheckResourceInterfaceConformance tests the check
@@ -2810,7 +3027,7 @@ func TestCheckResourceParameterInInterfaceNoResourceLossError(t *testing.T) {
 		common.DeclarationKindFunction,
 	}
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 		for _, declarationKind := range declarationKinds {
 			for _, hasCondition := range []bool{true, false} {
 
@@ -2825,6 +3042,7 @@ func TestCheckResourceParameterInInterfaceNoResourceLossError(t *testing.T) {
 				switch declarationKind {
 				case common.DeclarationKindInitializer:
 					innerDeclaration = declarationKind.Keywords()
+
 				case common.DeclarationKindFunction:
 					innerDeclaration = fmt.Sprintf("%s test", declarationKind.Keywords())
 				}

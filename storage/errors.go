@@ -3,7 +3,7 @@ package storage
 import "errors"
 
 var (
-	NotFoundErr         = errors.New("not found")
-	DifferentDataErr    = errors.New("different data for same key")
-	KeyAlreadyExistsErr = errors.New("key already exists")
+	ErrNotFound      = errors.New("key not found")
+	ErrAlreadyExists = errors.New("key already exists")
+	ErrDataMismatch  = errors.New("data for key is different")
 )

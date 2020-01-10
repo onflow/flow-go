@@ -10,12 +10,17 @@ import (
 // to announce collections to consensus nodes.
 type CollectionGuarantee struct {
 	// Hash is the hash of collection that is being guaranteed.
-	Hash       crypto.Hash
-	Signatures []crypto.Signature
+	CollectionID Identifier
+	Signatures   []crypto.Signature
 }
 
-// TODO we need to fix this later
-// Fingerprint returns the fingerprint of the collection guarantee.
-func (g *CollectionGuarantee) Fingerprint() Fingerprint {
-	return Fingerprint(g.Hash)
+// ID returns the fingerprint of the collection guarantee.
+func (cg *CollectionGuarantee) ID() Identifier {
+	return cg.CollectionID
+}
+
+// Checksum returns a checksum of the collection guarantee including the
+// signatures.
+func (cg *CollectionGuarantee) Checksum() Identifier {
+	return MakeID(cg)
 }

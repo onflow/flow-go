@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -20,8 +21,8 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 			es := state.NewExecutionState(ls)
 
-			// TODO: use real block hash
-			sc1, err := es.StateCommitmentByBlockHash(nil)
+			// TODO: use real block ID
+			sc1, err := es.StateCommitmentByBlockID(flow.Identifier{})
 			assert.NoError(t, err)
 
 			view1 := es.NewView(sc1)
@@ -50,8 +51,8 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 			es := state.NewExecutionState(ls)
 
-			// TODO: use real block hash
-			sc1, err := es.StateCommitmentByBlockHash(nil)
+			// TODO: use real block ID
+			sc1, err := es.StateCommitmentByBlockID(flow.Identifier{})
 			assert.NoError(t, err)
 
 			view1 := es.NewView(sc1)
@@ -91,8 +92,8 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 			es := state.NewExecutionState(ls)
 
-			// TODO: use real block hash
-			sc1, err := es.StateCommitmentByBlockHash(nil)
+			// TODO: use real block ID
+			sc1, err := es.StateCommitmentByBlockID(flow.Identifier{})
 			assert.NoError(t, err)
 
 			// set initial value

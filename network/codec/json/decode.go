@@ -7,7 +7,6 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/trickle"
 )
@@ -38,12 +37,8 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeTransaction:
 		v = &flow.Transaction{}
 
-	case CodeBlockProposal:
-		v = &coldstuff.BlockProposal{}
-	case CodeBlockVote:
-		v = &coldstuff.BlockVote{}
-	case CodeBlockCommit:
-		v = &coldstuff.BlockCommit{}
+	case CodeBlock:
+		v = &flow.Block{}
 
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)

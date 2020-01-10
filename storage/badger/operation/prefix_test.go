@@ -7,8 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/crypto"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -19,12 +17,6 @@ func TestMakePrefix(t *testing.T) {
 	u := uint64(1337)
 	expected := []byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x39}
 	actual := makePrefix(code, u)
-
-	assert.Equal(t, expected, actual)
-
-	h := crypto.Hash{0x02, 0x03}
-	expected = []byte{0x01, 0x02, 0x03}
-	actual = makePrefix(code, h)
 
 	assert.Equal(t, expected, actual)
 
