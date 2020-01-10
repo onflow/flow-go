@@ -188,6 +188,26 @@ func (e *Engine) onCollection(originID flow.Identifier, coll *flow.Collection) e
 	return nil
 }
 
+// requestCollection submits a request for the given collection to collection nodes.
+func (e *Engine) requestCollection(collID flow.Identifier) error {
+
+	collNodes, err := e.state.Final().Identities(identity.HasRole(flow.RoleCollection))
+	if err != nil {
+		return fmt.Errorf("could not load collection node identities: %w", err)
+	}
+
+	req := &messages.CollectionRequest{
+		CollectionID: collID,
+	}
+
+	err = e.colChannel.Submit(req, collNodes.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not submit request for collection (id=%s): %w", collID, err)
+	}
+
+	return nil
+}
+
 // verify is an internal component of the verifier engine.
 // It receives an execution receipt and does the core verification process.
 // The origin ID indicates the node which originally submitted the event to
