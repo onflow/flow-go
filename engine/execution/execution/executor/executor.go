@@ -45,7 +45,7 @@ func (e *blockExecutor) ExecuteBlock(
 func (e *blockExecutor) executeTransactions(
 	block flow.Block,
 	txs []flow.TransactionBody,
-) ([]flow.Chunk, error) {
+) ([]*flow.Chunk, error) {
 	blockContext := e.vm.NewBlockContext(&block)
 
 	startState, err := e.state.StateCommitmentByBlockID(block.ParentID)
@@ -75,7 +75,7 @@ func (e *blockExecutor) executeTransactions(
 
 	// TODO: (post-MVP) implement real chunking
 	// MVP uses single chunk per block
-	chunk := flow.Chunk{
+	chunk := &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			FirstTxIndex: 0,
 			TxCounts:     uint32(len(txs)),
@@ -93,12 +93,12 @@ func (e *blockExecutor) executeTransactions(
 		EndState: endState,
 	}
 
-	return []flow.Chunk{chunk}, nil
+	return []*flow.Chunk{chunk}, nil
 }
 
 // generateExecutionResultForBlock creates a new execution result for a block from
 // the provided chunk results.
-func generateExecutionResultForBlock(block ExecutableBlock, chunks []flow.Chunk) flow.ExecutionResult {
+func generateExecutionResultForBlock(block ExecutableBlock, chunks []*flow.Chunk) flow.ExecutionResult {
 	var finalStateCommitment flow.StateCommitment
 
 	// If block is not empty, set final state to the final state of the last chunk.
@@ -112,12 +112,10 @@ func generateExecutionResultForBlock(block ExecutableBlock, chunks []flow.Chunk)
 
 	return flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousExecutionResult: block.PreviousExecutionResult.Fingerprint(),
-			Block:                   flow.Fingerprint(block.Block.Hash()),
-			FinalStateCommitment:    finalStateCommitment,
-			Chunks: flow.ChunkList{
-				Chunks: chunks,
-			},
+			PreviousResultID:     block.PreviousExecutionResult.ID(),
+			BlockID:              block.Block.ID(),
+			FinalStateCommitment: finalStateCommitment,
+			Chunks:               flow.ChunkList{chunks},
 		},
 	}
 }
