@@ -58,13 +58,16 @@ func (m *MiddlewareTestSuit) TestPingTypeReception() {
 	m.Ping(mockery.Anything, mockery.AnythingOfType("[]uint8"))
 }
 
-// TestPingTypeReception tests the middleware against type of received payload
-// upon reception at the receiver side
-// it does not evaluate content of the payload
-// it does not evaluate anything related to the sender id
+// TestMultiPing tests the middleware against type of received payload
+// of distinct messages that are sent concurrently from a node to another
 func (m *MiddlewareTestSuit) TestMultiPing() {
+	// one distinct message
 	m.MultiPing(1)
 
+	// two distinct messages
+	m.MultiPing(2)
+
+	// 100 distinct messages
 	m.MultiPing(100)
 }
 
