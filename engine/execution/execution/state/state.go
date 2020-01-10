@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
@@ -20,7 +19,7 @@ type ExecutionState interface {
 	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
 
 	// PersistStateCommitment saves a state commitment under given hash
-	PersistStateCommitment(crypto.Hash, *flow.StateCommitment) error
+	PersistStateCommitment(flow.Identifier, *flow.StateCommitment) error
 }
 
 type state struct {
@@ -67,9 +66,9 @@ func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
 }
 
 func (s *state) StateCommitmentByBlockID(id flow.Identifier) (flow.StateCommitment, error) {
-	commitment, err := s.commitments.ByHash(id)
+	commitment, err := s.commitments.ByID(id)
 	if err != nil {
-		if errors.Is(err, storage.NotFoundErr) {
+		if errors.Is(err, storage.ErrNotFound) {
 			//TODO ? Shouldn't happen in MVP, in multi-node should query a state from other nodes
 			panic(fmt.Sprintf("storage commitment for id %v does not exist", id))
 		} else {
@@ -79,6 +78,6 @@ func (s *state) StateCommitmentByBlockID(id flow.Identifier) (flow.StateCommitme
 	return *commitment, nil
 }
 
-func (s *state) PersistStateCommitment(hash crypto.Hash, commitment *flow.StateCommitment) error {
-	return s.commitments.Persist(hash, commitment)
+func (s *state) PersistStateCommitment(id flow.Identifier, commitment *flow.StateCommitment) error {
+	return s.commitments.Persist(id, commitment)
 }

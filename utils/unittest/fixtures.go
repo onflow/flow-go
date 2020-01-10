@@ -79,22 +79,6 @@ func StateCommitmentFixture() flow.StateCommitment {
 	return flow.StateCommitment(state)
 }
 
-func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
-	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
-		Script:             []byte("pub fun main() {}"),
-		ReferenceBlockHash: flow.Fingerprint(HashFixture(32)),
-		Nonce:              1,
-		ComputeLimit:       10,
-		PayerAccount:       AddressFixture(),
-		ScriptAccounts:     []flow.Address{AddressFixture()},
-		Signatures:         []flow.AccountSignature{AccountSignatureFixture()},
-	}}
-	if len(n) > 0 {
-		n[0](&tx)
-	}
-	return tx
-}
-
 func HashFixture(size int) crypto.Hash {
 	hash := make(crypto.Hash, size)
 	for i := 0; i < size; i++ {

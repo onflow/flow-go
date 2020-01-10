@@ -32,12 +32,10 @@ func main() {
 			node.MustNot(err).Msg("could not initialize ledger trie storage")
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, genesis *flow.Block) {
-			genesis.Hash()
-
 			// TODO We boldly assume that if a genesis is being written than a storage tree is also empty
 			initialStateCommitment := flow.StateCommitment(ledgerStorage.LatestStateCommitment())
 
-			err := stateCommitments.Persist(genesis.Hash(), &initialStateCommitment)
+			err := stateCommitments.Persist(genesis.ID(), &initialStateCommitment)
 			node.MustNot(err).Msg("could not store initial state commitment for genesis block")
 
 		}).

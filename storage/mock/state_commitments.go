@@ -2,7 +2,6 @@
 
 package mock
 
-import crypto "github.com/dapperlabs/flow-go/crypto"
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 
@@ -11,13 +10,13 @@ type StateCommitments struct {
 	mock.Mock
 }
 
-// ByHash provides a mock function with given fields: hash
-func (_m *StateCommitments) ByHash(hash crypto.Hash) (*flow.StateCommitment, error) {
-	ret := _m.Called(hash)
+// ByID provides a mock function with given fields: id
+func (_m *StateCommitments) ByID(id flow.Identifier) (*flow.StateCommitment, error) {
+	ret := _m.Called(id)
 
 	var r0 *flow.StateCommitment
-	if rf, ok := ret.Get(0).(func(crypto.Hash) *flow.StateCommitment); ok {
-		r0 = rf(hash)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.StateCommitment); ok {
+		r0 = rf(id)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.StateCommitment)
@@ -25,8 +24,8 @@ func (_m *StateCommitments) ByHash(hash crypto.Hash) (*flow.StateCommitment, err
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(crypto.Hash) error); ok {
-		r1 = rf(hash)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -34,13 +33,13 @@ func (_m *StateCommitments) ByHash(hash crypto.Hash) (*flow.StateCommitment, err
 	return r0, r1
 }
 
-// Persist provides a mock function with given fields: hash, stateCommitment
-func (_m *StateCommitments) Persist(hash crypto.Hash, stateCommitment *flow.StateCommitment) error {
-	ret := _m.Called(hash, stateCommitment)
+// Persist provides a mock function with given fields: id, stateCommitment
+func (_m *StateCommitments) Persist(id flow.Identifier, stateCommitment *flow.StateCommitment) error {
+	ret := _m.Called(id, stateCommitment)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(crypto.Hash, *flow.StateCommitment) error); ok {
-		r0 = rf(hash, stateCommitment)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.StateCommitment) error); ok {
+		r0 = rf(id, stateCommitment)
 	} else {
 		r0 = ret.Error(0)
 	}
