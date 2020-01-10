@@ -127,13 +127,43 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	return nodes
 }
 
+func StateCommitmentFixture() flow.StateCommitment {
+	return flow.StateCommitment{
+		235, 123, 148, 153, 55, 102, 49, 115,
+		139, 193, 91, 66, 17, 209, 10, 68,
+		90, 169, 31, 94, 135, 33, 250, 250,
+		180, 198, 51, 74, 53, 22, 62, 234,
+	}
+}
+
+func ChunkFixture() flow.Chunk {
+	return flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			FirstTxIndex:                    0,
+			TxCounts:                        42,
+			ChunkTxCollection:               nil,
+			StartState:                      StateCommitmentFixture(),
+			EventCollection:                 nil,
+			TotalComputationUsed:            4200,
+			FirstTransactionComputationUsed: 42,
+		},
+		Index:    0,
+		EndState: StateCommitmentFixture(),
+	}
+}
+
 func ExecutionResultFixture() flow.ExecutionResult {
 	return flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousExecutionResult: nil,
 			Block:                   flow.Fingerprint(HashFixture(32)),
-			FinalStateCommitment:    nil,
-			Chunks:                  flow.ChunkList{},
+			FinalStateCommitment:    StateCommitmentFixture(),
+			Chunks: flow.ChunkList{
+				Chunks: []flow.Chunk{
+					ChunkFixture(),
+					ChunkFixture(),
+				},
+			},
 		},
 		Signatures: nil,
 	}
