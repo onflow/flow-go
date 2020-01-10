@@ -97,9 +97,9 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // to this function originate within the expulsion engine on the node with the
 // given origin ID.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch ev := event.(type) {
+	switch entity := event.(type) {
 	case *flow.CollectionGuarantee:
-		return e.onCollectionGuarantee(originID, ev)
+		return e.onCollectionGuarantee(originID, entity)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}

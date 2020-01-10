@@ -12,23 +12,24 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	mockmodule "github.com/dapperlabs/flow-go/module/mock"
-	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
+	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
+	module "github.com/dapperlabs/flow-go/module/mock"
+	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
-	mockprotocol "github.com/dapperlabs/flow-go/protocol/mock"
-	mockstorage "github.com/dapperlabs/flow-go/storage/mock"
+	protocol "github.com/dapperlabs/flow-go/protocol/mock"
+	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 // testcontext contains the context for a test case.
 type testcontext struct {
-	state       *mockprotocol.State
-	me          *mockmodule.Local
+	state       *protocol.State
+	me          *module.Local
 	net         *stub.Network
-	provider    *mocknetwork.Engine
-	pool        *mockmodule.TransactionPool
-	collections *mockstorage.Collections
-	guarantees  *mockstorage.Guarantees
+	provider    *network.Engine
+	pool        *mempool.Transactions
+	collections *storage.Collections
+	guarantees  *storage.Guarantees
 }
 
 // WithEngine initializes the dependencies for a test case, then runs the test
@@ -38,8 +39,8 @@ func WithEngine(t *testing.T, run func(testcontext, *Engine)) {
 
 	log := zerolog.New(os.Stderr)
 
-	ctx.state = new(mockprotocol.State)
-	ctx.me = new(mockmodule.Local)
+	ctx.state = new(protocol.State)
+	ctx.me = new(module.Local)
 	ctx.me.On("NodeID").Return(flow.Identifier{})
 
 	hub := stub.NewNetworkHub()
@@ -49,10 +50,10 @@ func WithEngine(t *testing.T, run func(testcontext, *Engine)) {
 		ProposalPeriod: time.Millisecond,
 	}
 
-	ctx.provider = new(mocknetwork.Engine)
-	ctx.pool = new(mockmodule.TransactionPool)
-	ctx.collections = new(mockstorage.Collections)
-	ctx.guarantees = new(mockstorage.Guarantees)
+	ctx.provider = new(network.Engine)
+	ctx.pool = new(mempool.Transactions)
+	ctx.collections = new(storage.Collections)
+	ctx.guarantees = new(storage.Guarantees)
 
 	e, err := New(log, conf, ctx.net, ctx.me, ctx.state, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees)
 	require.NoError(t, err)

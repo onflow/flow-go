@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -33,7 +34,7 @@ type Engine struct {
 	me          module.Local
 	state       protocol.State
 	provider    network.Engine // provider engine to propagate guarantees
-	pool        module.TransactionPool
+	pool        mempool.Transactions
 	collections storage.Collections
 	guarantees  storage.Guarantees
 }
@@ -45,7 +46,7 @@ func New(
 	me module.Local,
 	state protocol.State,
 	provider network.Engine,
-	pool module.TransactionPool,
+	pool mempool.Transactions,
 	collections storage.Collections,
 	guarantees storage.Guarantees,
 ) (*Engine, error) {

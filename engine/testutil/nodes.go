@@ -20,7 +20,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
-	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -59,7 +59,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis
 
 	node := GenericNode(t, hub, identity, genesis)
 
-	pool, err := mempool.NewTransactionPool()
+	pool, err := stdmap.NewTransactions()
 	require.NoError(t, err)
 
 	collections := storage.NewCollections(node.DB)
@@ -102,7 +102,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis 
 
 	node := GenericNode(t, hub, identity, genesis)
 
-	pool, err := mempool.NewGuaranteePool()
+	pool, err := stdmap.NewGuarantees()
 	require.NoError(t, err)
 
 	propagationEngine, err := propagation.New(node.Log, node.Net, node.State, node.Me, pool)

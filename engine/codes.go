@@ -26,8 +26,8 @@ const (
 	// Consensus 050-099
 	ConsensusProvider    = 50
 	ConsensusPropagation = 51
-
-	ConsensusReceiver = CollectionProvider
+	ConsensusMatching    = 52
+	ConsensusReceiver    = CollectionProvider
 
 	// Execution 100-199
 	ExecutionProvider       = 100

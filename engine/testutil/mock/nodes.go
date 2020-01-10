@@ -9,9 +9,9 @@ import (
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/engine/verification/receiver"
+	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -29,7 +29,7 @@ type GenericNode struct {
 // CollectionNode implements an in-process collection node for tests.
 type CollectionNode struct {
 	GenericNode
-	Pool            module.TransactionPool
+	Pool            mempool.Transactions
 	Collections     storage.Collections
 	IngestionEngine *collectioningest.Engine
 	ProviderEngine  *provider.Engine
@@ -38,7 +38,7 @@ type CollectionNode struct {
 // ConsensusNode implements an in-process consensus node for tests.
 type ConsensusNode struct {
 	GenericNode
-	Pool              module.CollectionGuaranteePool
+	Pool              mempool.Guarantees
 	IngestionEngine   *consensusingest.Engine
 	PropagationEngine *propagation.Engine
 }
@@ -46,8 +46,6 @@ type ConsensusNode struct {
 // VerificationNode implements an in-process verification node for tests.
 type VerificationNode struct {
 	GenericNode
-	Pool                     verification.Mempool
-	CollectionReceiverEngine *receiver.Engine
-	ExecutionReceiverEngine  *receiver.Engine
-	VerifierEngine           network.Engine
+	Pool           verification.Mempool
+	VerifierEngine *verifier.Engine
 }
