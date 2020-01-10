@@ -65,6 +65,12 @@ func CollectionFixture(n int) flow.Collection {
 	return flow.Collection{Transactions: transactions}
 }
 
+func StateCommitmentFixture() flow.StateCommitment {
+	var state = make([]byte, 20)
+	_, _ = rand.Read(state[0:20])
+	return flow.StateCommitment(state)
+}
+
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
 		Script:             []byte("pub fun main() {}"),

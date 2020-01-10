@@ -1,8 +1,12 @@
 package state
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
@@ -14,16 +18,21 @@ type ExecutionState interface {
 	CommitDelta(Delta) (flow.StateCommitment, error)
 	// StateCommitmentByBlockHash returns the final state commitment for the provided block hash.
 	StateCommitmentByBlockHash(crypto.Hash) (flow.StateCommitment, error)
+
+	// PersistStateCommitment saves a state commitment under given hash
+	PersistStateCommitment(crypto.Hash, *flow.StateCommitment) error
 }
 
 type state struct {
-	ls ledger.Storage
+	ls          ledger.Storage
+	commitments storage.StateCommitments
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
-func NewExecutionState(ls ledger.Storage) ExecutionState {
+func NewExecutionState(ls ledger.Storage, commitments storage.StateCommitments) ExecutionState {
 	return &state{
-		ls: ls,
+		ls:          ls,
+		commitments: commitments,
 	}
 }
 
@@ -57,8 +66,19 @@ func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
 	return flow.StateCommitment(commitment), nil
 }
 
-func (s *state) StateCommitmentByBlockHash(crypto.Hash) (flow.StateCommitment, error) {
-	// TODO: (post-MVP) get last state commitment from previous block
-	// https://github.com/dapperlabs/flow-go/issues/2025
-	return flow.StateCommitment(s.ls.LatestStateCommitment()), nil
+func (s *state) StateCommitmentByBlockHash(hash crypto.Hash) (flow.StateCommitment, error) {
+	commitment, err := s.commitments.ByHash(hash)
+	if err != nil {
+		if errors.Is(err, storage.NotFoundErr) {
+			//TODO ? Shouldn't happen in MVP, in multi-node should query a state from other nodes
+			panic(fmt.Sprintf("storage commitment for hash %v does not exist", hash))
+		} else {
+			return nil, err
+		}
+	}
+	return *commitment, nil
+}
+
+func (s *state) PersistStateCommitment(hash crypto.Hash, commitment *flow.StateCommitment) error {
+	return s.commitments.Persist(hash, commitment)
 }

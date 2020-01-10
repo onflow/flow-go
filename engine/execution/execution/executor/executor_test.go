@@ -90,6 +90,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Return(nil, nil).
 		Once()
 
+	es.On("PersistStateCommitment",
+		block.Hash(), mock.AnythingOfType("*flow.StateCommitment")).Return(nil).Once()
+
 	chunks, err := exe.ExecuteBlock(executableBlock)
 	assert.NoError(t, err)
 	assert.Len(t, chunks, 1)
