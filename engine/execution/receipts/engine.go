@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // An Engine broadcasts execution receipts to nodes in the network.
@@ -88,10 +89,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 func (e *Engine) onExecutionResult(result *flow.ExecutionResult) error {
 	e.log.Debug().
-		// TODO: replace with proper ID
-		Hex("block_id", result.Block).
-		// TODO: replace with proper ID
-		Hex("receipt_id", result.Fingerprint()).
+		Hex("block_id", result.BlockID[:]).
+		Hex("result_id", logging.ID(result)).
 		Msg("received execution result")
 
 	receipt := &flow.ExecutionReceipt{
