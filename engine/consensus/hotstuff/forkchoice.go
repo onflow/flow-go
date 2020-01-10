@@ -36,7 +36,7 @@ func (fc *ForkChoice) IsSafeNode(block *types.BlockProposal) bool {
 // return true only if the following conditions are all true
 // 1. above the finalized block's View
 // 2. block's QC is pointing to a leaf block on the tree
-func (fc *ForkChoice) CanIncorperate(bp *types.BlockProposal) bool {
+func (fc *ForkChoice) CanIncorporate(bp *types.BlockProposal) bool {
 	panic("TODO")
 }
 
