@@ -37,18 +37,9 @@ func (e *blockExecutor) ExecuteBlock(
 
 	// TODO: compute block fees & reward payments
 
-	finalChunk := chunks[len(chunks)-1]
+	result := generateExecutionResultForBlock(block, chunks)
 
-	return flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousExecutionResult: block.PreviousExecutionResult,
-			Block:                   flow.Fingerprint(block.Block.Hash()),
-			FinalStateCommitment:    finalChunk.EndState,
-			Chunks: flow.ChunkList{
-				Chunks: chunks,
-			},
-		},
-	}, nil
+	return result, nil
 }
 
 func (e *blockExecutor) executeTransactions(
@@ -103,4 +94,30 @@ func (e *blockExecutor) executeTransactions(
 	}
 
 	return []flow.Chunk{chunk}, nil
+}
+
+// generateExecutionResultForBlock creates a new execution result for a block from
+// the provided chunk results.
+func generateExecutionResultForBlock(block ExecutableBlock, chunks []flow.Chunk) flow.ExecutionResult {
+	var finalStateCommitment flow.StateCommitment
+
+	// If block is not empty, set final state to the final state of the last chunk.
+	// Otherwise, set to the final state of the previous execution result.
+	if len(chunks) > 0 {
+		finalChunk := chunks[len(chunks)-1]
+		finalStateCommitment = finalChunk.EndState
+	} else {
+		finalStateCommitment = block.PreviousExecutionResult.FinalStateCommitment
+	}
+
+	return flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousExecutionResult: block.PreviousExecutionResult.Fingerprint(),
+			Block:                   flow.Fingerprint(block.Block.Hash()),
+			FinalStateCommitment:    finalStateCommitment,
+			Chunks: flow.ChunkList{
+				Chunks: chunks,
+			},
+		},
+	}
 }

@@ -7,5 +7,5 @@ import "github.com/dapperlabs/flow-go/model/flow"
 type ExecutableBlock struct {
 	Block                   flow.Block
 	Transactions            []flow.TransactionBody
-	PreviousExecutionResult flow.Fingerprint
+	PreviousExecutionResult flow.ExecutionResult
 }
