@@ -93,6 +93,7 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 	defer s.cancel()
 
 	nets := make([]*Network, 0)
+	mws := make([]*Middleware, 0)
 	ids := make([]flow.Identifier, 0)
 
 	for i := 0; i < count; i++ {
@@ -101,19 +102,26 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 		nodeID[0] = byte(i + 1)
 		ID := flow.Identifier(nodeID)
 		ids = append(ids, ID)
-	}
 
-	for i := 0; i < count; i++ {
 		// creating middleware of nodes
-		mw, err := NewMiddleware(zerolog.Logger{}, json.NewCodec(), uint(0), "0.0.0.0:0", ids[i])
+		mw, err := NewMiddleware(zerolog.Logger{}, json.NewCodec(), uint(1), "0.0.0.0:0", ids[i])
 		require.NoError(s.Suite.T(), err)
-
+		mws = append(mws, mw)
+	}
+	for i := 0; i < count; i++ {
+		ip, port := mws[(i+1)%count].libP2PNode.GetIPPort()
+		// mocks an identity
+		targetID := flow.Identity{
+			NodeID:  ids[(i+1)%count],
+			Address: fmt.Sprintf("%s:%s", ip, port),
+			Role:    flow.RoleCollection,
+		}
 		state := &protocol.State{}
 		snapshot := &protocol.Snapshot{}
 		state.On("Final").Return(snapshot).Once()
-		snapshot.On("Identities", mockery.Anything).Return(ids[(i+1)%count], nil).Once()
+		snapshot.On("Identities", mockery.Anything).Return(flow.IdentityList{targetID}, nil).Once()
 		// creating network of node-1
-		net, err := NewNetwork(zerolog.Logger{}, json.NewCodec(), state, Local{me: ids[i]}, mw)
+		net, err := NewNetwork(zerolog.Logger{}, json.NewCodec(), state, Local{me: ids[i]}, mws[i])
 		require.NoError(s.Suite.T(), err)
 
 		nets = append(nets, net)
