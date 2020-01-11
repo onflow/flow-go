@@ -40,7 +40,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ConsensusPropagation, e)
+	con, err := net.Register(engine.BlockPropagation, e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}

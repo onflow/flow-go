@@ -4,6 +4,6 @@ package trickle
 
 // Request is a request for an item.
 type Request struct {
-	EngineID uint8
-	EventID  []byte
+	ChannelID uint8
+	EventID   []byte
 }
