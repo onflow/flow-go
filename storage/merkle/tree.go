@@ -5,8 +5,6 @@ package merkle
 import (
 	"github.com/jrick/bitset"
 	"golang.org/x/crypto/blake2b"
-
-	"github.com/dapperlabs/flow-go/crypto"
 )
 
 // Tree represents a binary patricia merkle tree. The difference with a normal
@@ -27,7 +25,7 @@ func NewTree() *Tree {
 
 // Put will stores the given value in the trie under the given key. If the key
 // already exists, it will replace the value and return true.
-func (t *Tree) Put(key crypto.Hash, val interface{}) bool {
+func (t *Tree) Put(key []byte, val interface{}) bool {
 
 	// the path through the tree is determined by the key; we decide whether to
 	// go left or right based on whether the next bit is set or not
@@ -171,7 +169,7 @@ PutLoop:
 
 // Get will retrieve the value associated with the given key. It returns true
 // if the key was found and false otherwise.
-func (t *Tree) Get(key crypto.Hash) (interface{}, bool) {
+func (t *Tree) Get(key []byte) (interface{}, bool) {
 
 	// we start at the root again
 	cur := &t.root
@@ -236,7 +234,7 @@ GetLoop:
 // Internally, any parent nodes between the leaf up to the closest shared path
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
-func (t *Tree) Del(key crypto.Hash) bool {
+func (t *Tree) Del(key []byte) bool {
 
 	// we initialize three pointers pointing to a dummy empty node
 	// this is used to keep track of the node we last pointed to, as well as
@@ -367,7 +365,7 @@ DelLoop:
 }
 
 // Hash will return the root hash of this patricia merkle tree.
-func (t *Tree) Hash() crypto.Hash {
+func (t *Tree) Hash() []byte {
 	hash := t.nodeHash(t.root)
 	return hash
 }

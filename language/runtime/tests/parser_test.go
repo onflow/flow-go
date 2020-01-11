@@ -4616,7 +4616,7 @@ func TestParseFailableCasting(t *testing.T) {
 
 func TestParseInterface(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		actual, _, err := parser.ParseProgram(fmt.Sprintf(`
             %s interface Test {
                 foo: Int
@@ -4992,59 +4992,70 @@ func TestParseEvent(t *testing.T) {
 
 	require.Nil(t, err)
 
-	transfer := &EventDeclaration{
+	transfer := &CompositeDeclaration{
+		CompositeKind: common.CompositeKindEvent,
 		Identifier: Identifier{
 			Identifier: "Transfer",
 			Pos:        Position{Offset: 15, Line: 2, Column: 14},
 		},
-		ParameterList: &ParameterList{
-			Parameters: []*Parameter{
+		Members: &Members{
+			SpecialFunctions: []*SpecialFunctionDeclaration{
 				{
-					Label: "",
-					Identifier: Identifier{
-						Identifier: "to",
-						Pos:        Position{Offset: 24, Line: 2, Column: 23},
-					},
-					TypeAnnotation: &TypeAnnotation{
-						IsResource: false,
-						Type: &NominalType{
-							Identifier: Identifier{
-								Identifier: "Address",
-								Pos:        Position{Offset: 28, Line: 2, Column: 27},
+					DeclarationKind: common.DeclarationKindInitializer,
+					FunctionDeclaration: &FunctionDeclaration{
+						ParameterList: &ParameterList{
+							Parameters: []*Parameter{
+								{
+									Label: "",
+									Identifier: Identifier{
+										Identifier: "to",
+										Pos:        Position{Offset: 24, Line: 2, Column: 23},
+									},
+									TypeAnnotation: &TypeAnnotation{
+										IsResource: false,
+										Type: &NominalType{
+											Identifier: Identifier{
+												Identifier: "Address",
+												Pos:        Position{Offset: 28, Line: 2, Column: 27},
+											},
+										},
+										StartPos: Position{Offset: 28, Line: 2, Column: 27},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 24, Line: 2, Column: 23},
+										EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+									},
+								},
+								{
+									Label: "",
+									Identifier: Identifier{
+										Identifier: "from",
+										Pos:        Position{Offset: 37, Line: 2, Column: 36},
+									},
+									TypeAnnotation: &TypeAnnotation{
+										IsResource: false,
+										Type: &NominalType{
+											Identifier: Identifier{
+												Identifier: "Address",
+												Pos:        Position{Offset: 43, Line: 2, Column: 42},
+											},
+										},
+										StartPos: Position{Offset: 43, Line: 2, Column: 42},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 37, Line: 2, Column: 36},
+										EndPos:   Position{Offset: 43, Line: 2, Column: 42},
+									},
+								},
+							},
+							Range: Range{
+								StartPos: Position{Offset: 23, Line: 2, Column: 22},
+								EndPos:   Position{Offset: 50, Line: 2, Column: 49},
 							},
 						},
-						StartPos: Position{Offset: 28, Line: 2, Column: 27},
-					},
-					Range: Range{
-						StartPos: Position{Offset: 24, Line: 2, Column: 23},
-						EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+						StartPos: Position{Offset: 23, Line: 2, Column: 22},
 					},
 				},
-				{
-					Label: "",
-					Identifier: Identifier{
-						Identifier: "from",
-						Pos:        Position{Offset: 37, Line: 2, Column: 36},
-					},
-					TypeAnnotation: &TypeAnnotation{
-						IsResource: false,
-						Type: &NominalType{
-							Identifier: Identifier{
-								Identifier: "Address",
-								Pos:        Position{Offset: 43, Line: 2, Column: 42},
-							},
-						},
-						StartPos: Position{Offset: 43, Line: 2, Column: 42},
-					},
-					Range: Range{
-						StartPos: Position{Offset: 37, Line: 2, Column: 36},
-						EndPos:   Position{Offset: 43, Line: 2, Column: 42},
-					},
-				},
-			},
-			Range: Range{
-				StartPos: Position{Offset: 23, Line: 2, Column: 22},
-				EndPos:   Position{Offset: 50, Line: 2, Column: 49},
 			},
 		},
 		Range: Range{
@@ -6333,8 +6344,13 @@ func TestParseAccessModifiers(t *testing.T) {
 		{"function", "%s fun test() {}"},
 	}
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
+
 		for _, isInterface := range []bool{true, false} {
+
+			if !compositeKind.SupportsInterfaces() && isInterface {
+				continue
+			}
 
 			interfaceKeyword := ""
 			if isInterface {
@@ -6354,20 +6370,29 @@ func TestParseAccessModifiers(t *testing.T) {
 				return fmt.Sprintf(format, compositeKind.Keyword(), interfaceKeyword)
 			}
 
-			declarations = append(declarations,
-				declaration{
-					formatName("itself"),
-					formatCode("%%s %s %s Test {}"),
-				},
-				declaration{
-					formatName("field"),
-					formatCode("%s %s Test { %%s let test: Int ; init() { self.test = 1 } }"),
-				},
-				declaration{
-					formatName("function"),
-					formatCode("%s %s Test { %%s fun test() {} }"),
-				},
-			)
+			if compositeKind == common.CompositeKindEvent {
+				declarations = append(declarations,
+					declaration{
+						formatName("itself"),
+						formatCode("%%s %s %s Test()"),
+					},
+				)
+			} else {
+				declarations = append(declarations,
+					declaration{
+						formatName("itself"),
+						formatCode("%%s %s %s Test {}"),
+					},
+					declaration{
+						formatName("field"),
+						formatCode("%s %s Test { %%s let test: Int ; init() { self.test = 1 } }"),
+					},
+					declaration{
+						formatName("function"),
+						formatCode("%s %s Test { %%s fun test() {} }"),
+					},
+				)
+			}
 		}
 	}
 

@@ -15,7 +15,7 @@ func TestCheckInvalidCompositeInitializerOverloading(t *testing.T) {
 
 	interfacePossibilities := []bool{true, false}
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		for _, isInterface := range interfacePossibilities {
 
 			interfaceKeyword := ""
