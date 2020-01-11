@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -31,21 +32,23 @@ type Engine struct {
 	state             protocol.State
 	execution         network.Engine
 
-	pendingBlocks      map[flow.Identifier]*execution.CompleteBlock
-	pendingCollections map[flow.Identifier]flow.Identifier
+	mempool *Mempool
+	//pendingBlocks      map[flow.Identifier]*execution.CompleteBlock
+	//pendingCollections map[flow.Identifier]flow.Identifier
 }
 
-func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections, state protocol.State, executionEngine network.Engine) (*Engine, error) {
+func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections, state protocol.State, executionEngine network.Engine, mempool *Mempool) (*Engine, error) {
 	eng := Engine{
-		unit:               engine.NewUnit(),
-		log:                logger,
-		me:                 me,
-		blocks:             blocks,
-		collections:        collections,
-		state:              state,
-		execution:          executionEngine,
-		pendingBlocks:      make(map[flow.Identifier]*execution.CompleteBlock),
-		pendingCollections: make(map[flow.Identifier]flow.Identifier),
+		unit:        engine.NewUnit(),
+		log:         logger,
+		me:          me,
+		blocks:      blocks,
+		collections: collections,
+		state:       state,
+		execution:   executionEngine,
+		//pendingBlocks:      make(map[flow.Identifier]*execution.CompleteBlock),
+		//pendingCollections: make(map[flow.Identifier]flow.Identifier),
+		mempool: mempool,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -134,12 +137,14 @@ func (e *Engine) checkForCompleteness(block *execution.CompleteBlock) bool {
 		return false
 	}
 
-	for _, collection := range block.Block.Guarantees {
-		delete(e.pendingCollections, collection.ID())
-	}
-	delete(e.pendingBlocks, block.Block.ID())
-
 	return true
+}
+
+func (e *Engine) removeCollections(block *execution.CompleteBlock, backdata *Backdata) {
+
+	for _, collection := range block.Block.Guarantees {
+		backdata.Rem(collection.ID())
+	}
 }
 
 func (e *Engine) handleBlock(block *flow.Block) error {
@@ -156,36 +161,50 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 	blockID := block.ID()
 
-	if _, ok := e.pendingBlocks[blockID]; !ok {
-
-		randomCollectionIdentifier, err := e.findCollectionNode()
-		if err != nil {
-			return err
-		}
-
-		completeBlock := &execution.CompleteBlock{
-			Block:               *block,
-			CompleteCollections: make(map[flow.Identifier]*execution.CompleteCollection),
-		}
-
-		for _, collection := range block.Guarantees {
-			id := collection.ID()
-			e.pendingCollections[id] = blockID
-			completeBlock.CompleteCollections[id] = &execution.CompleteCollection{
-				Collection:   collection,
-				Transactions: nil,
-			}
-
-			err := e.collectionConduit.Submit(messages.CollectionRequest{ID: collection.ID()}, randomCollectionIdentifier)
-			if err != nil {
-				e.log.Err(err).Msg("cannot submit collection requests")
-			}
-		}
-
-		e.pendingBlocks[blockID] = completeBlock
+	randomCollectionIdentifier, err := e.findCollectionNode()
+	if err != nil {
+		return err
 	}
 
-	return nil
+	emptyCompleteBlock := &execution.CompleteBlock{
+		Block:               *block,
+		CompleteCollections: make(map[flow.Identifier]*execution.CompleteCollection),
+	}
+
+	err = e.mempool.Run(func(backdata *Backdata) error {
+		for _, guarantee := range block.Guarantees {
+			completeBlock, err := backdata.Get(guarantee.ID())
+			if err != nil {
+				if err == mempool.ErrEntityNotFound {
+					emptyCompleteBlock.CompleteCollections[guarantee.ID()] = &execution.CompleteCollection{
+						Guarantee:    guarantee,
+						Transactions: nil,
+					}
+					err := backdata.Add(&blockByCollection{
+						CollectionID: guarantee.ID(),
+						Block:        emptyCompleteBlock,
+					})
+					if err != nil {
+						return fmt.Errorf("cannot save collection-block mapping: %w", err)
+					}
+
+					err = e.collectionConduit.Submit(messages.CollectionRequest{ID: guarantee.ID()}, randomCollectionIdentifier)
+					if err != nil {
+						e.log.Err(err).Msg("cannot submit collection requests")
+					}
+					continue
+				}
+				return fmt.Errorf("cannot get an item from mempool: %w", err)
+			}
+			if completeBlock.ID() != blockID {
+				// Should not happen in MVP
+				return fmt.Errorf("received block with same collection alredy pointing to different block ")
+			}
+		}
+		return nil
+	})
+
+	return err
 }
 
 func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse) error {
@@ -198,20 +217,21 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 
 	collID := collection.ID()
 
-	if blockHash, ok := e.pendingCollections[collID]; ok {
-		if block, ok := e.pendingBlocks[blockHash]; ok {
-			if completeCollection, ok := block.CompleteCollections[collID]; ok {
+	return e.mempool.Run(func(backdata *Backdata) error {
+		completeBlock, err := backdata.Get(collID)
+		if err == nil {
+			if completeCollection, ok := completeBlock.Block.CompleteCollections[collID]; ok {
 				if completeCollection.Transactions == nil {
 					completeCollection.Transactions = collection.Transactions
-					if e.checkForCompleteness(block) {
-						e.execution.SubmitLocal(block)
+					if e.checkForCompleteness(completeBlock.Block) {
+						e.removeCollections(completeBlock.Block, backdata)
+						e.execution.SubmitLocal(completeBlock.Block)
 					}
 				}
+			} else {
+				return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
 			}
-		} else {
-			return fmt.Errorf("cannot handle collection: internal inconsistency - pending collection pointing to non-existing block")
 		}
-	}
-
-	return nil
+		return nil
+	})
 }

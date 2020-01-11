@@ -11,13 +11,13 @@ import (
 // Transactions implements the transactions memory pool of the consensus nodes,
 // used to store transactions and to generate block payloads.
 type Transactions struct {
-	*backend
+	*Backend
 }
 
 // NewTransactions creates a new memory pool for transactions.
 func NewTransactions() (*Transactions, error) {
 	t := &Transactions{
-		backend: newBackend(),
+		Backend: NewBackend(),
 	}
 
 	return t, nil
@@ -25,12 +25,12 @@ func NewTransactions() (*Transactions, error) {
 
 // Add adds a transaction to the mempool.
 func (t *Transactions) Add(tx *flow.Transaction) error {
-	return t.backend.Add(tx)
+	return t.Backend.Add(tx)
 }
 
 // Get returns the transaction with the given ID from the mempool.
 func (t *Transactions) Get(txID flow.Identifier) (*flow.Transaction, error) {
-	entity, err := t.backend.Get(txID)
+	entity, err := t.Backend.Get(txID)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (t *Transactions) Get(txID flow.Identifier) (*flow.Transaction, error) {
 
 // All returns all transactions from the mempool.
 func (t *Transactions) All() []*flow.Transaction {
-	entities := t.backend.All()
+	entities := t.Backend.All()
 	txs := make([]*flow.Transaction, 0, len(entities))
 	for _, entity := range entities {
 		tx, ok := entity.(*flow.Transaction)

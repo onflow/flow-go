@@ -45,10 +45,13 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 
 	blocks := storage.NewMockBlocks(ctrl)
 	collections := storage.NewMockCollections(ctrl)
-	execution := network.NewMockEngine(ctrl)
+	executionEngine := network.NewMockEngine(ctrl)
 	state := protocol.NewMockState(ctrl)
 
 	snapshot := protocol.NewMockSnapshot(ctrl)
+
+	mempool, err := newMempool()
+	require.NoError(t, err)
 
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
 
@@ -61,13 +64,13 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 
 	var engine *Engine
 
-	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionBlockIngestion)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
+	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 
-	engine, err := New(log, net, me, blocks, collections, state, execution)
+	engine, err = New(log, net, me, blocks, collections, state, executionEngine, mempool)
 	require.NoError(t, err)
 
-	f(t, engine, blocks, collections, state, conduit, collectionConduit, execution)
+	f(t, engine, blocks, collections, state, conduit, collectionConduit, executionEngine)
 }
 
 // TODO Currently those tests check if objects are stored directly
@@ -82,7 +85,7 @@ func TestBlockStorage(t *testing.T) {
 		blocks.EXPECT().Store(gomock.Eq(&block))
 		collectionConduit.EXPECT().Submit(gomock.Any(), gomock.Any()).Times(len(block.Guarantees))
 
-		err := engine.Process(myIdentity.NodeID, &block)
+		err := engine.ProcessLocal(&block)
 		assert.NoError(t, err)
 	})
 }
