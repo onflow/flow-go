@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	engine2 "github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/collection/provider"
-	executionMock "github.com/dapperlabs/flow-go/engine/execution/execution/mocks"
+	engineCommon "github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/execution/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	network "github.com/dapperlabs/flow-go/network/mocks"
 	protocol "github.com/dapperlabs/flow-go/protocol/mocks"
@@ -25,7 +25,7 @@ var (
 	myIdentity         = unittest.IdentityFixture()
 )
 
-func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine)) {
+func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, executionEngine *network.MockEngine)) {
 
 	collectionIdentity.Role = flow.RoleCollection
 	myIdentity.Role = flow.RoleExecution
@@ -45,7 +45,7 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 
 	blocks := storage.NewMockBlocks(ctrl)
 	collections := storage.NewMockCollections(ctrl)
-	execution := executionMock.NewMockExecutionEngine(ctrl)
+	execution := network.NewMockEngine(ctrl)
 	state := protocol.NewMockState(ctrl)
 
 	snapshot := protocol.NewMockSnapshot(ctrl)
@@ -61,8 +61,8 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 
 	var engine *Engine
 
-	net.EXPECT().Register(gomock.Eq(uint8(engine2.ExecutionBlockIngestion)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
-	net.EXPECT().Register(gomock.Eq(uint8(engine2.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
+	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.ExecutionBlockIngestion)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
+	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 
 	engine, err := New(log, net, me, blocks, collections, state, execution)
 	require.NoError(t, err)
@@ -75,60 +75,53 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 // tests will have to change to reflect this
 func TestBlockStorage(t *testing.T) {
 
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine) {
+	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, executionEngine *network.MockEngine) {
 
 		block := unittest.BlockFixture()
 
 		blocks.EXPECT().Store(gomock.Eq(&block))
-		collectionConduit.EXPECT().Submit(gomock.Any(), gomock.Any()).Times(len(block.CollectionGuarantees))
+		collectionConduit.EXPECT().Submit(gomock.Any(), gomock.Any()).Times(len(block.Guarantees))
 
-		err := engine.Process(myIdentity.NodeID, block)
+		err := engine.Process(myIdentity.NodeID, &block)
 		assert.NoError(t, err)
 	})
 }
 
 func TestCollectionRequests(t *testing.T) {
 
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine) {
-
-		//collectionIdentity := unittest.IdentityFixture()
-		//collectionIdentity.Role = flow.RoleCollection
+	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, executionEngine *network.MockEngine) {
 
 		block := unittest.BlockFixture()
 		//To make sure we always have collection if the block fixture changes
-		block.CollectionGuarantees = unittest.CollectionGuaranteesFixture(5)
+		block.Guarantees = unittest.CollectionGuaranteesFixture(5)
 
-		blocks.EXPECT().Save(gomock.Eq(&block))
-		for _, col := range block.CollectionGuarantees {
-			collectionConduit.EXPECT().Submit(gomock.Eq(provider.CollectionRequest{Fingerprint: col.Fingerprint()}), gomock.Eq(collectionIdentity.NodeID))
+		blocks.EXPECT().Store(gomock.Eq(&block))
+		for _, col := range block.Guarantees {
+			collectionConduit.EXPECT().Submit(gomock.Eq(messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
 		}
 
-		err := engine.ProcessLocal(block)
+		err := engine.ProcessLocal(&block)
 		require.NoError(t, err)
 	})
 }
 
 func TestValidatingCollectionResponse(t *testing.T) {
 
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine) {
+	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, executionEngine *network.MockEngine) {
 
-		block := unittest.BlockFixture()
-		block.CollectionGuarantees = unittest.CollectionGuaranteesFixture(1)
+		block, colls := makeRealBlock(1)
 
-		blocks.EXPECT().Save(gomock.Eq(&block))
+		blocks.EXPECT().Store(gomock.Eq(&block))
 
-		fingerprint := block.CollectionGuarantees[0].Fingerprint()
+		id := block.Guarantees[0].ID()
 
-		collectionConduit.EXPECT().Submit(gomock.Eq(provider.CollectionRequest{Fingerprint: fingerprint}), gomock.Eq(collectionIdentity.NodeID)).Return(nil)
+		collectionConduit.EXPECT().Submit(gomock.Eq(messages.CollectionRequest{ID: id}), gomock.Eq(collectionIdentity.NodeID)).Return(nil)
 
-		err := engine.ProcessLocal(block)
+		err := engine.ProcessLocal(&block)
 		require.NoError(t, err)
 
-		tx := unittest.TransactionBodyFixture()
-
-		rightResponse := provider.CollectionResponse{
-			Fingerprint:  fingerprint,
-			Transactions: []flow.TransactionBody{tx},
+		rightResponse := messages.CollectionResponse{
+			Collection: colls[0],
 		}
 
 		// TODO Enable wrong response sending once we have a way to hash collection
@@ -143,41 +136,81 @@ func TestValidatingCollectionResponse(t *testing.T) {
 		// no interaction with conduit for finished block
 		// </TODO enable>
 
-		execution.EXPECT().ExecuteBlock(gomock.Any())
+		executionEngine.EXPECT().SubmitLocal(gomock.AssignableToTypeOf(&execution.CompleteBlock{})).Times(1)
 
-		err = engine.ProcessLocal(rightResponse)
+		err = engine.ProcessLocal(&rightResponse)
 		require.NoError(t, err)
 	})
 }
 
 func TestForwardingToExecution(t *testing.T) {
 
-	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, execution *executionMock.MockExecutionEngine) {
+	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, executionEngine *network.MockEngine) {
 
-		block := unittest.BlockFixture()
-		block.CollectionGuarantees = unittest.CollectionGuaranteesFixture(3)
+		block, colls := makeRealBlock(3)
 
-		blocks.EXPECT().Save(gomock.Eq(&block))
+		blocks.EXPECT().Store(gomock.Eq(&block))
 
-		for _, col := range block.CollectionGuarantees {
-			collectionConduit.EXPECT().Submit(gomock.Eq(provider.CollectionRequest{Fingerprint: col.Fingerprint()}), gomock.Eq(collectionIdentity.NodeID))
+		for _, col := range block.Guarantees {
+			collectionConduit.EXPECT().Submit(gomock.Eq(messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
 		}
 
-		err := engine.ProcessLocal(block)
+		err := engine.ProcessLocal(&block)
 		require.NoError(t, err)
 
-		tx := unittest.TransactionBodyFixture()
+		executionEngine.EXPECT().SubmitLocal(gomock.AssignableToTypeOf(&execution.CompleteBlock{})).Times(1)
 
-		execution.EXPECT().ExecuteBlock(gomock.Any())
-
-		for _, col := range block.CollectionGuarantees {
-			rightResponse := provider.CollectionResponse{
-				Fingerprint:  col.Fingerprint(),
-				Transactions: []flow.TransactionBody{tx},
+		for _, col := range colls {
+			rightResponse := messages.CollectionResponse{
+				Collection: col,
 			}
 
-			err := engine.ProcessLocal(rightResponse)
+			err := engine.ProcessLocal(&rightResponse)
 			require.NoError(t, err)
 		}
 	})
+}
+
+func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
+
+	runWithEngine(t, func(t *testing.T, engine *Engine, blocks *storage.MockBlocks, collections *storage.MockCollections, state *protocol.MockState, conduit *network.MockConduit, collectionConduit *network.MockConduit, executionEngine *network.MockEngine) {
+
+		block, colls := makeRealBlock(3)
+
+		for _, col := range block.Guarantees {
+			collectionConduit.EXPECT().Submit(gomock.Eq(messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
+		}
+
+		blocks.EXPECT().Store(gomock.Eq(&block))
+
+		err := engine.ProcessLocal(&block)
+		require.NoError(t, err)
+
+		executionEngine.EXPECT().SubmitLocal(gomock.AssignableToTypeOf(execution.CompleteBlock{})).Times(0)
+
+		rightResponse := messages.CollectionResponse{
+			Collection: colls[1],
+		}
+
+		err = engine.ProcessLocal(&rightResponse)
+		require.NoError(t, err)
+	})
+}
+
+func makeRealBlock(n int) (flow.Block, []flow.Collection) {
+	colls := make([]flow.Collection, n)
+	collsGuarantees := make([]*flow.CollectionGuarantee, n)
+
+	for i, _ := range colls {
+		tx := unittest.TransactionBodyFixture()
+		colls[i].Transactions = []flow.TransactionBody{tx}
+
+		collsGuarantees[i] = &flow.CollectionGuarantee{
+			CollectionID: colls[i].ID(),
+		}
+	}
+
+	block := unittest.BlockFixture()
+	block.Guarantees = collsGuarantees
+	return block, colls
 }

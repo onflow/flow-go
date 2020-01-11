@@ -8,9 +8,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -28,14 +29,13 @@ type Engine struct {
 	blocks            storage.Blocks
 	collections       storage.Collections
 	state             protocol.State
-	execution         execution.ExecutionEngine
+	execution         network.Engine
 
-	//TODO change for proper fingerprint/hash types once they become usable as maps keys
-	pendingBlocks      map[string]execution.CompleteBlock
-	pendingCollections map[string]string
+	pendingBlocks      map[flow.Identifier]*execution.CompleteBlock
+	pendingCollections map[flow.Identifier]flow.Identifier
 }
 
-func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections, state protocol.State, executionEngine execution.ExecutionEngine) (*Engine, error) {
+func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections, state protocol.State, executionEngine network.Engine) (*Engine, error) {
 	eng := Engine{
 		unit:               engine.NewUnit(),
 		log:                logger,
@@ -44,8 +44,8 @@ func New(logger zerolog.Logger, net module.Network, me module.Local, blocks stor
 		collections:        collections,
 		state:              state,
 		execution:          executionEngine,
-		pendingBlocks:      map[string]execution.CompleteBlock{},
-		pendingCollections: map[string]string{},
+		pendingBlocks:      make(map[flow.Identifier]*execution.CompleteBlock),
+		pendingCollections: make(map[flow.Identifier]flow.Identifier),
 	}
 
 	con, err := net.Register(engine.ExecutionBlockIngestion, &eng)
@@ -98,9 +98,9 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		var err error
 		switch v := event.(type) {
-		case flow.Block:
+		case *flow.Block:
 			err = e.handleBlock(v)
-		case provider.CollectionResponse:
+		case *messages.CollectionResponse:
 			err = e.handleCollectionResponse(v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
@@ -113,11 +113,9 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) findCollectionNode() (flow.Identifier, error) {
-	identities, err := e.state.Final().Identities(func(identity flow.Identity) bool {
-		return identity.Role == flow.RoleCollection
-	})
+	identities, err := e.state.Final().Identities(identity.HasRole(flow.RoleCollection))
 	if err != nil {
-		return flow.Identifier{}, err
+		return flow.Identifier{}, fmt.Errorf("could not retrieve identities: %w", err)
 	}
 	if len(identities) < 1 {
 		return flow.Identifier{}, fmt.Errorf("no Collection identity found")
@@ -125,87 +123,89 @@ func (e *Engine) findCollectionNode() (flow.Identifier, error) {
 	return identities[rand.Intn(len(identities))].NodeID, nil
 }
 
-func (e *Engine) checkForCompleteness(block execution.CompleteBlock) error {
+func (e *Engine) checkForCompleteness(block *execution.CompleteBlock) bool {
 
-	for _, collection := range block.Block.CollectionGuarantees {
-		//TODO change to proper hash once it can be used as maps key
-		hash := string(collection.Hash)
+	for _, collection := range block.Block.Guarantees {
 
-		if _, ok := block.CompleteCollections[hash]; !ok {
-			return nil
+		completeCollection, ok := block.CompleteCollections[collection.ID()]
+		if ok && completeCollection.Transactions != nil {
+			continue
 		}
+		return false
 	}
 
-	for _, collection := range block.Block.CollectionGuarantees {
-		hash := string(collection.Hash)
-		delete(e.pendingCollections, hash)
+	for _, collection := range block.Block.Guarantees {
+		delete(e.pendingCollections, collection.ID())
 	}
-	blockHash := string(block.Block.Hash())
-	delete(e.pendingBlocks, blockHash)
+	delete(e.pendingBlocks, block.Block.ID())
 
-	//TODO results storage?
-	return e.execution.ExecuteBlock(block)
+	return true
 }
 
-func (e *Engine) handleBlock(block flow.Block) error {
+func (e *Engine) handleBlock(block *flow.Block) error {
 
 	e.log.Debug().
 		Hex("block_id", logging.ID(block)).
 		Uint64("block_number", block.Number).
 		Msg("received block")
 
-	err := e.blocks.Store(&block)
+	err := e.blocks.Store(block)
 	if err != nil {
 		return fmt.Errorf("could not save block: %w", err)
 	}
 
-	blockHash := string(block.Hash())
+	blockID := block.ID()
 
-	if _, ok := e.pendingBlocks[blockHash]; !ok {
+	if _, ok := e.pendingBlocks[blockID]; !ok {
 
 		randomCollectionIdentifier, err := e.findCollectionNode()
 		if err != nil {
 			return err
 		}
 
-		completeBlock := execution.CompleteBlock{
-			Block:               block,
-			CompleteCollections: map[string]execution.CompleteCollection{},
+		completeBlock := &execution.CompleteBlock{
+			Block:               *block,
+			CompleteCollections: make(map[flow.Identifier]*execution.CompleteCollection),
 		}
 
-		for _, collection := range block.CollectionGuarantees {
-			hash := string(collection.Fingerprint())
-			e.pendingCollections[hash] = blockHash
-			completeBlock.CompleteCollections[hash] = execution.CompleteCollection{
-				Collection:   *collection,
+		for _, collection := range block.Guarantees {
+			id := collection.ID()
+			e.pendingCollections[id] = blockID
+			completeBlock.CompleteCollections[id] = &execution.CompleteCollection{
+				Collection:   collection,
 				Transactions: nil,
 			}
 
-			err := e.collectionConduit.Submit(provider.CollectionRequest{Fingerprint: collection.Fingerprint()}, randomCollectionIdentifier)
+			err := e.collectionConduit.Submit(messages.CollectionRequest{ID: collection.ID()}, randomCollectionIdentifier)
 			if err != nil {
 				e.log.Err(err).Msg("cannot submit collection requests")
 			}
 		}
 
-		e.pendingBlocks[blockHash] = completeBlock
+		e.pendingBlocks[blockID] = completeBlock
 	}
 
 	return nil
 }
 
-func (e *Engine) handleCollectionResponse(collectionResponse provider.CollectionResponse) error {
+func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse) error {
+
+	collection := response.Collection
+
 	e.log.Debug().
 		Hex("collection_id", logging.ID(collection)).
 		Msg("received collection")
 
-	hash := string(collectionResponse.Fingerprint)
+	collID := collection.ID()
 
-	if blockHash, ok := e.pendingCollections[hash]; ok {
+	if blockHash, ok := e.pendingCollections[collID]; ok {
 		if block, ok := e.pendingBlocks[blockHash]; ok {
-			if completeCollection, ok := block.CompleteCollections[hash]; ok {
+			if completeCollection, ok := block.CompleteCollections[collID]; ok {
 				if completeCollection.Transactions == nil {
-					completeCollection.Transactions = collectionResponse.Transactions
-					return e.checkForCompleteness(block)
+					completeCollection.Transactions = collection.Transactions
+					if e.checkForCompleteness(block) {
+						e.execution.SubmitLocal(block)
+					}
 				}
 			}
 		} else {
