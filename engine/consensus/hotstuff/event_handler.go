@@ -38,7 +38,7 @@ func (eh *EventHandler) onNewViewEntered(newView *types.NewViewEvent) {
 		if eh.viewState.IsSelfLeaderForView(view) {
 			// no need to check qc from voteaggregator, because it has been checked
 			qcForNewBlock := eh.forkChoice.GetQCForNextBlock(view)
-			proposal := eh.blockProposalProducer.MakeBlockProposalWithQC(qcForNewBlock)
+			proposal := eh.blockProposalProducer.MakeBlockProposalWithQC(eh.paceMaker.curView, qcForNewBlock)
 			eh.onReceiveBlockProposal(proposal)
 			go eh.network.BroadcastProposal(proposal)
 		} else {

@@ -13,3 +13,8 @@ type ConsensusPayload struct {
 	Adjudications []*Adjudication
 	StakeUpdates  []*StakeUpdate
 }
+
+//TODO: should be replaced by mempool
+func NewConsensusPayload() *ConsensusPayload {
+	return &ConsensusPayload{}
+}
