@@ -15,15 +15,22 @@ import (
 
 func TestCheckInvalidCompositeRedeclaringType(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		body := "{}"
+		if kind == common.CompositeKindEvent {
+			body = "()"
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %s Int {}
+                      %[1]s Int %[2]s
                     `,
 					kind.Keyword(),
+					body,
 				),
 			)
 
@@ -39,7 +46,8 @@ func TestCheckInvalidCompositeRedeclaringType(t *testing.T) {
 
 func TestCheckComposite(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -68,7 +76,7 @@ func TestCheckComposite(t *testing.T) {
 
 func TestCheckInitializerName(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -89,7 +97,7 @@ func TestCheckInitializerName(t *testing.T) {
 
 func TestCheckDestructor(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -123,7 +131,7 @@ func TestCheckInvalidUnknownSpecialFunction(t *testing.T) {
 
 	interfacePossibilities := []bool{true, false}
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		for _, isInterface := range interfacePossibilities {
 
 			interfaceKeyword := ""
@@ -159,7 +167,7 @@ func TestCheckInvalidCompositeFieldNames(t *testing.T) {
 
 	interfacePossibilities := []bool{true, false}
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		for _, isInterface := range interfacePossibilities {
 
 			interfaceKeyword := ""
@@ -205,7 +213,7 @@ func TestCheckInvalidCompositeFunctionNames(t *testing.T) {
 
 	interfacePossibilities := []bool{true, false}
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		for _, isInterface := range interfacePossibilities {
 
 			interfaceKeyword := ""
@@ -247,32 +255,54 @@ func TestCheckInvalidCompositeFunctionNames(t *testing.T) {
 
 func TestCheckInvalidCompositeRedeclaringFields(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			var body string
+			if kind == common.CompositeKindEvent {
+				body = `
+                  (
+                      x: Int,
+                      x: Int
+                  )
+                `
+			} else {
+				body = `
+                  {
+                      let x: Int
+                      let x: Int
+                  }
+                `
+			}
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %s Test {
-                          let x: Int
-                          let x: Int
-                      }
+                      %[1]s Test %[2]s
                     `,
 					kind.Keyword(),
+					body,
 				),
 			)
 
-			errs := ExpectCheckerErrors(t, err, 2)
+			if kind == common.CompositeKindEvent {
+				errs := ExpectCheckerErrors(t, err, 1)
 
-			assert.IsType(t, &sema.RedeclarationError{}, errs[0])
-			assert.IsType(t, &sema.MissingInitializerError{}, errs[1])
+				assert.IsType(t, &sema.RedeclarationError{}, errs[0])
+			} else {
+				errs := ExpectCheckerErrors(t, err, 2)
+
+				assert.IsType(t, &sema.RedeclarationError{}, errs[0])
+				assert.IsType(t, &sema.MissingInitializerError{}, errs[1])
+			}
 		})
 	}
 }
 
 func TestCheckInvalidCompositeRedeclaringFunctions(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -296,7 +326,7 @@ func TestCheckInvalidCompositeRedeclaringFunctions(t *testing.T) {
 
 func TestCheckInvalidCompositeRedeclaringFieldsAndFunctions(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -321,7 +351,7 @@ func TestCheckInvalidCompositeRedeclaringFieldsAndFunctions(t *testing.T) {
 
 func TestCheckCompositeFieldsAndFunctions(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -348,31 +378,45 @@ func TestCheckCompositeFieldsAndFunctions(t *testing.T) {
 
 func TestCheckInvalidCompositeFieldType(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t,
-				fmt.Sprintf(
-					`
-                      %s Test {
-                          let x: X
-                      }
-                    `,
-					kind.Keyword(),
-				),
-			)
+			if kind == common.CompositeKindEvent {
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          %s Test(x: X)
+                        `,
+						kind.Keyword(),
+					),
+				)
 
-			errs := ExpectCheckerErrors(t, err, 2)
-			assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+				errs := ExpectCheckerErrors(t, err, 1)
+				assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+			} else {
+				_, err := ParseAndCheck(t,
+					fmt.Sprintf(
+						`
+                          %s Test {
+                              let x: X
+                          }
+                        `,
+						kind.Keyword(),
+					),
+				)
 
-			assert.IsType(t, &sema.MissingInitializerError{}, errs[1])
+				errs := ExpectCheckerErrors(t, err, 2)
+				assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+
+				assert.IsType(t, &sema.MissingInitializerError{}, errs[1])
+			}
 		})
 	}
 }
 
 func TestCheckInvalidCompositeInitializerParameterType(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -395,7 +439,7 @@ func TestCheckInvalidCompositeInitializerParameterType(t *testing.T) {
 
 func TestCheckInvalidCompositeInitializerParameters(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -418,7 +462,7 @@ func TestCheckInvalidCompositeInitializerParameters(t *testing.T) {
 
 func TestCheckInvalidCompositeSpecialFunction(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -456,7 +500,7 @@ func TestCheckInvalidCompositeSpecialFunction(t *testing.T) {
 
 func TestCheckInvalidCompositeFunction(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -479,7 +523,7 @@ func TestCheckInvalidCompositeFunction(t *testing.T) {
 
 func TestCheckCompositeInitializerSelfUse(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -517,7 +561,7 @@ func TestCheckCompositeInitializerSelfUse(t *testing.T) {
 
 func TestCheckCompositeFunctionSelfUse(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -552,7 +596,7 @@ func TestCheckCompositeFunctionSelfUse(t *testing.T) {
 
 func TestCheckInvalidCompositeMissingInitializer(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -665,7 +709,7 @@ func TestCheckInvalidResourceFieldWithMissingResourceAnnotation(t *testing.T) {
 
 func TestCheckCompositeFieldAccess(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -694,7 +738,7 @@ func TestCheckCompositeFieldAccess(t *testing.T) {
 
 func TestCheckInvalidCompositeFieldAccess(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -741,7 +785,7 @@ func TestCheckInvalidCompositeFieldAccess(t *testing.T) {
 
 func TestCheckCompositeFieldAssignment(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -852,7 +896,7 @@ func TestCheckInvalidCompositeSelfAssignment(t *testing.T) {
 
 func TestCheckInvalidCompositeFieldAssignment(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -891,7 +935,7 @@ func TestCheckInvalidCompositeFieldAssignment(t *testing.T) {
 
 func TestCheckInvalidCompositeFieldAssignmentWrongType(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -923,7 +967,7 @@ func TestCheckInvalidCompositeFieldAssignmentWrongType(t *testing.T) {
 
 func TestCheckInvalidCompositeFieldConstantAssignment(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -956,7 +1000,7 @@ func TestCheckInvalidCompositeFieldConstantAssignment(t *testing.T) {
 
 func TestCheckCompositeFunctionCall(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -981,7 +1025,7 @@ func TestCheckCompositeFunctionCall(t *testing.T) {
 
 func TestCheckInvalidCompositeFunctionCall(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -1008,7 +1052,7 @@ func TestCheckInvalidCompositeFunctionCall(t *testing.T) {
 
 func TestCheckInvalidCompositeFunctionAssignment(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -1041,7 +1085,7 @@ func TestCheckInvalidCompositeFunctionAssignment(t *testing.T) {
 
 func TestCheckCompositeInstantiation(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 
 		if compositeKind == common.CompositeKindContract {
 			// Contracts cannot be instantiated
@@ -1083,17 +1127,23 @@ func TestCheckCompositeInstantiation(t *testing.T) {
 
 func TestCheckInvalidSameCompositeRedeclaration(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
 		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			body := "{}"
+			if kind == common.CompositeKindEvent {
+				body = "()"
+			}
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
                       let x = 1
-                      %[1]s Foo {}
-                      %[1]s Foo {}
+                      %[1]s Foo %[2]s
+                      %[1]s Foo %[2]s
                     `,
 					kind.Keyword(),
+					body,
 				),
 			)
 
@@ -1110,12 +1160,22 @@ func TestCheckInvalidSameCompositeRedeclaration(t *testing.T) {
 
 func TestCheckInvalidDifferentCompositeRedeclaration(t *testing.T) {
 
-	for _, firstKind := range common.CompositeKinds {
-		for _, secondKind := range common.CompositeKinds {
+	for _, firstKind := range common.AllCompositeKinds {
+		for _, secondKind := range common.AllCompositeKinds {
 
 			// only check different kinds
 			if firstKind == secondKind {
 				continue
+			}
+
+			firstBody := "{}"
+			if firstKind == common.CompositeKindEvent {
+				firstBody = "()"
+			}
+
+			secondBody := "{}"
+			if secondKind == common.CompositeKindEvent {
+				secondBody = "()"
 			}
 
 			testName := fmt.Sprintf(
@@ -1130,11 +1190,13 @@ func TestCheckInvalidDifferentCompositeRedeclaration(t *testing.T) {
 					fmt.Sprintf(
 						`
                           let x = 1
-                          %[1]s Foo {}
-                          %[2]s Foo {}
+                          %[1]s Foo %[2]s
+                          %[3]s Foo %[4]s
                         `,
 						firstKind.Keyword(),
+						firstBody,
 						secondKind.Keyword(),
+						secondBody,
 					),
 				)
 
@@ -1166,8 +1228,8 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 	// tests that composite typing is nominal, not structural,
 	// and composite kind is considered
 
-	for _, firstKind := range common.CompositeKinds {
-		for _, secondKind := range common.CompositeKinds {
+	for _, firstKind := range common.CompositeKindsWithBody {
+		for _, secondKind := range common.CompositeKindsWithBody {
 
 			if firstKind == common.CompositeKindContract ||
 				secondKind == common.CompositeKindContract {
@@ -1215,7 +1277,7 @@ func TestCheckInvalidIncompatibleSameCompositeTypes(t *testing.T) {
 
 func TestCheckInvalidCompositeFunctionWithSelfParameter(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -1238,7 +1300,7 @@ func TestCheckInvalidCompositeFunctionWithSelfParameter(t *testing.T) {
 
 func TestCheckInvalidCompositeInitializerWithSelfParameter(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -1261,7 +1323,7 @@ func TestCheckInvalidCompositeInitializerWithSelfParameter(t *testing.T) {
 
 func TestCheckCompositeInitializesConstant(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 
 		var setupCode string
 
@@ -1301,7 +1363,7 @@ func TestCheckCompositeInitializesConstant(t *testing.T) {
 
 func TestCheckCompositeInitializerWithArgumentLabel(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 
 		if compositeKind == common.CompositeKindContract {
 			// Contracts cannot be instantiated
@@ -1333,7 +1395,7 @@ func TestCheckCompositeInitializerWithArgumentLabel(t *testing.T) {
 
 func TestCheckInvalidCompositeInitializerCallWithMissingArgumentLabel(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 
 		if compositeKind == common.CompositeKindContract {
 			// Contracts cannot be instantiated
@@ -1367,7 +1429,7 @@ func TestCheckInvalidCompositeInitializerCallWithMissingArgumentLabel(t *testing
 
 func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 
 		var setupCode, identifier string
 
@@ -1409,7 +1471,7 @@ func TestCheckCompositeFunctionWithArgumentLabel(t *testing.T) {
 
 func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 
 		var setupCode, identifier string
 
@@ -1453,7 +1515,7 @@ func TestCheckInvalidCompositeFunctionCallWithMissingArgumentLabel(t *testing.T)
 
 func TestCheckCompositeConstructorUseInInitializerAndFunction(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 
 		if compositeKind == common.CompositeKindContract {
 			continue
@@ -1525,7 +1587,7 @@ func TestCheckCompositeConstructorUseInInitializerAndFunction(t *testing.T) {
 
 func TestCheckInvalidCompositeFieldMissingVariableKind(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -1552,7 +1614,7 @@ func TestCheckInvalidCompositeFieldMissingVariableKind(t *testing.T) {
 
 func TestCheckCompositeFunction(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
 			_, err := ParseAndCheck(t,
@@ -1597,7 +1659,7 @@ func TestCheckCompositeFunction(t *testing.T) {
 
 func TestCheckCompositeReferenceBeforeDeclaration(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
 
 		if compositeKind == common.CompositeKindContract {
 			continue
@@ -1834,9 +1896,9 @@ func TestCheckMutualTypeUseTopLevel(t *testing.T) {
 
 	interfacePossibilities := []bool{true, false}
 
-	for _, firstKind := range common.CompositeKinds {
+	for _, firstKind := range common.CompositeKindsWithBody {
 		for _, firstIsInterface := range interfacePossibilities {
-			for _, secondKind := range common.CompositeKinds {
+			for _, secondKind := range common.CompositeKindsWithBody {
 				for _, secondIsInterface := range interfacePossibilities {
 
 					firstInterfaceKeyword := ""

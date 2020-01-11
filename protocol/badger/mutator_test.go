@@ -3,10 +3,7 @@
 package badger
 
 import (
-	"fmt"
 	"math/rand"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func init() {
@@ -32,67 +30,72 @@ func TestBootStrapValid(t *testing.T) {
 	}
 
 	header := flow.Header{
-		Number:     0,
-		Timestamp:  time.Now().UTC(),
-		Parent:     crypto.ZeroHash,
-		Payload:    crypto.Hash([]byte("payload")),
-		Signatures: []crypto.Signature{[]byte("signature")},
+		Number:      0,
+		Timestamp:   time.Now().UTC(),
+		ParentID:    flow.ZeroID,
+		PayloadHash: flow.Identifier{0x11},
+		Signatures:  []crypto.Signature{[]byte("signature")},
+	}
+
+	content := flow.Content{
+		Identities: ids,
+		Guarantees: nil,
 	}
 
 	genesis := flow.Block{
-		Header:        header,
-		NewIdentities: ids,
+		Header:  header,
+		Payload: content.Payload(),
+		Content: content,
 	}
 
-	hash := genesis.Hash()
+	blockID := genesis.ID()
 
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
-	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
-	require.Nil(t, err)
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-	mutator := &Mutator{state: &State{db: db}}
-	err = mutator.Bootstrap(&genesis)
-	require.Nil(t, err)
-
-	var boundary uint64
-	err = db.View(operation.RetrieveBoundary(&boundary))
-	require.Nil(t, err)
-
-	var storedHash crypto.Hash
-	err = db.View(operation.RetrieveHash(0, &storedHash))
-	require.Nil(t, err)
-
-	var storedHeader flow.Header
-	err = db.View(operation.RetrieveHeader(genesis.Hash(), &storedHeader))
-	require.Nil(t, err)
-
-	var storedIDs flow.IdentityList
-	err = db.View(operation.RetrieveIdentities(genesis.Hash(), &storedIDs))
-	require.Nil(t, err)
-
-	assert.Zero(t, boundary)
-	assert.Equal(t, hash, storedHash)
-	assert.Equal(t, header, storedHeader)
-	assert.Equal(t, ids, storedIDs)
-
-	for _, id := range ids {
-
-		var role flow.Role
-		err = db.View(operation.RetrieveRole(id.NodeID, &role))
+		mutator := &Mutator{state: &State{db: db}}
+		err := mutator.Bootstrap(&genesis)
 		require.Nil(t, err)
 
-		var address string
-		err = db.View(operation.RetrieveAddress(id.NodeID, &address))
+		var boundary uint64
+		err = db.View(operation.RetrieveBoundary(&boundary))
 		require.Nil(t, err)
 
-		var delta int64
-		err = db.View(operation.RetrieveDelta(header.Number, id.Role, id.NodeID, &delta))
+		var storedID flow.Identifier
+		err = db.View(operation.RetrieveBlockID(0, &storedID))
 		require.Nil(t, err)
 
-		assert.Equal(t, id.Role, role)
-		assert.Equal(t, id.Address, address)
-		assert.Equal(t, int64(id.Stake), delta)
-	}
+		var storedHeader flow.Header
+		err = db.View(operation.RetrieveHeader(genesis.ID(), &storedHeader))
+		require.Nil(t, err)
+
+		var storedIDs flow.IdentityList
+		err = db.View(operation.RetrieveIdentities(genesis.ID(), &storedIDs))
+		require.Nil(t, err)
+
+		assert.Zero(t, boundary)
+		assert.Equal(t, blockID, storedID)
+		assert.Equal(t, header, storedHeader)
+		assert.Equal(t, ids, storedIDs)
+
+		for _, id := range ids {
+
+			var role flow.Role
+			err = db.View(operation.RetrieveRole(id.NodeID, &role))
+			require.Nil(t, err)
+
+			var address string
+			err = db.View(operation.RetrieveAddress(id.NodeID, &address))
+			require.Nil(t, err)
+
+			var delta int64
+			err = db.View(operation.RetrieveDelta(header.Number, id.Role, id.NodeID, &delta))
+			require.Nil(t, err)
+
+			assert.Equal(t, id.Role, role)
+			assert.Equal(t, id.Address, address)
+			assert.Equal(t, int64(id.Stake), delta)
+		}
+	})
 }
 
 func TestBootstrapDuplicateID(t *testing.T) {

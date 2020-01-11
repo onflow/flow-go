@@ -3,7 +3,6 @@
 package protocol
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -19,16 +18,16 @@ type Mutator interface {
 	// identities will be the initial staked nodes on the network.
 	Bootstrap(genesis *flow.Block) error
 
-	// Extend introduces the given block into the persistent protocol state
-	// without modifying the current finalized state. It allows us to execute
-	// fork-aware queries against ambiguous protocol state, while still
-	// validating that the given block is a valid extension of the protocol
+	// Extend introduces the block with the given ID into the persistent
+	// protocol state without modifying the current finalized state. It allows
+	// us to execute fork-aware queries against ambiguous protocol state, while
+	// still checking that the given block is a valid extension of the protocol
 	// state.
-	Extend(block *flow.Block) error
+	Extend(blockID flow.Identifier) error
 
 	// Finalize finalizes the block with the given hash, and all of its parents
 	// up to the finalized protocol state. It modifies the persistent immutable
 	// protocol state accordingly and forwards the pointer to the latest
 	// finalized state.
-	Finalize(hash crypto.Hash) error
+	Finalize(blockID flow.Identifier) error
 }

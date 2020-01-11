@@ -9,7 +9,6 @@ type Program struct {
 	interfaceDeclarations   []*InterfaceDeclaration
 	compositeDeclarations   []*CompositeDeclaration
 	functionDeclarations    []*FunctionDeclaration
-	eventDeclarations       []*EventDeclaration
 	transactionDeclarations []*TransactionDeclaration
 	importedPrograms        map[LocationID]*Program
 	importLocations         []Location
@@ -82,18 +81,6 @@ func (p *Program) FunctionDeclarations() []*FunctionDeclaration {
 		}
 	}
 	return p.functionDeclarations
-}
-
-func (p *Program) EventDeclarations() []*EventDeclaration {
-	if p.eventDeclarations == nil {
-		p.eventDeclarations = make([]*EventDeclaration, 0)
-		for _, declaration := range p.Declarations {
-			if eventDeclaration, ok := declaration.(*EventDeclaration); ok {
-				p.eventDeclarations = append(p.eventDeclarations, eventDeclaration)
-			}
-		}
-	}
-	return p.eventDeclarations
 }
 
 func (p *Program) TransactionDeclarations() []*TransactionDeclaration {

@@ -3,7 +3,7 @@
 package protocol
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // State represents the full protocol state of the local node. It allows us to
@@ -21,11 +21,11 @@ type State interface {
 	// returned snapshot is therefore immutable over time.
 	AtNumber(number uint64) Snapshot
 
-	// AtHash will return the snapshot of the persistent protocol state at the
-	// given block hash. It is available for any block that was introduced into
+	// AtBlockID will return the snapshot of the persistent protocol state at the
+	// given block ID. It is available for any block that was introduced into
 	// the protocol state, and can thus represent an ambiguous state that was or
 	// will never be finalized.
-	AtHash(hash crypto.Hash) Snapshot
+	AtBlockID(blockID flow.Identifier) Snapshot
 
 	// Mutate will create a mutator for the persistent protocol state. It allows
 	// us to extend the protocol state in a consistent manner that conserves the
