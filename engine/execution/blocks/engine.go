@@ -48,7 +48,7 @@ func New(logger zerolog.Logger, net module.Network, me module.Local, blocks stor
 		pendingCollections: make(map[flow.Identifier]flow.Identifier),
 	}
 
-	con, err := net.Register(engine.ExecutionBlockIngestion, &eng)
+	con, err := net.Register(engine.BlockProvider, &eng)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}

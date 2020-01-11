@@ -87,28 +87,28 @@ func (n *Network) Done() <-chan struct{} {
 	return done
 }
 
-// Register will register the given engine with the given unique engine engineID,
+// Register will register the given engine with the given unique engine channelID,
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
-func (n *Network) Register(engineID uint8, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channelID uint8, engine network.Engine) (network.Conduit, error) {
 
-	// check if the engine engineID is already taken
-	_, ok := n.engines[engineID]
+	// check if the engine channelID is already taken
+	_, ok := n.engines[channelID]
 	if ok {
 		return nil, errors.Errorf("engine already registered (%d)", engine)
 	}
 
 	// add the engine ID to the cache
-	n.cache.Add(engineID)
+	n.cache.Add(channelID)
 
 	// create the conduit
 	conduit := &Conduit{
-		engineID: engineID,
-		submit:   n.submit,
+		channelID: channelID,
+		submit:    n.submit,
 	}
 
-	// register engine with provided engineID
-	n.engines[engineID] = engine
+	// register engine with provided channelID
+	n.engines[channelID] = engine
 
 	return conduit, nil
 }
@@ -216,7 +216,7 @@ func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
 
 // pack will use the codec to encode an event and return both the payload
 // hash and the payload.
-func (n *Network) pack(engineID uint8, event interface{}) ([]byte, []byte, error) {
+func (n *Network) pack(channelID uint8, event interface{}) ([]byte, []byte, error) {
 
 	// encode the payload using the configured codec
 	payload, err := n.codec.Encode(event)
@@ -225,21 +225,21 @@ func (n *Network) pack(engineID uint8, event interface{}) ([]byte, []byte, error
 	}
 
 	// use a hash with an engine-specific salt to get the payload hash
-	sip := siphash.New([]byte("trickleengine" + fmt.Sprintf("%03d", engineID)))
+	sip := siphash.New([]byte("trickleengine" + fmt.Sprintf("%03d", channelID)))
 	return sip.Sum(payload), payload, nil
 }
 
 // submit will submit the given event for the given engine to the overlay layer
 // for processing; it is used by engines through conduits.
-func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 
 	// pack the event to get payload and event ID
-	eventID, payload, err := n.pack(engineID, event)
+	eventID, payload, err := n.pack(channelID, event)
 	if err != nil {
 		return errors.Wrap(err, "could not pack event")
 	}
 
-	err = n.gossip(engineID, eventID, payload, targetIDs...)
+	err = n.gossip(channelID, eventID, payload, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not gossip event")
 	}
@@ -248,23 +248,23 @@ func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Id
 }
 
 // gossip will cache the event and announce it to everyone wha hasn't seen it.
-func (n *Network) gossip(engineID uint8, eventID []byte, payload []byte, targetIDs ...flow.Identifier) error {
+func (n *Network) gossip(channelID uint8, eventID []byte, payload []byte, targetIDs ...flow.Identifier) error {
 
 	// check if the event is already in the cache
-	ok := n.cache.Has(engineID, eventID)
+	ok := n.cache.Has(channelID, eventID)
 	if ok {
 		return nil
 	}
 
 	// add gossip message to cache
 	res := &trickle.Response{
-		EngineID:  engineID,
+		ChannelID: channelID,
 		EventID:   eventID,
 		OriginID:  n.me.NodeID(),
 		TargetIDs: targetIDs,
 		Payload:   payload,
 	}
-	n.cache.Set(engineID, eventID, res)
+	n.cache.Set(channelID, eventID, res)
 
 	// get all peers that haven't seen it yet
 	nodeIDs := n.top.Peers(peer.Not(peer.HasSeen(eventID))).NodeIDs()
@@ -274,8 +274,8 @@ func (n *Network) gossip(engineID uint8, eventID []byte, payload []byte, targetI
 
 	// announce the event to the selected peers
 	ann := &trickle.Announce{
-		EngineID: engineID,
-		EventID:  eventID,
+		ChannelID: channelID,
+		EventID:   eventID,
 	}
 	err := n.send(ann, nodeIDs...)
 	if err != nil {
@@ -293,15 +293,15 @@ func (n *Network) processAnnounce(nodeID flow.Identifier, ann *trickle.Announce)
 	n.top.Seen(nodeID, ann.EventID)
 
 	// see if we have already cached this event
-	ok := n.cache.Has(ann.EngineID, ann.EventID)
+	ok := n.cache.Has(ann.ChannelID, ann.EventID)
 	if ok {
 		return nil
 	}
 
 	// request the event from the peer
 	req := &trickle.Request{
-		EngineID: ann.EngineID,
-		EventID:  ann.EventID,
+		ChannelID: ann.ChannelID,
+		EventID:   ann.EventID,
 	}
 	err := n.mw.Send(nodeID, req)
 	if err != nil {
@@ -315,7 +315,7 @@ func (n *Network) processAnnounce(nodeID flow.Identifier, ann *trickle.Announce)
 func (n *Network) processRequest(nodeID flow.Identifier, req *trickle.Request) error {
 
 	// check to find ID and payload in cache
-	res, ok := n.cache.Get(req.EngineID, req.EventID)
+	res, ok := n.cache.Get(req.ChannelID, req.EventID)
 	if !ok {
 		return nil
 	}
@@ -336,7 +336,7 @@ func (n *Network) processResponse(nodeID flow.Identifier, res *trickle.Response)
 	n.top.Seen(nodeID, res.EventID)
 
 	// check if we already have the event in the cache
-	ok := n.cache.Has(res.EngineID, res.EventID)
+	ok := n.cache.Has(res.ChannelID, res.EventID)
 	if ok {
 		return nil
 	}
@@ -354,7 +354,7 @@ func (n *Network) processResponse(nodeID flow.Identifier, res *trickle.Response)
 func (n *Network) processEvent(res *trickle.Response) error {
 
 	// if we don't have the engine, don't worry about processing
-	engine, ok := n.engines[res.EngineID]
+	engine, ok := n.engines[res.ChannelID]
 	if !ok {
 		return nil
 	}

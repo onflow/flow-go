@@ -79,6 +79,7 @@ generate-mocks:
 	GO111MODULE=on mockgen -destination=protocol/mocks/state.go -package=mocks github.com/dapperlabs/flow-go/protocol State
 	GO111MODULE=on mockgen -destination=protocol/mocks/snapshot.go -package=mocks github.com/dapperlabs/flow-go/protocol Snapshot
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
+	mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage/ledger -case=underscore -output="./storage/ledger/mock" -outpkg="mock"

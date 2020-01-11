@@ -1,4 +1,6 @@
-package mempool_test
+// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
+
+package stdmap_test
 
 import (
 	"testing"
@@ -6,18 +8,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 )
 
-func TestTransactionPool(t *testing.T) {
-	tx1 := unittest.TransactionFixture()
-	item1 := &tx1
+func TestCollectionPool(t *testing.T) {
+	item1 := &flow.CollectionGuarantee{
+		CollectionID: flow.Identifier{0x01},
+	}
+	item2 := &flow.CollectionGuarantee{
+		CollectionID: flow.Identifier{0x02},
+	}
 
-	tx2 := unittest.TransactionFixture()
-	item2 := &tx2
-
-	pool, err := mempool.NewTransactionPool()
+	pool, err := stdmap.NewGuarantees()
 	require.NoError(t, err)
 
 	t.Run("should be able to add first", func(t *testing.T) {
