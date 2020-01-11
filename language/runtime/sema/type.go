@@ -358,11 +358,13 @@ func (*StringType) HasMembers() bool {
 }
 
 func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	newFunction := func(functionType *FunctionType) *Member {
+		return NewPublicFunctionMember(t, identifier, functionType)
+	}
+
 	switch identifier {
 	case "concat":
-		return NewPublicFunctionMember(
-			t,
-			identifier,
+		return newFunction(
 			&FunctionType{
 				Parameters: []*Parameter{
 					{
@@ -378,9 +380,7 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 		)
 
 	case "slice":
-		return NewPublicFunctionMember(
-			t,
-			identifier,
+		return newFunction(
 			&FunctionType{
 				Parameters: []*Parameter{
 					{
@@ -798,6 +798,9 @@ type ArrayType interface {
 }
 
 func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, report func(error)) *Member {
+	newFunction := func(functionType *FunctionType) *Member {
+		return NewPublicFunctionMember(arrayType, field, functionType)
+	}
 
 	switch field {
 	case "append":
@@ -809,9 +812,7 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 		}
 
 		elementType := arrayType.ElementType(false)
-		return NewPublicFunctionMember(
-			arrayType,
-			field,
+		return newFunction(
 			&FunctionType{
 				Parameters: []*Parameter{
 					{
@@ -851,9 +852,7 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		typeAnnotation := NewTypeAnnotation(arrayType)
 
-		return NewPublicFunctionMember(
-			arrayType,
-			field,
+		return newFunction(
 			&FunctionType{
 				Parameters: []*Parameter{
 					{
@@ -876,9 +875,7 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		elementType := arrayType.ElementType(false)
 
-		return NewPublicFunctionMember(
-			arrayType,
-			field,
+		return newFunction(
 			&FunctionType{
 				Parameters: []*Parameter{
 					{
@@ -907,9 +904,7 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		elementType := arrayType.ElementType(false)
 
-		return NewPublicFunctionMember(
-			arrayType,
-			field,
+		return newFunction(
 			&FunctionType{
 				Parameters: []*Parameter{
 					{
@@ -933,9 +928,7 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		elementType := arrayType.ElementType(false)
 
-		return NewPublicFunctionMember(
-			arrayType,
-			field,
+		return newFunction(
 			&FunctionType{
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					elementType,
@@ -953,9 +946,7 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		elementType := arrayType.ElementType(false)
 
-		return NewPublicFunctionMember(
-			arrayType,
-			field,
+		return newFunction(
 			&FunctionType{
 				ReturnTypeAnnotation: NewTypeAnnotation(
 					elementType,
@@ -990,9 +981,7 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			)
 		}
 
-		return NewPublicFunctionMember(
-			arrayType,
-			field,
+		return newFunction(
 			&FunctionType{
 				Parameters: []*Parameter{
 					{
@@ -1569,15 +1558,19 @@ func (*AccountType) HasMembers() bool {
 }
 
 func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	newField := func(fieldType Type) *Member {
+		return NewPublicConstantFieldMember(t, identifier, fieldType)
+	}
+
 	switch identifier {
 	case "address":
-		return NewPublicConstantFieldMember(t, identifier, &AddressType{})
+		return newField(&AddressType{})
 
 	case "storage":
-		return NewPublicConstantFieldMember(t, identifier, &StorageType{})
+		return newField(&StorageType{})
 
 	case "published":
-		return NewPublicConstantFieldMember(t, identifier, &ReferencesType{Assignable: true})
+		return newField(&ReferencesType{Assignable: true})
 
 
 	default:
