@@ -1,37 +1,3 @@
-apiVersion: v1
-kind: Service
-
-metadata:
-  name: flow-consensus-node-v1
-  namespace: flow
-
-  labels:
-    app: flow-test-net
-    node: consensus
-    env: staging
-    owner: Kan
-    version: v1
-
-spec:
-  type: ClusterIP
-  selector:
-    app: flow-test-net
-    node: consensus
-    env: staging
-    version: v1
-
-  ports:
-    - name: http
-      protocol: TCP
-      port: 8080
-      targetPort: http # reference to the name of the port in your container config
-    - name: grpc
-      protocol: TCP
-      port: 3569
-      targetPort: grpc # reference to the name of the port in your container config
-
----
-
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -54,6 +20,7 @@ metadata:
 
 spec:
   replicas: 1
+  serviceName: flow-test-network-v1
   selector:
     matchLabels:
       app: flow-test-net
