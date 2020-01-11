@@ -360,64 +360,46 @@ func (*StringType) HasMembers() bool {
 func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
 	switch identifier {
 	case "concat":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation: NewTypeAnnotation(
-				&FunctionType{
-					Parameters: []*Parameter{
-						{
-							Label:          ArgumentLabelNotRequired,
-							Identifier:     "other",
-							TypeAnnotation: NewTypeAnnotation(&StringType{}),
-						},
+		return NewPublicFunctionMember(
+			t,
+			identifier,
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "other",
+						TypeAnnotation: NewTypeAnnotation(&StringType{}),
 					},
-					ReturnTypeAnnotation: NewTypeAnnotation(
-						&StringType{},
-					),
 				},
-			),
-		})
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&StringType{},
+				),
+			},
+		)
 
 	case "slice":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation: NewTypeAnnotation(
-				&FunctionType{
-					Parameters: []*Parameter{
-						{
-							Identifier:     "from",
-							TypeAnnotation: NewTypeAnnotation(&IntType{}),
-						},
-						{
-							Identifier:     "upTo",
-							TypeAnnotation: NewTypeAnnotation(&IntType{}),
-						},
+		return NewPublicFunctionMember(
+			t,
+			identifier,
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Identifier:     "from",
+						TypeAnnotation: NewTypeAnnotation(&IntType{}),
 					},
-					ReturnTypeAnnotation: NewTypeAnnotation(
-						&StringType{},
-					),
+					{
+						Identifier:     "upTo",
+						TypeAnnotation: NewTypeAnnotation(&IntType{}),
+					},
 				},
-			),
-			ArgumentLabels: []string{"from", "upTo"},
-		})
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&StringType{},
+				),
+			},
+		)
 
 	case "length":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation:  NewTypeAnnotation(&IntType{}),
-		})
+		return NewPublicConstantFieldMember(t, identifier, &IntType{})
 
 	default:
 		return nil
@@ -827,27 +809,22 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 		}
 
 		elementType := arrayType.ElementType(false)
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation: NewTypeAnnotation(
-				&FunctionType{
-					Parameters: []*Parameter{
-						{
-							Label:          ArgumentLabelNotRequired,
-							Identifier:     "element",
-							TypeAnnotation: NewTypeAnnotation(elementType),
-						},
+		return NewPublicFunctionMember(
+			arrayType,
+			field,
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "element",
+						TypeAnnotation: NewTypeAnnotation(elementType),
 					},
-					ReturnTypeAnnotation: NewTypeAnnotation(
-						&VoidType{},
-					),
 				},
-			),
-		})
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&VoidType{},
+				),
+			},
+		)
 
 	case "concat":
 		// TODO: maybe allow constant sized:
@@ -874,25 +851,20 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		typeAnnotation := NewTypeAnnotation(arrayType)
 
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation: NewTypeAnnotation(
-				&FunctionType{
-					Parameters: []*Parameter{
-						{
-							Label:          ArgumentLabelNotRequired,
-							Identifier:     "other",
-							TypeAnnotation: typeAnnotation,
-						},
+		return NewPublicFunctionMember(
+			arrayType,
+			field,
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "other",
+						TypeAnnotation: typeAnnotation,
 					},
-					ReturnTypeAnnotation: typeAnnotation,
 				},
-			),
-		})
+				ReturnTypeAnnotation: typeAnnotation,
+			},
+		)
 
 	case "insert":
 		// Inserting elements into to a constant sized array is not allowed
@@ -904,32 +876,26 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		elementType := arrayType.ElementType(false)
 
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation: NewTypeAnnotation(
-				&FunctionType{
-					Parameters: []*Parameter{
-						{
-							Identifier:     "at",
-							TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
-						},
-						{
-							Label:          ArgumentLabelNotRequired,
-							Identifier:     "element",
-							TypeAnnotation: NewTypeAnnotation(elementType),
-						},
+		return NewPublicFunctionMember(
+			arrayType,
+			field,
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Identifier:     "at",
+						TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
 					},
-					ReturnTypeAnnotation: NewTypeAnnotation(
-						&VoidType{},
-					),
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "element",
+						TypeAnnotation: NewTypeAnnotation(elementType),
+					},
 				},
-			),
-			ArgumentLabels: []string{"at", ArgumentLabelNotRequired},
-		})
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&VoidType{},
+				),
+			},
+		)
 
 	case "remove":
 		// Removing elements from a constant sized array is not allowed
@@ -941,27 +907,21 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		elementType := arrayType.ElementType(false)
 
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation: NewTypeAnnotation(
-				&FunctionType{
-					Parameters: []*Parameter{
-						{
-							Identifier:     "at",
-							TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
-						},
+		return NewPublicFunctionMember(
+			arrayType,
+			field,
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Identifier:     "at",
+						TypeAnnotation: NewTypeAnnotation(&IntegerType{}),
 					},
-					ReturnTypeAnnotation: NewTypeAnnotation(
-						elementType,
-					),
 				},
-			),
-			ArgumentLabels: []string{"at"},
-		})
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					elementType,
+				),
+			},
+		)
 
 	case "removeFirst":
 		// Removing elements from a constant sized array is not allowed
@@ -973,20 +933,15 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		elementType := arrayType.ElementType(false)
 
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation: NewTypeAnnotation(
-				&FunctionType{
-					ReturnTypeAnnotation: NewTypeAnnotation(
-						elementType,
-					),
-				},
-			),
-		})
+		return NewPublicFunctionMember(
+			arrayType,
+			field,
+			&FunctionType{
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					elementType,
+				),
+			},
+		)
 
 	case "removeLast":
 		// Removing elements from a constant sized array is not allowed
@@ -998,20 +953,15 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 
 		elementType := arrayType.ElementType(false)
 
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation: NewTypeAnnotation(
-				&FunctionType{
-					ReturnTypeAnnotation: NewTypeAnnotation(
-						elementType,
-					),
-				},
-			),
-		})
+		return NewPublicFunctionMember(
+			arrayType,
+			field,
+			&FunctionType{
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					elementType,
+				),
+			},
+		)
 
 	case "contains":
 		elementType := arrayType.ElementType(false)
@@ -1040,37 +990,29 @@ func getArrayMember(arrayType ArrayType, field string, targetRange ast.Range, re
 			)
 		}
 
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation: NewTypeAnnotation(
-				&FunctionType{
-					Parameters: []*Parameter{
-						{
-							Label:          ArgumentLabelNotRequired,
-							Identifier:     "element",
-							TypeAnnotation: NewTypeAnnotation(elementType),
-						},
+		return NewPublicFunctionMember(
+			arrayType,
+			field,
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "element",
+						TypeAnnotation: NewTypeAnnotation(elementType),
 					},
-					ReturnTypeAnnotation: NewTypeAnnotation(
-						&BoolType{},
-					),
 				},
-			),
-		})
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&BoolType{},
+				),
+			},
+		)
 
 	case "length":
-		return NewCheckedMember(&Member{
-			ContainerType:   arrayType,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: field},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation:  NewTypeAnnotation(&IntType{}),
-		})
+		return NewPublicConstantFieldMember(
+			arrayType,
+			field,
+			&IntType{},
+		)
 
 	default:
 		return nil
@@ -1629,34 +1571,14 @@ func (*AccountType) HasMembers() bool {
 func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
 	switch identifier {
 	case "address":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			TypeAnnotation:  NewTypeAnnotation(&AddressType{}),
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
+		return NewPublicConstantFieldMember(t, identifier, &AddressType{})
 
 	case "storage":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			TypeAnnotation:  NewTypeAnnotation(&StorageType{}),
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
+		return NewPublicConstantFieldMember(t, identifier, &StorageType{})
 
 	case "published":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			TypeAnnotation:  NewTypeAnnotation(&ReferencesType{Assignable: true}),
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
+		return NewPublicConstantFieldMember(t, identifier, &ReferencesType{Assignable: true})
+
 
 	default:
 		return nil
@@ -1777,6 +1699,44 @@ func NewCheckedMember(member *Member) *Member {
 	}
 
 	return member
+}
+
+func NewPublicFunctionMember(containerType Type, identifier string, functionType *FunctionType) *Member {
+
+	var argumentLabels []string
+
+	for _, parameter := range functionType.Parameters {
+
+		argumentLabel := ArgumentLabelNotRequired
+		if parameter.Label != "" {
+			argumentLabel = parameter.Label
+		} else if parameter.Identifier != "" {
+			argumentLabel = parameter.Identifier
+		}
+
+		argumentLabels = append(argumentLabels, argumentLabel)
+	}
+
+	return &Member{
+		ContainerType:   containerType,
+		Access:          ast.AccessPublic,
+		Identifier:      ast.Identifier{Identifier: identifier},
+		DeclarationKind: common.DeclarationKindFunction,
+		VariableKind:    ast.VariableKindConstant,
+		TypeAnnotation:  &TypeAnnotation{Type: functionType},
+		ArgumentLabels:  argumentLabels,
+	}
+}
+
+func NewPublicConstantFieldMember(containerType Type, identifier string, fieldType Type) *Member {
+	return &Member{
+		ContainerType:   containerType,
+		Access:          ast.AccessPublic,
+		Identifier:      ast.Identifier{Identifier: identifier},
+		DeclarationKind: common.DeclarationKindField,
+		VariableKind:    ast.VariableKindConstant,
+		TypeAnnotation:  NewTypeAnnotation(fieldType),
+	}
 }
 
 type MemberAccessibleType interface {
