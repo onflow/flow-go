@@ -58,10 +58,10 @@ spec:
             - '$(POD_NAME)'
             - '--entries'
             - '$(NODE_ENTRIES)'
+            - '--connections'
+            - '5'
             - '--datadir'
             - '/flowdb'
-            - '--listenaddr'
-            - 'localhost:3569'
 
           # Ports exposed can be named so other resources can reference
           # them by name and not have to hard code numbers

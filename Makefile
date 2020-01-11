@@ -125,6 +125,13 @@ docker-build-execution:
 docker-build-verification:
 	docker build -f cmd/Dockerfile --build-arg TARGET=verification -t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" .
 
+.PHONY: docker-build-flow
+docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification
+
+.PHONY: docker-push-flow
+docker-push-flow:
+	echo gcr.io/dl-flow/{collection,consensus,execution,verification}:$(SHORT_COMMIT) | xargs -n 1 docker push
+
 .PHONY: docker-run-collection
 docker-run-collection:
 	docker run -p 8080:8080 -p 3569:3569 gcr.io/dl-flow/collection:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries collection-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
