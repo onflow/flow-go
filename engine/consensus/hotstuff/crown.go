@@ -4,18 +4,18 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
-// Reactor encapsulated Finalization Logic and ForkChoice rule in one component.
-// Reactor maintains an in-memory data-structure of all blocks whose view-number is larger or equal to
+// Crown encapsulated Finalization Logic and ForkChoice rule in one component.
+// Crown maintains an in-memory data-structure of all blocks whose view-number is larger or equal to
 // the latest finalized block. The latest finalized block is defined as the finalized block with the largest view number.
-// When adding blocks, Reactor automatically updates its internal state (including finalized blocks).
+// When adding blocks, Crown automatically updates its internal state (including finalized blocks).
 // Furthermore, blocks whose view number is smaller than the latest finalized block are pruned automatically.
 //
 // PREREQUISITES:
-// * From the view-point of Reactor, a block B is identified by the pair (B.View, B.blockMRH)
-// * Reactor expects that only blocks are added that can be connected to its latest finalized block
-//   (without missing interim ancestors). If this condition is violated, Reactor will panic (instead of
+// * From the view-point of Crown, a block B is identified by the pair (B.View, B.blockMRH)
+// * Crown expects that only blocks are added that can be connected to its latest finalized block
+//   (without missing interim ancestors). If this condition is violated, Crown will panic (instead of
 //   transitioning into an undefined state).
-type Reactor interface {
+type Crown interface {
 
 	// GetBlocksForView returns the list of all known BlockProposals at the given view number.
 	// If none are known, an empty slice is returned.
@@ -42,14 +42,14 @@ type Reactor interface {
 	// IsProcessingNeeded returns true if consensus reactor should process the specified block
 	IsProcessingNeeded([]byte, uint64) bool
 
-	// AddBlock adds the block to Reactor. This might cause an update of the finalized block
+	// AddBlock adds the block to Crown. This might cause an update of the finalized block
 	// and pruning of older blocks.
 	// Handles duplicated addition of blocks (at the potential cost of additional computation time).
 	// PREREQUISITE:
-	// Reactor must be able to connect `block` to its latest finalized block (without missing interim ancestors).
+	// Crown must be able to connect `block` to its latest finalized block (without missing interim ancestors).
 	AddBlock(block *types.BlockProposal)
 
-	// AddQC adds a quorum certificate to Reactor.
+	// AddQC adds a quorum certificate to Crown.
 	AddQC(*types.QuorumCertificate)
 
 	// MakeForkChoice prompts the ForkChoice to generate a fork choice.
