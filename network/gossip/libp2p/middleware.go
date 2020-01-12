@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	networkmodel "github.com/dapperlabs/flow-go/model/libp2p/network"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
 )
@@ -97,7 +98,10 @@ func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 	default:
 	}
 
-	pmsg := m.createOutboundMessage(msg)
+	pmsg, err := m.createOutboundMessage(msg)
+	if err != nil {
+		return err
+	}
 
 	// whichever comes first, sending the message or ending the provided context
 	select {
@@ -108,13 +112,32 @@ func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 	}
 }
 
-func (m *Middleware) createOutboundMessage(msg interface{}) *Message {
-	// Compose the message payload
-	message := &Message{
-		SenderID: m.me[:],
-		Event:    msg.([]byte),
+func (m *Middleware) createOutboundMessage(msg interface{}) (*Message, error) {
+	switch msg.(type) {
+	case *networkmodel.NetworkMessage:
+		nm := msg.(*networkmodel.NetworkMessage)
+		var targetIDs [][]byte
+		for _, t := range nm.TargetIDs {
+			targetIDs = append(targetIDs, t[:])
+		}
+		em := &EventMessage{
+			EngineID:  uint32(nm.EngineID),
+			EventID:   nm.EventID,
+			OriginID:  nm.OriginID[:],
+			TargetIDs: targetIDs,
+			Payload:   nm.Payload,
+		}
+
+		// Compose the message payload
+		message := &Message{
+			SenderID: nm.OriginID[:],
+			Event:    em,
+		}
+		return message, nil
+	default:
+		err := errors.Errorf("invalid message type (%T)", msg)
+		return nil, err
 	}
-	return message
 }
 
 func (m *Middleware) createInboundMessage(msg *Message) (*flow.Identifier, interface{}, error) {
@@ -131,7 +154,25 @@ func (m *Middleware) createInboundMessage(msg *Message) (*flow.Identifier, inter
 	copy(senderID[:], msg.SenderID)
 	var id flow.Identifier
 	id = senderID
-	return &id, msg.Event, nil
+
+	var targetIDs []flow.Identifier
+	for _, t := range msg.Event.TargetIDs {
+		var f [32]byte
+		copy(f[:], t)
+		var id flow.Identifier
+		id = f
+		targetIDs = append(targetIDs, id)
+	}
+
+	nm := &networkmodel.NetworkMessage{
+		EngineID:  uint8(msg.Event.EngineID),
+		EventID:   msg.Event.EventID,
+		OriginID:  id,
+		TargetIDs: targetIDs,
+		Payload:   msg.Event.Payload,
+	}
+
+	return &id, nm, nil
 }
 
 // rotate periodically creates connection to peers

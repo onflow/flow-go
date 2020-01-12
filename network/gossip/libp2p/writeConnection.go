@@ -58,7 +58,7 @@ SendLoop:
 
 			wc.log.Debug().
 				Bytes("sender", msg.SenderID).
-				Int("length", len(msg.Event)).
+				Bytes("eventID", msg.Event.EventID).
 				Msg("sent message")
 
 			if isClosedErr(err) {
