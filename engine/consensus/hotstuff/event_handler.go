@@ -29,6 +29,10 @@ func (eh *EventHandler) OnLocalTimeout() {
 	panic("implement me")
 }
 
+func (eh *EventHandler) OnBlockRequest(req *types.BlockProposalRequest) {
+	panic("implement me")
+}
+
 func (eh *EventHandler) TimeoutChannel() <-chan time.Time {
 	panic("implement me")
 }
