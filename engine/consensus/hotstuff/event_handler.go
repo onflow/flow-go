@@ -48,9 +48,9 @@ func (eh *EventHandler) TimeoutChannel() <-chan time.Time {
 
 func (eh *EventHandler) startNewView() {
 	eh.pruneInMemoryState()
-	eh.proposeIfLeaderForCurrentView()
-
 	eh.internalState = WaitingForBlock
+
+	eh.proposeIfLeaderForCurrentView()
 	currentBlock := eh.selectBlockProposalForCurrentView()
 	if currentBlock == nil {
 		return // Remain in state "WaitingForBlock"
@@ -154,7 +154,6 @@ func (eh *EventHandler) commenceWaitingForVotes(block *types.BlockProposal) {
 }
 
 // onReceiveVote enters state "ProcessingVote". Gracefully handles (ignores) nil votes.
-// ToDo: split function into three different ones processing votes for past view, current view, future view
 func (eh *EventHandler) processVote(vote *types.Vote) {
 	if vote.View == eh.paceMaker.CurView() {
 		eh.processVoteForCurrentView(vote) // CAUTION: this might result in a state transition;
@@ -235,6 +234,7 @@ func (eh *EventHandler) onReceiveBlockProposal(receivedProposal *types.BlockProp
 
 	eh.reactor.AddBlock(receivedProposal)
 	if (receivedProposal.View() != eh.paceMaker.CurView()) || (eh.internalState != WaitingForBlock) {
+		// TODO this is TOO SIMPLE: we want to process past block too in case we can generate a QC from them
 		return
 	}
 	eh.processBlockForCurrentView(receivedProposal) // CAUTION: this might result in a state transition;
