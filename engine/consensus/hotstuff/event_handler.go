@@ -15,16 +15,7 @@ type EventHandler struct {
 	blockProposalProducer BlockProposalProducer
 	viewState             ViewState
 	network               NetworkSender
-
-	internalState stateValue
 }
-
-type stateValue int
-
-const (
-	WaitingForBlock stateValue = iota
-	WaitingForVotes stateValue = iota
-)
 
 func (eh *EventHandler) OnReceiveBlockProposal(block *types.BlockProposal) {
 	panic("implement me")
@@ -35,10 +26,6 @@ func (eh *EventHandler) OnReceiveVote(vote *types.Vote) {
 }
 
 func (eh *EventHandler) OnLocalTimeout() {
-	panic("implement me")
-}
-
-func (eh *EventHandler) OnBlockRequest(req *types.BlockProposalRequest) {
 	panic("implement me")
 }
 
