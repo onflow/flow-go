@@ -253,24 +253,24 @@ func (p *P2PNode) Publish(ctx context.Context, t FlowTopic, data []byte) error {
 	return ps.Publish(ctx, data)
 }
 
-// Register will register the given engine with the given unique engine engineID,
+// Register will register the given engine with the given unique engine channelID,
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
-func (p *P2PNode) Register(engineID uint8, engine flownetwork.Engine) (flownetwork.Conduit, error) {
+func (p *P2PNode) Register(channelID uint8, engine flownetwork.Engine) (flownetwork.Conduit, error) {
 	p.Lock()
 	defer p.Unlock()
-	// check if the engine engineID is already taken
-	if _, found := p.engines[engineID]; found {
+	// check if the engine channelID is already taken
+	if _, found := p.engines[channelID]; found {
 		return nil, errors.Errorf("engine already registered (%d)", engine)
 	}
 
-	// register engine with provided engineID
-	p.engines[engineID] = engine
+	// register engine with provided channelID
+	p.engines[channelID] = engine
 
 	// create the conduit
 	conduit := &Conduit{
-		engineID: engineID,
-		submit:   p.submit,
+		channelID: channelID,
+		submit:    p.submit,
 	}
 	return conduit, nil
 }
@@ -278,7 +278,7 @@ func (p *P2PNode) Register(engineID uint8, engine flownetwork.Engine) (flownetwo
 // submit method submits the given event for the given engine to the overlay layer
 // for processing; it is used by engines through conduits.
 // The Target needs to be added as a peer before submitting the message.
-func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+func (p *P2PNode) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 	for _, t := range targetIDs {
 		// TODO: Yet to figure out the whole flow identifier to libp2p id mapping (Issue#1968)
 
@@ -298,9 +298,9 @@ func (p *P2PNode) submit(engineID uint8, event interface{}, targetIDs ...flow.Id
 		copy(senderID[:], p.name)
 		// Compose the message payload
 		message := &Message{
-			SenderID: senderID[:],
-			Event:    event.([]byte),
-			EngineID: uint32(engineID),
+			SenderID:  senderID[:],
+			Event:     event.([]byte),
+			ChannelID: uint32(channelID),
 		}
 		// Get the ProtoBuf representation of the message
 		b, err := proto.Marshal(message)
@@ -384,10 +384,10 @@ func (p *P2PNode) readData(s network.Stream) {
 		copy(senderID[:], message.SenderID)
 
 		// Extract engine id and find the registered engine
-		en, found := p.engines[uint8(message.EngineID)]
+		en, found := p.engines[uint8(message.ChannelID)]
 		if !found {
 			p.logger.Debug().Str("peer", s.Conn().RemotePeer().String()).
-				Uint8("engine", uint8(message.EngineID)).
+				Uint8("engine", uint8(message.ChannelID)).
 				Msg(" dropping message since no engine to receive it was found")
 			return
 		}
@@ -395,7 +395,7 @@ func (p *P2PNode) readData(s network.Stream) {
 		err = en.Process(senderID, message.Event)
 		if err != nil {
 			p.logger.Error().
-				Uint8("engineid", uint8(message.EngineID)).
+				Uint8("channel_id", uint8(message.ChannelID)).
 				Str("peer", s.Conn().RemotePeer().String()).Err(err)
 			return
 		}

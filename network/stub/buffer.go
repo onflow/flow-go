@@ -9,9 +9,9 @@ import (
 // PendingMessage is a pending message to be sent
 type PendingMessage struct {
 	// The sender node id
-	From     flow.Identifier
-	EngineID uint8
-	Event    interface{}
+	From      flow.Identifier
+	ChannelID uint8
+	Event     interface{}
 	// The id of the receiver nodes
 	TargetIDs []flow.Identifier
 }
@@ -30,12 +30,12 @@ func NewBuffer() *Buffer {
 }
 
 // Save stores a pending message to the buffer
-func (b *Buffer) Save(from flow.Identifier, engineID uint8, event interface{}, targetIDs []flow.Identifier) {
+func (b *Buffer) Save(from flow.Identifier, channelID uint8, event interface{}, targetIDs []flow.Identifier) {
 	b.Lock()
 	defer b.Unlock()
 	b.pending = append(b.pending, &PendingMessage{
 		From:      from,
-		EngineID:  engineID,
+		ChannelID: channelID,
 		Event:     event,
 		TargetIDs: targetIDs,
 	})

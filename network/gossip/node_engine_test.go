@@ -62,7 +62,7 @@ func TestSendEngine(t *testing.T) {
 	eventBytes, err := n.codec.Encode(event)
 	require.Nil(t, err, "could not encode event")
 
-	eprBytes, err := proto.Marshal(&messages.EventProcessRequest{EngineID: 1, Event: eventBytes, SenderID: ""})
+	eprBytes, err := proto.Marshal(&messages.EventProcessRequest{ChannelID: 1, Event: eventBytes, SenderID: ""})
 	require.Nil(t, err, "could not marshal event request")
 
 	_, err = n.sendEngine(context.Background(), eprBytes)

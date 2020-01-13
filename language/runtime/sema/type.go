@@ -103,6 +103,33 @@ func NewTypeAnnotation(ty Type) *TypeAnnotation {
 	}
 }
 
+// AnyType represents the top type of all types.
+// NOTE: This type is only used internally and not available in programs.
+type AnyType struct{}
+
+func (*AnyType) isType() {}
+
+func (*AnyType) String() string {
+	return "Any"
+}
+
+func (*AnyType) ID() TypeID {
+	return "Any"
+}
+
+func (*AnyType) Equal(other Type) bool {
+	_, ok := other.(*AnyType)
+	return ok
+}
+
+func (*AnyType) IsResourceType() bool {
+	return false
+}
+
+func (*AnyType) IsInvalidType() bool {
+	return false
+}
+
 // AnyStructType represents the top type of all non-resource types
 type AnyStructType struct{}
 
@@ -2262,6 +2289,9 @@ func IsSubType(subType Type, superType Type) bool {
 	}
 
 	switch superType.(type) {
+	case *AnyType:
+		return true
+
 	case *AnyStructType:
 		return !subType.IsResourceType()
 
@@ -2292,7 +2322,7 @@ func IsSubType(subType Type, superType Type) bool {
 			// T <: U? if T <: U
 			return IsSubType(subType, typedSuperType.Type)
 		}
-		// optionals are covariant: T? <: U? if T <: U
+		// Optionals are covariant: T? <: U? if T <: U
 		return IsSubType(optionalSubType.Type, typedSuperType.Type)
 
 	case *InterfaceType:
@@ -2349,11 +2379,51 @@ func IsSubType(subType Type, superType Type) bool {
 			return false
 		}
 
-		// references are covariant: &T <: &U if T <: U
-		return IsSubType(typedSubType.Type, typedSuperType.Type)
-	}
+		// References are covariant: &T <: &U if T <: U
 
-	// TODO: functions
+		return IsSubType(typedSubType.Type, typedSuperType.Type)
+
+	case *FunctionType:
+		typedSubType, ok := subType.(*FunctionType)
+		if !ok {
+			return false
+		}
+
+		if len(typedSubType.Parameters) != len(typedSuperType.Parameters) {
+			return false
+		}
+
+		// Functions are contravariant in their parameter types
+
+		for i, subParameter := range typedSubType.Parameters {
+			superParameter := typedSuperType.Parameters[i]
+			if !IsSubType(
+				superParameter.TypeAnnotation.Type,
+				subParameter.TypeAnnotation.Type,
+			) {
+				return false
+			}
+		}
+
+		// Functions are covariant in their return type
+
+		if typedSubType.ReturnTypeAnnotation != nil &&
+			typedSuperType.ReturnTypeAnnotation != nil {
+
+			return IsSubType(
+				typedSubType.ReturnTypeAnnotation.Type,
+				typedSuperType.ReturnTypeAnnotation.Type,
+			)
+		}
+
+		if typedSubType.ReturnTypeAnnotation == nil &&
+			typedSuperType.ReturnTypeAnnotation == nil {
+
+			return true
+		}
+
+		return false
+	}
 
 	return false
 }
