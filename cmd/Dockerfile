@@ -1,3 +1,4 @@
+# syntax = docker/dockerfile:experimental
 # NOTE: Must be run in the context of the repo's root directory
 
 ## (1) Build Relic first to maximize caching
@@ -32,13 +33,15 @@ WORKDIR /app
 ARG TARGET
 
 COPY . .
-RUN go mod download
 
 # Copy over Relic build artifacts
 COPY --from=build-relic /build/relic/build ./crypto/relic/build
 
-RUN echo "Building ${TARGET}"
-RUN GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o ./app ./cmd/${TARGET}
+# Keep Go's build cache is kept between builds.
+# https://github.com/golang/go/issues/27719#issuecomment-514747274
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o ./app ./cmd/${TARGET}
 
 ## (3) Add the binary to a fresh Alpine image
 FROM alpine:3.10

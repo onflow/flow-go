@@ -12,6 +12,7 @@ GOPRIVATE=github.com/dapperlabs/*
 UNAME := $(shell uname)
 
 export FLOW_ABI_EXAMPLES_DIR := $(CURDIR)/language/abi/examples/
+export DOCKER_BUILDKIT := 1
 
 crypto/relic:
 	rm -rf crypto/relic
