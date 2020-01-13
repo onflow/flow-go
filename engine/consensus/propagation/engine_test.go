@@ -15,6 +15,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
+	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
@@ -27,7 +28,7 @@ func TestOnCollectionGuarantee(t *testing.T) {
 	state := &protocol.State{}
 	ss := &protocol.Snapshot{}
 	me := &module.Local{}
-	pool := &module.CollectionGuaranteePool{}
+	pool := &mempool.Guarantees{}
 	e := &Engine{
 		con:   con,
 		state: state,
@@ -75,7 +76,7 @@ func TestOnCollectionGuarantee(t *testing.T) {
 func TestProcessCollectionGuarantee(t *testing.T) {
 
 	// initialize mocks and engine
-	pool := &module.CollectionGuaranteePool{}
+	pool := &mempool.Guarantees{}
 	e := Engine{
 		pool: pool,
 	}

@@ -33,7 +33,7 @@ func New(logger zerolog.Logger, net module.Network, me module.Local, blocks stor
 		collections: collections,
 	}
 
-	con, err := net.Register(engine.ExecutionBlockIngestion, &eng)
+	con, err := net.Register(engine.BlockProvider, &eng)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
@@ -94,7 +94,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) handleBlock(block flow.Block) error {
 
 	e.log.Debug().
-		Hex("block_id", logging.ID(block)).
+		Hex("block_id", logging.Entity(block)).
 		Uint64("block_number", block.Number).
 		Msg("received block")
 
@@ -109,7 +109,7 @@ func (e *Engine) handleBlock(block flow.Block) error {
 func (e *Engine) handleCollection(collection flow.Collection) error {
 
 	e.log.Debug().
-		Hex("collection_id", logging.ID(collection)).
+		Hex("collection_id", logging.Entity(collection)).
 		Msg("received collection")
 
 	err := e.collections.Store(&collection)

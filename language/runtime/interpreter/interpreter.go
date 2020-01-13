@@ -661,7 +661,7 @@ func (interpreter *Interpreter) prepareInvoke(
 	}
 
 	// NOTE: can't fill argument types, as they are unknown
-	trampoline = functionValue.invoke(Invocation{
+	trampoline = functionValue.Invoke(Invocation{
 		Arguments:   preparedArguments,
 		Interpreter: interpreter,
 	})
@@ -1853,7 +1853,7 @@ func (interpreter *Interpreter) functionValueInvocationTrampoline(
 		Location: interpreter.Checker.Location,
 	}
 
-	return function.invoke(Invocation{
+	return function.Invoke(Invocation{
 		Arguments:     argumentCopies,
 		ArgumentTypes: argumentTypes,
 		Location:      location,
@@ -2209,7 +2209,7 @@ func (interpreter *Interpreter) declareCompositeValue(
 			if initializerFunction != nil {
 				// NOTE: arguments are already properly boxed by invocation expression
 
-				initializationTrampoline = initializerFunction.invoke(invocation)
+				initializationTrampoline = initializerFunction.Invoke(invocation)
 			}
 
 			return initializationTrampoline.
@@ -2715,7 +2715,7 @@ func (interpreter *Interpreter) functionConditionsWrapper(
 					// NOTE: It is important to actually return the value returned
 					//   from the inner function, otherwise it is lost
 
-					return inner.invoke(invocation).
+					return inner.Invoke(invocation).
 						Map(func(returnValue interface{}) interface{} {
 							return functionReturn{returnValue.(Value)}
 						})
@@ -2884,7 +2884,7 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 				)
 
 				prepareTrampoline = More(func() Trampoline {
-					return prepare.invoke(invocation)
+					return prepare.Invoke(invocation)
 				})
 			}
 
@@ -2898,7 +2898,7 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 				executeTrampoline = More(func() Trampoline {
 					invocationWithoutArguments := invocation
 					invocationWithoutArguments.Arguments = nil
-					return execute.invoke(invocationWithoutArguments)
+					return execute.Invoke(invocationWithoutArguments)
 				})
 			}
 

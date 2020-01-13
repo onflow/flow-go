@@ -73,6 +73,27 @@ func CollectionFixture(n int) flow.Collection {
 	return flow.Collection{Transactions: transactions}
 }
 
+func ExecutionReceiptFixture() flow.ExecutionReceipt {
+	return flow.ExecutionReceipt{
+		ExecutorID:        IdentifierFixture(),
+		ExecutionResult:   ExecutionResultFixture(),
+		Spocks:            nil,
+		ExecutorSignature: SignatureFixture(),
+	}
+}
+
+func ExecutionResultFixture() flow.ExecutionResult {
+	return flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID:     IdentifierFixture(),
+			BlockID:              IdentifierFixture(),
+			FinalStateCommitment: nil,
+			Chunks:               flow.ChunkList{},
+		},
+		Signatures: SignaturesFixture(6),
+	}
+}
+
 func HashFixture(size int) crypto.Hash {
 	hash := make(crypto.Hash, size)
 	for i := 0; i < size; i++ {
