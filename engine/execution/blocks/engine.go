@@ -33,8 +33,6 @@ type Engine struct {
 	execution         network.Engine
 
 	mempool *Mempool
-	//pendingBlocks      map[flow.Identifier]*execution.CompleteBlock
-	//pendingCollections map[flow.Identifier]flow.Identifier
 }
 
 func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections, state protocol.State, executionEngine network.Engine, mempool *Mempool) (*Engine, error) {
@@ -46,9 +44,7 @@ func New(logger zerolog.Logger, net module.Network, me module.Local, blocks stor
 		collections: collections,
 		state:       state,
 		execution:   executionEngine,
-		//pendingBlocks:      make(map[flow.Identifier]*execution.CompleteBlock),
-		//pendingCollections: make(map[flow.Identifier]flow.Identifier),
-		mempool: mempool,
+		mempool:     mempool,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
