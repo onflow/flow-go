@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/libp2p"
 	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
@@ -42,6 +43,9 @@ func decode(env Envelope) (interface{}, error) {
 		v = &coldstuff.BlockVote{}
 	case CodeBlockCommit:
 		v = &coldstuff.BlockCommit{}
+
+	case Echo:
+		v = &libp2p.Echo{}
 
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)

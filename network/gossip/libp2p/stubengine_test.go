@@ -1,7 +1,6 @@
 package libp2p
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"testing"
@@ -15,9 +14,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	gologging "github.com/whyrusleeping/go-logging"
 
-	gojson "encoding/json"
-
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/libp2p"
 	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
@@ -155,24 +153,29 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 	_, err = nets[1].Register(1, te2)
 	require.NoError(s.Suite.T(), err)
 
-	hello, _ := gojson.Marshal("hello")
-
 	// Send the message to node 2 using the conduit of node 1
-	event := json.Envelope{
-		Code: json.Echo,
-		Data: hello,
+	event := &libp2p.Echo{
+		Text: "hello",
 	}
 	require.NoError(s.Suite.T(), c1.Submit(event, ids[1]))
 
 	select {
 	case <-te2.received:
 		// Asserts that the message was received by peer 2
-		require.NotNil(s.Suite.T(), te2.originID)
-		require.NotNil(s.Suite.T(), te2.event)
-		senderID := bytes.Trim(te2.originID[:], "\x00")
-		senderIDStr := string(senderID)
-		assert.Equal(s.Suite.T(), ids[0], senderIDStr)
-		assert.Equal(s.Suite.T(), "hello", fmt.Sprintf("%s", te2.event))
+		//require.NotNil(s.Suite.T(), te2.originID)
+		//require.NotNil(s.Suite.T(), te2.event)
+		//senderID := bytes.Trim(te2.originID[:], "\x00")
+		//senderIDStr := string(senderID)
+		//assert.Equal(s.Suite.T(), ids[0], senderIDStr)
+
+		// evaluates proper reception of event
+		// casts the received event at the receiver side
+		rcvEvent, ok := te2.event.(*libp2p.Echo)
+		// evaluates correctness of casting
+		require.True(s.Suite.T(), ok)
+		// evaluates content of received message
+		assert.Equal(s.Suite.T(), event, rcvEvent)
+
 	case <-time.After(10 * time.Second):
 		assert.Fail(s.Suite.T(), "peer 1 failed to send a message to peer 2")
 	}
