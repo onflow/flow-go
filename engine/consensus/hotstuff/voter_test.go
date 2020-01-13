@@ -19,16 +19,34 @@ func TestProduceVote(t *testing.T) {
 	eventHandler := &EventHandler{}
 	fmt.Printf("%v", eventHandler)
 	fmt.Printf("%v", voter)
-	Temp(t)
+	CreateProtocolState(t)
 }
 
 func CreateProtocolState(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		state, err := protocol.NewState(db)
-		var ids flow.IdentityList
-		for _, entry := range []string{"node1"} {
-			flow.BytesToID([]byte(entry))
-		}
+		// for _, entry := range []flow.Identifier{unittest.IdentifierFixture()} {
+		// 	id, err := flow.ParseIdentity(entry)
+		// 	if err != nil {
+		// 		panic("could not parse identity")
+		// 	}
+		// 	ids = append(ids, id)
+		// }
+		ids := unittest.IdentityListFixture(5, func(node *flow.Identity) {
+			node.Role = flow.RoleConsensus
+		})
+		// func CreateProtocolState(t *testing.T) {
+		// 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		// 		state, err := protocol.NewState(db)
+		// 		var ids flow.IdentityList
+		// 		for _, entry := range []string{fmt.Sprintf("consensus-%x@address1=1000", flow.HashToID([]byte("node1")))} {
+		// 			id, err := flow.ParseIdentity(entry)
+		// 			if err != nil {
+		// 				t.Log("derp")
+		// 				t.Log(err)
+		// 			}
+		// 			ids = append(ids, id)
+		// 		}
 
 		err = state.Mutate().Bootstrap(flow.Genesis(ids))
 		if err != nil {
