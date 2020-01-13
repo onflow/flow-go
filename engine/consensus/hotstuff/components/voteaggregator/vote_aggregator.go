@@ -77,7 +77,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 	if err := va.storeIncorporatedVote(vote, bp); err != nil {
 		return nil, err
 	}
-	if _, hasBuiltQC := va.createdQC[string(bp.Block.BlockMRH)]; hasBuiltQC == false {
+	if _, hasBuiltQC := va.createdQC[string(bp.Block.BlockMRH())]; hasBuiltQC == false {
 		return va.buildQC(bp.Block)
 	}
 
@@ -90,7 +90,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 // returns a list
 func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*types.QuorumCertificate, []error) {
 	var errors []error
-	for _, vote := range va.pendingVotes[string(bp.Block.BlockMRH)] {
+	for _, vote := range va.pendingVotes[string(bp.Block.BlockMRH())] {
 		if err := va.storeIncorporatedVote(vote, bp); err != nil {
 			errors = append(errors, err)
 		}
@@ -129,7 +129,7 @@ func (va *VoteAggregator) buildQC(block *types.Block) (*types.QuorumCertificate,
 	if err != nil {
 		return nil, err
 	}
-	blockMRHStr := string(block.BlockMRH)
+	blockMRHStr := string(block.BlockMRH())
 	voteThreshold := uint64(float32(identities.TotalStake())*va.viewState.ThresholdStake()) + 1
 	// upon receipt of sufficient votes (in terms of stake)
 	if va.blockHashToIncorporatedStakes[blockMRHStr] >= voteThreshold {

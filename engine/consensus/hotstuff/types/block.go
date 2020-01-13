@@ -8,10 +8,9 @@ type Block struct {
 	Height      uint64
 	ChainID     string
 	PayloadHash []byte
-	BlockMRH    []byte
 	Timestamp   *timestamp.Timestamp
 }
 
-func (b *Block) computeBlockMRH() []byte {
+func (b *Block) BlockMRH() []byte {
 	panic("TODO")
 }
