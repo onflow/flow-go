@@ -32,7 +32,7 @@ func New(logger zerolog.Logger, net module.Network, state protocol.State, me mod
 		me:    me,
 	}
 
-	con, err := net.Register(engine.ExecutionReceiptProvider, &eng)
+	con, err := net.Register(engine.ReceiptProvider, &eng)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
