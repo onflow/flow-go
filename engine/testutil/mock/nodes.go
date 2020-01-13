@@ -47,5 +47,6 @@ type VerificationNode struct {
 	GenericNode
 	Receipts       mempool.Receipts
 	Approvals      mempool.Approvals
+	Blocks         mempool.Blocks
 	VerifierEngine *verifier.Engine
 }

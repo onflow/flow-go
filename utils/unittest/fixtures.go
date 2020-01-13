@@ -108,6 +108,13 @@ func IdentifierFixture() flow.Identifier {
 	return id
 }
 
+// WithRole adds a role to an identity fixture.
+func WithRole(role flow.Role) func(*flow.Identity) {
+	return func(id *flow.Identity) {
+		id.Role = role
+	}
+}
+
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) flow.Identity {
 	id := flow.Identity{

@@ -149,8 +149,11 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genes
 	node.Approvals, err = stdmap.NewApprovals()
 	require.Nil(t, err)
 
-	node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, node.Receipts, node.Approvals)
-	require.NoError(t, err)
+	node.Blocks, err = stdmap.NewBlocks()
+	require.Nil(t, err)
+
+	node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, node.Receipts, node.Approvals, node.Blocks)
+	require.Nil(t, err)
 
 	return node
 }
