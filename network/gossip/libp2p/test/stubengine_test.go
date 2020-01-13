@@ -161,12 +161,11 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 
 	select {
 	case <-te2.received:
-		// Asserts that the message was received by peer 2
-		//require.NotNil(s.Suite.T(), te2.originID)
-		//require.NotNil(s.Suite.T(), te2.event)
-		//senderID := bytes.Trim(te2.originID[:], "\x00")
-		//senderIDStr := string(senderID)
-		//assert.Equal(s.Suite.T(), ids[0], senderIDStr)
+		// evaluates reception of message at the other side
+		// does not evaluate the content
+		require.NotNil(s.Suite.T(), te2.originID)
+		require.NotNil(s.Suite.T(), te2.event)
+		assert.Equal(s.Suite.T(), ids[0], te2.originID)
 
 		// evaluates proper reception of event
 		// casts the received event at the receiver side

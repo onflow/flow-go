@@ -1,4 +1,4 @@
-package libp2p
+package test
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/model/libp2p/network"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -23,8 +24,8 @@ import (
 
 type MiddlewareTestSuit struct {
 	suite.Suite
-	size int           // used to determine number of middlewares under test
-	mws  []*Middleware // used to keep track of middlewares under test
+	size int                  // used to determine number of middlewares under test
+	mws  []*libp2p.Middleware // used to keep track of middlewares under test
 	ov   []*mock.Overlay
 	ids  []flow.Identifier
 }
@@ -227,8 +228,8 @@ func (m *MiddlewareTestSuit) TestEcho() {
 }
 
 // createMiddelwares creates middlewares with mock overlay for each middleware
-func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []*Middleware) {
-	var mws []*Middleware
+func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []*libp2p.Middleware) {
+	var mws []*libp2p.Middleware
 	var ids []flow.Identifier
 
 	// creates the middlewares
@@ -245,7 +246,7 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 		codec := json.NewCodec()
 
 		// creates new middleware
-		mw, err := NewMiddleware(logger, codec, uint(count-1), "0.0.0.0:0", targetID)
+		mw, err := libp2p.NewMiddleware(logger, codec, uint(count-1), "0.0.0.0:0", targetID)
 		require.NoError(m.Suite.T(), err)
 
 		mws = append(mws, mw)

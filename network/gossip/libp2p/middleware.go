@@ -286,28 +286,24 @@ ProcessLoop:
 	for {
 		select {
 		case <-conn.done:
-			log.Info().Msg("breaking loop")
+			m.log.Info().Msg("middleware stopped reception of incoming messages")
 			break ProcessLoop
 		case msg := <-conn.inbound:
-			fmt.Println("gottttttt")
-			log.Info().Msg("got message")
+			log.Info().Msg("middleware received a new message")
 			nodeID, payload, err := m.createInboundMessage(msg)
-			fmt.Println("converted inbound")
 			if err != nil {
 				log.Error().Err(err).Msg("could not extract payload")
 				continue ProcessLoop
 			}
-			fmt.Println("calling recive")
 			err = m.ov.Receive(*nodeID, payload)
 			if err != nil {
 				log.Error().Err(err).Msg("could not deliver payload")
 				continue ProcessLoop
 			}
-			fmt.Println("called recive")
 		}
 	}
 
-	log.Info().Msg("connection closed")
+	log.Info().Msg("middleware closed the connection")
 }
 
 // release will release one resource on the given semaphore.
