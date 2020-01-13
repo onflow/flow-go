@@ -117,7 +117,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("receipt_id", logging.ID(receipt)).
+		Hex("receipt_id", logging.Entity(receipt)).
 		Msg("execution receipt received")
 
 	// get the identity of the origin node, so we can check if it's a valid
@@ -142,7 +142,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("receipt_id", logging.ID(receipt)).
+		Hex("receipt_id", logging.Entity(receipt)).
 		Msg("execution receipt processed")
 
 	return nil
@@ -153,7 +153,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("approval_id", logging.ID(approval)).
+		Hex("approval_id", logging.Entity(approval)).
 		Msg("result approval received")
 
 	// get the identity of the origin node, so we can check if it's a valid
@@ -178,7 +178,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("approval_id", logging.ID(approval)).
+		Hex("approval_id", logging.Entity(approval)).
 		Msg("execution receipt forwarded")
 
 	return nil
