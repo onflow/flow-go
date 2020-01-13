@@ -23,8 +23,6 @@ import (
 
 type StubEngineTestSuite struct {
 	suite.Suite
-	state *protocol.State
-	me    *mock.Local
 }
 
 // TestStubEngineTestSuite runs all the test methods in this test suit
