@@ -1,4 +1,4 @@
-package hotstuff
+package voteaggregator
 
 import (
 	"fmt"

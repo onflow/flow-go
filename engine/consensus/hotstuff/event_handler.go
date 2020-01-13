@@ -1,10 +1,13 @@
 package hotstuff
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+import (
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/components/voteaggregator"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+)
 
 type EventHandler struct {
 	paceMaker             *PaceMaker
-	voteAggregator        *VoteAggregator
+	voteAggregator        *voteaggregator.VoteAggregator
 	voter                 *Voter
 	missingBlockRequester *MissingBlockRequester
 	forkChoice            *ForkChoice
@@ -77,7 +80,11 @@ func (eh *EventHandler) processIncorperatedBlock(block *types.BlockProposal) {
 
 	// check if there is pending votes to build a QC as a leader
 	if eh.paceMaker.CurView() == block.Block.View && eh.viewState.IsSelfLeaderForView(block.Block.View) {
-		if newQC, built := eh.voteAggregator.BuildQCOnReceivingBlock(block); built {
+		newQC, errors := eh.voteAggregator.BuildQCOnReceivingBlock(block)
+		if errors != nil {
+			//	TODO: handle errors
+		}
+		if newQC != nil {
 			eh.processNewQC(newQC)
 		}
 	}
@@ -143,14 +150,16 @@ func (eh *EventHandler) onReceiveVote(vote *types.Vote) {
 	blockProposal, found := eh.forkChoice.FindProposalByViewAndBlockMRH(vote.View, vote.BlockMRH)
 	if found == false {
 		if err := eh.voteAggregator.StorePendingVote(vote); err != nil {
-			//	handle error
+			// TODO: handle error
 			return
 		}
 		eh.missingBlockRequester.FetchMissingBlock(vote.View, vote.BlockMRH)
 		return
 	}
-	if newQC, built := eh.voteAggregator.StoreVoteAndBuildQC(vote, blockProposal); built == true {
+	if newQC, err := eh.voteAggregator.StoreVoteAndBuildQC(vote, blockProposal); err == nil {
 		eh.processNewQC(newQC)
+	} else {
+		//	TODO: handle error
 	}
 }
 

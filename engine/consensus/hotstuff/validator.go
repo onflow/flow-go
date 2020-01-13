@@ -17,10 +17,10 @@ func (v *Validator) ValidateBlock(qc *types.QuorumCertificate, bp *types.BlockPr
 	panic("TODO")
 }
 
-func (v *Validator) ValidateIncorporatedVote(vote *types.Vote, bp *types.BlockProposal, identities flow.IdentityList) (bool, error) {
+func (v *Validator) ValidateIncorporatedVote(vote *types.Vote, bp *types.BlockProposal, identities flow.IdentityList) error {
 	panic("TODO")
 }
 
-func (v *Validator) ValidatePendingVote(vote *types.Vote) (bool, error) {
+func (v *Validator) ValidatePendingVote(vote *types.Vote) error {
 	panic("TODO")
 }
