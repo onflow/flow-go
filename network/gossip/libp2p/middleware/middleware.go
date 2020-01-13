@@ -131,9 +131,6 @@ func (m *Middleware) createInboundMessage(msg *libp2p.Message) (*flow.Identifier
 
 	// Extract sender id
 	if len(msg.SenderID) < 32 {
-		m.log.Debug().
-			Bytes("sender", msg.SenderID).
-			Msg(" invalid sender id")
 		err := fmt.Errorf("invalid sender id")
 		return nil, nil, err
 	}

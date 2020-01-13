@@ -4,7 +4,6 @@ package middleware
 
 import (
 	"bufio"
-	"fmt"
 
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	"github.com/rs/zerolog"
@@ -49,14 +48,7 @@ SendLoop:
 		case msg := <-wc.outbound:
 			bufw := bufio.NewWriter(wc.stream)
 			writer := ggio.NewDelimitedWriter(bufw)
-
 			err := writer.WriteMsg(msg)
-			if err != nil {
-				fmt.Println(err)
-			}
-
-			bufw.Flush()
-
 			wc.log.Debug().
 				Bytes("sender", msg.SenderID).
 				Int("length", len(msg.Event)).
@@ -72,6 +64,7 @@ SendLoop:
 				wc.stop()
 				continue
 			}
+			bufw.Flush()
 		}
 	}
 

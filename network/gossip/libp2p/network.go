@@ -148,8 +148,6 @@ func (n *Network) Cleanup(nodeID flow.Identifier) error {
 
 func (n *Network) Receive(nodeID flow.Identifier, payload interface{}) error {
 
-	// TODO do type assettion
-
 	var err error
 	// Convert message payload to a known message type
 	msg, err := n.codec.Decode(payload.([]byte))
@@ -167,8 +165,6 @@ func (n *Network) Receive(nodeID flow.Identifier, payload interface{}) error {
 		return errors.Wrap(err, "could not process message")
 	}
 	return nil
-
-	return errors.New("method not implemented")
 }
 
 func (n *Network) processNetworkMessage(nodeID flow.Identifier, message *networkmodel.NetworkMessage) error {
