@@ -35,7 +35,7 @@ Resources are based on liner types which were popularized by Rust.
 Events are inspired by Solidity.
 
 **Disclaimer:** In real Cadence code, all type definitions and code
-must be defined and contained in contract blocks or transaction blocks, 
+must be defined and contained in [contracts](#contracts) or [transactions](#transactions), 
 but we omit these containers in examples for simplicity.
 
 ## Comments
@@ -2752,7 +2752,7 @@ create SomeResource()
 The constructor function may require parameters
 if the [initializer](#composite-data-type-fields) of the composite data type requires them.
 
-Composite data types can only be declared within smart contracts and not locally in functions.
+Composite data types can only be declared within [contract](#contracts) and not locally in functions.
 They can also not be nested.
 
 ### Composite Data Type Fields
@@ -4162,9 +4162,9 @@ resource interface FungibleToken {
 
 Note that the required initializer and functions do not have any executable code.
 
-Struct and Resource Interfaces can only be declared directly inside contracts,
+Struct and resource Interfaces can only be declared directly inside contracts,
 i.e. not inside of functions.  
-Contract interfaces can be declared globally and not inside contracts.
+Contract interfaces can only be declared globally and not inside contracts.
 
 ### Interface Implementation
 
@@ -4931,7 +4931,7 @@ let countObj = acct.storage[Counter]
 A contract in Cadence is a collection of type definitions 
 of interfaces, structs, resources,  data (its state), and code (its functions) 
 that lives in the contract storage area of an account in Flow.  
-Contracts are where all persistent composite types like structs, resources,
+Contracts are where all composite types like structs, resources,
 events, and interfaces for these types in Cadence have to be defined.  
 Therefore, an object of one of these types cannot exist 
 without having been defined in a deployed Cadence contract.
@@ -4993,6 +4993,7 @@ pub contract HelloWorld {
     }
 }
 ```
+
 This contract could be deployed to an account and live permenantely
 in the contract storage.  Transactions and other contracts 
 can interact with contracts by importing them at the beginning 
@@ -5001,6 +5002,7 @@ of a transaction or contract definition.
 Anyone could call the above contract's `hello` function by importing
 the contract from the account it was deployed to and using the imported
 object to call the hello function.
+
 ```cadence,file=contract_call.cdc
 import HelloWorld from 0x42
 
@@ -5039,15 +5041,16 @@ pub fun helloWorld(): String {}
 let num: Int
 ```
 
-Another important feature of contracts is that instances of composite types
+Another important feature of contracts is that instances of resources and events
 that are defined in contracts can only be created within functions or types
 that are defined in that contract.  A random transaction cannot arbitrarily
 create instances of types that are defined in another contract.  A contract
 restricts the situations that the objects can be created in.
 
 The contract below defines a resource interface `Receiver` and a resource `Vault`
-that implements that interface.  Currently, there is no way to create this resource,
-so it would not be usable.
+that implements that interface.  The way this example is written, 
+there is no way to create this resource, so it would not be usable.
+
 ```cadence,file=ft_contract.cdc
 // Valid
 pub contract FungibleToken {
@@ -5095,7 +5098,7 @@ pub contract FungibleToken {
 }
 ```
 If a user tried to run a transaction that created an instance of the `Vault` type,
-The type checker would not allow it because only code in the `FungibleToken`
+the type checker would not allow it because only code in the `FungibleToken`
 contract can create new `Vault`s.
 
 ```cadence,file=contract_invalid_create.cdc
@@ -5148,15 +5151,18 @@ to be deployed to an account. It can be initialized, updated, or deleted
 within a transaction by using the `updateAccountCode`
 or `createAccount` built-in functions.
 
-TODO: Bastian add documentation for these and examples
+<!-- TODO: Bastian add documentation for these and examples -->
 
 ### Contract Interfaces
 
-Like other composite types, contracts can have interfaces that specify rules
+Like composite types, contracts can have interfaces that specify rules
 about their behavior, their types, and the behavior of their types.
 
 Contract interfaces have to be declared globally.  Declarations
 cannot be nested in other types.  
+
+If a contract interface declares a concrete type, implementations of it
+must also declare the same concrete type conforming to the type requirement.
 
 If a contract interface declares an interface type, the implementing contract
 does not have to also define that interface.  They can refer to that nested
@@ -5168,9 +5174,14 @@ interface by saying `{ContractInterfaceName}.{NestedInterfaceName}`
 //
 pub contract interface InterfaceExample {
 
+    // Implementations do not need to declare this
+    // They refer to it as InterfaceExample.NestedInterface
+    //
     pub resource interface NestedInterface {}
 
-    pub resource Composite: NestedInterface {
+    // Implementations must declare this type 
+    //
+    pub resource Composite: NestedInterface {}
 }
 
 pub contract ExampleContract: InterfaceExample {
@@ -5200,9 +5211,9 @@ The syntax of an event declaration is similar to that of
 a [function declaration](#function-declarations); 
 events contain named parameters, each of which has an optional argument label.
 Types that can be in event definitions are restricted 
-to Booleans, Strings, Integer types, and Arrays or Dictionaries of these types.
+to booleans, strings, integer, and arrays or dictionaries of these types.
 
-Events can only be declared within a smart contract body.  
+Events can only be declared within a [contract](#contracts) body.  
 Events cannot be declared globally or within resource or struct types.
 
 Resource argument types are not allowed because when a resource is used as
@@ -5219,7 +5230,7 @@ pub contract Events {
     //
     event BarEvent(labelA fieldA: Int, labelB fieldB: Int)
 
-    // Invalid: A resource is not allowed to be used as an argument label
+    // Invalid: A resource type is not allowed to be used
     // because it would be moved and lost
     //
     event ResourceEvent(resourceField: @Vault)
