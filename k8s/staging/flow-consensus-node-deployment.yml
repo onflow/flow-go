@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   # This is the full name of your deployment. It must be unique
-  name: flow-verification-node-v1
+  name: flow-consensus-node-v1
   namespace: flow
 
   # Best practice labels:
@@ -13,7 +13,7 @@ metadata:
   #   version: the major version of this service (v1/v2/v1beta1)
   labels:
     app: flow-test-net
-    node: verification
+    node: consensus
     env: staging
     owner: Kan
     version: v1
@@ -24,7 +24,7 @@ spec:
   selector:
     matchLabels:
       app: flow-test-net
-      node: verification
+      node: consensus
       env: staging
       version: v1
 
@@ -40,7 +40,7 @@ spec:
 
       labels:
         app: flow-test-net
-        node: verification
+        node: consensus
         env: staging
         owner: Kan
         version: v1
@@ -52,7 +52,7 @@ spec:
       containers:
         - name: flow-test-net
           # No tag, will be attached by teamcity
-          image: gcr.io/dl-flow/verification
+          image: gcr.io/dl-flow/consensus
           args: 
             - '--nodename'
             - '$(POD_NAME)'
@@ -130,5 +130,5 @@ spec:
         - ReadWriteOnce
         resources:
           requests:
-            storage: 20Gi
+            storage: 10Gi
         storageClassName: standard

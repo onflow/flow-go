@@ -1,8 +1,146 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: flow-collection-node-ingress-service
+  namespace: flow
+
+  labels:
+    app: flow-test-net
+    node: collection
+    env: staging
+    owner: Kan
+    version: v1
+
+spec:
+  type: ClusterIP
+  selector:
+    app: flow-test-net
+    node: collection
+    env: staging
+    version: v1
+  ports:
+    - name: ingress
+      protocol: TCP
+      port: 9000
+      targetPort: ingress
+
+---
+# To pre-emptively prepare for the case where we'd want to connect to a specific collection cluster, we can have sub services per cluster
+
+# Service for accessing the first collection cluster
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: flow-collection-node-v1-0
+  namespace: flow
+
+  labels:
+    app: flow-test-net
+    node: collection
+    env: staging
+    owner: Kan
+    version: v1
+
+spec:
+  type: ClusterIP
+  selector:
+    app: flow-test-net
+    node: collection
+    env: staging
+    version: v1
+    statefulset.kubernetes.io/pod-name: flow-collection-node-v1-0
+
+  ports:
+    - name: ingress
+      protocol: TCP
+      port: 9000
+      targetPort: ingress
+    - name: grpc
+      protocol: TCP
+      port: 3569
+      targetPort: grpc
+
+---
+
+# Service for accessing the second collection cluster
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: flow-collection-node-v1-1
+  namespace: flow
+
+  labels:
+    app: flow-test-net
+    node: collection
+    env: staging
+    owner: Kan
+    version: v1
+
+spec:
+  type: ClusterIP
+  selector:
+    app: flow-test-net
+    node: collection
+    env: staging
+    version: v1
+    statefulset.kubernetes.io/pod-name: flow-collection-node-v1-1
+
+  ports:
+    - name: ingress
+      protocol: TCP
+      port: 9000
+      targetPort: ingress
+    - name: grpc
+      protocol: TCP
+      port: 3569
+      targetPort: grpc
+
+---
+
+# Service for accessing the third collection cluster
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: flow-collection-node-v1-2
+  namespace: flow
+
+  labels:
+    app: flow-test-net
+    node: collection
+    env: staging
+    owner: Kan
+    version: v1
+    statefulset.kubernetes.io/pod-name: flow-collection-node-v1-2
+
+spec:
+  type: ClusterIP
+  selector:
+    app: flow-test-net
+    node: collection
+    env: staging
+    version: v1
+
+  ports:
+    - name: ingress
+      protocol: TCP
+      port: 9000
+      targetPort: ingress
+    - name: grpc
+      protocol: TCP
+      port: 3569
+      targetPort: grpc
+
+---
+
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   # This is the full name of your deployment. It must be unique
-  name: flow-verification-node-v1
+  name: flow-collection-node-v1
   namespace: flow
 
   # Best practice labels:
@@ -13,18 +151,18 @@ metadata:
   #   version: the major version of this service (v1/v2/v1beta1)
   labels:
     app: flow-test-net
-    node: verification
+    node: collection
     env: staging
     owner: Kan
     version: v1
 
 spec:
-  replicas: 1
+  replicas: 3
   serviceName: flow-test-network-v1
   selector:
     matchLabels:
       app: flow-test-net
-      node: verification
+      node: collection
       env: staging
       version: v1
 
@@ -40,7 +178,7 @@ spec:
 
       labels:
         app: flow-test-net
-        node: verification
+        node: collection
         env: staging
         owner: Kan
         version: v1
@@ -49,10 +187,11 @@ spec:
     spec:
       imagePullSecrets:
         - name: gcr
+      terminationGracePeriodSeconds: 30
       containers:
         - name: flow-test-net
           # No tag, will be attached by teamcity
-          image: gcr.io/dl-flow/verification
+          image: gcr.io/dl-flow/collection
           args: 
             - '--nodename'
             - '$(POD_NAME)'
@@ -62,6 +201,8 @@ spec:
             - '5'
             - '--datadir'
             - '/flowdb'
+            - '--ingress-addr'
+            - ':9000'
 
           # Ports exposed can be named so other resources can reference
           # them by name and not have to hard code numbers
@@ -70,6 +211,8 @@ spec:
               containerPort: 3569
             - name: http
               containerPort: 8080
+            - name: ingress
+              containerPort: 9000
             # Prometheus is looking specifically for a port named 'metrics'
             # This may be the same as the above port, or different
             - name: metrics
@@ -79,6 +222,8 @@ spec:
           env:
             - name: ENV
               value: STAGING
+            # Cannot get ordinal index yet from metadata at this time: https://github.com/kubernetes/kubernetes/pull/83101/files
+            # Have to parse out from pod name
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -130,5 +275,5 @@ spec:
         - ReadWriteOnce
         resources:
           requests:
-            storage: 20Gi
+            storage: 10Gi
         storageClassName: standard
