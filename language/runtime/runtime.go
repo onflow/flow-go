@@ -468,14 +468,14 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 		for i, pkVal := range pkValues {
 			publicKey, err := toBytes(pkVal)
 			if err != nil {
-				panic(fmt.Sprintf("Account requires the first parameter to be an array of keys ([[UInt8]])"))
+				panic(fmt.Sprintf("Account requires the first parameter to be an array of keys ([[Int]])"))
 			}
 			publicKeys[i] = publicKey
 		}
 
 		code, err := toBytes(invocation.Arguments[1])
 		if err != nil {
-			panic(fmt.Sprintf("Account requires the second parameter to be an array of bytes ([UInt8])"))
+			panic(fmt.Sprintf("Account requires the second parameter to be an array of bytes ([Int])"))
 		}
 
 		accountAddress, err := runtimeInterface.CreateAccount(publicKeys)
@@ -577,7 +577,7 @@ func (r *interpreterRuntime) newSetCodeFunction(
 
 			code, err := toBytes(invocation.Arguments[0])
 			if err != nil {
-				panic(fmt.Sprintf("setCode requires the first parameter to be an array of bytes ([UInt8])"))
+				panic(fmt.Sprintf("setCode requires the first parameter to be an array of bytes ([Int])"))
 			}
 
 			constructorArguments := invocation.Arguments[requiredArgumentCount:]
