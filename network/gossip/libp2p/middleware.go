@@ -114,8 +114,8 @@ func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 
 func (m *Middleware) createOutboundMessage(msg interface{}) (*Message, error) {
 	switch msg.(type) {
-	case *networkmodel.NetworkMessage:
-		nm := msg.(*networkmodel.NetworkMessage)
+	case networkmodel.NetworkMessage:
+		nm := msg.(networkmodel.NetworkMessage)
 		var targetIDs [][]byte
 		for _, t := range nm.TargetIDs {
 			targetIDs = append(targetIDs, t[:])
@@ -164,7 +164,7 @@ func (m *Middleware) createInboundMessage(msg *Message) (*flow.Identifier, inter
 		targetIDs = append(targetIDs, id)
 	}
 
-	nm := &networkmodel.NetworkMessage{
+	nm := networkmodel.NetworkMessage{
 		EngineID:  uint8(msg.Event.EngineID),
 		EventID:   msg.Event.EventID,
 		OriginID:  id,
