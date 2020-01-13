@@ -63,6 +63,16 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, conns uint, address 
 	return m, err
 }
 
+// Me returns the flow identifier of the this middleware
+func (m *Middleware) Me() flow.Identifier {
+	return m.me
+}
+
+// GetIPPort returns the ip address and port number associated with the middleware
+func (m *Middleware) GetIPPort() (string, string) {
+	return m.libP2PNode.GetIPPort()
+}
+
 // Start will start the middleware.
 func (m *Middleware) Start(ov middleware.Overlay) {
 	m.ov = ov

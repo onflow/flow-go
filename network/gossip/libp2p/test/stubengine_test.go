@@ -1,7 +1,6 @@
-package libp2p
+package test
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/libp2p"
 	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
+	libp2p2 "github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
@@ -25,7 +25,7 @@ import (
 // driving the engines with libp2p
 type StubEngine struct {
 	t        *testing.T
-	net      Network // used to communicate with the network layer
+	net      libp2p2.Network // used to communicate with the network layer
 	originID flow.Identifier
 	event    interface{}   // used to keep track of the events that the node receives
 	received chan struct{} // used as an indicator on reception of messages for testing
@@ -44,7 +44,7 @@ func (l Local) Address() string {
 }
 
 type StubEngineTestSuite struct {
-	LibP2PNodeTestSuite
+	suite.Suite
 	state *protocol.State
 	me    *mock.Local
 }
@@ -82,21 +82,15 @@ func TestLibP2PNodeTestSuite(t *testing.T) {
 	suite.Run(t, new(StubEngineTestSuite))
 }
 
-// SetupTests initiates the test setups prior to each test
-func (s *StubEngineTestSuite) SetupTest() {
-	s.ctx, s.cancel = context.WithCancel(context.Background())
-}
-
 // TestLibP2PNode_P2P tests end-to-end a P2P message sending and receiving between two nodes
 func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 
 	golog.SetAllLoggers(gologging.INFO)
 	// cancelling the context of test suite
 	const count = 2
-	defer s.cancel()
 
-	nets := make([]*Network, 0)
-	mws := make([]*Middleware, 0)
+	nets := make([]*libp2p2.Network, 0)
+	mws := make([]*libp2p2.Middleware, 0)
 	ids := make([]flow.Identifier, 0)
 
 	for i := 0; i < count; i++ {
@@ -107,12 +101,12 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 		ids = append(ids, ID)
 
 		// creating middleware of nodes
-		mw, err := NewMiddleware(zerolog.Logger{}, json.NewCodec(), count-1, "0.0.0.0:0", ids[i])
+		mw, err := libp2p2.NewMiddleware(zerolog.Logger{}, json.NewCodec(), count-1, "0.0.0.0:0", ids[i])
 		require.NoError(s.Suite.T(), err)
 		mws = append(mws, mw)
 	}
 	for i := 0; i < count; i++ {
-		ip, port := mws[(i+1)%count].libP2PNode.GetIPPort()
+		ip, port := mws[(i+1)%count].GetIPPort()
 		// mocks an identity
 		targetID := flow.Identity{
 			NodeID:  ids[(i+1)%count],
@@ -124,7 +118,7 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 		state.On("Final").Return(snapshot).Once()
 		snapshot.On("Identities", mockery.Anything).Return(flow.IdentityList{targetID}, nil).Once()
 		// creating network of node-1
-		net, err := NewNetwork(zerolog.Logger{}, json.NewCodec(), state, Local{me: ids[i]}, mws[i])
+		net, err := libp2p2.NewNetwork(zerolog.Logger{}, json.NewCodec(), state, Local{me: ids[i]}, mws[i])
 		require.NoError(s.Suite.T(), err)
 
 		nets = append(nets, net)
