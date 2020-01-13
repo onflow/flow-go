@@ -32,7 +32,7 @@ func main() {
 				node.State,
 				node.Me,
 			)
-			node.MustNot(err).Msg("could not initialize execution engine")
+			node.MustNot(err).Msg("could not initialize receipts engine")
 
 			return receiptsEng
 		}).
