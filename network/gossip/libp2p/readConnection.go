@@ -47,7 +47,7 @@ RecvLoop:
 
 		rc.log.Debug().Str("peer", rc.stream.Conn().RemotePeer().String()).
 			Bytes("sender", msg.SenderID).
-			Int("length", len(msg.Event)).
+			Bytes("eventID", msg.Event.EventID).
 			Msg("received message")
 
 		// stash the received message into the inbound queue for handling

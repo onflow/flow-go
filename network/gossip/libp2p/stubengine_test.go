@@ -7,14 +7,17 @@ import (
 	"testing"
 	"time"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	gologging "github.com/whyrusleeping/go-logging"
+
+	gojson "encoding/json"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/libp2p"
 	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
@@ -88,6 +91,8 @@ func (s *StubEngineTestSuite) SetupTest() {
 
 // TestLibP2PNode_P2P tests end-to-end a P2P message sending and receiving between two nodes
 func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
+
+	golog.SetAllLoggers(gologging.INFO)
 	// cancelling the context of test suite
 	const count = 2
 	defer s.cancel()
@@ -104,7 +109,7 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 		ids = append(ids, ID)
 
 		// creating middleware of nodes
-		mw, err := NewMiddleware(zerolog.Logger{}, json.NewCodec(), uint(1), "0.0.0.0:0", ids[i])
+		mw, err := NewMiddleware(zerolog.Logger{}, json.NewCodec(), count-1, "0.0.0.0:0", ids[i])
 		require.NoError(s.Suite.T(), err)
 		mws = append(mws, mw)
 	}
@@ -132,7 +137,7 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 	}
 
 	// Step 4: Waits for nodes to heartbeat each other
-	time.Sleep(2 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// test engine1
 	te1 := &StubEngine{
@@ -150,9 +155,12 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 	_, err = nets[1].Register(1, te2)
 	require.NoError(s.Suite.T(), err)
 
+	hello, _ := gojson.Marshal("hello")
+
 	// Send the message to node 2 using the conduit of node 1
-	event := &libp2p.Echo{
-		Text: "hello",
+	event := json.Envelope{
+		Code: json.Echo,
+		Data: hello,
 	}
 	require.NoError(s.Suite.T(), c1.Submit(event, ids[1]))
 
@@ -165,7 +173,7 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 		senderIDStr := string(senderID)
 		assert.Equal(s.Suite.T(), ids[0], senderIDStr)
 		assert.Equal(s.Suite.T(), "hello", fmt.Sprintf("%s", te2.event))
-	case <-time.After(3 * time.Second):
+	case <-time.After(10 * time.Second):
 		assert.Fail(s.Suite.T(), "peer 1 failed to send a message to peer 2")
 	}
 }
