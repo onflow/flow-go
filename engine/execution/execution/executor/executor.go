@@ -39,7 +39,7 @@ func (e *blockExecutor) ExecuteBlock(
 
 	result := generateExecutionResultForBlock(block, chunks)
 
-	return &result, nil
+	return result, nil
 }
 
 func (e *blockExecutor) executeTransactions(
@@ -98,7 +98,7 @@ func (e *blockExecutor) executeTransactions(
 
 // generateExecutionResultForBlock creates a new execution result for a block from
 // the provided chunk results.
-func generateExecutionResultForBlock(block ExecutableBlock, chunks []*flow.Chunk) flow.ExecutionResult {
+func generateExecutionResultForBlock(block ExecutableBlock, chunks []*flow.Chunk) *flow.ExecutionResult {
 	var finalStateCommitment flow.StateCommitment
 
 	// If block is not empty, set final state to the final state of the last chunk.
@@ -110,7 +110,7 @@ func generateExecutionResultForBlock(block ExecutableBlock, chunks []*flow.Chunk
 		finalStateCommitment = block.PreviousExecutionResult.FinalStateCommitment
 	}
 
-	return flow.ExecutionResult{
+	return &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID:     block.PreviousExecutionResult.ID(),
 			BlockID:              block.Block.ID(),
