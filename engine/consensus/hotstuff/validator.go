@@ -13,7 +13,7 @@ func (v *Validator) ValidateQC(qc *types.QuorumCertificate) bool {
 	panic("TODO")
 }
 
-func (v *Validator) ValidateBlock(qc *types.QuorumCertificate, bp *types.BlockProposal) bool {
+func (v *Validator) ValidateBlock(bp *types.BlockProposal) bool {
 	panic("TODO")
 }
 

@@ -65,6 +65,22 @@ func (_m *Storage) GetRegistersWithProof(registerIDs [][]byte, stateCommitment l
 	return r0, r1, r2
 }
 
+// LatestStateCommitment provides a mock function with given fields:
+func (_m *Storage) LatestStateCommitment() ledger.StateCommitment {
+	ret := _m.Called()
+
+	var r0 ledger.StateCommitment
+	if rf, ok := ret.Get(0).(func() ledger.StateCommitment); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(ledger.StateCommitment)
+		}
+	}
+
+	return r0
+}
+
 // UpdateRegisters provides a mock function with given fields: registerIDs, values
 func (_m *Storage) UpdateRegisters(registerIDs [][]byte, values [][]byte) (ledger.StateCommitment, error) {
 	ret := _m.Called(registerIDs, values)

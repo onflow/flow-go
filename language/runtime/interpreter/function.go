@@ -13,6 +13,7 @@ import (
 // Invocation
 
 type Invocation struct {
+	Self          *CompositeValue
 	Arguments     []Value
 	ArgumentTypes []sema.Type
 	Location      LocationPosition
@@ -24,7 +25,7 @@ type Invocation struct {
 type FunctionValue interface {
 	Value
 	isFunctionValue()
-	invoke(Invocation) Trampoline
+	Invoke(Invocation) Trampoline
 }
 
 // InterpretedFunctionValue
@@ -57,8 +58,8 @@ func (InterpretedFunctionValue) SetOwner(owner string) {
 
 func (InterpretedFunctionValue) isFunctionValue() {}
 
-func (f InterpretedFunctionValue) invoke(invocation Invocation) Trampoline {
-	return f.Interpreter.invokeInterpretedFunction(f, invocation.Arguments)
+func (f InterpretedFunctionValue) Invoke(invocation Invocation) Trampoline {
+	return f.Interpreter.invokeInterpretedFunction(f, invocation)
 }
 
 // HostFunctionValue
@@ -95,7 +96,7 @@ func (HostFunctionValue) SetOwner(owner string) {
 
 func (HostFunctionValue) isFunctionValue() {}
 
-func (f HostFunctionValue) invoke(invocation Invocation) Trampoline {
+func (f HostFunctionValue) Invoke(invocation Invocation) Trampoline {
 	return f.Function(invocation)
 }
 
@@ -105,4 +106,33 @@ func (f HostFunctionValue) GetMember(interpreter *Interpreter, _ LocationRange, 
 
 func (f HostFunctionValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(errors.NewUnreachableError())
+}
+
+// BoundFunctionValue
+
+type BoundFunctionValue struct {
+	Function FunctionValue
+	Self     *CompositeValue
+}
+
+func (BoundFunctionValue) isValue() {}
+
+func (f BoundFunctionValue) Copy() Value {
+	return f
+}
+
+func (BoundFunctionValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (BoundFunctionValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
+
+func (BoundFunctionValue) isFunctionValue() {}
+
+func (f BoundFunctionValue) Invoke(invocation Invocation) Trampoline {
+	invocation.Self = f.Self
+	return f.Function.Invoke(invocation)
 }

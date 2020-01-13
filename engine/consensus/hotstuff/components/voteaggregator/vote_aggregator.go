@@ -16,20 +16,20 @@ type VoteAggregator struct {
 	viewState     hotstuff.ViewState
 	validator     hotstuff.Validator
 	// For pruning
-	viewToBlockMRH map[uint64]types.MRH
+	viewToBlockMRH map[uint64][]byte
 	// keeps track of votes whose blocks can not be found
-	pendingVotes map[types.MRH][]*types.Vote
+	pendingVotes map[string][]*types.Vote
 	// keeps track of votes that are valid to accumulate stakes
-	incorporatedVotes map[types.MRH][]*types.Vote
+	incorporatedVotes map[string][]*types.Vote
 	// keeps track of QCs that have been made for blocks
-	createdQC map[types.MRH]*types.QuorumCertificate
+	createdQC map[string]*types.QuorumCertificate
 	// keeps track of accumulated stakes for blocks
-	blockHashToIncorporatedStakes map[types.MRH]uint64
+	blockHashToIncorporatedStakes map[string]uint64
 }
 
 func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 	if err := va.validator.ValidatePendingVote(vote); err == nil {
-		va.pendingVotes[vote.BlockMRH] = append(va.pendingVotes[vote.BlockMRH], vote)
+		va.pendingVotes[string(vote.BlockMRH)] = append(va.pendingVotes[string(vote.BlockMRH)], vote)
 	} else {
 		return err
 	}
@@ -41,7 +41,7 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.BlockProposal) error {
 	// return error when the QC with the same view of the vote has been created
 	if blockMRH, exists := va.viewToBlockMRH[vote.View]; exists {
-		if qc, isCreated := va.createdQC[blockMRH]; isCreated {
+		if qc, isCreated := va.createdQC[string(blockMRH)]; isCreated {
 			return qcExistedError{
 				vote,
 				qc,
@@ -50,7 +50,7 @@ func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.Bloc
 	}
 
 	// return error when cannot get protocol state
-	identities, err := va.protocolState.AtHash(bp.Block.BlockMRH[:]).Identities(identity.HasRole(flow.RoleConsensus))
+	identities, err := va.protocolState.AtNumber(bp.Block.View).Identities(identity.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return err
 	}
@@ -58,8 +58,8 @@ func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.Bloc
 	// return error when the vote is invalid or cannot accumulate stakes
 	if err := va.validator.ValidateIncorporatedVote(vote, bp, identities); err == nil {
 		va.viewToBlockMRH[vote.View] = vote.BlockMRH
-		va.incorporatedVotes[vote.BlockMRH] = append(va.incorporatedVotes[vote.BlockMRH], vote)
-		if err := va.accumulateStakes(vote); err != nil {
+		va.incorporatedVotes[string(vote.BlockMRH)] = append(va.incorporatedVotes[string(vote.BlockMRH)], vote)
+		if err := va.accumulateStakes(vote, bp); err != nil {
 			return err
 		}
 	} else {
@@ -77,7 +77,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 	if err := va.storeIncorporatedVote(vote, bp); err != nil {
 		return nil, err
 	}
-	if _, hasBuiltQC := va.createdQC[bp.Block.BlockMRH]; hasBuiltQC == false {
+	if _, hasBuiltQC := va.createdQC[string(bp.Block.BlockMRH)]; hasBuiltQC == false {
 		return va.buildQC(bp.Block)
 	}
 
@@ -90,7 +90,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 // returns a list
 func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*types.QuorumCertificate, []error) {
 	var errors []error
-	for _, vote := range va.pendingVotes[bp.Block.BlockMRH] {
+	for _, vote := range va.pendingVotes[string(bp.Block.BlockMRH)] {
 		if err := va.storeIncorporatedVote(vote, bp); err != nil {
 			errors = append(errors, err)
 		}
@@ -104,19 +104,19 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 
 // garbage collection by view
 func (va *VoteAggregator) PruneByView(view uint64) {
-	blockMRH := va.viewToBlockMRH[view]
+	blockMRHStr := string(va.viewToBlockMRH[view])
 	delete(va.viewToBlockMRH, view)
-	delete(va.pendingVotes, blockMRH)
-	delete(va.incorporatedVotes, blockMRH)
-	delete(va.blockHashToIncorporatedStakes, blockMRH)
-	delete(va.createdQC, blockMRH)
+	delete(va.pendingVotes, blockMRHStr)
+	delete(va.incorporatedVotes, blockMRHStr)
+	delete(va.blockHashToIncorporatedStakes, blockMRHStr)
+	delete(va.createdQC, blockMRHStr)
 }
 
-func (va *VoteAggregator) accumulateStakes(vote *types.Vote) error {
-	identities, err := va.protocolState.AtHash(vote.BlockMRH[:]).Identities(identity.HasRole(flow.RoleConsensus))
+func (va *VoteAggregator) accumulateStakes(vote *types.Vote, bp *types.BlockProposal) error {
+	identities, err := va.protocolState.AtNumber(bp.Block.View).Identities(identity.HasRole(flow.RoleConsensus))
 	if err == nil {
 		voteSender := identities.Get(uint(vote.Signature.SignerIdx))
-		va.blockHashToIncorporatedStakes[vote.BlockMRH] += voteSender.Stake
+		va.blockHashToIncorporatedStakes[string(vote.BlockMRH)] += voteSender.Stake
 	} else {
 		return err
 	}
@@ -125,16 +125,17 @@ func (va *VoteAggregator) accumulateStakes(vote *types.Vote) error {
 }
 
 func (va *VoteAggregator) buildQC(block *types.Block) (*types.QuorumCertificate, error) {
-	identities, err := va.protocolState.AtHash(block.BlockMRH[:]).Identities(identity.HasRole(flow.RoleConsensus))
+	identities, err := va.protocolState.AtNumber(block.View).Identities(identity.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return nil, err
 	}
+	blockMRHStr := string(block.BlockMRH)
 	voteThreshold := uint64(float32(identities.TotalStake())*va.viewState.ThresholdStake()) + 1
 	// upon receipt of sufficient votes (in terms of stake)
-	if va.blockHashToIncorporatedStakes[block.BlockMRH] >= voteThreshold {
-		sigs := getSigsSliceFromVotes(va.pendingVotes[block.BlockMRH])
+	if va.blockHashToIncorporatedStakes[blockMRHStr] >= voteThreshold {
+		sigs := getSigsSliceFromVotes(va.pendingVotes[blockMRHStr])
 		qc := types.NewQC(block, sigs, uint32(identities.Count()))
-		va.createdQC[block.BlockMRH] = qc
+		va.createdQC[blockMRHStr] = qc
 		return qc, nil
 	}
 

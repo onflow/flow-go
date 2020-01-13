@@ -3,7 +3,6 @@
 package coldstuff
 
 import (
-	"bytes"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -15,8 +14,11 @@ import (
 	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine implements a simulated consensus algorithm. It's similar to a
@@ -28,9 +30,10 @@ type Engine struct {
 	log       zerolog.Logger
 	con       network.Conduit
 	exp       network.Engine
+	blocks    storage.Blocks
 	state     protocol.State
 	me        module.Local
-	pool      module.CollectionGuaranteePool
+	pool      mempool.Guarantees
 	round     Round
 	interval  time.Duration
 	timeout   time.Duration
@@ -41,12 +44,14 @@ type Engine struct {
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, net module.Network, exp network.Engine, state protocol.State, me module.Local, pool module.CollectionGuaranteePool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, exp network.Engine, blocks storage.Blocks, state protocol.State, me module.Local, pool mempool.Guarantees) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{
 		unit:      engine.NewUnit(),
 		log:       log.With().Str("engine", "coldstuff").Logger(),
+		exp:       exp,
+		blocks:    blocks,
 		state:     state,
 		me:        me,
 		pool:      pool,
@@ -119,10 +124,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		e.proposals <- proposalWrap{originID: originID, block: ev.Block}
 		return nil
 	case *coldstuff.BlockVote:
-		e.votes <- voteWrap{originID: originID, hash: ev.Hash}
+		e.votes <- voteWrap{originID: originID, blockID: ev.BlockID}
 		return nil
 	case *coldstuff.BlockCommit:
-		e.commits <- commitWrap{originID: originID, hash: ev.Hash}
+		e.commits <- commitWrap{originID: originID, blockID: ev.BlockID}
 		return nil
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
@@ -238,29 +243,44 @@ func (e *Engine) sendProposal() error {
 		return errors.Wrap(err, "could not get own current ID")
 	}
 
-	// create the next header
+	// get the collections from the pool
+	guarantees := e.pool.All()
+
+	// create the block content
+	content := flow.Content{
+		Identities: flow.IdentityList{},
+		Guarantees: guarantees,
+	}
+
+	// create the block payload
+	payload := content.Payload()
+
+	// create the block header
 	header := flow.Header{
-		Number:    e.round.Parent().Number + 1,
-		Parent:    e.round.Parent().Hash(),
-		Timestamp: time.Now().UTC(),
+		Number:      e.round.Parent().Number + 1,
+		ParentID:    e.round.Parent().ID(),
+		PayloadHash: payload.Root(),
+		Timestamp:   time.Now().UTC(),
 	}
 
 	// create a block with the current mempool collections as payload
-	collections := e.pool.All()
 	candidate := &flow.Block{
-		Header:               header,
-		NewIdentities:        flow.IdentityList{},
-		CollectionGuarantees: collections,
+		Header:  header,
+		Payload: payload,
+		Content: content,
 	}
-
-	// fill in the header payload hash
-	candidate.Header.Payload = candidate.Payload()
 
 	log = log.With().
 		Uint64("number", candidate.Number).
-		Int("collections", len(collections)).
-		Hex("hash", candidate.Hash()).
+		Int("guarantees", len(guarantees)).
+		Hex("candidate_id", logging.Entity(candidate)).
 		Logger()
+
+	// store the block proposal
+	err = e.blocks.Store(candidate)
+	if err != nil {
+		return errors.Wrap(err, "could not store candidate")
+	}
 
 	// cache the candidate block
 	e.round.Propose(candidate)
@@ -291,8 +311,8 @@ func (e *Engine) waitForVotes() error {
 
 	log := e.log.With().
 		Uint64("number", candidate.Number).
-		Hex("hash", candidate.Hash()).
-		Int("collections", len(candidate.CollectionGuarantees)).
+		Hex("candidate_id", logging.Entity(candidate)).
+		Int("collections", len(candidate.Guarantees)).
 		Str("action", "wait_votes").
 		Logger()
 
@@ -301,7 +321,7 @@ func (e *Engine) waitForVotes() error {
 
 		// process each vote that we receive
 		case w := <-e.votes:
-			voterID, voteHash := w.originID, w.hash
+			voterID, voteID := w.originID, w.blockID
 
 			// discard votes by double voters
 			voted := e.round.Voted(voterID)
@@ -332,8 +352,8 @@ func (e *Engine) waitForVotes() error {
 			}
 
 			// discard votes that are on the wrong candidate
-			if !bytes.Equal(voteHash, candidate.Hash()) {
-				log.Warn().Hex("vote_hash", voteHash).Msg("invalid candidate vote")
+			if voteID != candidate.ID() {
+				log.Warn().Hex("vote_id", voteID[:]).Msg("invalid candidate vote")
 				continue
 			}
 
@@ -364,14 +384,14 @@ func (e *Engine) sendCommit() error {
 
 	log := e.log.With().
 		Uint64("number", candidate.Number).
-		Hex("hash", candidate.Hash()).
-		Int("collections", len(candidate.CollectionGuarantees)).
+		Hex("candidate_id", logging.Entity(candidate)).
+		Int("collections", len(candidate.Guarantees)).
 		Str("action", "send_commit").
 		Logger()
 
 	// send a commit for the cached block hash
 	commit := &coldstuff.BlockCommit{
-		Hash: candidate.Hash(),
+		BlockID: candidate.ID(),
 	}
 	err := e.con.Submit(commit, e.round.Participants().NodeIDs()...)
 	if err != nil {
@@ -398,7 +418,14 @@ func (e *Engine) waitForProposal() error {
 
 		// process each proposal we receive
 		case w := <-e.proposals:
-			proposerID, block := w.originID, w.block
+			proposerID, candidate := w.originID, w.block
+
+			// store every proposal
+			err := e.blocks.Store(candidate)
+			if err != nil {
+				log.Error().Err(err).Msg("could not store candidate")
+				continue
+			}
 
 			// discard proposals by non-leaders
 			leaderID := e.round.Leader().NodeID
@@ -409,32 +436,32 @@ func (e *Engine) waitForProposal() error {
 
 			// discard proposals with the wrong height
 			number := e.round.Parent().Number + 1
-			if block.Number != e.round.Parent().Number+1 {
-				log.Warn().Uint64("candidate_height", block.Number).Uint64("expected_height", number).Msg("invalid height")
+			if candidate.Number != e.round.Parent().Number+1 {
+				log.Warn().Uint64("candidate_height", candidate.Number).Uint64("expected_height", number).Msg("invalid height")
 				continue
 			}
 
 			// discard proposals with the wrong parent
-			parent := e.round.Parent().Hash()
-			if !bytes.Equal(block.Parent, parent) {
-				log.Warn().Hex("candidate_parent", block.Parent).Hex("expected_parent", parent).Msg("invalid parent")
+			parentID := e.round.Parent().ID()
+			if candidate.ParentID != parentID {
+				log.Warn().Hex("candidate_parent", candidate.ParentID[:]).Hex("expected_parent", parentID[:]).Msg("invalid parent")
 				continue
 			}
 
 			// discard proposals with invalid timestamp
 			limit := e.round.Parent().Timestamp.Add(e.interval)
-			if block.Timestamp.Before(limit) {
-				log.Warn().Time("candidate_timestamp", block.Timestamp).Time("candidate_limit", limit).Msg("invalid timestamp")
+			if candidate.Timestamp.Before(limit) {
+				log.Warn().Time("candidate_timestamp", candidate.Timestamp).Time("candidate_limit", limit).Msg("invalid timestamp")
 				continue
 			}
 
 			// cache the candidate for the round
-			e.round.Propose(block)
+			e.round.Propose(candidate)
 
 			log.Info().
-				Uint64("number", block.Number).
-				Int("collections", len(block.CollectionGuarantees)).
-				Hex("hash", block.Hash()).
+				Uint64("number", candidate.Number).
+				Int("collections", len(candidate.Guarantees)).
+				Hex("candidate_id", logging.Entity(candidate)).
 				Msg("block proposal received")
 
 			return nil
@@ -454,15 +481,14 @@ func (e *Engine) voteOnProposal() error {
 
 	log := e.log.With().
 		Uint64("number", candidate.Number).
-		Hex("hash", candidate.Hash()).
-		Int("collections", len(candidate.CollectionGuarantees)).
+		Hex("candidate_id", logging.Entity(candidate)).
+		Int("collections", len(candidate.Guarantees)).
 		Str("action", "send_vote").
 		Logger()
 
 	// send vote for proposal to leader
-	hash := candidate.Hash()
 	vote := &coldstuff.BlockVote{
-		Hash: hash,
+		BlockID: candidate.ID(),
 	}
 	err := e.con.Submit(vote, e.round.Leader().NodeID)
 	if err != nil {
@@ -483,15 +509,15 @@ func (e *Engine) waitForCommit() error {
 
 	log := e.log.With().
 		Uint64("number", candidate.Number).
-		Hex("hash", candidate.Hash()).
-		Int("collections", len(candidate.CollectionGuarantees)).
+		Hex("candidate_id", logging.Entity(candidate)).
+		Int("collections", len(candidate.Guarantees)).
 		Str("action", "wait_commit").
 		Logger()
 
 	for {
 		select {
 		case w := <-e.commits:
-			committerID, commitHash := w.originID, w.hash
+			committerID, commitID := w.originID, w.blockID
 
 			// discard commits not from leader
 			leaderID := e.round.Leader().NodeID
@@ -501,8 +527,8 @@ func (e *Engine) waitForCommit() error {
 			}
 
 			// discard commits not for candidate hash
-			if !bytes.Equal(commitHash, candidate.Hash()) {
-				log.Warn().Hex("commit_hash", commitHash).Msg("invalid commit hash")
+			if commitID != candidate.ID() {
+				log.Warn().Hex("commit_id", commitID[:]).Msg("invalid commit hash")
 				continue
 			}
 
@@ -524,19 +550,19 @@ func (e *Engine) commitCandidate() error {
 
 	log := e.log.With().
 		Uint64("number", candidate.Number).
-		Hex("hash", candidate.Hash()).
-		Int("collections", len(candidate.CollectionGuarantees)).
+		Hex("candidate_id", logging.Entity(candidate)).
+		Int("collections", len(candidate.Guarantees)).
 		Str("action", "exec_commit").
 		Logger()
 
 	// commit the block to our chain state
-	err := e.state.Mutate().Extend(candidate)
+	err := e.state.Mutate().Extend(candidate.ID())
 	if err != nil {
 		return errors.Wrap(err, "could not extend state")
 	}
 
 	// finalize the state
-	err = e.state.Mutate().Finalize(candidate.Hash())
+	err = e.state.Mutate().Finalize(candidate.ID())
 	if err != nil {
 		return errors.Wrap(err, "could not finalize state")
 	}
@@ -546,8 +572,8 @@ func (e *Engine) commitCandidate() error {
 
 	// remove all collections from the block from the mempool
 	removed := uint(0)
-	for _, gc := range candidate.CollectionGuarantees {
-		ok := e.pool.Rem(gc.Fingerprint())
+	for _, guarantee := range candidate.Guarantees {
+		ok := e.pool.Rem(guarantee.ID())
 		if ok {
 			removed++
 		}

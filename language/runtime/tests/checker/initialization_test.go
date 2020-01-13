@@ -451,7 +451,6 @@ func TestCheckFieldInitializationWithPotentialNeverCallInElse(t *testing.T) {
 						stdlib.PanicFunction,
 					}.ToValueDeclarations(),
 				),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
 	)
@@ -480,10 +479,27 @@ func TestCheckFieldInitializationWithPotentialNeverCallInNilCoalescing(t *testin
 						stdlib.PanicFunction,
 					}.ToValueDeclarations(),
 				),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
 	)
 
 	require.NoError(t, err)
+}
+
+func TestCheckInvalidFieldInitializationWithUseOfUninitializedInPrecondition(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      struct Test {
+          var on: Bool
+
+          init() {
+              pre { self.on }
+              self.on = true
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.UninitializedFieldAccessError{}, errs[0])
 }

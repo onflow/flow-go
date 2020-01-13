@@ -2,7 +2,7 @@
 
 package mock
 
-import crypto "github.com/dapperlabs/flow-go/crypto"
+import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 import protocol "github.com/dapperlabs/flow-go/protocol"
 
@@ -11,13 +11,13 @@ type State struct {
 	mock.Mock
 }
 
-// AtHash provides a mock function with given fields: hash
-func (_m *State) AtHash(hash crypto.Hash) protocol.Snapshot {
-	ret := _m.Called(hash)
+// AtBlockID provides a mock function with given fields: blockID
+func (_m *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
+	ret := _m.Called(blockID)
 
 	var r0 protocol.Snapshot
-	if rf, ok := ret.Get(0).(func(crypto.Hash) protocol.Snapshot); ok {
-		r0 = rf(hash)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) protocol.Snapshot); ok {
+		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(protocol.Snapshot)

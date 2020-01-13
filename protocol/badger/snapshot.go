@@ -3,13 +3,12 @@
 package badger
 
 import (
+	"fmt"
 	"math"
 	"sort"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -17,9 +16,9 @@ import (
 
 // Snapshot represents a read-only immutable snapshot of the protocol state.
 type Snapshot struct {
-	state  *State
-	number uint64
-	hash   crypto.Hash
+	state   *State
+	number  uint64
+	blockID flow.Identifier
 }
 
 // Identities retrieves all active ids at the given snapshot and
@@ -34,14 +33,14 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 		var head flow.Header
 		err := s.head(&head)(tx)
 		if err != nil {
-			return errors.Wrap(err, "could not retrieve head")
+			return fmt.Errorf("could not retrieve head: %w", err)
 		}
 
 		// get the latest finalized height
 		var boundary uint64
 		err = operation.RetrieveBoundary(&boundary)(tx)
 		if err != nil {
-			return errors.Wrap(err, "could not retrieve boundary")
+			return fmt.Errorf("could not retrieve boundary: %w", err)
 		}
 
 		// if the target number is before finalized state, set it as new limit
@@ -52,27 +51,27 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 		// get finalized stakes within the boundary
 		deltas, err := computeFinalizedDeltas(tx, boundary, filters)
 		if err != nil {
-			return errors.Wrap(err, "could not compute finalized stakes")
+			return fmt.Errorf("could not compute finalized stakes: %w", err)
 		}
 
 		// if there are unfinalized blocks, retrieve stakes there
 		if head.Number > boundary {
 
 			// get the final block we want to reach
-			var final crypto.Hash
-			err = operation.RetrieveHash(boundary, &final)(tx)
+			var finalID flow.Identifier
+			err = operation.RetrieveBlockID(boundary, &finalID)(tx)
 			if err != nil {
-				return errors.Wrap(err, "could not get final hash")
+				return fmt.Errorf("could not get final hash: %w", err)
 			}
 
 			// track back from head block to latest finalized block
-			for !head.Hash().Equal(final) {
+			for head.ID() != finalID {
 
 				// get the identities for pending block
 				var ids flow.IdentityList
-				err = operation.RetrieveIdentities(head.Hash(), &ids)(tx)
+				err = operation.RetrieveIdentities(head.ID(), &ids)(tx)
 				if err != nil {
-					return errors.Wrap(err, "could not add deltas")
+					return fmt.Errorf("could not add deltas: %w", err)
 				}
 
 				// manually add the deltas for valid ids
@@ -86,9 +85,9 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 				}
 
 				// set the head to the parent
-				err = operation.RetrieveHeader(head.Parent, &head)(tx)
+				err = operation.RetrieveHeader(head.ParentID, &head)(tx)
 				if err != nil {
-					return errors.Wrap(err, "could not retrieve parent")
+					return fmt.Errorf("could not retrieve parent: %w", err)
 				}
 			}
 
@@ -111,13 +110,13 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 			// retrieve the identity role
 			err = operation.RetrieveRole(id.NodeID, &id.Role)(tx)
 			if err != nil {
-				return errors.Wrapf(err, "could not retrieve role (%x)", nodeID)
+				return fmt.Errorf("could not retrieve role (%x): %w", nodeID, err)
 			}
 
 			// retrieve the identity address
 			err = operation.RetrieveAddress(id.NodeID, &id.Address)(tx)
 			if err != nil {
-				return errors.Wrapf(err, "could not retrieve address (%x)", nodeID)
+				return fmt.Errorf("could not retrieve address (%x): %w", nodeID, err)
 			}
 
 			ids = append(ids, id)
@@ -138,15 +137,43 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (flow.Identity, error) {
 	// get the ids
 	ids, err := s.Identities(identity.HasNodeID(nodeID))
 	if err != nil {
-		return flow.Identity{}, errors.Wrap(err, "could not get ids")
+		return flow.Identity{}, fmt.Errorf("could not get identities: %w", err)
 	}
 
 	// return error if he doesn't exist
 	if len(ids) == 0 {
-		return flow.Identity{}, errors.Errorf("identity not staked")
+		return flow.Identity{}, fmt.Errorf("identity not staked (%x)", nodeID)
 	}
 
 	return ids[0], nil
+}
+
+// Clusters sorts the list of node identities after filtering into the given
+// number of clusters.
+//
+// This is guaranteed to be deterministic for an identical set of identities,
+// regardless of the order.
+func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
+
+	// get the node identities
+	identities, err := s.Identities(identity.HasRole(flow.RoleCollection))
+	if err != nil {
+		return nil, fmt.Errorf("could not get identities: %w", err)
+	}
+
+	// order the identities by node ID
+	sort.Slice(identities, func(i, j int) bool {
+		return identity.ByNodeIDAsc(identities[i], identities[j])
+	})
+
+	// create the desired number of clusters and assign nodes
+	clusters := flow.NewClusterList(s.state.clusters)
+	for i, identity := range identities {
+		index := uint(i) % s.state.clusters
+		clusters.Add(index, identity)
+	}
+
+	return clusters, nil
 }
 
 func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
@@ -156,22 +183,22 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 		if s.number == math.MaxUint64 {
 			err := operation.RetrieveBoundary(&s.number)(tx)
 			if err != nil {
-				return errors.Wrap(err, "could not retrieve boundary")
+				return fmt.Errorf("could not retrieve boundary: %w", err)
 			}
 		}
 
 		// check if hash is nil and try to get it from height
-		if s.hash == nil {
-			err := operation.RetrieveHash(s.number, &s.hash)(tx)
+		if s.blockID == flow.ZeroID {
+			err := operation.RetrieveBlockID(s.number, &s.blockID)(tx)
 			if err != nil {
-				return errors.Wrapf(err, "could not retrieve hash (%d)", s.number)
+				return fmt.Errorf("could not retrieve hash (%d): %w", s.number, err)
 			}
 		}
 
 		// get the height for our desired target hash
-		err := operation.RetrieveHeader(s.hash, head)(tx)
+		err := operation.RetrieveHeader(s.blockID, head)(tx)
 		if err != nil {
-			return errors.Wrapf(err, "could not retrieve header (%x)", s.hash)
+			return fmt.Errorf("could not retrieve header (%x): %w", s.blockID, err)
 		}
 
 		return nil

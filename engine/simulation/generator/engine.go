@@ -25,7 +25,7 @@ type Engine struct {
 func New(log zerolog.Logger, target network.Engine) (*Engine, error) {
 	e := &Engine{
 		unit:     engine.NewUnit(),
-		log:      log,
+		log:      log.With().Str("engine", "generator").Logger(),
 		target:   target,
 		interval: time.Second,
 	}
@@ -60,15 +60,15 @@ GenerateLoop:
 		select {
 		case <-time.After(time.Duration(dur)):
 
-			// generate a collection guarantee with a random hash
-			hash := make([]byte, 32)
-			_, _ = rand.Read(hash)
+			// generate a guaranteed collection with a random hash
+			var collID flow.Identifier
+			_, _ = rand.Read(collID[:])
 			coll := &flow.CollectionGuarantee{
-				Hash: hash,
+				CollectionID: collID,
 			}
 
 			e.log.Info().
-				Hex("collection_hash", hash).
+				Hex("collection_hash", collID[:]).
 				Msg("generated guaranteed collection")
 
 			// submit to the engine

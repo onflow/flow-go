@@ -45,6 +45,14 @@ func (e *unsupportedOperation) Error() string {
 	)
 }
 
+// MissingLocationError
+
+type MissingLocationError struct{}
+
+func (e *MissingLocationError) Error() string {
+	return "missing location"
+}
+
 // CheckerError
 
 type CheckerError struct {
@@ -69,8 +77,6 @@ type SemanticError interface {
 
 // RedeclarationError
 
-// TODO: show previous declaration
-
 type RedeclarationError struct {
 	Kind        common.DeclarationKind
 	Name        string
@@ -79,7 +85,11 @@ type RedeclarationError struct {
 }
 
 func (e *RedeclarationError) Error() string {
-	return fmt.Sprintf("cannot redeclare %s: `%s` is already declared", e.Kind.Name(), e.Name)
+	return fmt.Sprintf(
+		"cannot redeclare %s: `%s` is already declared",
+		e.Kind.Name(),
+		e.Name,
+	)
 }
 
 func (*RedeclarationError) isSemanticError() {}
@@ -91,6 +101,35 @@ func (e *RedeclarationError) StartPosition() ast.Position {
 func (e *RedeclarationError) EndPosition() ast.Position {
 	length := len(e.Name)
 	return e.Pos.Shifted(length - 1)
+}
+
+func (e *RedeclarationError) ErrorNotes() []errors.ErrorNote {
+	if e.PreviousPos == nil {
+		return nil
+	}
+
+	previousStartPos := *e.PreviousPos
+	length := len(e.Name)
+	previousEndPos := previousStartPos.Shifted(length - 1)
+
+	return []errors.ErrorNote{
+		RedeclarationNote{
+			Range: ast.Range{
+				StartPos: previousStartPos,
+				EndPos:   previousEndPos,
+			},
+		},
+	}
+}
+
+// RedeclarationNote
+
+type RedeclarationNote struct {
+	ast.Range
+}
+
+func (n RedeclarationNote) Message() string {
+	return "previously declared here"
 }
 
 // NotDeclaredError
@@ -351,7 +390,7 @@ type InvalidBinaryOperandsError struct {
 
 func (e *InvalidBinaryOperandsError) Error() string {
 	return fmt.Sprintf(
-		"cannot apply binary operation %s to different types: `%s`, `%s`",
+		"cannot apply binary operation %s to types: `%s`, `%s`",
 		e.Operation.Symbol(),
 		e.LeftType,
 		e.RightType,
@@ -691,8 +730,8 @@ type MemberMismatch struct {
 }
 
 type InitializerMismatch struct {
-	CompositeParameterTypes []*TypeAnnotation
-	InterfaceParameterTypes []*TypeAnnotation
+	CompositeParameters []*Parameter
+	InterfaceParameters []*Parameter
 }
 
 // TODO: improve error message:
@@ -1942,10 +1981,6 @@ func (e *InvalidNestedTypeError) Error() string {
 
 func (*InvalidNestedTypeError) isSemanticError() {}
 
-func (e *InvalidNestedTypeError) SecondaryError() string {
-	return "not found in this scope"
-}
-
 func (e *InvalidNestedTypeError) StartPosition() ast.Position {
 	return e.Type.StartPosition()
 }
@@ -2049,3 +2084,21 @@ func (e *InvalidMoveError) EndPosition() ast.Position {
 	length := len(e.Name)
 	return e.Pos.Shifted(length - 1)
 }
+
+// ConstantSizedArrayLiteralSizeError
+
+type ConstantSizedArrayLiteralSizeError struct {
+	ActualSize   int
+	ExpectedSize int
+	ast.Range
+}
+
+func (e *ConstantSizedArrayLiteralSizeError) Error() string {
+	return fmt.Sprintf(
+		"incorrect number of array literal elements: expected %d, got %d",
+		e.ExpectedSize,
+		e.ActualSize,
+	)
+}
+
+func (*ConstantSizedArrayLiteralSizeError) isSemanticError() {}

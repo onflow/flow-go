@@ -11,47 +11,37 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine is the transaction ingestion engine, which ensures that new
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
 type Engine struct {
-	unit      *engine.Unit
-	log       zerolog.Logger
-	con       network.Conduit
-	me        module.Local
-	state     protocol.State
-	clusters  flow.ClusterList
-	clusterID flow.ClusterID // my cluster ID
-	pool      module.TransactionPool
+	unit  *engine.Unit
+	log   zerolog.Logger
+	con   network.Conduit
+	me    module.Local
+	state protocol.State
+	pool  mempool.Transactions
 }
 
 // New creates a new collection ingest engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool module.TransactionPool) (*Engine, error) {
-	identities, err := state.Final().Identities(identity.HasRole(flow.RoleCollection))
-	if err != nil {
-		return nil, fmt.Errorf("could not get identities: %w", err)
-	}
-
-	clusters := protocol.Cluster(identities)
-	clusterID := clusters.ClusterIDFor(me.NodeID())
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool mempool.Transactions) (*Engine, error) {
 
 	logger := log.With().
 		Str("engine", "ingest").
-		Str("my_cluster", clusterID.String()).
 		Logger()
 
 	e := &Engine{
-		unit:      engine.NewUnit(),
-		log:       logger,
-		me:        me,
-		state:     state,
-		clusters:  clusters,
-		clusterID: clusterID,
-		pool:      pool,
+		unit:  engine.NewUnit(),
+		log:   logger,
+		me:    me,
+		state: state,
+		pool:  pool,
 	}
 
 	con, err := net.Register(engine.CollectionIngest, e)
@@ -123,41 +113,60 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // onTransaction handles receipt of a new transaction. This can be submitted
 // from outside the system or routed from another collection node.
 func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) error {
+
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
-		Hex("tx_hash", tx.Fingerprint()).
+		Hex("tx_id", logging.Entity(tx)).
 		Logger()
 
 	log.Debug().Msg("transaction message received")
 
+	// first, we check if the transaction is valid
 	err := e.validateTransaction(tx)
 	if err != nil {
 		return fmt.Errorf("invalid transaction: %w", err)
 	}
 
-	clusterID := protocol.Route(len(e.clusters), tx.Fingerprint())
-
-	// tx is routed to my cluster, add to mempool
-	if clusterID == e.clusterID {
-		log.Debug().Msg("adding transaction to pool")
-		return e.pool.Add(tx)
-	}
-
-	// tx is routed to another cluster
-	cluster := e.clusters.Get(clusterID)
-	if len(cluster) == 0 {
-		return fmt.Errorf("transaction routed to invalid cluster")
-	}
-
-	// TODO Don't need to send to all nodes
-	err = e.con.Submit(tx, cluster.NodeIDs()...)
+	// cluster the collection nodes into the configured amount of clusters
+	clusters, err := e.state.Final().Clusters()
 	if err != nil {
-		return fmt.Errorf("failed to route transaction to cluster nodes")
+		return fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
 
-	log.Debug().
-		Int("target_cluster", int(clusterID)).
-		Msg("routed transaction to cluster")
+	// get the locally assigned cluster and the cluster responsible for the
+	// transaction
+	txCluster := clusters.ByTxID(tx.ID())
+	localID := e.me.NodeID()
+	localCluster, err := clusters.ByNodeID(localID)
+	if err != nil {
+		return fmt.Errorf("could not get local cluster: %w", err)
+	}
+
+	log = log.With().
+		Hex("local_cluster", logging.ID(localCluster.Fingerprint())).
+		Hex("tx_cluster", logging.ID(txCluster.Fingerprint())).
+		Logger()
+
+	// if our cluster is responsible for the transaction, store it
+	if localCluster.Fingerprint() == txCluster.Fingerprint() {
+		log.Debug().Msg("adding transaction to pool")
+		err := e.pool.Add(tx)
+		if err != nil {
+			return fmt.Errorf("could not add transaction to mempool: %w", err)
+		}
+	}
+
+	// if the transaction is submitted locally, propagate it
+	if originID == localID {
+		log.Debug().Msg("propagating transaction to cluster")
+		targetIDs := txCluster.Filter(identity.Not(identity.HasNodeID(localID)))
+		err = e.con.Submit(tx, targetIDs.NodeIDs()...)
+		if err != nil {
+			return fmt.Errorf("could not route transaction to cluster: %w", err)
+		}
+	}
+
+	log.Info().Msg("transaction processed")
 
 	return nil
 }

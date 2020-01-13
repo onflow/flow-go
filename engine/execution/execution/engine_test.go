@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	executormock "github.com/dapperlabs/flow-go/engine/execution/execution/executor/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -31,16 +30,20 @@ func TestExecutionEngine_OnBlock(t *testing.T) {
 
 	col := flow.Collection{Transactions: []flow.TransactionBody{tx1, tx2}}
 
+	content := flow.Content{
+		Guarantees: []*flow.CollectionGuarantee{
+			{
+				CollectionID: col.ID(),
+				Signatures:   nil,
+			},
+		},
+	}
+
 	block := flow.Block{
 		Header: flow.Header{
 			Number: 42,
 		},
-		CollectionGuarantees: []*flow.CollectionGuarantee{
-			{
-				Hash:       crypto.Hash(col.Fingerprint()),
-				Signatures: nil,
-			},
-		},
+		Content: content,
 	}
 
 	transactions := []flow.TransactionBody{tx1, tx2}
@@ -50,7 +53,7 @@ func TestExecutionEngine_OnBlock(t *testing.T) {
 		Transactions: transactions,
 	}
 
-	collections.On("ByFingerprint", col.Fingerprint()).
+	collections.On("ByID", col.ID()).
 		Return(&col, nil).
 		Once()
 

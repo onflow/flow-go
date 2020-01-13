@@ -1,32 +1,37 @@
 package flow
 
 import (
-	"bytes"
-	"encoding/gob"
-
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/hash"
 )
 
 type Spock []byte
 
 type ExecutionReceipt struct {
+	ExecutorID        Identifier
 	ExecutionResult   ExecutionResult
 	Spocks            []Spock
 	ExecutorSignature crypto.Signature
 }
 
-// Encode implements the crypto.Encoder interface.
-func (er *ExecutionReceipt) Encode() []byte {
-	var b bytes.Buffer
-	e := gob.NewEncoder(&b)
-	if err := e.Encode(er); err != nil {
-		panic(err)
+// Body returns the body of the execution receipt.
+func (er *ExecutionReceipt) Body() interface{} {
+	return struct {
+		ExecutorID      Identifier
+		ExecutionResult ExecutionResult
+		Spocks          []Spock
+	}{
+		ExecutorID:      er.ExecutorID,
+		ExecutionResult: er.ExecutionResult,
+		Spocks:          er.Spocks,
 	}
-	return b.Bytes()
 }
 
-// Hash returns the canonical hash of this execution receipt.
-func (er *ExecutionReceipt) Hash() crypto.Hash {
-	return hash.DefaultHasher.ComputeHash(er.Encode())
+// ID returns the canonical ID of the execution receipt.
+func (er *ExecutionReceipt) ID() Identifier {
+	return MakeID(er.Body())
+}
+
+// Checksum returns a checksum for the execution receipt including the signatures.
+func (er *ExecutionReceipt) Checksum() Identifier {
+	return MakeID(er)
 }
