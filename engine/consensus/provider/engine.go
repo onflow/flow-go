@@ -116,7 +116,7 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("block_id", logging.ID(block)).
+		Hex("block_id", logging.Entity(block)).
 		Msg("block block received")
 
 	// currently, only accept blocks that come from our local consensus
@@ -139,7 +139,7 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("block_id", logging.ID(block)).
+		Hex("block_id", logging.Entity(block)).
 		Msg("block sent")
 
 	return nil
