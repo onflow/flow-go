@@ -14,6 +14,26 @@
 #define G2MULT RELIC
 
 ctx_t bls_ctx;
+prec_st bls_prec;
+
+#if (hashToPoint == OPSWU)
+extern const uint8_t E_a1[47];
+extern const uint8_t E_b1[48];
+#endif
+
+static void init_precomputed_data() {
+    #if (hashToPoint == OPSWU)
+        fp_read_bin(bls_prec.a1, E_a1, 47);
+        fp_read_bin(bls_prec.b1, E_b1, 48);
+    #endif
+    // (p-3)/4
+    bn_read_raw(&bls_prec.p_3div4, fp_prime_get(), FP_DIGITS);
+    bn_sub_dig(&bls_prec.p_3div4, &bls_prec.p_3div4, 3);
+    bn_rsh(&bls_prec.p_3div4, &bls_prec.p_3div4, 2);
+    // (p-1)/2
+    fp_sub_dig(bls_prec.p_1div2, fp_prime_get(), 1);
+    fp_rsh(bls_prec.p_1div2, bls_prec.p_1div2, 1);
+}
 
 // Initializes Relic context with BLS12-381 parameters
 ctx_t* _relic_init_BLS12_381() { 
@@ -32,6 +52,8 @@ ctx_t* _relic_init_BLS12_381() {
     ep_param_set(B12_P381);
     ep2_curve_set_twist(EP_MTYPE);  // Multiplicative twist 
     #endif 
+
+    init_precomputed_data();
     
     if (ret != RLC_OK) return NULL;
     return core_get();
@@ -66,10 +88,10 @@ static void ep_swu_b12(ep_t p, const fp_t t, int u, int negate) {
 
 		/* t0 = t^2. */
 		fp_sqr(t0, t);
-		/* Compute f(u) such that u^3 + b is a square. */
+		/* Compute f(u) such that u^3 + b is a square. */ 
 		fp_set_dig(p->x, -u);
 		fp_neg(p->x, p->x);
-		ep_rhs(t1, p);
+		ep_rhs(t1, p); // t1 = u0^3 + b  --> should be precomputed
 		/* Compute t1 = (-f(u) + t^2), t2 = t1 * t^2 and invert if non-zero. */
 		fp_add(t1, t1, t0);
 		fp_mul(t2, t1, t0);
@@ -87,7 +109,7 @@ static void ep_swu_b12(ep_t p, const fp_t t, int u, int negate) {
 		fp_mul(t0, t0, p->x);
 		fp_mul(t0, t0, p->x);
 		/* Compute constant u * sqrt(-3). */
-		fp_copy(t3, core_get()->srm3);
+		fp_copy(t3, core_get()->srm3); // --> should be precomputed
 		for (int i = 1; i < -u; i++) {
 			fp_add(t3, t3, core_get()->srm3);
 		}

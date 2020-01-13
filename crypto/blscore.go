@@ -16,6 +16,8 @@ type pointG2 C.ep2_st
 type scalar C.bn_st
 type ctx *C.ctx_t
 
+//type BLSPrecParams *C.prec_st
+
 var signatureLengthBLS_BLS12381 = int(C._getSignatureLengthBLS_BLS12381())
 var pubKeyLengthBLS_BLS12381 = int(C._getPubKeyLengthBLS_BLS12381())
 var prKeyLengthBLS_BLS12381 = int(C._getPrKeyLengthBLS_BLS12381())

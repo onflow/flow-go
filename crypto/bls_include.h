@@ -6,8 +6,10 @@
 #include "relic.h"
 #include "misc.h"
 
-// Fp length
+// fp_t type size in Relic
+#define FP_DIGITS (RLC_FP_DIGS + RLC_PAD(RLC_FP_BYTES)/(RLC_DIG / 8))
 
+// Fp length
 #define Fp_BITS  381
 #define Fr_BITS  255
 
@@ -40,6 +42,23 @@
 
 // Signature membership check
 #define MEMBERSHIP_CHECK 0
+
+// algorithm choice for the hashing to G1 
+#define HASHCHECK 1
+#define SWU 2
+#define OPSWU 3
+#define hashToPoint 3
+
+// Structure of precomputed data
+typedef struct prec_ {
+    #if (hashToPoint == OPSWU)
+    // coefficients of E1(Fp)
+    fp_st a1;
+    fp_st b1; 
+    #endif
+    bn_st p_3div4;
+    fp_st p_1div2;
+} prec_st;
 
 // Most of the functions are written for ALLOC=AUTO not ALLOC=DYNAMIC
 
