@@ -24,6 +24,9 @@ func main() {
 
 			approvals, err = stdmap.NewApprovals()
 			node.MustNot(err).Msg("could not initialize result approvals mempool")
+
+			blocks, err = stdmap.NewBlocks()
+			node.MustNot(err).Msg("could not initialize blocks mempool")
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing verifier engine")
