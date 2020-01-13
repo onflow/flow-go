@@ -13,8 +13,8 @@ import (
 // PREREQUISITES:
 // * From the view-point of Crown, a block B is identified by the pair (B.View, B.blockMRH)
 // * Crown expects that only blocks are added that can be connected to its latest finalized block
-//   (without missing interim ancestors). If this condition is violated, Crown will panic (instead of
-//   transitioning into an undefined state).
+//   (without missing interim ancestors). If this condition is violated, Crown will raise an error
+//   and irgnore the block.
 type Crown interface {
 
 	// GetBlocksForView returns the list of all known BlockProposals at the given view number.
@@ -46,11 +46,13 @@ type Crown interface {
 	// and pruning of older blocks.
 	// Handles duplicated addition of blocks (at the potential cost of additional computation time).
 	// PREREQUISITE:
-	// Crown must be able to connect `block` to its latest finalized block (without missing interim ancestors).
-	AddBlock(block *types.BlockProposal)
+	// Crown must be able to connect `block` to its latest finalized block
+	// (without missing interim ancestors). Otherwise, an error is raised.
+	AddBlock(block *types.BlockProposal) error
 
 	// AddQC adds a quorum certificate to Crown.
-	AddQC(*types.QuorumCertificate)
+	// Might error in case the block referenced by the QuorumCertificate is unknown.
+	AddQC(*types.QuorumCertificate) error
 
 	// MakeForkChoice prompts the ForkChoice to generate a fork choice.
 	// The fork choice is a qc that should be used for building the primaries block
