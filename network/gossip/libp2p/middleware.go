@@ -144,7 +144,7 @@ func (m *Middleware) createInboundMessage(msg *Message) (*flow.Identifier, inter
 
 	// Extract sender id
 	if len(msg.SenderID) < 32 {
-		m.log.Debug().
+		m.log.Error().
 			Bytes("sender", msg.SenderID).
 			Msg(" invalid sender id")
 		err := fmt.Errorf("invalid sender id")
@@ -289,17 +289,21 @@ ProcessLoop:
 			log.Info().Msg("breaking loop")
 			break ProcessLoop
 		case msg := <-conn.inbound:
+			fmt.Println("gottttttt")
 			log.Info().Msg("got message")
 			nodeID, payload, err := m.createInboundMessage(msg)
+			fmt.Println("converted inbound")
 			if err != nil {
 				log.Error().Err(err).Msg("could not extract payload")
 				continue ProcessLoop
 			}
+			fmt.Println("calling recive")
 			err = m.ov.Receive(*nodeID, payload)
 			if err != nil {
 				log.Error().Err(err).Msg("could not deliver payload")
 				continue ProcessLoop
 			}
+			fmt.Println("called recive")
 		}
 	}
 
