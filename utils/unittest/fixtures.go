@@ -94,6 +94,31 @@ func ExecutionResultFixture() flow.ExecutionResult {
 	}
 }
 
+func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
+	return func(ra *flow.ResultApproval) {
+		ra.ResultApprovalBody.ExecutionResultID = id
+	}
+}
+
+func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) flow.ResultApproval {
+	approval := flow.ResultApproval{
+		ResultApprovalBody: flow.ResultApprovalBody{
+			ExecutionResultID:    IdentifierFixture(),
+			AttestationSignature: SignatureFixture(),
+			ChunkIndexList:       nil,
+			Proof:                nil,
+			Spocks:               nil,
+		},
+		VerifierSignature: SignatureFixture(),
+	}
+
+	for _, apply := range opts {
+		apply(&approval)
+	}
+
+	return approval
+}
+
 func HashFixture(size int) crypto.Hash {
 	hash := make(crypto.Hash, size)
 	for i := 0; i < size; i++ {

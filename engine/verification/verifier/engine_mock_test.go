@@ -16,21 +16,25 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
+	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
-// TestSuite encloses functionality testings of Verifier Engine
+// TestSuite contains the context of a verifier engine test using mocked components.
 type TestSuite struct {
 	suite.Suite
-	net     *module.Network    // used as an instance of networking layer for the mock engine
-	state   *protocol.State    // used as a mock protocol state of nodes for verification engine
-	ss      *protocol.Snapshot // used as a mock representation of the snapshot of system (part of State)
-	me      *module.Local      // used as a mock representation of the mock verification node (owning the verifier engine)
-	pool    verification.Mempool
-	colChan *network.Conduit // used as a mock instance of conduit for collection channel
-	exeChan *network.Conduit // used as mock instance of conduit for execution channel
+	net                *module.Network    // used as an instance of networking layer for the mock engine
+	state              *protocol.State    // used as a mock protocol state of nodes for verification engine
+	ss                 *protocol.Snapshot // used as a mock representation of the snapshot of system (part of State)
+	me                 *module.Local      // used as a mock representation of the mock verification node (owning the verifier engine)
+	collectionsConduit *network.Conduit   // used as a mock instance of conduit for collection channel
+	receiptsConduit    *network.Conduit   // used as mock instance of conduit for execution channel
+	approvalsConduit   *network.Conduit
+	blocks             *mempool.Blocks
+	receipts           *mempool.Receipts
+	approvals          *mempool.Approvals
 }
 
 // TestVerifierEngineTestSuite is the constructor of the TestSuite of the verifier engine
@@ -43,28 +47,27 @@ func TestVerifierEngineTestSuite(t *testing.T) {
 func (v *TestSuite) SetupTest() {
 	// initializing test suite fields
 	v.state = &protocol.State{}
-	v.colChan = &network.Conduit{}
-	v.exeChan = &network.Conduit{}
+	v.collectionsConduit = &network.Conduit{}
+	v.receiptsConduit = &network.Conduit{}
+	v.approvalsConduit = &network.Conduit{}
 	v.net = &module.Network{}
 	v.me = &module.Local{}
 	v.ss = &protocol.Snapshot{}
+	v.blocks = &mempool.Blocks{}
+	v.receipts = &mempool.Receipts{}
+	v.approvals = &mempool.Approvals{}
 
 	// mocking the network registration of the engine
 	// all subsequent tests are expected to have a call on Register method
 	v.net.On("Register", engine.CollectionProvider, testifymock.Anything).
-		Return(v.colChan, nil).
+		Return(v.collectionsConduit, nil).
 		Once()
-	v.net.On("Register", engine.ExecutionProvider, testifymock.Anything).
-		Return(v.exeChan, nil).
+	v.net.On("Register", engine.ResultProvider, testifymock.Anything).
+		Return(v.receiptsConduit, nil).
 		Once()
-}
-
-// TestEncodeResultApproval tests encoding of result approvals
-// making sure that encoding works correctly
-func (v *TestSuite) TestEncodeResultApproval() {
-	resApprove := flow.ResultApproval{}
-	resultID := resApprove.ID()
-	require.NotEqual(v.T(), resultID, flow.ZeroID, "nil fingerprint")
+	v.net.On("Register", engine.ApprovalProvider, testifymock.Anything).
+		Return(v.approvalsConduit, nil).
+		Once()
 }
 
 // TestNewEngine verifies the establishment of the network registration upon
@@ -72,7 +75,7 @@ func (v *TestSuite) TestEncodeResultApproval() {
 // It also returns an instance of new engine to be used in the later tests
 func (v *TestSuite) TestNewEngine() *Engine {
 	// creating a new engine
-	e, err := New(zerolog.Logger{}, v.net, v.state, v.me)
+	e, err := New(zerolog.Logger{}, v.net, v.state, v.me, v.receipts, v.approvals, v.blocks)
 	require.Nil(v.T(), err, "could not create an engine")
 	v.net.AssertExpectations(v.T())
 	return e

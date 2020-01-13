@@ -21,15 +21,16 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit       *engine.Unit      // used to control startup/shutdown
-	log        zerolog.Logger    // used to log relevant actions
-	colChannel network.Conduit   // used to get resources from collection nodes
-	exeChannel network.Conduit   // used to get resources from execution nodes
-	me         module.Local      // used to access local node information
-	state      protocol.State    // used to access the  protocol state
-	blocks     mempool.Blocks    // used to store blocks in memory
-	receipts   mempool.Receipts  // used to store execution receipts in memory
-	approvals  mempool.Approvals // used to store result approvals in memory
+	unit               *engine.Unit      // used to control startup/shutdown
+	log                zerolog.Logger    // used to log relevant actions
+	collectionsConduit network.Conduit   // used to get collections from collection nodes
+	receiptsConduit    network.Conduit   // used to get execution receipts from execution nodes
+	approvalsConduit   network.Conduit   // used to propagate result approvals
+	me                 module.Local      // used to access local node information
+	state              protocol.State    // used to access the  protocol state
+	blocks             mempool.Blocks    // used to store blocks in memory
+	receipts           mempool.Receipts  // used to store execution receipts in memory
+	approvals          mempool.Approvals // used to store result approvals in memory
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -53,14 +54,19 @@ func New(
 	}
 
 	var err error
-	e.colChannel, err = net.Register(engine.CollectionProvider, e)
+	e.collectionsConduit, err = net.Register(engine.CollectionProvider, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on collection provider channel: %w", err)
 	}
 
-	e.exeChannel, err = net.Register(engine.ExecutionProvider, e)
+	e.receiptsConduit, err = net.Register(engine.ResultProvider, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on execution provider channel: %w", err)
+	}
+
+	e.approvalsConduit, err = net.Register(engine.ApprovalProvider, e)
+	if err != nil {
+		return nil, fmt.Errorf("could not register engine on approval provider channel: %w", err)
 	}
 
 	return e, nil
@@ -129,8 +135,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
 
 	e.log.Info().
-		Hex("origin_id", originID[:]).
-		Hex("receipt_id", logging.ID(receipt)).
+		Hex("origin_id", logging.ID(originID)).
+		Hex("receipt_id", logging.Entity(receipt)).
 		Msg("execution receipt received")
 
 	// TODO: correctness check for execution receipts
@@ -168,7 +174,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 func (e *Engine) handleBlock(block *flow.Block) error {
 
 	e.log.Debug().
-		Hex("block_id", logging.ID(block)).
+		Hex("block_id", logging.Entity(block)).
 		Uint64("block_number", block.Number).
 		Msg("received block")
 
@@ -186,8 +192,8 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
 
 	e.log.Info().
-		Hex("origin_id", originID[:]).
-		Hex("collection_id", logging.ID(coll)).
+		Hex("origin_id", logging.ID(originID)).
+		Hex("collection_id", logging.Entity(coll)).
 		Msg("collection received")
 
 	id, err := e.state.Final().Identity(originID)
@@ -216,7 +222,8 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 		CollectionID: collID,
 	}
 
-	err = e.colChannel.Submit(req, collNodes.NodeIDs()...)
+	// TODO we should only submit to cluster which owns the collection
+	err = e.collectionsConduit.Submit(req, collNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit request for collection (id=%s): %w", collID, err)
 	}
@@ -236,8 +243,8 @@ func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt
 	blockID := result.BlockID
 
 	log := e.log.With().
-		Hex("block_id", blockID[:]).
-		Hex("result_id", logging.ID(result)).
+		Hex("block_id", logging.ID(blockID)).
+		Hex("result_id", logging.Entity(result)).
 		Logger()
 
 	// request block if not available
