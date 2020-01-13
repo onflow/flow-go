@@ -1,32 +1,14 @@
 package libp2p
 
 import (
-	"bytes"
 	"crypto/md5"
 	"encoding/binary"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/pkg/errors"
 	"io"
 	"math/rand"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 )
-
-// Translate the target flow ID to the libp2p peer id
-// Remove the extra 0s at the end
-// TODO: Yet to figure out the whole flow identifier to libp2p id mapping (Issue#1968)
-func GetLibP2PIDFromFlowID(fID flow.Identifier) (peer.ID, error) {
-	f := bytes.Trim(fID[:], "\x00")
-	// Translate the bytes to the node Name
-	flowIDStr := string(f)
-	// Get the libp2p id from the node Name
-	p2pID, err := GetPeerID(flowIDStr)
-	if err != nil {
-		err = errors.Wrapf(err, "could not get peer ID for %s", flowIDStr)
-	}
-	return p2pID, err
-}
 
 // GetPeerID returns the LibP2P peer id derived from the given Name
 // e.g. node1 will generate a peer id of QmUqrhCAbnT7jnhMnKY2d1Py9N5PfEvvHazuJfpzn5fFVB

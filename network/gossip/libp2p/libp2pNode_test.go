@@ -93,7 +93,7 @@ func (l *LibP2PNodeTestSuite) TestAddPeers() {
 	}
 
 	// Adds the remaining nodes to the first node as its set of peers
-	require.NoError(l.Suite.T(), nodes[0].AddPeers(l.ctx, ids))
+	require.NoError(l.Suite.T(), nodes[0].AddPeers(l.ctx, ids...))
 	actual := nodes[0].libP2PHost.Peerstore().Peers().Len()
 
 	// Checks if all 9 nodes have been added as peers to the first node
@@ -145,14 +145,14 @@ func (l *LibP2PNodeTestSuite) TestPubSub() {
 		// defines next node to this on the chain
 		next := nodes[i+1]
 		nextIP, nextPort := next.GetIPPort()
-		nextAddr := &NodeAddress{
+		nextAddr := NodeAddress{
 			Name: next.name,
 			IP:   nextIP,
 			Port: nextPort,
 		}
 
 		// adds next node as the peer to this node and verifies their connection
-		require.NoError(l.Suite.T(), this.AddPeers(l.ctx, []NodeAddress{*nextAddr}))
+		require.NoError(l.Suite.T(), this.AddPeers(l.ctx, nextAddr))
 		assert.Eventuallyf(l.Suite.T(), func() bool {
 			return network.Connected == this.libP2PHost.Network().Connectedness(next.libP2PHost.ID())
 		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf(" %s not connected with %s", this.name, next.name))

@@ -12,6 +12,7 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network"
@@ -72,9 +73,18 @@ func (m *Middleware) Start(ov libp2p.Overlay) {
 // Stop will end the execution of the middleware and wait for it to end.
 func (m *Middleware) Stop() {
 	close(m.stop)
-	m.libP2PNode.Stop()
+
+	// Stop all the connections
 	for _, conn := range m.cc.GetAll() {
 		conn.stop()
+	}
+
+	// Stop libp2p
+	err := m.libP2PNode.Stop()
+	if err != nil {
+		log.Error().Err(err).Msg("stopping failed")
+	} else {
+		log.Debug().Msg("node stopped successfully")
 	}
 	m.wg.Wait()
 }

@@ -73,10 +73,6 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	)
 	p.libP2PHost = host
 
-	// Set the callback to use for an incoming peer message
-	if handler == nil {
-		return errors.New("could not start libp2pnode with a missing handler")
-	}
 	host.SetStreamHandler(FlowLibP2PProtocolID, handler)
 
 	// Creating a new PubSub instance of the type GossipSub
@@ -91,7 +87,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	if err == nil {
 		ip, port := p.GetIPPort()
-		p.logger.Debug().Str("Name", p.name).Str("address", fmt.Sprintf("%s:%s", ip, port)).
+		p.logger.Debug().Str("name", p.name).Str("address", fmt.Sprintf("%s:%s", ip, port)).
 			Msg("libp2p node started successfully")
 	}
 
@@ -104,15 +100,15 @@ func (p *P2PNode) Stop() error {
 	defer p.Unlock()
 	err := p.libP2PHost.Close()
 	if err != nil {
-		p.logger.Error().Err(err).Str("Name", p.name).Msg("libp2p node did not stop successfully")
+		err = fmt.Errorf("could not stop node: %w", err)
 	} else {
-		p.logger.Debug().Str("Name", p.name).Msg("libp2p node stopped successfully")
+		p.logger.Debug().Str("name", p.name).Msg("libp2p node stopped successfully")
 	}
 	return err
 }
 
 // AddPeers adds other nodes as peers to this node by adding them to the node's peerstore and connecting to them
-func (p *P2PNode) AddPeers(ctx context.Context, peers []NodeAddress) error {
+func (p *P2PNode) AddPeers(ctx context.Context, peers ...NodeAddress) error {
 	p.Lock()
 	defer p.Unlock()
 	for _, peer := range peers {
@@ -137,7 +133,7 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers []NodeAddress) error {
 func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stream, error) {
 
 	// Add node address as a peer
-	err := p.AddPeers(ctx, []NodeAddress{n})
+	err := p.AddPeers(ctx, n)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +207,7 @@ func (p *P2PNode) Subscribe(ctx context.Context, topic FlowTopic, callback func(
 	p.subs[topic] = s
 	go pubSubHandler(ctx, s, callback, p.logger)
 
-	p.logger.Debug().Str("topic", string(topic)).Str("Name", p.name).Msg("subscribed to topic")
+	p.logger.Debug().Str("topic", string(topic)).Str("name", p.name).Msg("subscribed to topic")
 	return err
 }
 
@@ -252,7 +248,7 @@ func (p *P2PNode) UnSubscribe(topic FlowTopic) error {
 	p.topics[topic] = nil
 	delete(p.topics, topic)
 
-	p.logger.Debug().Str("topic", string(topic)).Str("Name", p.name).Msg("unsubscribed from topic")
+	p.logger.Debug().Str("topic", string(topic)).Str("name", p.name).Msg("unsubscribed from topic")
 	return err
 }
 
