@@ -21,6 +21,9 @@ import (
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
+// StubEngineTestSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
+// protocol stack. It creates two instances of a stubengine, connects them through network, and sends a
+// single message from one engine to the other one.
 type StubEngineTestSuite struct {
 	suite.Suite
 }
@@ -30,8 +33,9 @@ func TestStubEngineTestSuite(t *testing.T) {
 	suite.Run(t, new(StubEngineTestSuite))
 }
 
-// TestLibP2PNode_P2P tests end-to-end a P2P message sending and receiving between two nodes
-func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
+// TestSingleMessage sends a single message from one network instance to the other one
+// it evaluates the correctness of implementation against correct delivery of the message.
+func (s *StubEngineTestSuite) TestSingleMessage() {
 
 	golog.SetAllLoggers(gologging.INFO)
 	// cancelling the context of test suite
@@ -82,9 +86,6 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 		<-done
 		time.Sleep(1 * time.Second)
 	}
-
-	// Step 4: Waits for nodes to heartbeat each other
-	time.Sleep(10 * time.Second)
 
 	// test engine1
 	te1 := &StubEngine{
