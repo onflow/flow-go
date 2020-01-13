@@ -3,54 +3,36 @@
 package mempool
 
 import (
-	"fmt"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// TransactionPool implements the transaction memory pool of the collection nodes, used to
-// store pending transactions and to generate guaranteed collections.
-type TransactionPool struct {
-	*mempool
-}
+// Transactions represents a concurrency-safe memory pool for transactions.
+type Transactions interface {
 
-// NewTransactionPool creates a new memory pool for transactions.
-func NewTransactionPool() (*TransactionPool, error) {
-	m := &TransactionPool{
-		mempool: newMempool(),
-	}
+	// Has checks whether the transaction with the given hash is currently in
+	// the memory pool.
+	Has(txID flow.Identifier) bool
 
-	return m, nil
-}
+	// Add will add the given transaction to the memory pool; it will error if
+	// the transaction is already in the memory pool.
+	Add(tx *flow.Transaction) error
 
-// Add adds a transaction to the mempool.
-func (m *TransactionPool) Add(tx *flow.Transaction) error {
-	return m.mempool.Add(tx)
-}
+	// Rem will remove the given transaction from the memory pool; it will
+	// will return true if the transaction was known and removed.
+	Rem(txID flow.Identifier) bool
 
-// Get returns the given transaction from the pool.
-func (m *TransactionPool) Get(txID flow.Identifier) (*flow.Transaction, error) {
-	item, err := m.mempool.Get(txID)
-	if err != nil {
-		return nil, err
-	}
+	// Get will retrieve the given transaction from the memory pool; it will
+	// error if the transaction is not in the memory pool.
+	Get(txID flow.Identifier) (*flow.Transaction, error)
 
-	tx, ok := item.(*flow.Transaction)
-	if !ok {
-		return nil, fmt.Errorf("unable to convert item to transaction")
-	}
+	// Size will return the current size of the memory pool.
+	Size() uint
 
-	return tx, nil
-}
+	// All will retrieve all transactions that are currently in the memory pool
+	// as a slice.
+	All() []*flow.Transaction
 
-// All returns all transactions from the pool.
-func (m *TransactionPool) All() []*flow.Transaction {
-
-	items := m.mempool.All()
-	transactions := make([]*flow.Transaction, 0, len(items))
-	for _, item := range items {
-		transactions = append(transactions, item.(*flow.Transaction))
-	}
-
-	return transactions
+	// Hash will return a fingerprint has representing the contents of the
+	// entire memory pool.
+	Hash() flow.Identifier
 }

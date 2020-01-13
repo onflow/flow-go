@@ -39,7 +39,7 @@ func (checker *Checker) VisitReturnStatement(statement *ast.ReturnStatement) ast
 
 		if !valueType.IsInvalidType() &&
 			!returnType.IsInvalidType() &&
-			!checker.IsTypeCompatible(statement.Expression, valueType, returnType) {
+			!checker.checkTypeCompatibility(statement.Expression, valueType, returnType) {
 
 			checker.report(
 				&TypeMismatchError{

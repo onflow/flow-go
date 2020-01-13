@@ -23,7 +23,7 @@ const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 // Message models a single message that is supposed to get exchanged by the gossip network
 type Message struct {
 	SenderID             []byte   `protobuf:"bytes,3,opt,name=SenderID,proto3" json:"SenderID,omitempty"`
-	EngineID             uint32   `protobuf:"varint,2,opt,name=EngineID,proto3" json:"EngineID,omitempty"`
+	ChannelID            uint32   `protobuf:"varint,2,opt,name=ChannelID,proto3" json:"ChannelID,omitempty"`
 	Event                []byte   `protobuf:"bytes,1,opt,name=Event,proto3" json:"Event,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
@@ -62,9 +62,9 @@ func (m *Message) GetSenderID() []byte {
 	return nil
 }
 
-func (m *Message) GetEngineID() uint32 {
+func (m *Message) GetChannelID() uint32 {
 	if m != nil {
-		return m.EngineID
+		return m.ChannelID
 	}
 	return 0
 }
