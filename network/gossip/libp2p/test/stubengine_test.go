@@ -27,20 +27,8 @@ type StubEngineTestSuite struct {
 	me    *mock.Local
 }
 
-type Local struct {
-	me flow.Identifier
-}
-
-func (l Local) NodeID() flow.Identifier {
-	return l.me
-}
-
-func (l Local) Address() string {
-	return ""
-}
-
-// TestLibP2PNodesTestSuite runs all the test methods in this test suit
-func TestLibP2PNodeTestSuite(t *testing.T) {
+// TestStubEngineTestSuite runs all the test methods in this test suit
+func TestStubEngineTestSuite(t *testing.T) {
 	suite.Run(t, new(StubEngineTestSuite))
 }
 
@@ -67,6 +55,7 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 		require.NoError(s.Suite.T(), err)
 		mws = append(mws, mw)
 	}
+
 	for i := 0; i < count; i++ {
 		ip, port := mws[(i+1)%count].GetIPPort()
 		// mocks an identity
@@ -75,12 +64,18 @@ func (s *StubEngineTestSuite) TestLibP2PNodeP2P() {
 			Address: fmt.Sprintf("%s:%s", ip, port),
 			Role:    flow.RoleCollection,
 		}
+
+		// creates and mocks the state
 		state := &protocol.State{}
 		snapshot := &protocol.Snapshot{}
 		state.On("Final").Return(snapshot).Once()
 		snapshot.On("Identities", mockery.Anything).Return(flow.IdentityList{targetID}, nil).Once()
+
+		// creates and mocks me
 		// creating network of node-1
-		net, err := libp2p2.NewNetwork(zerolog.Logger{}, json.NewCodec(), state, Local{me: ids[i]}, mws[i])
+		me := &mock.Local{}
+		me.On("NodeID").Return(ids[i])
+		net, err := libp2p2.NewNetwork(zerolog.Logger{}, json.NewCodec(), state, me, mws[i])
 		require.NoError(s.Suite.T(), err)
 
 		nets = append(nets, net)
