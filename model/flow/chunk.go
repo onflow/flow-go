@@ -1,18 +1,10 @@
 package flow
 
-import (
-	"fmt"
-
-	"github.com/dapperlabs/flow-go/crypto"
-)
-
 // ChunkBody - body section of a chunk
 type ChunkBody struct {
 
-	// transactions info
-	FirstTxIndex      uint64      // Transaction index inside the block
-	TxCounts          uint32      // number of transactions in this chunk
-	ChunkTxCollection crypto.Hash // Hash of collection of txs in this chunk
+	// the ID of the collection this chunk corresponds to
+	CollectionIndex uint
 
 	// execution info
 	StartState      StateCommitment // start state when starting executing this chunk
@@ -40,23 +32,6 @@ func (ch *Chunk) ID() Identifier {
 // Checksum provides a cryptographic commitment for a chunk content
 func (ch *Chunk) Checksum() Identifier {
 	return MakeID(ch)
-}
-
-func (ch *Chunk) String() string {
-	switch ch.TxCounts {
-	case 0:
-		return "An empty chunk"
-	case 1:
-		return fmt.Sprintf("chunk %v includes a single transaction (TotalGasSpent: %v)",
-			ch.ID(), ch.TotalComputationUsed)
-	default:
-		return fmt.Sprintf(
-			"Chunk %v includes %v transactions (TotalGasSpent: %v)",
-			ch.ID(),
-			ch.TxCounts,
-			ch.TotalComputationUsed,
-		)
-	}
 }
 
 // Note that this is the basic version of the List, we need to substitute it with something like Merkel tree at some point
