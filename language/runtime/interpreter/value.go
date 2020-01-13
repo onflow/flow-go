@@ -2207,15 +2207,19 @@ func (v AddressValue) Hex() string {
 
 // AccountValue
 
-func NewAccountValue(address AddressValue) *CompositeValue {
+func NewAccountValue(address AddressValue, setCode, addPublicKey, removePublicKey FunctionValue) *CompositeValue {
 	storageIdentifier := address.Hex()
 
 	return &CompositeValue{
+		Kind:   common.CompositeKindStructure,
 		TypeID: (&sema.AccountType{}).ID(),
 		InjectedFields: map[string]Value{
-			"address":   address,
-			"storage":   StorageValue{Identifier: storageIdentifier},
-			"published": PublishedValue{Identifier: storageIdentifier},
+			"address":         address,
+			"storage":         StorageValue{Identifier: storageIdentifier},
+			"published":       PublishedValue{Identifier: storageIdentifier},
+			"setCode":         setCode,
+			"addPublicKey":    addPublicKey,
+			"removePublicKey": removePublicKey,
 		},
 	}
 }
@@ -2226,6 +2230,7 @@ func NewPublicAccountValue(address AddressValue) *CompositeValue {
 	storageIdentifier := address.Hex()
 
 	return &CompositeValue{
+		Kind:   common.CompositeKindStructure,
 		TypeID: (&sema.PublicAccountType{}).ID(),
 		InjectedFields: map[string]Value{
 			"address":   address,

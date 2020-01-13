@@ -6832,8 +6832,16 @@ func TestInterpretContractAccountFieldUse(t *testing.T) {
 						_ sema.TypeID,
 						_ common.CompositeKind,
 					) map[string]interpreter.Value {
+						panicFunction := interpreter.NewHostFunctionValue(func(invocation interpreter.Invocation) trampoline.Trampoline {
+							panic(errors.NewUnreachableError())
+						})
 						return map[string]interpreter.Value{
-							"account": interpreter.NewAccountValue(addressValue),
+							"account": interpreter.NewAccountValue(
+								addressValue,
+								panicFunction,
+								panicFunction,
+								panicFunction,
+							),
 						}
 					},
 				),

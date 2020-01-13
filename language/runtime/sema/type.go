@@ -1562,6 +1562,10 @@ func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *
 		return NewPublicConstantFieldMember(t, identifier, fieldType)
 	}
 
+	newFunction := func(functionType *FunctionType) *Member {
+		return NewPublicFunctionMember(t, identifier, functionType)
+	}
+
 	switch identifier {
 	case "address":
 		return newField(&AddressType{})
@@ -1572,6 +1576,72 @@ func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *
 	case "published":
 		return newField(&ReferencesType{Assignable: true})
 
+	case "setCode":
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:      ArgumentLabelNotRequired,
+						Identifier: "code",
+						TypeAnnotation: NewTypeAnnotation(
+							&VariableSizedType{
+								// TODO: UInt8. Requires array literals of integer literals
+								//   to be type compatible with with [UInt8]
+								Type: &IntType{},
+							},
+						),
+					},
+				},
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&VoidType{},
+				),
+				// additional arguments are passed to the contract initializer
+				RequiredArgumentCount: (func() *int {
+					var count = 2
+					return &count
+				})(),
+			},
+		)
+
+	case "addPublicKey":
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:      ArgumentLabelNotRequired,
+						Identifier: "key",
+						TypeAnnotation: NewTypeAnnotation(
+							&VariableSizedType{
+								// TODO: UInt8. Requires array literals of integer literals
+								//   to be type compatible with with [UInt8]
+								Type: &IntType{},
+							},
+						),
+					},
+				},
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&VoidType{},
+				),
+			},
+		)
+
+	case "removePublicKey":
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Label:      ArgumentLabelNotRequired,
+						Identifier: "index",
+						TypeAnnotation: NewTypeAnnotation(
+							&IntType{},
+						),
+					},
+				},
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&VoidType{},
+				),
+			},
+		)
 
 	default:
 		return nil
