@@ -6,10 +6,10 @@ import (
 )
 
 type Conduit struct {
-	engineID uint8
-	submit   trickle.SubmitFunc
+	channelID uint8
+	submit    trickle.SubmitFunc
 }
 
 func (c *Conduit) Submit(event interface{}, targetIDs ...flow.Identifier) error {
-	return c.submit(c.engineID, event, targetIDs...)
+	return c.submit(c.channelID, event, targetIDs...)
 }

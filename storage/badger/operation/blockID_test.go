@@ -9,25 +9,23 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestHashInsertRetrieve(t *testing.T) {
-
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		number := uint64(1337)
-		expected := crypto.Hash{0x01, 0x02, 0x03}
+		expected := flow.Identifier{0x01, 0x02, 0x03}
 
-		err := db.Update(InsertHash(number, expected))
+		err := db.Update(InsertBlockID(number, expected))
 		require.Nil(t, err)
 
-		var actual crypto.Hash
-		err = db.View(RetrieveHash(number, &actual))
+		var actual flow.Identifier
+		err = db.View(RetrieveBlockID(number, &actual))
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)
 	})
-
 }

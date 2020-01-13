@@ -8,8 +8,8 @@ import (
 	"github.com/dchest/siphash"
 )
 
-func eventKey(engineID uint8, event interface{}) string {
-	sip := siphash.New([]byte("testthenetwork" + fmt.Sprintf("%03d", engineID)))
+func eventKey(channelID uint8, event interface{}) string {
+	sip := siphash.New([]byte("testthenetwork" + fmt.Sprintf("%03d", channelID)))
 	payload, _ := json.Marshal(event)
 	hash := sip.Sum(payload)
 	key := hex.EncodeToString(hash)

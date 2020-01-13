@@ -76,6 +76,7 @@ generate-mocks:
 	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/dapperlabs/flow-go/module Network,Local
 	GO111MODULE=on mockgen -destination=network/mocks/conduit.go -package=mocks github.com/dapperlabs/flow-go/network Conduit
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
+	mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage/ledger -case=underscore -output="./storage/ledger/mock" -outpkg="mock"
@@ -108,6 +109,10 @@ docker-ci-team-city:
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.5 \
 		make ci
 
+.PHONY: docker-build-collection
+docker-build-collection:
+	docker build -f cmd/Dockerfile --build-arg TARGET=collection -t gcr.io/dl-flow/collection:latest -t "gcr.io/dl-flow/collection:$(SHORT_COMMIT)" .
+
 .PHONY: docker-build-consensus
 docker-build-consensus:
 	docker build -f cmd/Dockerfile --build-arg TARGET=consensus -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" .
@@ -119,6 +124,25 @@ docker-build-execution:
 .PHONY: docker-build-verification
 docker-build-verification:
 	docker build -f cmd/Dockerfile --build-arg TARGET=verification -t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" .
+
+.PHONY: docker-build-flow
+docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification
+
+.PHONY: docker-push-flow
+docker-push-flow:
+	echo gcr.io/dl-flow/{collection,consensus,execution,verification}:$(SHORT_COMMIT) | xargs -n 1 docker push
+
+.PHONY: docker-run-collection
+docker-run-collection:
+	docker run -p 8080:8080 -p 3569:3569 gcr.io/dl-flow/collection:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries collection-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
+
+.PHONY: docker-run-consensus
+docker-run-consensus:
+	docker run -p 8080:8080 -p 3569:3569 gcr.io/dl-flow/consensus:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries consensus-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
+
+.PHONY: docker-run-execution
+docker-run-execution:
+	docker run -p 8080:8080 -p 3569:3569 gcr.io/dl-flow/execution:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries execution-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
 .PHONY: docker-run-verification
 docker-run-verification:

@@ -3,13 +3,11 @@
 package badger
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
@@ -23,7 +21,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 	return m.state.db.Update(func(tx *badger.Txn) error {
 
 		// check that the new identities are valid
-		err := checkIdentitiesValidity(tx, genesis.NewIdentities)
+		err := checkIdentitiesValidity(tx, genesis.Identities)
 		if err != nil {
 			return fmt.Errorf("could not check identities validity: %w", err)
 		}
@@ -50,42 +48,52 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 	})
 }
 
-func (m *Mutator) Extend(block *flow.Block) error {
+func (m *Mutator) Extend(blockID flow.Identifier) error {
 	return m.state.db.Update(func(tx *badger.Txn) error {
 
+		// retrieve the identities
+		var identities flow.IdentityList
+		err := operation.RetrieveIdentities(blockID, &identities)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve identities: %w", err)
+		}
+
 		// check that the new identities are valid
-		err := checkIdentitiesValidity(tx, block.NewIdentities)
+		err = checkIdentitiesValidity(tx, identities)
 		if err != nil {
 			return fmt.Errorf("could not check identities validity: %w", err)
 		}
 
+		// get the block header to check
+		var header flow.Header
+		err = operation.RetrieveHeader(blockID, &header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header: %w", err)
+		}
+
 		// check that the block is a valid extension of the protocol state
-		err = checkBlockValidity(tx, block.Header)
+		err = checkHeaderValidity(tx, &header)
 		if err != nil {
 			return fmt.Errorf("could not check block validity: %w", err)
 		}
 
-		// store the block contents in the database
-		err = storeBlockContents(tx, block)
-		if err != nil {
-			return fmt.Errorf("could not insert block payload: %w", err)
-		}
+		// TODO: stuff like indexing identities etc
 
 		return nil
 	})
 }
 
 type step struct {
-	hash   crypto.Hash
-	header flow.Header
+	blockID flow.Identifier
+	header  flow.Header
 }
 
-func (m *Mutator) Finalize(hash crypto.Hash) error {
+func (m *Mutator) Finalize(blockID flow.Identifier) error {
 	return m.state.db.Update(func(tx *badger.Txn) error {
 
 		// retrieve the block to make sure we have it
 		var header flow.Header
-		err := operation.RetrieveHeader(hash, &header)(tx)
+		err := operation.RetrieveHeader(blockID, &header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
@@ -98,8 +106,8 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 		}
 
 		// retrieve the hash of the boundary
-		var head crypto.Hash
-		err = operation.RetrieveHash(boundary, &head)(tx)
+		var headID flow.Identifier
+		err = operation.RetrieveBlockID(boundary, &headID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve head: %w", err)
 		}
@@ -108,14 +116,14 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 		// through the blocks that need to be finalized from oldest to youngest;
 		// we thus start at the youngest remember all of the intermediary steps
 		// while tracing back until we reach the finalized state
-		steps := []step{{hash: hash, header: header}}
-		for !header.Parent.Equal(head) {
-			hash = header.Parent
-			err = operation.RetrieveHeader(header.Parent, &header)(tx)
+		steps := []step{{blockID: blockID, header: header}}
+		for header.ParentID != headID {
+			blockID = header.ParentID
+			err = operation.RetrieveHeader(header.ParentID, &header)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve parent (%x): %w", header.Parent, err)
+				return fmt.Errorf("could not retrieve parent (%x): %w", header.ParentID, err)
 			}
-			steps = append(steps, step{hash: hash, header: header})
+			steps = append(steps, step{blockID: blockID, header: header})
 		}
 
 		// now we can step backwards in order to go from oldest to youngest; for
@@ -127,29 +135,34 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 
 			// get the identities
 			s := steps[i]
-			err = operation.RetrieveIdentities(s.hash, &identities)(tx)
+			err = operation.RetrieveIdentities(s.blockID, &identities)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve identities (%x): %w", s.hash, err)
+				return fmt.Errorf("could not retrieve identities (%x): %w", s.blockID, err)
 			}
 
 			// get the collection guarantees
-			err = operation.RetrieveCollectionGuaranteesByBlockHash(s.hash, &guarantees)(tx)
-
+			err = operation.RetrieveGuarantees(s.blockID, &guarantees)(tx)
 			if err != nil {
-				return fmt.Errorf("could not retrieve guarantees (%x): %w", s.hash, err)
+				return fmt.Errorf("could not retrieve guarantees (%x): %w", s.blockID, err)
+			}
+
+			// create contant
+			content := flow.Content{
+				Identities: identities,
+				Guarantees: guarantees,
 			}
 
 			// reconstruct block
 			block := flow.Block{
-				Header:               header,
-				NewIdentities:        identities,
-				CollectionGuarantees: guarantees,
+				Header:  header,
+				Payload: content.Payload(),
+				Content: content,
 			}
 
 			// insert the deltas
 			err = applyBlockChanges(tx, &block)
 			if err != nil {
-				return fmt.Errorf("could not insert block deltas (%x): %w", s.hash, err)
+				return fmt.Errorf("could not insert block deltas (%x): %w", s.blockID, err)
 			}
 		}
 
@@ -157,7 +170,7 @@ func (m *Mutator) Finalize(hash crypto.Hash) error {
 	})
 }
 
-func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
+func checkIdentitiesValidity(tx *badger.Txn, identities flow.IdentityList) error {
 
 	// check that we don't have duplicate identity entries
 	lookup := make(map[flow.Identifier]struct{})
@@ -182,7 +195,7 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		// check for role
 		var role flow.Role
 		err := operation.RetrieveRole(id.NodeID, &role)(tx)
-		if err == storage.NotFoundErr {
+		if errors.Is(err, storage.ErrNotFound) {
 			continue
 		}
 
@@ -198,7 +211,7 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 		// check for address
 		var address string
 		err := operation.RetrieveAddress(id.NodeID, &address)(tx)
-		if err == storage.NotFoundErr {
+		if errors.Is(err, storage.ErrNotFound) {
 			continue
 		}
 
@@ -211,7 +224,7 @@ func checkIdentitiesValidity(tx *badger.Txn, identities []flow.Identity) error {
 	return nil
 }
 
-func checkBlockValidity(tx *badger.Txn, header flow.Header) error {
+func checkHeaderValidity(tx *badger.Txn, header *flow.Header) error {
 
 	// get the boundary number of the finalized state
 	var boundary uint64
@@ -221,15 +234,15 @@ func checkBlockValidity(tx *badger.Txn, header flow.Header) error {
 	}
 
 	// get the hash of the latest finalized block
-	var head crypto.Hash
-	err = operation.RetrieveHash(boundary, &head)(tx)
+	var headID flow.Identifier
+	err = operation.RetrieveBlockID(boundary, &headID)(tx)
 	if err != nil {
 		return fmt.Errorf("could not retrieve hash: %w", err)
 	}
 
 	// get the first parent of the introduced block to check the number
 	var parent flow.Header
-	err = operation.RetrieveHeader(header.Parent, &parent)(tx)
+	err = operation.RetrieveHeader(header.ParentID, &parent)(tx)
 	if err != nil {
 		return fmt.Errorf("could not retrieve header: %w", err)
 	}
@@ -246,12 +259,12 @@ func checkBlockValidity(tx *badger.Txn, header flow.Header) error {
 
 	// trace back from new block until we find a block that has the latest
 	// finalized block as its parent
-	for !header.Parent.Equal(head) {
+	for header.ParentID != headID {
 
 		// get the parent of current block
-		err = operation.RetrieveHeader(header.Parent, &header)(tx)
+		err = operation.RetrieveHeader(header.ParentID, header)(tx)
 		if err != nil {
-			return fmt.Errorf("could not get parent (%x): %w", header.Parent, err)
+			return fmt.Errorf("could not get parent (%x): %w", header.ParentID, err)
 		}
 
 		// if its number is below current boundary, the block does not connect
@@ -273,12 +286,12 @@ func initializeFinalizedBoundary(tx *badger.Txn, genesis *flow.Block) error {
 	}
 
 	// the parent must be zero hash
-	if !bytes.Equal(genesis.Parent, crypto.ZeroHash) {
+	if genesis.ParentID != flow.ZeroID {
 		return errors.New("genesis parent must be zero hash")
 	}
 
 	// genesis should have no collections
-	if len(genesis.CollectionGuarantees) > 0 {
+	if len(genesis.Guarantees) > 0 {
 		return errors.New("genesis should not contain collections")
 	}
 
@@ -304,18 +317,18 @@ func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 	// one, instead of only by block
 
 	// insert the identities into the DB
-	err = operation.InsertIdentities(block.Hash(), block.NewIdentities)(tx)
+	err = operation.InsertIdentities(block.ID(), block.Identities)(tx)
 	if err != nil {
 		return fmt.Errorf("could not insert identities: %w", err)
 	}
 
 	// insert the collection guarantees into the DB
-	for _, coll := range block.CollectionGuarantees {
-		err = operation.InsertCollectionGuarantee(coll)(tx)
+	for _, cg := range block.Guarantees {
+		err = operation.InsertGuarantee(cg)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection guarantee: %w", err)
 		}
-		err = operation.IndexCollectionGuaranteeByBlockHash(block.Hash(), coll)(tx)
+		err = operation.IndexGuarantee(block.ID(), cg)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection guarantee: %w", err)
 		}
@@ -327,7 +340,7 @@ func storeBlockContents(tx *badger.Txn, block *flow.Block) error {
 func applyBlockChanges(tx *badger.Txn, block *flow.Block) error {
 
 	// insert the height to hash mapping for finalized block
-	err := operation.InsertHash(block.Number, block.Hash())(tx)
+	err := operation.InsertBlockID(block.Number, block.ID())(tx)
 	if err != nil {
 		return fmt.Errorf("could not insert hash: %w", err)
 	}
@@ -339,7 +352,7 @@ func applyBlockChanges(tx *badger.Txn, block *flow.Block) error {
 	}
 
 	// insert the information for each new identity
-	for _, id := range block.NewIdentities {
+	for _, id := range block.Identities {
 
 		// insert the role
 		err := operation.InsertRole(id.NodeID, id.Role)(tx)

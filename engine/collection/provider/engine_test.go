@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -48,7 +47,7 @@ func TestSubmitCollectionGuarantee(t *testing.T) {
 		net.FlushAll()
 
 		assert.Eventually(t, func() bool {
-			has := consNode.Pool.Has(guarantee.Fingerprint())
+			has := consNode.Pool.Has(guarantee.ID())
 			return has
 		}, time.Millisecond*5, time.Millisecond)
 	})
@@ -73,17 +72,22 @@ func TestCollectionRequest(t *testing.T) {
 
 		// set up a mock requester engine that will receive and verify the collection response
 		requesterEngine := new(mocknetwork.Engine)
-		requesterEngine.On("Process", collID.NodeID, testifymock.Anything).Return(nil).Once()
 		con, err := requesterNode.Net.Register(engine.CollectionProvider, requesterEngine)
 		assert.NoError(t, err)
 
 		// save a collection to the store
 		coll := unittest.CollectionFixture(3)
-		err = collNode.Collections.Save(&coll)
+		err = collNode.Collections.Store(&coll)
 		assert.NoError(t, err)
 
+		// expect that the requester will receive the collection
+		expectedRes := &messages.CollectionResponse{
+			Collection: coll,
+		}
+		requesterEngine.On("Process", collID.NodeID, expectedRes).Return(nil).Once()
+
 		// send a request for the collection
-		req := messages.CollectionRequest{Fingerprint: coll.Fingerprint()}
+		req := messages.CollectionRequest{CollectionID: coll.ID()}
 		err = con.Submit(&req, collID.NodeID)
 		assert.NoError(t, err)
 
@@ -97,12 +101,8 @@ func TestCollectionRequest(t *testing.T) {
 		require.True(t, ok)
 		net.FlushAll()
 
-		// the requester engine should have received the right collection
-		res := &messages.CollectionResponse{
-			Fingerprint:  coll.Fingerprint(),
-			Transactions: coll.Transactions,
-		}
-		requesterEngine.AssertCalled(t, "Process", collID.NodeID, res)
+		//assert we received the right collection
+		requesterEngine.AssertExpectations(t)
 	})
 
 	t.Run("should return error for non-existent collection", func(t *testing.T) {
@@ -118,12 +118,12 @@ func TestCollectionRequest(t *testing.T) {
 		collNode := testutil.CollectionNode(t, hub, collID, genesis)
 
 		// create request with invalid/nonexistent fingerprint
-		req := &messages.CollectionRequest{Fingerprint: flow.Fingerprint{}}
+		req := &messages.CollectionRequest{CollectionID: flow.ZeroID}
 
 		// provider should return error
 		err := collNode.ProviderEngine.ProcessLocal(req)
 		if assert.Error(t, err) {
-			assert.True(t, errors.Is(err, storage.NotFoundErr))
+			assert.True(t, errors.Is(err, storage.ErrNotFound))
 		}
 	})
 }

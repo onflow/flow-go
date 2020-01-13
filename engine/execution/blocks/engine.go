@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // An Engine receives and saves incoming blocks.
@@ -32,7 +33,7 @@ func New(logger zerolog.Logger, net module.Network, me module.Local, blocks stor
 		collections: collections,
 	}
 
-	con, err := net.Register(engine.ExecutionBlockIngestion, &eng)
+	con, err := net.Register(engine.BlockProvider, &eng)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
@@ -91,12 +92,13 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) handleBlock(block flow.Block) error {
+
 	e.log.Debug().
-		Hex("block_hash", block.Hash()).
+		Hex("block_id", logging.Entity(block)).
 		Uint64("block_number", block.Number).
 		Msg("received block")
 
-	err := e.blocks.Save(&block)
+	err := e.blocks.Store(&block)
 
 	if err != nil {
 		return fmt.Errorf("could not save block: %w", err)
@@ -105,11 +107,12 @@ func (e *Engine) handleBlock(block flow.Block) error {
 }
 
 func (e *Engine) handleCollection(collection flow.Collection) error {
+
 	e.log.Debug().
-		Hex("collection_hash", collection.Fingerprint()).
+		Hex("collection_id", logging.Entity(collection)).
 		Msg("received collection")
 
-	err := e.collections.Save(&collection)
+	err := e.collections.Store(&collection)
 	if err != nil {
 		return fmt.Errorf("could not save collection: %w", err)
 	}

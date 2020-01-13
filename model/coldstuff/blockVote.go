@@ -3,10 +3,10 @@
 package coldstuff
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // BlockVote is a coldstuff consensus event to vote for a block.
 type BlockVote struct {
-	Hash crypto.Hash
+	BlockID flow.Identifier
 }

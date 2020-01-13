@@ -7,14 +7,12 @@ import (
 // CollectionRequest request all transactions from a collection with the given
 // fingerprint.
 type CollectionRequest struct {
-	Fingerprint flow.Fingerprint
+	CollectionID flow.Identifier
 }
 
-// CollectionResponse is a response to previously sent CollectionRequest which
-// contains transactions payload.
+// CollectionResponse is a response to a request for a collection.
 type CollectionResponse struct {
-	Fingerprint  flow.Fingerprint
-	Transactions []flow.TransactionBody
+	Collection flow.Collection
 }
 
 // SubmitCollectionGuarantee is a request to submit the given collection

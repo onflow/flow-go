@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	"github.com/dapperlabs/flow-go/storage"
 	badgerstorage "github.com/dapperlabs/flow-go/storage/badger"
 )
@@ -19,7 +20,7 @@ import (
 func main() {
 
 	var (
-		pool         module.TransactionPool
+		pool         mempool.Transactions
 		collections  storage.Collections
 		guarantees   storage.Guarantees
 		ingressConf  ingress.Config
@@ -31,7 +32,7 @@ func main() {
 
 	cmd.FlowNode("collection").
 		Create(func(node *cmd.FlowNodeBuilder) {
-			pool, err = mempool.NewTransactionPool()
+			pool, err = stdmap.NewTransactions()
 			node.MustNot(err).Msg("could not initialize transaction pool")
 
 			collections = badgerstorage.NewCollections(node.DB)

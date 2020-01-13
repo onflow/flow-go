@@ -6,13 +6,10 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
-
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
 // rxid is the regex for parsing node identity entries.
-var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|observation)-([0-9a-fA-F]{64})@([\w\d]|[\w\d][\w\d\-]*[\w\d]\.*[\w\d]|[\w\d][\w\d\-]*[\w\d]:[\d]+)?=(\d{1,20})$`)
+var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|observation)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 
 // Identity represents a node identity.
 type Identity struct {
@@ -27,7 +24,7 @@ func ParseIdentity(identity string) (Identity, error) {
 
 	// use the regex to match the four parts of an identity
 	matches := rxid.FindStringSubmatch(identity)
-	if len(matches) != 5 {
+	if len(matches) != 6 {
 		return Identity{}, errors.New("invalid identity string format")
 	}
 
@@ -37,9 +34,9 @@ func ParseIdentity(identity string) (Identity, error) {
 	if err != nil {
 		return Identity{}, err
 	}
-	address := matches[3]
+	address := matches[3] + matches[4]
 	role, _ := ParseRole(matches[1])
-	stake, _ := strconv.ParseUint(matches[4], 10, 64)
+	stake, _ := strconv.ParseUint(matches[5], 10, 64)
 
 	// create the identity
 	id := Identity{
@@ -57,9 +54,14 @@ func (id Identity) String() string {
 	return fmt.Sprintf("%s-%x@%s=%d", id.Role, id.NodeID, id.Address, id.Stake)
 }
 
-// Encode provides a serialized version of the node identity.
-func (id Identity) Encode() []byte {
-	return encoding.DefaultEncoder.MustEncode(id)
+// ID returns a unique identifier for the identity.
+func (id Identity) ID() Identifier {
+	return id.NodeID
+}
+
+// Checksum returns a checksum for the identity including mutable attributes.
+func (id Identity) Checksum() Identifier {
+	return MakeID(id)
 }
 
 // IdentityFilter is a filter on identities.
@@ -92,12 +94,8 @@ func (il IdentityList) NodeIDs() []Identifier {
 	return ids
 }
 
-func (il IdentityList) Fingerprint() Fingerprint {
-	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
-	for _, item := range il {
-		hasher.Add(item.Encode())
-	}
-	return Fingerprint(hasher.SumHash())
+func (il IdentityList) Fingerprint() Identifier {
+	return MerkleRoot(GetIDs(il)...)
 }
 
 // TotalStake returns the total stake of all given identities.

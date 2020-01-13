@@ -1,12 +1,12 @@
 package virtualmachine
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // A TransactionResult is the result of executing a transaction.
 type TransactionResult struct {
-	TxHash  crypto.Hash
+	TxID    flow.Identifier
 	Error   error
 	GasUsed uint64
 }
