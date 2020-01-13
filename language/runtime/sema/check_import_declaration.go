@@ -5,7 +5,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 )
 
-func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
+func (checker *Checker) VisitImportDeclaration(_ *ast.ImportDeclaration) ast.Repr {
 	// Handled in `declareImportDeclaration`
 	panic(&UnreachableStatementError{})
 }
@@ -13,10 +13,12 @@ func (checker *Checker) VisitImportDeclaration(declaration *ast.ImportDeclaratio
 func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclaration) ast.Repr {
 	imports := checker.Program.ImportedPrograms()
 
+	locationID := declaration.Location.ID()
+
 	// Find the imported program.
 	// If it is not available, report an error and return
 
-	imported := imports[declaration.Location.ID()]
+	imported := imports[locationID]
 	if imported == nil {
 		checker.report(
 			&UnresolvedImportError{
@@ -32,7 +34,7 @@ func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclarat
 	// Ensure the program is only imported once.
 	// If it was imported before, report an error and return
 
-	if checker.seenImports[declaration.Location.ID()] {
+	if checker.seenImports[locationID] {
 		checker.report(
 			&RepeatedImportError{
 				ImportLocation: declaration.Location,
@@ -44,33 +46,14 @@ func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclarat
 		)
 		return nil
 	}
-	checker.seenImports[declaration.Location.ID()] = true
+	checker.seenImports[locationID] = true
 
-	// Find or create a checker for the imported program
-
-	importChecker, ok := checker.ImportCheckers[declaration.Location.ID()]
-	var checkerErr *CheckerError
-	if !ok || importChecker == nil {
-		var err error
-		importChecker, err = NewChecker(
-			imported,
-			declaration.Location,
-			WithPredeclaredValues(checker.PredeclaredValues),
-			WithPredeclaredTypes(checker.PredeclaredTypes),
-			WithAccessCheckMode(checker.AccessCheckMode),
-		)
-		if err == nil {
-			checker.ImportCheckers[declaration.Location.ID()] = importChecker
-		}
-	}
-
-	// Check the imported program.
-	// If there is a checker error, return and import nothing
-
-	// NOTE: ignore generic `error` result, get internal *CheckerError
-	_ = importChecker.Check()
-	checkerErr = importChecker.CheckerError()
-
+	importChecker, checkerErr := checker.EnsureLoaded(
+		declaration.Location,
+		func() *ast.Program {
+			return imported
+		},
+	)
 	if checkerErr != nil {
 		checker.report(
 			&ImportedProgramError{
@@ -164,6 +147,42 @@ func (checker *Checker) declareImportDeclaration(declaration *ast.ImportDeclarat
 	return nil
 }
 
+// EnsureLoaded finds or create a checker for the imported program and checks it.
+//
+func (checker *Checker) EnsureLoaded(location ast.Location, loadProgram func() *ast.Program) (*Checker, *CheckerError) {
+	locationID := location.ID()
+
+	subChecker, ok := checker.allCheckers[locationID]
+	if ok {
+		return subChecker, nil
+	}
+
+	if !ok || subChecker == nil {
+		var err error
+		subChecker, err = NewChecker(
+			loadProgram(),
+			location,
+			WithPredeclaredValues(checker.PredeclaredValues),
+			WithPredeclaredTypes(checker.PredeclaredTypes),
+			WithAccessCheckMode(checker.accessCheckMode),
+			WithValidTopLevelDeclarations(checker.validTopLevelDeclarations),
+			WithAllCheckers(checker.allCheckers),
+		)
+		if err == nil {
+			checker.allCheckers[locationID] = subChecker
+		}
+	}
+
+	// Check the imported program.
+	// If there is a checker error, return and import nothing
+
+	// NOTE: ignore generic `error` result, get internal *CheckerError
+	_ = subChecker.Check()
+	checkerErr := subChecker.CheckerError()
+
+	return subChecker, checkerErr
+}
+
 func (checker *Checker) handleMissingImports(missing map[ast.Identifier]bool, importLocation ast.Location) {
 	for identifier := range missing {
 		checker.report(
@@ -217,9 +236,9 @@ func (checker *Checker) importVariables(
 	explicitlyImported := map[string]ast.Identifier{}
 
 	var variables map[string]*Variable
-	identifierLength := len(requestedIdentifiers)
-	if identifierLength > 0 {
-		variables = make(map[string]*Variable, identifierLength)
+	identifiersCount := len(requestedIdentifiers)
+	if identifiersCount > 0 {
+		variables = make(map[string]*Variable, identifiersCount)
 		for _, identifier := range requestedIdentifiers {
 			name := identifier.Identifier
 			variable := availableVariables[name]
