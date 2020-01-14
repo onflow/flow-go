@@ -7,6 +7,8 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 )
 
+const defaultSubscriptionBufferSize = 10
+
 type Subscription struct {
 	id          int
 	ch          <-chan struct{}
@@ -22,15 +24,35 @@ func (s *Subscription) Unsubscribe() error {
 }
 
 type Broadcaster struct {
+	// mapping of subscription IDs to subscription channels
 	subscriptions map[int]chan struct{}
-	mu            sync.Mutex
-	nextID        int
+	// mutex protecting adding/removing subscribers and broadcasts
+	mu sync.Mutex
+	// the next subscription ID, IDs increment for each new subscriber
+	nextID int
+	// the size of subscribers' buffer channels
+	subBufSize uint
 }
 
-func NewBroadcaster() *Broadcaster {
-	return &Broadcaster{
-		subscriptions: make(map[int]chan struct{}),
+type Opt func(*Broadcaster)
+
+func WithBufferSize(size uint) Opt {
+	return func(broadcaster *Broadcaster) {
+		broadcaster.subBufSize = size
 	}
+}
+
+func NewBroadcaster(opts ...Opt) *Broadcaster {
+	b := &Broadcaster{
+		subscriptions: make(map[int]chan struct{}),
+		subBufSize:    defaultSubscriptionBufferSize,
+	}
+
+	for _, apply := range opts {
+		apply(b)
+	}
+
+	return b
 }
 
 func (b *Broadcaster) Subscribe() module.Subscription {
@@ -40,7 +62,7 @@ func (b *Broadcaster) Subscribe() module.Subscription {
 	b.nextID++
 	id := b.nextID
 
-	ch := make(chan struct{})
+	ch := make(chan struct{}, b.subBufSize)
 	b.subscriptions[id] = ch
 
 	unsubscribe := func() error {
@@ -61,7 +83,10 @@ func (b *Broadcaster) Broadcast() {
 	defer b.mu.Unlock()
 
 	for _, ch := range b.subscriptions {
-		ch <- struct{}{}
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
 	}
 }
 
