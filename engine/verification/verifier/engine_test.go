@@ -59,7 +59,7 @@ func (v *TestSuite) SetupTest() {
 	v.net.On("Register", uint8(engine.CollectionProvider), testifymock.Anything).
 		Return(v.collectionsConduit, nil).
 		Once()
-	v.net.On("Register", uint8(engine.ResultProvider), testifymock.Anything).
+	v.net.On("Register", uint8(engine.ReceiptProvider), testifymock.Anything).
 		Return(v.receiptsConduit, nil).
 		Once()
 	v.net.On("Register", uint8(engine.ApprovalProvider), testifymock.Anything).
