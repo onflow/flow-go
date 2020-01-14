@@ -12,6 +12,7 @@ GOPRIVATE=github.com/dapperlabs/*
 UNAME := $(shell uname)
 
 export FLOW_ABI_EXAMPLES_DIR := $(CURDIR)/language/abi/examples/
+export DOCKER_BUILDKIT := 1
 
 crypto/relic:
 	rm -rf crypto/relic
@@ -72,18 +73,23 @@ generate-capnp:
 
 .PHONY: generate-mocks
 generate-mocks:
-	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/dapperlabs/flow-go/storage Blocks,Collections
+	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/dapperlabs/flow-go/storage Blocks,Collections,StateCommitments
 	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/dapperlabs/flow-go/module Network,Local
 	GO111MODULE=on mockgen -destination=network/mocks/conduit.go -package=mocks github.com/dapperlabs/flow-go/network Conduit
+	GO111MODULE=on mockgen -destination=network/mocks/engine.go -package=mocks github.com/dapperlabs/flow-go/network Engine
+	GO111MODULE=on mockgen -destination=protocol/mocks/state.go -package=mocks github.com/dapperlabs/flow-go/protocol State
+	GO111MODULE=on mockgen -destination=protocol/mocks/snapshot.go -package=mocks github.com/dapperlabs/flow-go/protocol Snapshot
 	mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
+	mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
-	mockery -name '.*' -dir=storage/ledger -case=underscore -output="./storage/ledger/mock" -outpkg="mock"
+	# mockery -name '.*' -dir=storage/ledger -case=underscore -output="./storage/ledger/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/executor -case=underscore -output="./engine/execution/execution/executor/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/state -case=underscore -output="./engine/execution/execution/state/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/virtualmachine -case=underscore -output="./engine/execution/execution/virtualmachine/mock" -outpkg="mock"
 	mockery -name 'Processor' -dir="./engine/consensus/eventdriven/components/pacemaker/events" -case=underscore -output="./engine/consensus/eventdriven/components/pacemaker/mock" -outpkg="mock"
+	mockery -name '.*' -dir=network/gossip/libp2p -case=underscore -output="./network/gossip/libp2p/mock" -outpkg="mock"
 
 .PHONY: lint
 lint:
@@ -95,7 +101,7 @@ ci: install-tools lint test coverage
 .PHONY: docker-ci
 docker-ci:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
-		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" \
+		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.5 \
 		make ci
 
@@ -104,9 +110,13 @@ docker-ci:
 .PHONY: docker-ci-team-city
 docker-ci-team-city:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
-		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
+		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" -v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.5 \
 		make ci
+
+.PHONY: docker-build-collection
+docker-build-collection:
+	docker build -f cmd/Dockerfile --build-arg TARGET=collection -t gcr.io/dl-flow/collection:latest -t "gcr.io/dl-flow/collection:$(SHORT_COMMIT)" .
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
@@ -119,6 +129,25 @@ docker-build-execution:
 .PHONY: docker-build-verification
 docker-build-verification:
 	docker build -f cmd/Dockerfile --build-arg TARGET=verification -t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" .
+
+.PHONY: docker-build-flow
+docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification
+
+.PHONY: docker-push-flow
+docker-push-flow:
+	echo gcr.io/dl-flow/{collection,consensus,execution,verification}:$(SHORT_COMMIT) | xargs -n 1 docker push
+
+.PHONY: docker-run-collection
+docker-run-collection:
+	docker run -p 8080:8080 -p 3569:3569 gcr.io/dl-flow/collection:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries collection-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
+
+.PHONY: docker-run-consensus
+docker-run-consensus:
+	docker run -p 8080:8080 -p 3569:3569 gcr.io/dl-flow/consensus:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries consensus-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
+
+.PHONY: docker-run-execution
+docker-run-execution:
+	docker run -p 8080:8080 -p 3569:3569 gcr.io/dl-flow/execution:latest --nodeid 1234567890123456789012345678901234567890123456789012345678901234 --entries execution-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000
 
 .PHONY: docker-run-verification
 docker-run-verification:

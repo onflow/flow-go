@@ -7,7 +7,7 @@ import (
 // CollectionRequest request all transactions from a collection with the given
 // fingerprint.
 type CollectionRequest struct {
-	CollectionID flow.Identifier
+	ID flow.Identifier
 }
 
 // CollectionResponse is a response to a request for a collection.

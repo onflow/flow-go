@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -18,16 +19,16 @@ import (
 // Engine is the propagation engine, which makes sure that new collections are
 // propagated to the other consensus nodes on the network.
 type Engine struct {
-	unit  *engine.Unit                   // used to control startup/shutdown
-	log   zerolog.Logger                 // used to log relevant actions with context
-	con   network.Conduit                // used to talk to other nodes on the network
-	state protocol.State                 // used to access the  protocol state
-	me    module.Local                   // used to access local node information
-	pool  module.CollectionGuaranteePool // holds collection guarantees in memory
+	unit  *engine.Unit       // used to control startup/shutdown
+	log   zerolog.Logger     // used to log relevant actions with context
+	con   network.Conduit    // used to talk to other nodes on the network
+	state protocol.State     // used to access the  protocol state
+	me    module.Local       // used to access local node information
+	pool  mempool.Guarantees // holds collection guarantees in memory
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool module.CollectionGuaranteePool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool mempool.Guarantees) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -39,7 +40,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ConsensusPropagation, e)
+	con, err := net.Register(engine.BlockPropagation, e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
@@ -124,7 +125,7 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_id", logging.ID(guarantee)).
+		Hex("collection_id", logging.Entity(guarantee)).
 		Msg("collection guarantee processed")
 
 	return nil
@@ -143,7 +144,7 @@ func (e *Engine) storeGuarantee(guarantee *flow.CollectionGuarantee) error {
 	}
 
 	e.log.Info().
-		Hex("collection_id", logging.ID(guarantee)).
+		Hex("collection_id", logging.Entity(guarantee)).
 		Msg("collection guarantee stored")
 
 	return nil
@@ -171,7 +172,7 @@ func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
 
 	e.log.Info().
 		Strs("target_ids", logging.IDs(targetIDs)).
-		Hex("collection_id", logging.ID(guarantee)).
+		Hex("collection_id", logging.Entity(guarantee)).
 		Msg("guaranteed collection propagated")
 
 	return nil

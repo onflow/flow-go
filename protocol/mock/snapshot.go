@@ -10,6 +10,29 @@ type Snapshot struct {
 	mock.Mock
 }
 
+// Clusters provides a mock function with given fields:
+func (_m *Snapshot) Clusters() (*flow.ClusterList, error) {
+	ret := _m.Called()
+
+	var r0 *flow.ClusterList
+	if rf, ok := ret.Get(0).(func() *flow.ClusterList); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.ClusterList)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Head provides a mock function with given fields:
 func (_m *Snapshot) Head() (*flow.Header, error) {
 	ret := _m.Called()
