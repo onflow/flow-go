@@ -27,7 +27,7 @@ func TestAddRem(t *testing.T) {
 	item2 := fake("AGAIN")
 
 	t.Run("should be able to add and rem", func(t *testing.T) {
-		pool := newBackend()
+		pool := NewBackend()
 		_ = pool.Add(item1)
 		_ = pool.Add(item2)
 

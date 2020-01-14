@@ -161,7 +161,15 @@ func SignaturesFixture(n int) []crypto.Signature {
 }
 
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
-	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx := flow.Transaction{TransactionBody: TransactionBodyFixture()}
+	if len(n) > 0 {
+		n[0](&tx)
+	}
+	return tx
+}
+
+func TransactionBodyFixture() flow.TransactionBody {
+	return flow.TransactionBody{
 		Script:           []byte("pub fun main() {}"),
 		ReferenceBlockID: IdentifierFixture(),
 		Nonce:            rand.Uint64(),
@@ -169,9 +177,5 @@ func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 		PayerAccount:     AddressFixture(),
 		ScriptAccounts:   []flow.Address{AddressFixture()},
 		Signatures:       []flow.AccountSignature{AccountSignatureFixture()},
-	}}
-	if len(n) > 0 {
-		n[0](&tx)
 	}
-	return tx
 }

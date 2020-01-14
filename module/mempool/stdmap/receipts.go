@@ -11,13 +11,13 @@ import (
 // Receipts implements the execution receipts memory pool of the consensus node,
 // used to store execution receipts and to generate block seals.
 type Receipts struct {
-	*backend
+	*Backend
 }
 
 // NewReceipts creates a new memory pool for execution receipts.
 func NewReceipts() (*Receipts, error) {
 	r := &Receipts{
-		backend: newBackend(),
+		Backend: NewBackend(),
 	}
 
 	return r, nil
@@ -25,12 +25,12 @@ func NewReceipts() (*Receipts, error) {
 
 // Add adds an execution receipt to the mempool.
 func (r *Receipts) Add(receipt *flow.ExecutionReceipt) error {
-	return r.backend.Add(receipt)
+	return r.Backend.Add(receipt)
 }
 
 // Get returns the execution receipt with the given ID from the mempool.
 func (r *Receipts) Get(receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {
-	entity, err := r.backend.Get(receiptID)
+	entity, err := r.Backend.Get(receiptID)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (r *Receipts) Get(receiptID flow.Identifier) (*flow.ExecutionReceipt, error
 
 // All returns all execution receipts from the pool.
 func (r *Receipts) All() []*flow.ExecutionReceipt {
-	entities := r.backend.All()
+	entities := r.Backend.All()
 	receipts := make([]*flow.ExecutionReceipt, 0, len(entities))
 	for _, entity := range entities {
 		receipt, ok := entity.(*flow.ExecutionReceipt)
