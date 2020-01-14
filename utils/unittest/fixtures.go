@@ -94,6 +94,12 @@ func ExecutionResultFixture() flow.ExecutionResult {
 	}
 }
 
+func StateCommitmentFixture() flow.StateCommitment {
+	var state = make([]byte, 20)
+	_, _ = rand.Read(state[0:20])
+	return flow.StateCommitment(state)
+}
+
 func HashFixture(size int) crypto.Hash {
 	hash := make(crypto.Hash, size)
 	for i := 0; i < size; i++ {

@@ -6,7 +6,6 @@ option go_package = "libp2p";
 
 // Message models a single message that is supposed to get exchanged by the gossip network
 message Message {
-    bytes  SenderID = 3;
-    uint32  ChannelID = 2;
-    bytes Event = 1;
+    bytes  SenderID = 1;
+    bytes Event = 2;
 }
