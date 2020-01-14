@@ -33,6 +33,21 @@ func (m *MockSnapshot) EXPECT() *MockSnapshotMockRecorder {
 	return m.recorder
 }
 
+// Clusters mocks base method
+func (m *MockSnapshot) Clusters() (*flow.ClusterList, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Clusters")
+	ret0, _ := ret[0].(*flow.ClusterList)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Clusters indicates an expected call of Clusters
+func (mr *MockSnapshotMockRecorder) Clusters() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Clusters", reflect.TypeOf((*MockSnapshot)(nil).Clusters))
+}
+
 // Head mocks base method
 func (m *MockSnapshot) Head() (*flow.Header, error) {
 	m.ctrl.T.Helper()
