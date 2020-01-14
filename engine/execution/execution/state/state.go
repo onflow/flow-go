@@ -1,7 +1,11 @@
 package state
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
@@ -11,18 +15,23 @@ type ExecutionState interface {
 	NewView(flow.StateCommitment) *View
 	// CommitDelta commits a register delta and returns the new state commitment.
 	CommitDelta(Delta) (flow.StateCommitment, error)
-	// StateCommitmentByBlockHash returns the final state commitment for the provided block hash.
+	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
+
+	// PersistStateCommitment saves a state commitment under given hash
+	PersistStateCommitment(flow.Identifier, *flow.StateCommitment) error
 }
 
 type state struct {
-	ls ledger.Storage
+	ls          ledger.Storage
+	commitments storage.StateCommitments
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
-func NewExecutionState(ls ledger.Storage) ExecutionState {
+func NewExecutionState(ls ledger.Storage, commitments storage.StateCommitments) ExecutionState {
 	return &state{
-		ls: ls,
+		ls:          ls,
+		commitments: commitments,
 	}
 }
 
@@ -56,8 +65,19 @@ func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
 	return flow.StateCommitment(commitment), nil
 }
 
-func (s *state) StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error) {
-	// TODO: (post-MVP) get last state commitment from previous block
-	// https://github.com/dapperlabs/flow-go/issues/2025
-	return flow.StateCommitment(s.ls.LatestStateCommitment()), nil
+func (s *state) StateCommitmentByBlockID(id flow.Identifier) (flow.StateCommitment, error) {
+	commitment, err := s.commitments.ByID(id)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			//TODO ? Shouldn't happen in MVP, in multi-node should query a state from other nodes
+			panic(fmt.Sprintf("storage commitment for id %v does not exist", id))
+		} else {
+			return nil, err
+		}
+	}
+	return *commitment, nil
+}
+
+func (s *state) PersistStateCommitment(id flow.Identifier, commitment *flow.StateCommitment) error {
+	return s.commitments.Persist(id, commitment)
 }

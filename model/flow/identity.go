@@ -9,7 +9,7 @@ import (
 )
 
 // rxid is the regex for parsing node identity entries.
-var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|observation)-([0-9a-fA-F]{64})@([\w\d]|[\w\d][\w\d\-]*[\w\d]\.*[\w\d]|[\w\d][\w\d\-]*[\w\d]:[\d]+)?=(\d{1,20})$`)
+var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|observation)-([0-9a-fA-F]{64})@([\w\d]+|[\w\d][\w\d\-]*[\w\d](?:\.*[\w\d][\w\d\-]*[\w\d])*|[\w\d][\w\d\-]*[\w\d])(:[\d]+)?=(\d{1,20})$`)
 
 // Identity represents a node identity.
 type Identity struct {
@@ -24,7 +24,7 @@ func ParseIdentity(identity string) (Identity, error) {
 
 	// use the regex to match the four parts of an identity
 	matches := rxid.FindStringSubmatch(identity)
-	if len(matches) != 5 {
+	if len(matches) != 6 {
 		return Identity{}, errors.New("invalid identity string format")
 	}
 
@@ -34,9 +34,9 @@ func ParseIdentity(identity string) (Identity, error) {
 	if err != nil {
 		return Identity{}, err
 	}
-	address := matches[3]
+	address := matches[3] + matches[4]
 	role, _ := ParseRole(matches[1])
-	stake, _ := strconv.ParseUint(matches[4], 10, 64)
+	stake, _ := strconv.ParseUint(matches[5], 10, 64)
 
 	// create the identity
 	id := Identity{
