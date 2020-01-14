@@ -65,7 +65,7 @@ func New(
 		return nil, fmt.Errorf("could not register engine on collection provider channel: %w", err)
 	}
 
-	e.receiptsConduit, err = net.Register(engine.ResultProvider, e)
+	e.receiptsConduit, err = net.Register(engine.ReceiptProvider, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on execution provider channel: %w", err)
 	}
@@ -232,7 +232,7 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 	}
 
 	req := &messages.CollectionRequest{
-		CollectionID: collID,
+		ID: collID,
 	}
 
 	// TODO we should only submit to cluster which owns the collection

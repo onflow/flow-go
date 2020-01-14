@@ -20,6 +20,7 @@ type Engine struct {
 	log         zerolog.Logger
 	con         network.Conduit
 	me          module.Local
+	receipts    network.Engine
 	collections storage.Collections
 	executor    executor.BlockExecutor
 }
@@ -28,6 +29,7 @@ func New(
 	log zerolog.Logger,
 	net module.Network,
 	me module.Local,
+	receipts network.Engine,
 	collections storage.Collections,
 	executor executor.BlockExecutor,
 ) (*Engine, error) {
@@ -36,6 +38,7 @@ func New(
 		unit:        engine.NewUnit(),
 		log:         log,
 		me:          me,
+		receipts:    receipts,
 		collections: collections,
 		executor:    executor,
 	}
@@ -120,12 +123,17 @@ func (e *Engine) onBlock(block *flow.Block) error {
 	executableBlock := executor.ExecutableBlock{
 		Block:        *block,
 		Transactions: transactions,
+		// TODO: populate this field from previous block
+		PreviousExecutionResult: flow.ExecutionResult{},
 	}
 
-	_, err = e.executor.ExecuteBlock(executableBlock)
+	result, err := e.executor.ExecuteBlock(executableBlock)
 	if err != nil {
 		return fmt.Errorf("failed to execute block: %w", err)
 	}
+
+	// submit execution result to receipt engine
+	e.receipts.SubmitLocal(result)
 
 	return nil
 }

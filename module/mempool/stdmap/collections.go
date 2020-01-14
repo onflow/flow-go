@@ -10,13 +10,13 @@ import (
 
 // Collections implements a mempool storing collections.
 type Collections struct {
-	*backend
+	*Backend
 }
 
 // NewCollections creates a new memory pool for collection.
 func NewCollections() (*Collections, error) {
 	g := &Collections{
-		backend: newBackend(),
+		Backend: NewBackend(),
 	}
 
 	return g, nil
@@ -24,12 +24,12 @@ func NewCollections() (*Collections, error) {
 
 // Add adds a collection to the mempool.
 func (g *Collections) Add(coll *flow.Collection) error {
-	return g.backend.Add(coll)
+	return g.Backend.Add(coll)
 }
 
 // Get returns the collection with the given ID from the mempool.
 func (g *Collections) Get(collID flow.Identifier) (*flow.Collection, error) {
-	entity, err := g.backend.Get(collID)
+	entity, err := g.Backend.Get(collID)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (g *Collections) Get(collID flow.Identifier) (*flow.Collection, error) {
 
 // All returns all collections from the mempool.
 func (g *Collections) All() []*flow.Collection {
-	entities := g.backend.All()
+	entities := g.Backend.All()
 	colls := make([]*flow.Collection, 0, len(entities))
 	for _, entity := range entities {
 		coll, ok := entity.(*flow.Collection)
