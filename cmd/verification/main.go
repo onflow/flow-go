@@ -11,10 +11,10 @@ import (
 func main() {
 
 	var (
-		err       error
-		receipts  mempool.Receipts
-		approvals mempool.Approvals
-		blocks    mempool.Blocks
+		err         error
+		receipts    mempool.Receipts
+		blocks      mempool.Blocks
+		collections mempool.Collections
 	)
 
 	cmd.FlowNode("verification").
@@ -22,7 +22,7 @@ func main() {
 			receipts, err = stdmap.NewReceipts()
 			node.MustNot(err).Msg("could not initialize execution receipts mempool")
 
-			approvals, err = stdmap.NewApprovals()
+			collections, err = stdmap.NewCollections()
 			node.MustNot(err).Msg("could not initialize result approvals mempool")
 
 			blocks, err = stdmap.NewBlocks()
@@ -31,7 +31,7 @@ func main() {
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing verifier engine")
 
-			vrfy, err := verifier.New(node.Logger, node.Network, node.State, node.Me, receipts, approvals, blocks)
+			vrfy, err := verifier.New(node.Logger, node.Network, node.State, node.Me, receipts, blocks, collections)
 			node.MustNot(err).Msg("could not initialize verifier engine")
 			return vrfy
 		}).
