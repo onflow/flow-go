@@ -167,10 +167,10 @@ func (m *MockStateCommitments) EXPECT() *MockStateCommitmentsMockRecorder {
 }
 
 // ByID mocks base method
-func (m *MockStateCommitments) ByID(arg0 flow.Identifier) (*flow.StateCommitment, error) {
+func (m *MockStateCommitments) ByID(arg0 flow.Identifier) (*[]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ByID", arg0)
-	ret0, _ := ret[0].(*flow.StateCommitment)
+	ret0, _ := ret[0].(*[]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -182,7 +182,7 @@ func (mr *MockStateCommitmentsMockRecorder) ByID(arg0 interface{}) *gomock.Call 
 }
 
 // Persist mocks base method
-func (m *MockStateCommitments) Persist(arg0 flow.Identifier, arg1 *flow.StateCommitment) error {
+func (m *MockStateCommitments) Persist(arg0 flow.Identifier, arg1 *[]byte) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Persist", arg0, arg1)
 	ret0, _ := ret[0].(error)

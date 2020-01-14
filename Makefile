@@ -4,12 +4,20 @@ SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
 VERSION := $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
+# Image tag
+IMAGE_TAG := ${VERSION}
+ifeq (${IMAGE_TAG},)
+IMAGE_TAG := ${SHORT_COMMIT}
+endif
 # Name of the cover profile
 COVER_PROFILE := cover.out
 # Disable go sum database lookup for private repos
 GOPRIVATE=github.com/dapperlabs/*
 # OS
 UNAME := $(shell uname)
+
+# The location of the k8s YAML files
+K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 
 export FLOW_ABI_EXAMPLES_DIR := $(CURDIR)/language/abi/examples/
 export DOCKER_BUILDKIT := 1
@@ -83,7 +91,6 @@ generate-mocks:
 	mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
-	# mockery -name '.*' -dir=storage/ledger -case=underscore -output="./storage/ledger/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/executor -case=underscore -output="./engine/execution/execution/executor/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/state -case=underscore -output="./engine/execution/execution/state/mock" -outpkg="mock"
@@ -116,26 +123,26 @@ docker-ci-team-city:
 
 .PHONY: docker-build-collection
 docker-build-collection:
-	docker build -f cmd/Dockerfile --build-arg TARGET=collection -t gcr.io/dl-flow/collection:latest -t "gcr.io/dl-flow/collection:$(SHORT_COMMIT)" .
+	docker build -f cmd/Dockerfile --build-arg TARGET=collection -t gcr.io/dl-flow/collection:latest -t "gcr.io/dl-flow/collection:$(SHORT_COMMIT)" -t gcr.io/dl-flow/collection:$(IMAGE_TAG) .
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
-	docker build -f cmd/Dockerfile --build-arg TARGET=consensus -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" .
+	docker build -f cmd/Dockerfile --build-arg TARGET=consensus -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/consensus:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-execution
 docker-build-execution:
-	docker build -f cmd/Dockerfile --build-arg TARGET=execution -t gcr.io/dl-flow/execution:latest -t "gcr.io/dl-flow/execution:$(SHORT_COMMIT)" .
+	docker build -f cmd/Dockerfile --build-arg TARGET=execution -t gcr.io/dl-flow/execution:latest -t "gcr.io/dl-flow/execution:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/execution:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-verification
 docker-build-verification:
-	docker build -f cmd/Dockerfile --build-arg TARGET=verification -t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" .
+	docker build -f cmd/Dockerfile --build-arg TARGET=verification -t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification
 
 .PHONY: docker-push-flow
 docker-push-flow:
-	echo gcr.io/dl-flow/{collection,consensus,execution,verification}:$(SHORT_COMMIT) | xargs -n 1 docker push
+	echo gcr.io/dl-flow/{collection,consensus,execution,verification}:{$(SHORT_COMMIT),$(IMAGE_TAG)} | xargs -n 1 docker push
 
 .PHONY: docker-run-collection
 docker-run-collection:
@@ -169,3 +176,39 @@ promote-vscode-extension: build-vscode-extension
 .PHONY: check-go-version
 check-go-version:
 	go version | grep 1.13
+
+#----------------------------------------------------------------------
+# CD COMMANDS
+#----------------------------------------------------------------------
+
+.PHONY: deploy-staging
+deploy-staging: update-deployment-image-name-staging apply-staging-files monitor-rollout
+
+# Staging YAMLs must have 'staging' in their name.
+.PHONY: apply-staging-files
+apply-staging-files:
+	kconfig=$$(uuidgen); \
+	echo "$$KUBECONFIG_STAGING" > $$kconfig; \
+	files=$$(find ${K8S_YAMLS_LOCATION_STAGING} -type f \( -name "*.yml" -or -name "*.yaml" \)); \
+	echo "$$files" | xargs -I {} kubectl --kubeconfig=$$kconfig apply -f {}
+
+# Deployment YAMLs must have 'deployment' in their name.
+.PHONY: update-deployment-image-name-staging
+update-deployment-image-name-staging: CONTAINER=flow-test-net
+update-deployment-image-name-staging:
+	@files=$$(find ${K8S_YAMLS_LOCATION_STAGING} -type f \( -name "*.yml" -or -name "*.yaml" \) | grep deployment); \
+	for file in $$files; do \
+		patched=`openssl rand -hex 8`; \
+		node=`echo "$$file" | grep -oP 'flow-\K\w+(?=-node-deployment.yml)'`; \
+ 		kubectl patch -f $$file -p '{"spec":{"template":{"spec":{"containers":[{"name":"${CONTAINER}","image":"gcr.io/dl-flow/'"$$node"':${IMAGE_TAG}"}]}}}}`' --local -o yaml > $$patched; \
+		mv -f $$patched $$file; \
+	done
+
+.PHONY: monitor-rollout
+monitor-rollout:
+	kconfig=$$(uuidgen); \
+	echo "$$KUBECONFIG_STAGING" > $$kconfig; \
+	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-collection-node-v1; \
+	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-consensus-node-v1; \
+	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-execution-node-v1; \
+	kubectl --kubeconfig=$$kconfig rollout status statefulsets.apps flow-verification-node-v1

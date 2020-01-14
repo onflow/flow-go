@@ -87,8 +87,13 @@ func ExecutionResultFixture() flow.ExecutionResult {
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID:     IdentifierFixture(),
 			BlockID:              IdentifierFixture(),
-			FinalStateCommitment: nil,
-			Chunks:               flow.ChunkList{},
+			FinalStateCommitment: StateCommitmentFixture(),
+			Chunks: flow.ChunkList{
+				Chunks: []*flow.Chunk{
+					ChunkFixture(),
+					ChunkFixture(),
+				},
+			},
 		},
 		Signatures: SignaturesFixture(6),
 	}
@@ -122,7 +127,7 @@ func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) flow.ResultApprov
 func StateCommitmentFixture() flow.StateCommitment {
 	var state = make([]byte, 20)
 	_, _ = rand.Read(state[0:20])
-	return flow.StateCommitment(state)
+	return state
 }
 
 func HashFixture(size int) crypto.Hash {
@@ -176,6 +181,22 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	}
 
 	return nodes
+}
+
+func ChunkFixture() *flow.Chunk {
+	return &flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			FirstTxIndex:                    0,
+			TxCounts:                        42,
+			ChunkTxCollection:               nil,
+			StartState:                      StateCommitmentFixture(),
+			EventCollection:                 IdentifierFixture(),
+			TotalComputationUsed:            4200,
+			FirstTransactionComputationUsed: 42,
+		},
+		Index:    0,
+		EndState: StateCommitmentFixture(),
+	}
 }
 
 func SignatureFixture() crypto.Signature {

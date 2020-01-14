@@ -12,15 +12,15 @@ type BlockExecutor struct {
 }
 
 // ExecuteBlock provides a mock function with given fields: block
-func (_m *BlockExecutor) ExecuteBlock(block executor.ExecutableBlock) ([]flow.Chunk, error) {
+func (_m *BlockExecutor) ExecuteBlock(block executor.ExecutableBlock) (*flow.ExecutionResult, error) {
 	ret := _m.Called(block)
 
-	var r0 []flow.Chunk
-	if rf, ok := ret.Get(0).(func(executor.ExecutableBlock) []flow.Chunk); ok {
+	var r0 *flow.ExecutionResult
+	if rf, ok := ret.Get(0).(func(executor.ExecutableBlock) *flow.ExecutionResult); ok {
 		r0 = rf(block)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Chunk)
+			r0 = ret.Get(0).(*flow.ExecutionResult)
 		}
 	}
 

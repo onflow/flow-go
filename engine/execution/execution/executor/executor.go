@@ -10,7 +10,7 @@ import (
 
 // A BlockExecutor executes the transactions in a block.
 type BlockExecutor interface {
-	ExecuteBlock(block ExecutableBlock) ([]flow.Chunk, error)
+	ExecuteBlock(block ExecutableBlock) (*flow.ExecutionResult, error)
 }
 
 type blockExecutor struct {
@@ -29,7 +29,7 @@ func NewBlockExecutor(vm virtualmachine.VirtualMachine, state state.ExecutionSta
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *blockExecutor) ExecuteBlock(
 	block ExecutableBlock,
-) ([]flow.Chunk, error) {
+) (*flow.ExecutionResult, error) {
 	chunks, err := e.executeTransactions(block.Block, block.Transactions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
@@ -37,13 +37,15 @@ func (e *blockExecutor) ExecuteBlock(
 
 	// TODO: compute block fees & reward payments
 
-	return chunks, nil
+	result := generateExecutionResultForBlock(block, chunks)
+
+	return result, nil
 }
 
 func (e *blockExecutor) executeTransactions(
 	block flow.Block,
 	txs []flow.TransactionBody,
-) ([]flow.Chunk, error) {
+) ([]*flow.Chunk, error) {
 	blockContext := e.vm.NewBlockContext(&block)
 
 	startState, err := e.state.StateCommitmentByBlockID(block.ParentID)
@@ -78,14 +80,13 @@ func (e *blockExecutor) executeTransactions(
 
 	// TODO: (post-MVP) implement real chunking
 	// MVP uses single chunk per block
-	chunk := flow.Chunk{
+	chunk := &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			FirstTxIndex: 0,
 			TxCounts:     uint32(len(txs)),
 			// TODO: compute chunk tx collection hash
 			ChunkTxCollection: nil,
-			// TODO: include start state commitment
-			StartState: startState,
+			StartState:        startState,
 			// TODO: include event collection hash
 			EventCollection: flow.ZeroID,
 			// TODO: record gas used
@@ -93,10 +94,33 @@ func (e *blockExecutor) executeTransactions(
 			// TODO: record first tx gas used
 			FirstTransactionComputationUsed: 0,
 		},
-		Index: 0,
-		// TODO: include end state commitment
+		Index:    0,
 		EndState: endState,
 	}
 
-	return []flow.Chunk{chunk}, nil
+	return []*flow.Chunk{chunk}, nil
+}
+
+// generateExecutionResultForBlock creates a new execution result for a block from
+// the provided chunk results.
+func generateExecutionResultForBlock(block ExecutableBlock, chunks []*flow.Chunk) *flow.ExecutionResult {
+	var finalStateCommitment flow.StateCommitment
+
+	// If block is not empty, set final state to the final state of the last chunk.
+	// Otherwise, set to the final state of the previous execution result.
+	if len(chunks) > 0 {
+		finalChunk := chunks[len(chunks)-1]
+		finalStateCommitment = finalChunk.EndState
+	} else {
+		finalStateCommitment = block.PreviousExecutionResult.FinalStateCommitment
+	}
+
+	return &flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID:     block.PreviousExecutionResult.ID(),
+			BlockID:              block.Block.ID(),
+			FinalStateCommitment: finalStateCommitment,
+			Chunks:               flow.ChunkList{chunks},
+		},
+	}
 }
