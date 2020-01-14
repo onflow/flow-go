@@ -6,8 +6,6 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 )
 
-const defaultSubscriptionBufferSize = 10
-
 type Subscription struct {
 	id          int
 	ch          <-chan struct{}
@@ -29,26 +27,11 @@ type Broadcaster struct {
 	mu sync.Mutex
 	// the next subscription ID, IDs increment for each new subscriber
 	nextID int
-	// the size of subscribers' buffer channels
-	bufSize uint
 }
 
-type Opt func(*Broadcaster)
-
-func WithBufferSize(size uint) Opt {
-	return func(broadcaster *Broadcaster) {
-		broadcaster.bufSize = size
-	}
-}
-
-func NewBroadcaster(opts ...Opt) *Broadcaster {
+func NewBroadcaster() *Broadcaster {
 	b := &Broadcaster{
 		subscriptions: make(map[int]chan struct{}),
-		bufSize:       defaultSubscriptionBufferSize,
-	}
-
-	for _, apply := range opts {
-		apply(b)
 	}
 
 	return b
@@ -61,7 +44,7 @@ func (b *Broadcaster) Subscribe() module.Subscription {
 	b.nextID++
 	id := b.nextID
 
-	ch := make(chan struct{}, b.bufSize)
+	ch := make(chan struct{}, 1)
 	b.subscriptions[id] = ch
 
 	unsubscribe := func() {

@@ -17,7 +17,7 @@ type Counter struct {
 	count int
 }
 
-// Inc increments the counter by one
+// Inc increments the counter by one.
 func (c *Counter) Inc() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -25,6 +25,7 @@ func (c *Counter) Inc() {
 	c.count++
 }
 
+// N returns the current count.
 func (c *Counter) N() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -132,37 +133,39 @@ func TestBroadcast(t *testing.T) {
 
 	// broadcasts to a full subscription channel should be dropped
 	t.Run("with busy subscriber", func(t *testing.T) {
-		var (
-			size   uint = 1
-			caster      = broadcast.NewBroadcaster(broadcast.WithBufferSize(size))
-		)
+		caster := broadcast.NewBroadcaster()
 
 		// create one subscription whose channel isn't handled
-		_ = caster.Subscribe()
+		sub := caster.Subscribe()
 
 		done := make(chan struct{})
 
-		// broadcast 1 more times than the size of the channel buffer
+		// broadcast several times
 		go func() {
 			caster.Broadcast()
 			caster.Broadcast()
 			close(done)
 		}()
 
-		// the second broadcast should not block
+		// the broadcasts should skip when channel is full, and not block
 		select {
 		case <-time.After(time.Second):
 			t.Fail()
 		case <-done:
 			// both broadcasts completed
 		}
+
+		// should be able to read broadcast after-the-fact
+		select {
+		case <-time.After(time.Second):
+			t.Fail()
+		case <-sub.Ch():
+			// read broadcast successfully
+		}
 	})
 
 	t.Run("with unsubscribed subscriber", func(t *testing.T) {
-		var (
-			size   uint = 1
-			caster      = broadcast.NewBroadcaster(broadcast.WithBufferSize(size))
-		)
+		caster := broadcast.NewBroadcaster()
 
 		// create one subscription and immediately unsubscribe
 		sub := caster.Subscribe()
@@ -170,7 +173,7 @@ func TestBroadcast(t *testing.T) {
 
 		done := make(chan struct{})
 
-		// broadcast 1 more times than the size of the channel buffer
+		// broadcast several times
 		go func() {
 			caster.Broadcast()
 			caster.Broadcast()
