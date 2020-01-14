@@ -22,17 +22,17 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit               *engine.Unit        // used to control startup/shutdown
-	log                zerolog.Logger      // used to log relevant actions
-	collectionsConduit network.Conduit     // used to get collections from collection nodes
-	receiptsConduit    network.Conduit     // used to get execution receipts from execution nodes
-	approvalsConduit   network.Conduit     // used to propagate result approvals
-	me                 module.Local        // used to access local node information
-	state              protocol.State      // used to access the  protocol state
-	receipts           mempool.Receipts    // used to store execution receipts in memory
-	blocks             mempool.Blocks      // used to store blocks in memory
-	collections        mempool.Collections // used to store collections in memory
-	caster             module.Broadcaster  // used to broadcast when a resource is received
+	unit                 *engine.Unit        // used to control startup/shutdown
+	log                  zerolog.Logger      // used to log relevant actions
+	collectionsConduit   network.Conduit     // used to get collections from collection nodes
+	receiptsConduit      network.Conduit     // used to get execution receipts from execution nodes
+	approvalsConduit     network.Conduit     // used to propagate result approvals
+	me                   module.Local        // used to access local node information
+	state                protocol.State      // used to access the  protocol state
+	receipts             mempool.Receipts    // used to store execution receipts in memory
+	blocks               mempool.Blocks      // used to store blocks in memory
+	collections          mempool.Collections // used to store collections in memory
+	collectionsBroadcast module.Broadcaster  // used to broadcast when a collection is received
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -47,14 +47,14 @@ func New(
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:        engine.NewUnit(),
-		log:         log,
-		state:       state,
-		me:          me,
-		receipts:    receipts,
-		blocks:      blocks,
-		collections: collections,
-		caster:      broadcast.NewBroadcaster(),
+		unit:                 engine.NewUnit(),
+		log:                  log,
+		state:                state,
+		me:                   me,
+		receipts:             receipts,
+		blocks:               blocks,
+		collections:          collections,
+		collectionsBroadcast: broadcast.NewBroadcaster(),
 	}
 
 	var err error
@@ -216,7 +216,7 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 		return fmt.Errorf("could not add collection to mempool: %w", err)
 	}
 
-	// TODO notify of new collection
+	e.collectionsBroadcast.Broadcast()
 
 	return nil
 }
@@ -250,7 +250,7 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 // and submits that to the network
 func (e *Engine) verify(receipt *flow.ExecutionReceipt) {
 
-	sub := e.caster.Subscribe()
+	sub := e.collectionsBroadcast.Subscribe()
 	defer sub.Unsubscribe()
 
 	result := receipt.ExecutionResult
