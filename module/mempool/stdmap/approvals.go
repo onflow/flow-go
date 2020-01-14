@@ -11,13 +11,13 @@ import (
 // Approvals implements the result approvals memory pool of the consensus nodes,
 // used to store result approvals and to generate block seals.
 type Approvals struct {
-	*Backend
+	*BackendAccessor
 }
 
 // NewApprovals creates a new memory pool for result approvals.
 func NewApprovals() (*Approvals, error) {
 	a := &Approvals{
-		Backend: NewBackend(),
+		BackendAccessor: NewBackendAccesor(),
 	}
 
 	return a, nil
@@ -25,12 +25,12 @@ func NewApprovals() (*Approvals, error) {
 
 // Add adds an result approval to the mempool.
 func (a *Approvals) Add(approval *flow.ResultApproval) error {
-	return a.Backend.Add(approval)
+	return a.BackendAccessor.Add(approval)
 }
 
 // Get returns the result approval with the given ID from the mempool.
 func (a *Approvals) Get(approvalID flow.Identifier) (*flow.ResultApproval, error) {
-	entity, err := a.Backend.Get(approvalID)
+	entity, err := a.BackendAccessor.Get(approvalID)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (a *Approvals) Get(approvalID flow.Identifier) (*flow.ResultApproval, error
 
 // All returns all result approvals from the pool.
 func (a *Approvals) All() []*flow.ResultApproval {
-	entities := a.Backend.All()
+	entities := a.BackendAccessor.All()
 	approvals := make([]*flow.ResultApproval, 0, len(entities))
 	for _, entity := range entities {
 		approval, ok := entity.(*flow.ResultApproval)

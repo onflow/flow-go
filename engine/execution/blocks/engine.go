@@ -2,7 +2,6 @@ package blocks
 
 import (
 	"fmt"
-	"math/rand"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -111,15 +110,19 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-func (e *Engine) findCollectionNode() (flow.Identifier, error) {
+func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
 	identities, err := e.state.Final().Identities(identity.HasRole(flow.RoleCollection))
 	if err != nil {
-		return flow.Identifier{}, fmt.Errorf("could not retrieve identities: %w", err)
+		return nil, fmt.Errorf("could not retrieve identities: %w", err)
 	}
 	if len(identities) < 1 {
-		return flow.Identifier{}, fmt.Errorf("no Collection identity found")
+		return nil, fmt.Errorf("no Collection identity found")
 	}
-	return identities[rand.Intn(len(identities))].NodeID, nil
+	identifiers := make([]flow.Identifier, len(identities))
+	for i, id := range identities {
+		identifiers[i] = id.NodeID
+	}
+	return identifiers, nil
 }
 
 func (e *Engine) checkForCompleteness(block *execution.CompleteBlock) bool {
@@ -157,7 +160,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 	blockID := block.ID()
 
-	randomCollectionIdentifier, err := e.findCollectionNode()
+	collectionIdentifiers, err := e.findCollectionNodes()
 	if err != nil {
 		return err
 	}
@@ -170,26 +173,26 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	err = e.mempool.Run(func(backdata *Backdata) error {
 		for _, guarantee := range block.Guarantees {
 			completeBlock, err := backdata.Get(guarantee.ID())
-			if err != nil {
-				if err == mempool.ErrEntityNotFound {
-					emptyCompleteBlock.CompleteCollections[guarantee.ID()] = &execution.CompleteCollection{
-						Guarantee:    guarantee,
-						Transactions: nil,
-					}
-					err := backdata.Add(&blockByCollection{
-						CollectionID: guarantee.ID(),
-						Block:        emptyCompleteBlock,
-					})
-					if err != nil {
-						return fmt.Errorf("cannot save collection-block mapping: %w", err)
-					}
-
-					err = e.collectionConduit.Submit(messages.CollectionRequest{ID: guarantee.ID()}, randomCollectionIdentifier)
-					if err != nil {
-						e.log.Err(err).Msg("cannot submit collection requests")
-					}
-					continue
+			if err == mempool.ErrEntityNotFound {
+				emptyCompleteBlock.CompleteCollections[guarantee.ID()] = &execution.CompleteCollection{
+					Guarantee:    guarantee,
+					Transactions: nil,
 				}
+				err := backdata.Add(&blockByCollection{
+					CollectionID: guarantee.ID(),
+					Block:        emptyCompleteBlock,
+				})
+				if err != nil {
+					return fmt.Errorf("cannot save collection-block mapping: %w", err)
+				}
+
+				err = e.collectionConduit.Submit(messages.CollectionRequest{ID: guarantee.ID()}, collectionIdentifiers...)
+				if err != nil {
+					e.log.Err(err).Msg("cannot submit collection requests")
+				}
+				continue
+			}
+			if err != nil {
 				return fmt.Errorf("cannot get an item from mempool: %w", err)
 			}
 			if completeBlock.ID() != blockID {

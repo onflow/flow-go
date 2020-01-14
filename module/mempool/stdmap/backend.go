@@ -20,6 +20,11 @@ type Backend struct {
 	sync.RWMutex
 }
 
+// BackendAccessor is a delegation of backend method without exposing Backend instance
+type BackendAccessor struct {
+	backend *Backend
+}
+
 // Has checks if we already contain the item with the given hash.
 func (b *Backdata) Has(id flow.Identifier) bool {
 	_, ok := b.entities[id]
@@ -90,6 +95,12 @@ func NewBackdata() *Backdata {
 	}
 }
 
+func NewBackendAccesor() *BackendAccessor {
+	return &BackendAccessor{
+		backend: NewBackend(),
+	}
+}
+
 // Has checks if we already contain the item with the given hash.
 func (b *Backend) Has(id flow.Identifier) bool {
 	b.RLock()
@@ -149,4 +160,44 @@ func (b *Backend) Hash() flow.Identifier {
 	b.RLock()
 	defer b.RUnlock()
 	return b.Backdata.Hash()
+}
+
+// Has checks if we already contain the item with the given hash.
+func (b *BackendAccessor) Has(id flow.Identifier) bool {
+	return b.backend.Has(id)
+}
+
+// Add adds the given item to the pool.
+func (b *BackendAccessor) Add(entity flow.Entity) error {
+	return b.backend.Add(entity)
+}
+
+// Rem will remove the item with the given hash.
+func (b *BackendAccessor) Rem(id flow.Identifier) bool {
+	return b.backend.Rem(id)
+}
+
+// Get returns the given item from the pool.
+func (b *BackendAccessor) Get(id flow.Identifier) (flow.Entity, error) {
+	return b.backend.Get(id)
+}
+
+// Run fetches the given item from the pool and runs given function on it, returning the entity after
+func (b *BackendAccessor) Run(f func(backdata *Backdata) error) error {
+	return b.backend.Run(f)
+}
+
+// Size will return the size of the backend.
+func (b *BackendAccessor) Size() uint {
+	return b.backend.Size()
+}
+
+// All returns all entities from the pool.
+func (b *BackendAccessor) All() []flow.Entity {
+	return b.backend.All()
+}
+
+// Hash will use a merkle root hash to hash all items.
+func (b *BackendAccessor) Hash() flow.Identifier {
+	return b.backend.Hash()
 }

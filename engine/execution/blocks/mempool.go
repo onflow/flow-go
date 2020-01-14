@@ -42,7 +42,6 @@ func (a *Backdata) Get(id flow.Identifier) (*blockByCollection, error) {
 	return block, nil
 }
 
-// NewApprovals creates a new memory pool for result approvals.
 func newMempool() (*Mempool, error) {
 	a := &Mempool{
 		Backend: stdmap.NewBackend(),
