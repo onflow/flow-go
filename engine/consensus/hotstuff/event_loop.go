@@ -7,19 +7,19 @@ type EventLoop struct {
 
 	blockproposals chan *types.BlockProposal
 	votes          chan *types.Vote
-	localTimeouts  chan *types.Timeout
 	blockreqs      chan *types.BlockProposalRequest
 }
 
 func (el *EventLoop) loop() {
 	for {
+		timeoutChannel := el.eventHandler.TimeoutChannel()
 		select {
+		case <-timeoutChannel:
+			el.eventHandler.OnLocalTimeout()
 		case b := <-el.blockproposals:
 			el.eventHandler.OnReceiveBlockProposal(b)
 		case v := <-el.votes:
 			el.eventHandler.OnReceiveVote(v)
-		case to := <-el.localTimeouts:
-			el.eventHandler.OnLocalTimeout(to)
 		case req := <-el.blockreqs:
 			el.eventHandler.OnBlockRequest(req)
 		}

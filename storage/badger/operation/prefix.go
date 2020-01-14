@@ -21,6 +21,7 @@ const (
 	codeBlockID         = 100
 	codeBoundary        = 101
 	codeCollectionIndex = 102
+	codeHashToStateCommitment  = 103
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

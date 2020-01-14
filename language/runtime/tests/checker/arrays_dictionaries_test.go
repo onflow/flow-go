@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -768,7 +769,7 @@ func TestCheckConstantSizedArrayDeclaration(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
+func TestCheckInvalidConstantSizedArrayDeclarationCountMismatchTooMany(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       fun test() {
@@ -776,9 +777,10 @@ func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
       }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	assert.IsType(t, &sema.ConstantSizedArrayLiteralSizeError{}, errs[0])
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 }
 
 func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
@@ -837,4 +839,39 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 			assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[0])
 		})
 	}
+}
+
+func TestCheckArrayGeneration(t *testing.T) {
+
+	code := `
+      struct Person {
+          let id: Int
+
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      let persons = Array(
+          size: 3,
+          generate: fun(index: Int): Person {
+              return Person(id: index + 1)
+          }
+      )
+    `
+
+	_, err := ParseAndCheckWithOptions(t,
+		code,
+		ParseAndCheckOptions{
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.ArrayFunction,
+					}.ToValueDeclarations(),
+				),
+			},
+		},
+	)
+
+	assert.NoError(t, err)
 }

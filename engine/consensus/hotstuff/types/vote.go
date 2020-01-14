@@ -2,6 +2,6 @@ package types
 
 type Vote struct {
 	View      uint64
-	BlockMRH  MRH
+	BlockMRH  []byte
 	Signature *Signature
 }

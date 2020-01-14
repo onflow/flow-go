@@ -226,8 +226,10 @@
             <p><a href="#publishing-references">Publishing References</a></p>
           </li>
           <li>
-            <p><a href="#events">Events</a></p>
+            <p><a href="#contracts">Contracts</a></p>
             <ul>
+              <li><a href="#deploying-and-updating-contracts">Deploying and Updating Contracts</a></li>
+              <li><a href="#contract-interfaces">Contract Interfaces</a></li>
               <li><a href="#emitting-events">Emitting events</a></li>
             </ul>
           </li>
@@ -294,6 +296,11 @@
         </p>
         <p>Resources are based on liner types which were popularized by Rust.</p>
         <p>Events are inspired by Solidity.</p>
+        <p>
+          <strong>Disclaimer:</strong> In real Cadence code, all type definitions and code
+          must be defined and contained in <a href="#contracts">contracts</a> or <a href="#transactions">transactions</a>,
+          but we omit these containers in examples for simplicity.
+        </p>
       </section>
       <section>
         <h2 id="comments"><a href="#comments" aria-hidden="true"><span class="icon icon-link"></span></a>Comments</h2>
@@ -2807,7 +2814,14 @@
       </section>
       <section>
         <h2 id="composite-data-types"><a href="#composite-data-types" aria-hidden="true"><span class="icon icon-link"></span></a>Composite Data Types</h2>
-        <p>Composite data types allow composing simpler types into more complex types, i.e., they allow the composition of multiple values into one. Composite data types have a name and consist of zero or more named fields, and zero or more functions that operate on the data. Each field may have a different type.</p>
+        <p>
+          Composite data types allow composing simpler types into more complex types,
+          i.e., they allow the composition of multiple values into one.
+          Composite data types have a name and consist of zero or more named fields,
+          and zero or more functions that operate on the data.
+          Each field may have a different type. Composite data types can
+          only be declared within a <a href="#contracts">contract</a> and nowhere else.
+        </p>
         <p>
           There are two kinds of composite data types.
           The kinds differ in their usage and the behaviour when a value is used as the initial value for a constant or variable,
@@ -2863,7 +2877,7 @@
             if the <a href="#composite-data-type-fields">initializer</a> of the composite data type requires them.
           </p>
           <p>
-            Composite data types can only be declared globally and not locally in functions.
+            Composite data types can only be declared within <a href="#contracts">contract</a> and not locally in functions.
             They can also not be nested.
           </p>
         </section>
@@ -4177,12 +4191,13 @@
           the access control for those declarations,
           and preconditions and postconditions that implementing types need to provide.
         </p>
-        <p>There are two kinds of interfaces:</p>
+        <p>There are three kinds of interfaces:</p>
         <ul>
           <li><strong>Structure interfaces</strong>: implemented by <a href="#structures">structures</a></li>
           <li><strong>Resource interfaces</strong>: implemented by <a href="#resources">resources</a></li>
+          <li><strong>Contract interfaces</strong>: implemented by <a href="#contracts">contracts</a></li>
         </ul>
-        <p>Structure and resource types may implement multiple interfaces.</p>
+        <p>Structure, resource, and contract types may implement multiple interfaces.</p>
         <p>
           Interfaces consist of the function and field requirements
           that a type implementing the interface must provide implementations for.
@@ -4208,7 +4223,7 @@
         <section>
           <h3 id="interface-declaration"><a href="#interface-declaration" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Declaration</h3>
           <p>
-            Interfaces are declared using the <code>struct</code> or <code>resource</code> keyword,
+            Interfaces are declared using the <code>struct</code>, <code>resource</code>, or <code>contract</code> keyword,
             followed by the <code>interface</code> keyword,
             the name of the interface,
             and the requirements, which must be enclosed in opening and closing braces.
@@ -4321,7 +4336,10 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>Note that the required initializer and functions do not have any executable code.</p>
-          <p>Interfaces can only be declared globally, i.e. not inside of functions.</p>
+          <p>
+            Struct and resource Interfaces can only be declared directly inside contracts,
+            i.e. not inside of functions.<br>Contract interfaces can only be declared globally and not inside contracts.
+          </p>
         </section>
         <section>
           <h3 id="interface-implementation"><a href="#interface-implementation" aria-hidden="true"><span class="icon icon-link"></span></a>Interface Implementation</h3>
@@ -5073,30 +5091,331 @@
 </span></code></pre>
       </section>
       <section>
-        <h2 id="events"><a href="#events" aria-hidden="true"><span class="icon icon-link"></span></a>Events</h2>
-        <p>Events are special values that can be emitted during the execution of a program.</p>
-        <p>An event type can be declared with the <code>event</code> keyword:</p>
-        <pre><code class="language-cadence"><span style="color: #000000">event FooEvent(x: Int, y: Int)</span><span>
+        <h2 id="contracts"><a href="#contracts" aria-hidden="true"><span class="icon icon-link"></span></a>Contracts</h2>
+        <p>
+          A contract in Cadence is a collection of type definitions
+          of interfaces, structs, resources, data (its state), and code (its functions)
+          that lives in the contract storage area of an account in Flow.<br>Contracts are where all composite types like structs, resources,
+          events, and interfaces for these types in Cadence have to be defined.<br>Therefore, an object of one of these types cannot exist
+          without having been defined in a deployed Cadence contract.
+        </p>
+        <p>
+          Contracts can be initialized, updated, or deleted with the <code>updateAccountCode</code>
+          or <code>createAccount</code> built-in functions within transactions. These are covered
+          in the next section.
+        </p>
+        <p>
+          Contracts are types. They are similar to composite types,
+          but are stored differently than
+          structs or resources and cannot be used as values, copied, or moved
+          like resources or structs.
+          They stay in an account's contract storage
+          area and can only be updated or deleted by the account owner
+          with special commands.
+        </p>
+        <p>
+          Contracts are declared using the <code>contract</code> keyword. The keyword is followed
+          by the name of the contract.
+        </p>
+        <pre><code class="language-cadence,file=contract.cdc"><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> SomeContract {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">}</span><span>
 </span></code></pre>
-        <p>The syntax of an event declaration is similar to that of a <a href="#function-declarations">function declaration</a>; events contain named parameters, each of which has an optional argument label.</p>
-        <pre><code class="language-cadence"><span style="color: #008000">// Event with explicit argument labels</span><span>
-</span><span style="color: #000000">event BarEvent(labelA fieldA: Int, labelB fieldB: Int)</span><span>
+        <p>Contracts cannot be nested in each other.</p>
+        <pre><code class="language-cadence,file=contract_invalidnesting.cdc"><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> Invalid {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: Contracts cannot be nested in any other type.</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> Nested {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// ...</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #000000">One of the simplest forms of a </span><span style="color: #0000FF">contract</span><span style="color: #000000"> would just be one with a state variable, </span><span>
+</span><span style="color: #000000">a function, and an `init` function that initializes the variable:</span><span>
+</span><span>
+</span><span style="color: #000000">```cadence,file=contract_hello.cdc</span><span>
+</span><span style="color: #008000">// HelloWorldResource.cdc</span><span>
+</span><span style="color: #000000">    </span><span>
+</span><span style="color: #000000">pub contract HelloWorld {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a stored state variable in HelloWorld</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">let</span><span style="color: #000000"> greeting: </span><span style="color: #0000FF">String</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Declare a function that can be called by anyone</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// who imports the contract</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> hello(): </span><span style="color: #0000FF">String</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> </span><span style="color: #0000FF">self</span><span style="color: #000000">.greeting</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">() {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">self</span><span style="color: #000000">.greeting = </span><span style="color: #A31515">"Hello World!"</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
 </span></code></pre>
+        <p>
+          This contract could be deployed to an account and live permenantely
+          in the contract storage. Transactions and other contracts
+          can interact with contracts by importing them at the beginning
+          of a transaction or contract definition.
+        </p>
+        <p>
+          Anyone could call the above contract's <code>hello</code> function by importing
+          the contract from the account it was deployed to and using the imported
+          object to call the hello function.
+        </p>
+        <pre><code class="language-cadence,file=contract_call.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> HelloWorld </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: The contract does not know where hello comes from</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">log(hello())        </span><span style="color: #008000">// Error</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: Using the imported contract object to call the hello</span><span>
+</span><span style="color: #008000">// function</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">log(HelloWorld.hello())    </span><span style="color: #008000">// prints "Hello World!"</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: Using the imported contract object to read the greeting</span><span>
+</span><span style="color: #008000">// field.</span><span>
+</span><span style="color: #000000">log(HelloWorld.greeting)   </span><span style="color: #008000">// prints "Hello World!"</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot call the init function after the contract has been created.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">HelloWorld.</span><span style="color: #0000FF">init</span><span style="color: #000000">()    </span><span style="color: #008000">// Error</span><span>
+</span></code></pre>
+        <p>
+          There can be any number of contracts per account
+          and they can include an arbitrary amount of data. This means that
+          a contract can have any number of fields, functions, and type definitions,
+          but they have to be in the contract and not another top-level definition.
+        </p>
+        <pre><code class="language-cadence,file=bad_decl.cdc"><span style="color: #008000">// Invalid: Top-level declarations are restricted to only be contracts</span><span>
+</span><span style="color: #008000">//          or contract interfaces. Therefore, all of these would be invalid</span><span>
+</span><span style="color: #008000">//          if they were deployed to the account contract storage and </span><span>
+</span><span style="color: #008000">//          the deployment would be rejected.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault {}</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">struct</span><span style="color: #000000"> Hat {}</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> helloWorld(): </span><span style="color: #0000FF">String</span><span style="color: #000000"> {}</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> num: Int</span><span>
+</span></code></pre>
+        <p>
+          Another important feature of contracts is that instances of resources and events
+          that are defined in contracts can only be created within functions or types
+          that are defined in that contract. A random transaction cannot arbitrarily
+          create instances of types that are defined in another contract. A contract
+          restricts the situations that the objects can be created in.
+        </p>
+        <p>
+          The contract below defines a resource interface <code>Receiver</code> and a resource <code>Vault</code>
+          that implements that interface. The way this example is written,
+          there is no way to create this resource, so it would not be usable.
+        </p>
+        <pre><code class="language-cadence,file=ft_contract.cdc"><span style="color: #008000">// Valid</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> FungibleToken {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> Receiver {</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> balance: Int</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(from: @</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">pre</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                </span><span style="color: #0000FF">from</span><span style="color: #000000">.balance > </span><span style="color: #09885A">0</span><span style="color: #000000">:</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"Deposit balance needs to be positive!"</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">post</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">                </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance == before(</span><span style="color: #0000FF">self</span><span style="color: #000000">.balance) + before(from.balance):</span><span>
+</span><span style="color: #000000">                    </span><span style="color: #A31515">"Incorrect amount removed"</span><span>
+</span><span style="color: #000000">            }</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Vault: Receiver {</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// keeps track of the total balance of the accounts tokens</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">var</span><span style="color: #000000"> balance: Int</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = balance</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// withdraw subtracts amount from the vaults balance and</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// returns a vault object with the subtracted balance</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> withdraw(amount: Int): @</span><span style="color: #0000FF">Vault</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance - amount</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> Vault(balance: amount)</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// deposit takes a vault object as a parameter and adds</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// its balance to the balance of the Account's vault, then</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// destroys the sent vault because its balance has been consumed</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> deposit(from: @</span><span style="color: #0000FF">Receiver</span><span style="color: #000000">) {</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance = </span><span style="color: #0000FF">self</span><span style="color: #000000">.balance + </span><span style="color: #0000FF">from</span><span style="color: #000000">.balance</span><span>
+</span><span style="color: #000000">            </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> </span><span style="color: #0000FF">from</span><span>
+</span><span style="color: #000000">        }</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span></code></pre>
+        <p>
+          If a user tried to run a transaction that created an instance of the <code>Vault</code> type,
+          the type checker would not allow it because only code in the <code>FungibleToken</code>
+          contract can create new <code>Vault</code>s.
+        </p>
+        <pre><code class="language-cadence,file=contract_invalid_create.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+</span><span>
+</span><span style="color: #008000">// Invalid: Cannot create an instance of the `Vault` type outside</span><span>
+</span><span style="color: #008000">// of the contract that defines `Vault`</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> newVault &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> FungibleToken.Vault(balance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span></code></pre>
+        <p>
+          The contract would have to either define a function that creates new
+          <code>Vault</code> instances or use its <code>init</code> function to create an instance and
+          store it in the owner's account storage.
+        </p>
+        <p>
+          This brings up another key feature of contracts in Cadence. Contracts
+          can interact with its account's <code>storage</code> and <code>published</code> objects to store
+          resources, structs, and references. They do so by using the special
+          <code>self.account</code> object that is only accessible within the contract.
+        </p>
+        <p>Imagine that these were defined in the above <code>FungibleToken</code> contract.</p>
+        <pre><code class="language-cadence,file=ft_contract_additions.cdc"><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">fun</span><span style="color: #000000"> createVault(initialBalance: Int): @</span><span style="color: #0000FF">Vault</span><span style="color: #000000"> {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">return</span><span style="color: #000000"> &#x3C;-</span><span style="color: #0000FF">create</span><span style="color: #000000"> Vault(balance: initialBalance)</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">init</span><span style="color: #000000">(balance: Int) {</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">let</span><span style="color: #000000"> oldVault &#x3C;- </span><span style="color: #0000FF">self</span><span style="color: #000000">.account.storage[Vault] &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> Vault(balance: </span><span style="color: #09885A">1000</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #0000FF">destroy</span><span style="color: #000000"> oldVault</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span></code></pre>
+        <p>
+          Now, any account could call the <code>createVault</code> function defined in the contract
+          to create a <code>Vault</code> object. Or the owner could call the <code>withdraw</code> function
+          on their own <code>Vault</code> to send new vaults to others.
+        </p>
+        <pre><code class="language-cadence,file=ft_contract_tx.cdc"><span style="color: #0000FF">import</span><span style="color: #000000"> FungibleToken </span><span style="color: #0000FF">from</span><span style="color: #000000"> </span><span style="color: #09885A">0x42</span><span>
+</span><span>
+</span><span style="color: #008000">// Valid: Create an instance of the `Vault` type by calling the contract's</span><span>
+</span><span style="color: #008000">// `createVault` function.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> newVault &#x3C;- </span><span style="color: #0000FF">create</span><span style="color: #000000"> FungibleToken.createVault(initialBalance: </span><span style="color: #09885A">10</span><span style="color: #000000">)</span><span>
+</span></code></pre>
+        <section>
+          <h3 id="deploying-and-updating-contracts"><a href="#deploying-and-updating-contracts" aria-hidden="true"><span class="icon icon-link"></span></a>Deploying and Updating Contracts</h3>
+          <p>
+            In order for a contract to be used in Cadence, it needs
+            to be deployed to an account. It can be initialized, updated, or deleted
+            within a transaction by using the <code>updateAccountCode</code>
+            or <code>createAccount</code> built-in functions.
+          </p>
+        </section>
+        <section>
+          <h3 id="contract-interfaces"><a href="#contract-interfaces" aria-hidden="true"><span class="icon icon-link"></span></a>Contract Interfaces</h3>
+          <p>
+            Like composite types, contracts can have interfaces that specify rules
+            about their behavior, their types, and the behavior of their types.
+          </p>
+          <p>
+            Contract interfaces have to be declared globally. Declarations
+            cannot be nested in other types.
+          </p>
+          <p>
+            If a contract interface declares a concrete type, implementations of it
+            must also declare the same concrete type conforming to the type requirement.
+          </p>
+          <p>
+            If a contract interface declares an interface type, the implementing contract
+            does not have to also define that interface. They can refer to that nested
+            interface by saying <code>{ContractInterfaceName}.{NestedInterfaceName}</code>
+          </p>
+          <pre><code class="language-cadence,file=contract_interface.cdc"><span style="color: #008000">// Declare a contract interface that declares an interface and a resource </span><span>
+</span><span style="color: #008000">// that needs to implement that interface in the contract implementation.</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> interface InterfaceExample {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implementations do not need to declare this</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// They refer to it as InterfaceExample.NestedInterface</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource interface</span><span style="color: #000000"> NestedInterface {}</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Implementations must declare this type </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Composite: NestedInterface {}</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> ExampleContract: InterfaceExample {</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The contract doesn't need to redeclare the `NestedInterface` interface</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// because it is already declared in the contract interface</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// The resource has to refer to the resrouce interface using the name </span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// of the contract interface to access it</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Composite: InterfaceExample.NestedInterface {</span><span>
+</span><span style="color: #000000">    }</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span><span>
+</span><span style="color: #000000">## Events</span><span>
+</span><span>
+</span><span style="color: #000000">Events are special values that can be emitted during the execution of a program.</span><span>
+</span><span>
+</span><span style="color: #000000">An event type can be declared with the `event` keyword.</span><span>
+</span><span>
+</span><span style="color: #000000">```cadence</span><span>
+</span><span style="color: #000000">event FooEvent(x: Int, y: Int)</span><span>
+</span></code></pre>
+          <p>
+            The syntax of an event declaration is similar to that of
+            a <a href="#function-declarations">function declaration</a>;
+            events contain named parameters, each of which has an optional argument label.
+            Types that can be in event definitions are restricted
+            to booleans, strings, integer, and arrays or dictionaries of these types.
+          </p>
+          <p>Events can only be declared within a <a href="#contracts">contract</a> body.<br>Events cannot be declared globally or within resource or struct types.</p>
+          <p>
+            Resource argument types are not allowed because when a resource is used as
+            an argument, it is moved. A piece of code would not want to move a resource
+            to emit an event, so it is not allowed as a parameter.
+          </p>
+          <pre><code class="language-cadence"><span style="color: #008000">// Invalid: An event cannot be declared globally</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">event GlobalEvent(field: Int)</span><span>
+</span><span>
+</span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> Events {</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Event with explicit argument labels</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    event BarEvent(labelA fieldA: Int, labelB fieldB: Int)</span><span>
+</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Invalid: A resource type is not allowed to be used</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// because it would be moved and lost</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">//</span><span>
+</span><span style="color: #000000">    event ResourceEvent(resourceField: @Vault)</span><span>
+</span><span style="color: #000000">}</span><span>
+</span><span>
+</span></code></pre>
+        </section>
         <section>
           <h3 id="emitting-events"><a href="#emitting-events" aria-hidden="true"><span class="icon icon-link"></span></a>Emitting events</h3>
           <p>To emit an event from a program, use the <code>emit</code> statement:</p>
-          <pre><code class="language-cadence,file=events.cdc"><span style="color: #000000">event FooEvent(x: Int, y: Int)</span><span>
+          <pre><code class="language-cadence,file=events.cdc"><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">contract</span><span style="color: #000000"> Events {</span><span>
+</span><span style="color: #000000">    event FooEvent(x: Int, y: Int)</span><span>
 </span><span>
-</span><span style="color: #008000">// Event with argument labels</span><span>
-</span><span style="color: #000000">event BarEvent(labelA fieldA: Int, labelB fieldB: Int)</span><span>
+</span><span style="color: #000000">    </span><span style="color: #008000">// Event with argument labels</span><span>
+</span><span style="color: #000000">    event BarEvent(labelA fieldA: Int, labelB fieldB: Int)</span><span>
 </span><span>
-</span><span style="color: #0000FF">fun</span><span style="color: #000000"> events() {</span><span>
-</span><span style="color: #000000">    emit FooEvent(x: </span><span style="color: #09885A">1</span><span style="color: #000000">, y: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    </span><span style="color: #0000FF">fun</span><span style="color: #000000"> events() {</span><span>
+</span><span style="color: #000000">        emit FooEvent(x: </span><span style="color: #09885A">1</span><span style="color: #000000">, y: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
 </span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Emit event with explicit argument labels</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// Note that the emitted event will only contain the field names,</span><span>
-</span><span style="color: #000000">    </span><span style="color: #008000">// not the argument labels used at the invocation site.</span><span>
-</span><span style="color: #000000">    emit FooEvent(labelA: </span><span style="color: #09885A">1</span><span style="color: #000000">, labelB: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Emit event with explicit argument labels</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// Note that the emitted event will only contain the field names,</span><span>
+</span><span style="color: #000000">        </span><span style="color: #008000">// not the argument labels used at the invocation site.</span><span>
+</span><span style="color: #000000">        emit FooEvent(labelA: </span><span style="color: #09885A">1</span><span style="color: #000000">, labelB: </span><span style="color: #09885A">2</span><span style="color: #000000">)</span><span>
+</span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
           <p>Restrictions:</p>
