@@ -54,7 +54,7 @@ func TestBroadcast(t *testing.T) {
 	t.Run("with subscribers", func(t *testing.T) {
 		var (
 			caster      = broadcast.NewBroadcaster()
-			N           = 100
+			N           = 1
 			subscribers = make([]module.Subscription, N)
 			wg          sync.WaitGroup
 			counter     Counter
@@ -66,12 +66,13 @@ func TestBroadcast(t *testing.T) {
 
 			// subscribers increment the counter when they receive a broadcast
 			// once, then exit
+			wg.Add(1)
 			go func() {
-				wg.Add(1)
 				defer wg.Done()
 
 				select {
 				case <-time.After(time.Second):
+					t.Log("timeout")
 					t.Fail()
 				case <-sub.Ch():
 					counter.Inc()
@@ -99,8 +100,8 @@ func TestBroadcast(t *testing.T) {
 			sub := caster.Subscribe()
 			subscribers[i] = sub
 
+			wg.Add(1)
 			go func() {
-				wg.Add(1)
 				defer wg.Done()
 
 				select {
