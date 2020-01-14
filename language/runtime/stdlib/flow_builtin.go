@@ -30,10 +30,8 @@ var accountFunctionType = &sema.FunctionType{
 			Label:      sema.ArgumentLabelNotRequired,
 			Identifier: "code",
 			TypeAnnotation: sema.NewTypeAnnotation(
-				&sema.OptionalType{
-					Type: &sema.VariableSizedType{
-						Type: &sema.IntType{},
-					},
+				&sema.VariableSizedType{
+					Type: &sema.IntType{},
 				},
 			),
 		},

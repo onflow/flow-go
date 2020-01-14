@@ -838,16 +838,6 @@ func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpre
 }
 
 func toBytes(value interpreter.Value) ([]byte, error) {
-	_, isNil := value.(interpreter.NilValue)
-	if isNil {
-		return nil, nil
-	}
-
-	someValue, ok := value.(*interpreter.SomeValue)
-	if ok {
-		value = someValue.Value
-	}
-
 	array, ok := value.(*interpreter.ArrayValue)
 	if !ok {
 		return nil, errors.New("value is not an array")
@@ -855,9 +845,9 @@ func toBytes(value interpreter.Value) ([]byte, error) {
 
 	result := make([]byte, len(array.Values))
 	for i, arrayValue := range array.Values {
-		intValue, ok := arrayValue.(interpreter.IntValue)
+		intValue, ok := arrayValue.(interpreter.IntegerValue)
 		if !ok {
-			return nil, errors.New("array value is not an Int")
+			return nil, errors.New("array value is not an integer")
 		}
 
 		j := intValue.IntValue()
