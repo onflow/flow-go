@@ -3,6 +3,7 @@ package ledger
 import (
 	"errors"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
@@ -24,10 +25,10 @@ func NewTrieVerifier(height int, defaultHashes [256][]byte) *TrieVerifier {
 // VerifyRegistersProof takes in an encoded proof along with registers, state, and values,
 // and verifies if the proofs are correct
 func (v *TrieVerifier) VerifyRegistersProof(
-	registerIDs []RegisterID,
-	stateCommitment StateCommitment,
-	values []RegisterValue,
-	proof []StorageProof,
+	registerIDs []flow.RegisterID,
+	stateCommitment flow.StateCommitment,
+	values []flow.RegisterValue,
+	proof []flow.StorageProof,
 ) (verified bool, err error) {
 	proofHldr := trie.DecodeProof(proof)
 	length := proofHldr.GetSize()

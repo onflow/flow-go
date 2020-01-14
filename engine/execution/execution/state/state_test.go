@@ -4,12 +4,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
+	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -19,7 +21,13 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 			ls, err := ledger.NewTrieStorage(db)
 			require.NoError(t, err)
 
-			es := state.NewExecutionState(ls)
+			sc := &storage.StateCommitments{}
+
+			latestStateCommitment := ls.LatestStateCommitment()
+			sc.On("ByID", mock.AnythingOfType("flow.Identifier")).
+				Return(&latestStateCommitment, nil)
+
+			es := state.NewExecutionState(ls, sc)
 
 			// TODO: use real block ID
 			sc1, err := es.StateCommitmentByBlockID(flow.Identifier{})
@@ -49,7 +57,13 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 			ls, err := ledger.NewTrieStorage(db)
 			require.NoError(t, err)
 
-			es := state.NewExecutionState(ls)
+			sc := &storage.StateCommitments{}
+
+			latestStateCommitment := ls.LatestStateCommitment()
+			sc.On("ByID", mock.AnythingOfType("flow.Identifier")).
+				Return(&latestStateCommitment, nil)
+
+			es := state.NewExecutionState(ls, sc)
 
 			// TODO: use real block ID
 			sc1, err := es.StateCommitmentByBlockID(flow.Identifier{})
@@ -90,7 +104,13 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 			ls, err := ledger.NewTrieStorage(db)
 			require.NoError(t, err)
 
-			es := state.NewExecutionState(ls)
+			sc := &storage.StateCommitments{}
+
+			latestStateCommitment := ls.LatestStateCommitment()
+			sc.On("ByID", mock.AnythingOfType("flow.Identifier")).
+				Return(&latestStateCommitment, nil)
+
+			es := state.NewExecutionState(ls, sc)
 
 			// TODO: use real block ID
 			sc1, err := es.StateCommitmentByBlockID(flow.Identifier{})
