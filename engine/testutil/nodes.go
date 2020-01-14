@@ -143,13 +143,13 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genes
 	node.Receipts, err = stdmap.NewReceipts()
 	require.Nil(t, err)
 
-	node.Approvals, err = stdmap.NewApprovals()
-	require.Nil(t, err)
-
 	node.Blocks, err = stdmap.NewBlocks()
 	require.Nil(t, err)
 
-	node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, node.Receipts, node.Approvals, node.Blocks)
+	node.Collections, err = stdmap.NewCollections()
+	require.Nil(t, err)
+
+	node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, node.Receipts, node.Blocks, node.Collections)
 	require.Nil(t, err)
 
 	return node

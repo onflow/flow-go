@@ -46,7 +46,7 @@ type ConsensusNode struct {
 type VerificationNode struct {
 	GenericNode
 	Receipts       mempool.Receipts
-	Approvals      mempool.Approvals
 	Blocks         mempool.Blocks
+	Collections    mempool.Collections
 	VerifierEngine *verifier.Engine
 }
