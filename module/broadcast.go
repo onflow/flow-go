@@ -8,7 +8,7 @@ type Subscription interface {
 
 	// Unsubscribe cancels this subscription. Once Unsubscribe is called, no
 	// further notifications are sent over the channel.
-	Unsubscribe() error
+	Unsubscribe()
 }
 
 // Broadcaster notifies subscribers when some event occurs.
