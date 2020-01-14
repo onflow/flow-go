@@ -11,13 +11,13 @@ import (
 // Seals implements the block seals memory pool of the consensus nodes,
 // used to store block seals.
 type Seals struct {
-	*backend
+	*Backend
 }
 
 // NewSeals creates a new memory pool for block seals.
 func NewSeals() (*Seals, error) {
 	s := &Seals{
-		backend: newBackend(),
+		Backend: NewBackend(),
 	}
 
 	return s, nil
@@ -25,12 +25,12 @@ func NewSeals() (*Seals, error) {
 
 // Add adds an block seal to the mempool.
 func (s *Seals) Add(seal *flow.Seal) error {
-	return s.backend.Add(seal)
+	return s.Backend.Add(seal)
 }
 
 // Get returns the block seal with the given ID from the mempool.
 func (s *Seals) Get(sealID flow.Identifier) (*flow.Seal, error) {
-	entity, err := s.backend.Get(sealID)
+	entity, err := s.Backend.Get(sealID)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (s *Seals) Get(sealID flow.Identifier) (*flow.Seal, error) {
 
 // All returns all block seals from the pool.
 func (s *Seals) All() []*flow.Seal {
-	entities := s.backend.All()
+	entities := s.Backend.All()
 	seals := make([]*flow.Seal, 0, len(entities))
 	for _, entity := range entities {
 		seal, ok := entity.(*flow.Seal)
