@@ -76,7 +76,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	es.On(
 		"NewView",
-		mock.AnythingOfType("flow.StateCommitment"),
+		mock.AnythingOfType("[]uint8"),
 	).
 		Return(
 			state.NewView(func(key string) (bytes []byte, e error) {
@@ -88,6 +88,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		mock.AnythingOfType("state.Delta"),
 	).
 		Return(nil, nil)
+
+	es.On("PersistStateCommitment",
+		block.ID(), mock.AnythingOfType("*[]uint8")).Return(nil)
 
 	result, err := exe.ExecuteBlock(executableBlock)
 	assert.NoError(t, err)

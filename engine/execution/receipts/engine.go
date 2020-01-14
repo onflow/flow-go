@@ -32,7 +32,7 @@ func New(logger zerolog.Logger, net module.Network, state protocol.State, me mod
 		me:    me,
 	}
 
-	con, err := net.Register(engine.ExecutionReceiptProvider, &eng)
+	con, err := net.Register(engine.ReceiptProvider, &eng)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
@@ -76,7 +76,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		var err error
 		switch v := event.(type) {
 		case *flow.ExecutionResult:
-			err = e.onExecutionResult(v)
+			err = e.onExecutionResult(originID, v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
 		}
@@ -87,11 +87,15 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-func (e *Engine) onExecutionResult(result *flow.ExecutionResult) error {
+func (e *Engine) onExecutionResult(originID flow.Identifier, result *flow.ExecutionResult) error {
 	e.log.Debug().
 		Hex("block_id", result.BlockID[:]).
-		Hex("result_id", logging.ID(result)).
+		Hex("result_id", logging.ID(result.ID())).
 		Msg("received execution result")
+
+	if originID != e.me.NodeID() {
+		return fmt.Errorf("invalid remote request to submit execution result [%x]", result.ID())
+	}
 
 	receipt := &flow.ExecutionReceipt{
 		ExecutionResult: *result,

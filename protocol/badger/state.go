@@ -12,12 +12,19 @@ import (
 )
 
 type State struct {
-	db *badger.DB
+	db       *badger.DB
+	clusters uint
 }
 
-func NewState(db *badger.DB) (*State, error) {
+// NewState initializes a new state backed by a badger database, applying the
+// optional configuration parameters.
+func NewState(db *badger.DB, options ...func(*State)) (*State, error) {
 	s := &State{
-		db: db,
+		db:       db,
+		clusters: 1,
+	}
+	for _, option := range options {
+		option(s)
 	}
 	return s, nil
 }

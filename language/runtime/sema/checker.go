@@ -440,7 +440,7 @@ func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
 	}
 }
 
-func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Type, targetType Type) bool {
+func (checker *Checker) checkTypeCompatibility(expression ast.Expression, valueType Type, targetType Type) bool {
 	switch typedExpression := expression.(type) {
 	case *ast.IntExpression:
 		unwrappedTargetType := UnwrapOptionalType(targetType)
@@ -477,14 +477,21 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 				valueElementType := variableSizedValueType.ElementType(false)
 				targetElementType := constantSizedTargetType.ElementType(false)
 
-				// TODO: report helpful error when counts mismatch
-
 				literalCount := len(typedExpression.Values)
 
-				if IsSubType(valueElementType, targetElementType) &&
-					literalCount == int(constantSizedTargetType.Size) {
+				if IsSubType(valueElementType, targetElementType) {
 
-					return true
+					if literalCount == constantSizedTargetType.Size {
+						return true
+					} else {
+						checker.report(
+							&ConstantSizedArrayLiteralSizeError{
+								ExpectedSize: constantSizedTargetType.Size,
+								ActualSize:   literalCount,
+								Range:        typedExpression.Range,
+							},
+						)
+					}
 				}
 			}
 		}

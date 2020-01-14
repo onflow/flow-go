@@ -57,7 +57,7 @@ func (m *Server) Done() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		m.server.Shutdown(ctx)
+		_ = m.server.Shutdown(ctx)
 		cancel()
 		close(done)
 	}()

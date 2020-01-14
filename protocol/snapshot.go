@@ -22,6 +22,11 @@ type Snapshot interface {
 	// exist or if its stake is zero.
 	Identity(nodeID flow.Identifier) (flow.Identity, error)
 
+	// Cluster selects the given cluster from the node selection. You have to
+	// manually filter the identities to the desired set of nodes before
+	// clustering them.
+	Clusters() (*flow.ClusterList, error)
+
 	// Head returns the latest block at the selected point of the protocol state
 	// history. It can represent either a finalized or ambiguous block,
 	// depending on our selection criteria. Either way, it's the block on which

@@ -2084,3 +2084,21 @@ func (e *InvalidMoveError) EndPosition() ast.Position {
 	length := len(e.Name)
 	return e.Pos.Shifted(length - 1)
 }
+
+// ConstantSizedArrayLiteralSizeError
+
+type ConstantSizedArrayLiteralSizeError struct {
+	ActualSize   int
+	ExpectedSize int
+	ast.Range
+}
+
+func (e *ConstantSizedArrayLiteralSizeError) Error() string {
+	return fmt.Sprintf(
+		"incorrect number of array literal elements: expected %d, got %d",
+		e.ExpectedSize,
+		e.ActualSize,
+	)
+}
+
+func (*ConstantSizedArrayLiteralSizeError) isSemanticError() {}

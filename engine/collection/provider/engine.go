@@ -118,7 +118,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) onCollectionRequest(originID flow.Identifier, req *messages.CollectionRequest) error {
-	coll, err := e.collections.ByID(req.CollectionID)
+	coll, err := e.collections.ByID(req.ID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve requested collection: %w", err)
 	}

@@ -57,7 +57,7 @@ func TestInsertDuplicate(t *testing.T) {
 		err := db.Update(insert(key, e))
 		require.NoError(t, err)
 
-		// Save again
+		// Persist again
 		err = db.Update(insert(key, e))
 		require.Error(t, err)
 		require.Equal(t, err, storage.ErrAlreadyExists)

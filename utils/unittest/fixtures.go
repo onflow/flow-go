@@ -73,6 +73,38 @@ func CollectionFixture(n int) flow.Collection {
 	return flow.Collection{Transactions: transactions}
 }
 
+func ExecutionReceiptFixture() flow.ExecutionReceipt {
+	return flow.ExecutionReceipt{
+		ExecutorID:        IdentifierFixture(),
+		ExecutionResult:   ExecutionResultFixture(),
+		Spocks:            nil,
+		ExecutorSignature: SignatureFixture(),
+	}
+}
+
+func ExecutionResultFixture() flow.ExecutionResult {
+	return flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			PreviousResultID:     IdentifierFixture(),
+			BlockID:              IdentifierFixture(),
+			FinalStateCommitment: StateCommitmentFixture(),
+			Chunks: flow.ChunkList{
+				Chunks: []*flow.Chunk{
+					ChunkFixture(),
+					ChunkFixture(),
+				},
+			},
+		},
+		Signatures: SignaturesFixture(6),
+	}
+}
+
+func StateCommitmentFixture() flow.StateCommitment {
+	var state = make([]byte, 20)
+	_, _ = rand.Read(state[0:20])
+	return state
+}
+
 func HashFixture(size int) crypto.Hash {
 	hash := make(crypto.Hash, size)
 	for i := 0; i < size; i++ {
@@ -119,15 +151,6 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	return nodes
 }
 
-func StateCommitmentFixture() flow.StateCommitment {
-	return flow.StateCommitment{
-		235, 123, 148, 153, 55, 102, 49, 115,
-		139, 193, 91, 66, 17, 209, 10, 68,
-		90, 169, 31, 94, 135, 33, 250, 250,
-		180, 198, 51, 74, 53, 22, 62, 234,
-	}
-}
-
 func ChunkFixture() *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
@@ -139,23 +162,6 @@ func ChunkFixture() *flow.Chunk {
 		},
 		Index:    0,
 		EndState: StateCommitmentFixture(),
-	}
-}
-
-func ExecutionResultFixture() *flow.ExecutionResult {
-	return &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID:     IdentifierFixture(),
-			BlockID:              IdentifierFixture(),
-			FinalStateCommitment: StateCommitmentFixture(),
-			Chunks: flow.ChunkList{
-				Chunks: []*flow.Chunk{
-					ChunkFixture(),
-					ChunkFixture(),
-				},
-			},
-		},
-		Signatures: nil,
 	}
 }
 
@@ -174,7 +180,15 @@ func SignaturesFixture(n int) []crypto.Signature {
 }
 
 func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
-	tx := flow.Transaction{TransactionBody: flow.TransactionBody{
+	tx := flow.Transaction{TransactionBody: TransactionBodyFixture()}
+	if len(n) > 0 {
+		n[0](&tx)
+	}
+	return tx
+}
+
+func TransactionBodyFixture() flow.TransactionBody {
+	return flow.TransactionBody{
 		Script:           []byte("pub fun main() {}"),
 		ReferenceBlockID: IdentifierFixture(),
 		Nonce:            rand.Uint64(),
@@ -182,9 +196,5 @@ func TransactionFixture(n ...func(t *flow.Transaction)) flow.Transaction {
 		PayerAccount:     AddressFixture(),
 		ScriptAccounts:   []flow.Address{AddressFixture()},
 		Signatures:       []flow.AccountSignature{AccountSignatureFixture()},
-	}}
-	if len(n) > 0 {
-		n[0](&tx)
 	}
-	return tx
 }

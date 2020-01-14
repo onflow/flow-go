@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -32,7 +33,7 @@ type Engine struct {
 	blocks    storage.Blocks
 	state     protocol.State
 	me        module.Local
-	pool      module.CollectionGuaranteePool
+	pool      mempool.Guarantees
 	round     Round
 	interval  time.Duration
 	timeout   time.Duration
@@ -43,7 +44,7 @@ type Engine struct {
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, net module.Network, exp network.Engine, blocks storage.Blocks, state protocol.State, me module.Local, pool module.CollectionGuaranteePool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, exp network.Engine, blocks storage.Blocks, state protocol.State, me module.Local, pool mempool.Guarantees) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{
@@ -272,7 +273,7 @@ func (e *Engine) sendProposal() error {
 	log = log.With().
 		Uint64("number", candidate.Number).
 		Int("guarantees", len(guarantees)).
-		Hex("candidate_id", logging.ID(candidate)).
+		Hex("candidate_id", logging.Entity(candidate)).
 		Logger()
 
 	// store the block proposal
@@ -310,7 +311,7 @@ func (e *Engine) waitForVotes() error {
 
 	log := e.log.With().
 		Uint64("number", candidate.Number).
-		Hex("candidate_id", logging.ID(candidate)).
+		Hex("candidate_id", logging.Entity(candidate)).
 		Int("collections", len(candidate.Guarantees)).
 		Str("action", "wait_votes").
 		Logger()
@@ -383,7 +384,7 @@ func (e *Engine) sendCommit() error {
 
 	log := e.log.With().
 		Uint64("number", candidate.Number).
-		Hex("candidate_id", logging.ID(candidate)).
+		Hex("candidate_id", logging.Entity(candidate)).
 		Int("collections", len(candidate.Guarantees)).
 		Str("action", "send_commit").
 		Logger()
@@ -460,7 +461,7 @@ func (e *Engine) waitForProposal() error {
 			log.Info().
 				Uint64("number", candidate.Number).
 				Int("collections", len(candidate.Guarantees)).
-				Hex("candidate_id", logging.ID(candidate)).
+				Hex("candidate_id", logging.Entity(candidate)).
 				Msg("block proposal received")
 
 			return nil
@@ -480,7 +481,7 @@ func (e *Engine) voteOnProposal() error {
 
 	log := e.log.With().
 		Uint64("number", candidate.Number).
-		Hex("candidate_id", logging.ID(candidate)).
+		Hex("candidate_id", logging.Entity(candidate)).
 		Int("collections", len(candidate.Guarantees)).
 		Str("action", "send_vote").
 		Logger()
@@ -508,7 +509,7 @@ func (e *Engine) waitForCommit() error {
 
 	log := e.log.With().
 		Uint64("number", candidate.Number).
-		Hex("candidate_id", logging.ID(candidate)).
+		Hex("candidate_id", logging.Entity(candidate)).
 		Int("collections", len(candidate.Guarantees)).
 		Str("action", "wait_commit").
 		Logger()
@@ -549,7 +550,7 @@ func (e *Engine) commitCandidate() error {
 
 	log := e.log.With().
 		Uint64("number", candidate.Number).
-		Hex("candidate_id", logging.ID(candidate)).
+		Hex("candidate_id", logging.Entity(candidate)).
 		Int("collections", len(candidate.Guarantees)).
 		Str("action", "exec_commit").
 		Logger()
