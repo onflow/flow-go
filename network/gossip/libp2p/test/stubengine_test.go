@@ -14,10 +14,10 @@ import (
 	gologging "github.com/whyrusleeping/go-logging"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/libp2p"
+	libp2pmodel "github.com/dapperlabs/flow-go/model/libp2p"
 	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
-	libp2p2 "github.com/dapperlabs/flow-go/network/gossip/libp2p"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
@@ -26,6 +26,9 @@ import (
 // single message from one engine to the other one.
 type StubEngineTestSuite struct {
 	suite.Suite
+	nets []*libp2p.Network    // used to keep track of the networks
+	mws  []*libp2p.Middleware // used to keep track of the middlewares associated with networks
+	ids  []flow.Identifier    // used to keep track of the identifiers associated with networks
 }
 
 // TestStubEngineTestSuite runs all the test methods in this test suit
@@ -33,36 +36,36 @@ func TestStubEngineTestSuite(t *testing.T) {
 	suite.Run(t, new(StubEngineTestSuite))
 }
 
+func (s *StubEngineTestSuite) SetupTest() {
+	golog.SetAllLoggers(gologging.INFO)
+	s.nets = make([]*libp2p.Network, 0)
+	s.mws = make([]*libp2p.Middleware, 0)
+	s.ids = make([]flow.Identifier, 0)
+}
+
 // TestSingleMessage sends a single message from one network instance to the other one
 // it evaluates the correctness of implementation against correct delivery of the message.
 func (s *StubEngineTestSuite) TestSingleMessage() {
-
-	golog.SetAllLoggers(gologging.INFO)
-	// cancelling the context of test suite
 	const count = 2
-
-	nets := make([]*libp2p2.Network, 0)
-	mws := make([]*libp2p2.Middleware, 0)
-	ids := make([]flow.Identifier, 0)
 
 	for i := 0; i < count; i++ {
 		// defining id of node
 		var nodeID [32]byte
 		nodeID[0] = byte(i + 1)
 		ID := flow.Identifier(nodeID)
-		ids = append(ids, ID)
+		s.ids = append(s.ids, ID)
 
 		// creating middleware of nodes
-		mw, err := libp2p2.NewMiddleware(zerolog.Logger{}, json.NewCodec(), count-1, "0.0.0.0:0", ids[i])
+		mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), count-1, "0.0.0.0:0", s.ids[i])
 		require.NoError(s.Suite.T(), err)
-		mws = append(mws, mw)
+		s.mws = append(s.mws, mw)
 	}
 
 	for i := 0; i < count; i++ {
-		ip, port := mws[(i+1)%count].GetIPPort()
+		ip, port := s.mws[(i+1)%count].GetIPPort()
 		// mocks an identity
 		targetID := flow.Identity{
-			NodeID:  ids[(i+1)%count],
+			NodeID:  s.ids[(i+1)%count],
 			Address: fmt.Sprintf("%s:%s", ip, port),
 			Role:    flow.RoleCollection,
 		}
@@ -76,11 +79,11 @@ func (s *StubEngineTestSuite) TestSingleMessage() {
 		// creates and mocks me
 		// creating network of node-1
 		me := &mock.Local{}
-		me.On("NodeID").Return(ids[i])
-		net, err := libp2p2.NewNetwork(zerolog.Logger{}, json.NewCodec(), state, me, mws[i])
+		me.On("NodeID").Return(s.ids[i])
+		net, err := libp2p.NewNetwork(zerolog.Logger{}, json.NewCodec(), state, me, s.mws[i])
 		require.NoError(s.Suite.T(), err)
 
-		nets = append(nets, net)
+		s.nets = append(s.nets, net)
 
 		done := net.Ready()
 		<-done
@@ -91,7 +94,7 @@ func (s *StubEngineTestSuite) TestSingleMessage() {
 	te1 := &StubEngine{
 		t: s.Suite.T(),
 	}
-	c1, err := nets[0].Register(1, te1)
+	c1, err := s.nets[0].Register(1, te1)
 	require.NoError(s.Suite.T(), err)
 
 	// test engine 2
@@ -100,14 +103,14 @@ func (s *StubEngineTestSuite) TestSingleMessage() {
 		received: make(chan struct{}),
 	}
 
-	_, err = nets[1].Register(1, te2)
+	_, err = s.nets[1].Register(1, te2)
 	require.NoError(s.Suite.T(), err)
 
 	// Send the message to node 2 using the conduit of node 1
-	event := &libp2p.Echo{
+	event := &libp2pmodel.Echo{
 		Text: "hello",
 	}
-	require.NoError(s.Suite.T(), c1.Submit(event, ids[1]))
+	require.NoError(s.Suite.T(), c1.Submit(event, s.ids[1]))
 
 	select {
 	case <-te2.received:
@@ -115,11 +118,11 @@ func (s *StubEngineTestSuite) TestSingleMessage() {
 		// does not evaluate the content
 		require.NotNil(s.Suite.T(), te2.originID)
 		require.NotNil(s.Suite.T(), te2.event)
-		assert.Equal(s.Suite.T(), ids[0], te2.originID)
+		assert.Equal(s.Suite.T(), s.ids[0], te2.originID)
 
 		// evaluates proper reception of event
 		// casts the received event at the receiver side
-		rcvEvent, ok := te2.event.(*libp2p.Echo)
+		rcvEvent, ok := te2.event.(*libp2pmodel.Echo)
 		// evaluates correctness of casting
 		require.True(s.Suite.T(), ok)
 		// evaluates content of received message
