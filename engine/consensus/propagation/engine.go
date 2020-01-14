@@ -125,7 +125,7 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_id", logging.ID(guarantee)).
+		Hex("collection_id", logging.Entity(guarantee)).
 		Msg("collection guarantee processed")
 
 	return nil
@@ -144,7 +144,7 @@ func (e *Engine) storeGuarantee(guarantee *flow.CollectionGuarantee) error {
 	}
 
 	e.log.Info().
-		Hex("collection_id", logging.ID(guarantee)).
+		Hex("collection_id", logging.Entity(guarantee)).
 		Msg("collection guarantee stored")
 
 	return nil
@@ -172,7 +172,7 @@ func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
 
 	e.log.Info().
 		Strs("target_ids", logging.IDs(targetIDs)).
-		Hex("collection_id", logging.ID(guarantee)).
+		Hex("collection_id", logging.Entity(guarantee)).
 		Msg("guaranteed collection propagated")
 
 	return nil

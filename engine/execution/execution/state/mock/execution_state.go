@@ -50,6 +50,20 @@ func (_m *ExecutionState) NewView(_a0 flow.StateCommitment) *state.View {
 	return r0
 }
 
+// PersistStateCommitment provides a mock function with given fields: _a0, _a1
+func (_m *ExecutionState) PersistStateCommitment(_a0 flow.Identifier, _a1 *flow.StateCommitment) error {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.StateCommitment) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // StateCommitmentByBlockID provides a mock function with given fields: _a0
 func (_m *ExecutionState) StateCommitmentByBlockID(_a0 flow.Identifier) (flow.StateCommitment, error) {
 	ret := _m.Called(_a0)

@@ -94,6 +94,12 @@ func ExecutionResultFixture() flow.ExecutionResult {
 	}
 }
 
+func StateCommitmentFixture() flow.StateCommitment {
+	var state = make([]byte, 20)
+	_, _ = rand.Read(state[0:20])
+	return flow.StateCommitment(state)
+}
+
 func HashFixture(size int) crypto.Hash {
 	hash := make(crypto.Hash, size)
 	for i := 0; i < size; i++ {
@@ -138,6 +144,15 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 	}
 
 	return nodes
+}
+
+func StateCommitmentFixture() flow.StateCommitment {
+	return flow.StateCommitment{
+		235, 123, 148, 153, 55, 102, 49, 115,
+		139, 193, 91, 66, 17, 209, 10, 68,
+		90, 169, 31, 94, 135, 33, 250, 250,
+		180, 198, 51, 74, 53, 22, 62, 234,
+	}
 }
 
 func SignatureFixture() crypto.Signature {

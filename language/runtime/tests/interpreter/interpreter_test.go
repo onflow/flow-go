@@ -6546,7 +6546,7 @@ func TestInterpretOptionalChainingFieldReadAndNilCoalescing(t *testing.T) {
 		}
 
 	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
-	predefinedValues := standardLibraryFunctions.ToValues
+	predefinedValues := standardLibraryFunctions.ToValues()
 
 	inter := parseCheckAndInterpretWithOptions(t,
 		`
@@ -6566,7 +6566,7 @@ func TestInterpretOptionalChainingFieldReadAndNilCoalescing(t *testing.T) {
 				sema.WithPredeclaredValues(valueDeclarations),
 			},
 			Options: []interpreter.Option{
-				interpreter.WithPredefinedValues(predefinedValues()),
+				interpreter.WithPredefinedValues(predefinedValues),
 			},
 		},
 	)
@@ -6585,7 +6585,7 @@ func TestInterpretOptionalChainingFunctionCallAndNilCoalescing(t *testing.T) {
 		}
 
 	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
-	predefinedValues := standardLibraryFunctions.ToValues
+	predefinedValues := standardLibraryFunctions.ToValues()
 
 	inter := parseCheckAndInterpretWithOptions(t,
 		`
@@ -6603,7 +6603,7 @@ func TestInterpretOptionalChainingFunctionCallAndNilCoalescing(t *testing.T) {
 				sema.WithPredeclaredValues(valueDeclarations),
 			},
 			Options: []interpreter.Option{
-				interpreter.WithPredefinedValues(predefinedValues()),
+				interpreter.WithPredefinedValues(predefinedValues),
 			},
 		},
 	)
@@ -7219,4 +7219,65 @@ func TestInterpretResourceTypeRequirementInitializerAndDestructorPreConditions(t
 		require.IsType(t, &interpreter.ConditionError{}, err)
 		assert.Equal(t, "invalid destroy", err.(*interpreter.ConditionError).Message)
 	})
+}
+
+func TestInterpretConstantSizedArrayAllocation(t *testing.T) {
+
+	standardLibraryFunctions :=
+		stdlib.StandardLibraryFunctions{
+			stdlib.ArrayFunction,
+		}
+
+	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
+	predefinedValues := standardLibraryFunctions.ToValues()
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+            struct Person {
+                let id: Int
+
+                init(id: Int) {
+                    self.id = id
+                }
+            }
+
+            let persons = Array(
+                size: 3,
+                generate: fun(index: Int): Person {
+                    return Person(id: index + 1)
+                }
+            )
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(valueDeclarations),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(predefinedValues),
+			},
+		},
+	)
+
+	personTypeID := inter.Checker.GlobalTypes["Person"].Type.ID()
+
+	newPerson := func(id int64) *interpreter.CompositeValue {
+		return &interpreter.CompositeValue{
+			Kind:     common.CompositeKindStructure,
+			Location: TestLocation,
+			TypeID:   personTypeID,
+			Fields: map[string]interpreter.Value{
+				"id": interpreter.NewIntValue(id),
+			},
+			Functions: map[string]interpreter.FunctionValue{},
+		}
+	}
+
+	assert.Equal(t,
+		interpreter.NewArrayValueUnownedNonCopying(
+			newPerson(1),
+			newPerson(2),
+			newPerson(3),
+		),
+		inter.Globals["persons"].Value,
+	)
 }

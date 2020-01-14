@@ -149,7 +149,7 @@ func (e *Engine) removeCollections(block *execution.CompleteBlock, backdata *Bac
 func (e *Engine) handleBlock(block *flow.Block) error {
 
 	e.log.Debug().
-		Hex("block_id", logging.ID(block)).
+		Hex("block_id", logging.Entity(block)).
 		Uint64("block_number", block.Number).
 		Msg("received block")
 
@@ -211,7 +211,7 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 	collection := response.Collection
 
 	e.log.Debug().
-		Hex("collection_id", logging.ID(collection)).
+		Hex("collection_id", logging.Entity(collection)).
 		Msg("received collection")
 
 	collID := collection.ID()

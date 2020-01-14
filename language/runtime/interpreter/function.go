@@ -25,7 +25,7 @@ type Invocation struct {
 type FunctionValue interface {
 	Value
 	isFunctionValue()
-	invoke(Invocation) Trampoline
+	Invoke(Invocation) Trampoline
 }
 
 // InterpretedFunctionValue
@@ -58,7 +58,7 @@ func (InterpretedFunctionValue) SetOwner(owner string) {
 
 func (InterpretedFunctionValue) isFunctionValue() {}
 
-func (f InterpretedFunctionValue) invoke(invocation Invocation) Trampoline {
+func (f InterpretedFunctionValue) Invoke(invocation Invocation) Trampoline {
 	return f.Interpreter.invokeInterpretedFunction(f, invocation)
 }
 
@@ -96,7 +96,7 @@ func (HostFunctionValue) SetOwner(owner string) {
 
 func (HostFunctionValue) isFunctionValue() {}
 
-func (f HostFunctionValue) invoke(invocation Invocation) Trampoline {
+func (f HostFunctionValue) Invoke(invocation Invocation) Trampoline {
 	return f.Function(invocation)
 }
 
@@ -132,7 +132,7 @@ func (BoundFunctionValue) SetOwner(owner string) {
 
 func (BoundFunctionValue) isFunctionValue() {}
 
-func (f BoundFunctionValue) invoke(invocation Invocation) Trampoline {
+func (f BoundFunctionValue) Invoke(invocation Invocation) Trampoline {
 	invocation.Self = f.Self
-	return f.Function.invoke(invocation)
+	return f.Function.Invoke(invocation)
 }

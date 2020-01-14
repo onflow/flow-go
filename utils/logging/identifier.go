@@ -8,8 +8,12 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func ID(entity flow.Entity) []byte {
+func Entity(entity flow.Entity) []byte {
 	id := entity.ID()
+	return id[:]
+}
+
+func ID(id flow.Identifier) []byte {
 	return id[:]
 }
 

@@ -103,6 +103,33 @@ func NewTypeAnnotation(ty Type) *TypeAnnotation {
 	}
 }
 
+// AnyType represents the top type of all types.
+// NOTE: This type is only used internally and not available in programs.
+type AnyType struct{}
+
+func (*AnyType) isType() {}
+
+func (*AnyType) String() string {
+	return "Any"
+}
+
+func (*AnyType) ID() TypeID {
+	return "Any"
+}
+
+func (*AnyType) Equal(other Type) bool {
+	_, ok := other.(*AnyType)
+	return ok
+}
+
+func (*AnyType) IsResourceType() bool {
+	return false
+}
+
+func (*AnyType) IsInvalidType() bool {
+	return false
+}
+
 // AnyStructType represents the top type of all non-resource types
 type AnyStructType struct{}
 
@@ -2262,6 +2289,9 @@ func IsSubType(subType Type, superType Type) bool {
 	}
 
 	switch superType.(type) {
+	case *AnyType:
+		return true
+
 	case *AnyStructType:
 		return !subType.IsResourceType()
 

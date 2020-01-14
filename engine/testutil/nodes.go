@@ -25,14 +25,14 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func GenericNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) mock.GenericNode {
+func GenericNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block, options ...func(*protocol.State)) mock.GenericNode {
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.NoError(t, err)
 
-	state, err := protocol.NewState(db)
+	state, err := protocol.NewState(db, options...)
 	require.NoError(t, err)
 
 	err = state.Mutate().Bootstrap(genesis)
@@ -53,9 +53,9 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *f
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) mock.CollectionNode {
+func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block, options ...func(*protocol.State)) mock.CollectionNode {
 
-	node := GenericNode(t, hub, identity, genesis)
+	node := GenericNode(t, hub, identity, genesis, options...)
 
 	pool, err := stdmap.NewTransactions()
 	require.NoError(t, err)
@@ -78,19 +78,16 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis
 }
 
 // CollectionNodes returns n collection nodes connected to the given hub.
-func CollectionNodes(t *testing.T, hub *stub.Hub, n int) []mock.CollectionNode {
-	identities := unittest.IdentityListFixture(n, func(node *flow.Identity) {
+func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, options ...func(*protocol.State)) []mock.CollectionNode {
+	identities := unittest.IdentityListFixture(nNodes, func(node *flow.Identity) {
 		node.Role = flow.RoleCollection
 	})
-	for _, id := range identities {
-		t.Log(id.String())
-	}
 
 	genesis := mock.Genesis(identities)
 
-	nodes := make([]mock.CollectionNode, n)
-	for i := 0; i < n; i++ {
-		nodes[i] = CollectionNode(t, hub, identities[i], genesis)
+	nodes := make([]mock.CollectionNode, 0, len(identities))
+	for _, identity := range identities {
+		nodes = append(nodes, CollectionNode(t, hub, identity, genesis, options...))
 	}
 
 	return nodes
@@ -117,8 +114,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis 
 	}
 }
 
-func ConsensusNodes(t *testing.T, hub *stub.Hub, n int) []mock.ConsensusNode {
-	identities := unittest.IdentityListFixture(n, func(node *flow.Identity) {
+func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNode {
+	identities := unittest.IdentityListFixture(nNodes, func(node *flow.Identity) {
 		node.Role = flow.RoleConsensus
 	})
 	for _, id := range identities {
@@ -127,9 +124,9 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, n int) []mock.ConsensusNode {
 
 	genesis := mock.Genesis(identities)
 
-	nodes := make([]mock.ConsensusNode, n)
-	for i := 0; i < n; i++ {
-		nodes[i] = ConsensusNode(t, hub, identities[i], genesis)
+	nodes := make([]mock.ConsensusNode, 0, len(identities))
+	for _, identity := range identities {
+		nodes = append(nodes, ConsensusNode(t, hub, identity, genesis))
 	}
 
 	return nodes

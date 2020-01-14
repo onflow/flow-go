@@ -8,7 +8,7 @@ import (
 
 type MissingBlockRequester struct {
 	lock                  sync.RWMutex
-	reqs                  map[types.MRH]types.BlockProposalRequest
+	reqs                  map[string]types.BlockProposalRequest
 	FetchedBlockProposals chan<- *types.BlockProposal
 }
 
@@ -16,6 +16,6 @@ func (mbr *MissingBlockRequester) SetOnBlockFetchedHandler(handler func(*types.B
 	panic("TODO")
 }
 
-func (mbr *MissingBlockRequester) FetchMissingBlock(view uint64, blockMRH types.MRH) {
+func (mbr *MissingBlockRequester) FetchMissingBlock(view uint64, blockMRH []byte) {
 	panic("TODO")
 }

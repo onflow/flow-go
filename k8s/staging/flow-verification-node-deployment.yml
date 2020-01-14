@@ -1,58 +1,5 @@
-apiVersion: v1
-kind: Service
-
-metadata:
-  name: flow-verification-node-v1
-  namespace: flow
-
-  labels:
-    app: flow-test-net
-    node: verification
-    env: staging
-    owner: Kan
-    version: v1
-
-spec:
-  type: ClusterIP
-  selector:
-    app: flow-test-net
-    node: verification
-    env: staging
-    version: v1
-
-  ports:
-    - name: http
-      protocol: TCP
-      port: 8080
-      targetPort: http # reference to the name of the port in your container config
-    - name: grpc
-      protocol: TCP
-      port: 3569
-      targetPort: grpc # reference to the name of the port in your container config
-
----
-
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  labels:
-    app: flow-test-net
-    node: verification
-  name: flow-verification-node-claim
-  namespace: flow
-spec:
-  accessModes:
-  - ReadWriteOnce
-  dataSource: null
-  resources:
-    requests:
-      storage: 10Gi
-  storageClassName: standard
-
----
-
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   # This is the full name of your deployment. It must be unique
   name: flow-verification-node-v1
@@ -73,21 +20,13 @@ metadata:
 
 spec:
   replicas: 1
+  serviceName: flow-test-network-v1
   selector:
     matchLabels:
       app: flow-test-net
       node: verification
       env: staging
       version: v1
-
-  # Deployment strategy dictates how an update will be rolled out across the deployment
-  strategy:
-    type: Recreate
-
-  # How long should we wait (max) for deployment to be up, when checking rollout status
-  progressDeadlineSeconds: 60
-  # Minimum number of seconds that the deployment should be ready, to be considered available
-  minReadySeconds: 1
 
   template:
     metadata:
@@ -115,10 +54,14 @@ spec:
           # No tag, will be attached by teamcity
           image: gcr.io/dl-flow/verification
           args: 
-            - "--nodeid"
-            - "1234567890123456789012345678901234567890123456789012345678901234"
-            - "--entries"
-            - "verification-1234567890123456789012345678901234567890123456789012345678901234@localhost:3569=1000" # PORT 3569
+            - '--nodename'
+            - '$(POD_NAME)'
+            - '--entries'
+            - '$(NODE_ENTRIES)'
+            - '--connections'
+            - '5'
+            - '--datadir'
+            - '/flowdb'
 
           # Ports exposed can be named so other resources can reference
           # them by name and not have to hard code numbers
@@ -136,6 +79,15 @@ spec:
           env:
             - name: ENV
               value: STAGING
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_ENTRIES
+              valueFrom:
+                configMapKeyRef:
+                  name: flow-node-config-map
+                  key: entries
 
           # Resource requests and contraints
           resources:
@@ -169,7 +121,14 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 30
             successThreshold: 1
-      volumes:
-        - name: badger-volume
-          persistentVolumeClaim:
-            claimName: flow-verification-node-claim
+
+  volumeClaimTemplates:
+    - metadata:
+        name: badger-volume
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+        storageClassName: standard
