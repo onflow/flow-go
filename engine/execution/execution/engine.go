@@ -110,21 +110,27 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // This function fetches the collections and transactions in the block and passes
 // them to the block executor for execution.
 func (e *Engine) onBlock(block *flow.Block) error {
-	guarantees, err := e.getCollections(block.Guarantees)
+	collections, err := e.getCollections(block.Guarantees)
 	if err != nil {
 		return fmt.Errorf("failed to load guarantees: %w", err)
 	}
 
-	transactions, err := e.getTransactions(guarantees)
+	transactions, err := e.getTransactions(collections)
 	if err != nil {
 		return fmt.Errorf("failed to load transactions: %w", err)
 	}
 
-	executableBlock := executor.ExecutableBlock{
-		Block:        *block,
-		Transactions: transactions,
+	executableBlock := &executor.ExecutableBlock{
+		Block: block,
+		// TODO: replace with real logic from: https://github.com/dapperlabs/flow-go/pull/2028
+		Collections: []*executor.ExecutableCollection{
+			{
+				Guarantee:    block.Guarantees[0],
+				Transactions: transactions,
+			},
+		},
 		// TODO: populate this field from previous block
-		PreviousExecutionResult: flow.ExecutionResult{},
+		PreviousResultID: flow.ZeroID,
 	}
 
 	result, err := e.executor.ExecuteBlock(executableBlock)
@@ -153,20 +159,20 @@ func (e *Engine) getCollections(guarantees []*flow.CollectionGuarantee) ([]*flow
 	return collections, nil
 }
 
-func (e *Engine) getTransactions(cols []*flow.Collection) ([]flow.TransactionBody, error) {
+func (e *Engine) getTransactions(cols []*flow.Collection) ([]*flow.TransactionBody, error) {
 	txCount := 0
 
 	for _, c := range cols {
 		txCount += len(c.Transactions)
 	}
 
-	transactions := make([]flow.TransactionBody, txCount)
+	transactions := make([]*flow.TransactionBody, txCount)
 
 	i := 0
 
 	for _, c := range cols {
 		for _, tx := range c.Transactions {
-			transactions[i] = tx
+			transactions[i] = &tx
 			i++
 		}
 	}

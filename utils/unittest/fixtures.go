@@ -154,9 +154,7 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 func ChunkFixture() *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
-			FirstTxIndex:                    0,
-			TxCounts:                        42,
-			ChunkTxCollection:               nil,
+			CollectionIndex:                 42,
 			StartState:                      StateCommitmentFixture(),
 			EventCollection:                 IdentifierFixture(),
 			TotalComputationUsed:            4200,
