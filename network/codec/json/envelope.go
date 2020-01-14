@@ -15,11 +15,10 @@ const (
 	CodeResponse
 	Echo
 
-	CodeGuaranteedCollection
+	CodeCollectionGuarantee
+	CodeTransaction
 
-	CodeBlockProposal
-	CodeBlockVote
-	CodeBlockCommit
+	CodeBlock
 )
 
 // Envelope is a wrapper to convey type information with JSON encoding without

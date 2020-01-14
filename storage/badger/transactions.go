@@ -5,7 +5,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
@@ -21,23 +20,23 @@ func NewTransactions(db *badger.DB) *Transactions {
 	return &t
 }
 
-func (t *Transactions) ByFingerprint(fp flow.Fingerprint) (*flow.Transaction, error) {
-	var tx flow.Transaction
+func (t *Transactions) ByID(txID flow.Identifier) (flow.TransactionBody, error) {
 
+	var tx flow.TransactionBody
 	err := t.db.View(func(btx *badger.Txn) error {
-		err := operation.RetrieveTransaction(fp, &tx)(btx)
+		err := operation.RetrieveTransaction(txID, &tx)(btx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve transaction: %w", err)
 		}
 		return nil
 	})
 
-	return &tx, err
+	return tx, err
 }
 
-func (t *Transactions) Insert(tx *flow.Transaction) error {
+func (t *Transactions) Store(tx flow.TransactionBody) error {
 	return t.db.Update(func(btx *badger.Txn) error {
-		err := operation.InsertTransaction(tx.Fingerprint(), tx)(btx)
+		err := operation.InsertTransaction(&tx)(btx)
 		if err != nil {
 			return fmt.Errorf("could not insert transaction: %w", err)
 		}
@@ -45,9 +44,9 @@ func (t *Transactions) Insert(tx *flow.Transaction) error {
 	})
 }
 
-func (t *Transactions) Remove(hash crypto.Hash) error {
+func (t *Transactions) Remove(txID flow.Identifier) error {
 	return t.db.Update(func(btx *badger.Txn) error {
-		err := operation.RemoveTransaction(hash)(btx)
+		err := operation.RemoveTransaction(txID)(btx)
 		if err != nil {
 			return fmt.Errorf("could not remove transaction: %w", err)
 		}

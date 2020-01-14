@@ -1,9 +1,10 @@
 package verifier
 
 import (
+	"sync"
+
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"sync"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification/storage"
@@ -167,8 +168,8 @@ func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt
 
 	// emitting a result approval to all consensus nodes
 	resApprov := &flow.ResultApproval{
-		Body: flow.ResultApprovalBody{
-			ExecutionResultHash:  receipt.ExecutionResult.Fingerprint(),
+		ResultApprovalBody: flow.ResultApprovalBody{
+			ExecutionResultID:    receipt.ExecutionResult.ID(),
 			AttestationSignature: nil,
 			ChunkIndexList:       nil,
 			Proof:                nil,
@@ -197,7 +198,7 @@ func (e *Engine) broadcastResultApproval(resApprov *flow.ResultApproval, consIDs
 
 	// todo: add a hex for hash of the result approval
 	e.log.Info().
-		Strs("target_ids", logging.HexSlice(consIDs.NodeIDs())).
+		Strs("target_ids", logging.IDs(consIDs.NodeIDs())).
 		Msg("result approval propagated")
 	e.wg.Done()
 }

@@ -6,11 +6,8 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -26,17 +23,14 @@ func NewBlocks(db *badger.DB) *Blocks {
 	return b
 }
 
-func (b *Blocks) ByHash(hash crypto.Hash) (*flow.Block, error) {
+func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 
 	var block *flow.Block
 	err := b.db.View(func(tx *badger.Txn) error {
 
 		var err error
-		block, err = b.retrieveBlock(tx, hash)
+		block, err = b.retrieveBlock(tx, blockID)
 		if err != nil {
-			if err == storage.NotFoundErr {
-				return err
-			}
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
@@ -52,21 +46,15 @@ func (b *Blocks) ByNumber(number uint64) (*flow.Block, error) {
 	err := b.db.View(func(tx *badger.Txn) error {
 
 		// get the hash
-		var hash crypto.Hash
-		err := operation.RetrieveHash(number, &hash)(tx)
+		var blockID flow.Identifier
+		err := operation.RetrieveBlockID(number, &blockID)(tx)
 		if err != nil {
-			if err == storage.NotFoundErr {
-				return err
-			}
-			return errors.Wrap(err, "could not retrieve hash")
+			return fmt.Errorf("could not retrieve block ID: %w", err)
 		}
 
-		block, err = b.retrieveBlock(tx, hash)
+		block, err = b.retrieveBlock(tx, blockID)
 		if err != nil {
-			if err == storage.NotFoundErr {
-				return err
-			}
-			return errors.Wrap(err, "could not retrieve block")
+			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
 		return nil
@@ -75,62 +63,75 @@ func (b *Blocks) ByNumber(number uint64) (*flow.Block, error) {
 	return block, err
 }
 
-func (b *Blocks) retrieveBlock(tx *badger.Txn, hash crypto.Hash) (*flow.Block, error) {
+func (b *Blocks) retrieveBlock(tx *badger.Txn, blockID flow.Identifier) (*flow.Block, error) {
 
 	// get the header
 	var header flow.Header
-	err := operation.RetrieveHeader(hash, &header)(tx)
+	err := operation.RetrieveHeader(blockID, &header)(tx)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not retrieve header")
+		return nil, fmt.Errorf("could not retrieve header: %w", err)
 	}
 
 	// get the new identities
 	var identities flow.IdentityList
-	err = operation.RetrieveIdentities(hash, &identities)(tx)
+	err = operation.RetrieveIdentities(blockID, &identities)(tx)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not retrieve identities")
+		return nil, fmt.Errorf("could not retrieve identities: %w", err)
 	}
 
-	// get the guaranteed collections
-	var collections []*flow.GuaranteedCollection
-	err = operation.RetrieveGuaranteedCollections(hash, &collections)(tx)
+	// get the collection guarantees
+	var guarantees []*flow.CollectionGuarantee
+	err = operation.RetrieveGuarantees(blockID, &guarantees)(tx)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not retrieve collections")
+		return nil, fmt.Errorf("could not retrieve collection guarantees: %w", err)
 	}
+
+	// create the block content
+	content := flow.Content{
+		Identities: identities,
+		Guarantees: guarantees,
+	}
+
+	// deduce the block payload
+	payload := content.Payload()
 
 	// create the block
 	block := &flow.Block{
-		Header:                header,
-		NewIdentities:         identities,
-		GuaranteedCollections: collections,
+		Header:  header,
+		Payload: payload,
+		Content: content,
 	}
 
 	return block, nil
 }
 
-func (b *Blocks) Save(block *flow.Block) error {
+func (b *Blocks) Store(block *flow.Block) error {
 
 	err := b.db.Update(func(tx *badger.Txn) error {
 
 		err := operation.PersistHeader(&block.Header)(tx)
 		if err != nil {
-			return fmt.Errorf("cannot save block: %w", err)
+			return fmt.Errorf("could not save header: %w", err)
 		}
-		err = operation.PersistIdentities(block.Hash(), block.NewIdentities)(tx)
+
+		err = operation.PersistIdentities(block.ID(), block.Identities)(tx)
 		if err != nil {
-			return fmt.Errorf("cannot save block %w", err)
+			return fmt.Errorf("could not save block: %w", err)
 		}
-		err = operation.PersistGuaranteedCollections(block.Hash(), block.GuaranteedCollections)(tx)
-		if err != nil {
-			return fmt.Errorf("cannot save block %w", err)
-		}
-		err = operation.PersistHash(block.Number, block.Hash())(tx)
-		if err != nil {
-			return fmt.Errorf("cannot save block %w", err)
+
+		for _, cg := range block.Guarantees {
+			err = operation.PersistGuarantee(cg)(tx)
+			if err != nil {
+				return fmt.Errorf("could not save collection guarantee: %w", err)
+			}
+			err = operation.IndexGuarantee(block.ID(), cg)(tx)
+			if err != nil {
+				return fmt.Errorf("could not index guaranteed collection by block ID: %w", err)
+			}
 		}
 
 		return nil
 	})
-	return err
 
+	return err
 }

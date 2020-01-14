@@ -5,18 +5,17 @@ package operation
 import (
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertIdentities(hash crypto.Hash, identities flow.IdentityList) func(*badger.Txn) error {
-	return insert(makePrefix(codeIdentities, hash), identities)
+func InsertIdentities(blockID flow.Identifier, identities flow.IdentityList) func(*badger.Txn) error {
+	return insert(makePrefix(codeIdentities, blockID), identities)
 }
 
-func PersistIdentities(hash crypto.Hash, identities flow.IdentityList) func(*badger.Txn) error {
-	return persist(makePrefix(codeIdentities, hash), identities)
+func PersistIdentities(blockID flow.Identifier, identities flow.IdentityList) func(*badger.Txn) error {
+	return persist(makePrefix(codeIdentities, blockID), identities)
 }
 
-func RetrieveIdentities(hash crypto.Hash, identities *flow.IdentityList) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeIdentities, hash), identities)
+func RetrieveIdentities(blockID flow.Identifier, identities *flow.IdentityList) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeIdentities, blockID), identities)
 }

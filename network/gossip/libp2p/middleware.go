@@ -12,6 +12,7 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	networkmodel "github.com/dapperlabs/flow-go/model/libp2p/network"
@@ -83,9 +84,18 @@ func (m *Middleware) Start(ov middleware.Overlay) {
 // Stop will end the execution of the middleware and wait for it to end.
 func (m *Middleware) Stop() {
 	close(m.stop)
-	m.libP2PNode.Stop()
+
+	// Stop all the connections
 	for _, conn := range m.cc.GetAll() {
 		conn.stop()
+	}
+
+	// Stop libp2p
+	err := m.libP2PNode.Stop()
+	if err != nil {
+		log.Error().Err(err).Msg("stopping failed")
+	} else {
+		log.Debug().Msg("node stopped successfully")
 	}
 	m.wg.Wait()
 }
@@ -131,7 +141,7 @@ func (m *Middleware) createOutboundMessage(msg interface{}) (*Message, error) {
 			targetIDs = append(targetIDs, t[:])
 		}
 		em := &EventMessage{
-			EngineID:  uint32(nm.EngineID),
+			EngineID:  uint32(nm.ChannelID),
 			EventID:   nm.EventID,
 			OriginID:  nm.OriginID[:],
 			TargetIDs: targetIDs,
@@ -154,9 +164,6 @@ func (m *Middleware) createInboundMessage(msg *Message) (*flow.Identifier, inter
 
 	// Extract sender id
 	if len(msg.SenderID) < 32 {
-		m.log.Error().
-			Bytes("sender", msg.SenderID).
-			Msg(" invalid sender id")
 		err := fmt.Errorf("invalid sender id")
 		return nil, nil, err
 	}
@@ -175,7 +182,7 @@ func (m *Middleware) createInboundMessage(msg *Message) (*flow.Identifier, inter
 	}
 
 	nm := networkmodel.NetworkMessage{
-		EngineID:  uint8(msg.Event.EngineID),
+		ChannelID: uint8(msg.Event.EngineID),
 		EventID:   msg.Event.EventID,
 		OriginID:  id,
 		TargetIDs: targetIDs,

@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/stub"
-	"github.com/dapperlabs/flow-go/protocol"
+	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -45,92 +45,138 @@ func TestInvalidTransaction(t *testing.T) {
 // Transactions should be routed to the correct cluster and should not be
 // routed unnecessarily.
 func TestClusterRouting(t *testing.T) {
-	// number of nodes and number of clusters
-	const N = 3
+	// number of nodes
+	const nNodes = 3
 
-	t.Run("should not route transactions for my cluster", func(t *testing.T) {
+	// number of clusters
+	const nClusters = 3
+
+	t.Run("should store transaction for local cluster", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, N)
+		nodes := testutil.CollectionNodes(t, hub, nNodes, protocol.SetClusters(nClusters))
 
-		state := nodes[0].State
-		identities, err := state.AtNumber(0).Identities()
+		// name the various nodes
+		localNode, remoteNode, noopNode := nodes[0], nodes[1], nodes[2]
+
+		// get the list of clusters
+		clusters, err := localNode.State.AtNumber(0).Clusters()
 		require.NoError(t, err)
 
-		clusters := protocol.Cluster(identities)
-
-		// the node we will send transactions to
-		ingressNode := nodes[0]
-		// the transaction will target the ingress node's cluster
-		targetCluster := clusters.ClusterIDFor(ingressNode.Me.NodeID())
-
-		// the other nodes
-		otherNode1, otherNode2 := nodes[1], nodes[2]
-
-		// get a transaction that will be routed to the target cluster
-		tx := testutil.TransactionForCluster(N, targetCluster)
-
-		err = ingressNode.IngestionEngine.Process(ingressNode.Me.NodeID(), tx)
-		assert.NoError(t, err)
-
-		// transaction should be in target cluster's pool, not in other pool
-		assert.EqualValues(t, 1, ingressNode.Pool.Size())
-		assert.EqualValues(t, 0, otherNode1.Pool.Size())
-		assert.EqualValues(t, 0, otherNode2.Pool.Size())
-	})
-
-	t.Run("should route transactions for a different cluster", func(t *testing.T) {
-		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, N)
-
-		state := nodes[0].State
-		identities, err := state.AtNumber(0).Identities()
+		// set target cluster to the local cluster
+		localCluster, err := clusters.ByNodeID(localNode.Me.NodeID())
 		require.NoError(t, err)
 
-		clusters := protocol.Cluster(identities)
+		// get a transaction that will be routed to local
+		tx := testutil.TransactionForCluster(clusters, localCluster)
 
-		// the node we will send transactions to
-		ingressNode := nodes[0]
-
-		// the node in the target cluster
-		targetNode := nodes[1]
-		targetCluster := clusters.ClusterIDFor(targetNode.Me.NodeID())
-
-		otherNode := nodes[2]
-
-		// get a transaction that will be routed to the target cluster
-		tx := testutil.TransactionForCluster(N, targetCluster)
-
-		err = ingressNode.IngestionEngine.Process(ingressNode.Me.NodeID(), tx)
+		// submit transaction locally to test storing
+		err = localNode.IngestionEngine.ProcessLocal(tx)
 		assert.NoError(t, err)
 
-		// flush messages from the ingress node
-		net, ok := hub.GetNetwork(targetNode.Me.NodeID())
-		require.True(t, ok)
+		// flush the network to make sure all messages are sent
+		net, _ := hub.GetNetwork(localNode.Me.NodeID())
 		net.FlushAll()
 
 		// transaction should be in target cluster's pool, not in other pool
-		assert.EqualValues(t, 0, ingressNode.Pool.Size())
-		assert.EqualValues(t, 1, targetNode.Pool.Size())
-		assert.EqualValues(t, 0, otherNode.Pool.Size())
+		assert.EqualValues(t, 1, localNode.Pool.Size())
+		assert.EqualValues(t, 0, remoteNode.Pool.Size())
+		assert.EqualValues(t, 0, noopNode.Pool.Size())
 	})
 
-	t.Run("should not route invalid transactions", func(t *testing.T) {
+	t.Run("should propagate locally submitted transaction", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
-		nodes := testutil.CollectionNodes(t, hub, N)
+		nodes := testutil.CollectionNodes(t, hub, nNodes, protocol.SetClusters(nClusters))
 
-		ingressNode := nodes[0]
-		otherNode1, otherNode2 := nodes[1], nodes[2]
+		// name the various nodes
+		localNode, remoteNode, noopNode := nodes[0], nodes[1], nodes[2]
 
-		// get an invalid transaction
-		tx := unittest.TransactionFixture()
+		// get the list of clusters
+		clusters, err := localNode.State.AtNumber(0).Clusters()
+		require.NoError(t, err)
+
+		// set target cluster to remote cluster
+		remoteCluster, err := clusters.ByNodeID(remoteNode.Me.NodeID())
+		require.NoError(t, err)
+
+		// get a transaction that will be routed to the target cluster
+		tx := testutil.TransactionForCluster(clusters, remoteCluster)
+
+		// submit transaction locally to test propagation
+		err = localNode.IngestionEngine.ProcessLocal(tx)
+		assert.NoError(t, err)
+
+		// flush the network to make sure all messages are sent
+		net, _ := hub.GetNetwork(localNode.Me.NodeID())
+		net.FlushAll()
+
+		// transaction should be in target cluster's pool, not in other pool
+		assert.EqualValues(t, 0, localNode.Pool.Size())
+		assert.EqualValues(t, 1, remoteNode.Pool.Size())
+		assert.EqualValues(t, 0, noopNode.Pool.Size())
+	})
+
+	t.Run("should not propagate remotely submitted transaction", func(t *testing.T) {
+		hub := stub.NewNetworkHub()
+		nodes := testutil.CollectionNodes(t, hub, nNodes, protocol.SetClusters(nClusters))
+
+		// name the various nodes
+		localNode, remoteNode, noopNode := nodes[0], nodes[1], nodes[2]
+
+		// get the list of clusters
+		clusters, err := localNode.State.AtNumber(0).Clusters()
+		require.NoError(t, err)
+
+		// set target cluster to remote cluster
+		targetCluster, err := clusters.ByNodeID(remoteNode.Me.NodeID())
+		require.NoError(t, err)
+
+		// get a transaction that will be routed to remote cluster
+		tx := testutil.TransactionForCluster(clusters, targetCluster)
+
+		// submit transaction with remote origin to test non-propagation
+		err = localNode.IngestionEngine.Process(remoteNode.Me.NodeID(), tx)
+		assert.NoError(t, err)
+
+		// flush the network to make sure all messages are sent
+		net, _ := hub.GetNetwork(localNode.Me.NodeID())
+		net.FlushAll()
+
+		// transaction should not be in any pool
+		assert.EqualValues(t, 0, localNode.Pool.Size())
+		assert.EqualValues(t, 0, remoteNode.Pool.Size())
+		assert.EqualValues(t, 0, noopNode.Pool.Size())
+	})
+
+	t.Run("should not process invalid transaction", func(t *testing.T) {
+		hub := stub.NewNetworkHub()
+		nodes := testutil.CollectionNodes(t, hub, nNodes, protocol.SetClusters(nClusters))
+
+		// name the various nodes
+		localNode, remoteNode, noopNode := nodes[0], nodes[1], nodes[2]
+
+		// get the list of clusters
+		clusters, err := localNode.State.AtNumber(0).Clusters()
+		require.NoError(t, err)
+
+		// set the target cluster to local cluster
+		targetCluster, err := clusters.ByNodeID(localNode.Me.NodeID())
+		require.NoError(t, err)
+
+		// get transaction for target cluster, but make it invalid
+		tx := testutil.TransactionForCluster(clusters, targetCluster)
 		tx.Script = nil
 
-		err := ingressNode.IngestionEngine.Process(ingressNode.Me.NodeID(), tx)
+		// submit transaction locally (should not be relevant)
+		err = localNode.IngestionEngine.ProcessLocal(tx)
 		assert.Error(t, err)
 
+		// flush the network to make sure all messages are sent
+		net, _ := hub.GetNetwork(localNode.Me.NodeID())
+		net.FlushAll()
+
 		// the transaction should not be stored in the ingress, nor routed
-		assert.EqualValues(t, 0, ingressNode.Pool.Size())
-		assert.EqualValues(t, 0, otherNode1.Pool.Size())
-		assert.EqualValues(t, 0, otherNode2.Pool.Size())
+		assert.EqualValues(t, 0, localNode.Pool.Size())
+		assert.EqualValues(t, 0, remoteNode.Pool.Size())
+		assert.EqualValues(t, 0, noopNode.Pool.Size())
 	})
 }

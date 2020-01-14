@@ -5,6 +5,12 @@
 #  It takes the output of `gocov test` or `gocov convert` (e.g. gocov's JSON interchange format) and prints out a summary
 ###
 
+
+# Add all the sub coverages to the cover file
+tail -n +2 crypto/$COVER_PROFILE >> $COVER_PROFILE
+tail -n +2 language/$COVER_PROFILE >> $COVER_PROFILE
+gocov convert $COVER_PROFILE > cover.json
+
 # The summary lines are indicated by a long running set of `-`s, therefore to get the summary lines, we grep the lines with a set of dashes
 # To remove noise, we remove the root project path `github.com/dapperlabs/flow-go` and all the dashes using `sed`
 # Then we print out the lines in a way that teamcity understands, e.g. `##teamcity[buildStatisticValue key='package' value='100.00]'`

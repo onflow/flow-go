@@ -15,122 +15,108 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
-	"github.com/dapperlabs/flow-go/engine/verification/storage"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
-// Test suit for functionality testing of Verifier Engine
+// VerifierEngineTestSuit encloses functionality testings of Verifier Engine
 type VerifierEngineTestSuit struct {
 	suite.Suite
-	e     *Engine       // the mock engine, used for testing different functionalities
-	net   *mock.Network // used as an instance of networking layer for the mock engine
-	state *protocol.State
-	me    *mock.Local
-	con   *network.Conduit
-	ss    *protocol.Snapshot
-	wg    *sync.WaitGroup
+	net   *mock.Network      // used as an instance of networking layer for the mock engine
+	state *protocol.State    // used as a mock protocol state of nodes for verification engine
+	ss    *protocol.Snapshot // used as a mock representation of the snapshot of system (part of State)
+	me    *mock.Local        // used as a mock representation of the mock verification node (owning the verifier engine)
+	con   *network.Conduit   // used as a mock instance of conduit that connects engine to network
 }
 
-// SetupTests initiates the test setups prior to each test
-func (v *VerifierEngineTestSuit) SetupTest() {
-	v.state = &protocol.State{} // used as a mock identity table for the mock engine
-	v.con = &network.Conduit{}  // used as a mock conduit for the mock engine
-	v.net = &mock.Network{}     // used as a mock network for the mock engine
-	v.me = &mock.Local{}
-	v.ss = &protocol.Snapshot{}
-	log := zerolog.Logger{} // used as to log relevant
-	wg := sync.WaitGroup{}
-
-	// the mock verifier engine
-	v.e = &Engine{
-		unit:  engine.NewUnit(),
-		log:   log,
-		state: v.state,
-		me:    v.me,
-		store: *storage.New(),
-		wg:    wg,
-		mu:    sync.Mutex{},
-	}
-
-	// mocking the network registration of the engine
-	v.net.On("Register", uint8(engine.VerificationVerifier), testifymock.Anything).
-		Return(v.con, nil).
-		Once()
-}
-
+// TestVerifierEngineTestSuite is the constructor of the TestSuite of the verifier engine
+// Invoking this method executes all the subsequent tests methods of VerifierEngineTestSuit type
 func TestVerifierEngineTestSuite(t *testing.T) {
 	suite.Run(t, new(VerifierEngineTestSuit))
 }
 
-// TestNewEngineNetworkRegistration verifies the establishment of the network registration upon
-// creation of an instance of verifier.Engine using the New method
-func (v *VerifierEngineTestSuit) TestNewEngineNetworkRegistration() {
-	// creating a new engine
-	_, err := New(v.e.log, v.net, v.e.state, v.e.me)
-	require.Nil(v.T(), err, "could not create an engine")
-	v.net.AssertExpectations(v.T())
+// SetupTests initiates the test setups prior to each test
+func (v *VerifierEngineTestSuit) SetupTest() {
+	// initializing test suite fields
+	v.state = &protocol.State{}
+	v.con = &network.Conduit{}
+	v.net = &mock.Network{}
+	v.me = &mock.Local{}
+	v.ss = &protocol.Snapshot{}
 
-	// also independently testing the encoding of result approvals
-	// this is just to ensure that we have an encodable result approval
-	resApprove := flow.ResultApproval{}
-	resApprove.Fingerprint()
+	// mocking the network registration of the engine
+	// all subsequent tests are expected to have a call on Register method
+	v.net.On("Register", uint8(engine.VerificationVerifier), testifymock.AnythingOfType("*verifier.Engine")).
+		Return(v.con, nil).
+		Once()
 }
 
-// TestSubmitHappyPath covers the happy path of submitting a valid execution receipt to
-// a single verifier engine till a result approval is emitted to all the consensus nodes
-func (v *VerifierEngineTestSuit) TestSubmitHappyPath() {
+// TestEncodeResultApproval tests encoding of result approvals
+// making sure that encoding works correctly
+func (v *VerifierEngineTestSuit) TestEncodeResultApproval() {
+	resApprove := flow.ResultApproval{}
+	resultID := resApprove.ID()
+	require.NotEqual(v.T(), resultID, flow.ZeroID, "nil fingerprint")
+}
+
+// TestNewEngine verifies the establishment of the network registration upon
+// creation of an instance of verifier.Engine using the New method
+// It also returns an instance of new engine to be used in the later tests
+func (v *VerifierEngineTestSuit) TestNewEngine() *Engine {
 	// creating a new engine
-	vrfy, err := New(v.e.log, v.net, v.e.state, v.e.me)
+	e, err := New(zerolog.Logger{}, v.net, v.state, v.me)
 	require.Nil(v.T(), err, "could not create an engine")
+	v.net.AssertExpectations(v.T())
+	return e
+}
 
+// TestProcessLocalHappyPath covers the happy path of submitting a valid execution receipt to
+// a single verifier engine till a result approval is emitted to all the consensus nodes
+func (v *VerifierEngineTestSuit) TestProcessLocalHappyPath() {
+	// creating a new engine
+	vrfy := v.TestNewEngine()
 	//mocking the identity of the verification node under test
-	vnMe := flow.Identity{
-		NodeID:  flow.Identifier{0x01, 0x01, 0x01, 0x01},
-		Address: "mock-vn-address",
-		Role:    flow.RoleVerification,
-	}
-	//mocking state for me.NodeID for twice
-	v.me.On("NodeID").Return(vnMe.NodeID).Twice()
+	vnMe := newMockVrfyID()
 
-	// mocking for Final().Identities(Identity(verifierNode))
+	//mocking state for me.NodeID for internal call in ProcessLocal method
+	v.me.On("NodeID").Return(vnMe.NodeID).Once()
+
+	// mocking for Final().Identities(Identity(originID)) in onExecutionReceipt method
 	v.state.On("Final").Return(v.ss).Once()
 	v.ss.On("Identity", vnMe.NodeID).Return(vnMe, nil).Once()
 
-	// a set of mock staked nodes
-	ids := generateMockIdentities(100)
-	consID := ids.Filter(identity.HasRole(flow.RoleConsensus))
+	//mocking state for me.NodeID for internal call in onExecutionReceipt method
+	v.me.On("NodeID").Return(vnMe.NodeID).Once()
 
-	// mocking for Final().Identities(identity.HasRole(flow.RoleConsensus))
+	// a set of mock staked consensus nodes
+	consID := generateMockConsensusIDs(100)
+
+	// mocking for Final().Identities(identity.HasRole(flow.RoleConsensus)) call in verify method
 	v.state.On("Final").Return(v.ss).Once()
 	v.ss.On("Identities", testifymock.Anything).Return(consID, nil)
 
 	// generating a random ER and its associated result approval
 	er := verification.RandomERGen()
-	restApprov := verification.RnadRAGen(er)
-	// extracting mock consensus nodes IDs
-	params := []interface{}{restApprov}
-	for _, targetID := range consID.NodeIDs() {
-		params = append(params, targetID)
-	}
+	restApprov := verification.RandomRAGen(er)
 
 	// the happy path ends by the verifier engine emitting a
 	// result approval to ONLY all the consensus nodes
+	// generating and mocking parameters of Submit method
+	params := genSubmitParams(restApprov, consID)
 	v.con.On("Submit", params...).
 		Return(nil).
 		Once()
 
 	// store of the engine should be empty prior to the submit
-	assert.Equal(v.T(), vrfy.store.ResultsNum(), 0)
+	assert.Equal(v.T(), uint(0), vrfy.store.ResultsNum())
 
 	// emitting an execution receipt form the execution node
 	_ = vrfy.ProcessLocal(er)
 
 	// store of the engine should be of size one prior to the submit
-	assert.Equal(v.T(), vrfy.store.ResultsNum(), 1)
+	assert.Equal(v.T(), uint(1), vrfy.store.ResultsNum())
 
 	vrfy.wg.Wait()
 	v.state.AssertExpectations(v.T())
@@ -140,17 +126,17 @@ func (v *VerifierEngineTestSuit) TestSubmitHappyPath() {
 }
 
 // TestProcessUnhappyInput covers unhappy inputs for Process method
+// including nil event, empty event, and non-existing IDs
 func (v *VerifierEngineTestSuit) TestProcessUnhappyInput() {
-	// mocking state for Final().Identity(flow.Identifier{})
+	// mocking state for Final().Identity(flow.Identifier{}) call in onExecutionReceipt
 	v.state.On("Final").Return(v.ss).Once()
 	v.ss.On("Identity", flow.Identifier{}).Return(flow.Identity{}, errors.New("non-nil")).Once()
 
 	// creating a new engine
-	vrfy, err := New(v.e.log, v.net, v.e.state, v.me)
-	require.Nil(v.T(), err, "could not create an engine")
+	vrfy := v.TestNewEngine()
 
 	// nil event
-	err = vrfy.Process(flow.Identifier{}, nil)
+	err := vrfy.Process(flow.Identifier{}, nil)
 	assert.NotNil(v.T(), err, "failed recognizing nil event")
 
 	// non-execution receipt event
@@ -161,7 +147,7 @@ func (v *VerifierEngineTestSuit) TestProcessUnhappyInput() {
 	err = vrfy.Process(flow.Identifier{}, &flow.ExecutionReceipt{})
 	assert.NotNilf(v.T(), err, "broken happy path: %s", err)
 
-	// asserting a single calls in unhappy path
+	// asserting the calls in unhappy path
 	vrfy.wg.Wait()
 	v.net.AssertExpectations(v.T())
 	v.state.AssertExpectations(v.T())
@@ -173,8 +159,7 @@ func (v *VerifierEngineTestSuit) TestProcessUnhappyInput() {
 // catch this injected fault by returning an error
 func (v *VerifierEngineTestSuit) TestProcessUnstakeEmit() {
 	// creating a new engine
-	vrfy, err := New(v.e.log, v.net, v.e.state, v.me)
-	require.Nil(v.T(), err, "could not create an engine")
+	vrfy := v.TestNewEngine()
 
 	unstakedID := flow.Identity{
 		NodeID:  flow.Identifier{0x02, 0x02, 0x02, 0x02},
@@ -183,14 +168,14 @@ func (v *VerifierEngineTestSuit) TestProcessUnstakeEmit() {
 		Stake:   0,
 	}
 
-	// mocking state for Final().Identity(unstakedID.NodeID)
+	// mocking state for Final().Identity(unstakedID.NodeID) call in onExecutionReceipt
 	v.state.On("Final").Return(v.ss).Once()
 	v.ss.On("Identity", unstakedID.NodeID).
 		Return(flow.Identity{}, errors.New("non-nil")).Once()
 
 	// execution receipts should directly come from Execution Nodes,
 	// hence for all test cases a non-nil error should returned
-	err = vrfy.Process(unstakedID.NodeID, &flow.ExecutionReceipt{})
+	err := vrfy.Process(unstakedID.NodeID, &flow.ExecutionReceipt{})
 	assert.NotNil(v.T(), err, "failed rejecting an unstaked id")
 
 	vrfy.wg.Wait()
@@ -201,6 +186,9 @@ func (v *VerifierEngineTestSuit) TestProcessUnstakeEmit() {
 // TestProcessUnauthorizedEmits follows the unhappy path where staked nodes
 // rather than execution nodes send an execution receipt event
 func (v *VerifierEngineTestSuit) TestProcessUnauthorizedEmits() {
+	// creating a new engine
+	vrfy := v.TestNewEngine()
+
 	// defining mock nodes identities
 	// test table covers all roles except the execution nodes
 	// that are the only legitimate party to originate an execution receipt
@@ -226,16 +214,8 @@ func (v *VerifierEngineTestSuit) TestProcessUnauthorizedEmits() {
 		},
 	}
 
-	//mocking the identity of the verification node under test
-	vnMe := flow.Identity{
-		NodeID:  flow.Identifier{0x01, 0x01, 0x01, 0x01},
-		Address: "mock-vn-address",
-		Role:    flow.RoleVerification,
-	}
-
-	// creating a new engine
-	vrfy, err := New(v.e.log, v.net, v.e.state, v.e.me)
-	require.Nil(v.T(), err, "could not create an engine")
+	// mocking the identity of the verification node under test
+	vnMe := newMockVrfyID()
 
 	for _, tc := range tt {
 		id := flow.Identity{
@@ -243,16 +223,16 @@ func (v *VerifierEngineTestSuit) TestProcessUnauthorizedEmits() {
 			Address: "mock-address",
 			Role:    tc.role,
 		}
-		// mocking state fo Final().Identity(originID)
+		// mocking state for Final().Identity(originID) call in onExecutionReceipt method
 		v.state.On("Final").Return(v.ss).Once()
 		v.ss.On("Identity", id.NodeID).Return(id, nil).Once()
 
-		//mocking state for e.me.NodeID(vnMe.NodeID) for twice
+		//mocking state for e.me.NodeID(vnMe.NodeID) call in onExecutionReceipt method
 		v.me.On("NodeID").Return(vnMe.NodeID).Once()
 
 		// execution receipts should directly come from Execution Nodes,
 		// hence for all test cases a non-nil error should returned
-		err = vrfy.Process(id.NodeID, &flow.ExecutionReceipt{})
+		err := vrfy.Process(id.NodeID, &flow.ExecutionReceipt{})
 		assert.NotNil(v.T(), err, "failed rejecting an faulty origin id")
 
 		vrfy.wg.Wait()
@@ -263,17 +243,18 @@ func (v *VerifierEngineTestSuit) TestProcessUnauthorizedEmits() {
 }
 
 // ConcurrencyTestSetup is a sub-test method. It is not invoked independently, rather
-// it is executed as part of other test methods. It provides some setups for those test methods.
-// On receiving a concurrency degree, and number of consensus nodes, consNum, it generates a mock verifier engine
-// and an execution node id. It then mocks a consensus committee for the verifier engine to contact, and mocks
-// the submit method of the verifier node. It prepares the verifier engine to accept a valid execution receipt
-// from the execution node and emit an empty result approval to all the consensus nodes. It then returns the
-// verifier engine and identity of the consensus nodes for more advance caller tests to use.
-// The concurrency degree is used to mock the reception of identical execution results
+// it is executed as part of other test methods.
+// It does the followings:
+// 1- creates and returns a mock verifier engine as part of return values
+// 2- creates and returns a mock staked execution node ID as part of return values
+// 3- It receives the concurrency degree as input and mocks the methods to expect calls equal to that degree
+// 4- It generates and mocks a consensus committee for the verifier engine to contact, and mocks
+// Submit method of the verifier engine.
+// 5- It generates a valid execution receipt and mocks the verifier node accept that from the generated execution node ID
+// in step (2), and emit a result approval to the consensus committee generated in step (4).
 func (v *VerifierEngineTestSuit) ConcurrencyTestSetup(degree, consNum int) (*flow.Identity, *Engine, *flow.ExecutionReceipt) {
 	// creating a new engine
-	vrfy, err := New(v.e.log, v.net, v.e.state, v.e.me)
-	require.Nil(v.T(), err, "could not create an engine")
+	vrfy := v.TestNewEngine()
 
 	// a mock staked execution node for generating a mock execution receipt
 	exeID := flow.Identity{
@@ -282,32 +263,26 @@ func (v *VerifierEngineTestSuit) ConcurrencyTestSetup(degree, consNum int) (*flo
 		Role:    flow.RoleExecution,
 	}
 
-	// mocking state fo Final().Identity(originID)
+	// mocking state fo Final().Identity(originID) call in onExecutionReceipt method
 	v.state.On("Final").Return(v.ss).Times(degree)
 	v.ss.On("Identity", exeID.NodeID).Return(exeID, nil).Times(degree)
 
-	// a set of mock staked nodes
-	ids := generateMockIdentities(consNum)
-	// extracting mock consensus nodes IDs
-	consIDs := ids.Filter(identity.HasRole(flow.RoleConsensus))
+	consIDs := generateMockConsensusIDs(consNum)
 
-	// mocking for Final().Identities(identity.HasRole(flow.RoleConsensus))
+	// mocking for Final().Identities(identity.HasRole(flow.RoleConsensus)) call in verify method
 	// since all ERs are the same, only one call for identity of consensus nodes should happen
 	v.state.On("Final").Return(v.ss).Once()
 	v.ss.On("Identities", testifymock.Anything).Return(consIDs, nil)
 
 	// generating a random execution receipt and its corresponding result approval
 	er := verification.RandomERGen()
-	restApprov := verification.RnadRAGen(er)
-	// extracting mock consensus nodes IDs
-	params := []interface{}{restApprov}
-	for _, targetID := range consIDs {
-		params = append(params, targetID.NodeID)
-	}
+	restApprov := verification.RandomRAGen(er)
 
 	// the happy path ends by the verifier engine emitting a
 	// result approval to ONLY all the consensus nodes
 	// since all ERs are the same, only one submission should happen
+	// generating and mocking parameters of Submit method
+	params := genSubmitParams(restApprov, consIDs)
 	v.con.On("Submit", params...).
 		Return(nil).
 		Once()
@@ -316,8 +291,8 @@ func (v *VerifierEngineTestSuit) ConcurrencyTestSetup(degree, consNum int) (*flo
 }
 
 // TestProcessHappyPathConcurrentERs covers the happy path of the verifier engine on concurrently
-// receiving a valid execution receipt several times
-// The expected behavior is to verify only a single copy of those receipts while dismissing the rest
+// receiving a valid execution receipt several times. The execution receipts are coming from a single
+// execution node. The expected behavior is to verify only a single copy of those receipts while dismissing the rest.
 func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentERs() {
 	// ConcurrencyDegree defines the number of concurrent identical ER that are submitted to the
 	// verifier node
@@ -388,7 +363,7 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentERsConcurrently()
 }
 
 // TestProcessHappyPathConcurrentDifferentERs covers the happy path of the verifier engine on concurrently
-// receiving several valid execution receipts
+// receiving several valid execution receipts.
 // The expected behavior is to verify all of them and emit one submission of result approval per input receipt
 func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentDifferentERs() {
 	// ConcurrencyDegree defines the number of concurrent identical ER that are submitted to the
@@ -396,8 +371,7 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentDifferentERs() {
 	const ConcurrencyDegree = 10
 
 	// creating a new engine
-	vrfy, err := New(v.e.log, v.net, v.e.state, v.e.me)
-	require.Nil(v.T(), err, "could not create an engine")
+	vrfy := v.TestNewEngine()
 
 	// a mock staked execution node for generating a mock execution receipt
 	exeID := flow.Identity{
@@ -406,16 +380,14 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentDifferentERs() {
 		Role:    flow.RoleExecution,
 	}
 
-	// mocking state fo Final().Identity(originID)
+	// mocking state for Final().Identity(originID) in onExecutionReceipt method
 	v.state.On("Final").Return(v.ss).Times(ConcurrencyDegree)
 	v.ss.On("Identity", exeID.NodeID).Return(exeID, nil).Times(ConcurrencyDegree)
 
-	// a set of mock staked nodes
-	ids := generateMockIdentities(100)
-	// extracting mock consensus nodes IDs
-	consIDs := ids.Filter(identity.HasRole(flow.RoleConsensus))
+	// generating a set of mock consensus ids
+	consIDs := generateMockConsensusIDs(100)
 
-	// mocking for Final().Identities(identity.HasRole(flow.RoleConsensus))
+	// mocking for Final().Identities(identity.HasRole(flow.RoleConsensus)) call in verify method
 	// since ERs distinct, distinct calls for retrieving consensus nodes identity should happen
 	v.state.On("Final").Return(v.ss).Times(ConcurrencyDegree)
 	v.ss.On("Identities", testifymock.Anything).Return(consIDs, nil).Times(ConcurrencyDegree)
@@ -429,14 +401,8 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentDifferentERs() {
 	for i := 0; i < ConcurrencyDegree; i++ {
 		// generating a random execution receipt and its corresponding result approval
 		er := verification.RandomERGen()
-		restApprov := verification.RnadRAGen(er)
-
-		params := []interface{}{restApprov}
-		// generating mock consensus nodes as recipients of the result approval
-		for _, targetID := range consIDs {
-			params = append(params, targetID.NodeID)
-		}
-
+		restApprov := verification.RandomRAGen(er)
+		params := genSubmitParams(restApprov, consIDs)
 		testTable[i].receipt = er
 		testTable[i].params = params
 	}
@@ -451,13 +417,13 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentDifferentERs() {
 			Return(nil).
 			Once()
 
-		err = vrfy.Process(exeID.NodeID, testTable[i].receipt)
+		err := vrfy.Process(exeID.NodeID, testTable[i].receipt)
 		if err != nil {
 			errCount++
 		}
 	}
 	// all ERs are the same, so only one of them should be processed
-	assert.Equal(v.T(), errCount, 0)
+	assert.Equal(v.T(), 0, errCount)
 
 	vrfy.wg.Wait()
 	v.con.AssertExpectations(v.T())
@@ -465,12 +431,11 @@ func (v *VerifierEngineTestSuit) TestProcessHappyPathConcurrentDifferentERs() {
 	v.state.AssertExpectations(v.T())
 }
 
-// TestOnExecutionReceiptHappyPath covers the happy path of the verifier engine on receiving an valid execution receipt
+// TestProcessHappyPath covers the happy path of the verifier engine on receiving a valid execution receipt
 // The expected behavior is to verify the receipt and emit a result approval to all consensus nodes
-func (v *VerifierEngineTestSuit) TestOnExecutionReceiptHappyPath() {
+func (v *VerifierEngineTestSuit) TestProcessHappyPath() {
 	// creating a new engine
-	vrfy, err := New(v.e.log, v.net, v.e.state, v.e.me)
-	require.Nil(v.T(), err, "could not create an engine")
+	vrfy := v.TestNewEngine()
 
 	// a mock staked execution node for generating a mock execution receipt
 	exeID := flow.Identity{
@@ -479,37 +444,31 @@ func (v *VerifierEngineTestSuit) TestOnExecutionReceiptHappyPath() {
 		Role:    flow.RoleExecution,
 	}
 
-	// mocking state fo Final().Identity(originID)
+	// mocking state fo Final().Identity(originID) call in onExecutionReceipt method
 	v.state.On("Final").Return(v.ss).Once()
 	v.ss.On("Identity", exeID.NodeID).Return(exeID, nil).Once()
 
-	// a set of mock staked nodes
-	ids := generateMockIdentities(100)
-	// extracting mock consensus nodes IDs
-	consIds := ids.Filter(identity.HasRole(flow.RoleConsensus))
+	// generating a set of mock consensus ids
+	consIDs := generateMockConsensusIDs(100)
 
-	// mocking for Final().Identities(identity.HasRole(flow.RoleConsensus))
+	// mocking for Final().Identities(identity.HasRole(flow.RoleConsensus)) in verify method
 	v.state.On("Final").Return(v.ss).Once()
-	v.ss.On("Identities", testifymock.Anything).Return(consIds, nil)
+	v.ss.On("Identities", testifymock.Anything).Return(consIDs, nil)
 
 	// generating a random execution receipt and its corresponding result approval
 	er := verification.RandomERGen()
-	restApprov := verification.RnadRAGen(er)
-
-	// generating mock consensus nodes as recipients of the result approval
-	params := []interface{}{restApprov}
-	for _, targetID := range consIds {
-		params = append(params, targetID.NodeID)
-	}
+	restApprov := verification.RandomRAGen(er)
 
 	// the happy path ends by the verifier engine emitting a
 	// result approval to ONLY all the consensus nodes
+	// generating and mocking parameters of Submit method
+	params := genSubmitParams(restApprov, consIDs)
 	v.con.On("Submit", params...).
 		Return(nil).
 		Once()
 
 	// emitting an execution receipt form the execution node
-	err = vrfy.Process(exeID.NodeID, er)
+	err := vrfy.Process(exeID.NodeID, er)
 	assert.Nil(v.T(), err, "failed processing execution receipt")
 
 	vrfy.wg.Wait()
@@ -518,35 +477,42 @@ func (v *VerifierEngineTestSuit) TestOnExecutionReceiptHappyPath() {
 	v.state.AssertExpectations(v.T())
 }
 
-// generateMockIdentities generates and returns set of random nodes with different roles
-// the distribution of the roles is uniforms but not guaranteed
+// generateMockConsensusIDs generates and returns set of random consensus nodes
 // size: total number of nodes
-func generateMockIdentities(size int) flow.IdentityList {
+func generateMockConsensusIDs(size int) flow.IdentityList {
 	var identities flow.IdentityList
 	for i := 0; i < size; i++ {
 		// creating mock identities as a random byte array
 		var nodeID flow.Identifier
-		_, _ = rand.Read(nodeID[:])
+		rand.Read(nodeID[:])
 		address := fmt.Sprintf("address%d", i)
-		var role flow.Role
-		switch rand.Intn(5) {
-		case 0:
-			role = flow.RoleCollection
-		case 1:
-			role = flow.RoleConsensus
-		case 2:
-			role = flow.RoleExecution
-		case 3:
-			role = flow.RoleVerification
-		case 4:
-			role = flow.RoleObservation
-		}
 		id := flow.Identity{
 			NodeID:  nodeID,
 			Address: address,
-			Role:    role,
+			Role:    flow.RoleConsensus,
 		}
 		identities = append(identities, id)
 	}
 	return identities
+}
+
+// newMockVrfyID returns a new mocked identity for verification node
+func newMockVrfyID() flow.Identity {
+	return flow.Identity{
+		NodeID:  flow.Identifier{0x01, 0x01, 0x01, 0x01},
+		Address: "mock-vn-address",
+		Role:    flow.RoleVerification,
+	}
+}
+
+// genSubmitParams generates the parameters of network.Conduit.Submit method for emitting the
+// result approval. On receiving a result approval and identifiers of consensus nodes, it returns
+// a slice with the result approval as the first element followed by the ids of consensus nodes.
+func genSubmitParams(ra *flow.ResultApproval, consIDs flow.IdentityList) []interface{} {
+	// extracting mock consensus nodes IDs
+	params := []interface{}{ra}
+	for _, targetID := range consIDs.NodeIDs() {
+		params = append(params, targetID)
+	}
+	return params
 }

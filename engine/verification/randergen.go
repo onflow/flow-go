@@ -13,26 +13,30 @@ import (
 // FinalStateCommitment
 // The rest of bytes are chosen as nil
 func RandomERGen() *flow.ExecutionReceipt {
-	previousER := make([]byte, 32)
-	blockHash := make([]byte, 32)
+	var resultID flow.Identifier
+	var blockID flow.Identifier
+	var executorID flow.Identifier
 	stateComm := make([]byte, 32)
 	executorSignature := make([]byte, 32)
-	rand.Read(previousER)
-	rand.Read(blockHash)
-	rand.Read(stateComm)
-	rand.Read(executorSignature)
+	// NOTE: these never error
+	_, _ = rand.Read(resultID[:])
+	_, _ = rand.Read(blockID[:])
+	_, _ = rand.Read(executorID[:])
+	_, _ = rand.Read(stateComm)
+	_, _ = rand.Read(executorSignature)
 
 	exeResult := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousExecutionResult: blockHash,
-			Block:                   stateComm,
-			FinalStateCommitment:    nil,
-			Chunks:                  flow.ChunkList{},
+			PreviousResultID:     resultID,
+			BlockID:              blockID,
+			FinalStateCommitment: stateComm,
+			Chunks:               flow.ChunkList{},
 		},
 		Signatures: nil,
 	}
 
 	return &flow.ExecutionReceipt{
+		ExecutorID:        executorID,
 		ExecutionResult:   exeResult,
 		Spocks:            nil,
 		ExecutorSignature: executorSignature,
@@ -43,10 +47,10 @@ func RandomERGen() *flow.ExecutionReceipt {
 // for it.
 // In the current implementation, it just attaches hash of the ER to
 // the RA, and leaves the other fields of the RA empty.
-func RnadRAGen(receipt *flow.ExecutionReceipt) *flow.ResultApproval {
+func RandomRAGen(receipt *flow.ExecutionReceipt) *flow.ResultApproval {
 	return &flow.ResultApproval{
-		Body: flow.ResultApprovalBody{
-			ExecutionResultHash:  receipt.ExecutionResult.Fingerprint(),
+		ResultApprovalBody: flow.ResultApprovalBody{
+			ExecutionResultID:    receipt.ExecutionResult.ID(),
 			AttestationSignature: nil,
 			ChunkIndexList:       nil,
 			Proof:                nil,

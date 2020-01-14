@@ -26,11 +26,7 @@ type ParseCheckAndInterpretOptions struct {
 }
 
 func parseCheckAndInterpret(t *testing.T, code string) *interpreter.Interpreter {
-	return parseCheckAndInterpretWithOptions(t, code, ParseCheckAndInterpretOptions{
-		CheckerOptions: []sema.Option{
-			sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
-		},
-	})
+	return parseCheckAndInterpretWithOptions(t, code, ParseCheckAndInterpretOptions{})
 }
 
 func parseCheckAndInterpretWithOptions(
@@ -75,7 +71,7 @@ func constructorArguments(compositeKind common.CompositeKind, arguments string) 
 	return fmt.Sprintf("(%s)", arguments)
 }
 
-// makeContractValueHandler creates a interpreter option which
+// makeContractValueHandler creates an interpreter option which
 // sets the ContractValueHandler.
 // The handler immediately invokes the constructor with the given arguments.
 //
@@ -1571,10 +1567,18 @@ func TestInterpretHostFunction(t *testing.T) {
 	testFunction := stdlib.NewStandardLibraryFunction(
 		"test",
 		&sema.FunctionType{
-			ParameterTypeAnnotations: sema.NewTypeAnnotations(
-				&sema.IntType{},
-				&sema.IntType{},
-			),
+			Parameters: []*sema.Parameter{
+				{
+					Label:          sema.ArgumentLabelNotRequired,
+					Identifier:     "a",
+					TypeAnnotation: sema.NewTypeAnnotation(&sema.IntType{}),
+				},
+				{
+					Label:          sema.ArgumentLabelNotRequired,
+					Identifier:     "b",
+					TypeAnnotation: sema.NewTypeAnnotation(&sema.IntType{}),
+				},
+			},
 			ReturnTypeAnnotation: sema.NewTypeAnnotation(
 				&sema.IntType{},
 			),
@@ -1635,9 +1639,13 @@ func TestInterpretHostFunctionWithVariableArguments(t *testing.T) {
 	testFunction := stdlib.NewStandardLibraryFunction(
 		"test",
 		&sema.FunctionType{
-			ParameterTypeAnnotations: sema.NewTypeAnnotations(
-				&sema.IntType{},
-			),
+			Parameters: []*sema.Parameter{
+				{
+					Label:          sema.ArgumentLabelNotRequired,
+					Identifier:     "value",
+					TypeAnnotation: sema.NewTypeAnnotation(&sema.IntType{}),
+				},
+			},
 			ReturnTypeAnnotation: sema.NewTypeAnnotation(
 				&sema.IntType{},
 			),
@@ -1696,9 +1704,12 @@ func TestInterpretHostFunctionWithVariableArguments(t *testing.T) {
 
 func TestInterpretCompositeDeclaration(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
 
-		if compositeKind == common.CompositeKindContract {
+		switch compositeKind {
+		case common.CompositeKindContract,
+			common.CompositeKindEvent:
+
 			continue
 		}
 
@@ -3238,7 +3249,11 @@ func TestInterpretOptionalNilValueComparison(t *testing.T) {
 
 func TestInterpretCompositeNilEquality(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
+
+		if compositeKind == common.CompositeKindEvent {
+			continue
+		}
 
 		var setupCode, identifier string
 		if compositeKind == common.CompositeKindContract {
@@ -3474,9 +3489,13 @@ func TestInterpretIfStatementTestWithDeclarationNestedOptionalsExplicitAnnotatio
 
 func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
 
 		if compositeKind == common.CompositeKindContract {
+			continue
+		}
+
+		if !compositeKind.SupportsInterfaces() {
 			continue
 		}
 
@@ -3514,7 +3533,11 @@ func TestInterpretInterfaceConformanceNoRequirements(t *testing.T) {
 
 func TestInterpretInterfaceFieldUse(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
+
+		if !compositeKind.SupportsInterfaces() {
+			continue
+		}
 
 		var setupCode, identifier string
 		if compositeKind == common.CompositeKindContract {
@@ -3582,7 +3605,11 @@ func TestInterpretInterfaceFieldUse(t *testing.T) {
 
 func TestInterpretInterfaceFunctionUse(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
+
+		if !compositeKind.SupportsInterfaces() {
+			continue
+		}
 
 		var setupCode, identifier string
 		if compositeKind == common.CompositeKindContract {
@@ -3638,7 +3665,11 @@ func TestInterpretInterfaceFunctionUse(t *testing.T) {
 
 func TestInterpretInterfaceFunctionUseWithPreCondition(t *testing.T) {
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
+
+		if !compositeKind.SupportsInterfaces() {
+			continue
+		}
 
 		var setupCode, tearDownCode, identifier string
 
@@ -3728,7 +3759,11 @@ func TestInterpretInitializerWithInterfacePreCondition(t *testing.T) {
 		2: &interpreter.ConditionError{},
 	}
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.CompositeKindsWithBody {
+
+		if !compositeKind.SupportsInterfaces() {
+			continue
+		}
 
 		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
@@ -3827,12 +3862,21 @@ func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
 
 	inter := parseCheckAndInterpretWithOptions(t,
 		`
+
+          pub struct interface Also {
+             pub fun test(x: Int) {
+                 pre {
+                     x >= 0: "x >= 0"
+                 }
+             }
+          }
+
           pub contract interface Test {
 
               pub struct Nested {
                   pub fun test(x: Int) {
                       pre {
-                          x > 0: "x must be positive"
+                          x >= 1: "x >= 1"
                       }
                   }
               }
@@ -3840,10 +3884,10 @@ func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
 
           pub contract TestImpl: Test {
 
-              pub struct Nested {
+              pub struct Nested: Also {
                   pub fun test(x: Int) {
                       pre {
-                          x < 2: "x must be smaller than 2"
+                          x < 2: "x < 2"
                       }
                   }
               }
@@ -3860,25 +3904,45 @@ func TestInterpretTypeRequirementWithPreCondition(t *testing.T) {
 		},
 	)
 
-	_, err := inter.Invoke("test", big.NewInt(0))
-	assert.IsType(t,
-		&interpreter.ConditionError{},
-		err,
-	)
+	t.Run("-1", func(t *testing.T) {
+		_, err := inter.Invoke("test", big.NewInt(-1))
+		require.IsType(t,
+			&interpreter.ConditionError{},
+			err,
+		)
 
-	value, err := inter.Invoke("test", big.NewInt(1))
-	require.NoError(t, err)
+		// NOTE: The type requirement condition (`Test.Nested`) is evaluated first,
+		//  before the type's conformances (`Also`)
 
-	assert.IsType(t,
-		interpreter.VoidValue{},
-		value,
-	)
+		assert.Equal(t, err.(*interpreter.ConditionError).Message, "x >= 1")
+	})
 
-	_, err = inter.Invoke("test", big.NewInt(2))
-	assert.IsType(t,
-		&interpreter.ConditionError{},
-		err,
-	)
+	t.Run("0", func(t *testing.T) {
+		_, err := inter.Invoke("test", big.NewInt(0))
+		assert.IsType(t,
+			&interpreter.ConditionError{},
+			err,
+		)
+		assert.Equal(t, "x >= 1", err.(*interpreter.ConditionError).Message)
+	})
+
+	t.Run("1", func(t *testing.T) {
+		value, err := inter.Invoke("test", big.NewInt(1))
+		require.NoError(t, err)
+
+		assert.IsType(t,
+			interpreter.VoidValue{},
+			value,
+		)
+	})
+
+	t.Run("2", func(t *testing.T) {
+		_, err := inter.Invoke("test", big.NewInt(2))
+		assert.IsType(t,
+			&interpreter.ConditionError{},
+			err,
+		)
+	})
 }
 
 func TestInterpretImport(t *testing.T) {
@@ -5117,7 +5181,7 @@ func TestInterpretStorage(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -5450,15 +5514,17 @@ func TestInterpretInterfaceInitializer(t *testing.T) {
 
 	inter := parseCheckAndInterpret(t, `
       struct interface I {
-          init() {
-              pre { false }
+          init(a a1: Bool) {
+              pre { a1 }
           }
       }
 
-      struct S: I {}
+      struct S: I {
+          init(a a2: Bool) {}
+      }
 
       fun test() {
-          S()
+          S(a: false)
       }
     `)
 
@@ -5467,74 +5533,61 @@ func TestInterpretInterfaceInitializer(t *testing.T) {
 }
 
 func TestInterpretEmitEvent(t *testing.T) {
-	var actualEvents []interpreter.EventValue
+	var actualEvents []*interpreter.CompositeValue
 
 	inter := parseCheckAndInterpret(t,
 		`
-            event Transfer(to: Int, from: Int)
-            event TransferAmount(to: Int, from: Int, amount: Int)
+          event Transfer(to: Int, from: Int)
+          event TransferAmount(to: Int, from: Int, amount: Int)
 
-            fun test() {
+          fun test() {
               emit Transfer(to: 1, from: 2)
               emit Transfer(to: 3, from: 4)
               emit TransferAmount(to: 1, from: 2, amount: 100)
-            }
-            `,
+          }
+        `,
 	)
 
-	inter.SetOnEventEmittedHandler(func(_ *interpreter.Interpreter, event interpreter.EventValue) {
-		actualEvents = append(actualEvents, event)
-	})
+	inter.SetOnEventEmittedHandler(
+		func(_ *interpreter.Interpreter, event *interpreter.CompositeValue, eventType *sema.CompositeType) {
+			actualEvents = append(actualEvents, event)
+		},
+	)
 
 	_, err := inter.Invoke("test")
 	require.NoError(t, err)
 
-	expectedEvents := []interpreter.EventValue{
+	expectedEvents := []*interpreter.CompositeValue{
 		{
-			"Transfer",
-			[]interpreter.EventField{
-				{
-					Identifier: "to",
-					Value:      interpreter.NewIntValue(1),
-				},
-				{
-					Identifier: "from",
-					Value:      interpreter.NewIntValue(2),
-				},
+			Kind:     common.CompositeKindEvent,
+			Location: TestLocation,
+			TypeID:   inter.Checker.GlobalTypes["Transfer"].Type.ID(),
+			Fields: map[string]interpreter.Value{
+				"to":   interpreter.NewIntValue(1),
+				"from": interpreter.NewIntValue(2),
 			},
-			TestLocation,
+			Functions: map[string]interpreter.FunctionValue{},
 		},
 		{
-			"Transfer",
-			[]interpreter.EventField{
-				{
-					Identifier: "to",
-					Value:      interpreter.NewIntValue(3),
-				},
-				{
-					Identifier: "from",
-					Value:      interpreter.NewIntValue(4),
-				},
+			Kind:     common.CompositeKindEvent,
+			Location: TestLocation,
+			TypeID:   inter.Checker.GlobalTypes["Transfer"].Type.ID(),
+			Fields: map[string]interpreter.Value{
+				"to":   interpreter.NewIntValue(3),
+				"from": interpreter.NewIntValue(4),
 			},
-			TestLocation,
+			Functions: map[string]interpreter.FunctionValue{},
 		},
 		{
-			"TransferAmount",
-			[]interpreter.EventField{
-				{
-					Identifier: "to",
-					Value:      interpreter.NewIntValue(1),
-				},
-				{
-					Identifier: "from",
-					Value:      interpreter.NewIntValue(2),
-				},
-				{
-					Identifier: "amount",
-					Value:      interpreter.NewIntValue(100),
-				},
+			Kind:     common.CompositeKindEvent,
+			Location: TestLocation,
+			TypeID:   inter.Checker.GlobalTypes["TransferAmount"].Type.ID(),
+			Fields: map[string]interpreter.Value{
+				"to":     interpreter.NewIntValue(1),
+				"from":   interpreter.NewIntValue(2),
+				"amount": interpreter.NewIntValue(100),
 			},
-			TestLocation,
+			Functions: map[string]interpreter.FunctionValue{},
 		},
 	}
 
@@ -5649,7 +5702,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 				}),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -5670,7 +5723,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
 		&interpreter.ReferenceValue{
 			TargetStorageIdentifier: storageValue.Identifier,
 			// TODO: improve
-			TargetKey: rType.ID(),
+			TargetKey: string(rType.ID()),
 		},
 		value,
 	)
@@ -5746,7 +5799,7 @@ func TestInterpretReferenceUse(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -5829,7 +5882,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -5898,7 +5951,7 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -6170,7 +6223,7 @@ func TestInterpretOptionalChainingFunctionRead(t *testing.T) {
 	)
 
 	assert.IsType(t,
-		interpreter.HostFunctionValue{},
+		interpreter.BoundFunctionValue{},
 		inter.Globals["x2"].Value.(*interpreter.SomeValue).Value,
 	)
 }
@@ -6288,22 +6341,22 @@ func TestInterpretStorageResourceMoveRemovalInSwap(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
 		},
 	)
 
-	rType := inter.Checker.GlobalTypes["R"].Type
+	rType := inter.Checker.GlobalTypes["R"].Type.(*sema.CompositeType)
 
-	storageKey := interpreter.PrefixedStorageKey(rType.ID(), interpreter.AccessLevelPrivate)
+	storageKey := interpreter.PrefixedStorageKey(string(rType.ID()), interpreter.AccessLevelPrivate)
 
 	originalValue := &interpreter.CompositeValue{
-		Identifier: rType.ID(),
-		Kind:       common.CompositeKindResource,
-		Fields:     map[string]interpreter.Value{},
-		Owner:      storageIdentifier1,
+		TypeID: rType.ID(),
+		Kind:   common.CompositeKindResource,
+		Fields: map[string]interpreter.Value{},
+		Owner:  storageIdentifier1,
 	}
 
 	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
@@ -6427,22 +6480,22 @@ func TestInterpretStorageResourceMoveRemovalInVariableDeclaration(t *testing.T) 
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
 		},
 	)
 
-	rType := inter.Checker.GlobalTypes["R"].Type
+	rType := inter.Checker.GlobalTypes["R"].Type.(*sema.CompositeType)
 
-	storageKey := interpreter.PrefixedStorageKey(rType.ID(), interpreter.AccessLevelPrivate)
+	storageKey := interpreter.PrefixedStorageKey(string(rType.ID()), interpreter.AccessLevelPrivate)
 
 	originalValue := &interpreter.CompositeValue{
-		Identifier: rType.ID(),
-		Kind:       common.CompositeKindResource,
-		Fields:     map[string]interpreter.Value{},
-		Owner:      storageIdentifier1,
+		TypeID: rType.ID(),
+		Kind:   common.CompositeKindResource,
+		Fields: map[string]interpreter.Value{},
+		Owner:  storageIdentifier1,
 	}
 
 	allStoredValues[storageIdentifier1] = map[string]interpreter.OptionalValue{
@@ -6493,7 +6546,7 @@ func TestInterpretOptionalChainingFieldReadAndNilCoalescing(t *testing.T) {
 		}
 
 	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
-	predefinedValues := standardLibraryFunctions.ToValues
+	predefinedValues := standardLibraryFunctions.ToValues()
 
 	inter := parseCheckAndInterpretWithOptions(t,
 		`
@@ -6511,10 +6564,9 @@ func TestInterpretOptionalChainingFieldReadAndNilCoalescing(t *testing.T) {
 		ParseCheckAndInterpretOptions{
 			CheckerOptions: []sema.Option{
 				sema.WithPredeclaredValues(valueDeclarations),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 			Options: []interpreter.Option{
-				interpreter.WithPredefinedValues(predefinedValues()),
+				interpreter.WithPredefinedValues(predefinedValues),
 			},
 		},
 	)
@@ -6533,7 +6585,7 @@ func TestInterpretOptionalChainingFunctionCallAndNilCoalescing(t *testing.T) {
 		}
 
 	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
-	predefinedValues := standardLibraryFunctions.ToValues
+	predefinedValues := standardLibraryFunctions.ToValues()
 
 	inter := parseCheckAndInterpretWithOptions(t,
 		`
@@ -6549,10 +6601,9 @@ func TestInterpretOptionalChainingFunctionCallAndNilCoalescing(t *testing.T) {
 		ParseCheckAndInterpretOptions{
 			CheckerOptions: []sema.Option{
 				sema.WithPredeclaredValues(valueDeclarations),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 			Options: []interpreter.Option{
-				interpreter.WithPredefinedValues(predefinedValues()),
+				interpreter.WithPredefinedValues(predefinedValues),
 			},
 		},
 	)
@@ -6600,8 +6651,8 @@ func TestInterpretCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) 
 	)
 
 	assert.Equal(t,
-		"X",
-		x1.(*interpreter.CompositeValue).Identifier,
+		sema.TypeID("test.Test.X"),
+		x1.(*interpreter.CompositeValue).TypeID,
 	)
 
 	require.IsType(t,
@@ -6610,8 +6661,8 @@ func TestInterpretCompositeDeclarationNestedTypeScopingOuterInner(t *testing.T) 
 	)
 
 	assert.Equal(t,
-		"X",
-		x2.(*interpreter.CompositeValue).Identifier,
+		sema.TypeID("test.Test.X"),
+		x2.(*interpreter.CompositeValue).TypeID,
 	)
 }
 
@@ -6641,8 +6692,8 @@ func TestInterpretCompositeDeclarationNestedConstructor(t *testing.T) {
 	)
 
 	assert.Equal(t,
-		"X",
-		x.(*interpreter.CompositeValue).Identifier,
+		sema.TypeID("test.Test.X"),
+		x.(*interpreter.CompositeValue).TypeID,
 	)
 }
 
@@ -6775,7 +6826,12 @@ func TestInterpretContractAccountFieldUse(t *testing.T) {
 			Options: []interpreter.Option{
 				makeContractValueHandler(nil, nil, nil),
 				interpreter.WithInjectedCompositeFieldsHandler(
-					func(_ *interpreter.Interpreter, _ ast.Location, _ string, _ common.CompositeKind) map[string]interpreter.Value {
+					func(
+						_ *interpreter.Interpreter,
+						_ ast.Location,
+						_ sema.TypeID,
+						_ common.CompositeKind,
+					) map[string]interpreter.Value {
 						return map[string]interpreter.Value{
 							"account": interpreter.NewAccountValue(addressValue),
 						}
@@ -6829,9 +6885,6 @@ func TestInterpretConformToImportedInterface(t *testing.T) {
 					location,
 				)
 				return checkerImported.Program, nil
-			},
-			Options: []sema.Option{
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 			},
 		},
 	)
@@ -6894,7 +6947,7 @@ func TestInterpretPostConditionWithElaborationAccess(t *testing.T) {
 				interpreter.WithStorageWriteHandler(setter),
 				interpreter.WithStorageKeyHandler(
 					func(_ *interpreter.Interpreter, _ string, indexingType sema.Type) string {
-						return indexingType.ID()
+						return string(indexingType.ID())
 					},
 				),
 			},
@@ -7045,5 +7098,186 @@ func TestInterpretContractUseInNestedDeclaration(t *testing.T) {
 	require.IsType(t,
 		interpreter.NewIntValue(2),
 		i,
+	)
+}
+
+func TestInterpretResourceInterfaceInitializerAndDestructorPreConditions(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+
+      resource interface RI {
+
+          x: Int
+
+          init(_ x: Int) {
+              pre { x > 1: "invalid init" }
+          }
+
+          destroy() {
+              pre { self.x < 3: "invalid destroy" }
+          }
+      }
+
+      resource R: RI {
+
+          let x: Int
+
+          init(_ x: Int) {
+              self.x = x
+          }
+      }
+
+      fun test(_ x: Int) {
+          let r <- create R(x)
+          destroy r
+      }
+    `)
+
+	t.Run("1", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(1))
+		require.Error(t, err)
+
+		require.IsType(t, &interpreter.ConditionError{}, err)
+		assert.Equal(t, "invalid init", err.(*interpreter.ConditionError).Message)
+	})
+
+	t.Run("2", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(2))
+		require.NoError(t, err)
+	})
+
+	t.Run("3", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(3))
+		require.Error(t, err)
+
+		require.IsType(t, &interpreter.ConditionError{}, err)
+		assert.Equal(t, "invalid destroy", err.(*interpreter.ConditionError).Message)
+	})
+}
+
+func TestInterpretResourceTypeRequirementInitializerAndDestructorPreConditions(t *testing.T) {
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+          pub contract interface CI {
+
+              pub resource R {
+
+                  pub x: Int
+
+                  init(_ x: Int) {
+                      pre { x > 1: "invalid init" }
+                  }
+
+                  destroy() {
+                      pre { self.x < 3: "invalid destroy" }
+                  }
+              }
+          }
+
+          pub contract C: CI {
+
+              pub resource R {
+
+                  pub let x: Int
+
+                  init(_ x: Int) {
+                      self.x = x
+                  }
+              }
+          }
+
+          pub fun test(_ x: Int) {
+              let r <- create C.R(x)
+              destroy r
+          }
+        `,
+		ParseCheckAndInterpretOptions{
+			Options: []interpreter.Option{
+				makeContractValueHandler(nil, nil, nil),
+			},
+		},
+	)
+
+	t.Run("1", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(1))
+		require.Error(t, err)
+
+		require.IsType(t, &interpreter.ConditionError{}, err)
+		assert.Equal(t, "invalid init", err.(*interpreter.ConditionError).Message)
+	})
+
+	t.Run("2", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(2))
+		require.NoError(t, err)
+	})
+
+	t.Run("3", func(t *testing.T) {
+		_, err := inter.Invoke("test", interpreter.NewIntValue(3))
+		require.Error(t, err)
+
+		require.IsType(t, &interpreter.ConditionError{}, err)
+		assert.Equal(t, "invalid destroy", err.(*interpreter.ConditionError).Message)
+	})
+}
+
+func TestInterpretConstantSizedArrayAllocation(t *testing.T) {
+
+	standardLibraryFunctions :=
+		stdlib.StandardLibraryFunctions{
+			stdlib.ArrayFunction,
+		}
+
+	valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
+	predefinedValues := standardLibraryFunctions.ToValues()
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		`
+            struct Person {
+                let id: Int
+
+                init(id: Int) {
+                    self.id = id
+                }
+            }
+
+            let persons = Array(
+                size: 3,
+                generate: fun(index: Int): Person {
+                    return Person(id: index + 1)
+                }
+            )
+        `,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(valueDeclarations),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(predefinedValues),
+			},
+		},
+	)
+
+	personTypeID := inter.Checker.GlobalTypes["Person"].Type.ID()
+
+	newPerson := func(id int64) *interpreter.CompositeValue {
+		return &interpreter.CompositeValue{
+			Kind:     common.CompositeKindStructure,
+			Location: TestLocation,
+			TypeID:   personTypeID,
+			Fields: map[string]interpreter.Value{
+				"id": interpreter.NewIntValue(id),
+			},
+			Functions: map[string]interpreter.FunctionValue{},
+		}
+	}
+
+	assert.Equal(t,
+		interpreter.NewArrayValueUnownedNonCopying(
+			newPerson(1),
+			newPerson(2),
+			newPerson(3),
+		),
+		inter.Globals["persons"].Value,
 	)
 }

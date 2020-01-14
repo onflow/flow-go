@@ -1,8 +1,10 @@
 package badger
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
@@ -14,38 +16,73 @@ type Collections struct {
 }
 
 func NewCollections(db *badger.DB) *Collections {
-	b := &Collections{
+	c := Collections{
 		db: db,
 	}
-	return b
+	return &c
 }
 
-func (c *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, error) {
+func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
+	var (
+		light      flow.LightCollection
+		collection flow.Collection
+	)
 
-	var collection flow.Collection
-
-	err := c.db.View(func(tx *badger.Txn) error {
-
-		err := operation.RetrieveCollection(hash, &collection)(tx)
-
+	err := c.db.View(func(btx *badger.Txn) error {
+		err := operation.RetrieveCollection(collID, &light)(btx)
 		if err != nil {
-			if err == storage.NotFoundErr {
-				return err
+			if errors.Is(err, badger.ErrKeyNotFound) {
+				return storage.ErrNotFound
 			}
-			return errors.Wrap(err, "could not retrieve flow collection")
+			return fmt.Errorf("could not retrieve collection: %w", err)
+		}
+
+		for _, txID := range light.Transactions {
+			var tx flow.TransactionBody
+			err = operation.RetrieveTransaction(txID, &tx)(btx)
+			if err != nil {
+				if errors.Is(err, badger.ErrKeyNotFound) {
+					return storage.ErrNotFound
+				}
+				return fmt.Errorf("could not retrieve transaction: %w", err)
+			}
+
+			collection.Transactions = append(collection.Transactions, tx)
 		}
 
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	return &collection, err
+	return &collection, nil
 }
 
-func (c *Collections) Save(collection *flow.Collection) error {
-	return c.db.Update(func(tx *badger.Txn) error {
-		err := operation.PersistCollection(collection)(tx)
+func (c *Collections) Store(collection *flow.Collection) error {
+	return c.db.Update(func(btx *badger.Txn) error {
+		light := collection.Light()
+		err := operation.PersistCollection(&light)(btx)
 		if err != nil {
-			return errors.Wrap(err, "could not insert flow collection")
+			return fmt.Errorf("could not insert collection: %w", err)
+		}
+
+		for _, tx := range collection.Transactions {
+			err = operation.PersistTransaction(&tx)(btx)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+func (c *Collections) Remove(collID flow.Identifier) error {
+	return c.db.Update(func(btx *badger.Txn) error {
+		err := operation.RemoveCollection(collID)(btx)
+		if err != nil {
+			return fmt.Errorf("could not remove collection: %w", err)
 		}
 		return nil
 	})

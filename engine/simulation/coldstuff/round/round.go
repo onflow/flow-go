@@ -42,7 +42,8 @@ func New(state protocol.State, me module.Local) (*Round, error) {
 	}
 
 	// take first 8 bytes of previous block hash as a seed to shuffle identities
-	seed := binary.LittleEndian.Uint64(head.Hash())
+	headID := head.ID()
+	seed := binary.LittleEndian.Uint64(headID[:])
 	r := rand.New(rand.NewSource(int64(seed)))
 	r.Shuffle(len(ids), func(i int, j int) {
 		ids[i], ids[j] = ids[j], ids[i]

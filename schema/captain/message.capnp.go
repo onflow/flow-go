@@ -4,7 +4,6 @@ package captain
 
 import (
 	strconv "strconv"
-
 	capnp "zombiezen.com/go/capnproto2"
 	text "zombiezen.com/go/capnproto2/encoding/text"
 	schemas "zombiezen.com/go/capnproto2/schemas"
@@ -14,20 +13,20 @@ type Message struct{ capnp.Struct }
 type Message_Which uint16
 
 const (
-	Message_Which_auth                 Message_Which = 0
-	Message_Which_ping                 Message_Which = 1
-	Message_Which_pong                 Message_Which = 2
-	Message_Which_announce             Message_Which = 3
-	Message_Which_request              Message_Which = 4
-	Message_Which_response             Message_Which = 5
-	Message_Which_guaranteedCollection Message_Which = 6
-	Message_Which_blockProposal        Message_Which = 7
-	Message_Which_blockVote            Message_Which = 8
-	Message_Which_blockCommit          Message_Which = 9
+	Message_Which_auth                Message_Which = 0
+	Message_Which_ping                Message_Which = 1
+	Message_Which_pong                Message_Which = 2
+	Message_Which_announce            Message_Which = 3
+	Message_Which_request             Message_Which = 4
+	Message_Which_response            Message_Which = 5
+	Message_Which_collectionGuarantee Message_Which = 6
+	Message_Which_blockProposal       Message_Which = 7
+	Message_Which_blockVote           Message_Which = 8
+	Message_Which_blockCommit         Message_Which = 9
 )
 
 func (w Message_Which) String() string {
-	const s = "authpingpongannouncerequestresponseguaranteedCollectionblockProposalblockVoteblockCommit"
+	const s = "authpingpongannouncerequestresponsecollectionGuaranteeblockProposalblockVoteblockCommit"
 	switch w {
 	case Message_Which_auth:
 		return s[0:4]
@@ -41,14 +40,14 @@ func (w Message_Which) String() string {
 		return s[20:27]
 	case Message_Which_response:
 		return s[27:35]
-	case Message_Which_guaranteedCollection:
-		return s[35:55]
+	case Message_Which_collectionGuarantee:
+		return s[35:54]
 	case Message_Which_blockProposal:
-		return s[55:68]
+		return s[54:67]
 	case Message_Which_blockVote:
-		return s[68:77]
+		return s[67:76]
 	case Message_Which_blockCommit:
-		return s[77:88]
+		return s[76:87]
 
 	}
 	return "Message_Which(" + strconv.FormatUint(uint64(w), 10) + ")"
@@ -278,15 +277,15 @@ func (s Message) NewResponse() (Response, error) {
 	return ss, err
 }
 
-func (s Message) GuaranteedCollection() (GuaranteedCollection, error) {
+func (s Message) CollectionGuarantee() (CollectionGuarantee, error) {
 	if s.Struct.Uint16(0) != 6 {
-		panic("Which() != guaranteedCollection")
+		panic("Which() != collectionGuarantee")
 	}
 	p, err := s.Struct.Ptr(0)
-	return GuaranteedCollection{Struct: p.Struct()}, err
+	return CollectionGuarantee{Struct: p.Struct()}, err
 }
 
-func (s Message) HasGuaranteedCollection() bool {
+func (s Message) HasCollectionGuarantee() bool {
 	if s.Struct.Uint16(0) != 6 {
 		return false
 	}
@@ -294,18 +293,18 @@ func (s Message) HasGuaranteedCollection() bool {
 	return p.IsValid() || err != nil
 }
 
-func (s Message) SetGuaranteedCollection(v GuaranteedCollection) error {
+func (s Message) SetCollectionGuarantee(v CollectionGuarantee) error {
 	s.Struct.SetUint16(0, 6)
 	return s.Struct.SetPtr(0, v.Struct.ToPtr())
 }
 
-// NewGuaranteedCollection sets the guaranteedCollection field to a newly
-// allocated GuaranteedCollection struct, preferring placement in s's segment.
-func (s Message) NewGuaranteedCollection() (GuaranteedCollection, error) {
+// NewCollectionGuarantee sets the collectionGuarantee field to a newly
+// allocated CollectionGuarantee struct, preferring placement in s's segment.
+func (s Message) NewCollectionGuarantee() (CollectionGuarantee, error) {
 	s.Struct.SetUint16(0, 6)
-	ss, err := NewGuaranteedCollection(s.Struct.Segment())
+	ss, err := NewCollectionGuarantee(s.Struct.Segment())
 	if err != nil {
-		return GuaranteedCollection{}, err
+		return CollectionGuarantee{}, err
 	}
 	err = s.Struct.SetPtr(0, ss.Struct.ToPtr())
 	return ss, err
@@ -460,8 +459,8 @@ func (p Message_Promise) Response() Response_Promise {
 	return Response_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
 }
 
-func (p Message_Promise) GuaranteedCollection() GuaranteedCollection_Promise {
-	return GuaranteedCollection_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
+func (p Message_Promise) CollectionGuarantee() CollectionGuarantee_Promise {
+	return CollectionGuarantee_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
 }
 
 func (p Message_Promise) BlockProposal() BlockProposal_Promise {
@@ -476,38 +475,38 @@ func (p Message_Promise) BlockCommit() BlockCommit_Promise {
 	return BlockCommit_Promise{Pipeline: p.Pipeline.GetPipeline(0)}
 }
 
-const schema_cc8ede639915bf22 = "x\xdaT\xceKh\x13Q\x18\x05\xe0\xf3\xcfL2\x8d" +
-	"\xb4d\xca\xdcBE\x82U4j)m\xa5\x16\xdf\x10" +
-	"\xac\x15\x11+\x89#\xe2B\x94\xc9xIC\x92\xb9c" +
-	"f\xb2\x11D\xe86(\xba\x10Q\xbb\xac\x08\x85\x12\x04" +
-	"W\x82\x84\x80 \xf8X\xb8\x13\x17Z\x17\xa2\x82\x0bA" +
-	"\xb0\xbe\xea\x95\x1b\x12\xd1\xe5\x7f\xbes\xe0\x1f\xbfE\x19" +
-	"m{\xec\x86\x09\xe4N\xc5\xe22\xdf\x1c?\xb6p\xf9" +
-	"B\x03\xb9\x14\x91\xdc\xd8\x1c\xb8\xe9\xbd\xbe\xf2\x0c\xd3d" +
-	"\xae\x01&\xee\xe9\xc3d\xb7t\x13\x98x\xa8\xef\xd4\xf0" +
-	"A\x86\xde,\xaf\xb8c\x9e\xee\x06\x91[\xf4\xc7*<" +
-	"\x0c\xdd\x02\x1f\xf5\xdc\xc0\x0f\xf6\xcc\xf00\xa9\xce,Q" +
-	"n\xabn\xf4Ji\x10`'h\x18p\x0c\xd2\xc9\xb1" +
-	"H\xa3>\xfa-\x19)\xe8kC\x8f\x02\xa6@[\x95" +
-	"\x8c4\xc0\xeeoC\xaf\x82A\x05\xfa/\xc9H\x07\xec" +
-	"\x01:\x028L\xc1\x90\x02\xe3\xa7dd\x00v\x8a\x0e" +
-	"\x00\xce\xa0\x82M\x0ab?$\xa3\x18`oh/\x86" +
-	"\x14\x8c(\x88\x7f\x97\x8c\xe2\x80\xbd\x8d\x16\x01gD\xc1" +
-	".\x05\xe67\xc9\xc8\x04\xecI\xaa\x02\xce\x0e\x05\x19\x05" +
-	"=+\x92Q\x0f`\xef\xa7\xe3\x80\xb3O\xc1a\x05\x89" +
-	"\xaf\x92Q\x02\xb0\xa7)\x0f8\x07\x15dI\xa3\xa4[" +
-	"\x8bf\xc9\x92[\x1aO\xcd\xf7+\xcf_\x02D\x16(" +
-	"\x19\x14\xfd\x02Yr\xee\xc9Z#svo\xfdo," +
-	"\xdaq\x7f\xfaKBR\xbc\xd5\x89\xa5\xeb\xfb\xa2\xe6{" +
-	"\x1c\x00Y2\xd5\xa8\xb7\xea\xbc\xf4\xaa\xa3\x97\xaa\xfc|" +
-	"\x8d\x87\x11Y\xf2\xe3\xdb\xa33\x9f\x9b\xe9w\xdd]\x95" +
-	"\x87\x81\xf0\xc3\xcen\xdd\xf2\x9b\xc7\x93\x9b\xc5rW\x0b" +
-	"5\xb7\xea\xfa\x11'~nJ\x94\xcb\xdcKFE\xe1" +
-	"\xab\xe2\xbc1\xb7\xb4x\xe6Q\xb7\x98/\x0b\xaf\x94\xad" +
-	"\x0a\xac\x0fD\xe8\x96\xc9\x92\xa3w\xef\x7f:t\xba4" +
-	"\xff_\xe3\xa4\x88@\x9c\xac\xd5\x85\xc1\x07\x17\xaf/]" +
-	"\xfd\xd7\xa6D\x05f\xa5\xa8\x9e\xbc\x9d\xde}\xe2\xc55" +
-	"\xba\xd3\xd9\xfe\x09\x00\x00\xff\xffJ\x0e\xa4\x06"
+const schema_cc8ede639915bf22 = "x\xdaT\xceMh\xd3`\x1c\xc7\xf1\xdf?I\x9bU" +
+	"6\x9a\x91\x0c*R6\xc5U\x1dc\x9b\xcc\xe1;\x14" +
+	"u*\xe2\xa45\"\x1e\x04I\xc3\xc3V\xda&\xb1I" +
+	"/\x82\x08^\x8b\xa2\x87!\xeaN2\xf1$E\xf0$" +
+	"H\xe9A\x04_\x0e\xde\xc4\x83\xce\x83o\xe0A\x10\x9c" +
+	"N\xe7_\x9e\xd2\x8a\x1e\x9f\xdf\xe7\xff\x85g\xe2\x06e" +
+	"\x95\xad\xb1k:\x90?\x15\x8bs\xa19ql\xf1\xd2" +
+	"\xb9\x06\xf2i\"\xde\xd0\x1c\xb8\xee\xbe\xbe\xfc\x0c\xd3\xa4" +
+	"\xaf\x01&\xef\xa9#d\xb6T\x1d\x98|\xa8nW\xf0" +
+	"\x91CwNT\x9cqWu\x82\xc8)z\xe3\x15\x11" +
+	"\x86\xce\xac\x18s\x9d\xc0\x0bv\xcd\x880)\x9f9\xa2" +
+	"\xfcfU\xebe\xd6\x080\x134\x02\xd8\x1a\xa9d\x1b" +
+	"\xa4P\x1f\xfdf\x8b$\xf4\xb5\xa1G\x82%AYe" +
+	"\x8b\x14\xc0\xecoC\xaf\x84\x94\x04\xf5\x17[\xa4\x02\xe6" +
+	"\x00\x1d\x01lK\xc2\x90\x04\xed'[\xa4\x01f\x9a\xf6" +
+	"\x01vJ\xc2F\x09\xb1\x15\xb6(\x06\x98\xeb\xdb\xc5\x90" +
+	"\x84Q\x09\xf1\x1flQ\x1c0\xb7\xd0-\xc0\x1e\x95\xb0" +
+	"C\x82\xfe\x9d-\xd2\x01s\x8a\xaa\x80\xbdMBVB" +
+	"\xcf2[\xd4\x03\x98{\xe98`\xef\x91pXB\xe2" +
+	"\x1b[\x94\x00\xcci*\x00\xf6\x01\x099R(\xe9\xd4" +
+	"\xa292xS\xe3\xa9\xfea\xf9\xf9K\x80\xc8\x00%" +
+	"\x83\xa27K\x06_|\xb2V\xcb\x9e\xd9]\xff;\xfb" +
+	"\xed\xb9?\xf35\xc1\x14oufv<\xcf\xafy\xae" +
+	"\x00@\x06\xa7\x1b\xf5V]\x94^u\xf4BU\x9c\xad" +
+	"\x890\"\x83?\xbd=:\xf3\xa5\x99y\xd7\xed\xaa\"" +
+	"\x0c|/\xect\xeb\x96\xde<\x9e\x1a\xf6\x97\xba\xea\xfa" +
+	"\xe5\xb2p\xa3\"\xf9\xde\xa1\x9aSu<=\x12\x82\x0c" +
+	"\x1e\x9e\x7f\xbfR\x1a\\x\xd4\xbd+\x94}\xb7\x94\xab" +
+	"\xfa\x18\x0c\xfc\xd0)\x93\xc1cw\xee\x7f>x\xba\xb4" +
+	"\xf0\xdf\xc5I?\x02\x092V\x17S\x0f\xce\xcf\xdf\xbd" +
+	"\xf2\xaf\xed\xf7+\xd0+E\xf9\xc7\x9b\x99\x9d'^\\" +
+	"\xa5\xdb\x9d\xf6O\x00\x00\x00\xff\xff\xe6\xb0\xa4a"
 
 func init() {
 	schemas.Register(schema_cc8ede639915bf22,

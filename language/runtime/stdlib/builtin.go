@@ -16,10 +16,17 @@ import (
 var AssertFunction = NewStandardLibraryFunction(
 	"assert",
 	&sema.FunctionType{
-		ParameterTypeAnnotations: sema.NewTypeAnnotations(
-			&sema.BoolType{},
-			&sema.StringType{},
-		),
+		Parameters: []*sema.Parameter{
+			{
+				Label:          sema.ArgumentLabelNotRequired,
+				Identifier:     "condition",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.BoolType{}),
+			},
+			{
+				Identifier:     "message",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.StringType{}),
+			},
+		},
 		ReturnTypeAnnotation: sema.NewTypeAnnotation(
 			&sema.VoidType{},
 		),
@@ -76,9 +83,13 @@ func (e PanicError) ImportLocation() ast.Location {
 var PanicFunction = NewStandardLibraryFunction(
 	"panic",
 	&sema.FunctionType{
-		ParameterTypeAnnotations: sema.NewTypeAnnotations(
-			&sema.StringType{},
-		),
+		Parameters: []*sema.Parameter{
+			{
+				Label:          sema.ArgumentLabelNotRequired,
+				Identifier:     "message",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.StringType{}),
+			},
+		},
 		ReturnTypeAnnotation: sema.NewTypeAnnotation(
 			&sema.NeverType{},
 		),
@@ -94,11 +105,73 @@ var PanicFunction = NewStandardLibraryFunction(
 	nil,
 )
 
+var ArrayFunction = NewStandardLibraryFunction(
+	"Array",
+	&sema.FunctionType{
+		Parameters: []*sema.Parameter{
+			{
+				Identifier:     "size",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.IntType{}),
+			},
+			{
+				Identifier: "generate",
+				TypeAnnotation: sema.NewTypeAnnotation(
+					&sema.FunctionType{
+						Parameters: []*sema.Parameter{
+							{
+								Identifier:     "index",
+								TypeAnnotation: sema.NewTypeAnnotation(&sema.IntType{}),
+							},
+						},
+						ReturnTypeAnnotation: sema.NewTypeAnnotation(&sema.AnyType{}),
+					},
+				),
+			},
+		},
+		ReturnTypeGetter: func(argumentTypes []sema.Type) sema.Type {
+			generateFunctionType := argumentTypes[1].(*sema.FunctionType)
+			elementType := generateFunctionType.ReturnTypeAnnotation.Type
+			return &sema.VariableSizedType{
+				Type: elementType,
+			}
+		},
+	},
+	func(invocation interpreter.Invocation) trampoline.Trampoline {
+		count := invocation.Arguments[0].(interpreter.IntegerValue).IntValue()
+		generate := invocation.Arguments[1].(interpreter.FunctionValue)
+
+		var elements []interpreter.Value
+
+		var step func(i int) trampoline.Trampoline
+		step = func(i int) trampoline.Trampoline {
+			if i >= count {
+				array := interpreter.NewArrayValueUnownedNonCopying(elements...)
+				return trampoline.Done{Result: array}
+			}
+
+			generateInvocation := invocation
+			generateInvocation.Arguments = []interpreter.Value{interpreter.NewIntValue(int64(i))}
+			generateInvocation.ArgumentTypes = []sema.Type{&sema.IntType{}}
+
+			return generate.Invoke(generateInvocation).
+				FlatMap(func(value interface{}) trampoline.Trampoline {
+					elements = append(elements, value.(interpreter.Value))
+
+					return step(i + 1)
+				})
+		}
+
+		return step(0)
+	},
+	nil,
+)
+
 // BuiltinFunctions
 
 var BuiltinFunctions = StandardLibraryFunctions{
 	AssertFunction,
 	PanicFunction,
+	ArrayFunction,
 }
 
 // LogFunction
@@ -106,9 +179,13 @@ var BuiltinFunctions = StandardLibraryFunctions{
 var LogFunction = NewStandardLibraryFunction(
 	"log",
 	&sema.FunctionType{
-		ParameterTypeAnnotations: sema.NewTypeAnnotations(
-			&sema.AnyStructType{},
-		),
+		Parameters: []*sema.Parameter{
+			{
+				Label:          sema.ArgumentLabelNotRequired,
+				Identifier:     "value",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.AnyStructType{}),
+			},
+		},
 		ReturnTypeAnnotation: sema.NewTypeAnnotation(
 			&sema.VoidType{},
 		),

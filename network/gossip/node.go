@@ -208,7 +208,7 @@ func (n *Node) sendEngine(ctx context.Context, eprb []byte) ([]byte, error) {
 	}
 
 	senderID := util.StringToID(epr.GetSenderID())
-	return nil, n.er.Process(uint8(epr.GetEngineID()), senderID, event)
+	return nil, n.er.Process(uint8(epr.GetChannelID()), senderID, event)
 }
 
 // Gossip synchronizes over the delivery
@@ -542,26 +542,26 @@ func (n *Node) tryStore(msg *messages.GossipMessage) (bool, error) {
 
 // Register stores an engine into the engine registry and returns a conduit for
 // that engine
-func (n *Node) Register(engineID uint8, engine network.Engine) (network.Conduit, error) {
-	if err := n.er.Add(engineID, engine); err != nil {
+func (n *Node) Register(channelID uint8, engine network.Engine) (network.Conduit, error) {
+	if err := n.er.Add(channelID, engine); err != nil {
 		return nil, errors.Wrap(err, "could not add engnie to registry")
 	}
 
 	return &conduit{send: func(event interface{}, targetIDs ...flow.Identifier) error {
-		return n.send(engineID, event, targetIDs...)
+		return n.send(channelID, event, targetIDs...)
 	}}, nil
 }
 
 // send is the basic conduit function that gets wrapped for every engine
 // registered
-func (n *Node) send(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Node) send(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 	eventBytes, err := n.codec.Encode(event)
 	if err != nil {
 		return errors.Wrap(err, "could not encode event")
 	}
 
 	sender := util.IDToString(n.id)
-	eprBytes, err := proto.Marshal(&messages.EventProcessRequest{EngineID: uint32(engineID), Event: eventBytes, SenderID: sender})
+	eprBytes, err := proto.Marshal(&messages.EventProcessRequest{ChannelID: uint32(channelID), Event: eventBytes, SenderID: sender})
 	if err != nil {
 		return errors.Wrap(err, "could not marshal event process request")
 	}
