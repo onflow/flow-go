@@ -3,23 +3,41 @@ package test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	libp2p2 "github.com/dapperlabs/flow-go/network/gossip/libp2p"
+	libp2pmodel "github.com/dapperlabs/flow-go/model/libp2p"
+	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/network"
 )
 
 // StubEngine is a simple engine that is used for testing the correctness of
 // driving the engines with libp2p
 type StubEngine struct {
 	t        *testing.T
-	net      libp2p2.Network // used to communicate with the network layer
-	con      libp2p2.Conduit // used to directly communicate with the network
+	con      network.Conduit // used to directly communicate with the network
 	originID flow.Identifier
 	event    chan interface{} // used to keep track of the events that the node receives
 	received chan struct{}    // used as an indicator on reception of messages for testing
 	echomsg  string           // used as a fix string to be included in the reply echos
+}
+
+func NewEngine(t *testing.T, net module.Network, cap int, engineID uint8) *StubEngine {
+	te := &StubEngine{
+		t:        t,
+		echomsg:  "this is an echo",
+		event:    make(chan interface{}, cap),
+		received: make(chan struct{}, cap),
+	}
+
+	c2, err := net.Register(engineID, te)
+	time.Sleep(1 * time.Millisecond)
+	require.NoError(te.t, err)
+	te.con = c2
+
+	return te
 }
 
 // SubmitLocal is implemented for a valid type assertion to Engine
@@ -51,8 +69,9 @@ func (te *StubEngine) Process(originID flow.Identifier, event interface{}) error
 	te.received <- struct{}{}
 
 	// asserting event as string
-	strEvent, ok := event.(string)
-	require.True(te.t, ok, "could not assert event as string")
+	lip2pEvent, ok := (event).(*libp2pmodel.Echo)
+	require.True(te.t, ok, "could not assert event as Echo")
+	strEvent := lip2pEvent.Text
 
 	// sends a echo back
 	msg := fmt.Sprintf("%s: %s", te.echomsg, strEvent)
