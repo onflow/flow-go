@@ -3,9 +3,9 @@ module github.com/dapperlabs/flow-go
 go 1.13
 
 require (
-	github.com/dapperlabs/flow-go/crypto v0.0.0-00010101000000-000000000000
-	github.com/dapperlabs/flow-go/language v0.0.0-00010101000000-000000000000
-	github.com/dapperlabs/flow-go/protobuf v0.0.0-00010101000000-000000000000
+	github.com/dapperlabs/flow-go/crypto v0.2.5-beta
+	github.com/dapperlabs/flow-go/language v0.2.5-beta
+	github.com/dapperlabs/flow-go/protobuf v0.2.5-beta
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.0
 	github.com/ethereum/go-ethereum v1.9.9

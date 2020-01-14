@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/receipts"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -17,8 +18,12 @@ import (
 
 func main() {
 
-	var stateCommitments storage.StateCommitments
-	var ledgerStorage *ledger.TrieStorage
+	var (
+		receiptsEng      *receipts.Engine
+		stateCommitments storage.StateCommitments
+		ledgerStorage    storage.Ledger
+		err              error
+	)
 
 	cmd.
 		FlowNode("execution").
@@ -39,8 +44,20 @@ func main() {
 			node.MustNot(err).Msg("could not store initial state commitment for genesis block")
 
 		}).
-		Component("execution engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+		Component("receipts engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			node.Logger.Info().Msg("initializing receipts engine")
 
+			receiptsEng, err = receipts.New(
+				node.Logger,
+				node.Network,
+				node.State,
+				node.Me,
+			)
+			node.MustNot(err).Msg("could not initialize receipts engine")
+
+			return receiptsEng
+		}).
+		Component("execution engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing execution engine")
 
 			rt := runtime.NewInterpreterRuntime()
@@ -52,15 +69,17 @@ func main() {
 
 			collections := badger.NewCollections(node.DB)
 
-			engine, err := execution.New(
+			executionEng, err := execution.New(
 				node.Logger,
 				node.Network,
 				node.Me,
+				receiptsEng,
 				collections,
 				blockExec,
 			)
 			node.MustNot(err).Msg("could not initialize execution engine")
-			return engine
+
+			return executionEng
 		}).Run()
 
 }

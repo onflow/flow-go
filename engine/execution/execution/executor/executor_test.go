@@ -32,13 +32,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	col := flow.Collection{Transactions: []flow.TransactionBody{tx1, tx2}}
 
+	guarantee := flow.CollectionGuarantee{
+		CollectionID: col.ID(),
+		Signatures:   nil,
+	}
+
 	content := flow.Content{
-		Guarantees: []*flow.CollectionGuarantee{
-			{
-				CollectionID: col.ID(),
-				Signatures:   nil,
-			},
-		},
+		Guarantees: []*flow.CollectionGuarantee{&guarantee},
 	}
 
 	block := flow.Block{
@@ -48,11 +48,17 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Content: content,
 	}
 
-	transactions := []flow.TransactionBody{tx1, tx2}
+	transactions := []*flow.TransactionBody{&tx1, &tx2}
 
-	executableBlock := executor.ExecutableBlock{
-		Block:        block,
-		Transactions: transactions,
+	executableBlock := &executor.ExecutableBlock{
+		Block: &block,
+		Collections: []*executor.ExecutableCollection{
+			{
+				Guarantee:    &guarantee,
+				Transactions: transactions,
+			},
+		},
+		PreviousResultID: flow.ZeroID,
 	}
 
 	vm.On("NewBlockContext", &block).Return(bc)
@@ -60,7 +66,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	bc.On(
 		"ExecuteTransaction",
 		mock.AnythingOfType("*state.View"),
-		mock.AnythingOfType("flow.TransactionBody"),
+		mock.AnythingOfType("*flow.TransactionBody"),
 	).
 		Return(&virtualmachine.TransactionResult{}, nil).
 		Twice()
@@ -84,14 +90,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Return(nil, nil)
 
 	es.On("PersistStateCommitment",
-		block.ID(), mock.AnythingOfType("*[]uint8")).Return(nil).Once()
+		block.ID(), mock.AnythingOfType("*[]uint8")).Return(nil)
 
-	chunks, err := exe.ExecuteBlock(executableBlock)
+	result, err := exe.ExecuteBlock(executableBlock)
 	assert.NoError(t, err)
-	assert.Len(t, chunks, 1)
+	assert.Len(t, result.Chunks.Chunks, 1)
 
-	chunk := chunks[0]
-	assert.EqualValues(t, chunk.TxCounts, 2)
+	chunk := result.Chunks.Chunks[0]
+	assert.EqualValues(t, 0, chunk.CollectionIndex)
 
 	vm.AssertExpectations(t)
 	bc.AssertExpectations(t)
