@@ -2,6 +2,7 @@ package verifier
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -31,6 +32,7 @@ type Engine struct {
 	receipts           mempool.Receipts    // used to store execution receipts in memory
 	blocks             mempool.Blocks      // used to store blocks in memory
 	collections        mempool.Collections // used to store collections in memory
+	cond               *sync.Cond          // used to announce new blocks/collections
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -43,6 +45,9 @@ func New(
 	blocks mempool.Blocks,
 	collections mempool.Collections,
 ) (*Engine, error) {
+	var mu sync.Mutex
+	cond := sync.NewCond(&mu)
+
 	e := &Engine{
 		unit:        engine.NewUnit(),
 		log:         log,
@@ -51,6 +56,7 @@ func New(
 		receipts:    receipts,
 		blocks:      blocks,
 		collections: collections,
+		cond:        cond,
 	}
 
 	var err error
@@ -167,7 +173,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 
 	// TODO start a verification job asyncronously.
 	// For now, we do it synchronously and submit a RA before checking anything
-	e.verify(originID, receipt)
+	e.verify(receipt)
 
 	return nil
 }
@@ -244,7 +250,7 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 // the peer-to-peer network.
 // If the submission was successful it generates a result approval for the incoming ExecutionReceipt
 // and submits that to the network
-func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt) {
+func (e *Engine) verify(receipt *flow.ExecutionReceipt) {
 
 	result := receipt.ExecutionResult
 	blockID := result.BlockID
@@ -254,30 +260,59 @@ func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt
 		Hex("result_id", logging.Entity(result)).
 		Logger()
 
-	// TODO temporary as log uses are commented
-	_ = log
+	for {
+		e.cond.L.Lock()
+		e.cond.Wait()
 
-	// request block if not available
-	// TODO handle this case
-	//block, err := e.blocks.Get(blockID)
-	//if err != nil {
-	//	// TODO should request the block here
-	//	log.Error().
-	//		Err(err).
-	//		Msg("could not get block")
-	//	return
-	//}
+		// ensure we have the block corresponding to this execution
+		block, err := e.blocks.Get(blockID)
+		if err != nil {
+			// TODO should request the block here. For now, we require that we
+			// have received the block at this point
+			log.Warn().
+				Err(err).
+				Msg("missing dependent block")
+			continue
+		}
 
-	// request collection if not available
-	// TODO handle this case
-	//for _, guarantee := range block.Guarantees {
-	//	err := e.requestCollection(guarantee.ID())
-	//	if err != nil {
-	//		log.Error().
-	//			Err(err).
-	//			Msgf("could not request collection (id=%s): %w", logging.Entity(guarantee), err)
-	//	}
-	//}
+		chunks := result.Chunks.Items()
+
+		// TODO allow this case
+		if len(chunks) != 1 {
+			log.Error().
+				Msg("execution result contains more than one chunk")
+			return
+		}
+
+		// retrieve the collection corresponding to each chunk
+		for _, chunk := range result.Chunks.Items() {
+			// TODO replace this with updated chunk model referencing collection index
+			_ = chunk
+			collIndex := 0
+
+			// ensure the collection index specified by the ER is valid
+			if len(block.Guarantees) < collIndex {
+				log.Error().
+					Msgf("invalid collection index (%d) does not exist in block", collIndex)
+				return
+			}
+
+			// ensure we have the collection corresponding to this chunk
+			collID := block.Guarantees[collIndex].ID()
+			if !e.collections.Has(collID) {
+				err := e.requestCollection(collID)
+				if err != nil {
+					e.log.Error().
+						Err(err).
+						Hex("collection_id", logging.ID(collID)).
+						Msg("could not request collection")
+					continue
+				}
+			}
+		}
+
+		// TODO
+	}
 
 	// TODO for now, just submit the result approval without checking anything
 	// extracting list of consensus nodes' ids
