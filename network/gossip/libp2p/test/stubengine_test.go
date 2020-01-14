@@ -37,59 +37,16 @@ func TestStubEngineTestSuite(t *testing.T) {
 }
 
 func (s *StubEngineTestSuite) SetupTest() {
+	const count = 2
 	golog.SetAllLoggers(gologging.INFO)
-	s.nets = make([]*libp2p.Network, 0)
-	s.mws = make([]*libp2p.Middleware, 0)
-	s.ids = make([]flow.Identifier, 0)
+	s.ids = s.createIDs(count)
+	s.mws = s.createMiddleware(s.ids)
+	s.nets = s.createNetworks(s.mws, s.ids)
 }
 
 // TestSingleMessage sends a single message from one network instance to the other one
 // it evaluates the correctness of implementation against correct delivery of the message.
 func (s *StubEngineTestSuite) TestSingleMessage() {
-	const count = 2
-
-	for i := 0; i < count; i++ {
-		// defining id of node
-		var nodeID [32]byte
-		nodeID[0] = byte(i + 1)
-		ID := flow.Identifier(nodeID)
-		s.ids = append(s.ids, ID)
-
-		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), count-1, "0.0.0.0:0", s.ids[i])
-		require.NoError(s.Suite.T(), err)
-		s.mws = append(s.mws, mw)
-	}
-
-	for i := 0; i < count; i++ {
-		ip, port := s.mws[(i+1)%count].GetIPPort()
-		// mocks an identity
-		targetID := flow.Identity{
-			NodeID:  s.ids[(i+1)%count],
-			Address: fmt.Sprintf("%s:%s", ip, port),
-			Role:    flow.RoleCollection,
-		}
-
-		// creates and mocks the state
-		state := &protocol.State{}
-		snapshot := &protocol.Snapshot{}
-		state.On("Final").Return(snapshot).Once()
-		snapshot.On("Identities", mockery.Anything).Return(flow.IdentityList{targetID}, nil).Once()
-
-		// creates and mocks me
-		// creating network of node-1
-		me := &mock.Local{}
-		me.On("NodeID").Return(s.ids[i])
-		net, err := libp2p.NewNetwork(zerolog.Logger{}, json.NewCodec(), state, me, s.mws[i])
-		require.NoError(s.Suite.T(), err)
-
-		s.nets = append(s.nets, net)
-
-		done := net.Ready()
-		<-done
-		time.Sleep(1 * time.Second)
-	}
-
 	// test engine1
 	te1 := &StubEngine{
 		t: s.Suite.T(),
@@ -131,4 +88,73 @@ func (s *StubEngineTestSuite) TestSingleMessage() {
 	case <-time.After(10 * time.Second):
 		assert.Fail(s.Suite.T(), "peer 1 failed to send a message to peer 2")
 	}
+}
+
+// create ids creates and initializes count-many flow identifiers instances
+func (s *StubEngineTestSuite) createIDs(count int) []flow.Identifier {
+	ids := make([]flow.Identifier, 0)
+	for i := 0; i < count; i++ {
+		// defining id of node
+		var nodeID [32]byte
+		nodeID[0] = byte(i + 1)
+		ID := flow.Identifier(nodeID)
+		ids = append(ids, ID)
+	}
+	return ids
+}
+
+// create middleware receives an ids slice and creates and initializes a middleware instances for each id
+func (s *StubEngineTestSuite) createMiddleware(ids []flow.Identifier) []*libp2p.Middleware {
+	count := len(ids)
+	mws := make([]*libp2p.Middleware, 0)
+	for i := 0; i < count; i++ {
+		// creating middleware of nodes
+		mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), uint(count-1), "0.0.0.0:0", ids[i])
+		require.NoError(s.Suite.T(), err)
+		mws = append(mws, mw)
+	}
+	return mws
+}
+
+// createNetworks receives a slice of middlewares their associated flow identifiers,
+// and for each middleware creates a network instance on top
+// it returns the slice of created middlewares
+func (s *StubEngineTestSuite) createNetworks(mws []*libp2p.Middleware, ids []flow.Identifier) []*libp2p.Network {
+	count := len(mws)
+	nets := make([]*libp2p.Network, 0)
+
+	for i := 0; i < count; i++ {
+		// retrieves IP and port of the middleware
+		ip, port := mws[(i+1)%count].GetIPPort()
+
+		// mocks an identity for the middleware
+		//
+		targetID := flow.Identity{
+			NodeID:  ids[(i+1)%count],
+			Address: fmt.Sprintf("%s:%s", ip, port),
+			Role:    flow.RoleCollection,
+		}
+
+		// creates and mocks the state
+		state := &protocol.State{}
+		snapshot := &protocol.Snapshot{}
+		state.On("Final").Return(snapshot).Once()
+		snapshot.On("Identities", mockery.Anything).Return(flow.IdentityList{targetID}, nil).Once()
+
+		// creates and mocks me
+		// creating network of node-1
+		me := &mock.Local{}
+		me.On("NodeID").Return(ids[i])
+		net, err := libp2p.NewNetwork(zerolog.Logger{}, json.NewCodec(), state, me, mws[i])
+		require.NoError(s.Suite.T(), err)
+
+		nets = append(nets, net)
+
+		// starts the middlewares
+		done := net.Ready()
+		<-done
+		time.Sleep(1 * time.Second)
+	}
+
+	return nets
 }
