@@ -2,7 +2,6 @@ package verifier
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -12,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/broadcast"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -32,7 +32,7 @@ type Engine struct {
 	receipts           mempool.Receipts    // used to store execution receipts in memory
 	blocks             mempool.Blocks      // used to store blocks in memory
 	collections        mempool.Collections // used to store collections in memory
-	cond               *sync.Cond          // used to announce new blocks/collections
+	caster             module.Broadcaster  // used to broadcast when a resource is received
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -45,8 +45,6 @@ func New(
 	blocks mempool.Blocks,
 	collections mempool.Collections,
 ) (*Engine, error) {
-	var mu sync.Mutex
-	cond := sync.NewCond(&mu)
 
 	e := &Engine{
 		unit:        engine.NewUnit(),
@@ -56,7 +54,7 @@ func New(
 		receipts:    receipts,
 		blocks:      blocks,
 		collections: collections,
-		cond:        cond,
+		caster:      broadcast.NewBroadcaster(),
 	}
 
 	var err error
@@ -252,6 +250,9 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 // and submits that to the network
 func (e *Engine) verify(receipt *flow.ExecutionReceipt) {
 
+	sub := e.caster.Subscribe()
+	defer sub.Unsubscribe()
+
 	result := receipt.ExecutionResult
 	blockID := result.BlockID
 
@@ -260,28 +261,31 @@ func (e *Engine) verify(receipt *flow.ExecutionReceipt) {
 		Hex("result_id", logging.Entity(result)).
 		Logger()
 
+	// ensure we have the block corresponding to this execution
+	block, err := e.blocks.Get(blockID)
+	if err != nil {
+		// TODO should request the block here. For now, we require that we
+		// have received the block at this point
+		log.Warn().
+			Err(err).
+			Msg("missing dependent block")
+		return
+	}
+
+	chunks := result.Chunks.Items()
+
+	// TODO allow this case
+	if len(chunks) != 1 {
+		log.Error().
+			Msg("execution result contains more than one chunk")
+		return
+	}
+
 	for {
-		e.cond.L.Lock()
-		e.cond.Wait()
-
-		// ensure we have the block corresponding to this execution
-		block, err := e.blocks.Get(blockID)
-		if err != nil {
-			// TODO should request the block here. For now, we require that we
-			// have received the block at this point
-			log.Warn().
-				Err(err).
-				Msg("missing dependent block")
-			continue
-		}
-
-		chunks := result.Chunks.Items()
-
-		// TODO allow this case
-		if len(chunks) != 1 {
-			log.Error().
-				Msg("execution result contains more than one chunk")
+		select {
+		case <-e.unit.Done():
 			return
+		case <-sub.Ch():
 		}
 
 		// retrieve the collection corresponding to each chunk
