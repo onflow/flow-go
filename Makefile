@@ -12,6 +12,7 @@ GOPRIVATE=github.com/dapperlabs/*
 UNAME := $(shell uname)
 
 export FLOW_ABI_EXAMPLES_DIR := $(CURDIR)/language/abi/examples/
+export DOCKER_BUILDKIT := 1
 
 crypto/relic:
 	rm -rf crypto/relic
@@ -97,7 +98,7 @@ ci: install-tools lint test coverage
 .PHONY: docker-ci
 docker-ci:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
-		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" \
+		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.5 \
 		make ci
 
@@ -106,7 +107,7 @@ docker-ci:
 .PHONY: docker-ci-team-city
 docker-ci-team-city:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
-		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"${HOME}/.cache" -v "/tmp/pkg":"${GOPATH}/pkg" -v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
+		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" -v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.5 \
 		make ci
 
