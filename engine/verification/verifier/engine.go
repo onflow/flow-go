@@ -21,16 +21,16 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit               *engine.Unit      // used to control startup/shutdown
-	log                zerolog.Logger    // used to log relevant actions
-	collectionsConduit network.Conduit   // used to get collections from collection nodes
-	receiptsConduit    network.Conduit   // used to get execution receipts from execution nodes
-	approvalsConduit   network.Conduit   // used to propagate result approvals
-	me                 module.Local      // used to access local node information
-	state              protocol.State    // used to access the  protocol state
-	blocks             mempool.Blocks    // used to store blocks in memory
-	receipts           mempool.Receipts  // used to store execution receipts in memory
-	approvals          mempool.Approvals // used to store result approvals in memory
+	unit               *engine.Unit        // used to control startup/shutdown
+	log                zerolog.Logger      // used to log relevant actions
+	collectionsConduit network.Conduit     // used to get collections from collection nodes
+	receiptsConduit    network.Conduit     // used to get execution receipts from execution nodes
+	approvalsConduit   network.Conduit     // used to propagate result approvals
+	me                 module.Local        // used to access local node information
+	state              protocol.State      // used to access the  protocol state
+	receipts           mempool.Receipts    // used to store execution receipts in memory
+	blocks             mempool.Blocks      // used to store blocks in memory
+	collections        mempool.Collections // used to store collections in memory
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -40,17 +40,17 @@ func New(
 	state protocol.State,
 	me module.Local,
 	receipts mempool.Receipts,
-	approvals mempool.Approvals,
 	blocks mempool.Blocks,
+	collections mempool.Collections,
 ) (*Engine, error) {
 	e := &Engine{
-		unit:      engine.NewUnit(),
-		log:       log,
-		state:     state,
-		me:        me,
-		receipts:  receipts,
-		approvals: approvals,
-		blocks:    blocks,
+		unit:        engine.NewUnit(),
+		log:         log,
+		state:       state,
+		me:          me,
+		receipts:    receipts,
+		blocks:      blocks,
+		collections: collections,
 	}
 
 	var err error
@@ -119,6 +119,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
+	case *flow.Block:
+		return e.handleBlock(resource)
 	case *flow.ExecutionReceipt:
 		return e.handleExecutionReceipt(originID, resource)
 	case *flow.Collection:
@@ -151,21 +153,21 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 	// validating role of the originID
 	// an execution receipt should be either coming from an execution node through the
 	// Process method, or from the current verifier node itself through the Submit method
-	if id.Role != flow.RoleExecution && id.NodeID != e.me.NodeID() {
+	if id.Role != flow.RoleExecution {
 		// TODO: potential attack on integrity
 		return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", id.NodeID, id.Role)
 	}
 
 	// storing the execution receipt in the store of the engine
+	// this will fail if the receipt already exists in the store
 	err = e.receipts.Add(receipt)
 	if err != nil {
 		return fmt.Errorf("could not store execution receipt: %w", err)
 	}
 
-	// starting the core verification in a separate thread
-	e.unit.Launch(func() {
-		e.verify(originID, receipt)
-	})
+	// TODO start a verification job asyncronously.
+	// For now, we do it synchronously and submit a RA before checking anything
+	e.verify(originID, receipt)
 
 	return nil
 }
@@ -205,7 +207,12 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 		return fmt.Errorf("invalid role for receiving collection: %s", id.Role)
 	}
 
-	// TODO handle new collection
+	err = e.collections.Add(coll)
+	if err != nil {
+		return fmt.Errorf("could not add collection to mempool: %w", err)
+	}
+
+	// TODO notify of new collection
 
 	return nil
 }
@@ -247,6 +254,43 @@ func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt
 		Hex("result_id", logging.Entity(result)).
 		Logger()
 
+	// TODO for now, just submit the result approval without checking anything
+	{
+		// extracting list of consensus nodes' ids
+		consIDs, err := e.state.Final().
+			Identities(identity.HasRole(flow.RoleConsensus))
+		if err != nil {
+			// todo this error needs more advance handling after MVP
+			e.log.Error().
+				Str("error: ", err.Error()).
+				Msg("could not load the consensus nodes ids")
+			return
+		}
+
+		// emitting a result approval to all consensus nodes
+		approval := &flow.ResultApproval{
+			ResultApprovalBody: flow.ResultApprovalBody{
+				ExecutionResultID:    receipt.ExecutionResult.ID(),
+				AttestationSignature: nil,
+				ChunkIndexList:       nil,
+				Proof:                nil,
+				Spocks:               nil,
+			},
+			VerifierSignature: nil,
+		}
+
+		// broadcasting result approval to all consensus nodes
+		err = e.approvalsConduit.Submit(approval, consIDs.NodeIDs()...)
+		if err != nil {
+			e.log.Error().
+				Err(err).
+				Msg("could not submit result approval to consensus nodes")
+		}
+	}
+
+	// TODO below is unreachable, next we should do the below first before submitting the approval
+	return
+
 	// request block if not available
 	block, err := e.blocks.Get(blockID)
 	if err != nil {
@@ -254,41 +298,16 @@ func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt
 		log.Error().
 			Err(err).
 			Msg("could not get block")
-	}
-	// request collection if not available
-	// TODO dependent on chunk model change
-	_ = block
-
-	// extracting list of consensus nodes' ids
-	consIDs, err := e.state.Final().
-		Identities(identity.HasRole(flow.RoleConsensus))
-	if err != nil {
-		// todo this error needs more advance handling after MVP
-		e.log.Error().
-			Str("error: ", err.Error()).
-			Msg("could not load the consensus nodes ids")
 		return
 	}
 
-	// emitting a result approval to all consensus nodes
-	resApprov := &flow.ResultApproval{
-		ResultApprovalBody: flow.ResultApprovalBody{
-			ExecutionResultID:    receipt.ExecutionResult.ID(),
-			AttestationSignature: nil,
-			ChunkIndexList:       nil,
-			Proof:                nil,
-			Spocks:               nil,
-		},
-		VerifierSignature: nil,
+	// request collection if not available
+	for _, guarantee := range block.Guarantees {
+		err := e.requestCollection(guarantee.ID())
+		if err != nil {
+			log.Error().
+				Err(err).
+				Msgf("could not request collection (id=%s): %w", logging.Entity(guarantee), err)
+		}
 	}
-
-	// broadcasting result approval to all consensus nodes
-	e.broadcastResultApproval(resApprov, &consIDs)
-
-}
-
-// broadcastResultApproval receives a ResultApproval and list of consensus nodes IDs, and broadcasts
-// the result approval to the consensus nodes
-func (e *Engine) broadcastResultApproval(approval *flow.ResultApproval, consIDs *flow.IdentityList) {
-	// TODO replace with provider channel/engine
 }
