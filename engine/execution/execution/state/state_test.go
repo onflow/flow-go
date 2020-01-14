@@ -3,6 +3,7 @@ package state_test
 import (
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -10,119 +11,121 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
+	"github.com/dapperlabs/flow-go/storage/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
+func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T) {
+	return func(t *testing.T) {
+		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
+
+			ls, err := ledger.NewTrieStorage(db)
+			require.NoError(t, err)
+
+			ctrl := gomock.NewController(t)
+
+			stateCommitments := mocks.NewMockStateCommitments(ctrl)
+
+			stateCommitment := unittest.StateCommitmentFixture()
+
+			stateCommitments.EXPECT().ByID(gomock.Any()).Return(&stateCommitment, nil)
+
+			es := state.NewExecutionState(ls, stateCommitments)
+
+			f(t, es)
+		})
+	}
+}
+
 func TestExecutionStateWithTrieStorage(t *testing.T) {
-	t.Run("commit write and read new state", func(t *testing.T) {
-		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-			ls, err := ledger.NewTrieStorage(db)
-			require.NoError(t, err)
+	t.Run("commit write and read new state", prepareTest(func(t *testing.T, es state.ExecutionState) {
+		// TODO: use real block ID
+		sc1, err := es.StateCommitmentByBlockID(flow.Identifier{})
+		assert.NoError(t, err)
 
-			es := state.NewExecutionState(ls)
+		view1 := es.NewView(sc1)
 
-			// TODO: use real block ID
-			sc1, err := es.StateCommitmentByBlockID(flow.Identifier{})
-			assert.NoError(t, err)
+		view1.Set("fruit", []byte("apple"))
+		view1.Set("vegetable", []byte("carrot"))
 
-			view1 := es.NewView(sc1)
+		sc2, err := es.CommitDelta(view1.Delta())
 
-			view1.Set("fruit", []byte("apple"))
-			view1.Set("vegetable", []byte("carrot"))
+		view2 := es.NewView(sc2)
 
-			sc2, err := es.CommitDelta(view1.Delta())
+		b1, err := view2.Get("fruit")
+		assert.NoError(t, err)
+		b2, err := view2.Get("vegetable")
+		assert.NoError(t, err)
 
-			view2 := es.NewView(sc2)
+		assert.Equal(t, []byte("apple"), b1)
+		assert.Equal(t, []byte("carrot"), b2)
+	}))
 
-			b1, err := view2.Get("fruit")
-			assert.NoError(t, err)
-			b2, err := view2.Get("vegetable")
-			assert.NoError(t, err)
+	t.Run("commit write and read previous state", prepareTest(func(t *testing.T, es state.ExecutionState) {
+		// TODO: use real block ID
+		sc1, err := es.StateCommitmentByBlockID(flow.Identifier{})
+		assert.NoError(t, err)
 
-			assert.Equal(t, []byte("apple"), b1)
-			assert.Equal(t, []byte("carrot"), b2)
-		})
-	})
+		view1 := es.NewView(sc1)
 
-	t.Run("commit write and read previous state", func(t *testing.T) {
-		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-			ls, err := ledger.NewTrieStorage(db)
-			require.NoError(t, err)
+		view1.Set("fruit", []byte("apple"))
 
-			es := state.NewExecutionState(ls)
+		sc2, err := es.CommitDelta(view1.Delta())
 
-			// TODO: use real block ID
-			sc1, err := es.StateCommitmentByBlockID(flow.Identifier{})
-			assert.NoError(t, err)
+		// update value and get resulting state commitment
+		view2 := es.NewView(sc2)
+		view2.Set("fruit", []byte("orange"))
 
-			view1 := es.NewView(sc1)
+		sc3, err := es.CommitDelta(view2.Delta())
 
-			view1.Set("fruit", []byte("apple"))
+		// create a view for previous state version
+		view3 := es.NewView(sc2)
 
-			sc2, err := es.CommitDelta(view1.Delta())
+		// create a view for new state version
+		view4 := es.NewView(sc3)
 
-			// update value and get resulting state commitment
-			view2 := es.NewView(sc2)
-			view2.Set("fruit", []byte("orange"))
+		// fetch the value at both versions
+		b1, err := view3.Get("fruit")
+		assert.NoError(t, err)
 
-			sc3, err := es.CommitDelta(view2.Delta())
+		b2, err := view4.Get("fruit")
+		assert.NoError(t, err)
 
-			// create a view for previous state version
-			view3 := es.NewView(sc2)
+		assert.Equal(t, []byte("apple"), b1)
+		assert.Equal(t, []byte("orange"), b2)
+	}))
 
-			// create a view for new state version
-			view4 := es.NewView(sc3)
+	t.Run("commit delete and read new state", prepareTest(func(t *testing.T, es state.ExecutionState) {
+		// TODO: use real block ID
+		sc1, err := es.StateCommitmentByBlockID(flow.Identifier{})
+		assert.NoError(t, err)
 
-			// fetch the value at both versions
-			b1, err := view3.Get("fruit")
-			assert.NoError(t, err)
+		// set initial value
+		view1 := es.NewView(sc1)
+		view1.Set("fruit", []byte("apple"))
 
-			b2, err := view4.Get("fruit")
-			assert.NoError(t, err)
+		sc2, err := es.CommitDelta(view1.Delta())
 
-			assert.Equal(t, []byte("apple"), b1)
-			assert.Equal(t, []byte("orange"), b2)
-		})
-	})
+		// update value and get resulting state commitment
+		view2 := es.NewView(sc2)
+		view2.Delete("fruit")
 
-	t.Run("commit delete and read new state", func(t *testing.T) {
-		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-			ls, err := ledger.NewTrieStorage(db)
-			require.NoError(t, err)
+		sc3, err := es.CommitDelta(view2.Delta())
 
-			es := state.NewExecutionState(ls)
+		// create a view for previous state version
+		view3 := es.NewView(sc2)
 
-			// TODO: use real block ID
-			sc1, err := es.StateCommitmentByBlockID(flow.Identifier{})
-			assert.NoError(t, err)
+		// create a view for new state version
+		view4 := es.NewView(sc3)
 
-			// set initial value
-			view1 := es.NewView(sc1)
-			view1.Set("fruit", []byte("apple"))
+		// fetch the value at both versions
+		b1, err := view3.Get("fruit")
+		assert.NoError(t, err)
 
-			sc2, err := es.CommitDelta(view1.Delta())
+		b2, err := view4.Get("fruit")
+		assert.NoError(t, err)
 
-			// update value and get resulting state commitment
-			view2 := es.NewView(sc2)
-			view2.Delete("fruit")
-
-			sc3, err := es.CommitDelta(view2.Delta())
-
-			// create a view for previous state version
-			view3 := es.NewView(sc2)
-
-			// create a view for new state version
-			view4 := es.NewView(sc3)
-
-			// fetch the value at both versions
-			b1, err := view3.Get("fruit")
-			assert.NoError(t, err)
-
-			b2, err := view4.Get("fruit")
-			assert.NoError(t, err)
-
-			assert.Equal(t, []byte("apple"), b1)
-			assert.Empty(t, b2)
-		})
-	})
+		assert.Equal(t, []byte("apple"), b1)
+		assert.Empty(t, b2)
+	}))
 }

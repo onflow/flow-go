@@ -11,15 +11,15 @@ type StateCommitments struct {
 }
 
 // ByID provides a mock function with given fields: id
-func (_m *StateCommitments) ByID(id flow.Identifier) (*flow.StateCommitment, error) {
+func (_m *StateCommitments) ByID(id flow.Identifier) (*[]byte, error) {
 	ret := _m.Called(id)
 
-	var r0 *flow.StateCommitment
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.StateCommitment); ok {
+	var r0 *[]byte
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *[]byte); ok {
 		r0 = rf(id)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.StateCommitment)
+			r0 = ret.Get(0).(*[]byte)
 		}
 	}
 
@@ -34,11 +34,11 @@ func (_m *StateCommitments) ByID(id flow.Identifier) (*flow.StateCommitment, err
 }
 
 // Persist provides a mock function with given fields: id, stateCommitment
-func (_m *StateCommitments) Persist(id flow.Identifier, stateCommitment *flow.StateCommitment) error {
+func (_m *StateCommitments) Persist(id flow.Identifier, stateCommitment *[]byte) error {
 	ret := _m.Called(id, stateCommitment)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.StateCommitment) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *[]byte) error); ok {
 		r0 = rf(id, stateCommitment)
 	} else {
 		r0 = ret.Error(0)

@@ -12,15 +12,15 @@ type ExecutionState struct {
 }
 
 // CommitDelta provides a mock function with given fields: _a0
-func (_m *ExecutionState) CommitDelta(_a0 state.Delta) (flow.StateCommitment, error) {
+func (_m *ExecutionState) CommitDelta(_a0 state.Delta) ([]byte, error) {
 	ret := _m.Called(_a0)
 
-	var r0 flow.StateCommitment
-	if rf, ok := ret.Get(0).(func(state.Delta) flow.StateCommitment); ok {
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func(state.Delta) []byte); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.StateCommitment)
+			r0 = ret.Get(0).([]byte)
 		}
 	}
 
@@ -35,11 +35,11 @@ func (_m *ExecutionState) CommitDelta(_a0 state.Delta) (flow.StateCommitment, er
 }
 
 // NewView provides a mock function with given fields: _a0
-func (_m *ExecutionState) NewView(_a0 flow.StateCommitment) *state.View {
+func (_m *ExecutionState) NewView(_a0 []byte) *state.View {
 	ret := _m.Called(_a0)
 
 	var r0 *state.View
-	if rf, ok := ret.Get(0).(func(flow.StateCommitment) *state.View); ok {
+	if rf, ok := ret.Get(0).(func([]byte) *state.View); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
@@ -51,11 +51,11 @@ func (_m *ExecutionState) NewView(_a0 flow.StateCommitment) *state.View {
 }
 
 // PersistStateCommitment provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionState) PersistStateCommitment(_a0 flow.Identifier, _a1 *flow.StateCommitment) error {
+func (_m *ExecutionState) PersistStateCommitment(_a0 flow.Identifier, _a1 *[]byte) error {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.StateCommitment) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, *[]byte) error); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
@@ -65,15 +65,15 @@ func (_m *ExecutionState) PersistStateCommitment(_a0 flow.Identifier, _a1 *flow.
 }
 
 // StateCommitmentByBlockID provides a mock function with given fields: _a0
-func (_m *ExecutionState) StateCommitmentByBlockID(_a0 flow.Identifier) (flow.StateCommitment, error) {
+func (_m *ExecutionState) StateCommitmentByBlockID(_a0 flow.Identifier) ([]byte, error) {
 	ret := _m.Called(_a0)
 
-	var r0 flow.StateCommitment
-	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.StateCommitment); ok {
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func(flow.Identifier) []byte); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.StateCommitment)
+			r0 = ret.Get(0).([]byte)
 		}
 	}
 
