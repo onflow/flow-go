@@ -254,60 +254,60 @@ func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt
 		Hex("result_id", logging.Entity(result)).
 		Logger()
 
-	// TODO for now, just submit the result approval without checking anything
-	{
-		// extracting list of consensus nodes' ids
-		consIDs, err := e.state.Final().
-			Identities(identity.HasRole(flow.RoleConsensus))
-		if err != nil {
-			// todo this error needs more advance handling after MVP
-			e.log.Error().
-				Str("error: ", err.Error()).
-				Msg("could not load the consensus nodes ids")
-			return
-		}
-
-		// emitting a result approval to all consensus nodes
-		approval := &flow.ResultApproval{
-			ResultApprovalBody: flow.ResultApprovalBody{
-				ExecutionResultID:    receipt.ExecutionResult.ID(),
-				AttestationSignature: nil,
-				ChunkIndexList:       nil,
-				Proof:                nil,
-				Spocks:               nil,
-			},
-			VerifierSignature: nil,
-		}
-
-		// broadcasting result approval to all consensus nodes
-		err = e.approvalsConduit.Submit(approval, consIDs.NodeIDs()...)
-		if err != nil {
-			e.log.Error().
-				Err(err).
-				Msg("could not submit result approval to consensus nodes")
-		}
-	}
-
-	// TODO below is unreachable, next we should do the below first before submitting the approval
-	return
+	// TODO temporary as log uses are commented
+	_ = log
 
 	// request block if not available
-	block, err := e.blocks.Get(blockID)
+	// TODO handle this case
+	//block, err := e.blocks.Get(blockID)
+	//if err != nil {
+	//	// TODO should request the block here
+	//	log.Error().
+	//		Err(err).
+	//		Msg("could not get block")
+	//	return
+	//}
+
+	// request collection if not available
+	// TODO handle this case
+	//for _, guarantee := range block.Guarantees {
+	//	err := e.requestCollection(guarantee.ID())
+	//	if err != nil {
+	//		log.Error().
+	//			Err(err).
+	//			Msgf("could not request collection (id=%s): %w", logging.Entity(guarantee), err)
+	//	}
+	//}
+
+	// TODO for now, just submit the result approval without checking anything
+	// extracting list of consensus nodes' ids
+	consIDs, err := e.state.Final().
+		Identities(identity.HasRole(flow.RoleConsensus))
 	if err != nil {
-		// TODO should request the block here
-		log.Error().
-			Err(err).
-			Msg("could not get block")
+		// todo this error needs more advance handling after MVP
+		e.log.Error().
+			Str("error: ", err.Error()).
+			Msg("could not load the consensus nodes ids")
 		return
 	}
 
-	// request collection if not available
-	for _, guarantee := range block.Guarantees {
-		err := e.requestCollection(guarantee.ID())
-		if err != nil {
-			log.Error().
-				Err(err).
-				Msgf("could not request collection (id=%s): %w", logging.Entity(guarantee), err)
-		}
+	// emitting a result approval to all consensus nodes
+	approval := &flow.ResultApproval{
+		ResultApprovalBody: flow.ResultApprovalBody{
+			ExecutionResultID:    receipt.ExecutionResult.ID(),
+			AttestationSignature: nil,
+			ChunkIndexList:       nil,
+			Proof:                nil,
+			Spocks:               nil,
+		},
+		VerifierSignature: nil,
+	}
+
+	// broadcasting result approval to all consensus nodes
+	err = e.approvalsConduit.Submit(approval, consIDs.NodeIDs()...)
+	if err != nil {
+		e.log.Error().
+			Err(err).
+			Msg("could not submit result approval to consensus nodes")
 	}
 }

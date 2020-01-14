@@ -111,6 +111,7 @@ func (v *TestSuite) TestHandleReceipt() {
 	v.receipts.On("Add", &receipt).Return(nil).Once()
 
 	// expect that the receipt be submitted to consensus nodes
+	// TODO this will need to be changed once verifier flow is finished
 	v.approvalsConduit.On("Submit", genSubmitParams(testifymock.Anything, consNodes)...).Return(nil).Once()
 
 	err := vrfy.Process(execNodeID.NodeID, &receipt)
