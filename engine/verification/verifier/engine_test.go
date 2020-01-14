@@ -104,6 +104,9 @@ func (v *TestSuite) TestHandleReceipt() {
 	v.state.On("Final").Return(v.ss, nil)
 	v.ss.On("Identity", execNodeID.NodeID).Return(execNodeID, nil).Once()
 	v.ss.On("Identities", testifymock.Anything).Return(consNodes, nil)
+	// mock methods called in verify routine
+	v.blocks.On("Get", testifymock.Anything).Return(nil, errors.New(""))
+	v.collections.On("Has", testifymock.Anything).Return(true)
 
 	receipt := unittest.ExecutionReceiptFixture()
 

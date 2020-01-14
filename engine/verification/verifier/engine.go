@@ -169,9 +169,10 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 		return fmt.Errorf("could not store execution receipt: %w", err)
 	}
 
-	// TODO start a verification job asyncronously.
-	// For now, we do it synchronously and submit a RA before checking anything
-	e.verify(receipt)
+	// start the verification
+	e.unit.Launch(func() {
+		e.verify(receipt)
+	})
 
 	return nil
 }
@@ -242,12 +243,14 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 	return nil
 }
 
-// verify is an internal component of the verifier engine.
-// It receives an execution receipt and does the core verification process.
-// The origin ID indicates the node which originally submitted the event to
-// the peer-to-peer network.
-// If the submission was successful it generates a result approval for the incoming ExecutionReceipt
-// and submits that to the network
+// verify is an internal component of the verifier engine that handles
+// the core verification process.
+//
+// It receives an execution receipt, requests and waits for dependent
+// collections, then generates a result approval and submits it to
+// consensus nodes.
+//
+// This method should be run as a goroutine with unit.Launch.
 func (e *Engine) verify(receipt *flow.ExecutionReceipt) {
 
 	sub := e.collectionsBroadcast.Subscribe()
@@ -274,6 +277,35 @@ func (e *Engine) verify(receipt *flow.ExecutionReceipt) {
 
 	chunks := result.Chunks.Items()
 
+	// keep track of which collections that we depend on are locally available
+	var requiredCollections map[flow.Identifier]bool
+
+	for _, chunk := range result.Chunks.Items() {
+		collIndex := int(chunk.CollectionIndex)
+
+		// ensure the collection index specified by the ER is valid
+		if len(block.Guarantees) <= collIndex {
+			log.Error().
+				Msgf("invalid collection index (%d) does not exist in block", collIndex)
+			return
+		}
+
+		// log whether the collection is available locally
+		collID := block.Guarantees[collIndex].ID()
+		if e.collections.Has(collID) {
+			requiredCollections[collID] = true
+		} else {
+			requiredCollections[collID] = false
+			err := e.requestCollection(collID)
+			if err != nil {
+				e.log.Error().
+					Err(err).
+					Hex("collection_id", logging.ID(collID)).
+					Msg("could not request collection")
+			}
+		}
+	}
+
 	// TODO allow this case
 	if len(chunks) != 1 {
 		log.Error().
@@ -288,65 +320,52 @@ func (e *Engine) verify(receipt *flow.ExecutionReceipt) {
 		case <-sub.Ch():
 		}
 
-		// retrieve the collection corresponding to each chunk
-		for _, chunk := range result.Chunks.Items() {
-			// TODO replace this with updated chunk model referencing collection index
-			_ = chunk
-			collIndex := 0
-
-			// ensure the collection index specified by the ER is valid
-			if len(block.Guarantees) < collIndex {
-				log.Error().
-					Msgf("invalid collection index (%d) does not exist in block", collIndex)
-				return
-			}
-
-			// ensure we have the collection corresponding to this chunk
-			collID := block.Guarantees[collIndex].ID()
-			if !e.collections.Has(collID) {
-				err := e.requestCollection(collID)
-				if err != nil {
-					e.log.Error().
-						Err(err).
-						Hex("collection_id", logging.ID(collID)).
-						Msg("could not request collection")
-					continue
-				}
+		// update which collections exist locally
+		for collID, exists := range requiredCollections {
+			if !exists && e.collections.Has(collID) {
+				requiredCollections[collID] = true
 			}
 		}
 
-		// TODO
-	}
+		// if we're missing any collections, continue waiting
+		for _, exists := range requiredCollections {
+			if !exists {
+				continue
+			}
+		}
 
-	// TODO for now, just submit the result approval without checking anything
-	// extracting list of consensus nodes' ids
-	consIDs, err := e.state.Final().
-		Identities(identity.HasRole(flow.RoleConsensus))
-	if err != nil {
-		// todo this error needs more advance handling after MVP
-		e.log.Error().
-			Str("error: ", err.Error()).
-			Msg("could not load the consensus nodes ids")
+		// TODO execute transactions and confirm execution result
+
+		consensusNodes, err := e.state.Final().
+			Identities(identity.HasRole(flow.RoleConsensus))
+		if err != nil {
+			// TODO this error needs more advance handling after MVP
+			e.log.Error().
+				Str("error: ", err.Error()).
+				Msg("could not load the consensus nodes ids")
+			return
+		}
+
+		approval := &flow.ResultApproval{
+			ResultApprovalBody: flow.ResultApprovalBody{
+				ExecutionResultID:    receipt.ExecutionResult.ID(),
+				AttestationSignature: nil,
+				ChunkIndexList:       nil,
+				Proof:                nil,
+				Spocks:               nil,
+			},
+			VerifierSignature: nil,
+		}
+
+		// broadcast result approval to consensus nodes
+		err = e.approvalsConduit.Submit(approval, consensusNodes.NodeIDs()...)
+		if err != nil {
+			// TODO this error needs more advance handling after MVP
+			e.log.Error().
+				Err(err).
+				Msg("could not submit result approval to consensus nodes")
+		}
+
 		return
-	}
-
-	// emitting a result approval to all consensus nodes
-	approval := &flow.ResultApproval{
-		ResultApprovalBody: flow.ResultApprovalBody{
-			ExecutionResultID:    receipt.ExecutionResult.ID(),
-			AttestationSignature: nil,
-			ChunkIndexList:       nil,
-			Proof:                nil,
-			Spocks:               nil,
-		},
-		VerifierSignature: nil,
-	}
-
-	// broadcasting result approval to all consensus nodes
-	err = e.approvalsConduit.Submit(approval, consIDs.NodeIDs()...)
-	if err != nil {
-		e.log.Error().
-			Err(err).
-			Msg("could not submit result approval to consensus nodes")
 	}
 }
