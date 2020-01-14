@@ -27,7 +27,7 @@ spec:
       node: consensus
       env: staging
       version: v1
-
+  podManagementPolicy: Parallel
   template:
     metadata:
       annotations:
@@ -89,14 +89,14 @@ spec:
                   name: flow-node-config-map
                   key: entries
 
-          # Resource requests and contraints
+          # Resource requests and constraints
           resources:
             requests:
               cpu: '125m'
-              memory: '128Mi'
+              memory: '256Mi'
             limits:
               cpu: '250m'
-              memory: '256Mi'
+              memory: '1Gi'
           volumeMounts:
             - name: badger-volume
               mountPath: /flowdb
