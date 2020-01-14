@@ -120,6 +120,8 @@ func (e *Engine) onBlock(block *flow.Block) error {
 	executableBlock := executor.ExecutableBlock{
 		Block:        *block,
 		Transactions: transactions,
+		// TODO: populate this field from previous block
+		PreviousExecutionResult: flow.ExecutionResult{},
 	}
 
 	_, err = e.executor.ExecuteBlock(executableBlock)

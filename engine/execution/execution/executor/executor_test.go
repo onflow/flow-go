@@ -84,13 +84,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Return(nil, nil)
 
 	es.On("PersistStateCommitment",
-		block.ID(), mock.AnythingOfType("*[]uint8")).Return(nil).Once()
+		block.ID(), mock.AnythingOfType("*[]uint8")).Return(nil)
 
-	chunks, err := exe.ExecuteBlock(executableBlock)
+	result, err := exe.ExecuteBlock(executableBlock)
 	assert.NoError(t, err)
-	assert.Len(t, chunks, 1)
+	assert.Len(t, result.Chunks.Chunks, 1)
 
-	chunk := chunks[0]
+	chunk := result.Chunks.Chunks[0]
 	assert.EqualValues(t, chunk.TxCounts, 2)
 
 	vm.AssertExpectations(t)
