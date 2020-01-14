@@ -16,8 +16,8 @@ type StubEngine struct {
 	t        *testing.T
 	net      libp2p2.Network // used to communicate with the network layer
 	originID flow.Identifier
-	event    interface{}   // used to keep track of the events that the node receives
-	received chan struct{} // used as an indicator on reception of messages for testing
+	event    chan interface{} // used to keep track of the events that the node receives
+	received chan struct{}    // used as an indicator on reception of messages for testing
 }
 
 // SubmitLocal is implemented for a valid type assertion to Engine
@@ -43,7 +43,7 @@ func (te *StubEngine) ProcessLocal(event interface{}) error {
 // StubEngine. It then flags the received channel on reception of an event
 func (te *StubEngine) Process(originID flow.Identifier, event interface{}) error {
 	te.originID = originID
-	te.event = event
+	te.event <- event
 	te.received <- struct{}{}
 	return nil
 }

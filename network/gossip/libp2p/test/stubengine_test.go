@@ -57,7 +57,8 @@ func (s *StubEngineTestSuite) TestSingleMessage() {
 	// test engine 2
 	te2 := &StubEngine{
 		t:        s.Suite.T(),
-		received: make(chan struct{}),
+		event:    make(chan interface{}, 1),
+		received: make(chan struct{}, 1),
 	}
 
 	_, err = s.nets[1].Register(1, te2)
@@ -79,7 +80,7 @@ func (s *StubEngineTestSuite) TestSingleMessage() {
 
 		// evaluates proper reception of event
 		// casts the received event at the receiver side
-		rcvEvent, ok := te2.event.(*libp2pmodel.Echo)
+		rcvEvent, ok := (<-te2.event).(*libp2pmodel.Echo)
 		// evaluates correctness of casting
 		require.True(s.Suite.T(), ok)
 		// evaluates content of received message
@@ -87,6 +88,57 @@ func (s *StubEngineTestSuite) TestSingleMessage() {
 
 	case <-time.After(10 * time.Second):
 		assert.Fail(s.Suite.T(), "peer 1 failed to send a message to peer 2")
+	}
+}
+
+// TestMultiMessageSync sends a multiple messages from one network instance to the other one
+// it evaluates the correctness of implementation against correct delivery of the messages.
+func (s *StubEngineTestSuite) TestMultiMessageSync() {
+	// count defines number of messages
+	count := 10
+	// test engine1
+	te1 := &StubEngine{
+		t: s.Suite.T(),
+	}
+	c1, err := s.nets[0].Register(1, te1)
+	require.NoError(s.Suite.T(), err)
+
+	// test engine 2
+	te2 := &StubEngine{
+		t:        s.Suite.T(),
+		event:    make(chan interface{}, count),
+		received: make(chan struct{}, count),
+	}
+
+	_, err = s.nets[1].Register(1, te2)
+	require.NoError(s.Suite.T(), err)
+
+	for i := 0; i < count; i++ {
+		// Send the message to node 2 using the conduit of node 1
+		event := &libp2pmodel.Echo{
+			Text: fmt.Sprintf("hello%d", i),
+		}
+		require.NoError(s.Suite.T(), c1.Submit(event, s.ids[1]))
+
+		select {
+		case <-te2.received:
+			// evaluates reception of message at the other side
+			// does not evaluate the content
+			require.NotNil(s.Suite.T(), te2.originID)
+			require.NotNil(s.Suite.T(), te2.event)
+			assert.Equal(s.Suite.T(), s.ids[0], te2.originID)
+
+			// evaluates proper reception of event
+			// casts the received event at the receiver side
+			rcvEvent, ok := (<-te2.event).(*libp2pmodel.Echo)
+			// evaluates correctness of casting
+			require.True(s.Suite.T(), ok)
+			// evaluates content of received message
+			assert.Equal(s.Suite.T(), event, rcvEvent)
+
+		case <-time.After(2 * time.Second):
+			assert.Fail(s.Suite.T(), "peer 1 failed to send a message to peer 2")
+		}
 	}
 }
 
