@@ -6,7 +6,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
 // ExecutionState is an interface used to access and mutate the execution state of the blockchain.
@@ -23,12 +22,12 @@ type ExecutionState interface {
 }
 
 type state struct {
-	ls          ledger.Storage
+	ls          storage.Ledger
 	commitments storage.StateCommitments
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
-func NewExecutionState(ls ledger.Storage, commitments storage.StateCommitments) ExecutionState {
+func NewExecutionState(ls storage.Ledger, commitments storage.StateCommitments) ExecutionState {
 	return &state{
 		ls:          ls,
 		commitments: commitments,
@@ -38,8 +37,8 @@ func NewExecutionState(ls ledger.Storage, commitments storage.StateCommitments) 
 func (s *state) NewView(commitment flow.StateCommitment) *View {
 	return NewView(func(key string) ([]byte, error) {
 		values, err := s.ls.GetRegisters(
-			[]ledger.RegisterID{[]byte(key)},
-			ledger.StateCommitment(commitment),
+			[]flow.RegisterID{[]byte(key)},
+			flow.StateCommitment(commitment),
 		)
 		if err != nil {
 			return nil, err
