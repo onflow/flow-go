@@ -32,7 +32,6 @@ type Blocks interface {
 	// as a slice.
 	All() []*flow.Block
 
-	// Hash will return a fingerprint has representing the contents of the
-	// entire memory pool.
+	// Hash will return a hash of the contents of the memory pool.
 	Hash() flow.Identifier
 }

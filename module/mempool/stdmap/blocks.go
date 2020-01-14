@@ -23,33 +23,33 @@ func NewBlocks() (*Blocks, error) {
 }
 
 // Add adds an block to the mempool.
-func (a *Blocks) Add(approval *flow.Block) error {
-	return a.Backend.Add(approval)
+func (a *Blocks) Add(block *flow.Block) error {
+	return a.Backend.Add(block)
 }
 
 // Get returns the block with the given ID from the mempool.
-func (a *Blocks) Get(approvalID flow.Identifier) (*flow.Block, error) {
-	entity, err := a.Backend.Get(approvalID)
+func (a *Blocks) Get(blockID flow.Identifier) (*flow.Block, error) {
+	entity, err := a.Backend.Get(blockID)
 	if err != nil {
 		return nil, err
 	}
-	approval, ok := entity.(*flow.Block)
+	block, ok := entity.(*flow.Block)
 	if !ok {
-		panic(fmt.Sprintf("invalid entity in approval pool (%T)", entity))
+		panic(fmt.Sprintf("invalid entity in block pool (%T)", entity))
 	}
-	return approval, nil
+	return block, nil
 }
 
 // All returns all blocks from the pool.
 func (a *Blocks) All() []*flow.Block {
 	entities := a.Backend.All()
-	Blocks := make([]*flow.Block, 0, len(entities))
+	blocks := make([]*flow.Block, 0, len(entities))
 	for _, entity := range entities {
-		approval, ok := entity.(*flow.Block)
+		block, ok := entity.(*flow.Block)
 		if !ok {
-			panic(fmt.Sprintf("invalid entity in approval pool (%T)", entity))
+			panic(fmt.Sprintf("invalid entity in block pool (%T)", entity))
 		}
-		Blocks = append(Blocks, approval)
+		blocks = append(blocks, block)
 	}
-	return Blocks
+	return blocks
 }
