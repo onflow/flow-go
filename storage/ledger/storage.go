@@ -1,7 +1,9 @@
 package ledger
 
 import (
+	"fmt"
 	"github.com/dapperlabs/flow-go/model/flow"
+
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
@@ -84,14 +86,34 @@ func (f *TrieStorage) GetRegistersWithProof(registerIDs []flow.RegisterID, state
 
 // UpdateRegistersWithProof updates the values at the given registers
 // This is untrusted so a proof is generated
-func (f *TrieStorage) UpdateRegistersWithProof(registerIDs []flow.RegisterID, values []flow.RegisterValue) (newStateCommitment flow.StateCommitment, proofs []flow.StorageProof, err error) {
-	err = f.tree.Update(registerIDs, values)
+func (f *TrieStorage) UpdateRegistersWithProof(
+	ids []flow.RegisterID,
+	values []flow.RegisterValue,
+) (
+	newStateCommitment flow.StateCommitment,
+	proofs []flow.StorageProof,
+	err error,
+) {
+	// TODO: add test case
+	if len(ids) != len(values) {
+		return nil, nil, fmt.Errorf(
+			"length of IDs [%d] does not match values [%d]", len(ids), len(values),
+		)
+	}
+
+	// TODO: add test case
+	if len(ids) == 0 {
+		// return current state root unchanged
+		return f.tree.GetRoot().GetValue(), nil, nil
+	}
+
+	err = f.tree.Update(ids, values)
 	if err != nil {
 		return nil, nil, err
 	}
-	_, proofs, err = f.GetRegistersWithProof(registerIDs, f.tree.GetRoot().GetValue())
-	return f.tree.GetRoot().GetValue(), proofs, err
 
+	_, proofs, err = f.GetRegistersWithProof(ids, f.tree.GetRoot().GetValue())
+	return f.tree.GetRoot().GetValue(), proofs, err
 }
 
 // CloseStorage closes the DB
