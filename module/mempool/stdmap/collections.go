@@ -47,7 +47,7 @@ func (g *Collections) All() []*flow.Collection {
 	for _, entity := range entities {
 		coll, ok := entity.(*flow.Collection)
 		if !ok {
-			panic(fmt.Sprintf("invalid entity in guarantee pool (%T)", entity))
+			panic(fmt.Sprintf("invalid entity in collection pool (%T)", entity))
 		}
 		colls = append(colls, coll)
 	}

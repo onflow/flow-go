@@ -175,7 +175,7 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 // handleBlock handles an incoming block.
 func (e *Engine) handleBlock(block *flow.Block) error {
 
-	e.log.Debug().
+	e.log.Info().
 		Hex("block_id", logging.Entity(block)).
 		Uint64("block_number", block.Number).
 		Msg("received block")
