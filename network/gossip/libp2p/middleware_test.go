@@ -265,7 +265,7 @@ func (m *MiddlewareTestSuit) createNetworkMessage(originID flow.Identifier, targ
 		payload = msg[0]
 	}
 	nm := network.NetworkMessage{
-		EngineID:  1,
+		ChannelID: 1,
 		EventID:   []byte("1"),
 		OriginID:  originID,
 		TargetIDs: []flow.Identifier{targetID},

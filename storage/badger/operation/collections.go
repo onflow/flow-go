@@ -5,30 +5,25 @@ package operation
 import (
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertGuaranteedCollections(hash crypto.Hash, collections []*flow.GuaranteedCollection) func(*badger.Txn) error {
-	return insert(makePrefix(codeGuaranteedCollection, hash), collections)
+// NOTE: These insert light collections, which only contain references
+// to the constituent transactions. They do not modify transactions contained
+// by the collections.
+
+func InsertCollection(collection *flow.LightCollection) func(*badger.Txn) error {
+	return insert(makePrefix(codeCollection, collection.ID()), collection)
 }
 
-func PersistGuaranteedCollections(hash crypto.Hash, collections []*flow.GuaranteedCollection) func(*badger.Txn) error {
-	return persist(makePrefix(codeGuaranteedCollection, hash), collections)
+func PersistCollection(collection *flow.LightCollection) func(*badger.Txn) error {
+	return persist(makePrefix(codeCollection, collection.ID()), collection)
 }
 
-func RetrieveGuaranteedCollections(hash crypto.Hash, collections *[]*flow.GuaranteedCollection) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeGuaranteedCollection, hash), collections)
+func RetrieveCollection(collID flow.Identifier, collection *flow.LightCollection) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeCollection, collID), collection)
 }
 
-func InsertCollection(collection *flow.Collection) func(*badger.Txn) error {
-	return insert(makePrefix(codeCollection, collection.Fingerprint()), collection)
-}
-
-func PersistCollection(collection *flow.Collection) func(*badger.Txn) error {
-	return persist(makePrefix(codeCollection, collection.Fingerprint()), collection)
-}
-
-func RetrieveCollection(hash flow.Fingerprint, collection *flow.Collection) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeCollection, hash), collection)
+func RemoveCollection(collID flow.Identifier) func(*badger.Txn) error {
+	return remove(makePrefix(codeCollection, collID))
 }

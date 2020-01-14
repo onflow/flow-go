@@ -90,27 +90,27 @@ func (n *Network) Done() <-chan struct{} {
 // Register will register the given engine with the given unique engine engineID,
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
-func (n *Network) Register(engineID uint8, engine network.Engine) (network.Conduit, error) {
+func (n *Network) Register(channelID uint8, engine network.Engine) (network.Conduit, error) {
 	n.Lock()
 	defer n.Unlock()
 
 	// check if the engine engineID is already taken
-	_, ok := n.engines[engineID]
+	_, ok := n.engines[channelID]
 	if ok {
 		return nil, errors.Errorf("engine already registered (%d)", engine)
 	}
 
 	// add the engine ID to the cache
-	n.cache.Add(engineID)
+	n.cache.Add(channelID)
 
 	// create the conduit
 	conduit := &Conduit{
-		engineID: engineID,
-		submit:   n.submit,
+		channelID: channelID,
+		submit:    n.submit,
 	}
 
 	// register engine with provided engineID
-	n.engines[engineID] = engine
+	n.engines[channelID] = engine
 
 	return conduit, nil
 }
@@ -165,12 +165,12 @@ func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
 func (n *Network) processNetworkMessage(nodeID flow.Identifier, message networkmodel.NetworkMessage) error {
 
 	// Extract engine id and find the registered engine
-	en, found := n.engines[message.EngineID]
+	en, found := n.engines[message.ChannelID]
 	if !found {
 		n.logger.Debug().Str("sender", nodeID.String()).
-			Uint8("engine", uint8(message.EngineID)).
+			Uint8("engine", uint8(message.ChannelID)).
 			Msg(" dropping message since no engine to receive it was found")
-		return fmt.Errorf("could not find the engine: %d", message.EngineID)
+		return fmt.Errorf("could not find the engine: %d", message.ChannelID)
 	}
 
 	// Convert message payload to a known message type
@@ -183,14 +183,14 @@ func (n *Network) processNetworkMessage(nodeID flow.Identifier, message networkm
 	err = en.Process(message.OriginID, payload)
 	if err != nil {
 		n.logger.Error().
-			Uint8("engineid", uint8(message.EngineID)).Str("sender", nodeID.String()).Err(err)
+			Uint8("engineid", message.ChannelID).Str("sender", nodeID.String()).Err(err)
 		return err
 	}
 	return nil
 }
 
 // genNetworkMessage uses the codec to encode an event into a NetworkMessage
-func (n *Network) genNetworkMessage(engineID uint8, event interface{}, targetIDs ...flow.Identifier) (networkmodel.NetworkMessage, error) {
+func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetIDs ...flow.Identifier) (networkmodel.NetworkMessage, error) {
 	// encode the payload using the configured codec
 	payload, err := n.codec.Encode(event)
 	if err != nil {
@@ -198,11 +198,11 @@ func (n *Network) genNetworkMessage(engineID uint8, event interface{}, targetIDs
 	}
 
 	// use a hash with an engine-specific salt to get the payload hash
-	sip := siphash.New([]byte("libp2ppacking" + fmt.Sprintf("%03d", engineID)))
+	sip := siphash.New([]byte("libp2ppacking" + fmt.Sprintf("%03d", channelID)))
 
 	// casting event structure
 	e := networkmodel.NetworkMessage{
-		EngineID:  engineID,
+		ChannelID: channelID,
 		EventID:   sip.Sum(payload),
 		OriginID:  n.me.NodeID(),
 		TargetIDs: targetIDs,
@@ -212,26 +212,26 @@ func (n *Network) genNetworkMessage(engineID uint8, event interface{}, targetIDs
 	return e, nil
 }
 
-// submit method submits the given event for the given engine to the overlay layer
+// submit method submits the given event for the given channel to the overlay layer
 // for processing; it is used by engines through conduits.
 // The Target needs to be added as a peer before submitting the message.
-func (n *Network) submit(engineID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 	// genNetworkMessage the event to get payload and event ID
-	message, err := n.genNetworkMessage(engineID, event, targetIDs...)
+	message, err := n.genNetworkMessage(channelID, event, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not cast the event into NetworkMessage")
 	}
 	// gossip
 
 	// checks if the event is already in the cache
-	ok := n.cache.Has(engineID, message.EventID)
+	ok := n.cache.Has(channelID, message.EventID)
 	if ok {
 		// returns nil and terminates sending the message since
 		// the message already submitted to the network
 		return nil
 	}
 	// storing event in the cache
-	n.cache.Set(engineID, message.EventID, &message)
+	n.cache.Set(channelID, message.EventID, &message)
 
 	// get all peers that haven't seen it yet
 	//nodeIDs := n.top.Peers(peer.Not(peer.HasSeen(message.EventID))).NodeIDs()

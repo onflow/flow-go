@@ -8,11 +8,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
 func TestInterpreterOptionalBoxing(t *testing.T) {
 
-	inter, err := NewInterpreter(nil)
+	checker, err := sema.NewChecker(nil, utils.TestLocation)
+	require.NoError(t, err)
+
+	inter, err := NewInterpreter(checker)
 	require.NoError(t, err)
 
 	t.Run("Bool to Bool?", func(t *testing.T) {
@@ -102,7 +106,10 @@ func TestInterpreterOptionalBoxing(t *testing.T) {
 
 func TestInterpreterAnyBoxing(t *testing.T) {
 
-	inter, err := NewInterpreter(nil)
+	checker, err := sema.NewChecker(nil, utils.TestLocation)
+	require.NoError(t, err)
+
+	inter, err := NewInterpreter(checker)
 	require.NoError(t, err)
 
 	for _, anyType := range []sema.Type{
@@ -165,7 +172,10 @@ func TestInterpreterAnyBoxing(t *testing.T) {
 
 func TestInterpreterBoxing(t *testing.T) {
 
-	inter, err := NewInterpreter(nil)
+	checker, err := sema.NewChecker(nil, utils.TestLocation)
+	require.NoError(t, err)
+
+	inter, err := NewInterpreter(checker)
 	require.NoError(t, err)
 
 	for _, anyType := range []sema.Type{

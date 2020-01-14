@@ -1,97 +1,92 @@
 package flow
 
-import (
-	"bytes"
-
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/hash"
-)
-
-// Collection is set of transactions (transaction set)
+// Collection is set of transactions.
 type Collection struct {
-	Transactions []Fingerprint
+	Transactions []TransactionBody
 }
 
-// Fingerprint returns the canonical hash of this collection.
-func (c *Collection) Fingerprint() Fingerprint {
-	return Fingerprint(hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(c)))
+// CollectionFromTransactions creates a new collection from the list of
+// transactions.
+func CollectionFromTransactions(transactions []*Transaction) Collection {
+	coll := Collection{Transactions: make([]TransactionBody, 0, len(transactions))}
+	for _, tx := range transactions {
+		coll.Transactions = append(coll.Transactions, tx.TransactionBody)
+	}
+	return coll
 }
 
-// AddItem adds another entityID to the collection
-func (c *Collection) Add(item Entity) {
-	c.Transactions = append(c.Transactions, item.Fingerprint())
+// Light returns the light, reference-only version of the collection.
+func (c Collection) Light() LightCollection {
+	lc := LightCollection{Transactions: make([]Identifier, 0, len(c.Transactions))}
+	for _, tx := range c.Transactions {
+		lc.Transactions = append(lc.Transactions, tx.ID())
+	}
+	return lc
 }
 
-// GetItem returns a single item from the collection with the proof that this item is located at this index
-func (c *Collection) GetItem(index uint64) (fingerprint Fingerprint, proof []byte) {
-	return c.Transactions[index], nil
+// Guarantee returns a collection guarantee for this collection.
+func (c *Collection) Guarantee() CollectionGuarantee {
+	return CollectionGuarantee{
+		CollectionID: c.ID(),
+	}
 }
 
-// GetItem returns a range of elements from the collection
-// and provides an aggregated proof
-func (c *Collection) GetItems(startIndex uint64, length uint64) (fingerprints []Fingerprint, proof []byte) {
-	return c.Transactions[startIndex : startIndex+length], nil
+func (c Collection) ID() Identifier {
+	return c.Light().ID()
 }
 
-// Reset resets all transactions inside the collection
-func (c *Collection) Reset() {
-	c.Transactions = make([]Fingerprint, 0)
+func (c Collection) Checksum() Identifier {
+	return c.Light().Checksum()
 }
 
-// IsEmpty returns true if the collection is empty
-func (c Collection) IsEmpty() bool {
-	return len(c.Transactions) == 0
+// LightCollection is a collection containing references to the constituent
+// transactions rather than full transaction bodies. It is used for indexing
+// transactions by collection and for computing the collection fingerprint.
+type LightCollection struct {
+	Transactions []Identifier
 }
 
-// Size returns len of transaction slice
-func (c *Collection) Size() int {
-	return len(c.Transactions)
+func (lc LightCollection) ID() Identifier {
+	return MakeID(lc)
 }
 
-func (c *Collection) ID() Identifier {
-	var id Identifier
-	copy(id[:], hash.DefaultHasher.ComputeHash(encoding.DefaultEncoder.MustEncode(c)))
-	return id
+func (lc LightCollection) Checksum() Identifier {
+	return MakeID(lc)
 }
 
 // Note that this is the basic version of the List, we need to substitute it with something like Merkle tree at some point
 type CollectionList struct {
-	collections []Collection
+	collections []*Collection
 }
 
-func (cl *CollectionList) Fingerprint() Fingerprint {
-	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
-	for _, item := range cl.collections {
-		hasher.Add(item.Fingerprint())
-	}
-	return Fingerprint(hasher.SumHash())
+func (cl *CollectionList) Fingerprint() Identifier {
+	return MerkleRoot(GetIDs(cl.collections)...)
 }
 
-func (cl *CollectionList) Append(ch Collection) {
+func (cl *CollectionList) Insert(ch *Collection) {
 	cl.collections = append(cl.collections, ch)
 }
 
-func (cl *CollectionList) Items() []Collection {
+func (cl *CollectionList) Items() []*Collection {
 	return cl.collections
 }
 
-// ByFingerprint returns an entity from the list by entity fingerprint
-func (cl *CollectionList) ByFingerprint(c Fingerprint) Collection {
-	for _, item := range cl.collections {
-		if bytes.Equal(item.Fingerprint(), c) {
-			return item
+// ByChecksum returns an entity from the list by entity fingerprint
+func (cl *CollectionList) ByChecksum(cs Identifier) (*Collection, bool) {
+	for _, coll := range cl.collections {
+		if coll.Checksum() == cs {
+			return coll, true
 		}
 	}
-	return Collection{}
+	return nil, false
 }
 
 // ByIndex returns an entity from the list by index
-func (cl *CollectionList) ByIndex(i uint64) Collection {
+func (cl *CollectionList) ByIndex(i uint64) *Collection {
 	return cl.collections[i]
 }
 
 //  ByIndexWithProof returns an entity from the list by index and proof of membership
-func (cl *CollectionList) ByIndexWithProof(i uint64) (Collection, MembershipProof) {
+func (cl *CollectionList) ByIndexWithProof(i uint64) (*Collection, Proof) {
 	return cl.collections[i], nil
 }

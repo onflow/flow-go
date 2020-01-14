@@ -24,36 +24,36 @@ func New() (*Cache, error) {
 }
 
 // Add will add a new engine cache.
-func (c *Cache) Add(engineID uint8) {
+func (c *Cache) Add(channelID uint8) {
 	c.Lock()
 	defer c.Unlock()
-	c.caches[engineID] = make(map[string]*trickle.Response)
+	c.caches[channelID] = make(map[string]*trickle.Response)
 }
 
 // Has returns whether we know the given ID.
-func (c *Cache) Has(engineID uint8, eventID []byte) bool {
+func (c *Cache) Has(channelID uint8, eventID []byte) bool {
 	c.Lock()
 	defer c.Unlock()
-	cache := c.caches[engineID]
+	cache := c.caches[channelID]
 	key := hex.EncodeToString(eventID)
 	_, ok := cache[key]
 	return ok
 }
 
 // Set sets the response for the given ID.
-func (c *Cache) Set(engineID uint8, eventID []byte, res *trickle.Response) {
+func (c *Cache) Set(channelID uint8, eventID []byte, res *trickle.Response) {
 	c.Lock()
 	defer c.Unlock()
-	cache := c.caches[engineID]
+	cache := c.caches[channelID]
 	key := hex.EncodeToString(eventID)
 	cache[key] = res
 }
 
 // Get returns the payload for the given ID.
-func (c *Cache) Get(engineID uint8, eventID []byte) (*trickle.Response, bool) {
+func (c *Cache) Get(channelID uint8, eventID []byte) (*trickle.Response, bool) {
 	c.Lock()
 	defer c.Unlock()
-	cache := c.caches[engineID]
+	cache := c.caches[channelID]
 	key := hex.EncodeToString(eventID)
 	res, ok := cache[key]
 	return res, ok

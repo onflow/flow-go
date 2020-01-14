@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -594,19 +595,30 @@ func TestCheckEmptyDictionaryCall(t *testing.T) {
 
 func TestCheckArraySubtyping(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			body := "{}"
+			if kind == common.CompositeKindEvent {
+				body = "()"
+			}
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s interface I {}
-                      %[1]s S: I {}
+                      %[1]s interface I %[2]s
+                      %[1]s S: I %[2]s
 
-                      let xs: %[2]s[S] %[3]s []
-                      let ys: %[2]s[I] %[3]s xs
+                      let xs: %[3]s[S] %[4]s []
+                      let ys: %[3]s[I] %[4]s xs
 	                `,
 					kind.Keyword(),
+					body,
 					kind.Annotation(),
 					kind.TransferOperator(),
 				),
@@ -631,19 +643,30 @@ func TestCheckInvalidArraySubtyping(t *testing.T) {
 
 func TestCheckDictionarySubtyping(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			body := "{}"
+			if kind == common.CompositeKindEvent {
+				body = "()"
+			}
 
 			_, err := ParseAndCheck(t,
 				fmt.Sprintf(
 					`
-                      %[1]s interface I {}
-                      %[1]s S: I {}
+                      %[1]s interface I %[2]s
+                      %[1]s S: I %[2]s
 
-                      let xs: %[2]s{String: S} %[3]s {}
-                      let ys: %[2]s{String: I} %[3]s xs
+                      let xs: %[3]s{String: S} %[4]s {}
+                      let ys: %[3]s{String: I} %[4]s xs
 	                `,
 					kind.Keyword(),
+					body,
 					kind.Annotation(),
 					kind.TransferOperator(),
 				),
@@ -746,7 +769,7 @@ func TestCheckConstantSizedArrayDeclaration(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
+func TestCheckInvalidConstantSizedArrayDeclarationCountMismatchTooMany(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       fun test() {
@@ -754,9 +777,10 @@ func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
       }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	assert.IsType(t, &sema.ConstantSizedArrayLiteralSizeError{}, errs[0])
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 }
 
 func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
@@ -815,4 +839,39 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 			assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[0])
 		})
 	}
+}
+
+func TestCheckArrayGeneration(t *testing.T) {
+
+	code := `
+      struct Person {
+          let id: Int
+
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      let persons = Array(
+          size: 3,
+          generate: fun(index: Int): Person {
+              return Person(id: index + 1)
+          }
+      )
+    `
+
+	_, err := ParseAndCheckWithOptions(t,
+		code,
+		ParseAndCheckOptions{
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.ArrayFunction,
+					}.ToValueDeclarations(),
+				),
+			},
+		},
+	)
+
+	assert.NoError(t, err)
 }

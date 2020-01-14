@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -18,16 +19,16 @@ import (
 // Engine is the propagation engine, which makes sure that new collections are
 // propagated to the other consensus nodes on the network.
 type Engine struct {
-	unit  *engine.Unit          // used to control startup/shutdown
-	log   zerolog.Logger        // used to log relevant actions with context
-	con   network.Conduit       // used to talk to other nodes on the network
-	state protocol.State        // used to access the  protocol state
-	me    module.Local          // used to access local node information
-	pool  module.CollectionPool // holds guaranteed collections in memory
+	unit  *engine.Unit       // used to control startup/shutdown
+	log   zerolog.Logger     // used to log relevant actions with context
+	con   network.Conduit    // used to talk to other nodes on the network
+	state protocol.State     // used to access the  protocol state
+	me    module.Local       // used to access local node information
+	pool  mempool.Guarantees // holds collection guarantees in memory
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool module.CollectionPool) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool mempool.Guarantees) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -39,7 +40,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ConsensusPropagation, e)
+	con, err := net.Register(engine.BlockPropagation, e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
@@ -95,63 +96,63 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch ev := event.(type) {
-	case *flow.GuaranteedCollection:
-		return e.onGuaranteedCollection(originID, ev)
+	switch entity := event.(type) {
+	case *flow.CollectionGuarantee:
+		return e.onGuarantee(originID, entity)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// onGuaranteedCollection is called when a new guaranteed collection is received
+// onGuarantee is called when a new collection guarantee is received
 // from another node on the network.
-func (e *Engine) onGuaranteedCollection(originID flow.Identifier, coll *flow.GuaranteedCollection) error {
+func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Msg("guaranteed collection received")
+		Msg("collection guarantee received")
 
-	err := e.storeGuaranteedCollection(coll)
+	err := e.storeGuarantee(guarantee)
 	if err != nil {
 		return errors.Wrap(err, "could not store collection")
 	}
 
-	// propagate the guaranteed collection to other relevant nodes
-	err = e.propagateGuaranteedCollection(coll)
+	// propagate the collection guarantee to other relevant nodes
+	err = e.propagateGuarantee(guarantee)
 	if err != nil {
 		return errors.Wrap(err, "could not broadcast collection")
 	}
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_hash", coll.Hash()).
-		Msg("guaranteed collection processed")
+		Hex("collection_id", logging.Entity(guarantee)).
+		Msg("collection guarantee processed")
 
 	return nil
 }
 
-// storeGuaranteedCollection will store a guaranteed collection within the
+// storeGuarantee will store a collection guarantee within the
 // context of our local protocol state and memory pool.
-func (e *Engine) storeGuaranteedCollection(coll *flow.GuaranteedCollection) error {
+func (e *Engine) storeGuarantee(guarantee *flow.CollectionGuarantee) error {
 
-	// TODO: validate the guaranteed collection signature
+	// TODO: validate the collection guarantee signature
 
-	// add the guaranteed collection to our memory pool (also checks existence)
-	err := e.pool.Add(coll)
+	// add the collection guarantee to our memory pool (also checks existence)
+	err := e.pool.Add(guarantee)
 	if err != nil {
 		return errors.Wrap(err, "could not add collection to mempool")
 	}
 
 	e.log.Info().
-		Hex("collection_hash", coll.Hash()).
-		Msg("guaranteed collection stored")
+		Hex("collection_id", logging.Entity(guarantee)).
+		Msg("collection guarantee stored")
 
 	return nil
 }
 
-// propagateGuaranteedCollection will submit the guaranteed collection to the
+// propagateGuarantee will submit the collection guarantee to the
 // network layer with all other consensus nodes as desired recipients.
-func (e *Engine) propagateGuaranteedCollection(coll *flow.GuaranteedCollection) error {
+func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
 
 	// select all the collection nodes on the network as our targets
 	ids, err := e.state.Final().Identities(
@@ -162,16 +163,16 @@ func (e *Engine) propagateGuaranteedCollection(coll *flow.GuaranteedCollection) 
 		return errors.Wrap(err, "could not get identities")
 	}
 
-	// send the guaranteed collection to all consensus identities
+	// send the collection guarantee to all consensus identities
 	targetIDs := ids.NodeIDs()
-	err = e.con.Submit(coll, targetIDs...)
+	err = e.con.Submit(guarantee, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not push guaranteed collection")
 	}
 
 	e.log.Info().
-		Strs("target_ids", logging.HexSlice(targetIDs)).
-		Hex("collection_hash", coll.Hash()).
+		Strs("target_ids", logging.IDs(targetIDs)).
+		Hex("collection_id", logging.Entity(guarantee)).
 		Msg("guaranteed collection propagated")
 
 	return nil

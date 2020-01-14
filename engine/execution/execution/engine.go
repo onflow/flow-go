@@ -1,29 +1,43 @@
 package execution
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/storage"
 )
 
 // Engine manages execution of transactions
 type Engine struct {
-	unit *engine.Unit
-	log  zerolog.Logger
-	con  network.Conduit
-	me   module.Local
+	unit        *engine.Unit
+	log         zerolog.Logger
+	con         network.Conduit
+	me          module.Local
+	collections storage.Collections
+	executor    executor.BlockExecutor
 }
 
-func New(log zerolog.Logger, net module.Network, me module.Local) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	net module.Network,
+	me module.Local,
+	collections storage.Collections,
+	executor executor.BlockExecutor,
+) (*Engine, error) {
 
 	e := Engine{
-		unit: engine.NewUnit(),
-		log:  log,
-		me:   me,
+		unit:        engine.NewUnit(),
+		log:         log,
+		me:          me,
+		collections: collections,
+		executor:    executor,
 	}
 
 	con, err := net.Register(engine.ExecutionExecution, &e)
@@ -80,8 +94,74 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // process processes events for the execution engine on the execution node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch event.(type) {
+	switch ev := event.(type) {
+	case *flow.Block:
+		return e.onBlock(ev)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
+}
+
+// onBlock is triggered when this engine receives a new block.
+//
+// This function fetches the collections and transactions in the block and passes
+// them to the block executor for execution.
+func (e *Engine) onBlock(block *flow.Block) error {
+	guarantees, err := e.getCollections(block.Guarantees)
+	if err != nil {
+		return fmt.Errorf("failed to load guarantees: %w", err)
+	}
+
+	transactions, err := e.getTransactions(guarantees)
+	if err != nil {
+		return fmt.Errorf("failed to load transactions: %w", err)
+	}
+
+	executableBlock := executor.ExecutableBlock{
+		Block:        *block,
+		Transactions: transactions,
+	}
+
+	_, err = e.executor.ExecuteBlock(executableBlock)
+	if err != nil {
+		return fmt.Errorf("failed to execute block: %w", err)
+	}
+
+	return nil
+}
+
+func (e *Engine) getCollections(guarantees []*flow.CollectionGuarantee) ([]*flow.Collection, error) {
+	collections := make([]*flow.Collection, len(guarantees))
+
+	for i, guarantee := range guarantees {
+		c, err := e.collections.ByID(guarantee.ID())
+		if err != nil {
+			return nil, fmt.Errorf("failed to load collection: %w", err)
+		}
+
+		collections[i] = c
+	}
+
+	return collections, nil
+}
+
+func (e *Engine) getTransactions(cols []*flow.Collection) ([]flow.TransactionBody, error) {
+	txCount := 0
+
+	for _, c := range cols {
+		txCount += len(c.Transactions)
+	}
+
+	transactions := make([]flow.TransactionBody, txCount)
+
+	i := 0
+
+	for _, c := range cols {
+		for _, tx := range c.Transactions {
+			transactions[i] = tx
+			i++
+		}
+	}
+
+	return transactions, nil
 }

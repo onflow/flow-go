@@ -17,21 +17,21 @@ func TestTransactions(t *testing.T) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := unittest.TransactionFixture()
-		err := db.Update(InsertTransaction(expected.Fingerprint(), &expected))
+		err := db.Update(InsertTransaction(&expected.TransactionBody))
 		require.Nil(t, err)
 
 		var actual flow.Transaction
-		err = db.View(RetrieveTransaction(expected.Fingerprint(), &actual))
+		err = db.View(RetrieveTransaction(expected.ID(), &actual.TransactionBody))
 		require.Nil(t, err)
 		assert.Equal(t, expected, actual)
 
-		err = db.Update(RemoveTransaction(expected.Hash()))
+		err = db.Update(RemoveTransaction(expected.ID()))
 		require.Nil(t, err)
 
-		err = db.View(RetrieveTransaction(expected.Fingerprint(), &actual))
+		err = db.View(RetrieveTransaction(expected.ID(), &actual.TransactionBody))
 		// should fail since this was just deleted
 		if assert.Error(t, err) {
-			assert.True(t, errors.Is(err, storage.NotFoundErr))
+			assert.True(t, errors.Is(err, storage.ErrNotFound))
 		}
 	})
 }

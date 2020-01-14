@@ -10,13 +10,13 @@ type Collections struct {
 	mock.Mock
 }
 
-// ByFingerprint provides a mock function with given fields: hash
-func (_m *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, error) {
-	ret := _m.Called(hash)
+// ByID provides a mock function with given fields: collID
+func (_m *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
+	ret := _m.Called(collID)
 
 	var r0 *flow.Collection
-	if rf, ok := ret.Get(0).(func(flow.Fingerprint) *flow.Collection); ok {
-		r0 = rf(hash)
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Collection); ok {
+		r0 = rf(collID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Collection)
@@ -24,8 +24,8 @@ func (_m *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, e
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Fingerprint) error); ok {
-		r1 = rf(hash)
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(collID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -33,8 +33,22 @@ func (_m *Collections) ByFingerprint(hash flow.Fingerprint) (*flow.Collection, e
 	return r0, r1
 }
 
-// Save provides a mock function with given fields: collection
-func (_m *Collections) Save(collection *flow.Collection) error {
+// Remove provides a mock function with given fields: collID
+func (_m *Collections) Remove(collID flow.Identifier) error {
+	ret := _m.Called(collID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(collID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Store provides a mock function with given fields: collection
+func (_m *Collections) Store(collection *flow.Collection) error {
 	ret := _m.Called(collection)
 
 	var r0 error
