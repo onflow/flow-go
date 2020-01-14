@@ -121,8 +121,7 @@ func TestBroadcast(t *testing.T) {
 		// the unsubscribed subscribers should have exited their goroutine but
 		// not added to the counter
 		for i := 0; i < N/2; i++ {
-			err := subscribers[i].Unsubscribe()
-			assert.Nil(t, err)
+			subscribers[i].Unsubscribe()
 		}
 
 		caster.Broadcast()
@@ -167,8 +166,7 @@ func TestBroadcast(t *testing.T) {
 
 		// create one subscription and immediately unsubscribe
 		sub := caster.Subscribe()
-		err := sub.Unsubscribe()
-		assert.Nil(t, err)
+		sub.Unsubscribe()
 
 		done := make(chan struct{})
 
@@ -187,17 +185,4 @@ func TestBroadcast(t *testing.T) {
 			// both broadcasts completed
 		}
 	})
-}
-
-func TestUnsubscribe(t *testing.T) {
-	caster := broadcast.NewBroadcaster()
-	sub := caster.Subscribe()
-
-	// unsubscribing should not return error
-	err := sub.Unsubscribe()
-	assert.Nil(t, err)
-
-	// unsubscribing again should return error
-	err = sub.Unsubscribe()
-	assert.Error(t, err)
 }

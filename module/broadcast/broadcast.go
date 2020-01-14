@@ -30,21 +30,21 @@ type Broadcaster struct {
 	// the next subscription ID, IDs increment for each new subscriber
 	nextID int
 	// the size of subscribers' buffer channels
-	subBufSize uint
+	bufSize uint
 }
 
 type Opt func(*Broadcaster)
 
 func WithBufferSize(size uint) Opt {
 	return func(broadcaster *Broadcaster) {
-		broadcaster.subBufSize = size
+		broadcaster.bufSize = size
 	}
 }
 
 func NewBroadcaster(opts ...Opt) *Broadcaster {
 	b := &Broadcaster{
 		subscriptions: make(map[int]chan struct{}),
-		subBufSize:    defaultSubscriptionBufferSize,
+		bufSize:       defaultSubscriptionBufferSize,
 	}
 
 	for _, apply := range opts {
@@ -61,7 +61,7 @@ func (b *Broadcaster) Subscribe() module.Subscription {
 	b.nextID++
 	id := b.nextID
 
-	ch := make(chan struct{}, b.subBufSize)
+	ch := make(chan struct{}, b.bufSize)
 	b.subscriptions[id] = ch
 
 	unsubscribe := func() {
