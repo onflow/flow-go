@@ -9,32 +9,25 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool"
 )
 
-// backend implements a generic memory pool backed by a Go map.
-type backend struct {
-	sync.RWMutex
+// backdata implements a generic memory pool backed by a Go map.
+type Backdata struct {
 	entities map[flow.Identifier]flow.Entity
 }
 
-// newBackend creates a new memory pool backend.
-func newBackend() *backend {
-	b := &backend{
-		entities: make(map[flow.Identifier]flow.Entity),
-	}
-	return b
+// Backend provides synchronized access to a backend
+type Backend struct {
+	*Backdata
+	sync.RWMutex
 }
 
 // Has checks if we already contain the item with the given hash.
-func (b *backend) Has(id flow.Identifier) bool {
-	b.RLock()
-	defer b.RUnlock()
+func (b *Backdata) Has(id flow.Identifier) bool {
 	_, ok := b.entities[id]
 	return ok
 }
 
 // Add adds the given item to the pool.
-func (b *backend) Add(entity flow.Entity) error {
-	b.Lock()
-	defer b.Unlock()
+func (b *Backdata) Add(entity flow.Entity) error {
 	id := entity.ID()
 	_, ok := b.entities[id]
 	if ok {
@@ -45,9 +38,7 @@ func (b *backend) Add(entity flow.Entity) error {
 }
 
 // Rem will remove the item with the given hash.
-func (b *backend) Rem(id flow.Identifier) bool {
-	b.Lock()
-	defer b.Unlock()
+func (b *Backdata) Rem(id flow.Identifier) bool {
 	_, ok := b.entities[id]
 	if !ok {
 		return false
@@ -57,9 +48,7 @@ func (b *backend) Rem(id flow.Identifier) bool {
 }
 
 // Get returns the given item from the pool.
-func (b *backend) Get(id flow.Identifier) (flow.Entity, error) {
-	b.RLock()
-	defer b.RUnlock()
+func (b *Backdata) Get(id flow.Identifier) (flow.Entity, error) {
 	_, ok := b.entities[id]
 	if !ok {
 		return nil, mempool.ErrEntityNotFound
@@ -69,16 +58,12 @@ func (b *backend) Get(id flow.Identifier) (flow.Entity, error) {
 }
 
 // Size will return the size of the backend.
-func (b *backend) Size() uint {
-	b.RLock()
-	defer b.RUnlock()
+func (b *Backdata) Size() uint {
 	return uint(len(b.entities))
 }
 
 // All returns all entities from the pool.
-func (b *backend) All() []flow.Entity {
-	b.RLock()
-	defer b.RUnlock()
+func (b *Backdata) All() []flow.Entity {
 	entities := make([]flow.Entity, 0, len(b.entities))
 	for _, item := range b.entities {
 		entities = append(entities, item)
@@ -87,8 +72,81 @@ func (b *backend) All() []flow.Entity {
 }
 
 // Hash will use a merkle root hash to hash all items.
-func (b *backend) Hash() flow.Identifier {
+func (b *Backdata) Hash() flow.Identifier {
+	return flow.MerkleRoot(flow.GetIDs(b.All())...)
+}
+
+// NewBackend creates a new memory pool backend.
+func NewBackend() *Backend {
+	b := &Backend{
+		Backdata: NewBackdata(),
+	}
+	return b
+}
+
+func NewBackdata() *Backdata {
+	return &Backdata{
+		entities: make(map[flow.Identifier]flow.Entity),
+	}
+}
+
+// Has checks if we already contain the item with the given hash.
+func (b *Backend) Has(id flow.Identifier) bool {
 	b.RLock()
 	defer b.RUnlock()
-	return flow.MerkleRoot(flow.GetIDs(b.All())...)
+	return b.Backdata.Has(id)
+}
+
+// Add adds the given item to the pool.
+func (b *Backend) Add(entity flow.Entity) error {
+	b.Lock()
+	defer b.Unlock()
+	return b.Backdata.Add(entity)
+}
+
+// Rem will remove the item with the given hash.
+func (b *Backend) Rem(id flow.Identifier) bool {
+	b.Lock()
+	defer b.Unlock()
+	return b.Backdata.Rem(id)
+}
+
+// Get returns the given item from the pool.
+func (b *Backend) Get(id flow.Identifier) (flow.Entity, error) {
+	b.RLock()
+	defer b.RUnlock()
+	return b.Backdata.Get(id)
+}
+
+// Run fetches the given item from the pool and runs given function on it, returning the entity after
+func (b *Backend) Run(f func(backdata *Backdata) error) error {
+	b.RLock()
+	defer b.RUnlock()
+
+	err := f(b.Backdata)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Size will return the size of the backend.
+func (b *Backend) Size() uint {
+	b.RLock()
+	defer b.RUnlock()
+	return b.Backdata.Size()
+}
+
+// All returns all entities from the pool.
+func (b *Backend) All() []flow.Entity {
+	b.RLock()
+	defer b.RUnlock()
+	return b.Backdata.All()
+}
+
+// Hash will use a merkle root hash to hash all items.
+func (b *Backend) Hash() flow.Identifier {
+	b.RLock()
+	defer b.RUnlock()
+	return b.Backdata.Hash()
 }
