@@ -10,7 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 )
 
-// GetPeerID returns the LibP2P peer id derived from the given name
+// GetPeerID returns the LibP2P peer id derived from the given Name
 // e.g. node1 will generate a peer id of QmUqrhCAbnT7jnhMnKY2d1Py9N5PfEvvHazuJfpzn5fFVB
 func GetPeerID(name string) (peer.ID, error) {
 	key, err := GetPublicKey(name)

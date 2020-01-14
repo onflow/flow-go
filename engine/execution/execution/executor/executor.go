@@ -73,6 +73,11 @@ func (e *blockExecutor) executeTransactions(
 		return nil, fmt.Errorf("failed to apply chunk delta: %w", err)
 	}
 
+	err = e.state.PersistStateCommitment(block.ID(), &endState)
+	if err != nil {
+		return nil, fmt.Errorf("failed to store state commitment: %w", err)
+	}
+
 	// TODO: (post-MVP) implement real chunking
 	// MVP uses single chunk per block
 	chunk := &flow.Chunk{
