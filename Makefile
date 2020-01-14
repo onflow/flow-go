@@ -88,7 +88,6 @@ generate-mocks:
 	mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
 	mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
-	# mockery -name '.*' -dir=storage/ledger -case=underscore -output="./storage/ledger/mock" -outpkg="mock"
 	mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/executor -case=underscore -output="./engine/execution/execution/executor/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/state -case=underscore -output="./engine/execution/execution/state/mock" -outpkg="mock"
@@ -188,18 +187,18 @@ apply-staging-files:
 	kconfig=$$(uuidgen); \
 	echo "$$KUBECONFIG_STAGING" > $$kconfig; \
 	files=$$(find ${K8S_YAMLS_LOCATION_STAGING} -type f \( -name "*.yml" -or -name "*.yaml" \)); \
-	echo "$$files" | xargs -I {} kubectl --kubeconfig=$$kconfig apply -f {} --dry-run
+	echo "$$files" | xargs -I {} kubectl --kubeconfig=$$kconfig apply -f {}
 
 # Deployment YAMLs must have 'deployment' in their name.
 .PHONY: update-deployment-image-name-staging
 update-deployment-image-name-staging: CONTAINER=flow-test-net
 update-deployment-image-name-staging:
 	@files=$$(find ${K8S_YAMLS_LOCATION_STAGING} -type f \( -name "*.yml" -or -name "*.yaml" \) | grep deployment); \
-	for i in $$files; do \
+	for file in $$files; do \
 		patched=`openssl rand -hex 8`; \
-		node=`echo "$$i" | grep -oP 'flow-\K\w+(?=-node-deployment.yml)'`; \
- 		kubectl patch -f $$i -p '{"spec":{"template":{"spec":{"containers":[{"name":"${CONTAINER}","image":"gcr.io/dl-flow/'"$$node"':${IMAGE_TAG}"}]}}}}`' --local -o yaml > $$patched; \
-		mv -f $$patched $$i; \
+		node=`echo "$$file" | grep -oP 'flow-\K\w+(?=-node-deployment.yml)'`; \
+ 		kubectl patch -f $$file -p '{"spec":{"template":{"spec":{"containers":[{"name":"${CONTAINER}","image":"gcr.io/dl-flow/'"$$node"':${IMAGE_TAG}"}]}}}}`' --local -o yaml > $$patched; \
+		mv -f $$patched $$file; \
 	done
 
 .PHONY: monitor-rollout
