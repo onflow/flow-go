@@ -93,6 +93,8 @@ func (s *StubEngineTestSuite) TestSingleMessage() {
 
 // TestMultiMessageSync sends a multiple messages from one network instance to the other one
 // it evaluates the correctness of implementation against correct delivery of the messages.
+// sender and receiver are sync over reception, i.e., sender sends one message at a time and
+// waits for its reception
 func (s *StubEngineTestSuite) TestMultiMessageSync() {
 	// count defines number of messages
 	count := 10
@@ -140,6 +142,68 @@ func (s *StubEngineTestSuite) TestMultiMessageSync() {
 			assert.Fail(s.Suite.T(), "peer 1 failed to send a message to peer 2")
 		}
 	}
+}
+
+// TestMultiMessageAsync sends a multiple messages from one network instance to the other one
+// it evaluates the correctness of implementation against correct delivery of the messages.
+// sender and receiver are async, i.e., sender sends all its message at blast
+func (s *StubEngineTestSuite) TestMultiMessageAsync() {
+	// count defines number of messages
+	count := 10
+	// test engine1
+	te1 := &StubEngine{
+		t: s.Suite.T(),
+	}
+	c1, err := s.nets[0].Register(1, te1)
+	require.NoError(s.Suite.T(), err)
+
+	// test engine 2
+	te2 := &StubEngine{
+		t:        s.Suite.T(),
+		event:    make(chan interface{}, count),
+		received: make(chan struct{}, count),
+	}
+
+	_, err = s.nets[1].Register(1, te2)
+	require.NoError(s.Suite.T(), err)
+
+	received := make(map[string]struct{})
+
+	for i := 0; i < count; i++ {
+		// Send the message to node 2 using the conduit of node 1
+		event := &libp2pmodel.Echo{
+			Text: fmt.Sprintf("hello%d", i),
+		}
+		require.NoError(s.Suite.T(), c1.Submit(event, s.ids[1]))
+	}
+
+	for i := 0; i < count; i++ {
+		select {
+		case <-te2.received:
+			// evaluates reception of message at the other side
+			// does not evaluate the content
+			require.NotNil(s.Suite.T(), te2.originID)
+			require.NotNil(s.Suite.T(), te2.event)
+			assert.Equal(s.Suite.T(), s.ids[0], te2.originID)
+
+			// evaluates proper reception of event
+			// casts the received event at the receiver side
+			rcvEvent, ok := (<-te2.event).(*libp2pmodel.Echo)
+			// evaluates correctness of casting
+			require.True(s.Suite.T(), ok)
+
+			// evaluates content of received message
+			// the content should not yet received and be unique
+			_, rcv := received[rcvEvent.Text]
+			assert.False(s.Suite.T(), rcv)
+			// marking event as received
+			received[rcvEvent.Text] = struct{}{}
+
+		case <-time.After(2 * time.Second):
+			assert.Fail(s.Suite.T(), "peer 1 failed to send a message to peer 2")
+		}
+	}
+
 }
 
 // create ids creates and initializes count-many flow identifiers instances
