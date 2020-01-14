@@ -483,15 +483,14 @@ func (checker *Checker) checkTypeCompatibility(expression ast.Expression, valueT
 
 					if literalCount == constantSizedTargetType.Size {
 						return true
-					} else {
-						checker.report(
-							&ConstantSizedArrayLiteralSizeError{
-								ExpectedSize: constantSizedTargetType.Size,
-								ActualSize:   literalCount,
-								Range:        typedExpression.Range,
-							},
-						)
 					}
+					checker.report(
+						&ConstantSizedArrayLiteralSizeError{
+							ExpectedSize: constantSizedTargetType.Size,
+							ActualSize:   literalCount,
+							Range:        typedExpression.Range,
+						},
+					)
 				}
 			}
 		}

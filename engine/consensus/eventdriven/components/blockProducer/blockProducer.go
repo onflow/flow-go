@@ -16,6 +16,6 @@ func (bp *BlockProducer) OnForkChoiceGenerated(qc *def.QuorumCertificate) {
 
 // OnEnteringView listens to OnEnteringView events and updates BlockProducer's
 // current view for when it needs to build a block
-func (v *BlockProducer) OnEnteringView(view uint64) {
+func (bp *BlockProducer) OnEnteringView(view uint64) {
 	panic("Implement me")
 }

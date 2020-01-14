@@ -100,7 +100,7 @@ generate-mocks:
 
 .PHONY: lint
 lint:
-	GO111MODULE=on revive -config revive.toml ./...
+	GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
 
 .PHONY: ci
 ci: install-tools lint test coverage
