@@ -10,18 +10,15 @@ import (
 	executormock "github.com/dapperlabs/flow-go/engine/execution/execution/executor/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	network "github.com/dapperlabs/flow-go/network/mock"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
 )
 
-func TestExecutionEngine_OnBlock(t *testing.T) {
-	collections := &storage.Collections{}
+func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 	exec := &executormock.BlockExecutor{}
 	receipts := &network.Engine{}
 
 	e := &Engine{
-		receipts:    receipts,
-		collections: collections,
-		executor:    exec,
+		receipts: receipts,
+		executor: exec,
 	}
 
 	tx1 := flow.TransactionBody{
@@ -64,13 +61,11 @@ func TestExecutionEngine_OnBlock(t *testing.T) {
 	}
 
 	receipts.On("SubmitLocal", mock.AnythingOfType("*flow.ExecutionResult"))
-	collections.On("ByID", col.ID()).Return(&col, nil)
 	exec.On("ExecuteBlock", executableBlock).Return(&flow.ExecutionResult{}, nil)
 
-	err := e.onBlock(&block)
+	err := e.onExecutableBlock(executableBlock)
 	require.NoError(t, err)
 
-	collections.AssertExpectations(t)
 	receipts.AssertExpectations(t)
 	exec.AssertExpectations(t)
 }

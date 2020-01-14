@@ -11,18 +11,16 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/storage"
 )
 
 // Engine manages execution of transactions
 type Engine struct {
-	unit        *engine.Unit
-	log         zerolog.Logger
-	con         network.Conduit
-	me          module.Local
-	receipts    network.Engine
-	collections storage.Collections
-	executor    executor.BlockExecutor
+	unit     *engine.Unit
+	log      zerolog.Logger
+	con      network.Conduit
+	me       module.Local
+	receipts network.Engine
+	executor executor.BlockExecutor
 }
 
 func New(
@@ -30,17 +28,15 @@ func New(
 	net module.Network,
 	me module.Local,
 	receipts network.Engine,
-	collections storage.Collections,
 	executor executor.BlockExecutor,
 ) (*Engine, error) {
 
 	e := Engine{
-		unit:        engine.NewUnit(),
-		log:         log,
-		me:          me,
-		receipts:    receipts,
-		collections: collections,
-		executor:    executor,
+		unit:     engine.NewUnit(),
+		log:      log,
+		me:       me,
+		receipts: receipts,
+		executor: executor,
 	}
 
 	con, err := net.Register(engine.ExecutionExecution, &e)
@@ -98,42 +94,19 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // process processes events for the execution engine on the execution node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
-	case *flow.Block:
-		return e.onBlock(ev)
+	case *executor.ExecutableBlock:
+		return e.onExecutableBlock(ev)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// onBlock is triggered when this engine receives a new block.
+// onExecutableBlock is triggered when this engine receives a new block.
 //
-// This function fetches the collections and transactions in the block and passes
-// them to the block executor for execution.
-func (e *Engine) onBlock(block *flow.Block) error {
-	collections, err := e.getCollections(block.Guarantees)
-	if err != nil {
-		return fmt.Errorf("failed to load guarantees: %w", err)
-	}
-
-	transactions, err := e.getTransactions(collections)
-	if err != nil {
-		return fmt.Errorf("failed to load transactions: %w", err)
-	}
-
-	executableBlock := &executor.ExecutableBlock{
-		Block: block,
-		// TODO: replace with real logic from: https://github.com/dapperlabs/flow-go/pull/2028
-		Collections: []*executor.ExecutableCollection{
-			{
-				Guarantee:    block.Guarantees[0],
-				Transactions: transactions,
-			},
-		},
-		// TODO: populate this field from previous block
-		PreviousResultID: flow.ZeroID,
-	}
-
-	result, err := e.executor.ExecuteBlock(executableBlock)
+// This function passes the executable block to the block executor and
+// then submits the result to the receipts engine.
+func (e *Engine) onExecutableBlock(block *executor.ExecutableBlock) error {
+	result, err := e.executor.ExecuteBlock(block)
 	if err != nil {
 		return fmt.Errorf("failed to execute block: %w", err)
 	}
@@ -142,40 +115,4 @@ func (e *Engine) onBlock(block *flow.Block) error {
 	e.receipts.SubmitLocal(result)
 
 	return nil
-}
-
-func (e *Engine) getCollections(guarantees []*flow.CollectionGuarantee) ([]*flow.Collection, error) {
-	collections := make([]*flow.Collection, len(guarantees))
-
-	for i, guarantee := range guarantees {
-		c, err := e.collections.ByID(guarantee.ID())
-		if err != nil {
-			return nil, fmt.Errorf("failed to load collection: %w", err)
-		}
-
-		collections[i] = c
-	}
-
-	return collections, nil
-}
-
-func (e *Engine) getTransactions(cols []*flow.Collection) ([]*flow.TransactionBody, error) {
-	txCount := 0
-
-	for _, c := range cols {
-		txCount += len(c.Transactions)
-	}
-
-	transactions := make([]*flow.TransactionBody, txCount)
-
-	i := 0
-
-	for _, c := range cols {
-		for _, tx := range c.Transactions {
-			transactions[i] = &tx
-			i++
-		}
-	}
-
-	return transactions, nil
 }
