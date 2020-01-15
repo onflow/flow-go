@@ -58,22 +58,21 @@ func AssertEqualWithDiff(t *testing.T, expected, actual interface{}) {
 	}
 }
 
-func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+func tempDBDir() string {
+	return filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+}
+
+func TempBadgerDB(t *testing.T) *badger.DB {
+	dir := tempDBDir()
 
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 
-	defer func() {
-		db.Close()
-		os.RemoveAll(dir)
-	}()
-
-	f(db)
+	return db
 }
 
-func RunWithLevelDB(t *testing.T, f func(db *leveldb.LevelDB)) {
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+func TempLevelDB(t *testing.T) *leveldb.LevelDB {
+	dir := tempDBDir()
 
 	kvdbPath := filepath.Join(dir, "kvdb")
 	tdbPath := filepath.Join(dir, "tdb")
@@ -81,10 +80,21 @@ func RunWithLevelDB(t *testing.T, f func(db *leveldb.LevelDB)) {
 	db, err := leveldb.NewLevelDB(kvdbPath, tdbPath)
 	require.Nil(t, err)
 
-	defer func() {
-		db.SafeClose()
-		os.RemoveAll(dir)
-	}()
+	return db
+}
+
+func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
+	db := TempBadgerDB(t)
+
+	defer db.Close()
+
+	f(db)
+}
+
+func RunWithLevelDB(t *testing.T, f func(db *leveldb.LevelDB)) {
+	db := TempLevelDB(t)
+
+	defer db.SafeClose()
 
 	f(db)
 }
