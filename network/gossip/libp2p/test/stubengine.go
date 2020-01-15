@@ -2,8 +2,8 @@ package test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -22,6 +22,7 @@ type StubEngine struct {
 	event    chan interface{} // used to keep track of the events that the node receives
 	received chan struct{}    // used as an indicator on reception of messages for testing
 	echomsg  string           // used as a fix string to be included in the reply echos
+
 }
 
 func NewEngine(t *testing.T, net module.Network, cap int, engineID uint8) *StubEngine {
@@ -33,7 +34,6 @@ func NewEngine(t *testing.T, net module.Network, cap int, engineID uint8) *StubE
 	}
 
 	c2, err := net.Register(engineID, te)
-	time.Sleep(1 * time.Millisecond)
 	require.NoError(te.t, err)
 	te.con = c2
 
@@ -72,9 +72,15 @@ func (te *StubEngine) Process(originID flow.Identifier, event interface{}) error
 	lip2pEvent, ok := (event).(*libp2pmodel.Echo)
 	require.True(te.t, ok, "could not assert event as Echo")
 	strEvent := lip2pEvent.Text
+	// avoids endless circulation of echos by filtering echoing back the echo messages
+	if strings.HasPrefix(strEvent, te.echomsg) {
+		return nil
+	}
 
 	// sends a echo back
-	msg := fmt.Sprintf("%s: %s", te.echomsg, strEvent)
+	msg := &libp2pmodel.Echo{
+		Text: fmt.Sprintf("%s: %s", te.echomsg, strEvent),
+	}
 	err := te.con.Submit(msg, originID)
 	require.NoError(te.t, err, "could not submit echo back to network ")
 
