@@ -4967,15 +4967,15 @@ pub contract Invalid {
     }
 }
 
-One of the simplest forms of a contract would just be one with a state variable,
-a function, and an `init` function that initializes the variable:
+One of the simplest forms of a contract would just be one with a state field,
+a function, and an `init` function that initializes the field:
 
 ```cadence,file=contract_hello.cdc
 // HelloWorldResource.cdc
 
 pub contract HelloWorld {
 
-    // Declare a stored state variable in HelloWorld
+    // Declare a stored state field in HelloWorld
     //
     pub let greeting: String
 
