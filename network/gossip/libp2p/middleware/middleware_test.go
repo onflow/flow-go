@@ -201,7 +201,8 @@ func (m *MiddlewareTestSuit) TestEcho() {
 		Run(func(args mockery.Arguments) {
 			wg.Done()
 			// echos back the same message back to the sender
-			m.mws[lastNode].Send(m.mws[firstNode].me, []byte("hello back"))
+			err := m.mws[lastNode].Send(m.mws[firstNode].me, []byte("hello back"))
+			require.NoError(m.Suite.T(), err)
 		})
 
 	// first node
