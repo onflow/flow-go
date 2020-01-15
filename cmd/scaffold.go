@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -73,13 +74,15 @@ type FlowNodeBuilder struct {
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
+	homedir, _ := os.UserHomeDir()
+	datadir := filepath.Join(homedir, ".flow", "database")
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.NodeID, "nodeid", notSet, "identity of our node")
 	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
 	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "entries", "e", []string{"consensus-node1@address1=1000"}, "identity table entries for all nodes")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.UintVarP(&fnb.BaseConfig.Connections, "connections", "c", 0, "number of connections to establish to peers")
-	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", "data", "directory to store the protocol State")
+	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
 }
@@ -147,8 +150,6 @@ func (fnb *FlowNodeBuilder) initState() {
 	state, err := protocol.NewState(fnb.DB)
 	fnb.MustNot(err).Msg("could not initialize flow state")
 
-	var genesis *flow.Block
-
 	//check if database is initialized
 	lsm, vlog := fnb.DB.Size()
 	if vlog > 0 || lsm > 0 {
@@ -168,7 +169,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 
 		fnb.genesis = flow.Genesis(ids)
-		err = state.Mutate().Bootstrap(genesis)
+		err = state.Mutate().Bootstrap(fnb.genesis)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}

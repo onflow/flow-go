@@ -81,7 +81,6 @@ func (e *Engine) Ready() <-chan struct{} {
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// TODO describe conditions under which engine is done
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }

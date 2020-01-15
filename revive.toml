@@ -25,3 +25,6 @@ warningCode = 0
 [rule.superfluous-else]
 [rule.unreachable-code]
 [rule.redefines-builtin-id]
+
+# This will be activated at a later date.
+# [rule.unused-parameter]
