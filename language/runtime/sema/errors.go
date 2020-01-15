@@ -1934,14 +1934,14 @@ func (e *InvalidTransactionFieldAccessModifierError) EndPosition() ast.Position 
 	return e.Pos.Shifted(length - 1)
 }
 
-// InvalidTransactionPrepareParameterType
+// InvalidTransactionPrepareParameterTypeError
 
-type InvalidTransactionPrepareParameterType struct {
-	Type  Type
-	Range ast.Range
+type InvalidTransactionPrepareParameterTypeError struct {
+	Type Type
+	ast.Range
 }
 
-func (e *InvalidTransactionPrepareParameterType) Error() string {
+func (e *InvalidTransactionPrepareParameterTypeError) Error() string {
 	return fmt.Sprintf(
 		"prepare parameter must be of type `%s`, not `%s`",
 		&AccountType{},
@@ -1949,7 +1949,7 @@ func (e *InvalidTransactionPrepareParameterType) Error() string {
 	)
 }
 
-func (*InvalidTransactionPrepareParameterType) isSemanticError() {}
+func (*InvalidTransactionPrepareParameterTypeError) isSemanticError() {}
 
 // InvalidNestedDeclarationError
 
