@@ -149,3 +149,27 @@ func (e *DereferenceError) StartPosition() ast.Position {
 func (e *DereferenceError) EndPosition() ast.Position {
 	return e.LocationRange.EndPos
 }
+
+// OverflowError
+
+type OverflowError struct{}
+
+func (e OverflowError) Error() string {
+	return "overflow"
+}
+
+// UnderflowError
+
+type UnderflowError struct{}
+
+func (e UnderflowError) Error() string {
+	return "underflow"
+}
+
+// UnderflowError
+
+type DivisionByZeroError struct{}
+
+func (e DivisionByZeroError) Error() string {
+	return "division by zero"
+}
