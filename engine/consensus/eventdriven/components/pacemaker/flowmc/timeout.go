@@ -115,14 +115,14 @@ func NewTimoutController(minReplicaTimeout, voteAggregationTimeoutFraction, time
 
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *TimoutController) ReplicaTimeout() time.Duration {
-	return time.Duration(t.replicaTimeout * 1e6)
+	return time.Duration(t.replicaTimeout * 1E6)
 }
 
 // VoteCollectionTimeout returns the duration of Vote aggregation _after_ receiving a block
 // during which the primary tries to aggregate votes for the view where it is leader
 func (t *TimoutController) VoteCollectionTimeout() time.Duration {
 	// time.Duration expects an int64 as input which specifies the duration in units of nanoseconds (1E-9)
-	return time.Duration(t.replicaTimeout * 1e6 * t.voteAggregationTimeoutFraction)
+	return time.Duration(t.replicaTimeout * 1E6 * t.voteAggregationTimeoutFraction)
 }
 
 // OnTimeout indicates to the TimoutController that the timeout was reached
