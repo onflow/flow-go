@@ -630,43 +630,34 @@ static inline void eval_iso11(ep_st* r, const ep_st*  p) {
 
 // map an input point in E to a point in G1 by clearing the cofactor of G1 
 static void clear_cofactor(ep_st* out, const ep_st* in) {
-        bn_st z;
-        bn_new(&z);
-        fp_prime_get_par(&z);
-        // compute z-1 
-        bn_neg(&z, &z); 
-        bn_add_dig(&z, &z, 1);
-        bn_print(&z);
-        //printf("%d -")
-        if (bn_bits(&z) < RLC_DIG) {
-            printf("digit\n");
-            ep_mul_dig(out, in, z.dp[0]);
-        } else {
-            printf("mouch digit\n");
-            ep_mul(out, in, &z);
-        }
+    bn_st z;
+    bn_new(&z);
+    fp_prime_get_par(&z);
+    // compute 1-z 
+    bn_neg(&z, &z);  // keep -z in only 64 bits
+    bn_add_dig(&z, &z, 1);
+    ep_mul_dig(out, in, z.dp[0]);
+    bn_free(&z);
 }
 
-// evaluate the SWU map twice, add results together, apply isogeny map, clear cofactor
+// evaluate the optimized SWU map twice, add results together, apply isogeny map, clear cofactor
 static void mapToG1_opswu(ep_st* p, const uint8_t *msg, int len) {
     fp_t t1, t2;
     fp_read_bin(t1, msg, len/2);
     fp_read_bin(t2, msg + len/2, len - len/2);
-    //_fp_print("t1", &t1);
-    //_fp_print("t2", t2);
 
     ep_st p_temp;
     ep_new(&p_temp);
     mapToE1_swu(&p_temp, t1); // map to E1
     eval_iso11(&p_temp, &p_temp); // map to E
-    //clear_cofactor(&p_temp, &p_temp); // map to G1
+    clear_cofactor(&p_temp, &p_temp); // map to G1
     ep_norm(&p_temp,&p_temp);
     _ep_print("hash to point", &p_temp);
     printf("%d\n", ep_is_valid(&p_temp));
     
     mapToE1_swu(p, t2); // map to E1
     eval_iso11(p,p);  // map to E
-    //clear_cofactor(p, p); // map to G1
+    clear_cofactor(p, p); // map to G1
     ep_norm(p, p);
     _ep_print("after iso", p);
     printf("%d\n", ep_is_valid(p));
