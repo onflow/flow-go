@@ -6,12 +6,15 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/hash"
 )
 
 // A BlockContext is used to execute transactions in the context of a block.
 type BlockContext interface {
 	// ExecuteTransaction computes the result of a transaction.
 	ExecuteTransaction(ledger Ledger, tx *flow.TransactionBody) (*TransactionResult, error)
+	// ExecuteScript computes the result of a ready-only script.
+	ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error)
 }
 
 type blockContext struct {
@@ -28,6 +31,12 @@ func (bc *blockContext) newTransactionContext(ledger Ledger, tx *flow.Transactio
 	return &transactionContext{
 		ledger:          ledger,
 		signingAccounts: signingAccounts,
+	}
+}
+
+func (bc *blockContext) newScriptContext(ledger Ledger) *transactionContext {
+	return &transactionContext{
+		ledger: ledger,
 	}
 }
 
@@ -59,5 +68,31 @@ func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx *flow.TransactionBo
 	return &TransactionResult{
 		TxID:  txID,
 		Error: nil,
+	}, nil
+}
+
+func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error) {
+	scriptHash := hash.DefaultHasher.ComputeHash(script)
+
+	location := runtime.ScriptLocation(scriptHash)
+
+	ctx := bc.newScriptContext(ledger)
+
+	value, err := bc.vm.rt.ExecuteScript(script, ctx, location)
+	if err != nil {
+		if errors.As(err, &runtime.Error{}) {
+			// runtime errors occur when the execution reverts
+			return &ScriptResult{
+				ScriptID: flow.HashToID(scriptHash),
+				Error:    err,
+			}, nil
+		}
+
+		return nil, fmt.Errorf("failed to execute script: %w", err)
+	}
+
+	return &ScriptResult{
+		ScriptID: flow.HashToID(scriptHash),
+		Value:    value,
 	}, nil
 }
