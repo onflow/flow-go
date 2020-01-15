@@ -40,8 +40,8 @@ func (v *Voter) VoteIfVotable(bp *types.BlockProposal, curView uint64) (*types.V
 
 func (v *Voter) produceVote(bp *types.BlockProposal) *types.Vote {
 	signerIdx := v.viewState.GetSelfIdxForView(bp.Block.View)
-	unsignedVote := types.NewVote(bp.Block.View, bp.Block.BlockMRH())
-	vote := v.signer.SignVote(unsignedVote, signerIdx)
+	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.Block.BlockMRH())
+	sig := v.signer.SignVote(unsignedVote, signerIdx)
 
-	return vote
+	return types.NewVote(bp.Block.View, bp.Block.BlockMRH(), sig)
 }
