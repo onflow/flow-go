@@ -17,14 +17,28 @@ ctx_t bls_ctx;
 prec_st bls_prec;
 
 #if (hashToPoint == OPSWU)
-extern const uint8_t E_a1[47];
-extern const uint8_t E_b1[48];
+extern const uint64_t a1_data[6];
+extern const uint64_t b1_data[6];
+extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][6];
+extern const uint64_t iso_Dx_data[ELLP_Dx_LEN][6];
+extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][6];
+extern const uint64_t iso_Dy_data[ELLP_Dy_LEN][6];
 #endif
 
 static void init_precomputed_data() {
     #if (hashToPoint == OPSWU)
-        fp_read_bin(bls_prec.a1, E_a1, 47);
-        fp_read_bin(bls_prec.b1, E_b1, 48);
+        fp_read_raw(bls_prec.a1, a1_data, 6);
+        fp_read_raw(bls_prec.b1, b1_data, 6);
+        fp_print(bls_prec.a1);
+        fp_print(bls_prec.b1);
+        for (int i=0; i<ELLP_Dx_LEN; i++)  
+            fp_read_raw(bls_prec.iso_Dx[i], iso_Dx_data[i], 6);
+        for (int i=0; i<ELLP_Nx_LEN; i++)  
+            fp_read_raw(bls_prec.iso_Nx[i], iso_Nx_data[i], 6);
+        for (int i=0; i<ELLP_Dy_LEN; i++)  
+            fp_read_raw(bls_prec.iso_Dy[i], iso_Dy_data[i], 6);
+        for (int i=0; i<ELLP_Ny_LEN; i++)  
+            fp_read_raw(bls_prec.iso_Ny[i], iso_Ny_data[i], 6);
     #endif
     // (p-3)/4
     bn_read_raw(&bls_prec.p_3div4, fp_prime_get(), FP_DIGITS);

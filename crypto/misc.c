@@ -12,16 +12,23 @@ void _bytes_print(char* s, byte* data, int len) {
     printf("\n");
 }
 
-void _fp_print(char* s, fp_st* a) {
-    char* str = malloc(sizeof(char) * fp_size_str(*a, 16));
-    fp_write_str(str, 100, *a, 16);
+void _digits_print(char* s, uint64_t* data, int len) {
+    printf("[%s]:\n", s);
+    for (int i=0; i<len; i++) 
+        printf("%16llx,", data[i]);
+    printf("\n");
+}
+
+void _fp_print(char* s, fp_st a) {
+    char* str = malloc(sizeof(char) * fp_size_str(a, 16));
+    fp_write_str(str, 100, a, 16);
     printf("[%s]:\n%s\n", s, str);
     free(str);
 }
 
 void _bn_print(char* s, bn_st *a) {
     char* str = malloc(sizeof(char) * bn_size_str(a, 16));
-    bn_write_str(str, 100, a, 16);
+    bn_write_str(str, 128, a, 16);
     printf("[%s]:\n%s\n", s, str);
     free(str);
 }
@@ -35,6 +42,35 @@ void _ep2_print(char* s, ep2_st* p) {
     printf("[%s]:\n", s);
     g2_print(p);
 }
+
+// Reads a prime field element from a digit vecotor in little-endian format.
+void fp_read_raw(fp_t a, const dig_t *raw, int len) {
+     bn_t t;
+     bn_null(t); 
+     if (len != FP_DIGITS) {
+         THROW(ERR_NO_BUFFER);
+     }
+      TRY {
+         bn_new(t);
+         bn_read_raw(t, raw, len);
+         if (bn_is_zero(t)) {
+             fp_zero(a);
+         } else {
+             if (t->used == 1) {
+                 fp_prime_conv_dig(a, t->dp[0]);
+             } else {
+                 fp_prime_conv(a, t);
+             }
+         }
+     }
+     CATCH_ANY {
+         THROW(ERR_CAUGHT);
+     }
+     FINALLY {
+         bn_free(t);
+     }
+ }
+ 
 
 // seeds relic PRG
 void _seed_relic(byte* seed, int len) {
@@ -325,23 +361,15 @@ void mapToG1_hashCheck(ep_t p, const uint8_t *msg, int len) {
 extern prec_st bls_prec;
 
 #if (hashToPoint==OPSWU)
-const uint8_t E_a1[47] = { 
-    0x14, 0x46, 0x98, 0xa3, 0xb8, 0xe9, 0x43, 0x3d,
-    0x69, 0x3a, 0x02, 0xc9, 0x6d, 0x49, 0x82, 0xb0,
-    0xea, 0x98, 0x53, 0x83, 0xee, 0x66, 0xa8, 0xd8,
-    0xe8, 0x98, 0x1a, 0xef, 0xd8, 0x81, 0xac, 0x98,
-    0x93, 0x6f, 0x8d, 0xa0, 0xe0, 0xf9, 0x7f, 0x5c, 
-    0xf4, 0x28, 0x08, 0x2d, 0x58, 0x4c, 0x1d,
+const uint64_t a1_data[6] = { 
+    0x5cf428082d584c1d, 0x98936f8da0e0f97f, 0xd8e8981aefd881ac,
+    0xb0ea985383ee66a8, 0x3d693a02c96d4982, 0x00144698a3b8e943,
     };
 
 
-const uint8_t E_b1[48] = { 
-    0x12, 0xe2, 0x90, 0x8d, 0x11, 0x68, 0x80, 0x30,
-    0x01, 0x8b, 0x12, 0xe8, 0x75, 0x3e, 0xee, 0x3b,
-    0x20, 0x16, 0xc1, 0xf0, 0xf2, 0x4f, 0x40, 0x70,
-    0xa0, 0xb9, 0xc1, 0x4f, 0xce, 0xf3, 0x5e, 0xf5,
-    0x5a, 0x23, 0x21, 0x5a, 0x31, 0x6c, 0xea, 0xa5,
-    0xd1, 0xcc, 0x48, 0xe9, 0x8e, 0x17, 0x2b, 0xe0, 
+const uint64_t b1_data[48] = { 
+    0xd1cc48e98e172be0, 0x5a23215a316ceaa5, 0xa0b9c14fcef35ef5,
+    0x2016c1f0f24f4070, 0x018b12e8753eee3b, 0x12e2908d11688030, 
     };
 
 // check if (U/V) is a square, return 1 if yes, 0 otherwise 
@@ -426,92 +454,227 @@ static inline void mapToE1_swu(ep_st* p, const fp_t t) {
     free(fp_tmp);
 }
 
+const uint64_t iso_Nx_data[ELLP_Nx_LEN][6] = {
+    {0xaeac1662734649b7, 0x5610c2d5f2e62d6e, 0xf2627b56cdb4e2c8, 0x6b303e88a2d7005f, 0xb809101dd9981585, 0x11a05f2b1e833340, },
+    {0xe834eef1b3cb83bb, 0x4838f2a6f318c356, 0xf565e33c70d1e86b, 0x7c17e75b2f6a8417, 0x0588bab22147a81c, 0x17294ed3e943ab2f, },
+    {0xe0179f9dac9edcb0, 0x958c3e3d2a09729f, 0x6878e501ec68e25c, 0xce032473295983e5, 0x1d1048c5d10a9a1b, 0x0d54005db97678ec, },
+    {0xc5b388641d9b6861, 0x5336e25ce3107193, 0xf1b33289f1b33083, 0xd7f5e4656a8dbf25, 0x4e0609d307e55412, 0x1778e7166fcc6db7, },
+    {0x51154ce9ac8895d9, 0x985a286f301e77c4, 0x086eeb65982fac18, 0x99db995a1257fb3f, 0x6642b4b3e4118e54, 0x0e99726a3199f443, },
+    {0xcd13c1c66f652983, 0xa0870d2dcae73d19, 0x9ed3ab9097e68f90, 0xdb3cb17dd952799b, 0x01d1201bf7a74ab5, 0x1630c3250d7313ff, },
+    {0xddd7f225a139ed84, 0x8da25128c1052eca, 0x9008e218f9c86b2a, 0xb11586264f0f8ce1, 0x6a3726c38ae652bf, 0x0d6ed6553fe44d29, },
+    {0x9ccb5618e3f0c88e, 0x39b7c8f8c8f475af, 0xa682c62ef0f27533, 0x356de5ab275b4db1, 0xe8743884d1117e53, 0x17b81e7701abdbe2, },
+    {0x6d71986a8497e317, 0x4fa295f296b74e95, 0xa2c596c928c5d1de, 0xc43b756ce79f5574, 0x7b90b33563be990d, 0x080d3cf1f9a78fc4, },
+    {0x7f241067be390c9e, 0xa3190b2edc032779, 0x676314baf4bb1b7f, 0xdd2ecb803a0c5c99, 0x2e0c37515d138f22, 0x169b1f8e1bcfa7c4, },
+    {0xca67df3f1605fb7b, 0xf69b771f8c285dec, 0xd50af36003b14866, 0xfa7dccdde6787f96, 0x72d8ec09d2565b0d, 0x10321da079ce07e2, },
+    {0xa9c8ba2e8ba2d229, 0xc24b1b80b64d391f, 0x23c0bf1bc24c6b68, 0x31d79d7e22c837bc, 0xbd1e962381edee3d, 0x06e08c248e260e70, },
+};
+
+const uint64_t iso_Dx_data[ELLP_Dx_LEN][6] = {
+    {0x993cf9fa40d21b1c, 0xb558d681be343df8, 0x9c9588617fc8ac62, 0x01d5ef4ba35b48ba, 0x18b2e62f4bd3fa6f, 0x08ca8d548cff19ae, },
+    {0xe5c8276ec82b3bff, 0x13daa8846cb026e9, 0x0126c2588c48bf57, 0x7041e8ca0cf0800c, 0x48b4711298e53636, 0x12561a5deb559c43, },
+    {0xfcc239ba5cb83e19, 0xd6a3d0967c94fedc, 0xfca64e00b11aceac, 0x6f89416f5a718cd1, 0x8137e629bff2991f, 0x0b2962fe57a3225e, },
+    {0x130de8938dc62cd8, 0x4976d5243eecf5c4, 0x54cca8abc28d6fd0, 0x5b08243f16b16551, 0xc83aafef7c40eb54, 0x03425581a58ae2fe, },
+    {0x539d395b3532a21e, 0x9bd29ba81f35781d, 0x8d6b44e833b306da, 0xffdfc759a12062bb, 0x0a6f1d5f43e7a07d, 0x13a8e162022914a8, },
+    {0xc02df9a29f6304a5, 0x7400d24bc4228f11, 0x0a43bcef24b8982f, 0x395735e9ce9cad4d, 0x55390f7f0506c6e9, 0x0e7355f8e4e667b9, },
+    {0xec2574496ee84a3a, 0xea73b3538f0de06c, 0x4e2e073062aede9c, 0x570f5799af53a189, 0x0f3e0c63e0596721, 0x0772caacf1693619, },
+    {0x11f7d99bbdcc5a5e, 0x0fa5b9489d11e2d3, 0x1996e1cdf9822c58, 0x6e7f63c21bca68a8, 0x30b3f5b074cf0199, 0x14a7ac2a9d64a8b2, },
+    {0x4776ec3a79a1d641, 0x03826692abba4370, 0x74100da67f398835, 0xe07f8d1d7161366b, 0x5e920b3dafc7a3cc, 0x0a10ecf6ada54f82, },
+    {0x2d6384d168ecdd0a, 0x93174e4b4b786500, 0x76df533978f31c15, 0xf682b4ee96f7d037, 0x476d6e3eb3a56680, 0x095fc13ab9e92ad4, }, 
+};
+
+const uint64_t iso_Ny_data[ELLP_Ny_LEN][6] = {
+    {0xbe9845719707bb33, 0xcd0c7aee9b3ba3c2, 0x2b52af6c956543d3, 0x11ad138e48a86952, 0x259d1f094980dcfa, 0x090d97c81ba24ee0, },
+    {0xe097e75a2e41c696, 0xd6c56711962fa8bf, 0x0f906343eb67ad34, 0x1223e96c254f383d, 0xd51036d776fb4683, 0x134996a104ee5811, },
+    {0xb8dfe240c72de1f6, 0xd26d521628b00523, 0xc344be4b91400da7, 0x2552e2d658a31ce2, 0xf4a384c86a3b4994, 0x00cc786baa966e66, },
+    {0xa6355c77b0e5f4cb, 0xde405aba9ec61dec, 0x09e4a3ec03251cf9, 0xd42aa7b90eeb791c, 0x7898751ad8746757, 0x01f86376e8981c21, },
+    {0x41b6daecf2e8fedb, 0x2ee7f8dc099040a8, 0x79833fd221351adc, 0x195536fbe3ce50b8, 0x5caf4fe2a21529c4, 0x08cc03fdefe0ff13, },
+    {0x99b23ab13633a5f0, 0x203f6326c95a8072, 0x76505c3d3ad5544e, 0x74a7d0d4afadb7bd, 0x2211e11db8f0a6a0, 0x16603fca40634b6a, },
+    {0xc961f8855fe9d6f2, 0x47a87ac2460f415e, 0x5231413c4d634f37, 0xe75bb8ca2be184cb, 0xb2c977d027796b3c, 0x04ab0b9bcfac1bbc, },
+    {0xa15e4ca31870fb29, 0x42f64550fedfe935, 0xfd038da6c26c8426, 0x170a05bfe3bdd81f, 0xde9926bd2ca6c674, 0x0987c8d5333ab86f, },
+    {0x60370e577bdba587, 0x69d65201c78607a3, 0x1e8b6e6a1f20cabe, 0x8f3abd16679dc26c, 0xe88c9e221e4da1bb, 0x09fc4018bd96684b, },
+    {0x2bafaaebca731c30, 0x9b3f7055dd4eba6f, 0x06985e7ed1e4d43b, 0xc42a0ca7915af6fe, 0x223abde7ada14a23, 0x0e1bba7a1186bdb5, },
+    {0xe813711ad011c132, 0x31bf3a5cce3fbafc, 0xd1183e416389e610, 0xcd2fcbcb6caf493f, 0x0dfd0b8f1d43fb93, 0x19713e47937cd1be, },
+    {0xce07c8a4d0074d8e, 0x49d9cdf41b44d606, 0x2e6bfe7f911f6432, 0x523559b8aaf0c246, 0xb918c143fed2edcc, 0x18b46a908f36f6de, },
+    {0x0d4c04f00b971ef8, 0x06c851c1919211f2, 0xc02710e807b4633f, 0x7aa7b12a3426b08e, 0xd155096004f53f44, 0x0b182cac101b9399, },
+    {0x42d9d3f5db980133, 0xc6cf90ad1c232a64, 0x13e6632d3c40659c, 0x757b3b080d4c1580, 0x72fc00ae7be315dc, 0x0245a394ad1eca9b, },
+    {0x866b1e715475224b, 0x6ba1049b6579afb7, 0xd9ab0f5d396a7ce4, 0x5e673d81d7e86568, 0x02a159f748c4a3fc, 0x05c129645e44cf11, },
+    {0x04b456be69c8b604, 0xb665027efec01c77, 0x57add4fa95af01b2, 0xcb181d8f84965a39, 0x4ea50b3b42df2eb5, 0x15e6be4e990f03ce, },
+};
+
+const uint64_t iso_Dy_data[ELLP_Dy_LEN][6] = {
+    {0x01479253b03663c1, 0x07f3688ef60c206d, 0xeec3232b5be72e7a, 0x601a6de578980be6, 0x52181140fad0eae9, 0x16112c4c3a9c98b2, },
+    {0x32f6102c2e49a03d, 0x78a4260763529e35, 0xa4a10356f453e01f, 0x85c84ff731c4d59c, 0x1a0cbd6c43c348b8, 0x1962d75c2381201e, },
+    {0x1e2538b53dbf67f2, 0xa6757cd636f96f89, 0x0c35a5dd279cd2ec, 0x78c4855551ae7f31, 0x6faaae7d6e8eb157, 0x058df3306640da27, },
+    {0xa8d26d98445f5416, 0x727364f2c28297ad, 0x123da489e726af41, 0xd115c5dbddbcd30e, 0xf20d23bf89edb4d1, 0x16b7d288798e5395, },
+    {0xda39142311a5001d, 0xa20b15dc0fd2eded, 0x542eda0fc9dec916, 0xc6d19c9f0f69bbb0, 0xb00cc912f8228ddc, 0x0be0e079545f43e4, },
+    {0x02c6477faaf9b7ac, 0x49f38db9dfa9cce2, 0xc5ecd87b6f0f5a64, 0xb70152c65550d881, 0x9fb266eaac783182, 0x08d9e5297186db2d, },
+    {0x3d1a1399126a775c, 0xd5fa9c01a58b1fb9, 0x5dd365bc400a0051, 0x5eecfdfa8d0cf8ef, 0xc3ba8734ace9824b, 0x166007c08a99db2f, },
+    {0x60ee415a15812ed9, 0xb920f5b00801dee4, 0xfeb34fd206357132, 0xe5a4375efa1f4fd7, 0x03bcddfabba6ff6e, 0x16a3ef08be3ea7ea, },
+    {0x6b233d9d55535d4a, 0x52cfe2f7bb924883, 0xabc5750c4bf39b48, 0xf9fb0ce4c6af5920, 0x1a1be54fd1d74cc4, 0x1866c8ed336c6123, },
+    {0x346ef48bb8913f55, 0xc7385ea3d529b35e, 0x5308592e7ea7d4fb, 0x3216f763e13d87bb, 0xea820597d94a8490, 0x167a55cda70a6e1c, },
+    {0x00f8b49cba8f6aa8, 0x71a5c29f4f830604, 0x0e591b36e636a5c8, 0x9c6dd039bb61a629, 0x48f010a01ad2911d, 0x04d2f259eea405bd, },
+    {0x9684b529e2561092, 0x16f968986f7ebbea, 0x8c0f9a88cea79135, 0x7f94ff8aefce42d2, 0xf5852c1e48c50c47, 0x0accbb67481d033f, },
+    {0x1e99b138573345cc, 0x93000763e3b90ac1, 0x7d5ceef9a00d9b86, 0x543346d98adf0226, 0xc3613144b45f1496, 0x0ad6b9514c767fe3, },
+    {0xd1fadc1326ed06f7, 0x420517bd8714cc80, 0xcb748df27942480e, 0xbf565b94e72927c1, 0x628bdd0d53cd76f2, 0x02660400eb2e4f3b, },
+    {0x4415473a1d634b8f, 0x5ca2f570f1349780, 0x324efcd6356caa20, 0x71c40f65e273b853, 0x6b24255e0d7819c1, 0x0e0fa1d816ddc03e, },
+};
+
+static inline void hornerPolynomial(fp_t accumulator, const fp_t x, 
+        const int start_val, const fp_t* fp_tmp) {
+    for (int i = start_val; i >= 0; --i) {
+        fp_mul(accumulator, accumulator, x);            // tot *= x               v = 2   w = 1
+        fp_add(accumulator, accumulator, fp_tmp[i]);    // tot += next_val        v = 4   w = 2
+    }
+}
+
+static inline void compute_map_zvals(const fp_t inv[], fp_t zv[], 
+        const unsigned len, fp_t* fp_tmp) {
+    for (unsigned i = 0; i < len; ++i) {
+        fp_mul(fp_tmp[i], inv[i], zv[i]);
+    }
+}
+
 // 11-isogeny map
 // computes the mapping or p and stores it in r
 static inline void eval_iso11(ep_st* r, const ep_st*  p) {
-    const int tmp_len = 5;
+    const int tmp_len = 32;
     fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
     for (int i=0; i<tmp_len; i++) fp_new(&fp_tmp[i]);
 
-    // precompute even powers of Z up to Z^30
-    bint_sqr(bint_tmp[31], p->z);                 // Z^2
-    bint_sqr(bint_tmp[30], bint_tmp[31]);                // Z^4
-    bint_mul(bint_tmp[29], bint_tmp[30], bint_tmp[31]);  // Z^6
-    bint_sqr(bint_tmp[28], bint_tmp[30]);                // Z^8
-    for (unsigned i = 0; i < 3; ++i) {
-        bint_mul(bint_tmp[27 - i], bint_tmp[28 - i], bint_tmp[31]);  // Z^10, Z^12, Z^14
-    }
-    bint_sqr(bint_tmp[24], bint_tmp[28]);  // Z^16
-    for (unsigned i = 0; i < 7; ++i) {
-        bint_mul(bint_tmp[23 - i], bint_tmp[24 - i], bint_tmp[31]);  // Z^18, ..., Z^30
-    }
+    // precompute even powers of Z up to Z^30 in fp_tmp[31]..fp_tmp[17]
+    fp_sqr(fp_tmp[31], p->z);                       // Z^2
+    fp_sqr(fp_tmp[30], fp_tmp[31]);                 // Z^4
+    fp_mul(fp_tmp[29], fp_tmp[30], fp_tmp[31]);     // Z^6
+    fp_sqr(fp_tmp[28], fp_tmp[30]);                 // Z^8
+    fp_mul(fp_tmp[27], fp_tmp[28], fp_tmp[31]);     // Z^10
+    fp_sqr(fp_tmp[26], fp_tmp[29]);                 // Z^12
+    fp_mul(fp_tmp[25], fp_tmp[26], fp_tmp[31]);     // Z^14
+    fp_sqr(fp_tmp[24], fp_tmp[28]);                 // Z^16
+    fp_mul(fp_tmp[23], fp_tmp[24], fp_tmp[31]);     // Z^18
+    fp_sqr(fp_tmp[22], fp_tmp[27]);                 // Z^20
+    fp_mul(fp_tmp[21], fp_tmp[22], fp_tmp[31]);     // Z^22
+    fp_sqr(fp_tmp[20], fp_tmp[26]);                 // Z^24
+    fp_mul(fp_tmp[19], fp_tmp[20], fp_tmp[31]);     // Z^26
+    fp_sqr(fp_tmp[18], fp_tmp[25]);                 // Z^28
+    fp_mul(fp_tmp[17], fp_tmp[18], fp_tmp[31]);     // Z^30
 
-    // Ymap denominator
-    compute_map_zvals(iso_yden, bint_tmp + 17, ELLP_YMAP_DEN_LEN);         // k_(15-i) Z^(2i)
-    bint_add(bint_tmp[16], p->x, bint_tmp[ELLP_YMAP_DEN_LEN - 1]);  // X + k_14 Z^2 (denom is monic)
-    bint_horner(bint_tmp[16], p->x, ELLP_YMAP_DEN_LEN - 2);         // Horner for rest
-    bint_mul(bint_tmp[15], bint_tmp[16], bint_tmp[31]);                    // Yden * Z^2
-    bint_mul(bint_tmp[15], bint_tmp[15], p->z);                     // Yden * Z^3
+    // y = Ny/Dy
+    // compute Dy
+    compute_map_zvals(bls_prec.iso_Dy, fp_tmp + 17, ELLP_Dy_LEN, fp_tmp);     // k_(15-i) Z^(2i)
+    fp_add(fp_tmp[16], p->x, fp_tmp[ELLP_Dy_LEN - 1]);        // X + k_14 Z^2 (denom is monic)
+    hornerPolynomial(fp_tmp[16], p->x, ELLP_Dy_LEN - 2, fp_tmp);         // Horner for rest
+    fp_mul(fp_tmp[15], fp_tmp[16], fp_tmp[31]);                    // Dy * Z^2
+    fp_mul(fp_tmp[15], fp_tmp[15], p->z);                           // Dy * Z^3
 
-    // Ymap numerator
-    compute_map_zvals(iso_ynum, bint_tmp + 17, ELLP_YMAP_NUM_LEN - 1);      // k_(15-i) Z^(2i)
-    bint_mul(bint_tmp[16], p->x, iso_ynum[ELLP_YMAP_NUM_LEN - 1]);   // k_15 * X
-    bint_add(bint_tmp[16], bint_tmp[16], bint_tmp[ELLP_YMAP_NUM_LEN - 2]);  // k_15 * X + k_14 Z^2
-    bint_horner(bint_tmp[16], p->x, ELLP_YMAP_NUM_LEN - 3);          // Horner for rest
-    bint_mul(bint_tmp[16], bint_tmp[16], p->y);                      // Ynum * Y
-    // at this point, ymap num/den are in bint_tmp[16]/bint_tmp[15]
+    // compute Ny
+    compute_map_zvals(bls_prec.iso_Ny, fp_tmp + 17, ELLP_Ny_LEN - 1, fp_tmp); // k_(15-i) Z^(2i)
+    fp_mul(fp_tmp[16], p->x, bls_prec.iso_Ny[ELLP_Ny_LEN - 1]);      // k_15 * X
+    fp_add(fp_tmp[16], fp_tmp[16], fp_tmp[ELLP_Ny_LEN - 2]);  // k_15 * X + k_14 Z^2
+    hornerPolynomial(fp_tmp[16], p->x, ELLP_Ny_LEN - 3, fp_tmp);          // Horner for rest
+    fp_mul(fp_tmp[16], fp_tmp[16], p->y);                           // Ny * Y
+    
+    // x = Nx/Dx
+    // compute Dx
+    compute_map_zvals(bls_prec.iso_Dx, fp_tmp + 22, ELLP_Dx_LEN, fp_tmp);         // k_(10-i) Z^(2i)
+    fp_add(fp_tmp[14], p->x, fp_tmp[ELLP_Dx_LEN - 1]);  // X + k_9 Z^2 (denom is monic)
+    hornerPolynomial(fp_tmp[14], p->x, ELLP_Dx_LEN - 2, fp_tmp);         // Horner for rest
+    fp_mul(fp_tmp[14], fp_tmp[14], fp_tmp[31]);                    // Dx * Z^2
 
-    // Xmap denominator
-    compute_map_zvals(iso_xden, bint_tmp + 22, ELLP_XMAP_DEN_LEN);         // k_(10-i) Z^(2i)
-    bint_add(bint_tmp[14], p->x, bint_tmp[ELLP_XMAP_DEN_LEN - 1]);  // X + k_9 Z^2 (denom is monic)
-    bint_horner(bint_tmp[14], p->x, ELLP_XMAP_DEN_LEN - 2);         // Horner for rest
-    // mul by Z^2 because numerator has degree one greater than denominator
-    bint_mul(bint_tmp[14], bint_tmp[14], bint_tmp[31]);
+    // compute Nx
+    compute_map_zvals(bls_prec.iso_Nx, fp_tmp + 21, ELLP_Nx_LEN - 1, fp_tmp);      // k_(11-i) Z^(2i)
+    fp_mul(fp_tmp[13], p->x, bls_prec.iso_Nx[ELLP_Nx_LEN - 1]);   // k_11 * X
+    fp_add(fp_tmp[13], fp_tmp[13], fp_tmp[ELLP_Nx_LEN - 2]);  // k_11 * X + k_10 * Z^2
+    hornerPolynomial(fp_tmp[13], p->x, ELLP_Nx_LEN - 3, fp_tmp);          // Dy: Horner for rest
 
-    // Xmap numerator
-    compute_map_zvals(iso_xnum, bint_tmp + 21, ELLP_XMAP_NUM_LEN - 1);      // k_(11-i) Z^(2i)
-    bint_mul(bint_tmp[13], p->x, iso_xnum[ELLP_XMAP_NUM_LEN - 1]);   // k_11 * X
-    bint_add(bint_tmp[13], bint_tmp[13], bint_tmp[ELLP_XMAP_NUM_LEN - 2]);  // k_11 * X + k_10 * Z^2
-    bint_horner(bint_tmp[13], p->x, ELLP_XMAP_NUM_LEN - 3);          // Horner for rest
-
-    // at this point, xmap num/den are in bint_tmp[13]/bint_tmp[14]
-    // now compute Jacobian projective coordinates
-    bint_mul(r->z, bint_tmp[14], bint_tmp[15]);  // Zout = Xden Yden
-    bint_mul(r->x, bint_tmp[13], bint_tmp[15]);  // Xnum Yden
-    bint_mul(r->x, r->x, r->z);    // Xnum Xden Yden^2 = Xout => Xout / Zout^2 = Xnum / Xden
-    bint_sqr(bint_tmp[12], r->z);                // Zout^2
-    bint_mul(r->y, bint_tmp[16], bint_tmp[14]);  // Ynum Xden
-    bint_mul(r->y, r->y, bint_tmp[12]);   // Ynum Xden Zout^2 = Yout => Yout / Zout^3 = Ynum / Yden
+    // compute the resulting point (Xo,Yo,Zo)
+    fp_mul(r->z, fp_tmp[14], fp_tmp[15]);  // Zo = Dx Dy
+    fp_mul(r->x, fp_tmp[13], fp_tmp[15]);  //  Nx Dy
+    fp_mul(r->x, r->x, r->z);    // Xo = Nx Dy Z 
+    fp_sqr(fp_tmp[12], r->z);                // Zo^2
+    fp_mul(r->y, fp_tmp[16], fp_tmp[14]);  // Ny Dx
+    fp_mul(r->y, r->y, fp_tmp[12]);   // Yo = Ny Dx Zo^2
+    r->norm = 0;
     
     for (int i=0; i<tmp_len; i++) fp_free(&fp_tmp[i]);
     free(fp_tmp);
 }
 
+/*static void read_(){
+    for (int i=0; i<len; i++){
+        uint8_t* buff = (uint8_t*) malloc(56);
+        for (int j=0; j<7; j++) 
+            for (int k=0; k<7; k++) buff[7*j+k] = ((uint8_t*)&data[i][j])[k];
+        for (int j=49; j<56; j++) buff[j]=0;
+        bn_st a;
+        bn_read_raw(&a, (uint64_t*)buff, 7);
+        printf("{");
+        for (int j=0; j<a.used; j++) {
+            printf("0x");
+            if (!(a.dp[j] >> 60)) printf("0");
+            if (!(a.dp[j] >> 56)) printf("0"); 
+            if (!(a.dp[j] >> 52)) printf("0");
+            if (!(a.dp[j] >> 48)) printf("0");  
+            printf("%llx, ", a.dp[j]);
+        }
+        printf("}\n");
+    }
+        for (int i=0; i<ELLP_Dx_LEN; i++)  
+            _fp_print("Dx", bls_prec.iso_Dx[i]);
+        for (int i=0; i<ELLP_Nx_LEN; i++)  
+            _fp_print("Nx", bls_prec.iso_Nx[i]);
+        for (int i=0; i<ELLP_Dy_LEN; i++)  
+            _fp_print("Dy", bls_prec.iso_Dy[i]);
+        for (int i=0; i<ELLP_Ny_LEN; i++)  
+            _fp_print("Ny",bls_prec.iso_Ny[i]);
+}*/
 
+// map an input point in E to a point in G1 by clearing the cofactor of G1 
+static void clear_cofactor(ep_st* out, const ep_st* in) {
+        bn_st z;
+        bn_new(&z);
+        fp_prime_get_par(&z);
+        // compute z-1 
+        bn_neg(&z, &z); 
+        bn_add_dig(&z, &z, 1);
+        bn_print(&z);
+        //printf("%d -")
+        if (bn_bits(&z) < RLC_DIG) {
+            printf("digit\n");
+            ep_mul_dig(out, in, z.dp[0]);
+        } else {
+            printf("mouch digit\n");
+            ep_mul(out, in, &z);
+        }
+}
 
 // evaluate the SWU map twice, add results together, apply isogeny map, clear cofactor
 static void mapToG1_opswu(ep_st* p, const uint8_t *msg, int len) {
-    fp_st t1, t2;
+    fp_t t1, t2;
     fp_read_bin(t1, msg, len/2);
     fp_read_bin(t2, msg + len/2, len - len/2);
-    _fp_print("t1", &t1);
-    _fp_print("t2", &t2);
+    //_fp_print("t1", &t1);
+    //_fp_print("t2", t2);
 
     ep_st p_temp;
     ep_new(&p_temp);
-    mapToE1_swu(&p_temp, t1);
-    eval_iso11(&p_temp, p_temp); // map to E
+    mapToE1_swu(&p_temp, t1); // map to E1
+    eval_iso11(&p_temp, &p_temp); // map to E
+    //clear_cofactor(&p_temp, &p_temp); // map to G1
     ep_norm(&p_temp,&p_temp);
     _ep_print("hash to point", &p_temp);
-    mapToE1_swu(p, t2);
-    eval_iso11(p,p); 
-    ep_norm(p,p);
-    _ep_print("hash to point", p);
+    printf("%d\n", ep_is_valid(&p_temp));
+    
+    mapToE1_swu(p, t2); // map to E1
+    eval_iso11(p,p);  // map to E
+    //clear_cofactor(p, p); // map to G1
+    ep_norm(p, p);
+    _ep_print("after iso", p);
+    printf("%d\n", ep_is_valid(p));
 
     //ep_add_projc(p, p, &p_temp);
     //eval_iso11(&p_temp, p); // map to E
 
-    //clear_h_chain(p, &p_temp); // map to G1: expo by z-1 
+    //clear_cofactor(p, &p_temp);
     //ep_norm(p, p);  // normalize ??
     ep_free(&p_temp);
 }

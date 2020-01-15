@@ -15,10 +15,11 @@ typedef uint8_t byte;
 
 // Debug related functions
 void    _bytes_print(char*, byte*, int);
-void    _fp_print(char*, fp_st*);
+void    _fp_print(char*, fp_t);
 void    _bn_print(char*, bn_st*);
 void    _ep_print(char*, ep_st*);
 void    _ep2_print(char*, ep2_st*);
+void    fp_read_raw(fp_t a, const dig_t *raw, int len);
 void    _seed_relic(byte*, int);
 void    _bn_randZr(bn_t);
 void    _G1scalarGenMult(ep_st*, const bn_st*);

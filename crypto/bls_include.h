@@ -49,12 +49,24 @@
 #define OPSWU 3
 #define hashToPoint 3
 
+#if (hashToPoint == OPSWU)
+#define ELLP_Nx_LEN 12
+#define ELLP_Dx_LEN 10
+#define ELLP_Ny_LEN 16
+#define ELLP_Dy_LEN 15
+#endif
+
 // Structure of precomputed data
 typedef struct prec_ {
     #if (hashToPoint == OPSWU)
     // coefficients of E1(Fp)
     fp_st a1;
     fp_st b1; 
+    // coefficients of the isogeny map
+    fp_st iso_Nx[ELLP_Nx_LEN];
+    fp_st iso_Dx[ELLP_Dx_LEN];
+    fp_st iso_Ny[ELLP_Ny_LEN];
+    fp_st iso_Dy[ELLP_Dy_LEN];
     #endif
     bn_st p_3div4;
     fp_st p_1div2;
