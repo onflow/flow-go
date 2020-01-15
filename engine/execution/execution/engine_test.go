@@ -3,24 +3,18 @@ package execution
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
-	executormock "github.com/dapperlabs/flow-go/engine/execution/execution/executor/mock"
+	executor "github.com/dapperlabs/flow-go/engine/execution/execution/executor/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
+	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 )
 
 func TestExecutionEngine_OnCompleteBlock(t *testing.T) {
-	exec := &executormock.BlockExecutor{}
-	receipts := &network.Engine{}
-
-	e := &Engine{
-		receipts: receipts,
-		executor: exec,
-	}
-
 	tx1 := flow.TransactionBody{
 		Script: []byte("transaction { execute {} }"),
 	}
@@ -38,15 +32,13 @@ func TestExecutionEngine_OnCompleteBlock(t *testing.T) {
 		Signatures:   nil,
 	}
 
-	content := flow.Content{
-		Guarantees: []*flow.CollectionGuarantee{&guarantee},
-	}
-
 	block := flow.Block{
 		Header: flow.Header{
 			Number: 42,
 		},
-		Content: content,
+		Content: flow.Content{
+			Guarantees: []*flow.CollectionGuarantee{&guarantee},
+		},
 	}
 
 	completeBlock := &execution.CompleteBlock{
@@ -59,12 +51,36 @@ func TestExecutionEngine_OnCompleteBlock(t *testing.T) {
 		},
 	}
 
-	receipts.On("SubmitLocal", mock.Anything)
-	exec.On("ExecuteBlock", completeBlock).Return(&flow.ExecutionResult{}, nil)
+	t.Run("non-local engine", func(t *testing.T) {
+		me := &module.Local{}
+		me.On("NodeID").Return(flow.ZeroID)
 
-	err := e.onCompleteBlock(completeBlock)
-	require.NoError(t, err)
+		e := Engine{me: me}
 
-	receipts.AssertExpectations(t)
-	exec.AssertExpectations(t)
+		// submit using origin ID that does not match node ID
+		err := e.onCompleteBlock(flow.Identifier{42}, completeBlock)
+		assert.Error(t, err)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		exec := &executor.BlockExecutor{}
+		receipts := &network.Engine{}
+		me := &module.Local{}
+		me.On("NodeID").Return(flow.ZeroID)
+
+		e := &Engine{
+			receipts: receipts,
+			executor: exec,
+			me:       me,
+		}
+
+		receipts.On("SubmitLocal", mock.Anything)
+		exec.On("ExecuteBlock", completeBlock).Return(&flow.ExecutionResult{}, nil)
+
+		err := e.onCompleteBlock(e.me.NodeID(), completeBlock)
+		require.NoError(t, err)
+
+		receipts.AssertExpectations(t)
+		exec.AssertExpectations(t)
+	})
 }

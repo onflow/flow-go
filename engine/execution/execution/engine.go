@@ -12,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine manages execution of transactions.
@@ -96,7 +97,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *execution.CompleteBlock:
-		return e.onCompleteBlock(ev)
+		return e.onCompleteBlock(originID, ev)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
@@ -106,7 +107,15 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 //
 // This function passes the complete block to the block executor and
 // then submits the result to the receipts engine.
-func (e *Engine) onCompleteBlock(block *execution.CompleteBlock) error {
+func (e *Engine) onCompleteBlock(originID flow.Identifier, block *execution.CompleteBlock) error {
+	e.log.Debug().
+		Hex("block_id", logging.Entity(block.Block)).
+		Msg("received complete block")
+
+	if originID != e.me.NodeID() {
+		return fmt.Errorf("invalid remote request to execute complete block [%x]", block.Block.ID())
+	}
+
 	result, err := e.executor.ExecuteBlock(block)
 	if err != nil {
 		return fmt.Errorf("failed to execute block: %w", err)
