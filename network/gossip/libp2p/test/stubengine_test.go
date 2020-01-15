@@ -47,15 +47,21 @@ func (s *StubEngineTestSuite) SetupTest() {
 
 // TestSingleMessage tests sending a single message from sender to receiver
 func (s *StubEngineTestSuite) TestSingleMessage() {
+	event := &libp2pmodel.Echo{
+		Text: "hello",
+	}
 	// set to false for no echo expectation
-	s.singleMessage(false)
+	s.singleMessage(false, event)
 }
 
 // TestSingleMessage tests sending a single message from sender to receiver
 // it also evaluates the correct reception of an echo message back
 func (s *StubEngineTestSuite) TestSingleEcho() {
+	event := &libp2pmodel.Echo{
+		Text: "hello",
+	}
 	// set to true for an echo expectation
-	s.singleMessage(true)
+	s.singleMessage(true, event)
 }
 
 // TestMultiMsgSync tests sending multiple messages from sender to receiver
@@ -91,7 +97,8 @@ func (s *StubEngineTestSuite) TestEchoMultiMsgAsync() {
 // SingleMessage sends a single message from one network instance to the other one
 // it evaluates the correctness of implementation against correct delivery of the message.
 // in case echo is true, it also evaluates correct reception of the echo message from the receiver side
-func (s *StubEngineTestSuite) singleMessage(echo bool) {
+// event is the message sent from sender to receiver
+func (s *StubEngineTestSuite) singleMessage(echo bool, event interface{}) {
 	sndID := 0
 	rcvID := 1
 	// test engine1
@@ -101,9 +108,6 @@ func (s *StubEngineTestSuite) singleMessage(echo bool) {
 	receiver := NewEngine(s.Suite.T(), s.nets[rcvID], 1, 1)
 
 	// Send the message to node 2 using the conduit of node 1
-	event := &libp2pmodel.Echo{
-		Text: "hello",
-	}
 	require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID]))
 
 	// evaluates reception of echo request
@@ -144,10 +148,13 @@ func (s *StubEngineTestSuite) singleMessage(echo bool) {
 			// evaluates correctness of casting
 			require.True(s.Suite.T(), ok)
 			// evaluates content of received message
-			echoEvent := &libp2pmodel.Echo{
-				Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
+			// reconstructing expected echo message
+			eventBytes, err := toBytes(event)
+			require.NoError(s.Suite.T(), err)
+			expEvent := &libp2pmodel.Echo{
+				Text: receiver.hasher.ComputeHash(eventBytes).Hex(),
 			}
-			assert.Equal(s.Suite.T(), echoEvent, rcvEvent)
+			assert.Equal(s.Suite.T(), expEvent, rcvEvent)
 
 		case <-time.After(10 * time.Second):
 			assert.Fail(s.Suite.T(), "receiver failed to send an echo message back to sender")
