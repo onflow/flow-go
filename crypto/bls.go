@@ -19,7 +19,17 @@ func (sk *PrKeyBLS_BLS12381) signHash(h Hash) (Signature, error) {
 
 // Sign signs an array of bytes
 func (sk *PrKeyBLS_BLS12381) Sign(data []byte, alg Hasher) (Signature, error) {
-	h := alg.ComputeHash(data)
+	// hash the input to 128 bytes
+	h := make([]byte, 128)
+	// concatenate the input to a counter byte
+	dataToHash := make([]byte, len(data)+1)
+	copy(dataToHash[:1], data)
+	dataToHash[0] = 0
+	copy(h[0:], alg.ComputeHash(dataToHash)) // copy 48 bytes
+	dataToHash[0] = 1
+	copy(h[48:], alg.ComputeHash(dataToHash)) // copy 96 bytes
+	dataToHash[0] = 2
+	copy(h[96:], alg.ComputeHash(dataToHash)[:32]) // copy 128 bytes
 	return sk.signHash(h)
 }
 
@@ -33,7 +43,17 @@ func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, alg Hasher) (bool
 	if alg == nil {
 		return false, cryptoError{"VerifyBytes requires a Hasher"}
 	}
-	h := alg.ComputeHash(data)
+	// hash the input to 128 bytes
+	h := make([]byte, 128)
+	// concatenate the input to a counter byte
+	dataToHash := make([]byte, len(data)+1)
+	copy(dataToHash[:1], data)
+	dataToHash[0] = 0
+	copy(h[0:], alg.ComputeHash(dataToHash)) // copy 48 bytes
+	dataToHash[0] = 1
+	copy(h[48:], alg.ComputeHash(dataToHash)) // copy 96 bytes
+	dataToHash[0] = 2
+	copy(h[96:], alg.ComputeHash(dataToHash)[:32]) // copy 128 bytes
 	return pk.verifyHash(s, h)
 }
 

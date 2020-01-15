@@ -29,8 +29,6 @@ static void init_precomputed_data() {
     #if (hashToPoint == OPSWU)
         fp_read_raw(bls_prec.a1, a1_data, 6);
         fp_read_raw(bls_prec.b1, b1_data, 6);
-        fp_print(bls_prec.a1);
-        fp_print(bls_prec.b1);
         for (int i=0; i<ELLP_Dx_LEN; i++)  
             fp_read_raw(bls_prec.iso_Dx[i], iso_Dx_data[i], 6);
         for (int i=0; i<ELLP_Nx_LEN; i++)  
@@ -68,7 +66,6 @@ ctx_t* _relic_init_BLS12_381() {
     #endif 
 
     init_precomputed_data();
-    
     if (ret != RLC_OK) return NULL;
     return core_get();
 }
@@ -83,147 +80,6 @@ int _getPubKeyLengthBLS_BLS12381() {
 
 int _getPrKeyLengthBLS_BLS12381() {
     return SK_LEN;
-}
-
-
-static void ep_swu_b12(ep_t p, const fp_t t, int u, int negate) {
-	fp_t t0, t1, t2, t3;
-
-	fp_null(t0);
-	fp_null(t1);
-	fp_null(t2);
-	fp_null(t3);
-
-	TRY {
-		fp_new(t0);
-		fp_new(t1);
-		fp_new(t2);
-		fp_new(t3);
-
-		/* t0 = t^2. */
-		fp_sqr(t0, t);
-		/* Compute f(u) such that u^3 + b is a square. */ 
-		fp_set_dig(p->x, -u);
-		fp_neg(p->x, p->x);
-		ep_rhs(t1, p); // t1 = u0^3 + b  --> should be precomputed
-		/* Compute t1 = (-f(u) + t^2), t2 = t1 * t^2 and invert if non-zero. */
-		fp_add(t1, t1, t0);
-		fp_mul(t2, t1, t0);
-		if (!fp_is_zero(t2)) {
-			/* Compute inverse of u^3 * t2 and fix later. */
-			fp_mul(t2, t2, p->x);
-			fp_mul(t2, t2, p->x);
-			fp_mul(t2, t2, p->x);
-			fp_inv(t2, t2);
-		}
-		/* Compute t0 = t^4 * u * sqrt(-3)/t2. */
-		fp_sqr(t0, t0);
-		fp_mul(t0, t0, t2);
-		fp_mul(t0, t0, p->x);
-		fp_mul(t0, t0, p->x);
-		fp_mul(t0, t0, p->x);
-		/* Compute constant u * sqrt(-3). */
-		fp_copy(t3, core_get()->srm3); // --> should be precomputed
-		for (int i = 1; i < -u; i++) {
-			fp_add(t3, t3, core_get()->srm3);
-		}
-		fp_mul(t0, t0, t3);
-		/* Compute (u * sqrt(-3) + u)/2 - t0. */
-		fp_add_dig(p->x, t3, -u);
-		fp_hlv(p->y, p->x);
-		fp_sub(p->x, p->y, t0);
-		ep_rhs(p->y, p);
-		if (!fp_srt(p->y, p->y)) {
-			/* Now try t0 - (u * sqrt(-3) - u)/2. */
-			fp_sub_dig(p->x, t3, -u);
-			fp_hlv(p->y, p->x);
-			fp_sub(p->x, t0, p->y);
-			ep_rhs(p->y, p);
-			if (!fp_srt(p->y, p->y)) {
-				/* Finally, try (u - t1^2 / t2). */
-				fp_sqr(p->x, t1);
-				fp_mul(p->x, p->x, t1);
-				fp_mul(p->x, p->x, t2);
-				fp_sub_dig(p->x, p->x, -u);
-				ep_rhs(p->y, p);
-				fp_srt(p->y, p->y);
-			}
-		}
-		if (negate) {
-			fp_neg(p->y, p->y);
-		}
-		fp_set_dig(p->z, 1);
-		p->norm = 1;
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		fp_free(t0);
-		fp_free(t1);
-		fp_free(t2);
-		fp_free(t3);
-	}
-}
-
-// Maps a 384 bits number to G1
-// Optimized Shallue–van de Woestijne encoding from Section 3 of
-// "Fast and simple constant-time hashing to the BLS12-381 elliptic curve".
-// taken and modified from Relic library
-void mapToG1_swu(ep_t p, const uint8_t *digest, const int len) {
-	bn_t k, pm1o2;
-	fp_t t;
-	ep_t q;
-	uint8_t sec_digest[RLC_MD_LEN_SH384];
-	int neg;
-
-	bn_null(k);
-	bn_null(pm1o2);
-	fp_null(t);
-	ep_null(q);
-
-	TRY {
-		bn_new(k);
-		bn_new(pm1o2);
-		fp_new(t);
-		ep_new(q);
-
-		pm1o2->sign = RLC_POS;
-		pm1o2->used = RLC_FP_DIGS;
-		dv_copy(pm1o2->dp, fp_prime_get(), RLC_FP_DIGS);
-		bn_hlv(pm1o2, pm1o2);
-		bn_read_bin(k, digest, RLC_MIN(RLC_FP_BYTES, len));
-		fp_prime_conv(t, k);
-		fp_prime_back(k, t);
-		neg = (bn_cmp(k, pm1o2) == RLC_LT ? 0 : 1);
-
-        ep_swu_b12(p, t, -3, neg);
-        md_map_sh384(sec_digest, digest, len);
-        bn_read_bin(k, sec_digest, RLC_MIN(RLC_FP_BYTES, RLC_MD_LEN_SH384));
-        fp_prime_conv(t, k);
-        neg = (bn_cmp(k, pm1o2) == RLC_LT ? 0 : 1);
-        ep_swu_b12(q, t, -3, neg);
-        ep_add(p, p, q);
-        ep_norm(p, p);
-        /* multiply by the prime parameter z to get the correct group. */
-        fp_prime_get_par(k);
-        bn_neg(k, k);
-        bn_add_dig(k, k, 1);
-        if (bn_bits(k) < RLC_DIG) {
-            ep_mul_dig(p, p, k->dp[0]);
-        } else {
-            ep_mul(p, p, k);
-        }
-	}
-	CATCH_ANY {
-		THROW(ERR_CAUGHT);
-	}
-	FINALLY {
-		bn_free(k);
-		bn_free(pm1o2);
-		fp_free(t);
-		ep_free(q);
-	}
 }
 
 
@@ -273,7 +129,7 @@ void _blsSign(byte* s, const bn_st *sk, const byte* data, const int len) {
     ep_st h;
     ep_new(&h);
     // hash to G1
-    mapToG1_swu(&h, data, len);
+    mapToG1_opswu(&h, data, len);
     // s = p^sk
 	_G1scalarPointMult(&h, &h, sk);  
     _ep_write_bin_compact(s, &h, SIGNATURE_LEN);
@@ -313,7 +169,7 @@ int _blsVerify(const ep2_st *pk, const byte* sig, const byte* data, const int le
     // elemsG1[1] = h
     ep_new(elemsG1[1]);
     // hash to G1 
-    mapToG1_swu(elemsG1[1], data, len); 
+    mapToG1_opswu(elemsG1[1], data, len); 
 
     // elemsG2[1] = pk
     ep2_new(elemsG2[1]);
