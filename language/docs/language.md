@@ -5258,8 +5258,11 @@ pub contract Events {
 }
 ```
 
-Restrictions:
-- Events can only be invoked in an `emit` statement. This means events cannot be assigned to variables or used as function parameters.
+Emitting events has the following restrictions:
+
+- Events can only be invoked in an `emit` statement.
+  This means events cannot be assigned to variables or used as function parameters.
+
 - Events can only be emitted from the location in which they are defined.
 
 ## Transactions
@@ -5269,25 +5272,29 @@ and are sent to the chain to interact with it.
 
 Transactions are structured as such:
 
-First, the transaction can import any number of types from external accounts using the import syntax.
+First, the transaction can import any number of types from external accounts
+using the import syntax.
 
 Next is the body of the transaction, which is broken into three main phases:
 Preparation, execution, and postconditions, only in that order.
 Each phase is a block of code that executes sequentially.
 
-  - The **prepare phase** acts like the initializer in a composite data type,
-    i.e., it initializes fields that can then be used in the execution phase.
-    The prepare phase has the permissions to read from and write to the storage
-    of all the accounts that signed the transaction.
+- The **prepare phase** acts like the initializer in a composite data type,
+  i.e., it initializes fields that can then be used in the execution phase.
+  The prepare phase has the permissions to read from and write to the storage
+  of all the accounts that signed the transaction.
 
-  - The **execute phase** is where interaction with external contracts happens.
-    This usually involves interacting with contracts with public types and functions that are deployed in other accounts.
+- The **execute phase** is where interaction with external contracts happens.
+  This usually involves interacting with contracts with public types
+  and functions that are deployed in other accounts.
 
-  - The **postcondition phase** is where the transaction can check that its functionality was executed correctly.
+- The **postcondition phase** is where the transaction can check
+  that its functionality was executed correctly.
 
 Transactions are declared using the `transaction` keyword.
 
-Within the transaction, but before the prepare phase, any number of constants and/or variables can be declared. These are valid within the entire scope of the transaction.
+Within the transaction, but before the prepare phase, any number of constants and/or variables can be declared.
+These are valid within the entire scope of the transaction.
 
 The prepare phase is declared using the `prepare` keyword
 and the execution phase can be declared using the `execute` keyword.
