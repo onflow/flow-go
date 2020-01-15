@@ -4984,15 +4984,18 @@ events, and interfaces for these types in Cadence have to be defined.
 Therefore, an object of one of these types cannot exist
 without having been defined in a deployed Cadence contract.
 
-Contracts can be initialized, updated, or deleted with the `updateAccountCode`
-or `createAccount` built-in functions within transactions.  These are covered
-in the next section.
+Contracts can be created, updated, and deleted using the `setCode`
+function of [accounts](#accounts).
+Contract creation also possible when creating accounts,
+i.e. when using the `Account` constructor.
+This functionality is covered in the [next section](#Deploying%20and%20Updating%20Contracts)
 
-Contracts are types.  They are similar to composite types,
-but are stored differently than
+Contracts are types.
+They are similar to composite types, but are stored differently than
 structs or resources and cannot be used as values, copied, or moved
 like resources or structs.
-They stay in an account's contract storage
+
+Contract stay in an account's contract storage
 area and can only be updated or deleted by the account owner
 with special commands.
 
@@ -5197,11 +5200,44 @@ let newVault <- create FungibleToken.createVault(initialBalance: 10)
 ### Deploying and Updating Contracts
 
 In order for a contract to be used in Cadence, it needs
-to be deployed to an account. It can be initialized, updated, or deleted
-within a transaction by using the `updateAccountCode`
-or `createAccount` built-in functions.
+to be deployed to an account.
 
-<!-- TODO: Bastian add documentation for these and examples -->
+Contract can be deployed to an account using the `setCode` function of the `Account` type:
+`setCode(_ code: [UInt8], ...)`.
+The function's `code` parameter is the byte representation of the source code.
+Additional arguments are passed to the initializer of the contract.
+
+For example, assuming the following contract code should be deployed:
+
+```cadence,file=test_contract.cdc
+contract Test {
+    let message: String
+
+    init(message: String) {
+        self.message = message
+    }
+}
+```
+
+The contract can be deployed as follows:
+
+```cadence,file=deploy_setCode.cdc
+let signer: Account = ...
+signer.setCode(
+    [0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61/*, ... */],
+    message: "I'm a new contract in an existing account"
+)
+```
+
+The contract can also be deployed when creating an account by using the `Account` constructor.
+
+```cadence,file=deploy_setCode.cdc
+let newAccount = Account(
+    publicKeys: [],
+    code: [0x63, 0x6f, 0x6e, 0x74, 0x72, 0x61/*, ... */],
+    message: "I'm a new contract in a new account"
+)
+```
 
 ### Contract Interfaces
 
