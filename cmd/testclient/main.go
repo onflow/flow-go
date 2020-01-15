@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dapperlabs/flow-go/sdk/client"
-	"github.com/dapperlabs/flow-go/sdk/keys"
+	"github.com/dapperlabs/flow-go-sdk"
+	"github.com/dapperlabs/flow-go-sdk/client"
+	"github.com/dapperlabs/flow-go-sdk/keys"
 	"github.com/spf13/pflag"
-
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 var (

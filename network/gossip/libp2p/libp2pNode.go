@@ -62,7 +62,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		return err
 	}
 
-	// libp2p.NewMiddleware constructs a new libp2p Host.
+	// libp2p.New constructs a new libp2p Host.
 	// Other options can be added here.
 	host, err := libp2p.New(
 		ctx,
@@ -207,7 +207,7 @@ func (p *P2PNode) Subscribe(ctx context.Context, topic FlowTopic, callback func(
 	p.subs[topic] = s
 	go pubSubHandler(ctx, s, callback, p.logger)
 
-	p.logger.Debug().Str("topic", string(topic)).Str("Name", p.name).Msg("subscribed to topic")
+	p.logger.Debug().Str("topic", string(topic)).Str("name", p.name).Msg("subscribed to topic")
 	return err
 }
 
@@ -248,7 +248,7 @@ func (p *P2PNode) UnSubscribe(topic FlowTopic) error {
 	p.topics[topic] = nil
 	delete(p.topics, topic)
 
-	p.logger.Debug().Str("topic", string(topic)).Str("Name", p.name).Msg("unsubscribed from topic")
+	p.logger.Debug().Str("topic", string(topic)).Str("name", p.name).Msg("unsubscribed from topic")
 	return err
 }
 
