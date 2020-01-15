@@ -42,7 +42,7 @@ func (a *Backdata) Get(id flow.Identifier) (*blockByCollection, error) {
 	return block, nil
 }
 
-func newMempool() (*Mempool, error) {
+func NewMempool() (*Mempool, error) {
 	a := &Mempool{
 		Backend: stdmap.NewBackend(),
 	}

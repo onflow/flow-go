@@ -50,7 +50,7 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 
 	snapshot := protocol.NewMockSnapshot(ctrl)
 
-	mempool, err := newMempool()
+	mempool, err := NewMempool()
 	require.NoError(t, err)
 
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
