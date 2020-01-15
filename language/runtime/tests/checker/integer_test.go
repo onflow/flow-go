@@ -272,3 +272,53 @@ func TestCheckInvalidAddressDecimal(t *testing.T) {
 	assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[0])
 	assert.IsType(t, &sema.InvalidAddressLiteralError{}, errs[1])
 }
+
+func TestCheckSignedIntegerNegate(t *testing.T) {
+
+	for _, ty := range []sema.Type{
+		&sema.Int8Type{},
+		&sema.Int16Type{},
+		&sema.Int32Type{},
+		&sema.Int64Type{},
+	} {
+		name := ty.String()
+		t.Run(name, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+                        let x = -%s(1)
+                    `,
+					name,
+				),
+			)
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestCheckInvalidUnsignedIntegerNegate(t *testing.T) {
+
+	for _, ty := range []sema.Type{
+		&sema.UInt8Type{},
+		&sema.UInt16Type{},
+		&sema.UInt32Type{},
+		&sema.UInt64Type{},
+	} {
+		name := ty.String()
+		t.Run(name, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+                        let x = -%s(1)
+                    `,
+					name,
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidUnaryOperandError{}, errs[0])
+		})
+	}
+}
