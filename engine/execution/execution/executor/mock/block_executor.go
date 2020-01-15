@@ -2,7 +2,8 @@
 
 package mock
 
-import executor "github.com/dapperlabs/flow-go/engine/execution/execution/executor"
+import execution "github.com/dapperlabs/flow-go/engine/execution"
+
 import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 
@@ -12,11 +13,11 @@ type BlockExecutor struct {
 }
 
 // ExecuteBlock provides a mock function with given fields: _a0
-func (_m *BlockExecutor) ExecuteBlock(_a0 *executor.ExecutableBlock) (*flow.ExecutionResult, error) {
+func (_m *BlockExecutor) ExecuteBlock(_a0 *execution.CompleteBlock) (*flow.ExecutionResult, error) {
 	ret := _m.Called(_a0)
 
 	var r0 *flow.ExecutionResult
-	if rf, ok := ret.Get(0).(func(*executor.ExecutableBlock) *flow.ExecutionResult); ok {
+	if rf, ok := ret.Get(0).(func(*execution.CompleteBlock) *flow.ExecutionResult); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
@@ -25,7 +26,7 @@ func (_m *BlockExecutor) ExecuteBlock(_a0 *executor.ExecutableBlock) (*flow.Exec
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(*executor.ExecutableBlock) error); ok {
+	if rf, ok := ret.Get(1).(func(*execution.CompleteBlock) error); ok {
 		r1 = rf(_a0)
 	} else {
 		r1 = ret.Error(1)

@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	statemock "github.com/dapperlabs/flow-go/engine/execution/execution/state/mock"
@@ -30,7 +31,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Script: []byte("transaction { execute {} }"),
 	}
 
-	col := flow.Collection{Transactions: []flow.TransactionBody{tx1, tx2}}
+	transactions := []*flow.TransactionBody{&tx1, &tx2}
+
+	col := flow.Collection{Transactions: transactions}
 
 	guarantee := flow.CollectionGuarantee{
 		CollectionID: col.ID(),
@@ -48,17 +51,14 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Content: content,
 	}
 
-	transactions := []*flow.TransactionBody{&tx1, &tx2}
-
-	executableBlock := &executor.ExecutableBlock{
+	completeBlock := &execution.CompleteBlock{
 		Block: &block,
-		Collections: []*executor.ExecutableCollection{
-			{
+		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{
+			guarantee.ID(): {
 				Guarantee:    &guarantee,
 				Transactions: transactions,
 			},
 		},
-		PreviousResultID: flow.ZeroID,
 	}
 
 	vm.On("NewBlockContext", &block).Return(bc)
@@ -92,7 +92,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	es.On("PersistStateCommitment",
 		block.ID(), mock.AnythingOfType("*[]uint8")).Return(nil)
 
-	result, err := exe.ExecuteBlock(executableBlock)
+	result, err := exe.ExecuteBlock(completeBlock)
 	assert.NoError(t, err)
 	assert.Len(t, result.Chunks.Chunks, 1)
 

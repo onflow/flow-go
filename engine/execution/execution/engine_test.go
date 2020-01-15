@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
+	"github.com/dapperlabs/flow-go/engine/execution"
 	executormock "github.com/dapperlabs/flow-go/engine/execution/execution/executor/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -29,7 +29,9 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 		Script: []byte("transaction { execute {} }"),
 	}
 
-	col := flow.Collection{Transactions: []flow.TransactionBody{tx1, tx2}}
+	transactions := []*flow.TransactionBody{&tx1, &tx2}
+
+	col := flow.Collection{Transactions: transactions}
 
 	guarantee := flow.CollectionGuarantee{
 		CollectionID: col.ID(),
@@ -47,23 +49,20 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 		Content: content,
 	}
 
-	transactions := []*flow.TransactionBody{&tx1, &tx2}
-
-	executableBlock := &executor.ExecutableBlock{
+	completeBlock := &execution.CompleteBlock{
 		Block: &block,
-		Collections: []*executor.ExecutableCollection{
-			{
+		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{
+			guarantee.ID(): {
 				Guarantee:    &guarantee,
 				Transactions: transactions,
 			},
 		},
-		PreviousResultID: flow.ZeroID,
 	}
 
 	receipts.On("SubmitLocal", mock.AnythingOfType("*flow.ExecutionResult"))
-	exec.On("ExecuteBlock", executableBlock).Return(&flow.ExecutionResult{}, nil)
+	exec.On("ExecuteBlock", completeBlock).Return(&flow.ExecutionResult{}, nil)
 
-	err := e.onExecutableBlock(executableBlock)
+	err := e.onCompleteBlock(completeBlock)
 	require.NoError(t, err)
 
 	receipts.AssertExpectations(t)

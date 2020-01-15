@@ -7,13 +7,14 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 )
 
-// Engine manages execution of transactions
+// Engine manages execution of transactions.
 type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
@@ -94,18 +95,18 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // process processes events for the execution engine on the execution node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
-	case *executor.ExecutableBlock:
-		return e.onExecutableBlock(ev)
+	case *execution.CompleteBlock:
+		return e.onCompleteBlock(ev)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// onExecutableBlock is triggered when this engine receives a new block.
+// onCompleteBlock is triggered when this engine receives a new block.
 //
-// This function passes the executable block to the block executor and
+// This function passes the complete block to the block executor and
 // then submits the result to the receipts engine.
-func (e *Engine) onExecutableBlock(block *executor.ExecutableBlock) error {
+func (e *Engine) onCompleteBlock(block *execution.CompleteBlock) error {
 	result, err := e.executor.ExecuteBlock(block)
 	if err != nil {
 		return fmt.Errorf("failed to execute block: %w", err)

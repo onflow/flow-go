@@ -61,13 +61,13 @@ func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 }
 
 func CollectionFixture(n int) flow.Collection {
-	transactions := make([]flow.TransactionBody, 0, n)
+	transactions := make([]*flow.TransactionBody, 0, n)
 
 	for i := 0; i < n; i++ {
 		tx := TransactionFixture(func(t *flow.Transaction) {
 			t.Nonce = rand.Uint64()
 		})
-		transactions = append(transactions, tx.TransactionBody)
+		transactions = append(transactions, &tx.TransactionBody)
 	}
 
 	return flow.Collection{Transactions: transactions}
