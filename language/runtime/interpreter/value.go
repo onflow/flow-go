@@ -1670,6 +1670,384 @@ func ConvertUInt64(value Value) Value {
 	return UInt64Value(value.(IntegerValue).IntValue())
 }
 
+// Word8Value
+
+type Word8Value uint8
+
+func init() {
+	gob.Register(Word8Value(0))
+}
+
+func (Word8Value) isValue() {}
+
+func (v Word8Value) Copy() Value {
+	return v
+}
+
+func (Word8Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Word8Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v Word8Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word8Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word8Value) IntValue() int {
+	return int(v)
+}
+
+func (v Word8Value) Negate() IntegerValue {
+	panic(errors.NewUnreachableError())
+}
+
+func (v Word8Value) Plus(other IntegerValue) IntegerValue {
+	return v + other.(Word8Value)
+}
+
+func (v Word8Value) Minus(other IntegerValue) IntegerValue {
+	return v - other.(Word8Value)
+}
+
+func (v Word8Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(Word8Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
+}
+
+func (v Word8Value) Mul(other IntegerValue) IntegerValue {
+	return v * other.(Word8Value)
+}
+
+func (v Word8Value) Div(other IntegerValue) IntegerValue {
+	o := other.(Word8Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
+}
+
+func (v Word8Value) Less(other IntegerValue) BoolValue {
+	return v < other.(Word8Value)
+}
+
+func (v Word8Value) LessEqual(other IntegerValue) BoolValue {
+	return v <= other.(Word8Value)
+}
+
+func (v Word8Value) Greater(other IntegerValue) BoolValue {
+	return v > other.(Word8Value)
+}
+
+func (v Word8Value) GreaterEqual(other IntegerValue) BoolValue {
+	return v >= other.(Word8Value)
+}
+
+func (v Word8Value) Equal(other Value) BoolValue {
+	otherWord8, ok := other.(Word8Value)
+	if !ok {
+		return false
+	}
+	return v == otherWord8
+}
+
+func ConvertWord8(value Value) Value {
+	return Word8Value(value.(IntegerValue).IntValue())
+}
+
+// Word16Value
+
+type Word16Value uint16
+
+func init() {
+	gob.Register(Word16Value(0))
+}
+
+func (Word16Value) isValue() {}
+
+func (v Word16Value) Copy() Value {
+	return v
+}
+func (Word16Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Word16Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v Word16Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word16Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word16Value) IntValue() int {
+	return int(v)
+}
+func (v Word16Value) Negate() IntegerValue {
+	panic(errors.NewUnreachableError())
+}
+
+func (v Word16Value) Plus(other IntegerValue) IntegerValue {
+	return v + other.(Word16Value)
+}
+
+func (v Word16Value) Minus(other IntegerValue) IntegerValue {
+	return v - other.(Word16Value)
+}
+
+func (v Word16Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(Word16Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
+}
+
+func (v Word16Value) Mul(other IntegerValue) IntegerValue {
+	return v * other.(Word16Value)
+}
+
+func (v Word16Value) Div(other IntegerValue) IntegerValue {
+	o := other.(Word16Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
+}
+
+func (v Word16Value) Less(other IntegerValue) BoolValue {
+	return v < other.(Word16Value)
+}
+
+func (v Word16Value) LessEqual(other IntegerValue) BoolValue {
+	return v <= other.(Word16Value)
+}
+
+func (v Word16Value) Greater(other IntegerValue) BoolValue {
+	return v > other.(Word16Value)
+}
+
+func (v Word16Value) GreaterEqual(other IntegerValue) BoolValue {
+	return v >= other.(Word16Value)
+}
+
+func (v Word16Value) Equal(other Value) BoolValue {
+	otherWord16, ok := other.(Word16Value)
+	if !ok {
+		return false
+	}
+	return v == otherWord16
+}
+
+func ConvertWord16(value Value) Value {
+	return Word16Value(value.(IntegerValue).IntValue())
+}
+
+// Word32Value
+
+type Word32Value uint32
+
+func init() {
+	gob.Register(Word32Value(0))
+}
+
+func (Word32Value) isValue() {}
+
+func (v Word32Value) Copy() Value {
+	return v
+}
+
+func (Word32Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Word32Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v Word32Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word32Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word32Value) IntValue() int {
+	return int(v)
+}
+
+func (v Word32Value) Negate() IntegerValue {
+	panic(errors.NewUnreachableError())
+}
+
+func (v Word32Value) Plus(other IntegerValue) IntegerValue {
+	return v + other.(Word32Value)
+}
+
+func (v Word32Value) Minus(other IntegerValue) IntegerValue {
+	return v - other.(Word32Value)
+}
+
+func (v Word32Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(Word32Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
+}
+
+func (v Word32Value) Mul(other IntegerValue) IntegerValue {
+	return v * other.(Word32Value)
+}
+
+func (v Word32Value) Div(other IntegerValue) IntegerValue {
+	o := other.(Word32Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
+}
+
+func (v Word32Value) Less(other IntegerValue) BoolValue {
+	return v < other.(Word32Value)
+}
+
+func (v Word32Value) LessEqual(other IntegerValue) BoolValue {
+	return v <= other.(Word32Value)
+}
+
+func (v Word32Value) Greater(other IntegerValue) BoolValue {
+	return v > other.(Word32Value)
+}
+
+func (v Word32Value) GreaterEqual(other IntegerValue) BoolValue {
+	return v >= other.(Word32Value)
+}
+
+func (v Word32Value) Equal(other Value) BoolValue {
+	otherWord32, ok := other.(Word32Value)
+	if !ok {
+		return false
+	}
+	return v == otherWord32
+}
+
+func ConvertWord32(value Value) Value {
+	return Word32Value(value.(IntegerValue).IntValue())
+}
+
+// Word64Value
+
+type Word64Value uint64
+
+func init() {
+	gob.Register(Word64Value(0))
+}
+
+func (Word64Value) isValue() {}
+
+func (v Word64Value) Copy() Value {
+	return v
+}
+
+func (Word64Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Word64Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v Word64Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word64Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word64Value) IntValue() int {
+	return int(v)
+}
+
+func (v Word64Value) Negate() IntegerValue {
+	panic(errors.NewUnreachableError())
+}
+
+func (v Word64Value) Plus(other IntegerValue) IntegerValue {
+	return v + other.(Word64Value)
+}
+
+func (v Word64Value) Minus(other IntegerValue) IntegerValue {
+	return v - other.(Word64Value)
+}
+
+func (v Word64Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(Word64Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
+}
+
+func (v Word64Value) Mul(other IntegerValue) IntegerValue {
+	return v * other.(Word64Value)
+}
+
+func (v Word64Value) Div(other IntegerValue) IntegerValue {
+	o := other.(Word64Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
+}
+
+func (v Word64Value) Less(other IntegerValue) BoolValue {
+	return v < other.(Word64Value)
+}
+
+func (v Word64Value) LessEqual(other IntegerValue) BoolValue {
+	return v <= other.(Word64Value)
+}
+
+func (v Word64Value) Greater(other IntegerValue) BoolValue {
+	return v > other.(Word64Value)
+}
+
+func (v Word64Value) GreaterEqual(other IntegerValue) BoolValue {
+	return v >= other.(Word64Value)
+}
+
+func (v Word64Value) Equal(other Value) BoolValue {
+	otherWord64, ok := other.(Word64Value)
+	if !ok {
+		return false
+	}
+	return v == otherWord64
+}
+
+func ConvertWord64(value Value) Value {
+	return Word64Value(value.(IntegerValue).IntValue())
+}
+
 // CompositeValue
 
 type CompositeValue struct {
