@@ -60,7 +60,7 @@ GenerateLoop:
 		select {
 		case <-time.After(time.Duration(dur)):
 
-			// generate a guaranteed collection with a random hash
+			// generate a collection guarantee with a random hash
 			var collID flow.Identifier
 			_, _ = rand.Read(collID[:])
 			coll := &flow.CollectionGuarantee{
@@ -69,7 +69,7 @@ GenerateLoop:
 
 			e.log.Info().
 				Hex("collection_hash", collID[:]).
-				Msg("generated guaranteed collection")
+				Msg("generated collection guarantee")
 
 			// submit to the engine
 			e.target.SubmitLocal(coll)

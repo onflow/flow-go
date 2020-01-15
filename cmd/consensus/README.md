@@ -36,7 +36,7 @@ Collection are submitted to one or more CN(s) via the `SubmitCollection` gRPC me
   - During normal operation, CNs only receive the collection _hashes_
     and (aggregated) signatures from the collectors that guarantee the collection.  
     The collection's content is _not_ resolved or inspected.  
-  - CNs will only consider _guaranteed collections_ (see [Collection](../collect) for details).
+  - CNs will only consider _collection guarantees_ (see [Collection](../collect) for details).
 Consensus nodes will gossip received collections to other consensus nodes.  
 
 

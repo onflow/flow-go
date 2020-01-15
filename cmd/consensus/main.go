@@ -8,7 +8,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
-	"github.com/dapperlabs/flow-go/engine/simulation/generator"
 	"github.com/dapperlabs/flow-go/engine/simulation/subzero"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -77,11 +76,6 @@ func main() {
 			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Me)
 			node.MustNot(err).Msg("could not initialize guarantee ingestion engine")
 			return ing
-		}).
-		Component("generator engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			gen, err := generator.New(node.Logger, prop)
-			node.MustNot(err).Msg("could not initialize guarantee generator engine")
-			return gen
 		}).
 		Run()
 }

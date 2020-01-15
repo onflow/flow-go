@@ -151,13 +151,7 @@ ConsentLoop:
 
 			log.Info().Msg("block committed")
 
-			err = e.prov.ProcessLocal(block)
-			if err != nil {
-				log.Error().Err(err).Msg("could not broadcast block")
-				continue ConsentLoop
-			}
-
-			log.Info().Msg("block broadcasted")
+			e.prov.SubmitLocal(block)
 		}
 	}
 }
