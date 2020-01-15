@@ -373,19 +373,35 @@ They are either *signed* (positive, zero, or negative)
 or *unsigned* (positive or zero)
 and are either 8 bits, 16 bits, 32 bits, 64 bits or arbitrarily large.
 
-The names for the integer types follow this naming convention:
-Signed integer types have an `Int` prefix, unsigned integer types have a `UInt` prefix,
-i.e., the integer types are named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
-The types are independent types, i.e. not subtypes of each other.
+Signed integer types which check for overflow and underflow have an `Int` prefix.
+They are `Int8`, `Int16`, `Int32`, and `Int64`.
+They can represent values in the following ranges:
 
 - **`Int8`**: -128 through 127
 - **`Int16`**: -32768 through 32767
 - **`Int32`**: -2147483648 through 2147483647
 - **`Int64`**: -9223372036854775808 through 9223372036854775807
+
+Unsigned integer types which check for overflow and underflow have a `UInt` prefix.
+They are `UInt8`, `UInt16`, `UInt32`, and `UInt64`.
+
 - **`UInt8`**: 0 through 255
 - **`UInt16`**: 0 through 65535
 - **`UInt32`**: 0 through 4294967295
 - **`UInt64`**: 0 through 18446744073709551615
+
+Unsigned integer types which do **not** check for overflow and underflow,
+i.e. wrap around, have the `Word` prefix:
+
+- **`Word8`**: 0 through 255
+- **`Word16`**: 0 through 65535
+- **`Word32`**: 0 through 4294967295
+- **`Word64`**: 0 through 18446744073709551615
+
+The types are independent types, i.e. not subtypes of each other.
+
+See the section about [artihmetic operators](#arithmetic) for further
+information aout the behavior of the different integer types.
 
 ```cadence
 // Declare a constant that has type `UInt8` and the value 10.
@@ -1557,63 +1573,63 @@ let a = 1 + 2
 The arguments for the operators need to be of the same type.
 The result is always the same type as the arguments.
 
-Arithmetic operators do not cause values to overflow.
+The division and remainder operators abort the program when the divisor is zero.
+
+Arithmetic operations on the signed integer types `Int8`, `Int16`, `Int32`, `Int64`,
+and on the unsigned integer types `UInt8`, `UInt16`, `UInt32`, `UInt64`
+do not cause values to overflow or underflow.
 
 ```cadence,file=operator-times.cdc
 let a: Int8 = 100
 let b: Int8 = 100
+
+// Error: The result `10000` does not fit in the range of `Int8`,
+// thus a fatal overflow error is raised and the program aborts
 let c = a * b
-// `c` is `10000`, and has type `Int`
 ```
 
-If overflow behavior is intended, overflowing operators are available,
-which are prefixed with an `&`:
-
-- Overflow addition: `&+`
-- Overflow subtraction: `&-`
-- Overflow multiplication: `&*`
+Arithmetic operations on the unsigned integer types `Word8`, `Word6`, `Word32`, `Word64`
+may cause values to overflow or underflow.
 
 For example, the maximum value of an unsigned 8-bit integer is 255 (binary 11111111).
 Adding 1 results in an overflow, truncation to 8 bits, and the value 0.
 
 ```cadence
-//     11111111 = 255
-// &+         1
-//  = 100000000 = 0
+//    11111111 = 255
+// +         1
+// = 100000000 = 0
 ```
 
 ```cadence,file=operator-overflow-plus.cdc
-let a: UInt8 = 255
-a &+ 1 // is `0`
+let a: Word8 = 255
+a + 1 // is `0`
 ```
 
 Similarly, for the minimum value 0, subtracting 1 wraps around and results in the maximum value 255.
 
 ```cadence,file=operator-minus.cdc
-//     00000000
-// &-         1
-//  =  11111111 = 255
+//    00000000
+// -         1
+// =  11111111 = 255
 ```
 
 ```cadence
-let b: UInt8 = 0
-b &- 1  // is `255`
+let b: Word8 = 0
+b - 1  // is `255`
 ```
 
 Signed integers are also affected by overflow. In a signed integer, the first bit is used for the sign. This leaves 7 bits for the actual value for an 8-bit signed integer, i.e., the range of values is -128 (binary 10000000) to 127 (01111111). Subtracting 1 from -128 results in 127.
 
 ```cadence
-//    10000000 = -128
-// &-        1
-//  = 01111111 = 127
+//   10000000 = -128
+// -        1
+// = 01111111 = 127
 ```
 
 ```cadence
-let c: Int8 = -128
-c &- 1  // is `127`
+let c: Word8 = -128
+c - 1  // is `127`
 ```
-
-Division by zero is a fatal error at run-time and aborts the program.
 
 ### Logical Operators
 
