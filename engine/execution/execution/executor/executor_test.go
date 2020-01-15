@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	statemock "github.com/dapperlabs/flow-go/engine/execution/execution/state/mock"
@@ -30,7 +31,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Script: []byte("transaction { execute {} }"),
 	}
 
-	col := flow.Collection{Transactions: []flow.TransactionBody{tx1, tx2}}
+	transactions := []*flow.TransactionBody{&tx1, &tx2}
+
+	col := flow.Collection{Transactions: transactions}
 
 	guarantee := flow.CollectionGuarantee{
 		CollectionID: col.ID(),
@@ -48,51 +51,35 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Content: content,
 	}
 
-	transactions := []*flow.TransactionBody{&tx1, &tx2}
-
-	executableBlock := &executor.ExecutableBlock{
+	completeBlock := &execution.CompleteBlock{
 		Block: &block,
-		Collections: []*executor.ExecutableCollection{
-			{
+		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{
+			guarantee.ID(): {
 				Guarantee:    &guarantee,
 				Transactions: transactions,
 			},
 		},
-		PreviousResultID: flow.ZeroID,
 	}
 
 	vm.On("NewBlockContext", &block).Return(bc)
 
-	bc.On(
-		"ExecuteTransaction",
-		mock.AnythingOfType("*state.View"),
-		mock.AnythingOfType("*flow.TransactionBody"),
-	).
+	bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
 		Return(&virtualmachine.TransactionResult{}, nil).
 		Twice()
 
 	es.On("StateCommitmentByBlockID", block.ParentID).
 		Return(unittest.StateCommitmentFixture(), nil)
 
-	es.On(
-		"NewView",
-		mock.AnythingOfType("[]uint8"),
-	).
+	es.On("NewView", mock.Anything).
 		Return(
 			state.NewView(func(key string) (bytes []byte, e error) {
 				return nil, nil
 			}))
 
-	es.On(
-		"CommitDelta",
-		mock.AnythingOfType("state.Delta"),
-	).
-		Return(nil, nil)
+	es.On("CommitDelta", mock.Anything).Return(nil, nil)
+	es.On("PersistStateCommitment", block.ID(), mock.Anything).Return(nil)
 
-	es.On("PersistStateCommitment",
-		block.ID(), mock.AnythingOfType("*[]uint8")).Return(nil)
-
-	result, err := exe.ExecuteBlock(executableBlock)
+	result, err := exe.ExecuteBlock(completeBlock)
 	assert.NoError(t, err)
 	assert.Len(t, result.Chunks.Chunks, 1)
 

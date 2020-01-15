@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	engineCommon "github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution/execution"
+	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	module "github.com/dapperlabs/flow-go/module/mocks"
@@ -205,7 +205,7 @@ func makeRealBlock(n int) (flow.Block, []flow.Collection) {
 
 	for i := range colls {
 		tx := unittest.TransactionBodyFixture()
-		colls[i].Transactions = []flow.TransactionBody{tx}
+		colls[i].Transactions = []*flow.TransactionBody{&tx}
 
 		collsGuarantees[i] = &flow.CollectionGuarantee{
 			CollectionID: colls[i].ID(),

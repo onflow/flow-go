@@ -20,7 +20,7 @@ func NewTransactions(db *badger.DB) *Transactions {
 	return &t
 }
 
-func (t *Transactions) ByID(txID flow.Identifier) (flow.TransactionBody, error) {
+func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
 
 	var tx flow.TransactionBody
 	err := t.db.View(func(btx *badger.Txn) error {
@@ -31,12 +31,12 @@ func (t *Transactions) ByID(txID flow.Identifier) (flow.TransactionBody, error) 
 		return nil
 	})
 
-	return tx, err
+	return &tx, err
 }
 
-func (t *Transactions) Store(tx flow.TransactionBody) error {
+func (t *Transactions) Store(tx *flow.TransactionBody) error {
 	return t.db.Update(func(btx *badger.Txn) error {
-		err := operation.InsertTransaction(&tx)(btx)
+		err := operation.InsertTransaction(tx)(btx)
 		if err != nil {
 			return fmt.Errorf("could not insert transaction: %w", err)
 		}

@@ -2,15 +2,15 @@ package flow
 
 // Collection is set of transactions.
 type Collection struct {
-	Transactions []TransactionBody
+	Transactions []*TransactionBody
 }
 
 // CollectionFromTransactions creates a new collection from the list of
 // transactions.
 func CollectionFromTransactions(transactions []*Transaction) Collection {
-	coll := Collection{Transactions: make([]TransactionBody, 0, len(transactions))}
+	coll := Collection{Transactions: make([]*TransactionBody, 0, len(transactions))}
 	for _, tx := range transactions {
-		coll.Transactions = append(coll.Transactions, tx.TransactionBody)
+		coll.Transactions = append(coll.Transactions, &tx.TransactionBody)
 	}
 	return coll
 }

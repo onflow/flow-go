@@ -3,6 +3,7 @@ package executor
 import (
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -10,7 +11,7 @@ import (
 
 // A BlockExecutor executes the transactions in a block.
 type BlockExecutor interface {
-	ExecuteBlock(*ExecutableBlock) (*flow.ExecutionResult, error)
+	ExecuteBlock(*execution.CompleteBlock) (*flow.ExecutionResult, error)
 }
 
 type blockExecutor struct {
@@ -28,7 +29,7 @@ func NewBlockExecutor(vm virtualmachine.VirtualMachine, state state.ExecutionSta
 
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *blockExecutor) ExecuteBlock(
-	block *ExecutableBlock,
+	block *execution.CompleteBlock,
 ) (*flow.ExecutionResult, error) {
 	chunks, endState, err := e.executeBlock(block)
 	if err != nil {
@@ -48,7 +49,7 @@ func (e *blockExecutor) ExecuteBlock(
 }
 
 func (e *blockExecutor) executeBlock(
-	block *ExecutableBlock,
+	block *execution.CompleteBlock,
 ) (chunk []*flow.Chunk, endState flow.StateCommitment, err error) {
 	blockCtx := e.vm.NewBlockContext(block.Block)
 
@@ -60,9 +61,11 @@ func (e *blockExecutor) executeBlock(
 		return nil, nil, fmt.Errorf("failed to fetch starting state commitment: %w", err)
 	}
 
-	chunks := make([]*flow.Chunk, len(block.Collections))
+	collections := block.Collections()
 
-	for i, collection := range block.Collections {
+	chunks := make([]*flow.Chunk, len(collections))
+
+	for i, collection := range collections {
 		chunk, endState, err := e.executeCollection(i, blockCtx, startState, collection)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to execute collection: %w", err)
@@ -79,7 +82,7 @@ func (e *blockExecutor) executeCollection(
 	index int,
 	blockCtx virtualmachine.BlockContext,
 	startState flow.StateCommitment,
-	collection *ExecutableCollection,
+	collection *execution.CompleteCollection,
 ) (
 	chunk *flow.Chunk,
 	endState flow.StateCommitment,
@@ -126,13 +129,14 @@ func (e *blockExecutor) executeCollection(
 // generateExecutionResultForBlock creates a new execution result for a block from
 // the provided chunk results.
 func generateExecutionResultForBlock(
-	block *ExecutableBlock,
+	block *execution.CompleteBlock,
 	chunks []*flow.Chunk,
 	endState flow.StateCommitment,
 ) *flow.ExecutionResult {
 	return &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID:     block.PreviousResultID,
+			// TODO: populate with real value
+			PreviousResultID:     flow.ZeroID,
 			BlockID:              block.Block.ID(),
 			FinalStateCommitment: endState,
 			Chunks:               flow.ChunkList{chunks},
