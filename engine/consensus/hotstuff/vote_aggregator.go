@@ -10,22 +10,29 @@ type VoteAggregator struct {
 	viewState    ViewState
 }
 
-func (va *VoteAggregator) Store(v *types.Vote) {
+// StorePendingVote stores the vote as a pending vote assuming the caller has checked that the voting
+// block is currently missing.
+// Note: Validations on these pending votes will be postponded until the block has been received.
+func (va *VoteAggregator) StorePendingVote(v *types.Vote) {
 	panic("TODO")
 }
 
-// StoreVoteAndBuildQC adds the vote to the VoteAggregator internal memory and returns a QC if there are enough votes.
+// StoreVoteAndBuildQC stores the vote assuming the caller has checked that the voting block is incorporated,
+// and returns a QC if there are votes with enough stakes.
 // The VoteAggregator builds a QC as soon as the number of votes allow this.
 // While subsequent votes (past the required threshold) are not included in the QC anymore,
-// VoteAggregator ALWAYS returns a QC is possible.
+// VoteAggregator ALWAYS returns the same QC as the one returned before.
 func (va *VoteAggregator) StoreVoteAndBuildQC(v *types.Vote, b *types.BlockProposal) (*types.QuorumCertificate, bool) {
 	panic("TODO")
 }
 
+// BuildQCForBlockProposal will attempt to build a QC for the given block proposal when there are votes
+// with enough stakes.
 func (va *VoteAggregator) BuildQCForBlockProposal(b *types.BlockProposal) (*types.QuorumCertificate, bool) {
 	panic("TODO")
 }
 
+// PruneByView will delete all votes equal or below to the given view, as well as related indexes.
 func (va *VoteAggregator) PruneByView(view uint64) {
 	panic("TODO")
 }
