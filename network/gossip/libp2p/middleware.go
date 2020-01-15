@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"time"
 
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/pkg/errors"
@@ -37,7 +36,7 @@ type Middleware struct {
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
-func NewMiddleware(log zerolog.Logger, codec network.Codec, conns uint, address string, flowID flow.Identifier) (*Middleware, error) {
+func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier) (*Middleware, error) {
 	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -50,7 +49,6 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, conns uint, address 
 	m := &Middleware{
 		log:        log,
 		codec:      codec,
-		slots:      make(chan struct{}, conns),
 		cc:         NewConnectionCache(),
 		libP2PNode: p2p,
 		wg:         &sync.WaitGroup{},
@@ -77,8 +75,6 @@ func (m *Middleware) GetIPPort() (string, string) {
 // Start will start the middleware.
 func (m *Middleware) Start(ov middleware.Overlay) {
 	m.ov = ov
-	m.wg.Add(1)
-	go m.rotate()
 }
 
 // Stop will end the execution of the middleware and wait for it to end.
@@ -104,26 +100,20 @@ func (m *Middleware) Stop() {
 func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 	m.Lock()
 	defer m.Unlock()
-
-	// get the conn from the conn cache
-	conn, ok := m.cc.Get(nodeID)
-	if !ok {
-		return errors.Errorf("connection not found (node_id: %s)", nodeID)
+	var err error
+	// get an existing connection or create one
+	conn, err := m.connect(nodeID)
+	if err != nil {
+		return errors.Wrapf(err, "failed to connect to node_id: %s", nodeID.String())
 	}
 
-	// check if the peer is still running
-	select {
-	case <-conn.done:
-		return errors.Errorf("connection already closed (node_id: %s)", nodeID)
-	default:
-	}
-
+	// compose the message
 	pmsg, err := m.createOutboundMessage(msg)
 	if err != nil {
 		return err
 	}
 
-	// whichever comes first, sending the message or ending the provided context
+	// send the message if connection still valid
 	select {
 	case <-conn.done:
 		return errors.Errorf("connection has closed (node_id: %s)", nodeID)
@@ -192,70 +182,46 @@ func (m *Middleware) createInboundMessage(msg *Message) (*flow.Identifier, inter
 	return &id, nm, nil
 }
 
-// rotate periodically creates connection to peers
-func (m *Middleware) rotate() {
-	defer m.wg.Done()
-
-Loop:
-	for {
-		select {
-
-		// for each free connection slot, we create a new connection
-		case m.slots <- struct{}{}:
-
-			// launch connection attempt
-			m.wg.Add(1)
-			go m.connect()
-
-			// TODO: add proper rate limiter
-			time.Sleep(time.Second)
-
-		case <-m.stop:
-			break Loop
-		}
-	}
-}
-
-// connect creates an outbound stream
-func (m *Middleware) connect() {
-	defer m.wg.Done()
+// connect returns an existing connection if found else creates a new connection, adds it to the cache and returns it
+func (m *Middleware) connect(targetID flow.Identifier) (*WriteConnection, error) {
 
 	log := m.log.With().Logger()
 
-	// make sure we free up the connection slot once we drop the peer
-	defer m.release(m.slots)
-
-	// get an identity to connect to
-	flowIdentity, err := m.ov.Identity()
-	if err != nil {
-		log.Error().Err(err).Msg("could not get flow ID")
-		return
+	if conn, found := m.cc.Get(targetID); found {
+		// check if the peer is still running
+		select {
+		case <-conn.done:
+			// connection found to be stale; replace with a new one
+			log.Debug().Str("nodeid", targetID.String()).Msg("existing connection already closed ")
+			m.cc.Remove(targetID)
+		default:
+			log.Debug().Str("nodeid", targetID.String()).Msg("reusing existing connection")
+			return conn, nil
+		}
+	} else {
+		log.Debug().Str("nodeid", targetID.String()).Msg("connection not found, creating one")
 	}
 
-	// If this node is already added, noop
-	if m.cc.Exists(flowIdentity.NodeID) {
-		log.Debug().Str("flowIdentity", flowIdentity.String()).Msg("node already added")
-		return
+	// get an identity to connect to. The identity provides the destination TCP address.
+	flowIdentity, err := m.ov.GetIdentity(targetID)
+	if err != nil {
+		return nil, errors.Wrapf(err, "could not get flow ID for %s", targetID.String())
 	}
 
 	log = log.With().Str("flowIdentity", flowIdentity.String()).Str("address", flowIdentity.Address).Logger()
 
 	ip, port, err := net.SplitHostPort(flowIdentity.Address)
 	if err != nil {
-		log.Error().Err(err).Msg("could not parse address")
-		return
+		return nil, errors.Wrapf(err, "could not parse address %s", flowIdentity.Address)
 	}
+
 	// Create a new NodeAddress
 	nodeAddress := NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port}
 	// Add it as a peer
 	stream, err := m.libP2PNode.CreateStream(context.Background(), nodeAddress)
 	if err != nil {
-		log.Error().Err(err).Msgf("failed to create stream for %s", nodeAddress.Name)
-		return
+		return nil, errors.Wrapf(err, "failed to create stream for %s", nodeAddress.Name)
 	}
-
-	// make sure we close the stream once the handling is done
-	defer stream.Close()
 
 	clog := m.log.With().
 		Str("local_addr", stream.Conn().LocalPeer().String()).
@@ -267,10 +233,21 @@ func (m *Middleware) connect() {
 
 	// cache the connection against the node id and remove it when done
 	m.cc.Add(flowIdentity.NodeID, conn)
-	defer m.cc.Remove(flowIdentity.NodeID)
 
 	log.Info().Msg("connection established")
 
+	go m.handleOutboundConnection(flowIdentity.NodeID, conn)
+
+	return conn, nil
+}
+
+func (m *Middleware) handleOutboundConnection(targetID flow.Identifier, conn *WriteConnection) {
+	m.wg.Add(1)
+	defer m.wg.Done()
+	// Remove the conn from the cache when done
+	defer m.cc.Remove(targetID)
+	// make sure we close the stream once the handling is done
+	defer conn.stream.Close()
 	// kick off the send loop
 	conn.SendLoop()
 }

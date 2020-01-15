@@ -104,19 +104,11 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 			Role:    flow.RoleCollection,
 		}
 
-		// mocks Overlay.Identity for middleware.Overlay.Identity()
-		m.ov[i].On("Identity").Return(flowID, nil)
+		// mocks Overlay.GetIdentity
+		m.ov[i].On("GetIdentity", mockery.Anything).Maybe().Return(flowID, nil)
 
-	}
-
-	// starting the middleware
-	for i := 0; i < m.size; i++ {
+		// start the middleware
 		m.mws[i].Start(m.ov[i])
-		time.Sleep(1 * time.Second)
-	}
-
-	for i := 0; i < m.size; i++ {
-		m.ov[i].AssertExpectations(m.T())
 	}
 }
 
@@ -244,7 +236,7 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 		codec := json.NewCodec()
 
 		// creates new middleware
-		mw, err := NewMiddleware(logger, codec, uint(count-1), "0.0.0.0:0", targetID)
+		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID)
 		require.NoError(m.Suite.T(), err)
 
 		mws = append(mws, mw)

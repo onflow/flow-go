@@ -334,7 +334,7 @@ func (s *StubEngineTestSuite) createMiddleware(ids []flow.Identifier) []*libp2p.
 	mws := make([]*libp2p.Middleware, 0)
 	for i := 0; i < count; i++ {
 		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), uint(count-1), "0.0.0.0:0", ids[i])
+		mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), "0.0.0.0:0", ids[i])
 		require.NoError(s.Suite.T(), err)
 		mws = append(mws, mw)
 	}
@@ -364,7 +364,7 @@ func (s *StubEngineTestSuite) createNetworks(mws []*libp2p.Middleware, ids []flo
 		state := &protocol.State{}
 		snapshot := &protocol.Snapshot{}
 		state.On("Final").Return(snapshot).Once()
-		snapshot.On("Identities", mockery.Anything).Return(flow.IdentityList{targetID}, nil).Once()
+		snapshot.On("Identity", mockery.Anything).Return(targetID, nil).Once()
 
 		// creates and mocks me
 		// creating network of node-1
