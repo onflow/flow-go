@@ -35,7 +35,7 @@ Resources are based on liner types which were popularized by Rust.
 Events are inspired by Solidity.
 
 **Disclaimer:** In real Cadence code, all type definitions and code
-must be defined and contained in [contracts](#contracts) or [transactions](#transactions), 
+must be defined and contained in [contracts](#contracts) or [transactions](#transactions),
 but we omit these containers in examples for simplicity.
 
 ## Comments
@@ -2686,11 +2686,11 @@ let maybeSomething: Int? = nil
 
 ## Composite Data Types
 
-Composite data types allow composing simpler types into more complex types, 
-i.e., they allow the composition of multiple values into one. 
-Composite data types have a name and consist of zero or more named fields, 
-and zero or more functions that operate on the data. 
-Each field may have a different type.  Composite data types can 
+Composite data types allow composing simpler types into more complex types,
+i.e., they allow the composition of multiple values into one.
+Composite data types have a name and consist of zero or more named fields,
+and zero or more functions that operate on the data.
+Each field may have a different type.  Composite data types can
 only be declared within a [contract](#contracts) and nowhere else.
 
 There are two kinds of composite data types.
@@ -2809,7 +2809,8 @@ There are three kinds of fields:
 
 In initializers, the special constant `self` refers to the composite value that is to be initialized.
 
-Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax: the composite value is followed by a dot (`.`) and the name of the field.
+Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax:
+the composite value is followed by a dot (`.`) and the name of the field.
 
 ```cadence,file=composite-data-type-fields-and-init.cdc
 // Declare a structure named `Token`, which has a constant field
@@ -3319,7 +3320,7 @@ When the resource was moved, the constant or variable
 that referred to the resource before the move becomes **invalid**.
 An **invalid** resource cannot be used again.
 
-To make the behaviour of resource types explicit, 
+To make the behaviour of resource types explicit,
 the prefix `@` must be used in type annotations
 of variable or constant declarations, parameters, and return types.
 
@@ -4162,7 +4163,7 @@ resource interface FungibleToken {
 Note that the required initializer and functions do not have any executable code.
 
 Struct and resource Interfaces can only be declared directly inside contracts,
-i.e. not inside of functions.  
+i.e. not inside of functions.
 Contract interfaces can only be declared globally and not inside contracts.
 
 ### Interface Implementation
@@ -4927,21 +4928,21 @@ let countObj = acct.storage[Counter]
 
 ## Contracts
 
-A contract in Cadence is a collection of type definitions 
-of interfaces, structs, resources,  data (its state), and code (its functions) 
-that lives in the contract storage area of an account in Flow.  
+A contract in Cadence is a collection of type definitions
+of interfaces, structs, resources,  data (its state), and code (its functions)
+that lives in the contract storage area of an account in Flow.
 Contracts are where all composite types like structs, resources,
-events, and interfaces for these types in Cadence have to be defined.  
-Therefore, an object of one of these types cannot exist 
+events, and interfaces for these types in Cadence have to be defined.
+Therefore, an object of one of these types cannot exist
 without having been defined in a deployed Cadence contract.
 
 Contracts can be initialized, updated, or deleted with the `updateAccountCode`
-or `createAccount` built-in functions within transactions.  These are covered 
+or `createAccount` built-in functions within transactions.  These are covered
 in the next section.
 
-Contracts are types.  They are similar to composite types, 
+Contracts are types.  They are similar to composite types,
 but are stored differently than
-structs or resources and cannot be used as values, copied, or moved 
+structs or resources and cannot be used as values, copied, or moved
 like resources or structs.
 They stay in an account's contract storage
 area and can only be updated or deleted by the account owner
@@ -4968,12 +4969,12 @@ pub contract Invalid {
     }
 }
 
-One of the simplest forms of a contract would just be one with a state variable, 
+One of the simplest forms of a contract would just be one with a state variable,
 a function, and an `init` function that initializes the variable:
 
 ```cadence,file=contract_hello.cdc
 // HelloWorldResource.cdc
-    
+
 pub contract HelloWorld {
 
     // Declare a stored state variable in HelloWorld
@@ -4994,8 +4995,8 @@ pub contract HelloWorld {
 ```
 
 This contract could be deployed to an account and live permenantely
-in the contract storage.  Transactions and other contracts 
-can interact with contracts by importing them at the beginning 
+in the contract storage.  Transactions and other contracts
+can interact with contracts by importing them at the beginning
 of a transaction or contract definition.
 
 Anyone could call the above contract's `hello` function by importing
@@ -5023,7 +5024,7 @@ log(HelloWorld.greeting)   // prints "Hello World!"
 HelloWorld.init()    // Error
 ```
 
-There can be any number of contracts per account 
+There can be any number of contracts per account
 and they can include an arbitrary amount of data. This means that
 a contract can have any number of fields, functions, and type definitions,
 but they have to be in the contract and not another top-level definition.
@@ -5031,7 +5032,7 @@ but they have to be in the contract and not another top-level definition.
 ```cadence,file=bad_decl.cdc
 // Invalid: Top-level declarations are restricted to only be contracts
 //          or contract interfaces. Therefore, all of these would be invalid
-//          if they were deployed to the account contract storage and 
+//          if they were deployed to the account contract storage and
 //          the deployment would be rejected.
 //
 pub resource Vault {}
@@ -5047,7 +5048,7 @@ create instances of types that are defined in another contract.  A contract
 restricts the situations that the objects can be created in.
 
 The contract below defines a resource interface `Receiver` and a resource `Vault`
-that implements that interface.  The way this example is written, 
+that implements that interface.  The way this example is written,
 there is no way to create this resource, so it would not be usable.
 
 ```cadence,file=ft_contract.cdc
@@ -5110,12 +5111,12 @@ let newVault <- create FungibleToken.Vault(balance: 10)
 ```
 
 The contract would have to either define a function that creates new
-`Vault` instances or use its `init` function to create an instance and 
-store it in the owner's account storage. 
+`Vault` instances or use its `init` function to create an instance and
+store it in the owner's account storage.
 
-This brings up another key feature of contracts in Cadence.  Contracts 
+This brings up another key feature of contracts in Cadence.  Contracts
 can interact with its account's `storage` and `published` objects to store
-resources, structs, and references.  They do so by using the special 
+resources, structs, and references.  They do so by using the special
 `self.account` object that is only accessible within the contract.
 
 Imagine that these were defined in the above `FungibleToken` contract.
@@ -5158,7 +5159,7 @@ Like composite types, contracts can have interfaces that specify rules
 about their behavior, their types, and the behavior of their types.
 
 Contract interfaces have to be declared globally.  Declarations
-cannot be nested in other types.  
+cannot be nested in other types.
 
 If a contract interface declares a concrete type, implementations of it
 must also declare the same concrete type conforming to the type requirement.
@@ -5168,7 +5169,7 @@ does not have to also define that interface.  They can refer to that nested
 interface by saying `{ContractInterfaceName}.{NestedInterfaceName}`
 
 ```cadence,file=contract_interface.cdc
-// Declare a contract interface that declares an interface and a resource 
+// Declare a contract interface that declares an interface and a resource
 // that needs to implement that interface in the contract implementation.
 //
 pub contract interface InterfaceExample {
@@ -5178,7 +5179,7 @@ pub contract interface InterfaceExample {
     //
     pub resource interface NestedInterface {}
 
-    // Implementations must declare this type 
+    // Implementations must declare this type
     //
     pub resource Composite: NestedInterface {}
 }
@@ -5188,7 +5189,7 @@ pub contract ExampleContract: InterfaceExample {
     // The contract doesn't need to redeclare the `NestedInterface` interface
     // because it is already declared in the contract interface
 
-    // The resource has to refer to the resrouce interface using the name 
+    // The resource has to refer to the resrouce interface using the name
     // of the contract interface to access it
     //
     pub resource Composite: InterfaceExample.NestedInterface {
@@ -5206,13 +5207,13 @@ An event type can be declared with the `event` keyword.
 event FooEvent(x: Int, y: Int)
 ```
 
-The syntax of an event declaration is similar to that of 
-a [function declaration](#function-declarations); 
+The syntax of an event declaration is similar to that of
+a [function declaration](#function-declarations);
 events contain named parameters, each of which has an optional argument label.
-Types that can be in event definitions are restricted 
+Types that can be in event definitions are restricted
 to booleans, strings, integer, and arrays or dictionaries of these types.
 
-Events can only be declared within a [contract](#contracts) body.  
+Events can only be declared within a [contract](#contracts) body.
 Events cannot be declared globally or within resource or struct types.
 
 Resource argument types are not allowed because when a resource is used as
