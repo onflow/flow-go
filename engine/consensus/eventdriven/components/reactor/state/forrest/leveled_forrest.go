@@ -161,11 +161,11 @@ func (f *LeveledForrest) uncheckedCopyDescendants(root *vertexContainer, targetF
 	}
 }
 
-// Copies descendants of `root` vertex to `targetForrest`. Root Vertex itself is NOT copied.
+// CopyDescendants Copies descendants of `root` vertex to `targetForrest`. Root Vertex itself is NOT copied.
 // Copy is recursive and stops at empty vertices. If root does not exist
 // (or is an empty vertex container) no copying is performed.
-func (f *LeveledForrest) CopyDescendants(rootId []byte, rootLevel uint64, targetForrest *LeveledForrest) {
-	container, exists := f.findVertexContainer(rootId, rootLevel)
+func (f *LeveledForrest) CopyDescendants(rootID []byte, rootLevel uint64, targetForrest *LeveledForrest) {
+	container, exists := f.findVertexContainer(rootID, rootLevel)
 	if !exists { // no op, if vertex container does not exists
 		return
 	}
@@ -188,7 +188,7 @@ func (f *LeveledForrest) GetChildren(id []byte, level uint64) VertexIterator {
 	return newVertexIterator(container.children) // VertexIterator gracefully handles nil slices
 }
 
-// GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified height
+// GetNumberOfChildren #TODO write godoc
 func (f *LeveledForrest) GetNumberOfChildren(id []byte, level uint64) int {
 	container, _ := f.findVertexContainer(id, level) // if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
 	num := 0
@@ -206,7 +206,7 @@ func (f *LeveledForrest) GetVerticesAtLevel(level uint64) VertexIterator {
 	return newVertexIterator(f.verticesAtLevel[level]) // go returns the zero value for a missing level. Here, a nil slice
 }
 
-// GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified height
+// GetNumberOfVerticesAtLevel returns number of Vertices at the specified height
 func (f *LeveledForrest) GetNumberOfVerticesAtLevel(level uint64) int {
 	num := 0
 	for _, container := range f.verticesAtLevel[level] {

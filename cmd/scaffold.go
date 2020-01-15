@@ -115,7 +115,8 @@ func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
 func (fnb *FlowNodeBuilder) initNodeID() {
 	if fnb.BaseConfig.NodeID == notSet {
 		h := sha256.New()
-		_, _ = h.Write([]byte(fnb.BaseConfig.NodeName))
+		_, err := h.Write([]byte(fnb.BaseConfig.NodeName))
+		fnb.MustNot(err).Msg("could not initialize node id")
 		fnb.BaseConfig.NodeID = hex.EncodeToString(h.Sum(nil))
 	}
 }

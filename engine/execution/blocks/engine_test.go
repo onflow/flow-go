@@ -16,7 +16,6 @@ import (
 	network "github.com/dapperlabs/flow-go/network/mocks"
 	protocol "github.com/dapperlabs/flow-go/protocol/mocks"
 	storage "github.com/dapperlabs/flow-go/storage/mocks"
-
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -204,7 +203,7 @@ func makeRealBlock(n int) (flow.Block, []flow.Collection) {
 	colls := make([]flow.Collection, n)
 	collsGuarantees := make([]*flow.CollectionGuarantee, n)
 
-	for i, _ := range colls {
+	for i := range colls {
 		tx := unittest.TransactionBodyFixture()
 		colls[i].Transactions = []flow.TransactionBody{tx}
 

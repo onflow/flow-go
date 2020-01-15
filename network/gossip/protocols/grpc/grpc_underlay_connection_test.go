@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/network/gossip"
 )
@@ -30,7 +30,7 @@ func TestGRPCUnderlayConnection_Send(t *testing.T) {
 	}
 	assert.NoError(t, underlay.Handle(callbackfunc))
 	// Stop Server at the end
-	defer underlay.Stop()
+	defer func() { assert.NoError(t, underlay.Stop()) }()
 	// Start the Client
 	clientConnection, err := underlay.Dial(listener.Addr().String())
 	assert.NotNil(t, clientConnection)
@@ -62,7 +62,7 @@ func TestGRPCUnderlayConnection_OnClosed(t *testing.T) {
 	}()
 
 	// Stop Server at the end
-	defer underlay.Stop()
+	defer func() { assert.NoError(t, underlay.Stop()) }()
 	// Start the Client
 	clientConnection, err := underlay.Dial(listener.Addr().String())
 	assert.NotNil(t, clientConnection)

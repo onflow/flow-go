@@ -37,7 +37,7 @@ func CheckError(e error) {
 }
 
 func ConvertBoolToByte(b bool) byte {
-	if b == true {
+	if b {
 		return byte(1)
 	}
 	return byte(0)
