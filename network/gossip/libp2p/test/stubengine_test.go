@@ -57,6 +57,21 @@ func (s *StubEngineTestSuite) TestSingleEcho() {
 	s.singleMessage(true)
 }
 
+// TestMultiMsgSync tests sending multiple messages from sender to receiver
+// sender and receiver are synced over reception
+func (s *StubEngineTestSuite) TestMultiMsgSync() {
+	// set to true for an echo expectation
+	s.multiMessageSync(false, 10)
+}
+
+// TestEchoMultiMsgSync tests sending multiple messages from sender to receiver
+// it also evaluates the correct reception of an echo message back for each send
+// sender and receiver are synced over reception
+func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
+	// set to true for an echo expectation
+	s.multiMessageSync(true, 10)
+}
+
 // SingleMessage sends a single message from one network instance to the other one
 // it evaluates the correctness of implementation against correct delivery of the message.
 // in case echo is true, it also evaluates correct reception of the echo message from the receiver side
@@ -128,44 +143,34 @@ func (s *StubEngineTestSuite) singleMessage(echo bool) {
 // it evaluates the correctness of implementation against correct delivery of the messages.
 // sender and receiver are sync over reception, i.e., sender sends one message at a time and
 // waits for its reception
-func (s *StubEngineTestSuite) TestMultiMessageSync() {
-	// count defines number of messages
-	count := 10
+// count defines number of messages
+func (s *StubEngineTestSuite) multiMessageSync(echo bool, count int) {
+	sndID := 0
+	rcvID := 1
 	// test engine1
-	te1 := &StubEngine{
-		t: s.Suite.T(),
-	}
-	c1, err := s.nets[0].Register(1, te1)
-	require.NoError(s.Suite.T(), err)
+	sender := NewEngine(s.Suite.T(), s.nets[sndID], count, 1)
 
 	// test engine 2
-	te2 := &StubEngine{
-		t:        s.Suite.T(),
-		event:    make(chan interface{}, count),
-		received: make(chan struct{}, count),
-	}
-
-	_, err = s.nets[1].Register(1, te2)
-	require.NoError(s.Suite.T(), err)
+	receiver := NewEngine(s.Suite.T(), s.nets[rcvID], count, 1)
 
 	for i := 0; i < count; i++ {
-		// Send the message to node 2 using the conduit of node 1
+		// Send the message to receiver
 		event := &libp2pmodel.Echo{
 			Text: fmt.Sprintf("hello%d", i),
 		}
-		require.NoError(s.Suite.T(), c1.Submit(event, s.ids[1]))
+		require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID]))
 
 		select {
-		case <-te2.received:
+		case <-receiver.received:
 			// evaluates reception of message at the other side
 			// does not evaluate the content
-			require.NotNil(s.Suite.T(), te2.originID)
-			require.NotNil(s.Suite.T(), te2.event)
-			assert.Equal(s.Suite.T(), s.ids[0], te2.originID)
+			require.NotNil(s.Suite.T(), receiver.originID)
+			require.NotNil(s.Suite.T(), receiver.event)
+			assert.Equal(s.Suite.T(), s.ids[sndID], receiver.originID)
 
 			// evaluates proper reception of event
 			// casts the received event at the receiver side
-			rcvEvent, ok := (<-te2.event).(*libp2pmodel.Echo)
+			rcvEvent, ok := (<-receiver.event).(*libp2pmodel.Echo)
 			// evaluates correctness of casting
 			require.True(s.Suite.T(), ok)
 			// evaluates content of received message
@@ -174,7 +179,36 @@ func (s *StubEngineTestSuite) TestMultiMessageSync() {
 		case <-time.After(2 * time.Second):
 			assert.Fail(s.Suite.T(), "peer 1 failed to send a message to peer 2")
 		}
+
+		// evaluates echo back
+		if echo {
+			// evaluates reception of echo response
+			select {
+			case <-sender.received:
+				// evaluates reception of message at the other side
+				// does not evaluate the content
+				require.NotNil(s.Suite.T(), sender.originID)
+				require.NotNil(s.Suite.T(), sender.event)
+				assert.Equal(s.Suite.T(), s.ids[rcvID], sender.originID)
+
+				// evaluates proper reception of event
+				// casts the received event at the receiver side
+				rcvEvent, ok := (<-sender.event).(*libp2pmodel.Echo)
+				// evaluates correctness of casting
+				require.True(s.Suite.T(), ok)
+				// evaluates content of received message
+				echoEvent := &libp2pmodel.Echo{
+					Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
+				}
+				assert.Equal(s.Suite.T(), echoEvent, rcvEvent)
+
+			case <-time.After(10 * time.Second):
+				assert.Fail(s.Suite.T(), "peer 1 failed to send a message to peer 2")
+			}
+		}
+
 	}
+
 }
 
 // TestMultiMessageAsync sends a multiple messages from one network instance to the other one
