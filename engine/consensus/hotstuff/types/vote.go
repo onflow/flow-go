@@ -26,7 +26,7 @@ func (uv *Vote) BytesForSig() []byte {
 	length := len(viewBytes) + len(uv.BlockMRH) + len(voteStrBytes)
 	bytesForSig := make([]byte, 0, length)
 	bytesForSig = append(bytesForSig, viewBytes...)
-	bytesForSig = append(bytesForSig, uv.BlockMRH...)
+	bytesForSig = append(bytesForSig, uv.BlockMRH[:]...)
 	bytesForSig = append(bytesForSig, voteStrBytes...)
 
 	return bytesForSig

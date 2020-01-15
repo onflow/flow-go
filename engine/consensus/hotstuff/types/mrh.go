@@ -1,3 +1,3 @@
 package types
 
-type MRH = []byte
+type MRH = [32]byte
