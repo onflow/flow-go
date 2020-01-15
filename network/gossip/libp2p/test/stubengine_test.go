@@ -50,6 +50,13 @@ func (s *StubEngineTestSuite) TestSingleMessage() {
 	s.singleMessage(false)
 }
 
+// TestSingleMessage tests sending a single message from sender to receiver
+// it also evaluates the correct reception of an echo message back
+func (s *StubEngineTestSuite) TestSingleEcho() {
+	// set to true for an echo expectation
+	s.singleMessage(true)
+}
+
 // SingleMessage sends a single message from one network instance to the other one
 // it evaluates the correctness of implementation against correct delivery of the message.
 // in case echo is true, it also evaluates correct reception of the echo message from the receiver side
