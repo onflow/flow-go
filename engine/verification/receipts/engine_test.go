@@ -40,7 +40,7 @@ type TestSuite struct {
 }
 
 // Invoking this method executes all TestSuite tests.
-func TestVerifierEngineTestSuite(t *testing.T) {
+func TestReceiptsEngine(t *testing.T) {
 	suite.Run(t, new(TestSuite))
 }
 
@@ -104,12 +104,11 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 
 	// mock the receipt coming from an execution node
 	execNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	// mock the set of consensus nodes
-	consNodes := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
+	collNodeIDs := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
 
 	suite.state.On("Final").Return(suite.ss, nil)
 	suite.ss.On("Identity", execNodeID.NodeID).Return(execNodeID, nil).Once()
-	suite.ss.On("Identities", testifymock.Anything).Return(consNodes, nil)
+	suite.ss.On("Identities", testifymock.Anything).Return(collNodeIDs, nil).Once()
 
 	// we have the corresponding block, but not the collection
 	suite.blocks.On("Get", suite.block.ID()).Return(&suite.block, nil)
@@ -120,7 +119,7 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{&suite.receipt}, nil).Once()
 
 	// expect that the collection is requested
-	suite.collectionsConduit.On("Submit", genSubmitParams(testifymock.Anything, consNodes)...).Return(nil).Once()
+	suite.collectionsConduit.On("Submit", testifymock.Anything, collNodeIDs.Get(0).NodeID).Return(nil).Once()
 
 	err := eng.Process(execNodeID.NodeID, &suite.receipt)
 	suite.Assert().Nil(err)
@@ -252,8 +251,7 @@ func (suite *TestSuite) TestVerifyReady() {
 
 	execNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	collNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	// mock the set of consensus nodes
-	consNodes := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
+	consNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 
 	testcases := []struct {
 		resource interface{}
@@ -270,7 +268,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			label:    "received collection",
 		}, {
 			resource: &suite.block,
-			from:     consNodes.Get(0),
+			from:     consNodeID,
 			label:    "received block",
 		},
 	}
@@ -306,7 +304,7 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.verifierEng.AssertExpectations(suite.T())
 
 			// the collection should not be requested
-			suite.collectionsConduit.AssertNotCalled(suite.T(), "Submit", genSubmitParams(testifymock.Anything, consNodes))
+			suite.collectionsConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, collNodeID)
 		})
 	}
 }
