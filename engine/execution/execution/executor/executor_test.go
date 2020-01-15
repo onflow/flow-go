@@ -63,34 +63,21 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	vm.On("NewBlockContext", &block).Return(bc)
 
-	bc.On(
-		"ExecuteTransaction",
-		mock.AnythingOfType("*state.View"),
-		mock.AnythingOfType("*flow.TransactionBody"),
-	).
+	bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
 		Return(&virtualmachine.TransactionResult{}, nil).
 		Twice()
 
 	es.On("StateCommitmentByBlockID", block.ParentID).
 		Return(unittest.StateCommitmentFixture(), nil)
 
-	es.On(
-		"NewView",
-		mock.AnythingOfType("[]uint8"),
-	).
+	es.On("NewView", mock.Anything).
 		Return(
 			state.NewView(func(key string) (bytes []byte, e error) {
 				return nil, nil
 			}))
 
-	es.On(
-		"CommitDelta",
-		mock.AnythingOfType("state.Delta"),
-	).
-		Return(nil, nil)
-
-	es.On("PersistStateCommitment",
-		block.ID(), mock.AnythingOfType("*[]uint8")).Return(nil)
+	es.On("CommitDelta", mock.Anything).Return(nil, nil)
+	es.On("PersistStateCommitment", block.ID(), mock.Anything).Return(nil)
 
 	result, err := exe.ExecuteBlock(completeBlock)
 	assert.NoError(t, err)

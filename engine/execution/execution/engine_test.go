@@ -12,7 +12,7 @@ import (
 	network "github.com/dapperlabs/flow-go/network/mock"
 )
 
-func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
+func TestExecutionEngine_OnCompleteBlock(t *testing.T) {
 	exec := &executormock.BlockExecutor{}
 	receipts := &network.Engine{}
 
@@ -59,7 +59,7 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 		},
 	}
 
-	receipts.On("SubmitLocal", mock.AnythingOfType("*flow.ExecutionResult"))
+	receipts.On("SubmitLocal", mock.Anything)
 	exec.On("ExecuteBlock", completeBlock).Return(&flow.ExecutionResult{}, nil)
 
 	err := e.onCompleteBlock(completeBlock)
