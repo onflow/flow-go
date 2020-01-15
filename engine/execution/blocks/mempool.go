@@ -3,7 +3,7 @@ package blocks
 import (
 	"fmt"
 
-	execution2 "github.com/dapperlabs/flow-go/engine/execution"
+	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 )
@@ -14,7 +14,7 @@ type Mempool struct {
 
 type blockByCollection struct {
 	CollectionID flow.Identifier
-	Block        *execution2.CompleteBlock
+	Block        *execution.CompleteBlock
 }
 
 func (b *blockByCollection) ID() flow.Identifier {
