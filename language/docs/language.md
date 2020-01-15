@@ -1611,7 +1611,7 @@ Division by zero is a fatal error at run-time and aborts the program.
 
 Logical operators work with the boolean values `true` and `false`.
 
-  - Logical AND: `a && b`
+- Logical AND: `a && b`
 
     ```cadence,file=operator-and.cdc
     true && true  // is `true`
@@ -1625,7 +1625,7 @@ Logical operators work with the boolean values `true` and `false`.
 
     If the left-hand side is false, the right-hand side is not evaluated.
 
-  - Logical OR: `a || b`
+- Logical OR: `a || b`
 
     ```cadence,file=operator-or.cdc
     true || true  // is `true`
@@ -1643,7 +1643,7 @@ Logical operators work with the boolean values `true` and `false`.
 
 Comparison operators work with boolean and integer values.
 
-  - Equality: `==`, for booleans and integers
+- Equality: `==`, for booleans and integers
 
     Both sides of the equality operator may be optional, even of different levels,
     so it is for example possible to compare a non-optional with a double-optional (`??`).
@@ -1684,7 +1684,7 @@ Comparison operators work with boolean and integer values.
     x == y  // is `true`
     ```
 
-  - Inequality: `!=`, for booleans and integers (possibly optional)
+- Inequality: `!=`, for booleans and integers (possibly optional)
 
     Both sides of the inequality operator may be optional, even of different levels,
     so it is for example possible to compare a non-optional with a double-optional (`??`).
@@ -1725,7 +1725,7 @@ Comparison operators work with boolean and integer values.
     x != y  // is `false`
     ```
 
-  - Less than: `<`, for integers
+- Less than: `<`, for integers
 
     ```cadence,file=operator-less.cdc
     1 < 1  // is `false`
@@ -1735,7 +1735,7 @@ Comparison operators work with boolean and integer values.
     2 < 1  // is `false`
     ```
 
-  - Less or equal than: `<=`, for integers
+- Less or equal than: `<=`, for integers
 
     ```cadence,file=operator-less-equals.cdc
     1 <= 1  // is `true`
@@ -1745,7 +1745,7 @@ Comparison operators work with boolean and integer values.
     2 <= 1  // is `false`
     ```
 
-  - Greater than: `>`, for integers
+- Greater than: `>`, for integers
 
     ```cadence,file=operator-greater.cdc
     1 > 1  // is `false`
@@ -1755,7 +1755,7 @@ Comparison operators work with boolean and integer values.
     2 > 1  // is `true`
     ```
 
-  - Greater or equal than: `>=`, for integers
+- Greater or equal than: `>=`, for integers
 
     ```cadence,file=operator-greater-equals.cdc
     1 >= 1  // is `true`
@@ -2697,11 +2697,11 @@ when the value is assigned to a variable,
 when the value is passed as an argument to a function,
 and when the value is returned from a function:
 
-  - [**Structures**](#structures) are **copied**, i.e. they are value types.
+- [**Structures**](#structures) are **copied**, they are value types.
 
     Structures are useful when copies with independent state are desired.
 
-  - [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
+- [**Resources**](#resources) are **moved**, they are linear types and **must** be used **exactly once**.
 
     Resources are useful when it is desired to model ownership (a value exists exactly in one location and it should not be lost).
 
@@ -2747,10 +2747,11 @@ Resource must be created (instantiated) by using the `create` keyword and callin
 create SomeResource()
 ```
 
-The constructor function may require parameters
-if the [initializer](#composite-data-type-fields) of the composite data type requires them.
+The constructor function may require parameters if the [initializer](#composite-data-type-fields)
+of the composite data type requires them.
 
-Composite data types can only be declared within [contract](#contracts) and not locally in functions.
+Composite data types can only be declared within [contract](#contracts)
+and not locally in functions.
 They can also not be nested.
 
 ### Composite Data Type Fields
@@ -2778,18 +2779,19 @@ The initializer always follows any fields.
 
 There are three kinds of fields:
 
-  - **Constant fields** are also stored in the composite value,
+- **Constant fields** are also stored in the composite value,
     but after they have been initialized with a value
     they **cannot** have new values assigned to them afterwards.
     A constant field must be initialized exactly once.
 
     Constant fields are declared using the `let` keyword.
 
-  - **Variable fields** are stored in the composite value and can have new values assigned to them.
+- **Variable fields** are stored in the composite value
+    and can have new values assigned to them.
 
     Variable fields are declared using the `var` keyword.
 
-  - **Synthetic fields** are **not stored** in the composite value,
+- **Synthetic fields** are **not stored** in the composite value,
     i.e. they are derived/computed from other values.
     They can have new values assigned to them.
 
@@ -2805,10 +2807,12 @@ There are three kinds of fields:
 | **Constant field**   | Yes              | **No**             | `let`       |
 | **Synthetic field**  | **No**           | Yes                | `synthetic` |
 
-In initializers, the special constant `self` refers to the composite value that is to be initialized.
+In initializers, the special constant `self` refers to the composite value
+that is to be initialized.
 
-Fields can be read (if they are constant or variable) and set (if they are variable), using the access syntax:
-the composite value is followed by a dot (`.`) and the name of the field.
+Fields can be read (if they are constant or variable) and set (if they are variable),
+using the access syntax: the composite value is followed by a dot (`.`)
+and the name of the field.
 
 ```cadence,file=composite-data-type-fields-and-init.cdc
 // Declare a structure named `Token`, which has a constant field
@@ -3852,16 +3856,18 @@ and making other parts inaccessible/invisible.
 In Flow and Cadence, there are two types of access control:
 
 1. Access control between accounts using capability security.
-  Within Flow, a caller is not able to access an object
-  unless it owns the object or has a specific reference to that object.
-  This means that nothing is truly public by default.
-  Other accounts can not read or write the objects in an account
-  unless the owner of the account has granted them access
-  by providing references to the objects.
+
+    Within Flow, a caller is not able to access an object
+    unless it owns the object or has a specific reference to that object.
+    This means that nothing is truly public by default.
+    Other accounts can not read or write the objects in an account
+    unless the owner of the account has granted them access
+    by providing references to the objects.
 
 2. Access control within programs using `private` and `public` keywords.
-  Assuming the caller has a valid reference that satisfies the first type of access control,
-  these keywords further govern how access is controlled.
+
+   Assuming the caller has a valid reference that satisfies the first type of access control,
+   these keywords further govern how access is controlled.
 
 The high-level reference-based security (point 1 above)
 will be covered in a later section.
@@ -3874,13 +3880,16 @@ and fields (in structures, and resources) are either private or public.
 
 - **Private** means the declaration is only accessible/visible
   in the current and inner scopes.
+
   For example, a private field can only be
   accessed by functions of the type is part of,
   not by code that uses an instance of the type in an outer scope.
 
 - **Public** means the declaration is accessible/visible in all scopes.
+
   This includes the current and inner scopes like for private,
   and the outer scopes.
+
   For example, a public field in a type can be accessed using the access syntax
   on an instance of the type in an outer scope.
   This does not allow the declaration to be publicly writable though.
@@ -4008,7 +4017,6 @@ some.e
 //
 some.e = 5
 ```
-
 
 ## Interfaces
 
@@ -4752,6 +4760,7 @@ the reference is not updated and it becomes invalid.
 References are created by using the `&` operator,
 followed by the storage location,the `as` keyword,
 and the type through which the stored location should be accessed.
+
 ```cadence,file=reference-ex.cdc
 let nameRef: &Name = &account.storage[Name] as Name
 ```
@@ -4762,7 +4771,6 @@ References are covariant in their base types.
 For example, `&R` is a subtype of `&RI`,
 if `R` is a resource, `RI` is a resource interface,
 and resource `R` conforms to (implements) resource interface `RI`.
-
 
 ```cadence,file=storage-reference.cdc
 
@@ -5041,9 +5049,8 @@ let num: Int
 
 Another important feature of contracts is that instances of resources and events
 that are defined in contracts can only be created within functions or types
-that are defined in that contract.  A random transaction cannot arbitrarily
-create instances of types that are defined in another contract.  A contract
-restricts the situations that the objects can be created in.
+that are defined in that contract.
+Code outside the contract cannot arbitrarily create instances of resources and events.
 
 The contract below defines a resource interface `Receiver` and a resource `Vault`
 that implements that interface.  The way this example is written,
@@ -5095,6 +5102,7 @@ pub contract FungibleToken {
     }
 }
 ```
+
 If a user tried to run a transaction that created an instance of the `Vault` type,
 the type checker would not allow it because only code in the `FungibleToken`
 contract can create new `Vault`s.
@@ -5118,6 +5126,7 @@ resources, structs, and references.  They do so by using the special
 `self.account` object that is only accessible within the contract.
 
 Imagine that these were defined in the above `FungibleToken` contract.
+
 ```cadence,file=ft_contract_additions.cdc
 
     pub fun createVault(initialBalance: Int): @Vault {
@@ -5129,6 +5138,7 @@ Imagine that these were defined in the above `FungibleToken` contract.
         destroy oldVault
     }
 ```
+
 Now, any account could call the `createVault` function defined in the contract
 to create a `Vault` object.  Or the owner could call the `withdraw` function
 on their own `Vault` to send new vaults to others.
@@ -5293,7 +5303,8 @@ Each phase is a block of code that executes sequentially.
 
 Transactions are declared using the `transaction` keyword.
 
-Within the transaction, but before the prepare phase, any number of constants and/or variables can be declared.
+Within the transaction, but before the prepare phase,
+any number of constants and/or variables can be declared.
 These are valid within the entire scope of the transaction.
 
 The prepare phase is declared using the `prepare` keyword
@@ -5420,7 +5431,6 @@ and the string literal for the path of the file which contains the code of the t
      also see below for version referring to deployed code with an address
 -->
 
-
 ```cadence,file=deploy-resource-interface.cdc
 // Import the resource interface type `FungibleToken`
 // from the local file "FungibleToken.cdc".
@@ -5496,7 +5506,8 @@ Again, the type must be stored in the owners account.
 Once code is deployed, it can be used in other code and in transactions.
 
 In most situations it is important to expose only a subset of the functionality
-of the stored values, because some of the functionality should only be available to the owner.
+of the stored values,
+because some of the functionality should only be available to the owner.
 
 The following transaction creates an empty token and stores it in the signer's account.
 This allows the owner to withdraw and deposit.
