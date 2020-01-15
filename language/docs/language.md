@@ -21,7 +21,8 @@ The language's goals are, in order of importance:
 
 ## Terminology
 
-In this document, the following terminology is used to describe syntax or behavior that is not allowed in the language:
+In this document, the following terminology is used to describe syntax
+or behavior that is not allowed in the language:
 
 - `Invalid` means that the invalid program will not even be allowed to run.
   The program error is detected and reported statically by the type checker.
@@ -1806,28 +1807,41 @@ Operators have the following precedences, highest to lowest:
 
 All operators are left-associative, except for the ternary operator, which is right-associative.
 
-Expressions can be wrapped in parentheses to override precedence conventions, i.e. an alternate order should be indicated, or when the default order should be emphasized, e.g. to avoid confusion. For example, `(2 + 3) * 4` forces addition to precede multiplication, and `5 + (6 * 7)` reinforces the default order.
+Expressions can be wrapped in parentheses to override precedence conventions,
+i.e. an alternate order should be indicated, or when the default order should be emphasized
+e.g. to avoid confusion.
+For example, `(2 + 3) * 4` forces addition to precede multiplication,
+and `5 + (6 * 7)` reinforces the default order.
 
 ## Functions
 
-Functions are sequences of statements that perform a specific task. Functions have parameters (inputs) and an optional return value (output). Functions are typed: the function type consists of the parameter types and the return type.
+Functions are sequences of statements that perform a specific task.
+Functions have parameters (inputs) and an optional return value (output).
+Functions are typed: the function type consists of the parameter types and the return type.
 
-Functions are values, i.e., they can be assigned to constants and variables, and can be passed as arguments to other functions. This behavior is often called "first-class functions".
+Functions are values, i.e., they can be assigned to constants and variables,
+and can be passed as arguments to other functions.
+This behavior is often called "first-class functions".
 
 ### Function Declarations
 
-Functions can be declared by using the `fun` keyword, followed by the name of the declaration, the parameters, the optional return type, and the code that should be executed when the function is called.
+Functions can be declared by using the `fun` keyword, followed by the name of the declaration,
+ the parameters, the optional return type,
+ and the code that should be executed when the function is called.
 
 The parameters need to be enclosed in parentheses.
 The return type, if any, is separated from the parameters by a colon (`:`).
 The function code needs to be enclosed in opening and closing braces.
 
-Each parameter must have a name, which is the name that the argument value will be available as within the function.
+Each parameter must have a name, which is the name that the argument value
+will be available as within the function.
 
-An additional argument label can be provided to require function calls to use the label to provide an argument value for the parameter.
+An additional argument label can be provided to require function calls to use the label
+to provide an argument value for the parameter.
 
 Argument labels make code more explicit and readable.
-For example, they avoid confusion about the order of arguments when there are multiple arguments that have the same type.
+For example, they avoid confusion about the order of arguments
+when there are multiple arguments that have the same type.
 
 Argument labels should be named so they make sense from the perspective of the function call.
 
