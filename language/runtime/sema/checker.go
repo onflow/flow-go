@@ -298,7 +298,7 @@ var blacklist = map[string]interface{}{
 func (checker *Checker) UserDefinedValues() map[string]*Variable {
 	ret := map[string]*Variable{}
 	for key, value := range checker.GlobalValues {
-		if _, ok := blacklist[key]; ok == true {
+		if _, ok := blacklist[key]; ok {
 			continue
 		}
 		if _, ok := checker.PredeclaredValues[key]; ok {
