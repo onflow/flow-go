@@ -9,30 +9,24 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
-	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/broadcast"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
-	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine implements the verifier engine of the verification node,
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit                 *engine.Unit        // used to control startup/shutdown
-	log                  zerolog.Logger      // used to log relevant actions
-	collectionsConduit   network.Conduit     // used to get collections from collection nodes
-	receiptsConduit      network.Conduit     // used to get execution receipts from execution nodes
-	approvalsConduit     network.Conduit     // used to propagate result approvals
-	me                   module.Local        // used to access local node information
-	state                protocol.State      // used to access the  protocol state
-	receipts             mempool.Receipts    // used to store execution receipts in memory
-	blocks               mempool.Blocks      // used to store blocks in memory
-	collections          mempool.Collections // used to store collections in memory
-	collectionsBroadcast module.Broadcaster  // used to broadcast when a collection is received
+	unit        *engine.Unit        // used to control startup/shutdown
+	log         zerolog.Logger      // used to log relevant actions
+	conduit     network.Conduit     // used to propagate result approvals
+	me          module.Local        // used to access local node information
+	state       protocol.State      // used to access the protocol state
+	receipts    mempool.Receipts    // used to store execution receipts in memory
+	blocks      mempool.Blocks      // used to store blocks in memory
+	collections mempool.Collections // used to store collections in memory
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -41,34 +35,18 @@ func New(
 	net module.Network,
 	state protocol.State,
 	me module.Local,
-	receipts mempool.Receipts,
-	blocks mempool.Blocks,
-	collections mempool.Collections,
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:                 engine.NewUnit(),
-		log:                  log,
-		state:                state,
-		me:                   me,
-		receipts:             receipts,
-		blocks:               blocks,
-		collections:          collections,
-		collectionsBroadcast: broadcast.NewBroadcaster(),
+		unit:  engine.NewUnit(),
+		log:   log,
+		state: state,
+		me:    me,
 	}
 
 	var err error
-	e.collectionsConduit, err = net.Register(engine.CollectionProvider, e)
-	if err != nil {
-		return nil, fmt.Errorf("could not register engine on collection provider channel: %w", err)
-	}
 
-	e.receiptsConduit, err = net.Register(engine.ReceiptProvider, e)
-	if err != nil {
-		return nil, fmt.Errorf("could not register engine on execution provider channel: %w", err)
-	}
-
-	e.approvalsConduit, err = net.Register(engine.ApprovalProvider, e)
+	e.conduit, err = net.Register(engine.ApprovalProvider, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on approval provider channel: %w", err)
 	}
@@ -122,125 +100,10 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch resource := event.(type) {
-	case *flow.Block:
-		return e.handleBlock(resource)
-	case *flow.ExecutionReceipt:
-		return e.handleExecutionReceipt(originID, resource)
-	case *flow.Collection:
-		return e.handleCollection(originID, resource)
-	case *messages.CollectionResponse:
-		return e.handleCollection(originID, &resource.Collection)
+	switch event.(type) {
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
-}
-
-// handleExecutionReceipt receives an execution receipt (exrcpt), verifies that and emits
-// a result approval upon successful verification
-func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-
-	e.log.Info().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("receipt_id", logging.Entity(receipt)).
-		Msg("execution receipt received")
-
-	// TODO: correctness check for execution receipts
-
-	// validating identity of the originID
-	id, err := e.state.Final().Identity(originID)
-	if err != nil {
-		// TODO: potential attack on authenticity
-		return fmt.Errorf("invalid origin id (%s): %w", originID[:], err)
-	}
-
-	// validating role of the originID
-	// an execution receipt should be either coming from an execution node through the
-	// Process method, or from the current verifier node itself through the Submit method
-	if id.Role != flow.RoleExecution {
-		// TODO: potential attack on integrity
-		return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", id.NodeID, id.Role)
-	}
-
-	// storing the execution receipt in the store of the engine
-	// this will fail if the receipt already exists in the store
-	err = e.receipts.Add(receipt)
-	if err != nil {
-		return fmt.Errorf("could not store execution receipt: %w", err)
-	}
-
-	// start the verification
-	e.unit.Launch(func() {
-		e.verify(receipt)
-	})
-
-	return nil
-}
-
-// handleBlock handles an incoming block.
-func (e *Engine) handleBlock(block *flow.Block) error {
-
-	e.log.Info().
-		Hex("block_id", logging.Entity(block)).
-		Uint64("block_number", block.Number).
-		Msg("received block")
-
-	err := e.blocks.Add(block)
-	if err != nil {
-		return fmt.Errorf("could not store block: %w", err)
-	}
-
-	return nil
-}
-
-// handleCollection handles receipt of a new collection, either via push or after
-// a request. It ensures the sender is valid and notifies the main verification
-// process.
-func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
-
-	e.log.Info().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("collection_id", logging.Entity(coll)).
-		Msg("collection received")
-
-	id, err := e.state.Final().Identity(originID)
-	if err != nil {
-		return fmt.Errorf("invalid origin id (%s): %w", id, err)
-	}
-
-	if id.Role != flow.RoleCollection {
-		return fmt.Errorf("invalid role for receiving collection: %s", id.Role)
-	}
-
-	err = e.collections.Add(coll)
-	if err != nil {
-		return fmt.Errorf("could not add collection to mempool: %w", err)
-	}
-
-	e.collectionsBroadcast.Broadcast()
-
-	return nil
-}
-
-// requestCollection submits a request for the given collection to collection nodes.
-func (e *Engine) requestCollection(collID flow.Identifier) error {
-
-	collNodes, err := e.state.Final().Identities(identity.HasRole(flow.RoleCollection))
-	if err != nil {
-		return fmt.Errorf("could not load collection node identities: %w", err)
-	}
-
-	req := &messages.CollectionRequest{
-		ID: collID,
-	}
-
-	// TODO we should only submit to cluster which owns the collection
-	err = e.collectionsConduit.Submit(req, collNodes.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not submit request for collection (id=%s): %w", collID, err)
-	}
-
-	return nil
 }
 
 // verify is an internal component of the verifier engine that handles
@@ -249,77 +112,17 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 // It receives an execution receipt, requests and waits for dependent
 // collections, then generates a result approval and submits it to
 // consensus nodes.
-//
-// This method should be run as a goroutine with unit.Launch.
-func (e *Engine) verify(receipt *flow.ExecutionReceipt) {
-
-	sub := e.collectionsBroadcast.Subscribe()
-	defer sub.Unsubscribe()
+func (e *Engine) verify(receipt *flow.ExecutionReceipt) error {
 
 	result := receipt.ExecutionResult
 	blockID := result.BlockID
 
-	log := e.log.With().
-		Hex("block_id", logging.ID(blockID)).
-		Hex("result_id", logging.Entity(result)).
-		Logger()
-
-	// ensure we have the block corresponding to this execution
 	block, err := e.blocks.Get(blockID)
 	if err != nil {
-		// TODO should request the block here. For now, we require that we
-		// have received the block at this point
-		log.Warn().
-			Err(err).
-			Msg("missing dependent block")
-		return
-	}
-
-	chunks := result.Chunks.Items()
-
-	// keep track of which collections that we depend on are locally available
-	requiredCollections := make(map[flow.Identifier]bool)
-
-	for _, chunk := range result.Chunks.Items() {
-		collIndex := int(chunk.CollectionIndex)
-
-		// ensure the collection index specified by the ER is valid
-		if len(block.Guarantees) <= collIndex {
-			log.Error().
-				Msgf("invalid collection index (%d) does not exist in block", collIndex)
-			return
-		}
-
-		// log whether the collection is available locally
-		collID := block.Guarantees[collIndex].ID()
-		if e.collections.Has(collID) {
-			requiredCollections[collID] = true
-		} else {
-			requiredCollections[collID] = false
-			err := e.requestCollection(collID)
-			if err != nil {
-				e.log.Error().
-					Err(err).
-					Hex("collection_id", logging.ID(collID)).
-					Msg("could not request collection")
-				return
-			}
-		}
-	}
-
-	// TODO allow this case
-	if len(chunks) != 1 {
-		log.Error().
-			Msg("execution result contains more than one chunk")
-		return
+		return fmt.Errorf("could not get block (id=%s): %w", blockID, err)
 	}
 
 	for {
-		select {
-		case <-e.unit.Done():
-			return
-		case <-sub.Ch():
-		}
 
 		// update which collections exist locally
 		for collID, exists := range requiredCollections {
