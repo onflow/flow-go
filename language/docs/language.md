@@ -8,9 +8,16 @@ The Cadence Programming Language is a new high-level programming language intend
 
 The language's goals are, in order of importance:
 
-- **Safety and security**: Provide a strong static type system, design by contract (preconditions and postconditions), and resources (inspired by linear types).
-- **Auditability**: Focus on readability: make it easy to verify what the code is doing, and make intentions explicit, at a small cost of verbosity.
-- **Simplicity**: Focus on developer productivity and usability: make it easy to write code, provide good tooling.
+- **Safety and security**:
+  Provide a strong static type system, design by contract (preconditions and postconditions),
+  and resources (inspired by linear types).
+
+- **Auditability**:
+  Focus on readability: Make it easy to verify what the code is doing,
+  and make intentions explicit, at a small cost of verbosity.
+
+- **Simplicity**: Focus on developer productivity and usability:
+  Make it easy to write code, provide good tooling.
 
 ## Terminology
 
@@ -5271,6 +5278,7 @@ pub contract Events {
 Emitting events has the following restrictions:
 
 - Events can only be invoked in an `emit` statement.
+
   This means events cannot be assigned to variables or used as function parameters.
 
 - Events can only be emitted from the location in which they are defined.
@@ -5291,10 +5299,12 @@ Each phase is a block of code that executes sequentially.
 
 - The **prepare phase** acts like the initializer in a composite data type,
   i.e., it initializes fields that can then be used in the execution phase.
+
   The prepare phase has the permissions to read from and write to the storage
   of all the accounts that signed the transaction.
 
 - The **execute phase** is where interaction with external contracts happens.
+
   This usually involves interacting with contracts with public types
   and functions that are deployed in other accounts.
 
