@@ -766,3 +766,21 @@ func TestDivModInt64(t *testing.T) {
 		}
 	}
 }
+
+func TestDivModInt(t *testing.T) {
+
+	for op, f := range map[string]func(a, b IntValue){
+		"/": func(a, b IntValue) {
+			a.Div(b)
+		},
+		"%": func(a, b IntValue) {
+			a.Mod(b)
+		},
+	} {
+		t.Run(fmt.Sprintf("1 %s 0", op), func(t *testing.T) {
+			assert.Panics(t, func() {
+				f(NewIntValue(1), NewIntValue(0))
+			})
+		})
+	}
+}

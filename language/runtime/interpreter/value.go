@@ -607,7 +607,12 @@ func (v IntValue) Minus(other IntegerValue) IntegerValue {
 }
 
 func (v IntValue) Mod(other IntegerValue) IntegerValue {
-	newValue := big.NewInt(0).Mod(v.Int, other.(IntValue).Int)
+	o := other.(IntValue)
+	res := big.NewInt(0)
+	if o.Int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	newValue := res.Mod(v.Int, o.Int)
 	return IntValue{newValue}
 }
 
@@ -617,7 +622,12 @@ func (v IntValue) Mul(other IntegerValue) IntegerValue {
 }
 
 func (v IntValue) Div(other IntegerValue) IntegerValue {
-	newValue := big.NewInt(0).Div(v.Int, other.(IntValue).Int)
+	o := other.(IntValue)
+	res := big.NewInt(0)
+	if o.Int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	newValue := res.Div(v.Int, o.Int)
 	return IntValue{newValue}
 }
 
