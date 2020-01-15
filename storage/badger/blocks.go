@@ -126,7 +126,7 @@ func (b *Blocks) Store(block *flow.Block) error {
 			}
 			err = operation.IndexGuarantee(block.ID(), cg)(tx)
 			if err != nil {
-				return fmt.Errorf("could not index guaranteed collection by block ID: %w", err)
+				return fmt.Errorf("could not index collection guarantee by block ID: %w", err)
 			}
 		}
 

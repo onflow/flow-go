@@ -1173,10 +1173,10 @@ func TestRuntimeTransactionWithUpdateAccountCodeEmpty(t *testing.T) {
 
 	script := []byte(`
       transaction {
-        prepare(signer: Account) {
-          updateAccountCode(signer.address, [])
-        }
-        execute {}
+
+          prepare(signer: Account) {
+              signer.setCode([])
+          }
       }
     `)
 
@@ -1216,7 +1216,7 @@ func TestRuntimeTransactionWithCreateAccountEmpty(t *testing.T) {
 	script := []byte(`
       transaction {
         prepare() {
-          createAccount([], [])
+          Account(publicKeys: [], code: [])
         }
         execute {}
       }
@@ -1404,10 +1404,10 @@ func TestRuntimeTransactionWithContractDeployment(t *testing.T) {
 				script := []byte(fmt.Sprintf(
 					`
                       transaction {
-                        prepare(signer: Account) {
-                          updateAccountCode(signer.address, %s%s)
-                        }
-                        execute {}
+
+                          prepare(signer: Account) {
+                              signer.setCode(%s%s)
+                          }
                       }
                     `,
 					contractArrayCode,
@@ -1445,7 +1445,7 @@ func TestRuntimeTransactionWithContractDeployment(t *testing.T) {
 		}
 	})
 
-	t.Run("createAccount", func(t *testing.T) {
+	t.Run("Account", func(t *testing.T) {
 
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
@@ -1467,7 +1467,7 @@ func TestRuntimeTransactionWithContractDeployment(t *testing.T) {
 					`
                       transaction {
                         prepare() {
-                          createAccount([], %s%s)
+                          Account(publicKeys: [], code: %s%s)
                         }
                         execute {}
                       }
@@ -1553,10 +1553,10 @@ func TestRuntimeContractAccount(t *testing.T) {
 	deploy := []byte(fmt.Sprintf(
 		`
           transaction {
-            prepare(signer: Account) {
-              updateAccountCode(signer.address, %s)
-            }
-            execute {}
+
+              prepare(signer: Account) {
+                  signer.setCode(%s)
+              }
           }
         `,
 		ArrayValueFromBytes(contract).String(),
@@ -1638,6 +1638,7 @@ func TestRuntimeContractNestedResource(t *testing.T) {
 		import Test from 0x01
 
 		transaction {
+
 			prepare(acct: Account) {
 				log(acct.storage[Test.R]?.hello())
 			}
@@ -1647,8 +1648,9 @@ func TestRuntimeContractNestedResource(t *testing.T) {
 	deploy := []byte(fmt.Sprintf(
 		`
         transaction {
+
             prepare(signer: Account) {
-                updateAccountCode(signer.address, %s)
+                signer.setCode(%s)
             }
         }
         `,
@@ -1807,10 +1809,10 @@ func TestRuntimeFungibleTokenUpdateAccountCode(t *testing.T) {
 	deploy := []byte(fmt.Sprintf(
 		`
           transaction {
-            prepare(signer: Account) {
-              updateAccountCode(signer.address, %s)
-            }
-            execute {}
+
+              prepare(signer: Account) {
+                  signer.setCode(%s)
+              }
           }
         `,
 		ArrayValueFromBytes([]byte(fungibleTokenContract)).String(),
@@ -1911,7 +1913,7 @@ func TestRuntimeFungibleTokenCreateAccount(t *testing.T) {
 		`
           transaction {
             prepare(signer: Account) {
-              createAccount([], %s)
+                Account(publicKeys: [], code: %s)
             }
             execute {}
           }
@@ -2010,7 +2012,7 @@ func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
 			`
               transaction {
                 prepare(signer: Account) {
-                  createAccount([], %s)
+                  Account(publicKeys: [], code: %s)
                 }
               }
             `,
