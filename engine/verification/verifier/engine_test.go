@@ -19,8 +19,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-// TestSuite contains the context of a verifier engine test using mocked components.
-type TestSuite struct {
+// MockTestSuite contains the context of a verifier engine test using mocked components.
+type MockTestSuite struct {
 	suite.Suite
 	net                *module.Network    // used as an instance of networking layer for the mock engine
 	state              *protocol.State    // used as a mock protocol state of nodes for verification engine
@@ -34,211 +34,210 @@ type TestSuite struct {
 	collections        *mempool.Collections
 }
 
-// TestVerifierEngineTestSuite is the constructor of the TestSuite of the verifier engine
-// Invoking this method executes all the subsequent tests methods of TestSuite type
+// Invoking this method executes all MockTestSuite tests.
 func TestVerifierEngineTestSuite(t *testing.T) {
-	suite.Run(t, new(TestSuite))
+	suite.Run(t, new(MockTestSuite))
 }
 
-// SetupTests initiates the test setups prior to each test
-func (v *TestSuite) SetupTest() {
+// Setup initiates the test setups prior to each test.
+func (suite *MockTestSuite) Setup() {
 	// initializing test suite fields
-	v.state = &protocol.State{}
-	v.collectionsConduit = &network.Conduit{}
-	v.receiptsConduit = &network.Conduit{}
-	v.approvalsConduit = &network.Conduit{}
-	v.net = &module.Network{}
-	v.me = &module.Local{}
-	v.ss = &protocol.Snapshot{}
-	v.blocks = &mempool.Blocks{}
-	v.receipts = &mempool.Receipts{}
-	v.collections = &mempool.Collections{}
+	suite.state = &protocol.State{}
+	suite.collectionsConduit = &network.Conduit{}
+	suite.receiptsConduit = &network.Conduit{}
+	suite.approvalsConduit = &network.Conduit{}
+	suite.net = &module.Network{}
+	suite.me = &module.Local{}
+	suite.ss = &protocol.Snapshot{}
+	suite.blocks = &mempool.Blocks{}
+	suite.receipts = &mempool.Receipts{}
+	suite.collections = &mempool.Collections{}
 
 	// mocking the network registration of the engine
 	// all subsequent tests are expected to have a call on Register method
-	v.net.On("Register", uint8(engine.CollectionProvider), testifymock.Anything).
-		Return(v.collectionsConduit, nil).
+	suite.net.On("Register", uint8(engine.CollectionProvider), testifymock.Anything).
+		Return(suite.collectionsConduit, nil).
 		Once()
-	v.net.On("Register", uint8(engine.ReceiptProvider), testifymock.Anything).
-		Return(v.receiptsConduit, nil).
+	suite.net.On("Register", uint8(engine.ReceiptProvider), testifymock.Anything).
+		Return(suite.receiptsConduit, nil).
 		Once()
-	v.net.On("Register", uint8(engine.ApprovalProvider), testifymock.Anything).
-		Return(v.approvalsConduit, nil).
+	suite.net.On("Register", uint8(engine.ApprovalProvider), testifymock.Anything).
+		Return(suite.approvalsConduit, nil).
 		Once()
 }
 
 // TestNewEngine verifies the establishment of the network registration upon
 // creation of an instance of verifier.Engine using the New method
 // It also returns an instance of new engine to be used in the later tests
-func (v *TestSuite) TestNewEngine() *Engine {
-	e, err := New(zerolog.Logger{}, v.net, v.state, v.me, v.receipts, v.blocks, v.collections)
-	require.Nil(v.T(), err, "could not create an engine")
+func (suite *MockTestSuite) TestNewEngine() *Engine {
+	e, err := New(zerolog.Logger{}, suite.net, suite.state, suite.me, suite.receipts, suite.blocks, suite.collections)
+	require.Nil(suite.T(), err, "could not create an engine")
 
-	v.net.AssertExpectations(v.T())
+	suite.net.AssertExpectations(suite.T())
 
 	return e
 }
 
-func (v *TestSuite) TestHandleBlock() {
-	vrfy := v.TestNewEngine()
+func (suite *MockTestSuite) TestHandleBlock() {
+	vrfy := suite.TestNewEngine()
 
 	block := unittest.BlockFixture()
 
 	// expect that that the block be added to the mempool
-	v.blocks.On("Add", &block).Return(nil).Once()
+	suite.blocks.On("Add", &block).Return(nil).Once()
 
 	err := vrfy.Process(unittest.IdentifierFixture(), &block)
-	v.Assert().Nil(err)
+	suite.Assert().Nil(err)
 
-	v.blocks.AssertExpectations(v.T())
+	suite.blocks.AssertExpectations(suite.T())
 }
 
-func (v *TestSuite) TestHandleReceipt() {
-	vrfy := v.TestNewEngine()
+func (suite *MockTestSuite) TestHandleReceipt() {
+	vrfy := suite.TestNewEngine()
 
 	// mock the receipt coming from an execution node
 	execNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	// mock the set of consensus nodes
 	consNodes := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
 
-	v.state.On("Final").Return(v.ss, nil)
-	v.ss.On("Identity", execNodeID.NodeID).Return(execNodeID, nil).Once()
-	v.ss.On("Identities", testifymock.Anything).Return(consNodes, nil)
+	suite.state.On("Final").Return(suite.ss, nil)
+	suite.ss.On("Identity", execNodeID.NodeID).Return(execNodeID, nil).Once()
+	suite.ss.On("Identities", testifymock.Anything).Return(consNodes, nil)
 	// mock methods called in verify routine
-	v.blocks.On("Get", testifymock.Anything).Return(nil, errors.New(""))
-	v.collections.On("Has", testifymock.Anything).Return(true)
+	suite.blocks.On("Get", testifymock.Anything).Return(nil, errors.New(""))
+	suite.collections.On("Has", testifymock.Anything).Return(true)
 
 	receipt := unittest.ExecutionReceiptFixture()
 
 	// expect that the receipt be added to the mempool
-	v.receipts.On("Add", &receipt).Return(nil).Once()
+	suite.receipts.On("Add", &receipt).Return(nil).Once()
 
 	// expect that the receipt be submitted to consensus nodes
 	// TODO this will need to be changed once verifier flow is finished
-	v.approvalsConduit.On("Submit", genSubmitParams(testifymock.Anything, consNodes)...).Return(nil).Once()
+	suite.approvalsConduit.On("Submit", genSubmitParams(testifymock.Anything, consNodes)...).Return(nil).Once()
 
 	err := vrfy.Process(execNodeID.NodeID, &receipt)
-	v.Assert().Nil(err)
+	suite.Assert().Nil(err)
 
-	v.receipts.AssertExpectations(v.T())
+	suite.receipts.AssertExpectations(suite.T())
 }
 
-func (v *TestSuite) TestHandleReceipt_UnstakedSender() {
-	vrfy := v.TestNewEngine()
+func (suite *MockTestSuite) TestHandleReceipt_UnstakedSender() {
+	vrfy := suite.TestNewEngine()
 
 	myID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	v.me.On("NodeID").Return(myID)
+	suite.me.On("NodeID").Return(myID)
 
 	// mock the receipt coming from an unstaked node
 	unstakedID := unittest.IdentifierFixture()
-	v.state.On("Final").Return(v.ss)
-	v.ss.On("Identity", unstakedID).Return(flow.Identity{}, errors.New("")).Once()
+	suite.state.On("Final").Return(suite.ss)
+	suite.ss.On("Identity", unstakedID).Return(flow.Identity{}, errors.New("")).Once()
 
 	receipt := unittest.ExecutionReceiptFixture()
 
 	// process should fail
 	err := vrfy.Process(unstakedID, &receipt)
-	v.Assert().Error(err)
+	suite.Assert().Error(err)
 
 	// receipt should not be added
-	v.receipts.AssertNotCalled(v.T(), "Add", &receipt)
+	suite.receipts.AssertNotCalled(suite.T(), "Add", &receipt)
 
 	// approval should not be submitted
-	v.approvalsConduit.AssertNotCalled(v.T(), "Submit", testifymock.Anything, testifymock.Anything)
+	suite.approvalsConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, testifymock.Anything)
 }
 
-func (v *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
+func (suite *MockTestSuite) TestHandleReceipt_SenderWithWrongRole() {
 	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleCollection, flow.RoleVerification, flow.RoleObservation}
 
 	for _, role := range invalidRoles {
-		v.Run(fmt.Sprintf("role: %s", role), func() {
+		suite.Run(fmt.Sprintf("role: %s", role), func() {
 			// refresh test state in between each loop
-			v.SetupTest()
-			vrfy := v.TestNewEngine()
+			suite.Setup()
+			vrfy := suite.TestNewEngine()
 
 			// mock the receipt coming from the invalid role
 			invalidID := unittest.IdentityFixture(unittest.WithRole(role))
-			v.state.On("Final").Return(v.ss)
-			v.ss.On("Identity", invalidID.NodeID).Return(invalidID, nil).Once()
+			suite.state.On("Final").Return(suite.ss)
+			suite.ss.On("Identity", invalidID.NodeID).Return(invalidID, nil).Once()
 
 			receipt := unittest.ExecutionReceiptFixture()
 
 			// process should fail
 			err := vrfy.Process(invalidID.NodeID, &receipt)
-			v.Assert().Error(err)
+			suite.Assert().Error(err)
 
 			// receipt should not be added
-			v.receipts.AssertNotCalled(v.T(), "Add", &receipt)
+			suite.receipts.AssertNotCalled(suite.T(), "Add", &receipt)
 
 			// approval should not be submitted
-			v.approvalsConduit.AssertNotCalled(v.T(), "Submit", testifymock.Anything, testifymock.Anything)
+			suite.approvalsConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, testifymock.Anything)
 		})
 
 	}
 }
 
-func (v *TestSuite) TestHandleCollection() {
-	vrfy := v.TestNewEngine()
+func (suite *MockTestSuite) TestHandleCollection() {
+	vrfy := suite.TestNewEngine()
 
 	// mock the collection coming from an collection node
 	collNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	v.state.On("Final").Return(v.ss).Once()
-	v.ss.On("Identity", collNodeID.NodeID).Return(collNodeID, nil).Once()
+	suite.state.On("Final").Return(suite.ss).Once()
+	suite.ss.On("Identity", collNodeID.NodeID).Return(collNodeID, nil).Once()
 
 	coll := unittest.CollectionFixture(3)
 
 	// expect that the collection be added to the mempool
-	v.collections.On("Add", &coll).Return(nil).Once()
+	suite.collections.On("Add", &coll).Return(nil).Once()
 
 	err := vrfy.Process(collNodeID.NodeID, &coll)
-	v.Assert().Nil(err)
+	suite.Assert().Nil(err)
 
-	v.collections.AssertExpectations(v.T())
+	suite.collections.AssertExpectations(suite.T())
 }
 
-func (v *TestSuite) TestHandleCollection_UnstakedSender() {
-	vrfy := v.TestNewEngine()
+func (suite *MockTestSuite) TestHandleCollection_UnstakedSender() {
+	vrfy := suite.TestNewEngine()
 
 	// mock the receipt coming from an unstaked node
 	unstakedID := unittest.IdentifierFixture()
-	v.state.On("Final").Return(v.ss).Once()
-	v.ss.On("Identity", unstakedID).Return(flow.Identity{}, errors.New("")).Once()
+	suite.state.On("Final").Return(suite.ss).Once()
+	suite.ss.On("Identity", unstakedID).Return(flow.Identity{}, errors.New("")).Once()
 
 	coll := unittest.CollectionFixture(3)
 
 	err := vrfy.Process(unstakedID, &coll)
-	v.Assert().Error(err)
+	suite.Assert().Error(err)
 
-	v.collections.AssertNotCalled(v.T(), "Add", &coll)
+	suite.collections.AssertNotCalled(suite.T(), "Add", &coll)
 }
 
-func (v *TestSuite) TestHandleCollection_SenderWithWrongRole() {
+func (suite *MockTestSuite) TestHandleCollection_SenderWithWrongRole() {
 
 	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleObservation}
 
 	for _, role := range invalidRoles {
 		// refresh test state in between each loop
-		v.SetupTest()
-		vrfy := v.TestNewEngine()
+		suite.Setup()
+		vrfy := suite.TestNewEngine()
 
 		// mock the receipt coming from the invalid role
 		invalidID := unittest.IdentityFixture(unittest.WithRole(role))
-		v.state.On("Final").Return(v.ss).Once()
-		v.ss.On("Identity", invalidID.NodeID).Return(invalidID, nil).Once()
+		suite.state.On("Final").Return(suite.ss).Once()
+		suite.ss.On("Identity", invalidID.NodeID).Return(invalidID, nil).Once()
 
 		coll := unittest.CollectionFixture(3)
 
 		err := vrfy.Process(invalidID.NodeID, &coll)
-		v.Assert().Error(err)
+		suite.Assert().Error(err)
 
-		v.collections.AssertNotCalled(v.T(), "Add", &coll)
-		v.ss.AssertExpectations(v.T())
+		suite.collections.AssertNotCalled(suite.T(), "Add", &coll)
+		suite.ss.AssertExpectations(suite.T())
 	}
 }
 
 //// TestProcessLocalHappyPath covers the happy path of submitting a valid execution receipt to
 //// a single verifier engine till a result approval is emitted to all the consensus nodes
-//func (v *TestSuite) TestProcessLocalHappyPath() {
+//func (v *MockTestSuite) TestProcessLocalHappyPath() {
 //	// creating a new engine
 //	vrfy := v.TestNewEngine()
 //	// mocking the identity of the verification node under test
@@ -291,7 +290,7 @@ func (v *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 //
 //// TestProcessUnhappyInput covers unhappy inputs for Process method
 //// including nil event, empty event, and non-existing IDs
-//func (v *TestSuite) TestProcessUnhappyInput() {
+//func (v *MockTestSuite) TestProcessUnhappyInput() {
 //	// mocking state for Final().Identity(flow.Identifier{}) call in handleExecutionReceipt
 //	v.state.On("Final").Return(v.ss).Once()
 //	v.ss.On("Identity", flow.Identifier{}).Return(flow.Identity{}, errors.New("non-nil")).Once()
@@ -328,7 +327,7 @@ func (v *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 //// Submit method of the verifier engine.
 //// 5- It generates a valid execution receipt and mocks the verifier node accept that from the generated execution node ID
 //// in step (2), and emit a result approval to the consensus committee generated in step (4).
-//func (v *TestSuite) ConcurrencyTestSetup(degree, consNum int) (*flow.Identity, *Engine, *flow.ExecutionReceipt) {
+//func (v *MockTestSuite) ConcurrencyTestSetup(degree, consNum int) (*flow.Identity, *Engine, *flow.ExecutionReceipt) {
 //	// creating a new engine
 //	vrfy := v.TestNewEngine()
 //
@@ -369,7 +368,7 @@ func (v *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 //// TestProcessHappyPathConcurrentERs covers the happy path of the verifier engine on concurrently
 //// receiving a valid execution receipt several times. The execution receipts are coming from a single
 //// execution node. The expected behavior is to verify only a single copy of those receipts while dismissing the rest.
-//func (v *TestSuite) TestProcessHappyPathConcurrentERs() {
+//func (v *MockTestSuite) TestProcessHappyPathConcurrentERs() {
 //	// ConcurrencyDegree defines the number of concurrent identical ER that are submitted to the
 //	// verifier node
 //	const ConcurrencyDegree = 10
@@ -400,7 +399,7 @@ func (v *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 //// receiving a valid execution receipt several times each over a different threads
 //// In other words, this test concerns invoking the Process method over threads
 //// The expected behavior is to verify only a single copy of those receipts while dismissing the rest
-//func (v *TestSuite) TestProcessHappyPathConcurrentERsConcurrently() {
+//func (v *MockTestSuite) TestProcessHappyPathConcurrentERsConcurrently() {
 //	// Todo this test is currently broken as it assumes the Process method of engine to
 //	// be called sequentially and not over a thread
 //	// We skip it as it is not required for MVP
@@ -441,7 +440,7 @@ func (v *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 //// TestProcessHappyPathConcurrentDifferentERs covers the happy path of the verifier engine on concurrently
 //// receiving several valid execution receipts.
 //// The expected behavior is to verify all of them and emit one submission of result approval per input receipt
-//func (v *TestSuite) TestProcessHappyPathConcurrentDifferentERs() {
+//func (v *MockTestSuite) TestProcessHappyPathConcurrentDifferentERs() {
 //	// ConcurrencyDegree defines the number of concurrent identical ER that are submitted to the
 //	// verifier node
 //	const ConcurrencyDegree = 10
@@ -509,7 +508,7 @@ func (v *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 //
 //// TestProcessHappyPath covers the happy path of the verifier engine on receiving a valid execution receipt
 //// The expected behavior is to verify the receipt and emit a result approval to all consensus nodes
-//func (v *TestSuite) TestProcessHappyPath() {
+//func (v *MockTestSuite) TestProcessHappyPath() {
 //	// creating a new engine
 //	vrfy := v.TestNewEngine()
 //
