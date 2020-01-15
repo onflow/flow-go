@@ -3923,6 +3923,11 @@ To summarize the behavior for functions, structures, resources, and interfaces:
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   |                       | Current and inner |
 | `fun`, `struct`, `resource`, `struct interface`, `resource interface`   | `pub`                 | **All**           |
 
+Currently, all types must be declared public and are visible to all code.
+However, that does not imply that any code may instantiate the type:
+only code within the [contract](#contracts) in which the type is declared
+is allowed to create instances of the type. See the section for more information.
+
 ```cadence,file=access-control-globals.cdc
 // Declare a private constant, inaccessible/invisible in outer scope.
 //
