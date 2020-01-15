@@ -7,6 +7,7 @@ import (
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
+	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/module"
@@ -37,9 +38,13 @@ type CollectionNode struct {
 // ConsensusNode implements an in-process consensus node for tests.
 type ConsensusNode struct {
 	GenericNode
-	Pool              mempool.Guarantees
+	Guarantees        mempool.Guarantees
+	Approvals         mempool.Approvals
+	Receipts          mempool.Receipts
+	Seals             mempool.Seals
 	IngestionEngine   *consensusingest.Engine
 	PropagationEngine *propagation.Engine
+	MatchingEngine    *matching.Engine
 }
 
 // VerificationNode implements an in-process verification node for tests.

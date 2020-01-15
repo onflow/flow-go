@@ -278,7 +278,7 @@ func (e *Engine) verify(receipt *flow.ExecutionReceipt) {
 	chunks := result.Chunks.Items()
 
 	// keep track of which collections that we depend on are locally available
-	var requiredCollections map[flow.Identifier]bool
+	requiredCollections := make(map[flow.Identifier]bool)
 
 	for _, chunk := range result.Chunks.Items() {
 		collIndex := int(chunk.CollectionIndex)
@@ -302,6 +302,7 @@ func (e *Engine) verify(receipt *flow.ExecutionReceipt) {
 					Err(err).
 					Hex("collection_id", logging.ID(collID)).
 					Msg("could not request collection")
+				return
 			}
 		}
 	}
@@ -348,13 +349,8 @@ func (e *Engine) verify(receipt *flow.ExecutionReceipt) {
 
 		approval := &flow.ResultApproval{
 			ResultApprovalBody: flow.ResultApprovalBody{
-				ExecutionResultID:    receipt.ExecutionResult.ID(),
-				AttestationSignature: nil,
-				ChunkIndexList:       nil,
-				Proof:                nil,
-				Spocks:               nil,
+				ExecutionResultID: receipt.ExecutionResult.ID(),
 			},
-			VerifierSignature: nil,
 		}
 
 		// broadcast result approval to consensus nodes

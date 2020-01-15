@@ -29,6 +29,11 @@ func NewBuffer() *Buffer {
 	}
 }
 
+// Pending returns the pending messages.
+func (b *Buffer) Pending() []*PendingMessage {
+	return b.pending
+}
+
 // Save stores a pending message to the buffer
 func (b *Buffer) Save(from flow.Identifier, channelID uint8, event interface{}, targetIDs []flow.Identifier) {
 	b.Lock()

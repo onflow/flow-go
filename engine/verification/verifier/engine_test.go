@@ -1,20 +1,25 @@
-package verifier
+package verifier_test
 
 import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/testutil"
+	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
+	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -69,8 +74,8 @@ func (suite *MockTestSuite) Setup() {
 // TestNewEngine verifies the establishment of the network registration upon
 // creation of an instance of verifier.Engine using the New method
 // It also returns an instance of new engine to be used in the later tests
-func (suite *MockTestSuite) TestNewEngine() *Engine {
-	e, err := New(zerolog.Logger{}, suite.net, suite.state, suite.me, suite.receipts, suite.blocks, suite.collections)
+func (suite *MockTestSuite) TestNewEngine() *verifier.Engine {
+	e, err := verifier.New(zerolog.Logger{}, suite.net, suite.state, suite.me, suite.receipts, suite.blocks, suite.collections)
 	require.Nil(suite.T(), err, "could not create an engine")
 
 	suite.net.AssertExpectations(suite.T())
@@ -233,6 +238,74 @@ func (suite *MockTestSuite) TestHandleCollection_SenderWithWrongRole() {
 		suite.collections.AssertNotCalled(suite.T(), "Add", &coll)
 		suite.ss.AssertExpectations(suite.T())
 	}
+}
+
+func TestHappyPath(t *testing.T) {
+	hub := stub.NewNetworkHub()
+
+	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	identities := flow.IdentityList{colID, conID, exeID, verID}
+
+	genesis := flow.Genesis(identities)
+
+	colNode := testutil.CollectionNode(t, hub, colID, genesis)
+	conNode := testutil.ConsensusNode(t, hub, conID, genesis)
+	verNode := testutil.VerificationNode(t, hub, verID, genesis)
+
+	// create a block and receipt referencing a collection
+	coll, block, receipt := prepareModels()
+
+	// store the collection in the collection node
+	err := colNode.Collections.Store(&coll)
+	assert.Nil(t, err)
+
+	// store the block in the verification node
+	err = verNode.Blocks.Add(&block)
+	assert.Nil(t, err)
+
+	// process the receipt
+	err = verNode.VerifierEngine.Process(exeID.NodeID, &receipt)
+	assert.Nil(t, err)
+
+	// wait for the verifier to request the collection
+	//assert.Eventually(t, func() bool {
+	//	return len(hub.Buffer.Pending()) > 0
+	//}, time.Second, time.Millisecond)
+	time.Sleep(time.Second)
+	assert.Len(t, hub.Buffer.Pending(), 1)
+
+	// flush the collection request from the verifier
+	verNet, ok := hub.GetNetwork(verID.NodeID)
+	assert.True(t, ok)
+	verNet.FlushAll()
+
+	// wait for the collection response
+	//assert.Eventually(t, func() bool {
+	//	return len(hub.Buffer.Pending()) > 0
+	//}, time.Second, time.Millisecond)
+	time.Sleep(time.Second)
+	assert.Len(t, hub.Buffer.Pending(), 1)
+
+	// flush the response from the collection node
+	colNet, ok := hub.GetNetwork(colID.NodeID)
+	assert.True(t, ok)
+	colNet.FlushAll()
+
+	// wait for the approval broadcast
+	//assert.Eventually(t, func() bool {
+	//	return len(hub.Buffer.Pending()) > 0
+	//}, time.Second, time.Millisecond)
+	time.Sleep(time.Second)
+	assert.Len(t, hub.Buffer.Pending(), 1)
+
+	// flush the result approval broadcast
+	verNet.FlushAll()
+
+	// the consensus node should receive the result approval
+	assert.Equal(t, uint(1), conNode.Approvals.Size())
 }
 
 //// TestProcessLocalHappyPath covers the happy path of submitting a valid execution receipt to
@@ -551,6 +624,49 @@ func (suite *MockTestSuite) TestHandleCollection_SenderWithWrongRole() {
 //	v.ss.AssertExpectations(v.T())
 //	v.state.AssertExpectations(v.T())
 //}
+
+// prepareModels creates a set of models for a test case.
+//
+// The function creates a block containing a single collection and an
+// execution receipt referencing that block/collection.
+func prepareModels() (flow.Collection, flow.Block, flow.ExecutionReceipt) {
+	coll := unittest.CollectionFixture(3)
+	guarantee := coll.Guarantee()
+
+	content := flow.Content{
+		Identities: unittest.IdentityListFixture(32),
+		Guarantees: []*flow.CollectionGuarantee{&guarantee},
+	}
+	payload := content.Payload()
+	header := unittest.BlockHeaderFixture()
+	header.PayloadHash = payload.Root()
+
+	block := flow.Block{
+		Header:  header,
+		Payload: payload,
+		Content: content,
+	}
+
+	chunk := flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: 0,
+		},
+		Index: 0,
+	}
+
+	result := flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			BlockID: block.ID(),
+			Chunks:  flow.ChunkList{Chunks: []*flow.Chunk{&chunk}},
+		},
+	}
+
+	receipt := flow.ExecutionReceipt{
+		ExecutionResult: result,
+	}
+
+	return coll, block, receipt
+}
 
 // genSubmitParams generates the parameters of network.Conduit.Submit method for emitting the
 // result approval. On receiving a result approval and identifiers of consensus nodes, it returns
