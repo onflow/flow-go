@@ -10,9 +10,16 @@ type Voter struct {
 	forkChoice *ForkChoice
 	// Flag to turn on/off consensus acts (voting, block production etc)
 	isConActor bool
+	// Need to keep track of the last view we voted for so we don't double vote accidentally
+	lastVotedView uint64
 }
 
 func (v *Voter) VoteIfVotable(bp *types.BlockProposal, curView uint64) (*types.Vote, bool) {
+	if !v.isConActor {
+		// TODO: log this reason
+		return nil, false
+	}
+
 	if v.forkChoice.IsSafeNode(bp) {
 		// TODO: log this reason
 		return nil, false
@@ -23,7 +30,7 @@ func (v *Voter) VoteIfVotable(bp *types.BlockProposal, curView uint64) (*types.V
 		return nil, false
 	}
 
-	if !v.isConActor {
+	if curView <= v.lastVotedView {
 		// TODO: log this reason
 		return nil, false
 	}
