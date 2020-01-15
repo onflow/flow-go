@@ -58,7 +58,10 @@ func (suite *TestSuite) SetupTest() {
 	suite.receipts = &mempool.Receipts{}
 	suite.collections = &mempool.Collections{}
 
-	suite.collection, suite.block, suite.receipt = prepareModels()
+	complete := unittest.CompleteResultApprovalFixture()
+	suite.collection = complete.Collections[0]
+	suite.block = complete.Block
+	suite.receipt = complete.Receipt
 
 	// mocking the network registration of the engine
 	// all subsequent tests are expected to have a call on Register method
@@ -306,49 +309,6 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.collectionsConduit.AssertNotCalled(suite.T(), "Submit", genSubmitParams(testifymock.Anything, consNodes))
 		})
 	}
-}
-
-// prepareModels creates a set of models for a test case.
-//
-// The function creates a block containing a single collection and an
-// execution receipt referencing that block/collection.
-func prepareModels() (flow.Collection, flow.Block, flow.ExecutionReceipt) {
-	coll := unittest.CollectionFixture(3)
-	guarantee := coll.Guarantee()
-
-	content := flow.Content{
-		Identities: unittest.IdentityListFixture(32),
-		Guarantees: []*flow.CollectionGuarantee{&guarantee},
-	}
-	payload := content.Payload()
-	header := unittest.BlockHeaderFixture()
-	header.PayloadHash = payload.Root()
-
-	block := flow.Block{
-		Header:  header,
-		Payload: payload,
-		Content: content,
-	}
-
-	chunk := flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: 0,
-		},
-		Index: 0,
-	}
-
-	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			BlockID: block.ID(),
-			Chunks:  flow.ChunkList{Chunks: []*flow.Chunk{&chunk}},
-		},
-	}
-
-	receipt := flow.ExecutionReceipt{
-		ExecutionResult: result,
-	}
-
-	return coll, block, receipt
 }
 
 // genSubmitParams generates the parameters of network.Conduit.Submit method for emitting the
