@@ -738,8 +738,6 @@ fun returnNever(): Never {
 
 ### Strings and Characters
 
-> 🚧 Status: Characters are not implemented yet.
-
 Strings are collections of characters.
 Strings have the type `String`, and characters have the type `Character`.
 Strings can be used to work with text in a Unicode-compliant way.
