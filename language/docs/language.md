@@ -5264,8 +5264,6 @@ Restrictions:
 
 ## Transactions
 
-> 🚧 Status: The `transaction` syntax is not implemented yet. For now, declare a function named `main`.
-
 Transactions are objects that are signed by one or more [accounts](#accounts)
 and are sent to the chain to interact with it.
 
