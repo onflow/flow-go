@@ -96,7 +96,7 @@ func (suite *TestSuite) TestHandleBlock() {
 	suite.blocks.AssertExpectations(suite.T())
 }
 
-func (suite *TestSuite) TestHandleReceipt() {
+func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	eng := suite.TestNewEngine()
 
 	// mock the receipt coming from an execution node
@@ -126,7 +126,7 @@ func (suite *TestSuite) TestHandleReceipt() {
 	suite.collectionsConduit.AssertExpectations(suite.T())
 
 	// verifier should not be called
-	suite.verifierEng.AssertNotCalled(suite.T(), "Submit", testifymock.Anything)
+	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
 func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
@@ -148,7 +148,7 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	suite.receipts.AssertNotCalled(suite.T(), "Add", &suite.receipt)
 
 	// verifier should not be called
-	suite.verifierEng.AssertNotCalled(suite.T(), "Submit", testifymock.Anything)
+	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
 func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
@@ -175,7 +175,7 @@ func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
 			suite.receipts.AssertNotCalled(suite.T(), "Add", &receipt)
 
 			// verifier should not be called
-			suite.verifierEng.AssertNotCalled(suite.T(), "Submit", testifymock.Anything)
+			suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 		})
 
 	}
@@ -200,7 +200,7 @@ func (suite *TestSuite) TestHandleCollection() {
 	suite.collections.AssertExpectations(suite.T())
 
 	// verifier should not be called
-	suite.verifierEng.AssertNotCalled(suite.T(), "Submit", testifymock.Anything)
+	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
 func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
@@ -218,7 +218,7 @@ func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 	suite.collections.AssertNotCalled(suite.T(), "Add", &suite.collection)
 
 	// should not call verifier
-	suite.verifierEng.AssertNotCalled(suite.T(), testifymock.Anything)
+	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
 }
 
 func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
@@ -240,6 +240,71 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 
 		// should not add collection to mempool
 		suite.collections.AssertNotCalled(suite.T(), "Add", &suite.collection)
+	}
+}
+
+// the verifier engine should be called when the receipt is ready after any
+// new resource is received.
+func (suite *TestSuite) TestVerifyReady() {
+
+	execNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	collNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	// mock the set of consensus nodes
+	consNodes := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
+
+	testcases := []struct {
+		resource interface{}
+		from     flow.Identity
+		label    string
+	}{
+		{
+			resource: &suite.receipt,
+			from:     execNodeID,
+			label:    "received receipt",
+		}, {
+			resource: &suite.collection,
+			from:     collNodeID,
+			label:    "received collection",
+		}, {
+			resource: &suite.block,
+			from:     consNodes.Get(0),
+			label:    "received block",
+		},
+	}
+
+	for _, testcase := range testcases {
+		suite.Run(testcase.label, func() {
+			suite.SetupTest()
+			eng := suite.TestNewEngine()
+
+			suite.state.On("Final").Return(suite.ss, nil)
+			suite.ss.On("Identity", testcase.from.NodeID).Return(testcase.from, nil).Once()
+
+			// allow adding the received resource to mempool
+			suite.receipts.On("Add", &suite.receipt).Return(nil)
+			suite.collections.On("Add", &suite.collection).Return(nil)
+			suite.blocks.On("Add", &suite.block).Return(nil)
+
+			// we have all dependencies
+			suite.blocks.On("Get", suite.block.ID()).Return(&suite.block, nil)
+			suite.collections.On("Has", suite.collection.ID()).Return(true)
+			suite.collections.On("Get", suite.collection.ID()).Return(&suite.collection, nil)
+			suite.receipts.On("All").Return([]*flow.ExecutionReceipt{&suite.receipt}, nil).Once()
+
+			// we should call the verifier engine, as the receipt is ready for verification
+			suite.verifierEng.On("ProcessLocal", testifymock.Anything).Return(nil).Once()
+			// the receipt should be removed from mempool
+			suite.receipts.On("Rem", suite.receipt.ID()).Return(true).Once()
+
+			// submit the resource
+			err := eng.Process(testcase.from.NodeID, testcase.resource)
+			suite.Assert().Nil(err)
+
+			suite.verifierEng.AssertExpectations(suite.T())
+
+			// the collection should not be requested
+			suite.collectionsConduit.AssertNotCalled(suite.T(), "Submit", genSubmitParams(testifymock.Anything, consNodes))
+		})
 	}
 }
 
