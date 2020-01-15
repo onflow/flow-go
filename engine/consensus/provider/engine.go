@@ -117,7 +117,7 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 	e.log.Info().
 		Hex("origin_id", originID[:]).
 		Hex("block_id", logging.Entity(block)).
-		Msg("block block received")
+		Msg("block submitted")
 
 	// currently, only accept blocks that come from our local consensus
 	localID := e.me.NodeID()
@@ -128,19 +128,19 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 	// get all non-consensus nodes in the system
 	identities, err := e.state.Final().Identities(identity.Not(identity.HasNodeID(localID)))
 	if err != nil {
-		return errors.Wrap(err, "could not retrieve target identities")
+		return errors.Wrap(err, "could not get identities")
 	}
 
 	// submit the block proposal to the targets
 	err = e.con.Submit(block, identities.NodeIDs()...)
 	if err != nil {
-		return errors.Wrap(err, "could not send block proposal")
+		return errors.Wrap(err, "could not broadcast block")
 	}
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
 		Hex("block_id", logging.Entity(block)).
-		Msg("block sent")
+		Msg("block broadcasted")
 
 	return nil
 }

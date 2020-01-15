@@ -89,7 +89,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// SubmitCollectionGuarantee submits the guaranteed collection to all
+// SubmitCollectionGuarantee submits the collection guarantee to all
 // consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
 	identities, err := e.state.Final().Identities(identity.HasRole(flow.RoleConsensus))

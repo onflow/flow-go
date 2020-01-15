@@ -1,6 +1,9 @@
-/cmd/consensus/data/
-/cmd/consensus/consensus
 /cmd/flow/flow
+/cmd/collection/collection
+/cmd/consensus/consensus
+/cmd/execution/execution
+/cmd/verification/verification
+/cmd/testclient/testclient
 
 # Test binary, build with `go test -c`
 *.test
