@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/receipts"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
+	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
@@ -194,4 +195,25 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis 
 		VM:              vm,
 		State:           execState,
 	}
+}
+
+func VerificationNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) mock.VerificationNode {
+	var err error
+	node := mock.VerificationNode{
+		GenericNode: GenericNode(t, hub, identity, genesis),
+	}
+
+	node.Receipts, err = stdmap.NewReceipts()
+	require.Nil(t, err)
+
+	node.Blocks, err = stdmap.NewBlocks()
+	require.Nil(t, err)
+
+	node.Collections, err = stdmap.NewCollections()
+	require.Nil(t, err)
+
+	node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, node.Receipts, node.Blocks, node.Collections)
+	require.Nil(t, err)
+
+	return node
 }

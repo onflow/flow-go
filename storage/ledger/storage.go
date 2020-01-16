@@ -38,21 +38,53 @@ func (f *TrieStorage) LatestStateCommitment() flow.StateCommitment {
 
 // GetRegisters read the values at the given registers at the given flow.StateCommitment
 // This is trusted so no proof is generated
-func (f *TrieStorage) GetRegisters(registerIDs []flow.RegisterID, stateCommitment flow.StateCommitment) (values []flow.RegisterValue, err error) {
+func (f *TrieStorage) GetRegisters(
+	registerIDs []flow.RegisterID,
+	stateCommitment flow.StateCommitment,
+) (
+	values []flow.RegisterValue,
+	err error,
+) {
 	values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	return values, err
 }
 
 // UpdateRegisters updates the values at the given registers
 // This is trusted so no proof is generated
-func (f *TrieStorage) UpdateRegisters(registerIDs [][]byte, values []flow.RegisterValue) (newStateCommitment flow.StateCommitment, err error) {
-	err = f.tree.Update(registerIDs, values)
+func (f *TrieStorage) UpdateRegisters(
+	ids [][]byte,
+	values []flow.RegisterValue,
+) (
+	newStateCommitment flow.StateCommitment,
+	err error,
+) {
+	// TODO: add test case
+	if len(ids) != len(values) {
+		return nil, fmt.Errorf(
+			"length of IDs [%d] does not match values [%d]", len(ids), len(values),
+		)
+	}
+
+	// TODO: add test case
+	if len(ids) == 0 {
+		// return current state root unchanged
+		return f.tree.GetRoot().GetValue(), nil
+	}
+
+	err = f.tree.Update(ids, values)
 	return f.tree.GetRoot().GetValue(), err
 }
 
 // GetRegistersWithProof read the values at the given registers at the given flow.StateCommitment
 // This is untrusted so a proof is generated
-func (f *TrieStorage) GetRegistersWithProof(registerIDs []flow.RegisterID, stateCommitment flow.StateCommitment) (values []flow.RegisterValue, proofs []flow.StorageProof, err error) {
+func (f *TrieStorage) GetRegistersWithProof(
+	registerIDs []flow.RegisterID,
+	stateCommitment flow.StateCommitment,
+) (
+	values []flow.RegisterValue,
+	proofs []flow.StorageProof,
+	err error,
+) {
 	values, proofHldr, err := f.tree.Read(registerIDs, false, stateCommitment)
 	if err != nil {
 		return nil, nil, err
@@ -94,26 +126,13 @@ func (f *TrieStorage) UpdateRegistersWithProof(
 	proofs []flow.StorageProof,
 	err error,
 ) {
-	// TODO: add test case
-	if len(ids) != len(values) {
-		return nil, nil, fmt.Errorf(
-			"length of IDs [%d] does not match values [%d]", len(ids), len(values),
-		)
-	}
-
-	// TODO: add test case
-	if len(ids) == 0 {
-		// return current state root unchanged
-		return f.tree.GetRoot().GetValue(), nil, nil
-	}
-
-	err = f.tree.Update(ids, values)
+	newStateCommitment, err = f.UpdateRegisters(ids, values)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	_, proofs, err = f.GetRegistersWithProof(ids, f.tree.GetRoot().GetValue())
-	return f.tree.GetRoot().GetValue(), proofs, err
+	_, proofs, err = f.GetRegistersWithProof(ids, newStateCommitment)
+	return newStateCommitment, proofs, err
 }
 
 // CloseStorage closes the DB

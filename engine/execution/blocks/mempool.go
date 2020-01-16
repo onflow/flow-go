@@ -1,5 +1,7 @@
 package blocks
 
+//revive:disable:unexported-return
+
 import (
 	"fmt"
 

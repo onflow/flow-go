@@ -157,7 +157,7 @@ func (n *Network) Receive(nodeID flow.Identifier, payload interface{}) error {
 
 	switch m := msg.(type) {
 	case *networkmodel.NetworkMessage:
-		n.processNetworkMessage(nodeID, m)
+		err = n.processNetworkMessage(nodeID, m)
 	default:
 		err = errors.Errorf("invalid message type (%T)", m)
 	}

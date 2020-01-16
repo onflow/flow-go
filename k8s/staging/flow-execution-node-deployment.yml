@@ -27,7 +27,7 @@ spec:
       node: execution
       env: staging
       version: v1
-
+  podManagementPolicy: Parallel
   template:
     metadata:
       annotations:
@@ -89,7 +89,7 @@ spec:
                   name: flow-node-config-map
                   key: entries
 
-          # Resource requests and contraints
+          # Resource requests and constraints
           resources:
             requests:
               cpu: '125m'

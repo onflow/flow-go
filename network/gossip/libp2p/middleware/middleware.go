@@ -136,8 +136,7 @@ func (m *Middleware) createInboundMessage(msg *libp2p.Message) (*flow.Identifier
 	}
 	var senderID [32]byte
 	copy(senderID[:], msg.SenderID)
-	var id flow.Identifier
-	id = senderID
+	id := flow.Identifier(senderID)
 	return &id, msg.Event, nil
 }
 

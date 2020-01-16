@@ -3,6 +3,7 @@
 package flow
 
 import (
+	"encoding/hex"
 	"fmt"
 	"reflect"
 
@@ -15,6 +16,25 @@ import (
 type Identifier [32]byte
 
 var ZeroID = Identifier{}
+
+// HexStringToIdentifier converts a hex string to an identifier. The input
+// must be 64 characters long and contain only valid hex characters.
+func HexStringToIdentifier(hexString string) (Identifier, error) {
+	var identifier Identifier
+	i, err := hex.Decode(identifier[:], []byte(hexString))
+	if err != nil {
+		return identifier, err
+	}
+	if i != 32 {
+		return identifier, fmt.Errorf("malformed input, expected 32 bytes (64 characters), decoded %d", i)
+	}
+	return identifier, nil
+}
+
+// String returns the hex string representation of the identifier.
+func (id Identifier) String() string {
+	return hex.EncodeToString(id[:])
+}
 
 func HashToID(hash []byte) Identifier {
 	var id Identifier
