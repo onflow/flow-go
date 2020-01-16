@@ -2,12 +2,13 @@ package voteaggregator
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff"
+	"sync"
+
+	hotstuff "github.com/dapperlabs/flow-go/engine/consensus/HotStuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
-	"sync"
 )
 
 type VoteAggregator struct {
@@ -28,11 +29,13 @@ type VoteAggregator struct {
 }
 
 func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
-	if err := va.validator.ValidatePendingVote(vote); err == nil {
-		va.pendingVotes[string(vote.BlockMRH)] = append(va.pendingVotes[string(vote.BlockMRH)], vote)
-	} else {
-		return err
+	err := va.validator.ValidatePendingVote(vote)
+	if err != nil {
+		return fmt.Errorf("could not validate pending vote: %v", err)
 	}
+
+	va.pendingVotes[string(vote.BlockMRH)] = append(va.pendingVotes[string(vote.BlockMRH)], vote)
+
 	return nil
 }
 
@@ -52,18 +55,20 @@ func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.Bloc
 	// return error when cannot get protocol state
 	identities, err := va.protocolState.AtNumber(bp.Block.View).Identities(identity.HasRole(flow.RoleConsensus))
 	if err != nil {
-		return err
+		return fmt.Errorf("could not get protocol state %v", err)
 	}
 
 	// return error when the vote is invalid or cannot accumulate stakes
-	if err := va.validator.ValidateIncorporatedVote(vote, bp, identities); err == nil {
-		va.viewToBlockMRH[vote.View] = vote.BlockMRH
-		va.incorporatedVotes[string(vote.BlockMRH)] = append(va.incorporatedVotes[string(vote.BlockMRH)], vote)
-		if err := va.accumulateStakes(vote, bp); err != nil {
-			return err
-		}
-	} else {
-		return err
+	err = va.validator.ValidateIncorporatedVote(vote, bp, identities)
+	if err != nil {
+		return fmt.Errorf("could not validate incorporated vote %v", err)
+	}
+
+	va.viewToBlockMRH[vote.View] = vote.BlockMRH
+	va.incorporatedVotes[string(vote.BlockMRH)] = append(va.incorporatedVotes[string(vote.BlockMRH)], vote)
+	err = va.accumulateStakes(vote, bp)
+	if err != nil {
+		return fmt.Errorf("could not accumulate stake %v", err)
 	}
 
 	return nil
@@ -74,9 +79,11 @@ func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.Bloc
 // While subsequent votes (past the required threshold) are not included in the QC anymore,
 // VoteAggregator ALWAYS returns a QC is possible.
 func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockProposal) (*types.QuorumCertificate, error) {
-	if err := va.storeIncorporatedVote(vote, bp); err != nil {
-		return nil, err
+	err := va.storeIncorporatedVote(vote, bp)
+	if err != nil {
+		return nil, fmt.Errorf("could not store incorporated vote %v", err)
 	}
+
 	if _, hasBuiltQC := va.createdQC[string(bp.Block.BlockMRH())]; hasBuiltQC == false {
 		return va.buildQC(bp.Block)
 	}
@@ -114,12 +121,12 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 
 func (va *VoteAggregator) accumulateStakes(vote *types.Vote, bp *types.BlockProposal) error {
 	identities, err := va.protocolState.AtNumber(bp.Block.View).Identities(identity.HasRole(flow.RoleConsensus))
-	if err == nil {
-		voteSender := identities.Get(uint(vote.Signature.SignerIdx))
-		va.blockHashToIncorporatedStakes[string(vote.BlockMRH)] += voteSender.Stake
-	} else {
+	if err != nil {
 		return err
 	}
+
+	voteSender := identities.Get(uint(vote.Signature.SignerIdx))
+	va.blockHashToIncorporatedStakes[string(vote.BlockMRH)] += voteSender.Stake
 
 	return nil
 }
@@ -127,8 +134,9 @@ func (va *VoteAggregator) accumulateStakes(vote *types.Vote, bp *types.BlockProp
 func (va *VoteAggregator) buildQC(block *types.Block) (*types.QuorumCertificate, error) {
 	identities, err := va.protocolState.AtNumber(block.View).Identities(identity.HasRole(flow.RoleConsensus))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get protocol state %v", err)
 	}
+
 	blockMRHStr := string(block.BlockMRH())
 	voteThreshold := uint64(float32(identities.TotalStake())*va.viewState.ThresholdStake()) + 1
 	// upon receipt of sufficient votes (in terms of stake)

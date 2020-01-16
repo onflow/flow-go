@@ -1,20 +1,19 @@
 package types
 
-import (
-	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/crypto"
-)
-
 type QuorumCertificate struct {
 	View                uint64
 	BlockMRH            []byte
 	AggregatedSignature *AggregatedSignature
 }
 
-func NewQC(block *Block, sigs []*Signature, signersBitfieldLength uint32) *QuorumCertificate {
+func NewQC(block *Block, sigs []byte, signersBitfieldLength []bool) *QuorumCertificate {
 	qc := &QuorumCertificate{
-		BlockMRH:            block.BlockMRH(),
-		View:                block.View,
-		AggregatedSignature: crypto.AggregateSigs(sigs, signersBitfieldLength),
+		BlockMRH: block.BlockMRH(),
+		View:     block.View,
+		AggregatedSignature: &AggregatedSignature{
+			RawSignature: sigs,
+			Signers:      signersBitfieldLength,
+		},
 	}
 
 	return qc

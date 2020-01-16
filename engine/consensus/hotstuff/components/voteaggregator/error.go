@@ -1,51 +1,48 @@
 package voteaggregator
 
 import (
+	"fmt"
 	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/types"
 )
 
-type signerNotExistError struct {
-	msg string
+type errorMissingSigner struct {
+	vote *types.Vote
 }
 
-type invalidSigError struct {
-	signerIdx uint32
-	msg       string
+type errInvalidSignature struct {
+	vote *types.Vote
 }
 
-type doubleVoteError struct {
+type errInvalidView struct {
+	vote *types.Vote
+}
+
+type errDoubleVote struct {
 	originalVote *types.Vote
 	doubleVote   *types.Vote
-	msg          string
 }
 
-type invalidViewError struct {
-	vote *types.Vote
-	msg  string
-}
-
-type qcExistedError struct {
+type errExistingQC struct {
 	vote *types.Vote
 	qc   *types.QuorumCertificate
-	msg  string
 }
 
-func (e signerNotExistError) Error() string {
-	return e.msg
+func (e errorMissingSigner) Error() string {
+	return fmt.Sprintf("The signer of vote %v is missing", e.vote)
 }
 
-func (e invalidSigError) Error() string {
-	return e.msg
+func (e errInvalidSignature) Error() string {
+	return fmt.Sprintf("The signature of vote %v is invalid", e.vote)
 }
 
-func (e doubleVoteError) Error() string {
-	return e.msg
+func (e errInvalidView) Error() string {
+	return fmt.Sprintf("The view of vote %v is invalid", e.vote)
 }
 
-func (e invalidViewError) Error() string {
-	return e.msg
+func (e errDoubleVote) Error() string {
+	return fmt.Sprintf("Double voting detected (original vote: %v, double vote: %v)", e.originalVote, e.doubleVote)
 }
 
-func (e qcExistedError) Error() string {
-	return e.msg
+func (e errExistingQC) Error() string {
+	return fmt.Sprintf("QC already existed (vote: %v, qc: %v)", e.vote, e.qc)
 }
