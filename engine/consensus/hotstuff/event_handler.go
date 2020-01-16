@@ -16,8 +16,6 @@ type EventHandler struct {
 	blockProposalProducer BlockProposalProducer
 	viewState             ViewState
 	network               NetworkSender
-	// Flag to turn on/off consensus acts (voting, block production etc)
-	isConActor bool
 }
 
 func (eh *EventHandler) OnReceiveBlockProposal(block *types.BlockProposal) {
