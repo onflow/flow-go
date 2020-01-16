@@ -1886,12 +1886,27 @@
             and on the unsigned integer types <code>UInt8</code>, <code>UInt16</code>, <code>UInt32</code>, <code>UInt64</code>
             do not cause values to overflow or underflow.
           </p>
-          <pre><code class="language-cadence,file=operator-times.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">100</span><span>
+          <pre><code class="language-cadence,file=operator-add-overflow.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: UInt8 = </span><span style="color: #09885A">255</span><span>
+</span><span>
+</span><span style="color: #008000">// Error: The result `256` does not fit in the range of `UInt8`,</span><span>
+</span><span style="color: #008000">// thus a fatal overflow error is raised and the program aborts</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = a + </span><span style="color: #09885A">1</span><span>
+</span></code></pre>
+          <pre><code class="language-cadence,file=operator-times-overflow.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">100</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> b: Int8 = </span><span style="color: #09885A">100</span><span>
 </span><span>
 </span><span style="color: #008000">// Error: The result `10000` does not fit in the range of `Int8`,</span><span>
 </span><span style="color: #008000">// thus a fatal overflow error is raised and the program aborts</span><span>
+</span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> c = a * b</span><span>
+</span></code></pre>
+          <pre><code class="language-cadence,file=operator-unary-negate-overflow.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> a: Int8 = </span><span style="color: #09885A">-128</span><span>
+</span><span>
+</span><span style="color: #008000">// Error: The result `128` does not fit in the range of `Int8`,</span><span>
+</span><span style="color: #008000">// thus a fatal overflow error is raised and the program aborts</span><span>
+</span><span style="color: #008000">//</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> b = -a</span><span>
 </span></code></pre>
           <p>
             Arithmetic operations on the unsigned integer types <code>Word8</code>, <code>Word6</code>, <code>Word32</code>, <code>Word64</code>
@@ -1915,14 +1930,6 @@
 </span></code></pre>
           <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> b: </span><span style="color: #0000FF">Word8</span><span style="color: #000000"> = </span><span style="color: #09885A">0</span><span>
 </span><span style="color: #000000">b - </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `255`</span><span>
-</span></code></pre>
-          <p>Signed integers are also affected by overflow. In a signed integer, the first bit is used for the sign. This leaves 7 bits for the actual value for an 8-bit signed integer, i.e., the range of values is -128 (binary 10000000) to 127 (01111111). Subtracting 1 from -128 results in 127.</p>
-          <pre><code class="language-cadence"><span style="color: #008000">//   10000000 = -128</span><span>
-</span><span style="color: #008000">// -        1</span><span>
-</span><span style="color: #008000">// = 01111111 = 127</span><span>
-</span></code></pre>
-          <pre><code class="language-cadence"><span style="color: #0000FF">let</span><span style="color: #000000"> c: </span><span style="color: #0000FF">Word8</span><span style="color: #000000"> = </span><span style="color: #09885A">-128</span><span>
-</span><span style="color: #000000">c - </span><span style="color: #09885A">1</span><span style="color: #000000">  </span><span style="color: #008000">// is `127`</span><span>
 </span></code></pre>
         </section>
         <section>
