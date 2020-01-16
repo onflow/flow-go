@@ -87,6 +87,10 @@ func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready()
 }
 
+func (e *Engine) Wait() {
+	e.unit.Wait()
+}
+
 // Done returns a channel that will close when the engine has
 // successfully stopped.
 func (e *Engine) Done() <-chan struct{} {
