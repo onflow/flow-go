@@ -796,11 +796,10 @@ func (r *interpreterRuntime) instantiateContract(
 					contract = value.(*interpreter.CompositeValue)
 
 					return contract
-				} else {
-					// The contract is not the deployed contract, load it from storage
-
-					return r.loadContract(compositeType, runtimeStorage)
 				}
+				// The contract is not the deployed contract, load it from storage
+
+				return r.loadContract(compositeType, runtimeStorage)
 			},
 		),
 	}

@@ -67,14 +67,11 @@ func main() {
 
 			blockExec := executor.NewBlockExecutor(vm, execState)
 
-			collections := badger.NewCollections(node.DB)
-
 			executionEng, err := execution.New(
 				node.Logger,
 				node.Network,
 				node.Me,
 				receiptsEng,
-				collections,
 				blockExec,
 			)
 			node.MustNot(err).Msg("could not initialize execution engine")
