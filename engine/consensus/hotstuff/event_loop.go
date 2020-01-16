@@ -5,7 +5,6 @@ import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 type EventLoop struct {
 	eventHandler *EventHandler
 
-	localTimeouts  chan *types.Timeout
 	blockproposals chan *types.BlockProposal
 	votes          chan *types.Vote
 	blockreqs      chan *types.BlockProposalRequest
@@ -18,16 +17,10 @@ func (el *EventLoop) loop() {
 		// This is to prevent attacks from malicious nodes that attempt
 		// to block honest nodes' pacemaker from progressing by sending
 		// other events.
+		timeoutChannel := el.eventHandler.TimeoutChannel()
 		select {
-		case t := <-el.localTimeouts:
-			el.eventHandler.OnLocalTimeout(t)
-			return
-		default:
-		}
-
-		select {
-		case t := <-el.localTimeouts:
-			el.eventHandler.OnLocalTimeout(t)
+		case <-timeoutChannel:
+			el.eventHandler.OnLocalTimeout()
 		case b := <-el.blockproposals:
 			el.eventHandler.OnReceiveBlockProposal(b)
 		case v := <-el.votes:

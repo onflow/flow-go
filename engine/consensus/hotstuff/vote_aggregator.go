@@ -28,6 +28,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(v *types.Vote, b *types.BlockPropo
 
 // BuildQCForBlockProposal will attempt to build a QC for the given block proposal when there are votes
 // with enough stakes.
+// VoteAggregator ALWAYS returns the same QC as the one returned before.
 func (va *VoteAggregator) BuildQCForBlockProposal(b *types.BlockProposal) (*types.QuorumCertificate, bool) {
 	panic("TODO")
 }

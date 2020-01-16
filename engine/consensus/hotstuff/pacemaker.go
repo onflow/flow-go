@@ -18,8 +18,8 @@ type PaceMaker interface {
 	// If yes, a NewViewEvent will be returned.
 	UpdateCurViewWithBlock(block *types.BlockProposal) (*types.NewViewEvent, bool)
 
-	// OnTimeout takes a timeout that was previously created by the PaceMaker and looped
-	// through the event loop, and returns a NewViewEvent if it triggers the current
-	// view to be updated.
-	OnTimeout(timeout *types.Timeout) (*types.NewViewEvent, bool)
+	// OnTimeout is called when a timeout, which was previously created by the PaceMaker, has
+	// looped through the event loop.
+	// It returns a NewViewEvent if it triggers the current view to be updated.
+	OnTimeout() (*types.NewViewEvent, bool)
 }

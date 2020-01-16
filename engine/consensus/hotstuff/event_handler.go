@@ -1,6 +1,8 @@
 package hotstuff
 
 import (
+	"time"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
@@ -24,7 +26,11 @@ func (eh *EventHandler) OnReceiveVote(vote *types.Vote) {
 	panic("implement me")
 }
 
-func (eh *EventHandler) OnLocalTimeout(timeout *types.Timeout) {
+func (eh *EventHandler) TimeoutChannel() <-chan time.Time {
+	panic("implement me")
+}
+
+func (eh *EventHandler) OnLocalTimeout() {
 	panic("implement me")
 }
 
