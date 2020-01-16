@@ -1,4 +1,4 @@
-package receipts_test
+package ingest_test
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/verification/receipts"
+	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/model/flow"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -76,8 +76,8 @@ func (suite *TestSuite) SetupTest() {
 // TestNewEngine verifies the establishment of the network registration upon
 // creation of an instance of verifier.Engine using the New method
 // It also returns an instance of new engine to be used in the later tests
-func (suite *TestSuite) TestNewEngine() *receipts.Engine {
-	e, err := receipts.New(zerolog.Logger{}, suite.net, suite.state, suite.me, suite.verifierEng, suite.receipts, suite.blocks, suite.collections)
+func (suite *TestSuite) TestNewEngine() *ingest.Engine {
+	e, err := ingest.New(zerolog.Logger{}, suite.net, suite.state, suite.me, suite.verifierEng, suite.receipts, suite.blocks, suite.collections)
 	require.Nil(suite.T(), err, "could not create an engine")
 
 	suite.net.AssertExpectations(suite.T())
@@ -307,16 +307,4 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.collectionsConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, collNodeID)
 		})
 	}
-}
-
-// genSubmitParams generates the parameters of network.Conduit.Submit method for emitting the
-// result approval. On receiving a result approval and identifiers of consensus nodes, it returns
-// a slice with the result approval as the first element followed by the ids of consensus nodes.
-func genSubmitParams(resource interface{}, identities flow.IdentityList) []interface{} {
-	// extracting mock consensus nodes IDs
-	params := []interface{}{resource}
-	for _, targetID := range identities.NodeIDs() {
-		params = append(params, targetID)
-	}
-	return params
 }

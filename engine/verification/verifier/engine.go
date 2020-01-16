@@ -7,10 +7,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 )
@@ -19,14 +19,11 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit        *engine.Unit        // used to control startup/shutdown
-	log         zerolog.Logger      // used to log relevant actions
-	conduit     network.Conduit     // used to propagate result approvals
-	me          module.Local        // used to access local node information
-	state       protocol.State      // used to access the protocol state
-	receipts    mempool.Receipts    // used to store execution receipts in memory
-	blocks      mempool.Blocks      // used to store blocks in memory
-	collections mempool.Collections // used to store collections in memory
+	unit    *engine.Unit    // used to control startup/shutdown
+	log     zerolog.Logger  // used to log relevant actions
+	conduit network.Conduit // used to propagate result approvals
+	me      module.Local    // used to access local node information
+	state   protocol.State  // used to access the protocol state
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -45,7 +42,6 @@ func New(
 	}
 
 	var err error
-
 	e.conduit, err = net.Register(engine.ApprovalProvider, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on approval provider channel: %w", err)
@@ -95,76 +91,49 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // process receives and submits an event to the verifier engine for processing.
-// It returns an error so the verifier engine will not propagate an event unless
-// it is successfully processed by the engine.
-// The origin ID indicates the node which originally submitted the event to
-// the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch event.(type) {
+	switch resource := event.(type) {
+	case *verification.CompleteExecutionResult:
+		return e.verify(originID, resource)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// verify is an internal component of the verifier engine that handles
-// the core verification process.
+// verify handles the core verification process. It accepts an execution
+// result and all dependent resources, verifies the result, and emits a
+// result approval if applicable.
 //
-// It receives an execution receipt, requests and waits for dependent
-// collections, then generates a result approval and submits it to
-// consensus nodes.
-func (e *Engine) verify(receipt *flow.ExecutionReceipt) error {
+// If any part of verification fails, an error is returned, indicating to the
+// initiating engine that the verification must be re-tried.
+func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExecutionResult) error {
 
-	result := receipt.ExecutionResult
-	blockID := result.BlockID
+	if originID != e.me.NodeID() {
+		return fmt.Errorf("invalid remote origin for verify")
+	}
 
-	block, err := e.blocks.Get(blockID)
+	// TODO execute transactions and confirm execution result
+	// for now, we approve everything
+
+	consensusNodes, err := e.state.Final().
+		Identities(identity.HasRole(flow.RoleConsensus))
 	if err != nil {
-		return fmt.Errorf("could not get block (id=%s): %w", blockID, err)
+		// TODO this error needs more advance handling after MVP
+		return fmt.Errorf("could not load consensus node IDs: %w", err)
 	}
 
-	for {
-
-		// update which collections exist locally
-		for collID, exists := range requiredCollections {
-			if !exists && e.collections.Has(collID) {
-				requiredCollections[collID] = true
-			}
-		}
-
-		// if we're missing any collections, continue waiting
-		for _, exists := range requiredCollections {
-			if !exists {
-				continue
-			}
-		}
-
-		// TODO execute transactions and confirm execution result
-
-		consensusNodes, err := e.state.Final().
-			Identities(identity.HasRole(flow.RoleConsensus))
-		if err != nil {
-			// TODO this error needs more advance handling after MVP
-			e.log.Error().
-				Str("error: ", err.Error()).
-				Msg("could not load the consensus nodes ids")
-			return
-		}
-
-		approval := &flow.ResultApproval{
-			ResultApprovalBody: flow.ResultApprovalBody{
-				ExecutionResultID: receipt.ExecutionResult.ID(),
-			},
-		}
-
-		// broadcast result approval to consensus nodes
-		err = e.approvalsConduit.Submit(approval, consensusNodes.NodeIDs()...)
-		if err != nil {
-			// TODO this error needs more advance handling after MVP
-			e.log.Error().
-				Err(err).
-				Msg("could not submit result approval to consensus nodes")
-		}
-
-		return
+	approval := &flow.ResultApproval{
+		ResultApprovalBody: flow.ResultApprovalBody{
+			ExecutionResultID: res.Receipt.ExecutionResult.ID(),
+		},
 	}
+
+	// broadcast result approval to consensus nodes
+	err = e.conduit.Submit(approval, consensusNodes.NodeIDs()...)
+	if err != nil {
+		// TODO this error needs more advance handling after MVP
+		return fmt.Errorf("could not submit result approval: %w", err)
+	}
+
+	return nil
 }

@@ -1,4 +1,4 @@
-package receipts
+package ingest
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// Engine implements the receipts engine of the verification node. It is
+// Engine implements the ingest engine of the verification node. It is
 // responsible for receiving and handling new execution receipts. It requests
 // all dependent resources for each execution receipt and relays a complete
 // execution result to the verifier engine when all dependencies are ready.
@@ -34,7 +34,7 @@ type Engine struct {
 	collections        mempool.Collections
 }
 
-// New creates and returns a new instance of a verifier engine.
+// New creates and returns a new instance of the ingest engine.
 func New(
 	log zerolog.Logger,
 	net module.Network,

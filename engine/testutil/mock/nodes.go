@@ -9,6 +9,7 @@ import (
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
+	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -53,5 +54,6 @@ type VerificationNode struct {
 	Receipts       mempool.Receipts
 	Blocks         mempool.Blocks
 	Collections    mempool.Collections
+	ReceiptsEngine *ingest.Engine
 	VerifierEngine *verifier.Engine
 }
