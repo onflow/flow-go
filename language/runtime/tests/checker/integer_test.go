@@ -72,15 +72,22 @@ func TestCheckIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T) {
 func TestCheckIntegerLiteralRanges(t *testing.T) {
 
 	for _, ty := range []sema.Type{
+		&sema.AddressType{},
+		// Int*
 		&sema.Int8Type{},
 		&sema.Int16Type{},
 		&sema.Int32Type{},
 		&sema.Int64Type{},
+		// UInt*
 		&sema.UInt8Type{},
 		&sema.UInt16Type{},
 		&sema.UInt32Type{},
 		&sema.UInt64Type{},
-		&sema.AddressType{},
+		// Word*
+		&sema.Word8Type{},
+		&sema.Word16Type{},
+		&sema.Word32Type{},
+		&sema.Word64Type{},
 	} {
 		t.Run(ty.String(), func(t *testing.T) {
 
@@ -121,15 +128,22 @@ func TestCheckIntegerLiteralRanges(t *testing.T) {
 func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
 
 	for _, ty := range []sema.Type{
+		&sema.AddressType{},
+		// Int*
 		&sema.Int8Type{},
 		&sema.Int16Type{},
 		&sema.Int32Type{},
 		&sema.Int64Type{},
+		// UInt*
 		&sema.UInt8Type{},
 		&sema.UInt16Type{},
 		&sema.UInt32Type{},
 		&sema.UInt64Type{},
-		&sema.AddressType{},
+		// Word*
+		&sema.Word8Type{},
+		&sema.Word16Type{},
+		&sema.Word32Type{},
+		&sema.Word64Type{},
 	} {
 
 		t.Run(fmt.Sprintf("%s_minMinusOne", ty.String()), func(t *testing.T) {
@@ -300,10 +314,16 @@ func TestCheckSignedIntegerNegate(t *testing.T) {
 func TestCheckInvalidUnsignedIntegerNegate(t *testing.T) {
 
 	for _, ty := range []sema.Type{
+		// UInt*
 		&sema.UInt8Type{},
 		&sema.UInt16Type{},
 		&sema.UInt32Type{},
 		&sema.UInt64Type{},
+		// Word*
+		&sema.Word8Type{},
+		&sema.Word16Type{},
+		&sema.Word32Type{},
+		&sema.Word64Type{},
 	} {
 		name := ty.String()
 		t.Run(name, func(t *testing.T) {
