@@ -3,7 +3,7 @@ package blocks
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/engine/execution/execution"
+	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 )

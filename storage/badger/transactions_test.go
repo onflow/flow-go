@@ -18,13 +18,13 @@ func TestTransactions(t *testing.T) {
 		store := bstorage.NewTransactions(db)
 
 		expected := unittest.TransactionFixture()
-		err := store.Store(expected.TransactionBody)
+		err := store.Store(&expected.TransactionBody)
 		require.Nil(t, err)
 
 		actual, err := store.ByID(expected.ID())
 		require.Nil(t, err)
 
-		assert.Equal(t, expected.TransactionBody, actual)
+		assert.Equal(t, &expected.TransactionBody, actual)
 
 		err = store.Remove(expected.ID())
 		require.NoError(t, err)

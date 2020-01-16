@@ -7,13 +7,15 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// Engine manages execution of transactions
+// Engine manages execution of transactions.
 type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
@@ -24,12 +26,13 @@ type Engine struct {
 }
 
 func New(
-	log zerolog.Logger,
+	logger zerolog.Logger,
 	net module.Network,
 	me module.Local,
 	receipts network.Engine,
 	executor executor.BlockExecutor,
 ) (*Engine, error) {
+	log := logger.With().Str("engine", "execution").Logger()
 
 	e := Engine{
 		unit:     engine.NewUnit(),
@@ -53,6 +56,10 @@ func New(
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready()
+}
+
+func (e *Engine) Wait() {
+	e.unit.Wait()
 }
 
 // Done returns a channel that will close when the engine has
@@ -94,22 +101,39 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // process processes events for the execution engine on the execution node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
-	case *executor.ExecutableBlock:
-		return e.onExecutableBlock(ev)
+	case *execution.CompleteBlock:
+		return e.onCompleteBlock(originID, ev)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// onExecutableBlock is triggered when this engine receives a new block.
+// onCompleteBlock is triggered when this engine receives a new block.
 //
-// This function passes the executable block to the block executor and
+// This function passes the complete block to the block executor and
 // then submits the result to the receipts engine.
-func (e *Engine) onExecutableBlock(block *executor.ExecutableBlock) error {
+func (e *Engine) onCompleteBlock(originID flow.Identifier, block *execution.CompleteBlock) error {
+	e.log.Debug().
+		Hex("block_id", logging.Entity(block.Block)).
+		Msg("received complete block")
+
+	if originID != e.me.NodeID() {
+		return fmt.Errorf("invalid remote request to execute complete block [%x]", block.Block.ID())
+	}
+
 	result, err := e.executor.ExecuteBlock(block)
 	if err != nil {
+		e.log.Error().
+			Hex("block_id", logging.Entity(block.Block)).
+			Msg("failed to compute block result")
+
 		return fmt.Errorf("failed to execute block: %w", err)
 	}
+
+	e.log.Debug().
+		Hex("block_id", logging.Entity(block.Block)).
+		Hex("result_id", logging.Entity(result)).
+		Msg("computed block result")
 
 	// submit execution result to receipt engine
 	e.receipts.SubmitLocal(result)

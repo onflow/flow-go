@@ -93,8 +93,8 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 func (e *Engine) onExecutionResult(originID flow.Identifier, result *flow.ExecutionResult) error {
 	e.log.Debug().
-		Hex("block_id", result.BlockID[:]).
-		Hex("result_id", logging.ID(result.ID())).
+		Hex("block_id", logging.ID(result.BlockID)).
+		Hex("result_id", logging.Entity(result)).
 		Msg("received execution result")
 
 	if originID != e.me.NodeID() {
