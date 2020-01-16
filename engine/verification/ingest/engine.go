@@ -142,22 +142,19 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.
 
 	// TODO: correctness check for execution receipts
 
-	// validating identity of the originID
 	id, err := e.state.Final().Identity(originID)
 	if err != nil {
 		// TODO: potential attack on authenticity
 		return fmt.Errorf("invalid origin id (%s): %w", originID[:], err)
 	}
 
-	// validating role of the originID
-	// an execution receipt should be either coming from an execution node through the
-	// Process method, or from the current verifier node itself through the Submit method
+	// execution results are only valid from execution nodes
 	if id.Role != flow.RoleExecution {
 		// TODO: potential attack on integrity
 		return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", id.NodeID, id.Role)
 	}
 
-	// storing the execution receipt in the store of the engine
+	// store the execution receipt in the store of the engine
 	// this will fail if the receipt already exists in the store
 	err = e.receipts.Add(receipt)
 	if err != nil {
