@@ -50,7 +50,8 @@ func (checker *Checker) reportResourceUsesInLoop(startPos, endPos ast.Position) 
 
 		if variable, isVariable := resource.(*Variable); isVariable &&
 			variable.Pos != nil &&
-			(variable.Pos.Compare(startPos) > 0 && variable.Pos.Compare(endPos) < 0) {
+			variable.Pos.Compare(startPos) > 0 && 
+			variable.Pos.Compare(endPos) < 0 {
 
 			continue
 		}
