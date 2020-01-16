@@ -26,6 +26,7 @@ type Engine struct {
 	unit               *engine.Unit
 	log                zerolog.Logger
 	collectionsConduit network.Conduit
+	stateConduit       network.Conduit
 	me                 module.Local
 	state              protocol.State
 	verifierEng        network.Engine // for submitting ERs that are ready to be verified
@@ -63,9 +64,14 @@ func New(
 		return nil, fmt.Errorf("could not register engine on collection provider channel: %w", err)
 	}
 
+	e.collectionsConduit, err = net.Register(engine.StateProvider, e)
+	if err != nil {
+		return nil, fmt.Errorf("could not register engine on execution state provider channel: %w", err)
+	}
+
 	_, err = net.Register(engine.ReceiptProvider, e)
 	if err != nil {
-		return nil, fmt.Errorf("could not register engine on execution provider channel: %w", err)
+		return nil, fmt.Errorf("could not register engine on execution receipt provider channel: %w", err)
 	}
 
 	return e, nil
@@ -229,6 +235,25 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 	err = e.collectionsConduit.Submit(req, collNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit request for collection (id=%s): %w", collID, err)
+	}
+
+	return nil
+}
+
+func (e *Engine) requestState(chunkID flow.Identifier) error {
+
+	exeNodes, err := e.state.Final().Identities(identity.HasRole(flow.RoleExecution))
+	if err != nil {
+		return fmt.Errorf("could not load execution node identities: %w", err)
+	}
+
+	req := &messages.ExecutionStateRequest{
+		ChunkID: chunkID,
+	}
+
+	err = e.stateConduit.Submit(req, exeNodes.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not submit request for execution state (chunk_id=%s): %w", chunkID, err)
 	}
 
 	return nil

@@ -1,6 +1,8 @@
 package execution
 
-import "github.com/dapperlabs/flow-go/model/flow"
+import (
+	"github.com/dapperlabs/flow-go/model/flow"
+)
 
 type CompleteCollection struct {
 	Guarantee    *flow.CollectionGuarantee
@@ -20,17 +22,4 @@ func (b *CompleteBlock) Collections() []*CompleteCollection {
 	}
 
 	return collections
-}
-
-// StateRequest represents a request for the portion of execution state
-// used by all the transactions in the chunk specified by the chunk ID.
-type StateRequest struct {
-	ChunkID flow.Identifier
-}
-
-// StateResponse is the response to a state request. It includes all the
-// registers as a map required for the requested chunk.
-type StateResponse struct {
-	ChunkID   flow.Identifier
-	Registers map[string][]byte
 }
