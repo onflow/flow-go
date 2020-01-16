@@ -8,9 +8,6 @@ import (
 )
 
 type FlowMC struct {
-	// Replica's Identity
-	// ToDo: update to use identity component
-	myNodeID     types.ID
 	currentView  uint64
 	currentBlock *types.BlockProposal
 
@@ -26,7 +23,7 @@ type FlowMC struct {
 	stopSignal   chan struct{}
 }
 
-func New(id types.ID, view uint64, primarySelector primary.Selector, eventProc notifications.Distributor) *FlowMC {
+func New(startView uint64, eventProc notifications.Distributor) *FlowMC, error {
 	if view < 1 {
 		panic("Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)")
 	}
