@@ -585,7 +585,7 @@ let maybeInt: Int? = 1
 let anything: AnyStruct = maybeInt
 ```
 
-[Conditional downcasting](#Conditional%20Downcasting%20Operator) allows coercing
+[Conditional downcasting](#conditional-downcasting-operator) allows coercing
 a value which has the type `AnyStruct` or `AnyResource` back to its orignal type.
 
 ### Optionals
@@ -5028,7 +5028,7 @@ Contracts can be created, updated, and deleted using the `setCode`
 function of [accounts](#accounts).
 Contract creation also possible when creating accounts,
 i.e. when using the `Account` constructor.
-This functionality is covered in the [next section](#Deploying%20and%20Updating%20Contracts)
+This functionality is covered in the [next section](#deploying-and-updating-contracts)
 
 Contracts are types.
 They are similar to composite types, but are stored differently than
