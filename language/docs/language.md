@@ -493,60 +493,100 @@ let aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
 // `aNumber` has type `Int`
 ```
 
-### Any
+### AnyStruct and AnyResource
 
-`Any` is the top type, i.e., all types are a subtype of it.
+`AnyStruct` is the top type of all non-resource types,
+i.e., all non-resource types are a subtype of it.
+
+`AnyResource` is the top type of all resource types.
 
 ```cadence
-// Declare a variable that has the type `Any`.
-// Any value can be assigned to it, for example an integer.
+// Declare a variable that has the type `AnyStruct`.
+// Any non-resource typed value can be assigned to it, for example an integer,
+// but not resoure-typed values.
 //
-var someValue: Any = 1
+var someStruct: AnyStruct = 1
 
-// Assign a value with a different type, `Bool`.
-someValue = true
+// Assign a value with a different non-resource type, `Bool`.
+someStruct = true
+
+// Declare a structure named `TestStruct`, create an instance of it,
+// and assign it to the `AnyStruct`-typed variable
+//
+struct TestStruct {}
+
+let testStruct = TestStruct()
+
+someStruct = testStruct
+
+// Declare a resource named `TestResource`
+
+resource Test {}
+
+// Declare a variable that has the type `@AnyResource`.
+// Any resource-typed value can be assigned to it,
+// but not non-resource typed values.
+//
+var someResource: @AnyResource <- create Test()
+
+// Invalid: Resource-typed values can not be assigned
+// to `AnyStruct`-typed variables
+//
+someStruct <- create Test()
+
+// Invalid: Non-resource typed values can not be assigned
+// to `AnyResource`-typed variables
+//
+someResource = 1
 ```
 
-However, using `Any` does not opt-out of type checking.
-It is invalid to access fields and call functions on `Any` typed values,
-as it has no fields and functions.
+However, using `AnyStruct` and `AnyResource` does not opt-out of type checking.
+It is invalid to access fields and call functions on these types,
+as they have no fields and functions.
 
 ```cadence
-// Declare a variable that has the type `Any`. The initial value is an integer,
-// but the variable  still has the explicit type `Any`.
+// Declare a variable that has the type `AnyStruct`.
+// The initial value is an integer,
+// but the variable  still has the explicit type `AnyStruct`.
 //
-let a: Any = 1
+let a: AnyStruct = 1
 
-// Invalid: Operator cannot be used for an `Any` value (`a`, left-hand side)
+// Invalid: Operator cannot be used for an `AnyStruct` value (`a`, left-hand side)
 // and an `Int` value (`2`, right-hand side).
 //
 a + 2
 ```
 
-`Any` may be used like any other type, for example,
-it may be the element type of [arrays](#arrays)
+`AnyStruct` and `AnyResource` may be used like other types,
+for example, they may be the element type of [arrays](#arrays)
 or be the element type of an [optional type](#optionals).
 
 ```cadence
-// Declare a variable that has the type `[Any]`, i.e. an array of elements of any type.
+// Declare a variable that has the type `[AnyStruct]`,
+// i.e. an array of elements of any non-resource type.
 //
-let anyValues: [Any] = [1, "2", true]
+let anyValues: [AnyStruct] = [1, "2", true]
 
-// Declare a variable that has the type `Any?`, i.e. an optional type of any type.
+// Declare a variable that has the type `AnyStruct?`,
+// i.e. an optional type of any non-resource type.
 //
-var maybeSomething: Any? = 42
+var maybeSomething: AnyStruct? = 42
 
 maybeSomething = "twenty-four"
 
 maybeSomething = nil
 ```
 
-`Any` is also the super-type of optional types.
+`AnyStruct` is also the super-type of all non-resource optional types,
+and `AnyResource` is the super-type of all resource optional types.
 
 ```cadence
 let maybeInt: Int? = 1
-let anything: Any = y
+let anything: AnyStruct = maybeInt
 ```
+
+[Conditional downcasting](#Conditional%20Downcasting%20Operator) allows coercing
+a value which has the type `AnyStruct` or `AnyResource` back to its orignal type.
 
 ### Optionals
 
@@ -596,7 +636,7 @@ let y: Int? = x
 // may be `nil`, or any other value.
 // An optional with the value of `x` is created.
 //
-var z: Any? = x
+var z: AnyStruct? = x
 ```
 
 A non-optional type is a subtype of its optional type.
@@ -683,7 +723,7 @@ let d = a ?? false
 #### Conditional Downcasting Operator
 
 > 🚧 Status: The conditional downcasting operator `as?` is implemented,
-> but it only supports values that have the type `Any`.
+> but it only supports values that have the type `AnyStruct` and `AnyResource`.
 
 The conditional downcasting operator `as?`
 can be used to type cast a value to a type.
@@ -697,10 +737,10 @@ The cast and check is performed at run-time, i.e. when the program is executed,
 not statically, i.e. when the program is checked.
 
 ```cadence,file=conditional-downcasting-any.cdc
-// Declare a constant named `something` which has type `Any`,
+// Declare a constant named `something` which has type `AnyStruct`,
 // with an initial value which has type `Int`.
 //
-let something: Any = 1
+let something: AnyStruct = 1
 
 // Conditionally downcast the value of `something` to `Int`.
 // The cast succeeds, because the value has type `Int`.
@@ -721,10 +761,10 @@ interfaces (if a [resource](#resources) interface not to a concrete resource),
 and optionals.
 
 ```cadence,file=conditional-downcasting-any-array.cdc
-// Declare a constant named `values` which has type `[Any]`,
+// Declare a constant named `values` which has type `[AnyStruct]`,
 // i.e. an array of arbitrarily typed values.
 //
-let values: [Any] = [1, true]
+let values: [AnyStruct] = [1, true]
 
 let first = values[0] as? Int
 // `first` is `1` and has type `Int?`
@@ -954,7 +994,7 @@ var variableLengthArray: [Int] = []
 ```
 
 Array types are covariant in their element types.
-For example, `[Int]` is a subtype of `[Any]`.
+For example, `[Int]` is a subtype of `[AnyStruct]`.
 This is safe because arrays are value types and not reference types.
 
 #### Array Indexing
@@ -1261,8 +1301,8 @@ let integers = {
 ```
 
 Dictionary types are covariant in their key and value types.
-For example, `[Int: String]` is a subtype of `[Any: String]`
-and also a subtype of `[Int: Any]`.
+For example, `[Int: String]` is a subtype of `[AnyStruct: String]`
+and also a subtype of `[Int: AnyStruct]`.
 This is safe because dictionaries are value types and not reference types.
 
 #### Dictionary Access
