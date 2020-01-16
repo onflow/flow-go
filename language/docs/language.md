@@ -498,7 +498,7 @@ let aNumber = 0x06012c8cf97bead5deae237070f9587f8e7a266d
 `AnyStruct` is the top type of all non-resource types,
 i.e., all non-resource types are a subtype of it.
 
-`AnyResource` is the top type of all resource types.
+`@AnyResource` is the top type of all resource types.
 
 ```cadence
 // Declare a variable that has the type `AnyStruct`.
@@ -547,7 +547,7 @@ as they have no fields and functions.
 ```cadence
 // Declare a variable that has the type `AnyStruct`.
 // The initial value is an integer,
-// but the variable  still has the explicit type `AnyStruct`.
+// but the variable still has the explicit type `AnyStruct`.
 //
 let a: AnyStruct = 1
 
@@ -4002,7 +4002,7 @@ To summarize the behavior for functions, structures, resources, and interfaces:
 Currently, all types must be declared public and are visible to all code.
 However, that does not imply that any code may instantiate the type:
 only code within the [contract](#contracts) in which the type is declared
-is allowed to create instances of the type. See the section for more information.
+is allowed to create instances of the type. See the linked contracts section for more information.
 
 ```cadence,file=access-control-globals.cdc
 // Declare a private constant, inaccessible/invisible in outer scope.
@@ -5032,7 +5032,7 @@ without having been defined in a deployed Cadence contract.
 
 Contracts can be created, updated, and deleted using the `setCode`
 function of [accounts](#accounts).
-Contract creation also possible when creating accounts,
+Contract creation is also possible when creating accounts,
 i.e. when using the `Account` constructor.
 This functionality is covered in the [next section](#deploying-and-updating-contracts)
 
@@ -5091,7 +5091,7 @@ pub contract HelloWorld {
 }
 ```
 
-This contract could be deployed to an account and live permenantely
+This contract could be deployed to an account and live permanently
 in the contract storage.  Transactions and other contracts
 can interact with contracts by importing them at the beginning
 of a transaction or contract definition.
