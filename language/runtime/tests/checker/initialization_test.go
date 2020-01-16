@@ -4,8 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -40,7 +42,7 @@ func TestCheckFieldInitializationFromArgument(t *testing.T) {
        }
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckFieldInitializationWithFunctionCallAfterAllFieldsInitialized(t *testing.T) {
@@ -58,7 +60,7 @@ func TestCheckFieldInitializationWithFunctionCallAfterAllFieldsInitialized(t *te
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidFieldInitializationWithFunctionCallBeforeAllFieldsInitialized(t *testing.T) {
@@ -115,7 +117,7 @@ func TestCheckConstantFieldInitialization(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidRepeatedConstantFieldInitialization(t *testing.T) {
@@ -153,7 +155,7 @@ func TestCheckFieldInitializationInIfStatement(t *testing.T) {
            }
        `)
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("InvalidIfStatement", func(t *testing.T) {
@@ -210,7 +212,7 @@ func TestCheckFieldInitializationFromField(t *testing.T) {
            }
        `)
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("FromUninitializedField", func(t *testing.T) {
@@ -249,7 +251,7 @@ func TestCheckFieldInitializationUsages(t *testing.T) {
            }
        `)
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 	})
 
@@ -358,7 +360,7 @@ func TestCheckFieldInitializationUsages(t *testing.T) {
            }
        `)
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	})
 }
 
@@ -422,4 +424,82 @@ func TestCheckFieldInitializationWithReturn(t *testing.T) {
 
 		assert.IsType(t, &sema.FieldUninitializedError{}, errs[0])
 	})
+}
+
+func TestCheckFieldInitializationWithPotentialNeverCallInElse(t *testing.T) {
+
+	code := `
+      struct Test {
+          let foo: Int
+
+          init(foo: Int?) {
+              if let foo = foo {
+                  self.foo = foo
+              } else {
+                  panic("no x")
+              }
+          }
+      }
+    `
+	_, err := ParseAndCheckWithOptions(
+		t,
+		code,
+		ParseAndCheckOptions{
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.PanicFunction,
+					}.ToValueDeclarations(),
+				),
+			},
+		},
+	)
+
+	require.NoError(t, err)
+}
+
+func TestCheckFieldInitializationWithPotentialNeverCallInNilCoalescing(t *testing.T) {
+
+	code := `
+      struct Test {
+          let foo: Int
+
+          init(foo: Int?) {
+              self.foo = foo ?? panic("no x")
+          }
+      }
+    `
+	_, err := ParseAndCheckWithOptions(
+		t,
+		code,
+		ParseAndCheckOptions{
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.PanicFunction,
+					}.ToValueDeclarations(),
+				),
+			},
+		},
+	)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidFieldInitializationWithUseOfUninitializedInPrecondition(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      struct Test {
+          var on: Bool
+
+          init() {
+              pre { self.on }
+              self.on = true
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.UninitializedFieldAccessError{}, errs[0])
 }

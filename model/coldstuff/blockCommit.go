@@ -2,7 +2,11 @@
 
 package coldstuff
 
+import (
+	"github.com/dapperlabs/flow-go/model/flow"
+)
+
 // BlockCommit is a coldstuff consensus event to commit a block.
 type BlockCommit struct {
-	Hash []byte
+	BlockID flow.Identifier
 }

@@ -8,7 +8,7 @@ $Go.import("github.com/dapperlabs/flow-go/schema/captain");
 @0xf71cc0af2f870b3c;
 
 struct Auth {
-  nodeId @0 :Text;
+  nodeId @0 :Data;
 }
 
 struct Ping {
@@ -20,19 +20,19 @@ struct Pong {
 }
 
 struct Announce {
-  engineId @0: UInt8;
+  channelId @0 :UInt8;
   eventId @1 :Data;
 }
 
 struct Request {
-  engineId @0: UInt8;
+  channelId @0 :UInt8;
   eventId @1 :Data;
 }
 
 struct Response {
-  engineId @0 :UInt8;
+  channelId @0 :UInt8;
   eventId @1 :Data;
-  originId @2 :Text;
-  targetIds @3 :List(Text);
+  originId @2 :Data;
+  targetIds @3 :List(Data);
   payload @4 :Data;
 }

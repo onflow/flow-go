@@ -47,10 +47,10 @@ func TestAssert(t *testing.T) {
 		err)
 
 	_, err = inter.Invoke("assert", true, "oops")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	_, err = inter.Invoke("assert", true)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestPanic(t *testing.T) {

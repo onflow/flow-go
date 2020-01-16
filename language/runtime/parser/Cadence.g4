@@ -81,8 +81,9 @@ declaration
     | transactionDeclaration
     ;
 
+// Transactions can be in the form "prepare pre execute post" or "prepare pre post execute"
 transactionDeclaration
-    : Transaction '{' fields prepare? preConditions? execute? postConditions? '}'
+    : Transaction '{' fields prepare? ((preConditions? execute? postConditions?) | (preConditions? postConditions? execute?))'}'
     ;
 
 // NOTE: allow any identifier in parser, then check identifier
@@ -96,7 +97,7 @@ prepare
 // is `execute` in semantic analysis to provide better error
 //
 execute
-    : Identifier block
+    : identifier block
     ;
 
 importDeclaration
@@ -112,11 +113,12 @@ access
     ;
 
 compositeDeclaration
-    : access compositeKind identifier conformances '{' members '}'
+    : access compositeKind identifier conformances
+      '{' membersAndNestedDeclarations '}'
     ;
 
 conformances
-    : (':' identifier (',' identifier)*)?
+    : (':' nominalType (',' nominalType)*)?
     ;
 
 variableKind
@@ -133,19 +135,20 @@ fields
     ;
 
 interfaceDeclaration
-    : access compositeKind Interface identifier '{' members '}'
+    : access compositeKind Interface identifier '{' membersAndNestedDeclarations '}'
     ;
 
-members
-    : (member ';'?)*
+membersAndNestedDeclarations
+    : (memberOrNestedDeclaration ';'?)*
     ;
 
-member
+memberOrNestedDeclaration
     : field
     | specialFunctionDeclaration
     | functionDeclaration
     | interfaceDeclaration
     | compositeDeclaration
+    | eventDeclaration
     ;
 
 compositeKind
@@ -170,7 +173,7 @@ functionDeclaration
     ;
 
 eventDeclaration
-    : Event identifier parameterList
+    : access Event identifier parameterList
     ;
 
 parameterList
@@ -182,7 +185,7 @@ parameter
     ;
 
 typeAnnotation
-    : Move? fullType
+    : ResourceAnnotation? fullType
     ;
 
 // NOTE: only allow reference or optionals – prevent ambiguous
@@ -201,7 +204,7 @@ baseType
     ;
 
 nominalType
-    : identifier
+    : identifier ('.' identifier)*
     ;
 
 functionType
@@ -462,6 +465,8 @@ NilCoalescing : WS '??';
 Casting : 'as' ;
 FailableCasting : 'as?' ;
 
+ResourceAnnotation : '@' ;
+
 castingOp
     : Casting
     | FailableCasting
@@ -475,7 +480,7 @@ primaryExpressionStart
     ;
 
 createExpression
-    : Create identifier invocation
+    : Create nominalType invocation
     ;
 
 destroyExpression
@@ -623,6 +628,7 @@ identifier
     | From
     | Create
     | Destroy
+    | Contract
     ;
 
 Identifier
@@ -694,7 +700,7 @@ WS
     ;
 
 Terminator
-    : [\r\n]+ -> channel(HIDDEN)
+    : [\r\n\u2028\u2029]+ -> channel(HIDDEN)
     ;
 
 BlockComment

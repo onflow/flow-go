@@ -84,6 +84,14 @@ func NewHasher(algo HashingAlgorithm) (Hasher, error) {
 // Hash is the hash algorithms output types
 type Hash []byte
 
+// ZeroHash represents the empty hash, used as the parent of the genesis block.
+var ZeroHash = Hash{
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+}
+
 // Equal checks if a hash is equal to a given hash
 func (h Hash) Equal(input Hash) bool {
 	return bytes.Equal(h, input)
@@ -93,6 +101,7 @@ func (h Hash) Equal(input Hash) bool {
 func (h Hash) Hex() string {
 	return hex.EncodeToString(h)
 }
+
 
 // Hasher interface
 

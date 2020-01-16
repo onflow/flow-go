@@ -6,14 +6,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/proto/gossip/messages"
+	"github.com/dapperlabs/flow-go/protobuf/gossip/messages"
 )
 
 // TestDatabase covers several storage and retrieval of data to and from storage considering different scenarios
 func TestDatabase(t *testing.T) {
 	assert := assert.New(t)
 	mmd := NewMemMsgStore()
-
 
 	initKeys := []string{
 		"exists",

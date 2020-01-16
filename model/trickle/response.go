@@ -2,11 +2,15 @@
 
 package trickle
 
+import (
+	"github.com/dapperlabs/flow-go/model/flow"
+)
+
 // Response represents an opaque system layer event.
 type Response struct {
-	EngineID  uint8
+	ChannelID uint8
 	EventID   []byte
-	OriginID  string
-	TargetIDs []string
+	OriginID  flow.Identifier
+	TargetIDs []flow.Identifier
 	Payload   []byte
 }

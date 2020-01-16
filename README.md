@@ -56,7 +56,7 @@ You can find a high-level overview of the Flow architecture on the [documentatio
 
 #### Install Go
 
-- Download and install [Go 1.12](https://golang.org/doc/install)
+- Download and install [Go 1.13](https://golang.org/doc/install)
 - Create your workspace `$GOPATH` directory and update your bash_profile to contain the following:
 
 ```bash
@@ -126,7 +126,6 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 
 | Stream         | Owner(s)                    | Home directory  |
 | -------------- | --------------------------- | --------- |
-
 | Collection  | [Peter Siemens](https://github.com/psiemens) | [/engine/collection](/engine/collection) |
 | Consensus | [Alexander Hentschel](https://github.com/AlexHentschel) | [/engine/consensus](/engine/consensus) |
 | Execution      | [Bastian Müller](https://github.com/turbolent) | [/engine/execution](/engine/execution) |
@@ -134,8 +133,7 @@ Stream owners will assign tasks to contributors and ensure that all TODOs are tr
 | Observation | [Peter Siemens](https://github.com/psiemens)     | [/engine/observation](/engine/observation) |
 | Networking | [Yahya Hassanzadeh](https://github.com/yhassanzadeh)     | [/networking/gossip](/networking/gossip) |
 | Cryptography | [Tarak Ben Youssef](https://github.com/tarakby)     | [/crypto](/crypto) |
-| Emulator | [Brian Ho](https://github.com/mrbrianhobo), [Peter Siemens](https://github.com/psiemens), [Jordan Schalm](https://github.com/jordanschalm) | [/sdk/emulator](/sdk/emulator) |
-| Client Library | [Brian Ho](https://github.com/mrbrianhobo), [Peter Siemens](https://github.com/psiemens)     | [/sdk/client](/sdk/client), [/cli](/cli), [/cmd/flow](/cmd/flow) |
+| SDK & Emulator| [Brian Ho](https://github.com/mrbrianhobo), [Peter Siemens](https://github.com/psiemens)     | [Flow Go SDK](https://github.com/dapperlabs/flow-go-sdk) |
 | Ops & Performance | [Leo Zhang](https://github.com/zhangchiqing) | |
 | Language & Runtime | [Bastian Müller](https://github.com/turbolent) | [/language](/language) |
 

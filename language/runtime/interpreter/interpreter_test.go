@@ -1,140 +1,224 @@
 package interpreter
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
 func TestInterpreterOptionalBoxing(t *testing.T) {
 
-	inter, err := NewInterpreter(nil)
-	assert.Nil(t, err)
+	checker, err := sema.NewChecker(nil, utils.TestLocation)
+	require.NoError(t, err)
 
-	value, newType := inter.boxOptional(
-		BoolValue(true),
-		&sema.BoolType{},
-		&sema.OptionalType{Type: &sema.BoolType{}},
-	)
-	assert.Equal(t, value, SomeValue{BoolValue(true)})
-	assert.Equal(t, newType, &sema.OptionalType{Type: &sema.BoolType{}})
+	inter, err := NewInterpreter(checker)
+	require.NoError(t, err)
 
-	value, newType = inter.boxOptional(
-		SomeValue{BoolValue(true)},
-		&sema.OptionalType{Type: &sema.BoolType{}},
-		&sema.OptionalType{Type: &sema.BoolType{}},
-	)
-	assert.Equal(t, value, SomeValue{BoolValue(true)})
-	assert.Equal(t, newType, &sema.OptionalType{Type: &sema.BoolType{}})
+	t.Run("Bool to Bool?", func(t *testing.T) {
+		value, newType := inter.boxOptional(
+			BoolValue(true),
+			&sema.BoolType{},
+			&sema.OptionalType{Type: &sema.BoolType{}},
+		)
+		assert.Equal(t,
+			NewSomeValueOwningNonCopying(BoolValue(true)),
+			value,
+		)
+		assert.Equal(t,
+			&sema.OptionalType{Type: &sema.BoolType{}},
+			newType,
+		)
+	})
 
-	value, newType = inter.boxOptional(
-		SomeValue{BoolValue(true)},
-		&sema.OptionalType{Type: &sema.BoolType{}},
-		&sema.OptionalType{Type: &sema.OptionalType{Type: &sema.BoolType{}}},
-	)
-	assert.Equal(t, value, SomeValue{SomeValue{BoolValue(true)}})
-	assert.Equal(t, newType, &sema.OptionalType{Type: &sema.OptionalType{Type: &sema.BoolType{}}})
+	t.Run("Bool? to Bool?", func(t *testing.T) {
+		value, newType := inter.boxOptional(
+			NewSomeValueOwningNonCopying(BoolValue(true)),
+			&sema.OptionalType{Type: &sema.BoolType{}},
+			&sema.OptionalType{Type: &sema.BoolType{}},
+		)
+		assert.Equal(t,
+			NewSomeValueOwningNonCopying(BoolValue(true)),
+			value,
+		)
+		assert.Equal(t,
+			&sema.OptionalType{Type: &sema.BoolType{}},
+			newType,
+		)
+	})
 
-	// NOTE:
-	value, newType = inter.boxOptional(
-		NilValue{},
-		&sema.OptionalType{Type: &sema.NeverType{}},
-		&sema.OptionalType{Type: &sema.OptionalType{Type: &sema.BoolType{}}},
-	)
-	assert.Equal(t, value, NilValue{})
-	assert.Equal(t, newType, &sema.OptionalType{Type: &sema.NeverType{}})
+	t.Run("Bool? to Bool??", func(t *testing.T) {
+		value, newType := inter.boxOptional(
+			NewSomeValueOwningNonCopying(BoolValue(true)),
+			&sema.OptionalType{Type: &sema.BoolType{}},
+			&sema.OptionalType{Type: &sema.OptionalType{Type: &sema.BoolType{}}},
+		)
+		assert.Equal(t,
+			NewSomeValueOwningNonCopying(
+				NewSomeValueOwningNonCopying(BoolValue(true)),
+			),
+			value,
+		)
+		assert.Equal(t,
+			&sema.OptionalType{Type: &sema.OptionalType{Type: &sema.BoolType{}}},
+			newType,
+		)
+	})
 
-	// NOTE:
-	value, newType = inter.boxOptional(
-		SomeValue{NilValue{}},
-		&sema.OptionalType{Type: &sema.OptionalType{Type: &sema.NeverType{}}},
-		&sema.OptionalType{Type: &sema.OptionalType{Type: &sema.BoolType{}}},
-	)
-	assert.Equal(t, value, NilValue{})
-	assert.Equal(t, newType, &sema.OptionalType{Type: &sema.NeverType{}})
+	t.Run("nil (Never?) to Bool??", func(t *testing.T) {
+		// NOTE:
+		value, newType := inter.boxOptional(
+			NilValue{},
+			&sema.OptionalType{Type: &sema.NeverType{}},
+			&sema.OptionalType{Type: &sema.OptionalType{Type: &sema.BoolType{}}},
+		)
+		assert.Equal(t,
+			NilValue{},
+			value,
+		)
+		assert.Equal(t,
+			&sema.OptionalType{Type: &sema.NeverType{}},
+			newType,
+		)
+	})
+
+	t.Run("nil (Some(nil): Never??) to Bool??", func(t *testing.T) {
+		// NOTE:
+		value, newType := inter.boxOptional(
+			NewSomeValueOwningNonCopying(NilValue{}),
+			&sema.OptionalType{Type: &sema.OptionalType{Type: &sema.NeverType{}}},
+			&sema.OptionalType{Type: &sema.OptionalType{Type: &sema.BoolType{}}},
+		)
+		assert.Equal(t,
+			NilValue{},
+			value,
+		)
+		assert.Equal(t,
+			&sema.OptionalType{Type: &sema.NeverType{}},
+			newType,
+		)
+	})
 }
 
 func TestInterpreterAnyBoxing(t *testing.T) {
 
-	inter, err := NewInterpreter(nil)
-	assert.Nil(t, err)
+	checker, err := sema.NewChecker(nil, utils.TestLocation)
+	require.NoError(t, err)
 
-	assert.Equal(t,
-		inter.boxAny(
-			BoolValue(true),
-			&sema.BoolType{},
-			&sema.AnyType{},
-		), AnyValue{
-			Value: BoolValue(true),
-			Type:  &sema.BoolType{},
-		},
-	)
+	inter, err := NewInterpreter(checker)
+	require.NoError(t, err)
 
-	assert.Equal(t,
-		inter.boxAny(
-			SomeValue{BoolValue(true)},
-			&sema.OptionalType{Type: &sema.BoolType{}},
-			&sema.OptionalType{Type: &sema.AnyType{}},
-		),
+	for _, anyType := range []sema.Type{
+		&sema.AnyStructType{},
+		&sema.AnyResourceType{},
+	} {
+		t.Run(anyType.String(), func(t *testing.T) {
 
-		SomeValue{
-			Value: AnyValue{
-				Value: BoolValue(true),
-				Type:  &sema.BoolType{},
-			},
-		},
-	)
+			t.Run(fmt.Sprintf("Bool to %s", anyType), func(t *testing.T) {
+				assert.Equal(t,
+					NewAnyValueOwningNonCopying(
+						BoolValue(true),
+						&sema.BoolType{},
+					),
+					inter.boxAny(
+						BoolValue(true),
+						&sema.BoolType{},
+						anyType,
+					),
+				)
+			})
 
-	// don't box already boxed
-	assert.Equal(t,
-		inter.boxAny(
-			AnyValue{
-				Value: BoolValue(true),
-				Type:  &sema.BoolType{},
-			},
-			&sema.AnyType{},
-			&sema.AnyType{},
-		),
-		AnyValue{
-			Value: BoolValue(true),
-			Type:  &sema.BoolType{},
-		},
-	)
+			t.Run(fmt.Sprintf("Bool? to %s?", anyType), func(t *testing.T) {
 
+				assert.Equal(t,
+					NewSomeValueOwningNonCopying(
+						NewAnyValueOwningNonCopying(
+							BoolValue(true),
+							&sema.BoolType{},
+						),
+					),
+					inter.boxAny(
+						NewSomeValueOwningNonCopying(BoolValue(true)),
+						&sema.OptionalType{Type: &sema.BoolType{}},
+						&sema.OptionalType{Type: anyType},
+					),
+				)
+			})
+
+			t.Run(fmt.Sprintf("%[1]s to %[1]s", anyType), func(t *testing.T) {
+				// don't box already boxed
+				assert.Equal(t,
+					NewAnyValueOwningNonCopying(
+						BoolValue(true),
+						&sema.BoolType{},
+					),
+					inter.boxAny(
+						NewAnyValueOwningNonCopying(
+							BoolValue(true),
+							&sema.BoolType{},
+						),
+						anyType,
+						anyType,
+					),
+				)
+			})
+		})
+	}
 }
 
 func TestInterpreterBoxing(t *testing.T) {
 
-	inter, err := NewInterpreter(nil)
-	assert.Nil(t, err)
+	checker, err := sema.NewChecker(nil, utils.TestLocation)
+	require.NoError(t, err)
 
-	assert.Equal(t,
-		inter.convertAndBox(
-			BoolValue(true),
-			&sema.BoolType{},
-			&sema.OptionalType{Type: &sema.AnyType{}},
-		),
-		SomeValue{
-			Value: AnyValue{
-				Value: BoolValue(true),
-				Type:  &sema.BoolType{},
-			},
-		},
-	)
+	inter, err := NewInterpreter(checker)
+	require.NoError(t, err)
 
-	assert.Equal(t,
-		inter.convertAndBox(
-			SomeValue{BoolValue(true)},
-			&sema.OptionalType{Type: &sema.BoolType{}},
-			&sema.OptionalType{Type: &sema.AnyType{}},
-		),
-		SomeValue{
-			Value: AnyValue{
-				Value: BoolValue(true),
-				Type:  &sema.BoolType{},
-			},
-		},
-	)
+	for _, anyType := range []sema.Type{
+		&sema.AnyStructType{},
+		&sema.AnyResourceType{},
+	} {
+
+		t.Run(anyType.String(), func(t *testing.T) {
+
+			t.Run(fmt.Sprintf("Bool to %s?", anyType), func(t *testing.T) {
+
+				assert.Equal(t,
+					NewSomeValueOwningNonCopying(
+						NewAnyValueOwningNonCopying(
+							BoolValue(true),
+							&sema.BoolType{},
+						),
+					),
+					inter.convertAndBox(
+						BoolValue(true),
+						&sema.BoolType{},
+						&sema.OptionalType{Type: anyType},
+					),
+				)
+
+			})
+
+			t.Run(fmt.Sprintf("Bool? to %s?", anyType), func(t *testing.T) {
+
+				assert.Equal(t,
+					NewSomeValueOwningNonCopying(
+						NewAnyValueOwningNonCopying(
+							BoolValue(true),
+							&sema.BoolType{},
+						),
+					),
+					inter.convertAndBox(
+						NewSomeValueOwningNonCopying(BoolValue(true)),
+						&sema.OptionalType{Type: &sema.BoolType{}},
+						&sema.OptionalType{Type: anyType},
+					),
+				)
+			})
+		})
+	}
 }

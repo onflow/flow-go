@@ -3,217 +3,79 @@
 package main
 
 import (
-	"math/rand"
-	"os"
-	"os/signal"
-	"time"
-
-	"github.com/rs/zerolog"
-	"github.com/spf13/pflag"
-
+	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
+	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
-	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff"
-	"github.com/dapperlabs/flow-go/engine/simulation/generator"
-	"github.com/dapperlabs/flow-go/module/committee"
+	"github.com/dapperlabs/flow-go/engine/consensus/provider"
+	"github.com/dapperlabs/flow-go/engine/simulation/subzero"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/network/codec/captain"
-	"github.com/dapperlabs/flow-go/network/trickle"
-	"github.com/dapperlabs/flow-go/network/trickle/cache"
-	"github.com/dapperlabs/flow-go/network/trickle/middleware"
-	"github.com/dapperlabs/flow-go/network/trickle/state"
+	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
 func main() {
 
-	// initialize signal catcher
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt)
-
-	// declare configuration parameters
 	var (
-		identity    string
-		entries     []string
-		timeout     time.Duration
-		connections uint
+		guarantees mempool.Guarantees
+		receipts   mempool.Receipts
+		approvals  mempool.Approvals
+		seals      mempool.Seals
+		prop       *propagation.Engine
+		prov       *provider.Engine
+		err        error
 	)
 
-	// bind configuration parameters
-	pflag.StringVarP(&identity, "identity", "i", "consensus1", "identity of our node")
-	pflag.StringSliceVarP(&entries, "entries", "e", []string{"consensus-consensus1@localhost:7297"}, "identity table entries for all nodes")
-	pflag.DurationVarP(&timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
-	pflag.UintVarP(&connections, "connections", "c", 0, "number of connections to establish to peers")
-
-	// parse configuration parameters
-	pflag.Parse()
-
-	// seed random generator
-	rand.Seed(time.Now().UnixNano())
-
-	log := zerolog.New(os.Stderr).With().Str("identity", identity).Logger()
-
-	log.Info().Msg("flow consensus node starting up")
-
-	log.Info().Msg("initializing engine modules")
-
-	// initialize the node identity list
-	com, err := committee.New(entries, identity)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize flow committee")
-	}
-
-	pool, err := mempool.New()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize engine mempool")
-	}
-
-	log.Info().Msg("initializing network modules")
-
-	codec := captain.NewCodec()
-
-	state, err := state.New()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize trickle state")
-	}
-
-	cache, err := cache.New()
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize trickle cache")
-	}
-
-	mw, err := middleware.New(log, codec, connections, com.Me().Address)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize trickle middleware")
-	}
-
-	log.Info().Msg("initializing trickle network")
-
-	net, err := trickle.NewNetwork(log, codec, com, mw, state, cache)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize trickle network")
-	}
-
-	log.Info().Msg("starting trickle network")
-
-	select {
-	case <-net.Ready():
-		log.Info().Msg("trickle network ready")
-	case <-time.After(timeout):
-		log.Fatal().Msg("could not start trickle network")
-	case <-sig:
-		log.Warn().Msg("trickle network start aborted")
-		os.Exit(1)
-	}
-
-	log.Info().Msg("initializing propagation engine")
-
-	// initialize the propagation engines
-	prop, err := propagation.New(log, net, com, pool)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize propagation engine")
-	}
-
-	log.Info().Msg("starting propagation engine")
-
-	select {
-	case <-prop.Ready():
-		log.Info().Msg("propagation engine ready")
-	case <-time.After(timeout):
-		log.Fatal().Msg("could not start propagation engine")
-	case <-sig:
-		log.Warn().Msg("propagation engine start aborted")
-		os.Exit(1)
-	}
-
-	log.Info().Msg("initializing generator engine")
-
-	// initialize the fake collection generation
-	gen, err := generator.New(log, prop)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize generator engine")
-	}
-
-	log.Info().Msg("starting generator engine")
-
-	select {
-	case <-gen.Ready():
-		log.Info().Msg("generator engine ready")
-	case <-time.After(timeout):
-		log.Fatal().Msg("could not start generator engine")
-	case <-sig:
-		log.Warn().Msg("generator engine start aborted")
-	}
-
-	cons, err := coldstuff.New(log, net, com, pool)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not initialize coldstuff engine")
-	}
-
-	log.Info().Msg("starting coldstuff engine")
-
-	select {
-	case <-cons.Ready():
-		log.Info().Msg("coldstuff engine ready")
-	case <-time.After(timeout):
-		log.Fatal().Msg("could not start coldstuff engine")
-	case <-sig:
-		log.Warn().Msg("coldstuff engine start aborted")
-		os.Exit(1)
-	}
-
-	log.Info().Msg("flow consensus node startup complete")
-
-	<-sig
-
-	log.Info().Msg("flow consensus node shutting down")
-
-	log.Info().Msg("stopping generator engine")
-
-	select {
-	case <-gen.Done():
-		log.Info().Msg("generator engine shutdown complete")
-	case <-time.After(timeout):
-		log.Fatal().Msg("could not stop generator engine")
-	case <-sig:
-		log.Warn().Msg("generator engine stop aborted")
-	}
-
-	log.Info().Msg("stopping coldstuff engine")
-
-	select {
-	case <-cons.Done():
-		log.Info().Msg("coldstuff engine shutdown complete")
-	case <-time.After(timeout):
-		log.Fatal().Msg("could not stop coldstuff engine")
-	case <-sig:
-		log.Warn().Msg("coldstuff engine stop aborted")
-		os.Exit(1)
-	}
-
-	log.Info().Msg("stopping propagation engine")
-
-	select {
-	case <-prop.Done():
-		log.Info().Msg("propagation engine shutdown complete")
-	case <-time.After(timeout):
-		log.Fatal().Msg("could not stop propagation engine")
-	case <-sig:
-		log.Warn().Msg("propagation engine stop aborted")
-		os.Exit(1)
-	}
-
-	log.Info().Msg("stopping trickle network")
-
-	select {
-	case <-net.Done():
-		log.Info().Msg("trickle network shutdown complete")
-	case <-time.After(timeout):
-		log.Fatal().Msg("could not stop trickle network")
-	case <-sig:
-		log.Warn().Msg("trickle network stop aborted")
-		os.Exit(1)
-	}
-
-	log.Info().Msg("flow consensus node shutdown complete")
-
-	os.Exit(0)
+	cmd.FlowNode("consensus").
+		Create(func(node *cmd.FlowNodeBuilder) {
+			node.Logger.Info().Msg("initializing guarantee mempool")
+			guarantees, err = stdmap.NewGuarantees()
+			node.MustNot(err).Msg("could not initialize guarantee mempool")
+		}).
+		Create(func(node *cmd.FlowNodeBuilder) {
+			node.Logger.Info().Msg("initializing receipt mempool")
+			receipts, err = stdmap.NewReceipts()
+			node.MustNot(err).Msg("could not initialize receipt mempool")
+		}).
+		Create(func(node *cmd.FlowNodeBuilder) {
+			node.Logger.Info().Msg("initializing approval mempool")
+			approvals, err = stdmap.NewApprovals()
+			node.MustNot(err).Msg("could not initialize approval mempool")
+		}).
+		Create(func(node *cmd.FlowNodeBuilder) {
+			node.Logger.Info().Msg("initializing seal mempool")
+			seals, err = stdmap.NewSeals()
+			node.MustNot(err).Msg("could not initialize seal mempool")
+		}).
+		Component("matching engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			node.Logger.Info().Msg("initializing result matching engine")
+			match, err := matching.New(node.Logger, node.Network, node.State, node.Me, receipts, approvals, seals)
+			node.MustNot(err).Msg("could not initialize matching engine")
+			return match
+		}).
+		Component("provider engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			node.Logger.Info().Msg("initializing block provider engine")
+			prov, err = provider.New(node.Logger, node.Network, node.State, node.Me)
+			node.MustNot(err).Msg("could not initialize provider engine")
+			return prov
+		}).
+		Component("propagation engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			node.Logger.Info().Msg("initializing guarantee propagation engine")
+			prop, err = propagation.New(node.Logger, node.Network, node.State, node.Me, guarantees)
+			node.MustNot(err).Msg("could not initialize propagation engine")
+			return prop
+		}).
+		Component("subzero engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			node.Logger.Info().Msg("initializing subzero consensus engine")
+			sub, err := subzero.New(node.Logger, prov, storage.NewBlocks(node.DB), node.State, node.Me, guarantees)
+			node.MustNot(err).Msg("could not initialize subzero engine")
+			return sub
+		}).
+		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Me)
+			node.MustNot(err).Msg("could not initialize guarantee ingestion engine")
+			return ing
+		}).
+		Run()
 }

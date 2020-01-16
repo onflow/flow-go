@@ -33,9 +33,9 @@ func (s Auth) String() string {
 	return str
 }
 
-func (s Auth) NodeId() (string, error) {
+func (s Auth) NodeId() ([]byte, error) {
 	p, err := s.Struct.Ptr(0)
-	return p.Text(), err
+	return []byte(p.Data()), err
 }
 
 func (s Auth) HasNodeId() bool {
@@ -43,13 +43,8 @@ func (s Auth) HasNodeId() bool {
 	return p.IsValid() || err != nil
 }
 
-func (s Auth) NodeIdBytes() ([]byte, error) {
-	p, err := s.Struct.Ptr(0)
-	return p.TextBytes(), err
-}
-
-func (s Auth) SetNodeId(v string) error {
-	return s.Struct.SetText(0, v)
+func (s Auth) SetNodeId(v []byte) error {
+	return s.Struct.SetData(0, v)
 }
 
 // Auth_List is a list of Auth.
@@ -221,11 +216,11 @@ func (s Announce) String() string {
 	return str
 }
 
-func (s Announce) EngineId() uint8 {
+func (s Announce) ChannelId() uint8 {
 	return s.Struct.Uint8(0)
 }
 
-func (s Announce) SetEngineId(v uint8) {
+func (s Announce) SetChannelId(v uint8) {
 	s.Struct.SetUint8(0, v)
 }
 
@@ -294,11 +289,11 @@ func (s Request) String() string {
 	return str
 }
 
-func (s Request) EngineId() uint8 {
+func (s Request) ChannelId() uint8 {
 	return s.Struct.Uint8(0)
 }
 
-func (s Request) SetEngineId(v uint8) {
+func (s Request) SetChannelId(v uint8) {
 	s.Struct.SetUint8(0, v)
 }
 
@@ -367,11 +362,11 @@ func (s Response) String() string {
 	return str
 }
 
-func (s Response) EngineId() uint8 {
+func (s Response) ChannelId() uint8 {
 	return s.Struct.Uint8(0)
 }
 
-func (s Response) SetEngineId(v uint8) {
+func (s Response) SetChannelId(v uint8) {
 	s.Struct.SetUint8(0, v)
 }
 
@@ -389,9 +384,9 @@ func (s Response) SetEventId(v []byte) error {
 	return s.Struct.SetData(0, v)
 }
 
-func (s Response) OriginId() (string, error) {
+func (s Response) OriginId() ([]byte, error) {
 	p, err := s.Struct.Ptr(1)
-	return p.Text(), err
+	return []byte(p.Data()), err
 }
 
 func (s Response) HasOriginId() bool {
@@ -399,18 +394,13 @@ func (s Response) HasOriginId() bool {
 	return p.IsValid() || err != nil
 }
 
-func (s Response) OriginIdBytes() ([]byte, error) {
-	p, err := s.Struct.Ptr(1)
-	return p.TextBytes(), err
+func (s Response) SetOriginId(v []byte) error {
+	return s.Struct.SetData(1, v)
 }
 
-func (s Response) SetOriginId(v string) error {
-	return s.Struct.SetText(1, v)
-}
-
-func (s Response) TargetIds() (capnp.TextList, error) {
+func (s Response) TargetIds() (capnp.DataList, error) {
 	p, err := s.Struct.Ptr(2)
-	return capnp.TextList{List: p.List()}, err
+	return capnp.DataList{List: p.List()}, err
 }
 
 func (s Response) HasTargetIds() bool {
@@ -418,16 +408,16 @@ func (s Response) HasTargetIds() bool {
 	return p.IsValid() || err != nil
 }
 
-func (s Response) SetTargetIds(v capnp.TextList) error {
+func (s Response) SetTargetIds(v capnp.DataList) error {
 	return s.Struct.SetPtr(2, v.List.ToPtr())
 }
 
 // NewTargetIds sets the targetIds field to a newly
-// allocated capnp.TextList, preferring placement in s's segment.
-func (s Response) NewTargetIds(n int32) (capnp.TextList, error) {
-	l, err := capnp.NewTextList(s.Struct.Segment(), n)
+// allocated capnp.DataList, preferring placement in s's segment.
+func (s Response) NewTargetIds(n int32) (capnp.DataList, error) {
+	l, err := capnp.NewDataList(s.Struct.Segment(), n)
 	if err != nil {
-		return capnp.TextList{}, err
+		return capnp.DataList{}, err
 	}
 	err = s.Struct.SetPtr(2, l.List.ToPtr())
 	return l, err
@@ -473,37 +463,38 @@ func (p Response_Promise) Struct() (Response, error) {
 	return Response{s}, err
 }
 
-const schema_f71cc0af2f870b3c = "x\xda\xac\x90?h\x13Q\x1c\xc7\xbf\xdf\xf7\xde]S" +
-	"l\x02\xc7\xdd\"*\x9d\xac\x0a\xa2V-h\xb5\xa4\xba" +
-	"E\x14\xf2\xba9\x88\x84\xdc#\x86\x96w1\x7f,\x82" +
-	"\xa5*\x14+qPp\xca\"\x82\x0e\x05!\xe2\xd8E" +
-	";\x09\x8a\x8b\x93\xb8X\x07\x117\xd1\xa1\xe3\xc9]!" +
-	"\x954\x88\xa0\xdb\x8f\xbb\xcf\xf7\xfby\xbf\xdf\x91\x1f\x9c" +
-	"\x16\xe3\xce\xa3\x0c\xa0C\xc7\x8do\xbf\xd9\xa9\xa6/\x9f" +
-	"jC\xe7\xc8\xf8\xf4\x8e;\x87\xbb\xafvo@\x0d\x01" +
-	"\xfe\x84\xea\xf8S\xe9tR\xe5\xc1\xd8\x1b\xfb9\x1c\xd3" +
-	"]\x1b\xc4^T\x1d\xbf\x94N\x97Rv_\xf7\xed\xd0" +
-	"\xd7\x8dw\x1f\xe0\xe5~C\x1d&\xc4\x82\xea\xf8K)" +
-	"{+e\xf7t\xdbkm3\xfb\xb1\xafw\x13~\xac" +
-	"V\xfd\x95\x14~\xaa\xe6\xc1x\xd7\xfa\xa7\xd7\x13{\xa3" +
-	"\xf5~8E\x1cg\xd5\xcf:C\xc0\xb1ag\x94`" +
-	"\xfc\xed\xf3\xf9\x0b\xdf_\x8e}\x19X=\xe1\xbe\xf0\xa7" +
-	"\xdct?w\x1e\xef\xe3f\xbdZ\x9e\x9d3\x87X." +
-	"\xd5lm\xb2X\x95\xb6R$\xb5\x92\x0aP\x04\xbc\xec" +
-	"Q@g$u 8j#[6\xcc@0\x03n" +
-	"\x0bG\xff\x10>\xd3\x92\xcd+}\xe1\xc9\xadp\xdeF" +
-	"\xa1)\x84\x1c\x81\xe0\xc8\x80\xb4\xcd\xdb\xa8e\xcb&i" +
-	"\xc8\xf4\x1a\x0e\x9c\x03\xf4~I}\\\x90\x0c\x98|\x1b" +
-	"?\x0b\xe8\x83\x92\xfa\x84`ll\xa5jM!\x04@" +
-	"\x17\x82.\xb8h\xae\x19\xdb,\x84\xccB0\xbb]5" +
-	"c\xf2\x8dZd\x1b\xa9*\xe8\xa9\x16\x12\xd5\x0dI\xbd" +
-	"\xbc\xa5ZJT7%\xf5=AO0\xa0\x00\xbc\xbb" +
-	"\x09\xb8,\xa9\x1f\x0azR\x04\x94\x80\xf7`\x06\xd0\xf7" +
-	"%\xf53AO\xc9\x80\x0a\xf0V\x92\xf8\x13I\xfd\xfc" +
-	"/_\x1a\xd5\xab\x95\xaa\xdddz\x87*\xd5+\xa6Y" +
-	"\x08\xc1\x06s`Q2\xfd\x95\x03\x17k\xa5\xebsQ" +
-	"\xe9\x0f\x8b\x8e^m\x99F\xf3\xff\x9f\xf4W\x00\x00\x00" +
-	"\xff\xff/\x88\xc9\xe8"
+const schema_f71cc0af2f870b3c = "x\xda\xac\x90\xcfk\x13A\x18\x86\xbfwf6I\x91" +
+	"T\xb6\xbb\x1e\x8a\x86\x9c\xac?\x10c\xab\x05\xa9B[" +
+	"\xc1CD!\xd3\x937Y6C\x12\x1agcvc" +
+	"\x11\x94\x8a V\xe2AA\xf0,x\x11\x94\x98?@" +
+	"4'A\xf1\xaeB\xb1\x1e\x8a\xe4 \x08\x1ez\\\x99" +
+	"\x15R\x09\x85\xe6\xd0\xdb\xf0\xcd\xf3>\xef7sj\x1d" +
+	"\x0bl\xdaz\x96&\x92W\xadT|\xef\xe3\xa4X\xb8" +
+	"v\xaeM2\x07\xc4\xe7\xf7=(t\xde\x1f\xda\"\x91" +
+	"&:\xdd\xe5\x13pz<M\xe4\xbc\xe5\xf3\x84\xd8\x9e" +
+	"\xfa3\x16#\xd5\xdb\x09^7\xf0\xaf\x04\xee'\xf0\x91" +
+	"\xce\xa7\xf4\xcf\xad\xcf_\xc8\xce\xfd\xc7Z0\xf0\x98\x98" +
+	"\x803ir\xce\x01a\xe0\\\xa7\xddk\xab\xe5oC" +
+	"\xe6\x7f\xf4\xac\x98\x81s1\xa1\x17\xc5\x0a!>\xb8\xf1" +
+	"\xfd\xc3\xec\xe1`c\x98N\x16yn\xe8nr|-" +
+	"\xf2 \xc4\xfd\x1f\x97\xaf\xfc~7\xb5\xb9\xa3\xfc\xabu" +
+	"\x1cN\xdf2\xf2Mk\x85\xbaq\xe8W\xd5u\xaf\xe0" +
+	"s\xaf\x11y5]\x88\x9a5\x7f\xb9\xaeN\xfa^C" +
+	"7\xe6J5\x8dJ\x09\x90\x82\x0b\"\x01\";;C" +
+	"$3\x1c\xd2e\xc8\xeb@\xfb\x0a\x19b\xc8\x10vs" +
+	"\x05{\xe7ZlE\xa8\x0e\xb9\xe6\xb6]\xf3:(\xab" +
+	"b\x19Yb\xc8\xee.\xd3:\x1f\xb4\xb4\xaf\x8c03" +
+	"\x10\x1e[\"\x92G9\xe4\x19\x06\xc0\x85\x99M_ " +
+	"\x92'8\xe4Y\x86\xd8\xafzZ\xabz\x91PF\x8a" +
+	"\x18R\x84UuS\xe9h\xe4\xe6%\x15\xe6\x1b\x81\x0e" +
+	"\x93fw\xd0|\xc74\xdf\xe6\x90k\xdb\xcd\xf7M\xf3" +
+	"]\x0e\xf9\x88\xc1fp\xc1\x88\xec\x87\x97\x88\xe4\x1a\x87" +
+	"|\xca`s\xe6\x82\x13\xd9OL\xfa1\x87|\xc5`" +
+	"\x0b\xeeB\x10\xd9/M\xfc\x05\x87|3\xe2\xe2A\xb3" +
+	"V\xa9\xe9b\x99\x88\x06\xb3\xc8kVTT,\x13B" +
+	"\x8c\x13J\x1c\xc9\xd58a\xb5\xe1\xdd\xaa\x07\xde\xe8\xef" +
+	"\xbe\xb1\xbf\xa5\xc2h\xef?\xfco\x00\x00\x00\xff\xffR" +
+	"\xe8\xef\x1a"
 
 func init() {
 	schemas.Register(schema_f71cc0af2f870b3c,

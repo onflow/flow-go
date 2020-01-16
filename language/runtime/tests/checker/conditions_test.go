@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -22,7 +23,7 @@ func TestCheckFunctionConditions(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidFunctionPreConditionReference(t *testing.T) {
@@ -69,13 +70,12 @@ func TestCheckInvalidFunctionNonBoolCondition(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 }
 
 func TestCheckFunctionPostConditionWithBefore(t *testing.T) {
 
-	_, err := ParseAndCheck(t, `
+	checker, err := ParseAndCheck(t, `
       fun test(x: Int) {
           post {
               before(x) != 0
@@ -83,7 +83,25 @@ func TestCheckFunctionPostConditionWithBefore(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
+
+	assert.Len(t, checker.Elaboration.VariableDeclarationValueTypes, 1)
+	assert.Len(t, checker.Elaboration.VariableDeclarationTargetTypes, 1)
+}
+
+func TestCheckFunctionPostConditionWithBeforeNotDeclaredUse(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      fun test() {
+          post {
+              before(x) != 0
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
 }
 
 func TestCheckInvalidFunctionPostConditionWithBeforeAndNoArgument(t *testing.T) {
@@ -99,9 +117,7 @@ func TestCheckInvalidFunctionPostConditionWithBeforeAndNoArgument(t *testing.T) 
 	errs := ExpectCheckerErrors(t, err, 2)
 
 	assert.IsType(t, &sema.ArgumentCountError{}, errs[0])
-
 	assert.IsType(t, &sema.InvalidBinaryOperandsError{}, errs[1])
-
 }
 
 func TestCheckInvalidFunctionPreConditionWithBefore(t *testing.T) {
@@ -147,7 +163,7 @@ func TestCheckFunctionWithBeforeVariable(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckFunctionPostCondition(t *testing.T) {
@@ -162,7 +178,7 @@ func TestCheckFunctionPostCondition(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidFunctionPreConditionWithResult(t *testing.T) {
@@ -212,7 +228,7 @@ func TestCheckFunctionPostConditionWithResult(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidFunctionPostConditionWithResult(t *testing.T) {
@@ -245,7 +261,7 @@ func TestCheckFunctionWithoutReturnTypeAndLocalResultAndPostConditionWithResult(
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckFunctionWithoutReturnTypeAndResultParameterAndPostConditionWithResult(t *testing.T) {
@@ -258,7 +274,7 @@ func TestCheckFunctionWithoutReturnTypeAndResultParameterAndPostConditionWithRes
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidFunctionWithReturnTypeAndLocalResultAndPostConditionWithResult(t *testing.T) {
@@ -290,7 +306,7 @@ func TestCheckFunctionWithReturnTypeAndResultParameterAndPostConditionWithResult
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidFunctionPostConditionWithFunction(t *testing.T) {
@@ -318,7 +334,7 @@ func TestCheckFunctionPostConditionWithMessageUsingStringLiteral(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidFunctionPostConditionWithMessageUsingBooleanLiteral(t *testing.T) {
@@ -347,7 +363,7 @@ func TestCheckFunctionPostConditionWithMessageUsingResult(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckFunctionPostConditionWithMessageUsingBefore(t *testing.T) {
@@ -360,7 +376,7 @@ func TestCheckFunctionPostConditionWithMessageUsingBefore(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckFunctionPostConditionWithMessageUsingParameter(t *testing.T) {
@@ -373,5 +389,5 @@ func TestCheckFunctionPostConditionWithMessageUsingParameter(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }

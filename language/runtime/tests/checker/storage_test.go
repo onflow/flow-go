@@ -12,22 +12,21 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-var storageValueDeclaration = map[string]sema.ValueDeclaration{
-	"storage": stdlib.StandardLibraryValue{
-		Name:       "storage",
-		Type:       &sema.StorageType{},
-		Kind:       common.DeclarationKindConstant,
-		IsConstant: true,
-	},
+var storageValueDeclaration = stdlib.StandardLibraryValue{
+	Name:       "storage",
+	Type:       &sema.StorageType{},
+	Kind:       common.DeclarationKindConstant,
+	IsConstant: true,
 }
 
-func ParseAndCheckWithStorage(t *testing.T, code string) (*sema.Checker, error) {
+func ParseAndCheckStorage(t *testing.T, code string) (*sema.Checker, error) {
 	return ParseAndCheckWithOptions(t,
 		code,
 		ParseAndCheckOptions{
 			Options: []sema.Option{
-				sema.WithPredeclaredValues(storageValueDeclaration),
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+				sema.WithPredeclaredValues(map[string]sema.ValueDeclaration{
+					"storage": storageValueDeclaration,
+				}),
 			},
 		},
 	)
@@ -35,85 +34,202 @@ func ParseAndCheckWithStorage(t *testing.T, code string) (*sema.Checker, error) 
 
 func TestCheckStorageIndexing(t *testing.T) {
 
-	checker, err := ParseAndCheckWithStorage(t,
-		`
-          let a = storage[Int]
-          let b = storage[Bool]
-          let c = storage[[Int]]
-          let d = storage[{String: Int}]
-        `,
-	)
+	t.Run("resource", func(t *testing.T) {
+		checker, err := ParseAndCheckStorage(t,
+			`
+              resource R {}
 
-	require.Nil(t, err)
+              let r <- storage[R] <- nil
+            `,
+		)
 
-	assert.Equal(t,
-		&sema.OptionalType{
-			Type: &sema.IntType{},
-		},
-		checker.GlobalValues["a"].Type,
-	)
+		require.NoError(t, err)
 
-	assert.Equal(t,
-		&sema.OptionalType{
-			Type: &sema.BoolType{},
-		},
-		checker.GlobalValues["b"].Type,
-	)
+		rType := checker.GlobalTypes["R"].Type
 
-	assert.Equal(t,
-		&sema.OptionalType{
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
+		assert.Equal(t,
+			&sema.OptionalType{
+				Type: rType,
 			},
-		},
-		checker.GlobalValues["c"].Type,
-	)
+			checker.GlobalValues["r"].Type,
+		)
+	})
 
-	assert.Equal(t,
-		&sema.OptionalType{
-			Type: &sema.DictionaryType{
-				KeyType:   &sema.StringType{},
-				ValueType: &sema.IntType{},
+	t.Run("reference", func(t *testing.T) {
+		checker, err := ParseAndCheckStorage(t,
+			`
+              resource R {}
+
+              let r = storage[&R]
+            `,
+		)
+
+		require.NoError(t, err)
+
+		rType := checker.GlobalTypes["R"].Type
+
+		assert.Equal(t,
+			&sema.OptionalType{
+				Type: &sema.ReferenceType{
+					Type: rType,
+				},
 			},
-		},
-		checker.GlobalValues["d"].Type,
-	)
+			checker.GlobalValues["r"].Type,
+		)
+	})
+
+	t.Run("resource array", func(t *testing.T) {
+		checker, err := ParseAndCheckStorage(t,
+			`
+              resource R {}
+
+              let r <- storage[[R]] <- nil
+            `,
+		)
+
+		require.NoError(t, err)
+
+		rType := checker.GlobalTypes["R"].Type
+
+		assert.Equal(t,
+			&sema.OptionalType{
+				Type: &sema.VariableSizedType{
+					Type: rType,
+				},
+			},
+			checker.GlobalValues["r"].Type,
+		)
+	})
+
+	t.Run("resource dictionary", func(t *testing.T) {
+		checker, err := ParseAndCheckStorage(t,
+			`
+              resource R {}
+
+              let r <- storage[{String: R}] <- nil
+            `,
+		)
+
+		require.NoError(t, err)
+
+		rType := checker.GlobalTypes["R"].Type
+
+		assert.Equal(t,
+			&sema.OptionalType{
+				Type: &sema.DictionaryType{
+					KeyType:   &sema.StringType{},
+					ValueType: rType,
+				},
+			},
+			checker.GlobalValues["r"].Type,
+		)
+	})
 }
 
 func TestCheckStorageIndexingAssignment(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
-		`
-          fun test() {
-              storage[Int] = 1
-              storage[Bool] = true
-          }
-        `,
-	)
+	t.Run("resource", func(t *testing.T) {
+		_, err := ParseAndCheckStorage(t,
+			`
+              resource R {}
 
-	assert.Nil(t, err)
+              fun test() {
+                  let oldR <- storage[R] <- create R()
+                  destroy oldR
+              }
+            `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("reference", func(t *testing.T) {
+		_, err := ParseAndCheckStorage(t,
+			`
+              resource R {}
+
+              fun test() {
+                  storage[&R] = &storage[R] as R
+              }
+            `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("resource array", func(t *testing.T) {
+		_, err := ParseAndCheckStorage(t,
+			`
+              resource R {}
+
+              fun test() {
+                  let oldRs <- storage[[R]] <- [<-create R()]
+                  destroy oldRs
+              }
+            `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("resource dictionary", func(t *testing.T) {
+		_, err := ParseAndCheckStorage(t,
+			`
+              resource R {}
+
+              fun test() {
+                  let oldRs <- storage[{String: R}] <- {"r": <-create R()}
+                  destroy oldRs
+              }
+            `,
+		)
+
+		require.NoError(t, err)
+	})
 }
 
 func TestCheckInvalidStorageIndexingAssignment(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
-		`
-          fun test() {
-              storage[Int] = "1"
-              storage[Bool] = 1
-          }
-        `,
-	)
+	t.Run("resource", func(t *testing.T) {
 
-	errs := ExpectCheckerErrors(t, err, 2)
+		_, err := ParseAndCheckStorage(t,
+			`
+              resource R {}
 
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
+              fun test() {
+                  storage[R] = "1"
+              }
+            `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 3)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		assert.IsType(t, &sema.IncorrectTransferOperationError{}, errs[1])
+		assert.IsType(t, &sema.InvalidResourceAssignmentError{}, errs[2])
+	})
+
+	t.Run("reference", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t,
+			`
+              resource R {}
+
+              fun test() {
+                  storage[&R] = true
+              }
+            `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
 }
 
 func TestCheckInvalidStorageIndexingAssignmentWithExpression(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           fun test() {
               storage["1"] = "1"
@@ -128,7 +244,7 @@ func TestCheckInvalidStorageIndexingAssignmentWithExpression(t *testing.T) {
 
 func TestCheckInvalidStorageIndexingWithExpression(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           let x = storage["1"]
         `,
@@ -137,4 +253,59 @@ func TestCheckInvalidStorageIndexingWithExpression(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.InvalidTypeIndexingError{}, errs[0])
+}
+
+func TestCheckStorageIndexingWithResourceTypeInVariableDeclaration(t *testing.T) {
+
+	checker, err := ParseAndCheckStorage(t,
+		`
+          resource R {}
+
+          fun test() {
+              let r <- storage[R] <- create R()
+              destroy r
+          }
+        `,
+	)
+
+	require.NoError(t, err)
+
+	assert.Len(t, checker.Elaboration.IsResourceMovingStorageIndexExpression, 1)
+}
+
+func TestCheckStorageIndexingWithResourceTypeInSwap(t *testing.T) {
+
+	checker, err := ParseAndCheckStorage(t,
+		`
+          resource R {}
+
+          fun test() {
+              var r: @R? <- create R()
+              storage[R] <-> r
+              destroy r
+          }
+        `,
+	)
+
+	require.NoError(t, err)
+
+	assert.Len(t, checker.Elaboration.IsResourceMovingStorageIndexExpression, 1)
+}
+
+func TestCheckInvalidResourceMoveOutOfStorage(t *testing.T) {
+
+	_, err := ParseAndCheckStorage(t, `
+      resource R {}
+
+      fun test() {
+          consume(<-storage[R])
+      }
+
+      fun consume(_ r: @R?) {
+          destroy r
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
 }

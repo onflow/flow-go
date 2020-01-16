@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -15,7 +16,7 @@ func TestCheckBoolean(t *testing.T) {
         let x = true
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.BoolType{},

@@ -4,27 +4,28 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-func TestCheckFailableCastingAny(t *testing.T) {
+func TestCheckFailableCastingAnyStruct(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
-      let x: Any = 1
+      let x: AnyStruct = 1
       let y: Int? = x as? Int
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.NotEmpty(t, checker.Elaboration.CastingTargetTypes)
 }
 
-func TestCheckInvalidFailableCastingAny(t *testing.T) {
+func TestCheckInvalidFailableCastingAnyStruct(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-      let x: Any = 1
+      let x: AnyStruct = 1
       let y: Bool? = x as? Int
     `)
 
@@ -65,10 +66,10 @@ func TestCheckInvalidFailableCastingInterface(t *testing.T) {
 }
 
 // TODO: add support for "wrapped" Any: optional, array, dictionary
-func TestCheckInvalidFailableCastingOptionalAny(t *testing.T) {
+func TestCheckInvalidFailableCastingOptionalAnyStruct(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-      let x: Any? = 1
+      let x: AnyStruct? = 1
       let y: Int?? = x as? Int?
     `)
 
@@ -78,10 +79,10 @@ func TestCheckInvalidFailableCastingOptionalAny(t *testing.T) {
 }
 
 // TODO: add support for "wrapped" Any: optional, array, dictionary
-func TestCheckInvalidFailableCastingArrayAny(t *testing.T) {
+func TestCheckInvalidFailableCastingArrayAnyStruct(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-      let x: [Any] = [1]
+      let x: [AnyStruct] = [1]
       let y: [Int]? = x as? [Int]
     `)
 
@@ -90,24 +91,24 @@ func TestCheckInvalidFailableCastingArrayAny(t *testing.T) {
 	assert.IsType(t, &sema.UnsupportedTypeError{}, errs[0])
 }
 
-func TestCheckOptionalAnyFailableCastingNil(t *testing.T) {
+func TestCheckOptionalAnyStructFailableCastingNil(t *testing.T) {
 
 	checker, err := ParseAndCheck(t, `
-      let x: Any? = nil
+      let x: AnyStruct? = nil
       let y = x ?? 23
       let z = y as? Int
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
-		&sema.OptionalType{Type: &sema.AnyType{}},
+		&sema.OptionalType{Type: &sema.AnyStructType{}},
 		checker.GlobalValues["x"].Type,
 	)
 
 	// TODO: record result type of conditional and box to any in interpreter
 	assert.Equal(t,
-		&sema.AnyType{},
+		&sema.AnyStructType{},
 		checker.GlobalValues["y"].Type,
 	)
 

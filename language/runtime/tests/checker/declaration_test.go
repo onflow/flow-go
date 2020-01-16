@@ -1,9 +1,11 @@
 package checker
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
@@ -17,7 +19,7 @@ func TestCheckConstantAndVariableDeclarations(t *testing.T) {
         var y = 1
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.IsType(t,
 		&sema.IntType{},
@@ -179,7 +181,7 @@ func TestCheckInvalidConstantValue(t *testing.T) {
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
-func TestCheckInvalidReference(t *testing.T) {
+func TestCheckInvalidUse(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       fun test() {
@@ -199,9 +201,10 @@ func TestCheckInvalidVariableDeclarationSecondValueNotDeclared(t *testing.T) {
        let z = y = x
    `)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.NotDeclaredError{}, errs[0])
+	assert.IsType(t, &sema.NonResourceTypeError{}, errs[0])
+	assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
 }
 
 func TestCheckInvalidVariableDeclarationSecondValueCopyTransfers(t *testing.T) {
@@ -322,7 +325,7 @@ func TestCheckVariableDeclarationSecondValue(t *testing.T) {
      let r <- y
    `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.IsType(t,
 		&sema.CompositeType{},
@@ -359,7 +362,7 @@ func TestCheckVariableDeclarationSecondValueDictionary(t *testing.T) {
      let r <- ys.remove(key: "r")
    `)
 
-	assert.Nil(t, err)
+	require.Nil(t, err)
 
 	assert.IsType(t,
 		&sema.CompositeType{},
@@ -380,4 +383,145 @@ func TestCheckVariableDeclarationSecondValueDictionary(t *testing.T) {
 		&sema.OptionalType{},
 		checker.GlobalValues["r"].Type,
 	)
+}
+
+func TestCheckVariableDeclarationSecondValueNil(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource R {}
+
+     fun test() {
+         var x: @R? <- create R()
+         let y <- x <- nil
+         destroy x
+         destroy y
+     }
+   `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckTopLevelContractRestriction(t *testing.T) {
+
+	_, err := ParseAndCheckWithOptions(t,
+		`
+          contract C {}
+        `,
+		ParseAndCheckOptions{
+			Options: []sema.Option{
+				sema.WithValidTopLevelDeclarations(
+					[]common.DeclarationKind{
+						common.DeclarationKindContract,
+						common.DeclarationKindImport,
+					},
+				),
+			},
+		},
+	)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidTopLevelContractRestriction(t *testing.T) {
+
+	tests := map[string]string{
+		"resource":           `resource Test {}`,
+		"struct":             `struct Test {}`,
+		"resource interface": `resource interface Test {}`,
+		"struct interface":   `struct interface Test {}`,
+		"event":              `event Test()`,
+		"function":           `fun test() {}`,
+		"transaction":        `transaction { execute {} }`,
+		"constant":           `var x = 1`,
+		"variable":           `let x = 1`,
+	}
+
+	for name, code := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := ParseAndCheckWithOptions(t,
+				code,
+				ParseAndCheckOptions{
+					Options: []sema.Option{
+						sema.WithValidTopLevelDeclarations(
+							[]common.DeclarationKind{
+								common.DeclarationKindContractInterface,
+								common.DeclarationKindContract,
+								common.DeclarationKindImport,
+							},
+						),
+					},
+				},
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidTopLevelDeclarationError{}, errs[0])
+		})
+	}
+}
+
+func TestCheckInvalidLocalDeclarations(t *testing.T) {
+
+	tests := map[string]string{
+		"transaction": `transaction { execute {} }`,
+		"import":      `import 0x1`,
+	}
+
+	// composites and interfaces
+
+	for _, kind := range common.AllCompositeKinds {
+		for _, isInterface := range []bool{true, false} {
+
+			if !kind.SupportsInterfaces() && isInterface {
+				continue
+			}
+
+			interfaceKeyword := ""
+			if isInterface {
+				interfaceKeyword = "interface"
+			}
+
+			name := fmt.Sprintf(
+				"%s %s",
+				kind.Keyword(),
+
+				interfaceKeyword,
+			)
+
+			body := "{}"
+			if kind == common.CompositeKindEvent {
+				body = "()"
+			}
+
+			tests[name] = fmt.Sprintf(
+				`%s %s Test %s`,
+				kind.Keyword(),
+				interfaceKeyword,
+				body,
+			)
+		}
+	}
+
+	//
+
+	for name, code := range tests {
+		t.Run(name, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      fun test() {
+                          %s
+                      }
+                    `,
+					code,
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+
+		})
+	}
 }

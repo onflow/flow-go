@@ -4,14 +4,14 @@ import "fmt"
 
 type Program struct {
 	// all declarations, in the order they are defined
-	Declarations          []Declaration
-	importDeclarations    []*ImportDeclaration
-	interfaceDeclarations []*InterfaceDeclaration
-	compositeDeclarations []*CompositeDeclaration
-	functionDeclarations  []*FunctionDeclaration
-	eventDeclarations     []*EventDeclaration
-	importedPrograms      map[LocationID]*Program
-	importLocations       []Location
+	Declarations            []Declaration
+	importDeclarations      []*ImportDeclaration
+	interfaceDeclarations   []*InterfaceDeclaration
+	compositeDeclarations   []*CompositeDeclaration
+	functionDeclarations    []*FunctionDeclaration
+	transactionDeclarations []*TransactionDeclaration
+	importedPrograms        map[LocationID]*Program
+	importLocations         []Location
 }
 
 func (p *Program) StartPosition() Position {
@@ -83,16 +83,16 @@ func (p *Program) FunctionDeclarations() []*FunctionDeclaration {
 	return p.functionDeclarations
 }
 
-func (p *Program) EventDeclarations() []*EventDeclaration {
-	if p.eventDeclarations == nil {
-		p.eventDeclarations = make([]*EventDeclaration, 0)
+func (p *Program) TransactionDeclarations() []*TransactionDeclaration {
+	if p.transactionDeclarations == nil {
+		p.transactionDeclarations = make([]*TransactionDeclaration, 0)
 		for _, declaration := range p.Declarations {
-			if eventDeclaration, ok := declaration.(*EventDeclaration); ok {
-				p.eventDeclarations = append(p.eventDeclarations, eventDeclaration)
+			if transactionDeclaration, ok := declaration.(*TransactionDeclaration); ok {
+				p.transactionDeclarations = append(p.transactionDeclarations, transactionDeclaration)
 			}
 		}
 	}
-	return p.eventDeclarations
+	return p.transactionDeclarations
 }
 
 // ImportedPrograms returns the sub-programs imported by this program, indexed by location ID.
@@ -134,7 +134,7 @@ type CyclicImportsError struct {
 }
 
 func (e CyclicImportsError) Error() string {
-	return fmt.Sprintf("cyclic import of %s", e.Location)
+	return fmt.Sprintf("cyclic import of `%s`", e.Location)
 }
 
 func (p *Program) resolveImports(

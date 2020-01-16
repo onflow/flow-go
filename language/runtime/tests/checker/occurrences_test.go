@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
@@ -20,7 +21,7 @@ func TestCheckOccurrencesVariableDeclarations(t *testing.T) {
         var y = x
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	occurrences := checker.Occurrences.All()
 
@@ -83,7 +84,7 @@ func TestCheckOccurrencesFunction(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	occurrences := checker.Occurrences.All()
 
@@ -215,7 +216,7 @@ func TestCheckOccurrencesStructAndInterface(t *testing.T) {
 	    }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	occurrences := checker.Occurrences.All()
 
@@ -289,7 +290,7 @@ func TestCheckOccurrencesStructAndInterface(t *testing.T) {
 			EndPos:          sema.Position{Line: 14, Column: 16},
 			OriginStartPos:  &sema.Position{Line: 4, Column: 12},
 			OriginEndPos:    &sema.Position{Line: 4, Column: 12},
-			DeclarationKind: common.DeclarationKindFunction,
+			DeclarationKind: common.DeclarationKindStructure,
 		},
 	}
 

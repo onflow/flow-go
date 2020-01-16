@@ -6,34 +6,40 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/dapperlabs/flow-go/model/collection"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
+	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
+	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
-func TestOnGuaranteedCollection(t *testing.T) {
+func TestOnCollectionGuarantee(t *testing.T) {
 
 	// initialize the mocks and engine
-	pool := &module.Mempool{}
-	com := &module.Committee{}
 	con := &network.Conduit{}
+	state := &protocol.State{}
+	ss := &protocol.Snapshot{}
+	me := &module.Local{}
+	pool := &mempool.Guarantees{}
 	e := &Engine{
-		pool: pool,
-		com:  com,
-		con:  con,
+		con:   con,
+		state: state,
+		me:    me,
+		pool:  pool,
 	}
 
 	// create random collection
-	hash := make([]byte, 32)
-	_, _ = rand.Read(hash)
-	coll := &collection.GuaranteedCollection{Hash: hash}
+	var collID flow.Identifier
+	_, _ = rand.Read(collID[:])
+	coll := &flow.CollectionGuarantee{CollectionID: collID}
 
 	// NOTE: as this function relies on two other functions that have their own
 	// unit tests, we only set up and check the behaviour that proxies the
@@ -41,145 +47,158 @@ func TestOnGuaranteedCollection(t *testing.T) {
 	// happy path; anything else would be redundant
 
 	// check that we propagate if collection is new
-	pool.On("Has", mock.Anything).Return(false).Once()
 	pool.On("Add", mock.Anything).Return(nil).Once()
-	com.On("Me").Return(flow.Identity{}).Once()
-	com.On("Select").Return(flow.IdentityList{}).Once()
+	me.On("NodeID").Return(flow.Identifier{}).Once()
+	state.On("Final").Return(ss).Once()
+	ss.On("Identities", mock.Anything, mock.Anything).Return(flow.IdentityList{}, nil).Once()
 	con.On("Submit", mock.Anything, mock.Anything).Return(nil).Once()
-	err := e.onGuaranteedCollection("", coll)
+	err := e.onGuarantee(flow.Identifier{}, coll)
 	assert.Nil(t, err)
 	con.AssertExpectations(t)
 
 	// check that we don't propagate if processing fails
-	pool.On("Has", mock.Anything).Return(true).Once()
-	err = e.onGuaranteedCollection("", coll)
+	pool.On("Add", mock.Anything).Return(errors.New("dummy")).Once()
+	err = e.onGuarantee(flow.Identifier{}, coll)
 	assert.NotNil(t, err)
 	con.AssertExpectations(t)
 
 	// check that we error if propagation fails
-	pool.On("Has", mock.Anything).Return(false).Once()
 	pool.On("Add", mock.Anything).Return(nil).Once()
-	com.On("Me").Return(flow.Identity{}).Once()
-	com.On("Select").Return(flow.IdentityList{}).Once()
+	me.On("NodeID").Return(flow.Identifier{}).Once()
+	state.On("Final").Return(ss).Once()
+	ss.On("Identities", mock.Anything, mock.Anything).Return(flow.IdentityList{}, nil).Once()
 	con.On("Submit", mock.Anything, mock.Anything).Return(errors.New("dummy")).Once()
-	err = e.onGuaranteedCollection("", coll)
+	err = e.onGuarantee(flow.Identifier{}, coll)
 	assert.NotNil(t, err)
 	con.AssertExpectations(t)
 }
 
-func TestProcessGuaranteedCollection(t *testing.T) {
+func TestProcessCollectionGuarantee(t *testing.T) {
 
 	// initialize mocks and engine
-	pool := &module.Mempool{}
+	pool := &mempool.Guarantees{}
 	e := Engine{
 		pool: pool,
 	}
 
 	// generate n random collections
 	n := 3
-	collections := make([]*collection.GuaranteedCollection, 0, n)
+	collections := make([]*flow.CollectionGuarantee, 0, n)
 	for i := 0; i < n; i++ {
-		hash := make([]byte, 32)
-		_, _ = rand.Read(hash)
-		coll := &collection.GuaranteedCollection{Hash: hash}
+		var collID flow.Identifier
+		_, _ = rand.Read(collID[:])
+		coll := &flow.CollectionGuarantee{CollectionID: collID}
 		collections = append(collections, coll)
 	}
 
-	// test processing of collections for the first time
+	// test storing of collections for the first time
 	for i, coll := range collections {
-		pool.On("Has", coll.Hash).Return(false).Once()
 		pool.On("Add", coll).Return(nil).Once()
-		err := e.processGuaranteedCollection(coll)
+		err := e.storeGuarantee(coll)
 		assert.Nilf(t, err, "collection %d", i)
 	}
 
-	// test processing of collections for the second time
+	// test storing of collections for the second time
 	for i, coll := range collections {
-		pool.On("Has", coll.Hash).Return(true).Once()
-		err := e.processGuaranteedCollection(coll)
+		pool.On("Add", coll).Return(errors.New("dummy")).Once()
+		err := e.storeGuarantee(coll)
 		assert.NotNilf(t, err, "collection %d", i)
 	}
 
 	// check that we only had the expected calls
 	pool.AssertExpectations(t)
 
-	// test processing of collections when the mempool fails
+	// test storing of collections when the mempool fails
 	for i, coll := range collections {
-		pool.On("Has", coll.Hash).Return(false)
+		pool.On("Has", coll.ID()).Return(false)
 		pool.On("Add", coll).Return(errors.New("dummy"))
-		err := e.processGuaranteedCollection(coll)
+		err := e.storeGuarantee(coll)
 		assert.NotNilf(t, err, "collection %d", i)
 	}
 }
 
-func TestPropagateGuaranteedCollection(t *testing.T) {
+func TestPropagateCollectionGuarantee(t *testing.T) {
+
+	rand.Seed(time.Now().UnixNano())
 
 	// initialize mocks and engine
-	com := &module.Committee{}
+	state := &protocol.State{}
+	ss := &protocol.Snapshot{}
+	me := &module.Local{}
 	con := &network.Conduit{}
 	e := Engine{
-		com: com,
-		con: con,
+		state: state,
+		con:   con,
+		me:    me,
 	}
 
 	// generate random collections
 	n := 3
-	collections := make([]*collection.GuaranteedCollection, 0, n)
+	collections := make([]*flow.CollectionGuarantee, 0, n)
 	for i := 0; i < n; i++ {
-		hash := make([]byte, 32)
-		_, _ = rand.Read(hash)
-		coll := &collection.GuaranteedCollection{Hash: hash}
+		var collID flow.Identifier
+		_, _ = rand.Read(collID[:])
+		coll := &flow.CollectionGuarantee{CollectionID: collID}
 		collections = append(collections, coll)
 	}
 
 	// generate our own node identity
-	var identities flow.IdentityList
-	me := flow.Identity{
-		NodeID:  "me",
+	var ids flow.IdentityList
+	id := flow.Identity{
+		NodeID:  flow.Identifier{0x09, 0x09, 0x09, 0x09},
 		Address: "home",
-		Role:    identity.Consensus,
+		Role:    flow.RoleConsensus,
 	}
-	identities = append(identities, me)
+	ids = append(ids, id)
 
-	// generate another 1000 node identities
-	var targetIDs []string
+	// generate another 1000 node ids
+	var targetIDs flow.IdentityList
 	for i := 0; i < 1000; i++ {
-		nodeID := fmt.Sprintf("node%d", i)
+		var nodeID flow.Identifier
+		_, _ = rand.Read(nodeID[:])
 		address := fmt.Sprintf("address%d", i)
-		var role string
+		var role flow.Role
 		switch rand.Intn(5) {
 		case 0:
-			role = identity.Collection
+			role = flow.RoleCollection
 		case 1:
-			role = identity.Consensus
-			targetIDs = append(targetIDs, nodeID)
+			role = flow.RoleConsensus
 		case 2:
-			role = identity.Execution
+			role = flow.RoleExecution
 		case 3:
-			role = identity.Verification
+			role = flow.RoleVerification
 		case 4:
-			role = identity.Observation
+			role = flow.RoleObservation
 		}
 		id := flow.Identity{
 			NodeID:  nodeID,
 			Address: address,
 			Role:    role,
 		}
-		identities = append(identities, id)
+		ids = append(ids, id)
+		if role == flow.RoleConsensus {
+			targetIDs = append(targetIDs, id)
+		}
 	}
 
+	// sort by node id
+	sort.Slice(ids, func(i int, j int) bool {
+		return identity.ByNodeIDAsc(ids[i], ids[j])
+	})
+
 	// set up the committee mock for good
-	com.On("Me").Return(me)
-	com.On("Select").Return(identities)
+	me.On("NodeID").Return(id.NodeID)
+	state.On("Final").Return(ss)
+	ss.On("Identities", mock.Anything, mock.Anything).Return(targetIDs, nil)
 
 	// test propagating a collection through the network
 	for i, coll := range collections {
 		params := []interface{}{coll}
 		for _, targetID := range targetIDs {
-			params = append(params, targetID)
+			params = append(params, targetID.NodeID)
 		}
 		con.On("Submit", params...).Return(nil).Once()
-		err := e.PropagateGuaranteedCollection(coll)
+		err := e.propagateGuarantee(coll)
 		assert.Nilf(t, err, "collection %d", i)
 	}
 

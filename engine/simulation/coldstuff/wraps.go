@@ -3,20 +3,20 @@
 package coldstuff
 
 import (
-	"github.com/dapperlabs/flow-go/model/coldstuff"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type proposalWrap struct {
-	originID string
-	proposal *coldstuff.BlockProposal
+	originID flow.Identifier
+	block    *flow.Block
 }
 
 type voteWrap struct {
-	originID string
-	vote     *coldstuff.BlockVote
+	originID flow.Identifier
+	blockID  flow.Identifier
 }
 
 type commitWrap struct {
-	originID string
-	commit   *coldstuff.BlockCommit
+	originID flow.Identifier
+	blockID  flow.Identifier
 }

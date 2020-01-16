@@ -11,6 +11,7 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestParseReplInput(t *testing.T) {
@@ -19,7 +20,7 @@ func TestParseReplInput(t *testing.T) {
         struct X {}; let x = X(); x
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	require.IsType(t, []interface{}{}, actual)
 
 	require.Len(t, actual, 3)
@@ -123,7 +124,7 @@ func TestParseNames(t *testing.T) {
 
 		if validExpected {
 			assert.NotNil(t, actual)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 
 		} else {
 			assert.Nil(t, actual)
@@ -197,7 +198,7 @@ func TestParseBoolExpression(t *testing.T) {
 	    let a = true
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -223,7 +224,7 @@ func TestParseBoolExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIdentifierExpression(t *testing.T) {
@@ -232,7 +233,7 @@ func TestParseIdentifierExpression(t *testing.T) {
 	    let b = a
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	b := &VariableDeclaration{
 		IsConstant: true,
@@ -257,7 +258,7 @@ func TestParseIdentifierExpression(t *testing.T) {
 		Declarations: []Declaration{b},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseArrayExpression(t *testing.T) {
@@ -266,7 +267,7 @@ func TestParseArrayExpression(t *testing.T) {
 	    let a = [1, 2]
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -308,7 +309,7 @@ func TestParseArrayExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseDictionaryExpression(t *testing.T) {
@@ -317,7 +318,7 @@ func TestParseDictionaryExpression(t *testing.T) {
 	    let x = {"a": 1, "b": 2}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	x := &VariableDeclaration{
 		IsConstant: true,
@@ -377,7 +378,7 @@ func TestParseDictionaryExpression(t *testing.T) {
 		Declarations: []Declaration{x},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
@@ -386,7 +387,7 @@ func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 	    let a = b(1, 2)
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -438,7 +439,7 @@ func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInvocationExpressionWithLabels(t *testing.T) {
@@ -447,7 +448,7 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 	    let a = b(x: 1, y: 2)
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -503,7 +504,7 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMemberExpression(t *testing.T) {
@@ -512,7 +513,7 @@ func TestParseMemberExpression(t *testing.T) {
 	    let a = b.c
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -543,7 +544,7 @@ func TestParseMemberExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseOptionalMemberExpression(t *testing.T) {
@@ -552,7 +553,7 @@ func TestParseOptionalMemberExpression(t *testing.T) {
 	    let a = b?.c
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -584,7 +585,7 @@ func TestParseOptionalMemberExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIndexExpression(t *testing.T) {
@@ -593,7 +594,7 @@ func TestParseIndexExpression(t *testing.T) {
 	    let a = b[1]
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -632,7 +633,7 @@ func TestParseIndexExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseUnaryExpression(t *testing.T) {
@@ -641,7 +642,7 @@ func TestParseUnaryExpression(t *testing.T) {
 	    let foo = -boo
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -673,7 +674,7 @@ func TestParseUnaryExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseOrExpression(t *testing.T) {
@@ -682,7 +683,7 @@ func TestParseOrExpression(t *testing.T) {
         let a = false || true
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -718,7 +719,7 @@ func TestParseOrExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseAndExpression(t *testing.T) {
@@ -727,7 +728,7 @@ func TestParseAndExpression(t *testing.T) {
         let a = false && true
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -763,7 +764,7 @@ func TestParseAndExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseEqualityExpression(t *testing.T) {
@@ -772,7 +773,7 @@ func TestParseEqualityExpression(t *testing.T) {
         let a = false == true
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -808,7 +809,7 @@ func TestParseEqualityExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseRelationalExpression(t *testing.T) {
@@ -817,7 +818,7 @@ func TestParseRelationalExpression(t *testing.T) {
         let a = 1 < 2
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -855,7 +856,7 @@ func TestParseRelationalExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseAdditiveExpression(t *testing.T) {
@@ -864,7 +865,7 @@ func TestParseAdditiveExpression(t *testing.T) {
         let a = 1 + 2
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -902,7 +903,7 @@ func TestParseAdditiveExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMultiplicativeExpression(t *testing.T) {
@@ -911,7 +912,7 @@ func TestParseMultiplicativeExpression(t *testing.T) {
         let a = 1 * 2
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -949,7 +950,7 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseConcatenatingExpression(t *testing.T) {
@@ -958,7 +959,7 @@ func TestParseConcatenatingExpression(t *testing.T) {
         let a = [1, 2] & [3, 4]
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -1028,7 +1029,7 @@ func TestParseConcatenatingExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionExpressionAndReturn(t *testing.T) {
@@ -1037,7 +1038,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 	    let test = fun (): Int { return 1 }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -1057,7 +1058,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 				},
 			},
 			ReturnTypeAnnotation: &TypeAnnotation{
-				Move: false,
+				IsResource: false,
 				Type: &NominalType{
 					Identifier: Identifier{
 						Identifier: "Int",
@@ -1099,7 +1100,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionAndBlock(t *testing.T) {
@@ -1108,7 +1109,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 	    fun test() { return }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1123,7 +1124,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1154,7 +1155,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionParameterWithoutLabel(t *testing.T) {
@@ -1163,7 +1164,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 	    fun test(x: Int) { }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1180,7 +1181,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 						Pos:        Position{Offset: 15, Line: 2, Column: 14},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int",
@@ -1201,7 +1202,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 21, Line: 2, Column: 20},
@@ -1224,7 +1225,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionParameterWithLabel(t *testing.T) {
@@ -1233,7 +1234,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 	    fun test(x y: Int) { }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1250,7 +1251,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 						Pos:        Position{Offset: 17, Line: 2, Column: 16},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int",
@@ -1271,7 +1272,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 23, Line: 2, Column: 22},
@@ -1294,7 +1295,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIfStatement(t *testing.T) {
@@ -1312,7 +1313,7 @@ func TestParseIfStatement(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1327,7 +1328,7 @@ func TestParseIfStatement(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1440,7 +1441,7 @@ func TestParseIfStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
@@ -1455,7 +1456,7 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	ifStatement := &IfStatement{
 		Then: &Block{
@@ -1532,7 +1533,7 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1558,7 +1559,7 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIfStatementNoElse(t *testing.T) {
@@ -1571,7 +1572,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1586,7 +1587,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1636,7 +1637,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseWhileStatement(t *testing.T) {
@@ -1651,7 +1652,7 @@ func TestParseWhileStatement(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1666,7 +1667,7 @@ func TestParseWhileStatement(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1731,7 +1732,7 @@ func TestParseWhileStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseAssignment(t *testing.T) {
@@ -1742,7 +1743,7 @@ func TestParseAssignment(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1757,7 +1758,7 @@ func TestParseAssignment(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1802,7 +1803,7 @@ func TestParseAssignment(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseAccessAssignment(t *testing.T) {
@@ -1813,7 +1814,7 @@ func TestParseAccessAssignment(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1828,7 +1829,7 @@ func TestParseAccessAssignment(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -1919,7 +1920,7 @@ func TestParseAccessAssignment(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseExpressionStatementWithAccess(t *testing.T) {
@@ -1928,7 +1929,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 	    fun test() { x.foo.bar[0][1].baz }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -1943,7 +1944,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Pos: Position{Offset: 15, Line: 2, Column: 14},
@@ -2022,7 +2023,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseParametersAndArrayTypes(t *testing.T) {
@@ -2031,7 +2032,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 		pub fun test(a: Int32, b: [Int32; 2], c: [[Int32; 3]]): [[Int64]] {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessPublic,
@@ -2047,7 +2048,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 						Pos:        Position{Offset: 16, Line: 2, Column: 15},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int32",
@@ -2067,7 +2068,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 						Pos:        Position{Offset: 26, Line: 2, Column: 25},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &ConstantSizedType{
 							Type: &NominalType{
 								Identifier: Identifier{
@@ -2094,7 +2095,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 						Pos:        Position{Offset: 41, Line: 2, Column: 40},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &VariableSizedType{
 							Type: &ConstantSizedType{
 								Type: &NominalType{
@@ -2128,7 +2129,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &VariableSizedType{
 				Type: &VariableSizedType{
 					Type: &NominalType{
@@ -2163,7 +2164,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseDictionaryType(t *testing.T) {
@@ -2172,7 +2173,7 @@ func TestParseDictionaryType(t *testing.T) {
 	    let x: {String: Int} = {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	x := &VariableDeclaration{
 		IsConstant: true,
@@ -2180,7 +2181,7 @@ func TestParseDictionaryType(t *testing.T) {
 			Pos: Position{Offset: 10, Line: 2, Column: 9},
 		},
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &DictionaryType{
 				KeyType: &NominalType{
 					Identifier: Identifier{
@@ -2218,7 +2219,7 @@ func TestParseDictionaryType(t *testing.T) {
 		Declarations: []Declaration{x},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIntegerLiterals(t *testing.T) {
@@ -2230,7 +2231,7 @@ func TestParseIntegerLiterals(t *testing.T) {
         let decimal = 1234567890
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	octal := &VariableDeclaration{
 		IsConstant: true,
@@ -2320,7 +2321,7 @@ func TestParseIntegerLiterals(t *testing.T) {
 		Declarations: []Declaration{octal, hex, binary, decimal},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
@@ -2332,7 +2333,7 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
         let decimal = 1_234_567_890
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	octal := &VariableDeclaration{
 		IsConstant: true,
@@ -2422,7 +2423,7 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 		Declarations: []Declaration{octal, hex, binary, decimal},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInvalidIntegerLiteralPrefixWithout(t *testing.T) {
@@ -2486,7 +2487,7 @@ func TestParseIntegerLiteralWithLeadingZeros(t *testing.T) {
         let decimal = 0123
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	decimal := &VariableDeclaration{
 		IsConstant: true,
@@ -2513,7 +2514,7 @@ func TestParseIntegerLiteralWithLeadingZeros(t *testing.T) {
 		Declarations: []Declaration{decimal},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
@@ -2775,7 +2776,7 @@ func TestParseDecimalIntegerLiteralWithLeadingZeros(t *testing.T) {
 		let decimal = 00123
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -2802,7 +2803,7 @@ func TestParseDecimalIntegerLiteralWithLeadingZeros(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseBinaryIntegerLiteralWithLeadingZeros(t *testing.T) {
@@ -2811,7 +2812,7 @@ func TestParseBinaryIntegerLiteralWithLeadingZeros(t *testing.T) {
 		let binary = 0b001000
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -2838,7 +2839,7 @@ func TestParseBinaryIntegerLiteralWithLeadingZeros(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIntegerTypes(t *testing.T) {
@@ -2854,7 +2855,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		let h: UInt64 = 8
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		Identifier: Identifier{
@@ -2864,7 +2865,7 @@ func TestParseIntegerTypes(t *testing.T) {
 
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "Int8",
@@ -2894,7 +2895,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "Int16",
@@ -2924,7 +2925,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "Int32",
@@ -2954,7 +2955,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "Int64",
@@ -2984,7 +2985,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "UInt8",
@@ -3014,7 +3015,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "UInt16",
@@ -3044,7 +3045,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "UInt32",
@@ -3074,7 +3075,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "UInt64",
@@ -3102,7 +3103,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		Declarations: []Declaration{a, b, c, d, e, f, g, h},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionType(t *testing.T) {
@@ -3111,7 +3112,7 @@ func TestParseFunctionType(t *testing.T) {
 		let add: ((Int8, Int16): Int32) = nothing
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	add := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3120,11 +3121,11 @@ func TestParseFunctionType(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: []*TypeAnnotation{
 					{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int8",
@@ -3134,7 +3135,7 @@ func TestParseFunctionType(t *testing.T) {
 						StartPos: Position{Offset: 14, Line: 2, Column: 13},
 					},
 					{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int16",
@@ -3145,7 +3146,7 @@ func TestParseFunctionType(t *testing.T) {
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &NominalType{
 						Identifier: Identifier{
 							Identifier: "Int32",
@@ -3178,7 +3179,7 @@ func TestParseFunctionType(t *testing.T) {
 		Declarations: []Declaration{add},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionArrayType(t *testing.T) {
@@ -3187,7 +3188,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 		let test: [((Int8): Int16); 2] = []
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3197,12 +3198,12 @@ func TestParseFunctionArrayType(t *testing.T) {
 
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &ConstantSizedType{
 				Type: &FunctionType{
 					ParameterTypeAnnotations: []*TypeAnnotation{
 						{
-							Move: false,
+							IsResource: false,
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int8",
@@ -3213,7 +3214,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 						},
 					},
 					ReturnTypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int16",
@@ -3252,7 +3253,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
@@ -3261,7 +3262,7 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 		let test: ((Int8): [Int16; 2]) = nothing
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3271,11 +3272,11 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: []*TypeAnnotation{
 					{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int8",
@@ -3286,7 +3287,7 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &ConstantSizedType{
 						Type: &NominalType{
 							Identifier: Identifier{
@@ -3326,7 +3327,7 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
@@ -3335,7 +3336,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 		let test: ((Int8): ((Int16): Int32)) = nothing
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3344,11 +3345,11 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 		},
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: []*TypeAnnotation{
 					{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int8",
@@ -3359,11 +3360,11 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &FunctionType{
 						ParameterTypeAnnotations: []*TypeAnnotation{
 							{
-								Move: false,
+								IsResource: false,
 								Type: &NominalType{
 									Identifier: Identifier{
 										Identifier: "Int16",
@@ -3374,7 +3375,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 							},
 						},
 						ReturnTypeAnnotation: &TypeAnnotation{
-							Move: false,
+							IsResource: false,
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int32",
@@ -3414,7 +3415,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
@@ -3423,7 +3424,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 		let test: ((Int8): ((Int16): Int32)) = nothing
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3433,11 +3434,11 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: []*TypeAnnotation{
 					{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int8",
@@ -3448,11 +3449,11 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &FunctionType{
 						ParameterTypeAnnotations: []*TypeAnnotation{
 							{
-								Move: false,
+								IsResource: false,
 								Type: &NominalType{
 									Identifier: Identifier{
 										Identifier: "Int16",
@@ -3463,7 +3464,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 							},
 						},
 						ReturnTypeAnnotation: &TypeAnnotation{
-							Move: false,
+							IsResource: false,
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int32",
@@ -3503,7 +3504,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMissingReturnType(t *testing.T) {
@@ -3513,7 +3514,7 @@ func TestParseMissingReturnType(t *testing.T) {
             fun () { return }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	noop := &VariableDeclaration{
 		Identifier: Identifier{
@@ -3523,10 +3524,10 @@ func TestParseMissingReturnType(t *testing.T) {
 
 		IsConstant: true,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &FunctionType{
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &NominalType{
 						Identifier: Identifier{
 							Identifier: "Void",
@@ -3554,7 +3555,7 @@ func TestParseMissingReturnType(t *testing.T) {
 				},
 			},
 			ReturnTypeAnnotation: &TypeAnnotation{
-				Move: false,
+				IsResource: false,
 				Type: &NominalType{
 					Identifier: Identifier{
 						Pos: Position{Offset: 43, Line: 3, Column: 17},
@@ -3587,7 +3588,7 @@ func TestParseMissingReturnType(t *testing.T) {
 		Declarations: []Declaration{noop},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseLeftAssociativity(t *testing.T) {
@@ -3596,7 +3597,7 @@ func TestParseLeftAssociativity(t *testing.T) {
         let a = 1 + 2 + 3
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -3645,7 +3646,7 @@ func TestParseLeftAssociativity(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
@@ -3697,7 +3698,7 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
           : 3 > 2 ? 1 : 2
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	a := &VariableDeclaration{
 		IsConstant: true,
@@ -3782,7 +3783,7 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseStructure(t *testing.T) {
@@ -3801,7 +3802,7 @@ func TestParseStructure(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindStructure,
@@ -3820,7 +3821,7 @@ func TestParseStructure(t *testing.T) {
 						Pos:        Position{Offset: 48, Line: 3, Column: 25},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int",
@@ -3852,7 +3853,7 @@ func TestParseStructure(t *testing.T) {
 										Pos:        Position{Offset: 75, Line: 5, Column: 17},
 									},
 									TypeAnnotation: &TypeAnnotation{
-										Move: false,
+										IsResource: false,
 										Type: &NominalType{
 											Identifier: Identifier{
 												Identifier: "Int",
@@ -3924,7 +3925,7 @@ func TestParseStructure(t *testing.T) {
 						},
 					},
 					ReturnTypeAnnotation: &TypeAnnotation{
-						Move: false,
+						IsResource: false,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "Int",
@@ -3975,7 +3976,7 @@ func TestParseStructure(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseStructureWithConformances(t *testing.T) {
@@ -3984,7 +3985,7 @@ func TestParseStructureWithConformances(t *testing.T) {
         struct Test: Foo, Bar {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindStructure,
@@ -4017,7 +4018,7 @@ func TestParseStructureWithConformances(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParsePreAndPostConditions(t *testing.T) {
@@ -4035,7 +4036,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -4054,7 +4055,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 								Pos:        Position{Offset: 18, Line: 2, Column: 17},
 							},
 							TypeAnnotation: &TypeAnnotation{
-								Move: false,
+								IsResource: false,
 								Type: &NominalType{
 									Identifier: Identifier{
 										Identifier: "Int",
@@ -4075,7 +4076,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &NominalType{
 						Identifier: Identifier{
 							Identifier: "",
@@ -4107,7 +4108,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 							EndPos:   Position{Offset: 195, Line: 11, Column: 8},
 						},
 					},
-					PreConditions: []*Condition{
+					PreConditions: &Conditions{
 						{
 							Kind: ConditionKindPre,
 							Test: &BinaryExpression{
@@ -4149,7 +4150,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 							},
 						},
 					},
-					PostConditions: []*Condition{
+					PostConditions: &Conditions{
 						{
 							Kind: ConditionKindPost,
 							Test: &BinaryExpression{
@@ -4177,7 +4178,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseExpression(t *testing.T) {
@@ -4186,7 +4187,7 @@ func TestParseExpression(t *testing.T) {
         before(x + before(y)) + z
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &BinaryExpression{
 		Operation: OperationPlus,
@@ -4245,7 +4246,7 @@ func TestParseExpression(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseString(t *testing.T) {
@@ -4254,7 +4255,7 @@ func TestParseString(t *testing.T) {
        "test \0\n\r\t\"\'\\ xyz"
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &StringExpression{
 		Value: "test \x00\n\r\t\"'\\ xyz",
@@ -4264,7 +4265,7 @@ func TestParseString(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseStringWithUnicode(t *testing.T) {
@@ -4273,7 +4274,7 @@ func TestParseStringWithUnicode(t *testing.T) {
       "this is a test \t\\new line and race car:\n\u{1F3CE}\u{FE0F}"
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &StringExpression{
 		Value: "this is a test \t\\new line and race car:\n\U0001F3CE\uFE0F",
@@ -4283,7 +4284,7 @@ func TestParseStringWithUnicode(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseConditionMessage(t *testing.T) {
@@ -4297,7 +4298,7 @@ func TestParseConditionMessage(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -4315,7 +4316,7 @@ func TestParseConditionMessage(t *testing.T) {
 								Pos: Position{Offset: 18, Line: 2, Column: 17},
 							},
 							TypeAnnotation: &TypeAnnotation{
-								Move: false,
+								IsResource: false,
 								Type: &NominalType{
 									Identifier: Identifier{
 										Identifier: "Int",
@@ -4336,7 +4337,7 @@ func TestParseConditionMessage(t *testing.T) {
 					},
 				},
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &NominalType{
 						Identifier: Identifier{
 							Identifier: "",
@@ -4366,7 +4367,7 @@ func TestParseConditionMessage(t *testing.T) {
 							EndPos:   Position{Offset: 134, Line: 7, Column: 8},
 						},
 					},
-					PreConditions: []*Condition{
+					PreConditions: &Conditions{
 						{
 							Kind: ConditionKindPre,
 							Test: &BinaryExpression{
@@ -4402,7 +4403,7 @@ func TestParseConditionMessage(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseOptionalType(t *testing.T) {
@@ -4411,7 +4412,7 @@ func TestParseOptionalType(t *testing.T) {
        let x: Int?? = 1
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -4422,7 +4423,7 @@ func TestParseOptionalType(t *testing.T) {
 					Pos:        Position{Offset: 12, Line: 2, Column: 11},
 				},
 				TypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &OptionalType{
 						Type: &OptionalType{
 							Type: &NominalType{
@@ -4454,7 +4455,7 @@ func TestParseOptionalType(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseNilCoalescing(t *testing.T) {
@@ -4463,7 +4464,7 @@ func TestParseNilCoalescing(t *testing.T) {
        let x = nil ?? 1
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -4496,7 +4497,7 @@ func TestParseNilCoalescing(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseNilCoalescingRightAssociativity(t *testing.T) {
@@ -4506,7 +4507,7 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
        let x = 1 ?? 2 ?? 3
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -4555,7 +4556,7 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFailableCasting(t *testing.T) {
@@ -4564,7 +4565,7 @@ func TestParseFailableCasting(t *testing.T) {
        let x = 0 as? Int
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	failableDowncast := &CastingExpression{
 		Expression: &IntExpression{
@@ -4577,7 +4578,7 @@ func TestParseFailableCasting(t *testing.T) {
 		},
 		Operation: OperationFailableCast,
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "Int",
@@ -4610,12 +4611,12 @@ func TestParseFailableCasting(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInterface(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.CompositeKindsWithBody {
 		actual, _, err := parser.ParseProgram(fmt.Sprintf(`
             %s interface Test {
                 foo: Int
@@ -4626,7 +4627,7 @@ func TestParseInterface(t *testing.T) {
             }
 	    `, kind.Keyword()))
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 
 		// only compare AST for one kind: structs
 
@@ -4650,7 +4651,7 @@ func TestParseInterface(t *testing.T) {
 							Pos:        Position{Offset: 53, Line: 3, Column: 16},
 						},
 						TypeAnnotation: &TypeAnnotation{
-							Move: false,
+							IsResource: false,
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int",
@@ -4682,7 +4683,7 @@ func TestParseInterface(t *testing.T) {
 											Pos:        Position{Offset: 84, Line: 5, Column: 21},
 										},
 										TypeAnnotation: &TypeAnnotation{
-											Move: false,
+											IsResource: false,
 											Type: &NominalType{
 												Identifier: Identifier{
 													Identifier: "Int",
@@ -4721,7 +4722,7 @@ func TestParseInterface(t *testing.T) {
 							},
 						},
 						ReturnTypeAnnotation: &TypeAnnotation{
-							Move: false,
+							IsResource: false,
 							Type: &NominalType{
 								Identifier: Identifier{
 									Identifier: "Int",
@@ -4745,7 +4746,7 @@ func TestParseInterface(t *testing.T) {
 			Declarations: []Declaration{test},
 		}
 
-		assert.Equal(t, expected, actual)
+		unittest.AssertEqualWithDiff(t, expected, actual)
 	}
 }
 
@@ -4755,7 +4756,7 @@ func TestParseImportWithString(t *testing.T) {
         import "test.bpl"
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &ImportDeclaration{
 		Identifiers: []Identifier{},
@@ -4771,7 +4772,7 @@ func TestParseImportWithString(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 
 	importLocation := StringLocation("test.bpl")
 
@@ -4786,7 +4787,7 @@ func TestParseImportWithString(t *testing.T) {
 
 	assert.Equal(t,
 		map[LocationID]*Program{
-			importLocation.ID(): &Program{},
+			importLocation.ID(): {},
 		},
 		actualImports,
 	)
@@ -4798,7 +4799,7 @@ func TestParseImportWithAddress(t *testing.T) {
         import 0x1234
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &ImportDeclaration{
 		Identifiers: []Identifier{},
@@ -4814,7 +4815,7 @@ func TestParseImportWithAddress(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 
 	importLocation := AddressLocation([]byte{18, 52})
 
@@ -4829,7 +4830,7 @@ func TestParseImportWithAddress(t *testing.T) {
 
 	assert.Equal(t,
 		map[LocationID]*Program{
-			importLocation.ID(): &Program{},
+			importLocation.ID(): {},
 		},
 		actualImports,
 	)
@@ -4841,7 +4842,7 @@ func TestParseImportWithIdentifiers(t *testing.T) {
         import A, b from 0x0
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &ImportDeclaration{
 		Identifiers: []Identifier{
@@ -4866,7 +4867,7 @@ func TestParseImportWithIdentifiers(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFieldWithFromIdentifier(t *testing.T) {
@@ -4877,7 +4878,7 @@ func TestParseFieldWithFromIdentifier(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestParseFunctionWithFromIdentifier(t *testing.T) {
@@ -4886,7 +4887,7 @@ func TestParseFunctionWithFromIdentifier(t *testing.T) {
         fun send(from: String, to: String) {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestParseImportWithFromIdentifier(t *testing.T) {
@@ -4895,7 +4896,7 @@ func TestParseImportWithFromIdentifier(t *testing.T) {
         import from from 0x0
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestParseSemicolonsBetweenDeclarations(t *testing.T) {
@@ -4905,7 +4906,7 @@ func TestParseSemicolonsBetweenDeclarations(t *testing.T) {
         fun foo() {};
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestParseInvalidMultipleSemicolonsBetweenDeclarations(t *testing.T) {
@@ -4960,7 +4961,7 @@ func TestParseResource(t *testing.T) {
         resource Test {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindResource,
@@ -4980,7 +4981,7 @@ func TestParseResource(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseEvent(t *testing.T) {
@@ -4991,59 +4992,70 @@ func TestParseEvent(t *testing.T) {
 
 	require.Nil(t, err)
 
-	transfer := &EventDeclaration{
+	transfer := &CompositeDeclaration{
+		CompositeKind: common.CompositeKindEvent,
 		Identifier: Identifier{
 			Identifier: "Transfer",
 			Pos:        Position{Offset: 15, Line: 2, Column: 14},
 		},
-		ParameterList: &ParameterList{
-			Parameters: []*Parameter{
+		Members: &Members{
+			SpecialFunctions: []*SpecialFunctionDeclaration{
 				{
-					Label: "",
-					Identifier: Identifier{
-						Identifier: "to",
-						Pos:        Position{Offset: 24, Line: 2, Column: 23},
-					},
-					TypeAnnotation: &TypeAnnotation{
-						Move: false,
-						Type: &NominalType{
-							Identifier: Identifier{
-								Identifier: "Address",
-								Pos:        Position{Offset: 28, Line: 2, Column: 27},
+					DeclarationKind: common.DeclarationKindInitializer,
+					FunctionDeclaration: &FunctionDeclaration{
+						ParameterList: &ParameterList{
+							Parameters: []*Parameter{
+								{
+									Label: "",
+									Identifier: Identifier{
+										Identifier: "to",
+										Pos:        Position{Offset: 24, Line: 2, Column: 23},
+									},
+									TypeAnnotation: &TypeAnnotation{
+										IsResource: false,
+										Type: &NominalType{
+											Identifier: Identifier{
+												Identifier: "Address",
+												Pos:        Position{Offset: 28, Line: 2, Column: 27},
+											},
+										},
+										StartPos: Position{Offset: 28, Line: 2, Column: 27},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 24, Line: 2, Column: 23},
+										EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+									},
+								},
+								{
+									Label: "",
+									Identifier: Identifier{
+										Identifier: "from",
+										Pos:        Position{Offset: 37, Line: 2, Column: 36},
+									},
+									TypeAnnotation: &TypeAnnotation{
+										IsResource: false,
+										Type: &NominalType{
+											Identifier: Identifier{
+												Identifier: "Address",
+												Pos:        Position{Offset: 43, Line: 2, Column: 42},
+											},
+										},
+										StartPos: Position{Offset: 43, Line: 2, Column: 42},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 37, Line: 2, Column: 36},
+										EndPos:   Position{Offset: 43, Line: 2, Column: 42},
+									},
+								},
+							},
+							Range: Range{
+								StartPos: Position{Offset: 23, Line: 2, Column: 22},
+								EndPos:   Position{Offset: 50, Line: 2, Column: 49},
 							},
 						},
-						StartPos: Position{Offset: 28, Line: 2, Column: 27},
-					},
-					Range: Range{
-						StartPos: Position{Offset: 24, Line: 2, Column: 23},
-						EndPos:   Position{Offset: 28, Line: 2, Column: 27},
+						StartPos: Position{Offset: 23, Line: 2, Column: 22},
 					},
 				},
-				{
-					Label: "",
-					Identifier: Identifier{
-						Identifier: "from",
-						Pos:        Position{Offset: 37, Line: 2, Column: 36},
-					},
-					TypeAnnotation: &TypeAnnotation{
-						Move: false,
-						Type: &NominalType{
-							Identifier: Identifier{
-								Identifier: "Address",
-								Pos:        Position{Offset: 43, Line: 2, Column: 42},
-							},
-						},
-						StartPos: Position{Offset: 43, Line: 2, Column: 42},
-					},
-					Range: Range{
-						StartPos: Position{Offset: 37, Line: 2, Column: 36},
-						EndPos:   Position{Offset: 43, Line: 2, Column: 42},
-					},
-				},
-			},
-			Range: Range{
-				StartPos: Position{Offset: 23, Line: 2, Column: 22},
-				EndPos:   Position{Offset: 50, Line: 2, Column: 49},
 			},
 		},
 		Range: Range{
@@ -5056,7 +5068,7 @@ func TestParseEvent(t *testing.T) {
 		Declarations: []Declaration{transfer},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseEventEmitStatement(t *testing.T) {
@@ -5066,8 +5078,7 @@ func TestParseEventEmitStatement(t *testing.T) {
         emit Transfer(to: 1, from: 2)
       }
 	`)
-
-	actualStatements := actual.Declarations[0].(*FunctionDeclaration).FunctionBlock.Block.Statements
+	require.NoError(t, err)
 
 	expectedStatements := []Statement{
 		&EmitStatement{
@@ -5112,18 +5123,18 @@ func TestParseEventEmitStatement(t *testing.T) {
 		},
 	}
 
-	require.Nil(t, err)
+	actualStatements := actual.Declarations[0].(*FunctionDeclaration).FunctionBlock.Block.Statements
 
-	assert.Equal(t, expectedStatements, actualStatements)
+	unittest.AssertEqualWithDiff(t, expectedStatements, actualStatements)
 }
 
-func TestParseMoveReturnType(t *testing.T) {
+func TestParseResourceReturnType(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        fun test(): <-X {}
+        fun test(): @X {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Identifier: Identifier{
@@ -5137,11 +5148,11 @@ func TestParseMoveReturnType(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: true,
+			IsResource: true,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "X",
-					Pos:        Position{Offset: 23, Line: 2, Column: 22},
+					Pos:        Position{Offset: 22, Line: 2, Column: 21},
 				},
 			},
 			StartPos: Position{Offset: 21, Line: 2, Column: 20},
@@ -5149,8 +5160,8 @@ func TestParseMoveReturnType(t *testing.T) {
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
 				Range: Range{
-					StartPos: Position{Offset: 25, Line: 2, Column: 24},
-					EndPos:   Position{Offset: 26, Line: 2, Column: 25},
+					StartPos: Position{Offset: 24, Line: 2, Column: 23},
+					EndPos:   Position{Offset: 25, Line: 2, Column: 24},
 				},
 			},
 		},
@@ -5161,7 +5172,7 @@ func TestParseMoveReturnType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMovingVariableDeclaration(t *testing.T) {
@@ -5170,7 +5181,7 @@ func TestParseMovingVariableDeclaration(t *testing.T) {
         let x <- y
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -5195,7 +5206,7 @@ func TestParseMovingVariableDeclaration(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMoveStatement(t *testing.T) {
@@ -5206,7 +5217,7 @@ func TestParseMoveStatement(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Identifier: Identifier{
@@ -5220,7 +5231,7 @@ func TestParseMoveStatement(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "",
@@ -5264,7 +5275,7 @@ func TestParseMoveStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMoveOperator(t *testing.T) {
@@ -5273,7 +5284,7 @@ func TestParseMoveOperator(t *testing.T) {
       let x = foo(<-y)
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -5321,16 +5332,16 @@ func TestParseMoveOperator(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
-func TestParseMoveParameterType(t *testing.T) {
+func TestParseResourceParameterType(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        fun test(x: <-X) {}
+        fun test(x: @X) {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Identifier: Identifier{
@@ -5338,14 +5349,14 @@ func TestParseMoveParameterType(t *testing.T) {
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "",
-					Pos:        Position{Offset: 24, Line: 2, Column: 23},
+					Pos:        Position{Offset: 23, Line: 2, Column: 22},
 				},
 			},
-			StartPos: Position{Offset: 24, Line: 2, Column: 23},
+			StartPos: Position{Offset: 23, Line: 2, Column: 22},
 		},
 		ParameterList: &ParameterList{
 			Parameters: []*Parameter{
@@ -5356,31 +5367,31 @@ func TestParseMoveParameterType(t *testing.T) {
 						Pos:        Position{Offset: 18, Line: 2, Column: 17},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: true,
+						IsResource: true,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "X",
-								Pos:        Position{Offset: 23, Line: 2, Column: 22},
+								Pos:        Position{Offset: 22, Line: 2, Column: 21},
 							},
 						},
 						StartPos: Position{Offset: 21, Line: 2, Column: 20},
 					},
 					Range: Range{
 						StartPos: Position{Offset: 18, Line: 2, Column: 17},
-						EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+						EndPos:   Position{Offset: 22, Line: 2, Column: 21},
 					},
 				},
 			},
 			Range: Range{
 				StartPos: Position{Offset: 17, Line: 2, Column: 16},
-				EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+				EndPos:   Position{Offset: 23, Line: 2, Column: 22},
 			},
 		},
 		FunctionBlock: &FunctionBlock{
 			Block: &Block{
 				Range: Range{
-					StartPos: Position{Offset: 26, Line: 2, Column: 25},
-					EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+					StartPos: Position{Offset: 25, Line: 2, Column: 24},
+					EndPos:   Position{Offset: 26, Line: 2, Column: 25},
 				},
 			},
 		},
@@ -5391,16 +5402,16 @@ func TestParseMoveParameterType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        let x: <-R <- y
+        let x: @R <- y
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -5409,11 +5420,11 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
 		TypeAnnotation: &TypeAnnotation{
-			Move: true,
+			IsResource: true,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "R",
-					Pos:        Position{Offset: 18, Line: 2, Column: 17},
+					Pos:        Position{Offset: 17, Line: 2, Column: 16},
 				},
 			},
 			StartPos: Position{Offset: 16, Line: 2, Column: 15},
@@ -5421,12 +5432,12 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
 				Identifier: "y",
-				Pos:        Position{Offset: 23, Line: 2, Column: 22},
+				Pos:        Position{Offset: 22, Line: 2, Column: 21},
 			},
 		},
 		Transfer: &Transfer{
 			Operation: TransferOperationMove,
-			Pos:       Position{Offset: 20, Line: 2, Column: 19},
+			Pos:       Position{Offset: 19, Line: 2, Column: 18},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
 	}
@@ -5435,16 +5446,16 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        struct X { x: <-R }
+        struct X { x: @R }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindStructure,
@@ -5463,25 +5474,25 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 						Pos:        Position{Offset: 20, Line: 2, Column: 19},
 					},
 					TypeAnnotation: &TypeAnnotation{
-						Move: true,
+						IsResource: true,
 						Type: &NominalType{
 							Identifier: Identifier{
 								Identifier: "R",
-								Pos:        Position{Offset: 25, Line: 2, Column: 24},
+								Pos:        Position{Offset: 24, Line: 2, Column: 23},
 							},
 						},
 						StartPos: Position{Offset: 23, Line: 2, Column: 22},
 					},
 					Range: Range{
 						StartPos: Position{Offset: 20, Line: 2, Column: 19},
-						EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+						EndPos:   Position{Offset: 24, Line: 2, Column: 23},
 					},
 				},
 			},
 		},
 		Range: Range{
 			StartPos: Position{Offset: 9, Line: 2, Column: 8},
-			EndPos:   Position{Offset: 27, Line: 2, Column: 26},
+			EndPos:   Position{Offset: 26, Line: 2, Column: 25},
 		},
 	}
 
@@ -5489,16 +5500,16 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
-func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
+func TestParseFunctionTypeWithResourceTypeAnnotation(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        let f: ((): <-R) = g
+        let f: ((): @R) = g
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -5507,34 +5518,34 @@ func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
 			Pos:        Position{Offset: 13, Line: 2, Column: 12},
 		},
 		TypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &FunctionType{
 				ParameterTypeAnnotations: nil,
 				ReturnTypeAnnotation: &TypeAnnotation{
-					Move: true,
+					IsResource: true,
 					Type: &NominalType{
 						Identifier: Identifier{
 							Identifier: "R",
-							Pos:        Position{Offset: 23, Line: 2, Column: 22},
+							Pos:        Position{Offset: 22, Line: 2, Column: 21},
 						},
 					},
 					StartPos: Position{Offset: 21, Line: 2, Column: 20},
 				},
 				Range: Range{
 					StartPos: Position{Offset: 16, Line: 2, Column: 15},
-					EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+					EndPos:   Position{Offset: 22, Line: 2, Column: 21},
 				},
 			},
 			StartPos: Position{Offset: 16, Line: 2, Column: 15},
 		},
 		Transfer: &Transfer{
 			Operation: TransferOperationCopy,
-			Pos:       Position{Offset: 26, Line: 2, Column: 25},
+			Pos:       Position{Offset: 25, Line: 2, Column: 24},
 		},
 		Value: &IdentifierExpression{
 			Identifier: Identifier{
 				Identifier: "g",
-				Pos:        Position{Offset: 28, Line: 2, Column: 27},
+				Pos:        Position{Offset: 27, Line: 2, Column: 26},
 			},
 		},
 		StartPos: Position{Offset: 9, Line: 2, Column: 8},
@@ -5544,16 +5555,16 @@ func TestParseFunctionTypeWithMoveTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
-func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
+func TestParseFunctionExpressionWithResourceTypeAnnotation(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        let f = fun (): <-R { return X }
+        let f = fun (): @R { return X }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &VariableDeclaration{
 		IsConstant: true,
@@ -5573,11 +5584,11 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 				},
 			},
 			ReturnTypeAnnotation: &TypeAnnotation{
-				Move: true,
+				IsResource: true,
 				Type: &NominalType{
 					Identifier: Identifier{
 						Identifier: "R",
-						Pos:        Position{Offset: 27, Line: 2, Column: 26},
+						Pos:        Position{Offset: 26, Line: 2, Column: 25},
 					},
 				},
 				StartPos: Position{Offset: 25, Line: 2, Column: 24},
@@ -5589,18 +5600,18 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 							Expression: &IdentifierExpression{
 								Identifier: Identifier{
 									Identifier: "X",
-									Pos:        Position{Offset: 38, Line: 2, Column: 37},
+									Pos:        Position{Offset: 37, Line: 2, Column: 36},
 								},
 							},
 							Range: Range{
-								StartPos: Position{Offset: 31, Line: 2, Column: 30},
-								EndPos:   Position{Offset: 38, Line: 2, Column: 37},
+								StartPos: Position{Offset: 30, Line: 2, Column: 29},
+								EndPos:   Position{Offset: 37, Line: 2, Column: 36},
 							},
 						},
 					},
 					Range: Range{
-						StartPos: Position{Offset: 29, Line: 2, Column: 28},
-						EndPos:   Position{Offset: 40, Line: 2, Column: 39},
+						StartPos: Position{Offset: 28, Line: 2, Column: 27},
+						EndPos:   Position{Offset: 39, Line: 2, Column: 38},
 					},
 				},
 			},
@@ -5613,16 +5624,16 @@ func TestParseFunctionExpressionWithMoveTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
-func TestParseFailableCastingMoveTypeAnnotation(t *testing.T) {
+func TestParseFailableCastingResourceTypeAnnotation(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-        let y = x as? <-R
+        let y = x as? @R
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	failableDowncast := &CastingExpression{
 		Expression: &IdentifierExpression{
@@ -5633,11 +5644,11 @@ func TestParseFailableCastingMoveTypeAnnotation(t *testing.T) {
 		},
 		Operation: OperationFailableCast,
 		TypeAnnotation: &TypeAnnotation{
-			Move: true,
+			IsResource: true,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "R",
-					Pos:        Position{Offset: 25, Line: 2, Column: 24},
+					Pos:        Position{Offset: 24, Line: 2, Column: 23},
 				},
 			},
 			StartPos: Position{Offset: 23, Line: 2, Column: 22},
@@ -5664,7 +5675,7 @@ func TestParseFailableCastingMoveTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{variableDeclaration},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseCasting(t *testing.T) {
@@ -5673,7 +5684,7 @@ func TestParseCasting(t *testing.T) {
         let y = x as Y
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	cast := &CastingExpression{
 		Expression: &IdentifierExpression{
@@ -5714,7 +5725,7 @@ func TestParseCasting(t *testing.T) {
 		Declarations: []Declaration{variableDeclaration},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpression(t *testing.T) {
@@ -5726,7 +5737,7 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -5741,7 +5752,7 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "",
@@ -5789,7 +5800,7 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 									},
 								},
 								ReturnTypeAnnotation: &TypeAnnotation{
-									Move: false,
+									IsResource: false,
 									Type: &NominalType{
 										Identifier: Identifier{
 											Identifier: "",
@@ -5831,7 +5842,7 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIdentifiers(t *testing.T) {
@@ -5841,7 +5852,7 @@ func TestParseIdentifiers(t *testing.T) {
           let %s = 1
 	    `, name))
 
-		assert.Nil(t, err)
+		require.NoError(t, err)
 	}
 }
 
@@ -5857,7 +5868,7 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Access: AccessNotSpecified,
@@ -5872,7 +5883,7 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "",
@@ -5916,7 +5927,7 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseSwapStatement(t *testing.T) {
@@ -5927,7 +5938,7 @@ func TestParseSwapStatement(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &FunctionDeclaration{
 		Identifier: Identifier{
@@ -5941,7 +5952,7 @@ func TestParseSwapStatement(t *testing.T) {
 			},
 		},
 		ReturnTypeAnnotation: &TypeAnnotation{
-			Move: false,
+			IsResource: false,
 			Type: &NominalType{
 				Identifier: Identifier{
 					Identifier: "",
@@ -6004,7 +6015,7 @@ func TestParseSwapStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseDestructor(t *testing.T) {
@@ -6015,7 +6026,7 @@ func TestParseDestructor(t *testing.T) {
         }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	test := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindResource,
@@ -6062,7 +6073,7 @@ func TestParseDestructor(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseReferenceType(t *testing.T) {
@@ -6071,7 +6082,7 @@ func TestParseReferenceType(t *testing.T) {
        let x: &[&R] = 1
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -6082,7 +6093,7 @@ func TestParseReferenceType(t *testing.T) {
 					Pos:        Position{Offset: 12, Line: 2, Column: 11},
 				},
 				TypeAnnotation: &TypeAnnotation{
-					Move: false,
+					IsResource: false,
 					Type: &ReferenceType{
 						Type: &VariableSizedType{
 							Type: &ReferenceType{
@@ -6120,7 +6131,7 @@ func TestParseReferenceType(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInvalidReferenceToOptionalType(t *testing.T) {
@@ -6140,7 +6151,7 @@ func TestParseReference(t *testing.T) {
        let x = &account.storage[R] as R
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -6193,7 +6204,7 @@ func TestParseReference(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, expected, actual)
+	unittest.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseCompositeDeclarationWithSemicolonSeparatedMembers(t *testing.T) {
@@ -6202,7 +6213,7 @@ func TestParseCompositeDeclarationWithSemicolonSeparatedMembers(t *testing.T) {
         struct Kitty { let id: Int ; init(id: Int) { self.id = id } }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	expected := &Program{
 		Declarations: []Declaration{
@@ -6333,8 +6344,13 @@ func TestParseAccessModifiers(t *testing.T) {
 		{"function", "%s fun test() {}"},
 	}
 
-	for _, compositeKind := range common.CompositeKinds {
+	for _, compositeKind := range common.AllCompositeKinds {
+
 		for _, isInterface := range []bool{true, false} {
+
+			if !compositeKind.SupportsInterfaces() && isInterface {
+				continue
+			}
 
 			interfaceKeyword := ""
 			if isInterface {
@@ -6354,20 +6370,29 @@ func TestParseAccessModifiers(t *testing.T) {
 				return fmt.Sprintf(format, compositeKind.Keyword(), interfaceKeyword)
 			}
 
-			declarations = append(declarations,
-				declaration{
-					formatName("itself"),
-					formatCode("%%s %s %s Test {}"),
-				},
-				declaration{
-					formatName("field"),
-					formatCode("%s %s Test { %%s let test: Int ; init() { self.test = 1 } }"),
-				},
-				declaration{
-					formatName("function"),
-					formatCode("%s %s Test { %%s fun test() {} }"),
-				},
-			)
+			if compositeKind == common.CompositeKindEvent {
+				declarations = append(declarations,
+					declaration{
+						formatName("itself"),
+						formatCode("%%s %s %s Test()"),
+					},
+				)
+			} else {
+				declarations = append(declarations,
+					declaration{
+						formatName("itself"),
+						formatCode("%%s %s %s Test {}"),
+					},
+					declaration{
+						formatName("field"),
+						formatCode("%s %s Test { %%s let test: Int ; init() { self.test = 1 } }"),
+					},
+					declaration{
+						formatName("function"),
+						formatCode("%s %s Test { %%s fun test() {} }"),
+					},
+				)
+			}
 		}
 	}
 
@@ -6378,7 +6403,7 @@ func TestParseAccessModifiers(t *testing.T) {
 				program := fmt.Sprintf(declaration.code, access.Keyword())
 				_, _, err := parser.ParseProgram(program)
 
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			})
 		}
 	}
@@ -6398,8 +6423,8 @@ func TestParseTransactionDeclaration(t *testing.T) {
 					Fields:         []*FieldDeclaration{},
 					Prepare:        nil,
 					PreConditions:  nil,
-					Execute:        nil,
 					PostConditions: nil,
+					Execute:        nil,
 					Range: Range{
 						StartPos: Position{Offset: 5, Line: 2, Column: 4},
 						EndPos:   Position{Offset: 18, Line: 2, Column: 17},
@@ -6408,7 +6433,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 			},
 		}
 
-		assert.Equal(t, expected, actual)
+		unittest.AssertEqualWithDiff(t, expected, actual)
 	})
 
 	t.Run("SimpleTransaction", func(t *testing.T) {
@@ -6441,7 +6466,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 								Pos:        Position{Offset: 31, Line: 4, Column: 10},
 							},
 							TypeAnnotation: &TypeAnnotation{
-								Move: false,
+								IsResource: false,
 								Type: &NominalType{
 									Identifier: Identifier{
 										Identifier: "Int",
@@ -6457,7 +6482,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 						},
 					},
 					Prepare: &SpecialFunctionDeclaration{
-						DeclarationKind: common.DeclarationKindUnknown,
+						DeclarationKind: common.DeclarationKindPrepare,
 						FunctionDeclaration: &FunctionDeclaration{
 							Access: AccessNotSpecified,
 							Identifier: Identifier{
@@ -6473,7 +6498,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											Pos:        Position{Offset: 54, Line: 6, Column: 14},
 										},
 										TypeAnnotation: &TypeAnnotation{
-											Move: false,
+											IsResource: false,
 											Type: &NominalType{
 												Identifier: Identifier{
 													Identifier: "Account",
@@ -6499,7 +6524,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 									Statements: []Statement{
 										&AssignmentStatement{
 											Target: &IdentifierExpression{
-												Identifier{
+												Identifier: Identifier{
 													Identifier: "x",
 													Pos:        Position{Offset: 84, Line: 7, Column: 11},
 												},
@@ -6529,47 +6554,64 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							StartPos: Position{Offset: 46, Line: 6, Column: 6},
 						},
 					},
-					PreConditions: nil,
-					Execute: &Block{
-						Statements: []Statement{
-							&AssignmentStatement{
-								Target: &IdentifierExpression{
-									Identifier{
-										Identifier: "x",
-										Pos:        Position{Offset: 124, Line: 11, Column: 11},
-									},
-								},
-								Transfer: &Transfer{
-									Operation: TransferOperationCopy,
-									Pos:       Position{Offset: 126, Line: 11, Column: 13},
-								},
-								Value: &BinaryExpression{
-									Operation: OperationPlus,
-									Left: &IntExpression{
-										Value: big.NewInt(1),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 128, Line: 11, Column: 15},
-											EndPos:   Position{Offset: 128, Line: 11, Column: 15},
-										},
-									},
-									Right: &IntExpression{
-										Value: big.NewInt(1),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 132, Line: 11, Column: 19},
-											EndPos:   Position{Offset: 132, Line: 11, Column: 19},
-										},
-									},
-								},
+					PreConditions:  nil,
+					PostConditions: nil,
+					Execute: &SpecialFunctionDeclaration{
+						DeclarationKind: common.DeclarationKindExecute,
+						FunctionDeclaration: &FunctionDeclaration{
+							Access: AccessNotSpecified,
+							Identifier: Identifier{
+								Identifier: "execute",
+								Pos:        Position{Offset: 103, Line: 10, Column: 6},
 							},
-						},
-						Range: Range{
-							StartPos: Position{Offset: 111, Line: 10, Column: 14},
-							EndPos:   Position{Offset: 137, Line: 12, Column: 3},
+							ParameterList:        &ParameterList{},
+							ReturnTypeAnnotation: nil,
+							FunctionBlock: &FunctionBlock{
+								Block: &Block{
+									Statements: []Statement{
+										&AssignmentStatement{
+											Target: &IdentifierExpression{
+												Identifier: Identifier{
+													Identifier: "x",
+													Pos:        Position{Offset: 124, Line: 11, Column: 11},
+												},
+											},
+											Transfer: &Transfer{
+												Operation: TransferOperationCopy,
+												Pos:       Position{Offset: 126, Line: 11, Column: 13},
+											},
+											Value: &BinaryExpression{
+												Operation: OperationPlus,
+												Left: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 128, Line: 11, Column: 15},
+														EndPos:   Position{Offset: 128, Line: 11, Column: 15},
+													},
+												},
+												Right: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 132, Line: 11, Column: 19},
+														EndPos:   Position{Offset: 132, Line: 11, Column: 19},
+													},
+												},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 111, Line: 10, Column: 14},
+										EndPos:   Position{Offset: 137, Line: 12, Column: 3},
+									},
+								},
+								PreConditions:  nil,
+								PostConditions: nil,
+							},
+							StartPos: Position{Offset: 103, Line: 10, Column: 6},
 						},
 					},
-					PostConditions: nil,
 					Range: Range{
 						StartPos: Position{Offset: 5, Line: 2, Column: 4},
 						EndPos:   Position{Offset: 143, Line: 13, Column: 4},
@@ -6578,10 +6620,10 @@ func TestParseTransactionDeclaration(t *testing.T) {
 			},
 		}
 
-		assert.Equal(t, expected, actual)
+		unittest.AssertEqualWithDiff(t, expected, actual)
 	})
 
-	t.Run("PrePostConditions", func(t *testing.T) {
+	t.Run("PreExecutePost", func(t *testing.T) {
 		actual, _, err := parser.ParseProgram(`
 		  transaction {
 	
@@ -6619,7 +6661,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 								Pos:        Position{Offset: 31, Line: 4, Column: 10},
 							},
 							TypeAnnotation: &TypeAnnotation{
-								Move: false,
+								IsResource: false,
 								Type: &NominalType{
 									Identifier: Identifier{
 										Identifier: "Int",
@@ -6635,7 +6677,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 						},
 					},
 					Prepare: &SpecialFunctionDeclaration{
-						DeclarationKind: common.DeclarationKindUnknown,
+						DeclarationKind: common.DeclarationKindPrepare,
 						FunctionDeclaration: &FunctionDeclaration{
 							Access: AccessNotSpecified,
 							Identifier: Identifier{
@@ -6651,7 +6693,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 											Pos:        Position{Offset: 54, Line: 6, Column: 14},
 										},
 										TypeAnnotation: &TypeAnnotation{
-											Move: false,
+											IsResource: false,
 											Type: &NominalType{
 												Identifier: Identifier{
 													Identifier: "Account",
@@ -6677,7 +6719,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 									Statements: []Statement{
 										&AssignmentStatement{
 											Target: &IdentifierExpression{
-												Identifier{
+												Identifier: Identifier{
 													Identifier: "x",
 													Pos:        Position{Offset: 84, Line: 7, Column: 11},
 												},
@@ -6707,13 +6749,13 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							StartPos: Position{Offset: 46, Line: 6, Column: 6},
 						},
 					},
-					PreConditions: []*Condition{
+					PreConditions: &Conditions{
 						{
 							Kind: ConditionKindPre,
 							Test: &BinaryExpression{
 								Operation: OperationEqual,
 								Left: &IdentifierExpression{
-									Identifier{
+									Identifier: Identifier{
 										Identifier: "x",
 										Pos:        Position{Offset: 116, Line: 11, Column: 10},
 									},
@@ -6729,52 +6771,13 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							},
 						},
 					},
-					Execute: &Block{
-						Statements: []Statement{
-							&AssignmentStatement{
-								Target: &IdentifierExpression{
-									Identifier{
-										Identifier: "x",
-										Pos:        Position{Offset: 157, Line: 15, Column: 11},
-									},
-								},
-								Transfer: &Transfer{
-									Operation: TransferOperationCopy,
-									Pos:       Position{Offset: 159, Line: 15, Column: 13},
-								},
-								Value: &BinaryExpression{
-									Operation: OperationPlus,
-									Left: &IntExpression{
-										Value: big.NewInt(1),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 161, Line: 15, Column: 15},
-											EndPos:   Position{Offset: 161, Line: 15, Column: 15},
-										},
-									},
-									Right: &IntExpression{
-										Value: big.NewInt(1),
-										Base:  10,
-										Range: Range{
-											StartPos: Position{Offset: 165, Line: 15, Column: 19},
-											EndPos:   Position{Offset: 165, Line: 15, Column: 19},
-										},
-									},
-								},
-							},
-						},
-						Range: Range{
-							StartPos: Position{Offset: 144, Line: 14, Column: 14},
-							EndPos:   Position{Offset: 170, Line: 16, Column: 3},
-						},
-					},
-					PostConditions: []*Condition{
+					PostConditions: &Conditions{
 						{
 							Kind: ConditionKindPost,
 							Test: &BinaryExpression{
 								Operation: OperationEqual,
 								Left: &IdentifierExpression{
-									Identifier{
+									Identifier: Identifier{
 										Identifier: "x",
 										Pos:        Position{Offset: 198, Line: 19, Column: 11},
 									},
@@ -6790,6 +6793,62 @@ func TestParseTransactionDeclaration(t *testing.T) {
 							},
 						},
 					},
+					Execute: &SpecialFunctionDeclaration{
+						DeclarationKind: common.DeclarationKindExecute,
+						FunctionDeclaration: &FunctionDeclaration{
+							Access: AccessNotSpecified,
+							Identifier: Identifier{
+								Identifier: "execute",
+								Pos:        Position{Offset: 136, Line: 14, Column: 6},
+							},
+							ParameterList:        &ParameterList{},
+							ReturnTypeAnnotation: nil,
+							FunctionBlock: &FunctionBlock{
+								Block: &Block{
+									Statements: []Statement{
+										&AssignmentStatement{
+											Target: &IdentifierExpression{
+												Identifier: Identifier{
+													Identifier: "x",
+													Pos:        Position{Offset: 157, Line: 15, Column: 11},
+												},
+											},
+											Transfer: &Transfer{
+												Operation: TransferOperationCopy,
+												Pos:       Position{Offset: 159, Line: 15, Column: 13},
+											},
+											Value: &BinaryExpression{
+												Operation: OperationPlus,
+												Left: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 161, Line: 15, Column: 15},
+														EndPos:   Position{Offset: 161, Line: 15, Column: 15},
+													},
+												},
+												Right: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 165, Line: 15, Column: 19},
+														EndPos:   Position{Offset: 165, Line: 15, Column: 19},
+													},
+												},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 144, Line: 14, Column: 14},
+										EndPos:   Position{Offset: 170, Line: 16, Column: 3},
+									},
+								},
+								PreConditions:  nil,
+								PostConditions: nil,
+							},
+							StartPos: Position{Offset: 136, Line: 14, Column: 6},
+						},
+					},
 					Range: Range{
 						StartPos: Position{Offset: 5, Line: 2, Column: 4},
 						EndPos:   Position{Offset: 220, Line: 21, Column: 4},
@@ -6798,6 +6857,243 @@ func TestParseTransactionDeclaration(t *testing.T) {
 			},
 		}
 
-		assert.Equal(t, expected, actual)
+		unittest.AssertEqualWithDiff(t, expected, actual)
+	})
+
+	t.Run("PrePostExecute", func(t *testing.T) {
+		actual, _, err := parser.ParseProgram(`
+		  transaction {
+	
+		    var x: Int
+	
+		    prepare(signer: Account) {
+	          x = 0
+			}
+	
+			pre {
+	      	  x == 0
+			}
+
+		    post {
+	          x == 2
+	        }
+	
+		    execute {
+	          x = 1 + 1
+			}
+		  }
+		`)
+
+		assert.NoError(t, err)
+
+		expected := &Program{
+			Declarations: []Declaration{
+				&TransactionDeclaration{
+					Fields: []*FieldDeclaration{
+						{
+							Access:       AccessNotSpecified,
+							VariableKind: VariableKindVariable,
+							Identifier: Identifier{
+								Identifier: "x",
+								Pos:        Position{Offset: 31, Line: 4, Column: 10},
+							},
+							TypeAnnotation: &TypeAnnotation{
+								IsResource: false,
+								Type: &NominalType{
+									Identifier: Identifier{
+										Identifier: "Int",
+										Pos:        Position{Offset: 34, Line: 4, Column: 13},
+									},
+								},
+								StartPos: Position{Offset: 34, Line: 4, Column: 13},
+							},
+							Range: Range{
+								StartPos: Position{Offset: 27, Line: 4, Column: 6},
+								EndPos:   Position{Offset: 36, Line: 4, Column: 15},
+							},
+						},
+					},
+					Prepare: &SpecialFunctionDeclaration{
+						DeclarationKind: common.DeclarationKindPrepare,
+						FunctionDeclaration: &FunctionDeclaration{
+							Access: AccessNotSpecified,
+							Identifier: Identifier{
+								Identifier: "prepare",
+								Pos:        Position{Offset: 46, Line: 6, Column: 6},
+							},
+							ParameterList: &ParameterList{
+								Parameters: []*Parameter{
+									{
+										Label: "",
+										Identifier: Identifier{
+											Identifier: "signer",
+											Pos:        Position{Offset: 54, Line: 6, Column: 14},
+										},
+										TypeAnnotation: &TypeAnnotation{
+											IsResource: false,
+											Type: &NominalType{
+												Identifier: Identifier{
+													Identifier: "Account",
+													Pos:        Position{Offset: 62, Line: 6, Column: 22},
+												},
+											},
+											StartPos: Position{Offset: 62, Line: 6, Column: 22},
+										},
+										Range: Range{
+											StartPos: Position{Offset: 54, Line: 6, Column: 14},
+											EndPos:   Position{Offset: 62, Line: 6, Column: 22},
+										},
+									},
+								},
+								Range: Range{
+									StartPos: Position{Offset: 53, Line: 6, Column: 13},
+									EndPos:   Position{Offset: 69, Line: 6, Column: 29},
+								},
+							},
+							ReturnTypeAnnotation: nil,
+							FunctionBlock: &FunctionBlock{
+								Block: &Block{
+									Statements: []Statement{
+										&AssignmentStatement{
+											Target: &IdentifierExpression{
+												Identifier: Identifier{
+													Identifier: "x",
+													Pos:        Position{Offset: 84, Line: 7, Column: 11},
+												},
+											},
+											Transfer: &Transfer{
+												Operation: TransferOperationCopy,
+												Pos:       Position{Offset: 86, Line: 7, Column: 13},
+											},
+											Value: &IntExpression{
+												Value: big.NewInt(0),
+												Base:  10,
+												Range: Range{
+													StartPos: Position{Offset: 88, Line: 7, Column: 15},
+													EndPos:   Position{Offset: 88, Line: 7, Column: 15},
+												},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 71, Line: 6, Column: 31},
+										EndPos:   Position{Offset: 93, Line: 8, Column: 3},
+									},
+								},
+								PreConditions:  nil,
+								PostConditions: nil,
+							},
+							StartPos: Position{Offset: 46, Line: 6, Column: 6},
+						},
+					},
+					PreConditions: &Conditions{
+						{
+							Kind: ConditionKindPre,
+							Test: &BinaryExpression{
+								Operation: OperationEqual,
+								Left: &IdentifierExpression{
+									Identifier: Identifier{
+										Identifier: "x",
+										Pos:        Position{Offset: 116, Line: 11, Column: 10},
+									},
+								},
+								Right: &IntExpression{
+									Value: big.NewInt(0),
+									Base:  10,
+									Range: Range{
+										StartPos: Position{Offset: 121, Line: 11, Column: 15},
+										EndPos:   Position{Offset: 121, Line: 11, Column: 15},
+									},
+								},
+							},
+						},
+					},
+					PostConditions: &Conditions{
+						{
+							Kind: ConditionKindPost,
+							Test: &BinaryExpression{
+								Operation: OperationEqual,
+								Left: &IdentifierExpression{
+									Identifier: Identifier{
+										Identifier: "x",
+										Pos:        Position{Offset: 153, Line: 15, Column: 11},
+									},
+								},
+								Right: &IntExpression{
+									Value: big.NewInt(2),
+									Base:  10,
+									Range: Range{
+										StartPos: Position{Offset: 158, Line: 15, Column: 16},
+										EndPos:   Position{Offset: 158, Line: 15, Column: 16},
+									},
+								},
+							},
+						},
+					},
+					Execute: &SpecialFunctionDeclaration{
+						DeclarationKind: common.DeclarationKindExecute,
+						FunctionDeclaration: &FunctionDeclaration{
+							Access: AccessNotSpecified,
+							Identifier: Identifier{
+								Identifier: "execute",
+								Pos:        Position{Offset: 179, Line: 18, Column: 6},
+							},
+							ParameterList:        &ParameterList{},
+							ReturnTypeAnnotation: nil,
+							FunctionBlock: &FunctionBlock{
+								Block: &Block{
+									Statements: []Statement{
+										&AssignmentStatement{
+											Target: &IdentifierExpression{
+												Identifier: Identifier{
+													Identifier: "x",
+													Pos:        Position{Offset: 200, Line: 19, Column: 11},
+												},
+											},
+											Transfer: &Transfer{
+												Operation: TransferOperationCopy,
+												Pos:       Position{Offset: 202, Line: 19, Column: 13},
+											},
+											Value: &BinaryExpression{
+												Operation: OperationPlus,
+												Left: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 204, Line: 19, Column: 15},
+														EndPos:   Position{Offset: 204, Line: 19, Column: 15},
+													},
+												},
+												Right: &IntExpression{
+													Value: big.NewInt(1),
+													Base:  10,
+													Range: Range{
+														StartPos: Position{Offset: 208, Line: 19, Column: 19},
+														EndPos:   Position{Offset: 208, Line: 19, Column: 19},
+													},
+												},
+											},
+										},
+									},
+									Range: Range{
+										StartPos: Position{Offset: 187, Line: 18, Column: 14},
+										EndPos:   Position{Offset: 213, Line: 20, Column: 3},
+									},
+								},
+								PreConditions:  nil,
+								PostConditions: nil,
+							},
+							StartPos: Position{Offset: 179, Line: 18, Column: 6},
+						},
+					},
+					Range: Range{
+						StartPos: Position{Offset: 5, Line: 2, Column: 4},
+						EndPos:   Position{Offset: 219, Line: 21, Column: 4},
+					},
+				},
+			},
+		}
+
+		unittest.AssertEqualWithDiff(t, expected, actual)
 	})
 }

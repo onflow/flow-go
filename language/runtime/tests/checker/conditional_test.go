@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -17,7 +18,7 @@ func TestCheckConditionalExpressionTest(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidConditionalExpressionTest(t *testing.T) {
@@ -65,7 +66,7 @@ func TestCheckInvalidConditionalExpressionTypes(t *testing.T) {
 func TestCheckInvalidAnyConditional(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
-      let x: Any = true
+      let x: AnyStruct = true
       let y = true ? 1 : x
     `)
 

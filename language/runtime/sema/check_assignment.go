@@ -23,13 +23,17 @@ func (checker *Checker) VisitAssignmentStatement(assignment *ast.AssignmentState
 func (checker *Checker) checkAssignment(
 	target, value ast.Expression,
 	transfer *ast.Transfer,
-	allowResourceTarget bool,
+	isResourceAssignment bool,
 ) (targetType, valueType Type) {
 	valueType = value.Accept(checker).(Type)
 
 	targetType = checker.visitAssignmentValueType(target, value, valueType)
 
-	checker.checkTransfer(transfer, valueType)
+	// NOTE: `visitAssignmentValueType` checked compatibility between value and target types.
+	// Check for the *target* type, so that assignment using non-resource typed value (e.g. `nil`)
+	// is possible
+
+	checker.checkTransfer(transfer, targetType)
 
 	// An assignment to a resource is invalid, as it would result in a loss
 
@@ -43,7 +47,7 @@ func (checker *Checker) checkAssignment(
 
 		accessedSelfMember := checker.accessedSelfMember(target)
 
-		if (accessedSelfMember == nil || checker.functionActivations.Current().InitializationInfo == nil) && !allowResourceTarget {
+		if (accessedSelfMember == nil || checker.functionActivations.Current().InitializationInfo == nil) && !isResourceAssignment {
 			checker.report(
 				&InvalidResourceAssignmentError{
 					Range: ast.NewRangeFromPositioned(target),
@@ -51,6 +55,8 @@ func (checker *Checker) checkAssignment(
 			)
 		}
 	}
+
+	checker.checkVariableMove(value)
 
 	if valueType.IsResourceType() {
 		checker.recordResourceInvalidation(
@@ -86,6 +92,8 @@ func (checker *Checker) accessedSelfMember(expression ast.Expression) *Member {
 	case *CompositeType:
 		members = containerType.Members
 	case *InterfaceType:
+		members = containerType.Members
+	case *TransactionType:
 		members = containerType.Members
 	default:
 		panic(errors.NewUnreachableError())
@@ -150,7 +158,8 @@ func (checker *Checker) visitIdentifierExpressionAssignment(
 
 	// check value type is subtype of variable type
 	if !valueType.IsInvalidType() &&
-		!checker.IsTypeCompatible(valueExpression, valueType, variable.Type) {
+		!variable.Type.IsInvalidType() &&
+		!checker.checkTypeCompatibility(valueExpression, valueType, variable.Type) {
 
 		checker.report(
 			&TypeMismatchError{
@@ -176,8 +185,9 @@ func (checker *Checker) visitIndexExpressionAssignment(
 		return &InvalidType{}
 	}
 
-	if !elementType.IsInvalidType() &&
-		!checker.IsTypeCompatible(valueExpression, valueType, elementType) {
+	if !valueType.IsInvalidType() &&
+		!elementType.IsInvalidType() &&
+		!checker.checkTypeCompatibility(valueExpression, valueType, elementType) {
 
 		checker.report(
 			&TypeMismatchError{
@@ -214,11 +224,12 @@ func (checker *Checker) visitMemberExpressionAssignment(
 	// If the value type is valid, check that the value can be assigned to the member type
 
 	if !valueType.IsInvalidType() &&
-		!checker.IsTypeCompatible(valueExpression, valueType, member.Type) {
+		!member.TypeAnnotation.Type.IsInvalidType() &&
+		!checker.checkTypeCompatibility(valueExpression, valueType, member.TypeAnnotation.Type) {
 
 		checker.report(
 			&TypeMismatchError{
-				ExpectedType: member.Type,
+				ExpectedType: member.TypeAnnotation.Type,
 				ActualType:   valueType,
 				Range:        ast.NewRangeFromPositioned(valueExpression),
 			},
@@ -261,6 +272,9 @@ func (checker *Checker) visitMemberExpressionAssignment(
 			// If the function has already returned, the initialization
 			// is not definitive, and it must be ignored
 
+			// NOTE: assignment can still be considered definitive
+			//  if the function maybe halted
+
 			if !functionActivation.ReturnInfo.MaybeReturned {
 
 				// If the field is constant and it has already previously been
@@ -272,6 +286,10 @@ func (checker *Checker) visitMemberExpressionAssignment(
 					initializedFieldMembers.Contains(accessedSelfMember) {
 
 					// TODO: dedicated error: assignment to constant after initialization
+
+					reportAssignmentToConstant()
+				} else if functionActivation.InitializationInfo.FieldMembers[accessedSelfMember] == nil {
+					// This field is not supposed to be initialized
 
 					reportAssignmentToConstant()
 				} else {
@@ -301,5 +319,5 @@ func (checker *Checker) visitMemberExpressionAssignment(
 		}
 	}
 
-	return member.Type
+	return member.TypeAnnotation.Type
 }

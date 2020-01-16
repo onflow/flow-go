@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -18,7 +19,7 @@ func TestCheckDictionary(t *testing.T) {
       let z = {"a": 1, "b": 2}
 	`)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckDictionaryType(t *testing.T) {
@@ -27,7 +28,7 @@ func TestCheckDictionaryType(t *testing.T) {
       let z: {String: Int} = {"a": 1, "b": 2}
 	`)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckInvalidDictionaryTypeKey(t *testing.T) {
@@ -107,7 +108,7 @@ func TestCheckDictionaryIndexingBool(t *testing.T) {
       let y = x[true]
 	`)
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestCheckInvalidDictionaryIndexing(t *testing.T) {
@@ -131,7 +132,7 @@ func TestCheckDictionaryIndexingAssignment(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidDictionaryIndexingAssignment(t *testing.T) {
@@ -157,7 +158,7 @@ func TestCheckDictionaryRemove(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidDictionaryRemove(t *testing.T) {
@@ -183,7 +184,7 @@ func TestCheckDictionaryInsert(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidDictionaryInsert(t *testing.T) {
@@ -235,7 +236,7 @@ func TestCheckLength(t *testing.T) {
       let y = [1, 2, 3].length
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckArrayAppend(t *testing.T) {
@@ -248,7 +249,7 @@ func TestCheckArrayAppend(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayAppend(t *testing.T) {
@@ -277,7 +278,7 @@ func TestCheckArrayAppendBound(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayAppendToConstantSize(t *testing.T) {
@@ -306,7 +307,7 @@ func TestCheckArrayConcat(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayConcat(t *testing.T) {
@@ -352,7 +353,7 @@ func TestCheckArrayConcatBound(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckArrayInsert(t *testing.T) {
@@ -365,7 +366,7 @@ func TestCheckArrayInsert(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayInsert(t *testing.T) {
@@ -408,7 +409,7 @@ func TestCheckArrayRemove(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayRemove(t *testing.T) {
@@ -451,7 +452,7 @@ func TestCheckArrayRemoveFirst(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayRemoveFirst(t *testing.T) {
@@ -494,7 +495,7 @@ func TestCheckArrayRemoveLast(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayRemoveLastFromConstantSized(t *testing.T) {
@@ -521,7 +522,7 @@ func TestCheckArrayContains(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidArrayContains(t *testing.T) {
@@ -558,7 +559,7 @@ func TestCheckEmptyArray(t *testing.T) {
       let xs: [Int] = []
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckEmptyArrayCall(t *testing.T) {
@@ -569,7 +570,7 @@ func TestCheckEmptyArrayCall(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckEmptyDictionary(t *testing.T) {
@@ -578,7 +579,7 @@ func TestCheckEmptyDictionary(t *testing.T) {
       let xs: {String: Int} = {}
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckEmptyDictionaryCall(t *testing.T) {
@@ -589,38 +590,41 @@ func TestCheckEmptyDictionaryCall(t *testing.T) {
       }
 	`)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckArraySubtyping(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s interface I {}
-              %[1]s S: I {}
-
-              let xs: %[2]s[S] %[3]s []
-              let ys: %[2]s[I] %[3]s xs
-	        `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-			))
-
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 2)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+			body := "{}"
+			if kind == common.CompositeKindEvent {
+				body = "()"
 			}
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface I %[2]s
+                      %[1]s S: I %[2]s
+
+                      let xs: %[3]s[S] %[4]s []
+                      let ys: %[3]s[I] %[4]s xs
+	                `,
+					kind.Keyword(),
+					body,
+					kind.Annotation(),
+					kind.TransferOperator(),
+				),
+			)
+
+			require.NoError(t, err)
 		})
 	}
 }
@@ -639,34 +643,36 @@ func TestCheckInvalidArraySubtyping(t *testing.T) {
 
 func TestCheckDictionarySubtyping(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
+	for _, kind := range common.AllCompositeKinds {
+
+		if !kind.SupportsInterfaces() {
+			continue
+		}
+
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %[1]s interface I {}
-              %[1]s S: I {}
-
-              let xs: %[2]s{String: S} %[3]s {}
-              let ys: %[2]s{String: I} %[3]s xs
-	        `,
-				kind.Keyword(),
-				kind.Annotation(),
-				kind.TransferOperator(),
-			))
-
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
-
-			default:
-				errs := ExpectCheckerErrors(t, err, 2)
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+			body := "{}"
+			if kind == common.CompositeKindEvent {
+				body = "()"
 			}
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface I %[2]s
+                      %[1]s S: I %[2]s
+
+                      let xs: %[3]s{String: S} %[4]s {}
+                      let ys: %[3]s{String: I} %[4]s xs
+	                `,
+					kind.Keyword(),
+					body,
+					kind.Annotation(),
+					kind.TransferOperator(),
+				),
+			)
+
+			require.NoError(t, err)
 		})
 	}
 }
@@ -696,7 +702,7 @@ func TestCheckInvalidArrayElements(t *testing.T) {
 
 func TestCheckInvalidArrayIndexingWithType(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           let x = ["xyz"][String?]
 	    `,
@@ -709,7 +715,7 @@ func TestCheckInvalidArrayIndexingWithType(t *testing.T) {
 
 func TestCheckInvalidArrayIndexingAssignmentWithType(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           fun test() {
               let stuff = ["abc"]
@@ -725,7 +731,7 @@ func TestCheckInvalidArrayIndexingAssignmentWithType(t *testing.T) {
 
 func TestCheckInvalidDictionaryIndexingWithType(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           let x = {"a": 1}[String?]
 	    `,
@@ -738,7 +744,7 @@ func TestCheckInvalidDictionaryIndexingWithType(t *testing.T) {
 
 func TestCheckInvalidDictionaryIndexingAssignmentWithType(t *testing.T) {
 
-	_, err := ParseAndCheckWithStorage(t,
+	_, err := ParseAndCheckStorage(t,
 		`
           fun test() {
               let stuff = {"a": 1}
@@ -760,10 +766,10 @@ func TestCheckConstantSizedArrayDeclaration(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
-func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
+func TestCheckInvalidConstantSizedArrayDeclarationCountMismatchTooMany(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
       fun test() {
@@ -771,9 +777,10 @@ func TestCheckInvalidConstantSizedArrayDeclarationCountMismatch(t *testing.T) {
       }
     `)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	assert.IsType(t, &sema.ConstantSizedArrayLiteralSizeError{}, errs[0])
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 }
 
 func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
@@ -793,14 +800,17 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 	} {
 		t.Run("valid", func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s
-              let xs = {k: "x"}
-            `,
-				code,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s
+                      let xs = {k: "x"}
+                    `,
+					code,
+				),
+			)
 
-			assert.Nil(t, err)
+			require.NoError(t, err)
 		})
 	}
 
@@ -814,16 +824,54 @@ func TestCheckDictionaryKeyTypesExpressions(t *testing.T) {
 	} {
 		t.Run("invalid", func(t *testing.T) {
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-              %s
-              let xs = {k: "x"}
-            `,
-				code,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %s
+                      let xs = {k: "x"}
+                    `,
+					code,
+				),
+			)
 
 			errs := ExpectCheckerErrors(t, err, 1)
 
 			assert.IsType(t, &sema.InvalidDictionaryKeyTypeError{}, errs[0])
 		})
 	}
+}
+
+func TestCheckArrayGeneration(t *testing.T) {
+
+	code := `
+      struct Person {
+          let id: Int
+
+          init(id: Int) {
+              self.id = id
+          }
+      }
+
+      let persons = Array(
+          size: 3,
+          generate: fun(index: Int): Person {
+              return Person(id: index + 1)
+          }
+      )
+    `
+
+	_, err := ParseAndCheckWithOptions(t,
+		code,
+		ParseAndCheckOptions{
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.ArrayFunction,
+					}.ToValueDeclarations(),
+				),
+			},
+		},
+	)
+
+	assert.NoError(t, err)
 }

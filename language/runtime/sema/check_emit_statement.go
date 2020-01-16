@@ -2,6 +2,7 @@ package sema
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 )
 
 func (checker *Checker) VisitEmitStatement(statement *ast.EmitStatement) ast.Repr {
@@ -15,8 +16,8 @@ func (checker *Checker) VisitEmitStatement(statement *ast.EmitStatement) ast.Rep
 
 	// Check that emitted expression is an event
 
-	eventType, isEventType := ty.(*EventType)
-	if !isEventType {
+	compositeType, isCompositeType := ty.(*CompositeType)
+	if !isCompositeType || compositeType.Kind != common.CompositeKindEvent {
 		checker.report(
 			&EmitNonEventError{
 				Type:  ty,
@@ -26,9 +27,11 @@ func (checker *Checker) VisitEmitStatement(statement *ast.EmitStatement) ast.Rep
 		return nil
 	}
 
+	checker.Elaboration.EmitStatementEventTypes[statement] = compositeType
+
 	// Check that the emitted event is declared in the same location
 
-	if !ast.LocationsMatch(eventType.Location, checker.Location) {
+	if !ast.LocationsMatch(compositeType.Location, checker.Location) {
 
 		checker.report(
 			&EmitImportedEventError{

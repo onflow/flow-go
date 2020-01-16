@@ -2,16 +2,18 @@ package stub
 
 import (
 	"sync"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // PendingMessage is a pending message to be sent
 type PendingMessage struct {
 	// The sender node id
-	From     string
-	EngineID uint8
-	Event    interface{}
+	From      flow.Identifier
+	ChannelID uint8
+	Event     interface{}
 	// The id of the receiver nodes
-	TargetIDs []string
+	TargetIDs []flow.Identifier
 }
 
 // Buffer buffers all the pending messages to be sent over the mock network from one node to a list of nodes
@@ -28,12 +30,12 @@ func NewBuffer() *Buffer {
 }
 
 // Save stores a pending message to the buffer
-func (b *Buffer) Save(from string, engineID uint8, event interface{}, targetIDs []string) {
+func (b *Buffer) Save(from flow.Identifier, channelID uint8, event interface{}, targetIDs []flow.Identifier) {
 	b.Lock()
 	defer b.Unlock()
 	b.pending = append(b.pending, &PendingMessage{
 		From:      from,
-		EngineID:  engineID,
+		ChannelID: channelID,
 		Event:     event,
 		TargetIDs: targetIDs,
 	})
@@ -50,7 +52,7 @@ func (b *Buffer) Flush(sendOne func(*PendingMessage) error) {
 		}
 
 		for _, msg := range toSend {
-			sendOne(msg)
+			_ = sendOne(msg)
 		}
 	}
 }

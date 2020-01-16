@@ -2,9 +2,10 @@ package ast
 
 import (
 	"encoding/gob"
-	"encoding/hex"
+	"fmt"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Identifier
@@ -44,12 +45,16 @@ func (v *ImportDeclaration) Accept(visitor Visitor) Repr {
 	return visitor.VisitImportDeclaration(v)
 }
 
-func (v *ImportDeclaration) DeclarationName() string {
-	return ""
+func (v *ImportDeclaration) DeclarationIdentifier() *Identifier {
+	return nil
 }
 
 func (v *ImportDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindImport
+}
+
+func (v *ImportDeclaration) DeclarationAccess() Access {
+	return AccessNotSpecified
 }
 
 // Location describes the origin of a Cadence script.
@@ -90,14 +95,24 @@ func init() {
 
 // AddressLocation
 
+const AddressPrefix = "A"
+
 type AddressLocation []byte
 
-func (l AddressLocation) ID() LocationID {
-	return LocationID(l.String())
+func (l AddressLocation) String() string {
+	return fmt.Sprintf("0x%x", []byte(l))
 }
 
-func (l AddressLocation) String() string {
-	return hex.EncodeToString([]byte(l))
+func (l AddressLocation) ID() LocationID {
+	return LocationID(fmt.Sprintf(
+		"%s.%s",
+		AddressPrefix,
+		l.ToAddress().Hex(),
+	))
+}
+
+func (l AddressLocation) ToAddress() flow.Address {
+	return flow.BytesToAddress(l)
 }
 
 func init() {

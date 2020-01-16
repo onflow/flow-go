@@ -109,9 +109,9 @@ func (v *ProgramVisitor) visitReturnTypeAnnotation(ctx ITypeAnnotationContext, t
 			},
 		}
 		return &ast.TypeAnnotation{
-			Move:     false,
-			Type:     returnType,
-			StartPos: positionBeforeMissingReturnType,
+			IsResource: false,
+			Type:       returnType,
+			StartPos:   positionBeforeMissingReturnType,
 		}
 	}
 	result := ctx.Accept(v)
@@ -203,28 +203,31 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 		fields = fieldsCtx.Accept(v).([]*ast.FieldDeclaration)
 	}
 
-	var preConditions []*ast.Condition
-	preConditionsCtx := ctx.PreConditions()
-	if preConditionsCtx != nil {
-		preConditions = preConditionsCtx.Accept(v).([]*ast.Condition)
-	}
-
-	var postConditions []*ast.Condition
-	postConditionsCtx := ctx.PostConditions()
-	if postConditionsCtx != nil {
-		postConditions = postConditionsCtx.Accept(v).([]*ast.Condition)
-	}
-
 	var prepareFunction *ast.SpecialFunctionDeclaration
 	prepareCtx := ctx.Prepare()
 	if prepareCtx != nil {
 		prepareFunction = prepareCtx.Accept(v).(*ast.SpecialFunctionDeclaration)
+		prepareFunction.DeclarationKind = common.DeclarationKindPrepare
 	}
 
-	var executeBlock *ast.Block
+	var executeFunction *ast.SpecialFunctionDeclaration
 	executeCtx := ctx.Execute()
 	if executeCtx != nil {
-		executeBlock = executeCtx.Accept(v).(*ast.Block)
+		executeFunction = executeCtx.Accept(v).(*ast.SpecialFunctionDeclaration)
+	}
+
+	var preConditions *ast.Conditions
+	preConditionsCtx := ctx.PreConditions()
+	if preConditionsCtx != nil {
+		var conditions ast.Conditions = preConditionsCtx.Accept(v).([]*ast.Condition)
+		preConditions = &conditions
+	}
+
+	var postConditions *ast.Conditions
+	postConditionsCtx := ctx.PostConditions()
+	if postConditionsCtx != nil {
+		var conditions ast.Conditions = postConditionsCtx.Accept(v).([]*ast.Condition)
+		postConditions = &conditions
 	}
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
@@ -233,8 +236,8 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 		Fields:         fields,
 		Prepare:        prepareFunction,
 		PreConditions:  preConditions,
-		Execute:        executeBlock,
 		PostConditions: postConditions,
+		Execute:        executeFunction,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
@@ -247,23 +250,55 @@ func (v *ProgramVisitor) VisitPrepare(ctx *PrepareContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitExecute(ctx *ExecuteContext) interface{} {
-	return ctx.Block().Accept(v)
+	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+	block := ctx.Block().Accept(v).(*ast.Block)
+
+	startPosition := ast.PositionFromToken(ctx.GetStart())
+
+	return &ast.SpecialFunctionDeclaration{
+		DeclarationKind: common.DeclarationKindExecute,
+		FunctionDeclaration: &ast.FunctionDeclaration{
+			Access:        ast.AccessNotSpecified,
+			Identifier:    identifier,
+			ParameterList: &ast.ParameterList{},
+			FunctionBlock: &ast.FunctionBlock{
+				Block: block,
+			},
+			StartPos: startPosition,
+		},
+	}
 }
 
 func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) interface{} {
+	access := ctx.Access().Accept(v).(ast.Access)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 
-	var parameterList *ast.ParameterList
+	var specialFunctions []*ast.SpecialFunctionDeclaration
+
 	parameterListContext := ctx.ParameterList()
 	if parameterListContext != nil {
-		parameterList = parameterListContext.Accept(v).(*ast.ParameterList)
+		parameterList := parameterListContext.Accept(v).(*ast.ParameterList)
+
+		specialFunctions = append(specialFunctions,
+			&ast.SpecialFunctionDeclaration{
+				DeclarationKind: common.DeclarationKindInitializer,
+				FunctionDeclaration: &ast.FunctionDeclaration{
+					ParameterList: parameterList,
+					StartPos:      parameterList.StartPos,
+				},
+			},
+		)
 	}
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
-	return &ast.EventDeclaration{
+	return &ast.CompositeDeclaration{
+		Access:        access,
+		CompositeKind: common.CompositeKindEvent,
 		Identifier:    identifier,
-		ParameterList: parameterList,
+		Members: &ast.Members{
+			SpecialFunctions: specialFunctions,
+		},
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
@@ -292,16 +327,18 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 	conformances := ctx.Conformances().Accept(v).([]*ast.NominalType)
-	members := ctx.Members().Accept(v).(*ast.Members)
+	membersAndNestedDeclarations := ctx.MembersAndNestedDeclarations().Accept(v).(membersAndNestedDeclarations)
 
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.CompositeDeclaration{
-		Access:        access,
-		CompositeKind: kind,
-		Identifier:    identifier,
-		Conformances:  conformances,
-		Members:       members,
+		Access:                access,
+		CompositeKind:         kind,
+		Identifier:            identifier,
+		Conformances:          conformances,
+		Members:               membersAndNestedDeclarations.Members,
+		InterfaceDeclarations: membersAndNestedDeclarations.InterfaceDeclarations,
+		CompositeDeclarations: membersAndNestedDeclarations.CompositeDeclarations,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
@@ -310,22 +347,19 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 }
 
 func (v *ProgramVisitor) VisitConformances(ctx *ConformancesContext) interface{} {
-	identifierNodes := ctx.AllIdentifier
-	conformances := make([]*ast.NominalType, len(identifierNodes()))
-	for i, identifierNode := range identifierNodes() {
-		identifier := identifierNode.Accept(v).(ast.Identifier)
-		conformances[i] = &ast.NominalType{
-			Identifier: identifier,
-		}
+	typeContexts := ctx.AllNominalType()
+	conformances := make([]*ast.NominalType, len(typeContexts))
+	for i, typeContext := range typeContexts {
+		conformances[i] = typeContext.Accept(v).(*ast.NominalType)
 	}
 	return conformances
 }
 
-func (v *ProgramVisitor) VisitMember(ctx *MemberContext) interface{} {
+func (v *ProgramVisitor) VisitMemberOrNestedDeclaration(ctx *MemberOrNestedDeclarationContext) interface{} {
 	return v.VisitChildren(ctx.BaseParserRuleContext)
 }
 
-func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
+func (v *ProgramVisitor) VisitMembersAndNestedDeclarations(ctx *MembersAndNestedDeclarationsContext) interface{} {
 
 	var fields []*ast.FieldDeclaration
 	var specialFunctions []*ast.SpecialFunctionDeclaration
@@ -333,33 +367,44 @@ func (v *ProgramVisitor) VisitMembers(ctx *MembersContext) interface{} {
 	var compositeDeclarations []*ast.CompositeDeclaration
 	var interfaceDeclarations []*ast.InterfaceDeclaration
 
-	for _, memberCtx := range ctx.AllMember() {
-		member := memberCtx.Accept(v)
+	for _, memberOrNestedDeclarationContext := range ctx.AllMemberOrNestedDeclaration() {
+		memberOrNestedDeclaration := memberOrNestedDeclarationContext.Accept(v)
 
-		switch member := member.(type) {
+		switch memberOrNestedDeclaration := memberOrNestedDeclaration.(type) {
 		case *ast.FieldDeclaration:
-			fields = append(fields, member)
+			fields = append(fields, memberOrNestedDeclaration)
 
 		case *ast.SpecialFunctionDeclaration:
-			specialFunctions = append(specialFunctions, member)
+			specialFunctions = append(specialFunctions, memberOrNestedDeclaration)
 
 		case *ast.FunctionDeclaration:
-			functions = append(functions, member)
+			functions = append(functions, memberOrNestedDeclaration)
 
 		case *ast.CompositeDeclaration:
-			compositeDeclarations = append(compositeDeclarations, member)
+			compositeDeclarations = append(compositeDeclarations, memberOrNestedDeclaration)
 
 		case *ast.InterfaceDeclaration:
-			interfaceDeclarations = append(interfaceDeclarations, member)
+			interfaceDeclarations = append(interfaceDeclarations, memberOrNestedDeclaration)
 		}
 	}
 
-	return &ast.Members{
-		Fields:                fields,
-		SpecialFunctions:      specialFunctions,
-		Functions:             functions,
-		CompositeDeclarations: compositeDeclarations,
+	members := &ast.Members{
+		Fields:           fields,
+		SpecialFunctions: specialFunctions,
+		Functions:        functions,
 	}
+
+	return membersAndNestedDeclarations{
+		CompositeDeclarations: compositeDeclarations,
+		InterfaceDeclarations: interfaceDeclarations,
+		Members:               members,
+	}
+}
+
+type membersAndNestedDeclarations struct {
+	CompositeDeclarations []*ast.CompositeDeclaration
+	InterfaceDeclarations []*ast.InterfaceDeclaration
+	Members               *ast.Members
 }
 
 func (v *ProgramVisitor) VisitFields(ctx *FieldsContext) interface{} {
@@ -445,14 +490,16 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 	access := ctx.Access().Accept(v).(ast.Access)
 	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
-	members := ctx.Members().Accept(v).(*ast.Members)
+	membersAndNestedDeclarations := ctx.MembersAndNestedDeclarations().Accept(v).(membersAndNestedDeclarations)
 	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
 
 	return &ast.InterfaceDeclaration{
-		Access:        access,
-		CompositeKind: kind,
-		Identifier:    identifier,
-		Members:       members,
+		Access:                access,
+		CompositeKind:         kind,
+		Identifier:            identifier,
+		Members:               membersAndNestedDeclarations.Members,
+		InterfaceDeclarations: membersAndNestedDeclarations.InterfaceDeclarations,
+		CompositeDeclarations: membersAndNestedDeclarations.CompositeDeclarations,
 		Range: ast.Range{
 			StartPos: startPosition,
 			EndPos:   endPosition,
@@ -548,10 +595,24 @@ func (v *ProgramVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitNominalType(ctx *NominalTypeContext) interface{} {
-	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
+	var identifiers []ast.Identifier
+	for _, identifierContext := range ctx.AllIdentifier() {
+		identifier := identifierContext.Accept(v).(ast.Identifier)
+		identifiers = append(identifiers, identifier)
+	}
+
+	if identifiers == nil {
+		panic(errors.NewUnreachableError())
+	}
+
+	var nestedIdentifiers []ast.Identifier
+	if len(identifiers) > 1 {
+		nestedIdentifiers = identifiers[1:]
+	}
 
 	return &ast.NominalType{
-		Identifier: identifier,
+		Identifier:        identifiers[0],
+		NestedIdentifiers: nestedIdentifiers,
 	}
 }
 
@@ -634,14 +695,14 @@ func (v *ProgramVisitor) VisitDictionaryType(ctx *DictionaryTypeContext) interfa
 }
 
 func (v *ProgramVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interface{} {
-	move := ctx.Move() != nil
+	isResource := ctx.ResourceAnnotation() != nil
 	fullType := ctx.FullType().Accept(v).(ast.Type)
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 
 	return &ast.TypeAnnotation{
-		Move:     move,
-		Type:     fullType,
-		StartPos: startPosition,
+		IsResource: isResource,
+		Type:       fullType,
+		StartPos:   startPosition,
 	}
 }
 
@@ -681,16 +742,18 @@ func (v *ProgramVisitor) VisitBlock(ctx *BlockContext) interface{} {
 func (v *ProgramVisitor) VisitFunctionBlock(ctx *FunctionBlockContext) interface{} {
 	block := v.visitBlock(ctx.BaseParserRuleContext, ctx.Statements())
 
-	var preConditions []*ast.Condition
+	var preConditions *ast.Conditions
 	preConditionsCtx := ctx.PreConditions()
 	if preConditionsCtx != nil {
-		preConditions = preConditionsCtx.Accept(v).([]*ast.Condition)
+		var conditions ast.Conditions = preConditionsCtx.Accept(v).([]*ast.Condition)
+		preConditions = &conditions
 	}
 
-	var postConditions []*ast.Condition
+	var postConditions *ast.Conditions
 	postConditionsCtx := ctx.PostConditions()
 	if postConditionsCtx != nil {
-		postConditions = postConditionsCtx.Accept(v).([]*ast.Condition)
+		var conditions ast.Conditions = postConditionsCtx.Accept(v).([]*ast.Condition)
+		postConditions = &conditions
 	}
 
 	return &ast.FunctionBlock{
@@ -1404,12 +1467,18 @@ func (v *ProgramVisitor) VisitPrimaryExpressionStart(ctx *PrimaryExpressionStart
 }
 
 func (v *ProgramVisitor) VisitCreateExpression(ctx *CreateExpressionContext) interface{} {
-	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 	invocation := ctx.Invocation().Accept(v).(*ast.InvocationExpression)
-	invocation.InvokedExpression =
-		&ast.IdentifierExpression{
-			Identifier: identifier,
+	ty := ctx.NominalType().Accept(v).(*ast.NominalType)
+	invocation.InvokedExpression = &ast.IdentifierExpression{
+		Identifier: ty.Identifier,
+	}
+
+	for _, nestedIdentifier := range ty.NestedIdentifiers {
+		invocation.InvokedExpression = &ast.MemberExpression{
+			Expression: invocation.InvokedExpression,
+			Identifier: nestedIdentifier,
 		}
+	}
 
 	startPosition := ast.PositionFromToken(ctx.GetStart())
 

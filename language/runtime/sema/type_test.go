@@ -22,9 +22,11 @@ func TestConstantSizedType_String_OfFunctionType(t *testing.T) {
 
 	ty := &ConstantSizedType{
 		Type: &FunctionType{
-			ParameterTypeAnnotations: NewTypeAnnotations(
-				&Int8Type{},
-			),
+			Parameters: []*Parameter{
+				{
+					TypeAnnotation: NewTypeAnnotation(&Int8Type{}),
+				},
+			},
 			ReturnTypeAnnotation: NewTypeAnnotation(
 				&Int16Type{},
 			),
@@ -51,9 +53,11 @@ func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
 
 	ty := &VariableSizedType{
 		Type: &FunctionType{
-			ParameterTypeAnnotations: NewTypeAnnotations(
-				&Int8Type{},
-			),
+			Parameters: []*Parameter{
+				{
+					TypeAnnotation: NewTypeAnnotation(&Int8Type{}),
+				},
+			},
 			ReturnTypeAnnotation: NewTypeAnnotation(
 				&Int16Type{},
 			),
@@ -63,19 +67,28 @@ func TestVariableSizedType_String_OfFunctionType(t *testing.T) {
 	assert.Equal(t, ty.String(), "[((Int8): Int16)]")
 }
 
-func TestIsResourceType_AnyNestedInArray(t *testing.T) {
+func TestIsResourceType_AnyStructNestedInArray(t *testing.T) {
 
 	ty := &VariableSizedType{
-		Type: &AnyType{},
+		Type: &AnyStructType{},
 	}
 
 	assert.False(t, ty.IsResourceType())
 }
 
+func TestIsResourceType_AnyResourceNestedInArray(t *testing.T) {
+
+	ty := &VariableSizedType{
+		Type: &AnyResourceType{},
+	}
+
+	assert.True(t, ty.IsResourceType())
+}
+
 func TestIsResourceType_ResourceNestedInArray(t *testing.T) {
 
 	ty := &VariableSizedType{
-		&CompositeType{
+		Type: &CompositeType{
 			Kind: common.CompositeKindResource,
 		},
 	}

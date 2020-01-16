@@ -19,14 +19,7 @@ const TestLocation = ast.StringLocation("test")
 const ImportedLocation = ast.StringLocation("imported")
 
 func ParseAndCheck(t *testing.T, code string) (*sema.Checker, error) {
-	return ParseAndCheckWithOptions(t,
-		code,
-		ParseAndCheckOptions{
-			Options: []sema.Option{
-				sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
-			},
-		},
-	)
+	return ParseAndCheckWithOptions(t, code, ParseAndCheckOptions{})
 }
 
 type ParseAndCheckOptions struct {
@@ -42,7 +35,7 @@ func ParseAndCheckWithOptions(
 ) (*sema.Checker, error) {
 	program, _, err := parser.ParseProgram(code)
 
-	if !assert.Nil(t, err) {
+	if !assert.NoError(t, err) {
 		assert.FailNow(t, errors.UnrollChildErrors(err))
 		return nil, err
 	}
@@ -57,10 +50,18 @@ func ParseAndCheckWithOptions(
 	if options.Location == nil {
 		options.Location = TestLocation
 	}
+
+	checkerOptions := append(
+		[]sema.Option{
+			sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
+		},
+		options.Options...,
+	)
+
 	checker, err := sema.NewChecker(
 		program,
 		options.Location,
-		options.Options...,
+		checkerOptions...,
 	)
 	if err != nil {
 		return checker, err

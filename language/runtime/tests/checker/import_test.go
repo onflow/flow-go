@@ -5,9 +5,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -51,7 +53,7 @@ func TestCheckImportAll(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`
@@ -66,7 +68,7 @@ func TestCheckImportAll(t *testing.T) {
 		},
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidImportUnexported(t *testing.T) {
@@ -75,7 +77,7 @@ func TestCheckInvalidImportUnexported(t *testing.T) {
        pub let x = 1
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`
@@ -105,7 +107,7 @@ func TestCheckImportSome(t *testing.T) {
       pub let x = 1
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`
@@ -120,7 +122,7 @@ func TestCheckImportSome(t *testing.T) {
 		},
 	)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidImportedError(t *testing.T) {
@@ -132,7 +134,7 @@ func TestCheckInvalidImportedError(t *testing.T) {
        let x: Bool = 1
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`
@@ -152,28 +154,42 @@ func TestCheckInvalidImportedError(t *testing.T) {
 
 func TestCheckImportTypes(t *testing.T) {
 
-	for _, kind := range common.CompositeKinds {
-		t.Run(kind.Keyword(), func(t *testing.T) {
+	for _, compositeKind := range common.AllCompositeKinds {
 
-			checker, err := ParseAndCheck(t, fmt.Sprintf(`
-               pub %[1]s Test {}
+		if !compositeKind.SupportsInterfaces() {
+			continue
+		}
 
-               pub %[1]s interface TestInterface {}
-            `,
-				kind.Keyword(),
-			))
+		t.Run(compositeKind.Keyword(), func(t *testing.T) {
 
-			// TODO: add support for non-structure / non-resource declarations
+			body := "{}"
+			if compositeKind == common.CompositeKindEvent {
+				body = "()"
+			}
 
-			switch kind {
-			case common.CompositeKindStructure, common.CompositeKindResource:
-				assert.Nil(t, err)
+			checker, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                       pub %[1]s Test %[2]s
 
-			default:
-				errs := ExpectCheckerErrors(t, err, 2)
+                       pub %[1]s interface TestInterface %[2]s
+                    `,
+					compositeKind.Keyword(),
+					body,
+				),
+			)
 
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[0])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[1])
+			require.NoError(t, err)
+
+			var useCode string
+			if compositeKind != common.CompositeKindContract {
+				useCode = fmt.Sprintf(
+					`pub let x: %[1]sTest %[2]s %[3]s Test%[4]s`,
+					compositeKind.Annotation(),
+					compositeKind.TransferOperator(),
+					compositeKind.ConstructionKeyword(),
+					constructorArguments(compositeKind),
+				)
 			}
 
 			_, err = ParseAndCheckWithOptions(t,
@@ -183,12 +199,10 @@ func TestCheckImportTypes(t *testing.T) {
 
                       pub %[1]s TestImpl: TestInterface {}
 
-                      pub let x: %[2]sTest %[3]s %[4]s Test()
+                      %[2]s
                     `,
-					kind.Keyword(),
-					kind.Annotation(),
-					kind.TransferOperator(),
-					kind.ConstructionKeyword(),
+					compositeKind.Keyword(),
+					useCode,
 				),
 				ParseAndCheckOptions{
 					ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
@@ -197,11 +211,9 @@ func TestCheckImportTypes(t *testing.T) {
 				},
 			)
 
-			// TODO: add support for non-structure / non-resource declarations
-
-			switch kind {
-			case common.CompositeKindStructure:
-				assert.Nil(t, err)
+			switch compositeKind {
+			case common.CompositeKindStructure, common.CompositeKindContract:
+				require.NoError(t, err)
 
 			case common.CompositeKindResource:
 				errs := ExpectCheckerErrors(t, err, 1)
@@ -209,14 +221,30 @@ func TestCheckImportTypes(t *testing.T) {
 				assert.IsType(t, &sema.CreateImportedResourceError{}, errs[0])
 
 			default:
-				errs := ExpectCheckerErrors(t, err, 5)
-
-				assert.IsType(t, &sema.ImportedProgramError{}, errs[0])
-				assert.IsType(t, &sema.NotDeclaredError{}, errs[1])
-				assert.IsType(t, &sema.UnsupportedDeclarationError{}, errs[2])
-				assert.IsType(t, &sema.NotDeclaredError{}, errs[3])
-				assert.IsType(t, &sema.NotDeclaredError{}, errs[4])
+				panic(errors.NewUnreachableError())
 			}
 		})
 	}
+}
+
+func TestCheckInvalidImportCycle(t *testing.T) {
+
+	// NOTE: only parse, don't check imported program.
+	// will be checked by checker checking importing program
+
+	const code = `import 0x1`
+	imported, _, err := parser.ParseProgram(code)
+
+	require.NoError(t, err)
+
+	_, err = ParseAndCheckWithOptions(t,
+		code,
+		ParseAndCheckOptions{
+			ImportResolver: func(location ast.Location) (program *ast.Program, e error) {
+				return imported, nil
+			},
+		},
+	)
+
+	assert.IsType(t, ast.CyclicImportsError{}, err)
 }

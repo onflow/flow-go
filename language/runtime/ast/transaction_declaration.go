@@ -5,23 +5,27 @@ import "github.com/dapperlabs/flow-go/language/runtime/common"
 type TransactionDeclaration struct {
 	Fields         []*FieldDeclaration
 	Prepare        *SpecialFunctionDeclaration
-	PreConditions  []*Condition
-	Execute        *Block
-	PostConditions []*Condition
+	PreConditions  *Conditions
+	PostConditions *Conditions
+	Execute        *SpecialFunctionDeclaration
 	Range
 }
 
-func (e *TransactionDeclaration) Accept(visitor Visitor) Repr {
-	return visitor.VisitTransactionDeclaration(e)
+func (d *TransactionDeclaration) Accept(visitor Visitor) Repr {
+	return visitor.VisitTransactionDeclaration(d)
 }
 
 func (*TransactionDeclaration) isDeclaration() {}
 func (*TransactionDeclaration) isStatement()   {}
 
-func (e *TransactionDeclaration) DeclarationName() string {
-	return ""
+func (d *TransactionDeclaration) DeclarationIdentifier() *Identifier {
+	return nil
 }
 
-func (e *TransactionDeclaration) DeclarationKind() common.DeclarationKind {
+func (d *TransactionDeclaration) DeclarationKind() common.DeclarationKind {
 	return common.DeclarationKindTransaction
+}
+
+func (d *TransactionDeclaration) DeclarationAccess() Access {
+	return AccessNotSpecified
 }

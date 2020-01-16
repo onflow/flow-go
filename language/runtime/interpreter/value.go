@@ -13,19 +13,17 @@ import (
 	"golang.org/x/text/unicode/norm"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	"github.com/dapperlabs/flow-go/sdk/abi/values"
 )
 
 type Value interface {
 	isValue()
 	Copy() Value
-}
-
-type ExportableValue interface {
-	Export() values.Value
+	GetOwner() string
+	SetOwner(owner string)
 }
 
 // ValueIndexableValue
@@ -51,6 +49,7 @@ type ConcatenatableValue interface {
 // EquatableValue
 
 type EquatableValue interface {
+	Value
 	Equal(other Value) BoolValue
 }
 
@@ -58,6 +57,12 @@ type EquatableValue interface {
 
 type DestroyableValue interface {
 	Destroy(*Interpreter, LocationPosition) trampoline.Trampoline
+}
+
+// HasKeyString
+
+type HasKeyString interface {
+	KeyString() string
 }
 
 // VoidValue
@@ -74,11 +79,16 @@ func (v VoidValue) Copy() Value {
 	return v
 }
 
-func (v VoidValue) Export() values.Value {
-	return values.Void{}
+func (VoidValue) GetOwner() string {
+	// value is never owned
+	return ""
 }
 
-func (v VoidValue) String() string {
+func (VoidValue) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (VoidValue) String() string {
 	return "()"
 }
 
@@ -96,8 +106,13 @@ func (v BoolValue) Copy() Value {
 	return v
 }
 
-func (v BoolValue) Export() values.Value {
-	return values.Bool(v)
+func (BoolValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (BoolValue) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
 }
 
 func (v BoolValue) Negate() BoolValue {
@@ -105,7 +120,11 @@ func (v BoolValue) Negate() BoolValue {
 }
 
 func (v BoolValue) Equal(other Value) BoolValue {
-	return bool(v) == bool(other.(BoolValue))
+	otherBool, ok := other.(BoolValue)
+	if !ok {
+		return false
+	}
+	return bool(v) == bool(otherBool)
 }
 
 func (v BoolValue) String() string {
@@ -119,68 +138,75 @@ func (v BoolValue) KeyString() string {
 // StringValue
 
 type StringValue struct {
-	Str *string
+	Str string
 }
 
 func init() {
-	gob.Register(StringValue{})
+	gob.Register(&StringValue{})
 }
 
-func NewStringValue(str string) StringValue {
-	return StringValue{&str}
+func NewStringValue(str string) *StringValue {
+	return &StringValue{str}
 }
 
-func (StringValue) isValue() {}
+func (*StringValue) isValue() {}
 
-func (v StringValue) Copy() Value {
-	return v
+func (v *StringValue) Copy() Value {
+	return &StringValue{Str: v.Str}
 }
 
-func (v StringValue) Export() values.Value {
-	return values.String(v.StrValue())
+func (*StringValue) GetOwner() string {
+	// value is never owned
+	return ""
 }
 
-func (v StringValue) String() string {
+func (*StringValue) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v *StringValue) String() string {
 	// TODO: quote like in string literal
-	return strconv.Quote(v.StrValue())
+	return strconv.Quote(v.Str)
 }
 
-func (v StringValue) StrValue() string {
-	return *v.Str
+func (v *StringValue) KeyString() string {
+	return v.Str
 }
 
-func (v StringValue) KeyString() string {
-	return v.StrValue()
+func (v *StringValue) Equal(other Value) BoolValue {
+	otherString, ok := other.(*StringValue)
+	if !ok {
+		return false
+	}
+	return v.NormalForm() == otherString.NormalForm()
 }
 
-func (v StringValue) Equal(other Value) BoolValue {
-	otherString := other.(StringValue)
-	return norm.NFC.String(v.StrValue()) == norm.NFC.String(otherString.StrValue())
+func (v *StringValue) NormalForm() string {
+	return norm.NFC.String(v.Str)
 }
 
-func (v StringValue) Concat(other ConcatenatableValue) Value {
-	otherString := other.(StringValue)
+func (v *StringValue) Concat(other ConcatenatableValue) Value {
+	otherString := other.(*StringValue)
 
 	var sb strings.Builder
 
-	sb.WriteString(v.StrValue())
-	sb.WriteString(otherString.StrValue())
+	sb.WriteString(v.Str)
+	sb.WriteString(otherString.Str)
 
 	return NewStringValue(sb.String())
 }
 
-func (v StringValue) Slice(from IntValue, to IntValue) Value {
+func (v *StringValue) Slice(from IntValue, to IntValue) Value {
 	fromInt := from.IntValue()
 	toInt := to.IntValue()
-	str := v.StrValue()
-	return NewStringValue(str[fromInt:toInt])
+	return NewStringValue(v.Str[fromInt:toInt])
 }
 
-func (v StringValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
+func (v *StringValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
 	i := key.(IntegerValue).IntValue()
 
 	// TODO: optimize grapheme clusters to prevent unnecessary iteration
-	graphemes := uniseg.NewGraphemes(v.StrValue())
+	graphemes := uniseg.NewGraphemes(v.Str)
 	graphemes.Next()
 
 	for j := 0; j < i; j++ {
@@ -192,11 +218,11 @@ func (v StringValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
 	return NewStringValue(char)
 }
 
-func (v StringValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value) {
+func (v *StringValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value) {
 	i := key.(IntegerValue).IntValue()
-	char := value.(StringValue).StrValue()
+	char := value.(*StringValue).Str
 
-	str := v.StrValue()
+	str := v.Str
 
 	// TODO: optimize grapheme clusters to prevent unnecessary iteration
 	graphemes := uniseg.NewGraphemes(str)
@@ -214,70 +240,98 @@ func (v StringValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value
 	sb.WriteString(char)
 	sb.WriteString(str[end:])
 
-	*v.Str = sb.String()
+	v.Str = sb.String()
 }
 
-func (v StringValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+func (v *StringValue) GetMember(_ *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
-		count := uniseg.GraphemeClusterCount(v.StrValue())
+		count := uniseg.GraphemeClusterCount(v.Str)
 		return NewIntValue(int64(count))
+
 	case "concat":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				otherValue := arguments[0].(ConcatenatableValue)
+			func(invocation Invocation) trampoline.Trampoline {
+				otherValue := invocation.Arguments[0].(ConcatenatableValue)
 				result := v.Concat(otherValue)
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	case "slice":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				from := arguments[0].(IntValue)
-				to := arguments[1].(IntValue)
+			func(invocation Invocation) trampoline.Trampoline {
+				from := invocation.Arguments[0].(IntValue)
+				to := invocation.Arguments[1].(IntValue)
 				result := v.Slice(from, to)
 				return trampoline.Done{Result: result}
 			},
 		)
+
 	default:
 		panic(errors.NewUnreachableError())
 	}
 }
 
-func (v StringValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
+func (*StringValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(errors.NewUnreachableError())
 }
 
 // ArrayValue
 
 type ArrayValue struct {
-	Values *[]Value
+	Values []Value
+	Owner  string
 }
 
 func init() {
-	gob.Register(ArrayValue{})
+	gob.Register(&ArrayValue{})
 }
 
-func NewArrayValue(values ...Value) ArrayValue {
-	return ArrayValue{
-		Values: &values,
+func NewArrayValueUnownedNonCopying(values ...Value) *ArrayValue {
+	// NOTE: new value has no owner
+	const noOwner = ""
+
+	for _, value := range values {
+		value.SetOwner(noOwner)
+	}
+
+	return &ArrayValue{
+		Values: values,
+		Owner:  noOwner,
 	}
 }
 
-func (ArrayValue) isValue() {}
+func (*ArrayValue) isValue() {}
 
-func (v ArrayValue) Copy() Value {
+func (v *ArrayValue) Copy() Value {
 	// TODO: optimize, use copy-on-write
-	copies := make([]Value, len(*v.Values))
-	for i, value := range *v.Values {
+	copies := make([]Value, len(v.Values))
+	for i, value := range v.Values {
 		copies[i] = value.Copy()
 	}
-	return NewArrayValue(copies...)
+	return NewArrayValueUnownedNonCopying(copies...)
 }
 
-func (v ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
+func (v *ArrayValue) GetOwner() string {
+	return v.Owner
+}
+
+func (v *ArrayValue) SetOwner(owner string) {
+	if v.Owner == owner {
+		return
+	}
+
+	v.Owner = owner
+
+	for _, value := range v.Values {
+		value.SetOwner(owner)
+	}
+}
+
+func (v *ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	var result trampoline.Trampoline = trampoline.Done{}
-	for _, value := range *v.Values {
+	for _, value := range v.Values {
 		result = result.FlatMap(func(_ interface{}) trampoline.Trampoline {
 			return value.(DestroyableValue).Destroy(interpreter, location)
 		})
@@ -285,18 +339,7 @@ func (v ArrayValue) Destroy(interpreter *Interpreter, location LocationPosition)
 	return result
 }
 
-func (v ArrayValue) Export() values.Value {
-	// TODO: how to export constant-sized array?
-	arrayVal := make(values.VariableSizedArray, len(*v.Values))
-
-	for i, value := range *v.Values {
-		arrayVal[i] = value.(ExportableValue).Export()
-	}
-
-	return arrayVal
-}
-
-func (v ArrayValue) GobEncode() ([]byte, error) {
+func (v *ArrayValue) GobEncode() ([]byte, error) {
 	w := new(bytes.Buffer)
 	encoder := gob.NewEncoder(w)
 	err := encoder.Encode(v.Values)
@@ -315,29 +358,33 @@ func (v *ArrayValue) GobDecode(buf []byte) error {
 	}
 	// NOTE: ensure the `Values` slice is properly allocated
 	if v.Values == nil {
-		v.Values = new([]Value)
+		v.Values = make([]Value, 0)
 	}
 	return nil
 }
 
-func (v ArrayValue) Concat(other ConcatenatableValue) Value {
-	otherArray := other.(ArrayValue)
-	values := append(*v.Values, *otherArray.Values...)
-	return NewArrayValue(values...)
+func (v *ArrayValue) Concat(other ConcatenatableValue) Value {
+	otherArray := other.(*ArrayValue)
+	concatenated := append(v.Copy().(*ArrayValue).Values, otherArray.Values...)
+	return NewArrayValueUnownedNonCopying(concatenated...)
 }
 
-func (v ArrayValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
-	return (*v.Values)[key.(IntegerValue).IntValue()]
+func (v *ArrayValue) Get(_ *Interpreter, _ LocationRange, key Value) Value {
+	integerKey := key.(IntegerValue).IntValue()
+	return v.Values[integerKey]
 }
 
-func (v ArrayValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value) {
-	(*v.Values)[key.(IntegerValue).IntValue()] = value
+func (v *ArrayValue) Set(_ *Interpreter, _ LocationRange, key Value, value Value) {
+	value.SetOwner(v.Owner)
+
+	integerKey := key.(IntegerValue).IntValue()
+	v.Values[integerKey] = value
 }
 
-func (v ArrayValue) String() string {
+func (v *ArrayValue) String() string {
 	var builder strings.Builder
 	builder.WriteString("[")
-	for i, value := range *v.Values {
+	for i, value := range v.Values {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
@@ -347,97 +394,94 @@ func (v ArrayValue) String() string {
 	return builder.String()
 }
 
-func (v ArrayValue) Append(x Value) {
-	*v.Values = append(*v.Values, x)
+func (v *ArrayValue) Append(element Value) {
+	element.SetOwner(v.Owner)
+	v.Values = append(v.Values, element)
 }
 
-func (v ArrayValue) Insert(i int, x Value) {
-	values := *v.Values
-	*v.Values = append(values[:i], append([]Value{x}, values[i:]...)...)
+func (v *ArrayValue) Insert(i int, element Value) {
+	element.SetOwner(v.Owner)
+	v.Values = append(v.Values[:i], append([]Value{element}, v.Values[i:]...)...)
 }
 
-func (v ArrayValue) Remove(i int) Value {
-	values := *v.Values
-	result := values[i]
-	lastIndex := len(values) - 1
+// TODO: unset owner?
+func (v *ArrayValue) Remove(i int) Value {
+	result := v.Values[i]
 
-	copy(values[i:], values[i+1:])
+	lastIndex := len(v.Values) - 1
+	copy(v.Values[i:], v.Values[i+1:])
 
 	// avoid memory leaks by explicitly setting value to nil
-	values[lastIndex] = nil
+	v.Values[lastIndex] = nil
 
-	*v.Values = values[:lastIndex]
+	v.Values = v.Values[:lastIndex]
 
 	return result
 }
 
-func (v ArrayValue) RemoveFirst() Value {
-	values := *v.Values
-	var x Value
-
-	x, *v.Values = values[0], values[1:]
-
-	return x
+// TODO: unset owner?
+func (v *ArrayValue) RemoveFirst() Value {
+	var firstElement Value
+	firstElement, v.Values = v.Values[0], v.Values[1:]
+	return firstElement
 }
 
-func (v ArrayValue) RemoveLast() Value {
-	values := *v.Values
-	var x Value
-
-	lastIndex := len(values) - 1
-	x, *v.Values = values[lastIndex], values[:lastIndex]
-
-	return x
+// TODO: unset owner?
+func (v *ArrayValue) RemoveLast() Value {
+	var lastElement Value
+	lastIndex := len(v.Values) - 1
+	lastElement, v.Values = v.Values[lastIndex], v.Values[:lastIndex]
+	return lastElement
 }
 
-func (v ArrayValue) Contains(x Value) BoolValue {
-	y := x.(EquatableValue)
+func (v *ArrayValue) Contains(needleValue Value) BoolValue {
+	needleEquatable := needleValue.(EquatableValue)
 
-	for _, z := range *v.Values {
-		if y.Equal(z) {
-			return BoolValue(true)
+	for _, arrayValue := range v.Values {
+		if needleEquatable.Equal(arrayValue) {
+			return true
 		}
 	}
 
-	return BoolValue(false)
+	return false
 }
 
-func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+func (v *ArrayValue) GetMember(_ *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
 		return NewIntValue(int64(v.Count()))
 
 	case "append":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				v.Append(arguments[0])
+			func(invocation Invocation) trampoline.Trampoline {
+				v.Append(invocation.Arguments[0])
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
 
 	case "concat":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				x := arguments[0].(ConcatenatableValue)
-				result := v.Concat(x)
+			func(invocation Invocation) trampoline.Trampoline {
+				otherArray := invocation.Arguments[0].(ConcatenatableValue)
+				result := v.Concat(otherArray)
 				return trampoline.Done{Result: result}
 			},
 		)
 
 	case "insert":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				i := arguments[0].(IntegerValue).IntValue()
-				x := arguments[1]
-				v.Insert(i, x)
+			func(invocation Invocation) trampoline.Trampoline {
+				i := invocation.Arguments[0].(IntegerValue).IntValue()
+				element := invocation.Arguments[1]
+				v.Insert(i, element)
 				return trampoline.Done{Result: VoidValue{}}
 			},
 		)
 
 	case "remove":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				i := arguments[0].(IntegerValue).IntValue()
+			func(invocation Invocation) trampoline.Trampoline {
+				i := invocation.Arguments[0].(IntegerValue).IntValue()
 				result := v.Remove(i)
 				return trampoline.Done{Result: result}
 			},
@@ -445,7 +489,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 
 	case "removeFirst":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
+			func(invocation Invocation) trampoline.Trampoline {
 				result := v.RemoveFirst()
 				return trampoline.Done{Result: result}
 			},
@@ -453,7 +497,7 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 
 	case "removeLast":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
+			func(invocation Invocation) trampoline.Trampoline {
 				result := v.RemoveLast()
 				return trampoline.Done{Result: result}
 			},
@@ -461,8 +505,8 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 
 	case "contains":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				result := v.Contains(arguments[0])
+			func(invocation Invocation) trampoline.Trampoline {
+				result := v.Contains(invocation.Arguments[0])
 				return trampoline.Done{Result: result}
 			},
 		)
@@ -472,12 +516,12 @@ func (v ArrayValue) GetMember(interpreter *Interpreter, _ LocationRange, name st
 	}
 }
 
-func (v ArrayValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
+func (v *ArrayValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	panic(errors.NewUnreachableError())
 }
 
-func (v ArrayValue) Count() int {
-	return len(*v.Values)
+func (v *ArrayValue) Count() int {
+	return len(v.Values)
 }
 
 // IntegerValue
@@ -525,8 +569,13 @@ func (v IntValue) Copy() Value {
 	return IntValue{big.NewInt(0).Set(v.Int)}
 }
 
-func (v IntValue) Export() values.Value {
-	return values.NewIntFromBig(big.NewInt(0).Set(v.Int))
+func (IntValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (IntValue) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
 }
 
 func (v IntValue) IntValue() int {
@@ -573,27 +622,31 @@ func (v IntValue) Div(other IntegerValue) IntegerValue {
 
 func (v IntValue) Less(other IntegerValue) BoolValue {
 	cmp := v.Int.Cmp(other.(IntValue).Int)
-	return BoolValue(cmp == -1)
+	return cmp == -1
 }
 
 func (v IntValue) LessEqual(other IntegerValue) BoolValue {
 	cmp := v.Int.Cmp(other.(IntValue).Int)
-	return BoolValue(cmp <= 0)
+	return cmp <= 0
 }
 
 func (v IntValue) Greater(other IntegerValue) BoolValue {
 	cmp := v.Int.Cmp(other.(IntValue).Int)
-	return BoolValue(cmp == 1)
+	return cmp == 1
 }
 
 func (v IntValue) GreaterEqual(other IntegerValue) BoolValue {
 	cmp := v.Int.Cmp(other.(IntValue).Int)
-	return BoolValue(cmp >= 0)
+	return cmp >= 0
 }
 
 func (v IntValue) Equal(other Value) BoolValue {
-	cmp := v.Int.Cmp(other.(IntValue).Int)
-	return BoolValue(cmp == 0)
+	otherInt, ok := other.(IntValue)
+	if !ok {
+		return false
+	}
+	cmp := v.Int.Cmp(otherInt.Int)
+	return cmp == 0
 }
 
 // Int8Value
@@ -610,16 +663,21 @@ func (v Int8Value) Copy() Value {
 	return v
 }
 
+func (Int8Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Int8Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v Int8Value) String() string {
 	return strconv.FormatInt(int64(v), 10)
 }
 
 func (v Int8Value) KeyString() string {
 	return strconv.FormatInt(int64(v), 10)
-}
-
-func (v Int8Value) Export() values.Value {
-	return values.Int8(v)
 }
 
 func (v Int8Value) IntValue() int {
@@ -667,7 +725,11 @@ func (v Int8Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v Int8Value) Equal(other Value) BoolValue {
-	return v == other.(Int8Value)
+	otherInt8, ok := other.(Int8Value)
+	if !ok {
+		return false
+	}
+	return v == otherInt8
 }
 
 func ConvertInt8(value Value) Value {
@@ -688,16 +750,21 @@ func (v Int16Value) Copy() Value {
 	return v
 }
 
+func (Int16Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Int16Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v Int16Value) String() string {
 	return strconv.FormatInt(int64(v), 10)
 }
 
 func (v Int16Value) KeyString() string {
 	return strconv.FormatInt(int64(v), 10)
-}
-
-func (v Int16Value) Export() values.Int16 {
-	return values.Int16(v)
 }
 
 func (v Int16Value) IntValue() int {
@@ -745,7 +812,11 @@ func (v Int16Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v Int16Value) Equal(other Value) BoolValue {
-	return v == other.(Int16Value)
+	otherInt16, ok := other.(Int16Value)
+	if !ok {
+		return false
+	}
+	return v == otherInt16
 }
 
 func ConvertInt16(value Value) Value {
@@ -766,16 +837,21 @@ func (v Int32Value) Copy() Value {
 	return v
 }
 
+func (Int32Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Int32Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v Int32Value) String() string {
 	return strconv.FormatInt(int64(v), 10)
 }
 
 func (v Int32Value) KeyString() string {
 	return strconv.FormatInt(int64(v), 10)
-}
-
-func (v Int32Value) Export() values.Value {
-	return values.Int32(v)
 }
 
 func (v Int32Value) IntValue() int {
@@ -823,7 +899,11 @@ func (v Int32Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v Int32Value) Equal(other Value) BoolValue {
-	return v == other.(Int32Value)
+	otherInt32, ok := other.(Int32Value)
+	if !ok {
+		return false
+	}
+	return v == otherInt32
 }
 
 func ConvertInt32(value Value) Value {
@@ -844,16 +924,21 @@ func (v Int64Value) Copy() Value {
 	return v
 }
 
+func (Int64Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Int64Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v Int64Value) String() string {
 	return strconv.FormatInt(int64(v), 10)
 }
 
 func (v Int64Value) KeyString() string {
 	return strconv.FormatInt(int64(v), 10)
-}
-
-func (v Int64Value) Export() values.Value {
-	return values.Int64(v)
 }
 
 func (v Int64Value) IntValue() int {
@@ -901,7 +986,11 @@ func (v Int64Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v Int64Value) Equal(other Value) BoolValue {
-	return v == other.(Int64Value)
+	otherInt64, ok := other.(Int64Value)
+	if !ok {
+		return false
+	}
+	return v == otherInt64
 }
 
 func ConvertInt64(value Value) Value {
@@ -922,16 +1011,21 @@ func (v UInt8Value) Copy() Value {
 	return v
 }
 
+func (UInt8Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (UInt8Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v UInt8Value) String() string {
 	return strconv.FormatUint(uint64(v), 10)
 }
 
 func (v UInt8Value) KeyString() string {
 	return strconv.FormatUint(uint64(v), 10)
-}
-
-func (v UInt8Value) Export() values.Value {
-	return values.Uint8(v)
 }
 
 func (v UInt8Value) IntValue() int {
@@ -979,7 +1073,11 @@ func (v UInt8Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v UInt8Value) Equal(other Value) BoolValue {
-	return v == other.(UInt8Value)
+	otherUInt8, ok := other.(UInt8Value)
+	if !ok {
+		return false
+	}
+	return v == otherUInt8
 }
 
 func ConvertUInt8(value Value) Value {
@@ -999,6 +1097,14 @@ func (UInt16Value) isValue() {}
 func (v UInt16Value) Copy() Value {
 	return v
 }
+func (UInt16Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (UInt16Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
 
 func (v UInt16Value) String() string {
 	return strconv.FormatUint(uint64(v), 10)
@@ -1006,10 +1112,6 @@ func (v UInt16Value) String() string {
 
 func (v UInt16Value) KeyString() string {
 	return strconv.FormatUint(uint64(v), 10)
-}
-
-func (v UInt16Value) Export() values.Value {
-	return values.Uint16(v)
 }
 
 func (v UInt16Value) IntValue() int {
@@ -1056,7 +1158,11 @@ func (v UInt16Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v UInt16Value) Equal(other Value) BoolValue {
-	return v == other.(UInt16Value)
+	otherUInt16, ok := other.(UInt16Value)
+	if !ok {
+		return false
+	}
+	return v == otherUInt16
 }
 
 func ConvertUInt16(value Value) Value {
@@ -1077,16 +1183,21 @@ func (v UInt32Value) Copy() Value {
 	return v
 }
 
+func (UInt32Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (UInt32Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v UInt32Value) String() string {
 	return strconv.FormatUint(uint64(v), 10)
 }
 
 func (v UInt32Value) KeyString() string {
 	return strconv.FormatUint(uint64(v), 10)
-}
-
-func (v UInt32Value) Export() values.Value {
-	return values.Uint32(v)
 }
 
 func (v UInt32Value) IntValue() int {
@@ -1134,7 +1245,11 @@ func (v UInt32Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v UInt32Value) Equal(other Value) BoolValue {
-	return v == other.(UInt32Value)
+	otherUInt32, ok := other.(UInt32Value)
+	if !ok {
+		return false
+	}
+	return v == otherUInt32
 }
 
 func ConvertUInt32(value Value) Value {
@@ -1155,16 +1270,21 @@ func (v UInt64Value) Copy() Value {
 	return v
 }
 
+func (UInt64Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (UInt64Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v UInt64Value) String() string {
 	return strconv.FormatUint(uint64(v), 10)
 }
 
 func (v UInt64Value) KeyString() string {
 	return strconv.FormatUint(uint64(v), 10)
-}
-
-func (v UInt64Value) Export() values.Value {
-	return values.Uint64(v)
 }
 
 func (v UInt64Value) IntValue() int {
@@ -1212,7 +1332,11 @@ func (v UInt64Value) GreaterEqual(other IntegerValue) BoolValue {
 }
 
 func (v UInt64Value) Equal(other Value) BoolValue {
-	return v == other.(UInt64Value)
+	otherUInt64, ok := other.(UInt64Value)
+	if !ok {
+		return false
+	}
+	return v == otherUInt64
 }
 
 func ConvertUInt64(value Value) Value {
@@ -1222,21 +1346,26 @@ func ConvertUInt64(value Value) Value {
 // CompositeValue
 
 type CompositeValue struct {
-	Location   ast.Location
-	Identifier string
-	Fields     *map[string]Value
-	Functions  *map[string]FunctionValue
-	Destructor *InterpretedFunctionValue
+	Location       ast.Location
+	TypeID         sema.TypeID
+	Kind           common.CompositeKind
+	Fields         map[string]Value
+	InjectedFields map[string]Value
+	NestedValues   map[string]Value
+	Functions      map[string]FunctionValue
+	Destructor     FunctionValue
+	Owner          string
 }
 
 func init() {
-	gob.Register(CompositeValue{})
+	gob.Register(&CompositeValue{})
 }
 
-func (v CompositeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
+func (v *CompositeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
+
 	// if composite was deserialized, dynamically link in the destructor
 	if v.Destructor == nil {
-		v.Destructor = interpreter.DestructorFunctions[v.Identifier]
+		v.Destructor = interpreter.typeCodes.compositeCodes[v.TypeID].destructorFunction
 	}
 
 	destructor := v.Destructor
@@ -1244,77 +1373,127 @@ func (v CompositeValue) Destroy(interpreter *Interpreter, location LocationPosit
 		return trampoline.Done{Result: VoidValue{}}
 	}
 
-	return interpreter.bindSelf(*destructor, v).
-		invoke(nil, location)
+	invocation := Invocation{
+		Self:          v,
+		Arguments:     nil,
+		ArgumentTypes: nil,
+		Location:      location,
+		Interpreter:   interpreter,
+	}
+
+	return destructor.Invoke(invocation)
 }
 
-func (CompositeValue) isValue() {}
+func (*CompositeValue) isValue() {}
 
-func (v CompositeValue) Copy() Value {
-	newFields := make(map[string]Value, len(*v.Fields))
-	for field, value := range *v.Fields {
+func (v *CompositeValue) Copy() Value {
+	// Resources and contracts are not copied
+	switch v.Kind {
+	case common.CompositeKindResource, common.CompositeKindContract:
+		return v
+
+	default:
+		break
+	}
+
+	newFields := make(map[string]Value, len(v.Fields))
+	for field, value := range v.Fields {
 		newFields[field] = value.Copy()
 	}
 
 	// NOTE: not copying functions or destructor – they are linked in
 
-	return CompositeValue{
-		Location:   v.Location,
-		Identifier: v.Identifier,
-		Fields:     &newFields,
-		Functions:  v.Functions,
-		Destructor: v.Destructor,
+	return &CompositeValue{
+		Location:       v.Location,
+		TypeID:         v.TypeID,
+		Kind:           v.Kind,
+		Fields:         newFields,
+		InjectedFields: v.InjectedFields,
+		NestedValues:   v.NestedValues,
+		Functions:      v.Functions,
+		Destructor:     v.Destructor,
+		// NOTE: new value has no owner
+		Owner: "",
 	}
 }
 
-func (v CompositeValue) Export() values.Value {
-	fieldMap := *v.Fields
-
-	fields := make([]values.Value, 0, len(fieldMap))
-
-	for _, value := range fieldMap {
-		fields = append(fields, value.(ExportableValue).Export())
-	}
-
-	return values.Composite{fields}
+func (v *CompositeValue) GetOwner() string {
+	return v.Owner
 }
 
-func (v CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
-	value, ok := (*v.Fields)[name]
+func (v *CompositeValue) SetOwner(owner string) {
+	if v.Owner == owner {
+		return
+	}
+
+	v.Owner = owner
+
+	for _, value := range v.Fields {
+		value.SetOwner(owner)
+	}
+}
+
+func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+	value, ok := v.Fields[name]
 	if ok {
 		return value
 	}
 
-	// get correct interpreter
-	if v.Location != nil {
-		subInterpreter, ok := interpreter.SubInterpreters[v.Location.ID()]
-		if ok {
-			interpreter = subInterpreter
-		}
-	}
-
-	// if composite was deserialized, dynamically link in the functions
-	if v.Functions == nil {
-		functions := interpreter.CompositeFunctions[v.Identifier]
-		v.Functions = &functions
-	}
-
-	function, ok := (*v.Functions)[name]
+	value, ok = v.NestedValues[name]
 	if ok {
-		if interpretedFunction, ok := function.(InterpretedFunctionValue); ok {
-			function = interpreter.bindSelf(interpretedFunction, v)
+		return value
+	}
+
+	// Get the correct interpreter. The program code might need to be loaded.
+	// NOTE: standard library values have no location
+
+	if v.Location != nil && !ast.LocationsMatch(interpreter.Checker.Location, v.Location) {
+		interpreter = interpreter.ensureLoaded(v.Location, func() *ast.Program {
+			return interpreter.importProgramHandler(interpreter, v.Location)
+		})
+	}
+
+	// If the composite value was deserialized, dynamically link in the functions
+	// and get injected fields
+
+	if v.Functions == nil {
+		v.Functions = interpreter.typeCodes.compositeCodes[v.TypeID].compositeFunctions
+	}
+
+	if v.InjectedFields == nil && interpreter.injectedCompositeFieldsHandler != nil {
+		v.InjectedFields = interpreter.injectedCompositeFieldsHandler(
+			interpreter,
+			v.Location,
+			v.TypeID,
+			v.Kind,
+		)
+	}
+
+	if v.InjectedFields != nil {
+		value, ok = v.InjectedFields[name]
+		if ok {
+			return value
 		}
-		return function
+	}
+
+	function, ok := v.Functions[name]
+	if ok {
+		return BoundFunctionValue{
+			Self:     v,
+			Function: function,
+		}
 	}
 
 	return nil
 }
 
-func (v CompositeValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
-	(*v.Fields)[name] = value
+func (v *CompositeValue) SetMember(_ *Interpreter, _ LocationRange, name string, value Value) {
+	value.SetOwner(v.Owner)
+
+	v.Fields[name] = value
 }
 
-func (v CompositeValue) GobEncode() ([]byte, error) {
+func (v *CompositeValue) GobEncode() ([]byte, error) {
 	w := new(bytes.Buffer)
 	encoder := gob.NewEncoder(w)
 	// NOTE: important: decode as pointer, so gob sees
@@ -1323,7 +1502,11 @@ func (v CompositeValue) GobEncode() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = encoder.Encode(v.Identifier)
+	err = encoder.Encode(v.TypeID)
+	if err != nil {
+		return nil, err
+	}
+	err = encoder.Encode(v.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -1342,7 +1525,11 @@ func (v *CompositeValue) GobDecode(buf []byte) error {
 	if err != nil {
 		return err
 	}
-	err = decoder.Decode(&v.Identifier)
+	err = decoder.Decode(&v.TypeID)
+	if err != nil {
+		return err
+	}
+	err = decoder.Decode(&v.Kind)
 	if err != nil {
 		return err
 	}
@@ -1354,12 +1541,12 @@ func (v *CompositeValue) GobDecode(buf []byte) error {
 	return nil
 }
 
-func (v CompositeValue) String() string {
+func (v *CompositeValue) String() string {
 	var builder strings.Builder
-	builder.WriteString(v.Identifier)
+	builder.WriteString(string(v.TypeID))
 	builder.WriteString("(")
 	i := 0
-	for name, value := range *v.Fields {
+	for name, value := range v.Fields {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
@@ -1372,26 +1559,29 @@ func (v CompositeValue) String() string {
 	return builder.String()
 }
 
-func (v CompositeValue) GetField(name string) Value {
-	return (*v.Fields)[name]
+func (v *CompositeValue) GetField(name string) Value {
+	return v.Fields[name]
 }
 
 // DictionaryValue
 
 type DictionaryValue struct {
-	Keys    ArrayValue
+	Keys    *ArrayValue
 	Entries map[string]Value
+	Owner   string
 }
 
-func NewDictionaryValue(keysAndValues ...Value) DictionaryValue {
+func NewDictionaryValueUnownedNonCopying(keysAndValues ...Value) *DictionaryValue {
 	keysAndValuesCount := len(keysAndValues)
 	if keysAndValuesCount%2 != 0 {
 		panic("uneven number of keys and values")
 	}
 
-	result := DictionaryValue{
-		Keys:    NewArrayValue(),
+	result := &DictionaryValue{
+		Keys:    NewArrayValueUnownedNonCopying(),
 		Entries: make(map[string]Value, keysAndValuesCount/2),
+		// NOTE: new value has no owner
+		Owner: "",
 	}
 
 	for i := 0; i < keysAndValuesCount; i += 2 {
@@ -1402,26 +1592,46 @@ func NewDictionaryValue(keysAndValues ...Value) DictionaryValue {
 }
 
 func init() {
-	gob.Register(DictionaryValue{})
+	gob.Register(&DictionaryValue{})
 }
 
-func (DictionaryValue) isValue() {}
+func (*DictionaryValue) isValue() {}
 
-func (v DictionaryValue) Copy() Value {
-	newKeys := v.Keys.Copy().(ArrayValue)
+func (v *DictionaryValue) Copy() Value {
+	newKeys := v.Keys.Copy().(*ArrayValue)
 
 	newEntries := make(map[string]Value, len(v.Entries))
 	for name, value := range v.Entries {
 		newEntries[name] = value.Copy()
 	}
 
-	return DictionaryValue{
+	return &DictionaryValue{
 		Keys:    newKeys,
 		Entries: newEntries,
+		// NOTE: new value has no owner
+		Owner: "",
 	}
 }
 
-func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
+func (v *DictionaryValue) GetOwner() string {
+	return v.Owner
+}
+
+func (v *DictionaryValue) SetOwner(owner string) {
+	if v.Owner == owner {
+		return
+	}
+
+	v.Owner = owner
+
+	v.Keys.SetOwner(owner)
+
+	for _, value := range v.Entries {
+		value.SetOwner(owner)
+	}
+}
+
+func (v *DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	var result trampoline.Trampoline = trampoline.Done{}
 
 	maybeDestroy := func(value interface{}) {
@@ -1436,7 +1646,7 @@ func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosi
 			})
 	}
 
-	for _, keyValue := range *v.Keys.Values {
+	for _, keyValue := range v.Keys.Values {
 		maybeDestroy(keyValue)
 	}
 
@@ -1447,31 +1657,12 @@ func (v DictionaryValue) Destroy(interpreter *Interpreter, location LocationPosi
 	return result
 }
 
-func (v DictionaryValue) Export() values.Value {
-	d := make(values.Dictionary, v.Count())
-
-	for i, keyValue := range *v.Keys.Values {
-		key := dictionaryKey(keyValue)
-		value := v.Entries[key]
-
-		exportedKey := keyValue.(ExportableValue).Export()
-		exportedValue := value.(ExportableValue).Export()
-
-		d[i] = values.KeyValuePair{
-			Key:   exportedKey,
-			Value: exportedValue,
-		}
-	}
-
-	return d
-}
-
-func (v DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) Value {
+func (v *DictionaryValue) Get(_ *Interpreter, _ LocationRange, keyValue Value) Value {
 	value, ok := v.Entries[dictionaryKey(keyValue)]
 	if !ok {
 		return NilValue{}
 	}
-	return SomeValue{Value: value}
+	return NewSomeValueOwningNonCopying(value)
 }
 
 func dictionaryKey(keyValue Value) string {
@@ -1482,13 +1673,9 @@ func dictionaryKey(keyValue Value) string {
 	return hasKeyString.KeyString()
 }
 
-type HasKeyString interface {
-	KeyString() string
-}
-
-func (v DictionaryValue) Set(_ *Interpreter, _ LocationRange, keyValue Value, value Value) {
+func (v *DictionaryValue) Set(_ *Interpreter, _ LocationRange, keyValue Value, value Value) {
 	switch typedValue := value.(type) {
-	case SomeValue:
+	case *SomeValue:
 		v.Insert(keyValue, typedValue.Value)
 
 	case NilValue:
@@ -1500,11 +1687,11 @@ func (v DictionaryValue) Set(_ *Interpreter, _ LocationRange, keyValue Value, va
 	}
 }
 
-func (v DictionaryValue) String() string {
+func (v *DictionaryValue) String() string {
 	var builder strings.Builder
 	builder.WriteString("{")
 	i := 0
-	for _, keyValue := range *v.Keys.Values {
+	for _, keyValue := range v.Keys.Values {
 		if i > 0 {
 			builder.WriteString(", ")
 		}
@@ -1521,28 +1708,30 @@ func (v DictionaryValue) String() string {
 	return builder.String()
 }
 
-func (v DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string) Value {
+func (v *DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string) Value {
 	switch name {
 	case "length":
 		return NewIntValue(int64(v.Count()))
 
+	// TODO: is returning copies correct?
 	case "keys":
 		return v.Keys.Copy()
 
+	// TODO: is returning copies correct?
 	case "values":
-		values := make([]Value, v.Count())
+		dictionaryValues := make([]Value, v.Count())
 		i := 0
-		for _, keyValue := range *v.Keys.Values {
+		for _, keyValue := range v.Keys.Values {
 			key := dictionaryKey(keyValue)
-			values[i] = v.Entries[key]
+			dictionaryValues[i] = v.Entries[key].Copy()
 			i++
 		}
-		return NewArrayValue(values...)
+		return NewArrayValueUnownedNonCopying(dictionaryValues...)
 
 	case "remove":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				keyValue := arguments[0]
+			func(invocation Invocation) trampoline.Trampoline {
+				keyValue := invocation.Arguments[0]
 
 				existingValue := v.Remove(keyValue)
 
@@ -1550,7 +1739,7 @@ func (v DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string)
 				if existingValue == nil {
 					returnValue = NilValue{}
 				} else {
-					returnValue = SomeValue{Value: existingValue}
+					returnValue = NewSomeValueOwningNonCopying(existingValue)
 				}
 
 				return trampoline.Done{
@@ -1561,9 +1750,9 @@ func (v DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string)
 
 	case "insert":
 		return NewHostFunctionValue(
-			func(arguments []Value, location LocationPosition) trampoline.Trampoline {
-				keyValue := arguments[0]
-				newValue := arguments[1]
+			func(invocation Invocation) trampoline.Trampoline {
+				keyValue := invocation.Arguments[0]
+				newValue := invocation.Arguments[1]
 
 				existingValue := v.Insert(keyValue, newValue)
 
@@ -1571,7 +1760,7 @@ func (v DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string)
 				if existingValue == nil {
 					returnValue = NilValue{}
 				} else {
-					returnValue = SomeValue{Value: existingValue}
+					returnValue = NewSomeValueOwningNonCopying(existingValue)
 				}
 
 				return trampoline.Done{
@@ -1585,16 +1774,17 @@ func (v DictionaryValue) GetMember(_ *Interpreter, _ LocationRange, name string)
 	}
 }
 
-func (v DictionaryValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
+func (v *DictionaryValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
 	// Dictionaries have no settable members (fields / functions)
 	panic(errors.NewUnreachableError())
 }
 
-func (v DictionaryValue) Count() int {
+func (v *DictionaryValue) Count() int {
 	return v.Keys.Count()
 }
 
-func (v DictionaryValue) Remove(keyValue Value) (existingValue Value) {
+// TODO: unset owner?
+func (v *DictionaryValue) Remove(keyValue Value) (existingValue Value) {
 	key := dictionaryKey(keyValue)
 	existingValue, exists := v.Entries[key]
 
@@ -1605,7 +1795,7 @@ func (v DictionaryValue) Remove(keyValue Value) (existingValue Value) {
 	delete(v.Entries, key)
 
 	// TODO: optimize linear scan
-	for i, keyValue := range *v.Keys.Values {
+	for i, keyValue := range v.Keys.Values {
 		if dictionaryKey(keyValue) == key {
 			v.Keys.Remove(i)
 			return existingValue
@@ -1615,13 +1805,16 @@ func (v DictionaryValue) Remove(keyValue Value) (existingValue Value) {
 	panic(errors.NewUnreachableError())
 }
 
-func (v DictionaryValue) Insert(keyValue Value, value Value) (existingValue Value) {
+func (v *DictionaryValue) Insert(keyValue Value, value Value) (existingValue Value) {
 	key := dictionaryKey(keyValue)
 	existingValue, existed := v.Entries[key]
 
 	if !existed {
 		v.Keys.Append(keyValue)
 	}
+
+	value.SetOwner(v.Owner)
+
 	v.Entries[key] = value
 
 	if !existed {
@@ -1635,69 +1828,6 @@ type DictionaryEntryValues struct {
 	Key   Value
 	Value Value
 }
-
-// EventValue
-
-type EventValue struct {
-	Identifier string
-	Fields     []EventField
-	Location   ast.Location
-}
-
-func (EventValue) isValue() {}
-
-func (v EventValue) Export() values.Value {
-	fields := make([]values.Value, len(v.Fields))
-
-	for i, field := range v.Fields {
-		fields[i] = field.Value.(ExportableValue).Export()
-	}
-
-	return values.Event{
-		Identifier: v.Identifier,
-		Fields:     fields,
-	}
-}
-
-func (v EventValue) Copy() Value {
-	fields := make([]EventField, len(v.Fields))
-	for i, field := range v.Fields {
-		fields[i] = EventField{
-			Identifier: field.Identifier,
-			Value:      field.Value.Copy(),
-		}
-	}
-
-	return EventValue{
-		Identifier: v.Identifier,
-		Fields:     fields,
-	}
-}
-
-func (v EventValue) String() string {
-	var fields strings.Builder
-	for i, field := range v.Fields {
-		if i > 0 {
-			fields.WriteString(", ")
-		}
-		fields.WriteString(field.String())
-	}
-
-	return fmt.Sprintf("%s(%s)", v.Identifier, fields.String())
-}
-
-// EventField
-
-type EventField struct {
-	Identifier string
-	Value      Value
-}
-
-func (f EventField) String() string {
-	return fmt.Sprintf("%s: %s", f.Identifier, f.Value)
-}
-
-// ToValue
 
 // ToValue converts a Go value into an interpreter value
 func ToValue(value interface{}) (Value, error) {
@@ -1733,7 +1863,7 @@ func ToValue(value interface{}) (Value, error) {
 }
 
 func ToValues(inputs []interface{}) ([]Value, error) {
-	var values []Value
+	var newValues []Value
 	for _, argument := range inputs {
 		value, ok := argument.(Value)
 		if !ok {
@@ -1743,12 +1873,12 @@ func ToValues(inputs []interface{}) ([]Value, error) {
 				return nil, err
 			}
 		}
-		values = append(
-			values,
+		newValues = append(
+			newValues,
 			value,
 		)
 	}
-	return values, nil
+	return newValues, nil
 }
 
 // OptionalValue
@@ -1774,6 +1904,15 @@ func (v NilValue) Copy() Value {
 	return v
 }
 
+func (NilValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (NilValue) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
 func (v NilValue) Destroy(_ *Interpreter, _ LocationPosition) trampoline.Trampoline {
 	return trampoline.Done{}
 }
@@ -1782,35 +1921,55 @@ func (NilValue) String() string {
 	return "nil"
 }
 
-func (v NilValue) Export() values.Value {
-	return values.Nil{}
-}
-
 // SomeValue
 
 type SomeValue struct {
 	Value Value
+	Owner string
 }
 
 func init() {
-	gob.Register(SomeValue{})
+	gob.Register(&SomeValue{})
 }
 
-func (SomeValue) isValue() {}
-
-func (SomeValue) isOptionalValue() {}
-
-func (v SomeValue) Copy() Value {
-	return SomeValue{
-		Value: v.Value.Copy(),
+func NewSomeValueOwningNonCopying(value Value) *SomeValue {
+	return &SomeValue{
+		Value: value,
+		Owner: value.GetOwner(),
 	}
 }
 
-func (v SomeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
+func (*SomeValue) isValue() {}
+
+func (*SomeValue) isOptionalValue() {}
+
+func (v *SomeValue) Copy() Value {
+	return &SomeValue{
+		Value: v.Value.Copy(),
+		// NOTE: new value has no owner
+		Owner: "",
+	}
+}
+
+func (v *SomeValue) GetOwner() string {
+	return v.Owner
+}
+
+func (v *SomeValue) SetOwner(owner string) {
+	if v.Owner == owner {
+		return
+	}
+
+	v.Owner = owner
+
+	v.Value.SetOwner(owner)
+}
+
+func (v *SomeValue) Destroy(interpreter *Interpreter, location LocationPosition) trampoline.Trampoline {
 	return v.Value.(DestroyableValue).Destroy(interpreter, location)
 }
 
-func (v SomeValue) String() string {
+func (v *SomeValue) String() string {
 	return fmt.Sprint(v.Value)
 }
 
@@ -1819,23 +1978,48 @@ func (v SomeValue) String() string {
 type AnyValue struct {
 	Value Value
 	// TODO: don't store
-	Type sema.Type
+	Type  sema.Type
+	Owner string
 }
 
-func init() {
-	gob.Register(AnyValue{})
-}
-
-func (AnyValue) isValue() {}
-
-func (v AnyValue) Copy() Value {
-	return AnyValue{
-		Value: v.Value.Copy(),
-		Type:  v.Type,
+func NewAnyValueOwningNonCopying(value Value, ty sema.Type) *AnyValue {
+	return &AnyValue{
+		Value: value,
+		Type:  ty,
+		Owner: value.GetOwner(),
 	}
 }
 
-func (v AnyValue) String() string {
+func init() {
+	gob.Register(&AnyValue{})
+}
+
+func (*AnyValue) isValue() {}
+
+func (v *AnyValue) Copy() Value {
+	return &AnyValue{
+		Value: v.Value.Copy(),
+		Type:  v.Type,
+		// NOTE: new value has no owner
+		Owner: "",
+	}
+}
+
+func (v *AnyValue) GetOwner() string {
+	return v.Owner
+}
+
+func (v *AnyValue) SetOwner(owner string) {
+	if v.Owner == owner {
+		return
+	}
+
+	v.Owner = owner
+
+	v.Value.SetOwner(owner)
+}
+
+func (v *AnyValue) String() string {
 	return fmt.Sprint(v.Value)
 }
 
@@ -1853,27 +2037,72 @@ func (v StorageValue) Copy() Value {
 	}
 }
 
+func (v StorageValue) GetOwner() string {
+	return v.Identifier
+}
+
+func (StorageValue) SetOwner(_ string) {
+	// NO-OP: ownership cannot be changed
+}
+
+// PublishedValue
+
+type PublishedValue struct {
+	Identifier string
+}
+
+func (PublishedValue) isValue() {}
+
+func (v PublishedValue) Copy() Value {
+	return PublishedValue{
+		Identifier: v.Identifier,
+	}
+}
+
+func (v PublishedValue) GetOwner() string {
+	return v.Identifier
+}
+
+func (PublishedValue) SetOwner(_ string) {
+	// NO-OP: ownership cannot be changed
+}
+
 // ReferenceValue
 
 type ReferenceValue struct {
-	StorageIdentifier string
-	Key               string
+	TargetStorageIdentifier string
+	TargetKey               string
+	Owner                   string
 }
 
 func init() {
-	gob.Register(ReferenceValue{})
+	gob.Register(&ReferenceValue{})
 }
 
-func (ReferenceValue) isValue() {}
+func (*ReferenceValue) isValue() {}
 
-func (v ReferenceValue) Copy() Value {
-	return v
+func (v *ReferenceValue) Copy() Value {
+	return &ReferenceValue{
+		TargetStorageIdentifier: v.TargetStorageIdentifier,
+		TargetKey:               v.TargetKey,
+		// NOTE: new value has no owner
+		Owner: "",
+	}
 }
 
-func (v ReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
-	switch referenced :=
-		interpreter.readStored(v.StorageIdentifier, v.Key).(type) {
-	case SomeValue:
+func (v *ReferenceValue) GetOwner() string {
+	return v.Owner
+}
+
+func (v *ReferenceValue) SetOwner(owner string) {
+	v.Owner = owner
+}
+
+func (v *ReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
+	key := PrefixedStorageKey(v.TargetKey, AccessLevelPrivate)
+
+	switch referenced := interpreter.readStored(v.TargetStorageIdentifier, key).(type) {
+	case *SomeValue:
 		return referenced.Value
 	case NilValue:
 		panic(&DereferenceError{
@@ -1884,34 +2113,48 @@ func (v ReferenceValue) referencedValue(interpreter *Interpreter, locationRange 
 	}
 }
 
-func (v ReferenceValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
+func (v *ReferenceValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
 	return v.referencedValue(interpreter, locationRange).(MemberAccessibleValue).
 		GetMember(interpreter, locationRange, name)
 }
 
-func (v ReferenceValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
+func (v *ReferenceValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
 	v.referencedValue(interpreter, locationRange).(MemberAccessibleValue).
 		SetMember(interpreter, locationRange, name, value)
 }
 
-func (v ReferenceValue) Get(interpreter *Interpreter, locationRange LocationRange, key Value) Value {
+func (v *ReferenceValue) Get(interpreter *Interpreter, locationRange LocationRange, key Value) Value {
 	return v.referencedValue(interpreter, locationRange).(ValueIndexableValue).
 		Get(interpreter, locationRange, key)
 }
 
-func (v ReferenceValue) Set(interpreter *Interpreter, locationRange LocationRange, key Value, value Value) {
+func (v *ReferenceValue) Set(interpreter *Interpreter, locationRange LocationRange, key Value, value Value) {
 	v.referencedValue(interpreter, locationRange).(ValueIndexableValue).
 		Set(interpreter, locationRange, key, value)
 }
 
+func (v *ReferenceValue) Equal(other Value) BoolValue {
+	otherReference, ok := other.(*ReferenceValue)
+	if !ok {
+		return false
+	}
+
+	return v.TargetStorageIdentifier == otherReference.TargetStorageIdentifier &&
+		v.TargetKey == otherReference.TargetKey
+}
+
 // AddressValue
 
-const AddressLength = 20
-
-type AddressValue [AddressLength]byte
+type AddressValue [common.AddressLength]byte
 
 func init() {
 	gob.Register(AddressValue{})
+}
+
+func NewAddressValueFromBytes(b []byte) AddressValue {
+	result := AddressValue{}
+	copy(result[common.AddressLength-len(b):], b)
+	return result
 }
 
 func ConvertAddress(value Value) Value {
@@ -1919,12 +2162,12 @@ func ConvertAddress(value Value) Value {
 	if intValue, ok := value.(IntValue); ok {
 		bigEndianBytes := intValue.Int.Bytes()
 		copy(
-			result[AddressLength-len(bigEndianBytes):AddressLength],
+			result[common.AddressLength-len(bigEndianBytes):common.AddressLength],
 			bigEndianBytes,
 		)
 	} else {
 		binary.BigEndian.PutUint64(
-			result[AddressLength-8:AddressLength],
+			result[common.AddressLength-8:common.AddressLength],
 			uint64(value.(IntegerValue).IntValue()),
 		)
 	}
@@ -1933,10 +2176,65 @@ func ConvertAddress(value Value) Value {
 
 func (AddressValue) isValue() {}
 
-func (v AddressValue) Export() values.Value {
-	return values.Address(v)
-}
-
 func (v AddressValue) Copy() Value {
 	return v
+}
+
+func (v AddressValue) String() string {
+	return fmt.Sprintf("%x", [common.AddressLength]byte(v))
+}
+
+func (AddressValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (AddressValue) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v AddressValue) Equal(other Value) BoolValue {
+	otherAddress, ok := other.(AddressValue)
+	if !ok {
+		return false
+	}
+	return [common.AddressLength]byte(v) == [common.AddressLength]byte(otherAddress)
+}
+
+func (v AddressValue) Hex() string {
+	return fmt.Sprintf("%x", [common.AddressLength]byte(v))
+}
+
+// AccountValue
+
+func NewAccountValue(address AddressValue, setCode, addPublicKey, removePublicKey FunctionValue) *CompositeValue {
+	storageIdentifier := address.Hex()
+
+	return &CompositeValue{
+		Kind:   common.CompositeKindStructure,
+		TypeID: (&sema.AccountType{}).ID(),
+		InjectedFields: map[string]Value{
+			"address":         address,
+			"storage":         StorageValue{Identifier: storageIdentifier},
+			"published":       PublishedValue{Identifier: storageIdentifier},
+			"setCode":         setCode,
+			"addPublicKey":    addPublicKey,
+			"removePublicKey": removePublicKey,
+		},
+	}
+}
+
+// PublicAccountValue
+
+func NewPublicAccountValue(address AddressValue) *CompositeValue {
+	storageIdentifier := address.Hex()
+
+	return &CompositeValue{
+		Kind:   common.CompositeKindStructure,
+		TypeID: (&sema.PublicAccountType{}).ID(),
+		InjectedFields: map[string]Value{
+			"address":   address,
+			"published": PublishedValue{Identifier: storageIdentifier},
+		},
+	}
 }

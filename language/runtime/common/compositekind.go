@@ -13,9 +13,17 @@ const (
 	CompositeKindStructure
 	CompositeKindResource
 	CompositeKindContract
+	CompositeKindEvent
 )
 
-var CompositeKinds = []CompositeKind{
+var AllCompositeKinds = []CompositeKind{
+	CompositeKindStructure,
+	CompositeKindResource,
+	CompositeKindContract,
+	CompositeKindEvent,
+}
+
+var CompositeKindsWithBody = []CompositeKind{
 	CompositeKindStructure,
 	CompositeKindResource,
 	CompositeKindContract,
@@ -29,6 +37,8 @@ func (k CompositeKind) Name() string {
 		return "resource"
 	case CompositeKindContract:
 		return "contract"
+	case CompositeKindEvent:
+		return "event"
 	}
 
 	panic(errors.NewUnreachableError())
@@ -42,19 +52,38 @@ func (k CompositeKind) Keyword() string {
 		return "resource"
 	case CompositeKindContract:
 		return "contract"
+	case CompositeKindEvent:
+		return "event"
 	}
 
 	panic(errors.NewUnreachableError())
 }
 
-func (k CompositeKind) DeclarationKind() DeclarationKind {
+func (k CompositeKind) DeclarationKind(isInterface bool) DeclarationKind {
 	switch k {
 	case CompositeKindStructure:
+		if isInterface {
+			return DeclarationKindStructureInterface
+		}
 		return DeclarationKindStructure
+
 	case CompositeKindResource:
+		if isInterface {
+			return DeclarationKindResourceInterface
+		}
 		return DeclarationKindResource
+
 	case CompositeKindContract:
+		if isInterface {
+			return DeclarationKindContractInterface
+		}
 		return DeclarationKindContract
+
+	case CompositeKindEvent:
+		if isInterface {
+			return DeclarationKindUnknown
+		}
+		return DeclarationKindEvent
 	}
 
 	panic(errors.NewUnreachableError())
@@ -64,12 +93,19 @@ func (k CompositeKind) Annotation() string {
 	if k != CompositeKindResource {
 		return ""
 	}
-	return "<-"
+	return "@"
 }
 
 func (k CompositeKind) TransferOperator() string {
 	if k != CompositeKindResource {
 		return "="
+	}
+	return "<-"
+}
+
+func (k CompositeKind) MoveOperator() string {
+	if k != CompositeKindResource {
+		return ""
 	}
 	return "<-"
 }
@@ -86,4 +122,19 @@ func (k CompositeKind) DestructionKeyword() interface{} {
 		return ""
 	}
 	return "destroy"
+}
+
+func (k CompositeKind) SupportsInterfaces() bool {
+	switch k {
+	case CompositeKindStructure,
+		CompositeKindResource,
+		CompositeKindContract:
+
+		return true
+
+	case CompositeKindEvent:
+		return false
+	}
+
+	panic(errors.NewUnreachableError())
 }

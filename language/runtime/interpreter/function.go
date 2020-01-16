@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/raviqqe/hamt"
 	// revive:disable:dot-imports
@@ -9,21 +10,35 @@ import (
 	// revive:enable
 )
 
+// Invocation
+
+type Invocation struct {
+	Self          *CompositeValue
+	Arguments     []Value
+	ArgumentTypes []sema.Type
+	Location      LocationPosition
+	Interpreter   *Interpreter
+}
+
 // FunctionValue
 
 type FunctionValue interface {
 	Value
 	isFunctionValue()
-	invoke(arguments []Value, location LocationPosition) Trampoline
+	Invoke(Invocation) Trampoline
 }
 
 // InterpretedFunctionValue
 
 type InterpretedFunctionValue struct {
-	Interpreter *Interpreter
-	Expression  *ast.FunctionExpression
-	Type        *sema.FunctionType
-	Activation  hamt.Map
+	Interpreter      *Interpreter
+	ParameterList    *ast.ParameterList
+	Type             *sema.FunctionType
+	Activation       hamt.Map
+	BeforeStatements []ast.Statement
+	PreConditions    ast.Conditions
+	Statements       []ast.Statement
+	PostConditions   ast.Conditions
 }
 
 func (InterpretedFunctionValue) isValue() {}
@@ -32,44 +47,28 @@ func (f InterpretedFunctionValue) Copy() Value {
 	return f
 }
 
-func (InterpretedFunctionValue) isFunctionValue() {}
-
-func newInterpretedFunction(
-	interpreter *Interpreter,
-	expression *ast.FunctionExpression,
-	functionType *sema.FunctionType,
-	activation hamt.Map,
-) InterpretedFunctionValue {
-	return InterpretedFunctionValue{
-		Interpreter: interpreter,
-		Expression:  expression,
-		Type:        functionType,
-		Activation:  activation,
-	}
+func (InterpretedFunctionValue) GetOwner() string {
+	// value is never owned
+	return ""
 }
 
-func (f InterpretedFunctionValue) invoke(arguments []Value, _ LocationPosition) Trampoline {
-	return f.Interpreter.invokeInterpretedFunction(f, arguments)
+func (InterpretedFunctionValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
+
+func (InterpretedFunctionValue) isFunctionValue() {}
+
+func (f InterpretedFunctionValue) Invoke(invocation Invocation) Trampoline {
+	return f.Interpreter.invokeInterpretedFunction(f, invocation)
 }
 
 // HostFunctionValue
 
-type HostFunction func(arguments []Value, location LocationPosition) Trampoline
+type HostFunction func(invocation Invocation) Trampoline
 
 type HostFunctionValue struct {
 	Function HostFunction
-}
-
-func (HostFunctionValue) isValue() {}
-
-func (f HostFunctionValue) Copy() Value {
-	return f
-}
-
-func (HostFunctionValue) isFunctionValue() {}
-
-func (f HostFunctionValue) invoke(arguments []Value, location LocationPosition) Trampoline {
-	return f.Function(arguments, location)
+	Members  map[string]Value
 }
 
 func NewHostFunctionValue(
@@ -78,4 +77,62 @@ func NewHostFunctionValue(
 	return HostFunctionValue{
 		Function: function,
 	}
+}
+
+func (HostFunctionValue) isValue() {}
+
+func (f HostFunctionValue) Copy() Value {
+	return f
+}
+
+func (HostFunctionValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (HostFunctionValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
+
+func (HostFunctionValue) isFunctionValue() {}
+
+func (f HostFunctionValue) Invoke(invocation Invocation) Trampoline {
+	return f.Function(invocation)
+}
+
+func (f HostFunctionValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+	return f.Members[name]
+}
+
+func (f HostFunctionValue) SetMember(_ *Interpreter, _ LocationRange, _ string, _ Value) {
+	panic(errors.NewUnreachableError())
+}
+
+// BoundFunctionValue
+
+type BoundFunctionValue struct {
+	Function FunctionValue
+	Self     *CompositeValue
+}
+
+func (BoundFunctionValue) isValue() {}
+
+func (f BoundFunctionValue) Copy() Value {
+	return f
+}
+
+func (BoundFunctionValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (BoundFunctionValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
+
+func (BoundFunctionValue) isFunctionValue() {}
+
+func (f BoundFunctionValue) Invoke(invocation Invocation) Trampoline {
+	invocation.Self = f.Self
+	return f.Function.Invoke(invocation)
 }

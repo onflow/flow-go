@@ -1,97 +1,76 @@
 package stdlib
 
 import (
+	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
 )
 
 // This file defines functions built in to the Flow runtime.
 
-// TODO: improve types
-var createAccountFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// publicKeys
-		&sema.VariableSizedType{
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
+var flowLocation = ast.StringLocation("flow")
+
+// built-in function types
+
+var accountFunctionType = &sema.FunctionType{
+	Parameters: []*sema.Parameter{
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "publicKeys",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.VariableSizedType{
+					Type: &sema.VariableSizedType{
+						Type: &sema.IntType{},
+					},
+				},
+			),
 		},
-		// code
-		&sema.OptionalType{
-			Type: &sema.VariableSizedType{
-				Type: &sema.IntType{},
-			},
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "code",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.VariableSizedType{
+					Type: &sema.IntType{},
+				},
+			),
 		},
-	),
-	// value
-	// TODO: add proper type
+	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.IntType{},
+		&sema.AccountType{},
 	),
+	// additional arguments are passed to the contract initializer
+	RequiredArgumentCount: (func() *int {
+		var count = 2
+		return &count
+	})(),
 }
 
-// TODO: improve types
-var addAccountKeyFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// address
-		&sema.StringType{},
-		// key
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
+var getAccountFunctionType = &sema.FunctionType{
+	Parameters: []*sema.Parameter{
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "address",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.AddressType{},
+			),
 		},
-	),
-	// nothing
+	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
+		&sema.PublicAccountType{},
 	),
 }
 
-// TODO: improve types
-var removeAccountKeyFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// address
-		&sema.StringType{},
-		// index
-		&sema.IntType{},
-	),
-	// nothing
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
-	),
-}
-
-// TODO: improve types
-var updateAccountCodeFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// address
-		&sema.StringType{},
-		// code
-		&sema.VariableSizedType{
-			Type: &sema.IntType{},
+var logFunctionType = &sema.FunctionType{
+	Parameters: []*sema.Parameter{
+		{
+			Label:      sema.ArgumentLabelNotRequired,
+			Identifier: "value",
+			TypeAnnotation: sema.NewTypeAnnotation(
+				&sema.AnyStructType{},
+			),
 		},
-	),
-	// nothing
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
-	),
-}
-
-var getAccountFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		// TODO:
-		// address
-		&sema.StringType{},
-	),
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		AccountType.Type,
-	),
-}
-
-var logFunctionType = sema.FunctionType{
-	ParameterTypeAnnotations: sema.NewTypeAnnotations(
-		&sema.AnyType{},
-	),
+	},
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
 		&sema.VoidType{},
 	),
@@ -100,12 +79,9 @@ var logFunctionType = sema.FunctionType{
 // FlowBuiltinImpls defines the set of functions needed to implement the Flow
 // built-in functions.
 type FlowBuiltinImpls struct {
-	CreateAccount     func([]interpreter.Value, interpreter.LocationPosition) trampoline.Trampoline
-	AddAccountKey     func([]interpreter.Value, interpreter.LocationPosition) trampoline.Trampoline
-	RemoveAccountKey  func([]interpreter.Value, interpreter.LocationPosition) trampoline.Trampoline
-	UpdateAccountCode func([]interpreter.Value, interpreter.LocationPosition) trampoline.Trampoline
-	GetAccount        func([]interpreter.Value, interpreter.LocationPosition) trampoline.Trampoline
-	Log               func([]interpreter.Value, interpreter.LocationPosition) trampoline.Trampoline
+	CreateAccount interpreter.HostFunction
+	GetAccount    interpreter.HostFunction
+	Log           interpreter.HostFunction
 }
 
 // FlowBuiltInFunctions returns a list of standard library functions, bound to
@@ -113,40 +89,115 @@ type FlowBuiltinImpls struct {
 func FlowBuiltInFunctions(impls FlowBuiltinImpls) StandardLibraryFunctions {
 	return StandardLibraryFunctions{
 		NewStandardLibraryFunction(
-			"createAccount",
-			&createAccountFunctionType,
+			"Account",
+			accountFunctionType,
 			impls.CreateAccount,
 			nil,
 		),
 		NewStandardLibraryFunction(
-			"addAccountKey",
-			&addAccountKeyFunctionType,
-			impls.AddAccountKey,
-			nil,
-		),
-		NewStandardLibraryFunction(
-			"removeAccountKey",
-			&removeAccountKeyFunctionType,
-			impls.RemoveAccountKey,
-			nil,
-		),
-		NewStandardLibraryFunction(
-			"updateAccountCode",
-			&updateAccountCodeFunctionType,
-			impls.UpdateAccountCode,
-			nil,
-		),
-		NewStandardLibraryFunction(
 			"getAccount",
-			&getAccountFunctionType,
+			getAccountFunctionType,
 			impls.GetAccount,
 			nil,
 		),
 		NewStandardLibraryFunction(
 			"log",
-			&logFunctionType,
+			logFunctionType,
 			impls.Log,
 			nil,
 		),
 	}
 }
+
+// built-in event types
+
+func newFlowEventType(identifier string, parameters ...*sema.Parameter) *sema.CompositeType {
+
+	eventType := &sema.CompositeType{
+		Kind:       common.CompositeKindEvent,
+		Location:   flowLocation,
+		Identifier: identifier,
+		Members:    map[string]*sema.Member{},
+	}
+
+	for _, parameter := range parameters {
+
+		eventType.Members[parameter.Identifier] =
+			sema.NewPublicConstantFieldMember(
+				eventType,
+				parameter.Identifier,
+				parameter.TypeAnnotation.Type,
+			)
+
+		eventType.ConstructorParameters = append(
+			eventType.ConstructorParameters,
+			parameter,
+		)
+	}
+
+	return eventType
+}
+
+var AccountCreatedEventType = newFlowEventType(
+	"AccountCreated",
+	&sema.Parameter{
+		Identifier: "address",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.StringType{},
+		),
+	},
+)
+
+var AccountKeyAddedEventType = newFlowEventType(
+	"AccountKeyAdded",
+	&sema.Parameter{
+		Identifier: "address",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.StringType{},
+		),
+	},
+	&sema.Parameter{
+		Identifier: "publicKey",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		),
+	},
+)
+
+var AccountKeyRemovedEventType = newFlowEventType(
+	"AccountKeyRemoved",
+	&sema.Parameter{
+		Identifier: "address",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.StringType{},
+		),
+	},
+	&sema.Parameter{
+		Identifier: "publicKey",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		),
+	},
+)
+
+var AccountCodeUpdatedEventType = newFlowEventType(
+	"AccountCodeUpdated",
+	&sema.Parameter{
+		Identifier: "address",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.StringType{},
+		),
+	},
+	&sema.Parameter{
+		Identifier: "codeHash",
+		TypeAnnotation: sema.NewTypeAnnotation(
+			&sema.VariableSizedType{
+				Type: &sema.IntType{},
+			},
+		),
+	},
+)

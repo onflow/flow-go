@@ -16,9 +16,11 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 		// not combined after both type checks!
 
 		entryKeyType := entry.Key.Accept(checker).(Type)
+		checker.checkVariableMove(entry.Key)
 		checker.checkResourceMoveOperation(entry.Key, entryKeyType)
 
 		entryValueType := entry.Value.Accept(checker).(Type)
+		checker.checkVariableMove(entry.Value)
 		checker.checkResourceMoveOperation(entry.Value, entryValueType)
 
 		entryTypes[i] = DictionaryEntryType{
@@ -30,7 +32,9 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 		// TODO: find common super type?
 		if keyType == nil {
 			keyType = entryKeyType
-		} else if !IsSubType(entryKeyType, keyType) {
+		} else if !entryKeyType.IsInvalidType() &&
+			!IsSubType(entryKeyType, keyType) {
+
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: keyType,
@@ -44,7 +48,9 @@ func (checker *Checker) VisitDictionaryExpression(expression *ast.DictionaryExpr
 		// TODO: find common super type?
 		if valueType == nil {
 			valueType = entryValueType
-		} else if !IsSubType(entryValueType, valueType) {
+		} else if !entryValueType.IsInvalidType() &&
+			!IsSubType(entryValueType, valueType) {
+
 			checker.report(
 				&TypeMismatchError{
 					ExpectedType: valueType,

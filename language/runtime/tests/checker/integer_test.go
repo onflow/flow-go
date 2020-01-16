@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -17,7 +18,7 @@ func TestCheckIntegerLiteralTypeConversionInVariableDeclaration(t *testing.T) {
         let x: Int8 = 1
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.Int8Type{},
@@ -31,7 +32,7 @@ func TestCheckIntegerLiteralTypeConversionInVariableDeclarationOptional(t *testi
         let x: Int8? = 1
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.OptionalType{Type: &sema.Int8Type{}},
@@ -48,7 +49,7 @@ func TestCheckIntegerLiteralTypeConversionInAssignment(t *testing.T) {
         }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.Int8Type{},
@@ -65,7 +66,7 @@ func TestCheckIntegerLiteralTypeConversionInAssignmentOptional(t *testing.T) {
         }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckIntegerLiteralRanges(t *testing.T) {
@@ -98,12 +99,13 @@ func TestCheckIntegerLiteralRanges(t *testing.T) {
 				maxString = max.String()
 			}
 
-			code := fmt.Sprintf(`
-                let min: %[1]s = %[2]s
-                let max: %[1]s = %[3]s
-                let a = %[1]s(%[2]s)
-                let b = %[1]s(%[3]s)
-            `,
+			code := fmt.Sprintf(
+				`
+                    let min: %[1]s = %[2]s
+                    let max: %[1]s = %[3]s
+                    let a = %[1]s(%[2]s)
+                    let b = %[1]s(%[3]s)
+                `,
 				ty.String(),
 				minString,
 				maxString,
@@ -111,7 +113,7 @@ func TestCheckIntegerLiteralRanges(t *testing.T) {
 
 			_, err := ParseAndCheck(t, code)
 
-			assert.Nil(t, err)
+			require.NoError(t, err)
 		})
 	}
 }
@@ -142,13 +144,16 @@ func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
 				minMinusOneString = minMinusOne.String()
 			}
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                let minMinusOne: %[1]s = %[2]s
-                let minMinusOne2 = %[1]s(%[2]s)
-            `,
-				ty.String(),
-				minMinusOneString,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      let minMinusOne: %[1]s = %[2]s
+                      let minMinusOne2 = %[1]s(%[2]s)
+                    `,
+					ty.String(),
+					minMinusOneString,
+				),
+			)
 
 			errs := ExpectCheckerErrors(t, err, 2)
 
@@ -173,13 +178,16 @@ func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
 				maxPlusOneString = maxPlusOne.String()
 			}
 
-			_, err := ParseAndCheck(t, fmt.Sprintf(`
-                let maxPlusOne: %[1]s = %[2]s
-                let maxPlusOne2 = %[1]s(%[2]s)
-            `,
-				ty.String(),
-				maxPlusOneString,
-			))
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      let maxPlusOne: %[1]s = %[2]s
+                      let maxPlusOne2 = %[1]s(%[2]s)
+                    `,
+					ty.String(),
+					maxPlusOneString,
+				),
+			)
 
 			errs := ExpectCheckerErrors(t, err, 2)
 
@@ -217,7 +225,7 @@ func TestCheckIntegerLiteralTypeConversionInFunctionCallArgument(t *testing.T) {
         let x = test(1)
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckIntegerLiteralTypeConversionInFunctionCallArgumentOptional(t *testing.T) {
@@ -227,7 +235,7 @@ func TestCheckIntegerLiteralTypeConversionInFunctionCallArgumentOptional(t *test
         let x = test(1)
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckIntegerLiteralTypeConversionInReturn(t *testing.T) {
@@ -238,7 +246,7 @@ func TestCheckIntegerLiteralTypeConversionInReturn(t *testing.T) {
         }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
@@ -249,7 +257,7 @@ func TestCheckIntegerLiteralTypeConversionInReturnOptional(t *testing.T) {
         }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidAddressDecimal(t *testing.T) {

@@ -3,62 +3,44 @@
 package propagation
 
 import (
-	"bytes"
-	"math/rand"
-	"sync"
-	"time"
-
-	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/consensus/propagation/volatile"
-	"github.com/dapperlabs/flow-go/model/collection"
-	"github.com/dapperlabs/flow-go/model/consensus"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// Engine implements the circulation engine of the consensus node, responsible
-// for making sure collections are propagated to all consensus nodes within the
-// flow system.
+// Engine is the propagation engine, which makes sure that new collections are
+// propagated to the other consensus nodes on the network.
 type Engine struct {
-	log     zerolog.Logger   // used to log relevant actions with context
-	con     network.Conduit  // used to talk to other nodes on the network
-	com     module.Committee // holds the node identity table for the network
-	pool    module.Mempool   // holds guaranteed collections in memory
-	cache   *volatile.Cache  // holds volatile information on collection exchange
-	polling time.Duration    // interval at which we poll for mempool contents
-	wg      *sync.WaitGroup  // used to wait on cleanup upon shutdown
-	once    *sync.Once       // used to only close the done channel once
-	stop    chan struct{}    // used as a signal to indicate engine shutdown
+	unit  *engine.Unit       // used to control startup/shutdown
+	log   zerolog.Logger     // used to log relevant actions with context
+	con   network.Conduit    // used to talk to other nodes on the network
+	state protocol.State     // used to access the  protocol state
+	me    module.Local       // used to access local node information
+	pool  mempool.Guarantees // holds collection guarantees in memory
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, net module.Network, com module.Committee, pool module.Mempool) (*Engine, error) {
-
-	// initialize the volatile storage
-	cache, err := volatile.NewCache()
-	if err != nil {
-		return nil, errors.Wrap(err, "could not initialize cache")
-	}
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool mempool.Guarantees) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		log:     log,
-		com:     com,
-		pool:    pool,
-		cache:   cache,
-		polling: 2 * time.Second,
-		wg:      &sync.WaitGroup{},
-		once:    &sync.Once{},
-		stop:    make(chan struct{}),
+		unit:  engine.NewUnit(),
+		log:   log.With().Str("engine", "propagation").Logger(),
+		state: state,
+		me:    me,
+		pool:  pool,
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ConsensusPropagation, e)
+	con, err := net.Register(engine.BlockPropagation, e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
@@ -70,351 +52,128 @@ func New(log zerolog.Logger, net module.Network, com module.Committee, pool modu
 
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For the propagation engine, we consider the engine up and running
-// when we have received the first guaranteed collection for the memory pool.
-// We thus start polling and wait until the memory pool has a size of at least
-// one.
+// upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
-	ready := make(chan struct{})
-	e.wg.Add(1)
-	go e.pollSnapshots()
-	go func() {
-		close(ready)
-	}()
-	return ready
+	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// It closes the internal stop channel to signal all running go routines and
-// then waits for them to finish using the wait group.
+// For the propagation engine, it closes the channel when all submit goroutines
+// have ended.
 func (e *Engine) Done() <-chan struct{} {
-	done := make(chan struct{})
-	e.once.Do(func() {
-		close(e.stop)
-	})
-	go func() {
-		e.wg.Wait()
-		e.cache.Close()
-		close(done)
-	}()
-	return done
+	return e.unit.Done()
 }
 
-// Submit allows us to submit entities locally to this engine, in a way that
-// doesn't block on engine boundaries. The error is logged internally to the
-// engine in this case.
-func (e *Engine) Submit(event interface{}) {
-
-	// process the event with our own ID to indicate it's local
-	err := e.Process(e.com.Me().NodeID, event)
-	if err != nil {
-		e.log.Error().
-			Err(err).
-			Msg("could not process local event")
-	}
+// SubmitLocal submits an event originating on the local node.
+func (e *Engine) SubmitLocal(event interface{}) {
+	e.Submit(e.me.NodeID(), event)
 }
 
-// Process processes the given propagation engine event. Events that are given
-// to this function originate within the propagation engine on the node with the
-// given origin ID.
-func (e *Engine) Process(originID string, event interface{}) error {
-	var err error
-	switch ev := event.(type) {
-	case *consensus.SnapshotRequest:
-		err = e.onSnapshotRequest(originID, ev)
-	case *consensus.SnapshotResponse:
-		err = e.onSnapshotResponse(originID, ev)
-	case *consensus.MempoolRequest:
-		err = e.onMempoolRequest(originID, ev)
-	case *consensus.MempoolResponse:
-		err = e.onMempoolResponse(originID, ev)
-	case *collection.GuaranteedCollection:
-		err = e.onGuaranteedCollection(originID, ev)
-	default:
-		err = errors.Errorf("invalid event type (%T)", event)
-	}
-	if err != nil {
-		return errors.Wrap(err, "could not process event")
-	}
-	return nil
-}
-
-// pollSnapshots will poll for snapshots from other peers at regular intervals.
-func (e *Engine) pollSnapshots() {
-	defer e.wg.Done()
-Loop:
-	for {
-		select {
-
-		case <-e.stop:
-			break Loop
-
-		case <-time.After(e.polling):
-			err := e.PropagateSnapshotRequest()
-			if err != nil {
-				e.log.Error().Err(err).Msg("could not request snapshot")
-				continue
-			}
-		}
-	}
-}
-
-// onSnapshotRequest is called when another node within the guaranteed
-// collection propagation process requests a snapshot of our collection memory
-// pool.
-func (e *Engine) onSnapshotRequest(originID string, req *consensus.SnapshotRequest) error {
-
-	e.log.Info().
-		Str("origin_id", originID).
-		Uint64("nonce", req.Nonce).
-		Msg("snapshot request received")
-
-	// check if our memory pool has the same hash, in which case there is no need
-	// to send them the memory pool snapshot or exchange its contents
-	hash := e.pool.Hash()
-	if bytes.Equal(hash, req.MempoolHash) {
-		return nil
-	}
-
-	// reply with our memory pool hash and the related nonce, which allows the
-	// recipient to associate the reply and request contents of the memory pool
-	// if it so desires
-	res := &consensus.SnapshotResponse{
-		Nonce:       req.Nonce,
-		MempoolHash: hash,
-	}
-	err := e.con.Submit(res, originID)
-	if err != nil {
-		return errors.Wrap(err, "could not send snapshot response")
-	}
-
-	// TODO: we can keep track of the request and related responses by introducing
-	// the nonce into our volatile state
-
-	e.log.Info().
-		Str("target_id", originID).
-		Uint64("nonce", req.Nonce).
-		Hex("mempool_hash", hash).
-		Msg("snapshot response sent")
-
-	return nil
-}
-
-// onSnapshotResponse is called when another node responds to our request for
-// a snapshot of their collection memory pool.
-func (e *Engine) onSnapshotResponse(originID string, res *consensus.SnapshotResponse) error {
-
-	e.log.Info().
-		Str("origin_id", originID).
-		Uint64("nonce", res.Nonce).
-		Hex("mempool_hash", res.MempoolHash).
-		Msg("snapshot response received")
-
-	// TODO: we can check whether we actually requested the snapshot by checking
-	// the nonce against our volatile state
-
-	// TODO: we can check whether we have already processed a response from this
-	// node by checking the origin ID against our volatile state
-
-	// TODO: we can keep track of which nodes have already sent us a response by
-	// introducing the origin ID into our volatile state
-
-	// TODO: we can check whether we already requested a memory pool with the
-	// given hash by checking the memory pool hash versus our volatile state
-
-	// send a memory pool request to the given node with the same nonce
-	req := &consensus.MempoolRequest{
-		Nonce: res.Nonce,
-	}
-	err := e.con.Submit(req, originID)
-	if err != nil {
-		return errors.Wrap(err, "could not send mempool request")
-	}
-
-	// TODO: we can keep track of which memory pool hashes we have already
-	// requested by adding the memory pool hash into our volatile state
-
-	e.log.Info().
-		Str("target_id", originID).
-		Uint64("nonce", res.Nonce).
-		Msg("mempool request sent")
-
-	return nil
-}
-
-// onMempoolRequest is called when another node requests the contents of our
-// collection memory pool.
-func (e *Engine) onMempoolRequest(originID string, req *consensus.MempoolRequest) error {
-
-	e.log.Info().
-		Str("origin_id", originID).
-		Uint64("nonce", req.Nonce).
-		Msg("mempool request received")
-
-	// TODO: we can check whether we actually provided this snapshot by checking
-	// the nonce against our volatile state
-
-	// TODO: we can check if we have already sent the memory pool to this node
-	// by checking the origin ID against our volatile state
-
-	// send our memory pool contents to the node using the same nonce
-	colls := e.pool.All()
-	res := &consensus.MempoolResponse{
-		Nonce:       req.Nonce,
-		Collections: colls,
-	}
-	err := e.con.Submit(res, originID)
-	if err != nil {
-		return errors.Wrap(err, "could not send mempool response")
-	}
-
-	e.log.Info().
-		Str("target_id", originID).
-		Uint64("nonce", req.Nonce).
-		Int("sent_collections", len(colls)).
-		Msg("mempool response sent")
-
-	return nil
-}
-
-// onMempoolResponse is called when another node sends us the contents of its
-// collection memory pool.
-func (e *Engine) onMempoolResponse(originID string, res *consensus.MempoolResponse) error {
-
-	e.log.Info().
-		Str("origin_id", originID).
-		Uint64("nonce", res.Nonce).
-		Int("received_collections", len(res.Collections)).
-		Msg("mempool response received")
-
-	// TODO: we can check whether we have an ongoing memory pool exchange with the
-	// given  nonce by checking it against our volatile state
-
-	// TODO: we can check whether we already processed a memory pool response from
-	// this node by checking it against our volatile state
-
-	var result *multierror.Error
-	for _, coll := range res.Collections {
-		err := e.processGuaranteedCollection(coll)
+// Submit submits the given event from the node with the given origin ID
+// for processing in a non-blocking manner. It returns instantly and logs
+// a potential processing error internally when done.
+func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+	e.unit.Launch(func() {
+		err := e.Process(originID, event)
 		if err != nil {
-			result = multierror.Append(result, err)
-			continue
+			e.log.Error().Err(err).Msg("could not process submitted event")
 		}
-	}
-
-	// TODO: we can keep track of which nodes we already received responses from
-	// by adding it to our volatile state
-
-	e.log.Info().
-		Str("target_id", originID).
-		Uint64("nonce", res.Nonce).
-		Uint("mempool_size", e.pool.Size()).
-		Msg("mempool response processed")
-
-	return result.ErrorOrNil()
+	})
 }
 
-// onGuaranteedCollection is called when a new guaranteed collection is received
-// from the given node on the network.
-func (e *Engine) onGuaranteedCollection(originID string, coll *collection.GuaranteedCollection) error {
+// ProcessLocal processes an event originating on the local node.
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.Process(e.me.NodeID(), event)
+}
+
+// Process processes the given event from the node with the given origin ID in
+// a blocking manner. It returns the potential processing error when done.
+func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+	return e.unit.Do(func() error {
+		return e.process(originID, event)
+	})
+}
+
+// process processes events for the propagation engine on the consensus node.
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	switch entity := event.(type) {
+	case *flow.CollectionGuarantee:
+		return e.onGuarantee(originID, entity)
+	default:
+		return errors.Errorf("invalid event type (%T)", event)
+	}
+}
+
+// onGuarantee is called when a new collection guarantee is received
+// from another node on the network.
+func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
 	e.log.Info().
-		Str("origin_id", originID).
-		Hex("collection_hash", coll.Hash).
-		Msg("fingerprint message received")
+		Hex("origin_id", originID[:]).
+		Msg("collection guarantee submitted")
 
-	// process the collection, which determines if it's new
-	err := e.processGuaranteedCollection(coll)
+	err := e.storeGuarantee(guarantee)
 	if err != nil {
-		return errors.Wrap(err, "could not process collection")
+		return errors.Wrap(err, "could not store guarantee")
 	}
 
-	// then propagate the guaranteed collections to relevant nodes on the network
-	err = e.PropagateGuaranteedCollection(coll)
+	// propagate the collection guarantee to other relevant nodes
+	err = e.propagateGuarantee(guarantee)
 	if err != nil {
-		return errors.Wrap(err, "could not broadcast collection")
+		return errors.Wrap(err, "could not broadcast guaantee")
 	}
 
 	e.log.Info().
-		Str("origin_id", originID).
-		Hex("collection_hash", coll.Hash).
-		Msg("guaranteed collection processed")
+		Hex("origin_id", originID[:]).
+		Hex("collection_id", logging.Entity(guarantee)).
+		Msg("collection guarantee processed")
 
 	return nil
 }
 
-// processGuaranteedCollection will process a guaranteed collection by
-// validating it and adding it to our memory pool.
-func (e *Engine) processGuaranteedCollection(coll *collection.GuaranteedCollection) error {
+// storeGuarantee will store a collection guarantee within the
+// context of our local protocol state and memory pool.
+func (e *Engine) storeGuarantee(guarantee *flow.CollectionGuarantee) error {
 
-	// check if we already know the guaranteed collection with the given hash, in
-	// which case we don't need to further process it
-	ok := e.pool.Has(coll.Hash)
-	if ok {
-		return errors.New("collection already processed")
-	}
+	// TODO: validate the collection guarantee signature
 
-	// TODO: validate the guaranteed collection signature
-
-	// add the guaranteed collection to our memory pool
-	err := e.pool.Add(coll)
+	// add the collection guarantee to our memory pool (also checks existence)
+	err := e.pool.Add(guarantee)
 	if err != nil {
-		return errors.Wrap(err, "could not add collection")
+		return errors.Wrap(err, "could not add guarantee to mempool")
 	}
+
+	e.log.Info().
+		Hex("collection_id", logging.Entity(guarantee)).
+		Msg("collection guarantee stored")
 
 	return nil
 }
 
-// PropagateGuaranteedCollection will propagate the collection to the relevant
-// nodes on the network.
-func (e *Engine) PropagateGuaranteedCollection(coll *collection.GuaranteedCollection) error {
+// propagateGuarantee will submit the collection guarantee to the
+// network layer with all other consensus nodes as desired recipients.
+func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
 
 	// select all the collection nodes on the network as our targets
-	me := e.com.Me().NodeID
-	identities := e.com.Select().
-		Filter(identity.Role(identity.Consensus)).
-		Filter(identity.Not(identity.NodeID(me)))
-
-	// send the guaranteed collection to all consensus identities
-	targetIDs := identities.NodeIDs()
-	err := e.con.Submit(coll, targetIDs...)
+	ids, err := e.state.Final().Identities(
+		identity.HasRole(flow.RoleConsensus),
+		identity.Not(identity.HasNodeID(e.me.NodeID())),
+	)
 	if err != nil {
-		return errors.Wrap(err, "could not push guaranteed collection")
+		return errors.Wrap(err, "could not get identities")
+	}
+
+	// send the collection guarantee to all consensus identities
+	targetIDs := ids.NodeIDs()
+	err = e.con.Submit(guarantee, targetIDs...)
+	if err != nil {
+		return errors.Wrap(err, "could not push collection guarantee")
 	}
 
 	e.log.Info().
-		Strs("target_ids", targetIDs).
-		Hex("collection_hash", coll.Hash).
-		Msg("guaranteed collection propagated")
-
-	return nil
-}
-
-// propagateSnapshotRequest will propagate a memory pool snapshot request to the
-// relevant nodes on the network.
-func (e *Engine) PropagateSnapshotRequest() error {
-
-	// select all the consensus nodes on the network to request snapshot
-	identities := e.com.Select().
-		Filter(identity.Role(identity.Consensus)).
-		Filter(identity.Not(identity.NodeID(e.com.Me().NodeID)))
-
-	// send the snapshot request to the selected nodes
-	hash := e.pool.Hash()
-	targetIDs := identities.NodeIDs()
-	req := &consensus.SnapshotRequest{
-		Nonce:       rand.Uint64(),
-		MempoolHash: hash,
-	}
-	err := e.con.Submit(req, targetIDs...)
-	if err != nil {
-		return errors.Wrap(err, "could not send snapshot request")
-	}
-
-	e.log.Info().
-		Uint64("nonce", req.Nonce).
-		Strs("target_ids", targetIDs).
-		Hex("mempool_hash", hash).
-		Msg("snapshot request propagated")
+		Strs("target_ids", logging.IDs(targetIDs)).
+		Hex("collection_id", logging.Entity(guarantee)).
+		Msg("collection guarantee propagated")
 
 	return nil
 }

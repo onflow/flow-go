@@ -12,6 +12,8 @@ func (checker *Checker) VisitCreateExpression(expression *ast.CreateExpression) 
 		checker.inCreate = inCreate
 	}()
 
+	// TODO: maybe check that invoked expression is a composite constructor
+
 	invocation := expression.InvocationExpression
 
 	ty := invocation.Accept(checker).(Type)

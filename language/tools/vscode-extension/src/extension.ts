@@ -1,92 +1,57 @@
 import {
-  ExtensionContext,
-  commands,
-  workspace,
-  window,
-  ColorPresentation
+    ExtensionContext,
+    window,
+    Terminal,
+    StatusBarItem,
 } from "vscode";
-import { LanguageClient } from "vscode-languageclient";
-import { getConfig, Config } from "./config";
+import {getConfig, handleConfigChanges, Config} from "./config";
+import {LanguageServerAPI} from "./language-server";
+import {registerCommands} from "./commands";
+import {createTerminal} from "./terminal";
+import {createActiveAccountStatusBarItem, updateActiveAccountStatusBarItem} from "./status-bar";
 
+// The container for all data relevant to the extension.
+export type Extension = {
+    config: Config
+    ctx: ExtensionContext
+    api: LanguageServerAPI
+    terminal: Terminal
+    activeAccountStatusBarItem: StatusBarItem
+};
+
+// Called when the extension starts up. Reads config, starts the language
+// server, and registers command handlers.
 export function activate(ctx: ExtensionContext) {
-  detectLaunchConfigurationChanges();
+    let config: Config;
+    let terminal: Terminal;
+    let activeAccountStatusBarItem: StatusBarItem;
+    let api: LanguageServerAPI;
 
-  function registerCommand(command: string, callback: (...args: any[]) => any) {
-    ctx.subscriptions.push(commands.registerCommand(command, callback));
-  }
-
-  const maybeConfig: Config | undefined = getConfig();
-  if (!maybeConfig) {
-    window.showWarningMessage("Missing required config");
-  }
-  const config = maybeConfig as Config;
-
-  let client = startServer(ctx, config);
-
-  registerCommand("cadence.restartServer", async () => {
-    if (!client) {
-      return;
+    try {
+        config = getConfig();
+        terminal = createTerminal(ctx);
+        api = new LanguageServerAPI(ctx, config);
+        activeAccountStatusBarItem = createActiveAccountStatusBarItem();
+    } catch (err) {
+        window.showErrorMessage("Failed to activate extension: ", err);
+        return;
     }
-    await client.stop();
-    client = startServer(ctx, config);
-  });
-}
+    handleConfigChanges();
 
-function startServer(ctx: ExtensionContext, config: Config): LanguageClient | undefined {
-  const client = new LanguageClient(
-    "cadence",
-    "Cadence",
-    {
-      command: config.languageServerCommand,
-      args: config.languageServerArgs,
-    },
-    {
-      documentSelector: [{ scheme: "file", language: "cadence" }],
-      synchronize: {
-        configurationSection: "cadence"
-      },
-      initializationOptions: config.serverConfig,
-    }
-  );
+    const ext: Extension = {
+        config: config,
+        ctx: ctx,
+        api: api,
+        terminal: terminal,
+        activeAccountStatusBarItem: activeAccountStatusBarItem,
+    };
 
-  client
-    .onReady()
-    .then(() => {
-      return window.showInformationMessage("Cadence language server started");
-    })
-    .catch(error => {
-      return window.showErrorMessage(
-        `Cadence language server failed to start: ${error}`
-      );
-    });
-
-  let languageServerDisposable = client.start();
-  ctx.subscriptions.push(languageServerDisposable);
-
-  return client;
-}
-
-function detectLaunchConfigurationChanges() {
-  workspace.onDidChangeConfiguration(e => {
-    // TODO: do something smarter for account/emulator config (re-send to server)
-    const promptRestartKeys = ["languageServerPath", "accountKey", "accountAddress", "emulatorAddress"];
-    const shouldPromptRestart = promptRestartKeys.some(key =>
-      e.affectsConfiguration(`cadence.${key}`)
-    );
-    if (shouldPromptRestart) {
-      window
-        .showInformationMessage(
-          "Server launch configuration change detected. Reload the window for changes to take effect",
-          "Reload Window",
-          "Not now"
-        )
-        .then(choice => {
-          if (choice === "Reload Window") {
-            commands.executeCommand("workbench.action.reloadWindow");
-          }
-        });
-    }
-  });
+    registerCommands(ext);
+    renderExtension(ext);
 }
 
 export function deactivate() {}
+
+export function renderExtension(ext: Extension) {
+    updateActiveAccountStatusBarItem(ext.activeAccountStatusBarItem, ext.config.activeAccount);
+}

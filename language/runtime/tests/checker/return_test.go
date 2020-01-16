@@ -5,11 +5,25 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
+
+func TestCheckInvalidReturnValue(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+       fun test() {
+           return 1
+       }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidReturnValueError{}, errs[0])
+}
 
 func TestCheckMissingReturnStatement(t *testing.T) {
 
@@ -34,7 +48,7 @@ func TestCheckMissingReturnStatementInterfaceFunction(t *testing.T) {
         }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidMissingReturnStatementStructFunction(t *testing.T) {
@@ -69,20 +83,19 @@ type exitTest struct {
 func testExits(t *testing.T, tests []exitTest) {
 	for _, test := range tests {
 		t.Run("", func(t *testing.T) {
-			code := fmt.Sprintf("fun test(): Any {%s}", test.body)
+			code := fmt.Sprintf("fun test(): AnyStruct {%s}", test.body)
 			_, err := ParseAndCheckWithOptions(
 				t,
 				code,
 				ParseAndCheckOptions{
 					Options: []sema.Option{
 						sema.WithPredeclaredValues(test.valueDeclarations),
-						sema.WithAccessCheckMode(sema.AccessCheckModeNotSpecifiedUnrestricted),
 					},
 				},
 			)
 
 			if test.exits {
-				assert.Nil(t, err)
+				require.NoError(t, err)
 			} else {
 				errs := ExpectCheckerErrors(t, err, 1)
 

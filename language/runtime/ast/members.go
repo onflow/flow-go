@@ -20,7 +20,6 @@ type Members struct {
 	Functions    []*FunctionDeclaration
 	// Use `FunctionsByIdentifier()` instead
 	_functionsByIdentifier map[string]*FunctionDeclaration
-	CompositeDeclarations  []*CompositeDeclaration
 }
 
 func (m *Members) FieldsByIdentifier() map[string]*FieldDeclaration {

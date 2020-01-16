@@ -4,8 +4,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
+	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -38,7 +40,7 @@ func TestCheckFunctionCallWithArgumentLabel(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckFunctionCallWithoutArgumentLabel(t *testing.T) {
@@ -53,7 +55,7 @@ func TestCheckFunctionCallWithoutArgumentLabel(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidFunctionCallWithNotRequiredArgumentLabel(t *testing.T) {
@@ -86,7 +88,7 @@ func TestCheckIndirectFunctionCallWithoutArgumentLabel(t *testing.T) {
       }
     `)
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckFunctionCallMissingArgumentLabel(t *testing.T) {
@@ -215,7 +217,7 @@ func TestCheckInvocationOfFunctionFromStructFunction(t *testing.T) {
         }
       }
     `)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidStructFunctionInvocation(t *testing.T) {
@@ -245,7 +247,7 @@ func TestCheckInvocationOfFunctionFromStructFunctionWithSameName(t *testing.T) {
         }
       }
     `)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckIntricateIntegerBinaryExpression(t *testing.T) {
@@ -254,5 +256,39 @@ func TestCheckIntricateIntegerBinaryExpression(t *testing.T) {
       let x: Int8 = 100
       let y = (Int8(90) + Int8(10)) == x
     `)
-	assert.Nil(t, err)
+	require.NoError(t, err)
+}
+
+func TestCheckInvocationWithOnlyVarargs(t *testing.T) {
+
+	_, err := ParseAndCheckWithOptions(t,
+		`
+            pub fun test() {
+                foo(1)
+            }
+        `,
+		ParseAndCheckOptions{
+			Options: []sema.Option{
+				sema.WithPredeclaredValues(
+					stdlib.StandardLibraryFunctions{
+						stdlib.StandardLibraryFunction{
+							Name: "foo",
+							Type: &sema.FunctionType{
+								ReturnTypeAnnotation: &sema.TypeAnnotation{
+									Type: &sema.VoidType{},
+								},
+								RequiredArgumentCount: func() *int {
+									// NOTE: important to check *all* arguments are optional
+									var count = 0
+									return &count
+								}(),
+							},
+						},
+					}.ToValueDeclarations(),
+				),
+			},
+		},
+	)
+
+	require.NoError(t, err)
 }
