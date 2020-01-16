@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -606,7 +607,12 @@ func (v IntValue) Minus(other IntegerValue) IntegerValue {
 }
 
 func (v IntValue) Mod(other IntegerValue) IntegerValue {
-	newValue := big.NewInt(0).Mod(v.Int, other.(IntValue).Int)
+	o := other.(IntValue)
+	res := big.NewInt(0)
+	if o.Int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	newValue := res.Mod(v.Int, o.Int)
 	return IntValue{newValue}
 }
 
@@ -616,7 +622,12 @@ func (v IntValue) Mul(other IntegerValue) IntegerValue {
 }
 
 func (v IntValue) Div(other IntegerValue) IntegerValue {
-	newValue := big.NewInt(0).Div(v.Int, other.(IntValue).Int)
+	o := other.(IntValue)
+	res := big.NewInt(0)
+	if o.Int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	newValue := res.Div(v.Int, o.Int)
 	return IntValue{newValue}
 }
 
@@ -685,27 +696,84 @@ func (v Int8Value) IntValue() int {
 }
 
 func (v Int8Value) Negate() IntegerValue {
+	// INT32-C
+	if v == math.MinInt8 {
+		panic(&OverflowError{})
+	}
 	return -v
 }
 
 func (v Int8Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(Int8Value)
+	o := other.(Int8Value)
+	// INT32-C
+	if (o > 0) && (v > (math.MaxInt8 - o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v < (math.MinInt8 - o)) {
+		panic(&UnderflowError{})
+	}
+	return v + o
 }
 
 func (v Int8Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(Int8Value)
+	o := other.(Int8Value)
+	// INT32-C
+	if (o > 0) && (v < (math.MinInt8 + o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v > (math.MaxInt8 + o)) {
+		panic(&UnderflowError{})
+	}
+	return v - o
 }
 
 func (v Int8Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(Int8Value)
+	o := other.(Int8Value)
+	// INT33-C
+	// https://golang.org/ref/spec#Integer_operators
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	} else if (v == math.MinInt8) && (o == -1) {
+		panic(OverflowError{})
+	}
+	return v % o
 }
 
 func (v Int8Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(Int8Value)
+	o := other.(Int8Value)
+	// INT32-C
+	if v > 0 {
+		if o > 0 {
+			if v > (math.MaxInt8 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if o < (math.MinInt8 / v) {
+				panic(&OverflowError{})
+			}
+		}
+	} else {
+		if o > 0 {
+			if v < (math.MinInt8 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if (v != 0) && (o < (math.MaxInt8 / v)) {
+				panic(&OverflowError{})
+			}
+		}
+	}
+	return v * o
 }
 
 func (v Int8Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(Int8Value)
+	o := other.(Int8Value)
+	// INT33-C
+	// https://golang.org/ref/spec#Integer_operators
+	if o == 0 {
+		panic(DivisionByZeroError{})
+	} else if (v == math.MinInt8) && (o == -1) {
+		panic(OverflowError{})
+	}
+	return v / o
 }
 
 func (v Int8Value) Less(other IntegerValue) BoolValue {
@@ -772,27 +840,84 @@ func (v Int16Value) IntValue() int {
 }
 
 func (v Int16Value) Negate() IntegerValue {
+	// INT32-C
+	if v == math.MinInt16 {
+		panic(&OverflowError{})
+	}
 	return -v
 }
 
 func (v Int16Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(Int16Value)
+	o := other.(Int16Value)
+	// INT32-C
+	if (o > 0) && (v > (math.MaxInt16 - o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v < (math.MinInt16 - o)) {
+		panic(&UnderflowError{})
+	}
+	return v + o
 }
 
 func (v Int16Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(Int16Value)
+	o := other.(Int16Value)
+	// INT32-C
+	if (o > 0) && (v < (math.MinInt16 + o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v > (math.MaxInt16 + o)) {
+		panic(&UnderflowError{})
+	}
+	return v - o
 }
 
 func (v Int16Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(Int16Value)
+	o := other.(Int16Value)
+	// INT33-C
+	// https://golang.org/ref/spec#Integer_operators
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	} else if (v == math.MinInt16) && (o == -1) {
+		panic(OverflowError{})
+	}
+	return v % o
 }
 
 func (v Int16Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(Int16Value)
+	o := other.(Int16Value)
+	// INT32-C
+	if v > 0 {
+		if o > 0 {
+			if v > (math.MaxInt16 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if o < (math.MinInt16 / v) {
+				panic(&OverflowError{})
+			}
+		}
+	} else {
+		if o > 0 {
+			if v < (math.MinInt16 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if (v != 0) && (o < (math.MaxInt16 / v)) {
+				panic(&OverflowError{})
+			}
+		}
+	}
+	return v * o
 }
 
 func (v Int16Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(Int16Value)
+	o := other.(Int16Value)
+	// INT33-C
+	// https://golang.org/ref/spec#Integer_operators
+	if o == 0 {
+		panic(DivisionByZeroError{})
+	} else if (v == math.MinInt16) && (o == -1) {
+		panic(OverflowError{})
+	}
+	return v / o
 }
 
 func (v Int16Value) Less(other IntegerValue) BoolValue {
@@ -859,27 +984,84 @@ func (v Int32Value) IntValue() int {
 }
 
 func (v Int32Value) Negate() IntegerValue {
+	// INT32-C
+	if v == math.MinInt32 {
+		panic(&OverflowError{})
+	}
 	return -v
 }
 
 func (v Int32Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(Int32Value)
+	o := other.(Int32Value)
+	// INT32-C
+	if (o > 0) && (v > (math.MaxInt32 - o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v < (math.MinInt32 - o)) {
+		panic(&UnderflowError{})
+	}
+	return v + o
 }
 
 func (v Int32Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(Int32Value)
+	o := other.(Int32Value)
+	// INT32-C
+	if (o > 0) && (v < (math.MinInt32 + o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v > (math.MaxInt32 + o)) {
+		panic(&UnderflowError{})
+	}
+	return v - o
 }
 
 func (v Int32Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(Int32Value)
+	o := other.(Int32Value)
+	// INT33-C
+	// https://golang.org/ref/spec#Integer_operators
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	} else if (v == math.MinInt32) && (o == -1) {
+		panic(OverflowError{})
+	}
+	return v % o
 }
 
 func (v Int32Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(Int32Value)
+	o := other.(Int32Value)
+	// INT32-C
+	if v > 0 {
+		if o > 0 {
+			if v > (math.MaxInt32 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if o < (math.MinInt32 / v) {
+				panic(&OverflowError{})
+			}
+		}
+	} else {
+		if o > 0 {
+			if v < (math.MinInt32 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if (v != 0) && (o < (math.MaxInt32 / v)) {
+				panic(&OverflowError{})
+			}
+		}
+	}
+	return v * o
 }
 
 func (v Int32Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(Int32Value)
+	o := other.(Int32Value)
+	// INT33-C
+	// https://golang.org/ref/spec#Integer_operators
+	if o == 0 {
+		panic(DivisionByZeroError{})
+	} else if (v == math.MinInt32) && (o == -1) {
+		panic(OverflowError{})
+	}
+	return v / o
 }
 
 func (v Int32Value) Less(other IntegerValue) BoolValue {
@@ -946,27 +1128,84 @@ func (v Int64Value) IntValue() int {
 }
 
 func (v Int64Value) Negate() IntegerValue {
+	// INT32-C
+	if v == math.MinInt64 {
+		panic(&OverflowError{})
+	}
 	return -v
 }
 
 func (v Int64Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(Int64Value)
+	o := other.(Int64Value)
+	// INT32-C
+	if (o > 0) && (v > (math.MaxInt64 - o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v < (math.MinInt64 - o)) {
+		panic(&UnderflowError{})
+	}
+	return v + o
 }
 
 func (v Int64Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(Int64Value)
+	o := other.(Int64Value)
+	// INT32-C
+	if (o > 0) && (v < (math.MinInt64 + o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v > (math.MaxInt64 + o)) {
+		panic(&UnderflowError{})
+	}
+	return v - o
 }
 
 func (v Int64Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(Int64Value)
+	o := other.(Int64Value)
+	// INT33-C
+	// https://golang.org/ref/spec#Integer_operators
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	} else if (v == math.MinInt64) && (o == -1) {
+		panic(OverflowError{})
+	}
+	return v % o
 }
 
 func (v Int64Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(Int64Value)
+	o := other.(Int64Value)
+	// INT32-C
+	if v > 0 {
+		if o > 0 {
+			if v > (math.MaxInt64 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if o < (math.MinInt64 / v) {
+				panic(&OverflowError{})
+			}
+		}
+	} else {
+		if o > 0 {
+			if v < (math.MinInt64 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if (v != 0) && (o < (math.MaxInt64 / v)) {
+				panic(&OverflowError{})
+			}
+		}
+	}
+	return v * o
 }
 
 func (v Int64Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(Int64Value)
+	o := other.(Int64Value)
+	// INT33-C
+	// https://golang.org/ref/spec#Integer_operators
+	if o == 0 {
+		panic(DivisionByZeroError{})
+	} else if (v == math.MinInt64) && (o == -1) {
+		panic(OverflowError{})
+	}
+	return v / o
 }
 
 func (v Int64Value) Less(other IntegerValue) BoolValue {
@@ -1033,27 +1272,49 @@ func (v UInt8Value) IntValue() int {
 }
 
 func (v UInt8Value) Negate() IntegerValue {
-	return -v
+	panic(errors.NewUnreachableError())
 }
 
 func (v UInt8Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(UInt8Value)
+	sum := v + other.(UInt8Value)
+	// INT30-C
+	if sum < v {
+		panic(OverflowError{})
+	}
+	return sum
 }
 
 func (v UInt8Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(UInt8Value)
+	diff := v - other.(UInt8Value)
+	// INT30-C
+	if diff > v {
+		panic(UnderflowError{})
+	}
+	return diff
 }
 
 func (v UInt8Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(UInt8Value)
+	o := other.(UInt8Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
 }
 
 func (v UInt8Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(UInt8Value)
+	o := other.(UInt8Value)
+	if (v > 0) && (o > 0) && (v > (math.MaxUint8 / o)) {
+		panic(&OverflowError{})
+	}
+	return v * o
 }
 
 func (v UInt8Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(UInt8Value)
+	o := other.(UInt8Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
 }
 
 func (v UInt8Value) Less(other IntegerValue) BoolValue {
@@ -1118,27 +1379,49 @@ func (v UInt16Value) IntValue() int {
 	return int(v)
 }
 func (v UInt16Value) Negate() IntegerValue {
-	return -v
+	panic(errors.NewUnreachableError())
 }
 
 func (v UInt16Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(UInt16Value)
+	sum := v + other.(UInt16Value)
+	// INT30-C
+	if sum < v {
+		panic(OverflowError{})
+	}
+	return sum
 }
 
 func (v UInt16Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(UInt16Value)
+	diff := v - other.(UInt16Value)
+	// INT30-C
+	if diff > v {
+		panic(UnderflowError{})
+	}
+	return diff
 }
 
 func (v UInt16Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(UInt16Value)
+	o := other.(UInt16Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
 }
 
 func (v UInt16Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(UInt16Value)
+	o := other.(UInt16Value)
+	if (v > 0) && (o > 0) && (v > (math.MaxUint16 / o)) {
+		panic(&OverflowError{})
+	}
+	return v * o
 }
 
 func (v UInt16Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(UInt16Value)
+	o := other.(UInt16Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
 }
 
 func (v UInt16Value) Less(other IntegerValue) BoolValue {
@@ -1205,27 +1488,49 @@ func (v UInt32Value) IntValue() int {
 }
 
 func (v UInt32Value) Negate() IntegerValue {
-	return -v
+	panic(errors.NewUnreachableError())
 }
 
 func (v UInt32Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(UInt32Value)
+	sum := v + other.(UInt32Value)
+	// INT30-C
+	if sum < v {
+		panic(OverflowError{})
+	}
+	return sum
 }
 
 func (v UInt32Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(UInt32Value)
+	diff := v - other.(UInt32Value)
+	// INT30-C
+	if diff > v {
+		panic(UnderflowError{})
+	}
+	return diff
 }
 
 func (v UInt32Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(UInt32Value)
+	o := other.(UInt32Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
 }
 
 func (v UInt32Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(UInt32Value)
+	o := other.(UInt32Value)
+	if (v > 0) && (o > 0) && (v > (math.MaxUint32 / o)) {
+		panic(&OverflowError{})
+	}
+	return v * o
 }
 
 func (v UInt32Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(UInt32Value)
+	o := other.(UInt32Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
 }
 
 func (v UInt32Value) Less(other IntegerValue) BoolValue {
@@ -1292,27 +1597,49 @@ func (v UInt64Value) IntValue() int {
 }
 
 func (v UInt64Value) Negate() IntegerValue {
-	return -v
+	panic(errors.NewUnreachableError())
 }
 
 func (v UInt64Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(UInt64Value)
+	sum := v + other.(UInt64Value)
+	// INT30-C
+	if sum < v {
+		panic(OverflowError{})
+	}
+	return sum
 }
 
 func (v UInt64Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(UInt64Value)
+	diff := v - other.(UInt64Value)
+	// INT30-C
+	if diff > v {
+		panic(UnderflowError{})
+	}
+	return diff
 }
 
 func (v UInt64Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(UInt64Value)
+	o := other.(UInt64Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
 }
 
 func (v UInt64Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(UInt64Value)
+	o := other.(UInt64Value)
+	if (v > 0) && (o > 0) && (v > (math.MaxUint64 / o)) {
+		panic(&OverflowError{})
+	}
+	return v * o
 }
 
 func (v UInt64Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(UInt64Value)
+	o := other.(UInt64Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
 }
 
 func (v UInt64Value) Less(other IntegerValue) BoolValue {

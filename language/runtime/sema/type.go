@@ -486,6 +486,40 @@ func (*IntegerType) Max() *big.Int {
 	return nil
 }
 
+// SignedIntegerType represents the super-type of all signed integer types
+type SignedIntegerType struct{}
+
+func (*SignedIntegerType) isType() {}
+
+func (*SignedIntegerType) String() string {
+	return "SignedInteger"
+}
+
+func (*SignedIntegerType) ID() TypeID {
+	return "SignedInteger"
+}
+
+func (*SignedIntegerType) Equal(other Type) bool {
+	_, ok := other.(*SignedIntegerType)
+	return ok
+}
+
+func (*SignedIntegerType) IsResourceType() bool {
+	return false
+}
+
+func (*SignedIntegerType) IsInvalidType() bool {
+	return false
+}
+
+func (*SignedIntegerType) Min() *big.Int {
+	return nil
+}
+
+func (*SignedIntegerType) Max() *big.Int {
+	return nil
+}
+
 // IntType represents the arbitrary-precision integer type `Int`
 type IntType struct{}
 
@@ -2329,9 +2363,20 @@ func IsSubType(subType Type, superType Type) bool {
 	switch typedSuperType := superType.(type) {
 	case *IntegerType:
 		switch subType.(type) {
-		case *IntType,
+		case *IntegerType, *SignedIntegerType, *IntType,
 			*Int8Type, *Int16Type, *Int32Type, *Int64Type,
 			*UInt8Type, *UInt16Type, *UInt32Type, *UInt64Type:
+
+			return true
+
+		default:
+			return false
+		}
+
+	case *SignedIntegerType:
+		switch subType.(type) {
+		case *SignedIntegerType, *IntType,
+			*Int8Type, *Int16Type, *Int32Type, *Int64Type:
 
 			return true
 
