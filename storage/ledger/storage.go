@@ -131,7 +131,7 @@ func (f *TrieStorage) UpdateRegistersWithProof(
 		return nil, nil, err
 	}
 
-	_, proofs, err = f.GetRegistersWithProof(ids, f.tree.GetRoot().GetValue())
+	_, proofs, err = f.GetRegistersWithProof(ids, newStateCommitment)
 	return newStateCommitment, proofs, err
 }
 
