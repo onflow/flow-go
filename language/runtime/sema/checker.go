@@ -1161,7 +1161,6 @@ func (checker *Checker) checkDeclarationAccessModifier(
 	declarationKind common.DeclarationKind,
 	startPos ast.Position,
 	isConstant bool,
-	allowAuth bool,
 ) {
 	if checker.functionActivations.IsLocal() {
 
@@ -1231,17 +1230,6 @@ func (checker *Checker) checkDeclarationAccessModifier(
 					},
 				)
 			}
-
-		case ast.AccessAuthorized:
-			if !allowAuth {
-				checker.report(
-					&InvalidAccessModifierError{
-						Access:          access,
-						DeclarationKind: declarationKind,
-						Pos:             startPos,
-					},
-				)
-			}
 		}
 	}
 }
@@ -1255,7 +1243,6 @@ func (checker *Checker) checkFieldsAccessModifier(fields []*ast.FieldDeclaration
 			field.DeclarationKind(),
 			field.StartPos,
 			isConstant,
-			true,
 		)
 	}
 }
@@ -1283,14 +1270,12 @@ func (checker *Checker) isReadableAccess(access ast.Access) bool {
 	case AccessCheckModeStrict,
 		AccessCheckModeNotSpecifiedRestricted:
 
-		return access == ast.AccessAuthorized ||
-			access == ast.AccessPublic ||
+		return access == ast.AccessPublic ||
 			access == ast.AccessPublicSettable
 
 	case AccessCheckModeNotSpecifiedUnrestricted:
 
 		return access == ast.AccessNotSpecified ||
-			access == ast.AccessAuthorized ||
 			access == ast.AccessPublic ||
 			access == ast.AccessPublicSettable
 
@@ -1307,13 +1292,11 @@ func (checker *Checker) isWriteableAccess(access ast.Access) bool {
 	case AccessCheckModeStrict,
 		AccessCheckModeNotSpecifiedRestricted:
 
-		return access == ast.AccessAuthorized ||
-			access == ast.AccessPublicSettable
+		return access == ast.AccessPublicSettable
 
 	case AccessCheckModeNotSpecifiedUnrestricted:
 
 		return access == ast.AccessNotSpecified ||
-			access == ast.AccessAuthorized ||
 			access == ast.AccessPublicSettable
 
 	case AccessCheckModeNone:

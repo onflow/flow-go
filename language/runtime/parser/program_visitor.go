@@ -126,9 +126,6 @@ func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
 	case ctx.Priv() != nil:
 		return ast.AccessPrivate
 
-	case ctx.Auth() != nil:
-		return ast.AccessAuthorized
-
 	case ctx.Pub() != nil:
 		return ast.AccessPublic
 

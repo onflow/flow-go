@@ -107,7 +107,6 @@ importDeclaration
 access
     : /* Not specified */
     | Priv
-    | Auth
     | Pub
     | PubSet
     ;
@@ -595,7 +594,6 @@ Pre : 'pre' ;
 Post : 'post' ;
 
 Priv : 'priv' ;
-Auth : 'auth' ;
 Pub : 'pub' ;
 PubSet : 'pub(set)' ;
 
