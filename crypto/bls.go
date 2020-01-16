@@ -6,6 +6,7 @@ package crypto
 type BLS_BLS12381Algo struct {
 	// points to Relic context of BLS12-381 with all the parameters
 	context ctx
+
 	// points to precomputed parameters of BLS12-381 not included in Relic context
 	//precomputed BLSPrecParams
 	// embeds commonSigner
@@ -17,19 +18,30 @@ func (sk *PrKeyBLS_BLS12381) signHash(h Hash) (Signature, error) {
 	return sk.alg.blsSign(&sk.scalar, h), nil
 }
 
-// Sign signs an array of bytes
-func (sk *PrKeyBLS_BLS12381) Sign(data []byte, alg Hasher) (Signature, error) {
-	// hash the input to 128 bytes
-	h := make([]byte, 128)
+// hashes an input data to a hash of an arbitrary input length
+// using a chaining of the input Hasher
+func hashToArbitraryLength(data []byte, outLen int, alg Hasher) Hash {
+	// the overall output hash
+	h := make([]byte, outLen)
 	// concatenate the input to a counter byte
 	dataToHash := make([]byte, len(data)+1)
 	copy(dataToHash[:1], data)
-	dataToHash[0] = 0
-	copy(h[0:], alg.ComputeHash(dataToHash)) // copy 48 bytes
-	dataToHash[0] = 1
-	copy(h[48:], alg.ComputeHash(dataToHash)) // copy 96 bytes
-	dataToHash[0] = 2
-	copy(h[96:], alg.ComputeHash(dataToHash)[:32]) // copy 128 bytes
+	i := 0
+	for ; i < outLen/alg.Size(); i++ {
+		dataToHash[0] = byte(i)
+		// copy the round output to the overall output
+		copy(h[i*alg.Size():], alg.ComputeHash(dataToHash))
+	}
+	dataToHash[0] = byte(i)
+	// copy the last round bytes to the overall output
+	copy(h[i*alg.Size():], alg.ComputeHash(dataToHash)[:outLen%alg.Size()])
+	return h
+}
+
+// Sign signs an array of bytes
+func (sk *PrKeyBLS_BLS12381) Sign(data []byte, alg Hasher) (Signature, error) {
+	// hash the input to 128 bytes
+	h := hashToArbitraryLength(data, OpSwUInputLenBLS_BLS12381, alg)
 	return sk.signHash(h)
 }
 
@@ -44,16 +56,7 @@ func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, alg Hasher) (bool
 		return false, cryptoError{"VerifyBytes requires a Hasher"}
 	}
 	// hash the input to 128 bytes
-	h := make([]byte, 128)
-	// concatenate the input to a counter byte
-	dataToHash := make([]byte, len(data)+1)
-	copy(dataToHash[:1], data)
-	dataToHash[0] = 0
-	copy(h[0:], alg.ComputeHash(dataToHash)) // copy 48 bytes
-	dataToHash[0] = 1
-	copy(h[48:], alg.ComputeHash(dataToHash)) // copy 96 bytes
-	dataToHash[0] = 2
-	copy(h[96:], alg.ComputeHash(dataToHash)[:32]) // copy 128 bytes
+	h := hashToArbitraryLength(data, OpSwUInputLenBLS_BLS12381, alg)
 	return pk.verifyHash(s, h)
 }
 

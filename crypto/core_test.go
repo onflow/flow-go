@@ -93,8 +93,9 @@ func BenchmarkHashToG1(b *testing.B) {
 func TestHashToG1(t *testing.T) {
 	NewSigner(BLS_BLS12381)
 	// msg is split into 2 halves to accomodate testing the optimized SwU algo
-	msg0 := "0e58bd6d947af8aec009ff396cd83a3636614f917423db76e8948e9c25130ae04e721beb924efca3ce585540b2567cf6"
-	msg1 := "0082bd2ed5473b191da55420c9b4df9031a50445b28c17115d614ad6993d7037d6792dd2211e4b485761a6fe2df17582"
+	msg0 := "0e58bd6d947af8aec009ff396cd83a3636614f917423db76e8948e9c25130ae04e721beb924efca3ce585540b2567cf600000000000000000000000000000000"
+	msg1 := "0082bd2ed5473b191da55420c9b4df9031a50445b28c17115d614ad6993d7037d6792dd2211e4b485761a6fe2df1758200000000000000000000000000000000"
+
 	input, _ := hex.DecodeString(msg0 + msg1)
 	hashToG1(input)
 	return

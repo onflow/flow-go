@@ -3,7 +3,7 @@
 #include "misc.h"
 #include "bls_include.h"
 
-extern prec_st bls_prec;
+extern prec_st* bls_prec;
 
 #if (hashToPoint == SWU)
 
@@ -213,13 +213,13 @@ void mapToG1_hashCheck(ep_t p, const uint8_t *msg, int len) {
 const uint64_t a1_data[6] = { 
     0x5cf428082d584c1d, 0x98936f8da0e0f97f, 0xd8e8981aefd881ac,
     0xb0ea985383ee66a8, 0x3d693a02c96d4982, 0x00144698a3b8e943,
-    };
+};
 
 
-const uint64_t b1_data[48] = { 
+const uint64_t b1_data[6] = { 
     0xd1cc48e98e172be0, 0x5a23215a316ceaa5, 0xa0b9c14fcef35ef5,
     0x2016c1f0f24f4070, 0x018b12e8753eee3b, 0x12e2908d11688030, 
-    };
+};
 
 // check if (U/V) is a square, return 1 if yes, 0 otherwise 
 // if 1 is returned, out contains sqrt(U/V)
@@ -231,15 +231,16 @@ int quotient_sqrt(fp_t out, const fp_t u, const fp_t v) {
     fp_sqr(out, v);                  // V^2
     fp_mul(tmp, u, v);               // UV
     fp_mul(out, out, tmp);           // UV^3
-    fp_exp(out, out, &bls_prec.p_3div4);        // (UV^3)^((p-3)/4)
+    fp_exp(out, out, &bls_prec->p_3div4);        // (UV^3)^((p-3)/4)
     fp_mul(out, out, tmp);           // UV(UV^3)^((p-3)/4)
 
     fp_sqr(tmp, out);     // out^2
     fp_mul(tmp, tmp, v);  // out^2 * V
     fp_sub(tmp, tmp, u);   // out^2 * V - U
 
+    int res = fp_cmp_dig(tmp, 0)==RLC_EQ;
     fp_free(&tmp);
-    return fp_cmp_dig(tmp, 0)==RLC_EQ;
+    return res;
 }
 
 
@@ -247,7 +248,7 @@ int quotient_sqrt(fp_t out, const fp_t u, const fp_t v) {
 // using optimized non-constant-time SWU impl
 // p point is in Jacobian coordinates
 static inline void mapToE1_swu(ep_st* p, const fp_t t) {
-    const int tmp_len = 5;
+    const int tmp_len = 6;
     fp_t* fp_tmp = (fp_t*) malloc(tmp_len*sizeof(fp_t));
     for (int i=0; i<tmp_len; i++) fp_new(&fp_tmp[i]);
 
@@ -257,11 +258,11 @@ static inline void mapToE1_swu(ep_st* p, const fp_t t) {
     fp_sub(fp_tmp[1], fp_tmp[0], fp_tmp[1]);  // t^2 - t^4
     fp_set_dig(fp_tmp[3], 1);
     fp_sub(fp_tmp[2], fp_tmp[3], fp_tmp[1]);        // t^4 - t^2 + 1
-    fp_mul(fp_tmp[2], fp_tmp[2], bls_prec.b1);     // N = b * (t^4 - t^2 + 1)                
-    fp_mul(fp_tmp[1], fp_tmp[1], bls_prec.a1);     // D = a * (t^2 - t^4)                    
+    fp_mul(fp_tmp[2], fp_tmp[2], bls_prec->b1);     // N = b * (t^4 - t^2 + 1)                
+    fp_mul(fp_tmp[1], fp_tmp[1], bls_prec->a1);     // D = a * (t^2 - t^4)                    
     if (fp_cmp_dig(fp_tmp[1], 0) == RLC_EQ) {
         // t was 0, -1, 1, so num is b and den is 0; set den to -a, because -b/a is square in Fp
-        fp_neg_basic(fp_tmp[1], bls_prec.a1);
+        fp_neg_basic(fp_tmp[1], bls_prec->a1);
     }
 
     // compute numerator and denominator of g(X0(t)) = U / V 
@@ -269,10 +270,10 @@ static inline void mapToE1_swu(ep_st* p, const fp_t t) {
     // V = D^3
     fp_sqr(fp_tmp[3], fp_tmp[1]);              // D^2
     fp_mul(fp_tmp[4], fp_tmp[2], fp_tmp[3]);  // N * D^2
-    fp_mul(fp_tmp[4], fp_tmp[4], bls_prec.a1);      // a * N * D^2
+    fp_mul(fp_tmp[4], fp_tmp[4], bls_prec->a1);      // a * N * D^2
                                                    
     fp_mul(fp_tmp[3], fp_tmp[3], fp_tmp[1]);  // V = D^3
-    fp_mul(fp_tmp[5], fp_tmp[3], bls_prec.b1);      // b1 * D^3
+    fp_mul(fp_tmp[5], fp_tmp[3], bls_prec->b1);      // b1 * D^3
     fp_add(fp_tmp[4], fp_tmp[4], fp_tmp[5]);   // a1 * N * D^2 + b1 * D^3
                                                    
     fp_sqr(fp_tmp[5], fp_tmp[2]);              // N^2
@@ -286,7 +287,7 @@ static inline void mapToE1_swu(ep_st* p, const fp_t t) {
         fp_mul(fp_tmp[5], fp_tmp[5], t);           // t^3 * sqrtCand
         fp_mul(fp_tmp[2], fp_tmp[2], fp_tmp[0]);  // b * t^2 * (t^4 - t^2 + 1)
         fp_neg_basic(fp_tmp[2], fp_tmp[2]);        // N = - b * t^2 * (t^4 - t^2 + 1)
-    } else if (dv_cmp(bls_prec.p_1div2, t, FP_DIGITS) ==  RLC_LT) {
+    } else if (dv_cmp(bls_prec->p_1div2, t, FP_DIGITS) ==  RLC_LT) {
         // g(X0(t)) was square and t is negative, so negate y
         fp_neg_basic(fp_tmp[5], fp_tmp[5]);  // negate y because t is negative
     }
@@ -461,29 +462,29 @@ static inline void eval_iso11(ep_st* r, const ep_st*  p) {
 
     // y = Ny/Dy
     // compute Dy
-    compute_map_zvals(bls_prec.iso_Dy, fp_tmp + 17, ELLP_Dy_LEN, fp_tmp);     // k_(15-i) Z^(2i)
+    compute_map_zvals(bls_prec->iso_Dy, fp_tmp + 17, ELLP_Dy_LEN, fp_tmp);     // k_(15-i) Z^(2i)
     fp_add(fp_tmp[16], p->x, fp_tmp[ELLP_Dy_LEN - 1]);        // X + k_14 Z^2 
     hornerPolynomial(fp_tmp[16], p->x, ELLP_Dy_LEN - 2, fp_tmp);    // Horner for the rest
     fp_mul(fp_tmp[15], fp_tmp[16], fp_tmp[31]);                    // Dy * Z^2
     fp_mul(fp_tmp[15], fp_tmp[15], p->z);                           // Dy * Z^3
 
     // compute Ny
-    compute_map_zvals(bls_prec.iso_Ny, fp_tmp + 17, ELLP_Ny_LEN - 1, fp_tmp); // k_(15-i) Z^(2i)
-    fp_mul(fp_tmp[16], p->x, bls_prec.iso_Ny[ELLP_Ny_LEN - 1]);      // k_15 * X
+    compute_map_zvals(bls_prec->iso_Ny, fp_tmp + 17, ELLP_Ny_LEN - 1, fp_tmp); // k_(15-i) Z^(2i)
+    fp_mul(fp_tmp[16], p->x, bls_prec->iso_Ny[ELLP_Ny_LEN - 1]);      // k_15 * X
     fp_add(fp_tmp[16], fp_tmp[16], fp_tmp[ELLP_Ny_LEN - 2]);  // k_15 * X + k_14 Z^2
     hornerPolynomial(fp_tmp[16], p->x, ELLP_Ny_LEN - 3, fp_tmp);     // Horner for the rest
     fp_mul(fp_tmp[16], fp_tmp[16], p->y);                           // Ny * Y
     
     // x = Nx/Dx
     // compute Dx
-    compute_map_zvals(bls_prec.iso_Dx, fp_tmp + 22, ELLP_Dx_LEN, fp_tmp);         // k_(10-i) Z^(2i)
+    compute_map_zvals(bls_prec->iso_Dx, fp_tmp + 22, ELLP_Dx_LEN, fp_tmp);         // k_(10-i) Z^(2i)
     fp_add(fp_tmp[14], p->x, fp_tmp[ELLP_Dx_LEN - 1]);  // X + k_9 Z^2 
     hornerPolynomial(fp_tmp[14], p->x, ELLP_Dx_LEN - 2, fp_tmp);    // Horner for the rest
     fp_mul(fp_tmp[14], fp_tmp[14], fp_tmp[31]);                    // Dx * Z^2
 
     // compute Nx
-    compute_map_zvals(bls_prec.iso_Nx, fp_tmp + 21, ELLP_Nx_LEN - 1, fp_tmp);      // k_(11-i) Z^(2i)
-    fp_mul(fp_tmp[13], p->x, bls_prec.iso_Nx[ELLP_Nx_LEN - 1]);   // k_11 * X
+    compute_map_zvals(bls_prec->iso_Nx, fp_tmp + 21, ELLP_Nx_LEN - 1, fp_tmp);      // k_(11-i) Z^(2i)
+    fp_mul(fp_tmp[13], p->x, bls_prec->iso_Nx[ELLP_Nx_LEN - 1]);   // k_11 * X
     fp_add(fp_tmp[13], fp_tmp[13], fp_tmp[ELLP_Nx_LEN - 2]);  // k_11 * X + k_10 * Z^2
     hornerPolynomial(fp_tmp[13], p->x, ELLP_Nx_LEN - 3, fp_tmp);      // Dy: Horner for the rest
 
@@ -529,12 +530,10 @@ void mapToG1_opswu(ep_st* p, const uint8_t *msg, int len) {
         fp_prime_conv(t1, &tmp);
         bn_read_bin(&tmp, msg + len/2, len - len/2);
         fp_prime_conv(t2, &tmp);
-
         bn_free(&tmp);
 
         ep_st p_temp;
         ep_new(&p_temp);
-
         mapToE1_swu(&p_temp, t1); // map to E1
         mapToE1_swu(p, t2); // map to E1
         ep_add_projc(p, p, &p_temp);

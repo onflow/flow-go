@@ -75,18 +75,20 @@ typedef struct prec_ {
 // Most of the functions are written for ALLOC=AUTO not ALLOC=DYNAMIC
 
 // bls core
-ctx_t*  _relic_init_BLS12_381();
-int     _getSignatureLengthBLS_BLS12381();
-int     _getPubKeyLengthBLS_BLS12381();
-int     _getPrKeyLengthBLS_BLS12381(); 
-void    _G1scalarPointMult(ep_st*, const ep_st*, const bn_st*);
-void    _G2scalarGenMult(ep2_st*, const bn_st*);
-void    _blsSign(byte*, const bn_st*, const byte*, const int);
-int     _blsVerify(const ep2_st *, const byte*, const byte*, const int);
-void    _ep_read_bin_compact(ep_st*, const byte *, const int);
-void    _ep_write_bin_compact(byte *, const ep_st *,  const int);
-void    _ep2_read_bin_compact(ep2_st* , const byte *,  const int);
-void    _ep2_write_bin_compact(byte *, const ep2_st *,  const int);
+ctx_t*   relic_init_BLS12_381();
+prec_st* init_precomputed_data_BLS12_381();
+void     precomputed_data_set(prec_st* p);
+int      _getSignatureLengthBLS_BLS12381();
+int      _getPubKeyLengthBLS_BLS12381();
+int      _getPrKeyLengthBLS_BLS12381(); 
+void     _G1scalarPointMult(ep_st*, const ep_st*, const bn_st*);
+void     _G2scalarGenMult(ep2_st*, const bn_st*);
+void     _blsSign(byte*, const bn_st*, const byte*, const int);
+int      _blsVerify(const ep2_st *, const byte*, const byte*, const int);
+void     _ep_read_bin_compact(ep_st*, const byte *, const int);
+void     _ep_write_bin_compact(byte *, const ep_st *,  const int);
+void     _ep2_read_bin_compact(ep2_st* , const byte *,  const int);
+void     _ep2_write_bin_compact(byte *, const ep2_st *,  const int);
 
 void    mapToG1_swu(ep_t, const uint8_t *, const int);
 void    mapToG1_hashCheck(ep_t p, const uint8_t *msg, int len);
