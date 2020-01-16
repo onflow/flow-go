@@ -38,7 +38,7 @@ func main() {
 		}).
 		GenesisHandler(func(node *cmd.FlowNodeBuilder, genesis *flow.Block) {
 			// TODO We boldly assume that if a genesis is being written than a storage tree is also empty
-			initialStateCommitment := flow.StateCommitment(ledgerStorage.LatestStateCommitment())
+			initialStateCommitment := ledgerStorage.LatestStateCommitment()
 
 			err := stateCommitments.Persist(genesis.ID(), &initialStateCommitment)
 			node.MustNot(err).Msg("could not store initial state commitment for genesis block")
