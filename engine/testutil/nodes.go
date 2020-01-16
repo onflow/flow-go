@@ -152,6 +152,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis 
 	ls, err := ledger.NewTrieStorage(levelDB)
 	require.NoError(t, err)
 
+	initialStateCommitment := ls.LatestStateCommitment()
+
+	err = commitmentsStorage.Persist(genesis.ID(), &initialStateCommitment)
+	require.NoError(t, err)
+
 	execState := state.NewExecutionState(ls, commitmentsStorage)
 	blockExec := executor.NewBlockExecutor(vm, execState)
 
