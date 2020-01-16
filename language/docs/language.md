@@ -5327,7 +5327,7 @@ pub contract ExampleContract: InterfaceExample {
     pub resource Composite: InterfaceExample.NestedInterface {
     }
 }
-
+```
 
 ## Events
 
