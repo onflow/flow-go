@@ -326,7 +326,7 @@ type IncorrectArgumentLabelError struct {
 func (e *IncorrectArgumentLabelError) Error() string {
 	expected := "none"
 	if e.ExpectedArgumentLabel != "" {
-		expected = fmt.Sprintf(`%s`, e.ExpectedArgumentLabel)
+		expected = e.ExpectedArgumentLabel
 	}
 	return fmt.Sprintf(
 		"incorrect argument label: expected `%s`, got `%s`",
@@ -1934,14 +1934,14 @@ func (e *InvalidTransactionFieldAccessModifierError) EndPosition() ast.Position 
 	return e.Pos.Shifted(length - 1)
 }
 
-// InvalidTransactionPrepareParameterType
+// InvalidTransactionPrepareParameterTypeError
 
-type InvalidTransactionPrepareParameterType struct {
-	Type  Type
-	Range ast.Range
+type InvalidTransactionPrepareParameterTypeError struct {
+	Type Type
+	ast.Range
 }
 
-func (e *InvalidTransactionPrepareParameterType) Error() string {
+func (e *InvalidTransactionPrepareParameterTypeError) Error() string {
 	return fmt.Sprintf(
 		"prepare parameter must be of type `%s`, not `%s`",
 		&AccountType{},
@@ -1949,7 +1949,7 @@ func (e *InvalidTransactionPrepareParameterType) Error() string {
 	)
 }
 
-func (*InvalidTransactionPrepareParameterType) isSemanticError() {}
+func (*InvalidTransactionPrepareParameterTypeError) isSemanticError() {}
 
 // InvalidNestedDeclarationError
 
