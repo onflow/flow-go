@@ -25,7 +25,7 @@ func (uv *UnsignedVote) BytesForSig() []byte {
 	bytesForSig := make([]byte, 0, length)
 
 	bytesForSig = append(bytesForSig, viewBytes...)
-	bytesForSig = append(bytesForSig, uv.BlockMRH[:]...)
+	bytesForSig = append(bytesForSig, uv.BlockMRH...)
 	bytesForSig = append(bytesForSig, voteStrBytes...)
 
 	return bytesForSig
