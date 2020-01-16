@@ -1619,13 +1619,32 @@ Arithmetic operations on the signed integer types `Int8`, `Int16`, `Int32`, `Int
 and on the unsigned integer types `UInt8`, `UInt16`, `UInt32`, `UInt64`
 do not cause values to overflow or underflow.
 
-```cadence,file=operator-times.cdc
+```cadence,file=operator-add-overflow.cdc
+let a: UInt8 = 255
+
+// Error: The result `256` does not fit in the range of `UInt8`,
+// thus a fatal overflow error is raised and the program aborts
+//
+let b = a + 1
+```
+
+```cadence,file=operator-times-overflow.cdc
 let a: Int8 = 100
 let b: Int8 = 100
 
 // Error: The result `10000` does not fit in the range of `Int8`,
 // thus a fatal overflow error is raised and the program aborts
+//
 let c = a * b
+```
+
+```cadence,file=operator-unary-negate-overflow.cdc
+let a: Int8 = -128
+
+// Error: The result `128` does not fit in the range of `Int8`,
+// thus a fatal overflow error is raised and the program aborts
+//
+let b = -a
 ```
 
 Arithmetic operations on the unsigned integer types `Word8`, `Word6`, `Word32`, `Word64`
@@ -1656,19 +1675,6 @@ Similarly, for the minimum value 0, subtracting 1 wraps around and results in th
 ```cadence
 let b: Word8 = 0
 b - 1  // is `255`
-```
-
-Signed integers are also affected by overflow. In a signed integer, the first bit is used for the sign. This leaves 7 bits for the actual value for an 8-bit signed integer, i.e., the range of values is -128 (binary 10000000) to 127 (01111111). Subtracting 1 from -128 results in 127.
-
-```cadence
-//   10000000 = -128
-// -        1
-// = 01111111 = 127
-```
-
-```cadence
-let c: Word8 = -128
-c - 1  // is `127`
 ```
 
 ### Logical Operators
