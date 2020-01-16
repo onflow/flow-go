@@ -122,6 +122,5 @@ func (u *GRPCUnderlay) StreamQueueService(saq messages.MessageReceiver_StreamQue
 			return fmt.Errorf("handle call back has not been set")
 		}
 		u.onReceive(peer.Addr.String(), req.Payload)
-		return nil
 	}
 }

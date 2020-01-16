@@ -61,13 +61,13 @@ func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 }
 
 func CollectionFixture(n int) flow.Collection {
-	transactions := make([]flow.TransactionBody, 0, n)
+	transactions := make([]*flow.TransactionBody, 0, n)
 
 	for i := 0; i < n; i++ {
 		tx := TransactionFixture(func(t *flow.Transaction) {
 			t.Nonce = rand.Uint64()
 		})
-		transactions = append(transactions, tx.TransactionBody)
+		transactions = append(transactions, &tx.TransactionBody)
 	}
 
 	return flow.Collection{Transactions: transactions}
@@ -99,6 +99,31 @@ func ExecutionResultFixture() flow.ExecutionResult {
 	}
 }
 
+func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
+	return func(ra *flow.ResultApproval) {
+		ra.ResultApprovalBody.ExecutionResultID = id
+	}
+}
+
+func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) flow.ResultApproval {
+	approval := flow.ResultApproval{
+		ResultApprovalBody: flow.ResultApprovalBody{
+			ExecutionResultID:    IdentifierFixture(),
+			AttestationSignature: SignatureFixture(),
+			ChunkIndexList:       nil,
+			Proof:                nil,
+			Spocks:               nil,
+		},
+		VerifierSignature: SignatureFixture(),
+	}
+
+	for _, apply := range opts {
+		apply(&approval)
+	}
+
+	return approval
+}
+
 func StateCommitmentFixture() flow.StateCommitment {
 	var state = make([]byte, 20)
 	_, _ = rand.Read(state[0:20])
@@ -117,6 +142,13 @@ func IdentifierFixture() flow.Identifier {
 	var id flow.Identifier
 	_, _ = rand.Read(id[:])
 	return id
+}
+
+// WithRole adds a role to an identity fixture.
+func WithRole(role flow.Role) func(*flow.Identity) {
+	return func(id *flow.Identity) {
+		id.Role = role
+	}
 }
 
 // IdentityFixture returns a node identity.

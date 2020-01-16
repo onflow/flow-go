@@ -11,19 +11,19 @@ type VertexMock struct {
 	id    []byte
 	level uint64
 
-	parentId    []byte
+	parentID    []byte
 	parentLevel uint64
 }
 
 func (v *VertexMock) VertexID() []byte         { return v.id }
 func (v *VertexMock) Level() uint64            { return v.level }
-func (v *VertexMock) Parent() ([]byte, uint64) { return v.parentId, v.parentLevel }
+func (v *VertexMock) Parent() ([]byte, uint64) { return v.parentID, v.parentLevel }
 
-func NewVertexMock(vertexId string, vertexLevel uint64, parentId string, parentLevel uint64) *VertexMock {
+func NewVertexMock(vertexID string, vertexLevel uint64, parentID string, parentLevel uint64) *VertexMock {
 	return &VertexMock{
-		id:          []byte(vertexId),
+		id:          []byte(vertexID),
 		level:       vertexLevel,
-		parentId:    []byte(parentId),
+		parentID:    []byte(parentID),
 		parentLevel: parentLevel,
 	}
 }
@@ -345,6 +345,6 @@ func children2List(it *VertexIterator) []*VertexMock {
 	return l
 }
 
-func toVertexInfo(vertexId string, vertexLevel uint64) ([]byte, uint64) {
-	return []byte(vertexId), vertexLevel
+func toVertexInfo(vertexID string, vertexLevel uint64) ([]byte, uint64) {
+	return []byte(vertexID), vertexLevel
 }

@@ -30,16 +30,16 @@ require (
 	github.com/magiconair/properties v1.8.1
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/pkg/errors v0.8.1
-	github.com/prometheus/client_golang v1.1.0
+	github.com/prometheus/client_golang v1.3.0
 	github.com/rs/zerolog v1.15.0
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/goleveldb v1.0.1-0.20190923125748-758128399b1d
-	github.com/whyrusleeping/go-logging v0.0.0-20170515211332-0457bb6b88fc
-	go.uber.org/atomic v1.4.0
+	github.com/whyrusleeping/go-logging v0.0.1
+	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20191219195013-becbf705a915
 	google.golang.org/grpc v1.26.0
-	zombiezen.com/go/capnproto2 v2.17.0+incompatible
+	zombiezen.com/go/capnproto2 v2.18.0+incompatible
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1

@@ -165,7 +165,7 @@ spec:
       node: collection
       env: staging
       version: v1
-
+  podManagementPolicy: Parallel
   template:
     metadata:
       annotations:

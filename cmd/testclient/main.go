@@ -3,64 +3,76 @@ package main
 import (
 	"context"
 	"crypto/rand"
-	"fmt"
+	"log"
+	"os"
+	"os/signal"
 	"time"
 
-	"github.com/dapperlabs/flow-go-sdk"
+	"github.com/spf13/pflag"
+
+	sdk "github.com/dapperlabs/flow-go-sdk"
 	"github.com/dapperlabs/flow-go-sdk/client"
 	"github.com/dapperlabs/flow-go-sdk/keys"
-	"github.com/spf13/pflag"
 )
 
 var (
-	targetAddr      string
-	numTransactions int
+	targetAddr string
+	txPerSec   int
 )
 
 func main() {
-	pflag.StringVarP(&targetAddr, "target-addr", "t", "localhost:9001", "address of the collection node to connect to")
-	pflag.IntVarP(&numTransactions, "num-transactions", "n", 5, "number of transactions to send")
-	pflag.Parse()
+	pflag.StringVarP(&targetAddr, "target-address", "t", "localhost:9001", "address of the collection node to connect to")
+	pflag.IntVarP(&txPerSec, "transaction-rate", "r", 1, "number of transactions to send per second")
 
-	fmt.Println("server addr: ", targetAddr)
-	fmt.Println("num transactions: ", numTransactions)
+	pflag.Parse()
 
 	c, err := client.New(targetAddr)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	// Generate key
 	seed := make([]byte, 40)
-	rand.Read(seed)
+	_, _ = rand.Read(seed)
 	key, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA2_256, seed)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	for i := 0; i < numTransactions; i++ {
-		time.Sleep(time.Second)
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt)
 
-		tx := flow.Transaction{
-			Script:             []byte("fun main() {}"),
-			ReferenceBlockHash: []byte{1, 2, 3, 4},
-			Nonce:              uint64(i + 1),
-			ComputeLimit:       10,
-			PayerAccount:       flow.RootAddress,
+	nonce := uint64(0)
+	for {
+
+		select {
+
+		case <-time.After(time.Second / time.Duration(txPerSec)):
+
+			nonce++
+
+			tx := sdk.Transaction{
+				Script:             []byte("fun main() {}"),
+				ReferenceBlockHash: []byte{1, 2, 3, 4},
+				Nonce:              nonce,
+				ComputeLimit:       10,
+				PayerAccount:       sdk.RootAddress,
+			}
+
+			sig, err := keys.SignTransaction(tx, key)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			tx.AddSignature(sdk.RootAddress, sig)
+
+			err = c.SendTransaction(context.Background(), tx)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+		case <-sig:
+			os.Exit(0)
 		}
-
-		sig, err := keys.SignTransaction(tx, key)
-		if err != nil {
-			fmt.Println("failed to sign transaction: ", err)
-			continue
-		}
-		tx.AddSignature(flow.RootAddress, sig)
-
-		err = c.SendTransaction(context.Background(), tx)
-		if err != nil {
-			fmt.Println("failed to send transaction: ", err)
-			continue
-		}
-
 	}
 }

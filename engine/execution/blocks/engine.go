@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution/execution"
+	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -166,7 +166,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	}
 
 	emptyCompleteBlock := &execution.CompleteBlock{
-		Block:               *block,
+		Block:               block,
 		CompleteCollections: make(map[flow.Identifier]*execution.CompleteCollection),
 	}
 
