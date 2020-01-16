@@ -126,8 +126,8 @@ func (eh *EventHandler) onReceiveBlockProposal(blockProposal *types.BlockProposa
 		eh.processIncorporatedBlock(incorporatedBlock)
 	}
 
-	myVote, producedVoteSuccess := eh.voter.VoteIfVotable(blockProposal, eh.paceMaker.CurView())
-	if !producedVoteSuccess {
+	myVote, votable := eh.voter.ProduceVoteIfVotable(blockProposal, eh.paceMaker.CurView())
+	if !votable {
 		// TODO: log this
 		return
 	}

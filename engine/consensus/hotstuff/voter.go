@@ -14,7 +14,7 @@ type Voter struct {
 	lastVotedView uint64
 }
 
-func (v *Voter) VoteIfVotable(bp *types.BlockProposal, curView uint64) (*types.Vote, bool) {
+func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*types.Vote, bool) {
 	if !v.isConActor {
 		// TODO: log this reason
 		return nil, false
