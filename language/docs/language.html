@@ -230,6 +230,11 @@
             <ul>
               <li><a href="#deploying-and-updating-contracts">Deploying and Updating Contracts</a></li>
               <li><a href="#contract-interfaces">Contract Interfaces</a></li>
+            </ul>
+          </li>
+          <li>
+            <p><a href="#events">Events</a></p>
+            <ul>
               <li><a href="#emitting-events">Emitting events</a></li>
             </ul>
           </li>
@@ -778,7 +783,7 @@
             <code>AnyStruct</code> is the top type of all non-resource types,
             i.e., all non-resource types are a subtype of it.
           </p>
-          <p><code>AnyResource</code> is the top type of all resource types.</p>
+          <p><code>@AnyResource</code> is the top type of all resource types.</p>
           <pre><code class="language-cadence"><span style="color: #008000">// Declare a variable that has the type `AnyStruct`.</span><span>
 </span><span style="color: #008000">// Any non-resource typed value can be assigned to it, for example an integer,</span><span>
 </span><span style="color: #008000">// but not resoure-typed values.</span><span>
@@ -824,7 +829,7 @@
           </p>
           <pre><code class="language-cadence"><span style="color: #008000">// Declare a variable that has the type `AnyStruct`.</span><span>
 </span><span style="color: #008000">// The initial value is an integer,</span><span>
-</span><span style="color: #008000">// but the variable  still has the explicit type `AnyStruct`.</span><span>
+</span><span style="color: #008000">// but the variable still has the explicit type `AnyStruct`.</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #0000FF">let</span><span style="color: #000000"> a: </span><span style="color: #0000FF">AnyStruct</span><span style="color: #000000"> = </span><span style="color: #09885A">1</span><span>
 </span><span>
@@ -4208,7 +4213,7 @@
           Currently, all types must be declared public and are visible to all code.
           However, that does not imply that any code may instantiate the type:
           only code within the <a href="#contracts">contract</a> in which the type is declared
-          is allowed to create instances of the type. See the section for more information.
+          is allowed to create instances of the type. See the linked contracts section for more information.
         </p>
         <pre><code class="language-cadence,file=access-control-globals.cdc"><span style="color: #008000">// Declare a private constant, inaccessible/invisible in outer scope.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -5232,7 +5237,7 @@
         <p>
           Contracts can be created, updated, and deleted using the <code>setCode</code>
           function of <a href="#accounts">accounts</a>.
-          Contract creation also possible when creating accounts,
+          Contract creation is also possible when creating accounts,
           i.e. when using the <code>Account</code> constructor.
           This functionality is covered in the <a href="#deploying-and-updating-contracts">next section</a>
         </p>
@@ -5290,7 +5295,7 @@
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>
         <p>
-          This contract could be deployed to an account and live permenantely
+          This contract could be deployed to an account and live permanently
           in the contract storage. Transactions and other contracts
           can interact with contracts by importing them at the beginning
           of a transaction or contract definition.
@@ -5518,34 +5523,32 @@
 </span><span style="color: #000000">    </span><span style="color: #0000FF">pub</span><span style="color: #000000"> </span><span style="color: #0000FF">resource</span><span style="color: #000000"> Composite: InterfaceExample.NestedInterface {</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
-</span><span>
-</span><span>
-</span><span style="color: #000000">## Events</span><span>
-</span><span>
-</span><span style="color: #000000">Events are special values that can be emitted during the execution of a program.</span><span>
-</span><span>
-</span><span style="color: #000000">An event type can be declared with the `event` keyword.</span><span>
-</span><span>
-</span><span style="color: #000000">```cadence</span><span>
-</span><span style="color: #000000">event FooEvent(x: Int, y: Int)</span><span>
 </span></code></pre>
-          <p>
-            The syntax of an event declaration is similar to that of
-            a <a href="#function-declarations">function declaration</a>;
-            events contain named parameters, each of which has an optional argument label.
-            Types that can be in event definitions are restricted
-            to booleans, strings, integer, and arrays or dictionaries of these types.
-          </p>
-          <p>
-            Events can only be declared within a <a href="#contracts">contract</a> body.
-            Events cannot be declared globally or within resource or struct types.
-          </p>
-          <p>
-            Resource argument types are not allowed because when a resource is used as
-            an argument, it is moved. A piece of code would not want to move a resource
-            to emit an event, so it is not allowed as a parameter.
-          </p>
-          <pre><code class="language-cadence"><span style="color: #008000">// Invalid: An event cannot be declared globally</span><span>
+        </section>
+      </section>
+      <section>
+        <h2 id="events"><a href="#events" aria-hidden="true"><span class="icon icon-link"></span></a>Events</h2>
+        <p>Events are special values that can be emitted during the execution of a program.</p>
+        <p>An event type can be declared with the <code>event</code> keyword.</p>
+        <pre><code class="language-cadence"><span style="color: #000000">event FooEvent(x: Int, y: Int)</span><span>
+</span></code></pre>
+        <p>
+          The syntax of an event declaration is similar to that of
+          a <a href="#function-declarations">function declaration</a>;
+          events contain named parameters, each of which has an optional argument label.
+          Types that can be in event definitions are restricted
+          to booleans, strings, integer, and arrays or dictionaries of these types.
+        </p>
+        <p>
+          Events can only be declared within a <a href="#contracts">contract</a> body.
+          Events cannot be declared globally or within resource or struct types.
+        </p>
+        <p>
+          Resource argument types are not allowed because when a resource is used as
+          an argument, it is moved. A piece of code would not want to move a resource
+          to emit an event, so it is not allowed as a parameter.
+        </p>
+        <pre><code class="language-cadence"><span style="color: #008000">// Invalid: An event cannot be declared globally</span><span>
 </span><span style="color: #008000">//</span><span>
 </span><span style="color: #000000">event GlobalEvent(field: Int)</span><span>
 </span><span>
@@ -5561,7 +5564,6 @@
 </span><span style="color: #000000">}</span><span>
 </span><span>
 </span></code></pre>
-        </section>
         <section>
           <h3 id="emitting-events"><a href="#emitting-events" aria-hidden="true"><span class="icon icon-link"></span></a>Emitting events</h3>
           <p>To emit an event from a program, use the <code>emit</code> statement:</p>
