@@ -329,9 +329,8 @@ func (e *Engine) checkPendingReceipts() {
 					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 					Msg("could not get complete execution result")
 				continue
-			} else {
-				e.receipts.Rem(receipt.ID())
 			}
+			e.receipts.Rem(receipt.ID())
 		}
 	}
 }
