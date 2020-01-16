@@ -232,9 +232,9 @@ func TransactionBodyFixture() flow.TransactionBody {
 	}
 }
 
-// CompleteResultApprovalFixture returns complete result approval with an
+// CompleteExecutionResultFixture returns complete execution result with an
 // execution receipt referencing the block/collections.
-func CompleteResultApprovalFixture() verification.CompleteExecutionResult {
+func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 	coll := CollectionFixture(3)
 	guarantee := coll.Guarantee()
 

@@ -23,17 +23,23 @@ import (
 // TestSuite contains the context of a verifier engine test using mocked components.
 type TestSuite struct {
 	suite.Suite
-	net                *module.Network    // used as an instance of networking layer for the mock engine
-	state              *protocol.State    // used as a mock protocol state of nodes for verification engine
-	ss                 *protocol.Snapshot // used as a mock representation of the snapshot of system (part of State)
-	me                 *module.Local      // used as a mock representation of the mock verification node (owning the verifier engine)
-	collectionsConduit *network.Conduit   // used as a mock instance of conduit for collection channel
-	receiptsConduit    *network.Conduit   // used as mock instance of conduit for execution channel
-	verifierEng        *network.Engine
-	blocks             *mempool.Blocks
-	receipts           *mempool.Receipts
-	collections        *mempool.Collections
-	// resources
+	net   *module.Network
+	state *protocol.State
+	ss    *protocol.Snapshot
+	me    *module.Local
+	// mock conduit for requesting/receiving collections
+	collectionsConduit *network.Conduit
+	// mock conduit for receiving receipts
+	receiptsConduit *network.Conduit
+	// mock verifier engine, should be called when all dependent resources
+	// for a receipt have been received by the ingest engine.
+	verifierEng *network.Engine
+	// mock mempools used by the ingest engine, valid resources should be added
+	// to these when they are received from an appropriate node role.
+	blocks      *mempool.Blocks
+	receipts    *mempool.Receipts
+	collections *mempool.Collections
+	// resources fixtures
 	collection flow.Collection
 	block      flow.Block
 	receipt    flow.ExecutionReceipt
@@ -58,7 +64,7 @@ func (suite *TestSuite) SetupTest() {
 	suite.receipts = &mempool.Receipts{}
 	suite.collections = &mempool.Collections{}
 
-	complete := unittest.CompleteResultApprovalFixture()
+	complete := unittest.CompleteExecutionResultFixture()
 	suite.collection = complete.Collections[0]
 	suite.block = complete.Block
 	suite.receipt = complete.Receipt

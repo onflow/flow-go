@@ -22,10 +22,11 @@ import (
 
 type TestSuite struct {
 	suite.Suite
-	net     *module.Network
-	state   *protocol.State
-	ss      *protocol.Snapshot
-	me      *module.Local
+	net   *module.Network
+	state *protocol.State
+	ss    *protocol.Snapshot
+	me    *module.Local
+	// mock conduit for submitting result approvals
 	conduit *network.Conduit
 }
 
@@ -63,14 +64,14 @@ func (suite *TestSuite) TestInvalidSender() {
 
 	suite.me.On("NodeID").Return(myID)
 
-	completeRA := unittest.CompleteResultApprovalFixture()
+	completeRA := unittest.CompleteExecutionResultFixture()
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)
 }
 
 func (suite *TestSuite) TestIncorrectResult() {
-	// TODO
+	// TODO when ERs are verified
 	suite.T().Skip()
 }
 
@@ -79,7 +80,7 @@ func (suite *TestSuite) TestVerify() {
 
 	myID := unittest.IdentifierFixture()
 	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
-	completeRA := unittest.CompleteResultApprovalFixture()
+	completeER := unittest.CompleteExecutionResultFixture()
 
 	suite.me.On("NodeID").Return(myID).Once()
 	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil).Once()
@@ -87,13 +88,14 @@ func (suite *TestSuite) TestVerify() {
 		On("Submit", testifymock.Anything, consensusNodes.Get(0).NodeID).
 		Return(nil).
 		Run(func(args testifymock.Arguments) {
+			// check that the approval matches the input execution result
 			ra, ok := args[0].(*flow.ResultApproval)
 			suite.Assert().True(ok)
-			suite.Assert().Equal(completeRA.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
+			suite.Assert().Equal(completeER.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
 		}).
 		Once()
 
-	err := eng.Process(myID, &completeRA)
+	err := eng.Process(myID, &completeER)
 	suite.Assert().Nil(err)
 
 	suite.me.AssertExpectations(suite.T())
@@ -101,6 +103,10 @@ func (suite *TestSuite) TestVerify() {
 	suite.conduit.AssertExpectations(suite.T())
 }
 
+// checks that an execution result received by the verification node results in:
+// - request of the appropriate collection
+// - formation of a complete execution result by the ingest engine
+// - broadcast of a matching result approval to consensus nodes
 func TestHappyPath(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
@@ -116,16 +122,16 @@ func TestHappyPath(t *testing.T) {
 	verNode := testutil.VerificationNode(t, hub, verID, genesis)
 	colNode := testutil.CollectionNode(t, hub, colID, genesis)
 
-	completeRA := unittest.CompleteResultApprovalFixture()
+	completeER := unittest.CompleteExecutionResultFixture()
 
-	// we mock the consensus node with a generic node and mocked engine
+	// mock the consensus node with a generic node and mocked engine
 	conNode := testutil.GenericNode(t, hub, conID, genesis)
 	conEngine := new(network.Engine)
 	conEngine.On("Process", verID.NodeID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			ra, ok := args[1].(*flow.ResultApproval)
 			assert.True(t, ok)
-			assert.Equal(t, completeRA.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
+			assert.Equal(t, completeER.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
 		}).
 		Return(nil).
 		Once()
@@ -133,19 +139,19 @@ func TestHappyPath(t *testing.T) {
 	assert.Nil(t, err)
 
 	// assume the verification node has received the block
-	err = verNode.Blocks.Add(&completeRA.Block)
+	err = verNode.Blocks.Add(&completeER.Block)
 	assert.Nil(t, err)
 
 	// inject the collection into the collection node mempool
-	err = colNode.Collections.Store(&completeRA.Collections[0])
+	err = colNode.Collections.Store(&completeER.Collections[0])
 	assert.Nil(t, err)
 
 	// send the ER from execution to verification node
-	err = verNode.ReceiptsEngine.Process(exeID.NodeID, &completeRA.Receipt)
+	err = verNode.ReceiptsEngine.Process(exeID.NodeID, &completeER.Receipt)
 	assert.Nil(t, err)
 
 	// the receipt should be added to the mempool
-	assert.True(t, verNode.Receipts.Has(completeRA.Receipt.ID()))
+	assert.True(t, verNode.Receipts.Has(completeER.Receipt.ID()))
 
 	// flush the collection request
 	verNet, ok := hub.GetNetwork(verID.NodeID)
@@ -158,7 +164,7 @@ func TestHappyPath(t *testing.T) {
 	colNet.FlushAll()
 
 	// the collection should be stored in the mempool
-	assert.True(t, verNode.Collections.Has(completeRA.Collections[0].ID()))
+	assert.True(t, verNode.Collections.Has(completeER.Collections[0].ID()))
 
 	// flush the result approval broadcast
 	verNet.FlushAll()
