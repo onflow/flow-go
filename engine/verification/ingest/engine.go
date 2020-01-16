@@ -33,6 +33,7 @@ type Engine struct {
 	receipts           mempool.Receipts
 	blocks             mempool.Blocks
 	collections        mempool.Collections
+	chunkStates        mempool.ChunkStates
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -45,6 +46,7 @@ func New(
 	receipts mempool.Receipts,
 	blocks mempool.Blocks,
 	collections mempool.Collections,
+	chunkStates mempool.ChunkStates,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -56,6 +58,7 @@ func New(
 		verifierEng: verifierEng,
 		blocks:      blocks,
 		collections: collections,
+		chunkStates: chunkStates,
 	}
 
 	var err error
@@ -190,9 +193,9 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	return nil
 }
 
-// handleCollection handles receipt of a new collection, either via push or after
-// a request. It ensures the sender is valid and notifies the main verification
-// process.
+// handleCollection handles receipt of a new collection, either via push or
+// after a request. It adds the collection to the mempool and checks for
+// pending receipts that are ready for verification.
 func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
 
 	e.log.Info().
@@ -219,6 +222,9 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 	return nil
 }
 
+// handleExecutionStateResponse handles responses to our requests for execution
+// states for particular chunks. It adds the state to the mempool and checks for
+// pending receipts that are ready for verification.
 func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *messages.ExecutionStateResponse) error {
 
 	e.log.Info().
@@ -235,7 +241,10 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 		return fmt.Errorf("invalid role for receiving execution state: %s", id.Role)
 	}
 
-	// TODO store state in mempool
+	err = e.chunkStates.Add(&res.State)
+	if err != nil {
+		return fmt.Errorf("could not add execution state (chunk_id=%s): %w", res.State.ChunkID, err)
+	}
 
 	e.checkPendingReceipts()
 
