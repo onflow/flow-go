@@ -20,15 +20,13 @@ func TestGRPCUnderlay_Start_Twice(t *testing.T) {
 	t.Skipf(" Skipping this test since the underlay functionality is no longer needed")
 	var protocol gossip.Underlay = &GRPCUnderlay{}
 	require.NotNil(t, protocol, "Protocol is nil")
-	protocol.Handle(func(sender string, msg []byte) {})
+	require.NoError(t, protocol.Handle(func(sender string, msg []byte) {}))
 	address := ":0"
 	listener, err := net.Listen("tcp4", address)
 	require.NoError(t, err)
-	go func() {
-		require.NoError(t, protocol.StartWithListener(listener))
-	}()
+	go func() { require.NoError(t, protocol.StartWithListener(listener)) }()
 	time.Sleep(time.Duration(1))
-	defer protocol.Stop()
+	defer func() { require.NoError(t, protocol.Stop()) }()
 	checkClientConnection(t, listener.Addr().String())
 	assert.Error(t, protocol.StartWithListener(listener))
 }
@@ -38,13 +36,11 @@ func TestGRPCUnderlay_Start_Stop(t *testing.T) {
 	t.Skipf(" Skipping this test since the underlay functionality is no longer needed")
 	var protocol gossip.Underlay = &GRPCUnderlay{}
 	require.NotNil(t, protocol, "Protocol is nil")
-	protocol.Handle(func(sender string, msg []byte) {})
+	require.NoError(t, protocol.Handle(func(sender string, msg []byte) {}))
 	address := ":0"
 	listener, err := net.Listen("tcp4", address)
 	require.NoError(t, err)
-	go func() {
-		require.NoError(t, protocol.StartWithListener(listener))
-	}()
+	go func() { require.NoError(t, protocol.StartWithListener(listener)) }()
 	checkClientConnection(t, listener.Addr().String())
 	assert.NoError(t, protocol.Stop())
 }
@@ -69,11 +65,14 @@ func TestGRPCUnderlay_Handle(t *testing.T) {
 		require.NoError(t, protocol.StartWithListener(listener))
 	}()
 	checkClientConnection(t, listener.Addr().String())
-	defer protocol.Stop()
+	defer func() { require.NoError(t, protocol.Stop()) }()
 	conn, err := createClientConnection(listener.Addr().String())
 	assert.NoError(t, err)
+
 	client := messages.NewMessageReceiverClient(conn)
 	stream, err := client.StreamQueueService(context.Background())
+	assert.NoError(t, err)
+
 	messagePayload := "hello"
 	gossipMessage := &messages.GossipMessage{Payload: []byte(messagePayload)}
 	err = stream.Send(gossipMessage)
@@ -95,7 +94,11 @@ func checkClientConnection(t *testing.T, address string) {
 	timeout := 5 * time.Millisecond
 	assert.Eventually(t, func() bool {
 		con, err := net.DialTimeout("tcp", address, timeout)
-		defer con.Close()
+		defer func() {
+			if err := con.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 		return con != nil && err == nil
 	}, 4*timeout, 2*timeout)
 }

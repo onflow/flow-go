@@ -1,7 +1,7 @@
 ignoreGeneratedHeader = false
-severity = "warning"
+severity = "error"
 confidence = 0.8
-errorCode = 0
+errorCode = 1
 warningCode = 0
 
 [rule.blank-imports]
@@ -12,7 +12,6 @@ warningCode = 0
 [rule.error-strings]
 [rule.error-naming]
 [rule.if-return]
-[rule.increment-decrement]
 [rule.var-naming]
 [rule.var-declaration]
 [rule.package-comments]
@@ -26,3 +25,6 @@ warningCode = 0
 [rule.superfluous-else]
 [rule.unreachable-code]
 [rule.redefines-builtin-id]
+
+# This will be activated at a later date.
+# [rule.unused-parameter]

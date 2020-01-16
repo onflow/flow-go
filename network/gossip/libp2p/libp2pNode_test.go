@@ -234,9 +234,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int) (nodes []*P2PNode) {
 
 // StopNodes stop all nodes in the input slice
 func (l *LibP2PNodeTestSuite) StopNodes(nodes []*P2PNode) {
-	if nodes != nil {
-		for _, n := range nodes {
-			assert.NoError(l.Suite.T(), n.Stop())
-		}
+	for _, n := range nodes {
+		assert.NoError(l.Suite.T(), n.Stop())
 	}
 }
