@@ -219,6 +219,29 @@ func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collectio
 	return nil
 }
 
+func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *messages.ExecutionStateResponse) error {
+
+	e.log.Info().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("chunk_id", logging.ID(res.ChunkID)).
+		Msg("execution state received")
+
+	id, err := e.state.Final().Identity(originID)
+	if err != nil {
+		return fmt.Errorf("invalid origin id (%s): %w", id, err)
+	}
+
+	if id.Role != flow.RoleExecution {
+		return fmt.Errorf("invalid role for receiving execution state: %s", id.Role)
+	}
+
+	// TODO store state in mempool
+
+	e.checkPendingReceipts()
+
+	return nil
+}
+
 // requestCollection submits a request for the given collection to collection nodes.
 func (e *Engine) requestCollection(collID flow.Identifier) error {
 
