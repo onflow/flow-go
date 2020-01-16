@@ -25,9 +25,11 @@ type Engine struct {
 }
 
 func New(logger zerolog.Logger, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
+	log := logger.With().Str("engine", "receipts").Logger()
+
 	eng := Engine{
 		unit:  engine.NewUnit(),
-		log:   logger,
+		log:   log,
 		state: state,
 		me:    me,
 	}
@@ -118,6 +120,11 @@ func (e *Engine) onExecutionResult(originID flow.Identifier, result *flow.Execut
 }
 
 func (e *Engine) broadcastExecutionReceipt(receipt *flow.ExecutionReceipt) error {
+	e.log.Debug().
+		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
+		Hex("receipt_id", logging.Entity(receipt)).
+		Msg("broadcasting execution receipt")
+
 	identities, err := e.state.Final().Identities(identity.HasRole(flow.RoleConsensus, flow.RoleVerification))
 	if err != nil {
 		return fmt.Errorf("could not get consensus and verification identities: %w", err)

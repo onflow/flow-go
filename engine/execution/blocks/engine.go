@@ -35,9 +35,11 @@ type Engine struct {
 }
 
 func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections, state protocol.State, executionEngine network.Engine, mempool *Mempool) (*Engine, error) {
+	log := logger.With().Str("engine", "blocks").Logger()
+
 	eng := Engine{
 		unit:        engine.NewUnit(),
-		log:         logger,
+		log:         log,
 		me:          me,
 		blocks:      blocks,
 		collections: collections,
@@ -185,6 +187,11 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 				if err != nil {
 					return fmt.Errorf("cannot save collection-block mapping: %w", err)
 				}
+
+				e.log.Debug().
+					Hex("block_id", logging.Entity(block)).
+					Hex("collection_id", logging.ID(guarantee.ID())).
+					Msg("requesting collection")
 
 				err = e.collectionConduit.Submit(messages.CollectionRequest{ID: guarantee.ID()}, collectionIdentifiers...)
 				if err != nil {
