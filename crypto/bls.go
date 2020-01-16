@@ -27,14 +27,17 @@ func hashToArbitraryLength(data []byte, outLen int, alg Hasher) Hash {
 	dataToHash := make([]byte, len(data)+1)
 	copy(dataToHash[:1], data)
 	i := 0
-	for ; i < outLen/alg.Size(); i++ {
-		dataToHash[0] = byte(i)
+	for ; i < outLen; i += alg.Size() {
+		// update the counter byte
+		dataToHash[0] = byte(i / alg.Size())
 		// copy the round output to the overall output
-		copy(h[i*alg.Size():], alg.ComputeHash(dataToHash))
+		copy(h[i:], alg.ComputeHash(dataToHash))
 	}
-	dataToHash[0] = byte(i)
+	i -= alg.Size()
+	// update the counter byte
+	dataToHash[0] = byte(i / alg.Size())
 	// copy the last round bytes to the overall output
-	copy(h[i*alg.Size():], alg.ComputeHash(dataToHash)[:outLen%alg.Size()])
+	copy(h[i:], alg.ComputeHash(dataToHash)[:outLen-i])
 	return h
 }
 

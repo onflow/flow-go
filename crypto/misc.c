@@ -40,7 +40,7 @@ void _ep2_print(char* s, ep2_st* p) {
 void fp_read_raw(fp_t a, const dig_t *raw, int len) {
      bn_t t;
      bn_null(t); 
-     if (len != FP_DIGITS) {
+     if (len != Fp_DIGITS) {
          THROW(ERR_NO_BUFFER);
      }
       TRY {

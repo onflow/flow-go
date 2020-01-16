@@ -6,15 +6,12 @@
 #include "relic.h"
 #include "misc.h"
 
-// fp_t type size in Relic
-#define FP_DIGITS (RLC_FP_DIGS + RLC_PAD(RLC_FP_BYTES)/(RLC_DIG / 8))
-
 // Fp length
-#define Fp_BITS  381
-#define Fr_BITS  255
-
-#define Fp_BYTES BITS_TO_BYTES(Fp_BITS)
-#define Fr_BYTES BITS_TO_BYTES(Fr_BITS)
+#define Fp_BITS   381
+#define Fr_BITS   255
+#define Fp_BYTES  BITS_TO_BYTES(Fp_BITS)
+#define Fp_DIGITS BITS_TO_DIGITS(Fp_BITS)
+#define Fr_BYTES  BITS_TO_BYTES(Fr_BITS)
 
 #define G1_BYTES (2*Fp_BYTES)
 #define G2_BYTES (4*Fp_BYTES)

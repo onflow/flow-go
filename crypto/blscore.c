@@ -45,7 +45,7 @@ prec_st* init_precomputed_data_BLS12_381() {
             fp_read_raw(bls_prec->iso_Ny[i], iso_Ny_data[i], 6);
     #endif
     // (p-3)/4
-    bn_read_raw(&bls_prec->p_3div4, fp_prime_get(), FP_DIGITS);
+    bn_read_raw(&bls_prec->p_3div4, fp_prime_get(), Fp_DIGITS);
     bn_sub_dig(&bls_prec->p_3div4, &bls_prec->p_3div4, 3);
     bn_rsh(&bls_prec->p_3div4, &bls_prec->p_3div4, 2);
     // (p-1)/2

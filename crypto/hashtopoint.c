@@ -287,7 +287,7 @@ static inline void mapToE1_swu(ep_st* p, const fp_t t) {
         fp_mul(fp_tmp[5], fp_tmp[5], t);           // t^3 * sqrtCand
         fp_mul(fp_tmp[2], fp_tmp[2], fp_tmp[0]);  // b * t^2 * (t^4 - t^2 + 1)
         fp_neg_basic(fp_tmp[2], fp_tmp[2]);        // N = - b * t^2 * (t^4 - t^2 + 1)
-    } else if (dv_cmp(bls_prec->p_1div2, t, FP_DIGITS) ==  RLC_LT) {
+    } else if (dv_cmp(bls_prec->p_1div2, t, Fp_DIGITS) ==  RLC_LT) {
         // g(X0(t)) was square and t is negative, so negate y
         fp_neg_basic(fp_tmp[5], fp_tmp[5]);  // negate y because t is negative
     }
@@ -548,7 +548,7 @@ void mapToG1_opswu(ep_st* p, const uint8_t *msg, int len) {
 #endif
 
 // computes a hashing to G1 
-// this is a testing test function
+// this is a testing function
 ep_st* _hashToG1(const byte* data, const int len) {
     ep_st* h = (ep_st*) malloc(sizeof(ep_st));
     ep_new(h);
