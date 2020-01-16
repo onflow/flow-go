@@ -20,7 +20,7 @@ type PaceMaker interface {
 	// The parameter `nextPrimary` indicates to the PaceMaker whether or not this replica is the
 	// primary for the NEXT view (taking curView as reference).
 	// True corresponds to this replica being the next primary.
-	UpdateCurViewWithBlock(block *types.BlockProposal, nextPrimary bool) (*types.NewViewEvent, bool)
+	UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool)
 
 	// OnTimeout is called when a timeout, which was previously created by the PaceMaker, has
 	// looped through the event loop.

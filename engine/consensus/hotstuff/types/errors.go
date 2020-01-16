@@ -1,9 +1,9 @@
 package types
 
-type FinalizationFatalError struct {
+type ErrorFinalizationFatal struct {
 }
 
-func (e *FinalizationFatalError) FinalizationFatalError() string {
+func (e *ErrorFinalizationFatal) Error() string {
 	panic("implement me")
 }
 
