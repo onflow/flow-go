@@ -305,7 +305,7 @@ func (checker *Checker) checkInvocationArgument(argument *ast.Argument, paramete
 
 	if !argumentType.IsInvalidType() &&
 		!parameterType.IsInvalidType() &&
-		!checker.IsTypeCompatible(argument.Expression, argumentType, parameterType) {
+		!checker.checkTypeCompatibility(argument.Expression, argumentType, parameterType) {
 
 		checker.report(
 			&TypeMismatchError{

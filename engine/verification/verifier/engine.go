@@ -1,16 +1,17 @@
 package verifier
 
 import (
-	"sync"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/verification/storage"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -20,35 +21,53 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit  *engine.Unit      // used to control startup/shutdown
-	log   zerolog.Logger    // used to log relevant actions
-	con   network.Conduit   // used for inter-node communication within the network
-	me    module.Local      // used to access local node information
-	state protocol.State    // used to access the  protocol state
-	store storage.ERMempool // used to maintain an in-memory store for execution receipts
-	wg    sync.WaitGroup    // used to keep track of the number of threads
-	mu    sync.Mutex
+	unit               *engine.Unit        // used to control startup/shutdown
+	log                zerolog.Logger      // used to log relevant actions
+	collectionsConduit network.Conduit     // used to get collections from collection nodes
+	receiptsConduit    network.Conduit     // used to get execution receipts from execution nodes
+	approvalsConduit   network.Conduit     // used to propagate result approvals
+	me                 module.Local        // used to access local node information
+	state              protocol.State      // used to access the  protocol state
+	receipts           mempool.Receipts    // used to store execution receipts in memory
+	blocks             mempool.Blocks      // used to store blocks in memory
+	collections        mempool.Collections // used to store collections in memory
 }
 
-// New creates and returns a new instance of a verifier engine
-func New(loger zerolog.Logger, net module.Network, state protocol.State, me module.Local) (*Engine, error) {
+// New creates and returns a new instance of a verifier engine.
+func New(
+	log zerolog.Logger,
+	net module.Network,
+	state protocol.State,
+	me module.Local,
+	receipts mempool.Receipts,
+	blocks mempool.Blocks,
+	collections mempool.Collections,
+) (*Engine, error) {
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   loger,
-		state: state,
-		me:    me,
-		store: *storage.New(),
-		wg:    sync.WaitGroup{},
-		mu:    sync.Mutex{},
+		unit:        engine.NewUnit(),
+		log:         log,
+		state:       state,
+		me:          me,
+		receipts:    receipts,
+		blocks:      blocks,
+		collections: collections,
 	}
 
-	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.VerificationVerifier, e)
+	var err error
+	e.collectionsConduit, err = net.Register(engine.CollectionProvider, e)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register engine")
+		return nil, fmt.Errorf("could not register engine on collection provider channel: %w", err)
 	}
 
-	e.con = con
+	e.receiptsConduit, err = net.Register(engine.ReceiptProvider, e)
+	if err != nil {
+		return nil, fmt.Errorf("could not register engine on execution provider channel: %w", err)
+	}
+
+	e.approvalsConduit, err = net.Register(engine.ApprovalProvider, e)
+	if err != nil {
+		return nil, fmt.Errorf("could not register engine on approval provider channel: %w", err)
+	}
 
 	return e, nil
 }
@@ -99,48 +118,122 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // The origin ID indicates the node which originally submitted the event to
 // the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch ev := event.(type) {
+	switch resource := event.(type) {
+	case *flow.Block:
+		return e.handleBlock(resource)
 	case *flow.ExecutionReceipt:
-		return e.onExecutionReceipt(originID, ev)
+		return e.handleExecutionReceipt(originID, resource)
+	case *flow.Collection:
+		return e.handleCollection(originID, resource)
+	case *messages.CollectionResponse:
+		return e.handleCollection(originID, &resource.Collection)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// onExecutionReceipt receives an execution receipt (exrcpt), verifies that and emits
+// handleExecutionReceipt receives an execution receipt (exrcpt), verifies that and emits
 // a result approval upon successful verification
-func (e *Engine) onExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
-	// todo: add id of the ER once gets available
+func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+
 	e.log.Info().
-		Hex("origin_id", originID[:]).
+		Hex("origin_id", logging.ID(originID)).
+		Hex("receipt_id", logging.Entity(receipt)).
 		Msg("execution receipt received")
 
-	// todo: correctness check for execution receipts
+	// TODO: correctness check for execution receipts
 
 	// validating identity of the originID
 	id, err := e.state.Final().Identity(originID)
 	if err != nil {
-		// todo: potential attack on authenticity
-		return errors.Errorf("invalid origin id %s", originID[:])
+		// TODO: potential attack on authenticity
+		return fmt.Errorf("invalid origin id (%s): %w", originID[:], err)
 	}
 
 	// validating role of the originID
 	// an execution receipt should be either coming from an execution node through the
 	// Process method, or from the current verifier node itself through the Submit method
-	if id.Role != flow.Role(flow.RoleExecution) && id.NodeID != e.me.NodeID() {
-		// todo: potential attack on integrity
-		return errors.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", id.NodeID, id.Role)
+	if id.Role != flow.RoleExecution {
+		// TODO: potential attack on integrity
+		return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", id.NodeID, id.Role)
 	}
 
 	// storing the execution receipt in the store of the engine
-	isUnique := e.store.Put(receipt)
-	if !isUnique {
-		return errors.New("received duplicate execution receipt")
+	// this will fail if the receipt already exists in the store
+	err = e.receipts.Add(receipt)
+	if err != nil {
+		return fmt.Errorf("could not store execution receipt: %w", err)
 	}
 
-	// starting the core verification in a separate thread
-	e.wg.Add(1)
-	go e.verify(originID, receipt)
+	// TODO start a verification job asyncronously.
+	// For now, we do it synchronously and submit a RA before checking anything
+	e.verify(originID, receipt)
+
+	return nil
+}
+
+// handleBlock handles an incoming block.
+func (e *Engine) handleBlock(block *flow.Block) error {
+
+	e.log.Info().
+		Hex("block_id", logging.Entity(block)).
+		Uint64("block_number", block.Number).
+		Msg("received block")
+
+	err := e.blocks.Add(block)
+	if err != nil {
+		return fmt.Errorf("could not store block: %w", err)
+	}
+
+	return nil
+}
+
+// handleCollection handles receipt of a new collection, either via push or after
+// a request. It ensures the sender is valid and notifies the main verification
+// process.
+func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
+
+	e.log.Info().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("collection_id", logging.Entity(coll)).
+		Msg("collection received")
+
+	id, err := e.state.Final().Identity(originID)
+	if err != nil {
+		return fmt.Errorf("invalid origin id (%s): %w", id, err)
+	}
+
+	if id.Role != flow.RoleCollection {
+		return fmt.Errorf("invalid role for receiving collection: %s", id.Role)
+	}
+
+	err = e.collections.Add(coll)
+	if err != nil {
+		return fmt.Errorf("could not add collection to mempool: %w", err)
+	}
+
+	// TODO notify of new collection
+
+	return nil
+}
+
+// requestCollection submits a request for the given collection to collection nodes.
+func (e *Engine) requestCollection(collID flow.Identifier) error {
+
+	collNodes, err := e.state.Final().Identities(identity.HasRole(flow.RoleCollection))
+	if err != nil {
+		return fmt.Errorf("could not load collection node identities: %w", err)
+	}
+
+	req := &messages.CollectionRequest{
+		ID: collID,
+	}
+
+	// TODO we should only submit to cluster which owns the collection
+	err = e.collectionsConduit.Submit(req, collNodes.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not submit request for collection (id=%s): %w", collID, err)
+	}
 
 	return nil
 }
@@ -152,8 +245,41 @@ func (e *Engine) onExecutionReceipt(originID flow.Identifier, receipt *flow.Exec
 // If the submission was successful it generates a result approval for the incoming ExecutionReceipt
 // and submits that to the network
 func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt) {
-	// todo core verification happens here
 
+	result := receipt.ExecutionResult
+	blockID := result.BlockID
+
+	log := e.log.With().
+		Hex("block_id", logging.ID(blockID)).
+		Hex("result_id", logging.Entity(result)).
+		Logger()
+
+	// TODO temporary as log uses are commented
+	_ = log
+
+	// request block if not available
+	// TODO handle this case
+	//block, err := e.blocks.Get(blockID)
+	//if err != nil {
+	//	// TODO should request the block here
+	//	log.Error().
+	//		Err(err).
+	//		Msg("could not get block")
+	//	return
+	//}
+
+	// request collection if not available
+	// TODO handle this case
+	//for _, guarantee := range block.Guarantees {
+	//	err := e.requestCollection(guarantee.ID())
+	//	if err != nil {
+	//		log.Error().
+	//			Err(err).
+	//			Msgf("could not request collection (id=%s): %w", logging.Entity(guarantee), err)
+	//	}
+	//}
+
+	// TODO for now, just submit the result approval without checking anything
 	// extracting list of consensus nodes' ids
 	consIDs, err := e.state.Final().
 		Identities(identity.HasRole(flow.RoleConsensus))
@@ -162,12 +288,11 @@ func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt
 		e.log.Error().
 			Str("error: ", err.Error()).
 			Msg("could not load the consensus nodes ids")
-		e.wg.Done()
 		return
 	}
 
 	// emitting a result approval to all consensus nodes
-	resApprov := &flow.ResultApproval{
+	approval := &flow.ResultApproval{
 		ResultApprovalBody: flow.ResultApprovalBody{
 			ExecutionResultID:    receipt.ExecutionResult.ID(),
 			AttestationSignature: nil,
@@ -179,26 +304,10 @@ func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt
 	}
 
 	// broadcasting result approval to all consensus nodes
-	e.broadcastResultApproval(resApprov, &consIDs)
-
-}
-
-// broadcastResultApproval receives a ResultApproval and list of consensus nodes IDs, and broadcasts
-// the result approval to the consensus nodes
-func (e *Engine) broadcastResultApproval(resApprov *flow.ResultApproval, consIDs *flow.IdentityList) {
-	err := e.con.Submit(resApprov, consIDs.NodeIDs()...)
+	err = e.approvalsConduit.Submit(approval, consIDs.NodeIDs()...)
 	if err != nil {
-		// todo this error needs more advance handling after MVP
 		e.log.Error().
-			Str("error: ", err.Error()).
-			Msg("could not push the result approval to the network")
-		e.wg.Done()
-		return
+			Err(err).
+			Msg("could not submit result approval to consensus nodes")
 	}
-
-	// todo: add a hex for hash of the result approval
-	e.log.Info().
-		Strs("target_ids", logging.IDs(consIDs.NodeIDs())).
-		Msg("result approval propagated")
-	e.wg.Done()
 }

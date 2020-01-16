@@ -4,10 +4,10 @@ import "encoding/binary"
 
 type UnsignedVote struct {
 	View     uint64
-	BlockMRH MRH
+	BlockMRH []byte
 }
 
-func NewUnsignedVote(view uint64, blockMRH MRH) *Vote {
+func NewUnsignedVote(view uint64, blockMRH []byte) *Vote {
 	return &Vote{
 		View:     view,
 		BlockMRH: blockMRH,

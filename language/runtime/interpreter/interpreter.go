@@ -661,7 +661,7 @@ func (interpreter *Interpreter) prepareInvoke(
 	}
 
 	// NOTE: can't fill argument types, as they are unknown
-	trampoline = functionValue.invoke(Invocation{
+	trampoline = functionValue.Invoke(Invocation{
 		Arguments:   preparedArguments,
 		Interpreter: interpreter,
 	})
@@ -1853,7 +1853,7 @@ func (interpreter *Interpreter) functionValueInvocationTrampoline(
 		Location: interpreter.Checker.Location,
 	}
 
-	return function.invoke(Invocation{
+	return function.Invoke(Invocation{
 		Arguments:     argumentCopies,
 		ArgumentTypes: argumentTypes,
 		Location:      location,
@@ -2209,7 +2209,7 @@ func (interpreter *Interpreter) declareCompositeValue(
 			if initializerFunction != nil {
 				// NOTE: arguments are already properly boxed by invocation expression
 
-				initializationTrampoline = initializerFunction.invoke(invocation)
+				initializationTrampoline = initializerFunction.Invoke(invocation)
 			}
 
 			return initializationTrampoline.
@@ -2445,24 +2445,49 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 	switch unwrappedTargetType.(type) {
 	case *sema.IntType:
 		return ConvertInt(value)
-	case *sema.Int8Type:
-		return ConvertInt8(value)
-	case *sema.Int16Type:
-		return ConvertInt16(value)
-	case *sema.Int32Type:
-		return ConvertInt32(value)
-	case *sema.Int64Type:
-		return ConvertInt64(value)
-	case *sema.UInt8Type:
-		return ConvertUInt8(value)
-	case *sema.UInt16Type:
-		return ConvertUInt16(value)
-	case *sema.UInt32Type:
-		return ConvertUInt32(value)
-	case *sema.UInt64Type:
-		return ConvertUInt64(value)
+
 	case *sema.AddressType:
 		return ConvertAddress(value)
+
+	// Int*
+	case *sema.Int8Type:
+		return ConvertInt8(value)
+
+	case *sema.Int16Type:
+		return ConvertInt16(value)
+
+	case *sema.Int32Type:
+		return ConvertInt32(value)
+
+	case *sema.Int64Type:
+		return ConvertInt64(value)
+
+	// UInt*
+	case *sema.UInt8Type:
+		return ConvertUInt8(value)
+
+	case *sema.UInt16Type:
+		return ConvertUInt16(value)
+
+	case *sema.UInt32Type:
+		return ConvertUInt32(value)
+
+	case *sema.UInt64Type:
+		return ConvertUInt64(value)
+
+	// Word*
+	case *sema.Word8Type:
+		return ConvertWord8(value)
+
+	case *sema.Word16Type:
+		return ConvertWord16(value)
+
+	case *sema.Word32Type:
+		return ConvertWord32(value)
+
+	case *sema.Word64Type:
+		return ConvertWord64(value)
+
 	default:
 		return value
 	}
@@ -2715,7 +2740,7 @@ func (interpreter *Interpreter) functionConditionsWrapper(
 					// NOTE: It is important to actually return the value returned
 					//   from the inner function, otherwise it is lost
 
-					return inner.invoke(invocation).
+					return inner.Invoke(invocation).
 						Map(func(returnValue interface{}) interface{} {
 							return functionReturn{returnValue.(Value)}
 						})
@@ -2884,7 +2909,7 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 				)
 
 				prepareTrampoline = More(func() Trampoline {
-					return prepare.invoke(invocation)
+					return prepare.Invoke(invocation)
 				})
 			}
 
@@ -2898,7 +2923,7 @@ func (interpreter *Interpreter) declareTransactionEntryPoint(declaration *ast.Tr
 				executeTrampoline = More(func() Trampoline {
 					invocationWithoutArguments := invocation
 					invocationWithoutArguments.Arguments = nil
-					return execute.invoke(invocationWithoutArguments)
+					return execute.Invoke(invocationWithoutArguments)
 				})
 			}
 

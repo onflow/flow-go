@@ -19,12 +19,11 @@ import (
 // link between collection nodes and consensus nodes and has a counterpart with
 // the same engine ID in the collection node.
 type Engine struct {
-	unit  *engine.Unit    // used to manage concurrency & shutdown
-	log   zerolog.Logger  // used to log relevant actions with context
-	con   network.Conduit // used to talk to other nodes on the network
-	prop  network.Engine  // used to process & propagate collections
-	state protocol.State  // used to access the  protocol state
-	me    module.Local    // used to access local node information
+	unit  *engine.Unit   // used to manage concurrency & shutdown
+	log   zerolog.Logger // used to log relevant actions with context
+	prop  network.Engine // used to process & propagate collections
+	state protocol.State // used to access the  protocol state
+	me    module.Local   // used to access local node information
 }
 
 // New creates a new collection propagation engine.
@@ -40,12 +39,10 @@ func New(log zerolog.Logger, net module.Network, prop network.Engine, state prot
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.CollectionProvider, e)
+	_, err := net.Register(engine.CollectionProvider, e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
-
-	e.con = con
 
 	return e, nil
 }
@@ -73,7 +70,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // a potential processing error internally when done.
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.process(originID, event)
 		if err != nil {
 			e.log.Error().Err(err).Msg("could not process submitted event")
 		}
@@ -111,11 +108,11 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_id", logging.ID(guarantee)).
-		Msg("guaranteed collection received")
+		Hex("collection_id", logging.Entity(guarantee)).
+		Msg("collection guarantee received")
 
 	// get the identity of the origin node, so we can check if it's a valid
-	// source for a guaranteed collection (usually collection nodes)
+	// source for a collection guarantee (usually collection nodes)
 	id, err := e.state.Final().Identity(originID)
 	if err != nil {
 		return errors.Wrap(err, "could not get origin node identity")
@@ -137,8 +134,8 @@ func (e *Engine) onCollectionGuarantee(originID flow.Identifier, guarantee *flow
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_id", logging.ID(guarantee)).
-		Msg("guaranteed collection forwarded")
+		Hex("collection_id", logging.Entity(guarantee)).
+		Msg("collection guarantee forwarded")
 
 	return nil
 }

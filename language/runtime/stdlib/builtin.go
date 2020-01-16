@@ -100,7 +100,67 @@ var PanicFunction = NewStandardLibraryFunction(
 			Message:  message.Str,
 			Location: invocation.Location,
 		})
-		return trampoline.Done{}
+	},
+	nil,
+)
+
+var ArrayFunction = NewStandardLibraryFunction(
+	"Array",
+	&sema.FunctionType{
+		Parameters: []*sema.Parameter{
+			{
+				Identifier:     "size",
+				TypeAnnotation: sema.NewTypeAnnotation(&sema.IntType{}),
+			},
+			{
+				Identifier: "generate",
+				TypeAnnotation: sema.NewTypeAnnotation(
+					&sema.FunctionType{
+						Parameters: []*sema.Parameter{
+							{
+								Identifier:     "index",
+								TypeAnnotation: sema.NewTypeAnnotation(&sema.IntType{}),
+							},
+						},
+						ReturnTypeAnnotation: sema.NewTypeAnnotation(&sema.AnyType{}),
+					},
+				),
+			},
+		},
+		ReturnTypeGetter: func(argumentTypes []sema.Type) sema.Type {
+			generateFunctionType := argumentTypes[1].(*sema.FunctionType)
+			elementType := generateFunctionType.ReturnTypeAnnotation.Type
+			return &sema.VariableSizedType{
+				Type: elementType,
+			}
+		},
+	},
+	func(invocation interpreter.Invocation) trampoline.Trampoline {
+		count := invocation.Arguments[0].(interpreter.IntegerValue).IntValue()
+		generate := invocation.Arguments[1].(interpreter.FunctionValue)
+
+		var elements []interpreter.Value
+
+		var step func(i int) trampoline.Trampoline
+		step = func(i int) trampoline.Trampoline {
+			if i >= count {
+				array := interpreter.NewArrayValueUnownedNonCopying(elements...)
+				return trampoline.Done{Result: array}
+			}
+
+			generateInvocation := invocation
+			generateInvocation.Arguments = []interpreter.Value{interpreter.NewIntValue(int64(i))}
+			generateInvocation.ArgumentTypes = []sema.Type{&sema.IntType{}}
+
+			return generate.Invoke(generateInvocation).
+				FlatMap(func(value interface{}) trampoline.Trampoline {
+					elements = append(elements, value.(interpreter.Value))
+
+					return step(i + 1)
+				})
+		}
+
+		return step(0)
 	},
 	nil,
 )
@@ -110,6 +170,7 @@ var PanicFunction = NewStandardLibraryFunction(
 var BuiltinFunctions = StandardLibraryFunctions{
 	AssertFunction,
 	PanicFunction,
+	ArrayFunction,
 }
 
 // LogFunction

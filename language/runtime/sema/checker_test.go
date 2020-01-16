@@ -119,3 +119,74 @@ func TestInterfaceType_ID(t *testing.T) {
 		assert.Equal(t, interfaceInInterface.ID(), TypeID("x.A.B.C"))
 	})
 }
+
+func TestFunctionSubtyping(t *testing.T) {
+
+	t.Run("((Int): Void) <: ((AnyStruct): Void)", func(t *testing.T) {
+		assert.False(t,
+			IsSubType(
+				&FunctionType{
+					Parameters: []*Parameter{
+						{
+							TypeAnnotation: NewTypeAnnotation(&IntType{}),
+						},
+					},
+				},
+				&FunctionType{
+					Parameters: []*Parameter{
+						{
+							TypeAnnotation: NewTypeAnnotation(&AnyStructType{}),
+						},
+					},
+				},
+			),
+		)
+	})
+
+	t.Run("((AnyStruct): Void) <: ((Int): Void)", func(t *testing.T) {
+		assert.True(t,
+			IsSubType(
+				&FunctionType{
+					Parameters: []*Parameter{
+						{
+							TypeAnnotation: NewTypeAnnotation(&AnyStructType{}),
+						},
+					},
+				},
+				&FunctionType{
+					Parameters: []*Parameter{
+						{
+							TypeAnnotation: NewTypeAnnotation(&IntType{}),
+						},
+					},
+				},
+			),
+		)
+	})
+
+	t.Run("((): Int) <: ((): AnyStruct)", func(t *testing.T) {
+		assert.True(t,
+			IsSubType(
+				&FunctionType{
+					ReturnTypeAnnotation: NewTypeAnnotation(&IntType{}),
+				},
+				&FunctionType{
+					ReturnTypeAnnotation: NewTypeAnnotation(&AnyStructType{}),
+				},
+			),
+		)
+	})
+
+	t.Run("((): Any) <: ((): Int)", func(t *testing.T) {
+		assert.False(t,
+			IsSubType(
+				&FunctionType{
+					ReturnTypeAnnotation: NewTypeAnnotation(&AnyStructType{}),
+				},
+				&FunctionType{
+					ReturnTypeAnnotation: NewTypeAnnotation(&IntType{}),
+				},
+			),
+		)
+	})
+}

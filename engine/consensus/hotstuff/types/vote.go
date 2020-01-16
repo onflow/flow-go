@@ -4,11 +4,11 @@ import "encoding/binary"
 
 type Vote struct {
 	View      uint64
-	BlockMRH  MRH
+	BlockMRH  []byte
 	Signature *Signature
 }
 
-func NewVote(view uint64, blockMRH MRH, sig *Signature) *Vote {
+func NewVote(view uint64, blockMRH []byte, sig *Signature) *Vote {
 	return &Vote{
 		View:      view,
 		BlockMRH:  blockMRH,

@@ -1,6 +1,6 @@
 package types
 
 type BlockProposalRequest struct {
-	BlockMRH MRH
+	BlockMRH []byte
 	View     uint64
 }
