@@ -107,8 +107,8 @@ importDeclaration
 access
     : /* Not specified */
     | Priv
-    | Pub
-    | PubSet
+    | Pub ('(' Set ')')?
+    | Access '(' (Self | Contract | Account | All) ')'
     ;
 
 compositeDeclaration
@@ -595,7 +595,12 @@ Post : 'post' ;
 
 Priv : 'priv' ;
 Pub : 'pub' ;
-PubSet : 'pub(set)' ;
+Set : 'set' ;
+
+Access : 'access' ;
+All : 'all' ;
+Self : 'self' ;
+Account : 'account' ;
 
 Return : 'return' ;
 
@@ -627,6 +632,14 @@ identifier
     | Create
     | Destroy
     | Contract
+    | Resource
+    | Struct
+    | Event
+    | All
+    | Access
+    | All
+    | Account
+    | Self
     ;
 
 Identifier

@@ -12,11 +12,13 @@ func _() {
 	_ = x[AccessPrivate-1]
 	_ = x[AccessPublic-2]
 	_ = x[AccessPublicSettable-3]
+	_ = x[AccessAccount-4]
+	_ = x[AccessContract-5]
 }
 
-const _Access_name = "AccessNotSpecifiedAccessPrivateAccessPublicAccessPublicSettable"
+const _Access_name = "AccessNotSpecifiedAccessPrivateAccessPublicAccessPublicSettableAccessAccountAccessContract"
 
-var _Access_index = [...]uint8{0, 18, 31, 43, 63}
+var _Access_index = [...]uint8{0, 18, 31, 43, 63, 76, 90}
 
 func (i Access) String() string {
 	if i < 0 || i >= Access(len(_Access_index)-1) {

@@ -127,10 +127,22 @@ func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
 		return ast.AccessPrivate
 
 	case ctx.Pub() != nil:
+		if ctx.Set() != nil {
+			return ast.AccessPublicSettable
+		}
 		return ast.AccessPublic
 
-	case ctx.PubSet() != nil:
-		return ast.AccessPublicSettable
+	case ctx.Self() != nil:
+		return ast.AccessPrivate
+
+	case ctx.All() != nil:
+		return ast.AccessPrivate
+
+	case ctx.Contract() != nil:
+		return ast.AccessContract
+
+	case ctx.Account() != nil:
+		return ast.AccessAccount
 
 	default:
 		return ast.AccessNotSpecified

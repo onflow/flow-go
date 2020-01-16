@@ -13,6 +13,8 @@ const (
 	AccessPrivate
 	AccessPublic
 	AccessPublicSettable
+	AccessAccount
+	AccessContract
 )
 
 var Accesses = []Access{
@@ -32,6 +34,10 @@ func (a Access) Keyword() string {
 		return "pub"
 	case AccessPublicSettable:
 		return "pub(set)"
+	case AccessAccount:
+		return "access(account)"
+	case AccessContract:
+		return "access(contract)"
 	}
 
 	panic(errors.NewUnreachableError())
@@ -47,6 +53,10 @@ func (a Access) Description() string {
 		return "public"
 	case AccessPublicSettable:
 		return "public settable"
+	case AccessAccount:
+		return "account"
+	case AccessContract:
+		return "contract"
 	}
 
 	panic(errors.NewUnreachableError())
