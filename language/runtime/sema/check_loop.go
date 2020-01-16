@@ -45,7 +45,18 @@ func (checker *Checker) reportResourceUsesInLoop(startPos, endPos ast.Position) 
 	for resources.Size() != 0 {
 		resource, info, resources = resources.FirstRest()
 
-		// only report if the variable was invalidated
+		// If the resource is a variable,
+		// only report an error if the variable was declared outside the loop
+
+		if variable, isVariable := resource.(*Variable); isVariable &&
+			variable.Pos != nil &&
+			(variable.Pos.Compare(startPos) > 0 && variable.Pos.Compare(endPos) < 0) {
+
+			continue
+		}
+
+		// Only report an error if the resource was invalidated
+
 		if info.Invalidations.IsEmpty() {
 			continue
 		}
@@ -53,7 +64,9 @@ func (checker *Checker) reportResourceUsesInLoop(startPos, endPos ast.Position) 
 		invalidations := info.Invalidations.All()
 
 		for _, usePosition := range info.UsePositions.AllPositions() {
-			// only report if the variable is inside the loop
+
+			// Only report an error if the use is inside the loop
+
 			if usePosition.Compare(startPos) < 0 ||
 				usePosition.Compare(endPos) > 0 {
 

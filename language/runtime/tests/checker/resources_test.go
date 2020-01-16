@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/cmd"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
@@ -3533,4 +3534,23 @@ func TestCheckInvalidResourceSelfMoveSwap(t *testing.T) {
 	errs := ExpectCheckerErrors(t, err, 1)
 
 	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
+}
+
+func TestCheckResourceCreationAndInvalidationInLoop(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {}
+
+      fun loop() {
+          var i = 0
+          while i < 10 {
+              let x <- create X()
+              destroy x
+              i = i + 1
+          }
+      }
+    `)
+
+	require.NoError(t, err)
 }
