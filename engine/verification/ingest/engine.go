@@ -272,7 +272,9 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 	return nil
 }
 
-func (e *Engine) requestState(chunkID flow.Identifier) error {
+// requestExecutionState submits a request for the state required by the
+// given chunk to execution nodes.
+func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 
 	exeNodes, err := e.state.Final().Identities(identity.HasRole(flow.RoleExecution))
 	if err != nil {
