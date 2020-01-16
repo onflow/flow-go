@@ -10,10 +10,12 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
+	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -61,9 +63,9 @@ func (suite *TestSuite) TestInvalidSender() {
 
 	suite.me.On("NodeID").Return(myID)
 
-	complete := unittest.CompleteResultApprovalFixture()
+	completeRA := unittest.CompleteResultApprovalFixture()
 
-	err := eng.Process(invalidID, &complete)
+	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)
 }
 
@@ -77,7 +79,7 @@ func (suite *TestSuite) TestVerify() {
 
 	myID := unittest.IdentifierFixture()
 	consensusNodes := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
-	complete := unittest.CompleteResultApprovalFixture()
+	completeRA := unittest.CompleteResultApprovalFixture()
 
 	suite.me.On("NodeID").Return(myID).Once()
 	suite.ss.On("Identities", testifymock.Anything).Return(consensusNodes, nil).Once()
@@ -87,14 +89,80 @@ func (suite *TestSuite) TestVerify() {
 		Run(func(args testifymock.Arguments) {
 			ra, ok := args[0].(*flow.ResultApproval)
 			suite.Assert().True(ok)
-			suite.Assert().Equal(complete.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
+			suite.Assert().Equal(completeRA.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
 		}).
 		Once()
 
-	err := eng.Process(myID, &complete)
+	err := eng.Process(myID, &completeRA)
 	suite.Assert().Nil(err)
 
 	suite.me.AssertExpectations(suite.T())
 	suite.ss.AssertExpectations(suite.T())
 	suite.conduit.AssertExpectations(suite.T())
+}
+
+func TestHappyPath(t *testing.T) {
+	hub := stub.NewNetworkHub()
+
+	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	conIDList := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
+	conID := conIDList.Get(0)
+
+	identities := flow.IdentityList{colID, conID, exeID, verID}
+	genesis := flow.Genesis(identities)
+
+	verNode := testutil.VerificationNode(t, hub, verID, genesis)
+	colNode := testutil.CollectionNode(t, hub, colID, genesis)
+
+	completeRA := unittest.CompleteResultApprovalFixture()
+
+	// we mock the consensus node with a generic node and mocked engine
+	conNode := testutil.GenericNode(t, hub, conID, genesis)
+	conEngine := new(network.Engine)
+	conEngine.On("Process", verID.NodeID, testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			ra, ok := args[1].(*flow.ResultApproval)
+			assert.True(t, ok)
+			assert.Equal(t, completeRA.Receipt.ExecutionResult.ID(), ra.ResultApprovalBody.ExecutionResultID)
+		}).
+		Return(nil).
+		Once()
+	_, err := conNode.Net.Register(engine.ApprovalProvider, conEngine)
+	assert.Nil(t, err)
+
+	// assume the verification node has received the block
+	err = verNode.Blocks.Add(&completeRA.Block)
+	assert.Nil(t, err)
+
+	// inject the collection into the collection node mempool
+	err = colNode.Collections.Store(&completeRA.Collections[0])
+	assert.Nil(t, err)
+
+	// send the ER from execution to verification node
+	err = verNode.ReceiptsEngine.Process(exeID.NodeID, &completeRA.Receipt)
+	assert.Nil(t, err)
+
+	// the receipt should be added to the mempool
+	assert.True(t, verNode.Receipts.Has(completeRA.Receipt.ID()))
+
+	// flush the collection request
+	verNet, ok := hub.GetNetwork(verID.NodeID)
+	assert.True(t, ok)
+	verNet.FlushAll()
+
+	// flush the collection response
+	colNet, ok := hub.GetNetwork(colID.NodeID)
+	assert.True(t, ok)
+	colNet.FlushAll()
+
+	// the collection should be stored in the mempool
+	assert.True(t, verNode.Collections.Has(completeRA.Collections[0].ID()))
+
+	// flush the result approval broadcast
+	verNet.FlushAll()
+
+	// assert that the RA was received
+	conEngine.AssertExpectations(t)
 }

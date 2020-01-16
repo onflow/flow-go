@@ -299,25 +299,39 @@ func (e *Engine) checkReceiptCollections(receipt *flow.ExecutionReceipt) bool {
 
 // getCompleteExecutionResult creates a complete execution result for a receipt
 // whose dependencies are all locally available.
-func (e *Engine) getCompleteExecutionResult(receipt *flow.ExecutionReceipt) *verification.CompleteExecutionResult {
+func (e *Engine) getCompleteExecutionResult(receipt *flow.ExecutionReceipt) (*verification.CompleteExecutionResult, error) {
 	// TODO
-	return nil
+	return &verification.CompleteExecutionResult{
+		Receipt: *receipt,
+	}, nil
 }
 
 // checkPendingReceipts checks all pending receipts in the mempool and verifies
 // any that are ready for verification.
 func (e *Engine) checkPendingReceipts() {
-	// TODO address race on this method
+	// TODO address race on this method - if called simultaneously, could double-verify
 	receipts := e.receipts.All()
 
 	for _, receipt := range receipts {
 		ready := e.checkReceiptCollections(receipt)
 		if ready {
 
-			res := e.getCompleteExecutionResult(receipt)
-			err := e.verifierEng.ProcessLocal(res)
+			res, err := e.getCompleteExecutionResult(receipt)
 			if err != nil {
-				// TODO log
+				e.log.Error().
+					Err(err).
+					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+					Msg("could not get complete execution result")
+				continue
+			}
+
+			err = e.verifierEng.ProcessLocal(res)
+			if err != nil {
+				e.log.Error().
+					Err(err).
+					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
+					Msg("could not get complete execution result")
+				continue
 			} else {
 				e.receipts.Rem(receipt.ID())
 			}
