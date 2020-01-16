@@ -1,13 +1,11 @@
-package execution
+package execution_test
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -28,18 +26,12 @@ func TestExecutionFlow(t *testing.T) {
 	exeID := unittest.IdentityFixture(func(id *flow.Identity) {
 		id.Role = flow.RoleExecution
 	})
-	// verID := unittest.IdentityFixture(func(id *flow.Identity) {
-	// 	id.Role = flow.RoleVerification
-	// })
 
 	identities := flow.IdentityList{colID, conID, exeID}
 
 	genesis := mock.Genesis(identities)
 
-	_ = testutil.CollectionNode(t, hub, colID, genesis)
-	_ = testutil.ConsensusNode(t, hub, conID, genesis)
 	exeNode := testutil.ExecutionNode(t, hub, exeID, genesis)
-	// verNode := testutil.VerificationNode(t, hub, verID, genesis)
 
 	defer func() {
 		exeNode.BadgerDB.Close()
@@ -54,53 +46,51 @@ func TestExecutionFlow(t *testing.T) {
 		Script: []byte("transaction { execute {} }"),
 	}
 
-	col := flow.Collection{Transactions: []flow.TransactionBody{tx1, tx2}}
+	transactions := []*flow.TransactionBody{&tx1, &tx2}
+
+	col := flow.Collection{Transactions: transactions}
 
 	guarantee := flow.CollectionGuarantee{
 		CollectionID: col.ID(),
 		Signatures:   nil,
 	}
 
-	content := flow.Content{
-		Guarantees: []*flow.CollectionGuarantee{&guarantee},
-	}
-
 	block := &flow.Block{
 		Header: flow.Header{
-			Number: 42,
+			ParentID: genesis.ID(),
+			Number:   42,
 		},
-		Content: content,
+		Content: flow.Content{
+			Guarantees: []*flow.CollectionGuarantee{&guarantee},
+		},
 	}
 
-	transactions := []*flow.TransactionBody{&tx1, &tx2}
+	// submit block from consensus node
+	exeNode.BlocksEngine.Submit(conID.NodeID, block)
 
-	executableBlock := &executor.ExecutableBlock{
-		Block: block,
-		Collections: []*executor.ExecutableCollection{
-			{
-				Guarantee:    &guarantee,
-				Transactions: transactions,
-			},
-		},
-		PreviousResultID: flow.ZeroID,
-	}
+	// wait for blocks engine to finish processing
+	exeNode.BlocksEngine.Wait()
 
-	err := exeNode.BlocksEngine.Process(flow.Identifier{42}, block)
-	assert.NoError(t, err)
-
-	err = exeNode.BlocksEngine.Process(flow.Identifier{84}, &messages.CollectionResponse{
+	// submit collection from collection node
+	exeNode.BlocksEngine.Submit(colID.NodeID, &messages.CollectionResponse{
 		Collection: col,
 	})
-	assert.NoError(t, err)
 
-	net, ok := hub.GetNetwork(exeNode.Me.NodeID())
-	require.True(t, ok)
+	// wait for blocks engine to finish processing
+	exeNode.BlocksEngine.Wait()
+
+	// wait for execution engine to finish processing
+	exeNode.ExecutionEngine.Wait()
 
 	// wait for receipt engine to finish processing
 	exeNode.ReceiptsEngine.Wait()
 
+	net, ok := hub.GetNetwork(exeNode.Me.NodeID())
+	require.True(t, ok)
+
 	var receipt *flow.ExecutionReceipt
 
+	// intercept execution receipt
 	net.FlushAllExcept(func(message *stub.PendingMessage) bool {
 		event, ok := message.Event.(*flow.ExecutionReceipt)
 		if ok {
@@ -113,31 +103,13 @@ func TestExecutionFlow(t *testing.T) {
 
 	require.NotNil(t, receipt)
 
-	view := exeNode.State.NewView(receipt.ExecutionResult.FinalStateCommitment)
+	// view := exeNode.State.NewView(receipt.ExecutionResult.FinalStateCommitment)
 
-	_, err = exeNode.VM.NewBlockContext(executableBlock.Block).ExecuteScript(view, []byte(`
-		pub fun main(): Int {
-		  return 5
-		}
-	`))
-}
-
-func makeRealBlock(n int) (flow.Block, []flow.Collection) {
-	colls := make([]flow.Collection, n)
-	collsGuarantees := make([]*flow.CollectionGuarantee, n)
-
-	for i, _ := range colls {
-		tx := unittest.TransactionBodyFixture()
-		colls[i].Transactions = []flow.TransactionBody{tx}
-
-		collsGuarantees[i] = &flow.CollectionGuarantee{
-			CollectionID: colls[i].ID(),
-		}
-	}
-
-	block := unittest.BlockFixture()
-	block.Guarantees = collsGuarantees
-	return block, colls
+	// _, err = exeNode.VM.NewBlockContext(block).ExecuteScript(view, []byte(`
+	// 	pub fun main(): Int {
+	// 	  return 5
+	// 	}
+	// `))
 }
 
 const counterScript = `
