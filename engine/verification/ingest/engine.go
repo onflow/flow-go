@@ -223,7 +223,7 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
-		Hex("chunk_id", logging.ID(res.ChunkID)).
+		Hex("chunk_id", logging.ID(res.State.ChunkID)).
 		Msg("execution state received")
 
 	id, err := e.state.Final().Identity(originID)

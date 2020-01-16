@@ -61,9 +61,3 @@ func (r *View) Delta() Delta {
 func (r *View) ApplyDelta(delta Delta) {
 	r.delta.MergeWith(delta)
 }
-
-// ConcreteView represents a ledger view with a concrete register mapping
-// rather than a read function.
-type ConcreteView struct {
-	registers map[string][]byte
-}

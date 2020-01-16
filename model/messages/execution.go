@@ -1,7 +1,6 @@
 package messages
 
 import (
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -14,6 +13,5 @@ type ExecutionStateRequest struct {
 // ExecutionStateResponse is the response to a state request. It includes all the
 // registers required for the requested chunk in a concrete view.
 type ExecutionStateResponse struct {
-	ChunkID   flow.Identifier
-	StateView state.ConcreteView
+	State flow.ChunkState
 }

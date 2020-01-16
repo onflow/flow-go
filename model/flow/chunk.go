@@ -30,6 +30,23 @@ func (ch *Chunk) Checksum() Identifier {
 	return MakeID(ch)
 }
 
+// ChunkState represents the state registers used by a particular chunk.
+type ChunkState struct {
+	ChunkID   Identifier
+	Registers map[string][]byte
+}
+
+// ID returns the unique identifier for the concrete view, which is the ID of
+// the chunk the view is for.
+func (c *ChunkState) ID() Identifier {
+	return c.ChunkID
+}
+
+// Checksum returns the checksum of the chunk state.
+func (c *ChunkState) Checksum() Identifier {
+	return MakeID(c)
+}
+
 // Note that this is the basic version of the List, we need to substitute it with something like Merkel tree at some point
 type ChunkList struct {
 	Chunks []*Chunk
