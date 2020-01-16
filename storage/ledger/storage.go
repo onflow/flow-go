@@ -38,14 +38,26 @@ func (f *TrieStorage) LatestStateCommitment() flow.StateCommitment {
 
 // GetRegisters read the values at the given registers at the given flow.StateCommitment
 // This is trusted so no proof is generated
-func (f *TrieStorage) GetRegisters(registerIDs []flow.RegisterID, stateCommitment flow.StateCommitment) (values []flow.RegisterValue, err error) {
+func (f *TrieStorage) GetRegisters(
+	registerIDs []flow.RegisterID,
+	stateCommitment flow.StateCommitment,
+) (
+	values []flow.RegisterValue,
+	err error,
+) {
 	values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	return values, err
 }
 
 // UpdateRegisters updates the values at the given registers
 // This is trusted so no proof is generated
-func (f *TrieStorage) UpdateRegisters(ids [][]byte, values []flow.RegisterValue) (newStateCommitment flow.StateCommitment, err error) {
+func (f *TrieStorage) UpdateRegisters(
+	ids [][]byte,
+	values []flow.RegisterValue,
+) (
+	newStateCommitment flow.StateCommitment,
+	err error,
+) {
 	// TODO: add test case
 	if len(ids) != len(values) {
 		return nil, fmt.Errorf(
@@ -65,7 +77,14 @@ func (f *TrieStorage) UpdateRegisters(ids [][]byte, values []flow.RegisterValue)
 
 // GetRegistersWithProof read the values at the given registers at the given flow.StateCommitment
 // This is untrusted so a proof is generated
-func (f *TrieStorage) GetRegistersWithProof(registerIDs []flow.RegisterID, stateCommitment flow.StateCommitment) (values []flow.RegisterValue, proofs []flow.StorageProof, err error) {
+func (f *TrieStorage) GetRegistersWithProof(
+	registerIDs []flow.RegisterID,
+	stateCommitment flow.StateCommitment,
+) (
+	values []flow.RegisterValue,
+	proofs []flow.StorageProof,
+	err error,
+) {
 	values, proofHldr, err := f.tree.Read(registerIDs, false, stateCommitment)
 	if err != nil {
 		return nil, nil, err
