@@ -2,14 +2,21 @@ package testingdock_test
 
 import (
 	"context"
-	"database/sql"
+	"fmt"
+	"log"
+	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	_ "github.com/lib/pq"
 	"github.com/m4ksio/testingdock"
+
+	sdk "github.com/dapperlabs/flow-go-sdk"
+	"github.com/dapperlabs/flow-go-sdk/client"
+	"github.com/dapperlabs/flow-go-sdk/keys"
 )
 
 const (
@@ -38,37 +45,71 @@ func TestContainer_Start(t *testing.T) {
 		Name: name,
 	})
 
-	collectionNodeApi := testingdock.RandomPort(t)
+	collectionNodeApiPort := testingdock.RandomPort(t)
 
 	collectionNode := suite.Container(testingdock.ContainerOpts{
 		Name:      "collection",
 		ForcePull: false,
 		Config: &container.Config{
 			Image: "gcr.io/dl-flow/collection:latest",
-			Cmd:   []string{"--entries=collection-c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295@collection:9000=10000"},
+			ExposedPorts: nat.PortSet{
+				"9000/tcp": struct{}{},
+			},
+			Cmd:   []string{
+					"--entries=collection-c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295@collection:2137=10000,consensus-8330adb950a72ea2d1ca919d9bc4d9a784544d2614fcd13709606e0ece204d2b@consensus:2138=10000,execution-7276bf64cecb9e556dc961f2aa9b2cc8db2c5a1d8d2021fa75da3acd8b367e0b@execution:2139=10000",
+					"--nodeid=c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295",
+					"--connections=2",
+					"--loglevel=debug",
+					"--ingress-addr=collection:9000",
+			},
 		},
 		HostConfig: &container.HostConfig{
 			PortBindings: nat.PortMap{
 				nat.Port("9000/tcp"): []nat.PortBinding{
 					{
-						HostPort: collectionNodeApi,
+						HostIP: "0.0.0.0",
+						HostPort: collectionNodeApiPort,
 					},
 				},
 			},
 		},
-		//HealthCheck: testingdock.HealthCheckCustom(db.Ping),
-		//Reset: testingdock.ResetCustom(func() error {
-		//	_, err := db.Exec(`
-		//		DROP SCHEMA public CASCADE;
-		//		DROP SCHEMA mnemosyne CASCADE;
-		//		CREATE SCHEMA public;
-		//	`)
-		//	return err
-		//}),
+		HealthCheck: testingdock.HealthCheckCustom(func() error {
+			return healthcheckGRPC(collectionNodeApiPort)
+		}),
+	})
+
+	consensusNode := suite.Container(testingdock.ContainerOpts{
+		Name:      "consensus",
+		ForcePull: false,
+		Config: &container.Config{
+			Image: "gcr.io/dl-flow/consensus:latest",
+			Cmd:   []string{
+					"--entries=collection-c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295@collection:2137=10000,consensus-8330adb950a72ea2d1ca919d9bc4d9a784544d2614fcd13709606e0ece204d2b@consensus:2138=10000,execution-7276bf64cecb9e556dc961f2aa9b2cc8db2c5a1d8d2021fa75da3acd8b367e0b@execution:2139=10000",
+					"--nodeid=8330adb950a72ea2d1ca919d9bc4d9a784544d2614fcd13709606e0ece204d2b",
+					"--connections=2",
+					"--loglevel=debug",
+			},
+		},
+	})
+
+	executionNode := suite.Container(testingdock.ContainerOpts{
+		Name:      "execution",
+		ForcePull: false,
+		Config: &container.Config{
+			Image: "gcr.io/dl-flow/execution:latest",
+			Cmd:   []string{
+					"--entries=collection-c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295@collection:2137=10000,consensus-8330adb950a72ea2d1ca919d9bc4d9a784544d2614fcd13709606e0ece204d2b@consensus:2138=10000,execution-7276bf64cecb9e556dc961f2aa9b2cc8db2c5a1d8d2021fa75da3acd8b367e0b@execution:2139=10000",
+					"--nodeid=7276bf64cecb9e556dc961f2aa9b2cc8db2c5a1d8d2021fa75da3acd8b367e0b",
+					"--connections=2",
+					"--loglevel=debug",
+			},
+		},
 	})
 
 	// add postgres to the test network
 	n.After(collectionNode)
+	n.After(consensusNode)
+	n.After(executionNode)
 	// start mnemosyned after postgres, this also adds it to the test network
 	//postgres.After(mnemosyned)
 
@@ -78,19 +119,60 @@ func TestContainer_Start(t *testing.T) {
 
 	//testQueries(t, db)
 
+	sendTransaction(t, collectionNodeApiPort)
+
+	time.Sleep(15*time.Second)
+
 }
 
-func testQueries(t *testing.T, db *sql.DB) {
-	_, err := db.ExecContext(context.TODO(), "CREATE TABLE public.example (name TEXT);")
+func healthcheckGRPC(apiPort string) error {
+	fmt.Printf("healthchecking...\n")
+	c, err := client.New("localhost:"+apiPort)
 	if err != nil {
-		t.Fatalf("table creation error: %s", err.Error())
+		return err
 	}
-	_, err = db.ExecContext(context.TODO(), "INSERT INTO public.example (name) VALUES ('anything')")
+	return c.Ping(context.Background())
+}
+
+func sendTransaction(t *testing.T, apiPort string) {
+	fmt.Printf("Sending tx to %s\n", apiPort)
+	c, err := client.New("localhost:"+apiPort)
 	if err != nil {
-		t.Fatalf("insert error: %s", err.Error())
+		log.Fatal(err)
 	}
-	_, err = db.ExecContext(context.TODO(), "INSERT INTO mnemosyne.session (access_token, refresh_token,subject_id, bag) VALUES ('123', '123', '1', '{}')")
+
+	//_, err = c.GetLatestBlock(context.Background(), false)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+
+	// Generate key
+	seed := make([]byte, 40)
+	_, _ = rand.Read(seed)
+	key, err := keys.GeneratePrivateKey(keys.ECDSA_P256_SHA2_256, seed)
 	if err != nil {
-		t.Fatalf("insert error: %s", err.Error())
+		log.Fatal(err)
+	}
+
+	nonce := 2137
+
+	tx := sdk.Transaction{
+		Script:             []byte("fun main() {}"),
+		ReferenceBlockHash: []byte{1, 2, 3, 4},
+		Nonce:              uint64(nonce),
+		ComputeLimit:       10,
+		PayerAccount:       sdk.RootAddress,
+	}
+
+	sig, err := keys.SignTransaction(tx, key)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tx.AddSignature(sdk.RootAddress, sig)
+
+	err = c.SendTransaction(context.Background(), tx)
+	if err != nil {
+		log.Fatal(err)
 	}
 }

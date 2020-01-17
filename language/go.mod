@@ -7,7 +7,6 @@ require (
 	github.com/c-bata/go-prompt v0.2.3
 	github.com/dapperlabs/flow-go v0.2.5-beta
 	github.com/logrusorgru/aurora v0.0.0-20191116043053-66b7ad493a23
-	github.com/pkg/term v0.0.0-20190109203006-aa71e9d9e942 // indirect
 	github.com/raviqqe/hamt v0.0.0-20190615202029-864fb7caef85
 	github.com/rivo/uniseg v0.1.0
 	github.com/segmentio/fasthash v1.0.1
