@@ -2,9 +2,12 @@ package execution_test
 
 import (
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -64,49 +67,41 @@ func TestExecutionFlow(t *testing.T) {
 		},
 	}
 
-	// submit block from consensus node
-	exeNode.BlocksEngine.Submit(conID.NodeID, block)
-
-	// wait for blocks engine to finish processing
-	exeNode.BlocksEngine.Wait()
-
-	// submit collection from collection node
-	exeNode.BlocksEngine.Submit(colID.NodeID, &messages.CollectionResponse{
-		Collection: col,
-	})
-
-	// wait for blocks engine to finish processing
-	exeNode.BlocksEngine.Wait()
-
-	// wait for execution engine to finish processing
-	exeNode.ExecutionEngine.Wait()
-
-	// wait for receipt engine to finish processing
-	exeNode.ReceiptsEngine.Wait()
-
 	net, ok := hub.GetNetwork(exeNode.Me.NodeID())
 	require.True(t, ok)
 
+	// intercept collection request message
+	net.
+		OnMessage(
+			stub.FromID(exeNode.Me.NodeID()),
+			stub.ChannelID(engine.CollectionProvider),
+		).
+		Do(func(m *stub.PendingMessage) {
+			// submit collection from collection node
+			exeNode.BlocksEngine.Submit(colID.NodeID, &messages.CollectionResponse{
+				Collection: col,
+			})
+		})
+
 	var receipt *flow.ExecutionReceipt
 
-	// intercept execution receipt
-	net.FlushAllExcept(func(message *stub.PendingMessage) bool {
-		event, ok := message.Event.(*flow.ExecutionReceipt)
-		if ok {
-			receipt = event
-			return false
-		}
+	// intercept receipt broadcast message
+	net.
+		OnMessage(
+			stub.FromID(exeNode.Me.NodeID()),
+			stub.ChannelID(engine.ReceiptProvider),
+		).
+		Do(func(m *stub.PendingMessage) {
+			event, ok := m.Event.(*flow.ExecutionReceipt)
+			if ok {
+				receipt = event
+			}
+		})
 
-		return true
-	})
+	// submit block from consensus node
+	exeNode.BlocksEngine.Submit(conID.NodeID, block)
 
-	require.NotNil(t, receipt)
-
-	// view := exeNode.State.NewView(receipt.ExecutionResult.FinalStateCommitment)
-
-	// _, err = exeNode.VM.NewBlockContext(block).ExecuteScript(view, []byte(`
-	// 	pub fun main(): Int {
-	// 	  return 5
-	// 	}
-	// `))
+	assert.Eventually(t, func() bool {
+		return receipt != nil
+	}, time.Second*3, time.Millisecond*500)
 }
