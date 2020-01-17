@@ -17,20 +17,20 @@ type FlowMC struct {
 	started           bool
 }
 
-func New(startView uint64, timeoutController *timeout.Controller, eventProc notifications.Distributor) (hotstuff.PaceMaker, error) {
+func New(startView uint64, timeoutController *timeout.Controller, notifier notifications.Distributor) (hotstuff.PaceMaker, error) {
 	if startView < 1 {
 		return nil, &types.ErrorConfiguration{Msg: "Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)"}
 	}
 	if utils.IsNil(timeoutController) {
 		timeoutController = timeout.DefaultController()
 	}
-	if utils.IsNil(eventProc) {
+	if utils.IsNil(notifier) {
 		return nil, &types.ErrorConfiguration{Msg: "notifications.Distributor cannot be nil"}
 	}
 	pm := FlowMC{
 		currentView:    startView,
 		timeoutControl: timeoutController,
-		notifier:       eventProc,
+		notifier:       notifier,
 		started:        false,
 	}
 	return &pm, nil
