@@ -33,7 +33,7 @@ func (ch *Chunk) Checksum() Identifier {
 // ChunkState represents the state registers used by a particular chunk.
 type ChunkState struct {
 	ChunkID   Identifier
-	Registers map[string][]byte
+	Registers Ledger
 }
 
 // ID returns the unique identifier for the concrete view, which is the ID of
