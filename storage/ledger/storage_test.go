@@ -1,9 +1,12 @@
 package ledger
 
 import (
-	"bytes"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -12,93 +15,152 @@ import (
 func TestNewTrieStorage(t *testing.T) {
 	unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
 		_, err := NewTrieStorage(db)
-
-		if err != nil {
-			t.Fatal(err)
-		}
+		assert.NoError(t, err)
 	})
 }
 
-func TestTrieTrusted(t *testing.T) {
-	unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-		f, err := NewTrieStorage(db)
-		if err != nil {
-			t.Fatal(err)
-		}
+func TestTrieStorage_UpdateRegisters(t *testing.T) {
+	t.Run("mismatched IDs and values", func(t *testing.T) {
+		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
+			f, err := NewTrieStorage(db)
+			require.NoError(t, err)
 
-		keys, values := makeTestKeys()
+			ids, values := makeTestValues()
 
-		newRoot, err := f.UpdateRegisters(keys, values)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(f.tree.GetRoot().GetValue(), newRoot) {
-			t.Fatalf("Something in UpdateRegister went wrong")
-		}
+			// add extra id but not value
+			ids = append(ids, flow.RegisterID{42})
 
-		newValues, err := f.GetRegisters(keys, f.tree.GetRoot().GetValue())
-		if err != nil {
-			t.Fatal(err)
-		}
-		for i, val := range newValues {
-			if !bytes.Equal(values[i], val) {
-				t.Fatalf("Something in GetRegister went wrong")
-			}
-		}
+			currentRoot := f.tree.GetRoot().GetValue()
+
+			_, err = f.UpdateRegisters(ids, values)
+			assert.Error(t, err)
+
+			newRoot := f.tree.GetRoot().GetValue()
+
+			// root should not change
+			assert.Equal(t, currentRoot, newRoot)
+		})
+	})
+
+	t.Run("empty update", func(t *testing.T) {
+		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
+			f, err := NewTrieStorage(db)
+			require.NoError(t, err)
+
+			// create empty values
+			ids := []flow.RegisterID{}
+			values := []flow.RegisterValue{}
+
+			currentRoot := f.tree.GetRoot().GetValue()
+
+			newRoot, err := f.UpdateRegisters(ids, values)
+			require.NoError(t, err)
+
+			// root should not change
+			assert.Equal(t, currentRoot, newRoot)
+		})
+	})
+
+	t.Run("non-empty update", func(t *testing.T) {
+		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
+			f, err := NewTrieStorage(db)
+			require.NoError(t, err)
+
+			ids, values := makeTestValues()
+
+			newRoot, err := f.UpdateRegisters(ids, values)
+			require.NoError(t, err)
+			assert.Equal(t, f.tree.GetRoot().GetValue(), newRoot)
+
+			newValues, err := f.GetRegisters(ids, newRoot)
+			require.NoError(t, err)
+			assert.Equal(t, values, newValues)
+		})
 	})
 }
 
-func TestTrieUntrusted(t *testing.T) {
-	unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
-		f, err := NewTrieStorage(db)
-		if err != nil {
-			t.Fatal(err)
-		}
+func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
+	t.Run("mismatched IDs and values", func(t *testing.T) {
+		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
+			f, err := NewTrieStorage(db)
+			require.NoError(t, err)
 
-		keys, values := makeTestKeys()
+			ids, values := makeTestValues()
 
-		newRoot, _, err := f.UpdateRegistersWithProof(keys, values)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !bytes.Equal(f.tree.GetRoot().GetValue(), newRoot) {
-			t.Fatalf("Something in UpdateRegister went wrong")
-		}
+			// add extra id but not value
+			ids = append(ids, flow.RegisterID{42})
 
-		newValues, _, err := f.GetRegistersWithProof(keys, f.tree.GetRoot().GetValue())
-		if err != nil {
-			t.Fatal(err)
-		}
-		for i, val := range newValues {
-			if !bytes.Equal(values[i], val) {
-				t.Fatalf("Something in GetRegister went wrong")
-			}
-		}
+			currentRoot := f.tree.GetRoot().GetValue()
+
+			_, _, err = f.UpdateRegistersWithProof(ids, values)
+			assert.Error(t, err)
+
+			newRoot := f.tree.GetRoot().GetValue()
+
+			// root should not change
+			assert.Equal(t, currentRoot, newRoot)
+		})
+	})
+
+	t.Run("empty update", func(t *testing.T) {
+		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
+			f, err := NewTrieStorage(db)
+			require.NoError(t, err)
+
+			currentRoot := f.tree.GetRoot().GetValue()
+
+			// create empty values
+			ids := []flow.RegisterID{}
+			values := []flow.RegisterValue{}
+
+			newRoot, _, err := f.UpdateRegistersWithProof(ids, values)
+			require.NoError(t, err)
+
+			// root should not change
+			assert.Equal(t, currentRoot, newRoot)
+		})
+	})
+
+	t.Run("non-empty update", func(t *testing.T) {
+		unittest.RunWithLevelDB(t, func(db *leveldb.LevelDB) {
+			f, err := NewTrieStorage(db)
+			require.NoError(t, err)
+
+			ids, values := makeTestValues()
+
+			newRoot, _, err := f.UpdateRegistersWithProof(ids, values)
+			require.NoError(t, err)
+			assert.Equal(t, f.tree.GetRoot().GetValue(), newRoot)
+
+			newValues, _, err := f.GetRegistersWithProof(ids, newRoot)
+			require.NoError(t, err)
+			assert.Equal(t, values, newValues)
+		})
 	})
 }
 
-func makeTestKeys() ([][]byte, [][]byte) {
-	key1 := make([]byte, 1)
+func makeTestValues() ([][]byte, [][]byte) {
+	id1 := make([]byte, 1)
 	value1 := []byte{'a'}
 
-	key2 := make([]byte, 1)
+	id2 := make([]byte, 1)
 	value2 := []byte{'b'}
-	utils.SetBit(key2, 5)
+	utils.SetBit(id2, 5)
 
-	key3 := make([]byte, 1)
+	id3 := make([]byte, 1)
 	value3 := []byte{'c'}
-	utils.SetBit(key3, 0)
+	utils.SetBit(id3, 0)
 
-	key4 := make([]byte, 1)
+	id4 := make([]byte, 1)
 	value4 := []byte{'d'}
-	utils.SetBit(key4, 0)
-	utils.SetBit(key4, 5)
+	utils.SetBit(id4, 0)
+	utils.SetBit(id4, 5)
 
-	keys := make([][]byte, 0)
+	ids := make([][]byte, 0)
 	values := make([][]byte, 0)
 
-	keys = append(keys, key1, key2, key3, key4)
+	ids = append(ids, id1, id2, id3, id4)
 	values = append(values, value1, value2, value3, value4)
 
-	return keys, values
+	return ids, values
 }
