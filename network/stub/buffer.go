@@ -30,15 +30,10 @@ func NewBuffer() *Buffer {
 }
 
 // Save stores a pending message to the buffer
-func (b *Buffer) Save(from flow.Identifier, channelID uint8, event interface{}, targetIDs []flow.Identifier) {
+func (b *Buffer) Save(m *PendingMessage) {
 	b.Lock()
 	defer b.Unlock()
-	b.pending = append(b.pending, &PendingMessage{
-		From:      from,
-		ChannelID: channelID,
-		Event:     event,
-		TargetIDs: targetIDs,
-	})
+	b.pending = append(b.pending, m)
 }
 
 // Flush recursively delivers the pending messages until the buffer is empty

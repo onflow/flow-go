@@ -22,6 +22,7 @@ type Network struct {
 	hub          *Hub
 	engines      map[uint8]network.Engine
 	seenEventIDs map[string]bool
+	interceptors []func(*PendingMessage)
 }
 
 // NewNetwork create a mocked network.
@@ -38,12 +39,6 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 	// Plug the network to a hub so that networks can find each other.
 	hub.Plug(o)
 	return o
-}
-
-// submit is called when an Engine is sending an event to an Engine on another node or nodes.
-func (mn *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
-	mn.buffer(mn.GetID(), channelID, event, targetIDs)
-	return nil
 }
 
 // GetID returns the identity of the Node.
@@ -65,6 +60,33 @@ func (mn *Network) Register(channelID uint8, engine network.Engine) (network.Con
 	return conduit, nil
 }
 
+// OnMessage registers a message interceptor with this network.
+//
+// Messages that match any of the provided matchers will be captured by
+// the returned interceptor.
+func (mn *Network) OnMessage(matchers ...Matcher) *Interceptor {
+	return &Interceptor{
+		net:      mn,
+		matchers: matchers,
+	}
+
+}
+
+// submit is called when an Engine is sending an event to an Engine on another node or nodes.
+func (mn *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+	m := &PendingMessage{
+		From:      mn.GetID(),
+		ChannelID: channelID,
+		Event:     event,
+		TargetIDs: targetIDs,
+	}
+
+	mn.intercept(m)
+	mn.buffer(m)
+
+	return nil
+}
+
 // return a certain node has seen a certain key
 func (mn *Network) haveSeen(key string) bool {
 	mn.Lock()
@@ -84,8 +106,20 @@ func (mn *Network) seen(key string) {
 }
 
 // buffer saves the request into pending buffer
-func (mn *Network) buffer(from flow.Identifier, channelID uint8, event interface{}, targetIDs []flow.Identifier) {
-	mn.hub.Buffer.Save(from, channelID, event, targetIDs)
+func (mn *Network) buffer(m *PendingMessage) {
+	mn.hub.Buffer.Save(m)
+}
+
+// intercept passes a message to all registered message interceptors
+func (mn *Network) intercept(m *PendingMessage) {
+	for _, intercept := range mn.interceptors {
+		intercept(m)
+	}
+}
+
+// addInterceptor registers a message interceptor with this network
+func (mn *Network) addInterceptor(f func(*PendingMessage)) {
+	mn.interceptors = append(mn.interceptors, f)
 }
 
 // FlushAll sends all pending messages to the receivers. The receivers might be triggered to forward messages to its peers,
