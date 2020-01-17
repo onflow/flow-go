@@ -17,17 +17,21 @@ func NewVote(view uint64, blockMRH []byte, sig *Signature) *Vote {
 }
 
 func (uv *Vote) BytesForSig() []byte {
+	return voteBytesForSig(uv.View, uv.BlockMRH)
+}
+
+func voteBytesForSig(view uint64, blockMRH []byte) []byte {
 	// TODO there's probably a cleaner way to do this whole fcn
 	voteStrBytes := []byte("vote")
 
 	viewBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(viewBytes, uv.View)
+	binary.LittleEndian.PutUint64(viewBytes, view)
 
-	length := len(viewBytes) + len(uv.BlockMRH) + len(voteStrBytes)
+	length := len(voteStrBytes) + len(viewBytes) + len(blockMRH)
 	bytesForSig := make([]byte, 0, length)
 	bytesForSig = append(bytesForSig, voteStrBytes...)
 	bytesForSig = append(bytesForSig, viewBytes...)
-	bytesForSig = append(bytesForSig, uv.BlockMRH...)
+	bytesForSig = append(bytesForSig, blockMRH...)
 
 	return bytesForSig
 }
