@@ -5,11 +5,12 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
-// TimoutConfig implements a timout with:
+// TimoutConfig contains the configuration parameters for ExponentialIncrease-LinearDecrease
+// timeout.Controller
 // - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
 //   this results in exponential growing timeout duration on multiple subsequent timeouts
 // - on progress: decrease timeout by subtrahend `timeoutDecrease`
-type TimoutConfig struct {
+type Config struct {
 	// replicaTimeout is the duration of a view before we time out [Milliseconds]
 	// replicaTimeout is the only variable quantity
 	replicaTimeout float64
@@ -30,7 +31,7 @@ type TimoutConfig struct {
 // voteAggregationTimeoutFraction: fraction of replicaTimeout which is reserved for aggregating votes;
 // timeoutIncrease: multiplicative factor for increasing timeout;
 // timeoutDecrease: linear subtrahend for timeout decrease [Milliseconds]
-func NewConfig(startReplicaTimeout, minReplicaTimeout, voteAggregationTimeoutFraction, timeoutIncrease, timeoutDecrease float64) (*TimoutConfig, error) {
+func NewConfig(startReplicaTimeout, minReplicaTimeout, voteAggregationTimeoutFraction, timeoutIncrease, timeoutDecrease float64) (*Config, error) {
 	if startReplicaTimeout < minReplicaTimeout {
 		msg := fmt.Sprintf("startReplicaTimeout (%f) cannot be smaller than minReplicaTimeout (%f)",
 			startReplicaTimeout, minReplicaTimeout)
@@ -48,7 +49,7 @@ func NewConfig(startReplicaTimeout, minReplicaTimeout, voteAggregationTimeoutFra
 	if timeoutDecrease <= 0 {
 		return nil, &types.ErrorConfiguration{"timeoutDecrease must positive"}
 	}
-	tc := TimoutConfig{
+	tc := Config{
 		replicaTimeout:                 startReplicaTimeout,
 		minReplicaTimeout:              minReplicaTimeout,
 		voteAggregationTimeoutFraction: voteAggregationTimeoutFraction,
@@ -58,7 +59,7 @@ func NewConfig(startReplicaTimeout, minReplicaTimeout, voteAggregationTimeoutFra
 	return &tc, nil
 }
 
-func DefaultConfig() *TimoutConfig {
+func DefaultConfig() *Config {
 	tc, err := NewConfig(
 		1200,
 		1200,

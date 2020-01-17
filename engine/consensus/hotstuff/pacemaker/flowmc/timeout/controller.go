@@ -9,7 +9,7 @@ import (
 //   this results in exponential growing timeout duration on multiple subsequent timeouts
 // - on progress: decrease timeout by subtrahend `timeoutDecrease`
 type Controller struct {
-	TimoutConfig
+	Config
 	mode  TimeoutMode
 	timer *time.Timer
 }
@@ -22,9 +22,9 @@ const (
 )
 
 // NewController creates a new Controller.
-func NewController(timeoutConfig TimoutConfig) *Controller {
+func NewController(timeoutConfig Config) *Controller {
 	tc := Controller{
-		TimoutConfig: timeoutConfig,
+		Config: timeoutConfig,
 	}
 	return &tc
 }
