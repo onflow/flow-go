@@ -52,7 +52,7 @@ spec:
       containers:
         - name: flow-test-net
           # No tag, will be attached by teamcity
-          image: gcr.io/dl-flow/consensus
+          image: gcr.io/dl-flow/consensus:05db1550f
           args: 
             - '--nodename'
             - '$(POD_NAME)'
@@ -93,7 +93,7 @@ spec:
           resources:
             requests:
               cpu: '250m'
-              memory: '1Gi'
+              memory: '512Mi'
             limits:
               cpu: '500m'
               memory: '2Gi'

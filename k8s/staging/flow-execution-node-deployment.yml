@@ -52,7 +52,7 @@ spec:
       containers:
         - name: flow-test-net
           # No tag, will be attached by teamcity
-          image: gcr.io/dl-flow/execution
+          image: gcr.io/dl-flow/execution:05db1550f
           args: 
             - '--nodename'
             - '$(POD_NAME)'
@@ -130,5 +130,5 @@ spec:
         - ReadWriteOnce
         resources:
           requests:
-            storage: 100Gi
+            storage: 20Gi
         storageClassName: standard

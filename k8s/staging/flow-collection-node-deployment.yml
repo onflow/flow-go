@@ -191,7 +191,7 @@ spec:
       containers:
         - name: flow-test-net
           # No tag, will be attached by teamcity
-          image: gcr.io/dl-flow/collection
+          image: gcr.io/dl-flow/collection:228a52b47
           args: 
             - '--nodename'
             - '$(POD_NAME)'
@@ -233,7 +233,12 @@ spec:
                 configMapKeyRef:
                   name: flow-node-config-map
                   key: entries
-
+            - name: JAEGER_AGENT_HOST
+              value: jaeger-agent
+            - name: JAEGER_SAMPLER_TYPE
+              value: const
+            - name: JAEGER_SAMPLER_PARAM
+              value: "1"
           # Resource requests and contraints
           resources:
             requests:

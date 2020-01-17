@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -33,6 +34,7 @@ type Engine struct {
 	con         network.Conduit
 	me          module.Local
 	state       protocol.State
+	tracer      opentracing.Tracer
 	provider    network.Engine // provider engine to propagate guarantees
 	pool        mempool.Transactions
 	collections storage.Collections
@@ -45,6 +47,7 @@ func New(
 	net module.Network,
 	me module.Local,
 	state protocol.State,
+	tracer opentracing.Tracer,
 	provider network.Engine,
 	pool mempool.Transactions,
 	collections storage.Collections,
@@ -57,6 +60,7 @@ func New(
 		log:         log.With().Str("engine", "proposal").Logger(),
 		me:          me,
 		state:       state,
+		tracer:      tracer,
 		provider:    provider,
 		pool:        pool,
 		collections: collections,
@@ -161,6 +165,15 @@ func (e *Engine) createProposal() error {
 	if err != nil {
 		return fmt.Errorf("could not save proposed collection guarantee: %w", err)
 	}
+
+	followsFrom := make([]opentracing.StartSpanOption, 0, len(transactions))
+	txIDs := make([]flow.Identifier, 0, len(transactions))
+	for _, tx := range transactions {
+		followsFrom = append(followsFrom, opentracing.FollowsFrom(tx.SpanContext()))
+		txIDs = append(txIDs, tx.ID())
+	}
+	guarantee.StartSpan(e.tracer, "collectionGuarateeProposal", followsFrom...).
+		SetTag("collection_txs", txIDs)
 
 	err = e.provider.ProcessLocal(&messages.SubmitCollectionGuarantee{Guarantee: guarantee})
 	if err != nil {

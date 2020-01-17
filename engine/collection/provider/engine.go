@@ -92,6 +92,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // SubmitCollectionGuarantee submits the collection guarantee to all
 // consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
+	defer guarantee.FinishSpan()
 	consensusNodes, err := e.state.Final().Identities(identity.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get consensus consensusNodes: %w", err)
