@@ -23,7 +23,6 @@ require (
 	github.com/libp2p/go-libp2p-core v0.2.5
 	github.com/libp2p/go-libp2p-pubsub v0.2.5
 	github.com/libp2p/go-tcp-transport v0.1.1
-	github.com/m4ksio/testingdock v0.4.0
 	github.com/magiconair/properties v1.8.1
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/pkg/errors v0.8.1
@@ -48,5 +47,3 @@ replace github.com/dapperlabs/flow-go/language => ./language
 replace github.com/dapperlabs/flow-go/crypto => ./crypto
 
 replace github.com/dapperlabs/flow-go/protobuf => ./protobuf
-
-//replace github.com/m4ksio/testingdock => /Users/makspawlak/go/src/github.com/m4ksio/testingdock
