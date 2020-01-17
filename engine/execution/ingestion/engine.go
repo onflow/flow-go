@@ -192,7 +192,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 					return fmt.Errorf("cannot save collection-block mapping: %w", err)
 				}
 
-				err = e.collectionConduit.Submit(messages.CollectionRequest{ID: guarantee.ID()}, collectionIdentifiers...)
+				err = e.collectionConduit.Submit(&messages.CollectionRequest{ID: guarantee.ID()}, collectionIdentifiers...)
 				if err != nil {
 					e.log.Err(err).Msg("cannot submit collection requests")
 				}
