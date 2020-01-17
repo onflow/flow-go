@@ -29,6 +29,8 @@ type TestSuite struct {
 	me    *module.Local
 	// mock conduit for requesting/receiving collections
 	collectionsConduit *network.Conduit
+	// mock conduit for requesting/receiving chunk states
+	statesConduit *network.Conduit
 	// mock conduit for receiving receipts
 	receiptsConduit *network.Conduit
 	// mock verifier engine, should be called when all dependent resources
@@ -39,10 +41,12 @@ type TestSuite struct {
 	blocks      *mempool.Blocks
 	receipts    *mempool.Receipts
 	collections *mempool.Collections
+	chunkStates *mempool.ChunkStates
 	// resources fixtures
 	collection flow.Collection
 	block      flow.Block
 	receipt    flow.ExecutionReceipt
+	chunkState flow.ChunkState
 }
 
 // Invoking this method executes all TestSuite tests.
@@ -55,6 +59,7 @@ func (suite *TestSuite) SetupTest() {
 	// initializing test suite fields
 	suite.state = &protocol.State{}
 	suite.collectionsConduit = &network.Conduit{}
+	suite.statesConduit = &network.Conduit{}
 	suite.receiptsConduit = &network.Conduit{}
 	suite.net = &module.Network{}
 	suite.me = &module.Local{}
@@ -63,11 +68,13 @@ func (suite *TestSuite) SetupTest() {
 	suite.blocks = &mempool.Blocks{}
 	suite.receipts = &mempool.Receipts{}
 	suite.collections = &mempool.Collections{}
+	suite.chunkStates = &mempool.ChunkStates{}
 
-	complete := unittest.CompleteExecutionResultFixture()
-	suite.collection = complete.Collections[0]
-	suite.block = complete.Block
-	suite.receipt = complete.Receipt
+	completeER := unittest.CompleteExecutionResultFixture()
+	suite.collection = completeER.Collections[0]
+	suite.block = completeER.Block
+	suite.receipt = completeER.Receipt
+	suite.chunkState = completeER.ChunkStates[0]
 
 	// mocking the network registration of the engine
 	// all subsequent tests are expected to have a call on Register method
@@ -77,13 +84,16 @@ func (suite *TestSuite) SetupTest() {
 	suite.net.On("Register", uint8(engine.ReceiptProvider), testifymock.Anything).
 		Return(suite.receiptsConduit, nil).
 		Once()
+	suite.net.On("Register", uint8(engine.StateProvider), testifymock.Anything).
+		Return(suite.statesConduit, nil).
+		Once()
 }
 
 // TestNewEngine verifies the establishment of the network registration upon
 // creation of an instance of verifier.Engine using the New method
 // It also returns an instance of new engine to be used in the later tests
 func (suite *TestSuite) TestNewEngine() *ingest.Engine {
-	e, err := ingest.New(zerolog.Logger{}, suite.net, suite.state, suite.me, suite.verifierEng, suite.receipts, suite.blocks, suite.collections)
+	e, err := ingest.New(zerolog.Logger{}, suite.net, suite.state, suite.me, suite.verifierEng, suite.receipts, suite.blocks, suite.collections, suite.chunkStates)
 	require.Nil(suite.T(), err, "could not create an engine")
 
 	suite.net.AssertExpectations(suite.T())

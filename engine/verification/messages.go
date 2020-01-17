@@ -12,4 +12,5 @@ type CompleteExecutionResult struct {
 	Receipt     flow.ExecutionReceipt
 	Block       flow.Block
 	Collections []flow.Collection
+	ChunkStates []flow.ChunkState
 }

@@ -54,6 +54,7 @@ type VerificationNode struct {
 	Receipts       mempool.Receipts
 	Blocks         mempool.Blocks
 	Collections    mempool.Collections
+	ChunkStates    mempool.ChunkStates
 	ReceiptsEngine *ingest.Engine
 	VerifierEngine *verifier.Engine
 }

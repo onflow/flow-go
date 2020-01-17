@@ -259,6 +259,11 @@ func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 		Index: 0,
 	}
 
+	chunkState := flow.ChunkState{
+		ChunkID:   chunk.ID(),
+		Registers: make(map[string][]byte),
+	}
+
 	result := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			BlockID: block.ID(),
@@ -274,5 +279,6 @@ func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 		Receipt:     receipt,
 		Block:       block,
 		Collections: []flow.Collection{coll},
+		ChunkStates: []flow.ChunkState{chunkState},
 	}
 }

@@ -67,7 +67,7 @@ func New(
 		return nil, fmt.Errorf("could not register engine on collection provider channel: %w", err)
 	}
 
-	e.collectionsConduit, err = net.Register(engine.StateProvider, e)
+	e.stateConduit, err = net.Register(engine.StateProvider, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on execution state provider channel: %w", err)
 	}
