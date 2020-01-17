@@ -1,4 +1,4 @@
-package blocks
+package ingestion
 
 import (
 	"fmt"
@@ -34,7 +34,13 @@ type Engine struct {
 	mempool *Mempool
 }
 
-func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections, state protocol.State, executionEngine network.Engine, mempool *Mempool) (*Engine, error) {
+func NewEngine(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections, state protocol.State, executionEngine network.Engine) (*Engine, error) {
+
+	mempool, err := newMempool()
+	if err != nil {
+		return nil, errors.Wrap(err, "cannot create mempool")
+	}
+
 	eng := Engine{
 		unit:        engine.NewUnit(),
 		log:         logger,

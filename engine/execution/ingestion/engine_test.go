@@ -1,4 +1,4 @@
-package blocks
+package ingestion
 
 import (
 	"testing"
@@ -49,9 +49,6 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 
 	snapshot := protocol.NewMockSnapshot(ctrl)
 
-	mempool, err := newMempool()
-	require.NoError(t, err)
-
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
 
 	state.EXPECT().Final().Return(snapshot).AnyTimes()
@@ -66,7 +63,7 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 
-	engine, err = New(log, net, me, blocks, collections, state, executionEngine, mempool)
+	engine, err := NewEngine(log, net, me, blocks, collections, state, executionEngine)
 	require.NoError(t, err)
 
 	f(t, engine, blocks, collections, state, conduit, collectionConduit, executionEngine)
