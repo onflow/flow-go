@@ -1,5 +1,7 @@
 package notifications
 
+import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+
 // Distributor consumes notifications outbound events produced by HotStuff and its components.
 // Outbound events are all events that are potentially relevant to the larger node
 // in which HotStuff (or Forks) is running.
@@ -13,6 +15,10 @@ type Distributor interface {
 	OnReachedBlockTimeout(uint64)
 	OnStartingVotesTimeout(uint64)
 	OnReachedVotesTimeout(uint64)
+
+	OnBlockIncorporated(proposal *types.BlockProposal)
+	OnFinalizedBlock(*types.BlockProposal)
+	OnDoubleProposeDetected(*types.BlockProposal, *types.BlockProposal)
 }
 
 // SkippedViewConsumer consumes notifications of type `OnSkippedAhead`
@@ -76,4 +82,35 @@ type StartingVotesTimeoutConsumer interface {
 // and must handle repetition of the same events (with some processing overhead).
 type ReachedVotesTimeoutConsumer interface {
 	OnReachedVotesTimeout(viewNumber uint64)
+}
+
+// BlockIncorporatedConsumer consumes notifications of type `OnBlockIncorporated`,
+// which are produced by Forks. It indicates that Forks has incorporated the referenced block
+// into the consensus state.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+type BlockIncorporatedConsumer interface {
+	OnBlockIncorporated(*types.BlockProposal)
+}
+
+// FinalizedConsumer consumes notifications of type `OnFinalizedBlock`,
+// which are produced by Forks. It indicates that Forks has finalized the referenced block.
+// Forks will emit the events in the strict order in which blocks are finalized
+// (i.e. with strictly increasing height and view)
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+type FinalizedConsumer interface {
+	OnFinalizedBlock(*types.BlockProposal)
+}
+
+// DoubleProposalConsumer consumes notifications of type `OnDoubleProposeDetected`,
+// which are produced by Forks. It indicates that Forks has detected a slashable
+// double proposal.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+type DoubleProposalConsumer interface {
+	OnDoubleProposeDetected(*types.BlockProposal, *types.BlockProposal)
 }
