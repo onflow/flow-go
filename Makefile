@@ -95,7 +95,7 @@ generate-mocks:
 	mockery -name '.*' -dir=engine/execution/execution/executor -case=underscore -output="./engine/execution/execution/executor/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/state -case=underscore -output="./engine/execution/execution/state/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/virtualmachine -case=underscore -output="./engine/execution/execution/virtualmachine/mock" -outpkg="mock"
-	mockery -name 'Processor' -dir="./engine/consensus/eventdriven/components/pacemaker/events" -case=underscore -output="./engine/consensus/eventdriven/components/pacemaker/mock" -outpkg="mock"
+	mockery -name 'Distributor' -dir="./engine/consensus/hotstuff/notifications/" -case=underscore -output="./engine/consensus/hotstuff/notifications/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network/gossip/libp2p -case=underscore -output="./network/gossip/libp2p/mock" -outpkg="mock"
 
 .PHONY: lint

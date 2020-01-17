@@ -7,10 +7,10 @@ func (e *ErrorFinalizationFatal) Error() string {
 	panic("implement me")
 }
 
-type HotStuffConfigurationError struct {
-	msg string
+type ErrorConfiguration struct {
+	Msg string
 }
 
-func (e *HotStuffConfigurationError) Error() string {
-	return e.msg
+func (e *ErrorConfiguration) Error() string {
+	return e.Msg
 }

@@ -10,7 +10,9 @@ type Distributor interface {
 	OnSkippedAhead(uint64)
 
 	OnStartingBlockTimeout(uint64)
+	OnReachedBlockTimeout(uint64)
 	OnStartingVotesTimeout(uint64)
+	OnReachedVotesTimeout(uint64)
 }
 
 // SkippedViewConsumer consumes notifications of type `OnSkippedAhead`
@@ -25,7 +27,7 @@ type SkippedAheadConsumer interface {
 }
 
 // EnteringViewConsumer consumes notifications of type `OnEnteringView`,
-// which are produced by the EventHandler when it enters a new view.
+// which are produced by the EventLoop when it enters a new view.
 // Prerequisites:
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
@@ -44,6 +46,16 @@ type StartingBlockTimeoutConsumer interface {
 	OnStartingBlockTimeout(viewNumber uint64)
 }
 
+// ReachedBlockTimeoutConsumer consumes notifications of type `OnReachedBlockTimeout`,
+// which are produced by PaceMaker.
+// It indicates that the PaceMaker's timeout event was processed by the system.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+type ReachedBlockTimeoutConsumer interface {
+	OnReachedBlockTimeout(viewNumber uint64)
+}
+
 // StartingVoteTimeoutConsumer consumes notifications of type `OnStartingVotesTimeout`,
 // which are produced by PaceMaker.
 // It indicates that the PaceMaker is now waiting for the system to (receive) and process
@@ -51,6 +63,17 @@ type StartingBlockTimeoutConsumer interface {
 // Prerequisites:
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
-type StartingVoteTimeoutConsumer interface {
+type StartingVotesTimeoutConsumer interface {
 	OnStartingVotesTimeout(viewNumber uint64)
+}
+
+// ReachedVotesConsumer consumes notifications of type `OnReachedVotesTimeout`,
+// which are produced by PaceMaker.
+// It indicates that the PaceMaker is now waiting for the system to (receive) and process
+// votes block for the current view.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+type ReachedVotesTimeoutConsumer interface {
+	OnReachedVotesTimeout(viewNumber uint64)
 }

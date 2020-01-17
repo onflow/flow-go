@@ -9,8 +9,7 @@ type PaceMaker interface {
 	CurView() uint64
 
 	// UpdateCurViewWithQC will check if the given QC will allow PaceMaker to fast
-	// forward to the QC's view.
-	// If yes, a NewViewEvent will be returned
+	// forward to QC.view+1. If PaceMaker incremented the current View, a NewViewEvent will be returned
 	UpdateCurViewWithQC(qc *types.QuorumCertificate) (*types.NewViewEvent, bool)
 
 	// UpdateCurViewWithBlock will check if the given block will allow PaceMaker to fast forward
@@ -18,7 +17,7 @@ type PaceMaker interface {
 	// CurView and return a NewViewEvent.
 	//
 	// The parameter `nextPrimary` indicates to the PaceMaker whether or not this replica is the
-	// primary for the NEXT view (taking curView as reference).
+	// primary for the NEXT view taking block.view as reference.
 	// True corresponds to this replica being the next primary.
 	UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool)
 
@@ -26,4 +25,7 @@ type PaceMaker interface {
 	// looped through the event loop.
 	// It returns a NewViewEvent if it triggers the current view to be updated.
 	OnTimeout() (*types.NewViewEvent, bool)
+
+	// Start starts the PaceMaker (i.e. the timeout for the configured starting value for view)
+	Start()
 }

@@ -12,7 +12,9 @@ type PubSubDistributor struct {
 	skippedAheadConsumers         []SkippedAheadConsumer
 	enteringViewConsumers         []EnteringViewConsumer
 	startingBlockTimeoutConsumers []StartingBlockTimeoutConsumer
-	startingVoteTimeoutConsumers  []StartingVoteTimeoutConsumer
+	reachedBlockTimeoutConsumers  []ReachedBlockTimeoutConsumer
+	startingVotesTimeoutConsumers []StartingVotesTimeoutConsumer
+	reachedVotesTimeoutConsumers  []ReachedVotesTimeoutConsumer
 	lock                          sync.RWMutex
 }
 
@@ -44,18 +46,36 @@ func (p *PubSubDistributor) OnStartingBlockTimeout(view uint64) {
 	}
 }
 
+func (p *PubSubDistributor) OnReachedBlockTimeout(view uint64) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.reachedBlockTimeoutConsumers {
+		subscriber.OnReachedBlockTimeout(view)
+	}
+}
+
 func (p *PubSubDistributor) OnStartingVotesTimeout(view uint64) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	for _, subscriber := range p.startingVoteTimeoutConsumers {
+	for _, subscriber := range p.startingVotesTimeoutConsumers {
 		subscriber.OnStartingVotesTimeout(view)
+	}
+}
+
+func (p *PubSubDistributor) OnReachedVotesTimeout(view uint64) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.reachedVotesTimeoutConsumers {
+		subscriber.OnReachedVotesTimeout(view)
 	}
 }
 
 // AddSkippedAheadConsumer adds an SkippedAheadConsumer to the PubSubDistributor;
 // concurrency safe; returns self-reference for chaining
 func (p *PubSubDistributor) AddSkippedAheadConsumer(cons SkippedAheadConsumer) *PubSubDistributor {
-	utils.EnsureNotNil(cons, "Event consumer")
+	if utils.IsNil(cons) {
+		return p
+	}
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.skippedAheadConsumers = append(p.skippedAheadConsumers, cons)
@@ -65,7 +85,9 @@ func (p *PubSubDistributor) AddSkippedAheadConsumer(cons SkippedAheadConsumer) *
 // AddEnteringViewConsumer adds an EnteringViewConsumer to the PubSubDistributor;
 // concurrency safe; returns self-reference for chaining
 func (p *PubSubDistributor) AddEnteringViewConsumer(cons EnteringViewConsumer) *PubSubDistributor {
-	utils.EnsureNotNil(cons, "Event consumer")
+	if utils.IsNil(cons) {
+		return p
+	}
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.enteringViewConsumers = append(p.enteringViewConsumers, cons)
@@ -75,19 +97,48 @@ func (p *PubSubDistributor) AddEnteringViewConsumer(cons EnteringViewConsumer) *
 // AddStartingBlockTimeoutConsumer adds an StartingBlockTimeoutConsumer to the PubSubDistributor;
 // concurrency safe; returns self-reference for chaining
 func (p *PubSubDistributor) AddStartingBlockTimeoutConsumer(cons StartingBlockTimeoutConsumer) *PubSubDistributor {
-	utils.EnsureNotNil(cons, "Event consumer")
+	if utils.IsNil(cons) {
+		return p
+	}
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.startingBlockTimeoutConsumers = append(p.startingBlockTimeoutConsumers, cons)
 	return p
 }
 
-// AddStartingVoteTimeoutConsumer adds an StartingVoteTimeoutConsumer to the PubSubDistributor;
+// AddReachedBlockTimeoutConsumer adds an StartingBlockTimeoutConsumer to the PubSubDistributor;
 // concurrency safe; returns self-reference for chaining
-func (p *PubSubDistributor) AddStartingVoteTimeoutConsumer(cons StartingVoteTimeoutConsumer) *PubSubDistributor {
-	utils.EnsureNotNil(cons, "Event consumer")
+func (p *PubSubDistributor) AddReachedBlockTimeoutConsumer(cons ReachedBlockTimeoutConsumer) *PubSubDistributor {
+	if utils.IsNil(cons) {
+		return p
+	}
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.startingVoteTimeoutConsumers = append(p.startingVoteTimeoutConsumers, cons)
+	p.reachedBlockTimeoutConsumers = append(p.reachedBlockTimeoutConsumers, cons)
+	return p
+}
+
+
+// AddStartingVotesTimeoutConsumer adds an StartingVoteTimeoutConsumer to the PubSubDistributor;
+// concurrency safe; returns self-reference for chaining
+func (p *PubSubDistributor) AddStartingVotesTimeoutConsumer(cons StartingVotesTimeoutConsumer) *PubSubDistributor {
+	if utils.IsNil(cons) {
+		return p
+	}
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.startingVotesTimeoutConsumers = append(p.startingVotesTimeoutConsumers, cons)
+	return p
+}
+
+// AddReachedVotesTimeoutConsumer adds an StartingVoteTimeoutConsumer to the PubSubDistributor;
+// concurrency safe; returns self-reference for chaining
+func (p *PubSubDistributor) AddReachedVotesTimeoutConsumer(cons ReachedVotesTimeoutConsumer) *PubSubDistributor {
+	if utils.IsNil(cons) {
+		return p
+	}
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.reachedVotesTimeoutConsumers = append(p.reachedVotesTimeoutConsumers, cons)
 	return p
 }
