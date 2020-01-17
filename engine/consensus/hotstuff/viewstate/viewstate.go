@@ -7,7 +7,7 @@ import (
 )
 
 type ViewState struct {
-	pc protocol.State
+	ps protocol.State
 	me module.Local
 }
 
@@ -19,4 +19,11 @@ type ViewState struct {
 
 func (vs *ViewState) IsSelf(id flow.Identifier) bool {
 	return id == vs.me.NodeID()
+}
+
+func (vs *ViewState) GetIdentitiesByRole(role flow.IdentityList) bool {
+	vs.ps
+	func(node *flow.Identity) {
+		node.Role == flow.RoleConsensus
+	}
 }
