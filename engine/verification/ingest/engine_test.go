@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -248,7 +249,7 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 		suite.SetupTest()
 		eng := suite.TestNewEngine()
 
-		// mock the receipt coming from the invalid role
+		// mock the collection coming from the invalid role
 		invalidID := unittest.IdentityFixture(unittest.WithRole(role))
 		suite.state.On("Final").Return(suite.ss).Once()
 		suite.ss.On("Identity", invalidID.NodeID).Return(invalidID, nil).Once()
@@ -261,9 +262,81 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 	}
 }
 
+func (suite *TestSuite) TestHandleExecutionState() {
+	eng := suite.TestNewEngine()
+
+	// mock the state coming from an execution node
+	exeNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+
+	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
+	suite.state.On("Final").Return(suite.ss).Once()
+	suite.ss.On("Identity", exeNodeID.NodeID).Return(exeNodeID, nil).Once()
+
+	// expect that the state be added to the mempool
+	suite.chunkStates.On("Add", &suite.chunkState).Return(nil).Once()
+
+	res := &messages.ExecutionStateResponse{
+		State: suite.chunkState,
+	}
+
+	err := eng.Process(exeNodeID.NodeID, res)
+	suite.Assert().Nil(err)
+
+	suite.chunkStates.AssertExpectations(suite.T())
+
+	// verifier should not be called
+	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
+}
+
+func (suite *TestSuite) TestHandleExecutionState_UnstakedSender() {
+	eng := suite.TestNewEngine()
+
+	// mock the receipt coming from an unstaked node
+	unstakedID := unittest.IdentifierFixture()
+	suite.state.On("Final").Return(suite.ss).Once()
+	suite.ss.On("Identity", unstakedID).Return(flow.Identity{}, errors.New("")).Once()
+
+	res := &messages.ExecutionStateResponse{
+		State: suite.chunkState,
+	}
+
+	err := eng.Process(unstakedID, res)
+	suite.Assert().Error(err)
+
+	// should not add the state to mempool
+	suite.chunkStates.AssertNotCalled(suite.T(), "Add", &suite.chunkState)
+
+	// verifier should not be called
+	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
+}
+
+func (suite *TestSuite) TestHandleExecutionState_SenderWithWrongRole() {
+
+	invalidRoles := []flow.Role{flow.RoleConsensus, flow.RoleExecution, flow.RoleVerification, flow.RoleObservation}
+
+	for _, role := range invalidRoles {
+		// refresh test state in between each loop
+		suite.SetupTest()
+		eng := suite.TestNewEngine()
+
+		// mock the state coming from the invalid role
+		invalidID := unittest.IdentityFixture(unittest.WithRole(role))
+		suite.state.On("Final").Return(suite.ss).Once()
+		suite.ss.On("Identity", invalidID.NodeID).Return(invalidID, nil).Once()
+
+		err := eng.Process(invalidID.NodeID, &suite.chunkState)
+		suite.Assert().Error(err)
+
+		// should not add state to mempool
+		suite.chunkStates.AssertNotCalled(suite.T(), "Add", &suite.chunkState)
+	}
+}
+
 // the verifier engine should be called when the receipt is ready after any
 // new resource is received.
 func (suite *TestSuite) TestVerifyReady() {
+
+	// TODO add case for execution state
 
 	execNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	collNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))

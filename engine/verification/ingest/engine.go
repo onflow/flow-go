@@ -135,6 +135,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.handleCollection(originID, resource)
 	case *messages.CollectionResponse:
 		return e.handleCollection(originID, &resource.Collection)
+	case *messages.ExecutionStateResponse:
+		return e.handleExecutionStateResponse(originID, resource)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
