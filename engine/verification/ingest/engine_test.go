@@ -44,10 +44,10 @@ type TestSuite struct {
 	collections *mempool.Collections
 	chunkStates *mempool.ChunkStates
 	// resources fixtures
-	collection flow.Collection
-	block      flow.Block
-	receipt    flow.ExecutionReceipt
-	chunkState flow.ChunkState
+	collection *flow.Collection
+	block      *flow.Block
+	receipt    *flow.ExecutionReceipt
+	chunkState *flow.ChunkState
 }
 
 // Invoking this method executes all TestSuite tests.
@@ -108,9 +108,9 @@ func (suite *TestSuite) TestHandleBlock() {
 	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{}, nil)
 
 	// expect that that the block be added to the mempool
-	suite.blocks.On("Add", &suite.block).Return(nil).Once()
+	suite.blocks.On("Add", suite.block).Return(nil).Once()
 
-	err := eng.Process(unittest.IdentifierFixture(), &suite.block)
+	err := eng.Process(unittest.IdentifierFixture(), suite.block)
 	suite.Assert().Nil(err)
 
 	suite.blocks.AssertExpectations(suite.T())
@@ -127,18 +127,20 @@ func (suite *TestSuite) TestHandleReceipt_MissingCollection() {
 	suite.ss.On("Identity", execNodeID.NodeID).Return(execNodeID, nil).Once()
 	suite.ss.On("Identities", testifymock.Anything).Return(collNodeIDs, nil).Once()
 
-	// we have the corresponding block, but not the collection
-	suite.blocks.On("Get", suite.block.ID()).Return(&suite.block, nil)
+	// we have the corresponding block and chunk state, but not the collection
+	suite.blocks.On("Get", suite.block.ID()).Return(suite.block, nil)
 	suite.collections.On("Has", suite.collection.ID()).Return(false)
+	suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
+	suite.chunkStates.On("Get", suite.chunkState.ID()).Return(suite.chunkState, nil)
 
 	// expect that the receipt be added to the mempool, and return it in All
-	suite.receipts.On("Add", &suite.receipt).Return(nil).Once()
-	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{&suite.receipt}, nil).Once()
+	suite.receipts.On("Add", suite.receipt).Return(nil).Once()
+	suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 
 	// expect that the collection is requested
 	suite.collectionsConduit.On("Submit", testifymock.Anything, collNodeIDs.Get(0).NodeID).Return(nil).Once()
 
-	err := eng.Process(execNodeID.NodeID, &suite.receipt)
+	err := eng.Process(execNodeID.NodeID, suite.receipt)
 	suite.Assert().Nil(err)
 
 	suite.receipts.AssertExpectations(suite.T())
@@ -160,11 +162,11 @@ func (suite *TestSuite) TestHandleReceipt_UnstakedSender() {
 	suite.ss.On("Identity", unstakedID).Return(flow.Identity{}, errors.New("")).Once()
 
 	// process should fail
-	err := eng.Process(unstakedID, &suite.receipt)
+	err := eng.Process(unstakedID, suite.receipt)
 	suite.Assert().Error(err)
 
 	// receipt should not be added
-	suite.receipts.AssertNotCalled(suite.T(), "Add", &suite.receipt)
+	suite.receipts.AssertNotCalled(suite.T(), "Add", suite.receipt)
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
@@ -211,9 +213,9 @@ func (suite *TestSuite) TestHandleCollection() {
 	suite.ss.On("Identity", collNodeID.NodeID).Return(collNodeID, nil).Once()
 
 	// expect that the collection be added to the mempool
-	suite.collections.On("Add", &suite.collection).Return(nil).Once()
+	suite.collections.On("Add", suite.collection).Return(nil).Once()
 
-	err := eng.Process(collNodeID.NodeID, &suite.collection)
+	err := eng.Process(collNodeID.NodeID, suite.collection)
 	suite.Assert().Nil(err)
 
 	suite.collections.AssertExpectations(suite.T())
@@ -230,11 +232,11 @@ func (suite *TestSuite) TestHandleCollection_UnstakedSender() {
 	suite.state.On("Final").Return(suite.ss).Once()
 	suite.ss.On("Identity", unstakedID).Return(flow.Identity{}, errors.New("")).Once()
 
-	err := eng.Process(unstakedID, &suite.collection)
+	err := eng.Process(unstakedID, suite.collection)
 	suite.Assert().Error(err)
 
 	// should not add collection to mempool
-	suite.collections.AssertNotCalled(suite.T(), "Add", &suite.collection)
+	suite.collections.AssertNotCalled(suite.T(), "Add", suite.collection)
 
 	// should not call verifier
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
@@ -254,11 +256,11 @@ func (suite *TestSuite) TestHandleCollection_SenderWithWrongRole() {
 		suite.state.On("Final").Return(suite.ss).Once()
 		suite.ss.On("Identity", invalidID.NodeID).Return(invalidID, nil).Once()
 
-		err := eng.Process(invalidID.NodeID, &suite.collection)
+		err := eng.Process(invalidID.NodeID, suite.collection)
 		suite.Assert().Error(err)
 
 		// should not add collection to mempool
-		suite.collections.AssertNotCalled(suite.T(), "Add", &suite.collection)
+		suite.collections.AssertNotCalled(suite.T(), "Add", suite.collection)
 	}
 }
 
@@ -273,10 +275,10 @@ func (suite *TestSuite) TestHandleExecutionState() {
 	suite.ss.On("Identity", exeNodeID.NodeID).Return(exeNodeID, nil).Once()
 
 	// expect that the state be added to the mempool
-	suite.chunkStates.On("Add", &suite.chunkState).Return(nil).Once()
+	suite.chunkStates.On("Add", suite.chunkState).Return(nil).Once()
 
 	res := &messages.ExecutionStateResponse{
-		State: suite.chunkState,
+		State: *suite.chunkState,
 	}
 
 	err := eng.Process(exeNodeID.NodeID, res)
@@ -297,14 +299,14 @@ func (suite *TestSuite) TestHandleExecutionState_UnstakedSender() {
 	suite.ss.On("Identity", unstakedID).Return(flow.Identity{}, errors.New("")).Once()
 
 	res := &messages.ExecutionStateResponse{
-		State: suite.chunkState,
+		State: *suite.chunkState,
 	}
 
 	err := eng.Process(unstakedID, res)
 	suite.Assert().Error(err)
 
 	// should not add the state to mempool
-	suite.chunkStates.AssertNotCalled(suite.T(), "Add", &suite.chunkState)
+	suite.chunkStates.AssertNotCalled(suite.T(), "Add", suite.chunkState)
 
 	// verifier should not be called
 	suite.verifierEng.AssertNotCalled(suite.T(), "ProcessLocal", testifymock.Anything)
@@ -324,41 +326,47 @@ func (suite *TestSuite) TestHandleExecutionState_SenderWithWrongRole() {
 		suite.state.On("Final").Return(suite.ss).Once()
 		suite.ss.On("Identity", invalidID.NodeID).Return(invalidID, nil).Once()
 
-		err := eng.Process(invalidID.NodeID, &suite.chunkState)
+		err := eng.Process(invalidID.NodeID, suite.chunkState)
 		suite.Assert().Error(err)
 
 		// should not add state to mempool
-		suite.chunkStates.AssertNotCalled(suite.T(), "Add", &suite.chunkState)
+		suite.chunkStates.AssertNotCalled(suite.T(), "Add", suite.chunkState)
 	}
 }
 
 // the verifier engine should be called when the receipt is ready after any
-// new resource is received.
+// new received is received.
 func (suite *TestSuite) TestVerifyReady() {
-
-	// TODO add case for execution state
 
 	execNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 	collNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	consNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 
 	testcases := []struct {
-		resource interface{}
-		from     flow.Identity
-		label    string
+		getResource func(*TestSuite) interface{}
+		from        flow.Identity
+		label       string
 	}{
 		{
-			resource: &suite.receipt,
-			from:     execNodeID,
-			label:    "received receipt",
+			getResource: func(s *TestSuite) interface{} { return s.receipt },
+			from:        execNodeID,
+			label:       "received receipt",
 		}, {
-			resource: &suite.collection,
-			from:     collNodeID,
-			label:    "received collection",
+			getResource: func(s *TestSuite) interface{} { return s.collection },
+			from:        collNodeID,
+			label:       "received collection",
 		}, {
-			resource: &suite.block,
-			from:     consNodeID,
-			label:    "received block",
+			getResource: func(s *TestSuite) interface{} { return s.block },
+			from:        consNodeID,
+			label:       "received block",
+		}, {
+			getResource: func(s *TestSuite) interface{} {
+				return &messages.ExecutionStateResponse{
+					State: *s.chunkState,
+				}
+			},
+			from:  execNodeID,
+			label: "received execution state",
 		},
 	}
 
@@ -371,29 +379,35 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.ss.On("Identity", testcase.from.NodeID).Return(testcase.from, nil).Once()
 
 			// allow adding the received resource to mempool
-			suite.receipts.On("Add", &suite.receipt).Return(nil)
-			suite.collections.On("Add", &suite.collection).Return(nil)
-			suite.blocks.On("Add", &suite.block).Return(nil)
+			suite.receipts.On("Add", suite.receipt).Return(nil)
+			suite.collections.On("Add", suite.collection).Return(nil)
+			suite.blocks.On("Add", suite.block).Return(nil)
+			suite.chunkStates.On("Add", suite.chunkState).Return(nil)
 
 			// we have all dependencies
-			suite.blocks.On("Get", suite.block.ID()).Return(&suite.block, nil)
+			suite.blocks.On("Get", suite.block.ID()).Return(suite.block, nil)
 			suite.collections.On("Has", suite.collection.ID()).Return(true)
-			suite.collections.On("Get", suite.collection.ID()).Return(&suite.collection, nil)
-			suite.receipts.On("All").Return([]*flow.ExecutionReceipt{&suite.receipt}, nil).Once()
+			suite.collections.On("Get", suite.collection.ID()).Return(suite.collection, nil)
+			suite.chunkStates.On("Has", suite.chunkState.ID()).Return(true)
+			suite.chunkStates.On("Get", suite.chunkState.ID()).Return(suite.chunkState, nil)
+			suite.receipts.On("All").Return([]*flow.ExecutionReceipt{suite.receipt}, nil).Once()
 
 			// we should call the verifier engine, as the receipt is ready for verification
 			suite.verifierEng.On("ProcessLocal", testifymock.Anything).Return(nil).Once()
 			// the receipt should be removed from mempool
 			suite.receipts.On("Rem", suite.receipt.ID()).Return(true).Once()
 
-			// submit the resource
-			err := eng.Process(testcase.from.NodeID, testcase.resource)
+			// get the resource to use from the current test suite
+			received := testcase.getResource(suite)
+			err := eng.Process(testcase.from.NodeID, received)
 			suite.Assert().Nil(err)
 
 			suite.verifierEng.AssertExpectations(suite.T())
 
 			// the collection should not be requested
 			suite.collectionsConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, collNodeID)
+			// the chunk state should not be requested
+			suite.statesConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, execNodeID)
 		})
 	}
 }

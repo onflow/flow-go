@@ -276,9 +276,9 @@ func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 	}
 
 	return verification.CompleteExecutionResult{
-		Receipt:     receipt,
-		Block:       block,
-		Collections: []flow.Collection{coll},
-		ChunkStates: []flow.ChunkState{chunkState},
+		Receipt:     &receipt,
+		Block:       &block,
+		Collections: []*flow.Collection{&coll},
+		ChunkStates: []*flow.ChunkState{&chunkState},
 	}
 }

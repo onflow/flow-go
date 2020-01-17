@@ -295,33 +295,98 @@ func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 	return nil
 }
 
-// checkReceiptCollections checks all collections depended on by the
-// given execution receipt. Returns true if all collections are available
-// locally. If the collections are not available locally, they are requested.
-func (e *Engine) checkReceiptCollections(receipt *flow.ExecutionReceipt) bool {
-	result := receipt.ExecutionResult
-	blockID := result.BlockID
-
-	log := e.log.With().
-		Hex("block_id", logging.ID(blockID)).
-		Hex("receipt_id", logging.Entity(receipt)).
-		Logger()
-
+// getBlockForReceipt checks the block referenced by the given receipt. If the
+// block is available locally, returns true and the block. Otherwise, returns
+// false and requests the block.
+// TODO does not yet request block
+func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
 	// ensure we have the block corresponding to this execution
-	block, err := e.blocks.Get(blockID)
+	block, err := e.blocks.Get(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		// TODO should request the block here. For now, we require that we
 		// have received the block at this point as there is no way to request it
-		log.Error().
-			Err(err).
-			Msg("could not check collections - missing block")
-		return false
+		return nil, false
 	}
 
-	chunks := result.Chunks.Items()
+	return block, true
+}
 
-	// whether the receipt is ready for verification
+// getChunkStatesForReceipt checks all chunk states depended on by the given
+// execution receipt. If all chunk states are available locally, returns true
+// and an list of the required chunk states, ordered by their block order.
+// Otherwise, returns false and requests any chunk states that are not yet
+// locally available.
+func (e *Engine) getChunkStatesForReceipt(receipt *flow.ExecutionReceipt) ([]*flow.ChunkState, bool) {
+
+	log := e.log.With().
+		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
+		Hex("receipt_id", logging.Entity(receipt)).
+		Logger()
+
+	chunks := receipt.ExecutionResult.Chunks.Items()
+
+	// whether all chunk states for the receipt are available locally
 	ready := true
+	chunkStates := make([]*flow.ChunkState, 0, len(chunks))
+
+	for _, chunk := range chunks {
+		if !e.chunkStates.Has(chunk.ID()) {
+			// a chunk state is missing, the receipt cannot yet be verified
+			ready = false
+
+			// TODO rate limit these requests
+			err := e.requestExecutionState(chunk.ID())
+			if err != nil {
+				log.Error().
+					Err(err).
+					Hex("chunk_id", logging.ID(chunk.ID())).
+					Msg("could not request chunk state")
+			}
+			continue
+		}
+
+		chunkState, err := e.chunkStates.Get(chunk.ID())
+		if err != nil {
+			// couldn't get chunk state from mempool, the receipt cannot yet be verified
+			ready = false
+
+			log.Error().
+				Err(err).
+				Hex("chunk_id", logging.ID(chunk.ID())).
+				Msg("could not get chunk")
+			continue
+		}
+
+		chunkStates = append(chunkStates, chunkState)
+	}
+
+	// sanity check to ensure no chunk states were missed
+	if len(chunks) != len(chunkStates) {
+		ready = false
+	}
+
+	if ready {
+		return chunkStates, true
+	}
+
+	return nil, false
+}
+
+// getCollectionsForReceipt checks all collections depended on by the
+// given execution receipt. Returns true if all collections are available
+// locally. If the collections are not available locally, they are requested.
+func (e *Engine) getCollectionsForReceipt(block *flow.Block, receipt *flow.ExecutionReceipt) ([]*flow.Collection, bool) {
+
+	log := e.log.With().
+		Hex("block_id", logging.ID(block.ID())).
+		Hex("receipt_id", logging.Entity(receipt)).
+		Logger()
+
+	chunks := receipt.ExecutionResult.Chunks.Items()
+
+	// whether all collections for the receipt are available locally
+	ready := true
+	collections := make([]*flow.Collection, 0, len(chunks))
 
 	for _, chunk := range chunks {
 		collIndex := int(chunk.CollectionIndex)
@@ -330,12 +395,16 @@ func (e *Engine) checkReceiptCollections(receipt *flow.ExecutionReceipt) bool {
 		if len(block.Guarantees) <= collIndex {
 			log.Error().
 				Int("collection_index", collIndex).
-				Msg("could not check collections - invalid collection index")
-			continue
+				Msg("could not get collections - invalid collection index")
+
+			// TODO this means the block or receipt is invalid, for now fail fast
+			ready = false
+			break
 		}
 
 		// request the collection if we don't already have it
 		collID := block.Guarantees[collIndex].ID()
+
 		if !e.collections.Has(collID) {
 			// a collection is missing, the receipt cannot yet be verified
 			ready = false
@@ -347,21 +416,35 @@ func (e *Engine) checkReceiptCollections(receipt *flow.ExecutionReceipt) bool {
 					Err(err).
 					Hex("collection_id", logging.ID(collID)).
 					Msg("could not request collection")
-				continue
 			}
+			continue
 		}
+
+		coll, err := e.collections.Get(collID)
+		if err != nil {
+			// couldn't get the collection from mempool, the receipt cannot be verified
+			ready = false
+
+			log.Error().
+				Err(err).
+				Hex("collection_id", logging.ID(collID)).
+				Msg("could not get collection")
+			continue
+		}
+
+		collections = append(collections, coll)
 	}
 
-	return ready
-}
+	// sanity check to ensure no chunk states were missed
+	if len(chunks) != len(collections) {
+		ready = false
+	}
 
-// getCompleteExecutionResult creates a complete execution result for a receipt
-// whose dependencies are all locally available.
-func (e *Engine) getCompleteExecutionResult(receipt *flow.ExecutionReceipt) (*verification.CompleteExecutionResult, error) {
-	// TODO
-	return &verification.CompleteExecutionResult{
-		Receipt: *receipt,
-	}, nil
+	if ready {
+		return collections, true
+	}
+
+	return nil, false
 }
 
 // checkPendingReceipts checks all pending receipts in the mempool and verifies
@@ -371,10 +454,27 @@ func (e *Engine) checkPendingReceipts() {
 	receipts := e.receipts.All()
 
 	for _, receipt := range receipts {
-		ready := e.checkReceiptCollections(receipt)
-		if ready {
+		block, blockReady := e.getBlockForReceipt(receipt)
 
-			res, err := e.getCompleteExecutionResult(receipt)
+		chunkStates, chunkStatesReady := e.getChunkStatesForReceipt(receipt)
+
+		// we can't get collections without the block
+		if !blockReady {
+			continue
+		}
+
+		collections, collectionsReady := e.getCollectionsForReceipt(block, receipt)
+
+		if blockReady && chunkStatesReady && collectionsReady {
+			res := verification.CompleteExecutionResult{
+				Receipt:     receipt,
+				Block:       block,
+				Collections: collections,
+				ChunkStates: chunkStates,
+			}
+
+			// verify the receipt
+			err := e.verifierEng.ProcessLocal(res)
 			if err != nil {
 				e.log.Error().
 					Err(err).
@@ -383,14 +483,7 @@ func (e *Engine) checkPendingReceipts() {
 				continue
 			}
 
-			err = e.verifierEng.ProcessLocal(res)
-			if err != nil {
-				e.log.Error().
-					Err(err).
-					Hex("result_id", logging.Entity(receipt.ExecutionResult)).
-					Msg("could not get complete execution result")
-				continue
-			}
+			// if the receipt was verified, remove it from the mempool
 			e.receipts.Rem(receipt.ID())
 		}
 	}
