@@ -31,7 +31,7 @@ import (
 )
 
 func GenericNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block, options ...func(*protocol.State)) mock.GenericNode {
-	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
+	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 
 	db := unittest.TempBadgerDB(t)
 
