@@ -483,8 +483,15 @@ func (e *Engine) checkPendingReceipts() {
 				continue
 			}
 
-			// if the receipt was verified, remove it from the mempool
+			// if the receipt was verified, remove it and associated resources from the mempool
 			e.receipts.Rem(receipt.ID())
+			e.blocks.Rem(block.ID())
+			for _, coll := range collections {
+				e.collections.Rem(coll.ID())
+			}
+			for _, chunkState := range chunkStates {
+				e.chunkStates.Rem(chunkState.ID())
+			}
 		}
 	}
 }

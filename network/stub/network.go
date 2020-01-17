@@ -94,16 +94,22 @@ func (mn *Network) FlushAll() {
 	mn.hub.Buffer.Flush(mn.sendToAllTargets)
 }
 
-// FlushAllExcept takes a function which determines whether a message should be blocked,
-// and go through all pending messages in the buffer, ignore the blocked ones, and send out
-// unblocked messages.
-// It runs in a loop until all the pending messages have been either blocked or sent out.
+// FlushAllExcept flushes all pending messages in the buffer except those that
+// satisfy the shouldBlock predicate function.
 func (mn *Network) FlushAllExcept(shouldBlock func(*PendingMessage) bool) {
+	mn.FlushOnly(func(m *PendingMessage) bool {
+		return !shouldBlock(m)
+	})
+}
+
+// FlushOnly flushes any pending messages in the buffer that satisfy the
+// shouldAllow predicate function.
+func (mn *Network) FlushOnly(shouldAllow func(*PendingMessage) bool) {
 	mn.hub.Buffer.Flush(func(m *PendingMessage) error {
-		if shouldBlock(m) {
-			return nil
+		if shouldAllow(m) {
+			return mn.sendToAllTargets(m)
 		}
-		return mn.sendToAllTargets(m)
+		return nil
 	})
 }
 

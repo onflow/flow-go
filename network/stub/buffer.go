@@ -44,7 +44,9 @@ func (b *Buffer) Save(from flow.Identifier, channelID uint8, event interface{}, 
 // Flush recursively delivers the pending messages until the buffer is empty
 func (b *Buffer) Flush(sendOne func(*PendingMessage) error) {
 	for {
-		toSend := b.takeAll()
+		b.Lock()
+		toSend := b.pending[:]
+		b.Unlock()
 
 		// This check is necessary to exit the endless forloop
 		if len(toSend) == 0 {

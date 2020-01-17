@@ -179,30 +179,38 @@ func TestHappyPath(t *testing.T) {
 	// flush the chunk state request
 	verNet, ok := hub.GetNetwork(verID.NodeID)
 	assert.True(t, ok)
-	verNet.FlushAll()
+	verNet.FlushOnly(func(m *stub.PendingMessage) bool {
+		return m.ChannelID == engine.StateProvider
+	})
 
 	// flush the chunk state response
 	exeNet, ok := hub.GetNetwork(exeID.NodeID)
 	assert.True(t, ok)
-	exeNet.FlushAll()
+	exeNet.FlushOnly(func(m *stub.PendingMessage) bool {
+		return m.ChannelID == engine.StateProvider
+	})
 
 	// the chunk state should be added to the mempool
 	assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[0].ID()))
 
 	// flush the collection request
-	verNet.FlushAll()
+	verNet.FlushOnly(func(m *stub.PendingMessage) bool {
+		return m.ChannelID == engine.CollectionProvider
+	})
 
 	// flush the collection response
 	colNet, ok := hub.GetNetwork(colID.NodeID)
 	assert.True(t, ok)
-	colNet.FlushAll()
-
-	// the collection should be stored in the mempool
-	assert.True(t, verNode.Collections.Has(completeER.Collections[0].ID()))
+	colNet.FlushOnly(func(m *stub.PendingMessage) bool {
+		return m.ChannelID == engine.CollectionProvider
+	})
 
 	// flush the result approval broadcast
 	verNet.FlushAll()
 
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
+
+	// the receipt should be removed from the mempool
+	assert.False(t, verNode.Receipts.Has(completeER.Receipt.ID()))
 }

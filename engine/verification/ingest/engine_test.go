@@ -335,8 +335,8 @@ func (suite *TestSuite) TestHandleExecutionState_SenderWithWrongRole() {
 	}
 }
 
-// the verifier engine should be called when the receipt is ready after any
-// new received is received.
+// the verifier engine should be called when the receipt is ready regardless of
+// the order in which dependent resources are received.
 func (suite *TestSuite) TestVerifyReady() {
 
 	execNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
@@ -395,8 +395,11 @@ func (suite *TestSuite) TestVerifyReady() {
 
 			// we should call the verifier engine, as the receipt is ready for verification
 			suite.verifierEng.On("ProcessLocal", testifymock.Anything).Return(nil).Once()
-			// the receipt should be removed from mempool
+			// the receipt and all dependent resources should be removed from mempool
 			suite.receipts.On("Rem", suite.receipt.ID()).Return(true).Once()
+			suite.blocks.On("Rem", suite.block.ID()).Return(true).Once()
+			suite.collections.On("Rem", suite.collection.ID()).Return(true).Once()
+			suite.chunkStates.On("Rem", suite.chunkState.ID()).Return(true).Once()
 
 			// get the resource to use from the current test suite
 			received := testcase.getResource(suite)
@@ -409,6 +412,12 @@ func (suite *TestSuite) TestVerifyReady() {
 			suite.collectionsConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, collNodeID)
 			// the chunk state should not be requested
 			suite.statesConduit.AssertNotCalled(suite.T(), "Submit", testifymock.Anything, execNodeID)
+
+			// the dependent resources should be removed from the mempool
+			suite.receipts.AssertCalled(suite.T(), "Rem", suite.receipt.ID())
+			suite.blocks.AssertCalled(suite.T(), "Rem", suite.block.ID())
+			suite.collections.AssertCalled(suite.T(), "Rem", suite.collection.ID())
+			suite.chunkStates.AssertCalled(suite.T(), "Rem", suite.chunkState.ID())
 		})
 	}
 }
