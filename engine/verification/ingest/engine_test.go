@@ -202,6 +202,7 @@ func (suite *TestSuite) TestHandleReceipt_SenderWithWrongRole() {
 	}
 }
 
+// receive a collection without any other receipt-dependent resources
 func (suite *TestSuite) TestHandleCollection() {
 	eng := suite.TestNewEngine()
 

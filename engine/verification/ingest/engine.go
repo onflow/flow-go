@@ -466,7 +466,7 @@ func (e *Engine) checkPendingReceipts() {
 		collections, collectionsReady := e.getCollectionsForReceipt(block, receipt)
 
 		if blockReady && chunkStatesReady && collectionsReady {
-			res := verification.CompleteExecutionResult{
+			res := &verification.CompleteExecutionResult{
 				Receipt:     receipt,
 				Block:       block,
 				Collections: collections,

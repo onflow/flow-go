@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/messages"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -124,7 +125,29 @@ func TestHappyPath(t *testing.T) {
 
 	completeER := unittest.CompleteExecutionResultFixture()
 
-	// mock the consensus node with a generic node and mocked engine
+	// mock the execution node with a generic node and mocked engine
+	// to handle request for chunk state
+	exeNode := testutil.GenericNode(t, hub, exeID, genesis)
+	exeEngine := new(network.Engine)
+	exeConduit, err := exeNode.Net.Register(engine.StateProvider, exeEngine)
+	assert.Nil(t, err)
+	exeEngine.On("Process", verID.NodeID, testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			req, ok := args[1].(*messages.ExecutionStateRequest)
+			require.True(t, ok)
+			assert.Equal(t, completeER.Receipt.ExecutionResult.Chunks.ByIndex(0).ID(), req.ChunkID)
+
+			res := &messages.ExecutionStateResponse{
+				State: *completeER.ChunkStates[0],
+			}
+			err := exeConduit.Submit(res, verID.NodeID)
+			assert.Nil(t, err)
+		}).
+		Return(nil).
+		Once()
+
+	// mock the consensus node with a generic node and mocked engine to assert
+	// that the result approval is broadcast
 	conNode := testutil.GenericNode(t, hub, conID, genesis)
 	conEngine := new(network.Engine)
 	conEngine.On("Process", verID.NodeID, testifymock.Anything).
@@ -135,27 +158,38 @@ func TestHappyPath(t *testing.T) {
 		}).
 		Return(nil).
 		Once()
-	_, err := conNode.Net.Register(engine.ApprovalProvider, conEngine)
+	_, err = conNode.Net.Register(engine.ApprovalProvider, conEngine)
 	assert.Nil(t, err)
 
 	// assume the verification node has received the block
-	err = verNode.Blocks.Add(&completeER.Block)
+	err = verNode.Blocks.Add(completeER.Block)
 	assert.Nil(t, err)
 
 	// inject the collection into the collection node mempool
-	err = colNode.Collections.Store(&completeER.Collections[0])
+	err = colNode.Collections.Store(completeER.Collections[0])
 	assert.Nil(t, err)
 
 	// send the ER from execution to verification node
-	err = verNode.ReceiptsEngine.Process(exeID.NodeID, &completeER.Receipt)
+	err = verNode.ReceiptsEngine.Process(exeID.NodeID, completeER.Receipt)
 	assert.Nil(t, err)
 
 	// the receipt should be added to the mempool
 	assert.True(t, verNode.Receipts.Has(completeER.Receipt.ID()))
 
-	// flush the collection request
+	// flush the chunk state request
 	verNet, ok := hub.GetNetwork(verID.NodeID)
 	assert.True(t, ok)
+	verNet.FlushAll()
+
+	// flush the chunk state response
+	exeNet, ok := hub.GetNetwork(exeID.NodeID)
+	assert.True(t, ok)
+	exeNet.FlushAll()
+
+	// the chunk state should be added to the mempool
+	assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[0].ID()))
+
+	// flush the collection request
 	verNet.FlushAll()
 
 	// flush the collection response
