@@ -19,15 +19,9 @@ import (
 func TestExecutionFlow(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
-	colID := unittest.IdentityFixture(func(id *flow.Identity) {
-		id.Role = flow.RoleCollection
-	})
-	conID := unittest.IdentityFixture(func(id *flow.Identity) {
-		id.Role = flow.RoleConsensus
-	})
-	exeID := unittest.IdentityFixture(func(id *flow.Identity) {
-		id.Role = flow.RoleExecution
-	})
+	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
 	identities := flow.IdentityList{colID, conID, exeID}
 
