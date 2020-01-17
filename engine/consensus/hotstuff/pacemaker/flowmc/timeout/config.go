@@ -1,0 +1,72 @@
+package timeout
+
+import (
+	"fmt"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+)
+
+// TimoutConfig implements a timout with:
+// - on timeout: increase timeout by multiplicative factor `timeoutIncrease` (user-specified)
+//   this results in exponential growing timeout duration on multiple subsequent timeouts
+// - on progress: decrease timeout by subtrahend `timeoutDecrease`
+type TimoutConfig struct {
+	// replicaTimeout is the duration of a view before we time out [Milliseconds]
+	// replicaTimeout is the only variable quantity
+	replicaTimeout float64
+
+	// replicaTimeout is the duration of a view before we time out [Milliseconds]
+	minReplicaTimeout float64
+	// voteAggregationTimeoutFraction is a fraction of replicaTimeout which is reserved for aggregating votes
+	voteAggregationTimeoutFraction float64
+	// timeoutDecrease: multiplicative factor for increasing timeout
+	timeoutIncrease float64
+	// timeoutDecrease linear subtrahend for timeout decrease [Milliseconds]
+	timeoutDecrease float64
+}
+
+// NewTimoutConfig creates a new TimoutConfig.
+// startReplicaTimeout: starting timeout value for replica round [Milliseconds];
+// minReplicaTimeout: minimal timeout value for replica round [Milliseconds];
+// voteAggregationTimeoutFraction: fraction of replicaTimeout which is reserved for aggregating votes;
+// timeoutIncrease: multiplicative factor for increasing timeout;
+// timeoutDecrease: linear subtrahend for timeout decrease [Milliseconds]
+func NewConfig(startReplicaTimeout, minReplicaTimeout, voteAggregationTimeoutFraction, timeoutIncrease, timeoutDecrease float64) (*TimoutConfig, error) {
+	if startReplicaTimeout < minReplicaTimeout {
+		msg := fmt.Sprintf("startReplicaTimeout (%f) cannot be smaller than minReplicaTimeout (%f)",
+			startReplicaTimeout, minReplicaTimeout)
+		return nil, &types.ErrorConfiguration{msg}
+	}
+	if minReplicaTimeout < 0 {
+		return nil, &types.ErrorConfiguration{"minReplicaTimeout must non-negative"}
+	}
+	if voteAggregationTimeoutFraction <= 0 || 1 < voteAggregationTimeoutFraction {
+		return nil, &types.ErrorConfiguration{"VoteAggregationTimeoutFraction must be in range (0,1]"}
+	}
+	if timeoutIncrease <= 1 {
+		return nil, &types.ErrorConfiguration{"TimeoutIncrease must be strictly bigger than 1"}
+	}
+	if timeoutDecrease <= 0 {
+		return nil, &types.ErrorConfiguration{"timeoutDecrease must positive"}
+	}
+	tc := TimoutConfig{
+		replicaTimeout:                 startReplicaTimeout,
+		minReplicaTimeout:              minReplicaTimeout,
+		voteAggregationTimeoutFraction: voteAggregationTimeoutFraction,
+		timeoutIncrease:                timeoutIncrease,
+		timeoutDecrease:                timeoutDecrease,
+	}
+	return &tc, nil
+}
+
+func DefaultConfig() *TimoutConfig {
+	tc, err := NewConfig(
+		1200,
+		1200,
+		0.5,
+		1.5,
+		800)
+	if err != nil { // should never happen
+		panic("Default timeout config does not comply with internal TimoutConfig conditions")
+	}
+	return tc
+}
