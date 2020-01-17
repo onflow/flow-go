@@ -19,13 +19,13 @@ type FlowMC struct {
 
 func New(startView uint64, timeoutController *timeout.Controller, eventProc notifications.Distributor) (hotstuff.PaceMaker, error) {
 	if startView < 1 {
-		return nil, &types.ErrorConfiguration{"Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)"}
+		return nil, &types.ErrorConfiguration{Msg: "Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)"}
 	}
 	if utils.IsNil(timeoutController) {
 		timeoutController = timeout.DefaultController()
 	}
 	if utils.IsNil(eventProc) {
-		return nil, &types.ErrorConfiguration{"notifications.Distributor cannot be nil"}
+		return nil, &types.ErrorConfiguration{Msg: "notifications.Distributor cannot be nil"}
 	}
 	pm := FlowMC{
 		currentView:    startView,
@@ -61,7 +61,7 @@ func (p *FlowMC) UpdateCurViewWithQC(qc *types.QuorumCertificate) (*types.NewVie
 	// => replica can skip ahead to view qc.view + 1
 	newView := qc.View + 1
 	p.startView(newView)
-	return &types.NewViewEvent{newView}, true
+	return &types.NewViewEvent{View: newView}, true
 }
 
 func (p *FlowMC) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
@@ -93,7 +93,7 @@ func (p *FlowMC) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForN
 
 	newView := p.currentView + 1
 	p.startView(newView)
-	return &types.NewViewEvent{newView}, true
+	return &types.NewViewEvent{View: newView}, true
 }
 
 func (p *FlowMC) OnTimeout() (*types.NewViewEvent, bool) {
@@ -105,7 +105,7 @@ func (p *FlowMC) OnTimeout() (*types.NewViewEvent, bool) {
 
 	newView := p.currentView + 1
 	p.startView(newView)
-	return &types.NewViewEvent{newView}, true
+	return &types.NewViewEvent{View: newView}, true
 }
 
 func (p *FlowMC) Start() {

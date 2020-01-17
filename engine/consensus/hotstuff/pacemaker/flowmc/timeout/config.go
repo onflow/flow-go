@@ -35,19 +35,19 @@ func NewConfig(startReplicaTimeout, minReplicaTimeout, voteAggregationTimeoutFra
 	if startReplicaTimeout < minReplicaTimeout {
 		msg := fmt.Sprintf("startReplicaTimeout (%f) cannot be smaller than minReplicaTimeout (%f)",
 			startReplicaTimeout, minReplicaTimeout)
-		return nil, &types.ErrorConfiguration{msg}
+		return nil, &types.ErrorConfiguration{Msg: msg}
 	}
 	if minReplicaTimeout < 0 {
-		return nil, &types.ErrorConfiguration{"minReplicaTimeout must non-negative"}
+		return nil, &types.ErrorConfiguration{Msg: "minReplicaTimeout must non-negative"}
 	}
 	if voteAggregationTimeoutFraction <= 0 || 1 < voteAggregationTimeoutFraction {
-		return nil, &types.ErrorConfiguration{"VoteAggregationTimeoutFraction must be in range (0,1]"}
+		return nil, &types.ErrorConfiguration{Msg: "VoteAggregationTimeoutFraction must be in range (0,1]"}
 	}
 	if timeoutIncrease <= 1 {
-		return nil, &types.ErrorConfiguration{"TimeoutIncrease must be strictly bigger than 1"}
+		return nil, &types.ErrorConfiguration{Msg: "TimeoutIncrease must be strictly bigger than 1"}
 	}
 	if timeoutDecrease <= 0 {
-		return nil, &types.ErrorConfiguration{"timeoutDecrease must positive"}
+		return nil, &types.ErrorConfiguration{Msg: "timeoutDecrease must positive"}
 	}
 	tc := Config{
 		replicaTimeout:                 startReplicaTimeout,
