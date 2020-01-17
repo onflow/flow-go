@@ -545,6 +545,26 @@ static void mapToG1_opswu(ep_st* p, const uint8_t *msg, int len) {
 		THROW(ERR_CAUGHT);
 	}
 }
+
+// This is a testing funstion for the Optimized SwU core
+void opswu_test(uint8_t *out, const uint8_t *msg, int len){
+    if (len != Fp_BYTES) {
+            THROW(ERR_NO_BUFFER);
+    }
+    fp_t t;
+    bn_st tmp;
+    bn_new(&tmp);
+    bn_read_bin(&tmp, msg, len);
+    fp_prime_conv(t, &tmp);
+    bn_free(&tmp);
+
+    ep_st p;
+    ep_new(&p);
+    mapToE1_swu(&p, t); // map to E1
+    eval_iso11(&p, &p); // map to E
+    clear_cofactor(&p, &p); // map to G1
+    _ep_write_bin_compact(out, &p, SIGNATURE_LEN);
+}
 #endif
 
 // computes a hash of input data to G1

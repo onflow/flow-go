@@ -23,6 +23,6 @@ void    fp_read_raw(fp_t a, const dig_t *raw, int len);
 void    _seed_relic(byte*, int);
 void    _bn_randZr(bn_t);
 void    _G1scalarGenMult(ep_st*, const bn_st*);
-ep_st*  _hashToG1(const byte* data, const int len);
+void    opswu_test(uint8_t *, const uint8_t *, int);
 
 #endif
