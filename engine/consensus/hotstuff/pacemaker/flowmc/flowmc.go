@@ -12,7 +12,7 @@ import (
 type FlowMC struct {
 	currentView       uint64
 	timeoutControl    *timeout.Controller
-	eventProcessor    notifications.Distributor
+	notifier          notifications.Distributor
 	onWaitingForVotes bool
 	started           bool
 }
@@ -30,7 +30,7 @@ func New(startView uint64, timeoutController *timeout.Controller, eventProc noti
 	pm := FlowMC{
 		currentView:    startView,
 		timeoutControl: timeoutController,
-		eventProcessor: eventProc,
+		notifier:       eventProc,
 		started:        false,
 	}
 	return &pm, nil
@@ -38,11 +38,11 @@ func New(startView uint64, timeoutController *timeout.Controller, eventProc noti
 
 func (p *FlowMC) startView(newView uint64) {
 	if newView > p.currentView+1 {
-		p.eventProcessor.OnSkippedAhead(newView)
+		p.notifier.OnSkippedAhead(newView)
 	}
 	p.currentView = newView
 	p.onWaitingForVotes = false
-	p.eventProcessor.OnStartingBlockTimeout(newView)
+	p.notifier.OnStartingBlockTimeout(newView)
 	p.timeoutControl.StartTimeout(timeout.ReplicaTimeout)
 }
 
@@ -87,7 +87,7 @@ func (p *FlowMC) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForN
 	if isLeaderForNextView {
 		p.onWaitingForVotes = true
 		p.timeoutControl.StartTimeout(timeout.VoteCollectionTimeout)
-		p.eventProcessor.OnStartingVotesTimeout(p.currentView)
+		p.notifier.OnStartingVotesTimeout(p.currentView)
 		return nil, false
 	}
 
@@ -98,9 +98,9 @@ func (p *FlowMC) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForN
 
 func (p *FlowMC) OnTimeout() (*types.NewViewEvent, bool) {
 	if p.onWaitingForVotes {
-		p.eventProcessor.OnReachedVotesTimeout(p.currentView)
+		p.notifier.OnReachedVotesTimeout(p.currentView)
 	} else {
-		p.eventProcessor.OnReachedBlockTimeout(p.currentView)
+		p.notifier.OnReachedBlockTimeout(p.currentView)
 	}
 
 	newView := p.currentView + 1
