@@ -198,6 +198,57 @@ func (l *LibP2PNodeTestSuite) TestPubSub() {
 	}
 }
 
+func (l *LibP2PNodeTestSuite) TestCreateStream() {
+	defer l.cancel()
+	count := 2
+
+	// Creates nodes
+	nodes := l.CreateNodes(count)
+	defer l.StopNodes(nodes)
+
+	// Create target NodeAddress
+	ip2, port2 := nodes[1].GetIPPort()
+	name2 := nodes[1].name
+	na2 := NodeAddress{IP: ip2, Port: port2, Name: name2}
+
+	// Assert that there is no outbound stream to the target yet
+	require.Equal(l.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolID, network.DirOutbound))
+
+	// Create the outbound stream by calling CreateStream
+	firstStream, err := nodes[0].CreateStream(context.Background(), na2)
+	// Assert the stream creation was successful
+	require.NoError(l.T(), err)
+	require.NotNil(l.T(), firstStream)
+	require.Equal(l.T(), 1, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolID, network.DirOutbound))
+
+	// Assert that the stream can be written to without error
+	n, err := firstStream.Write([]byte("bkjbjbkjbk"))
+	require.NoError(l.T(), err)
+	require.Greater(l.T(), n, 0)
+
+	// Now attempt to create another outbound stream by calling CreateStream
+	secondStream, err := nodes[0].CreateStream(context.Background(), na2)
+	// Assert that a stream was returned without error
+	require.NoError(l.T(), err)
+	require.NotNil(l.T(), secondStream)
+	// Assert that the stream count within libp2p is still 1 (i.e. No new stream was created)
+	require.Equal(l.T(), 1, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolID, network.DirOutbound))
+	// Cannot assert that firstStream == secondStream since the underlying objects are different
+	// In other words, require.Equal(l.T(), firstStream, secondStream) fails
+	//(https://discuss.libp2p.io/t/how-to-check-if-a-stream-is-already-open-with-peer/249/7?u=vishal)
+	// However, the counts reported by libp2p should prove that no new stream was created.
+
+	// Close the first stream
+	err = firstStream.Reset()
+	require.NoError(l.T(), err)
+	// This should also close the second stream. Assert that libp2p reports the correct stream count
+	require.Equal(l.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolID, network.DirOutbound))
+
+	// Write to the second stream (this is another way of confirming that secondStream is indeed the same as firstStream)
+	_, err = secondStream.Write([]byte("bkjbjbkjbk"))
+	require.Error(l.T(), err)
+}
+
 // CreateNodes creates a number of libp2pnodes equal to the count
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test

@@ -129,14 +129,8 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers ...NodeAddress) error {
 	return nil
 }
 
-// CreateStream adds node n as a peer and creates a new stream with it
+// CreateStream returns an existing stream connected to n if it exists or adds node n as a peer and creates a new stream with it
 func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stream, error) {
-
-	// Add node address as a peer
-	err := p.AddPeers(ctx, n)
-	if err != nil {
-		return nil, err
-	}
 
 	// Get the PeerID
 	peerID, err := GetPeerID(n.Name)
@@ -144,8 +138,21 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 		return nil, err
 	}
 
-	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
-	return p.libP2PHost.NewStream(ctx, peerID, FlowLibP2PProtocolID)
+	stream := FindOutboundStream(p.libP2PHost, peerID, FlowLibP2PProtocolID, p.logger)
+
+	// if existing stream found return it
+	if stream != nil {
+		return stream, nil
+	} else {
+		// Add node address as a peer
+		err := p.AddPeers(ctx, n)
+		if err != nil {
+			return nil, err
+		}
+
+		// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
+		return p.libP2PHost.NewStream(ctx, peerID, FlowLibP2PProtocolID)
+	}
 }
 
 // GetPeerInfo generates the address of a Node/Peer given its address in a deterministic and consistent way.

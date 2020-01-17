@@ -236,6 +236,7 @@ func (m *Middleware) connect(targetID flow.Identifier) (*WriteConnection, error)
 
 	log.Info().Msg("connection established")
 
+	// one go routine for each outbound connection
 	go m.handleOutboundConnection(flowIdentity.NodeID, conn)
 
 	return conn, nil
