@@ -57,10 +57,6 @@ func (u *Unit) Quit() <-chan struct{} {
 	return u.quit
 }
 
-func (u *Unit) Wait() {
-	u.wg.Wait()
-}
-
 func (u *Unit) Done(actions ...func()) <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
