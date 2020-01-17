@@ -104,4 +104,6 @@ func TestExecutionFlow(t *testing.T) {
 	assert.Eventually(t, func() bool {
 		return receipt != nil
 	}, time.Second*3, time.Millisecond*500)
+
+	assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
 }
