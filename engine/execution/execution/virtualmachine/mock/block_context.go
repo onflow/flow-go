@@ -11,29 +11,6 @@ type BlockContext struct {
 	mock.Mock
 }
 
-// ExecuteScript provides a mock function with given fields: ledger, script
-func (_m *BlockContext) ExecuteScript(ledger virtualmachine.Ledger, script []byte) (*virtualmachine.ScriptResult, error) {
-	ret := _m.Called(ledger, script)
-
-	var r0 *virtualmachine.ScriptResult
-	if rf, ok := ret.Get(0).(func(virtualmachine.Ledger, []byte) *virtualmachine.ScriptResult); ok {
-		r0 = rf(ledger, script)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*virtualmachine.ScriptResult)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(virtualmachine.Ledger, []byte) error); ok {
-		r1 = rf(ledger, script)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // ExecuteTransaction provides a mock function with given fields: ledger, tx
 func (_m *BlockContext) ExecuteTransaction(ledger virtualmachine.Ledger, tx *flow.TransactionBody) (*virtualmachine.TransactionResult, error) {
 	ret := _m.Called(ledger, tx)
