@@ -5,9 +5,9 @@ import (
 )
 
 type Voter struct {
-	signer     Signer
-	viewState  ViewState
-	forkChoice *ForkChoice
+	signer    Signer
+	viewState ViewState
+	forks     Forks
 	// Flag to turn on/off consensus acts (voting, block production etc)
 	isConActor bool
 	// Need to keep track of the last view we voted for so we don't double vote accidentally
@@ -20,7 +20,7 @@ func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*
 		return nil, false
 	}
 
-	if v.forkChoice.IsSafeNode(bp) {
+	if v.forks.IsSafeNode(bp) {
 		// TODO: log this reason
 		return nil, false
 	}
