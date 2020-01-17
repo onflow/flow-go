@@ -96,7 +96,7 @@ func TestCollectionRequests(t *testing.T) {
 
 		blocks.EXPECT().Store(gomock.Eq(&block))
 		for _, col := range block.Guarantees {
-			collectionConduit.EXPECT().Submit(gomock.Eq(messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
+			collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
 		}
 
 		err := engine.ProcessLocal(&block)
@@ -114,7 +114,7 @@ func TestValidatingCollectionResponse(t *testing.T) {
 
 		id := block.Guarantees[0].ID()
 
-		collectionConduit.EXPECT().Submit(gomock.Eq(messages.CollectionRequest{ID: id}), gomock.Eq(collectionIdentity.NodeID)).Return(nil)
+		collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: id}), gomock.Eq(collectionIdentity.NodeID)).Return(nil)
 
 		err := engine.ProcessLocal(&block)
 		require.NoError(t, err)
@@ -151,7 +151,7 @@ func TestForwardingToExecution(t *testing.T) {
 		blocks.EXPECT().Store(gomock.Eq(&block))
 
 		for _, col := range block.Guarantees {
-			collectionConduit.EXPECT().Submit(gomock.Eq(messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
+			collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
 		}
 
 		err := engine.ProcessLocal(&block)
@@ -177,7 +177,7 @@ func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 		block, colls := makeRealBlock(3)
 
 		for _, col := range block.Guarantees {
-			collectionConduit.EXPECT().Submit(gomock.Eq(messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
+			collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
 		}
 
 		blocks.EXPECT().Store(gomock.Eq(&block))
