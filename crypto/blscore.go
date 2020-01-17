@@ -85,9 +85,11 @@ func randZr(x *scalar) error {
 
 // TEST/DEBUG/BENCH
 // returns the hash to G1 point
-func hashToG1(data []byte) {
+func hashToG1(data []byte) *pointG1 {
 	l := len(data)
-	_ = C._hashToG1((*C.uchar)(&data[0]), (C.int)(l))
+	var h pointG1
+	C.mapToG1((*C.ep_st)(&h), (*C.uchar)(&data[0]), (C.int)(l))
+	return &h
 }
 
 // sets a scalar to a small integer

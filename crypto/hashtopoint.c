@@ -91,7 +91,7 @@ static void ep_swu_b12(ep_t p, const fp_t t, int u, int negate) {
 // Optimized Shallue–van de Woestijne encoding from Section 3 of
 // "Fast and simple constant-time hashing to the BLS12-381 elliptic curve".
 // taken and modified from Relic library
-void mapToG1_swu(ep_t p, const uint8_t *digest, const int len) {
+static void mapToG1_swu(ep_t p, const uint8_t *digest, const int len) {
 	bn_t k, pm1o2;
 	fp_t t;
 	ep_t q;
@@ -151,7 +151,7 @@ void mapToG1_swu(ep_t p, const uint8_t *digest, const int len) {
 // Simple hashing to G1 as described in the original BLS paper 
 // https://www.iacr.org/archive/asiacrypt2001/22480516.pdf
 // taken and modified from Relic library
-void mapToG1_hashCheck(ep_t p, const uint8_t *msg, int len) {
+static void mapToG1_hashCheck(ep_t p, const uint8_t *msg, int len) {
 	bn_t k, pm1o2;
 	fp_t t;
 	uint8_t digest[RLC_MD_LEN];
@@ -224,7 +224,7 @@ const uint64_t b1_data[6] = {
 // check if (U/V) is a square, return 1 if yes, 0 otherwise 
 // if 1 is returned, out contains sqrt(U/V)
 // out should not be the same as U, or V
-int quotient_sqrt(fp_t out, const fp_t u, const fp_t v) {
+static int quotient_sqrt(fp_t out, const fp_t u, const fp_t v) {
     fp_st tmp;
     fp_new(&tmp);
 
@@ -517,7 +517,7 @@ static void clear_cofactor(ep_st* out, const ep_st* in) {
 // evaluate the optimized SWU map twice, add resulting points, apply isogeny map, clear cofactor
 // the result is stored in p
 // msg is the input message to hash, must be at least 2*(FP_BYTES+16) = 128 bytes
-void mapToG1_opswu(ep_st* p, const uint8_t *msg, int len) {
+static void mapToG1_opswu(ep_st* p, const uint8_t *msg, int len) {
     TRY {
         if (len < 2*(Fp_BYTES+16)) {
             THROW(ERR_NO_BUFFER);
@@ -547,11 +547,8 @@ void mapToG1_opswu(ep_st* p, const uint8_t *msg, int len) {
 }
 #endif
 
-// computes a hashing to G1 
-// this is a testing function
-ep_st* _hashToG1(const byte* data, const int len) {
-    ep_st* h = (ep_st*) malloc(sizeof(ep_st));
-    ep_new(h);
+// computes a hash of input data to G1
+void mapToG1(ep_st* h, const byte* data, const int len) {
     #if hashToPoint==OPSWU
     // construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
     mapToG1_opswu(h, data, len);
@@ -562,6 +559,7 @@ ep_st* _hashToG1(const byte* data, const int len) {
     // hash & check as described in the BLS paper
     mapToG1_hashCheck(h, data, len);
     #endif
-    return h;
 }
+
+
 

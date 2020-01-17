@@ -92,7 +92,8 @@ func BenchmarkHashToG1(b *testing.B) {
 	return
 }
 
-// Hashing to G1 bench
+// Hashing to G1 test for debugging
+// TODO: test opSwU against a test vector
 func TestHashToG1(t *testing.T) {
 	NewSigner(BLS_BLS12381)
 	// msg is split into 2 halves to accomodate testing the optimized SwU algo

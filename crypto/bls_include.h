@@ -86,9 +86,6 @@ void     _ep_read_bin_compact(ep_st*, const byte *, const int);
 void     _ep_write_bin_compact(byte *, const ep_st *,  const int);
 void     _ep2_read_bin_compact(ep2_st* , const byte *,  const int);
 void     _ep2_write_bin_compact(byte *, const ep2_st *,  const int);
-
-void    mapToG1_swu(ep_t, const uint8_t *, const int);
-void    mapToG1_hashCheck(ep_t p, const uint8_t *msg, int len);
-void    mapToG1_opswu(ep_st* p, const uint8_t *msg, int len);
+void     mapToG1(ep_st* h, const byte* data, const int len);
 
 #endif

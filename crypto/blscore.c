@@ -135,7 +135,7 @@ void _blsSign(byte* s, const bn_st *sk, const byte* data, const int len) {
     ep_st h;
     ep_new(&h);
     // hash to G1
-    mapToG1_opswu(&h, data, len);
+    mapToG1(&h, data, len);
     // s = p^sk
 	_G1scalarPointMult(&h, &h, sk);  
     _ep_write_bin_compact(s, &h, SIGNATURE_LEN);
@@ -175,7 +175,7 @@ int _blsVerify(const ep2_st *pk, const byte* sig, const byte* data, const int le
     // elemsG1[1] = h
     ep_new(elemsG1[1]);
     // hash to G1 
-    mapToG1_opswu(elemsG1[1], data, len); 
+    mapToG1(elemsG1[1], data, len); 
 
     // elemsG2[1] = pk
     ep2_new(elemsG2[1]);
