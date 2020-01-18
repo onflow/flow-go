@@ -25,7 +25,7 @@ func hashToArbitraryLength(data []byte, outLen int, alg Hasher) Hash {
 	h := make([]byte, outLen)
 	// concatenate the input to a counter byte
 	dataToHash := make([]byte, len(data)+1)
-	copy(dataToHash[:1], data)
+	copy(dataToHash[1:], data)
 	i := 0
 	for ; i < outLen; i += alg.Size() {
 		// update the counter byte

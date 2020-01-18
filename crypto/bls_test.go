@@ -17,8 +17,12 @@ func TestBLS_BLS12381(t *testing.T) {
 		return
 	}
 	halg, err := NewHasher(SHA3_384)
-	input := []byte("test")
-	testSignVerify(t, halg, sk, input)
+	input := []byte("test input")
+	// test the consistency with different inputs
+	for i := 0; i < 256; i++ {
+		input[0] = byte(i)
+		testSignVerify(t, halg, sk, input)
+	}
 }
 
 // Signing bench
