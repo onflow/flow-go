@@ -18,6 +18,9 @@ const (
 	CodeTransaction
 
 	CodeBlock
+
+	CodeCollectionRequest
+	CodeCollectionResponse
 )
 
 // Envelope is a wrapper to convey type information with JSON encoding without
