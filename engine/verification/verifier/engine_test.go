@@ -213,4 +213,8 @@ func TestHappyPath(t *testing.T) {
 
 	// the receipt should be removed from the mempool
 	assert.False(t, verNode.Receipts.Has(completeER.Receipt.ID()))
+	// associated resources should be removed from the mempool
+	assert.False(t, verNode.Collections.Has(completeER.Collections[0].ID()))
+	assert.False(t, verNode.ChunkStates.Has(completeER.ChunkStates[0].ID()))
+	assert.False(t, verNode.Blocks.Has(completeER.Block.ID()))
 }
