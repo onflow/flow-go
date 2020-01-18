@@ -597,8 +597,10 @@ func (v IntValue) Negate() IntegerValue {
 }
 
 func (v IntValue) Plus(other IntegerValue) IntegerValue {
-	newValue := big.NewInt(0).Add(v.Int, other.(IntValue).Int)
-	return IntValue{newValue}
+	o := other.(IntValue)
+	res := big.NewInt(0)
+	res.Add(v.Int, o.Int)
+	return IntValue{res}
 }
 
 func (v IntValue) Minus(other IntegerValue) IntegerValue {
@@ -609,26 +611,30 @@ func (v IntValue) Minus(other IntegerValue) IntegerValue {
 func (v IntValue) Mod(other IntegerValue) IntegerValue {
 	o := other.(IntValue)
 	res := big.NewInt(0)
+	// INT33-C
 	if o.Int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
-	newValue := res.Mod(v.Int, o.Int)
-	return IntValue{newValue}
+	res.Mod(v.Int, o.Int)
+	return IntValue{res}
 }
 
 func (v IntValue) Mul(other IntegerValue) IntegerValue {
-	newValue := big.NewInt(0).Mul(v.Int, other.(IntValue).Int)
-	return IntValue{newValue}
+	o := other.(IntValue)
+	res := big.NewInt(0)
+	res.Mul(v.Int, o.Int)
+	return IntValue{res}
 }
 
 func (v IntValue) Div(other IntegerValue) IntegerValue {
 	o := other.(IntValue)
 	res := big.NewInt(0)
+	// INT33-C
 	if o.Int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
-	newValue := res.Div(v.Int, o.Int)
-	return IntValue{newValue}
+	res.Div(v.Int, o.Int)
+	return IntValue{res}
 }
 
 func (v IntValue) Less(other IntegerValue) BoolValue {
