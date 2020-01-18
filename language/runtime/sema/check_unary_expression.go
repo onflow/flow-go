@@ -24,11 +24,11 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 		return valueType
 
 	case ast.OperationMinus:
-		if !IsSubType(valueType, &IntegerType{}) {
+		if !IsSubType(valueType, &SignedIntegerType{}) {
 			checker.report(
 				&InvalidUnaryOperandError{
 					Operation:    expression.Operation,
-					ExpectedType: &IntegerType{},
+					ExpectedType: &SignedIntegerType{},
 					ActualType:   valueType,
 					Range:        ast.NewRangeFromPositioned(expression.Expression),
 				},

@@ -261,7 +261,7 @@ func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 
 	chunkState := flow.ChunkState{
 		ChunkID:   chunk.ID(),
-		Registers: make(map[string][]byte),
+		Registers: flow.Ledger{},
 	}
 
 	result := flow.ExecutionResult{

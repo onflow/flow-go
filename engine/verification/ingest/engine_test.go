@@ -85,7 +85,7 @@ func (suite *TestSuite) SetupTest() {
 	suite.net.On("Register", uint8(engine.ReceiptProvider), testifymock.Anything).
 		Return(suite.receiptsConduit, nil).
 		Once()
-	suite.net.On("Register", uint8(engine.StateProvider), testifymock.Anything).
+	suite.net.On("Register", uint8(engine.ExecutionStateProvider), testifymock.Anything).
 		Return(suite.statesConduit, nil).
 		Once()
 }

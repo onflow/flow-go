@@ -129,7 +129,7 @@ func TestHappyPath(t *testing.T) {
 	// to handle request for chunk state
 	exeNode := testutil.GenericNode(t, hub, exeID, genesis)
 	exeEngine := new(network.Engine)
-	exeConduit, err := exeNode.Net.Register(engine.StateProvider, exeEngine)
+	exeConduit, err := exeNode.Net.Register(engine.ExecutionStateProvider, exeEngine)
 	assert.Nil(t, err)
 	exeEngine.On("Process", verID.NodeID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
