@@ -7,7 +7,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/rs/zerolog"
 )
 
 var directionLookUp = map[network.Direction]string{
@@ -42,7 +41,7 @@ func ConnectednessToString(connectedness network.Connectedness) string {
 }
 
 // FindOutboundStream finds an existing outbound stream to the target id if it exists, else it returns nil by querying the state of the libp2p host
-func FindOutboundStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, logger zerolog.Logger) network.Stream {
+func FindOutboundStream(host host.Host, targetID peer.ID, protocol core.ProtocolID) network.Stream {
 
 	// get all connections
 	conns := host.Network().ConnsToPeer(targetID)
@@ -53,17 +52,9 @@ func FindOutboundStream(host host.Host, targetID peer.ID, protocol core.Protocol
 		// choose the connection only if it is connected
 		if host.Network().Connectedness(targetID) == network.Connected {
 
-			logger.Debug().
-				Str("direction", DirectionToString(conn.Stat().Direction)).
-				Msg("found existing connection")
-
 			// get all streams
 			streams := conn.GetStreams()
 			for _, stream := range streams {
-
-				logger.Debug().Str("protocol", string(stream.Protocol())).
-					Str("direction", DirectionToString(stream.Stat().Direction)).
-					Msg("found existing stream")
 
 				// choose a stream which is marked as outbound and is for the flow protocol
 				if stream.Stat().Direction == network.DirOutbound && stream.Protocol() == protocol {

@@ -138,10 +138,14 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 		return nil, err
 	}
 
-	stream := FindOutboundStream(p.libP2PHost, peerID, FlowLibP2PProtocolID, p.logger)
+	stream := FindOutboundStream(p.libP2PHost, peerID, FlowLibP2PProtocolID)
 
 	// if existing stream found return it
 	if stream != nil {
+		p.logger.Debug().Str("protocol", string(stream.Protocol())).
+			Str("stream_direction", DirectionToString(stream.Stat().Direction)).
+			Str("connection_direction", DirectionToString(stream.Conn().Stat().Direction)).
+			Msg("found existing stream")
 		return stream, nil
 	} else {
 		// Add node address as a peer

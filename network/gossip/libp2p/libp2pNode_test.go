@@ -1,6 +1,7 @@
 package libp2p
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -198,6 +199,7 @@ func (l *LibP2PNodeTestSuite) TestPubSub() {
 	}
 }
 
+// TestCreateStreams checks if an existing stream is reused instead of creating a new streams each time when CreateStream is called
 func (l *LibP2PNodeTestSuite) TestCreateStream() {
 	defer l.cancel()
 	count := 2
@@ -226,17 +228,21 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 	require.NoError(l.T(), err)
 	require.Greater(l.T(), n, 0)
 
-	// Now attempt to create another outbound stream by calling CreateStream
-	secondStream, err := nodes[0].CreateStream(context.Background(), na2)
-	// Assert that a stream was returned without error
-	require.NoError(l.T(), err)
-	require.NotNil(l.T(), secondStream)
-	// Assert that the stream count within libp2p is still 1 (i.e. No new stream was created)
-	require.Equal(l.T(), 1, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolID, network.DirOutbound))
-	// Cannot assert that firstStream == secondStream since the underlying objects are different
-	// In other words, require.Equal(l.T(), firstStream, secondStream) fails
-	//(https://discuss.libp2p.io/t/how-to-check-if-a-stream-is-already-open-with-peer/249/7?u=vishal)
-	// However, the counts reported by libp2p should prove that no new stream was created.
+	// Now attempt to create another 100 outbound stream by calling CreateStream
+	var streams []network.Stream
+	for i := 0; i < 100; i++ {
+		anotherStream, err := nodes[0].CreateStream(context.Background(), na2)
+		// Assert that a stream was returned without error
+		require.NoError(l.T(), err)
+		require.NotNil(l.T(), anotherStream)
+		// Assert that the stream count within libp2p is still 1 (i.e. No new stream was created)
+		require.Equal(l.T(), 1, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolID, network.DirOutbound))
+		// Cannot assert that firstStream == anotherStream since the underlying objects are different
+		// In other words, require.Equal(l.T(), firstStream, anotherStream) fails
+		//(https://discuss.libp2p.io/t/how-to-check-if-a-stream-is-already-open-with-peer/249/7?u=vishal)
+		// However, the counts reported by libp2p should prove that no new stream was created.
+		streams = append(streams, anotherStream)
+	}
 
 	// Close the first stream
 	err = firstStream.Reset()
@@ -244,15 +250,141 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 	// This should also close the second stream. Assert that libp2p reports the correct stream count
 	require.Equal(l.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolID, network.DirOutbound))
 
-	// Write to the second stream (this is another way of confirming that secondStream is indeed the same as firstStream)
-	_, err = secondStream.Write([]byte("bkjbjbkjbk"))
-	require.Error(l.T(), err)
+	// Write to each of the other stream (this is another way of confirming that the other streams are indeed the same as firstStream)
+	for _, s := range streams {
+		_, err = s.Write([]byte("bkjbjbkjbk"))
+		require.Error(l.T(), err)
+	}
 }
 
-// CreateNodes creates a number of libp2pnodes equal to the count
+// TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
+func (l *LibP2PNodeTestSuite) TestOneToOneComm() {
+	defer l.cancel()
+	count := 2
+	ch := make(chan string, count)
+
+	// Create the handler function
+	handler := func(s network.Stream) {
+		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+		str, err := rw.ReadString('\n')
+		assert.NoError(l.T(), err)
+		ch <- str
+	}
+
+	// Creates peers
+	peers := l.CreateNodes(count, handler)
+	defer l.StopNodes(peers)
+
+	// Create source NodeAddress
+	ip1, port1 := peers[0].GetIPPort()
+	na1 := NodeAddress{IP: ip1, Port: port1, Name: peers[0].name}
+
+	// Create target NodeAddress
+	ip2, port2 := peers[1].GetIPPort()
+	na2 := NodeAddress{IP: ip2, Port: port2, Name: peers[1].name}
+
+	// Create stream from node 1 to node 2
+	s1, err := peers[0].CreateStream(context.Background(), na2)
+	assert.NoError(l.T(), err)
+	rw := bufio.NewReadWriter(bufio.NewReader(s1), bufio.NewWriter(s1))
+
+	// Send message from node 1 to 2
+	msg := "hello\n"
+	_, err = rw.WriteString(msg)
+	assert.NoError(l.T(), err)
+
+	// Flush the stream
+	assert.NoError(l.T(), rw.Flush())
+
+	// Wait for the message to be received
+	select {
+	case rcv := <-ch:
+		require.Equal(l.T(), msg, rcv)
+	case <-time.After(1 * time.Second):
+		assert.Fail(l.T(), "message not received")
+	}
+
+	// Create stream from node 2 to node 1
+	s2, err := peers[1].CreateStream(context.Background(), na1)
+	assert.NoError(l.T(), err)
+	rw = bufio.NewReadWriter(bufio.NewReader(s2), bufio.NewWriter(s2))
+
+	// Send message from node 2 to 1
+	msg = "hey\n"
+	_, err = rw.WriteString(msg)
+	assert.NoError(l.T(), err)
+
+	// Flush the stream
+	assert.NoError(l.T(), rw.Flush())
+
+	select {
+	case rcv := <-ch:
+		require.Equal(l.T(), msg, rcv)
+	case <-time.After(3 * time.Second):
+		assert.Fail(l.T(), "message not received")
+	}
+}
+
+// libp2p.CreateStream() reuses an existing stream if it exists. This test checks if the reused stream works as expected
+func (l *LibP2PNodeTestSuite) TestStreamReuse() {
+	defer l.cancel()
+	ch := make(chan string)
+	done := make(chan struct{})
+
+	// Create the handler function
+	handler := func(s network.Stream) {
+		go func(s network.Stream) {
+			rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+			for {
+				str, err := rw.ReadString('\n')
+				select {
+				case <-done:
+					return
+				default:
+					assert.NoError(l.T(), err)
+					ch <- str
+				}
+			}
+		}(s)
+	}
+
+	// Creates peers
+	peers := l.CreateNodes(2, handler)
+	defer l.StopNodes(peers)
+	defer close(done)
+
+	// Create target NodeAddress
+	ip2, port2 := peers[1].GetIPPort()
+	na2 := NodeAddress{IP: ip2, Port: port2, Name: peers[1].name}
+
+	for i := 0; i < 10; i++ {
+		// Create stream from node 1 to node 2 (reuse if one already exists)
+		s, err := peers[0].CreateStream(context.Background(), na2)
+		assert.NoError(l.T(), err)
+		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+
+		// Send message from node 1 to 2
+		msg := fmt.Sprintf("hello%d\n", i)
+		_, err = rw.WriteString(msg)
+		assert.NoError(l.T(), err)
+
+		// Flush the stream
+		assert.NoError(l.T(), rw.Flush())
+
+		// Wait for the message to be received
+		select {
+		case rcv := <-ch:
+			require.Equal(l.T(), msg, rcv)
+		case <-time.After(10 * time.Second):
+			assert.Fail(l.T(), fmt.Sprintf("message %s not received", msg))
+		}
+	}
+}
+
+// CreateNodes creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
-func (l *LibP2PNodeTestSuite) CreateNodes(count int) (nodes []*P2PNode) {
+func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHandler) (nodes []*P2PNode) {
 	// keeps track of errors on creating a node
 	var err error
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -263,6 +395,15 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int) (nodes []*P2PNode) {
 		}
 	}()
 
+	var handlerFunc network.StreamHandler
+	if len(handler) > 0 {
+		// use the callback that has been passed in
+		handlerFunc = handler[0]
+	} else {
+		// use a default call back
+		handlerFunc = func(network.Stream) {}
+	}
+
 	// creating nodes
 	for i := 1; i <= count; i++ {
 		n := &P2PNode{}
@@ -271,8 +412,8 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int) (nodes []*P2PNode) {
 			IP:   "0.0.0.0", // localhost
 			Port: "0",       // random Port number
 		}
-		err := n.Start(l.ctx, nodeID, logger, func(stream network.Stream) {
-		})
+
+		err := n.Start(l.ctx, nodeID, logger, handlerFunc)
 		require.NoError(l.Suite.T(), err)
 		require.Eventuallyf(l.Suite.T(), func() bool {
 			ip, p := n.GetIPPort()
