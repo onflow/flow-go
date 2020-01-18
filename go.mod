@@ -7,6 +7,7 @@ require (
 	github.com/dapperlabs/flow-go/language v0.2.5-beta
 	github.com/dapperlabs/flow-go/protobuf v0.2.5-beta
 	github.com/dchest/siphash v1.2.1
+	github.com/dgraph-io/badger v1.6.0
 	github.com/dgraph-io/badger/v2 v2.0.0
 	github.com/ethereum/go-ethereum v1.9.9
 	github.com/gammazero/deque v0.0.0-20190521012701-46e4ffb7a622
