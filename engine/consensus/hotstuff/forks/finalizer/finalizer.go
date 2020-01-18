@@ -2,55 +2,56 @@ package finalizer
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/utils"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/state/forrest"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 )
 
-// ReactorCore implements HotStuff finalization logic
-type ReactorCore struct {
+// Finalizer implements HotStuff finalization logic
+type Finalizer struct {
 	notifier notifications.Distributor
 
 	mainChain forrest.LeveledForrest
-	cache     forrest.LeveledForrest
 
 	// LockedBlockQC is the QC that POINTS TO the the most recently locked block
 	LockedBlockQC *types.QuorumCertificate
 
 	// lastFinalizedBlockQC is the QC that POINTS TO the most recently finalized locked block
 	LastFinalizedBlockQC *types.QuorumCertificate
-
-	// LastSafeBlockView is the view number of the last safe block
-	LastSafeBlockView uint64
 }
 
-func New(rootBlock *types.BlockProposal, rootQc *types.QuorumCertificate, notifier notifications.Distributor) *ReactorCore {
-	if rootBlock == nil {
-		panic("finalizedRootBlock cannot be nil")
+func New(rootBlock *types.BlockProposal, rootQc *types.QuorumCertificate, notifier notifications.Distributor) (*Finalizer, error) {
+	if utils.IsNil(rootBlock) {
+		return nil, &types.ErrorConfiguration{Msg: "finalizedRootBlock cannot be nil"}
 	}
-	if notifier == nil {
-		panic("notifier cannot be nil")
+	if utils.IsNil(notifier) {
+		return nil, &types.ErrorConfiguration{Msg: "notifications.Distributor cannot be nil"}
+	}
+	if utils.IsNil(rootQc) {
+		return nil, &types.ErrorConfiguration{Msg: "rootQC cannot be nil"}
 	}
 	if !bytes.Equal(rootQc.BlockMRH, rootBlock.BlockMRH()) || (rootQc.View != rootBlock.View()) {
-		panic("rootQc must be for rootBlock")
+		return nil, &types.ErrorConfiguration{Msg: "rootQc must be for rootBlock"}
 	}
 
-	return &ReactorCore{
-		notifier:       notifier,
+	fnlzr := Finalizer{
+		notifier:             notifier,
 		mainChain:            *forrest.NewLeveledForrest(),
-		cache:                *forrest.NewLeveledForrest(),
 		LockedBlockQC:        rootQc,
 		LastFinalizedBlockQC: rootQc,
-		LastSafeBlockView:    rootBlock.View(),
 	}
+
+	return &fnlzr, nil
 }
 
-func (r *ReactorCore) IsKnownBlock(blockMRH []byte, blockView uint64) bool {
-	return r.mainChain.HasVertex(blockMRH, blockView) || r.cache.HasVertex(blockMRH, blockView)
+func (r *Finalizer) IsKnownBlock(blockID []byte, blockView uint64) bool {
+	return r.mainChain.HasVertex(blockID, blockView)
 }
 
-func (r *ReactorCore) GetBlocksForView(view uint64) []*types.BlockProposal {
+func (r *Finalizer) GetBlocksForView(view uint64) []*types.BlockProposal {
 	vertexIterator := r.mainChain.GetVerticesAtLevel(view)
 	l := make([]*types.BlockProposal, 0, 1) // in the vast majority of cases, there will only be one proposal for a particular view
 	for vertexIterator.HasNext() {
@@ -60,8 +61,8 @@ func (r *ReactorCore) GetBlocksForView(view uint64) []*types.BlockProposal {
 	return l
 }
 
-func (r *ReactorCore) GetBlock(blockMRH []byte, view uint64) (*types.BlockProposal, bool) {
-	blockContainer, hasBlock := r.mainChain.GetVertex(blockMRH, view)
+func (r *Finalizer) GetBlock(blockID []byte, view uint64) (*types.BlockProposal, bool) {
+	blockContainer, hasBlock := r.mainChain.GetVertex(blockID, view)
 	if !hasBlock {
 		return nil, false
 	}
@@ -73,17 +74,17 @@ func (r *ReactorCore) GetBlock(blockMRH []byte, view uint64) (*types.BlockPropos
 // Returns false if any of the following conditions applies
 //  * block is for already finalized views
 //  * known block
-func (r *ReactorCore) IsProcessingNeeded(blockMRH []byte, blockView uint64) bool {
-	if blockView <= r.LastFinalizedBlockQC.View || r.IsKnownBlock(blockMRH, blockView) {
+func (r *Finalizer) IsProcessingNeeded(blockID []byte, blockView uint64) bool {
+	if blockView <= r.LastFinalizedBlockQC.View || r.IsKnownBlock(blockID, blockView) {
 		return false
 	}
 	return true
 }
 
-// IsSafeNode returns true if block is safe to vote for
+// IsSafeBlock returns true if block is safe to vote for
 // (according to the definition in https://arxiv.org/abs/1803.05069v6).
 // Returns false for unknown blocks.
-func (r *ReactorCore) IsSafeBlock(block *types.BlockProposal) bool {
+func (r *Finalizer) IsSafeBlock(block *types.BlockProposal) bool {
 	blockContainer, hasBlock := r.mainChain.GetVertex(block.BlockMRH(), block.View())
 	if !hasBlock {
 		return false
@@ -91,10 +92,9 @@ func (r *ReactorCore) IsSafeBlock(block *types.BlockProposal) bool {
 	return r.isSafeBlock(blockContainer.(*BlockContainer))
 }
 
-
 // isSafeBlock should only be called on blocks that are connected to the main chain.
 // Function returns true iff block is safe to vote for block.
-func (r *ReactorCore) isSafeBlock(block *BlockContainer) bool {
+func (r *Finalizer) isSafeBlock(block *BlockContainer) bool {
 	// According to the paper, a block is considered a safe block if
 	//  * it extends from locked block (safety rule),
 	//  * or the view of the parent block is higher than the view number of locked block (liveness rule).
@@ -116,60 +116,39 @@ func (r *ReactorCore) isSafeBlock(block *BlockContainer) bool {
 // Calling this method with previously-processed blocks leaves the consensus state invariant
 // (though, it will potentially cause some duplicate processing).
 // CAUTION: method assumes that `block` is well-formed (i.e. all fields are set)
-// ToDo when adding block to mainchain: check COMPLIANCE with rules for chain evolution (otherwise leave in cache)
-func (r *ReactorCore) ProcessBlock(block *types.BlockProposal) {
+func (r *Finalizer) ProcessBlock(block *types.BlockProposal) error {
 	if !r.IsProcessingNeeded(block.BlockMRH(), block.View()) {
-		// ToDo: we can probably skip this check as
-		//  - check is most likely performed in higher-level code
-		//  - even if not checked, LeveledForrest handles repeated additions
-		//    or additions ob blocks below pruning level gracefully
-		return
+		return nil
 	}
 	bc := &BlockContainer{block: block}
-	mainChainParent, hasParentInMainchain := r.mainChain.GetVertex(block.QC().BlockMRH, block.QC().View)
-	if !hasParentInMainchain { //if parent not in mainchain: add block to cache and return
-		r.cache.AddVertex(bc)
-		r.notifier.OnMissingBlock(block.BlockMRH(), block.View())
-		panic("Encountered Missing Block")
-		return
+	parent, isParentKnown := r.mainChain.GetVertex(block.QC().BlockMRH, block.QC().View)
+	if !isParentKnown { //parent not in mainchain
+		return &types.ErrorMissingBlock{
+			View:    block.QC().View,
+			BlockID: block.QC().BlockMRH,
+		}
 	}
-
 	// parent in mainchain:
-	r.addToMainChain(bc, mainChainParent.(*BlockContainer))
-	r.mergeBlocksFromCache(bc)
-}
-
-// mergeBlocksFromCache adds all descendants of block that are currently in the cache to the main chain.
-// block itself is NOT added.
-// Calling this method with previously-processed blocks leaves the consensus state invariant.
-func (r *ReactorCore) mergeBlocksFromCache(block *BlockContainer) {
-	// ToDo: [Optimization]
-	//  (1) move business logic for iterating over all descendants to LeveledForrest as it can be executed more efficiently there.
-	//  (2) as cache and main chain are distinct data structures, we could even retrieve the subtree from the cache in one go routine.
-	//      and add the vertices to the mainChain in the main thread
-	childrenIterator := r.cache.GetChildren(block.Hash(), block.View())
-	for childrenIterator.HasNext() {
-		// Vertex interface is implemented by VertexMock POINTER!
-		// Hence, the concrete type is *VertexMock
-		child := childrenIterator.NextVertex().(*BlockContainer)
-		r.addToMainChain(child, block)
-		r.mergeBlocksFromCache(child)
+	err := r.addToMainChain(bc, parent.(*BlockContainer))
+	if err != nil {
+		return fmt.Errorf("could not process block: %w", err)
 	}
+	return nil
 }
 
 // addToMainChain adds the block to the main chain and updates consensus state.
-// UNSAFE: assumes that the block is properly formatted and all signatures and QCs are valid
 // Calling this method with previously-processed blocks leaves the consensus state invariant.
-func (r *ReactorCore) addToMainChain(blockContainer, mainChainParent *BlockContainer) {
-	r.setMainChainProperties(blockContainer, mainChainParent)
-	if (blockContainer.View() > r.LastSafeBlockView) && r.isSafeBlock(blockContainer) {
-		r.LastSafeBlockView = blockContainer.View()
-		defer r.notifier.OnSafeBlock(blockContainer.Block()) // executing the hook should take place after complete state update
+// UNSAFE: assumes that the block is properly formatted and all signatures and QCs are valid
+func (r *Finalizer) addToMainChain(blockContainer, mainChainParent *BlockContainer) error {
+	err := r.setMainChainProperties(blockContainer, mainChainParent)
+	if err != nil {
+		return err
 	}
 	r.mainChain.AddVertex(blockContainer)
 	r.updateLockedQc(blockContainer)
-	r.updateFinalisedBlockQc(blockContainer)
+	r.updateFinalizedBlockQc(blockContainer)
 	r.notifier.OnBlockIncorporated(blockContainer.Block())
+	return nil
 }
 
 // setMainChainProperties defines all fields in the BlockContainer
@@ -177,69 +156,67 @@ func (r *ReactorCore) addToMainChain(blockContainer, mainChainParent *BlockConta
 //  * Block's ViewNumber is strictly monotonously increasing
 // Prerequisites:
 //  * parent must point to correct parent (no check performed!)
-func (r *ReactorCore) setMainChainProperties(block, parent *BlockContainer) {
+func (r *Finalizer) setMainChainProperties(block, parent *BlockContainer) error {
 	if block.View() <= parent.View() {
-		panic("View of a block must be LARGER than its parent")
+		return &types.ErrorInvalidBlock{
+			View:    block.View(),
+			BlockID: block.ID(),
+			Msg:     fmt.Sprintf("block's view (%d) is SMALLER than its parent's view (%d)", block.View(), parent.View()),
+		}
 	}
 	block.twoChainHead = parent.OneChainHead()
 	block.threeChainHead = parent.TwoChainHead()
+	return nil
 }
 
 // updateLockedBlock updates `LockedBlockQC`
-// Currently, the method implements 'Chained HotStuff Protocol' where the condition is:
+// We use the locking rule from 'Event-driven HotStuff Protocol' where the condition is:
 //
-// * Consider the set S of all blocks that have a DIRECT 2-chain on top of it
+// * Consider the set S of all blocks that have a INDIRECT 2-chain on top of it
 //
 // * The 'Locked Block' is the block in S with the _highest view number_ (newest);
 //   LockedBlockQC should be a QC POINTING TO this block
 //
 // Calling this method with previously-processed blocks leaves consensus state invariant.
-func (r *ReactorCore) updateLockedQc(block *BlockContainer) {
-	// r.LockedBlockQC is called 'lockedQC' in 'Chained HotStuff Protocol' https://arxiv.org/abs/1803.05069v6
-	twoChainQc := block.TwoChainHead()
-	if twoChainQc.View <= r.LockedBlockQC.View {
+func (r *Finalizer) updateLockedQc(block *BlockContainer) {
+	if block.TwoChainHead().View <= r.LockedBlockQC.View {
 		return
 	}
-	// For now, we are implementing the 'Chained HotStuff Protocol' rule which requires a DIRECT 2-chain
-	// Note: when adding blocks to mainchain, we enforce that Block's ViewNumber is strictly monotonously
-	// increasing (method setMainChainProperties). Hence, the current block forms direct 2-chain, if and only if
-	// its viewNumber is exactly 2 higher than the head of the two chain (pointing backwards)
-	if block.View() == twoChainQc.View+2 {
-		// ToDo [optimization]: update also with an _indirect_ 2-chain, i.e. remove if-clause
-		r.LockedBlockQC = twoChainQc
-	}
+	r.LockedBlockQC = block.TwoChainHead() // update qc to newer block with any 2-chain on top of it
 }
 
-// updateFinalisedBlockQc updates `lastFinalizedBlockQC`
-// Currently, the method implements 'Chained HotStuff Protocol' where the condition is:
+// updateFinalizedBlockQc updates `lastFinalizedBlockQC`
+// We use the locking rule from 'Event-driven HotStuff Protocol' where the condition is:
 //
-// * Consider the set S of all blocks that have a DIRECT 3-chain on top of it
+// * Consider the set S of all blocks that have a DIRECT 2-chain on top of it PLUS any 1-chain
 //
 // * The 'Last finalized Block' is the block in S with the _highest view number_ (newest);
 //   lastFinalizedBlockQC should a QC POINTING TO this block
 //
 // Calling this method with previously-processed blocks leaves consensus state invariant.
-func (r *ReactorCore) updateFinalisedBlockQc(block *BlockContainer) {
-	threeChainQc := block.ThreeChainHead()
-	if threeChainQc.View <= r.LockedBlockQC.View {
-		return
-	}
-	// For now, we are implementing the 'Chained HotStuff Protocol' rule which requires a DIRECT 3-chain
+func (r *Finalizer) updateFinalizedBlockQc(block *BlockContainer) {
 	// Note: when adding blocks to mainchain, we enforce that Block's ViewNumber is strictly monotonously
-	// increasing (method setMainChainProperties). Hence, the current block forms direct 3-chain, if and only if
-	// its viewNumber is exactly 3 higher than the head of the three chain (pointing backwards)
-	if block.View() == threeChainQc.View+3 {
-		r.finalizeUpToBlock(threeChainQc)
+	// increasing (method setMainChainProperties). We denote:
+	//  * a DIRECT 1-chain as '<-'
+	//  * a general 1-chain as '<~' (direct or indirect)
+	// The rule from 'Event-driven HotStuff' for finalizing block b is
+	//     b <- b' <- b'' <~ b*     (aka a DIRECT 2-chain PLUS any 1-chain)
+	// where b* is the input block to this method.
+	// Hence, we can finalize b, if and only the viewNumber of b'' is exactly 2 higher than the view of b
+	b := block.ThreeChainHead() // note that b is actually not the block itself here but rather the QC pointing to it
+	if block.OneChainHead().View == b.View+2 {
+		r.finalizeUpToBlock(b)
 	}
 }
 
-// finalizeUpToBlock finalizes all block up to (and including) the block pointed to by `blockQC`.
+// finalizeUpToBlock finalizes all blocks up to (and including) the block pointed to by `blockQC`.
 // Finalization starts with the child of `LastFinalizedBlockQC` (explicitly checked);
-// and calls OnFinalizedBlock
-func (r *ReactorCore) finalizeUpToBlock(blockQC *types.QuorumCertificate) {
+// and calls OnFinalizedBlock on the newly finalized blocks in the respective order
+func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) {
 	if blockQC.View <= r.LastFinalizedBlockQC.View {
 		// Sanity check: the previously last Finalized Block must be an ancestor of `block`
 		if !bytes.Equal(r.LastFinalizedBlockQC.BlockMRH, blockQC.BlockMRH) {
+			// this should never happen unless the finalization logic in `updateFinalizedBlockQc` is broken
 			panic("Internal Error: About to finalize a block which CONFLICTS with last finalized block!")
 		}
 		return
