@@ -34,7 +34,7 @@ type Forks interface {
 	// IsSafeNode returns true if block is safe to vote for
 	// (according to the definition in https://arxiv.org/abs/1803.05069v6).
 	// Returns false for unknown blocks.
-	IsSafeNode(block *types.BlockProposal) bool
+	IsSafeBlock(block *types.BlockProposal) bool
 
 	// AddBlock adds the block to Forks. This might cause an update of the finalized block
 	// and pruning of older blocks.

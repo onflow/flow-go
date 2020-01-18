@@ -26,7 +26,7 @@ func (b *BlockContainer) Level() uint64            { return b.block.View() }
 func (b *BlockContainer) Parent() ([]byte, uint64) { return b.block.QC().BlockMRH, b.block.QC().View }
 
 // Hash returns the block's hash
-func (b *BlockContainer) Hash() []byte { return b.block.BlockMRH() }
+func (b *BlockContainer) ID() []byte { return b.block.BlockMRH() }
 
 // View returns the block's view number
 func (b *BlockContainer) View() uint64 { return b.block.View() }

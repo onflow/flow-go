@@ -36,12 +36,12 @@ func (fc *NewestForkChoice) ProcessBlock(block *types.BlockProposal) {
 	fc.updateQC(block.QC())
 }
 
-func (fc *NewestForkChoice) IsProcessingNeeded(blockMRH []byte, blockView uint64) bool {
-	return fc.finalizer.IsProcessingNeeded(blockMRH, blockView)
+func (fc *NewestForkChoice) IsProcessingNeeded(blockID []byte, blockView uint64) bool {
+	return fc.finalizer.IsProcessingNeeded(blockID, blockView)
 }
 
-func (fc *NewestForkChoice) IsKnownBlock(blockMRH []byte, blockView uint64) bool {
-	return fc.finalizer.IsKnownBlock(blockMRH, blockView)
+func (fc *NewestForkChoice) IsKnownBlock(blockID []byte, blockView uint64) bool {
+	return fc.finalizer.IsKnownBlock(blockID, blockView)
 }
 
 // ProcessQc updates `preferredQc` according to the fork-choice rule.
