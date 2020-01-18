@@ -9,7 +9,8 @@ import (
 // verify it.
 // TODO update this as needed based on execution requirements
 type CompleteExecutionResult struct {
-	Receipt     flow.ExecutionReceipt
-	Block       flow.Block
-	Collections []flow.Collection
+	Receipt     *flow.ExecutionReceipt
+	Block       *flow.Block
+	Collections []*flow.Collection
+	ChunkStates []*flow.ChunkState
 }

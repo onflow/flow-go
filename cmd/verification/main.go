@@ -15,6 +15,7 @@ func main() {
 		receipts    *stdmap.Receipts
 		blocks      *stdmap.Blocks
 		collections *stdmap.Collections
+		chunkStates *stdmap.ChunkStates
 		verifierEng *verifier.Engine
 	)
 
@@ -28,6 +29,9 @@ func main() {
 
 			blocks, err = stdmap.NewBlocks()
 			node.MustNot(err).Msg("could not initialize blocks mempool")
+
+			chunkStates, err = stdmap.NewChunkStates()
+			node.MustNot(err).Msg("could not initialize chunk states mempool")
 		}).
 		Component("verifier engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing verifier engine")
@@ -39,7 +43,7 @@ func main() {
 		Component("ingest engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing ingest engine")
 
-			eng, err := ingest.New(node.Logger, node.Network, node.State, node.Me, verifierEng, receipts, blocks, collections)
+			eng, err := ingest.New(node.Logger, node.Network, node.State, node.Me, verifierEng, receipts, blocks, collections, chunkStates)
 			node.MustNot(err).Msg("could not initialize ingest engine")
 			return eng
 		}).
