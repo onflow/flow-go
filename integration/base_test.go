@@ -5,18 +5,19 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
-	_ "github.com/lib/pq"
 	"github.com/m4ksio/testingdock"
 
 	sdk "github.com/dapperlabs/flow-go-sdk"
 	"github.com/dapperlabs/flow-go-sdk/client"
 	"github.com/dapperlabs/flow-go-sdk/keys"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 const (
@@ -24,11 +25,29 @@ const (
 	flowEnableIntegrationTest = "on"
 )
 
+
 func TestContainer_Start(t *testing.T) {
 
-	if os.Getenv(flowIntegrationTest) != flowEnableIntegrationTest {
-		t.Skipf("Integration tests not enabled, set %s system variable to '%s'", flowIntegrationTest, flowEnableIntegrationTest)
-	}
+	//network := flow.IdentityList{
+	//	flow.Identity{
+	//		NodeID:  unittest.IdentifierFixture(),
+	//		Address: "collection",
+	//		Role:    flow.RoleCollection,
+	//		Stake:   1000,
+	//	},
+	//	flow.Identity{
+	//		NodeID:  unittest.IdentifierFixture(),
+	//		Address: "consensus",
+	//		Role:    flow.RoleConsensus,
+	//		Stake:   1000,
+	//	},
+	//	flow.Identity{
+	//		NodeID:  unittest.IdentifierFixture(),
+	//		Address: "execution",
+	//		Role:    flow.RoleExecution,
+	//		Stake:   1234,
+	//	}
+	//}
 
 	// create suite
 
