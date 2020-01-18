@@ -179,29 +179,29 @@ func TestHappyPath(t *testing.T) {
 	// flush the chunk state request
 	verNet, ok := hub.GetNetwork(verID.NodeID)
 	assert.True(t, ok)
-	verNet.FlushOnly(func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.StateProvider
+	verNet.DeliverSome(func(m *stub.PendingMessage) bool {
+		return m.ChannelID == engine.ExecutionStateProvider
 	})
 
 	// flush the chunk state response
 	exeNet, ok := hub.GetNetwork(exeID.NodeID)
 	assert.True(t, ok)
-	exeNet.FlushOnly(func(m *stub.PendingMessage) bool {
-		return m.ChannelID == engine.StateProvider
+	exeNet.DeliverSome(func(m *stub.PendingMessage) bool {
+		return m.ChannelID == engine.ExecutionStateProvider
 	})
 
 	// the chunk state should be added to the mempool
 	assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[0].ID()))
 
 	// flush the collection request
-	verNet.FlushOnly(func(m *stub.PendingMessage) bool {
+	verNet.DeliverSome(func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.CollectionProvider
 	})
 
 	// flush the collection response
 	colNet, ok := hub.GetNetwork(colID.NodeID)
 	assert.True(t, ok)
-	colNet.FlushOnly(func(m *stub.PendingMessage) bool {
+	colNet.DeliverSome(func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.CollectionProvider
 	})
 
