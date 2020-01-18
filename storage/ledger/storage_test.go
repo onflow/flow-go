@@ -68,13 +68,17 @@ func TestTrieStorage_UpdateRegisters(t *testing.T) {
 
 			ids, values := makeTestValues()
 
+			currentRoot := f.tree.GetRoot().GetValue()
+
 			newRoot, err := f.UpdateRegisters(ids, values)
 			require.NoError(t, err)
 			assert.Equal(t, f.tree.GetRoot().GetValue(), newRoot)
 
 			newValues, err := f.GetRegisters(ids, newRoot)
 			require.NoError(t, err)
+
 			assert.Equal(t, values, newValues)
+			assert.NotEqual(t, currentRoot, newRoot)
 		})
 	})
 }
@@ -128,13 +132,17 @@ func TestTrieStorage_UpdateRegistersWithProof(t *testing.T) {
 
 			ids, values := makeTestValues()
 
+			currentRoot := f.tree.GetRoot().GetValue()
+
 			newRoot, _, err := f.UpdateRegistersWithProof(ids, values)
 			require.NoError(t, err)
 			assert.Equal(t, f.tree.GetRoot().GetValue(), newRoot)
 
 			newValues, _, err := f.GetRegistersWithProof(ids, newRoot)
 			require.NoError(t, err)
+
 			assert.Equal(t, values, newValues)
+			assert.NotEqual(t, currentRoot, newRoot)
 		})
 	})
 }
