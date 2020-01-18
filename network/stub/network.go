@@ -88,32 +88,41 @@ func (mn *Network) buffer(from flow.Identifier, channelID uint8, event interface
 	mn.hub.Buffer.Save(from, channelID, event, targetIDs)
 }
 
-// FlushAll sends all pending messages to the receivers. The receivers might be triggered to forward messages to its peers,
-// so this function block until all receivers have done their forwarding
+// FlushAll sends all pending messages to the receivers. The receivers might
+// be triggered to forward messages to its peers, so this function will block
+// until all receivers have done their forwarding.
 func (mn *Network) FlushAll() {
-	mn.hub.Buffer.Flush(mn.sendToAllTargets)
+	mn.hub.Buffer.Flush(func(m *PendingMessage) {
+		_ = mn.sendToAllTargets(m)
+	})
 }
 
 // FlushAllExcept flushes all pending messages in the buffer except those that
-// satisfy the shouldBlock predicate function.
-func (mn *Network) FlushAllExcept(shouldBlock func(*PendingMessage) bool) {
-	mn.FlushOnly(func(m *PendingMessage) bool {
-		return !shouldBlock(m)
-	})
-}
-
-// FlushOnly flushes any pending messages in the buffer that satisfy the
-// shouldAllow predicate function.
-func (mn *Network) FlushOnly(shouldAllow func(*PendingMessage) bool) {
-	mn.hub.Buffer.Flush(func(m *PendingMessage) error {
-		if shouldAllow(m) {
-			return mn.sendToAllTargets(m)
+// satisfy the shouldDrop predicate function. All messages that satisfy the
+// shouldDrop predicate are permanently dropped.
+func (mn *Network) FlushAllExcept(shouldDrop func(*PendingMessage) bool) {
+	mn.hub.Buffer.Flush(func(m *PendingMessage) {
+		if shouldDrop(m) {
+			return
 		}
-		return nil
+		_ = mn.sendToAllTargets(m)
 	})
 }
 
-// sendToAllTargets send a message to all it's targeted nodes if the targeted node haven't seen it.
+// DeliverSome delivers all messages in the buffer that satisfy the
+// shouldDeliver predicate. Any messages that are not delivered remain in the
+// buffer.
+func (mn *Network) DeliverSome(shouldDeliver func(*PendingMessage) bool) {
+	mn.hub.Buffer.Deliver(func(m *PendingMessage) bool {
+		if shouldDeliver(m) {
+			return mn.sendToAllTargets(m) != nil
+		}
+		return false
+	})
+}
+
+// sendToAllTargets send a message to all its targeted nodes if the targeted
+// node has not yet seen it.
 func (mn *Network) sendToAllTargets(m *PendingMessage) error {
 	key := eventKey(m.ChannelID, m.Event)
 	for _, nodeID := range m.TargetIDs {
