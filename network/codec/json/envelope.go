@@ -13,6 +13,7 @@ const (
 	CodeAnnounce
 	CodeRequest
 	CodeResponse
+	CodeEcho
 
 	CodeCollectionGuarantee
 	CodeTransaction

@@ -1,4 +1,4 @@
-package middleware
+package libp2p
 
 import (
 	"sync"

@@ -5,10 +5,12 @@ package json
 import (
 	"encoding/json"
 
+	"github.com/dapperlabs/flow-go/model/messages"
+
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/messages"
+	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
@@ -30,6 +32,8 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeRequest
 	case *trickle.Response:
 		code = CodeResponse
+	case *message.Echo:
+		code = CodeEcho
 
 	case *flow.CollectionGuarantee:
 		code = CodeCollectionGuarantee
