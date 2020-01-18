@@ -2,9 +2,12 @@ package interpreter
 
 import (
 	"math"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/dapperlabs/flow-go/language/runtime/sema"
 )
 
 func TestNegate(t *testing.T) {
@@ -30,6 +33,12 @@ func TestNegate(t *testing.T) {
 	t.Run("Int64", func(t *testing.T) {
 		assert.Panics(t, func() {
 			Int64Value(math.MinInt64).Negate()
+		})
+	})
+
+	t.Run("Int128", func(t *testing.T) {
+		assert.Panics(t, func() {
+			Int128Value{big.NewInt(0).Set(sema.Int128TypeMin)}.Negate()
 		})
 	})
 }

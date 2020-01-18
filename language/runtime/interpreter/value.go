@@ -1236,6 +1236,180 @@ func ConvertInt64(value Value) Value {
 	return Int64Value(value.(IntegerValue).IntValue())
 }
 
+// Int128Value
+
+type Int128Value struct {
+	Int *big.Int
+}
+
+func init() {
+	gob.Register(Int128Value{})
+}
+
+func (v Int128Value) isValue() {}
+
+func (v Int128Value) Copy() Value {
+	return Int128Value{big.NewInt(0).Set(v.Int)}
+}
+
+func (Int128Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Int128Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v Int128Value) IntValue() int {
+	// TODO: handle overflow
+	return int(v.Int.Int64())
+}
+
+func (v Int128Value) String() string {
+	return v.Int.String()
+}
+
+func (v Int128Value) KeyString() string {
+	return v.Int.String()
+}
+
+func (v Int128Value) Negate() IntegerValue {
+	// INT32-C
+	//   if v == Int128TypeMin {
+	//       ...
+	//   }
+	if v.Int.Cmp(sema.Int128TypeMin) == 0 {
+		panic(&OverflowError{})
+	}
+	return Int128Value{big.NewInt(0).Neg(v.Int)}
+}
+
+func (v Int128Value) Plus(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	// INT32-C:
+	//   if (o > 0) && (v > (Int128TypeMax - o)) {
+	//       ...
+	//   } else if (o < 0) && (v < (Int128TypeMin - o)) {
+	//       ...
+	//   }
+	tmp := big.NewInt(0)
+	oSign := o.Int.Cmp(tmp)
+	if oSign > 0 && v.Int.Cmp(tmp.Sub(sema.Int128TypeMax, o.Int)) > 0 {
+		panic(&OverflowError{})
+	} else if oSign < 0 && v.Int.Cmp(tmp.Sub(sema.Int128TypeMin, o.Int)) < 0 {
+		panic(&UnderflowError{})
+	}
+	tmp.Add(v.Int, o.Int)
+	return Int128Value{tmp}
+}
+
+func (v Int128Value) Minus(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	// INT32-C:
+	//   if (o > 0) && (v < (Int128TypeMin + o)) {
+	// 	     ...
+	//   } else if (o < 0) && (v > (Int128TypeMax + o)) {
+	//       ...
+	//   }
+	tmp := big.NewInt(0)
+	oSign := o.Int.Cmp(tmp)
+	if oSign > 0 && v.Int.Cmp(tmp.Add(sema.Int128TypeMin, o.Int)) < 0 {
+		panic(&OverflowError{})
+	} else if oSign < 0 && v.Int.Cmp(tmp.Add(sema.Int128TypeMax, o.Int)) > 0 {
+		panic(&UnderflowError{})
+	}
+	tmp.Sub(v.Int, o.Int)
+	return Int128Value{tmp}
+}
+
+func (v Int128Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	res := big.NewInt(0)
+	// INT33-C:
+	//   if o == 0 {
+	//       ...
+	//   } else if (v == Int128TypeMin) && (o == -1) {
+	//       ...
+	//   }
+	if o.Int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.SetInt64(-1)
+	if (v.Int.Cmp(sema.Int128TypeMin) == 0) && (o.Int.Cmp(res) == 0) {
+		panic(OverflowError{})
+	}
+	res.Mod(v.Int, o.Int)
+	return Int128Value{res}
+}
+
+func (v Int128Value) Mul(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	res := big.NewInt(0)
+	res.Mul(v.Int, o.Int)
+	if res.Cmp(sema.Int128TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int128TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return Int128Value{res}
+}
+
+func (v Int128Value) Div(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	res := big.NewInt(0)
+	// INT33-C:
+	//   if o == 0 {
+	//       ...
+	//   } else if (v == Int128TypeMin) && (o == -1) {
+	//       ...
+	//   }
+	if o.Int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.SetInt64(-1)
+	if (v.Int.Cmp(sema.Int128TypeMin) == 0) && (o.Int.Cmp(res) == 0) {
+		panic(OverflowError{})
+	}
+	res.Div(v.Int, o.Int)
+	return Int128Value{res}
+}
+
+func (v Int128Value) Less(other IntegerValue) BoolValue {
+	cmp := v.Int.Cmp(other.(Int128Value).Int)
+	return cmp == -1
+}
+
+func (v Int128Value) LessEqual(other IntegerValue) BoolValue {
+	cmp := v.Int.Cmp(other.(Int128Value).Int)
+	return cmp <= 0
+}
+
+func (v Int128Value) Greater(other IntegerValue) BoolValue {
+	cmp := v.Int.Cmp(other.(Int128Value).Int)
+	return cmp == 1
+}
+
+func (v Int128Value) GreaterEqual(other IntegerValue) BoolValue {
+	cmp := v.Int.Cmp(other.(Int128Value).Int)
+	return cmp >= 0
+}
+
+func (v Int128Value) Equal(other Value) BoolValue {
+	otherInt, ok := other.(Int128Value)
+	if !ok {
+		return false
+	}
+	cmp := v.Int.Cmp(otherInt.Int)
+	return cmp == 0
+}
+
+func ConvertInt128(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+	intValue := value.(IntegerValue).IntValue()
+	return Int128Value{big.NewInt(0).SetInt64(int64(intValue))}
+}
+
 // UInt8Value
 
 type UInt8Value uint8
