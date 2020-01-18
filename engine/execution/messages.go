@@ -1,6 +1,8 @@
 package execution
 
-import "github.com/dapperlabs/flow-go/model/flow"
+import (
+	"github.com/dapperlabs/flow-go/model/flow"
+)
 
 type CompleteCollection struct {
 	Guarantee    *flow.CollectionGuarantee
