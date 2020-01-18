@@ -1,7 +1,6 @@
 package interpreter
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,24 +56,22 @@ func TestDivModUInt8(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b UInt8Value){
-			"/": func(a, b UInt8Value) {
+		for _, f := range []func(a, b UInt8Value){
+			func(a, b UInt8Value) {
 				a.Div(b)
 			},
-			"%": func(a, b UInt8Value) {
+			func(a, b UInt8Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -129,24 +126,22 @@ func TestDivModUInt16(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b UInt16Value){
-			"/": func(a, b UInt16Value) {
+		for _, f := range []func(a, b UInt16Value){
+			func(a, b UInt16Value) {
 				a.Div(b)
 			},
-			"%": func(a, b UInt16Value) {
+			func(a, b UInt16Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -201,24 +196,22 @@ func TestDivModUInt32(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b UInt32Value){
-			"/": func(a, b UInt32Value) {
+		for _, f := range []func(a, b UInt32Value){
+			func(a, b UInt32Value) {
 				a.Div(b)
 			},
-			"%": func(a, b UInt32Value) {
+			func(a, b UInt32Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -363,24 +356,22 @@ func TestDivModUInt64(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b UInt64Value){
-			"/": func(a, b UInt64Value) {
+		for _, f := range []func(a, b UInt64Value){
+			func(a, b UInt64Value) {
 				a.Div(b)
 			},
-			"%": func(a, b UInt64Value) {
+			func(a, b UInt64Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -436,24 +427,22 @@ func TestDivModInt8(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b Int8Value){
-			"/": func(a, b Int8Value) {
+		for _, f := range []func(a, b Int8Value){
+			func(a, b Int8Value) {
 				a.Div(b)
 			},
-			"%": func(a, b Int8Value) {
+			func(a, b Int8Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -509,24 +498,22 @@ func TestDivModInt16(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b Int16Value){
-			"/": func(a, b Int16Value) {
+		for _, f := range []func(a, b Int16Value){
+			func(a, b Int16Value) {
 				a.Div(b)
 			},
-			"%": func(a, b Int16Value) {
+			func(a, b Int16Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -582,24 +569,22 @@ func TestDivModInt32(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b Int32Value){
-			"/": func(a, b Int32Value) {
+		for _, f := range []func(a, b Int32Value){
+			func(a, b Int32Value) {
 				a.Div(b)
 			},
-			"%": func(a, b Int32Value) {
+			func(a, b Int32Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -745,42 +730,38 @@ func TestDivModInt64(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b Int64Value){
-			"/": func(a, b Int64Value) {
+		for _, f := range []func(a, b Int64Value){
+			func(a, b Int64Value) {
 				a.Div(b)
 			},
-			"%": func(a, b Int64Value) {
+			func(a, b Int64Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
 
 func TestDivModInt(t *testing.T) {
 
-	for op, f := range map[string]func(a, b IntValue){
-		"/": func(a, b IntValue) {
+	for _, f := range []func(a, b IntValue){
+		func(a, b IntValue) {
 			a.Div(b)
 		},
-		"%": func(a, b IntValue) {
+		func(a, b IntValue) {
 			a.Mod(b)
 		},
 	} {
-		t.Run(fmt.Sprintf("1 %s 0", op), func(t *testing.T) {
-			assert.Panics(t, func() {
-				f(NewIntValue(1), NewIntValue(0))
-			})
+		assert.Panics(t, func() {
+			f(NewIntValue(1), NewIntValue(0))
 		})
 	}
 }
@@ -884,24 +865,22 @@ func TestDivModInt128(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b Int128Value){
-			"/": func(a, b Int128Value) {
+		for _, f := range []func(a, b Int128Value){
+			func(a, b Int128Value) {
 				a.Div(b)
 			},
-			"%": func(a, b Int128Value) {
+			func(a, b Int128Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%s %s %s", test.a.String(), op, test.b.String()), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }

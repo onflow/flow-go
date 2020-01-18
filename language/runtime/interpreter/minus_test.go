@@ -1,7 +1,6 @@
 package interpreter
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -105,16 +104,14 @@ func TestMinusUInt8(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -216,16 +213,14 @@ func TestMinusUInt16(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -327,16 +322,14 @@ func TestMinusUInt32(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -654,16 +647,14 @@ func TestMinusUInt64(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -765,16 +756,15 @@ func TestMinusInt8(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+
 	}
 }
 
@@ -876,16 +866,14 @@ func TestMinusInt16(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -987,16 +975,14 @@ func TestMinusInt32(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -1314,16 +1300,14 @@ func TestMinusInt64(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -1427,15 +1411,13 @@ func TestMinusInt128(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%s - %s", test.a.String(), test.b.String()), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }

@@ -1,7 +1,6 @@
 package interpreter
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -140,16 +139,14 @@ func TestMulUInt8(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d * %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Mul(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Mul(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -286,16 +283,14 @@ func TestMulUInt16(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d * %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Mul(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Mul(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -432,16 +427,15 @@ func TestMulUInt32(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d * %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Mul(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Mul(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+
 	}
 }
 
@@ -588,16 +582,15 @@ func TestMulUInt64(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d * %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Mul(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Mul(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+
 	}
 }
 
@@ -767,16 +760,15 @@ func TestMulInt8(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d * %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Mul(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Mul(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+
 	}
 }
 
@@ -954,16 +946,14 @@ func TestMulInt16(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d * %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Mul(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Mul(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -1125,16 +1115,14 @@ func TestMulInt32(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d * %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Mul(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Mul(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -1281,16 +1269,15 @@ func TestMulInt64(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d * %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Mul(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Mul(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+
 	}
 }
 
@@ -1438,15 +1425,13 @@ func TestMulInt128(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%s * %s", test.a.String(), test.b.String()), func(t *testing.T) {
-			f := func() {
-				test.a.Mul(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Mul(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }

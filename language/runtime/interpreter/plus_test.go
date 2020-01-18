@@ -106,16 +106,15 @@ func TestPlusUInt8(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d + %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Plus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Plus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+
 	}
 }
 
@@ -217,16 +216,14 @@ func TestPlusUInt16(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d + %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Plus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Plus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -328,16 +325,15 @@ func TestPlusUInt32(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d + %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Plus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Plus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+
 	}
 }
 
@@ -655,16 +651,15 @@ func TestPlusUInt64(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d + %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Plus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Plus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+
 	}
 }
 
@@ -766,16 +761,15 @@ func TestPlusInt8(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d + %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Plus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Plus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+
 	}
 }
 
@@ -877,16 +871,15 @@ func TestPlusInt16(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d + %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Plus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Plus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+
 	}
 }
 
@@ -988,16 +981,15 @@ func TestPlusInt32(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d + %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Plus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Plus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+
 	}
 }
 
@@ -1315,16 +1307,14 @@ func TestPlusInt64(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d + %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Plus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Plus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -1436,15 +1426,13 @@ func TestPlusInt128(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%s + %s", test.a.String(), test.b.String()), func(t *testing.T) {
-			f := func() {
-				test.a.Plus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Plus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
