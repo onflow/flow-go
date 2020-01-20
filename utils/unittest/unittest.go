@@ -2,8 +2,7 @@ package unittest
 
 import (
 	"fmt"
-	"math/rand"
-	"os"
+	"io/ioutil"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -58,12 +57,13 @@ func AssertEqualWithDiff(t *testing.T, expected, actual interface{}) {
 	}
 }
 
-func tempDBDir() string {
-	return filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+func tempDBDir() (string, error) {
+	return ioutil.TempDir("", "flow-test-db")
 }
 
 func TempBadgerDB(t *testing.T) *badger.DB {
-	dir := tempDBDir()
+	dir, err := tempDBDir()
+	require.Nil(t, err)
 
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
@@ -72,7 +72,8 @@ func TempBadgerDB(t *testing.T) *badger.DB {
 }
 
 func TempLevelDB(t *testing.T) *leveldb.LevelDB {
-	dir := tempDBDir()
+	dir, err := tempDBDir()
+	require.Nil(t, err)
 
 	kvdbPath := filepath.Join(dir, "kvdb")
 	tdbPath := filepath.Join(dir, "tdb")
@@ -86,7 +87,10 @@ func TempLevelDB(t *testing.T) *leveldb.LevelDB {
 func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
 	db := TempBadgerDB(t)
 
-	defer db.Close()
+	defer func() {
+		err := db.Close()
+		require.Nil(t, err)
+	}()
 
 	f(db)
 }
@@ -94,7 +98,11 @@ func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
 func RunWithLevelDB(t *testing.T, f func(db *leveldb.LevelDB)) {
 	db := TempLevelDB(t)
 
-	defer db.SafeClose()
+	defer func() {
+		err1, err2 := db.SafeClose()
+		require.Nil(t, err1)
+		require.Nil(t, err2)
+	}()
 
 	f(db)
 }
