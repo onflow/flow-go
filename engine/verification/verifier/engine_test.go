@@ -225,6 +225,8 @@ func TestHappyPath(t *testing.T) {
 	assert.False(t, verNode.Blocks.Has(completeER.Block.ID()))
 }
 
+// Test that ERs received multiple times, or concurrently with other ERs
+// are verified exactly once.
 func TestConcurrency(t *testing.T) {
 	testcases := []struct{ erCount, senderCount int }{
 		{
@@ -243,7 +245,7 @@ func TestConcurrency(t *testing.T) {
 	}
 
 	for _, testcase := range testcases {
-		name := fmt.Sprintf("#%d ERs / #%d senders", testcase.erCount, testcase.senderCount)
+		name := fmt.Sprintf("%d-ERs/%d-senders", testcase.erCount, testcase.senderCount)
 		t.Run(name, func(t *testing.T) {
 			testConcurrency(t, testcase.erCount, testcase.senderCount)
 		})
