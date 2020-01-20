@@ -145,7 +145,7 @@ func TestContainer_Start(t *testing.T) {
 
 	sendTransaction(t, collectionNodeApiPort)
 
-	time.Sleep(15*time.Second)
+	time.Sleep(25*time.Second)
 
 }
 
