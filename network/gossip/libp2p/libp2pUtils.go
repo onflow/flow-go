@@ -22,20 +22,20 @@ var connectednessLookup = map[network.Connectedness]string{
 	network.NotConnected:  "NotConnected",
 }
 
-// reverse translating libp2p network direction to string
-func DirectionToString(direction network.Direction) string {
+// DirectionToString reverse translates libp2p network direction to string
+func DirectionToString(direction network.Direction) (string, bool) {
 	if dirStr, found := directionLookUp[direction]; found {
-		return dirStr
+		return dirStr, true
 	}
-	return "Not defined"
+	return "", false
 }
 
-// reverse translating libp2p network connectedness to string
-func ConnectednessToString(connectedness network.Connectedness) string {
+// ConnectednessToString reverse translates libp2p network connectedness to string
+func ConnectednessToString(connectedness network.Connectedness) (string, bool) {
 	if connStr, found := connectednessLookup[connectedness]; found {
-		return connStr
+		return connStr, true
 	}
-	return "Not defined"
+	return "", false
 
 }
 

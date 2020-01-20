@@ -211,13 +211,13 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 	// Create target NodeAddress
 	ip2, port2 := nodes[1].GetIPPort()
 	name2 := nodes[1].name
-	na2 := NodeAddress{IP: ip2, Port: port2, Name: name2}
+	address2 := NodeAddress{IP: ip2, Port: port2, Name: name2}
 
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(l.T(), 0, CountStream(nodes[0].libP2PHost, nodes[1].libP2PHost.ID(), FlowLibP2PProtocolID, network.DirOutbound))
 
 	// Create the outbound stream by calling CreateStream
-	firstStream, err := nodes[0].CreateStream(context.Background(), na2)
+	firstStream, err := nodes[0].CreateStream(context.Background(), address2)
 	// Assert the stream creation was successful
 	require.NoError(l.T(), err)
 	require.NotNil(l.T(), firstStream)
@@ -228,10 +228,10 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 	require.NoError(l.T(), err)
 	require.Greater(l.T(), n, 0)
 
-	// Now attempt to create another 100 outbound stream by calling CreateStream
+	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	var streams []network.Stream
 	for i := 0; i < 100; i++ {
-		anotherStream, err := nodes[0].CreateStream(context.Background(), na2)
+		anotherStream, err := nodes[0].CreateStream(context.Background(), address2)
 		// Assert that a stream was returned without error
 		require.NoError(l.T(), err)
 		require.NotNil(l.T(), anotherStream)
@@ -277,14 +277,14 @@ func (l *LibP2PNodeTestSuite) TestOneToOneComm() {
 
 	// Create source NodeAddress
 	ip1, port1 := peers[0].GetIPPort()
-	na1 := NodeAddress{IP: ip1, Port: port1, Name: peers[0].name}
+	addr1 := NodeAddress{IP: ip1, Port: port1, Name: peers[0].name}
 
 	// Create target NodeAddress
 	ip2, port2 := peers[1].GetIPPort()
-	na2 := NodeAddress{IP: ip2, Port: port2, Name: peers[1].name}
+	addr2 := NodeAddress{IP: ip2, Port: port2, Name: peers[1].name}
 
 	// Create stream from node 1 to node 2
-	s1, err := peers[0].CreateStream(context.Background(), na2)
+	s1, err := peers[0].CreateStream(context.Background(), addr2)
 	assert.NoError(l.T(), err)
 	rw := bufio.NewReadWriter(bufio.NewReader(s1), bufio.NewWriter(s1))
 
@@ -305,7 +305,7 @@ func (l *LibP2PNodeTestSuite) TestOneToOneComm() {
 	}
 
 	// Create stream from node 2 to node 1
-	s2, err := peers[1].CreateStream(context.Background(), na1)
+	s2, err := peers[1].CreateStream(context.Background(), addr1)
 	assert.NoError(l.T(), err)
 	rw = bufio.NewReadWriter(bufio.NewReader(s2), bufio.NewWriter(s2))
 
