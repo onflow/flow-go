@@ -3,7 +3,6 @@ package libp2p
 import (
 	"fmt"
 	"hash"
-	"math/rand"
 	"sync"
 
 	"github.com/dchest/siphash"
@@ -12,7 +11,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
 	networkmodel "github.com/dapperlabs/flow-go/model/libp2p/network"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -115,26 +113,12 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 	return conduit, nil
 }
 
-// Address implements a callback to provide the overlay layer with the
-// addresses we want to establish new connections to.
-func (n *Network) Identity() (flow.Identity, error) {
-
-	// get a list of other nodes that are not us, and we are not connected to
-	nodeIDs := n.top.Peers().NodeIDs()
-	nodeIDs = append(nodeIDs, n.me.NodeID())
-	ids, err := n.state.Final().Identities(identity.Not(identity.HasNodeID(nodeIDs...)))
+// Identity returns the flow identity for a given flow identifier by querying the flow state
+func (n *Network) Identity(nodeID flow.Identifier) (flow.Identity, error) {
+	id, err := n.state.Final().Identity(nodeID)
 	if err != nil {
-		return flow.Identity{}, errors.Wrap(err, "could not get identities")
+		return flow.Identity{}, errors.Wrap(err, "could not get identity")
 	}
-
-	// if we don't have nodes available, we can't do anything
-	if len(ids) == 0 {
-		return flow.Identity{}, errors.New("no identities available")
-	}
-
-	// select a random identity from the list
-	id := ids[rand.Int()%len(ids)]
-
 	return id, nil
 }
 
