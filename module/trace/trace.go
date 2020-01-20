@@ -16,6 +16,19 @@ type Tracer struct {
 	log    zerolog.Logger
 }
 
+type traceLogger struct {
+	zerolog.Logger
+}
+
+func (t traceLogger) Error(msg string) {
+	t.Logger.Error().Msg(msg)
+}
+
+// Infof logs a message at info priority
+func (t traceLogger) Infof(msg string, args ...interface{}) {
+	t.Debug().Msgf(msg, args...)
+}
+
 // NewTracer creates a new tracer
 func NewTracer(log zerolog.Logger, service string) (*Tracer, error) {
 	cfg, err := config.FromEnv()
@@ -23,7 +36,8 @@ func NewTracer(log zerolog.Logger, service string) (*Tracer, error) {
 		return nil, err
 	}
 	metricsFactory := prometheus.New()
-	tracer, closer, err := cfg.New(service, config.Metrics(metricsFactory))
+	log.Debug().Msgf("%+v", cfg)
+	tracer, closer, err := cfg.New(service, config.Metrics(metricsFactory), config.Logger(traceLogger{log}))
 	if err != nil {
 		return nil, err
 	}

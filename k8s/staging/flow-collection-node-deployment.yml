@@ -191,7 +191,7 @@ spec:
       containers:
         - name: flow-test-net
           # No tag, will be attached by teamcity
-          image: gcr.io/dl-flow/collection:228a52b47
+          image: gcr.io/dl-flow/collection:02b9b6eb1
           args: 
             - '--nodename'
             - '$(POD_NAME)'
@@ -239,6 +239,8 @@ spec:
               value: const
             - name: JAEGER_SAMPLER_PARAM
               value: "1"
+            - name: JAEGER_REPORTER_LOG_SPANS
+              value: "true"
           # Resource requests and contraints
           resources:
             requests:
