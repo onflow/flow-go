@@ -2,7 +2,9 @@ package voteaggregator
 
 import (
 	"fmt"
+
 	"github.com/hashicorp/go-multierror"
+	"github.com/rs/zerolog"
 
 	hotstuff "github.com/dapperlabs/flow-go/engine/consensus/HotStuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
@@ -18,6 +20,7 @@ type VotingStatus struct {
 }
 
 type VoteAggregator struct {
+	log           zerolog.Logger
 	protocolState protocol.State
 	viewState     hotstuff.ViewState
 	voteValidator hotstuff.Validator
@@ -41,6 +44,7 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 	}
 
 	va.pendingVotes[string(vote.BlockMRH)][vote.Hash()] = vote
+	va.log.Info().Msg("new pending vote added")
 	return nil
 }
 
@@ -66,6 +70,8 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 		return nil, fmt.Errorf("could not build QC: %w", err)
 	}
 
+	va.log.Info().Msg("new QC created")
+
 	return newQC, nil
 }
 
@@ -77,43 +83,50 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 	for _, vote := range va.pendingVotes[string(bp.Block.BlockMRH())] {
 		err := va.storeIncorporatedVote(vote, bp)
 		if err != nil {
+			va.log.Debug().Msg("invalid pending vote found")
+			result = multierror.Append(result, fmt.Errorf("could not save pending vote: %w", err))
 		}
 	}
 
 	qc, err := va.buildQC(bp.Block)
 	if err != nil {
-		result = multierror.Append(result, err)
+		result = multierror.Append(result, fmt.Errorf("could not build QC: %w", err))
 		return nil, result
 	}
+
+	va.log.Info().Msg("new QC created")
 
 	return qc, result
 }
 
 // PruneByView will delete all votes equal or below to the given view, as well as related indexes.
 func (va *VoteAggregator) PruneByView(view uint64) {
-	if view > 1 {
-		blockMRHStr := string(va.viewToBlockMRH[view-1])
-		delete(va.viewToBlockMRH, view)
-		delete(va.pendingVotes, blockMRHStr)
-		delete(va.blockHashToVotingStatus, blockMRHStr)
-		delete(va.createdQC, blockMRHStr)
+	if view < 1 {
+		return
 	}
+	blockMRHStr := string(va.viewToBlockMRH[view-1])
+	delete(va.viewToBlockMRH, view)
+	delete(va.pendingVotes, blockMRHStr)
+	delete(va.blockHashToVotingStatus, blockMRHStr)
+	delete(va.createdQC, blockMRHStr)
+	va.log.Info().Msg("successfully pruned")
 }
 
 // storeIncorporatedVote stores incorporated votes and accumulate stakes
 // it drops invalid votes and duplicate votes
 func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.BlockProposal) error {
+	// TODO: will be using AtBlockID after unifying Block structure
 	identities, err := va.protocolState.AtNumber(bp.Block.View).Identities(identity.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("cannot get protocol state at block")
 	}
-	voteSender := identities.Get(uint(vote.Signature.SignerIdx))
 
 	err = va.voteValidator.ValidateIncorporatedVote(vote, bp, identities)
 	if err != nil {
 		return fmt.Errorf("could not validate incorporated vote: %w", err)
 	}
 
+	voteSender := identities.Get(uint(vote.Signature.SignerIdx))
 	// update existing voting status or create a new one
 	votingStatus, exists := va.blockHashToVotingStatus[string(vote.BlockMRH)]
 	if exists {
@@ -128,6 +141,7 @@ func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.Bloc
 		va.blockHashToVotingStatus[string(vote.BlockMRH)] = votingStatus
 	}
 
+	va.log.Info().Msg("new incorporated vote added")
 	return nil
 }
 
@@ -140,6 +154,7 @@ func (va *VoteAggregator) buildQC(block *types.Block) (*types.QuorumCertificate,
 	blockMRHStr := string(block.BlockMRH())
 	votingStatus := va.blockHashToVotingStatus[blockMRHStr]
 	if !votingStatus.canBuildQC() {
+		va.log.Debug().Msg("vote threshold not reached")
 		return nil, fmt.Errorf("can not build a QC: %w", errInsufficientVotes{})
 	}
 
