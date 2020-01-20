@@ -11,6 +11,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
+	"github.com/dapperlabs/flow-go/engine/testutil/mock"
+	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -205,4 +207,82 @@ func TestHappyPath(t *testing.T) {
 
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
+}
+
+func TestConcurrency(t *testing.T) {
+	hub := stub.NewNetworkHub()
+
+	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	conIDList := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
+	conID := conIDList.Get(0)
+
+	identities := flow.IdentityList{colID, conID, exeID, verID}
+	genesis := flow.Genesis(identities)
+
+	verNode := testutil.VerificationNode(t, hub, verID, genesis)
+	colNode := testutil.CollectionNode(t, hub, colID, genesis)
+
+	var ERList []*verification.CompleteExecutionResult
+
+	// mock the execution node with a generic node and mocked engine
+	// to handle request for chunk state
+	exeNode := testutil.GenericNode(t, hub, exeID, genesis)
+	setupMockExeNode(t, exeNode, verID.NodeID, ERList)
+
+	// mock the consensus node with a generic node and mocked engine to assert
+	// that the result approval is broadcast
+	conNode := testutil.GenericNode(t, hub, conID, genesis)
+	setupMockConNode(t, conNode, verID.NodeID, ERList)
+}
+
+// deliverER delivers a block and receipt for one block's execution.
+func deliverER(block *flow.Block, receipt *flow.ExecutionReceipt) {}
+
+// setupMockExeNode sets up a mocked execution node that responds to requests for
+// chunk states. Any requests that don't correspond to an execution receipt in
+// the input ers list result in the test failing.
+func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, ers []*verification.CompleteExecutionResult) {
+	eng := new(network.Engine)
+	conduit, err := node.Net.Register(engine.ExecutionStateProvider, eng)
+	assert.Nil(t, err)
+
+	eng.On("Process", verID, testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			req, ok := args[1].(*messages.ExecutionStateRequest)
+			require.True(t, ok)
+
+			for _, er := range ers {
+				if er.Receipt.ExecutionResult.Chunks.Chunks[0].ID() == req.ChunkID {
+					res := &messages.ExecutionStateResponse{
+						State: *er.ChunkStates[0],
+					}
+					err := conduit.Submit(res, verID)
+					assert.Nil(t, err)
+					return
+				}
+			}
+			t.Log("invalid chunk state request", req.ChunkID.String())
+			t.Fail()
+		}).
+		Return(nil)
+}
+
+// setupMockConNode sets up a mocked consensus node to assert that a set of
+// result approvals are delivered correctly.
+func setupMockConNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, ers []*verification.CompleteExecutionResult) {
+	eng := new(network.Engine)
+	_, err := node.Net.Register(engine.ExecutionStateProvider, eng)
+	assert.Nil(t, err)
+
+	eng.On("Process", verID, testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			ra, ok := args[1].(*flow.ResultApproval)
+			assert.True(t, ok)
+			// TODO check that each ER is delivered exactly once
+			_ = ra
+		}).
+		Return(nil).
+		Once()
 }

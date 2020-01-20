@@ -412,3 +412,21 @@ func (suite *TestSuite) TestVerifyReady() {
 		})
 	}
 }
+
+func (suite *TestSuite) TestConcurrency() {
+	eng := suite.TestNewEngine()
+
+	execNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	collNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	consNodeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+
+	suite.state.On("Final").Return(suite.ss, nil)
+	suite.ss.On("Identity", testcase.from.NodeID).Return(testcase.from, nil).Once()
+
+	// allow adding the received resource to mempool
+	suite.receipts.On("Add", suite.receipt).Return(nil)
+	suite.collections.On("Add", suite.collection).Return(nil)
+	suite.blocks.On("Add", suite.block).Return(nil)
+	suite.chunkStates.On("Add", suite.chunkState).Return(nil)
+
+}
