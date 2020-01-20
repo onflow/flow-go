@@ -1333,7 +1333,7 @@ func int128(v string) Int128Value {
 	if negative {
 		res.Neg(res)
 	}
-	return Int128Value{Int: res}
+	return Int128Value{int: res}
 }
 
 func TestPlusInt128(t *testing.T) {

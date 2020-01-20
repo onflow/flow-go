@@ -1245,7 +1245,7 @@ func ConvertInt64(value Value) Value {
 // Int128Value
 
 type Int128Value struct {
-	Int *big.Int
+	int *big.Int
 }
 
 func init() {
@@ -1255,7 +1255,7 @@ func init() {
 func (v Int128Value) isValue() {}
 
 func (v Int128Value) Copy() Value {
-	return Int128Value{big.NewInt(0).Set(v.Int)}
+	return Int128Value{big.NewInt(0).Set(v.int)}
 }
 
 func (Int128Value) GetOwner() string {
@@ -1269,15 +1269,15 @@ func (Int128Value) SetOwner(_ string) {
 
 func (v Int128Value) IntValue() int {
 	// TODO: handle overflow
-	return int(v.Int.Int64())
+	return int(v.int.Int64())
 }
 
 func (v Int128Value) String() string {
-	return v.Int.String()
+	return v.int.String()
 }
 
 func (v Int128Value) KeyString() string {
-	return v.Int.String()
+	return v.int.String()
 }
 
 func (v Int128Value) Negate() IntegerValue {
@@ -1285,48 +1285,58 @@ func (v Int128Value) Negate() IntegerValue {
 	//   if v == Int128TypeMin {
 	//       ...
 	//   }
-	if v.Int.Cmp(sema.Int128TypeMin) == 0 {
+	if v.int.Cmp(sema.Int128TypeMin) == 0 {
 		panic(&OverflowError{})
 	}
-	return Int128Value{big.NewInt(0).Neg(v.Int)}
+	return Int128Value{big.NewInt(0).Neg(v.int)}
 }
 
 func (v Int128Value) Plus(other IntegerValue) IntegerValue {
 	o := other.(Int128Value)
-	// INT32-C:
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just add and check the range of the result.
+	//
+	// If Go gains a native int128 type and we switch this value
+	// to be based on it, then we need to follow INT32-C:
+	//
 	//   if (o > 0) && (v > (Int128TypeMax - o)) {
 	//       ...
 	//   } else if (o < 0) && (v < (Int128TypeMin - o)) {
 	//       ...
 	//   }
-	tmp := big.NewInt(0)
-	oSign := o.Int.Cmp(tmp)
-	if oSign > 0 && v.Int.Cmp(tmp.Sub(sema.Int128TypeMax, o.Int)) > 0 {
-		panic(&OverflowError{})
-	} else if oSign < 0 && v.Int.Cmp(tmp.Sub(sema.Int128TypeMin, o.Int)) < 0 {
-		panic(&UnderflowError{})
+	//
+	res := big.NewInt(0)
+	res.Add(v.int, o.int)
+	if res.Cmp(sema.Int128TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int128TypeMax) > 0 {
+		panic(OverflowError{})
 	}
-	tmp.Add(v.Int, o.Int)
-	return Int128Value{tmp}
+	return Int128Value{res}
 }
 
 func (v Int128Value) Minus(other IntegerValue) IntegerValue {
 	o := other.(Int128Value)
-	// INT32-C:
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just subtract and check the range of the result.
+	//
+	// If Go gains a native int128 type and we switch this value
+	// to be based on it, then we need to follow INT32-C:
+	//
 	//   if (o > 0) && (v < (Int128TypeMin + o)) {
 	// 	     ...
 	//   } else if (o < 0) && (v > (Int128TypeMax + o)) {
 	//       ...
 	//   }
-	tmp := big.NewInt(0)
-	oSign := o.Int.Cmp(tmp)
-	if oSign > 0 && v.Int.Cmp(tmp.Add(sema.Int128TypeMin, o.Int)) < 0 {
-		panic(&OverflowError{})
-	} else if oSign < 0 && v.Int.Cmp(tmp.Add(sema.Int128TypeMax, o.Int)) > 0 {
-		panic(&UnderflowError{})
+	//
+	res := big.NewInt(0)
+	res.Sub(v.int, o.int)
+	if res.Cmp(sema.Int128TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int128TypeMax) > 0 {
+		panic(OverflowError{})
 	}
-	tmp.Sub(v.Int, o.Int)
-	return Int128Value{tmp}
+	return Int128Value{res}
 }
 
 func (v Int128Value) Mod(other IntegerValue) IntegerValue {
@@ -1338,21 +1348,21 @@ func (v Int128Value) Mod(other IntegerValue) IntegerValue {
 	//   } else if (v == Int128TypeMin) && (o == -1) {
 	//       ...
 	//   }
-	if o.Int.Cmp(res) == 0 {
+	if o.int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
 	res.SetInt64(-1)
-	if (v.Int.Cmp(sema.Int128TypeMin) == 0) && (o.Int.Cmp(res) == 0) {
+	if (v.int.Cmp(sema.Int128TypeMin) == 0) && (o.int.Cmp(res) == 0) {
 		panic(OverflowError{})
 	}
-	res.Mod(v.Int, o.Int)
+	res.Mod(v.int, o.int)
 	return Int128Value{res}
 }
 
 func (v Int128Value) Mul(other IntegerValue) IntegerValue {
 	o := other.(Int128Value)
 	res := big.NewInt(0)
-	res.Mul(v.Int, o.Int)
+	res.Mul(v.int, o.int)
 	if res.Cmp(sema.Int128TypeMin) < 0 {
 		panic(UnderflowError{})
 	} else if res.Cmp(sema.Int128TypeMax) > 0 {
@@ -1370,34 +1380,34 @@ func (v Int128Value) Div(other IntegerValue) IntegerValue {
 	//   } else if (v == Int128TypeMin) && (o == -1) {
 	//       ...
 	//   }
-	if o.Int.Cmp(res) == 0 {
+	if o.int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
 	res.SetInt64(-1)
-	if (v.Int.Cmp(sema.Int128TypeMin) == 0) && (o.Int.Cmp(res) == 0) {
+	if (v.int.Cmp(sema.Int128TypeMin) == 0) && (o.int.Cmp(res) == 0) {
 		panic(OverflowError{})
 	}
-	res.Div(v.Int, o.Int)
+	res.Div(v.int, o.int)
 	return Int128Value{res}
 }
 
 func (v Int128Value) Less(other IntegerValue) BoolValue {
-	cmp := v.Int.Cmp(other.(Int128Value).Int)
+	cmp := v.int.Cmp(other.(Int128Value).int)
 	return cmp == -1
 }
 
 func (v Int128Value) LessEqual(other IntegerValue) BoolValue {
-	cmp := v.Int.Cmp(other.(Int128Value).Int)
+	cmp := v.int.Cmp(other.(Int128Value).int)
 	return cmp <= 0
 }
 
 func (v Int128Value) Greater(other IntegerValue) BoolValue {
-	cmp := v.Int.Cmp(other.(Int128Value).Int)
+	cmp := v.int.Cmp(other.(Int128Value).int)
 	return cmp == 1
 }
 
 func (v Int128Value) GreaterEqual(other IntegerValue) BoolValue {
-	cmp := v.Int.Cmp(other.(Int128Value).Int)
+	cmp := v.int.Cmp(other.(Int128Value).int)
 	return cmp >= 0
 }
 
@@ -1406,7 +1416,7 @@ func (v Int128Value) Equal(other Value) BoolValue {
 	if !ok {
 		return false
 	}
-	cmp := v.Int.Cmp(otherInt.Int)
+	cmp := v.int.Cmp(otherInt.int)
 	return cmp == 0
 }
 
