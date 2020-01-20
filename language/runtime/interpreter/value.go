@@ -597,8 +597,10 @@ func (v IntValue) Negate() IntegerValue {
 }
 
 func (v IntValue) Plus(other IntegerValue) IntegerValue {
-	newValue := big.NewInt(0).Add(v.Int, other.(IntValue).Int)
-	return IntValue{newValue}
+	o := other.(IntValue)
+	res := big.NewInt(0)
+	res.Add(v.Int, o.Int)
+	return IntValue{res}
 }
 
 func (v IntValue) Minus(other IntegerValue) IntegerValue {
@@ -609,26 +611,30 @@ func (v IntValue) Minus(other IntegerValue) IntegerValue {
 func (v IntValue) Mod(other IntegerValue) IntegerValue {
 	o := other.(IntValue)
 	res := big.NewInt(0)
+	// INT33-C
 	if o.Int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
-	newValue := res.Mod(v.Int, o.Int)
-	return IntValue{newValue}
+	res.Mod(v.Int, o.Int)
+	return IntValue{res}
 }
 
 func (v IntValue) Mul(other IntegerValue) IntegerValue {
-	newValue := big.NewInt(0).Mul(v.Int, other.(IntValue).Int)
-	return IntValue{newValue}
+	o := other.(IntValue)
+	res := big.NewInt(0)
+	res.Mul(v.Int, o.Int)
+	return IntValue{res}
 }
 
 func (v IntValue) Div(other IntegerValue) IntegerValue {
 	o := other.(IntValue)
 	res := big.NewInt(0)
+	// INT33-C
 	if o.Int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
 	}
-	newValue := res.Div(v.Int, o.Int)
-	return IntValue{newValue}
+	res.Div(v.Int, o.Int)
+	return IntValue{res}
 }
 
 func (v IntValue) Less(other IntegerValue) BoolValue {
@@ -1234,6 +1240,190 @@ func (v Int64Value) Equal(other Value) BoolValue {
 
 func ConvertInt64(value Value) Value {
 	return Int64Value(value.(IntegerValue).IntValue())
+}
+
+// Int128Value
+
+type Int128Value struct {
+	int *big.Int
+}
+
+func init() {
+	gob.Register(Int128Value{})
+}
+
+func (v Int128Value) isValue() {}
+
+func (v Int128Value) Copy() Value {
+	return Int128Value{big.NewInt(0).Set(v.int)}
+}
+
+func (Int128Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Int128Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v Int128Value) IntValue() int {
+	// TODO: handle overflow
+	return int(v.int.Int64())
+}
+
+func (v Int128Value) String() string {
+	return v.int.String()
+}
+
+func (v Int128Value) KeyString() string {
+	return v.int.String()
+}
+
+func (v Int128Value) Negate() IntegerValue {
+	// INT32-C
+	//   if v == Int128TypeMin {
+	//       ...
+	//   }
+	if v.int.Cmp(sema.Int128TypeMin) == 0 {
+		panic(&OverflowError{})
+	}
+	return Int128Value{big.NewInt(0).Neg(v.int)}
+}
+
+func (v Int128Value) Plus(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just add and check the range of the result.
+	//
+	// If Go gains a native int128 type and we switch this value
+	// to be based on it, then we need to follow INT32-C:
+	//
+	//   if (o > 0) && (v > (Int128TypeMax - o)) {
+	//       ...
+	//   } else if (o < 0) && (v < (Int128TypeMin - o)) {
+	//       ...
+	//   }
+	//
+	res := big.NewInt(0)
+	res.Add(v.int, o.int)
+	if res.Cmp(sema.Int128TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int128TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return Int128Value{res}
+}
+
+func (v Int128Value) Minus(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just subtract and check the range of the result.
+	//
+	// If Go gains a native int128 type and we switch this value
+	// to be based on it, then we need to follow INT32-C:
+	//
+	//   if (o > 0) && (v < (Int128TypeMin + o)) {
+	// 	     ...
+	//   } else if (o < 0) && (v > (Int128TypeMax + o)) {
+	//       ...
+	//   }
+	//
+	res := big.NewInt(0)
+	res.Sub(v.int, o.int)
+	if res.Cmp(sema.Int128TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int128TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return Int128Value{res}
+}
+
+func (v Int128Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	res := big.NewInt(0)
+	// INT33-C:
+	//   if o == 0 {
+	//       ...
+	//   } else if (v == Int128TypeMin) && (o == -1) {
+	//       ...
+	//   }
+	if o.int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.SetInt64(-1)
+	if (v.int.Cmp(sema.Int128TypeMin) == 0) && (o.int.Cmp(res) == 0) {
+		panic(OverflowError{})
+	}
+	res.Mod(v.int, o.int)
+	return Int128Value{res}
+}
+
+func (v Int128Value) Mul(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	res := big.NewInt(0)
+	res.Mul(v.int, o.int)
+	if res.Cmp(sema.Int128TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int128TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return Int128Value{res}
+}
+
+func (v Int128Value) Div(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	res := big.NewInt(0)
+	// INT33-C:
+	//   if o == 0 {
+	//       ...
+	//   } else if (v == Int128TypeMin) && (o == -1) {
+	//       ...
+	//   }
+	if o.int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.SetInt64(-1)
+	if (v.int.Cmp(sema.Int128TypeMin) == 0) && (o.int.Cmp(res) == 0) {
+		panic(OverflowError{})
+	}
+	res.Div(v.int, o.int)
+	return Int128Value{res}
+}
+
+func (v Int128Value) Less(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int128Value).int)
+	return cmp == -1
+}
+
+func (v Int128Value) LessEqual(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int128Value).int)
+	return cmp <= 0
+}
+
+func (v Int128Value) Greater(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int128Value).int)
+	return cmp == 1
+}
+
+func (v Int128Value) GreaterEqual(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int128Value).int)
+	return cmp >= 0
+}
+
+func (v Int128Value) Equal(other Value) BoolValue {
+	otherInt, ok := other.(Int128Value)
+	if !ok {
+		return false
+	}
+	cmp := v.int.Cmp(otherInt.int)
+	return cmp == 0
+}
+
+func ConvertInt128(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+	intValue := value.(IntegerValue).IntValue()
+	return Int128Value{big.NewInt(0).SetInt64(int64(intValue))}
 }
 
 // UInt8Value
