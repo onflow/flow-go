@@ -6,6 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/engine/execution/receipts"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -23,6 +24,7 @@ func main() {
 		stateCommitments storage.StateCommitments
 		ledgerStorage    storage.Ledger
 		err              error
+		executionEng     *execution.Engine
 	)
 
 	cmd.
@@ -67,7 +69,7 @@ func main() {
 
 			blockExec := executor.NewBlockExecutor(vm, execState)
 
-			executionEng, err := execution.New(
+			executionEng, err = execution.New(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -77,6 +79,17 @@ func main() {
 			node.MustNot(err).Msg("could not initialize execution engine")
 
 			return executionEng
+		}).
+		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			node.Logger.Info().Msg("initializing ingestion engine")
+
+			blocks := badger.NewBlocks(node.DB)
+			collections := badger.NewCollections(node.DB)
+
+			ingestionEng, err := ingestion.NewEngine(node.Logger, node.Network, node.Me, blocks, collections, node.State, executionEng, )
+			node.MustNot(err).Msg("could not initialize ingestion engine")
+
+			return ingestionEng
 		}).Run()
 
 }
