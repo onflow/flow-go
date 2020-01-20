@@ -8,7 +8,7 @@ import (
 )
 
 type EventHandler struct {
-	paceMaker             PaceMaker
+	paceMaker             *PaceMaker
 	voteAggregator        *voteaggregator.VoteAggregator
 	voter                 *Voter
 	missingBlockRequester *MissingBlockRequester

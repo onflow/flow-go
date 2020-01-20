@@ -27,6 +27,9 @@ type errExistingQC struct {
 	qc   *types.QuorumCertificate
 }
 
+type errInsufficientVotes struct {
+}
+
 func (e errorMissingSigner) Error() string {
 	return fmt.Sprintf("The signer of vote %v is missing", e.vote)
 }
@@ -45,4 +48,8 @@ func (e errDoubleVote) Error() string {
 
 func (e errExistingQC) Error() string {
 	return fmt.Sprintf("QC already existed (vote: %v, qc: %v)", e.vote, e.qc)
+}
+
+func (e errInsufficientVotes) Error() string {
+	return fmt.Sprintf("Not receiving enough votes")
 }
