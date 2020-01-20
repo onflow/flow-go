@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
+	storage "github.com/dapperlabs/flow-go/storage/mock"
 	"github.com/dapperlabs/flow-go/storage/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -30,7 +31,9 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 			stateCommitments.EXPECT().ByID(gomock.Any()).Return(&stateCommitment, nil)
 
-			es := state.NewExecutionState(ls, stateCommitments)
+			chunkHeaders := new(storage.ChunkHeaders)
+
+			es := state.NewExecutionState(ls, stateCommitments, chunkHeaders)
 
 			f(t, es)
 		})
