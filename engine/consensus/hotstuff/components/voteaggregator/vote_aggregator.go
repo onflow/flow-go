@@ -11,73 +11,38 @@ import (
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 )
 
+type VotingStatus struct {
+	thresholdStake   uint64
+	accumulatedStake uint64
+	validVotes       map[string]*types.Vote
+}
+
 type VoteAggregator struct {
-	lock          sync.RWMutex
 	protocolState protocol.State
 	viewState     hotstuff.ViewState
-	validator     hotstuff.Validator
+	voteValidator hotstuff.Validator
 	// For pruning
 	viewToBlockMRH map[uint64][]byte
 	// keeps track of votes whose blocks can not be found
-	pendingVotes map[string][]*types.Vote
-	// keeps track of votes that are valid to accumulate stakes
-	incorporatedVotes map[string][]*types.Vote
+	pendingVotes map[string]map[string]*types.Vote
 	// keeps track of QCs that have been made for blocks
 	createdQC map[string]*types.QuorumCertificate
-	// keeps track of accumulated stakes for blocks
-	blockHashToIncorporatedStakes map[string]uint64
+	// keeps track of accumulated votes and stakes for blocks
+	blockHashToVotingStatus map[string]VotingStatus
 }
 
+// StorePendingVote stores the vote as a pending vote assuming the caller has checked that the voting
+// block is currently missing.
+// Note: Validations on these pending votes will be postponed until the block has been received.
 func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
-	err := va.validator.ValidatePendingVote(vote)
-	if err != nil {
-		return fmt.Errorf("could not validate pending vote: %v", err)
-	}
-
-	va.pendingVotes[string(vote.BlockMRH)] = append(va.pendingVotes[string(vote.BlockMRH)], vote)
-
-	return nil
+	va.pendingVotes[string(vote.BlockMRH)][vote.Hash()] = vote
 }
 
-// StoreIncorporatedVote stores incorporated votes and accumulate stakes
-// if the QC for the same view has been created, ignore subsequent votes
-func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.BlockProposal) error {
-	// return error when the QC with the same view of the vote has been created
-	if blockMRH, exists := va.viewToBlockMRH[vote.View]; exists {
-		if qc, isCreated := va.createdQC[string(blockMRH)]; isCreated {
-			return qcExistedError{
-				vote,
-				qc,
-				fmt.Sprintf("QC for view %v has been created", vote.View)}
-		}
-	}
-
-	// return error when cannot get protocol state
-	identities, err := va.protocolState.AtNumber(bp.Block.View).Identities(identity.HasRole(flow.RoleConsensus))
-	if err != nil {
-		return fmt.Errorf("could not get protocol state %v", err)
-	}
-
-	// return error when the vote is invalid or cannot accumulate stakes
-	err = va.validator.ValidateIncorporatedVote(vote, bp, identities)
-	if err != nil {
-		return fmt.Errorf("could not validate incorporated vote %v", err)
-	}
-
-	va.viewToBlockMRH[vote.View] = vote.BlockMRH
-	va.incorporatedVotes[string(vote.BlockMRH)] = append(va.incorporatedVotes[string(vote.BlockMRH)], vote)
-	err = va.accumulateStakes(vote, bp)
-	if err != nil {
-		return fmt.Errorf("could not accumulate stake %v", err)
-	}
-
-	return nil
-}
-
-// StoreVoteAndBuildQC adds the vote to the VoteAggregator internal memory and returns a QC if there are enough votes.
+// StoreVoteAndBuildQC stores the vote assuming the caller has checked that the voting block is incorporated,
+// and returns a QC if there are votes with enough stakes.
 // The VoteAggregator builds a QC as soon as the number of votes allow this.
 // While subsequent votes (past the required threshold) are not included in the QC anymore,
-// VoteAggregator ALWAYS returns a QC is possible.
+// VoteAggregator ALWAYS returns the same QC as the one returned before.
 func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockProposal) (*types.QuorumCertificate, error) {
 	err := va.storeIncorporatedVote(vote, bp)
 	if err != nil {
@@ -92,10 +57,10 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 	return nil, nil
 }
 
-// BuildQCOnReceivingBlock handles pending votes if there are any and then try to make a QC
-// returns nil if there are no pending votes or the accumulated stakes are not enough to build a QC
-// returns a list
-func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*types.QuorumCertificate, []error) {
+// BuildQCForBlockProposal will attempt to build a QC for the given block proposal when there are votes
+// with enough stakes.
+// VoteAggregator ALWAYS returns the same QC as the one returned before.
+func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*types.QuorumCertificate, bool) {
 	var errors []error
 	for _, vote := range va.pendingVotes[string(bp.Block.BlockMRH())] {
 		if err := va.storeIncorporatedVote(vote, bp); err != nil {
@@ -106,29 +71,51 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 	if err != nil {
 		errors = append(errors, err)
 	}
-	return qc, errors
+	return qc, false
 }
 
-// garbage collection by view
+// PruneByView will delete all votes equal or below to the given view, as well as related indexes.
 func (va *VoteAggregator) PruneByView(view uint64) {
-	blockMRHStr := string(va.viewToBlockMRH[view])
-	delete(va.viewToBlockMRH, view)
-	delete(va.pendingVotes, blockMRHStr)
-	delete(va.incorporatedVotes, blockMRHStr)
-	delete(va.blockHashToIncorporatedStakes, blockMRHStr)
-	delete(va.createdQC, blockMRHStr)
+	if view > 1 {
+		blockMRHStr := string(va.viewToBlockMRH[view-1])
+		delete(va.viewToBlockMRH, view)
+		delete(va.pendingVotes, blockMRHStr)
+		delete(va.incorporatedVotes, blockMRHStr)
+		delete(va.blockHashToIncorporatedStakes, blockMRHStr)
+		delete(va.createdQC, blockMRHStr)
+	}
 }
 
-func (va *VoteAggregator) accumulateStakes(vote *types.Vote, bp *types.BlockProposal) error {
-	identities, err := va.protocolState.AtNumber(bp.Block.View).Identities(identity.HasRole(flow.RoleConsensus))
-	if err != nil {
-		return err
+func (va *VoteAggregator) shouldDropVote(vote *types.Vote) bool {
+	// the vote is duplicate
+	if _, existed := va.incorporatedVotes[string(vote.BlockMRH)][vote.Hash()]; existed {
+		return true
+	}
+	// the QC for the same block has been created
+	if _, isCreated := va.createdQC[string(vote.BlockMRH)]; isCreated {
+		return true
 	}
 
+	return false
+}
+
+// storeIncorporatedVote stores incorporated votes and accumulate stakes
+// it drops invalid votes and duplicate votes
+func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.BlockProposal) error {
+	identities, err := va.protocolState.AtNumber(bp.Block.View).Identities(identity.HasRole(flow.RoleConsensus))
+	if err != nil {
+		return fmt.Errorf("cannot get protocol state at block")
+	}
+
+	err := va.voteValidator.ValidateIncorporatedVote(vote, bp, identities)
+	if err != nil {
+		return fmt.Errorf("could not validate incorporated vote %v", err)
+	}
+
+	va.viewToBlockMRH[vote.View] = vote.BlockMRH
+	va.incorporatedVotes[string(vote.BlockMRH)][vote.Hash()] = vote
 	voteSender := identities.Get(uint(vote.Signature.SignerIdx))
 	va.blockHashToIncorporatedStakes[string(vote.BlockMRH)] += voteSender.Stake
-
-	return nil
 }
 
 func (va *VoteAggregator) buildQC(block *types.Block) (*types.QuorumCertificate, error) {

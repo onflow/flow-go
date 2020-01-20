@@ -13,8 +13,7 @@ var flowLocation = ast.StringLocation("flow")
 
 // built-in function types
 
-// TODO: improve types
-var createAccountFunctionType = &sema.FunctionType{
+var accountFunctionType = &sema.FunctionType{
 	Parameters: []*sema.Parameter{
 		{
 			Label:      sema.ArgumentLabelNotRequired,
@@ -31,95 +30,14 @@ var createAccountFunctionType = &sema.FunctionType{
 			Label:      sema.ArgumentLabelNotRequired,
 			Identifier: "code",
 			TypeAnnotation: sema.NewTypeAnnotation(
-				&sema.OptionalType{
-					Type: &sema.VariableSizedType{
-						Type: &sema.IntType{},
-					},
-				},
-			),
-		},
-	},
-	// address
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.AddressType{},
-	),
-	// additional arguments are passed to the contract initializer
-	RequiredArgumentCount: (func() *int {
-		var count = 2
-		return &count
-	})(),
-}
-
-var addAccountKeyFunctionType = &sema.FunctionType{
-	Parameters: []*sema.Parameter{
-		{
-			Label:      sema.ArgumentLabelNotRequired,
-			Identifier: "address",
-			TypeAnnotation: sema.NewTypeAnnotation(
-				&sema.AddressType{},
-			),
-		},
-		{
-			Label:      sema.ArgumentLabelNotRequired,
-			Identifier: "key",
-			TypeAnnotation: sema.NewTypeAnnotation(
 				&sema.VariableSizedType{
 					Type: &sema.IntType{},
 				},
 			),
 		},
 	},
-	// nothing
 	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
-	),
-}
-
-var removeAccountKeyFunctionType = &sema.FunctionType{
-	Parameters: []*sema.Parameter{
-		{
-			Label:      sema.ArgumentLabelNotRequired,
-			Identifier: "address",
-			TypeAnnotation: sema.NewTypeAnnotation(
-				&sema.AddressType{},
-			),
-		},
-		{
-			Label:      sema.ArgumentLabelNotRequired,
-			Identifier: "index",
-			TypeAnnotation: sema.NewTypeAnnotation(
-				&sema.IntType{},
-			),
-		},
-	},
-	// nothing
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
-	),
-}
-
-var updateAccountCodeFunctionType = &sema.FunctionType{
-	Parameters: []*sema.Parameter{
-		{
-			Label:      sema.ArgumentLabelNotRequired,
-			Identifier: "address",
-			TypeAnnotation: sema.NewTypeAnnotation(
-				&sema.AddressType{},
-			),
-		},
-		{
-			Label:      sema.ArgumentLabelNotRequired,
-			Identifier: "code",
-			TypeAnnotation: sema.NewTypeAnnotation(
-				&sema.VariableSizedType{
-					Type: &sema.IntType{},
-				},
-			),
-		},
-	},
-	// nothing
-	ReturnTypeAnnotation: sema.NewTypeAnnotation(
-		&sema.VoidType{},
+		&sema.AccountType{},
 	),
 	// additional arguments are passed to the contract initializer
 	RequiredArgumentCount: (func() *int {
@@ -161,12 +79,9 @@ var logFunctionType = &sema.FunctionType{
 // FlowBuiltinImpls defines the set of functions needed to implement the Flow
 // built-in functions.
 type FlowBuiltinImpls struct {
-	CreateAccount     interpreter.HostFunction
-	AddAccountKey     interpreter.HostFunction
-	RemoveAccountKey  interpreter.HostFunction
-	UpdateAccountCode interpreter.HostFunction
-	GetAccount        interpreter.HostFunction
-	Log               interpreter.HostFunction
+	CreateAccount interpreter.HostFunction
+	GetAccount    interpreter.HostFunction
+	Log           interpreter.HostFunction
 }
 
 // FlowBuiltInFunctions returns a list of standard library functions, bound to
@@ -174,27 +89,9 @@ type FlowBuiltinImpls struct {
 func FlowBuiltInFunctions(impls FlowBuiltinImpls) StandardLibraryFunctions {
 	return StandardLibraryFunctions{
 		NewStandardLibraryFunction(
-			"createAccount",
-			createAccountFunctionType,
+			"Account",
+			accountFunctionType,
 			impls.CreateAccount,
-			nil,
-		),
-		NewStandardLibraryFunction(
-			"addAccountKey",
-			addAccountKeyFunctionType,
-			impls.AddAccountKey,
-			nil,
-		),
-		NewStandardLibraryFunction(
-			"removeAccountKey",
-			removeAccountKeyFunctionType,
-			impls.RemoveAccountKey,
-			nil,
-		),
-		NewStandardLibraryFunction(
-			"updateAccountCode",
-			updateAccountCodeFunctionType,
-			impls.UpdateAccountCode,
 			nil,
 		),
 		NewStandardLibraryFunction(
@@ -226,14 +123,11 @@ func newFlowEventType(identifier string, parameters ...*sema.Parameter) *sema.Co
 	for _, parameter := range parameters {
 
 		eventType.Members[parameter.Identifier] =
-			sema.NewCheckedMember(&sema.Member{
-				ContainerType:   eventType,
-				Access:          ast.AccessPublic,
-				Identifier:      ast.Identifier{Identifier: parameter.Identifier},
-				TypeAnnotation:  parameter.TypeAnnotation,
-				DeclarationKind: common.DeclarationKindField,
-				VariableKind:    ast.VariableKindConstant,
-			})
+			sema.NewPublicConstantFieldMember(
+				eventType,
+				parameter.Identifier,
+				parameter.TypeAnnotation.Type,
+			)
 
 		eventType.ConstructorParameters = append(
 			eventType.ConstructorParameters,

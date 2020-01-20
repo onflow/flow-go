@@ -19,7 +19,7 @@ const (
 	BlockPropagation = 51
 
 	// Execution 100-199
-	ResultProvider     = 100
+	ReceiptProvider    = 100
 	ExecutionExecution = 101
 
 	// Verification 150-199

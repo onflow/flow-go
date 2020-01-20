@@ -47,7 +47,7 @@ func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 				return fmt.Errorf("could not retrieve transaction: %w", err)
 			}
 
-			collection.Transactions = append(collection.Transactions, tx)
+			collection.Transactions = append(collection.Transactions, &tx)
 		}
 
 		return nil
@@ -68,7 +68,7 @@ func (c *Collections) Store(collection *flow.Collection) error {
 		}
 
 		for _, tx := range collection.Transactions {
-			err = operation.PersistTransaction(&tx)(btx)
+			err = operation.PersistTransaction(tx)(btx)
 			if err != nil {
 				return err
 			}

@@ -11,7 +11,7 @@ import (
 // A BlockContext is used to execute transactions in the context of a block.
 type BlockContext interface {
 	// ExecuteTransaction computes the result of a transaction.
-	ExecuteTransaction(ledger Ledger, tx flow.TransactionBody) (*TransactionResult, error)
+	ExecuteTransaction(ledger Ledger, tx *flow.TransactionBody) (*TransactionResult, error)
 }
 
 type blockContext struct {
@@ -19,7 +19,7 @@ type blockContext struct {
 	block *flow.Block
 }
 
-func (bc *blockContext) newTransactionContext(ledger Ledger, tx flow.TransactionBody) *transactionContext {
+func (bc *blockContext) newTransactionContext(ledger Ledger, tx *flow.TransactionBody) *transactionContext {
 	signingAccounts := make([]runtime.Address, len(tx.ScriptAccounts))
 	for i, addr := range tx.ScriptAccounts {
 		signingAccounts[i] = runtime.Address(addr)
@@ -36,7 +36,7 @@ func (bc *blockContext) newTransactionContext(ledger Ledger, tx flow.Transaction
 // Register updates are recorded in the provided ledger view. An error is returned
 // if an unexpected error occurs during execution. If the transaction reverts due to
 // a normal runtime error, the error is recorded in the transaction result.
-func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx flow.TransactionBody) (*TransactionResult, error) {
+func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx *flow.TransactionBody) (*TransactionResult, error) {
 	txID := tx.ID()
 	location := runtime.TransactionLocation(txID[:])
 

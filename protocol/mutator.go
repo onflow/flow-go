@@ -14,7 +14,7 @@ type Mutator interface {
 
 	// Bootstrap initializes the persistent protocol state with the given
 	// genesis block. A genesis block requires a number of zero, a hash of 32
-	// zero bytes and an empty guaranteed collections slice. The provided new
+	// zero bytes and an empty collection guarantees slice. The provided new
 	// identities will be the initial staked nodes on the network.
 	Bootstrap(genesis *flow.Block) error
 

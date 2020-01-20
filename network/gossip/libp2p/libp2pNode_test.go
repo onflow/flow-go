@@ -54,9 +54,9 @@ func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
 	for i := 0; i < 10; i++ {
 		// creates node-i address
 		address := NodeAddress{
-			name: fmt.Sprintf("node%d", i),
-			ip:   "1.1.1.1",
-			port: "0",
+			Name: fmt.Sprintf("node%d", i),
+			IP:   "1.1.1.1",
+			Port: "0",
 		}
 
 		// translates node-i address into info
@@ -86,14 +86,14 @@ func (l *LibP2PNodeTestSuite) TestAddPeers() {
 	defer l.StopNodes(nodes)
 
 	ids := make([]NodeAddress, 0)
-	// Get actual ip and port numbers on which the nodes were started
+	// Get actual IP and Port numbers on which the nodes were started
 	for _, n := range nodes[1:] {
 		ip, p := n.GetIPPort()
-		ids = append(ids, NodeAddress{name: n.name, ip: ip, port: p})
+		ids = append(ids, NodeAddress{Name: n.name, IP: ip, Port: p})
 	}
 
 	// Adds the remaining nodes to the first node as its set of peers
-	require.NoError(l.Suite.T(), nodes[0].AddPeers(l.ctx, ids))
+	require.NoError(l.Suite.T(), nodes[0].AddPeers(l.ctx, ids...))
 	actual := nodes[0].libP2PHost.Peerstore().Peers().Len()
 
 	// Checks if all 9 nodes have been added as peers to the first node
@@ -145,14 +145,14 @@ func (l *LibP2PNodeTestSuite) TestPubSub() {
 		// defines next node to this on the chain
 		next := nodes[i+1]
 		nextIP, nextPort := next.GetIPPort()
-		nextAddr := &NodeAddress{
-			name: next.name,
-			ip:   nextIP,
-			port: nextPort,
+		nextAddr := NodeAddress{
+			Name: next.name,
+			IP:   nextIP,
+			Port: nextPort,
 		}
 
 		// adds next node as the peer to this node and verifies their connection
-		require.NoError(l.Suite.T(), this.AddPeers(l.ctx, []NodeAddress{*nextAddr}))
+		require.NoError(l.Suite.T(), this.AddPeers(l.ctx, nextAddr))
 		assert.Eventuallyf(l.Suite.T(), func() bool {
 			return network.Connected == this.libP2PHost.Network().Connectedness(next.libP2PHost.ID())
 		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf(" %s not connected with %s", this.name, next.name))
@@ -216,11 +216,12 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int) (nodes []*P2PNode) {
 	for i := 1; i <= count; i++ {
 		n := &P2PNode{}
 		nodeID := NodeAddress{
-			name: fmt.Sprintf("node%d", i),
-			ip:   "0.0.0.0", // localhost
-			port: "0",       // random port number
+			Name: fmt.Sprintf("node%d", i),
+			IP:   "0.0.0.0", // localhost
+			Port: "0",       // random Port number
 		}
-		err := n.Start(l.ctx, nodeID, logger)
+		err := n.Start(l.ctx, nodeID, logger, func(stream network.Stream) {
+		})
 		require.NoError(l.Suite.T(), err)
 		require.Eventuallyf(l.Suite.T(), func() bool {
 			ip, p := n.GetIPPort()
@@ -233,9 +234,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int) (nodes []*P2PNode) {
 
 // StopNodes stop all nodes in the input slice
 func (l *LibP2PNodeTestSuite) StopNodes(nodes []*P2PNode) {
-	if nodes != nil {
-		for _, n := range nodes {
-			assert.NoError(l.Suite.T(), n.Stop())
-		}
+	for _, n := range nodes {
+		assert.NoError(l.Suite.T(), n.Stop())
 	}
 }

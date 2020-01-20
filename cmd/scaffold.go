@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -48,28 +49,40 @@ type namedDoneObject struct {
 }
 
 // FlowNodeBuilder is the builder struct used for all flow nodes
+// It runs a node process with following structure, in sequential order
+// Base inits (network, storage, state, logger)
+//   PostInit handlers, if any
+//   GenesisHandler, if any and if genesis was generate
+// Components handlers, if any, wait sequentially
+// Run() <- main loop
+// Components destructors, if any
 type FlowNodeBuilder struct {
-	BaseConfig   BaseConfig
-	flags        *pflag.FlagSet
-	name         string
-	Logger       zerolog.Logger
-	DB           *badger.DB
-	Me           *local.Local
-	State        *protocol.State
-	readyDoneFns []namedReadyFn
-	doneObject   []namedDoneObject
-	sig          chan os.Signal
-	Network      *trickle.Network
+	BaseConfig     BaseConfig
+	flags          *pflag.FlagSet
+	name           string
+	Logger         zerolog.Logger
+	DB             *badger.DB
+	Me             *local.Local
+	State          *protocol.State
+	readyDoneFns   []namedReadyFn
+	doneObject     []namedDoneObject
+	sig            chan os.Signal
+	Network        *trickle.Network
+	genesisHandler func(node *FlowNodeBuilder, block *flow.Block)
+	postInitFns    []func(*FlowNodeBuilder)
+	genesis        *flow.Block
 }
 
 func (fnb *FlowNodeBuilder) baseFlags() {
+	homedir, _ := os.UserHomeDir()
+	datadir := filepath.Join(homedir, ".flow", "database")
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.NodeID, "nodeid", notSet, "identity of our node")
 	fnb.flags.StringVarP(&fnb.BaseConfig.NodeName, "nodename", "n", "node1", "identity of our node")
 	fnb.flags.StringSliceVarP(&fnb.BaseConfig.Entries, "entries", "e", []string{"consensus-node1@address1=1000"}, "identity table entries for all nodes")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.Timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.UintVarP(&fnb.BaseConfig.Connections, "connections", "c", 0, "number of connections to establish to peers")
-	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", "data", "directory to store the protocol State")
+	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol State")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
 }
@@ -102,7 +115,8 @@ func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
 func (fnb *FlowNodeBuilder) initNodeID() {
 	if fnb.BaseConfig.NodeID == notSet {
 		h := sha256.New()
-		h.Write([]byte(fnb.BaseConfig.NodeName))
+		_, err := h.Write([]byte(fnb.BaseConfig.NodeName))
+		fnb.MustNot(err).Msg("could not initialize node id")
 		fnb.BaseConfig.NodeID = hex.EncodeToString(h.Sum(nil))
 	}
 }
@@ -140,7 +154,6 @@ func (fnb *FlowNodeBuilder) initState() {
 	lsm, vlog := fnb.DB.Size()
 	if vlog > 0 || lsm > 0 {
 		fnb.Logger.Debug().Msg("using existing database")
-
 	} else {
 		//Bootstrap!
 
@@ -155,10 +168,12 @@ func (fnb *FlowNodeBuilder) initState() {
 			ids = append(ids, id)
 		}
 
-		err = state.Mutate().Bootstrap(flow.Genesis(ids))
+		fnb.genesis = flow.Genesis(ids)
+		err = state.Mutate().Bootstrap(fnb.genesis)
 		if err != nil {
 			fnb.Logger.Fatal().Err(err).Msg("could not bootstrap protocol state")
 		}
+
 	}
 
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.NodeID)
@@ -249,6 +264,17 @@ func (fnb *FlowNodeBuilder) Component(name string, f func(*FlowNodeBuilder) modu
 	return fnb
 }
 
+// GenesisHandler sets up handler which will be executed when a genesis block is generated
+func (fnb *FlowNodeBuilder) GenesisHandler(handler func(node *FlowNodeBuilder, block *flow.Block)) *FlowNodeBuilder {
+	fnb.genesisHandler = handler
+	return fnb
+}
+
+func (fnb *FlowNodeBuilder) PostInit(f func(node *FlowNodeBuilder)) *FlowNodeBuilder {
+	fnb.postInitFns = append(fnb.postInitFns, f)
+	return fnb
+}
+
 // FlowNode creates a new Flow node builder with the given name.
 func FlowNode(name string) *FlowNodeBuilder {
 
@@ -291,6 +317,14 @@ func (fnb *FlowNodeBuilder) Run() {
 
 	fnb.initState()
 
+	for _, f := range fnb.postInitFns {
+		fnb.handlePostInit(f)
+	}
+
+	if fnb.genesis != nil && fnb.genesisHandler != nil {
+		fnb.genesisHandler(fnb, fnb.genesis)
+	}
+
 	for _, f := range fnb.readyDoneFns {
 		fnb.handleReadyAware(f)
 	}
@@ -311,4 +345,8 @@ func (fnb *FlowNodeBuilder) Run() {
 
 	os.Exit(0)
 
+}
+
+func (fnb *FlowNodeBuilder) handlePostInit(f func(node *FlowNodeBuilder)) {
+	f(fnb)
 }

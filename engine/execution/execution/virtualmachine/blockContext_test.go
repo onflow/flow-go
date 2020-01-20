@@ -23,7 +23,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	bc := vm.NewBlockContext(&b)
 
 	t.Run("transaction success", func(t *testing.T) {
-		tx := flow.TransactionBody{
+		tx := &flow.TransactionBody{
 			ScriptAccounts: []flow.Address{unittest.AddressFixture()},
 			Script: []byte(`
                 transaction {
@@ -40,7 +40,7 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	})
 
 	t.Run("transaction failure", func(t *testing.T) {
-		tx := flow.TransactionBody{
+		tx := &flow.TransactionBody{
 			Script: []byte(`
                 transaction {
                   var x: Int

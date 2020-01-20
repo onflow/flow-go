@@ -6,12 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	statemock "github.com/dapperlabs/flow-go/engine/execution/execution/state/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	vmmock "github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
@@ -29,15 +31,17 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Script: []byte("transaction { execute {} }"),
 	}
 
-	col := flow.Collection{Transactions: []flow.TransactionBody{tx1, tx2}}
+	transactions := []*flow.TransactionBody{&tx1, &tx2}
+
+	col := flow.Collection{Transactions: transactions}
+
+	guarantee := flow.CollectionGuarantee{
+		CollectionID: col.ID(),
+		Signatures:   nil,
+	}
 
 	content := flow.Content{
-		Guarantees: []*flow.CollectionGuarantee{
-			{
-				CollectionID: col.ID(),
-				Signatures:   nil,
-			},
-		},
+		Guarantees: []*flow.CollectionGuarantee{&guarantee},
 	}
 
 	block := flow.Block{
@@ -47,58 +51,40 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Content: content,
 	}
 
-	transactions := []flow.TransactionBody{tx1, tx2}
-
-	executableBlock := executor.ExecutableBlock{
-		Block:        block,
-		Transactions: transactions,
+	completeBlock := &execution.CompleteBlock{
+		Block: &block,
+		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{
+			guarantee.ID(): {
+				Guarantee:    &guarantee,
+				Transactions: transactions,
+			},
+		},
 	}
 
-	vm.On("NewBlockContext", &block).
-		Return(bc).
-		Once()
+	vm.On("NewBlockContext", &block).Return(bc)
 
-	bc.On(
-		"ExecuteTransaction",
-		mock.AnythingOfType("*state.View"),
-		mock.AnythingOfType("flow.TransactionBody"),
-	).
+	bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
 		Return(&virtualmachine.TransactionResult{}, nil).
 		Twice()
 
 	es.On("StateCommitmentByBlockID", block.ParentID).
-		Return(
-			flow.StateCommitment{
-				235, 123, 148, 153, 55, 102, 49, 115,
-				139, 193, 91, 66, 17, 209, 10, 68,
-				90, 169, 31, 94, 135, 33, 250, 250,
-				180, 198, 51, 74, 53, 22, 62, 234,
-			}, nil).
-		Once()
+		Return(unittest.StateCommitmentFixture(), nil)
 
-	es.On(
-		"NewView",
-		mock.AnythingOfType("flow.StateCommitment"),
-	).
+	es.On("NewView", mock.Anything).
 		Return(
 			state.NewView(func(key string) (bytes []byte, e error) {
 				return nil, nil
-			})).
-		Once()
+			}))
 
-	es.On(
-		"CommitDelta",
-		mock.AnythingOfType("state.Delta"),
-	).
-		Return(nil, nil).
-		Once()
+	es.On("CommitDelta", mock.Anything).Return(nil, nil)
+	es.On("PersistStateCommitment", block.ID(), mock.Anything).Return(nil)
 
-	chunks, err := exe.ExecuteBlock(executableBlock)
+	result, err := exe.ExecuteBlock(completeBlock)
 	assert.NoError(t, err)
-	assert.Len(t, chunks, 1)
+	assert.Len(t, result.Chunks.Chunks, 1)
 
-	chunk := chunks[0]
-	assert.EqualValues(t, chunk.TxCounts, 2)
+	chunk := result.Chunks.Chunks[0]
+	assert.EqualValues(t, 0, chunk.CollectionIndex)
 
 	vm.AssertExpectations(t)
 	bc.AssertExpectations(t)
