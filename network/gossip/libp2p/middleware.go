@@ -96,14 +96,52 @@ func (m *Middleware) Stop() {
 }
 
 // Send will try to send the given message to the given peer.
-func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
+func (m *Middleware) Send(targetID flow.Identifier, msg interface{}) error {
 	m.Lock()
 	defer m.Unlock()
 	var err error
-	// get an existing connection or create one
-	conn, err := m.connect(nodeID)
-	if err != nil {
-		return errors.Wrapf(err, "failed to connect to node_id: %s", nodeID.String())
+	found, stale := false, false
+	var conn *WriteConnection
+
+	log := m.log.With().Str("nodeid", targetID.String()).Logger()
+
+	if conn, found = m.cc.Get(targetID); found {
+		// check if the peer is still running
+		select {
+		case <-conn.done:
+			// connection found to be stale; replace with a new one
+			log.Debug().Msg("existing connection already closed ")
+			stale = true
+			conn = nil
+			m.cc.Remove(targetID)
+		default:
+			log.Debug().Msg("reusing existing connection")
+		}
+	} else {
+		log.Debug().Str("nodeid", targetID.String()).Msg("connection not found, creating one")
+	}
+
+	if !found || stale {
+
+		// get an identity to connect to. The identity provides the destination TCP address.
+		flowIdentity, err := m.ov.Identity(targetID)
+		if err != nil {
+			return fmt.Errorf("could not get identity for %s: %w", targetID.String(), err)
+		}
+
+		// create new connection
+		conn, err = m.connect(flowIdentity.NodeID.String(), flowIdentity.Address)
+		if err != nil {
+			return fmt.Errorf("could not create new connection for %s: %w", targetID.String(), err)
+		}
+
+		// cache the connection against the node id
+		m.cc.Add(flowIdentity.NodeID, conn)
+
+		// kick-off a go routine (one for each outbound connection)
+		m.wg.Add(1)
+		go m.handleOutboundConnection(flowIdentity.NodeID, conn)
+
 	}
 
 	// compose the message
@@ -115,31 +153,30 @@ func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 	// send the message if connection still valid
 	select {
 	case <-conn.done:
-		return errors.Errorf("connection has closed (node_id: %s)", nodeID)
+		return errors.Errorf("connection has closed (node_id: %s)", targetID.String())
 	case conn.outbound <- pmsg:
 		return nil
 	}
 }
 
 func (m *Middleware) createOutboundMessage(msg interface{}) (*Message, error) {
-	switch msg.(type) {
+	switch msg := msg.(type) {
 	case *networkmodel.NetworkMessage:
-		nm := msg.(*networkmodel.NetworkMessage)
 		var targetIDs [][]byte
-		for _, t := range nm.TargetIDs {
+		for _, t := range msg.TargetIDs {
 			targetIDs = append(targetIDs, t[:])
 		}
 		em := &EventMessage{
-			ChannelID: uint32(nm.ChannelID),
-			EventID:   nm.EventID,
-			OriginID:  nm.OriginID[:],
+			ChannelID: uint32(msg.ChannelID),
+			EventID:   msg.EventID,
+			OriginID:  msg.OriginID[:],
 			TargetIDs: targetIDs,
-			Payload:   nm.Payload,
+			Payload:   msg.Payload,
 		}
 
 		// Compose the message payload
 		message := &Message{
-			SenderID: nm.OriginID[:],
+			SenderID: msg.OriginID[:],
 			Event:    em,
 		}
 		return message, nil
@@ -158,15 +195,13 @@ func (m *Middleware) createInboundMessage(msg *Message) (*flow.Identifier, inter
 	}
 	var senderID [32]byte
 	copy(senderID[:], msg.SenderID)
-	var id flow.Identifier
-	id = senderID
+	var id flow.Identifier = senderID
 
 	var targetIDs []flow.Identifier
 	for _, t := range msg.Event.TargetIDs {
 		var f [32]byte
 		copy(f[:], t)
-		var id flow.Identifier
-		id = f
+		var id flow.Identifier = f
 		targetIDs = append(targetIDs, id)
 	}
 
@@ -181,45 +216,23 @@ func (m *Middleware) createInboundMessage(msg *Message) (*flow.Identifier, inter
 	return &id, nm, nil
 }
 
-// connect returns an existing connection if found else creates a new connection, adds it to the cache and returns it
-func (m *Middleware) connect(targetID flow.Identifier) (*WriteConnection, error) {
+// connect creates a new connection
+func (m *Middleware) connect(flowID string, address string) (*WriteConnection, error) {
 
-	log := m.log.With().Logger()
+	log := m.log.With().Str("targetid", flowID).Str("address", address).Logger()
 
-	if conn, found := m.cc.Get(targetID); found {
-		// check if the peer is still running
-		select {
-		case <-conn.done:
-			// connection found to be stale; replace with a new one
-			log.Debug().Str("nodeid", targetID.String()).Msg("existing connection already closed ")
-			m.cc.Remove(targetID)
-		default:
-			log.Debug().Str("nodeid", targetID.String()).Msg("reusing existing connection")
-			return conn, nil
-		}
-	} else {
-		log.Debug().Str("nodeid", targetID.String()).Msg("connection not found, creating one")
-	}
-
-	// get an identity to connect to. The identity provides the destination TCP address.
-	flowIdentity, err := m.ov.GetIdentity(targetID)
+	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not get flow ID for %s", targetID.String())
-	}
-
-	log = log.With().Str("flowIdentity", flowIdentity.String()).Str("address", flowIdentity.Address).Logger()
-
-	ip, port, err := net.SplitHostPort(flowIdentity.Address)
-	if err != nil {
-		return nil, errors.Wrapf(err, "could not parse address %s", flowIdentity.Address)
+		return nil, fmt.Errorf("could not parse address %s:%v", address, err)
 	}
 
 	// Create a new NodeAddress
-	nodeAddress := NodeAddress{Name: flowIdentity.NodeID.String(), IP: ip, Port: port}
-	// Add it as a peer
+	nodeAddress := NodeAddress{Name: flowID, IP: ip, Port: port}
+
+	// Create a stream for it
 	stream, err := m.libP2PNode.CreateStream(context.Background(), nodeAddress)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to create stream for %s", nodeAddress.Name)
+		return nil, fmt.Errorf("failed to create stream for %s:%v", nodeAddress.Name, err)
 	}
 
 	clog := m.log.With().
@@ -230,19 +243,12 @@ func (m *Middleware) connect(targetID flow.Identifier) (*WriteConnection, error)
 	// create the write connection handler
 	conn := NewWriteConnection(clog, stream)
 
-	// cache the connection against the node id and remove it when done
-	m.cc.Add(flowIdentity.NodeID, conn)
-
 	log.Info().Msg("connection established")
-
-	// one go routine for each outbound connection
-	go m.handleOutboundConnection(flowIdentity.NodeID, conn)
 
 	return conn, nil
 }
 
 func (m *Middleware) handleOutboundConnection(targetID flow.Identifier, conn *WriteConnection) {
-	m.wg.Add(1)
 	defer m.wg.Done()
 	// Remove the conn from the cache when done
 	defer m.cc.Remove(targetID)

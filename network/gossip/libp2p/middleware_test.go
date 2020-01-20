@@ -104,8 +104,8 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 			Role:    flow.RoleCollection,
 		}
 
-		// mocks Overlay.GetIdentity
-		m.ov[i].On("GetIdentity", mockery.Anything).Maybe().Return(flowID, nil)
+		// mocks Overlay.Identity
+		m.ov[i].On("Identity", mockery.Anything).Maybe().Return(flowID, nil)
 
 		// start the middleware
 		m.mws[i].Start(m.ov[i])
@@ -197,7 +197,9 @@ func (m *MiddlewareTestSuit) TestEcho() {
 		Run(func(args mockery.Arguments) {
 			wg.Done()
 			// echos back the same message back to the sender
-			m.mws[lastNode].Send(m.mws[firstNode].me, replyMsg)
+			err = m.mws[lastNode].Send(m.mws[firstNode].me, replyMsg)
+			assert.NoError(m.T(), err)
+
 		})
 
 	// first node

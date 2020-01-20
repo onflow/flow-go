@@ -138,13 +138,13 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 	// Get the PeerID
 	peerID, err := GetPeerID(n.Name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get peer ID: %w", err)
 	}
 
-	stream := FindOutboundStream(p.libP2PHost, peerID, FlowLibP2PProtocolID)
+	stream, found := FindOutboundStream(p.libP2PHost, peerID, FlowLibP2PProtocolID)
 
 	// if existing stream found return it
-	if stream != nil {
+	if found {
 		p.logger.Debug().Str("protocol", string(stream.Protocol())).
 			Str("stream_direction", DirectionToString(stream.Stat().Direction)).
 			Str("connection_direction", DirectionToString(stream.Conn().Stat().Direction)).
@@ -155,7 +155,7 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 	// Add node address as a peer
 	err = p.AddPeers(ctx, n)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not add peer: %w", err)
 	}
 
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)

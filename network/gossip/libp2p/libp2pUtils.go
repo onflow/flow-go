@@ -39,13 +39,13 @@ func ConnectednessToString(connectedness network.Connectedness) string {
 
 }
 
-// FindOutboundStream finds an existing outbound stream to the target id if it exists, else it returns nil by querying the state of the libp2p host
-func FindOutboundStream(host host.Host, targetID peer.ID, protocol core.ProtocolID) network.Stream {
+// FindOutboundStream finds an existing outbound stream to the target id if it exists by querying libp2p
+func FindOutboundStream(host host.Host, targetID peer.ID, protocol core.ProtocolID) (network.Stream, bool) {
 	streams := filterStream(host, targetID, protocol, network.DirOutbound, false)
 	if len(streams) > 0 {
-		return streams[0]
+		return streams[0], true
 	}
-	return nil
+	return nil, false
 }
 
 // CountStream finds total number of outbound stream to the target id

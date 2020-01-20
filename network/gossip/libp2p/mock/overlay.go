@@ -25,8 +25,8 @@ func (_m *Overlay) Cleanup(nodeID flow.Identifier) error {
 	return r0
 }
 
-// GetIdentity provides a mock function with given fields: nodeID
-func (_m *Overlay) GetIdentity(nodeID flow.Identifier) (flow.Identity, error) {
+// Identity provides a mock function with given fields: nodeID
+func (_m *Overlay) Identity(nodeID flow.Identifier) (flow.Identity, error) {
 	ret := _m.Called(nodeID)
 
 	var r0 flow.Identity
