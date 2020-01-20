@@ -30,6 +30,12 @@ func (ch *Chunk) Checksum() Identifier {
 	return MakeID(ch)
 }
 
+type ChunkHeader struct {
+	ChunkID     Identifier
+	StartState  StateCommitment
+	RegisterIDs []RegisterID
+}
+
 // ChunkState represents the state registers used by a particular chunk.
 type ChunkState struct {
 	ChunkID   Identifier

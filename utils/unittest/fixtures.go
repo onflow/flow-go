@@ -282,3 +282,11 @@ func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 		ChunkStates: []*flow.ChunkState{&chunkState},
 	}
 }
+
+func ChunkHeaderFixture() flow.ChunkHeader {
+	return flow.ChunkHeader{
+		ChunkID:     IdentifierFixture(),
+		StartState:  StateCommitmentFixture(),
+		RegisterIDs: []flow.RegisterID{{1}, {2}, {3}},
+	}
+}
