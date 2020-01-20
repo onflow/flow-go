@@ -22,6 +22,11 @@ const (
 
 	CodeCollectionRequest
 	CodeCollectionResponse
+
+	CodeExecutionRecipt
+
+	CodeExecutionStateRequest
+	CodeExecutionStateResponse
 )
 
 // Envelope is a wrapper to convey type information with JSON encoding without
