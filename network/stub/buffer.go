@@ -42,7 +42,7 @@ func (b *Buffer) Save(from flow.Identifier, channelID uint8, event interface{}, 
 }
 
 // Flush recursively delivers all pending messages using the provided sendOne
-// method until the buffer is empty. If sendOne does not deliver the messaage,
+// method until the buffer is empty. If sendOne does not deliver the message,
 // it is permanently dropped.
 func (b *Buffer) Flush(sendOne func(*PendingMessage)) {
 	for {

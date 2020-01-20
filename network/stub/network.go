@@ -99,7 +99,8 @@ func (mn *Network) FlushAll() {
 
 // FlushAllExcept flushes all pending messages in the buffer except those that
 // satisfy the shouldDrop predicate function. All messages that satisfy the
-// shouldDrop predicate are permanently dropped.
+// shouldDrop predicate are permanently dropped. This function will block
+// until all receivers have done their forwarding.
 func (mn *Network) FlushAllExcept(shouldDrop func(*PendingMessage) bool) {
 	mn.hub.Buffer.Flush(func(m *PendingMessage) {
 		if shouldDrop(m) {
