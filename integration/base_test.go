@@ -65,11 +65,11 @@ func TestContainer_Start(t *testing.T) {
 				"9000/tcp": struct{}{},
 			},
 			Cmd:   []string{
-					"--entries=collection-c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295@collection:2137=10000,consensus-8330adb950a72ea2d1ca919d9bc4d9a784544d2614fcd13709606e0ece204d2b@consensus:2138=10000,execution-7276bf64cecb9e556dc961f2aa9b2cc8db2c5a1d8d2021fa75da3acd8b367e0b@execution:2139=10000",
-					"--nodeid=c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295",
-					"--connections=2",
-					"--loglevel=debug",
-					"--ingress-addr=collection:9000",
+				"--entries=collection-c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295@collection:2137=10000,consensus-8330adb950a72ea2d1ca919d9bc4d9a784544d2614fcd13709606e0ece204d2b@consensus:2138=10000,execution-7276bf64cecb9e556dc961f2aa9b2cc8db2c5a1d8d2021fa75da3acd8b367e0b@execution:2139=10000,verification-831c36beb7fa82a05fb0114c03a4c167897941d0268212b6ba66bd2648a6ff53@verification:2140=1000",
+				"--nodeid=c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295",
+				"--connections=3",
+				"--loglevel=debug",
+				"--ingress-addr=collection:9000",
 			},
 		},
 		HostConfig: &container.HostConfig{
@@ -93,10 +93,10 @@ func TestContainer_Start(t *testing.T) {
 		Config: &container.Config{
 			Image: "gcr.io/dl-flow/consensus:latest",
 			Cmd:   []string{
-					"--entries=collection-c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295@collection:2137=10000,consensus-8330adb950a72ea2d1ca919d9bc4d9a784544d2614fcd13709606e0ece204d2b@consensus:2138=10000,execution-7276bf64cecb9e556dc961f2aa9b2cc8db2c5a1d8d2021fa75da3acd8b367e0b@execution:2139=10000",
-					"--nodeid=8330adb950a72ea2d1ca919d9bc4d9a784544d2614fcd13709606e0ece204d2b",
-					"--connections=2",
-					"--loglevel=debug",
+				"--entries=collection-c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295@collection:2137=10000,consensus-8330adb950a72ea2d1ca919d9bc4d9a784544d2614fcd13709606e0ece204d2b@consensus:2138=10000,execution-7276bf64cecb9e556dc961f2aa9b2cc8db2c5a1d8d2021fa75da3acd8b367e0b@execution:2139=10000,verification-831c36beb7fa82a05fb0114c03a4c167897941d0268212b6ba66bd2648a6ff53@verification:2140=1000",
+				"--nodeid=8330adb950a72ea2d1ca919d9bc4d9a784544d2614fcd13709606e0ece204d2b",
+				"--connections=3",
+				"--loglevel=debug",
 			},
 		},
 	})
@@ -107,10 +107,24 @@ func TestContainer_Start(t *testing.T) {
 		Config: &container.Config{
 			Image: "gcr.io/dl-flow/execution:latest",
 			Cmd:   []string{
-					"--entries=collection-c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295@collection:2137=10000,consensus-8330adb950a72ea2d1ca919d9bc4d9a784544d2614fcd13709606e0ece204d2b@consensus:2138=10000,execution-7276bf64cecb9e556dc961f2aa9b2cc8db2c5a1d8d2021fa75da3acd8b367e0b@execution:2139=10000",
-					"--nodeid=7276bf64cecb9e556dc961f2aa9b2cc8db2c5a1d8d2021fa75da3acd8b367e0b",
-					"--connections=2",
-					"--loglevel=debug",
+				"--entries=collection-c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295@collection:2137=10000,consensus-8330adb950a72ea2d1ca919d9bc4d9a784544d2614fcd13709606e0ece204d2b@consensus:2138=10000,execution-7276bf64cecb9e556dc961f2aa9b2cc8db2c5a1d8d2021fa75da3acd8b367e0b@execution:2139=10000,verification-831c36beb7fa82a05fb0114c03a4c167897941d0268212b6ba66bd2648a6ff53@verification:2140=1000",
+				"--nodeid=7276bf64cecb9e556dc961f2aa9b2cc8db2c5a1d8d2021fa75da3acd8b367e0b",
+				"--connections=3",
+				"--loglevel=debug",
+			},
+		},
+	})
+
+	verificationNode := suite.Container(testingdock.ContainerOpts{
+		Name:      "verification",
+		ForcePull: false,
+		Config: &container.Config{
+			Image: "gcr.io/dl-flow/verification:latest",
+			Cmd:   []string{
+				"--entries=collection-c3bb99b34fdbd57eae8378a317af29b4b2da07610fd3a866c3a5ce9a19173295@collection:2137=10000,consensus-8330adb950a72ea2d1ca919d9bc4d9a784544d2614fcd13709606e0ece204d2b@consensus:2138=10000,execution-7276bf64cecb9e556dc961f2aa9b2cc8db2c5a1d8d2021fa75da3acd8b367e0b@execution:2139=10000,verification-831c36beb7fa82a05fb0114c03a4c167897941d0268212b6ba66bd2648a6ff53@verification:2140=1000",
+				"--nodeid=831c36beb7fa82a05fb0114c03a4c167897941d0268212b6ba66bd2648a6ff53",
+				"--connections=3",
+				"--loglevel=debug",
 			},
 		},
 	})
@@ -119,6 +133,7 @@ func TestContainer_Start(t *testing.T) {
 	n.After(collectionNode)
 	n.After(consensusNode)
 	n.After(executionNode)
+	n.After(verificationNode)
 	// start mnemosyned after postgres, this also adds it to the test network
 	//postgres.After(mnemosyned)
 
