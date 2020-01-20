@@ -42,33 +42,30 @@ func ConnectednessToString(connectedness network.Connectedness) string {
 
 // FindOutboundStream finds an existing outbound stream to the target id if it exists, else it returns nil by querying the state of the libp2p host
 func FindOutboundStream(host host.Host, targetID peer.ID, protocol core.ProtocolID) network.Stream {
-
-	// get all connections
-	conns := host.Network().ConnsToPeer(targetID)
-
-	// find a connection which is in the connected state
-	for _, conn := range conns {
-
-		// choose the connection only if it is connected
-		if host.Network().Connectedness(targetID) == network.Connected {
-
-			// get all streams
-			streams := conn.GetStreams()
-			for _, stream := range streams {
-
-				// choose a stream which is marked as outbound and is for the flow protocol
-				if stream.Stat().Direction == network.DirOutbound && stream.Protocol() == protocol {
-					return stream
-				}
-			}
-		}
+	streams := filterStream(host, targetID, protocol, network.DirOutbound, false)
+	if len(streams) > 0 {
+		return streams[0]
+	} else {
+		return nil
 	}
-	return nil
 }
 
+// CountStream finds total number of outbound stream to the target id
 func CountStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, dir network.Direction) int {
+	streams := filterStream(host, targetID, protocol, dir, true)
+	return len(streams)
+}
 
-	count := 0
+// filterStream finds one or all existing outbound streams to the target id if it exists.
+// if parameter all is true - all streams are found else the first stream found is returned
+func filterStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, dir network.Direction, all bool) []network.Stream {
+
+	var filteredStreams []network.Stream
+
+	// choose the connection only if it is connected
+	if host.Network().Connectedness(targetID) != network.Connected {
+		return filteredStreams
+	}
 
 	// get all connections
 	conns := host.Network().ConnsToPeer(targetID)
@@ -76,19 +73,18 @@ func CountStream(host host.Host, targetID peer.ID, protocol core.ProtocolID, dir
 	// find a connection which is in the connected state
 	for _, conn := range conns {
 
-		// choose the connection only if it is connected
-		if host.Network().Connectedness(targetID) == network.Connected {
+		// get all streams
+		streams := conn.GetStreams()
+		for _, stream := range streams {
 
-			// get all streams
-			streams := conn.GetStreams()
-			for _, stream := range streams {
-
-				// choose a stream which is marked as outbound and is for the flow protocol
-				if stream.Stat().Direction == dir && stream.Protocol() == protocol {
-					count++
+			// choose a stream which is marked as outbound and is for the flow protocol
+			if stream.Stat().Direction == dir && stream.Protocol() == protocol {
+				filteredStreams = append(filteredStreams, stream)
+				if !all {
+					return filteredStreams
 				}
 			}
 		}
 	}
-	return count
+	return filteredStreams
 }
