@@ -5,9 +5,12 @@ package json
 import (
 	"encoding/json"
 
+
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/libp2p/message"
+	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
@@ -39,6 +42,23 @@ func decode(env Envelope) (interface{}, error) {
 
 	case CodeBlock:
 		v = &flow.Block{}
+
+	case CodeCollectionRequest:
+		v = &messages.CollectionRequest{}
+	case CodeCollectionResponse:
+		v = &messages.CollectionResponse{}
+
+	case CodeEcho:
+		v = &message.Echo{}
+
+	case CodeExecutionRecipt:
+		v = &flow.ExecutionReceipt{}
+
+	case CodeExecutionStateRequest:
+		v = &messages.ExecutionStateRequest{}
+
+	case CodeExecutionStateResponse:
+		v = &messages.ExecutionStateResponse{}
 
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)

@@ -1,7 +1,6 @@
 package interpreter
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -105,16 +104,14 @@ func TestMinusUInt8(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -216,16 +213,14 @@ func TestMinusUInt16(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -327,16 +322,14 @@ func TestMinusUInt32(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -654,16 +647,14 @@ func TestMinusUInt64(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -765,16 +756,15 @@ func TestMinusInt8(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+
 	}
 }
 
@@ -876,16 +866,14 @@ func TestMinusInt16(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -987,16 +975,14 @@ func TestMinusInt32(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }
 
@@ -1314,15 +1300,124 @@ func TestMinusInt64(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%d - %d", test.a, test.b), func(t *testing.T) {
-			f := func() {
-				test.a.Minus(test.b)
-			}
-			if test.valid {
-				assert.NotPanics(t, f)
-			} else {
-				assert.Panics(t, f)
-			}
-		})
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+	}
+}
+
+func TestMinusInt128(t *testing.T) {
+
+	// NOTE: hex values are integer values, not bit patterns!
+
+	tests := []struct {
+		a, b  Int128Value
+		valid bool
+	}{
+		{int128("0x00000000000000000000000000000000"), int128("0x00000000000000000000000000000000"), true},
+		{int128("0x00000000000000000000000000000001"), int128("0x00000000000000000000000000000000"), true},
+		{int128("0x00000000000000000000000000000002"), int128("0x00000000000000000000000000000000"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("0x00000000000000000000000000000000"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("0x00000000000000000000000000000000"), true},
+		{int128("-0x80000000000000000000000000000000"), int128("0x00000000000000000000000000000000"), true},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("0x00000000000000000000000000000000"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("0x00000000000000000000000000000000"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("0x00000000000000000000000000000000"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("0x00000000000000000000000000000001"), true},
+		{int128("0x00000000000000000000000000000001"), int128("0x00000000000000000000000000000001"), true},
+		{int128("0x00000000000000000000000000000002"), int128("0x00000000000000000000000000000001"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("0x00000000000000000000000000000001"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("0x00000000000000000000000000000001"), true},
+		{int128("-0x80000000000000000000000000000000"), int128("0x00000000000000000000000000000001"), false},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("0x00000000000000000000000000000001"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("0x00000000000000000000000000000001"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("0x00000000000000000000000000000001"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("0x00000000000000000000000000000002"), true},
+		{int128("0x00000000000000000000000000000001"), int128("0x00000000000000000000000000000002"), true},
+		{int128("0x00000000000000000000000000000002"), int128("0x00000000000000000000000000000002"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("0x00000000000000000000000000000002"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("0x00000000000000000000000000000002"), true},
+		{int128("-0x80000000000000000000000000000000"), int128("0x00000000000000000000000000000002"), false},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("0x00000000000000000000000000000002"), false},
+		{int128("-0x00000000000000000000000000000002"), int128("0x00000000000000000000000000000002"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("0x00000000000000000000000000000002"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("0x00000000000000000000000000000001"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("0x00000000000000000000000000000002"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("-0x80000000000000000000000000000000"), int128("0x7ffffffffffffffffffffffffffffffe"), false},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("0x7ffffffffffffffffffffffffffffffe"), false},
+		{int128("-0x00000000000000000000000000000002"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("0x00000000000000000000000000000001"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("0x00000000000000000000000000000002"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("-0x80000000000000000000000000000000"), int128("0x7fffffffffffffffffffffffffffffff"), false},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("0x7fffffffffffffffffffffffffffffff"), false},
+		{int128("-0x00000000000000000000000000000002"), int128("0x7fffffffffffffffffffffffffffffff"), false},
+		{int128("-0x00000000000000000000000000000001"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("-0x80000000000000000000000000000000"), false},
+		{int128("0x00000000000000000000000000000001"), int128("-0x80000000000000000000000000000000"), false},
+		{int128("0x00000000000000000000000000000002"), int128("-0x80000000000000000000000000000000"), false},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("-0x80000000000000000000000000000000"), false},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("-0x80000000000000000000000000000000"), false},
+		{int128("-0x80000000000000000000000000000000"), int128("-0x80000000000000000000000000000000"), true},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("-0x80000000000000000000000000000000"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("-0x80000000000000000000000000000000"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("-0x80000000000000000000000000000000"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("0x00000000000000000000000000000001"), int128("-0x7fffffffffffffffffffffffffffffff"), false},
+		{int128("0x00000000000000000000000000000002"), int128("-0x7fffffffffffffffffffffffffffffff"), false},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("-0x7fffffffffffffffffffffffffffffff"), false},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("-0x7fffffffffffffffffffffffffffffff"), false},
+		{int128("-0x80000000000000000000000000000000"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("0x00000000000000000000000000000001"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("0x00000000000000000000000000000002"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("-0x00000000000000000000000000000002"), false},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("-0x00000000000000000000000000000002"), false},
+		{int128("-0x80000000000000000000000000000000"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("-0x00000000000000000000000000000002"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("-0x00000000000000000000000000000001"), true},
+		{int128("0x00000000000000000000000000000001"), int128("-0x00000000000000000000000000000001"), true},
+		{int128("0x00000000000000000000000000000002"), int128("-0x00000000000000000000000000000001"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("-0x00000000000000000000000000000001"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("-0x00000000000000000000000000000001"), false},
+		{int128("-0x80000000000000000000000000000000"), int128("-0x00000000000000000000000000000001"), true},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("-0x00000000000000000000000000000001"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("-0x00000000000000000000000000000001"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("-0x00000000000000000000000000000001"), true},
+	}
+
+	for _, test := range tests {
+		f := func() {
+			test.a.Minus(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
 	}
 }

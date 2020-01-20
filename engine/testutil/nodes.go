@@ -14,8 +14,10 @@ import (
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
+	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
+	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
@@ -98,20 +100,36 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis 
 
 	node := GenericNode(t, hub, identity, genesis)
 
-	pool, err := stdmap.NewGuarantees()
+	guarantees, err := stdmap.NewGuarantees()
 	require.NoError(t, err)
 
-	propagationEngine, err := propagation.New(node.Log, node.Net, node.State, node.Me, pool)
+	approvals, err := stdmap.NewApprovals()
+	require.NoError(t, err)
+
+	receipts, err := stdmap.NewReceipts()
+	require.NoError(t, err)
+
+	seals, err := stdmap.NewSeals()
+	require.NoError(t, err)
+
+	propagationEngine, err := propagation.New(node.Log, node.Net, node.State, node.Me, guarantees)
 	require.NoError(t, err)
 
 	ingestionEngine, err := consensusingest.New(node.Log, node.Net, propagationEngine, node.State, node.Me)
 	require.Nil(t, err)
 
+	matchingEngine, err := matching.New(node.Log, node.Net, node.State, node.Me, receipts, approvals, seals)
+	require.Nil(t, err)
+
 	return mock.ConsensusNode{
 		GenericNode:       node,
-		Pool:              pool,
+		Guarantees:        guarantees,
+		Approvals:         approvals,
+		Receipts:          receipts,
+		Seals:             seals,
 		PropagationEngine: propagationEngine,
 		IngestionEngine:   ingestionEngine,
+		MatchingEngine:    matchingEngine,
 	}
 }
 
@@ -149,8 +167,13 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genes
 	node.Collections, err = stdmap.NewCollections()
 	require.Nil(t, err)
 
-	node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me, node.Receipts, node.Blocks, node.Collections)
+	node.ChunkStates, err = stdmap.NewChunkStates()
 	require.Nil(t, err)
+
+	node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me)
+	require.Nil(t, err)
+
+	node.ReceiptsEngine, err = ingest.New(node.Log, node.Net, node.State, node.Me, node.VerifierEngine, node.Receipts, node.Blocks, node.Collections, node.ChunkStates)
 
 	return node
 }

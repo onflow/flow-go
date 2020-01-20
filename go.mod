@@ -7,6 +7,7 @@ require (
 	github.com/dapperlabs/flow-go/language v0.2.5-beta
 	github.com/dapperlabs/flow-go/protobuf v0.2.5-beta
 	github.com/dchest/siphash v1.2.1
+	github.com/dgraph-io/badger v1.6.0
 	github.com/dgraph-io/badger/v2 v2.0.0
 	github.com/ethereum/go-ethereum v1.9.9
 	github.com/gammazero/deque v0.0.0-20190521012701-46e4ffb7a622
@@ -27,6 +28,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.2.0
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/pkg/errors v0.8.1
+	github.com/pkg/term v0.0.0-20190109203006-aa71e9d9e942 // indirect
 	github.com/prometheus/client_golang v1.3.0
 	github.com/rs/zerolog v1.15.0
 	github.com/spf13/pflag v1.0.3
