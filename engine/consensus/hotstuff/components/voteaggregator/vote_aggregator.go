@@ -13,12 +13,6 @@ import (
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 )
 
-type VotingStatus struct {
-	thresholdStake   uint64
-	accumulatedStake uint64
-	validVotes       map[string]*types.Vote
-}
-
 type VoteAggregator struct {
 	log           zerolog.Logger
 	protocolState protocol.State
@@ -183,8 +177,4 @@ func getSigsSliceFromVotes(votes map[string]*types.Vote) []*types.Signature {
 	}
 
 	return signatures
-}
-
-func (vs *VotingStatus) canBuildQC() bool {
-	return vs.accumulatedStake >= vs.thresholdStake
 }
