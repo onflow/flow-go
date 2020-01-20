@@ -26,18 +26,17 @@ var connectednessLookup = map[network.Connectedness]string{
 func DirectionToString(direction network.Direction) string {
 	if dirStr, found := directionLookUp[direction]; found {
 		return dirStr
-	} else {
-		return "Not defined"
 	}
+	return "Not defined"
 }
 
 // reverse translating libp2p network connectedness to string
 func ConnectednessToString(connectedness network.Connectedness) string {
 	if connStr, found := connectednessLookup[connectedness]; found {
 		return connStr
-	} else {
-		return "Not defined"
 	}
+	return "Not defined"
+
 }
 
 // FindOutboundStream finds an existing outbound stream to the target id if it exists, else it returns nil by querying the state of the libp2p host
@@ -45,9 +44,8 @@ func FindOutboundStream(host host.Host, targetID peer.ID, protocol core.Protocol
 	streams := filterStream(host, targetID, protocol, network.DirOutbound, false)
 	if len(streams) > 0 {
 		return streams[0]
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // CountStream finds total number of outbound stream to the target id

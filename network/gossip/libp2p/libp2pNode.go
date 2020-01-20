@@ -150,16 +150,16 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 			Str("connection_direction", DirectionToString(stream.Conn().Stat().Direction)).
 			Msg("found existing stream")
 		return stream, nil
-	} else {
-		// Add node address as a peer
-		err := p.AddPeers(ctx, n)
-		if err != nil {
-			return nil, err
-		}
-
-		// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
-		return p.libP2PHost.NewStream(ctx, peerID, FlowLibP2PProtocolID)
 	}
+
+	// Add node address as a peer
+	err = p.AddPeers(ctx, n)
+	if err != nil {
+		return nil, err
+	}
+
+	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
+	return p.libP2PHost.NewStream(ctx, peerID, FlowLibP2PProtocolID)
 }
 
 // GetPeerInfo generates the address of a Node/Peer given its address in a deterministic and consistent way.
