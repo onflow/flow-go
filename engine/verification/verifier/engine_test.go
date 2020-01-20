@@ -1,6 +1,7 @@
 package verifier_test
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -225,7 +226,28 @@ func TestHappyPath(t *testing.T) {
 }
 
 func TestConcurrency(t *testing.T) {
-	testConcurrency(t, 1, 1)
+	testcases := []struct{ erCount, senderCount int }{
+		{
+			erCount:     1,
+			senderCount: 1,
+		}, {
+			erCount:     1,
+			senderCount: 10,
+		}, {
+			erCount:     10,
+			senderCount: 1,
+		}, {
+			erCount:     10,
+			senderCount: 10,
+		},
+	}
+
+	for _, testcase := range testcases {
+		name := fmt.Sprintf("#%d ERs / #%d senders", testcase.erCount, testcase.senderCount)
+		t.Run(name, func(t *testing.T) {
+			testConcurrency(t, testcase.erCount, testcase.senderCount)
+		})
+	}
 }
 
 func testConcurrency(t *testing.T, erCount, senderCount int) {
@@ -268,44 +290,48 @@ func testConcurrency(t *testing.T, erCount, senderCount int) {
 	senderWG.Add(erCount * senderCount)
 
 	for _, completeER := range ers {
+		for _, coll := range completeER.Collections {
+			err := colNode.Collections.Store(coll)
+			assert.Nil(t, err)
+		}
 
 		// spin up `senderCount` sender goroutines to mimic receiving
 		// the same resource multiple times
 		for i := 0; i < senderCount; i++ {
-			go func() {
-				defer senderWG.Done()
+			go func(j int, id flow.Identifier, block *flow.Block, receipt *flow.ExecutionReceipt) {
 
-				for _, coll := range completeER.Collections {
-					err := colNode.Collections.Store(coll)
-					assert.Nil(t, err)
+				sendBlock := func() {
+					_ = verNode.ReceiptsEngine.Process(conID.NodeID, block)
 				}
 
-				var sentBlock, sentReceipt bool
+				sendReceipt := func() {
+					_ = verNode.ReceiptsEngine.Process(exeID.NodeID, receipt)
+				}
 
-				for {
-					if sentBlock && sentReceipt {
-						return
-					}
-
-					switch rand.Intn(2) {
-					case 0:
-						// send block
-						_ = verNode.ReceiptsEngine.Process(conID.NodeID, completeER.Block)
-						sentBlock = true
-					case 1:
-						// send receipt
-						_ = verNode.ReceiptsEngine.Process(exeID.NodeID, completeER.Receipt)
-						sentReceipt = true
-					}
-
+				switch rand.Intn(2) {
+				case 0:
+					// block then receipt
+					sendBlock()
 					verNet.FlushAll()
+					time.Sleep(1)
+					sendReceipt()
+				case 1:
+					// receipt then block
+					sendReceipt()
+					verNet.FlushAll()
+					time.Sleep(1)
+					sendBlock()
 				}
-			}()
+
+				verNet.FlushAll()
+				go senderWG.Done()
+			}(i, completeER.Receipt.ExecutionResult.ID(), completeER.Block, completeER.Receipt)
 		}
 	}
 
 	// wait for all ERs to be sent to VER
 	assert.True(t, unittest.ReturnsWithin(senderWG.Wait, time.Second))
+	verNet.FlushAll()
 	// wait for all RAs to be received by CON
 	assert.True(t, unittest.ReturnsWithin(receiverWG.Wait, time.Second))
 }
@@ -368,8 +394,7 @@ func setupMockConNode(t *testing.T, node mock.GenericNode, verID flow.Identifier
 			receivedRAs[erID] = struct{}{}
 			wg.Done()
 		}).
-		Return(nil).
-		Once()
+		Return(nil)
 
 	return &wg
 }
