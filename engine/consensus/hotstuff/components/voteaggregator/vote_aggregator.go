@@ -34,6 +34,15 @@ type VoteAggregator struct {
 	blockHashToVotingStatus map[string]*VotingStatus
 }
 
+func NewVoteAggregator(log zerolog.Logger, protocolState protocol.State, viewState hotstuff.ViewState, voteValidator hotstuff.Validator) *VoteAggregator {
+	return &VoteAggregator{
+		log:           log,
+		protocolState: protocolState,
+		viewState:     viewState,
+		voteValidator: voteValidator,
+	}
+}
+
 // StorePendingVote stores the vote as a pending vote assuming the caller has checked that the voting
 // block is currently missing.
 // Note: Validations on these pending votes will be postponed until the block has been received.
