@@ -7,5 +7,16 @@ option go_package = "libp2p";
 // Message models a single message that is supposed to get exchanged by the gossip network
 message Message {
     bytes  SenderID = 1;
-    bytes Event = 2;
+    EventMessage Event = 2;
 }
+
+// NetMsg represents the message data structure of an application layer event
+message EventMessage {
+    uint32 ChannelID = 1;
+    bytes EventID = 2;
+    bytes OriginID = 3;
+    repeated bytes TargetIDs = 4;
+    bytes Payload = 5;
+}
+
+

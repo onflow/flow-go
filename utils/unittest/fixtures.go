@@ -5,6 +5,7 @@ import (
 	"math/rand"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -228,5 +229,56 @@ func TransactionBodyFixture() flow.TransactionBody {
 		PayerAccount:     AddressFixture(),
 		ScriptAccounts:   []flow.Address{AddressFixture()},
 		Signatures:       []flow.AccountSignature{AccountSignatureFixture()},
+	}
+}
+
+// CompleteExecutionResultFixture returns complete execution result with an
+// execution receipt referencing the block/collections.
+func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
+	coll := CollectionFixture(3)
+	guarantee := coll.Guarantee()
+
+	content := flow.Content{
+		Identities: IdentityListFixture(32),
+		Guarantees: []*flow.CollectionGuarantee{&guarantee},
+	}
+	payload := content.Payload()
+	header := BlockHeaderFixture()
+	header.PayloadHash = payload.Root()
+
+	block := flow.Block{
+		Header:  header,
+		Payload: payload,
+		Content: content,
+	}
+
+	chunk := flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: 0,
+		},
+		Index: 0,
+	}
+
+	chunkState := flow.ChunkState{
+		ChunkID:   chunk.ID(),
+		Registers: flow.Ledger{},
+	}
+
+	result := flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			BlockID: block.ID(),
+			Chunks:  flow.ChunkList{Chunks: []*flow.Chunk{&chunk}},
+		},
+	}
+
+	receipt := flow.ExecutionReceipt{
+		ExecutionResult: result,
+	}
+
+	return verification.CompleteExecutionResult{
+		Receipt:     &receipt,
+		Block:       &block,
+		Collections: []*flow.Collection{&coll},
+		ChunkStates: []*flow.ChunkState{&chunkState},
 	}
 }

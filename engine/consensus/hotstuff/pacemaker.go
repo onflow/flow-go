@@ -16,7 +16,9 @@ type PaceMaker interface {
 	// UpdateCurViewWithBlock will check if the given block will allow PaceMaker to
 	// fast forward to the BlockProposal's view.
 	// If yes, a NewViewEvent will be returned.
-	UpdateCurViewWithBlock(block *types.BlockProposal) (*types.NewViewEvent, bool)
+	// The parameter `isLeaderForNextView` is for PaceMaker to check whether it should
+	// stay at the current view if it's the next leader.
+	UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool)
 
 	// OnTimeout is called when a timeout, which was previously created by the PaceMaker, has
 	// looped through the event loop.
