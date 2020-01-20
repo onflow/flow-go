@@ -115,7 +115,8 @@ func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
 func (fnb *FlowNodeBuilder) initNodeID() {
 	if fnb.BaseConfig.NodeID == notSet {
 		h := sha256.New()
-		_, _ = h.Write([]byte(fnb.BaseConfig.NodeName))
+		_, err := h.Write([]byte(fnb.BaseConfig.NodeName))
+		fnb.MustNot(err).Msg("could not initialize node id")
 		fnb.BaseConfig.NodeID = hex.EncodeToString(h.Sum(nil))
 	}
 }
@@ -140,6 +141,10 @@ func (fnb *FlowNodeBuilder) initLogger() {
 }
 
 func (fnb *FlowNodeBuilder) initDatabase() {
+	//Pre-create DB path (Badger creates only one-level dirs)
+	err := os.MkdirAll(fnb.BaseConfig.datadir, 700)
+	fnb.MustNot(err).Msgf("could not create datadir %s", fnb.BaseConfig.datadir)
+
 	db, err := badger.Open(badger.DefaultOptions(fnb.BaseConfig.datadir).WithLogger(nil))
 	fnb.MustNot(err).Msg("could not open key-value store")
 	fnb.DB = db

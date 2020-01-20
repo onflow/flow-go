@@ -56,7 +56,7 @@ func (m *MiddlewareTestSuit) TestPingRawReception() {
 // it does not evaluate content of the payload
 // it does not evaluate anything related to the sender id
 func (m *MiddlewareTestSuit) TestPingTypeReception() {
-	m.Ping(mockery.Anything, mockery.AnythingOfType("network.NetworkMessage"))
+	m.Ping(mockery.Anything, mockery.AnythingOfType("*network.NetworkMessage"))
 }
 
 // TestPingIDType tests the middleware against both the type of sender id
@@ -251,12 +251,12 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 	return ids, mws
 }
 
-func (m *MiddlewareTestSuit) createNetworkMessage(originID flow.Identifier, targetID flow.Identifier, msg ...string) network.NetworkMessage {
+func (m *MiddlewareTestSuit) createNetworkMessage(originID flow.Identifier, targetID flow.Identifier, msg ...string) *network.NetworkMessage {
 	payload := "hello"
 	if len(msg) > 0 {
 		payload = msg[0]
 	}
-	nm := network.NetworkMessage{
+	nm := &network.NetworkMessage{
 		ChannelID: 1,
 		EventID:   []byte("1"),
 		OriginID:  originID,

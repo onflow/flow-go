@@ -100,7 +100,6 @@ var PanicFunction = NewStandardLibraryFunction(
 			Message:  message.Str,
 			Location: invocation.Location,
 		})
-		return trampoline.Done{}
 	},
 	nil,
 )

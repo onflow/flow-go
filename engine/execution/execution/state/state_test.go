@@ -49,6 +49,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		view1.Set("vegetable", []byte("carrot"))
 
 		sc2, err := es.CommitDelta(view1.Delta())
+		assert.NoError(t, err)
 
 		view2 := es.NewView(sc2)
 
@@ -71,12 +72,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		view1.Set("fruit", []byte("apple"))
 
 		sc2, err := es.CommitDelta(view1.Delta())
+		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
 		view2.Set("fruit", []byte("orange"))
 
 		sc3, err := es.CommitDelta(view2.Delta())
+		assert.NoError(t, err)
 
 		// create a view for previous state version
 		view3 := es.NewView(sc2)
@@ -105,12 +108,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		view1.Set("fruit", []byte("apple"))
 
 		sc2, err := es.CommitDelta(view1.Delta())
+		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
 		view2.Delete("fruit")
 
 		sc3, err := es.CommitDelta(view2.Delta())
+		assert.NoError(t, err)
 
 		// create a view for previous state version
 		view3 := es.NewView(sc2)

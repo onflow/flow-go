@@ -36,9 +36,8 @@ RecvLoop:
 		default:
 		}
 
-		msg := new(Message)
-
-		err := r.ReadMsg(msg)
+		var msg Message
+		err := r.ReadMsg(&msg)
 		if err != nil {
 			rc.log.Error().Str("peer", rc.stream.Conn().RemotePeer().String()).Err(err)
 			rc.stream.Close()
@@ -47,11 +46,11 @@ RecvLoop:
 
 		rc.log.Debug().Str("peer", rc.stream.Conn().RemotePeer().String()).
 			Bytes("sender", msg.SenderID).
-			Bytes("eventID", msg.Event.EventID).
+			Hex("eventID", msg.Event.EventID).
 			Msg("received message")
 
 		// stash the received message into the inbound queue for handling
-		rc.inbound <- msg
+		rc.inbound <- &msg
 	}
 
 	// close and drain the inbound channel

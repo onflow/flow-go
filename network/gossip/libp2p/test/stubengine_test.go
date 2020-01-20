@@ -15,7 +15,7 @@ import (
 	gologging "github.com/whyrusleeping/go-logging"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	libp2pmodel "github.com/dapperlabs/flow-go/model/libp2p"
+	libp2pmodel "github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"

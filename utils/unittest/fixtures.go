@@ -5,6 +5,7 @@ import (
 	"math/rand"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -61,13 +62,13 @@ func CollectionGuaranteesFixture(n int) []*flow.CollectionGuarantee {
 }
 
 func CollectionFixture(n int) flow.Collection {
-	transactions := make([]flow.TransactionBody, 0, n)
+	transactions := make([]*flow.TransactionBody, 0, n)
 
 	for i := 0; i < n; i++ {
 		tx := TransactionFixture(func(t *flow.Transaction) {
 			t.Nonce = rand.Uint64()
 		})
-		transactions = append(transactions, tx.TransactionBody)
+		transactions = append(transactions, &tx.TransactionBody)
 	}
 
 	return flow.Collection{Transactions: transactions}
@@ -99,6 +100,31 @@ func ExecutionResultFixture() flow.ExecutionResult {
 	}
 }
 
+func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
+	return func(ra *flow.ResultApproval) {
+		ra.ResultApprovalBody.ExecutionResultID = id
+	}
+}
+
+func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) flow.ResultApproval {
+	approval := flow.ResultApproval{
+		ResultApprovalBody: flow.ResultApprovalBody{
+			ExecutionResultID:    IdentifierFixture(),
+			AttestationSignature: SignatureFixture(),
+			ChunkIndexList:       nil,
+			Proof:                nil,
+			Spocks:               nil,
+		},
+		VerifierSignature: SignatureFixture(),
+	}
+
+	for _, apply := range opts {
+		apply(&approval)
+	}
+
+	return approval
+}
+
 func StateCommitmentFixture() flow.StateCommitment {
 	var state = make([]byte, 20)
 	_, _ = rand.Read(state[0:20])
@@ -117,6 +143,13 @@ func IdentifierFixture() flow.Identifier {
 	var id flow.Identifier
 	_, _ = rand.Read(id[:])
 	return id
+}
+
+// WithRole adds a role to an identity fixture.
+func WithRole(role flow.Role) func(*flow.Identity) {
+	return func(id *flow.Identity) {
+		id.Role = role
+	}
 }
 
 // IdentityFixture returns a node identity.
@@ -196,5 +229,56 @@ func TransactionBodyFixture() flow.TransactionBody {
 		PayerAccount:     AddressFixture(),
 		ScriptAccounts:   []flow.Address{AddressFixture()},
 		Signatures:       []flow.AccountSignature{AccountSignatureFixture()},
+	}
+}
+
+// CompleteExecutionResultFixture returns complete execution result with an
+// execution receipt referencing the block/collections.
+func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
+	coll := CollectionFixture(3)
+	guarantee := coll.Guarantee()
+
+	content := flow.Content{
+		Identities: IdentityListFixture(32),
+		Guarantees: []*flow.CollectionGuarantee{&guarantee},
+	}
+	payload := content.Payload()
+	header := BlockHeaderFixture()
+	header.PayloadHash = payload.Root()
+
+	block := flow.Block{
+		Header:  header,
+		Payload: payload,
+		Content: content,
+	}
+
+	chunk := flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: 0,
+		},
+		Index: 0,
+	}
+
+	chunkState := flow.ChunkState{
+		ChunkID:   chunk.ID(),
+		Registers: flow.Ledger{},
+	}
+
+	result := flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			BlockID: block.ID(),
+			Chunks:  flow.ChunkList{Chunks: []*flow.Chunk{&chunk}},
+		},
+	}
+
+	receipt := flow.ExecutionReceipt{
+		ExecutionResult: result,
+	}
+
+	return verification.CompleteExecutionResult{
+		Receipt:     &receipt,
+		Block:       &block,
+		Collections: []*flow.Collection{&coll},
+		ChunkStates: []*flow.ChunkState{&chunkState},
 	}
 }

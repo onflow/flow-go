@@ -26,7 +26,6 @@ type Middleware struct {
 	log        zerolog.Logger
 	codec      network.Codec
 	ov         middleware.Overlay
-	slots      chan struct{} // semaphore for outgoing connection slots
 	cc         *ConnectionCache
 	wg         *sync.WaitGroup
 	libP2PNode *P2PNode
@@ -124,14 +123,14 @@ func (m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 
 func (m *Middleware) createOutboundMessage(msg interface{}) (*Message, error) {
 	switch msg.(type) {
-	case networkmodel.NetworkMessage:
-		nm := msg.(networkmodel.NetworkMessage)
+	case *networkmodel.NetworkMessage:
+		nm := msg.(*networkmodel.NetworkMessage)
 		var targetIDs [][]byte
 		for _, t := range nm.TargetIDs {
 			targetIDs = append(targetIDs, t[:])
 		}
 		em := &EventMessage{
-			EngineID:  uint32(nm.ChannelID),
+			ChannelID: uint32(nm.ChannelID),
 			EventID:   nm.EventID,
 			OriginID:  nm.OriginID[:],
 			TargetIDs: targetIDs,
@@ -171,8 +170,8 @@ func (m *Middleware) createInboundMessage(msg *Message) (*flow.Identifier, inter
 		targetIDs = append(targetIDs, id)
 	}
 
-	nm := networkmodel.NetworkMessage{
-		ChannelID: uint8(msg.Event.EngineID),
+	nm := &networkmodel.NetworkMessage{
+		ChannelID: uint8(msg.Event.ChannelID),
 		EventID:   msg.Event.EventID,
 		OriginID:  id,
 		TargetIDs: targetIDs,
@@ -299,9 +298,4 @@ ProcessLoop:
 	}
 
 	log.Info().Msg("middleware closed the connection")
-}
-
-// release will release one resource on the given semaphore.
-func (m *Middleware) release(slots chan struct{}) {
-	<-slots
 }

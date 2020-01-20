@@ -596,8 +596,8 @@ func (s *SMT) updateHistoricalStates(root []byte) error {
 
 }
 
-// Update takes a sorted list of keys and assoicated values and inserts
-// them into the trie, and if that is successful updates the databases
+// Update takes a sorted list of keys and associated values and inserts
+// them into the trie, and if that is successful updates the databases.
 func (s *SMT) Update(keys [][]byte, values [][]byte) error {
 	s.database.NewBatch()
 	res, err := s.UpdateAtomically(s.GetRoot(), keys, values, s.height-1)
@@ -679,7 +679,7 @@ func (s *SMT) insertIntoKeys(insert []byte, keys [][]byte, values [][]byte) ([][
 	return append(keys, insert), append(values, oldVal), nil
 }
 
-// UpdateAtomically updates the trie atomatically and returns the state root
+// UpdateAtomically updates the trie atomically and returns the state root
 // NOTE: This function assumes keys and values are sorted and haves indexes mapping to each other
 func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, height int) (*node, error) {
 	var err error

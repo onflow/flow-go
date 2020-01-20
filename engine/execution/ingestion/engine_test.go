@@ -1,4 +1,4 @@
-package blocks
+package ingestion
 
 import (
 	"testing"
@@ -9,14 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	engineCommon "github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution/execution"
+	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	network "github.com/dapperlabs/flow-go/network/mocks"
 	protocol "github.com/dapperlabs/flow-go/protocol/mocks"
 	storage "github.com/dapperlabs/flow-go/storage/mocks"
-
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -50,9 +49,6 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 
 	snapshot := protocol.NewMockSnapshot(ctrl)
 
-	mempool, err := newMempool()
-	require.NoError(t, err)
-
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
 
 	state.EXPECT().Final().Return(snapshot).AnyTimes()
@@ -67,7 +63,7 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 
-	engine, err = New(log, net, me, blocks, collections, state, executionEngine, mempool)
+	engine, err := NewEngine(log, net, me, blocks, collections, state, executionEngine)
 	require.NoError(t, err)
 
 	f(t, engine, blocks, collections, state, conduit, collectionConduit, executionEngine)
@@ -100,7 +96,7 @@ func TestCollectionRequests(t *testing.T) {
 
 		blocks.EXPECT().Store(gomock.Eq(&block))
 		for _, col := range block.Guarantees {
-			collectionConduit.EXPECT().Submit(gomock.Eq(messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
+			collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
 		}
 
 		err := engine.ProcessLocal(&block)
@@ -118,7 +114,7 @@ func TestValidatingCollectionResponse(t *testing.T) {
 
 		id := block.Guarantees[0].ID()
 
-		collectionConduit.EXPECT().Submit(gomock.Eq(messages.CollectionRequest{ID: id}), gomock.Eq(collectionIdentity.NodeID)).Return(nil)
+		collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: id}), gomock.Eq(collectionIdentity.NodeID)).Return(nil)
 
 		err := engine.ProcessLocal(&block)
 		require.NoError(t, err)
@@ -155,7 +151,7 @@ func TestForwardingToExecution(t *testing.T) {
 		blocks.EXPECT().Store(gomock.Eq(&block))
 
 		for _, col := range block.Guarantees {
-			collectionConduit.EXPECT().Submit(gomock.Eq(messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
+			collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
 		}
 
 		err := engine.ProcessLocal(&block)
@@ -181,7 +177,7 @@ func TestNoBlockExecutedUntilAllCollectionsArePosted(t *testing.T) {
 		block, colls := makeRealBlock(3)
 
 		for _, col := range block.Guarantees {
-			collectionConduit.EXPECT().Submit(gomock.Eq(messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
+			collectionConduit.EXPECT().Submit(gomock.Eq(&messages.CollectionRequest{ID: col.ID()}), gomock.Eq(collectionIdentity.NodeID))
 		}
 
 		blocks.EXPECT().Store(gomock.Eq(&block))
@@ -204,9 +200,9 @@ func makeRealBlock(n int) (flow.Block, []flow.Collection) {
 	colls := make([]flow.Collection, n)
 	collsGuarantees := make([]*flow.CollectionGuarantee, n)
 
-	for i, _ := range colls {
+	for i := range colls {
 		tx := unittest.TransactionBodyFixture()
-		colls[i].Transactions = []flow.TransactionBody{tx}
+		colls[i].Transactions = []*flow.TransactionBody{&tx}
 
 		collsGuarantees[i] = &flow.CollectionGuarantee{
 			CollectionID: colls[i].ID(),

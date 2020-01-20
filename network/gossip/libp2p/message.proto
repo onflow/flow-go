@@ -12,7 +12,7 @@ message Message {
 
 // NetMsg represents the message data structure of an application layer event
 message EventMessage {
-    uint32 EngineID = 1;
+    uint32 ChannelID = 1;
     bytes EventID = 2;
     bytes OriginID = 3;
     repeated bytes TargetIDs = 4;

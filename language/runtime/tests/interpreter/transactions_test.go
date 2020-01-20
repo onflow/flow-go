@@ -7,7 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
+	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
 )
 
 func TestInterpretTransactions(t *testing.T) {
@@ -192,11 +194,21 @@ func TestInterpretTransactions(t *testing.T) {
           }
         `)
 
+		panicFunction := interpreter.NewHostFunctionValue(func(invocation interpreter.Invocation) trampoline.Trampoline {
+			panic(errors.NewUnreachableError())
+		})
+
 		signer1 := interpreter.NewAccountValue(
 			interpreter.AddressValue{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
+			panicFunction,
+			panicFunction,
+			panicFunction,
 		)
 		signer2 := interpreter.NewAccountValue(
 			interpreter.AddressValue{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2},
+			panicFunction,
+			panicFunction,
+			panicFunction,
 		)
 
 		// first transaction
