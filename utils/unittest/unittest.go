@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/go-test/deep"
@@ -25,6 +26,24 @@ func ExpectPanic(expectedMsg string, t *testing.T) {
 		return
 	}
 	t.Errorf("Expected to panic with `%s`, but did not panic", expectedMsg)
+}
+
+// ReturnsWithin returns true if the given function returns within the given
+// duration, or false otherwise.
+func ReturnsWithin(f func(), duration time.Duration) bool {
+	done := make(chan struct{})
+
+	go func() {
+		f()
+		close(done)
+	}()
+
+	select {
+	case <-time.After(duration):
+		return false
+	case <-done:
+		return true
+	}
 }
 
 // AssertEqualWithDiff asserts that two objects are equal.
