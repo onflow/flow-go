@@ -3,23 +3,18 @@ package execution
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
-	executormock "github.com/dapperlabs/flow-go/engine/execution/execution/executor/mock"
+	"github.com/dapperlabs/flow-go/engine/execution"
+	executor "github.com/dapperlabs/flow-go/engine/execution/execution/executor/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
+	module "github.com/dapperlabs/flow-go/module/mock"
+	network "github.com/dapperlabs/flow-go/network/mock"
 )
 
-func TestExecutionEngine_OnBlock(t *testing.T) {
-	collections := &storage.Collections{}
-	exec := &executormock.BlockExecutor{}
-
-	e := &Engine{
-		collections: collections,
-		executor:    exec,
-	}
-
+func TestExecutionEngine_OnCompleteBlock(t *testing.T) {
 	tx1 := flow.TransactionBody{
 		Script: []byte("transaction { execute {} }"),
 	}
@@ -28,42 +23,64 @@ func TestExecutionEngine_OnBlock(t *testing.T) {
 		Script: []byte("transaction { execute {} }"),
 	}
 
-	col := flow.Collection{Transactions: []flow.TransactionBody{tx1, tx2}}
+	transactions := []*flow.TransactionBody{&tx1, &tx2}
 
-	content := flow.Content{
-		Guarantees: []*flow.CollectionGuarantee{
-			{
-				CollectionID: col.ID(),
-				Signatures:   nil,
-			},
-		},
+	col := flow.Collection{Transactions: transactions}
+
+	guarantee := flow.CollectionGuarantee{
+		CollectionID: col.ID(),
+		Signatures:   nil,
 	}
 
 	block := flow.Block{
 		Header: flow.Header{
 			Number: 42,
 		},
-		Content: content,
+		Content: flow.Content{
+			Guarantees: []*flow.CollectionGuarantee{&guarantee},
+		},
 	}
 
-	transactions := []flow.TransactionBody{tx1, tx2}
-
-	executableBlock := executor.ExecutableBlock{
-		Block:        block,
-		Transactions: transactions,
+	completeBlock := &execution.CompleteBlock{
+		Block: &block,
+		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{
+			guarantee.ID(): {
+				Guarantee:    &guarantee,
+				Transactions: transactions,
+			},
+		},
 	}
 
-	collections.On("ByID", col.ID()).
-		Return(&col, nil).
-		Once()
+	t.Run("non-local engine", func(t *testing.T) {
+		me := &module.Local{}
+		me.On("NodeID").Return(flow.ZeroID)
 
-	exec.On("ExecuteBlock", executableBlock).
-		Return(nil, nil).
-		Once()
+		e := Engine{me: me}
 
-	err := e.onBlock(&block)
-	require.NoError(t, err)
+		// submit using origin ID that does not match node ID
+		err := e.onCompleteBlock(flow.Identifier{42}, completeBlock)
+		assert.Error(t, err)
+	})
 
-	collections.AssertExpectations(t)
-	exec.AssertExpectations(t)
+	t.Run("success", func(t *testing.T) {
+		exec := &executor.BlockExecutor{}
+		receipts := &network.Engine{}
+		me := &module.Local{}
+		me.On("NodeID").Return(flow.ZeroID)
+
+		e := &Engine{
+			receipts: receipts,
+			executor: exec,
+			me:       me,
+		}
+
+		receipts.On("SubmitLocal", mock.Anything)
+		exec.On("ExecuteBlock", completeBlock).Return(&flow.ExecutionResult{}, nil)
+
+		err := e.onCompleteBlock(e.me.NodeID(), completeBlock)
+		require.NoError(t, err)
+
+		receipts.AssertExpectations(t)
+		exec.AssertExpectations(t)
+	})
 }

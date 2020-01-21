@@ -1,6 +1,9 @@
 package ledger
 
 import (
+	"fmt"
+	"github.com/dapperlabs/flow-go/model/flow"
+
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
@@ -29,27 +32,59 @@ func NewTrieStorage(db databases.DAL) (*TrieStorage, error) {
 	}, nil
 }
 
-func (f *TrieStorage) LatestStateCommitment() StateCommitment {
+func (f *TrieStorage) LatestStateCommitment() flow.StateCommitment {
 	return f.tree.GetRoot().GetValue()
 }
 
-// GetRegisters read the values at the given registers at the given StateCommitment
+// GetRegisters read the values at the given registers at the given flow.StateCommitment
 // This is trusted so no proof is generated
-func (f *TrieStorage) GetRegisters(registerIDs []RegisterID, stateCommitment StateCommitment) (values []RegisterValue, err error) {
+func (f *TrieStorage) GetRegisters(
+	registerIDs []flow.RegisterID,
+	stateCommitment flow.StateCommitment,
+) (
+	values []flow.RegisterValue,
+	err error,
+) {
 	values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
 	return values, err
 }
 
 // UpdateRegisters updates the values at the given registers
 // This is trusted so no proof is generated
-func (f *TrieStorage) UpdateRegisters(registerIDs [][]byte, values []RegisterValue) (newStateCommitment StateCommitment, err error) {
-	err = f.tree.Update(registerIDs, values)
+func (f *TrieStorage) UpdateRegisters(
+	ids [][]byte,
+	values []flow.RegisterValue,
+) (
+	newStateCommitment flow.StateCommitment,
+	err error,
+) {
+	// TODO: add test case
+	if len(ids) != len(values) {
+		return nil, fmt.Errorf(
+			"length of IDs [%d] does not match values [%d]", len(ids), len(values),
+		)
+	}
+
+	// TODO: add test case
+	if len(ids) == 0 {
+		// return current state root unchanged
+		return f.tree.GetRoot().GetValue(), nil
+	}
+
+	err = f.tree.Update(ids, values)
 	return f.tree.GetRoot().GetValue(), err
 }
 
-// GetRegistersWithProof read the values at the given registers at the given StateCommitment
+// GetRegistersWithProof read the values at the given registers at the given flow.StateCommitment
 // This is untrusted so a proof is generated
-func (f *TrieStorage) GetRegistersWithProof(registerIDs []RegisterID, stateCommitment StateCommitment) (values []RegisterValue, proofs []StorageProof, err error) {
+func (f *TrieStorage) GetRegistersWithProof(
+	registerIDs []flow.RegisterID,
+	stateCommitment flow.StateCommitment,
+) (
+	values []flow.RegisterValue,
+	proofs []flow.StorageProof,
+	err error,
+) {
 	values, proofHldr, err := f.tree.Read(registerIDs, false, stateCommitment)
 	if err != nil {
 		return nil, nil, err
@@ -61,7 +96,7 @@ func (f *TrieStorage) GetRegistersWithProof(registerIDs []RegisterID, stateCommi
 	// Then the size is encoded as a single byte
 	// Then the flag is encoded
 	// Finally the proofs are encoded one at a time, and is stored as a byte array
-	proofs = make([]StorageProof, 0)
+	proofs = make([]flow.StorageProof, 0)
 	for i := 0; i < proofHldr.GetSize(); i++ {
 		flag, singleProof, inclusion, size := proofHldr.ExportProof(i)
 		byteSize := []byte{size}
@@ -83,14 +118,21 @@ func (f *TrieStorage) GetRegistersWithProof(registerIDs []RegisterID, stateCommi
 
 // UpdateRegistersWithProof updates the values at the given registers
 // This is untrusted so a proof is generated
-func (f *TrieStorage) UpdateRegistersWithProof(registerIDs []RegisterID, values []RegisterValue) (newStateCommitment StateCommitment, proofs []StorageProof, err error) {
-	err = f.tree.Update(registerIDs, values)
+func (f *TrieStorage) UpdateRegistersWithProof(
+	ids []flow.RegisterID,
+	values []flow.RegisterValue,
+) (
+	newStateCommitment flow.StateCommitment,
+	proofs []flow.StorageProof,
+	err error,
+) {
+	newStateCommitment, err = f.UpdateRegisters(ids, values)
 	if err != nil {
 		return nil, nil, err
 	}
-	_, proofs, err = f.GetRegistersWithProof(registerIDs, f.tree.GetRoot().GetValue())
-	return f.tree.GetRoot().GetValue(), proofs, err
 
+	_, proofs, err = f.GetRegistersWithProof(ids, newStateCommitment)
+	return newStateCommitment, proofs, err
 }
 
 // CloseStorage closes the DB

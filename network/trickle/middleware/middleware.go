@@ -64,10 +64,12 @@ func (m *Middleware) Start(ov trickle.Overlay) {
 // Stop will end the execution of the middleware and wait for it to end.
 func (m *Middleware) Stop() {
 	close(m.stop)
+	m.Lock()
 	_ = m.ln.Close()
 	for _, conn := range m.conns {
 		conn.stop()
 	}
+	m.Unlock()
 	m.wg.Wait()
 }
 

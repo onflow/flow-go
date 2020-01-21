@@ -69,9 +69,8 @@ func persist(key []byte, entity interface{}) func(*badger.Txn) error {
 			err := item.Value(func(existingVal []byte) error {
 				if bytes.Equal(val, existingVal) {
 					return nil
-				} else {
-					return storage.ErrDataMismatch
 				}
+				return storage.ErrDataMismatch
 			})
 			if err != nil {
 				return err

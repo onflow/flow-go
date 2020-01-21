@@ -94,8 +94,8 @@ func TestCheckTransactions(t *testing.T) {
 		  }
 		`,
 		[]error{
-			&sema.InvalidTransactionPrepareParameterType{},
-			&sema.InvalidTransactionPrepareParameterType{},
+			&sema.InvalidTransactionPrepareParameterTypeError{},
+			&sema.InvalidTransactionPrepareParameterTypeError{},
 		},
 	}
 

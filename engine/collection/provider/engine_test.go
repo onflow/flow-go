@@ -23,12 +23,8 @@ func TestSubmitCollectionGuarantee(t *testing.T) {
 	t.Run("should submit guarantee to consensus nodes", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
 
-		collID := unittest.IdentityFixture(func(id *flow.Identity) {
-			id.Role = flow.RoleCollection
-		})
-		consID := unittest.IdentityFixture(func(id *flow.Identity) {
-			id.Role = flow.RoleConsensus
-		})
+		collID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+		consID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 		identities := flow.IdentityList{collID, consID}
 
 		genesis := mock.Genesis(identities)
@@ -47,7 +43,7 @@ func TestSubmitCollectionGuarantee(t *testing.T) {
 		net.FlushAll()
 
 		assert.Eventually(t, func() bool {
-			has := consNode.Pool.Has(guarantee.ID())
+			has := consNode.Guarantees.Has(guarantee.ID())
 			return has
 		}, time.Millisecond*5, time.Millisecond)
 	})
@@ -57,12 +53,8 @@ func TestCollectionRequest(t *testing.T) {
 	t.Run("should respond to request", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
 
-		collID := unittest.IdentityFixture(func(id *flow.Identity) {
-			id.Role = flow.RoleCollection
-		})
-		requesterID := unittest.IdentityFixture(func(id *flow.Identity) {
-			id.Role = flow.RoleExecution
-		})
+		collID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+		requesterID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
 		identities := flow.IdentityList{collID, requesterID}
 		genesis := mock.Genesis(identities)
@@ -87,7 +79,7 @@ func TestCollectionRequest(t *testing.T) {
 		requesterEngine.On("Process", collID.NodeID, expectedRes).Return(nil).Once()
 
 		// send a request for the collection
-		req := messages.CollectionRequest{CollectionID: coll.ID()}
+		req := messages.CollectionRequest{ID: coll.ID()}
 		err = con.Submit(&req, collID.NodeID)
 		assert.NoError(t, err)
 
@@ -108,9 +100,7 @@ func TestCollectionRequest(t *testing.T) {
 	t.Run("should return error for non-existent collection", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
 
-		collID := unittest.IdentityFixture(func(id *flow.Identity) {
-			id.Role = flow.RoleCollection
-		})
+		collID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
 		identities := flow.IdentityList{collID}
 		genesis := mock.Genesis(identities)
@@ -118,7 +108,7 @@ func TestCollectionRequest(t *testing.T) {
 		collNode := testutil.CollectionNode(t, hub, collID, genesis)
 
 		// create request with invalid/nonexistent fingerprint
-		req := &messages.CollectionRequest{CollectionID: flow.ZeroID}
+		req := &messages.CollectionRequest{ID: flow.ZeroID}
 
 		// provider should return error
 		err := collNode.ProviderEngine.ProcessLocal(req)

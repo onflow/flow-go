@@ -27,7 +27,6 @@ func (fc *NewestForkChoice) OnForkChoiceTrigger(view uint64) {
 	} else {
 		ForkChoiceLogger.Warningf("Dropped ForkChoiceTrigger for view %d as the result was already stale", view)
 	}
-	return
 }
 
 func (fc *NewestForkChoice) ProcessBlock(block *def.Block) {

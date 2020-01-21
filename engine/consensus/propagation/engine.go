@@ -40,7 +40,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 	}
 
 	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ConsensusPropagation, e)
+	con, err := net.Register(engine.BlockPropagation, e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
@@ -110,22 +110,22 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Msg("collection guarantee received")
+		Msg("collection guarantee submitted")
 
 	err := e.storeGuarantee(guarantee)
 	if err != nil {
-		return errors.Wrap(err, "could not store collection")
+		return errors.Wrap(err, "could not store guarantee")
 	}
 
 	// propagate the collection guarantee to other relevant nodes
 	err = e.propagateGuarantee(guarantee)
 	if err != nil {
-		return errors.Wrap(err, "could not broadcast collection")
+		return errors.Wrap(err, "could not broadcast guaantee")
 	}
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("collection_id", logging.ID(guarantee)).
+		Hex("collection_id", logging.Entity(guarantee)).
 		Msg("collection guarantee processed")
 
 	return nil
@@ -140,11 +140,11 @@ func (e *Engine) storeGuarantee(guarantee *flow.CollectionGuarantee) error {
 	// add the collection guarantee to our memory pool (also checks existence)
 	err := e.pool.Add(guarantee)
 	if err != nil {
-		return errors.Wrap(err, "could not add collection to mempool")
+		return errors.Wrap(err, "could not add guarantee to mempool")
 	}
 
 	e.log.Info().
-		Hex("collection_id", logging.ID(guarantee)).
+		Hex("collection_id", logging.Entity(guarantee)).
 		Msg("collection guarantee stored")
 
 	return nil
@@ -167,13 +167,13 @@ func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
 	targetIDs := ids.NodeIDs()
 	err = e.con.Submit(guarantee, targetIDs...)
 	if err != nil {
-		return errors.Wrap(err, "could not push guaranteed collection")
+		return errors.Wrap(err, "could not push collection guarantee")
 	}
 
 	e.log.Info().
 		Strs("target_ids", logging.IDs(targetIDs)).
-		Hex("collection_id", logging.ID(guarantee)).
-		Msg("guaranteed collection propagated")
+		Hex("collection_id", logging.Entity(guarantee)).
+		Msg("collection guarantee propagated")
 
 	return nil
 }

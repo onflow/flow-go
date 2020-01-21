@@ -1,18 +1,7 @@
 package flow
 
-import (
-	"fmt"
-
-	"github.com/dapperlabs/flow-go/crypto"
-)
-
-// ChunkBody - body section of a chunk
 type ChunkBody struct {
-
-	// transactions info
-	FirstTxIndex      uint64      // Transaction index inside the block
-	TxCounts          uint32      // number of transactions in this chunk
-	ChunkTxCollection crypto.Hash // Hash of collection of txs in this chunk
+	CollectionIndex uint
 
 	// execution info
 	StartState      StateCommitment // start state when starting executing this chunk
@@ -23,7 +12,6 @@ type ChunkBody struct {
 	FirstTransactionComputationUsed uint64 // first tx in this chunk computation usage
 }
 
-// Chunk is an aggregate execution info about a sequence of transactions
 type Chunk struct {
 	ChunkBody
 
@@ -42,21 +30,21 @@ func (ch *Chunk) Checksum() Identifier {
 	return MakeID(ch)
 }
 
-func (ch *Chunk) String() string {
-	switch ch.TxCounts {
-	case 0:
-		return "An empty chunk"
-	case 1:
-		return fmt.Sprintf("chunk %v includes a single transaction (TotalGasSpent: %v)",
-			ch.ID(), ch.TotalComputationUsed)
-	default:
-		return fmt.Sprintf(
-			"Chunk %v includes %v transactions (TotalGasSpent: %v)",
-			ch.ID(),
-			ch.TxCounts,
-			ch.TotalComputationUsed,
-		)
-	}
+// ChunkState represents the state registers used by a particular chunk.
+type ChunkState struct {
+	ChunkID   Identifier
+	Registers Ledger
+}
+
+// ID returns the unique identifier for the concrete view, which is the ID of
+// the chunk the view is for.
+func (c *ChunkState) ID() Identifier {
+	return c.ChunkID
+}
+
+// Checksum returns the checksum of the chunk state.
+func (c *ChunkState) Checksum() Identifier {
+	return MakeID(c)
 }
 
 // Note that this is the basic version of the List, we need to substitute it with something like Merkel tree at some point

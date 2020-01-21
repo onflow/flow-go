@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
@@ -21,7 +20,6 @@ import (
 type Engine struct {
 	unit      *engine.Unit      // used to control startup/shutdown
 	log       zerolog.Logger    // used to log relevant actions with context
-	con       network.Conduit   // used to talk to other nodes on the network
 	state     protocol.State    // used to access the  protocol state
 	me        module.Local      // used to access local node information
 	receipts  mempool.Receipts  // holds collection guarantees in memory
@@ -43,13 +41,17 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 		seals:     seals,
 	}
 
-	// register the engine with the network layer and store the conduit
-	con, err := net.Register(engine.ConsensusMatching, e)
+	// register engine with the receipt provider
+	_, err := net.Register(engine.ReceiptProvider, e)
 	if err != nil {
-		return nil, fmt.Errorf("could not register engine: %w", err)
+		return nil, fmt.Errorf("could not register for results: %w", err)
 	}
 
-	e.con = con
+	// register engine with the approval provider
+	_, err = net.Register(engine.ApprovalProvider, e)
+	if err != nil {
+		return nil, fmt.Errorf("could not register for approvals: %w", err)
+	}
 
 	return e, nil
 }
@@ -115,7 +117,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("receipt_id", logging.ID(receipt)).
+		Hex("receipt_id", logging.Entity(receipt)).
 		Msg("execution receipt received")
 
 	// get the identity of the origin node, so we can check if it's a valid
@@ -140,7 +142,7 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("receipt_id", logging.ID(receipt)).
+		Hex("receipt_id", logging.Entity(receipt)).
 		Msg("execution receipt processed")
 
 	return nil
@@ -151,7 +153,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("approval_id", logging.ID(approval)).
+		Hex("approval_id", logging.Entity(approval)).
 		Msg("result approval received")
 
 	// get the identity of the origin node, so we can check if it's a valid
@@ -176,7 +178,7 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
-		Hex("approval_id", logging.ID(approval)).
+		Hex("approval_id", logging.Entity(approval)).
 		Msg("execution receipt forwarded")
 
 	return nil

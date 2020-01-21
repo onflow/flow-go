@@ -1,29 +1,27 @@
 package hotstuff
 
 import (
-	"time"
-
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
-type PaceMaker struct {
-	curView  uint64
-	timeout  *time.Timer
-	Timeouts chan<- *types.Timeout
-}
+type PaceMaker interface {
+	// CurView returns the current view
+	CurView() uint64
 
-func (p *PaceMaker) CurView() uint64 {
-	return p.curView
-}
+	// UpdateCurViewWithQC will check if the given QC will allow PaceMaker to fast
+	// forward to the QC's view.
+	// If yes, a NewViewEvent will be returned
+	UpdateCurViewWithQC(qc *types.QuorumCertificate) (*types.NewViewEvent, bool)
 
-func (p *PaceMaker) UpdateValidQC(qc *types.QuorumCertificate) (*types.NewViewEvent, bool) {
-	panic("TODO")
-}
+	// UpdateCurViewWithBlock will check if the given block will allow PaceMaker to
+	// fast forward to the BlockProposal's view.
+	// If yes, a NewViewEvent will be returned.
+	// The parameter `isLeaderForNextView` is for PaceMaker to check whether it should
+	// stay at the current view if it's the next leader.
+	UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool)
 
-func (p *PaceMaker) UpdateBlock(block *types.BlockProposal) (*types.NewViewEvent, bool) {
-	panic("TODO")
-}
-
-func (p *PaceMaker) OnLocalTimeout(timeout *types.Timeout) (*types.NewViewEvent, bool) {
-	panic("TODO")
+	// OnTimeout is called when a timeout, which was previously created by the PaceMaker, has
+	// looped through the event loop.
+	// It returns a NewViewEvent if it triggers the current view to be updated.
+	OnTimeout() (*types.NewViewEvent, bool)
 }

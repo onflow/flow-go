@@ -298,7 +298,7 @@ var blacklist = map[string]interface{}{
 func (checker *Checker) UserDefinedValues() map[string]*Variable {
 	ret := map[string]*Variable{}
 	for key, value := range checker.GlobalValues {
-		if _, ok := blacklist[key]; ok == true {
+		if _, ok := blacklist[key]; ok {
 			continue
 		}
 		if _, ok := checker.PredeclaredValues[key]; ok {
@@ -440,7 +440,7 @@ func (checker *Checker) checkTransfer(transfer *ast.Transfer, valueType Type) {
 	}
 }
 
-func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Type, targetType Type) bool {
+func (checker *Checker) checkTypeCompatibility(expression ast.Expression, valueType Type, targetType Type) bool {
 	switch typedExpression := expression.(type) {
 	case *ast.IntExpression:
 		unwrappedTargetType := UnwrapOptionalType(targetType)
@@ -477,14 +477,20 @@ func (checker *Checker) IsTypeCompatible(expression ast.Expression, valueType Ty
 				valueElementType := variableSizedValueType.ElementType(false)
 				targetElementType := constantSizedTargetType.ElementType(false)
 
-				// TODO: report helpful error when counts mismatch
-
 				literalCount := len(typedExpression.Values)
 
-				if IsSubType(valueElementType, targetElementType) &&
-					literalCount == int(constantSizedTargetType.Size) {
+				if IsSubType(valueElementType, targetElementType) {
 
-					return true
+					if literalCount == constantSizedTargetType.Size {
+						return true
+					}
+					checker.report(
+						&ConstantSizedArrayLiteralSizeError{
+							ExpectedSize: constantSizedTargetType.Size,
+							ActualSize:   literalCount,
+							Range:        typedExpression.Range,
+						},
+					)
 				}
 			}
 		}

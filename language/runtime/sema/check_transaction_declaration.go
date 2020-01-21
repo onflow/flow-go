@@ -154,7 +154,7 @@ func (checker *Checker) checkTransactionPrepareFunctionParameters(
 
 		if !IsSubType(parameterType, &AccountType{}) {
 			checker.report(
-				&InvalidTransactionPrepareParameterType{
+				&InvalidTransactionPrepareParameterTypeError{
 					Type:  parameterType,
 					Range: ast.NewRangeFromPositioned(parameter.TypeAnnotation),
 				},
