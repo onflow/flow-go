@@ -21,6 +21,11 @@ const (
 	VoteCollection  TimeoutMode = iota
 )
 
+// timeoutCap this is an internal cap on the timeout to avoid numerical overflows.
+// Its value is large enough to be of no practical implication.
+// We use 1E9 milliseconds which is about 11 days for a single timout (i.e. more than a full epoch)
+const timeoutCap float64 = 1E9
+
 // NewController creates a new Controller.
 func NewController(timeoutConfig Config) *Controller {
 	tc := Controller{
@@ -64,6 +69,9 @@ func (t *Controller) VoteCollectionTimeout() time.Duration {
 // OnTimeout indicates to the Controller that the timeout was reached
 func (t *Controller) OnTimeout() {
 	t.replicaTimeout *= t.timeoutIncrease
+	if t.replicaTimeout > timeoutCap {
+		t.replicaTimeout = timeoutCap
+	}
 }
 
 // OnProgressBeforeTimeout indicates to the Controller that progress was made _before_ the timeout was reached

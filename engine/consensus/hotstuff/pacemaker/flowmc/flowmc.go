@@ -5,7 +5,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/pacemaker/flowmc/timeout"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/utils"
 	"go.uber.org/atomic"
 )
 
@@ -20,12 +19,6 @@ type FlowMC struct {
 func New(startView uint64, timeoutController *timeout.Controller, notifier notifications.Distributor) (hotstuff.PaceMaker, error) {
 	if startView < 1 {
 		return nil, &types.ErrorConfiguration{Msg: "Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)"}
-	}
-	if utils.IsNil(timeoutController) {
-		timeoutController = timeout.DefaultController()
-	}
-	if utils.IsNil(notifier) {
-		return nil, &types.ErrorConfiguration{Msg: "notifications.Distributor cannot be nil"}
 	}
 	pm := FlowMC{
 		currentView:    startView,
