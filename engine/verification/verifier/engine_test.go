@@ -332,10 +332,10 @@ func testConcurrency(t *testing.T, erCount, senderCount int) {
 	}
 
 	// wait for all ERs to be sent to VER
-	assert.True(t, unittest.ReturnsWithin(senderWG.Wait, time.Second))
+	assert.True(t, unittest.ReturnsBefore(senderWG.Wait, time.Second))
 	verNet.FlushAll()
 	// wait for all RAs to be received by CON
-	assert.True(t, unittest.ReturnsWithin(receiverWG.Wait, time.Second))
+	assert.True(t, unittest.ReturnsBefore(receiverWG.Wait, time.Second))
 }
 
 // setupMockExeNode sets up a mocked execution node that responds to requests for

@@ -28,9 +28,9 @@ func ExpectPanic(expectedMsg string, t *testing.T) {
 	t.Errorf("Expected to panic with `%s`, but did not panic", expectedMsg)
 }
 
-// ReturnsWithin returns true if the given function returns within the given
+// ReturnsBefore returns true if the given function returns within the given
 // duration, or false otherwise.
-func ReturnsWithin(f func(), duration time.Duration) bool {
+func ReturnsBefore(f func(), duration time.Duration) bool {
 	done := make(chan struct{})
 
 	go func() {
