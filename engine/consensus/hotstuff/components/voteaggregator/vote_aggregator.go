@@ -27,6 +27,8 @@ type VoteAggregator struct {
 	createdQC map[string]*types.QuorumCertificate
 	// keeps track of accumulated votes and stakes for blocks
 	blockHashToVotingStatus map[string]*VotingStatus
+	//	For detecting double voting
+	viewToIDToVote map[uint64]map[string]*types.Vote
 }
 
 func NewVoteAggregator(log zerolog.Logger, protocolState protocol.State, viewState hotstuff.ViewState, voteValidator hotstuff.Validator) *VoteAggregator {
@@ -113,6 +115,7 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 			delete(va.pendingVotes, blockMRHStr)
 			delete(va.blockHashToVotingStatus, blockMRHStr)
 			delete(va.createdQC, blockMRHStr)
+			delete(va.viewToIDToVote, view)
 		}
 	}
 	va.lastPrunedView = view
@@ -135,20 +138,22 @@ func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.Bloc
 	}
 
 	voteSender := identities.Get(uint(vote.Signature.SignerIdx))
+	originalVote, ok := va.isDoubleVote(vote, voteSender)
+	if ok {
+		return fmt.Errorf("double voting detected: %w", types.ErrDoubleVote{
+			OriginalVote: originalVote,
+			DoubleVote:   vote,
+		})
+	}
 	// update existing voting status or create a new one
 	votingStatus, exists := va.blockHashToVotingStatus[string(vote.BlockMRH)]
-	if exists {
-		votingStatus.validVotes[vote.Hash()] = vote
-		votingStatus.accumulatedStake += voteSender.Stake
-	} else {
-		votingStatus = &VotingStatus{
-			thresholdStake:   uint64(float32(identities.TotalStake())*va.viewState.ThresholdStake(vote.View)) + 1,
-			accumulatedStake: voteSender.Stake,
-			validVotes:       map[string]*types.Vote{vote.Hash(): vote},
-		}
+	if !exists {
+		threshold := computeThresholdStake(identities)
+		votingStatus = NewVotingStatus(threshold, voteSender)
 		va.blockHashToVotingStatus[string(vote.BlockMRH)] = votingStatus
 	}
-
+	votingStatus.AddVote(vote)
+	va.viewToIDToVote[vote.View][voteSender.String()] = vote
 	va.log.Info().Msg("new incorporated vote added")
 	return nil
 }
@@ -163,7 +168,7 @@ func (va *VoteAggregator) buildQC(block *types.Block) (*types.QuorumCertificate,
 	votingStatus := va.blockHashToVotingStatus[blockMRHStr]
 	if !votingStatus.canBuildQC() {
 		va.log.Debug().Msg("vote threshold not reached")
-		return nil, fmt.Errorf("can not build a QC: %w", errInsufficientVotes{})
+		return nil, fmt.Errorf("can not build a QC: %w", types.ErrInsufficientVotes{})
 	}
 
 	sigs := getSigsSliceFromVotes(va.blockHashToVotingStatus[blockMRHStr].validVotes)
@@ -171,6 +176,17 @@ func (va *VoteAggregator) buildQC(block *types.Block) (*types.QuorumCertificate,
 	va.createdQC[blockMRHStr] = qc
 
 	return qc, nil
+}
+
+// double voting is detected when the voter has voted a different block at the same view before
+func (va *VoteAggregator) isDoubleVote(vote *types.Vote, sender flow.Identity) (*types.Vote, bool) {
+	originalVote, exists := va.viewToIDToVote[vote.View][sender.String()]
+	if exists {
+		if string(originalVote.BlockMRH) != string(vote.BlockMRH) {
+			return originalVote, true
+		}
+	}
+	return nil, false
 }
 
 func getSigsSliceFromVotes(votes map[string]*types.Vote) []*types.Signature {
@@ -182,4 +198,8 @@ func getSigsSliceFromVotes(votes map[string]*types.Vote) []*types.Signature {
 	}
 
 	return signatures
+}
+
+func computeThresholdStake(identities flow.IdentityList) uint64 {
+	return identities.TotalStake()*2/3 + 1
 }
