@@ -14,8 +14,8 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	networkmodel "github.com/dapperlabs/flow-go/model/libp2p/network"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
 )
 
@@ -99,7 +99,6 @@ func (m *Middleware) Stop() {
 func (m *Middleware) Send(targetID flow.Identifier, msg interface{}) error {
 	m.Lock()
 	defer m.Unlock()
-	var err error
 	found, stale := false, false
 	var conn *WriteConnection
 
@@ -144,76 +143,21 @@ func (m *Middleware) Send(targetID flow.Identifier, msg interface{}) error {
 
 	}
 
-	// compose the message
-	pmsg, err := m.createOutboundMessage(msg)
-	if err != nil {
-		return err
-	}
-
 	// send the message if connection still valid
 	select {
 	case <-conn.done:
 		return errors.Errorf("connection has closed (node_id: %s)", targetID.String())
-	case conn.outbound <- pmsg:
+	default:
+		switch msg := msg.(type) {
+		case *message.Message:
+			// Write message to outbound channel only if it is of the correct type
+			conn.outbound <- msg
+		default:
+			err := errors.Errorf("invalid message type (%T)", msg)
+			return err
+		}
 		return nil
 	}
-}
-
-func (m *Middleware) createOutboundMessage(msg interface{}) (*Message, error) {
-	switch msg := msg.(type) {
-	case *networkmodel.NetworkMessage:
-		var targetIDs [][]byte
-		for _, t := range msg.TargetIDs {
-			targetIDs = append(targetIDs, t[:])
-		}
-		em := &EventMessage{
-			ChannelID: uint32(msg.ChannelID),
-			EventID:   msg.EventID,
-			OriginID:  msg.OriginID[:],
-			TargetIDs: targetIDs,
-			Payload:   msg.Payload,
-		}
-
-		// Compose the message payload
-		message := &Message{
-			SenderID: msg.OriginID[:],
-			Event:    em,
-		}
-		return message, nil
-	default:
-		err := errors.Errorf("invalid message type (%T)", msg)
-		return nil, err
-	}
-}
-
-func (m *Middleware) createInboundMessage(msg *Message) (*flow.Identifier, interface{}, error) {
-
-	// Extract sender id
-	if len(msg.SenderID) < 32 {
-		err := fmt.Errorf("invalid sender id")
-		return nil, nil, err
-	}
-	var senderID [32]byte
-	copy(senderID[:], msg.SenderID)
-	var id flow.Identifier = senderID
-
-	var targetIDs []flow.Identifier
-	for _, t := range msg.Event.TargetIDs {
-		var f [32]byte
-		copy(f[:], t)
-		var id flow.Identifier = f
-		targetIDs = append(targetIDs, id)
-	}
-
-	nm := &networkmodel.NetworkMessage{
-		ChannelID: uint8(msg.Event.ChannelID),
-		EventID:   msg.Event.EventID,
-		OriginID:  id,
-		TargetIDs: targetIDs,
-		Payload:   msg.Event.Payload,
-	}
-
-	return &id, nm, nil
 }
 
 // connect creates a new connection
@@ -290,12 +234,12 @@ ProcessLoop:
 			break ProcessLoop
 		case msg := <-conn.inbound:
 			log.Info().Msg("middleware received a new message")
-			nodeID, payload, err := m.createInboundMessage(msg)
+			nodeID, err := getSenderID(msg)
 			if err != nil {
-				log.Error().Err(err).Msg("could not extract payload")
+				log.Error().Err(err).Msg("could not extract sender ID")
 				continue ProcessLoop
 			}
-			err = m.ov.Receive(*nodeID, payload)
+			err = m.ov.Receive(*nodeID, msg)
 			if err != nil {
 				log.Error().Err(err).Msg("could not deliver payload")
 				continue ProcessLoop
@@ -304,4 +248,16 @@ ProcessLoop:
 	}
 
 	log.Info().Msg("middleware closed the connection")
+}
+
+func getSenderID(msg *message.Message) (*flow.Identifier, error) {
+	// Extract sender id
+	if len(msg.SenderID) < 32 {
+		err := fmt.Errorf("invalid sender id")
+		return nil, err
+	}
+	var senderID [32]byte
+	copy(senderID[:], msg.SenderID)
+	var id flow.Identifier = senderID
+	return &id, nil
 }
