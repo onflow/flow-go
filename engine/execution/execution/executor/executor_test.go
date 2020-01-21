@@ -17,9 +17,9 @@ import (
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
-	vm := &vmmock.VirtualMachine{}
-	bc := &vmmock.BlockContext{}
-	es := &statemock.ExecutionState{}
+	vm := new(vmmock.VirtualMachine)
+	bc := new(vmmock.BlockContext)
+	es := new(statemock.ExecutionState)
 
 	exe := executor.NewBlockExecutor(vm, es)
 
