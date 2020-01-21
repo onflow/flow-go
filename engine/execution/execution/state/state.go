@@ -16,6 +16,7 @@ type ExecutionState interface {
 	CommitDelta(Delta) (flow.StateCommitment, error)
 
 	GetRegisters(flow.StateCommitment, []flow.RegisterID) ([]flow.RegisterValue, error)
+	GetChunkRegisters(flow.Identifier) (flow.Ledger, error)
 
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
@@ -82,6 +83,28 @@ func (s *state) GetRegisters(
 	registerIDs []flow.RegisterID,
 ) ([]flow.RegisterValue, error) {
 	return s.ls.GetRegisters(registerIDs, commitment)
+}
+
+func (s *state) GetChunkRegisters(chunkID flow.Identifier) (flow.Ledger, error) {
+	chunkHeader, err := s.ChunkHeaderByChunkID(chunkID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve chunk header: %w", err)
+	}
+
+	registerIDs := chunkHeader.RegisterIDs
+
+	registerValues, err := s.GetRegisters(chunkHeader.StartState, registerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve chunk register values: %w", err)
+	}
+
+	l := make(flow.Ledger)
+
+	for i, registerID := range registerIDs {
+		l[string(registerID)] = registerValues[i]
+	}
+
+	return l, nil
 }
 
 func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
