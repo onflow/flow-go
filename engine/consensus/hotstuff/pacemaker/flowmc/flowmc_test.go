@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	startRepTimeout float64 = 120.0
-	minRepTimeout float64 = 100.0
-	voteTimeoutFraction float64 = 0.5
+	startRepTimeout         float64 = 120.0
+	minRepTimeout           float64 = 100.0
+	voteTimeoutFraction     float64 = 0.5
 	multiplicateiveIncrease float64 = 1.5
-	additiveDecrease float64 = 50
+	additiveDecrease        float64 = 50
 )
 
 func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mockdist.Distributor) {
@@ -234,13 +234,13 @@ func Test_ReplicaTimeout(t *testing.T) {
 	start := time.Now()
 
 	select {
-	case <- pm.TimeoutChannel():
+	case <-pm.TimeoutChannel():
 		break // testing path: corresponds to EventLoop picking up timeout from channel
-	case <- time.NewTimer(time.Duration(2) * time.Duration(startRepTimeout) * time.Millisecond).C:
+	case <-time.NewTimer(time.Duration(2) * time.Duration(startRepTimeout) * time.Millisecond).C:
 		t.Fail() // to prevent test from hanging
 	}
-	duration := float64(time.Now().Nanosecond() - start.Nanosecond()) * 1E-6 // in millisecond
-	assert.True(t, math.Abs(duration - startRepTimeout) < 0.1 * startRepTimeout)
+	duration := float64(time.Now().Nanosecond()-start.Nanosecond()) * 1E-6 // in millisecond
+	assert.True(t, math.Abs(duration-startRepTimeout) < 0.1*startRepTimeout)
 	// While the timeout event has been put in the channel,
 	// PaceMaker should NOT react on it without the timeout event being processed by the EventHandler
 	assert.Equal(t, uint64(3), pm.CurView())
@@ -264,13 +264,13 @@ func Test_VoteTimeout(t *testing.T) {
 
 	expectedTimeout := startRepTimeout * voteTimeoutFraction
 	select {
-	case <- pm.TimeoutChannel():
+	case <-pm.TimeoutChannel():
 		break // testing path: corresponds to EventLoop picking up timeout from channel
-	case <- time.NewTimer(time.Duration(2) * time.Duration(expectedTimeout) * time.Millisecond).C:
+	case <-time.NewTimer(time.Duration(2) * time.Duration(expectedTimeout) * time.Millisecond).C:
 		t.Fail() // to prevent test from hanging
 	}
-	duration := float64(time.Now().Nanosecond() - start.Nanosecond()) * 1E-6 // in millisecond
-	assert.True(t, math.Abs(duration - expectedTimeout) < 0.1 * expectedTimeout)
+	duration := float64(time.Now().Nanosecond()-start.Nanosecond()) * 1E-6 // in millisecond
+	assert.True(t, math.Abs(duration-expectedTimeout) < 0.1*expectedTimeout)
 	// While the timeout event has been put in the channel,
 	// PaceMaker should NOT react on it without the timeout event being processed by the EventHandler
 	assert.Equal(t, uint64(3), pm.CurView())
