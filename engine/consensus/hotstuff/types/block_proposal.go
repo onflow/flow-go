@@ -6,10 +6,11 @@ type BlockProposal struct {
 	Signature        *Signature // CAUTION: this is sign(Block), i.e. it does NOT include ConsensusPayload
 }
 
-func NewBlockProposal(block *Block, consensusPayload *ConsensusPayload) *BlockProposal {
+func NewBlockProposal(block *Block, consensusPayload *ConsensusPayload, sig *Signature) *BlockProposal {
 	return &BlockProposal{
 		Block:            block,
 		ConsensusPayload: consensusPayload,
+		Signature:        sig,
 	}
 }
 
