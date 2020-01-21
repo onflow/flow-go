@@ -14,12 +14,13 @@ import (
 )
 
 type VoteAggregator struct {
-	log           zerolog.Logger
-	protocolState protocol.State
-	viewState     hotstuff.ViewState
-	voteValidator hotstuff.Validator
+	log            zerolog.Logger
+	protocolState  protocol.State
+	viewState      hotstuff.ViewState
+	voteValidator  hotstuff.Validator
+	lastPrunedView uint64
 	// For pruning
-	viewToBlockMRH map[uint64][]byte
+	viewToBlockMRH map[uint64][][]byte
 	// keeps track of votes whose blocks can not be found
 	pendingVotes map[string]map[string]*types.Vote
 	// keeps track of QCs that have been made for blocks
@@ -104,14 +105,18 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 
 // PruneByView will delete all votes equal or below to the given view, as well as related indexes.
 func (va *VoteAggregator) PruneByView(view uint64) {
-	if view < 1 {
-		return
+	for i := va.lastPrunedView + 1; i <= view; i++ {
+		blockMRHs := va.viewToBlockMRH[i]
+		for _, blockMRH := range blockMRHs {
+			blockMRHStr := string(blockMRH)
+			delete(va.viewToBlockMRH, i)
+			delete(va.pendingVotes, blockMRHStr)
+			delete(va.blockHashToVotingStatus, blockMRHStr)
+			delete(va.createdQC, blockMRHStr)
+		}
 	}
-	blockMRHStr := string(va.viewToBlockMRH[view-1])
-	delete(va.viewToBlockMRH, view)
-	delete(va.pendingVotes, blockMRHStr)
-	delete(va.blockHashToVotingStatus, blockMRHStr)
-	delete(va.createdQC, blockMRHStr)
+	va.lastPrunedView = view
+
 	va.log.Info().Msg("successfully pruned")
 }
 
@@ -161,7 +166,7 @@ func (va *VoteAggregator) buildQC(block *types.Block) (*types.QuorumCertificate,
 		return nil, fmt.Errorf("can not build a QC: %w", errInsufficientVotes{})
 	}
 
-	sigs := getSigsSliceFromVotes(va.pendingVotes[blockMRHStr])
+	sigs := getSigsSliceFromVotes(va.blockHashToVotingStatus[blockMRHStr].validVotes)
 	qc := types.NewQC(block, sigs, uint32(identities.Count()))
 	va.createdQC[blockMRHStr] = qc
 
