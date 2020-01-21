@@ -752,6 +752,55 @@ func (*Int128Type) Max() *big.Int {
 	return Int128TypeMax
 }
 
+// Int256Type represents the 256-bit signed integer type `Int256`
+type Int256Type struct{}
+
+func (*Int256Type) isType() {}
+
+func (*Int256Type) String() string {
+	return "Int256"
+}
+
+func (*Int256Type) ID() TypeID {
+	return "Int256"
+}
+
+func (*Int256Type) Equal(other Type) bool {
+	_, ok := other.(*Int256Type)
+	return ok
+}
+
+func (*Int256Type) IsResourceType() bool {
+	return false
+}
+
+func (*Int256Type) IsInvalidType() bool {
+	return false
+}
+
+var Int256TypeMin *big.Int
+
+func init() {
+	Int256TypeMin = big.NewInt(-1)
+	Int256TypeMin.Lsh(Int256TypeMin, 255)
+}
+
+var Int256TypeMax *big.Int
+
+func init() {
+	Int256TypeMax = big.NewInt(1)
+	Int256TypeMax.Lsh(Int256TypeMax, 255)
+	Int256TypeMax.Sub(Int256TypeMax, big.NewInt(1))
+}
+
+func (*Int256Type) Min() *big.Int {
+	return Int256TypeMin
+}
+
+func (*Int256Type) Max() *big.Int {
+	return Int256TypeMax
+}
+
 // UInt8Type represents the 8-bit unsigned integer type `UInt8`
 // which checks for overflow and underflow
 type UInt8Type struct{}
@@ -1568,6 +1617,7 @@ func init() {
 		&Int32Type{},
 		&Int64Type{},
 		&Int128Type{},
+		&Int256Type{},
 		&UInt8Type{},
 		&UInt16Type{},
 		&UInt32Type{},
@@ -1637,6 +1687,7 @@ func initIntegerFunctions() {
 		&Int32Type{},
 		&Int64Type{},
 		&Int128Type{},
+		&Int256Type{},
 		// UInt*
 		&UInt8Type{},
 		&UInt16Type{},
@@ -2582,7 +2633,7 @@ func IsSubType(subType Type, superType Type) bool {
 	case *IntegerType:
 		switch subType.(type) {
 		case *IntegerType, *SignedIntegerType, *IntType,
-			*Int8Type, *Int16Type, *Int32Type, *Int64Type, *Int128Type,
+			*Int8Type, *Int16Type, *Int32Type, *Int64Type, *Int128Type, *Int256Type,
 			*UInt8Type, *UInt16Type, *UInt32Type, *UInt64Type,
 			*Word8Type, *Word16Type, *Word32Type, *Word64Type:
 
@@ -2595,7 +2646,7 @@ func IsSubType(subType Type, superType Type) bool {
 	case *SignedIntegerType:
 		switch subType.(type) {
 		case *SignedIntegerType, *IntType,
-			*Int8Type, *Int16Type, *Int32Type, *Int64Type, *Int128Type:
+			*Int8Type, *Int16Type, *Int32Type, *Int64Type, *Int128Type, *Int256Type:
 
 			return true
 
