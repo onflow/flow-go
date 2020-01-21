@@ -12,7 +12,6 @@ import (
 // A BlockExecutor executes the transactions in a block.
 type BlockExecutor interface {
 	ExecuteBlock(*execution.CompleteBlock) (*flow.ExecutionResult, error)
-	GetChunkState(chunkID flow.Identifier) (flow.Ledger, error)
 }
 
 type blockExecutor struct {
@@ -47,28 +46,6 @@ func (e *blockExecutor) ExecuteBlock(
 	result := generateExecutionResultForBlock(block, chunks, endState)
 
 	return result, nil
-}
-
-func (e *blockExecutor) GetChunkState(chunkID flow.Identifier) (flow.Ledger, error) {
-	chunkHeader, err := e.state.ChunkHeaderByChunkID(chunkID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve chunk header: %w", err)
-	}
-
-	registerIDs := chunkHeader.RegisterIDs
-
-	registerValues, err := e.state.GetRegisters(chunkHeader.StartState, registerIDs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve chunk register values: %w", err)
-	}
-
-	l := make(flow.Ledger)
-
-	for i, registerID := range registerIDs {
-		l[string(registerID)] = registerValues[i]
-	}
-
-	return l, nil
 }
 
 func (e *blockExecutor) executeBlock(
@@ -131,20 +108,7 @@ func (e *blockExecutor) executeCollection(
 		return nil, nil, fmt.Errorf("failed to apply chunk delta: %w", err)
 	}
 
-	chunk = &flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: uint(index),
-			StartState:      startState,
-			// TODO: include event collection hash
-			EventCollection: flow.ZeroID,
-			// TODO: record gas used
-			TotalComputationUsed: 0,
-			// TODO: record first tx gas used
-			FirstTransactionComputationUsed: 0,
-		},
-		Index:    0,
-		EndState: endState,
-	}
+	chunk = generateChunk(index, startState, endState)
 
 	chunkHeader := generateChunkHeader(chunk, chunkView.Reads())
 
@@ -171,6 +135,24 @@ func generateExecutionResultForBlock(
 			FinalStateCommitment: endState,
 			Chunks:               flow.ChunkList{chunks},
 		},
+	}
+}
+
+// generateChunk creates a chunk from the provided execution data.
+func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flow.Chunk {
+	return &flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: uint(colIndex),
+			StartState:      startState,
+			// TODO: include event collection hash
+			EventCollection: flow.ZeroID,
+			// TODO: record gas used
+			TotalComputationUsed: 0,
+			// TODO: record first tx gas used
+			FirstTransactionComputationUsed: 0,
+		},
+		Index:    0,
+		EndState: endState,
 	}
 }
 

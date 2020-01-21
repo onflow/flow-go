@@ -34,26 +34,3 @@ func (_m *BlockExecutor) ExecuteBlock(_a0 *execution.CompleteBlock) (*flow.Execu
 
 	return r0, r1
 }
-
-// GetChunkState provides a mock function with given fields: chunkID
-func (_m *BlockExecutor) GetChunkState(chunkID flow.Identifier) (flow.Ledger, error) {
-	ret := _m.Called(chunkID)
-
-	var r0 flow.Ledger
-	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Ledger); ok {
-		r0 = rf(chunkID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.Ledger)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(chunkID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
