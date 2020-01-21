@@ -23,25 +23,34 @@ import (
 type Engine struct {
 	unit              *engine.Unit
 	log               zerolog.Logger
+	me                module.Local
+	state             protocol.State
 	conduit           network.Conduit
 	collectionConduit network.Conduit
-	me                module.Local
 	blocks            storage.Blocks
 	collections       storage.Collections
-	state             protocol.State
 	execution         network.Engine
-
-	mempool *Mempool
+	mempool           *Mempool
 }
 
-func New(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections, state protocol.State, executionEngine network.Engine, mempool *Mempool) (*Engine, error) {
+func New(
+	logger zerolog.Logger,
+	net module.Network,
+	me module.Local,
+	state protocol.State,
+	blocks storage.Blocks,
+	collections storage.Collections,
+	executionEngine network.Engine,
+	mempool *Mempool,
+) (*Engine, error) {
+
 	eng := Engine{
 		unit:        engine.NewUnit(),
 		log:         logger,
 		me:          me,
+		state:       state,
 		blocks:      blocks,
 		collections: collections,
-		state:       state,
 		execution:   executionEngine,
 		mempool:     mempool,
 	}

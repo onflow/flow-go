@@ -71,6 +71,7 @@ func main() {
 				node.Logger,
 				node.Network,
 				node.Me,
+				node.State,
 				receiptsEng,
 				blockExec,
 			)
