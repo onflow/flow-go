@@ -1426,6 +1426,190 @@ func ConvertInt128(value Value) Value {
 	return Int128Value{big.NewInt(0).SetInt64(int64(intValue))}
 }
 
+// Int256Value
+
+type Int256Value struct {
+	int *big.Int
+}
+
+func init() {
+	gob.Register(Int256Value{})
+}
+
+func (v Int256Value) isValue() {}
+
+func (v Int256Value) Copy() Value {
+	return Int256Value{big.NewInt(0).Set(v.int)}
+}
+
+func (Int256Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Int256Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v Int256Value) IntValue() int {
+	// TODO: handle overflow
+	return int(v.int.Int64())
+}
+
+func (v Int256Value) String() string {
+	return v.int.String()
+}
+
+func (v Int256Value) KeyString() string {
+	return v.int.String()
+}
+
+func (v Int256Value) Negate() IntegerValue {
+	// INT32-C
+	//   if v == Int256TypeMin {
+	//       ...
+	//   }
+	if v.int.Cmp(sema.Int256TypeMin) == 0 {
+		panic(&OverflowError{})
+	}
+	return Int256Value{big.NewInt(0).Neg(v.int)}
+}
+
+func (v Int256Value) Plus(other IntegerValue) IntegerValue {
+	o := other.(Int256Value)
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just add and check the range of the result.
+	//
+	// If Go gains a native int256 type and we switch this value
+	// to be based on it, then we need to follow INT32-C:
+	//
+	//   if (o > 0) && (v > (Int256TypeMax - o)) {
+	//       ...
+	//   } else if (o < 0) && (v < (Int256TypeMin - o)) {
+	//       ...
+	//   }
+	//
+	res := big.NewInt(0)
+	res.Add(v.int, o.int)
+	if res.Cmp(sema.Int256TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int256TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return Int256Value{res}
+}
+
+func (v Int256Value) Minus(other IntegerValue) IntegerValue {
+	o := other.(Int256Value)
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just subtract and check the range of the result.
+	//
+	// If Go gains a native int256 type and we switch this value
+	// to be based on it, then we need to follow INT32-C:
+	//
+	//   if (o > 0) && (v < (Int256TypeMin + o)) {
+	// 	     ...
+	//   } else if (o < 0) && (v > (Int256TypeMax + o)) {
+	//       ...
+	//   }
+	//
+	res := big.NewInt(0)
+	res.Sub(v.int, o.int)
+	if res.Cmp(sema.Int256TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int256TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return Int256Value{res}
+}
+
+func (v Int256Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(Int256Value)
+	res := big.NewInt(0)
+	// INT33-C:
+	//   if o == 0 {
+	//       ...
+	//   } else if (v == Int256TypeMin) && (o == -1) {
+	//       ...
+	//   }
+	if o.int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.SetInt64(-1)
+	if (v.int.Cmp(sema.Int256TypeMin) == 0) && (o.int.Cmp(res) == 0) {
+		panic(OverflowError{})
+	}
+	res.Mod(v.int, o.int)
+	return Int256Value{res}
+}
+
+func (v Int256Value) Mul(other IntegerValue) IntegerValue {
+	o := other.(Int256Value)
+	res := big.NewInt(0)
+	res.Mul(v.int, o.int)
+	if res.Cmp(sema.Int256TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int256TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return Int256Value{res}
+}
+
+func (v Int256Value) Div(other IntegerValue) IntegerValue {
+	o := other.(Int256Value)
+	res := big.NewInt(0)
+	// INT33-C:
+	//   if o == 0 {
+	//       ...
+	//   } else if (v == Int256TypeMin) && (o == -1) {
+	//       ...
+	//   }
+	if o.int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.SetInt64(-1)
+	if (v.int.Cmp(sema.Int256TypeMin) == 0) && (o.int.Cmp(res) == 0) {
+		panic(OverflowError{})
+	}
+	res.Div(v.int, o.int)
+	return Int256Value{res}
+}
+
+func (v Int256Value) Less(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int256Value).int)
+	return cmp == -1
+}
+
+func (v Int256Value) LessEqual(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int256Value).int)
+	return cmp <= 0
+}
+
+func (v Int256Value) Greater(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int256Value).int)
+	return cmp == 1
+}
+
+func (v Int256Value) GreaterEqual(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int256Value).int)
+	return cmp >= 0
+}
+
+func (v Int256Value) Equal(other Value) BoolValue {
+	otherInt, ok := other.(Int256Value)
+	if !ok {
+		return false
+	}
+	cmp := v.int.Cmp(otherInt.int)
+	return cmp == 0
+}
+
+func ConvertInt256(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+	intValue := value.(IntegerValue).IntValue()
+	return Int256Value{big.NewInt(0).SetInt64(int64(intValue))}
+}
+
 // UInt8Value
 
 type UInt8Value uint8
