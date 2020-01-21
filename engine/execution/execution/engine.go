@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
@@ -19,31 +20,34 @@ import (
 
 // Engine manages execution of transactions.
 type Engine struct {
-	unit         *engine.Unit
-	log          zerolog.Logger
-	me           module.Local
-	state        protocol.State
-	stateConduit network.Conduit
-	receipts     network.Engine
-	executor     executor.BlockExecutor
+	unit             *engine.Unit
+	log              zerolog.Logger
+	me               module.Local
+	protoState       protocol.State
+	execState        state.ExecutionState
+	execStateConduit network.Conduit
+	receipts         network.Engine
+	executor         executor.BlockExecutor
 }
 
 func New(
 	log zerolog.Logger,
 	net module.Network,
 	me module.Local,
-	state protocol.State,
+	protoState protocol.State,
+	execState state.ExecutionState,
 	receipts network.Engine,
 	executor executor.BlockExecutor,
 ) (*Engine, error) {
 
 	e := Engine{
-		unit:     engine.NewUnit(),
-		log:      log,
-		me:       me,
-		state:    state,
-		receipts: receipts,
-		executor: executor,
+		unit:       engine.NewUnit(),
+		log:        log,
+		me:         me,
+		protoState: protoState,
+		execState:  execState,
+		receipts:   receipts,
+		executor:   executor,
 	}
 
 	var err error
@@ -53,7 +57,7 @@ func New(
 		return nil, errors.Wrap(err, "could not register execution engine")
 	}
 
-	e.stateConduit, err = net.Register(engine.StateProvider, &e)
+	e.execStateConduit, err = net.Register(engine.StateProvider, &e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register execution state engine")
 	}
@@ -147,7 +151,7 @@ func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages
 		Hex("chunk_id", logging.ID(chunkID)).
 		Msg("received execution state request")
 
-	id, err := e.state.Final().Identity(originID)
+	id, err := e.protoState.Final().Identity(originID)
 	if err != nil {
 		return fmt.Errorf("invalid origin id (%s): %w", id, err)
 	}
@@ -156,7 +160,7 @@ func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages
 		return fmt.Errorf("invalid role for requesting execution state: %s", id.Role)
 	}
 
-	registers, err := e.executor.GetChunkState(chunkID)
+	registers, err := e.execState.GetChunkRegisters(chunkID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve chunk state (id=%s): %w", chunkID, err)
 	}
@@ -166,7 +170,7 @@ func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages
 		Registers: registers,
 	}}
 
-	err = e.stateConduit.Submit(msg, id.NodeID)
+	err = e.execStateConduit.Submit(msg, id.NodeID)
 	if err != nil {
 		return fmt.Errorf("could not submit response for chunk state (id=%s): %w", chunkID, err)
 	}

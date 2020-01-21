@@ -63,7 +63,9 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 
-			execState := state.NewExecutionState(ledgerStorage, stateCommitments)
+			chunkHeaders := badger.NewChunkHeaders(node.DB)
+
+			execState := state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
 
 			blockExec := executor.NewBlockExecutor(vm, execState)
 
@@ -72,6 +74,7 @@ func main() {
 				node.Network,
 				node.Me,
 				node.State,
+				execState,
 				receiptsEng,
 				blockExec,
 			)
