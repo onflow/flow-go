@@ -2,6 +2,7 @@ package timeout
 
 import (
 	"fmt"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 

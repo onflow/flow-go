@@ -118,7 +118,6 @@ func (p *PubSubDistributor) AddReachedBlockTimeoutConsumer(cons ReachedBlockTime
 	return p
 }
 
-
 // AddStartingVotesTimeoutConsumer adds an StartingVoteTimeoutConsumer to the PubSubDistributor;
 // concurrency safe; returns self-reference for chaining
 func (p *PubSubDistributor) AddStartingVotesTimeoutConsumer(cons StartingVotesTimeoutConsumer) *PubSubDistributor {

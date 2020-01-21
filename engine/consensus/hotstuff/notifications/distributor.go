@@ -15,7 +15,7 @@ type Distributor interface {
 	OnReachedVotesTimeout(uint64)
 }
 
-// SkippedViewConsumer consumes notifications of type `OnSkippedAhead`
+// SkippedAheadConsumer consumes notifications of type `OnSkippedAhead`
 // which are produced by PaceMaker when it decides to skip over one or more view numbers.
 // Prerequisites:
 // Implementation must be concurrency safe; Non-blocking;
