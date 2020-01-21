@@ -12,6 +12,7 @@ import (
 // A BlockExecutor executes the transactions in a block.
 type BlockExecutor interface {
 	ExecuteBlock(*execution.CompleteBlock) (*flow.ExecutionResult, error)
+	GetChunkState(chunkID flow.Identifier) (flow.Ledger, error)
 }
 
 type blockExecutor struct {
@@ -46,6 +47,28 @@ func (e *blockExecutor) ExecuteBlock(
 	result := generateExecutionResultForBlock(block, chunks, endState)
 
 	return result, nil
+}
+
+func (e *blockExecutor) GetChunkState(chunkID flow.Identifier) (flow.Ledger, error) {
+	chunkHeader, err := e.state.ChunkHeaderByChunkID(chunkID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve chunk header: %w", err)
+	}
+
+	registerIDs := chunkHeader.RegisterIDs
+
+	registerValues, err := e.state.GetRegisters(chunkHeader.StartState, registerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve chunk register values: %w", err)
+	}
+
+	l := make(flow.Ledger)
+
+	for i, registerID := range registerIDs {
+		l[string(registerID)] = registerValues[i]
+	}
+
+	return l, nil
 }
 
 func (e *blockExecutor) executeBlock(
@@ -123,6 +146,13 @@ func (e *blockExecutor) executeCollection(
 		EndState: endState,
 	}
 
+	chunkHeader := generateChunkHeader(chunk, chunkView.Reads())
+
+	err = e.state.PersistChunkHeader(chunkHeader)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to save chunk header: %w", err)
+	}
+
 	return chunk, endState, nil
 }
 
@@ -141,5 +171,23 @@ func generateExecutionResultForBlock(
 			FinalStateCommitment: endState,
 			Chunks:               flow.ChunkList{chunks},
 		},
+	}
+}
+
+// generateChunkHeader creates a chunk header from the provided chunk and register IDs.
+func generateChunkHeader(
+	chunk *flow.Chunk,
+	registerIDs []string,
+) *flow.ChunkHeader {
+	reads := make([]flow.RegisterID, len(registerIDs))
+
+	for i, registerID := range registerIDs {
+		reads[i] = flow.RegisterID(registerID)
+	}
+
+	return &flow.ChunkHeader{
+		ChunkID:     chunk.ID(),
+		StartState:  chunk.StartState,
+		RegisterIDs: reads,
 	}
 }

@@ -78,6 +78,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	es.On("CommitDelta", mock.Anything).Return(nil, nil)
 	es.On("PersistStateCommitment", block.ID(), mock.Anything).Return(nil)
+	es.On("PersistChunkHeader", mock.Anything, mock.Anything).Return(nil)
 
 	result, err := exe.ExecuteBlock(completeBlock)
 	assert.NoError(t, err)
