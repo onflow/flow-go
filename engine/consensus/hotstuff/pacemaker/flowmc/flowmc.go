@@ -1,6 +1,8 @@
 package flowmc
 
 import (
+	"time"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/pacemaker/flowmc/timeout"
@@ -35,12 +37,16 @@ func (p *FlowMC) gotoView(newView uint64) {
 	}
 	p.currentView = newView
 	p.notifier.OnStartingBlockTimeout(newView)
-	p.timeoutControl.StartTimeout(timeout.WaitingForBlock)
+	p.timeoutControl.StartTimeout(timeout.ReplicaTimeout)
 }
 
 // CurView returns the current view
 func (p *FlowMC) CurView() uint64 {
 	return p.currentView
+}
+
+func (p *FlowMC) TimeoutChannel() <-chan time.Time {
+	return p.timeoutControl.Channel()
 }
 
 func (p *FlowMC) UpdateCurViewWithQC(qc *types.QuorumCertificate) (*types.NewViewEvent, bool) {
@@ -64,7 +70,7 @@ func (p *FlowMC) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForN
 	}
 	// block is for current view
 
-	if p.timeoutControl.Mode() != timeout.WaitingForBlock {
+	if p.timeoutControl.Mode() != timeout.ReplicaTimeout {
 		// i.e. we are already on timeout.VoteCollection.
 		// This edge case can occur as follows:
 		// * we previously already have processed a block for the current view
@@ -97,7 +103,7 @@ func (p *FlowMC) processBlockForCurView(block *types.BlockProposal, isLeaderForN
 func (p *FlowMC) OnTimeout() (*types.NewViewEvent, bool) {
 	// block is for current view
 	switch p.timeoutControl.Mode() {
-	case timeout.WaitingForBlock:
+	case timeout.ReplicaTimeout:
 		p.notifier.OnReachedBlockTimeout(p.currentView)
 	case timeout.VoteCollection:
 		p.notifier.OnReachedVotesTimeout(p.currentView)

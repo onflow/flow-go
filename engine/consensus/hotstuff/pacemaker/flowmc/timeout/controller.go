@@ -17,8 +17,8 @@ type Controller struct {
 type TimeoutMode int
 
 const (
-	WaitingForBlock TimeoutMode = iota
-	VoteCollection  TimeoutMode = iota
+	ReplicaTimeout TimeoutMode = iota
+	VoteCollection TimeoutMode = iota
 )
 
 // timeoutCap this is an internal cap on the timeout to avoid numerical overflows.
@@ -43,7 +43,7 @@ func (t *Controller) StartTimeout(mode TimeoutMode) {
 	switch mode {
 	case VoteCollection:
 		t.timer = time.NewTimer(t.VoteCollectionTimeout())
-	case WaitingForBlock:
+	case ReplicaTimeout:
 		t.timer = time.NewTimer(t.ReplicaTimeout())
 	default:
 		panic("unknown timeout mode")
@@ -54,7 +54,7 @@ func (t *Controller) StartTimeout(mode TimeoutMode) {
 func (t *Controller) Channel() <-chan time.Time { return t.timer.C }
 func (t *Controller) Mode() TimeoutMode         { return t.mode }
 
-// WaitingForBlock returns the duration of the current view before we time out
+// ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
 	return time.Duration(t.replicaTimeout * 1E6)
 }

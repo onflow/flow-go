@@ -1,7 +1,9 @@
 package flowmc
 
 import (
+	"math"
 	"testing"
+	"time"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	mockdist "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications/mock"
@@ -10,9 +12,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	startRepTimeout float64 = 120.0
+	minRepTimeout float64 = 100.0
+	voteTimeoutFraction float64 = 0.5
+	multiplicateiveIncrease float64 = 1.5
+	additiveDecrease float64 = 50
+)
+
 func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mockdist.Distributor) {
 	eventProc := &mockdist.Distributor{}
-	tc, err := timeout.NewConfig(100, 100, 0.5, 1.5, 50)
+	tc, err := timeout.NewConfig(startRepTimeout, minRepTimeout, voteTimeoutFraction, multiplicateiveIncrease, additiveDecrease)
 	if err != nil {
 		t.Fail()
 	}
@@ -214,6 +224,61 @@ func Test_IgnoreBlockDuplicates(t *testing.T) {
 	assert.True(t, !nveOccured && nve == nil)
 	nve, nveOccured = pm.UpdateCurViewWithBlock(makeBlockProposal(3, 4), true)
 	assert.True(t, !nveOccured && nve == nil)
+	eventProc.AssertExpectations(t)
+	assert.Equal(t, uint64(4), pm.CurView())
+}
+
+// Test_ReplicaTimeout tests that replica timeout fires as expected
+func Test_ReplicaTimeout(t *testing.T) {
+	pm, eventProc := initPaceMaker(t, 3) // initPaceMaker also calls Start() on PaceMaker
+	start := time.Now()
+
+	select {
+	case <- pm.TimeoutChannel():
+		break // testing path: corresponds to EventLoop picking up timeout from channel
+	case <- time.NewTimer(time.Duration(2) * time.Duration(startRepTimeout) * time.Millisecond).C:
+		t.Fail() // to prevent test from hanging
+	}
+	duration := float64(time.Now().Nanosecond() - start.Nanosecond()) * 1E-6 // in millisecond
+	assert.True(t, math.Abs(duration - startRepTimeout) < 0.1 * startRepTimeout)
+	// While the timeout event has been put in the channel,
+	// PaceMaker should NOT react on it without the timeout event being processed by the EventHandler
+	assert.Equal(t, uint64(3), pm.CurView())
+
+	// here the, the Event loop would now call EventHandler.OnTimeout() -> PaceMaker.OnTimeout()
+	eventProc.On("OnReachedBlockTimeout", uint64(3)).Return().Once()
+	eventProc.On("OnStartingBlockTimeout", uint64(4)).Return().Once()
+	pm.OnTimeout()
+	eventProc.AssertExpectations(t)
+	assert.Equal(t, uint64(4), pm.CurView())
+}
+
+// Test_ReplicaTimeout tests that replica timeout fires as expected
+func Test_VoteTimeout(t *testing.T) {
+	pm, eventProc := initPaceMaker(t, 3) // initPaceMaker also calls Start() on PaceMaker
+	start := time.Now()
+
+	eventProc.On("OnStartingVotesTimeout", uint64(3)).Return().Once()
+	pm.UpdateCurViewWithBlock(makeBlockProposal(2, 3), true)
+	eventProc.AssertExpectations(t)
+
+	expectedTimeout := startRepTimeout * voteTimeoutFraction
+	select {
+	case <- pm.TimeoutChannel():
+		break // testing path: corresponds to EventLoop picking up timeout from channel
+	case <- time.NewTimer(time.Duration(2) * time.Duration(expectedTimeout) * time.Millisecond).C:
+		t.Fail() // to prevent test from hanging
+	}
+	duration := float64(time.Now().Nanosecond() - start.Nanosecond()) * 1E-6 // in millisecond
+	assert.True(t, math.Abs(duration - expectedTimeout) < 0.1 * expectedTimeout)
+	// While the timeout event has been put in the channel,
+	// PaceMaker should NOT react on it without the timeout event being processed by the EventHandler
+	assert.Equal(t, uint64(3), pm.CurView())
+
+	// here the, the Event loop would now call EventHandler.OnTimeout() -> PaceMaker.OnTimeout()
+	eventProc.On("OnReachedVotesTimeout", uint64(3)).Return().Once()
+	eventProc.On("OnStartingBlockTimeout", uint64(4)).Return().Once()
+	pm.OnTimeout()
 	eventProc.AssertExpectations(t)
 	assert.Equal(t, uint64(4), pm.CurView())
 }
