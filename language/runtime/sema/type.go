@@ -733,15 +733,15 @@ var Int128TypeMin *big.Int
 
 func init() {
 	Int128TypeMin = big.NewInt(-1)
-	Int128TypeMin = Int128TypeMin.Lsh(Int128TypeMin, 127)
+	Int128TypeMin.Lsh(Int128TypeMin, 127)
 }
 
 var Int128TypeMax *big.Int
 
 func init() {
 	Int128TypeMax = big.NewInt(1)
-	Int128TypeMax = Int128TypeMax.Lsh(Int128TypeMax, 127)
-	Int128TypeMax = Int128TypeMax.Sub(Int128TypeMax, big.NewInt(1))
+	Int128TypeMax.Lsh(Int128TypeMax, 127)
+	Int128TypeMax.Sub(Int128TypeMax, big.NewInt(1))
 }
 
 func (*Int128Type) Min() *big.Int {
