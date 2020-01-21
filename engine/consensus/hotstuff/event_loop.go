@@ -43,12 +43,12 @@ func (el *EventLoop) OnReceiveVote(vote *types.Vote) {
 	el.votes <- vote
 }
 
-func (el *EventLoop) Start() {
+func (el *EventLoop) Start() error {
 	if el.started.Swap(true) {
-		return
+		return nil
 	}
 	el.eventHandler.paceMaker.Start() // start Pacemaker;
 	// Wait with starting EventLoop until Pacemaker is started, i.e. above call returned
-	go el.loop()
+	el.loop()
 }
 
