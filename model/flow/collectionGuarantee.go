@@ -10,7 +10,7 @@ import (
 // CollectionGuarantee is a signed hash for a collection, which is used
 // to announce collections to consensus nodes.
 type CollectionGuarantee struct {
-	*tracing.Traceable
+	tracing.Traceable
 	// Hash is the hash of collection that is being guaranteed.
 	CollectionID Identifier
 	Signatures   []crypto.Signature

@@ -161,10 +161,6 @@ func (e *Engine) createProposal() error {
 	}
 
 	guarantee := coll.Guarantee()
-	err = e.guarantees.Store(&guarantee)
-	if err != nil {
-		return fmt.Errorf("could not save proposed collection guarantee: %w", err)
-	}
 
 	followsFrom := make([]opentracing.StartSpanOption, 0, len(transactions))
 	txIDs := make([]flow.Identifier, 0, len(transactions))
@@ -172,16 +168,22 @@ func (e *Engine) createProposal() error {
 		followsFrom = append(followsFrom, opentracing.FollowsFrom(tx.SpanContext()))
 		txIDs = append(txIDs, tx.ID())
 	}
-	guarantee.StartSpan(e.tracer, "collectionGuarateeProposal", followsFrom...).
+	guarantee.StartSpan(e.tracer, "collectionGuaranteeProposal", followsFrom...).
 		SetTag("collection_txs", txIDs)
+
+	err = e.guarantees.Store(&guarantee)
+	if err != nil {
+		return fmt.Errorf("could not save proposed collection guarantee %s: %w", guarantee.ID(), err)
+	}
+
+	// Collection guarante is saved, we can now delete Txs from the mem pool
+	for _, tx := range transactions {
+		e.pool.Rem(tx.ID())
+	}
 
 	err = e.provider.ProcessLocal(&messages.SubmitCollectionGuarantee{Guarantee: guarantee})
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
-	}
-
-	for _, tx := range transactions {
-		e.pool.Rem(tx.ID())
 	}
 
 	return nil

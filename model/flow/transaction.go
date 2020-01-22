@@ -48,7 +48,7 @@ func (tb TransactionBody) ID() Identifier {
 // Transaction is the smallest unit of task.
 type Transaction struct {
 	TransactionBody
-	*tracing.Traceable
+	tracing.Traceable
 	Status           TransactionStatus
 	Events           []Event
 	ComputationSpent uint64

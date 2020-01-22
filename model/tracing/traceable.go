@@ -9,9 +9,6 @@ type Traceable struct {
 }
 
 func (t *Traceable) StartSpan(tracer opentracing.Tracer, spanName string, opts ...opentracing.StartSpanOption) opentracing.Span {
-	if t == nil {
-		t = new(Traceable)
-	}
 	t.span = tracer.StartSpan(spanName, opts...)
 	return t.span
 }

@@ -52,7 +52,7 @@ spec:
       containers:
         - name: flow-test-net
           # No tag, will be attached by teamcity
-          image: gcr.io/dl-flow/consensus:02b9b6eb1
+          image: gcr.io/dl-flow/consensus
           args: 
             - '--nodename'
             - '$(POD_NAME)'
