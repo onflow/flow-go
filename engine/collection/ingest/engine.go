@@ -38,7 +38,6 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, tracer op
 		Str("engine", "ingest").
 		Logger()
 	if tracer == nil {
-		logger.Info().Msg("TRACER NIL")
 		tracer = opentracing.NoopTracer{}
 	}
 	e := &Engine{
