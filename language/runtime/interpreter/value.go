@@ -3224,10 +3224,14 @@ func (v *ReferenceValue) Equal(other Value) BoolValue {
 
 // AddressValue
 
-type AddressValue [common.AddressLength]byte
+type AddressValue common.Address
 
 func init() {
 	gob.Register(AddressValue{})
+}
+
+func NewAddressValue(a common.Address) AddressValue {
+	return NewAddressValueFromBytes(a[:])
 }
 
 func NewAddressValueFromBytes(b []byte) AddressValue {
@@ -3281,7 +3285,11 @@ func (v AddressValue) Equal(other Value) BoolValue {
 }
 
 func (v AddressValue) Hex() string {
-	return fmt.Sprintf("%x", [common.AddressLength]byte(v))
+	return v.ToAddress().Hex()
+}
+
+func (v AddressValue) ToAddress() common.Address {
+	return common.Address(v)
 }
 
 // AccountValue
