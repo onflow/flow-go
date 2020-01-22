@@ -455,8 +455,8 @@ func (e *Engine) getCollectionsForReceipt(block *flow.Block, receipt *flow.Execu
 //
 // NOTE: this method is protected by mutex to prevent double-verifying ERs.
 func (e *Engine) checkPendingReceipts() {
-	e.checkReceiptsMu.Lock()
-	defer e.checkReceiptsMu.Unlock()
+	//e.checkReceiptsMu.Lock()
+	//defer e.checkReceiptsMu.Unlock()
 
 	receipts := e.receipts.All()
 

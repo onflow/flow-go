@@ -1,11 +1,7 @@
 package verifier_test
 
 import (
-	"fmt"
-	"math/rand"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -15,8 +11,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/engine/testutil/mock"
-	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -176,7 +170,7 @@ func TestHappyPath(t *testing.T) {
 	assert.Nil(t, err)
 
 	// send the ER from execution to verification node
-	err = verNode.ReceiptsEngine.Process(exeID.NodeID, completeER.Receipt)
+	err = verNode.IngestEngine.Process(exeID.NodeID, completeER.Receipt)
 	assert.Nil(t, err)
 
 	// the receipt should be added to the mempool
@@ -223,180 +217,4 @@ func TestHappyPath(t *testing.T) {
 	assert.False(t, verNode.Collections.Has(completeER.Collections[0].ID()))
 	assert.False(t, verNode.ChunkStates.Has(completeER.ChunkStates[0].ID()))
 	assert.False(t, verNode.Blocks.Has(completeER.Block.ID()))
-}
-
-// Test that ERs received multiple times, or concurrently with other ERs
-// are verified exactly once.
-func TestConcurrency(t *testing.T) {
-	testcases := []struct{ erCount, senderCount int }{
-		{
-			erCount:     1,
-			senderCount: 1,
-		}, {
-			erCount:     1,
-			senderCount: 10,
-		}, {
-			erCount:     10,
-			senderCount: 1,
-		}, {
-			erCount:     10,
-			senderCount: 10,
-		},
-	}
-
-	for _, testcase := range testcases {
-		name := fmt.Sprintf("%d-ERs/%d-senders", testcase.erCount, testcase.senderCount)
-		t.Run(name, func(t *testing.T) {
-			testConcurrency(t, testcase.erCount, testcase.senderCount)
-		})
-	}
-}
-
-func testConcurrency(t *testing.T, erCount, senderCount int) {
-	hub := stub.NewNetworkHub()
-
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	conIDList := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
-	conID := conIDList.Get(0)
-
-	identities := flow.IdentityList{colID, conID, exeID, verID}
-	genesis := flow.Genesis(identities)
-
-	verNode := testutil.VerificationNode(t, hub, verID, genesis)
-	colNode := testutil.CollectionNode(t, hub, colID, genesis)
-
-	// create `erCount` ER fixtures that will be concurrently delivered
-	ers := make([]verification.CompleteExecutionResult, 0, erCount)
-	for i := 0; i < erCount; i++ {
-		ers = append(ers, unittest.CompleteExecutionResultFixture())
-	}
-
-	// mock the execution node with a generic node and mocked engine
-	// to handle requests for chunk state
-	exeNode := testutil.GenericNode(t, hub, exeID, genesis)
-	setupMockExeNode(t, exeNode, verID.NodeID, ers)
-
-	// mock the consensus node with a generic node and mocked engine to assert
-	// that each result approval is broadcast
-	conNode := testutil.GenericNode(t, hub, conID, genesis)
-	// the wait group represents consensus node waiting on result approvals
-	receiverWG := setupMockConNode(t, conNode, verID.NodeID, ers)
-
-	verNet, ok := hub.GetNetwork(verID.NodeID)
-	assert.True(t, ok)
-
-	// the wait group tracks goroutines for each ER sending it to VER
-	var senderWG sync.WaitGroup
-	senderWG.Add(erCount * senderCount)
-
-	for _, completeER := range ers {
-		for _, coll := range completeER.Collections {
-			err := colNode.Collections.Store(coll)
-			assert.Nil(t, err)
-		}
-
-		// spin up `senderCount` sender goroutines to mimic receiving
-		// the same resource multiple times
-		for i := 0; i < senderCount; i++ {
-			go func(j int, id flow.Identifier, block *flow.Block, receipt *flow.ExecutionReceipt) {
-
-				sendBlock := func() {
-					_ = verNode.ReceiptsEngine.Process(conID.NodeID, block)
-				}
-
-				sendReceipt := func() {
-					_ = verNode.ReceiptsEngine.Process(exeID.NodeID, receipt)
-				}
-
-				switch rand.Intn(2) {
-				case 0:
-					// block then receipt
-					sendBlock()
-					verNet.FlushAll()
-					time.Sleep(1)
-					sendReceipt()
-				case 1:
-					// receipt then block
-					sendReceipt()
-					verNet.FlushAll()
-					time.Sleep(1)
-					sendBlock()
-				}
-
-				verNet.FlushAll()
-				go senderWG.Done()
-			}(i, completeER.Receipt.ExecutionResult.ID(), completeER.Block, completeER.Receipt)
-		}
-	}
-
-	// wait for all ERs to be sent to VER
-	assert.True(t, unittest.ReturnsBefore(senderWG.Wait, time.Second))
-	verNet.FlushAll()
-	// wait for all RAs to be received by CON
-	assert.True(t, unittest.ReturnsBefore(receiverWG.Wait, time.Second))
-}
-
-// setupMockExeNode sets up a mocked execution node that responds to requests for
-// chunk states. Any requests that don't correspond to an execution receipt in
-// the input ers list result in the test failing.
-func setupMockExeNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, ers []verification.CompleteExecutionResult) {
-	eng := new(network.Engine)
-	conduit, err := node.Net.Register(engine.ExecutionStateProvider, eng)
-	assert.Nil(t, err)
-
-	eng.On("Process", verID, testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			req, ok := args[1].(*messages.ExecutionStateRequest)
-			require.True(t, ok)
-
-			for _, er := range ers {
-				if er.Receipt.ExecutionResult.Chunks.Chunks[0].ID() == req.ChunkID {
-					res := &messages.ExecutionStateResponse{
-						State: *er.ChunkStates[0],
-					}
-					err := conduit.Submit(res, verID)
-					assert.Nil(t, err)
-					return
-				}
-			}
-			t.Log("invalid chunk state request", req.ChunkID.String())
-			t.Fail()
-		}).
-		Return(nil)
-}
-
-// setupMockConNode sets up a mocked consensus node to assert that a set of
-// result approvals are delivered correctly.
-func setupMockConNode(t *testing.T, node mock.GenericNode, verID flow.Identifier, ers []verification.CompleteExecutionResult) *sync.WaitGroup {
-	eng := new(network.Engine)
-	_, err := node.Net.Register(engine.ApprovalProvider, eng)
-	assert.Nil(t, err)
-
-	// keep track of which result approvals we have received
-	receivedRAs := make(map[flow.Identifier]struct{})
-	// we decrement the wait group when each RA is received
-	var wg sync.WaitGroup
-	wg.Add(len(ers))
-
-	eng.On("Process", verID, testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			ra, ok := args[1].(*flow.ResultApproval)
-			assert.True(t, ok)
-
-			erID := ra.ResultApprovalBody.ExecutionResultID
-			_, alreadyReceived := receivedRAs[erID]
-			if alreadyReceived {
-				t.Logf("received RA (with ER ID %s) twice", erID)
-				t.Fail()
-				return
-			}
-
-			receivedRAs[erID] = struct{}{}
-			wg.Done()
-		}).
-		Return(nil)
-
-	return &wg
 }
