@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine implements the verifier engine of the verification node,
@@ -116,9 +117,11 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 		return fmt.Errorf("invalid remote origin for verify")
 	}
 
+	chunkID := res.Receipt.ExecutionResult.Chunks.ByIndex(0).ID()
+
 	computedEndState, err := e.executeChunk(res)
 	if err != nil {
-		return fmt.Errorf("could not verify chunk: %w", err)
+		return fmt.Errorf("could not verify chunk (id=%s): %w", chunkID, err)
 	}
 
 	// TODO for now, we discard the computed end state and approve the ER
@@ -145,6 +148,10 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not submit result approval: %w", err)
 	}
+
+	e.log.Info().
+		Hex("chunk_id", logging.ID(chunkID)).
+		Msg("verified chunk")
 
 	return nil
 }
