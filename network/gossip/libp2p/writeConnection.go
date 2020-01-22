@@ -58,8 +58,8 @@ SendLoop:
 			bufw.Flush()
 
 			wc.log.Debug().
-				Bytes("sender", msg.SenderID).
-				Hex("eventID", msg.Event.EventID).
+				Bytes("sender", msg.OriginID).
+				Hex("eventID", msg.EventID).
 				Msg("sent message")
 
 			if isClosedErr(err) {

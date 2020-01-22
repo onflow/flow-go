@@ -252,12 +252,12 @@ ProcessLoop:
 
 func getSenderID(msg *message.Message) (*flow.Identifier, error) {
 	// Extract sender id
-	if len(msg.SenderID) < 32 {
+	if len(msg.OriginID) < 32 {
 		err := fmt.Errorf("invalid sender id")
 		return nil, err
 	}
 	var senderID [32]byte
-	copy(senderID[:], msg.SenderID)
+	copy(senderID[:], msg.OriginID)
 	var id flow.Identifier = senderID
 	return &id, nil
 }
