@@ -26,11 +26,9 @@ func (bp *BlockProposalProducer) MakeBlockProposal(view uint64, qc *types.Quorum
 
 	unsignedBlockProposal := bp.propose(block)
 
-	sig := bp.signer.SignBlockProposal(unsignedBlockProposal, bp.viewState.GetSelfIdxForView(view))
+	signedBlockProposal := bp.signBlockProposal(unsignedBlockProposal)
 
-	blockProposal := types.NewBlockProposal(unsignedBlockProposal.Block, unsignedBlockProposal.ConsensusPayload, sig)
-
-	return blockProposal
+	return signedBlockProposal
 }
 
 // makeBlockForView gets the payload hash from mempool and build a block on top of the given qc for the given view.
@@ -49,4 +47,11 @@ func (bp *BlockProposalProducer) propose(block *types.Block) *types.UnsignedBloc
 	consensusPayload := bp.mempool.NewConsensusPayload()
 	unsignedBlockProposal := types.NewUnsignedBlockProposal(block, consensusPayload)
 	return unsignedBlockProposal
+}
+
+func (bp *BlockProposalProducer) signBlockProposal(proposal *types.UnsignedBlockProposal) *types.BlockProposal {
+	sig := bp.signer.SignBlockProposal(proposal, bp.viewState.GetSelfIdxForView(proposal.View()))
+
+	blockProposal := types.NewBlockProposal(unsignedBlockProposal.Block, unsignedBlockProposal.ConsensusPayload, sig)
+	return blockProposal
 }
