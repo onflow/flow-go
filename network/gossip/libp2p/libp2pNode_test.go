@@ -38,6 +38,47 @@ func (l *LibP2PNodeTestSuite) SetupTest() {
 	l.ctx, l.cancel = context.WithCancel(context.Background())
 }
 
+// TestMultiAddress evaluates correct translations from
+// dns and ip4 to libp2p multi-address
+func (l *LibP2PNodeTestSuite) TestMultiAddress() {
+	defer l.cancel()
+	tt := []struct {
+		address      NodeAddress
+		multiaddress string
+	}{
+		{ // ip4 test case
+			address: NodeAddress{
+				Name: "ip4-node",
+				IP:   "172.16.254.1",
+				Port: "72",
+			},
+			multiaddress: "/ip4/172.16.254.1/tcp/72",
+		},
+		{ // dns test case
+			address: NodeAddress{
+				Name: "dns-node-1",
+				IP:   "consensus",
+				Port: "2222",
+			},
+			multiaddress: "/dns4/consensus/tcp/2222",
+		},
+		{ // dns test case
+			address: NodeAddress{
+				Name: "dns-node-2",
+				IP:   "flow.com",
+				Port: "3333",
+			},
+			multiaddress: "/dns4/flow.com/tcp/3333",
+		},
+	}
+
+	for _, tc := range tt {
+		actualAddress := multiaddressStr(tc.address)
+		assert.Equal(l.Suite.T(), tc.multiaddress, actualAddress, "incorrect multi-address translation")
+	}
+
+}
+
 func (l *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 	defer l.cancel()
 

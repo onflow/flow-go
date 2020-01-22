@@ -109,7 +109,6 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 
 	// register engine with provided engineID
 	n.engines[channelID] = engine
-
 	return conduit, nil
 }
 
@@ -155,7 +154,7 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 		n.logger.Debug().Str("sender", senderID.String()).
 			Uint8("channel", channelID).
 			Msg(" dropping message since no engine to receive it was found")
-		return fmt.Errorf("could not find the engine for channel ID: %d", channelID)
+		return nil
 	}
 
 	// Convert message payload to a known message type
