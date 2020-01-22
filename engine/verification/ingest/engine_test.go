@@ -437,11 +437,22 @@ func TestConcurrency(t *testing.T) {
 		{
 			erCount:     1,
 			senderCount: 1,
+		}, {
+			erCount:     1,
+			senderCount: 10,
+		}, {
+			erCount:     10,
+			senderCount: 1,
+		}, {
+			erCount:     10,
+			senderCount: 10,
 		},
 	}
 
 	for _, tc := range testcases {
-		testConcurrency(t, tc.erCount, tc.senderCount)
+		t.Run(fmt.Sprintf("%d-ers/%d-senders", tc.erCount, tc.senderCount), func(t *testing.T) {
+			testConcurrency(t, tc.erCount, tc.senderCount)
+		})
 	}
 }
 
@@ -565,18 +576,23 @@ func setupMockVerifierEng(t *testing.T, ers []verification.CompleteExecutionResu
 
 	// keep track of which ERs we have received
 	receivedERs := make(map[flow.Identifier]struct{})
-	// decrement the wait group when each ER received
-	var wg sync.WaitGroup
+	var (
+		// decrement the wait group when each ER received
+		wg sync.WaitGroup
+		// check one ER at a time to ensure dupe checking works
+		mu sync.Mutex
+	)
 	wg.Add(len(ers))
 
 	eng.On("ProcessLocal", testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
+			mu.Lock()
+			defer mu.Unlock()
+
 			completeER, ok := args[0].(*verification.CompleteExecutionResult)
 			assert.True(t, ok)
 
 			erID := completeER.Receipt.ExecutionResult.ID()
-
-			t.Log("received ER: ", erID.String())
 
 			// ensure there are no dupe ERs
 			_, alreadySeen := receivedERs[erID]
