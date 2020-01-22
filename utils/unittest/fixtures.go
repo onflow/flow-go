@@ -65,9 +65,7 @@ func CollectionFixture(n int) flow.Collection {
 	transactions := make([]*flow.TransactionBody, 0, n)
 
 	for i := 0; i < n; i++ {
-		tx := TransactionFixture(func(t *flow.Transaction) {
-			t.Nonce = rand.Uint64()
-		})
+		tx := TransactionFixture()
 		transactions = append(transactions, &tx.TransactionBody)
 	}
 
@@ -255,13 +253,14 @@ func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: 0,
+			StartState:      StateCommitmentFixture(),
 		},
 		Index: 0,
 	}
 
 	chunkState := flow.ChunkState{
 		ChunkID:   chunk.ID(),
-		Registers: make(map[string][]byte),
+		Registers: flow.Ledger{},
 	}
 
 	result := flow.ExecutionResult{

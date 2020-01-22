@@ -1,4 +1,4 @@
-package blocks
+package ingestion
 
 //revive:disable:unexported-return
 

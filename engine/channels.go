@@ -19,9 +19,9 @@ const (
 	BlockPropagation = 51
 
 	// Execution 100-199
-	ReceiptProvider    = 100
-	StateProvider      = 101
-	ExecutionExecution = 102
+	ReceiptProvider        = 100
+	ExecutionStateProvider = 101
+	ExecutionExecution     = 102
 
 	// Verification 150-199
 	ApprovalProvider = 150

@@ -4,19 +4,19 @@ import (
 	"encoding/hex"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/libp2p/network"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 )
 
 // Cache implements a naive cache for peers.
 type Cache struct {
 	sync.Mutex
-	caches map[uint8](map[string]*network.NetworkMessage)
+	caches map[uint8]map[string]*message.Message
 }
 
 // New creates a new naive cache.
 func New() (*Cache, error) {
 	c := &Cache{
-		caches: make(map[uint8](map[string]*network.NetworkMessage)),
+		caches: make(map[uint8]map[string]*message.Message),
 	}
 	return c, nil
 }
@@ -25,7 +25,7 @@ func New() (*Cache, error) {
 func (c *Cache) Add(channelID uint8) {
 	c.Lock()
 	defer c.Unlock()
-	c.caches[channelID] = make(map[string]*network.NetworkMessage)
+	c.caches[channelID] = make(map[string]*message.Message)
 }
 
 // Has returns whether we know the given ID.
@@ -39,7 +39,7 @@ func (c *Cache) Has(channelID uint8, eventID []byte) bool {
 }
 
 // Set sets the response for the given ID.
-func (c *Cache) Set(channelID uint8, eventID []byte, res *network.NetworkMessage) {
+func (c *Cache) Set(channelID uint8, eventID []byte, res *message.Message) {
 	c.Lock()
 	defer c.Unlock()
 	cache := c.caches[channelID]
@@ -48,7 +48,7 @@ func (c *Cache) Set(channelID uint8, eventID []byte, res *network.NetworkMessage
 }
 
 // Get returns the payload for the given ID.
-func (c *Cache) Get(channelID uint8, eventID []byte) (*network.NetworkMessage, bool) {
+func (c *Cache) Get(channelID uint8, eventID []byte) (*message.Message, bool) {
 	c.Lock()
 	defer c.Unlock()
 	cache := c.caches[channelID]
