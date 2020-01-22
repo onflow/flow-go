@@ -138,7 +138,7 @@ func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
 	case *message.Message:
 		err = n.processNetworkMessage(nodeID, m)
 	default:
-		err = fmt.Errorf("invalid message type (%T)", m)
+		err = fmt.Errorf("network received invalid message type (%T)", m)
 	}
 	if err != nil {
 		err = fmt.Errorf("could not process message: %w", err)
@@ -245,6 +245,11 @@ func (n *Network) send(msg interface{}, nodeIDs ...flow.Identifier) error {
 	// send the message through the peer connection
 	var result *multierror.Error
 	for _, nodeID := range nodeIDs {
+		if nodeID == n.me.NodeID() {
+			// to avoid self dial by the underlay
+			n.logger.Debug().Msg("self dial attempt")
+			continue
+		}
 		err := n.mw.Send(nodeID, msg)
 		if err != nil {
 			result = multierror.Append(result, err)

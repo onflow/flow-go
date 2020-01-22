@@ -153,7 +153,7 @@ func (m *Middleware) Send(targetID flow.Identifier, msg interface{}) error {
 			// Write message to outbound channel only if it is of the correct type
 			conn.outbound <- msg
 		default:
-			err := errors.Errorf("invalid message type (%T)", msg)
+			err := errors.Errorf("middleware received invalid message type (%T)", msg)
 			return err
 		}
 		return nil
