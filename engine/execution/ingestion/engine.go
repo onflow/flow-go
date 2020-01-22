@@ -41,8 +41,12 @@ func NewEngine(
 	blocks storage.Blocks,
 	collections storage.Collections,
 	executionEngine network.Engine,
-	mempool *Mempool,
 ) (*Engine, error) {
+
+	mempool, err := newMempool()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not create mempool")
+	}
 
 	eng := Engine{
 		unit:        engine.NewUnit(),

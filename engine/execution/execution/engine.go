@@ -57,7 +57,7 @@ func New(
 		return nil, errors.Wrap(err, "could not register execution engine")
 	}
 
-	e.execStateConduit, err = net.Register(engine.StateProvider, &e)
+	e.execStateConduit, err = net.Register(engine.ExecutionStateProvider, &e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register execution state engine")
 	}
