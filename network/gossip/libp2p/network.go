@@ -11,10 +11,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	networkmodel "github.com/dapperlabs/flow-go/model/libp2p/network"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/cache"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/topology"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -135,7 +135,7 @@ func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
 	var err error
 
 	switch m := msg.(type) {
-	case *networkmodel.NetworkMessage:
+	case *message.Message:
 		err = n.processNetworkMessage(nodeID, m)
 	default:
 		err = fmt.Errorf("network received invalid message type (%T)", m)
@@ -146,35 +146,35 @@ func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
 	return err
 }
 
-func (n *Network) processNetworkMessage(nodeID flow.Identifier, message *networkmodel.NetworkMessage) error {
+func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
 
 	// Extract channel id and find the registered engine
-	en, found := n.engines[message.ChannelID]
+	channelID := uint8(message.Event.ChannelID)
+	en, found := n.engines[channelID]
 	if !found {
-		n.logger.Debug().Str("sender", nodeID.String()).
-			Uint8("engine", uint8(message.ChannelID)).
+		n.logger.Debug().Str("sender", senderID.String()).
+			Uint8("channel", channelID).
 			Msg(" dropping message since no engine to receive it was found")
-		return fmt.Errorf("could not find the engine: %d", message.ChannelID)
+		return fmt.Errorf("could not find the engine for channel ID: %d", channelID)
 	}
 
 	// Convert message payload to a known message type
-	decodedMessage, err := n.codec.Decode(message.Payload)
+	decodedMessage, err := n.codec.Decode(message.Event.Payload)
 	if err != nil {
-		return errors.Wrap(err, "could not decode event")
+		return fmt.Errorf("could not decode event: %w", err)
 	}
 
 	// call the engine with the message payload
-	err = en.Process(message.OriginID, decodedMessage)
+	err = en.Process(senderID, decodedMessage)
 	if err != nil {
-		n.logger.Error().
-			Uint8("channel", message.ChannelID).Str("sender", nodeID.String()).Err(err)
-		return err
+		n.logger.Error().Str("sender", senderID.String()).Uint8("channel", channelID).Err(err)
+		return fmt.Errorf("failed to process message from %s: %w", senderID.String(), err)
 	}
 	return nil
 }
 
 // genNetworkMessage uses the codec to encode an event into a NetworkMessage
-func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetIDs ...flow.Identifier) (*networkmodel.NetworkMessage, error) {
+func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetIDs ...flow.Identifier) (*message.Message, error) {
 	// encode the payload using the configured codec
 	payload, err := n.codec.Encode(event)
 	if err != nil {
@@ -184,38 +184,49 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 	// use a hash with an engine-specific salt to get the payload hash
 	sip := siphash.New([]byte("libp2ppacking" + fmt.Sprintf("%03d", channelID)))
 
-	// casting event structure
-	e := &networkmodel.NetworkMessage{
-		ChannelID: channelID,
-		EventID:   sip.Sum(payload),
-		OriginID:  n.me.NodeID(),
-		TargetIDs: targetIDs,
-		Payload:   payload,
+	var emTargets [][]byte
+	for _, t := range targetIDs {
+		emTargets = append(emTargets, t[:])
 	}
 
-	return e, nil
+	// get origin ID (inplace slicing n.me.NodeID()[:] doesn't work)
+	selfID := n.me.NodeID()
+	originID := selfID[:]
+
+	//cast event to a libp2p.Message
+	em := &message.EventMessage{
+		ChannelID: uint32(channelID),
+		EventID:   sip.Sum(payload),
+		OriginID:  originID,
+		TargetIDs: emTargets,
+		Payload:   payload,
+	}
+	message := &message.Message{
+		SenderID: originID,
+		Event:    em,
+	}
+
+	return message, nil
 }
 
 // submit method submits the given event for the given channel to the overlay layer
 // for processing; it is used by engines through conduits.
-// The Target needs to be added as a peer before submitting the message.
 func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 	// genNetworkMessage the event to get payload and event ID
 	message, err := n.genNetworkMessage(channelID, event, targetIDs...)
 	if err != nil {
-		return errors.Wrap(err, "could not cast the event into NetworkMessage")
+		return errors.Wrap(err, "could not cast the event into network message")
 	}
-	// gossip
 
 	// checks if the event is already in the cache
-	ok := n.cache.Has(channelID, message.EventID)
+	ok := n.cache.Has(channelID, message.Event.EventID)
 	if ok {
 		// returns nil and terminates sending the message since
 		// the message already submitted to the network
 		return nil
 	}
 	// storing event in the cache
-	n.cache.Set(channelID, message.EventID, message)
+	n.cache.Set(channelID, message.Event.EventID, message)
 
 	// TODO: debup the message here
 

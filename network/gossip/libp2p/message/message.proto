@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package libp2p;
+package message;
 
-option go_package = "libp2p";
+// Run protoc --gofast_out=. message.proto to generate message.pb.go
 
 // Message models a single message that is supposed to get exchanged by the gossip network
 message Message {
