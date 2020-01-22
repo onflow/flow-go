@@ -33,7 +33,7 @@ func BenchmarkUpdate(b *testing.B) {
 			defer os.RemoveAll("./db/")
 			keys, values := generateRandomKVPairs(mark)
 
-			s.Update(keys, values)
+			_ = s.Update(keys, values)
 			s.database.SafeClose()
 		})
 	}
@@ -60,7 +60,7 @@ func BenchmarkReadSMT(b *testing.B) {
 
 	defer os.RemoveAll("./db/")
 	keys, values := generateRandomKVPairs(1000)
-	s.Update(keys, values)
+	_ = s.Update(keys, values)
 	for _, mark := range benchmarks {
 		mark := mark // Workaround for scopelint issue
 		readKeys := getRandomKeys(keys, mark.size)
@@ -91,7 +91,7 @@ func BenchmarkVerifyProof(b *testing.B) {
 
 	defer os.RemoveAll("./db/")
 	keys, values := generateRandomKVPairs(1000)
-	s.Update(keys, values)
+	_ = s.Update(keys, values)
 	for _, mark := range benchmarks {
 		readKeys := getRandomKeys(keys, mark.size)
 		values, proofs, err := s.Read(readKeys, mark.trusted, s.GetRoot().value)
@@ -126,7 +126,7 @@ func BenchmarkVerifyHistoricalStates(b *testing.B) {
 
 	defer os.RemoveAll("./db/")
 	keys, values := generateRandomKVPairs(1000)
-	new_smt.Update(keys, values)
+	_ = new_smt.Update(keys, values)
 	oldRoot := new_smt.GetRoot().value
 	_, newvalues := generateRandomKVPairs(1000)
 	err := new_smt.Update(keys, newvalues)

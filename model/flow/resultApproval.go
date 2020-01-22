@@ -6,11 +6,11 @@ import (
 
 type ResultApprovalBody struct {
 	// CorrectnessAttestation
-	ExecutionResultID    Identifier       //hash of approved execution result
+	ExecutionResultID    Identifier       // hash of approved execution result
 	AttestationSignature crypto.Signature // signature over ExecutionResultHash
 
 	// Verification Proof
-	ChunkIndexList []uint32 // list of chunk indices assigned tot he verifier
+	ChunkIndexList []uint32 // list of chunk indices assigned to the verifier
 	Proof          []byte   // proof of correctness of the chunk assignment
 	Spocks         []Spock  // proof of re-computation, one per each chunk
 }

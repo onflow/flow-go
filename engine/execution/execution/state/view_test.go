@@ -246,3 +246,56 @@ func TestView_ApplyDelta(t *testing.T) {
 		assert.Nil(t, b)
 	})
 }
+
+func TestView_Reads(t *testing.T) {
+	v := state.NewView(func(key string) ([]byte, error) {
+		return nil, nil
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		reads := v.Reads()
+		assert.Empty(t, reads)
+	})
+
+	t.Run("ValueInCache", func(t *testing.T) {
+		v := state.NewView(func(key string) ([]byte, error) {
+			return nil, nil
+		})
+
+		v.Set("fruit", []byte("apple"))
+
+		// cache reads are not recorded
+		_, err := v.Get("fruit")
+		assert.NoError(t, err)
+
+		// read list should be empty
+		reads := v.Reads()
+		assert.Empty(t, reads)
+	})
+
+	t.Run("ValuesNotInCache", func(t *testing.T) {
+		v := state.NewView(func(key string) ([]byte, error) {
+			if key == "fruit" {
+				return []byte("orange"), nil
+			}
+
+			if key == "vegetable" {
+				return []byte("carrot"), nil
+			}
+
+			return nil, nil
+		})
+
+		_, err := v.Get("fruit")
+		assert.NoError(t, err)
+
+		_, err = v.Get("vegetable")
+		assert.NoError(t, err)
+
+		reads := v.Reads()
+		assert.Len(t, reads, 2)
+
+		assert.Equal(t, "fruit", reads[0])
+		assert.Equal(t, "vegetable", reads[1])
+	})
+}

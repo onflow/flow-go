@@ -45,7 +45,7 @@ func TraverseDeltas(from uint64, to uint64, filters []flow.IdentityFilter, proce
 			number, role, nodeID = fromDeltaKey(key)
 			id := flow.Identity{NodeID: nodeID, Role: role}
 			for _, filter := range filters {
-				if !filter(id) {
+				if !filter(&id) {
 					return false
 				}
 			}

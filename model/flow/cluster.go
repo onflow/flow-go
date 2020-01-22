@@ -22,7 +22,7 @@ func NewClusterList(nClusters uint) *ClusterList {
 }
 
 // Add will add a node to the cluster list.
-func (cl *ClusterList) Add(index uint, identity Identity) {
+func (cl *ClusterList) Add(index uint, identity *Identity) {
 	cl.clusters[int(index)] = append(cl.clusters[int(index)], identity)
 	cl.lookup[identity.NodeID] = index
 }

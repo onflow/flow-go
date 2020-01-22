@@ -147,7 +147,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 			}
 
 			// create contant
-			content := flow.Content{
+			payload := flow.Payload{
 				Identities: identities,
 				Guarantees: guarantees,
 			}
@@ -155,8 +155,7 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 			// reconstruct block
 			block := flow.Block{
 				Header:  header,
-				Payload: content.Payload(),
-				Content: content,
+				Payload: payload,
 			}
 
 			// insert the deltas

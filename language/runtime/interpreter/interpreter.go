@@ -2445,24 +2445,55 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 	switch unwrappedTargetType.(type) {
 	case *sema.IntType:
 		return ConvertInt(value)
-	case *sema.Int8Type:
-		return ConvertInt8(value)
-	case *sema.Int16Type:
-		return ConvertInt16(value)
-	case *sema.Int32Type:
-		return ConvertInt32(value)
-	case *sema.Int64Type:
-		return ConvertInt64(value)
-	case *sema.UInt8Type:
-		return ConvertUInt8(value)
-	case *sema.UInt16Type:
-		return ConvertUInt16(value)
-	case *sema.UInt32Type:
-		return ConvertUInt32(value)
-	case *sema.UInt64Type:
-		return ConvertUInt64(value)
+
 	case *sema.AddressType:
 		return ConvertAddress(value)
+
+	// Int*
+	case *sema.Int8Type:
+		return ConvertInt8(value)
+
+	case *sema.Int16Type:
+		return ConvertInt16(value)
+
+	case *sema.Int32Type:
+		return ConvertInt32(value)
+
+	case *sema.Int64Type:
+		return ConvertInt64(value)
+
+	case *sema.Int128Type:
+		return ConvertInt128(value)
+
+	case *sema.Int256Type:
+		return ConvertInt256(value)
+
+	// UInt*
+	case *sema.UInt8Type:
+		return ConvertUInt8(value)
+
+	case *sema.UInt16Type:
+		return ConvertUInt16(value)
+
+	case *sema.UInt32Type:
+		return ConvertUInt32(value)
+
+	case *sema.UInt64Type:
+		return ConvertUInt64(value)
+
+	// Word*
+	case *sema.Word8Type:
+		return ConvertWord8(value)
+
+	case *sema.Word16Type:
+		return ConvertWord16(value)
+
+	case *sema.Word32Type:
+		return ConvertWord32(value)
+
+	case *sema.Word64Type:
+		return ConvertWord64(value)
+
 	default:
 		return value
 	}

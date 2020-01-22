@@ -6,12 +6,15 @@ import (
 
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/hash"
 )
 
 // A BlockContext is used to execute transactions in the context of a block.
 type BlockContext interface {
 	// ExecuteTransaction computes the result of a transaction.
 	ExecuteTransaction(ledger Ledger, tx *flow.TransactionBody) (*TransactionResult, error)
+	// ExecuteScript computes the result of a ready-only script.
+	ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error)
 }
 
 type blockContext struct {
@@ -31,6 +34,12 @@ func (bc *blockContext) newTransactionContext(ledger Ledger, tx *flow.Transactio
 	}
 }
 
+func (bc *blockContext) newScriptContext(ledger Ledger) *transactionContext {
+	return &transactionContext{
+		ledger: ledger,
+	}
+}
+
 // ExecuteTransaction computes the result of a transaction.
 //
 // Register updates are recorded in the provided ledger view. An error is returned
@@ -42,7 +51,7 @@ func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx *flow.TransactionBo
 
 	ctx := bc.newTransactionContext(ledger, tx)
 
-	err := bc.vm.rt.ExecuteTransaction(tx.Script, ctx, location)
+	err := bc.vm.executeTransaction(tx.Script, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts
@@ -59,5 +68,31 @@ func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx *flow.TransactionBo
 	return &TransactionResult{
 		TxID:  txID,
 		Error: nil,
+	}, nil
+}
+
+func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error) {
+	scriptHash := hash.DefaultHasher.ComputeHash(script)
+
+	location := runtime.ScriptLocation(scriptHash)
+
+	ctx := bc.newScriptContext(ledger)
+
+	value, err := bc.vm.executeScript(script, ctx, location)
+	if err != nil {
+		if errors.As(err, &runtime.Error{}) {
+			// runtime errors occur when the execution reverts
+			return &ScriptResult{
+				ScriptID: flow.HashToID(scriptHash),
+				Error:    err,
+			}, nil
+		}
+
+		return nil, fmt.Errorf("failed to execute script: %w", err)
+	}
+
+	return &ScriptResult{
+		ScriptID: flow.HashToID(scriptHash),
+		Value:    value,
 	}, nil
 }

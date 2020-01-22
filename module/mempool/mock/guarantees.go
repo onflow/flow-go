@@ -41,8 +41,8 @@ func (_m *Guarantees) All() []*flow.CollectionGuarantee {
 	return r0
 }
 
-// Get provides a mock function with given fields: collID
-func (_m *Guarantees) Get(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
+// ByID provides a mock function with given fields: collID
+func (_m *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
 	ret := _m.Called(collID)
 
 	var r0 *flow.CollectionGuarantee

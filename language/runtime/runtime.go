@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	"github.com/dapperlabs/flow-go/language/runtime/trampoline"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type Interface interface {
@@ -152,15 +151,15 @@ func (r *interpreterRuntime) interpret(
 }
 
 func (r *interpreterRuntime) newAccountValue(
-	address Address,
+	addressValue interpreter.AddressValue,
 	runtimeInterface Interface,
 	runtimeStorage *interpreterRuntimeStorage,
 ) *interpreter.CompositeValue {
 	return interpreter.NewAccountValue(
-		address,
-		r.newSetCodeFunction(address, runtimeInterface, runtimeStorage),
-		r.newAddPublicKeyFunction(address, runtimeInterface),
-		r.newRemovePublicKeyFunction(address, runtimeInterface),
+		addressValue,
+		r.newSetCodeFunction(addressValue, runtimeInterface, runtimeStorage),
+		r.newAddPublicKeyFunction(addressValue, runtimeInterface),
+		r.newRemovePublicKeyFunction(addressValue, runtimeInterface),
 	)
 }
 
@@ -215,7 +214,10 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	signingAccounts := make([]interface{}, signingAccountsCount)
 
 	for i, address := range signingAccountAddresses {
-		signingAccounts[i] = r.newAccountValue(address, runtimeInterface, runtimeStorage)
+		signingAccounts[i] = r.newAccountValue(
+			interpreter.NewAddressValue(address),
+			runtimeInterface, runtimeStorage,
+		)
 	}
 
 	_, err = r.interpret(
@@ -483,6 +485,8 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 			panic(err)
 		}
 
+		accountAddressValue := interpreter.NewAddressValue(accountAddress)
+
 		constructorArguments := invocation.Arguments[requiredArgumentCount:]
 		constructorArgumentTypes := invocation.ArgumentTypes[requiredArgumentCount:]
 
@@ -490,7 +494,7 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 			runtimeInterface,
 			runtimeStorage,
 			code,
-			accountAddress,
+			accountAddressValue,
 			constructorArguments,
 			constructorArgumentTypes,
 			false,
@@ -500,17 +504,17 @@ func (r *interpreterRuntime) newCreateAccountFunction(
 		r.emitAccountEvent(
 			stdlib.AccountCreatedEventType,
 			runtimeInterface,
-			[]Value{accountAddress},
+			[]Value{accountAddressValue},
 		)
 
-		account := r.newAccountValue(accountAddress, runtimeInterface, runtimeStorage)
+		account := r.newAccountValue(accountAddressValue, runtimeInterface, runtimeStorage)
 
 		return trampoline.Done{Result: account}
 	}
 }
 
 func (r *interpreterRuntime) newAddPublicKeyFunction(
-	address Address,
+	addressValue interpreter.AddressValue,
 	runtimeInterface Interface,
 ) interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
@@ -522,7 +526,7 @@ func (r *interpreterRuntime) newAddPublicKeyFunction(
 				panic(fmt.Sprintf("addPublicKey requires the first parameter to be an array"))
 			}
 
-			err = runtimeInterface.AddAccountKey(address, publicKey)
+			err = runtimeInterface.AddAccountKey(addressValue.ToAddress(), publicKey)
 			if err != nil {
 				panic(err)
 			}
@@ -530,7 +534,7 @@ func (r *interpreterRuntime) newAddPublicKeyFunction(
 			r.emitAccountEvent(
 				stdlib.AccountKeyAddedEventType,
 				runtimeInterface,
-				[]Value{address, publicKeyValue},
+				[]Value{addressValue, publicKeyValue},
 			)
 
 			result := interpreter.VoidValue{}
@@ -540,14 +544,14 @@ func (r *interpreterRuntime) newAddPublicKeyFunction(
 }
 
 func (r *interpreterRuntime) newRemovePublicKeyFunction(
-	address Address,
+	addressValue interpreter.AddressValue,
 	runtimeInterface Interface,
 ) interpreter.HostFunctionValue {
 	return interpreter.NewHostFunctionValue(
 		func(invocation interpreter.Invocation) trampoline.Trampoline {
 			index := invocation.Arguments[0].(interpreter.IntValue)
 
-			publicKey, err := runtimeInterface.RemoveAccountKey(address, index.IntValue())
+			publicKey, err := runtimeInterface.RemoveAccountKey(addressValue.ToAddress(), index.IntValue())
 			if err != nil {
 				panic(err)
 			}
@@ -557,7 +561,7 @@ func (r *interpreterRuntime) newRemovePublicKeyFunction(
 			r.emitAccountEvent(
 				stdlib.AccountKeyRemovedEventType,
 				runtimeInterface,
-				[]Value{address, publicKeyValue},
+				[]Value{addressValue, publicKeyValue},
 			)
 
 			result := interpreter.VoidValue{}
@@ -567,7 +571,7 @@ func (r *interpreterRuntime) newRemovePublicKeyFunction(
 }
 
 func (r *interpreterRuntime) newSetCodeFunction(
-	accountAddress Address,
+	addressValue interpreter.AddressValue,
 	runtimeInterface Interface,
 	runtimeStorage *interpreterRuntimeStorage,
 ) interpreter.HostFunctionValue {
@@ -587,7 +591,7 @@ func (r *interpreterRuntime) newSetCodeFunction(
 				runtimeInterface,
 				runtimeStorage,
 				code,
-				accountAddress,
+				addressValue,
 				constructorArguments,
 				constructorArgumentTypes,
 				true,
@@ -599,7 +603,7 @@ func (r *interpreterRuntime) newSetCodeFunction(
 			r.emitAccountEvent(
 				stdlib.AccountCodeUpdatedEventType,
 				runtimeInterface,
-				[]Value{accountAddress, codeValue},
+				[]Value{addressValue, codeValue},
 			)
 
 			result := interpreter.VoidValue{}
@@ -612,13 +616,13 @@ func (r *interpreterRuntime) updateAccountCode(
 	runtimeInterface Interface,
 	runtimeStorage *interpreterRuntimeStorage,
 	code []byte,
-	accountAddress Address,
+	addressValue interpreter.AddressValue,
 	constructorArguments []interpreter.Value,
 	constructorArgumentTypes []sema.Type,
 	checkPermission bool,
 	invocationPosition ast.Position,
 ) {
-	location := AddressLocation(accountAddress[:])
+	location := AddressLocation(addressValue[:])
 
 	functions := r.standardLibraryFunctions(runtimeInterface, runtimeStorage)
 	checker, err := r.parseAndCheckProgram(
@@ -672,24 +676,24 @@ func (r *interpreterRuntime) updateAccountCode(
 		contractValue = interpreter.NewSomeValueOwningNonCopying(contract)
 	}
 
-	contractValue.SetOwner(accountAddress.Hex())
+	contractValue.SetOwner(addressValue.Hex())
 
 	// NOTE: only update account code if contract instantiation succeeded
 
-	err = runtimeInterface.UpdateAccountCode(accountAddress, code, checkPermission)
+	err = runtimeInterface.UpdateAccountCode(addressValue.ToAddress(), code, checkPermission)
 	if err != nil {
 		panic(err)
 	}
 
-	r.writeContract(runtimeStorage, accountAddress, contractValue)
+	r.writeContract(runtimeStorage, addressValue, contractValue)
 }
 
 func (r *interpreterRuntime) writeContract(
 	runtimeStorage *interpreterRuntimeStorage,
-	accountAddress Address,
+	addressValue interpreter.AddressValue,
 	contractValue interpreter.OptionalValue,
 ) {
-	addressHex := flow.BytesToAddress(accountAddress[:]).Hex()
+	addressHex := addressValue.Hex()
 	runtimeStorage.writeValue(
 		addressHex,
 		contractKey,

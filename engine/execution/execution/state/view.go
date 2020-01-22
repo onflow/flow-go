@@ -8,7 +8,9 @@ type GetRegisterFunc func(key string) ([]byte, error)
 // A ledger view records writes to a delta that can be used to update the
 // underlying data source.
 type View struct {
-	delta    Delta
+	delta Delta
+	// TODO: store reads as set
+	reads    []string
 	readFunc GetRegisterFunc
 }
 
@@ -16,6 +18,7 @@ type View struct {
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
 		delta:    NewDelta(),
+		reads:    make([]string, 0),
 		readFunc: readFunc,
 	}
 }
@@ -39,6 +42,9 @@ func (r *View) Get(key string) ([]byte, error) {
 		return nil, err
 	}
 
+	// record read
+	r.reads = append(r.reads, key)
+
 	return value, nil
 }
 
@@ -60,4 +66,9 @@ func (r *View) Delta() Delta {
 // ApplyDelta applies the changes from a delta to this view.
 func (r *View) ApplyDelta(delta Delta) {
 	r.delta.MergeWith(delta)
+}
+
+// Reads returns the register IDs read by this view.
+func (r *View) Reads() []string {
+	return r.reads
 }
