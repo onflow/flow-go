@@ -28,9 +28,9 @@ func ExpectPanic(expectedMsg string, t *testing.T) {
 	t.Errorf("Expected to panic with `%s`, but did not panic", expectedMsg)
 }
 
-// ReturnsBefore returns true if the given function returns within the given
-// duration, or false otherwise.
-func ReturnsBefore(f func(), duration time.Duration) bool {
+// AssertReturnsBefore asserts that the given function returns before the
+// duration expires.
+func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 	done := make(chan struct{})
 
 	go func() {
@@ -40,9 +40,10 @@ func ReturnsBefore(f func(), duration time.Duration) bool {
 
 	select {
 	case <-time.After(duration):
-		return false
+		t.Log("function did not return in time")
+		t.Fail()
 	case <-done:
-		return true
+		return
 	}
 }
 

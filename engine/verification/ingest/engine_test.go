@@ -535,9 +535,9 @@ func testConcurrency(t *testing.T, erCount, senderCount int) {
 	}
 
 	// wait for all ERs to be sent to VER
-	assert.True(t, unittest.ReturnsBefore(senderWG.Wait, time.Second*5))
+	unittest.AssertReturnsBefore(t, senderWG.Wait, time.Second)
 	verNet.FlushAll()
-	assert.True(t, unittest.ReturnsBefore(verifierEngWG.Wait, time.Second*5))
+	unittest.AssertReturnsBefore(t, verifierEngWG.Wait, time.Second)
 	verNet.FlushAll()
 }
 
