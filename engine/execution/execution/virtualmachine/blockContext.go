@@ -51,7 +51,7 @@ func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx *flow.TransactionBo
 
 	ctx := bc.newTransactionContext(ledger, tx)
 
-	err := bc.vm.rt.ExecuteTransaction(tx.Script, ctx, location)
+	err := bc.vm.executeTransaction(tx.Script, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts
@@ -78,7 +78,7 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 
 	ctx := bc.newScriptContext(ledger)
 
-	value, err := bc.vm.rt.ExecuteScript(script, ctx, location)
+	value, err := bc.vm.executeScript(script, ctx, location)
 	if err != nil {
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts
