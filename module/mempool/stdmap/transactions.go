@@ -44,7 +44,7 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.Transaction, error) {
 // Rem removes the transaction with the given ID from the mempool,
 // and finishes the tracing span if one exists
 func (t *Transactions) Rem(txID flow.Identifier) bool {
-	entity, err := t.Backend.Get(txID)
+	entity, err := t.Backend.ByID(txID)
 	if err != nil {
 		return false
 	}
