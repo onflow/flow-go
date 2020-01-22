@@ -1447,25 +1447,37 @@ type Parameter struct {
 	TypeAnnotation *TypeAnnotation
 }
 
-func (t *Parameter) String() string {
-	if t.Label != "" {
+func (p *Parameter) String() string {
+	if p.Label != "" {
 		return fmt.Sprintf(
 			"%s %s: %s",
-			t.Label,
-			t.Identifier,
-			t.TypeAnnotation.String(),
+			p.Label,
+			p.Identifier,
+			p.TypeAnnotation.String(),
 		)
 	}
 
-	if t.Identifier != "" {
+	if p.Identifier != "" {
 		return fmt.Sprintf(
 			"%s: %s",
-			t.Identifier,
-			t.TypeAnnotation.String(),
+			p.Identifier,
+			p.TypeAnnotation.String(),
 		)
 	}
 
-	return t.TypeAnnotation.String()
+	return p.TypeAnnotation.String()
+}
+
+// EffectiveArgumentLabel returns the effective argument label that
+// an argument in a call must use:
+// If no argument label is declared for parameter,
+// the parameter name is used as the argument label
+//
+func (p *Parameter) EffectiveArgumentLabel() string {
+	if p.Label != "" {
+		return p.Label
+	}
+	return p.Identifier
 }
 
 // FunctionType
@@ -1545,6 +1557,24 @@ func (t *FunctionType) Equal(other Type) bool {
 	}
 
 	return t.ReturnTypeAnnotation.Equal(otherFunction.ReturnTypeAnnotation)
+}
+
+// NOTE: argument labels *are* considered! parameter names are intentionally *not* considered!
+func (t *FunctionType) EqualIncludingArgumentLabels(other Type) bool {
+	if !t.Equal(other) {
+		return false
+	}
+
+	otherFunction := other.(*FunctionType)
+
+	for i, parameter := range t.Parameters {
+		otherParameter := otherFunction.Parameters[i]
+		if parameter.EffectiveArgumentLabel() != otherParameter.EffectiveArgumentLabel() {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (*FunctionType) IsResourceType() bool {

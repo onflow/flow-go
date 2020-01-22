@@ -77,7 +77,7 @@ func (checker *Checker) declareFunctionDeclaration(
 	declaration *ast.FunctionDeclaration,
 	functionType *FunctionType,
 ) {
-	argumentLabels := declaration.ParameterList.ArgumentLabels()
+	argumentLabels := declaration.ParameterList.EffectiveArgumentLabels()
 
 	variable, err := checker.valueActivations.Declare(
 		declaration.Identifier.Identifier,
