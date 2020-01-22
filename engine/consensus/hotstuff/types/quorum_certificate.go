@@ -5,4 +5,3 @@ type QuorumCertificate struct {
 	BlockMRH            []byte
 	AggregatedSignature *AggregatedSignature
 }
-

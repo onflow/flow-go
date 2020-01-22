@@ -4,6 +4,7 @@ package libp2p
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 
 	"github.com/libp2p/go-libp2p"
@@ -50,7 +51,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	defer p.Unlock()
 	p.name = n.Name
 	p.logger = logger
-	addr := getLocationMultiaddrString(n)
+	addr := multiaddressStr(n)
 	sourceMultiAddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
 		return err
@@ -132,19 +133,38 @@ func (p *P2PNode) AddPeers(ctx context.Context, peers ...NodeAddress) error {
 	return nil
 }
 
-// CreateStream adds node n as a peer and creates a new stream with it
+// CreateStream returns an existing stream connected to n if it exists or adds node n as a peer and creates a new stream with it
 func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stream, error) {
-
-	// Add node address as a peer
-	err := p.AddPeers(ctx, n)
-	if err != nil {
-		return nil, err
-	}
 
 	// Get the PeerID
 	peerID, err := GetPeerID(n.Name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get peer ID: %w", err)
+	}
+
+	stream, found := FindOutboundStream(p.libP2PHost, peerID, FlowLibP2PProtocolID)
+
+	// if existing stream found return it
+	if found {
+		var sDir, cDir string
+		if sDir, found = DirectionToString(stream.Stat().Direction); !found {
+			sDir = "not defined"
+		}
+		if cDir, found = DirectionToString(stream.Conn().Stat().Direction); !found {
+			cDir = "not defined"
+		}
+
+		p.logger.Debug().Str("protocol", string(stream.Protocol())).
+			Str("stream_direction", sDir).
+			Str("connection_direction", cDir).
+			Msg("found existing stream")
+		return stream, nil
+	}
+
+	// Add node address as a peer
+	err = p.AddPeers(ctx, n)
+	if err != nil {
+		return nil, fmt.Errorf("could not add peer: %w", err)
 	}
 
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
@@ -158,7 +178,7 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 // An MD5 hash of such of the node Name is used as a seed to a deterministic crypto algorithm to generate the
 // public key from which libp2p derives the node id
 func GetPeerInfo(p NodeAddress) (peer.AddrInfo, error) {
-	addr := getLocationMultiaddrString(p)
+	addr := multiaddressStr(p)
 	maddr, err := multiaddr.NewMultiaddr(addr)
 	if err != nil {
 		return peer.AddrInfo{}, err
@@ -264,7 +284,18 @@ func (p *P2PNode) Publish(ctx context.Context, t FlowTopic, data []byte) error {
 	return ps.Publish(ctx, data)
 }
 
-// GetLocationMultiaddr returns a Multiaddress string (https://docs.libp2p.io/concepts/addressing/) given a node address
-func getLocationMultiaddrString(id NodeAddress) string {
-	return fmt.Sprintf("/ip4/%s/tcp/%s", id.IP, id.Port)
+// multiaddressStr receives a node address and returns
+// its corresponding Libp2p Multiaddress in string format
+// in current implementation IP part of the node address is
+// either an IP or a dns4
+// https://docs.libp2p.io/concepts/addressing/
+func multiaddressStr(address NodeAddress) string {
+	parsedIP := net.ParseIP(address.IP)
+	if parsedIP != nil {
+		// returns parsed ip version of the multi-address
+		return fmt.Sprintf("/ip4/%s/tcp/%s", address.IP, address.Port)
+	}
+	// could not parse it as an IP address and returns the dns version of the
+	// multi-address
+	return fmt.Sprintf("/dns4/%s/tcp/%s", address.IP, address.Port)
 }
