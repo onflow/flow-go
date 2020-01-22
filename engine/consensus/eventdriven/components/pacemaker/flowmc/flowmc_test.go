@@ -11,22 +11,19 @@ import (
 )
 
 type MockEventProcessor struct {
-
 }
 
-func (m *MockEventProcessor) OnForkChoiceTrigger(uint64) { }
+func (m *MockEventProcessor) OnForkChoiceTrigger(uint64) {}
 func (m *MockEventProcessor) OnEnteringView(v uint64) {
 	fmt.Println(v)
 
 }
-func (m *MockEventProcessor) OnPassiveTillView(uint64) { }
-func (m *MockEventProcessor) OnWaitingForBlockTimeout(uint64) { }
-func (m *MockEventProcessor) OnWaitingForVotesTimeout(uint64) { }
-
-
+func (m *MockEventProcessor) OnPassiveTillView(uint64)        {}
+func (m *MockEventProcessor) OnWaitingForBlockTimeout(uint64) {}
+func (m *MockEventProcessor) OnWaitingForVotesTimeout(uint64) {}
 
 func initPaceMaker(view uint64) (*FlowMC, *mockproc.Processor) {
-	committee := []primary.ID {"Replica0", "Replica1", "Me", "Replica3", "Replica4"}
+	committee := []primary.ID{"Replica0", "Replica1", "Me", "Replica3", "Replica4"}
 	primarySelector := primary.NewRoundRobinSelector(committee)
 	eventProc := &mockproc.Processor{}
 	pm := New("Me", view, primarySelector, eventProc)
@@ -34,9 +31,8 @@ func initPaceMaker(view uint64) (*FlowMC, *mockproc.Processor) {
 }
 
 func qc(view uint64) *def.QuorumCertificate {
-	return &def.QuorumCertificate{View:view}
+	return &def.QuorumCertificate{View: view}
 }
-
 
 // Test_SkipViewThroughQC tests that PaceMaker skips View when receiving QC with larger View Number
 func Test_SkipViewThroughQC(t *testing.T) {
@@ -65,8 +61,8 @@ func Test_SkipViewThroughBlock(t *testing.T) {
 
 	// fill events in channels and specify expected Mock calls
 	pm.OnBlockIncorporated(&def.Block{
-		View:       13,
-		QC:         qc(5),
+		View: 13,
+		QC:   qc(5),
 	})
 	eventProc.On("OnEnteringView", uint64(3)).Return().Once()
 	eventProc.On("OnPassiveTillView", uint64(5)).Return().Once()
@@ -85,8 +81,8 @@ func Test_SkipViewAndProcessBlock(t *testing.T) {
 
 	// fill events in channels and specify expected Mock calls
 	pm.OnBlockIncorporated(&def.Block{
-		View:       13,
-		QC:         qc(12),
+		View: 13,
+		QC:   qc(12),
 	})
 	eventProc.On("OnEnteringView", uint64(3)).Return().Once()
 	eventProc.On("OnPassiveTillView", uint64(12)).Return().Once()
@@ -102,8 +98,8 @@ func Test_IgnoreOldBlocks(t *testing.T) {
 
 	// fill events in channels and specify expected Mock calls
 	pm.OnBlockIncorporated(&def.Block{
-		View:       2,
-		QC:         qc(1),
+		View: 2,
+		QC:   qc(1),
 	})
 	eventProc.On("OnEnteringView", uint64(3)).Return().Once()
 	eventProc.On("OnWaitingForBlockTimeout", uint64(3)).Return().Once()
@@ -119,15 +115,15 @@ func Test_IgnoreBlockDuplicates(t *testing.T) {
 
 	go func() {
 		cycleTime := int64(pm.timeout.replicaTimeout * pm.timeout.voteAggregationTimeoutFraction / 20) // we expect 20 cycles of time cycleTime before OnWaitingForVotesTimeout should be triggered
-		for i := 0 ; i <= 40; i++ {
+		for i := 0; i <= 40; i++ {
 			pm.OnBlockIncorporated(&def.Block{
-				View:       2,
-				QC:         qc(1),
+				View: 2,
+				QC:   qc(1),
 			})
 
 			// time.Duration expects an int64 as input which specifies the duration in units of nanoseconds (1E-9)
-			time.Sleep(time.Duration(cycleTime * 1E6))
-			if (pm.CurrentView() > 2) {
+			time.Sleep(time.Duration(cycleTime * 1e6))
+			if pm.CurrentView() > 2 {
 				break
 			}
 		}

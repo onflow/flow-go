@@ -181,7 +181,7 @@ func (m *Middleware) createOutboundMessage(msg interface{}) (*Message, error) {
 		}
 		return message, nil
 	default:
-		err := errors.Errorf("invalid message type (%T)", msg)
+		err := errors.Errorf("middleware received invalid message type (%T)", msg)
 		return nil, err
 	}
 }

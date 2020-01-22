@@ -138,7 +138,7 @@ func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
 	case *networkmodel.NetworkMessage:
 		err = n.processNetworkMessage(nodeID, m)
 	default:
-		err = fmt.Errorf("invalid message type (%T)", m)
+		err = fmt.Errorf("network received invalid message type (%T)", m)
 	}
 	if err != nil {
 		err = fmt.Errorf("could not process message: %w", err)
@@ -152,7 +152,7 @@ func (n *Network) processNetworkMessage(nodeID flow.Identifier, message *network
 	en, found := n.engines[message.ChannelID]
 	if !found {
 		n.logger.Debug().Str("sender", nodeID.String()).
-			Uint8("channel", uint8(message.ChannelID)).
+			Uint8("engine", uint8(message.ChannelID)).
 			Msg(" dropping message since no engine to receive it was found")
 		return fmt.Errorf("could not find the engine: %d", message.ChannelID)
 	}
@@ -234,6 +234,11 @@ func (n *Network) send(msg interface{}, nodeIDs ...flow.Identifier) error {
 	// send the message through the peer connection
 	var result *multierror.Error
 	for _, nodeID := range nodeIDs {
+		if nodeID == n.me.NodeID() {
+			// to avoid self dial by the underlay
+			n.logger.Debug().Msg("self dial attempt")
+			continue
+		}
 		err := n.mw.Send(nodeID, msg)
 		if err != nil {
 			result = multierror.Append(result, err)
