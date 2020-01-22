@@ -210,12 +210,65 @@ func (checker *Checker) visitMember(expression *ast.MemberExpression) (member *M
 	return member, isOptional
 }
 
+// isReadableMember returns true if the given member can be read from
+// in the current location of the checker
+//
 func (checker *Checker) isReadableMember(member *Member) bool {
-	return checker.isReadableAccess(member.Access) ||
-		checker.containerTypes[member.ContainerType]
+	if checker.isReadableAccess(member.Access) ||
+		checker.containerTypes[member.ContainerType] {
+
+		return true
+	}
+
+	switch member.Access {
+	case ast.AccessContract:
+		// If the member allows access from the containing contract,
+		// check if the current location is contained in the member's contract
+
+		contractType := containingContractKindedType(member.ContainerType)
+		if checker.containerTypes[contractType] {
+			return true
+		}
+
+	case ast.AccessAccount:
+		// If the member allows access from the containing account,
+		// check if the current location is the same as the member's container location
+
+		location := member.ContainerType.(LocatedType).GetLocation()
+		if ast.LocationsMatch(checker.Location, location) {
+			return true
+		}
+	}
+
+	return false
 }
 
+// isWriteableMember returns true if the given member can be written to
+// in the current location of the checker
+//
 func (checker *Checker) isWriteableMember(member *Member) bool {
 	return checker.isWriteableAccess(member.Access) ||
 		checker.containerTypes[member.ContainerType]
+}
+
+// containingContractKindedType returns the containing contract-kinded type
+// of the given type, if any.
+//
+// The given type itself might be the result.
+//
+func containingContractKindedType(t Type) Type {
+	for {
+		if compositeKindedType, ok := t.(CompositeKindedType); ok &&
+			compositeKindedType.GetCompositeKind() == common.CompositeKindContract {
+
+			return t
+		}
+
+		if containedType, ok := t.(ContainedType); ok {
+			t = containedType.GetContainerType()
+			continue
+		}
+
+		return nil
+	}
 }

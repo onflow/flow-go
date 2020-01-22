@@ -1838,3 +1838,183 @@ func TestCheckContractNestedDeclarationPrivateAccess(t *testing.T) {
 		assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
 	})
 }
+
+func TestCheckAccessSameContractInnerStructField(t *testing.T) {
+
+	tests := map[ast.Access]bool{
+		ast.AccessPrivate:  false,
+		ast.AccessContract: true,
+		ast.AccessAccount:  true,
+	}
+
+	for access, expectSuccess := range tests {
+
+		t.Run(access.Keyword(), func(t *testing.T) {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+	                  contract A {
+
+                          struct B {
+                              %s let field: Int
+
+                              init() {
+                                  self.field = 42
+                              }
+                          }
+
+                          fun useB() {
+                              let b = A.B()
+                              b.field
+                          }
+                      }
+	                `,
+					access.Keyword(),
+				),
+			)
+
+			if expectSuccess {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestCheckAccessSameContractInnerStructInterfaceField(t *testing.T) {
+
+	tests := map[ast.Access]bool{
+		ast.AccessPrivate:  false,
+		ast.AccessContract: true,
+		ast.AccessAccount:  true,
+	}
+
+	for access, expectSuccess := range tests {
+
+		t.Run(access.Keyword(), func(t *testing.T) {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+	                  contract A {
+
+                          struct interface B {
+                              %[1]s let field: Int
+                          }
+
+                          struct BImpl: B {
+                              %[1]s let field: Int
+
+                              init() {
+                                  self.field = 42
+                              }
+                          }
+
+                          fun useB() {
+                              let b: B = A.BImpl()
+                              b.field
+                          }
+                      }
+	                `,
+					access.Keyword(),
+				),
+			)
+
+			if expectSuccess {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestCheckAccessOtherContractInnerStructField(t *testing.T) {
+
+	tests := map[ast.Access]bool{
+		ast.AccessPrivate:  false,
+		ast.AccessContract: false,
+		ast.AccessAccount:  true,
+	}
+
+	for access, expectSuccess := range tests {
+
+		t.Run(access.Keyword(), func(t *testing.T) {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+	                  contract A {
+
+                          struct B {
+                              %s let field: Int
+
+                              init() {
+                                  self.field = 42
+                              }
+                          }
+                      }
+
+                      contract C {
+                          fun useB() {
+                              let b = A.B()
+                              b.field
+                          }
+                      }
+	                `,
+					access.Keyword(),
+				),
+			)
+
+			if expectSuccess {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestCheckAccessOtherContractInnerStructInterfaceField(t *testing.T) {
+
+	tests := map[ast.Access]bool{
+		ast.AccessPrivate:  false,
+		ast.AccessContract: false,
+		ast.AccessAccount:  true,
+	}
+
+	for access, expectSuccess := range tests {
+
+		t.Run(access.Keyword(), func(t *testing.T) {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+	                  contract A {
+
+                          struct interface B {
+                              %[1]s let field: Int
+                          }
+
+                          struct BImpl: B {
+                              %[1]s let field: Int
+
+                              init() {
+                                  self.field = 42
+                              }
+                          }
+                      }
+
+                      contract C {
+                          fun useB() {
+                              let b: A.B = A.BImpl()
+                              b.field
+                          }
+                      }
+	                `,
+					access.Keyword(),
+				),
+			)
+
+			if expectSuccess {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}

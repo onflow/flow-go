@@ -1180,8 +1180,9 @@ func (checker *Checker) checkDeclarationAccessModifier(
 		switch access {
 		case ast.AccessPublicSettable:
 			// Public settable access for a constant is not sensible
+			// and type declarations must be public for now
 
-			if isConstant {
+			if isConstant || isTypeDeclaration {
 				checker.report(
 					&InvalidAccessModifierError{
 						Access:          access,
@@ -1192,10 +1193,25 @@ func (checker *Checker) checkDeclarationAccessModifier(
 			}
 
 		case ast.AccessPrivate:
-			// Type declarations cannot be private for now
+			// Type declarations must be public for now
 
 			if isTypeDeclaration {
 
+				checker.report(
+					&InvalidAccessModifierError{
+						Access:          access,
+						DeclarationKind: declarationKind,
+						Pos:             startPos,
+					},
+				)
+			}
+
+		case ast.AccessContract,
+			ast.AccessAccount:
+
+			// Type declarations must be public for now
+
+			if isTypeDeclaration {
 				checker.report(
 					&InvalidAccessModifierError{
 						Access:          access,
@@ -1367,13 +1383,9 @@ func (checker *Checker) checkVariableMove(expression ast.Expression) {
 	case *TransactionType:
 		reportInvalidMove(common.DeclarationKindTransaction)
 
-	case *CompositeType:
-		if ty.Kind == common.CompositeKindContract {
-			reportInvalidMove(common.DeclarationKindContract)
-		}
-
-	case *InterfaceType:
-		if ty.CompositeKind == common.CompositeKindContract {
+	case CompositeKindedType:
+		kind := ty.GetCompositeKind()
+		if kind == common.CompositeKindContract {
 			reportInvalidMove(common.DeclarationKindContract)
 		}
 	}
