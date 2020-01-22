@@ -136,7 +136,7 @@ func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
 		return ast.AccessPrivate
 
 	case ctx.All() != nil:
-		return ast.AccessPrivate
+		return ast.AccessPublic
 
 	case ctx.Contract() != nil:
 		return ast.AccessContract

@@ -1845,6 +1845,7 @@ func TestCheckAccessSameContractInnerStructField(t *testing.T) {
 		ast.AccessPrivate:  false,
 		ast.AccessContract: true,
 		ast.AccessAccount:  true,
+		ast.AccessPublic:   true,
 	}
 
 	for access, expectSuccess := range tests {
@@ -1887,6 +1888,7 @@ func TestCheckAccessSameContractInnerStructInterfaceField(t *testing.T) {
 		ast.AccessPrivate:  false,
 		ast.AccessContract: true,
 		ast.AccessAccount:  true,
+		ast.AccessPublic:   true,
 	}
 
 	for access, expectSuccess := range tests {
@@ -1933,6 +1935,7 @@ func TestCheckAccessOtherContractInnerStructField(t *testing.T) {
 		ast.AccessPrivate:  false,
 		ast.AccessContract: false,
 		ast.AccessAccount:  true,
+		ast.AccessPublic:   true,
 	}
 
 	for access, expectSuccess := range tests {
@@ -1977,6 +1980,7 @@ func TestCheckAccessOtherContractInnerStructInterfaceField(t *testing.T) {
 		ast.AccessPrivate:  false,
 		ast.AccessContract: false,
 		ast.AccessAccount:  true,
+		ast.AccessPublic:   true,
 	}
 
 	for access, expectSuccess := range tests {
