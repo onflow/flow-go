@@ -40,7 +40,7 @@ func TestSubmitCollectionGuarantee(t *testing.T) {
 		// flush messages from the collection node
 		net, ok := hub.GetNetwork(collNode.Me.NodeID())
 		require.True(t, ok)
-		net.FlushAll()
+		net.DeliverAllRecursive()
 
 		assert.Eventually(t, func() bool {
 			has := consNode.Guarantees.Has(guarantee.ID())
@@ -86,12 +86,12 @@ func TestCollectionRequest(t *testing.T) {
 		// flush the request
 		net, ok := hub.GetNetwork(requesterID.NodeID)
 		require.True(t, ok)
-		net.FlushAll()
+		net.DeliverAllRecursive()
 
 		// flush the response
 		net, ok = hub.GetNetwork(collID.NodeID)
 		require.True(t, ok)
-		net.FlushAll()
+		net.DeliverAllRecursive()
 
 		//assert we received the right collection
 		requesterEngine.AssertExpectations(t)

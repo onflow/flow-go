@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -34,6 +35,8 @@ type Engine struct {
 	blocks             mempool.Blocks
 	collections        mempool.Collections
 	chunkStates        mempool.ChunkStates
+	// protects the checkPendingReceipts method to prevent double-verifying
+	checkReceiptsMu sync.Mutex
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -449,8 +452,12 @@ func (e *Engine) getCollectionsForReceipt(block *flow.Block, receipt *flow.Execu
 
 // checkPendingReceipts checks all pending receipts in the mempool and verifies
 // any that are ready for verification.
+//
+// NOTE: this method is protected by mutex to prevent double-verifying ERs.
 func (e *Engine) checkPendingReceipts() {
-	// TODO address race on this method - if called simultaneously, could double-verify
+	e.checkReceiptsMu.Lock()
+	defer e.checkReceiptsMu.Unlock()
+
 	receipts := e.receipts.All()
 
 	for _, receipt := range receipts {
@@ -483,8 +490,15 @@ func (e *Engine) checkPendingReceipts() {
 				continue
 			}
 
-			// if the receipt was verified, remove it from the mempool
+			// if the receipt was verified, remove it and associated resources from the mempool
 			e.receipts.Rem(receipt.ID())
+			e.blocks.Rem(block.ID())
+			for _, coll := range collections {
+				e.collections.Rem(coll.ID())
+			}
+			for _, chunkState := range chunkStates {
+				e.chunkStates.Rem(chunkState.ID())
+			}
 		}
 	}
 }
