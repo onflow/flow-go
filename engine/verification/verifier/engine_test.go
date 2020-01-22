@@ -206,7 +206,7 @@ func TestHappyPath(t *testing.T) {
 	})
 
 	// flush the result approval broadcast
-	verNet.FlushAll()
+	verNet.DeliverAllRecursive()
 
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)

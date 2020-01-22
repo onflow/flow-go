@@ -88,20 +88,20 @@ func (mn *Network) buffer(from flow.Identifier, channelID uint8, event interface
 	mn.hub.Buffer.Save(from, channelID, event, targetIDs)
 }
 
-// FlushAll sends all pending messages to the receivers. The receivers might
-// be triggered to forward messages to its peers, so this function will block
-// until all receivers have done their forwarding.
-func (mn *Network) FlushAll() {
+// DeliverAllRecursive sends all pending messages to the receivers. The receivers
+// might be triggered to forward messages to its peers, so this function will
+// block until all receivers have done their forwarding.
+func (mn *Network) DeliverAllRecursive() {
 	mn.hub.Buffer.Flush(func(m *PendingMessage) {
 		_ = mn.sendToAllTargets(m)
 	})
 }
 
-// FlushAllExcept flushes all pending messages in the buffer except those that
-// satisfy the shouldDrop predicate function. All messages that satisfy the
-// shouldDrop predicate are permanently dropped. This function will block
-// until all receivers have done their forwarding.
-func (mn *Network) FlushAllExcept(shouldDrop func(*PendingMessage) bool) {
+// DeliverAllRecursiveExcept flushes all pending messages in the buffer except
+// those that satisfy the shouldDrop predicate function. All messages that
+// satisfy the shouldDrop predicate are permanently dropped. This function will
+// block until all receivers have done their forwarding.
+func (mn *Network) DeliverAllRecursiveExcept(shouldDrop func(*PendingMessage) bool) {
 	mn.hub.Buffer.Flush(func(m *PendingMessage) {
 		if shouldDrop(m) {
 			return
