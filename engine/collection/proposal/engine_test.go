@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -55,7 +56,7 @@ func WithEngine(t *testing.T, run func(testcontext, *Engine)) {
 	ctx.collections = new(storage.Collections)
 	ctx.guarantees = new(storage.Guarantees)
 
-	e, err := New(log, conf, ctx.net, ctx.me, ctx.state, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees)
+	e, err := New(log, conf, ctx.net, ctx.me, ctx.state, &opentracing.NoopTracer{}, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees)
 	require.NoError(t, err)
 
 	run(ctx, e)

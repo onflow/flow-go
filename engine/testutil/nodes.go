@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -66,7 +67,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis
 
 	collections := storage.NewCollections(node.DB)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Me, pool)
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, &opentracing.NoopTracer{}, node.Me, pool)
 	require.Nil(t, err)
 
 	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Me, collections)
