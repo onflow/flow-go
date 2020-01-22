@@ -27,7 +27,7 @@ func initTimeoutController(t *testing.T) *Controller {
 func Test_TimeoutInitialization(t *testing.T) {
 	tc := initTimeoutController(t)
 	assert.Equal(t, tc.ReplicaTimeout().Milliseconds(), int64(startRepTimeout))
-	assert.Equal(t, tc.VoteCollectionTimeout().Milliseconds(), int64(startRepTimeout*voteTimeoutFraction))
+	assert.Equal(t, tc.VoteCollectionTimeoutTimeout().Milliseconds(), int64(startRepTimeout*voteTimeoutFraction))
 }
 
 // Test_TimeoutIncrease verifies that timeout increases exponentially
@@ -41,7 +41,7 @@ func Test_TimeoutIncrease(t *testing.T) {
 			int64(startRepTimeout*math.Pow(multiplicateiveIncrease, float64(i))),
 		)
 		assert.Equal(t,
-			tc.VoteCollectionTimeout().Milliseconds(),
+			tc.VoteCollectionTimeoutTimeout().Milliseconds(),
 			int64(startRepTimeout*voteTimeoutFraction*math.Pow(multiplicateiveIncrease, float64(i))),
 		)
 	}
@@ -62,7 +62,7 @@ func Test_TimeoutDecrease(t *testing.T) {
 			int64(repTimeout-float64(i)*additiveDecrease),
 		)
 		assert.Equal(t,
-			tc.VoteCollectionTimeout().Milliseconds(),
+			tc.VoteCollectionTimeoutTimeout().Milliseconds(),
 			int64((repTimeout-float64(i)*additiveDecrease)*voteTimeoutFraction),
 		)
 	}
@@ -78,7 +78,7 @@ func Test_MinCutoff(t *testing.T) {
 
 	tc.OnProgressBeforeTimeout()
 	assert.Equal(t, tc.ReplicaTimeout().Milliseconds(), int64(minRepTimeout))
-	assert.Equal(t, tc.VoteCollectionTimeout().Milliseconds(), int64(minRepTimeout*voteTimeoutFraction))
+	assert.Equal(t, tc.VoteCollectionTimeoutTimeout().Milliseconds(), int64(minRepTimeout*voteTimeoutFraction))
 }
 
 // Test_MinCutoff verifies that timeout does not decrease below minRepTimeout
@@ -93,6 +93,6 @@ func Test_MaxCutoff(t *testing.T) {
 	for i := 1; i <= 50; i += 1 {
 		tc.OnTimeout() // after already 7 iterations we should have reached the max value
 		assert.True(t, float64(tc.ReplicaTimeout().Milliseconds()) <= timeoutCap)
-		assert.True(t, float64(tc.VoteCollectionTimeout().Milliseconds()) <= timeoutCap*voteTimeoutFraction)
+		assert.True(t, float64(tc.VoteCollectionTimeoutTimeout().Milliseconds()) <= timeoutCap*voteTimeoutFraction)
 	}
 }

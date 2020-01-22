@@ -37,7 +37,7 @@ func (p *FlowMC) gotoView(newView uint64) {
 	}
 	p.currentView = newView
 	p.notifier.OnStartingBlockTimeout(newView)
-	p.timeoutControl.StartTimeout(timeout.ReplicaTimeout)
+	p.timeoutControl.StartTimeout(types.ReplicaTimeout)
 }
 
 // CurView returns the current view
@@ -70,8 +70,8 @@ func (p *FlowMC) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForN
 	}
 	// block is for current view
 
-	if p.timeoutControl.Mode() != timeout.ReplicaTimeout {
-		// i.e. we are already on timeout.VoteCollection.
+	if p.timeoutControl.Mode() != types.ReplicaTimeout {
+		// i.e. we are already on timeout.VoteCollectionTimeout.
 		// This edge case can occur as follows:
 		// * we previously already have processed a block for the current view
 		//   and started the vote collection phase
@@ -90,7 +90,7 @@ func (p *FlowMC) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForN
 
 func (p *FlowMC) processBlockForCurView(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
 	if isLeaderForNextView {
-		p.timeoutControl.StartTimeout(timeout.VoteCollection)
+		p.timeoutControl.StartTimeout(types.VoteCollectionTimeout)
 		p.notifier.OnStartingVotesTimeout(p.currentView)
 		return nil, false
 	}
@@ -100,20 +100,35 @@ func (p *FlowMC) processBlockForCurView(block *types.BlockProposal, isLeaderForN
 	return &types.NewViewEvent{View: newView}, true
 }
 
-func (p *FlowMC) OnTimeout() (*types.NewViewEvent, bool) {
-	// block is for current view
+func (p *FlowMC) OnTimeout(timeout *types.Timeout) (*types.NewViewEvent, error) {
+	if err := p.ensureMatchingTimeout(timeout); err != nil {
+		return nil, err
+	}
+
+	// timeout is for current condition
+	p.emitTimeoutNotifications()
+	newView := p.currentView + 1
+	p.gotoView(newView)
+	return &types.NewViewEvent{View: newView}, nil
+}
+
+func (p *FlowMC) ensureMatchingTimeout(timeout *types.Timeout) error {
+	if timeout.View != p.currentView || p.timeoutControl.Mode() != timeout.Mode {
+		// this indicates a bug in the usage of the PaceMaker
+		return &types.ErrorInvalidTimeout{Timeout: timeout, CurrentView: p.currentView, CurrentMode: p.timeoutControl.Mode()}
+	}
+	return nil
+}
+
+func (p *FlowMC) emitTimeoutNotifications() {
 	switch p.timeoutControl.Mode() {
-	case timeout.ReplicaTimeout:
+	case types.ReplicaTimeout:
 		p.notifier.OnReachedBlockTimeout(p.currentView)
-	case timeout.VoteCollection:
+	case types.VoteCollectionTimeout:
 		p.notifier.OnReachedVotesTimeout(p.currentView)
 	default: // this should never happen unless the number of TimeoutModes are extended without updating this code
 		panic("unknown timeout mode " + string(p.timeoutControl.Mode()))
 	}
-
-	newView := p.currentView + 1
-	p.gotoView(newView)
-	return &types.NewViewEvent{View: newView}, true
 }
 
 func (p *FlowMC) Start() {

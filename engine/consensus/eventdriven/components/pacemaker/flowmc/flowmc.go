@@ -119,7 +119,7 @@ func (p *FlowMC) processBlock(block *def.Block) {
 	}
 	// Replica is primary at current view
 	// => wait for votes with ReplicaTimeout
-	p.timeout.StartTimeout(p.currentView, VoteCollectionTimeout)
+	p.timeout.StartTimeout(p.currentView, VoteCollectionTimeoutTimeout)
 }
 
 func (p *FlowMC) ExecuteView() {
@@ -161,7 +161,7 @@ func (p *FlowMC) CurrentView() uint64 {
 // OnReplicaTimeout is a hook which is called when the replica timeout occurs
 func (p *FlowMC) emitTimeoutEvent() {
 	switch p.timeout.Mode() {
-	case VoteCollectionTimeout:
+	case VoteCollectionTimeoutTimeout:
 		p.eventProcessor.OnWaitingForVotesTimeout(p.currentView)
 	case ReplicaTimeout:
 		p.eventProcessor.OnWaitingForBlockTimeout(p.currentView)

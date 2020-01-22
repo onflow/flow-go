@@ -1,6 +1,7 @@
 package flowmc
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -143,9 +144,12 @@ func Test_ProcessBlockForCurrentView(t *testing.T) {
 	assert.True(t, nveOccured && nve.View == 4)
 }
 
-// Test_ProcessBlockForFutureView tests that PaceMaker processes the block for future views correctly:
-// *
-func Test_ProcessBlockForFutureView(t *testing.T) {
+// Test_FutureBlockWithQcForCurrentView tests that PaceMaker processes the block with
+//    block.qc.view = curView
+//    block.view = curView +1
+// correctly. Specifically, it should induce a view change to the block.view, which
+// enables processing the block right away, i.e. switch to block.view + 1
+func Test_FutureBlockWithQcForCurrentView(t *testing.T) {
 	// NOT Primary for the Block's view
 	pm, eventProc := initPaceMaker(t, 3)
 	eventProc.On("OnStartingBlockTimeout", uint64(4)).Return().Once()
@@ -155,23 +159,6 @@ func Test_ProcessBlockForFutureView(t *testing.T) {
 	assert.Equal(t, uint64(5), pm.CurView())
 	assert.True(t, nveOccured && nve.View == 5)
 
-	pm, eventProc = initPaceMaker(t, 3)
-	eventProc.On("OnSkippedAhead", uint64(14)).Return().Once()
-	eventProc.On("OnStartingBlockTimeout", uint64(14)).Return().Once()
-	eventProc.On("OnStartingBlockTimeout", uint64(15)).Return().Once()
-	nve, nveOccured = pm.UpdateCurViewWithBlock(makeBlockProposal(13, 14), false)
-	eventProc.AssertExpectations(t)
-	assert.Equal(t, uint64(15), pm.CurView())
-	assert.True(t, nveOccured && nve.View == 15)
-
-	pm, eventProc = initPaceMaker(t, 3)
-	eventProc.On("OnSkippedAhead", uint64(14)).Return().Once()
-	eventProc.On("OnStartingBlockTimeout", uint64(14)).Return().Once()
-	nve, nveOccured = pm.UpdateCurViewWithBlock(makeBlockProposal(13, 17), false)
-	eventProc.AssertExpectations(t)
-	assert.Equal(t, uint64(14), pm.CurView())
-	assert.True(t, nveOccured && nve.View == 14)
-
 	// PRIMARY for the Block's view
 	pm, eventProc = initPaceMaker(t, 3)
 	eventProc.On("OnStartingBlockTimeout", uint64(4)).Return().Once()
@@ -180,12 +167,44 @@ func Test_ProcessBlockForFutureView(t *testing.T) {
 	eventProc.AssertExpectations(t)
 	assert.Equal(t, uint64(4), pm.CurView())
 	assert.True(t, nveOccured && nve.View == 4)
+}
+
+// Test_FutureBlockWithQcForCurrentView tests that PaceMaker processes the block with
+//    block.qc.view > curView
+//    block.view = block.qc.view +1
+// correctly. Specifically, it should induce a view change to block.view, which
+// enables processing the block right away, i.e. switch to block.view + 1
+func Test_FutureBlockWithQcForFutureView(t *testing.T) {
+	pm, eventProc := initPaceMaker(t, 3)
+	eventProc.On("OnSkippedAhead", uint64(14)).Return().Once()
+	eventProc.On("OnStartingBlockTimeout", uint64(14)).Return().Once()
+	eventProc.On("OnStartingBlockTimeout", uint64(15)).Return().Once()
+	nve, nveOccured := pm.UpdateCurViewWithBlock(makeBlockProposal(13, 14), false)
+	eventProc.AssertExpectations(t)
+	assert.Equal(t, uint64(15), pm.CurView())
+	assert.True(t, nveOccured && nve.View == 15)
 
 	pm, eventProc = initPaceMaker(t, 3)
 	eventProc.On("OnSkippedAhead", uint64(14)).Return().Once()
 	eventProc.On("OnStartingBlockTimeout", uint64(14)).Return().Once()
 	eventProc.On("OnStartingVotesTimeout", uint64(14)).Return().Once()
 	nve, nveOccured = pm.UpdateCurViewWithBlock(makeBlockProposal(13, 14), true)
+	eventProc.AssertExpectations(t)
+	assert.Equal(t, uint64(14), pm.CurView())
+	assert.True(t, nveOccured && nve.View == 14)
+}
+
+// Test_FutureBlockWithQcForCurrentView tests that PaceMaker processes the block with
+//    block.qc.view > curView
+//    block.view > block.qc.view +1
+// correctly. Specifically, it should induce a view change to the block.qc.view +1,
+// which is not sufficient to process the block. I.e. we expect view change to block.qc.view +1
+// enables processing the block right away.
+func Test_FutureBlockWithQcForFutureFutureView(t *testing.T) {
+	pm, eventProc := initPaceMaker(t, 3)
+	eventProc.On("OnSkippedAhead", uint64(14)).Return().Once()
+	eventProc.On("OnStartingBlockTimeout", uint64(14)).Return().Once()
+	nve, nveOccured := pm.UpdateCurViewWithBlock(makeBlockProposal(13, 17), false)
 	eventProc.AssertExpectations(t)
 	assert.Equal(t, uint64(14), pm.CurView())
 	assert.True(t, nveOccured && nve.View == 14)
@@ -198,6 +217,7 @@ func Test_ProcessBlockForFutureView(t *testing.T) {
 	assert.Equal(t, uint64(14), pm.CurView())
 	assert.True(t, nveOccured && nve.View == 14)
 }
+
 
 // Test_IgnoreBlockDuplicates tests that PaceMaker ignores duplicate blocks
 func Test_IgnoreBlockDuplicates(t *testing.T) {
@@ -240,7 +260,8 @@ func Test_ReplicaTimeout(t *testing.T) {
 		t.Fail() // to prevent test from hanging
 	}
 	duration := float64(time.Now().Nanosecond()-start.Nanosecond()) * 1E-6 // in millisecond
-	assert.True(t, math.Abs(duration-startRepTimeout) < 0.1*startRepTimeout)
+	fmt.Println(duration)
+	assert.True(t, math.Abs(duration-startRepTimeout) < 0.3*startRepTimeout)
 	// While the timeout event has been put in the channel,
 	// PaceMaker should NOT react on it without the timeout event being processed by the EventHandler
 	assert.Equal(t, uint64(3), pm.CurView())
@@ -248,12 +269,19 @@ func Test_ReplicaTimeout(t *testing.T) {
 	// here the, the Event loop would now call EventHandler.OnTimeout() -> PaceMaker.OnTimeout()
 	eventProc.On("OnReachedBlockTimeout", uint64(3)).Return().Once()
 	eventProc.On("OnStartingBlockTimeout", uint64(4)).Return().Once()
-	pm.OnTimeout()
+	toEvent, err := pm.OnTimeout(&types.Timeout{Mode: types.ReplicaTimeout, View: 3})
+	if err != nil {
+		assert.Fail(t, err.Error())
+	}
+	if toEvent == nil {
+		assert.Fail(t, "Expecting ViewChange event as result of timeout")
+	}
+
 	eventProc.AssertExpectations(t)
 	assert.Equal(t, uint64(4), pm.CurView())
 }
 
-// Test_ReplicaTimeout tests that replica timeout fires as expected
+// Test_VoteTimeout tests that vote timeout fires as expected
 func Test_VoteTimeout(t *testing.T) {
 	pm, eventProc := initPaceMaker(t, 3) // initPaceMaker also calls Start() on PaceMaker
 	start := time.Now()
@@ -270,7 +298,8 @@ func Test_VoteTimeout(t *testing.T) {
 		t.Fail() // to prevent test from hanging
 	}
 	duration := float64(time.Now().Nanosecond()-start.Nanosecond()) * 1E-6 // in millisecond
-	assert.True(t, math.Abs(duration-expectedTimeout) < 0.1*expectedTimeout)
+	fmt.Println(duration)
+	assert.True(t, math.Abs(duration-expectedTimeout) < 0.3*expectedTimeout)
 	// While the timeout event has been put in the channel,
 	// PaceMaker should NOT react on it without the timeout event being processed by the EventHandler
 	assert.Equal(t, uint64(3), pm.CurView())
@@ -278,7 +307,13 @@ func Test_VoteTimeout(t *testing.T) {
 	// here the, the Event loop would now call EventHandler.OnTimeout() -> PaceMaker.OnTimeout()
 	eventProc.On("OnReachedVotesTimeout", uint64(3)).Return().Once()
 	eventProc.On("OnStartingBlockTimeout", uint64(4)).Return().Once()
-	pm.OnTimeout()
+	toEvent, err := pm.OnTimeout(&types.Timeout{Mode: types.VoteCollectionTimeout, View: 3})
+	if err != nil {
+		assert.Fail(t, err.Error())
+	}
+	if toEvent == nil {
+		assert.Fail(t, "Expecting ViewChange event as result of timeout")
+	}
 	eventProc.AssertExpectations(t)
 	assert.Equal(t, uint64(4), pm.CurView())
 }

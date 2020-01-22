@@ -3,6 +3,8 @@ package timeout
 import (
 	"math"
 	"time"
+
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
 // Controller implements a timout with:
@@ -11,16 +13,9 @@ import (
 // - on progress: decrease timeout by subtrahend `timeoutDecrease`
 type Controller struct {
 	Config
-	mode  TimeoutMode
-	timer *time.Timer
+	mode           types.TimeoutMode
+	timeoutChannel <-chan time.Time
 }
-
-type TimeoutMode int
-
-const (
-	ReplicaTimeout TimeoutMode = iota
-	VoteCollection TimeoutMode = iota
-)
 
 // timeoutCap this is an internal cap on the timeout to avoid numerical overflows.
 // Its value is large enough to be of no practical implication.
@@ -29,8 +24,14 @@ const timeoutCap float64 = 1E9
 
 // NewController creates a new Controller.
 func NewController(timeoutConfig Config) *Controller {
+	// the initial value for the timeout channel is a closed channel which returns immediately
+	// this prevents indefinite blocking when no timeout has been started
+	startChannel := make(chan time.Time)
+	close(startChannel)
+
 	tc := Controller{
-		Config: timeoutConfig,
+		Config:         timeoutConfig,
+		timeoutChannel: startChannel,
 	}
 	return &tc
 }
@@ -39,13 +40,13 @@ func DefaultController() *Controller {
 	return NewController(*DefaultConfig())
 }
 
-func (t *Controller) StartTimeout(mode TimeoutMode) {
+func (t *Controller) StartTimeout(mode types.TimeoutMode) {
 	t.mode = mode
 	switch mode {
-	case VoteCollection:
-		t.timer = time.NewTimer(t.VoteCollectionTimeout())
-	case ReplicaTimeout:
-		t.timer = time.NewTimer(t.ReplicaTimeout())
+	case types.VoteCollectionTimeout:
+		t.timeoutChannel = time.NewTimer(t.VoteCollectionTimeoutTimeout()).C
+	case types.ReplicaTimeout:
+		t.timeoutChannel = time.NewTimer(t.ReplicaTimeout()).C
 	default:
 		// This should never happen; Only protects code from future inconsistent modifications.
 		// There are only the two timeout modes explicitly handled above. Unless the enum
@@ -55,27 +56,27 @@ func (t *Controller) StartTimeout(mode TimeoutMode) {
 
 }
 
-func (t *Controller) Channel() <-chan time.Time { return t.timer.C }
-func (t *Controller) Mode() TimeoutMode         { return t.mode }
+func (t *Controller) Channel() <-chan time.Time { return t.timeoutChannel }
+func (t *Controller) Mode() types.TimeoutMode   { return t.mode }
 
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
 	return time.Duration(t.replicaTimeout * 1E6)
 }
 
-// VoteCollection returns the duration of Vote aggregation _after_ receiving a block
+// VoteCollectionTimeout returns the duration of Vote aggregation _after_ receiving a block
 // during which the primary tries to aggregate votes for the view where it is leader
-func (t *Controller) VoteCollectionTimeout() time.Duration {
+func (t *Controller) VoteCollectionTimeoutTimeout() time.Duration {
 	// time.Duration expects an int64 as input which specifies the duration in units of nanoseconds (1E-9)
 	return time.Duration(t.replicaTimeout * 1E6 * t.voteAggregationTimeoutFraction)
 }
 
 // OnTimeout indicates to the Controller that the timeout was reached
 func (t *Controller) OnTimeout() {
-	t.replicaTimeout = math.Min(t.replicaTimeout * t.timeoutIncrease, timeoutCap)
+	t.replicaTimeout = math.Min(t.replicaTimeout*t.timeoutIncrease, timeoutCap)
 }
 
 // OnProgressBeforeTimeout indicates to the Controller that progress was made _before_ the timeout was reached
 func (t *Controller) OnProgressBeforeTimeout() {
-	t.replicaTimeout = math.Max(t.replicaTimeout - t.timeoutDecrease, t.minReplicaTimeout)
+	t.replicaTimeout = math.Max(t.replicaTimeout-t.timeoutDecrease, t.minReplicaTimeout)
 }
