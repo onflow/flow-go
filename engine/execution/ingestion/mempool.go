@@ -32,8 +32,8 @@ type Backdata struct {
 	*stdmap.Backdata
 }
 
-func (a *Backdata) Get(id flow.Identifier) (*blockByCollection, error) {
-	entity, err := a.Backdata.Get(id)
+func (a *Backdata) ByID(id flow.Identifier) (*blockByCollection, error) {
+	entity, err := a.Backdata.ByID(id)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (b *Mempool) Add(block *blockByCollection) error {
 
 func (b *Mempool) Get(id flow.Identifier) (*blockByCollection, error) {
 	backdata := &Backdata{b.Backdata}
-	return backdata.Get(id)
+	return backdata.ByID(id)
 }
 
 func (b *Mempool) Run(f func(backdata *Backdata) error) error {

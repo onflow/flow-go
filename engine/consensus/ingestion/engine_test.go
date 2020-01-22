@@ -27,11 +27,11 @@ func TestOnCollectionGuaranteeValid(t *testing.T) {
 
 	originID := unittest.IdentifierFixture()
 	coll := &flow.CollectionGuarantee{CollectionID: unittest.IdentifierFixture()}
-	id := unittest.IdentityFixture()
-	id.Role = flow.RoleCollection
+	identity := unittest.IdentityFixture()
+	identity.Role = flow.RoleCollection
 
 	state.On("Final").Return(final).Once()
-	final.On("Identity", originID).Return(id, nil).Once()
+	final.On("Identity", originID).Return(identity, nil).Once()
 	prop.On("SubmitLocal", coll).Return().Once()
 
 	err := e.onCollectionGuarantee(originID, coll)
@@ -55,11 +55,11 @@ func TestOnCollectionGuaranteeMissingIdentity(t *testing.T) {
 
 	originID := unittest.IdentifierFixture()
 	coll := &flow.CollectionGuarantee{CollectionID: unittest.IdentifierFixture()}
-	id := unittest.IdentityFixture()
-	id.Role = flow.RoleCollection
+	identity := unittest.IdentityFixture()
+	identity.Role = flow.RoleCollection
 
 	state.On("Final").Return(final).Once()
-	final.On("Identity", originID).Return(flow.Identity{}, errors.New("identity error")).Once()
+	final.On("Identity", originID).Return(nil, errors.New("identity error")).Once()
 
 	err := e.onCollectionGuarantee(originID, coll)
 	require.Error(t, err)
@@ -82,11 +82,11 @@ func TestOnCollectionGuaranteeInvalidRole(t *testing.T) {
 
 	originID := unittest.IdentifierFixture()
 	coll := &flow.CollectionGuarantee{CollectionID: unittest.IdentifierFixture()}
-	id := unittest.IdentityFixture()
-	id.Role = flow.RoleConsensus
+	identity := unittest.IdentityFixture()
+	identity.Role = flow.RoleConsensus
 
 	state.On("Final").Return(final).Once()
-	final.On("Identity", originID).Return(id, nil).Once()
+	final.On("Identity", originID).Return(identity, nil).Once()
 
 	err := e.onCollectionGuarantee(originID, coll)
 	require.Error(t, err)

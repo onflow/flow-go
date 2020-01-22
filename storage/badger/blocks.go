@@ -87,19 +87,15 @@ func (b *Blocks) retrieveBlock(tx *badger.Txn, blockID flow.Identifier) (*flow.B
 	}
 
 	// create the block content
-	content := flow.Content{
+	payload := flow.Payload{
 		Identities: identities,
 		Guarantees: guarantees,
 	}
-
-	// deduce the block payload
-	payload := content.Payload()
 
 	// create the block
 	block := &flow.Block{
 		Header:  header,
 		Payload: payload,
-		Content: content,
 	}
 
 	return block, nil

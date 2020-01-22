@@ -25,7 +25,7 @@ type ChunkStates interface {
 
 	// Get will retrieve the given chunk state from the memory pool; it will
 	// error if the chunk state is not in the memory pool.
-	Get(chunkID flow.Identifier) (*flow.ChunkState, error)
+	ByID(chunkID flow.Identifier) (*flow.ChunkState, error)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

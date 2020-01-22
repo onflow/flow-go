@@ -28,9 +28,9 @@ func (t *Transactions) Add(tx *flow.Transaction) error {
 	return t.Backend.Add(tx)
 }
 
-// Get returns the transaction with the given ID from the mempool.
-func (t *Transactions) Get(txID flow.Identifier) (*flow.Transaction, error) {
-	entity, err := t.Backend.Get(txID)
+// ByID returns the transaction with the given ID from the mempool.
+func (t *Transactions) ByID(txID flow.Identifier) (*flow.Transaction, error) {
+	entity, err := t.Backend.ByID(txID)
 	if err != nil {
 		return nil, err
 	}

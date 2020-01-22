@@ -20,19 +20,19 @@ type Identity struct {
 }
 
 // ParseIdentity parses a string representation of an identity.
-func ParseIdentity(identity string) (Identity, error) {
+func ParseIdentity(identity string) (*Identity, error) {
 
 	// use the regex to match the four parts of an identity
 	matches := rxid.FindStringSubmatch(identity)
 	if len(matches) != 6 {
-		return Identity{}, errors.New("invalid identity string format")
+		return nil, errors.New("invalid identity string format")
 	}
 
 	// none of these will error as they are checked by the regex
 	var nodeID Identifier
 	nodeID, err := HexStringToIdentifier(matches[2])
 	if err != nil {
-		return Identity{}, err
+		return nil, err
 	}
 	address := matches[3] + matches[4]
 	role, _ := ParseRole(matches[1])
@@ -46,7 +46,7 @@ func ParseIdentity(identity string) (Identity, error) {
 		Stake:   stake,
 	}
 
-	return id, nil
+	return &id, nil
 }
 
 // String returns a string representation of the identity.
@@ -65,10 +65,10 @@ func (id Identity) Checksum() Identifier {
 }
 
 // IdentityFilter is a filter on identities.
-type IdentityFilter func(Identity) bool
+type IdentityFilter func(*Identity) bool
 
 // IdentityList is a list of nodes.
-type IdentityList []Identity
+type IdentityList []*Identity
 
 // Filter will apply a filter to the identity list.
 func (il IdentityList) Filter(filters ...IdentityFilter) IdentityList {
@@ -113,6 +113,6 @@ func (il IdentityList) Count() uint {
 }
 
 // Get returns the node at the given index.
-func (il IdentityList) Get(i uint) Identity {
+func (il IdentityList) Get(i uint) *Identity {
 	return il[int(i)]
 }

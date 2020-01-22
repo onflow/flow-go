@@ -30,7 +30,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func GenericNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block, options ...func(*protocol.State)) mock.GenericNode {
+func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, genesis *flow.Block, options ...func(*protocol.State)) mock.GenericNode {
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 
 	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
@@ -58,7 +58,7 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *f
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block, options ...func(*protocol.State)) mock.CollectionNode {
+func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, genesis *flow.Block, options ...func(*protocol.State)) mock.CollectionNode {
 
 	node := GenericNode(t, hub, identity, genesis, options...)
 
@@ -88,7 +88,7 @@ func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, options ...func(*p
 		node.Role = flow.RoleCollection
 	})
 
-	genesis := mock.Genesis(identities)
+	genesis := flow.Genesis(identities)
 
 	nodes := make([]mock.CollectionNode, 0, len(identities))
 	for _, identity := range identities {
@@ -98,7 +98,7 @@ func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, options ...func(*p
 	return nodes
 }
 
-func ConsensusNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) mock.ConsensusNode {
+func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, genesis *flow.Block) mock.ConsensusNode {
 
 	node := GenericNode(t, hub, identity, genesis)
 
@@ -143,7 +143,7 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNod
 		t.Log(id.String())
 	}
 
-	genesis := mock.Genesis(identities)
+	genesis := flow.Genesis(identities)
 
 	nodes := make([]mock.ConsensusNode, 0, len(identities))
 	for _, identity := range identities {
@@ -161,7 +161,7 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
-func VerificationNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block, opts ...VerificationOpt) mock.VerificationNode {
+func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, genesis *flow.Block, opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
 	node := mock.VerificationNode{
@@ -199,6 +199,7 @@ func VerificationNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genes
 
 	if node.IngestEngine == nil {
 		node.IngestEngine, err = ingest.New(node.Log, node.Net, node.State, node.Me, node.VerifierEngine, node.Receipts, node.Blocks, node.Collections, node.ChunkStates)
+		require.Nil(t, err)
 	}
 
 	return node

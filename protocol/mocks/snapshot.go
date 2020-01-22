@@ -83,10 +83,10 @@ func (mr *MockSnapshotMockRecorder) Identities(arg0 ...interface{}) *gomock.Call
 }
 
 // Identity mocks base method
-func (m *MockSnapshot) Identity(arg0 flow.Identifier) (flow.Identity, error) {
+func (m *MockSnapshot) Identity(arg0 flow.Identifier) (*flow.Identity, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Identity", arg0)
-	ret0, _ := ret[0].(flow.Identity)
+	ret0, _ := ret[0].(*flow.Identity)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

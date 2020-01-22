@@ -113,10 +113,10 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 }
 
 // Identity returns the flow identity for a given flow identifier by querying the flow state
-func (n *Network) Identity(nodeID flow.Identifier) (flow.Identity, error) {
+func (n *Network) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	id, err := n.state.Final().Identity(nodeID)
 	if err != nil {
-		return flow.Identity{}, errors.Wrap(err, "could not get identity")
+		return nil, errors.Wrap(err, "could not get identity")
 	}
 	return id, nil
 }

@@ -7,12 +7,16 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // Engine implements the verifier engine of the verification node,
@@ -106,14 +110,22 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 //
 // If any part of verification fails, an error is returned, indicating to the
 // initiating engine that the verification must be re-tried.
+// TODO assumes blocks with one chunk
 func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExecutionResult) error {
 
 	if originID != e.me.NodeID() {
 		return fmt.Errorf("invalid remote origin for verify")
 	}
 
-	// TODO execute transactions and confirm execution result
-	// for now, we approve everything
+	chunkID := res.Receipt.ExecutionResult.Chunks.ByIndex(0).ID()
+
+	computedEndState, err := e.executeChunk(res)
+	if err != nil {
+		return fmt.Errorf("could not verify chunk (id=%s): %w", chunkID, err)
+	}
+
+	// TODO for now, we discard the computed end state and approve the ER
+	_ = computedEndState
 
 	consensusNodes, err := e.state.Final().
 		Identities(identity.HasRole(flow.RoleConsensus))
@@ -135,5 +147,46 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 		return fmt.Errorf("could not submit result approval: %w", err)
 	}
 
+	e.log.Info().
+		Hex("chunk_id", logging.ID(chunkID)).
+		Msg("submitted result approval")
+
 	return nil
+}
+
+// executeChunk executes the transactions for a single chunk and returns the
+// resultant end state, or an error if execution failed.
+func (e *Engine) executeChunk(res *verification.CompleteExecutionResult) (flow.StateCommitment, error) {
+	rt := runtime.NewInterpreterRuntime()
+	blockCtx := virtualmachine.NewBlockContext(rt, res.Block)
+
+	getRegister := func(key string) ([]byte, error) {
+		registers := res.ChunkStates[0].Registers
+
+		val, ok := registers[key]
+		if !ok {
+			return nil, fmt.Errorf("missing register")
+		}
+
+		return val, nil
+	}
+
+	chunkView := state.NewView(getRegister)
+
+	for _, tx := range res.Collections[0].Transactions {
+		txView := chunkView.NewChild()
+
+		result, err := blockCtx.ExecuteTransaction(txView, tx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute transaction: %w", err)
+		}
+
+		if result.Succeeded() {
+			chunkView.ApplyDelta(txView.Delta())
+		}
+	}
+
+	// TODO compute and return state commitment
+
+	return nil, nil
 }

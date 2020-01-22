@@ -9,7 +9,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
@@ -24,7 +23,7 @@ func TestInvalidTransaction(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
 	t.Run("missing field", func(t *testing.T) {
-		genesis := mock.Genesis(flow.IdentityList{identity})
+		genesis := flow.Genesis(flow.IdentityList{identity})
 		node := testutil.CollectionNode(t, hub, identity, genesis)
 
 		tx := unittest.TransactionFixture()

@@ -41,8 +41,8 @@ func (_m *Approvals) All() []*flow.ResultApproval {
 	return r0
 }
 
-// Get provides a mock function with given fields: approvalID
-func (_m *Approvals) Get(approvalID flow.Identifier) (*flow.ResultApproval, error) {
+// ByID provides a mock function with given fields: approvalID
+func (_m *Approvals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, error) {
 	ret := _m.Called(approvalID)
 
 	var r0 *flow.ResultApproval

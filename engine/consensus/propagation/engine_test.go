@@ -144,7 +144,7 @@ func TestPropagateCollectionGuarantee(t *testing.T) {
 
 	// generate our own node identity
 	var ids flow.IdentityList
-	id := flow.Identity{
+	id := &flow.Identity{
 		NodeID:  flow.Identifier{0x09, 0x09, 0x09, 0x09},
 		Address: "home",
 		Role:    flow.RoleConsensus,
@@ -170,7 +170,7 @@ func TestPropagateCollectionGuarantee(t *testing.T) {
 		case 4:
 			role = flow.RoleObservation
 		}
-		id := flow.Identity{
+		id := &flow.Identity{
 			NodeID:  nodeID,
 			Address: address,
 			Role:    role,
