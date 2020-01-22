@@ -637,7 +637,6 @@ identifier
     | Event
     | All
     | Access
-    | All
     | Account
     | Self
     ;
