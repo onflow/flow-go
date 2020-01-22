@@ -17,9 +17,9 @@ import (
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
-	vm := &vmmock.VirtualMachine{}
-	bc := &vmmock.BlockContext{}
-	es := &statemock.ExecutionState{}
+	vm := new(vmmock.VirtualMachine)
+	bc := new(vmmock.BlockContext)
+	es := new(statemock.ExecutionState)
 
 	exe := executor.NewBlockExecutor(vm, es)
 
@@ -78,6 +78,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	es.On("CommitDelta", mock.Anything).Return(nil, nil)
 	es.On("PersistStateCommitment", block.ID(), mock.Anything).Return(nil)
+	es.On("PersistChunkHeader", mock.Anything, mock.Anything).Return(nil)
 
 	result, err := exe.ExecuteBlock(completeBlock)
 	assert.NoError(t, err)

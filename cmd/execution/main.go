@@ -65,7 +65,9 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 
-			execState := state.NewExecutionState(ledgerStorage, stateCommitments)
+			chunkHeaders := badger.NewChunkHeaders(node.DB)
+
+			execState := state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
 
 			blockExec := executor.NewBlockExecutor(vm, execState)
 
@@ -73,6 +75,8 @@ func main() {
 				node.Logger,
 				node.Network,
 				node.Me,
+				node.State,
+				execState,
 				receiptsEng,
 				blockExec,
 			)
@@ -86,7 +90,15 @@ func main() {
 			blocks := badger.NewBlocks(node.DB)
 			collections := badger.NewCollections(node.DB)
 
-			ingestionEng, err := ingestion.NewEngine(node.Logger, node.Network, node.Me, blocks, collections, node.State, executionEng)
+			ingestionEng, err := ingestion.NewEngine(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.State,
+				blocks,
+				collections,
+				executionEng,
+			)
 			node.MustNot(err).Msg("could not initialize ingestion engine")
 
 			return ingestionEng
