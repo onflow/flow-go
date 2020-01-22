@@ -109,7 +109,6 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 
 	// register engine with provided engineID
 	n.engines[channelID] = engine
-
 	return conduit, nil
 }
 
@@ -149,17 +148,17 @@ func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
 
 	// Extract channel id and find the registered engine
-	channelID := uint8(message.Event.ChannelID)
+	channelID := uint8(message.ChannelID)
 	en, found := n.engines[channelID]
 	if !found {
 		n.logger.Debug().Str("sender", senderID.String()).
 			Uint8("channel", channelID).
 			Msg(" dropping message since no engine to receive it was found")
-		return fmt.Errorf("could not find the engine for channel ID: %d", channelID)
+		return nil
 	}
 
 	// Convert message payload to a known message type
-	decodedMessage, err := n.codec.Decode(message.Event.Payload)
+	decodedMessage, err := n.codec.Decode(message.Payload)
 	if err != nil {
 		return fmt.Errorf("could not decode event: %w", err)
 	}
@@ -194,16 +193,12 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 	originID := selfID[:]
 
 	//cast event to a libp2p.Message
-	em := &message.EventMessage{
+	message := &message.Message{
 		ChannelID: uint32(channelID),
 		EventID:   sip.Sum(payload),
 		OriginID:  originID,
 		TargetIDs: emTargets,
 		Payload:   payload,
-	}
-	message := &message.Message{
-		SenderID: originID,
-		Event:    em,
 	}
 
 	return message, nil
@@ -219,14 +214,14 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 	}
 
 	// checks if the event is already in the cache
-	ok := n.cache.Has(channelID, message.Event.EventID)
+	ok := n.cache.Has(channelID, message.EventID)
 	if ok {
 		// returns nil and terminates sending the message since
 		// the message already submitted to the network
 		return nil
 	}
 	// storing event in the cache
-	n.cache.Set(channelID, message.Event.EventID, message)
+	n.cache.Set(channelID, message.EventID, message)
 
 	// TODO: debup the message here
 

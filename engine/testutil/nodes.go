@@ -22,6 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -151,29 +152,53 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNod
 	return nodes
 }
 
-func VerificationNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) mock.VerificationNode {
+type VerificationOpt func(*mock.VerificationNode)
+
+func WithVerifierEngine(eng network.Engine) VerificationOpt {
+	return func(node *mock.VerificationNode) {
+		node.VerifierEngine = eng
+	}
+}
+
+func VerificationNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block, opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
 	node := mock.VerificationNode{
 		GenericNode: GenericNode(t, hub, identity, genesis),
 	}
 
-	node.Receipts, err = stdmap.NewReceipts()
-	require.Nil(t, err)
+	for _, apply := range opts {
+		apply(&node)
+	}
 
-	node.Blocks, err = stdmap.NewBlocks()
-	require.Nil(t, err)
+	if node.Receipts == nil {
+		node.Receipts, err = stdmap.NewReceipts()
+		require.Nil(t, err)
+	}
 
-	node.Collections, err = stdmap.NewCollections()
-	require.Nil(t, err)
+	if node.Blocks == nil {
+		node.Blocks, err = stdmap.NewBlocks()
+		require.Nil(t, err)
+	}
 
-	node.ChunkStates, err = stdmap.NewChunkStates()
-	require.Nil(t, err)
+	if node.Collections == nil {
+		node.Collections, err = stdmap.NewCollections()
+		require.Nil(t, err)
+	}
 
-	node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me)
-	require.Nil(t, err)
+	if node.ChunkStates == nil {
+		node.ChunkStates, err = stdmap.NewChunkStates()
+		require.Nil(t, err)
+	}
 
-	node.ReceiptsEngine, err = ingest.New(node.Log, node.Net, node.State, node.Me, node.VerifierEngine, node.Receipts, node.Blocks, node.Collections, node.ChunkStates)
+	if node.VerifierEngine == nil {
+		node.VerifierEngine, err = verifier.New(node.Log, node.Net, node.State, node.Me)
+		require.Nil(t, err)
+	}
+
+	if node.IngestEngine == nil {
+		node.IngestEngine, err = ingest.New(node.Log, node.Net, node.State, node.Me, node.VerifierEngine, node.Receipts, node.Blocks, node.Collections, node.ChunkStates)
+	}
 
 	return node
 }

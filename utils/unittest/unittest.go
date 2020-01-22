@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
@@ -22,6 +23,25 @@ func ExpectPanic(expectedMsg string, t *testing.T) {
 		return
 	}
 	t.Errorf("Expected to panic with `%s`, but did not panic", expectedMsg)
+}
+
+// AssertReturnsBefore asserts that the given function returns before the
+// duration expires.
+func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
+	done := make(chan struct{})
+
+	go func() {
+		f()
+		close(done)
+	}()
+
+	select {
+	case <-time.After(duration):
+		t.Log("function did not return in time")
+		t.Fail()
+	case <-done:
+		return
+	}
 }
 
 func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
