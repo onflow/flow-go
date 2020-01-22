@@ -49,6 +49,7 @@ func (el *EventLoop) Start() error {
 	}
 	el.eventHandler.paceMaker.Start() // start Pacemaker;
 	// Wait with starting EventLoop until Pacemaker is started, i.e. above call returned
+	el.eventHandler.startNewView()
 	el.loop()
 	return nil
 }
