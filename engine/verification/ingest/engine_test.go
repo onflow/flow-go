@@ -516,12 +516,14 @@ func testConcurrency(t *testing.T, erCount, senderCount int) {
 					// block then receipt
 					sendBlock()
 					verNet.FlushAll()
+					// allow another goroutine to run before sending receipt
 					time.Sleep(1)
 					sendReceipt()
 				case 1:
 					// receipt then block
 					sendReceipt()
 					verNet.FlushAll()
+					// allow another goroutine to run before sending block
 					time.Sleep(1)
 					sendBlock()
 				}
