@@ -149,7 +149,7 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 
 	e.log.Info().
 		Hex("chunk_id", logging.ID(chunkID)).
-		Msg("verified chunk")
+		Msg("submitted result approval")
 
 	return nil
 }
