@@ -20,8 +20,7 @@ func New(rt runtime.Runtime) VirtualMachine {
 }
 
 type virtualMachine struct {
-	rt    runtime.Runtime
-	block *flow.Block
+	rt runtime.Runtime
 }
 
 func (vm *virtualMachine) NewBlockContext(b *flow.Block) BlockContext {

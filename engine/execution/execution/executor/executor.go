@@ -38,7 +38,7 @@ func (e *blockExecutor) ExecuteBlock(
 
 	// TODO: compute block fees & reward payments
 
-	err = e.state.PersistStateCommitment(block.Block.ID(), &endState)
+	err = e.state.PersistStateCommitment(block.Block.ID(), endState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}
@@ -133,7 +133,7 @@ func generateExecutionResultForBlock(
 			PreviousResultID:     flow.ZeroID,
 			BlockID:              block.Block.ID(),
 			FinalStateCommitment: endState,
-			Chunks:               flow.ChunkList{chunks},
+			Chunks:               chunks,
 		},
 	}
 }

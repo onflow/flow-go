@@ -10,7 +10,6 @@ type Guarantees interface {
 	// Store inserts the collection guarantee.
 	Store(guarantee *flow.CollectionGuarantee) error
 
-	// ByID retrieves the collection guarantee by the collection
-	// fingerprint.
+	// ByID retrieves the collection guarantee by collection ID.
 	ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error)
 }

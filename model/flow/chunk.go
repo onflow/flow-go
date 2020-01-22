@@ -54,25 +54,23 @@ func (c *ChunkState) Checksum() Identifier {
 }
 
 // Note that this is the basic version of the List, we need to substitute it with something like Merkel tree at some point
-type ChunkList struct {
-	Chunks []*Chunk
-}
+type ChunkList []*Chunk
 
-func (cl *ChunkList) Fingerprint() Identifier {
+func (cl ChunkList) Fingerprint() Identifier {
 	return MerkleRoot(GetIDs(cl)...)
 }
 
 func (cl *ChunkList) Insert(ch *Chunk) {
-	cl.Chunks = append(cl.Chunks, ch)
+	*cl = append(*cl, ch)
 }
 
-func (cl *ChunkList) Items() []*Chunk {
-	return cl.Chunks
+func (cl ChunkList) Items() []*Chunk {
+	return cl
 }
 
 // ByChecksum returns an entity from the list by entity fingerprint
-func (cl *ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
-	for _, ch := range cl.Chunks {
+func (cl ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
+	for _, ch := range cl {
 		if ch.Checksum() == cs {
 			return ch, true
 		}
@@ -81,16 +79,16 @@ func (cl *ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
 }
 
 // ByIndex returns an entity from the list by index
-func (cl *ChunkList) ByIndex(i uint64) *Chunk {
-	return cl.Chunks[i]
+func (cl ChunkList) ByIndex(i uint64) *Chunk {
+	return cl[i]
 }
 
 // ByIndexWithProof returns an entity from the list by index and proof of membership
-func (cl *ChunkList) ByIndexWithProof(i uint64) (*Chunk, Proof) {
-	return cl.Chunks[i], nil
+func (cl ChunkList) ByIndexWithProof(i uint64) (*Chunk, Proof) {
+	return cl[i], nil
 }
 
 // Size returns the number of Chunks in the list
-func (cl *ChunkList) Size() int {
-	return len(cl.Chunks)
+func (cl ChunkList) Size() int {
+	return len(cl)
 }

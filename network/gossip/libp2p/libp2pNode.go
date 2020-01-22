@@ -228,7 +228,9 @@ func (p *P2PNode) Subscribe(ctx context.Context, topic FlowTopic, callback func(
 	}
 	// Add the subscription to the cache
 	p.subs[topic] = s
-	go pubSubHandler(ctx, s, callback, p.logger)
+	go func() {
+		_ = pubSubHandler(ctx, s, callback, p.logger)
+	}()
 
 	p.logger.Debug().Str("topic", string(topic)).Str("name", p.name).Msg("subscribed to topic")
 	return err

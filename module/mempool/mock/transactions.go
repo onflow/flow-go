@@ -41,8 +41,8 @@ func (_m *Transactions) All() []*flow.Transaction {
 	return r0
 }
 
-// Get provides a mock function with given fields: txID
-func (_m *Transactions) Get(txID flow.Identifier) (*flow.Transaction, error) {
+// ByID provides a mock function with given fields: txID
+func (_m *Transactions) ByID(txID flow.Identifier) (*flow.Transaction, error) {
 	ret := _m.Called(txID)
 
 	var r0 *flow.Transaction

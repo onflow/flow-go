@@ -23,7 +23,7 @@ type Blocks interface {
 
 	// Get will retrieve the given block from the memory pool; it will
 	// error if the block is not in the memory pool.
-	Get(blockID flow.Identifier) (*flow.Block, error)
+	ByID(blockID flow.Identifier) (*flow.Block, error)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

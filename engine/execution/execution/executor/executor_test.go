@@ -40,7 +40,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Signatures:   nil,
 	}
 
-	content := flow.Content{
+	payload := flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{&guarantee},
 	}
 
@@ -48,7 +48,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Header: flow.Header{
 			Number: 42,
 		},
-		Content: content,
+		Payload: payload,
 	}
 
 	completeBlock := &execution.CompleteBlock{
@@ -82,9 +82,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	result, err := exe.ExecuteBlock(completeBlock)
 	assert.NoError(t, err)
-	assert.Len(t, result.Chunks.Chunks, 1)
+	assert.Len(t, result.Chunks, 1)
 
-	chunk := result.Chunks.Chunks[0]
+	chunk := result.Chunks[0]
 	assert.EqualValues(t, 0, chunk.CollectionIndex)
 
 	vm.AssertExpectations(t)

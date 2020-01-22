@@ -20,7 +20,7 @@ type Snapshot interface {
 	// Identity attempts to retrieve the node with the given identifier at the
 	// selected point of the protocol state history. It will error if it doesn't
 	// exist or if its stake is zero.
-	Identity(nodeID flow.Identifier) (flow.Identity, error)
+	Identity(nodeID flow.Identifier) (*flow.Identity, error)
 
 	// Cluster selects the given cluster from the node selection. You have to
 	// manually filter the identities to the desired set of nodes before

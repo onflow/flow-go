@@ -21,7 +21,7 @@ type ExecutionState interface {
 	// StateCommitmentByBlockID returns the final state commitment for the provided block ID.
 	StateCommitmentByBlockID(flow.Identifier) (flow.StateCommitment, error)
 	// PersistStateCommitment saves a state commitment by the given block ID.
-	PersistStateCommitment(flow.Identifier, *flow.StateCommitment) error
+	PersistStateCommitment(flow.Identifier, flow.StateCommitment) error
 
 	// ChunkHeaderByChunkID returns the chunk header for the provided chunk ID.
 	ChunkHeaderByChunkID(flow.Identifier) (*flow.ChunkHeader, error)
@@ -31,19 +31,19 @@ type ExecutionState interface {
 
 type state struct {
 	ls           storage.Ledger
-	commitments  storage.StateCommitments
+	commits      storage.Commits
 	chunkHeaders storage.ChunkHeaders
 }
 
 // NewExecutionState returns a new execution state access layer for the given ledger storage.
 func NewExecutionState(
 	ls storage.Ledger,
-	commitments storage.StateCommitments,
+	commits storage.Commits,
 	chunkHeaders storage.ChunkHeaders,
 ) ExecutionState {
 	return &state{
 		ls:           ls,
-		commitments:  commitments,
+		commits:      commits,
 		chunkHeaders: chunkHeaders,
 	}
 }
@@ -70,19 +70,19 @@ func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
 	ids, values := delta.RegisterUpdates()
 
 	// TODO: update CommitDelta to also return proofs
-	commitment, _, err := s.ls.UpdateRegistersWithProof(ids, values)
+	commit, _, err := s.ls.UpdateRegistersWithProof(ids, values)
 	if err != nil {
 		return nil, err
 	}
 
-	return commitment, nil
+	return commit, nil
 }
 
 func (s *state) GetRegisters(
-	commitment flow.StateCommitment,
+	commit flow.StateCommitment,
 	registerIDs []flow.RegisterID,
 ) ([]flow.RegisterValue, error) {
-	return s.ls.GetRegisters(registerIDs, commitment)
+	return s.ls.GetRegisters(registerIDs, commit)
 }
 
 func (s *state) GetChunkRegisters(chunkID flow.Identifier) (flow.Ledger, error) {
@@ -108,7 +108,7 @@ func (s *state) GetChunkRegisters(chunkID flow.Identifier) (flow.Ledger, error) 
 }
 
 func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
-	commitment, err := s.commitments.ByID(blockID)
+	commit, err := s.commits.ByBlockID(blockID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			//TODO ? Shouldn't happen in MVP, in multi-node should query a state from other nodes
@@ -117,11 +117,11 @@ func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCom
 			return nil, err
 		}
 	}
-	return *commitment, nil
+	return commit, nil
 }
 
-func (s *state) PersistStateCommitment(blockID flow.Identifier, commitment *flow.StateCommitment) error {
-	return s.commitments.Persist(blockID, commitment)
+func (s *state) PersistStateCommitment(blockID flow.Identifier, commit flow.StateCommitment) error {
+	return s.commits.Store(blockID, commit)
 }
 
 func (s *state) ChunkHeaderByChunkID(chunkID flow.Identifier) (*flow.ChunkHeader, error) {
