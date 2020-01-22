@@ -46,8 +46,8 @@ RecvLoop:
 		}
 
 		rc.log.Debug().Str("peer", rc.stream.Conn().RemotePeer().String()).
-			Bytes("sender", msg.SenderID).
-			Hex("eventID", msg.Event.EventID).
+			Bytes("sender", msg.OriginID).
+			Hex("eventID", msg.EventID).
 			Msg("received message")
 
 		// stash the received message into the inbound queue for handling

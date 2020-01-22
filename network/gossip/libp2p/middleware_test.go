@@ -260,7 +260,7 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...st
 		payload = msg[0]
 	}
 
-	e := &message.EventMessage{
+	message := &message.Message{
 		ChannelID: 1,
 		EventID:   []byte("1"),
 		OriginID:  originID[:],
@@ -268,10 +268,5 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...st
 		Payload:   []byte(payload),
 	}
 
-	lm := &message.Message{
-		SenderID: originID[:],
-		Event:    e,
-	}
-
-	return lm
+	return message
 }
