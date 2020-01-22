@@ -140,8 +140,6 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 		},
 	}
 
-	fmt.Println("verify: er_id: ", approval.ResultApprovalBody.ExecutionResultID.String())
-
 	// broadcast result approval to consensus nodes
 	err = e.conduit.Submit(approval, consensusNodes.NodeIDs()...)
 	if err != nil {
