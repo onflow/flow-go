@@ -86,7 +86,7 @@ func main() {
 			blocks := badger.NewBlocks(node.DB)
 			collections := badger.NewCollections(node.DB)
 
-			ingestionEng, err := ingestion.NewEngine(node.Logger, node.Network, node.Me, blocks, collections, node.State, executionEng, )
+			ingestionEng, err := ingestion.NewEngine(node.Logger, node.Network, node.Me, blocks, collections, node.State, executionEng)
 			node.MustNot(err).Msg("could not initialize ingestion engine")
 
 			return ingestionEng

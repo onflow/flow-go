@@ -98,12 +98,17 @@ generate-mocks:
 	mockery -name 'Processor' -dir="./engine/consensus/eventdriven/components/pacemaker/events" -case=underscore -output="./engine/consensus/eventdriven/components/pacemaker/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network/gossip/libp2p/middleware -case=underscore -output="./network/gossip/libp2p/mock" -outpkg="mock"
 
+# this ensures there is no unused dependency being added by accident
+.PHONY: tidy
+tidy:
+	go mod tidy; git diff --exit-code
+
 .PHONY: lint
 lint:
 	GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
 
 .PHONY: ci
-ci: install-tools lint test coverage
+ci: install-tools tidy lint test coverage
 
 .PHONY: docker-ci
 docker-ci:

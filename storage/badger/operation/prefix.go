@@ -10,18 +10,18 @@ import (
 )
 
 const (
-	codeRole            = 10
-	codeAddress         = 11
-	codeDelta           = 12
-	codeHeader          = 20
-	codeIdentities      = 21
-	codeTransaction     = 22
-	codeCollection      = 23
-	codeGuarantee       = 24
-	codeBlockID         = 100
-	codeBoundary        = 101
-	codeCollectionIndex = 102
-	codeHashToStateCommitment  = 103
+	codeRole                  = 10
+	codeAddress               = 11
+	codeDelta                 = 12
+	codeHeader                = 20
+	codeIdentities            = 21
+	codeTransaction           = 22
+	codeCollection            = 23
+	codeGuarantee             = 24
+	codeBlockID               = 100
+	codeBoundary              = 101
+	codeCollectionIndex       = 102
+	codeHashToStateCommitment = 103
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

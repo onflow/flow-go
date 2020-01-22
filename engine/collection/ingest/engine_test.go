@@ -75,7 +75,7 @@ func TestClusterRouting(t *testing.T) {
 
 		// flush the network to make sure all messages are sent
 		net, _ := hub.GetNetwork(localNode.Me.NodeID())
-		net.FlushAll()
+		net.DeliverAllRecursive()
 
 		// transaction should be in target cluster's pool, not in other pool
 		assert.EqualValues(t, 1, localNode.Pool.Size())
@@ -107,7 +107,7 @@ func TestClusterRouting(t *testing.T) {
 
 		// flush the network to make sure all messages are sent
 		net, _ := hub.GetNetwork(localNode.Me.NodeID())
-		net.FlushAll()
+		net.DeliverAllRecursive()
 
 		// transaction should be in target cluster's pool, not in other pool
 		assert.EqualValues(t, 0, localNode.Pool.Size())
@@ -139,7 +139,7 @@ func TestClusterRouting(t *testing.T) {
 
 		// flush the network to make sure all messages are sent
 		net, _ := hub.GetNetwork(localNode.Me.NodeID())
-		net.FlushAll()
+		net.DeliverAllRecursive()
 
 		// transaction should not be in any pool
 		assert.EqualValues(t, 0, localNode.Pool.Size())
@@ -172,7 +172,7 @@ func TestClusterRouting(t *testing.T) {
 
 		// flush the network to make sure all messages are sent
 		net, _ := hub.GetNetwork(localNode.Me.NodeID())
-		net.FlushAll()
+		net.DeliverAllRecursive()
 
 		// the transaction should not be stored in the ingress, nor routed
 		assert.EqualValues(t, 0, localNode.Pool.Size())
