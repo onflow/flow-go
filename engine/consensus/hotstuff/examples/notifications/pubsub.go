@@ -2,6 +2,8 @@ package notifications
 
 import (
 	"sync"
+
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 )
 
 // PubSubDistributor implements notifications.Distributor
@@ -16,7 +18,7 @@ type PubSubDistributor struct {
 	lock                          sync.RWMutex
 }
 
-func NewPubSubDistributor() Distributor {
+func NewPubSubDistributor() notifications.Distributor {
 	return &PubSubDistributor{}
 }
 

@@ -1,6 +1,7 @@
 package timeout
 
 import (
+	"math"
 	"time"
 )
 
@@ -46,6 +47,9 @@ func (t *Controller) StartTimeout(mode TimeoutMode) {
 	case ReplicaTimeout:
 		t.timer = time.NewTimer(t.ReplicaTimeout())
 	default:
+		// This should never happen; Only protects code from future inconsistent modifications.
+		// There are only the two timeout modes explicitly handled above. Unless the enum
+		// containing the timeout mode is extended, the default case will never be reached.
 		panic("unknown timeout mode")
 	}
 
@@ -68,16 +72,10 @@ func (t *Controller) VoteCollectionTimeout() time.Duration {
 
 // OnTimeout indicates to the Controller that the timeout was reached
 func (t *Controller) OnTimeout() {
-	t.replicaTimeout *= t.timeoutIncrease
-	if t.replicaTimeout > timeoutCap {
-		t.replicaTimeout = timeoutCap
-	}
+	t.replicaTimeout = math.Min(t.replicaTimeout * t.timeoutIncrease, timeoutCap)
 }
 
 // OnProgressBeforeTimeout indicates to the Controller that progress was made _before_ the timeout was reached
 func (t *Controller) OnProgressBeforeTimeout() {
-	t.replicaTimeout -= t.timeoutDecrease
-	if t.replicaTimeout < t.minReplicaTimeout {
-		t.replicaTimeout = t.minReplicaTimeout
-	}
+	t.replicaTimeout = math.Max(t.replicaTimeout - t.timeoutDecrease, t.minReplicaTimeout)
 }
