@@ -32,7 +32,13 @@ const processor = unified()
   .use(slug)
   .use(autolink)
   .use(validateLinks)
-  .use(styleGuide)
+  .use({
+    plugins: styleGuide.plugins.filter(elem => {
+      if (!Array.isArray(elem))
+        return elem;
+      return elem[0].displayName !== 'remark-lint:list-item-indent'
+    })
+  })
   .use(highlight, {
     languageScopes: {'cadence': 'source.cadence'},
     grammarPaths: ['../tools/vscode-extension/syntaxes/cadence.tmGrammar.json'],

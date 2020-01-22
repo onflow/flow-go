@@ -1,6 +1,9 @@
 package runtime
 
-import "github.com/dapperlabs/flow-go/language/runtime/interpreter"
+import (
+	"github.com/dapperlabs/flow-go/language/runtime/common"
+	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
+)
 
 type Value = interpreter.Value
 
@@ -9,4 +12,4 @@ type Event struct {
 	Fields []Value
 }
 
-type Address = interpreter.AddressValue
+type Address = common.Address
