@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
+	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 	"github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
@@ -1039,7 +1040,7 @@ func TestRuntimeAccountAddress(t *testing.T) {
 
 	var loggedMessages []string
 
-	address := interpreter.AddressValue{42}
+	address := common.Address{42}
 
 	runtimeInterface := &testRuntimeInterface{
 		getSigningAccounts: func() []Address {
@@ -1113,7 +1114,7 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
       }
     `)
 
-	address := interpreter.AddressValue{42}
+	address := common.Address{42}
 
 	script2 := []byte(
 		fmt.Sprintf(
@@ -1512,7 +1513,7 @@ func TestRuntimeContractAccount(t *testing.T) {
 
 	runtime := NewInterpreterRuntime()
 
-	addressValue := Address{
+	addressValue := interpreter.AddressValue{
 		0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xCA, 0xDE,
 	}
 
@@ -1578,7 +1579,7 @@ func TestRuntimeContractAccount(t *testing.T) {
 			return nil
 		},
 		getSigningAccounts: func() []Address {
-			return []Address{addressValue}
+			return []Address{addressValue.ToAddress()}
 		},
 		updateAccountCode: func(address Address, code []byte, checkPermission bool) (err error) {
 			accountCode = code
@@ -2112,7 +2113,7 @@ func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
 		createAccount: func(publicKeys [][]byte) (address Address, err error) {
 			result := interpreter.NewAddressValueFromBytes([]byte{nextAccount})
 			nextAccount++
-			return result, nil
+			return result.ToAddress(), nil
 		},
 		getSigningAccounts: func() []Address {
 			return []Address{{0x1}}

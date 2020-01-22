@@ -171,19 +171,16 @@ func (e *Engine) createBlock() (*flow.Block, error) {
 	guarantees := e.pool.All()
 
 	// create the block content with the collection guarantees
-	content := flow.Content{
+	payload := flow.Payload{
 		Identities: nil,
 		Guarantees: guarantees,
 	}
-
-	// create the payload hashes from the block content
-	payload := content.Payload()
 
 	// create the block header from the current head
 	header := flow.Header{
 		Number:      head.Number + 1,
 		ParentID:    head.ID(),
-		PayloadHash: payload.Root(),
+		PayloadHash: payload.Hash(),
 		Timestamp:   time.Now().UTC(),
 	}
 
@@ -191,7 +188,6 @@ func (e *Engine) createBlock() (*flow.Block, error) {
 	block := flow.Block{
 		Header:  header,
 		Payload: payload,
-		Content: content,
 	}
 
 	return &block, nil

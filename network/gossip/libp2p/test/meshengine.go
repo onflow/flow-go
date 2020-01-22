@@ -19,7 +19,6 @@ type MeshEngine struct {
 	originID flow.Identifier  // used to keep track of the id of the sender of the messages
 	event    chan interface{} // used to keep track of the events that the node receives
 	received chan struct{}    // used as an indicator on reception of messages for testing
-	echomsg  string           // used as a fix string to be included in the reply echos
 
 }
 

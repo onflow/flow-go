@@ -21,17 +21,15 @@ func AccountSignatureFixture() flow.AccountSignature {
 }
 
 func BlockFixture() flow.Block {
-	content := flow.Content{
+	payload := flow.Payload{
 		Identities: IdentityListFixture(32),
 		Guarantees: CollectionGuaranteesFixture(16),
 	}
-	payload := content.Payload()
 	header := BlockHeaderFixture()
-	header.PayloadHash = payload.Root()
+	header.PayloadHash = payload.Hash()
 	return flow.Block{
 		Header:  header,
 		Payload: payload,
-		Content: content,
 	}
 }
 
@@ -65,9 +63,7 @@ func CollectionFixture(n int) flow.Collection {
 	transactions := make([]*flow.TransactionBody, 0, n)
 
 	for i := 0; i < n; i++ {
-		tx := TransactionFixture(func(t *flow.Transaction) {
-			t.Nonce = rand.Uint64()
-		})
+		tx := TransactionFixture()
 		transactions = append(transactions, &tx.TransactionBody)
 	}
 
@@ -90,10 +86,8 @@ func ExecutionResultFixture() flow.ExecutionResult {
 			BlockID:              IdentifierFixture(),
 			FinalStateCommitment: StateCommitmentFixture(),
 			Chunks: flow.ChunkList{
-				Chunks: []*flow.Chunk{
-					ChunkFixture(),
-					ChunkFixture(),
-				},
+				ChunkFixture(),
+				ChunkFixture(),
 			},
 		},
 		Signatures: SignaturesFixture(6),
@@ -153,7 +147,7 @@ func WithRole(role flow.Role) func(*flow.Identity) {
 }
 
 // IdentityFixture returns a node identity.
-func IdentityFixture(opts ...func(*flow.Identity)) flow.Identity {
+func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	id := flow.Identity{
 		NodeID:  IdentifierFixture(),
 		Address: "address",
@@ -163,25 +157,25 @@ func IdentityFixture(opts ...func(*flow.Identity)) flow.Identity {
 	for _, apply := range opts {
 		apply(&id)
 	}
-	return id
+	return &id
 }
 
 // IdentityListFixture returns a list of node identity objects. The identities
 // can be customized (ie. set their role) by passing in a function that modifies
 // the input identities as required.
 func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList {
-	nodes := make(flow.IdentityList, n)
+	identities := make(flow.IdentityList, n)
 
 	for i := 0; i < n; i++ {
-		node := IdentityFixture()
-		node.Address = fmt.Sprintf("address-%d", i+1)
+		identity := IdentityFixture()
+		identity.Address = fmt.Sprintf("address-%d", i+1)
 		for _, opt := range opts {
-			opt(&node)
+			opt(identity)
 		}
-		nodes[i] = node
+		identities[i] = identity
 	}
 
-	return nodes
+	return identities
 }
 
 func ChunkFixture() *flow.Chunk {
@@ -238,23 +232,22 @@ func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 	coll := CollectionFixture(3)
 	guarantee := coll.Guarantee()
 
-	content := flow.Content{
+	payload := flow.Payload{
 		Identities: IdentityListFixture(32),
 		Guarantees: []*flow.CollectionGuarantee{&guarantee},
 	}
-	payload := content.Payload()
 	header := BlockHeaderFixture()
-	header.PayloadHash = payload.Root()
+	header.PayloadHash = payload.Hash()
 
 	block := flow.Block{
 		Header:  header,
 		Payload: payload,
-		Content: content,
 	}
 
 	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: 0,
+			StartState:      StateCommitmentFixture(),
 		},
 		Index: 0,
 	}
@@ -267,7 +260,7 @@ func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 	result := flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			BlockID: block.ID(),
-			Chunks:  flow.ChunkList{Chunks: []*flow.Chunk{&chunk}},
+			Chunks:  flow.ChunkList{&chunk},
 		},
 	}
 
@@ -280,5 +273,13 @@ func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 		Block:       &block,
 		Collections: []*flow.Collection{&coll},
 		ChunkStates: []*flow.ChunkState{&chunkState},
+	}
+}
+
+func ChunkHeaderFixture() flow.ChunkHeader {
+	return flow.ChunkHeader{
+		ChunkID:     IdentifierFixture(),
+		StartState:  StateCommitmentFixture(),
+		RegisterIDs: []flow.RegisterID{{1}, {2}, {3}},
 	}
 }

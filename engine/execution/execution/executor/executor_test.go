@@ -17,9 +17,9 @@ import (
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
-	vm := &vmmock.VirtualMachine{}
-	bc := &vmmock.BlockContext{}
-	es := &statemock.ExecutionState{}
+	vm := new(vmmock.VirtualMachine)
+	bc := new(vmmock.BlockContext)
+	es := new(statemock.ExecutionState)
 
 	exe := executor.NewBlockExecutor(vm, es)
 
@@ -40,7 +40,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Signatures:   nil,
 	}
 
-	content := flow.Content{
+	payload := flow.Payload{
 		Guarantees: []*flow.CollectionGuarantee{&guarantee},
 	}
 
@@ -48,7 +48,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		Header: flow.Header{
 			Number: 42,
 		},
-		Content: content,
+		Payload: payload,
 	}
 
 	completeBlock := &execution.CompleteBlock{
@@ -78,12 +78,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	es.On("CommitDelta", mock.Anything).Return(nil, nil)
 	es.On("PersistStateCommitment", block.ID(), mock.Anything).Return(nil)
+	es.On("PersistChunkHeader", mock.Anything, mock.Anything).Return(nil)
 
 	result, err := exe.ExecuteBlock(completeBlock)
 	assert.NoError(t, err)
-	assert.Len(t, result.Chunks.Chunks, 1)
+	assert.Len(t, result.Chunks, 1)
 
-	chunk := result.Chunks.Chunks[0]
+	chunk := result.Chunks[0]
 	assert.EqualValues(t, 0, chunk.CollectionIndex)
 
 	vm.AssertExpectations(t)

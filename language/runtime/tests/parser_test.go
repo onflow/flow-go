@@ -11,7 +11,7 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
 func TestParseReplInput(t *testing.T) {
@@ -224,7 +224,7 @@ func TestParseBoolExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIdentifierExpression(t *testing.T) {
@@ -258,7 +258,7 @@ func TestParseIdentifierExpression(t *testing.T) {
 		Declarations: []Declaration{b},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseArrayExpression(t *testing.T) {
@@ -309,7 +309,7 @@ func TestParseArrayExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseDictionaryExpression(t *testing.T) {
@@ -378,7 +378,7 @@ func TestParseDictionaryExpression(t *testing.T) {
 		Declarations: []Declaration{x},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
@@ -439,7 +439,7 @@ func TestParseInvocationExpressionWithoutLabels(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInvocationExpressionWithLabels(t *testing.T) {
@@ -504,7 +504,7 @@ func TestParseInvocationExpressionWithLabels(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMemberExpression(t *testing.T) {
@@ -544,7 +544,7 @@ func TestParseMemberExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseOptionalMemberExpression(t *testing.T) {
@@ -585,7 +585,7 @@ func TestParseOptionalMemberExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIndexExpression(t *testing.T) {
@@ -633,7 +633,7 @@ func TestParseIndexExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseUnaryExpression(t *testing.T) {
@@ -674,7 +674,7 @@ func TestParseUnaryExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseOrExpression(t *testing.T) {
@@ -719,7 +719,7 @@ func TestParseOrExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseAndExpression(t *testing.T) {
@@ -764,7 +764,7 @@ func TestParseAndExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseEqualityExpression(t *testing.T) {
@@ -809,7 +809,7 @@ func TestParseEqualityExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseRelationalExpression(t *testing.T) {
@@ -856,7 +856,7 @@ func TestParseRelationalExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseAdditiveExpression(t *testing.T) {
@@ -903,7 +903,7 @@ func TestParseAdditiveExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMultiplicativeExpression(t *testing.T) {
@@ -950,7 +950,7 @@ func TestParseMultiplicativeExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseConcatenatingExpression(t *testing.T) {
@@ -1029,7 +1029,7 @@ func TestParseConcatenatingExpression(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionExpressionAndReturn(t *testing.T) {
@@ -1100,7 +1100,7 @@ func TestParseFunctionExpressionAndReturn(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionAndBlock(t *testing.T) {
@@ -1155,7 +1155,7 @@ func TestParseFunctionAndBlock(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionParameterWithoutLabel(t *testing.T) {
@@ -1225,7 +1225,7 @@ func TestParseFunctionParameterWithoutLabel(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionParameterWithLabel(t *testing.T) {
@@ -1295,7 +1295,7 @@ func TestParseFunctionParameterWithLabel(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIfStatement(t *testing.T) {
@@ -1441,7 +1441,7 @@ func TestParseIfStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
@@ -1559,7 +1559,7 @@ func TestParseIfStatementWithVariableDeclaration(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIfStatementNoElse(t *testing.T) {
@@ -1637,7 +1637,7 @@ func TestParseIfStatementNoElse(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseWhileStatement(t *testing.T) {
@@ -1732,7 +1732,7 @@ func TestParseWhileStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseAssignment(t *testing.T) {
@@ -1803,7 +1803,7 @@ func TestParseAssignment(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseAccessAssignment(t *testing.T) {
@@ -1920,7 +1920,7 @@ func TestParseAccessAssignment(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseExpressionStatementWithAccess(t *testing.T) {
@@ -2023,7 +2023,7 @@ func TestParseExpressionStatementWithAccess(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseParametersAndArrayTypes(t *testing.T) {
@@ -2164,7 +2164,7 @@ func TestParseParametersAndArrayTypes(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseDictionaryType(t *testing.T) {
@@ -2219,7 +2219,7 @@ func TestParseDictionaryType(t *testing.T) {
 		Declarations: []Declaration{x},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIntegerLiterals(t *testing.T) {
@@ -2321,7 +2321,7 @@ func TestParseIntegerLiterals(t *testing.T) {
 		Declarations: []Declaration{octal, hex, binary, decimal},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
@@ -2423,7 +2423,7 @@ func TestParseIntegerLiteralsWithUnderscores(t *testing.T) {
 		Declarations: []Declaration{octal, hex, binary, decimal},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInvalidIntegerLiteralPrefixWithout(t *testing.T) {
@@ -2514,7 +2514,7 @@ func TestParseIntegerLiteralWithLeadingZeros(t *testing.T) {
 		Declarations: []Declaration{decimal},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInvalidOctalIntegerLiteralWithTrailingUnderscore(t *testing.T) {
@@ -2803,7 +2803,7 @@ func TestParseDecimalIntegerLiteralWithLeadingZeros(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseBinaryIntegerLiteralWithLeadingZeros(t *testing.T) {
@@ -2839,7 +2839,7 @@ func TestParseBinaryIntegerLiteralWithLeadingZeros(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIntegerTypes(t *testing.T) {
@@ -3103,7 +3103,7 @@ func TestParseIntegerTypes(t *testing.T) {
 		Declarations: []Declaration{a, b, c, d, e, f, g, h},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionType(t *testing.T) {
@@ -3179,7 +3179,7 @@ func TestParseFunctionType(t *testing.T) {
 		Declarations: []Declaration{add},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionArrayType(t *testing.T) {
@@ -3253,7 +3253,7 @@ func TestParseFunctionArrayType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
@@ -3327,7 +3327,7 @@ func TestParseFunctionTypeWithArrayReturnType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
@@ -3415,7 +3415,7 @@ func TestParseFunctionTypeWithFunctionReturnTypeInParentheses(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
@@ -3504,7 +3504,7 @@ func TestParseFunctionTypeWithFunctionReturnType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMissingReturnType(t *testing.T) {
@@ -3588,7 +3588,7 @@ func TestParseMissingReturnType(t *testing.T) {
 		Declarations: []Declaration{noop},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseLeftAssociativity(t *testing.T) {
@@ -3646,7 +3646,7 @@ func TestParseLeftAssociativity(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInvalidDoubleIntegerUnary(t *testing.T) {
@@ -3783,7 +3783,7 @@ func TestParseTernaryRightAssociativity(t *testing.T) {
 		Declarations: []Declaration{a},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseStructure(t *testing.T) {
@@ -3976,7 +3976,7 @@ func TestParseStructure(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseStructureWithConformances(t *testing.T) {
@@ -4018,7 +4018,7 @@ func TestParseStructureWithConformances(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParsePreAndPostConditions(t *testing.T) {
@@ -4178,7 +4178,7 @@ func TestParsePreAndPostConditions(t *testing.T) {
 		},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseExpression(t *testing.T) {
@@ -4246,7 +4246,7 @@ func TestParseExpression(t *testing.T) {
 		},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseString(t *testing.T) {
@@ -4265,7 +4265,7 @@ func TestParseString(t *testing.T) {
 		},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseStringWithUnicode(t *testing.T) {
@@ -4284,7 +4284,7 @@ func TestParseStringWithUnicode(t *testing.T) {
 		},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseConditionMessage(t *testing.T) {
@@ -4403,7 +4403,7 @@ func TestParseConditionMessage(t *testing.T) {
 		},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseOptionalType(t *testing.T) {
@@ -4455,7 +4455,7 @@ func TestParseOptionalType(t *testing.T) {
 		},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseNilCoalescing(t *testing.T) {
@@ -4497,7 +4497,7 @@ func TestParseNilCoalescing(t *testing.T) {
 		},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseNilCoalescingRightAssociativity(t *testing.T) {
@@ -4556,7 +4556,7 @@ func TestParseNilCoalescingRightAssociativity(t *testing.T) {
 		},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFailableCasting(t *testing.T) {
@@ -4611,7 +4611,7 @@ func TestParseFailableCasting(t *testing.T) {
 		},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInterface(t *testing.T) {
@@ -4746,7 +4746,7 @@ func TestParseInterface(t *testing.T) {
 			Declarations: []Declaration{test},
 		}
 
-		unittest.AssertEqualWithDiff(t, expected, actual)
+		utils.AssertEqualWithDiff(t, expected, actual)
 	}
 }
 
@@ -4772,7 +4772,7 @@ func TestParseImportWithString(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 
 	importLocation := StringLocation("test.bpl")
 
@@ -4815,7 +4815,7 @@ func TestParseImportWithAddress(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 
 	importLocation := AddressLocation([]byte{18, 52})
 
@@ -4867,7 +4867,7 @@ func TestParseImportWithIdentifiers(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFieldWithFromIdentifier(t *testing.T) {
@@ -4981,7 +4981,7 @@ func TestParseResource(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseEvent(t *testing.T) {
@@ -5068,7 +5068,7 @@ func TestParseEvent(t *testing.T) {
 		Declarations: []Declaration{transfer},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseEventEmitStatement(t *testing.T) {
@@ -5125,7 +5125,7 @@ func TestParseEventEmitStatement(t *testing.T) {
 
 	actualStatements := actual.Declarations[0].(*FunctionDeclaration).FunctionBlock.Block.Statements
 
-	unittest.AssertEqualWithDiff(t, expectedStatements, actualStatements)
+	utils.AssertEqualWithDiff(t, expectedStatements, actualStatements)
 }
 
 func TestParseResourceReturnType(t *testing.T) {
@@ -5172,7 +5172,7 @@ func TestParseResourceReturnType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMovingVariableDeclaration(t *testing.T) {
@@ -5206,7 +5206,7 @@ func TestParseMovingVariableDeclaration(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMoveStatement(t *testing.T) {
@@ -5275,7 +5275,7 @@ func TestParseMoveStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMoveOperator(t *testing.T) {
@@ -5332,7 +5332,7 @@ func TestParseMoveOperator(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseResourceParameterType(t *testing.T) {
@@ -5402,7 +5402,7 @@ func TestParseResourceParameterType(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
@@ -5446,7 +5446,7 @@ func TestParseMovingVariableDeclarationWithTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
@@ -5500,7 +5500,7 @@ func TestParseFieldDeclarationWithMoveTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionTypeWithResourceTypeAnnotation(t *testing.T) {
@@ -5555,7 +5555,7 @@ func TestParseFunctionTypeWithResourceTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionExpressionWithResourceTypeAnnotation(t *testing.T) {
@@ -5624,7 +5624,7 @@ func TestParseFunctionExpressionWithResourceTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFailableCastingResourceTypeAnnotation(t *testing.T) {
@@ -5675,7 +5675,7 @@ func TestParseFailableCastingResourceTypeAnnotation(t *testing.T) {
 		Declarations: []Declaration{variableDeclaration},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseCasting(t *testing.T) {
@@ -5725,7 +5725,7 @@ func TestParseCasting(t *testing.T) {
 		Declarations: []Declaration{variableDeclaration},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpression(t *testing.T) {
@@ -5842,7 +5842,7 @@ func TestParseFunctionExpressionStatementAfterVariableDeclarationWithCreateExpre
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseIdentifiers(t *testing.T) {
@@ -5927,7 +5927,7 @@ func TestParseExpressionStatementAfterReturnStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseSwapStatement(t *testing.T) {
@@ -6015,7 +6015,7 @@ func TestParseSwapStatement(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseDestructor(t *testing.T) {
@@ -6073,7 +6073,7 @@ func TestParseDestructor(t *testing.T) {
 		Declarations: []Declaration{test},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseReferenceType(t *testing.T) {
@@ -6131,7 +6131,7 @@ func TestParseReferenceType(t *testing.T) {
 		},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseInvalidReferenceToOptionalType(t *testing.T) {
@@ -6204,7 +6204,7 @@ func TestParseReference(t *testing.T) {
 		},
 	}
 
-	unittest.AssertEqualWithDiff(t, expected, actual)
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseCompositeDeclarationWithSemicolonSeparatedMembers(t *testing.T) {
@@ -6433,7 +6433,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 			},
 		}
 
-		unittest.AssertEqualWithDiff(t, expected, actual)
+		utils.AssertEqualWithDiff(t, expected, actual)
 	})
 
 	t.Run("SimpleTransaction", func(t *testing.T) {
@@ -6620,7 +6620,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 			},
 		}
 
-		unittest.AssertEqualWithDiff(t, expected, actual)
+		utils.AssertEqualWithDiff(t, expected, actual)
 	})
 
 	t.Run("PreExecutePost", func(t *testing.T) {
@@ -6857,7 +6857,7 @@ func TestParseTransactionDeclaration(t *testing.T) {
 			},
 		}
 
-		unittest.AssertEqualWithDiff(t, expected, actual)
+		utils.AssertEqualWithDiff(t, expected, actual)
 	})
 
 	t.Run("PrePostExecute", func(t *testing.T) {
@@ -7094,6 +7094,6 @@ func TestParseTransactionDeclaration(t *testing.T) {
 			},
 		}
 
-		unittest.AssertEqualWithDiff(t, expected, actual)
+		utils.AssertEqualWithDiff(t, expected, actual)
 	})
 }

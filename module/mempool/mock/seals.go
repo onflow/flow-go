@@ -41,8 +41,8 @@ func (_m *Seals) All() []*flow.Seal {
 	return r0
 }
 
-// Get provides a mock function with given fields: sealID
-func (_m *Seals) Get(sealID flow.Identifier) (*flow.Seal, error) {
+// ByID provides a mock function with given fields: sealID
+func (_m *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	ret := _m.Called(sealID)
 
 	var r0 *flow.Seal

@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
@@ -34,6 +35,8 @@ type Engine struct {
 	blocks             mempool.Blocks
 	collections        mempool.Collections
 	chunkStates        mempool.ChunkStates
+	// protects the checkPendingReceipts method to prevent double-verifying
+	checkReceiptsMu sync.Mutex
 }
 
 // New creates and returns a new instance of the ingest engine.
@@ -301,7 +304,7 @@ func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 // TODO does not yet request block
 func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
 	// ensure we have the block corresponding to this execution
-	block, err := e.blocks.Get(receipt.ExecutionResult.BlockID)
+	block, err := e.blocks.ByID(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		// TODO should request the block here. For now, we require that we
 		// have received the block at this point as there is no way to request it
@@ -345,7 +348,7 @@ func (e *Engine) getChunkStatesForReceipt(receipt *flow.ExecutionReceipt) ([]*fl
 			continue
 		}
 
-		chunkState, err := e.chunkStates.Get(chunk.ID())
+		chunkState, err := e.chunkStates.ByID(chunk.ID())
 		if err != nil {
 			// couldn't get chunk state from mempool, the receipt cannot yet be verified
 			ready = false
@@ -420,7 +423,7 @@ func (e *Engine) getCollectionsForReceipt(block *flow.Block, receipt *flow.Execu
 			continue
 		}
 
-		coll, err := e.collections.Get(collID)
+		coll, err := e.collections.ByID(collID)
 		if err != nil {
 			// couldn't get the collection from mempool, the receipt cannot be verified
 			ready = false
@@ -449,8 +452,12 @@ func (e *Engine) getCollectionsForReceipt(block *flow.Block, receipt *flow.Execu
 
 // checkPendingReceipts checks all pending receipts in the mempool and verifies
 // any that are ready for verification.
+//
+// NOTE: this method is protected by mutex to prevent double-verifying ERs.
 func (e *Engine) checkPendingReceipts() {
-	// TODO address race on this method - if called simultaneously, could double-verify
+	e.checkReceiptsMu.Lock()
+	defer e.checkReceiptsMu.Unlock()
+
 	receipts := e.receipts.All()
 
 	for _, receipt := range receipts {
@@ -483,8 +490,15 @@ func (e *Engine) checkPendingReceipts() {
 				continue
 			}
 
-			// if the receipt was verified, remove it from the mempool
+			// if the receipt was verified, remove it and associated resources from the mempool
 			e.receipts.Rem(receipt.ID())
+			e.blocks.Rem(block.ID())
+			for _, coll := range collections {
+				e.collections.Rem(coll.ID())
+			}
+			for _, chunkState := range chunkStates {
+				e.chunkStates.Rem(chunkState.ID())
+			}
 		}
 	}
 }
