@@ -92,7 +92,7 @@ func (mn *Network) buffer(from flow.Identifier, channelID uint8, event interface
 // might be triggered to forward messages to its peers, so this function will
 // block until all receivers have done their forwarding.
 func (mn *Network) DeliverAllRecursive() {
-	mn.hub.Buffer.Flush(func(m *PendingMessage) {
+	mn.hub.Buffer.DeliverRecursive(func(m *PendingMessage) {
 		_ = mn.sendToAllTargets(m)
 	})
 }
@@ -102,7 +102,7 @@ func (mn *Network) DeliverAllRecursive() {
 // satisfy the shouldDrop predicate are permanently dropped. This function will
 // block until all receivers have done their forwarding.
 func (mn *Network) DeliverAllRecursiveExcept(shouldDrop func(*PendingMessage) bool) {
-	mn.hub.Buffer.Flush(func(m *PendingMessage) {
+	mn.hub.Buffer.DeliverRecursive(func(m *PendingMessage) {
 		if shouldDrop(m) {
 			return
 		}
