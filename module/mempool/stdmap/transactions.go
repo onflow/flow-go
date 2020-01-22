@@ -53,7 +53,7 @@ func (t *Transactions) Rem(txID flow.Identifier) bool {
 		panic(fmt.Sprintf("invalid entity in transaction pool (%T)", entity))
 	}
 	tx.FinishSpan()
-	return t.Rem(txID)
+	return t.Backend.Rem(txID)
 }
 
 // All returns all transactions from the mempool.
