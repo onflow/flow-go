@@ -9,13 +9,12 @@ import (
 	golog "github.com/ipfs/go-log"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	mockery "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	gologging "github.com/whyrusleeping/go-logging"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	libp2pmodel "github.com/dapperlabs/flow-go/model/libp2p/message"
+	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/module/mock"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
@@ -29,7 +28,7 @@ type StubEngineTestSuite struct {
 	suite.Suite
 	nets []*libp2p.Network    // used to keep track of the networks
 	mws  []*libp2p.Middleware // used to keep track of the middlewares associated with networks
-	ids  []flow.Identifier    // used to keep track of the identifiers associated with networks
+	ids  flow.IdentityList    // used to keep track of the identifiers associated with networks
 }
 
 // TestStubEngineTestSuite runs all the test methods in this test suit
@@ -95,16 +94,16 @@ func (s *StubEngineTestSuite) singleMessage(echo bool) {
 	sndID := 0
 	rcvID := 1
 	// test engine1
-	sender := NewEngine(s.Suite.T(), s.nets[sndID], 1, 1)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 1, 1)
 
 	// test engine 2
-	receiver := NewEngine(s.Suite.T(), s.nets[rcvID], 1, 1)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 1, 1)
 
 	// Send the message to node 2 using the conduit of node 1
-	event := &libp2pmodel.Echo{
+	event := &message.Echo{
 		Text: "hello",
 	}
-	require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID]))
+	require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID].NodeID))
 
 	// evaluates reception of echo request
 	select {
@@ -113,11 +112,11 @@ func (s *StubEngineTestSuite) singleMessage(echo bool) {
 		// does not evaluate the content
 		require.NotNil(s.Suite.T(), receiver.originID)
 		require.NotNil(s.Suite.T(), receiver.event)
-		assert.Equal(s.Suite.T(), s.ids[sndID], receiver.originID)
+		assert.Equal(s.Suite.T(), s.ids[sndID].NodeID, receiver.originID)
 
 		// evaluates proper reception of event
 		// casts the received event at the receiver side
-		rcvEvent, ok := (<-receiver.event).(*libp2pmodel.Echo)
+		rcvEvent, ok := (<-receiver.event).(*message.Echo)
 		// evaluates correctness of casting
 		require.True(s.Suite.T(), ok)
 		// evaluates content of received message
@@ -136,15 +135,15 @@ func (s *StubEngineTestSuite) singleMessage(echo bool) {
 			// does not evaluate the content
 			require.NotNil(s.Suite.T(), sender.originID)
 			require.NotNil(s.Suite.T(), sender.event)
-			assert.Equal(s.Suite.T(), s.ids[rcvID], sender.originID)
+			assert.Equal(s.Suite.T(), s.ids[rcvID].NodeID, sender.originID)
 
 			// evaluates proper reception of event
 			// casts the received event at the receiver side
-			rcvEvent, ok := (<-sender.event).(*libp2pmodel.Echo)
+			rcvEvent, ok := (<-sender.event).(*message.Echo)
 			// evaluates correctness of casting
 			require.True(s.Suite.T(), ok)
 			// evaluates content of received message
-			echoEvent := &libp2pmodel.Echo{
+			echoEvent := &message.Echo{
 				Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
 			}
 			assert.Equal(s.Suite.T(), echoEvent, rcvEvent)
@@ -164,17 +163,17 @@ func (s *StubEngineTestSuite) multiMessageSync(echo bool, count int) {
 	sndID := 0
 	rcvID := 1
 	// test engine1
-	sender := NewEngine(s.Suite.T(), s.nets[sndID], count, 1)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], count, 1)
 
 	// test engine 2
-	receiver := NewEngine(s.Suite.T(), s.nets[rcvID], count, 1)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], count, 1)
 
 	for i := 0; i < count; i++ {
 		// Send the message to receiver
-		event := &libp2pmodel.Echo{
+		event := &message.Echo{
 			Text: fmt.Sprintf("hello%d", i),
 		}
-		require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID]))
+		require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[rcvID].NodeID))
 
 		select {
 		case <-receiver.received:
@@ -182,11 +181,11 @@ func (s *StubEngineTestSuite) multiMessageSync(echo bool, count int) {
 			// does not evaluate the content
 			require.NotNil(s.Suite.T(), receiver.originID)
 			require.NotNil(s.Suite.T(), receiver.event)
-			assert.Equal(s.Suite.T(), s.ids[sndID], receiver.originID)
+			assert.Equal(s.Suite.T(), s.ids[sndID].NodeID, receiver.originID)
 
 			// evaluates proper reception of event
 			// casts the received event at the receiver side
-			rcvEvent, ok := (<-receiver.event).(*libp2pmodel.Echo)
+			rcvEvent, ok := (<-receiver.event).(*message.Echo)
 			// evaluates correctness of casting
 			require.True(s.Suite.T(), ok)
 			// evaluates content of received message
@@ -205,15 +204,15 @@ func (s *StubEngineTestSuite) multiMessageSync(echo bool, count int) {
 				// does not evaluate the content
 				require.NotNil(s.Suite.T(), sender.originID)
 				require.NotNil(s.Suite.T(), sender.event)
-				assert.Equal(s.Suite.T(), s.ids[rcvID], sender.originID)
+				assert.Equal(s.Suite.T(), s.ids[rcvID].NodeID, sender.originID)
 
 				// evaluates proper reception of event
 				// casts the received event at the receiver side
-				rcvEvent, ok := (<-sender.event).(*libp2pmodel.Echo)
+				rcvEvent, ok := (<-sender.event).(*message.Echo)
 				// evaluates correctness of casting
 				require.True(s.Suite.T(), ok)
 				// evaluates content of received message
-				echoEvent := &libp2pmodel.Echo{
+				echoEvent := &message.Echo{
 					Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
 				}
 				assert.Equal(s.Suite.T(), echoEvent, rcvEvent)
@@ -235,10 +234,10 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 	sndID := 0
 	rcvID := 1
 	// test engine1
-	sender := NewEngine(s.Suite.T(), s.nets[sndID], count, 1)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], count, 1)
 
 	// test engine 2
-	receiver := NewEngine(s.Suite.T(), s.nets[rcvID], count, 1)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], count, 1)
 
 	// keeps track of async received messages at receiver side
 	received := make(map[string]struct{})
@@ -248,10 +247,10 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 
 	for i := 0; i < count; i++ {
 		// Send the message to node 2 using the conduit of node 1
-		event := &libp2pmodel.Echo{
+		event := &message.Echo{
 			Text: fmt.Sprintf("hello%d", i),
 		}
-		require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[1]))
+		require.NoError(s.Suite.T(), sender.con.Submit(event, s.ids[1].NodeID))
 	}
 
 	for i := 0; i < count; i++ {
@@ -261,11 +260,11 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 			// does not evaluate the content
 			require.NotNil(s.Suite.T(), receiver.originID)
 			require.NotNil(s.Suite.T(), receiver.event)
-			assert.Equal(s.Suite.T(), s.ids[0], receiver.originID)
+			assert.Equal(s.Suite.T(), s.ids[0].NodeID, receiver.originID)
 
 			// evaluates proper reception of event
 			// casts the received event at the receiver side
-			rcvEvent, ok := (<-receiver.event).(*libp2pmodel.Echo)
+			rcvEvent, ok := (<-receiver.event).(*message.Echo)
 			// evaluates correctness of casting
 			require.True(s.Suite.T(), ok)
 
@@ -291,11 +290,11 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 				// does not evaluate the content
 				require.NotNil(s.Suite.T(), sender.originID)
 				require.NotNil(s.Suite.T(), sender.event)
-				assert.Equal(s.Suite.T(), s.ids[rcvID], sender.originID)
+				assert.Equal(s.Suite.T(), s.ids[rcvID].NodeID, sender.originID)
 
 				// evaluates proper reception of event
 				// casts the received event at the receiver side
-				rcvEvent, ok := (<-sender.event).(*libp2pmodel.Echo)
+				rcvEvent, ok := (<-sender.event).(*message.Echo)
 				// evaluates correctness of casting
 				require.True(s.Suite.T(), ok)
 				// evaluates content of received echo message
@@ -316,26 +315,36 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 }
 
 // create ids creates and initializes count-many flow identifiers instances
-func (s *StubEngineTestSuite) createIDs(count int) []flow.Identifier {
-	ids := make([]flow.Identifier, 0)
+func (s *StubEngineTestSuite) createIDs(count int) []flow.Identity {
+	ids := make([]flow.Identity, 0)
 	for i := 0; i < count; i++ {
 		// defining id of node
 		var nodeID [32]byte
 		nodeID[0] = byte(i + 1)
-		ID := flow.Identifier(nodeID)
+		ID := flow.Identity{
+			NodeID: flow.Identifier(nodeID),
+		}
 		ids = append(ids, ID)
 	}
 	return ids
 }
 
 // create middleware receives an ids slice and creates and initializes a middleware instances for each id
-func (s *StubEngineTestSuite) createMiddleware(ids []flow.Identifier) []*libp2p.Middleware {
+func (s *StubEngineTestSuite) createMiddleware(ids []flow.Identity) []*libp2p.Middleware {
 	count := len(ids)
 	mws := make([]*libp2p.Middleware, 0)
 	for i := 0; i < count; i++ {
 		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), "0.0.0.0:0", ids[i])
+		mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), "0.0.0.0:0", ids[i].NodeID)
 		require.NoError(s.Suite.T(), err)
+
+		// retrieves IP and port of the middleware
+		ip, port := mw.GetIPPort()
+
+		// mocks an identity for the middleware
+		ids[i].Address = fmt.Sprintf("%s:%s", ip, port)
+		ids[i].Role = flow.RoleCollection
+
 		mws = append(mws, mw)
 	}
 	return mws
@@ -344,32 +353,23 @@ func (s *StubEngineTestSuite) createMiddleware(ids []flow.Identifier) []*libp2p.
 // createNetworks receives a slice of middlewares their associated flow identifiers,
 // and for each middleware creates a network instance on top
 // it returns the slice of created middlewares
-func (s *StubEngineTestSuite) createNetworks(mws []*libp2p.Middleware, ids []flow.Identifier) []*libp2p.Network {
+func (s *StubEngineTestSuite) createNetworks(mws []*libp2p.Middleware, ids flow.IdentityList) []*libp2p.Network {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
 
+	// creates and mocks the state
+	state := &protocol.State{}
+	snapshot := &protocol.Snapshot{}
 	for i := 0; i < count; i++ {
-		// retrieves IP and port of the middleware
-		ip, port := mws[(i+1)%count].GetIPPort()
+		state.On("Final").Return(snapshot)
+		snapshot.On("Identity", ids[i].NodeID).Return(ids[i], nil)
+	}
 
-		// mocks an identity for the middleware
-		//
-		targetID := flow.Identity{
-			NodeID:  ids[(i+1)%count],
-			Address: fmt.Sprintf("%s:%s", ip, port),
-			Role:    flow.RoleCollection,
-		}
-
-		// creates and mocks the state
-		state := &protocol.State{}
-		snapshot := &protocol.Snapshot{}
-		state.On("Final").Return(snapshot).Once()
-		snapshot.On("Identity", mockery.Anything).Return(targetID, nil).Once()
-
+	for i := 0; i < count; i++ {
 		// creates and mocks me
 		// creating network of node-1
 		me := &mock.Local{}
-		me.On("NodeID").Return(ids[i])
+		me.On("NodeID").Return(ids[i].NodeID)
 		net, err := libp2p.NewNetwork(zerolog.Logger{}, json.NewCodec(), state, me, mws[i])
 		require.NoError(s.Suite.T(), err)
 
@@ -378,7 +378,7 @@ func (s *StubEngineTestSuite) createNetworks(mws []*libp2p.Middleware, ids []flo
 		// starts the middlewares
 		done := net.Ready()
 		<-done
-		time.Sleep(1 * time.Second)
+		// time.Sleep(1 * time.Second)
 	}
 
 	return nets
