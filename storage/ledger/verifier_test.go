@@ -15,9 +15,9 @@ func TestTrieUntrustedAndVerify(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		keys, values := makeTestKeys()
+		ids, values := makeTestValues()
 
-		newRoot, proofs, err := f.UpdateRegistersWithProof(keys, values)
+		newRoot, proofs, err := f.UpdateRegistersWithProof(ids, values)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -27,7 +27,7 @@ func TestTrieUntrustedAndVerify(t *testing.T) {
 		}
 
 		v := NewTrieVerifier(f.tree.GetHeight(), f.tree.GetDefaultHashes())
-		_, err = v.VerifyRegistersProof(keys, f.tree.GetRoot().GetValue(), values, proofs)
+		_, err = v.VerifyRegistersProof(ids, f.tree.GetRoot().GetValue(), values, proofs)
 		if err != nil {
 			t.Fatal(err)
 		}

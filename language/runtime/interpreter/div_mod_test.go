@@ -1,7 +1,6 @@
 package interpreter
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,24 +56,22 @@ func TestDivModUInt8(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b UInt8Value){
-			"/": func(a, b UInt8Value) {
+		for _, f := range []func(a, b UInt8Value){
+			func(a, b UInt8Value) {
 				a.Div(b)
 			},
-			"%": func(a, b UInt8Value) {
+			func(a, b UInt8Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -129,24 +126,22 @@ func TestDivModUInt16(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b UInt16Value){
-			"/": func(a, b UInt16Value) {
+		for _, f := range []func(a, b UInt16Value){
+			func(a, b UInt16Value) {
 				a.Div(b)
 			},
-			"%": func(a, b UInt16Value) {
+			func(a, b UInt16Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -201,24 +196,22 @@ func TestDivModUInt32(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b UInt32Value){
-			"/": func(a, b UInt32Value) {
+		for _, f := range []func(a, b UInt32Value){
+			func(a, b UInt32Value) {
 				a.Div(b)
 			},
-			"%": func(a, b UInt32Value) {
+			func(a, b UInt32Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -363,24 +356,22 @@ func TestDivModUInt64(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b UInt64Value){
-			"/": func(a, b UInt64Value) {
+		for _, f := range []func(a, b UInt64Value){
+			func(a, b UInt64Value) {
 				a.Div(b)
 			},
-			"%": func(a, b UInt64Value) {
+			func(a, b UInt64Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -436,24 +427,22 @@ func TestDivModInt8(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b Int8Value){
-			"/": func(a, b Int8Value) {
+		for _, f := range []func(a, b Int8Value){
+			func(a, b Int8Value) {
 				a.Div(b)
 			},
-			"%": func(a, b Int8Value) {
+			func(a, b Int8Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -509,24 +498,22 @@ func TestDivModInt16(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b Int16Value){
-			"/": func(a, b Int16Value) {
+		for _, f := range []func(a, b Int16Value){
+			func(a, b Int16Value) {
 				a.Div(b)
 			},
-			"%": func(a, b Int16Value) {
+			func(a, b Int16Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -582,24 +569,22 @@ func TestDivModInt32(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b Int32Value){
-			"/": func(a, b Int32Value) {
+		for _, f := range []func(a, b Int32Value){
+			func(a, b Int32Value) {
 				a.Div(b)
 			},
-			"%": func(a, b Int32Value) {
+			func(a, b Int32Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
@@ -745,42 +730,618 @@ func TestDivModInt64(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		for op, f := range map[string]func(a, b Int64Value){
-			"/": func(a, b Int64Value) {
+		for _, f := range []func(a, b Int64Value){
+			func(a, b Int64Value) {
 				a.Div(b)
 			},
-			"%": func(a, b Int64Value) {
+			func(a, b Int64Value) {
 				a.Mod(b)
 			},
 		} {
-			t.Run(fmt.Sprintf("%d %s %d", test.a, op, test.b), func(t *testing.T) {
-				f := func() {
-					f(test.a, test.b)
-				}
-				if test.valid {
-					assert.NotPanics(t, f)
-				} else {
-					assert.Panics(t, f)
-				}
-			})
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
 		}
 	}
 }
 
 func TestDivModInt(t *testing.T) {
 
-	for op, f := range map[string]func(a, b IntValue){
-		"/": func(a, b IntValue) {
+	for _, f := range []func(a, b IntValue){
+		func(a, b IntValue) {
 			a.Div(b)
 		},
-		"%": func(a, b IntValue) {
+		func(a, b IntValue) {
 			a.Mod(b)
 		},
 	} {
-		t.Run(fmt.Sprintf("1 %s 0", op), func(t *testing.T) {
-			assert.Panics(t, func() {
-				f(NewIntValue(1), NewIntValue(0))
-			})
+		assert.Panics(t, func() {
+			f(NewIntValue(1), NewIntValue(0))
 		})
+	}
+}
+
+func TestDivModInt128(t *testing.T) {
+
+	tests := []struct {
+		a, b  Int128Value
+		valid bool
+	}{
+		{int128("0x00000000000000000000000000000000"), int128("0x00000000000000000000000000000000"), false},
+		{int128("0x00000000000000000000000000000001"), int128("0x00000000000000000000000000000000"), false},
+		{int128("0x00000000000000000000000000000002"), int128("0x00000000000000000000000000000000"), false},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("0x00000000000000000000000000000000"), false},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("0x00000000000000000000000000000000"), false},
+		{int128("-0x80000000000000000000000000000000"), int128("0x00000000000000000000000000000000"), false},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("0x00000000000000000000000000000000"), false},
+		{int128("-0x00000000000000000000000000000002"), int128("0x00000000000000000000000000000000"), false},
+		{int128("-0x00000000000000000000000000000001"), int128("0x00000000000000000000000000000000"), false},
+
+		{int128("0x00000000000000000000000000000000"), int128("0x00000000000000000000000000000001"), true},
+		{int128("0x00000000000000000000000000000001"), int128("0x00000000000000000000000000000001"), true},
+		{int128("0x00000000000000000000000000000002"), int128("0x00000000000000000000000000000001"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("0x00000000000000000000000000000001"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("0x00000000000000000000000000000001"), true},
+		{int128("-0x80000000000000000000000000000000"), int128("0x00000000000000000000000000000001"), true},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("0x00000000000000000000000000000001"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("0x00000000000000000000000000000001"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("0x00000000000000000000000000000001"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("0x00000000000000000000000000000002"), true},
+		{int128("0x00000000000000000000000000000001"), int128("0x00000000000000000000000000000002"), true},
+		{int128("0x00000000000000000000000000000002"), int128("0x00000000000000000000000000000002"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("0x00000000000000000000000000000002"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("0x00000000000000000000000000000002"), true},
+		{int128("-0x80000000000000000000000000000000"), int128("0x00000000000000000000000000000002"), true},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("0x00000000000000000000000000000002"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("0x00000000000000000000000000000002"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("0x00000000000000000000000000000002"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("0x00000000000000000000000000000001"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("0x00000000000000000000000000000002"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("-0x80000000000000000000000000000000"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("0x7ffffffffffffffffffffffffffffffe"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("0x00000000000000000000000000000001"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("0x00000000000000000000000000000002"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("-0x80000000000000000000000000000000"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("0x7fffffffffffffffffffffffffffffff"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("-0x80000000000000000000000000000000"), true},
+		{int128("0x00000000000000000000000000000001"), int128("-0x80000000000000000000000000000000"), true},
+		{int128("0x00000000000000000000000000000002"), int128("-0x80000000000000000000000000000000"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("-0x80000000000000000000000000000000"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("-0x80000000000000000000000000000000"), true},
+		{int128("-0x80000000000000000000000000000000"), int128("-0x80000000000000000000000000000000"), true},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("-0x80000000000000000000000000000000"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("-0x80000000000000000000000000000000"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("-0x80000000000000000000000000000000"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("0x00000000000000000000000000000001"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("0x00000000000000000000000000000002"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("-0x80000000000000000000000000000000"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("-0x7fffffffffffffffffffffffffffffff"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("0x00000000000000000000000000000001"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("0x00000000000000000000000000000002"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("-0x80000000000000000000000000000000"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("-0x00000000000000000000000000000002"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("-0x00000000000000000000000000000002"), true},
+
+		{int128("0x00000000000000000000000000000000"), int128("-0x00000000000000000000000000000001"), true},
+		{int128("0x00000000000000000000000000000001"), int128("-0x00000000000000000000000000000001"), true},
+		{int128("0x00000000000000000000000000000002"), int128("-0x00000000000000000000000000000001"), true},
+		{int128("0x7ffffffffffffffffffffffffffffffe"), int128("-0x00000000000000000000000000000001"), true},
+		{int128("0x7fffffffffffffffffffffffffffffff"), int128("-0x00000000000000000000000000000001"), true},
+		// NOTE:
+		{int128("-0x80000000000000000000000000000000"), int128("-0x00000000000000000000000000000001"), false},
+		{int128("-0x7fffffffffffffffffffffffffffffff"), int128("-0x00000000000000000000000000000001"), true},
+		{int128("-0x00000000000000000000000000000002"), int128("-0x00000000000000000000000000000001"), true},
+		{int128("-0x00000000000000000000000000000001"), int128("-0x00000000000000000000000000000001"), true},
+	}
+
+	for _, test := range tests {
+		for _, f := range []func(a, b Int128Value){
+			func(a, b Int128Value) {
+				a.Div(b)
+			},
+			func(a, b Int128Value) {
+				a.Mod(b)
+			},
+		} {
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
+		}
+	}
+}
+
+func TestDivModInt256(t *testing.T) {
+
+	tests := []struct {
+		a, b  Int256Value
+		valid bool
+	}{
+		// 0x0000000000000000000000000000000000000000000000000000000000000000
+
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+
+		// 0x0000000000000000000000000000000000000000000000000000000000000001
+
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+
+		// 0x0000000000000000000000000000000000000000000000000000000000000002
+
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+
+		// 0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe
+
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			true,
+		},
+		{
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			true,
+		},
+		{
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			true,
+		},
+		{
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			true,
+		},
+		{
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			true,
+		},
+
+		// 0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+
+		// -0x8000000000000000000000000000000000000000000000000000000000000000
+
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			true,
+		},
+		{
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			true,
+		},
+		{
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			true,
+		},
+		{
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			true,
+		},
+		{
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			true,
+		},
+
+		// -0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+
+		// -0x0000000000000000000000000000000000000000000000000000000000000002
+
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			true,
+		},
+
+		// -0x0000000000000000000000000000000000000000000000000000000000000001
+
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("0x7ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		// NOTE:
+		{
+			int256("-0x8000000000000000000000000000000000000000000000000000000000000000"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			false,
+		},
+		{
+			int256("-0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000002"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+		{
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			int256("-0x0000000000000000000000000000000000000000000000000000000000000001"),
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		for _, f := range []func(a, b Int256Value){
+			func(a, b Int256Value) {
+				a.Div(b)
+			},
+			func(a, b Int256Value) {
+				a.Mod(b)
+			},
+		} {
+			f := func() {
+				f(test.a, test.b)
+			}
+			if test.valid {
+				assert.NotPanics(t, f)
+			} else {
+				assert.Panics(t, f)
+			}
+		}
 	}
 }
