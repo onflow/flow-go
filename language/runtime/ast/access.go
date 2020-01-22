@@ -8,14 +8,20 @@ import (
 
 type Access int
 
+// NOTE: order indicates permissiveness: from less to most permissive!
+
 const (
 	AccessNotSpecified Access = iota
 	AccessPrivate
+	AccessContract
+	AccessAccount
 	AccessPublic
 	AccessPublicSettable
-	AccessAccount
-	AccessContract
 )
+
+func (a Access) IsLessPermissiveThan(otherAccess Access) bool {
+	return a < otherAccess
+}
 
 var Accesses = []Access{
 	AccessNotSpecified,
@@ -60,8 +66,4 @@ func (a Access) Description() string {
 	}
 
 	panic(errors.NewUnreachableError())
-}
-
-func (a Access) IsLessPermissiveThan(otherAccess Access) bool {
-	return a < otherAccess
 }
