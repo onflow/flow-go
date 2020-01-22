@@ -20,8 +20,7 @@ type BlockContext interface {
 // NewBlockContext creates a new block context given a runtime and block.
 func NewBlockContext(rt runtime.Runtime, block *flow.Block) BlockContext {
 	vm := &virtualMachine{
-		rt:    rt,
-		block: block,
+		rt: rt,
 	}
 
 	return &blockContext{
