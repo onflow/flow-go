@@ -7,7 +7,9 @@ type BlockProposalProducer struct {
 	signer    Signer
 	viewState ViewState
 	mempool   Mempool
-	chainID   string
+
+	// chainID is used for specifying the chainID field for new blocks
+	chainID string
 }
 
 func NewBlockProposalProducer(signer Signer, viewState ViewState, mempool Mempool, chainID string) (*BlockProposalProducer, error) {
@@ -49,9 +51,10 @@ func (bp *BlockProposalProducer) propose(block *types.Block) *types.UnsignedBloc
 	return unsignedBlockProposal
 }
 
+// signBlockProposal takes a unsigned proposal, signes it and returns a signed block proposal
 func (bp *BlockProposalProducer) signBlockProposal(proposal *types.UnsignedBlockProposal) *types.BlockProposal {
 	sig := bp.signer.SignBlockProposal(proposal, bp.viewState.GetSelfIdxForView(proposal.View()))
 
-	blockProposal := types.NewBlockProposal(unsignedBlockProposal.Block, unsignedBlockProposal.ConsensusPayload, sig)
+	blockProposal := types.NewBlockProposal(proposal.Block, proposal.ConsensusPayload, sig)
 	return blockProposal
 }
