@@ -30,3 +30,19 @@ func (vm *virtualMachine) NewBlockContext(b *flow.Block) BlockContext {
 		block: b,
 	}
 }
+
+func (vm *virtualMachine) executeTransaction(
+	script []byte,
+	runtimeInterface runtime.Interface,
+	location runtime.Location,
+) error {
+	return vm.rt.ExecuteTransaction(script, runtimeInterface, location)
+}
+
+func (vm *virtualMachine) executeScript(
+	script []byte,
+	runtimeInterface runtime.Interface,
+	location runtime.Location,
+) (runtime.Value, error) {
+	return vm.rt.ExecuteScript(script, runtimeInterface, location)
+}
