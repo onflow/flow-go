@@ -2446,6 +2446,9 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 	case *sema.IntType:
 		return ConvertInt(value)
 
+	case *sema.UIntType:
+		return ConvertUInt(value)
+
 	case *sema.AddressType:
 		return ConvertAddress(value)
 
