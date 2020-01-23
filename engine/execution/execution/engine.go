@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
@@ -27,6 +28,7 @@ type Engine struct {
 	execState        state.ExecutionState
 	execStateConduit network.Conduit
 	receipts         network.Engine
+	vm               virtualmachine.VirtualMachine
 	executor         executor.BlockExecutor
 }
 
@@ -37,8 +39,9 @@ func New(
 	protoState protocol.State,
 	execState state.ExecutionState,
 	receipts network.Engine,
-	executor executor.BlockExecutor,
+	vm virtualmachine.VirtualMachine,
 ) (*Engine, error) {
+	executor := executor.NewBlockExecutor(vm, execState)
 
 	e := Engine{
 		unit:       engine.NewUnit(),
@@ -47,6 +50,7 @@ func New(
 		protoState: protoState,
 		execState:  execState,
 		receipts:   receipts,
+		vm:         vm,
 		executor:   executor,
 	}
 

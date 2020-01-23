@@ -158,7 +158,7 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 // resultant end state, or an error if execution failed.
 func (e *Engine) executeChunk(res *verification.CompleteExecutionResult) (flow.StateCommitment, error) {
 	rt := runtime.NewInterpreterRuntime()
-	blockCtx := virtualmachine.NewBlockContext(rt, res.Block)
+	blockCtx := virtualmachine.NewBlockContext(rt, &res.Block.Header)
 
 	getRegister := func(key string) ([]byte, error) {
 		registers := res.ChunkStates[0].Registers

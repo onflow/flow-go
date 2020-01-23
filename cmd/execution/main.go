@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/engine/execution/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
@@ -69,8 +68,6 @@ func main() {
 
 			execState := state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
 
-			blockExec := executor.NewBlockExecutor(vm, execState)
-
 			executionEng, err = execution.New(
 				node.Logger,
 				node.Network,
@@ -78,7 +75,7 @@ func main() {
 				node.State,
 				execState,
 				receiptsEng,
-				blockExec,
+				vm,
 			)
 			node.MustNot(err).Msg("could not initialize execution engine")
 
