@@ -28,7 +28,7 @@ const (
 	SHA2_384
 	SHA3_256
 	SHA3_384
-	CSHAKE_128
+	CSHAKE128
 )
 
 // String returns the string representation of this hashing algorithm.
