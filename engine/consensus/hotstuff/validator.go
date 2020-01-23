@@ -2,9 +2,9 @@ package hotstuff
 
 import (
 	"fmt"
+	"github.com/dapperlabs/flow-go/model/flow"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type Validator struct {
@@ -19,26 +19,21 @@ func (v *Validator) ValidateBlock(bp *types.BlockProposal) bool {
 	panic("TODO")
 }
 
-func (v *Validator) ValidateIncorporatedVote(vote *types.Vote, bp *types.BlockProposal, identities flow.IdentityList) error {
+func (v *Validator) ValidateVote(vote *types.Vote, bp *types.BlockProposal) (*flow.Identity, error) {
 	err := v.checkVoteSig(vote)
 	if err != nil {
-		return fmt.Errorf("could not validate the signature: %w", err)
+		return nil, fmt.Errorf("could not validate the signature: %w", err)
+	}
+
+	if bp == nil {
+		return nil, nil
 	}
 
 	if vote.View != bp.View() {
-		return fmt.Errorf("could not validate the view: %w", types.ErrInvalidView{vote})
+		return nil, fmt.Errorf("could not validate the view: %w", types.ErrInvalidView{vote})
 	}
 
-	return nil
-}
-
-func (v *Validator) ValidatePendingVote(vote *types.Vote) error {
-	err := v.checkVoteSig(vote)
-	if err != nil {
-		return fmt.Errorf("could not validate the signature: %w", err)
-	}
-
-	return nil
+	return nil, nil
 }
 
 func (v *Validator) checkVoteSig(vote *types.Vote) error {

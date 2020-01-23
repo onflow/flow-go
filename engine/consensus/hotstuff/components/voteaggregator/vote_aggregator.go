@@ -9,7 +9,6 @@ import (
 	hotstuff "github.com/dapperlabs/flow-go/engine/consensus/HotStuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
 )
 
 type VoteAggregator struct {
@@ -41,7 +40,7 @@ func NewVoteAggregator(log zerolog.Logger, viewState hotstuff.ViewState, voteVal
 // block is currently missing.
 // Note: Validations on these pending votes will be postponed until the block has been received.
 func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
-	err := va.voteValidator.ValidatePendingVote(vote)
+	_, err := va.voteValidator.ValidateVote(vote, nil)
 	if err != nil {
 		return fmt.Errorf("could not validate the vote: %w", err)
 	}
@@ -131,13 +130,7 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 // storeIncorporatedVote stores incorporated votes and accumulate stakes
 // it drops invalid votes and duplicate votes
 func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.BlockProposal) error {
-	// TODO: will be using AtBlockID after unifying Block structure
-	identities, err := va.protocolState.AtNumber(bp.Block.View).Identities(identity.HasRole(flow.RoleConsensus))
-	if err != nil {
-		return fmt.Errorf("cannot get protocol state at block")
-	}
-
-	err = va.voteValidator.ValidateIncorporatedVote(vote, bp, identities)
+	voter, err := va.voteValidator.ValidateVote(vote, bp)
 	if err != nil {
 		return fmt.Errorf("could not validate incorporated vote: %w", err)
 	}
@@ -149,8 +142,7 @@ func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.Bloc
 		})
 	}
 
-	voteSender := identities.Get(uint(vote.Signature.SignerIdx))
-	originalVote, ok := va.isDoubleVote(vote, voteSender)
+	originalVote, ok := va.isDoubleVote(vote, voter)
 	if ok {
 		return fmt.Errorf("double voting detected: %w", types.ErrDoubleVote{
 			OriginalVote: originalVote,
@@ -160,22 +152,17 @@ func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.Bloc
 	// update existing voting status or create a new one
 	votingStatus, exists := va.blockHashToVotingStatus[string(vote.BlockMRH)]
 	if !exists {
-		threshold := computeThresholdStake(identities)
-		votingStatus = NewVotingStatus(threshold, voteSender)
+		threshold := va.viewState.ComputeQCStakeThresholdAtBlockID(vote.BlockMRH)
+		votingStatus = NewVotingStatus(threshold, voter)
 		va.blockHashToVotingStatus[string(vote.BlockMRH)] = votingStatus
 	}
 	votingStatus.AddVote(vote)
-	va.viewToIDToVote[vote.View][voteSender.String()] = vote
+	va.viewToIDToVote[vote.View][voter.String()] = vote
 	va.log.Info().Msg("new incorporated vote added")
 	return nil
 }
 
 func (va *VoteAggregator) buildQC(block *types.Block) (*types.QuorumCertificate, error) {
-	identities, err := va.protocolState.AtNumber(block.View).Identities(identity.HasRole(flow.RoleConsensus))
-	if err != nil {
-		return nil, fmt.Errorf("could not get protocol state %w", err)
-	}
-
 	blockMRHStr := string(block.BlockMRH())
 	votingStatus := va.blockHashToVotingStatus[blockMRHStr]
 	if !votingStatus.canBuildQC() {
@@ -184,14 +171,14 @@ func (va *VoteAggregator) buildQC(block *types.Block) (*types.QuorumCertificate,
 	}
 
 	sigs := getSigsSliceFromVotes(va.blockHashToVotingStatus[blockMRHStr].validVotes)
-	qc := types.NewQC(block, sigs, uint32(identities.Count()))
+	qc := types.NewQC(block, sigs)
 	va.createdQC[blockMRHStr] = qc
 
 	return qc, nil
 }
 
 // double voting is detected when the voter has voted a different block at the same view before
-func (va *VoteAggregator) isDoubleVote(vote *types.Vote, sender flow.Identity) (*types.Vote, bool) {
+func (va *VoteAggregator) isDoubleVote(vote *types.Vote, sender *flow.Identity) (*types.Vote, bool) {
 	originalVote, exists := va.viewToIDToVote[vote.View][sender.String()]
 	if exists {
 		if string(originalVote.BlockMRH) != string(vote.BlockMRH) {
@@ -210,8 +197,4 @@ func getSigsSliceFromVotes(votes map[string]*types.Vote) []*types.Signature {
 	}
 
 	return signatures
-}
-
-func computeThresholdStake(identities flow.IdentityList) uint64 {
-	return identities.TotalStake()*2/3 + 1
 }

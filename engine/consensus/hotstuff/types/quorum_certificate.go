@@ -6,7 +6,7 @@ type QuorumCertificate struct {
 	AggregatedSignature *AggregatedSignature
 }
 
-func NewQC(block *Block, sigs []*Signature, signersBitfieldLength uint32) *QuorumCertificate {
+func NewQC(block *Block, sigs []*Signature) *QuorumCertificate {
 	// TODO: need to add aggregate sig
 	qc := &QuorumCertificate{
 		BlockMRH: block.BlockMRH(),

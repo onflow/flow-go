@@ -8,11 +8,11 @@ import (
 type VotingStatus struct {
 	thresholdStake   uint64
 	accumulatedStake uint64
-	voteSender       flow.Identity
+	voteSender       *flow.Identity
 	validVotes       map[string]*types.Vote
 }
 
-func NewVotingStatus(thresholdStake uint64, voteSender flow.Identity) *VotingStatus {
+func NewVotingStatus(thresholdStake uint64, voteSender *flow.Identity) *VotingStatus {
 	return &VotingStatus{
 		thresholdStake: thresholdStake,
 		voteSender:     voteSender,
