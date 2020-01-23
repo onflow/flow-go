@@ -28,11 +28,12 @@ const (
 	SHA2_384
 	SHA3_256
 	SHA3_384
+	CSHAKE_128
 )
 
 // String returns the string representation of this hashing algorithm.
 func (f HashingAlgorithm) String() string {
-	return [...]string{"UNKNOWN", "SHA2_256", "SHA2_384", "SHA3_256", "SHA3_384"}[f]
+	return [...]string{"UNKNOWN", "SHA2_256", "SHA2_384", "SHA3_256", "SHA3_384", "CSHAKE_128"}[f]
 }
 
 const (

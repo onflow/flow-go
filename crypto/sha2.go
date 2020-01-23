@@ -1,8 +1,11 @@
 package crypto
 
-// sha2_256Algo, embeds HashAlgo
+import "hash"
+
+// sha2_256Algo, embeds commonHasher
 type sha2_256Algo struct {
 	*commonHasher
+	hash.Hash
 }
 
 // ComputeHash calculates and returns the SHA2-256 output of input byte array
@@ -21,9 +24,15 @@ func (s *sha2_256Algo) SumHash() Hash {
 	return digest
 }
 
-// sha2_384Algo, embeds HashAlgo
+// Add adds data to the state data to be hashed
+/*func (s *sha2_256Algo) Add(data []byte) {
+	s.Write(data)
+}*/
+
+// sha2_384Algo, embeds commonHasher
 type sha2_384Algo struct {
 	*commonHasher
+	hash.Hash
 }
 
 // ComputeHash calculates and returns the SHA2-384 output of input byte array
@@ -41,3 +50,8 @@ func (s *sha2_384Algo) SumHash() Hash {
 	s.Reset()
 	return digest
 }
+
+// Add adds data to the state data to be hashed
+/*func (s *sha2_384Algo) Add(data []byte) {
+	s.Write(data)
+}*/
