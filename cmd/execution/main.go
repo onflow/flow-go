@@ -1,12 +1,15 @@
 package main
 
 import (
+	"github.com/spf13/pflag"
+
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/engine/execution/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/engine/execution/receipts"
+	"github.com/dapperlabs/flow-go/engine/execution/rpc"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -19,15 +22,19 @@ import (
 func main() {
 
 	var (
-		receiptsEng      *receipts.Engine
 		stateCommitments storage.Commits
 		ledgerStorage    storage.Ledger
-		err              error
+		receiptsEng      *receipts.Engine
 		executionEng     *execution.Engine
+		rpcConf          rpc.Config
+		err              error
 	)
 
 	cmd.
 		FlowNode("execution").
+		ExtraFlags(func(flags *pflag.FlagSet) {
+			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
+		}).
 		PostInit(func(node *cmd.FlowNodeBuilder) {
 			stateCommitments = badger.NewCommits(node.DB)
 
@@ -99,6 +106,12 @@ func main() {
 			node.MustNot(err).Msg("could not initialize ingestion engine")
 
 			return ingestionEng
+		}).
+		Component("RPC engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			node.Logger.Info().Msg("initializing gRPC server")
+
+			rpcEng := rpc.New(node.Logger, rpcConf, executionEng)
+			return rpcEng
 		}).Run()
 
 }
