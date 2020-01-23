@@ -48,10 +48,10 @@ func TestNetworkSetupBasic(t *testing.T) {
 	realData := getRealData(flowNetwork)
 
 	expectedData := []data{
-		{image: "gcr.io/dl-flow/collection:latest", name: "collection", address: "collection"},
-		{image: "gcr.io/dl-flow/consensus:latest", name: "consensus", address: "consensus"},
-		{image: "gcr.io/dl-flow/execution:latest", name: "execution", address: "execution"},
-		{image: "gcr.io/dl-flow/verification:latest", name: "verification", address: "verification"},
+		{image: "gcr.io/dl-flow/collection:latest", name: "collection", address: "collection:2137"},
+		{image: "gcr.io/dl-flow/consensus:latest", name: "consensus", address: "consensus:2137"},
+		{image: "gcr.io/dl-flow/execution:latest", name: "execution", address: "execution:2137"},
+		{image: "gcr.io/dl-flow/verification:latest", name: "verification", address: "verification:2137"},
 	}
 
 	assert.Subset(t, realData, expectedData)
@@ -98,13 +98,13 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 	realData := getRealData(flowNetwork)
 
 	expectedData := []data{
-		{image: "gcr.io/dl-flow/collection:latest", name: "collection_0", address: "collection_0"},
-		{image: "gcr.io/dl-flow/collection:latest", name: "collection_1", address: "collection_1"},
-		{image: "gcr.io/dl-flow/collection:latest", name: "collection_2", address: "collection_2"},
-		{image: "gcr.io/dl-flow/verification:latest", name: "verification_0", address: "verification_0"},
-		{image: "gcr.io/dl-flow/verification:latest", name: "verification_1", address: "verification_1"},
-		{image: "gcr.io/dl-flow/verification:latest", name: "verification_2", address: "verification_2"},
-		{image: "gcr.io/dl-flow/execution:latest", name: "execution", address: "execution"},
+		{image: "gcr.io/dl-flow/collection:latest", name: "collection_0", address: "collection_0:2137"},
+		{image: "gcr.io/dl-flow/collection:latest", name: "collection_1", address: "collection_1:2137"},
+		{image: "gcr.io/dl-flow/collection:latest", name: "collection_2", address: "collection_2:2137"},
+		{image: "gcr.io/dl-flow/verification:latest", name: "verification_0", address: "verification_0:2137"},
+		{image: "gcr.io/dl-flow/verification:latest", name: "verification_1", address: "verification_1:2137"},
+		{image: "gcr.io/dl-flow/verification:latest", name: "verification_2", address: "verification_2:2137"},
+		{image: "gcr.io/dl-flow/execution:latest", name: "execution", address: "execution:2137"},
 	}
 
 	assert.Subset(t, realData, expectedData)

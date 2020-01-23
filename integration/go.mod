@@ -8,11 +8,9 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/docker v1.4.2-0.20190513124817-8c8457b0f2f8
 	github.com/docker/go-connections v0.4.0
-	github.com/m4ksio/testingdock v0.4.0
+	github.com/m4ksio/testingdock v0.4.1
 	github.com/stretchr/testify v1.4.0
 
 )
-
-replace github.com/m4ksio/testingdock => /Users/makspawlak/go/src/github.com/m4ksio/testingdock
 
 replace github.com/dapperlabs/flow-go => ../

@@ -56,6 +56,11 @@ test: generate-mocks
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	$(MAKE) -C crypto test
 	$(MAKE) -C language test
+	$(MAKE) -C integration test
+
+.PHONY: integration-test
+integration-test:
+	$(MAKE) -C integration integration-test
 
 .PHONY: coverage
 coverage:

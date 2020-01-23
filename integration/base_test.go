@@ -60,6 +60,7 @@ func TestContainer_Start(t *testing.T) {
 
 	sendTransaction(t, collectionNodeApiPort)
 
+	// TODO Once we have observation API in place, query this API as the actual method of test assertion
 	time.Sleep(15 * time.Second)
 }
 
