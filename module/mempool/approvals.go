@@ -23,7 +23,7 @@ type Approvals interface {
 
 	// Get will retrieve the given result approval from the memory pool; it will
 	// error if the result approval is not in the memory pool.
-	Get(approvalID flow.Identifier) (*flow.ResultApproval, error)
+	ByID(approvalID flow.Identifier) (*flow.ResultApproval, error)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

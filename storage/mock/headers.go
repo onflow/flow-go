@@ -10,8 +10,8 @@ type Headers struct {
 	mock.Mock
 }
 
-// ByID provides a mock function with given fields: blockID
-func (_m *Headers) ByID(blockID flow.Identifier) (*flow.Header, error) {
+// ByBlockID provides a mock function with given fields: blockID
+func (_m *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	ret := _m.Called(blockID)
 
 	var r0 *flow.Header

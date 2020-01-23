@@ -28,9 +28,9 @@ func (g *Guarantees) Add(guarantee *flow.CollectionGuarantee) error {
 	return g.Backend.Add(guarantee)
 }
 
-// Get returns the collection guarantee with the given ID from the mempool.
-func (g *Guarantees) Get(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
-	entity, err := g.Backend.Get(collID)
+// ByID returns the collection guarantee with the given ID from the mempool.
+func (g *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
+	entity, err := g.Backend.ByID(collID)
 	if err != nil {
 		return nil, err
 	}

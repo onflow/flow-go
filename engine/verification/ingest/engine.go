@@ -304,7 +304,7 @@ func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 // TODO does not yet request block
 func (e *Engine) getBlockForReceipt(receipt *flow.ExecutionReceipt) (*flow.Block, bool) {
 	// ensure we have the block corresponding to this execution
-	block, err := e.blocks.Get(receipt.ExecutionResult.BlockID)
+	block, err := e.blocks.ByID(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		// TODO should request the block here. For now, we require that we
 		// have received the block at this point as there is no way to request it
@@ -348,7 +348,7 @@ func (e *Engine) getChunkStatesForReceipt(receipt *flow.ExecutionReceipt) ([]*fl
 			continue
 		}
 
-		chunkState, err := e.chunkStates.Get(chunk.ID())
+		chunkState, err := e.chunkStates.ByID(chunk.ID())
 		if err != nil {
 			// couldn't get chunk state from mempool, the receipt cannot yet be verified
 			ready = false
@@ -423,7 +423,7 @@ func (e *Engine) getCollectionsForReceipt(block *flow.Block, receipt *flow.Execu
 			continue
 		}
 
-		coll, err := e.collections.Get(collID)
+		coll, err := e.collections.ByID(collID)
 		if err != nil {
 			// couldn't get the collection from mempool, the receipt cannot be verified
 			ready = false

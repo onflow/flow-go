@@ -21,7 +21,7 @@ func main() {
 
 	var (
 		receiptsEng      *receipts.Engine
-		stateCommitments storage.StateCommitments
+		stateCommitments storage.Commits
 		ledgerStorage    storage.Ledger
 		err              error
 		executionEng     *execution.Engine
@@ -30,7 +30,7 @@ func main() {
 	cmd.
 		FlowNode("execution").
 		PostInit(func(node *cmd.FlowNodeBuilder) {
-			stateCommitments = badger.NewStateCommitments(node.DB)
+			stateCommitments = badger.NewCommits(node.DB)
 
 			levelDB, err := leveldb.NewLevelDB("db/valuedb", "db/triedb")
 			node.MustNot(err).Msg("could not initialize LevelDB databases")
@@ -42,7 +42,7 @@ func main() {
 			// TODO We boldly assume that if a genesis is being written than a storage tree is also empty
 			initialStateCommitment := flow.StateCommitment(ledgerStorage.LatestStateCommitment())
 
-			err := stateCommitments.Persist(genesis.ID(), &initialStateCommitment)
+			err := stateCommitments.Store(genesis.ID(), initialStateCommitment)
 			node.MustNot(err).Msg("could not store initial state commitment for genesis block")
 
 		}).
@@ -65,7 +65,9 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 
-			execState := state.NewExecutionState(ledgerStorage, stateCommitments)
+			chunkHeaders := badger.NewChunkHeaders(node.DB)
+
+			execState := state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
 
 			blockExec := executor.NewBlockExecutor(vm, execState)
 
@@ -73,6 +75,8 @@ func main() {
 				node.Logger,
 				node.Network,
 				node.Me,
+				node.State,
+				execState,
 				receiptsEng,
 				blockExec,
 			)
@@ -86,7 +90,15 @@ func main() {
 			blocks := badger.NewBlocks(node.DB)
 			collections := badger.NewCollections(node.DB)
 
-			ingestionEng, err := ingestion.NewEngine(node.Logger, node.Network, node.Me, blocks, collections, node.State, executionEng)
+			ingestionEng, err := ingestion.NewEngine(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.State,
+				blocks,
+				collections,
+				executionEng,
+			)
 			node.MustNot(err).Msg("could not initialize ingestion engine")
 
 			return ingestionEng

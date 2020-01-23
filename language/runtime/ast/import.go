@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/language/runtime/common"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Identifier
@@ -100,7 +99,7 @@ const AddressPrefix = "A"
 type AddressLocation []byte
 
 func (l AddressLocation) String() string {
-	return fmt.Sprintf("0x%x", []byte(l))
+	return l.ToAddress().String()
 }
 
 func (l AddressLocation) ID() LocationID {
@@ -111,8 +110,8 @@ func (l AddressLocation) ID() LocationID {
 	))
 }
 
-func (l AddressLocation) ToAddress() flow.Address {
-	return flow.BytesToAddress(l)
+func (l AddressLocation) ToAddress() common.Address {
+	return common.BytesToAddress(l)
 }
 
 func init() {

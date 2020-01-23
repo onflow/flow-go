@@ -41,7 +41,7 @@ RecvLoop:
 		err := r.ReadMsg(&msg)
 		if err != nil {
 			rc.log.Error().Str("peer", rc.stream.Conn().RemotePeer().String()).Err(err)
-			rc.stream.Close()
+			rc.stop()
 			return
 		}
 

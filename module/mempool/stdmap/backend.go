@@ -47,8 +47,8 @@ func (b *Backdata) Rem(id flow.Identifier) bool {
 	return true
 }
 
-// Get returns the given item from the pool.
-func (b *Backdata) Get(id flow.Identifier) (flow.Entity, error) {
+// ByID returns the given item from the pool.
+func (b *Backdata) ByID(id flow.Identifier) (flow.Entity, error) {
 	_, ok := b.entities[id]
 	if !ok {
 		return nil, mempool.ErrEntityNotFound
@@ -111,11 +111,11 @@ func (b *Backend) Rem(id flow.Identifier) bool {
 	return b.Backdata.Rem(id)
 }
 
-// Get returns the given item from the pool.
-func (b *Backend) Get(id flow.Identifier) (flow.Entity, error) {
+// ByID returns the given item from the pool.
+func (b *Backend) ByID(id flow.Identifier) (flow.Entity, error) {
 	b.RLock()
 	defer b.RUnlock()
-	return b.Backdata.Get(id)
+	return b.Backdata.ByID(id)
 }
 
 // Run fetches the given item from the pool and runs given function on it, returning the entity after
