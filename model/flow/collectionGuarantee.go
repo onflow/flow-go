@@ -4,13 +4,13 @@ package flow
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/tracing"
+	"github.com/dapperlabs/flow-go/module/trace"
 )
 
 // CollectionGuarantee is a signed hash for a collection, which is used
 // to announce collections to consensus nodes.
 type CollectionGuarantee struct {
-	tracing.Traceable
+	trace.Traceable
 	// Hash is the hash of collection that is being guaranteed.
 	CollectionID Identifier
 	Signatures   []crypto.Signature
