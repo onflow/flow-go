@@ -35,6 +35,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, tracer tr
 	e := &Engine{
 		unit:        engine.NewUnit(),
 		log:         log.With().Str("engine", "provider").Logger(),
+		tracer:      tracer,
 		me:          me,
 		state:       state,
 		collections: collections,

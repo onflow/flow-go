@@ -22,7 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	trace "github.com/dapperlabs/flow-go/module/trace/mock"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
@@ -48,7 +48,8 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, genesis *
 
 	stub := stub.NewNetwork(state, me, hub)
 
-	tracer := &trace.Tracer{}
+	tracer, err := trace.NewTracer(log, "mock")
+	require.NoError(t, err)
 
 	return mock.GenericNode{
 		Log:    log,

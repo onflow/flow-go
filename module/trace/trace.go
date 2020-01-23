@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/uber/jaeger-client-go"
 	config "github.com/uber/jaeger-client-go/config"
-	"github.com/uber/jaeger-lib/metrics/prometheus"
 )
 
 // OpenTracer
@@ -38,9 +37,7 @@ func NewTracer(log zerolog.Logger, service string) (Tracer, error) {
 	if err != nil {
 		return nil, err
 	}
-	metricsFactory := prometheus.New()
-	log.Debug().Msgf("%+v", cfg)
-	tracer, closer, err := cfg.New(service, config.Metrics(metricsFactory), config.Logger(traceLogger{log}))
+	tracer, closer, err := cfg.New(service, config.Logger(traceLogger{log}))
 	if err != nil {
 		return nil, err
 	}
@@ -86,6 +83,7 @@ func (t *OpenTracer) FinishSpan(entity flow.Identifier) {
 	delete(t.openSpans, entity)
 }
 
-func (t *OpenTracer) GetSpan(entity flow.Identifier) opentracing.Span {
-	return t.openSpans[entity]
+func (t *OpenTracer) GetSpan(entity flow.Identifier) (opentracing.Span, bool) {
+	span, exists := t.openSpans[entity]
+	return span, exists
 }

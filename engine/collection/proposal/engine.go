@@ -166,8 +166,9 @@ func (e *Engine) createProposal() error {
 	followsFrom := make([]opentracing.StartSpanOption, 0, len(transactions))
 	txIDs := make([]flow.Identifier, 0, len(transactions))
 	for _, tx := range transactions {
-		txSpan := e.tracer.GetSpan(tx.ID())
-		followsFrom = append(followsFrom, opentracing.FollowsFrom(txSpan.Context()))
+		if txSpan, exists := e.tracer.GetSpan(tx.ID()); exists {
+			followsFrom = append(followsFrom, opentracing.FollowsFrom(txSpan.Context()))
+		}
 		txIDs = append(txIDs, tx.ID())
 	}
 	e.tracer.StartSpan(guarantee.ID(), "collectionGuaranteeProposal", followsFrom...).

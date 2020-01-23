@@ -33,7 +33,7 @@ func (_m *Tracer) FinishSpan(entity flow.Identifier) {
 }
 
 // GetSpan provides a mock function with given fields: entity
-func (_m *Tracer) GetSpan(entity flow.Identifier) opentracing.Span {
+func (_m *Tracer) GetSpan(entity flow.Identifier) (opentracing.Span, bool) {
 	ret := _m.Called(entity)
 
 	var r0 opentracing.Span
@@ -45,7 +45,14 @@ func (_m *Tracer) GetSpan(entity flow.Identifier) opentracing.Span {
 		}
 	}
 
-	return r0
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+		r1 = rf(entity)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
 }
 
 // Ready provides a mock function with given fields:
