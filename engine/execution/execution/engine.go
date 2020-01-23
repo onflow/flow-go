@@ -111,6 +111,33 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
+func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
+	// TODO: replace with latest sealed block
+	block, err := e.protoState.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest block: %w", err)
+	}
+
+	stateCommit, err := e.execState.StateCommitmentByBlockID(block.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest block state commitment: %w", err)
+	}
+
+	blockView := e.execState.NewView(stateCommit)
+
+	result, err := e.vm.NewBlockContext(block).ExecuteScript(blockView, script)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
+	}
+
+	if !result.Succeeded() {
+		return nil, fmt.Errorf("failed to execute script: %w", result.Error)
+	}
+
+	// TODO: convert return value to bytes
+	return []byte{}, nil
+}
+
 // process processes events for the execution engine on the execution node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
