@@ -51,6 +51,8 @@ func (v *Validator) ValidateBlock(bp *types.BlockProposal, parent *types.BlockPr
 		return nil, err
 	}
 
+	// TODO: validate the signer is the leader for that block
+
 	qc := bp.QC()
 
 	// validate QC
