@@ -51,28 +51,3 @@ func (a AggregatedSignature) Verify(hash []byte, pubkey [32]byte) bool {
 func verifyAggregatedSignature(sig []byte, hash []byte, pubkey [32]byte) bool {
 	panic("TODO")
 }
-
-// func (a AggregatedSignature) Sigs() []*Signature {
-// 	sigs := make([]*Signature, 0)
-// 	for signerIdx, signed := range a.Signers {
-// 		// add the signature of the signer at this index if the flag says the signer signed
-// 		if signed {
-// 			rawsig := a.ReadRawSigForSignerIdx(signerIdx)
-// 			// sig := &Signature{
-// 			// 	RawSignature: rawsig,
-// 			// 	SignerIdx:    uint32(signerIdx)
-// 			// }
-// 			// sigs = append(sigs, sig)
-// 		}
-// 	}
-// 	return sigs
-// }
-//
-// func (a AggregatedSignature) ReadRawSigForSignerIdx(idx int) [32]byte {
-// 	return readRawSigForSignerIdx(a.RawSignature, idx)
-// }
-//
-// func readRawSigForSignerIdx(rawSig []byte, idx int) [32]byte {
-// 	min, max := 32*idx, 32*(idx+1)
-// 	return rawSig[min:max]
-// }
