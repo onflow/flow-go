@@ -22,7 +22,7 @@ func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 
 	hash := qc.BytesForSig()
 
-	// validate signatures and get all signers
+	// validate signatures. If valid, get back all signers
 	signers, err := validateSignaturesForHash(allStakedNode, hash, qc.AggregatedSignature)
 	if err != nil {
 		return fmt.Errorf("qc contains invalid signature: %w", err)

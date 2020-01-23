@@ -30,13 +30,13 @@ func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 	return v.IsSelf(leader)
 }
 
-// GetSelfIdxForBlockID returns my own index in all staked node at a given view.
+// GetSelfIdxForBlockID returns my own index in all staked node at a given block.
 func (v *ViewState) GetSelfIdxForBlockID(blockID flow.Identifier) (uint32, error) {
 	identities, err := v.GetIdentitiesForBlockID(blockID)
 	if err != nil {
 		return 0, err
 	}
-	// TODO: using the index from the for loop is not reliable
+	// TODO: using the index might be volnerble for attacks that has a big long list of identities
 	for idx, id := range identities {
 		if v.IsSelf(id) {
 			return uint32(idx), nil
@@ -45,12 +45,13 @@ func (v *ViewState) GetSelfIdxForBlockID(blockID flow.Identifier) (uint32, error
 	return 0, fmt.Errorf("can not found my index at blockID:%v", blockID)
 }
 
-// GetIdentitiesForView returns all the staked nodes for my role at a certain view.
+// GetIdentitiesForView returns all the staked nodes for my role at a certain block.
 // view specifies the view
 func (v *ViewState) GetIdentitiesForBlockID(blockID flow.Identifier) (flow.IdentityList, error) {
 	return v.protocolState.AtBlockID(blockID).Identities(identity.HasRole(v.myRole))
 }
 
+// GetQCStakeThresholdForBlockID returns the stack threshold for building QC at a given block
 func (v *ViewState) GetQCStakeThresholdForBlockID(blockID flow.Identifier) (uint64, error) {
 	identities, err := v.GetIdentitiesForBlockID(blockID)
 	if err != nil {
@@ -59,6 +60,8 @@ func (v *ViewState) GetQCStakeThresholdForBlockID(blockID flow.Identifier) (uint
 	return ComputeStakeThresholdForBuildingQC(identities), nil
 }
 
+// ComputeStakeThresholdForBuildingQC returns the threshold to determine how much stake are needed for building a QC
+// identities is the full identity list at a certain block
 func ComputeStakeThresholdForBuildingQC(identities flow.IdentityList) uint64 {
 	// total * 2 / 3
 	total := new(big.Int).SetUint64(identities.TotalStake())
