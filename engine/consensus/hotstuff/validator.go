@@ -33,14 +33,14 @@ func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 	}
 
 	// compute total stakes of all signers from the QC
-	totalStakes := computeTotalStakes(signers, allStakedNode)
+	totalStakes := computeTotalStakes(signers)
 
 	// compute the threshold of stake required for a valid QC
 	threshold := computeStakeThresholdForBuildingQC(allStakedNode)
 
 	// check if there are enough stake for building QC
 	if totalStakes < threshold {
-		return fmt.Errorf("invalid QC: not enough stake, qc BlockMRH: %v", qc.BlockMRH())
+		return fmt.Errorf("invalid QC: not enough stake, qc BlockMRH: %v", qc.BlockMRH)
 	}
 	return nil
 }
@@ -80,20 +80,23 @@ func (v *Validator) ValidateBlock(bp *types.BlockProposal, parent *types.BlockPr
 	return nil
 }
 
+// ValidateVote validates the vote
+// vote is the vote to be validated
+// bp is the voting block
 func (v *Validator) ValidateVote(vote *types.Vote, bp *types.BlockProposal) error {
 	// validate signature
 	err := v.validateVoteSig(vote)
 	if err != nil {
-		return err {
+		return err
 	}
 
 	// view must match with the block's view
-	if v.View != bp.View() {
+	if vote.View != bp.View() {
 		return fmt.Errorf("invalid vote: wrong view number")
 	}
 
 	// block hash must match
-	if v.BlockMRH != bp.BlockMRH() {
+	if !bytes.Equal(vote.BlockMRH, bp.BlockMRH()) {
 		return fmt.Errorf("invalid vote: wrong block hash")
 	}
 
@@ -101,7 +104,7 @@ func (v *Validator) ValidateVote(vote *types.Vote, bp *types.BlockProposal) erro
 }
 
 func validateSignaturesForHash(allStakedNode flow.IdentityList, hash []byte, sigs []*types.Signature) ([]*flow.Identity, error) {
-	signers := make([]*flow.Identity)
+	signers := make([]*flow.Identity, 0)
 	for _, sig := range sigs {
 		signer, err := validateSignatureForHash(allStakedNode, hash, sig)
 		if err != nil {
@@ -122,11 +125,9 @@ func computeStakeThresholdForBuildingQC(identities flow.IdentityList) uint64 {
 		three).Uint64()
 }
 
-func computeTotalStakes(sig []*types.Signature, identities flow.IdentityList) uint64 {
+func computeTotalStakes(signers []*flow.Identity) uint64 {
 	var total uint64
-	for _, s := range sig {
-		// could be found, because sig has been checked
-		signer := identities.Get(uint(s.SignerIdx))
+	for _, signer := range signers {
 		total += signer.Stake
 	}
 	return total
@@ -163,7 +164,7 @@ func (v *Validator) validateBlockSig(bp *types.BlockProposal) error {
 }
 
 // validateSignatureForHash validates the signature and returns an identity if the sig is valid and the signer is staked.
-func validateSignatureForHash(identities flow.IdentityList, hash []byte, sig *types.Signature) (flow.Identity, error) {
+func validateSignatureForHash(identities flow.IdentityList, hash []byte, sig *types.Signature) (*flow.Identity, error) {
 	// getting signer's public key
 	signer, err := findSignerByIndex(identities, sig.SignerIdx)
 	if err != nil {
@@ -186,10 +187,10 @@ func validateSignatureForHash(identities flow.IdentityList, hash []byte, sig *ty
 	return signer, nil
 }
 
-func findSignerByIndex(identities flow.IdentityList, idx uint32) (flow.Identity, error) {
+func findSignerByIndex(identities flow.IdentityList, idx uint32) (*flow.Identity, error) {
 	// signer must exist
 	if uint(idx) > identities.Count() {
-		return flow.ZeroID, fmt.Errorf("signer not found by signerIdx: %v", idx)
+		return nil, fmt.Errorf("signer not found by signerIdx: %v", idx)
 	}
 
 	signer := identities.Get(uint(idx))
@@ -197,7 +198,7 @@ func findSignerByIndex(identities flow.IdentityList, idx uint32) (flow.Identity,
 }
 
 // readPubKey returns the public key of an identity
-func readPubKey(id flow.Identity) [32]byte {
+func readPubKey(id *flow.Identity) [32]byte {
 	// TODO: confirm that the NodeID is the public key
 	return id.NodeID
 }
