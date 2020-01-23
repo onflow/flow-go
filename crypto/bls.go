@@ -6,6 +6,9 @@ package crypto
 type BLS_BLS12381Algo struct {
 	// points to Relic context of BLS12-381 with all the parameters
 	context ctx
+
+	// points to precomputed parameters of BLS12-381 not included in Relic context
+	//precomputed BLSPrecParams
 	// embeds commonSigner
 	*commonSigner
 }
@@ -15,9 +18,33 @@ func (sk *PrKeyBLS_BLS12381) signHash(h Hash) (Signature, error) {
 	return sk.alg.blsSign(&sk.scalar, h), nil
 }
 
+// hashes an input data to a hash of an arbitrary input length
+// using a chaining of the input Hasher
+func hashToArbitraryLength(data []byte, outLen int, alg Hasher) Hash {
+	// the overall output hash
+	h := make([]byte, outLen)
+	// concatenate the input to a counter byte
+	dataToHash := make([]byte, len(data)+1)
+	copy(dataToHash[1:], data)
+	i := 0
+	for ; i < outLen; i += alg.Size() {
+		// update the counter byte
+		dataToHash[0] = byte(i / alg.Size())
+		// copy the round output to the overall output
+		copy(h[i:], alg.ComputeHash(dataToHash))
+	}
+	i -= alg.Size()
+	// update the counter byte
+	dataToHash[0] = byte(i / alg.Size())
+	// copy the last round bytes to the overall output
+	copy(h[i:], alg.ComputeHash(dataToHash)[:outLen-i])
+	return h
+}
+
 // Sign signs an array of bytes
 func (sk *PrKeyBLS_BLS12381) Sign(data []byte, alg Hasher) (Signature, error) {
-	h := alg.ComputeHash(data)
+	// hash the input to 128 bytes
+	h := hashToArbitraryLength(data, OpSwUInputLenBLS_BLS12381, alg)
 	return sk.signHash(h)
 }
 
@@ -31,7 +58,8 @@ func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, alg Hasher) (bool
 	if alg == nil {
 		return false, cryptoError{"VerifyBytes requires a Hasher"}
 	}
-	h := alg.ComputeHash(data)
+	// hash the input to 128 bytes
+	h := hashToArbitraryLength(data, OpSwUInputLenBLS_BLS12381, alg)
 	return pk.verifyHash(s, h)
 }
 
