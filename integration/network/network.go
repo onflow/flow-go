@@ -84,7 +84,7 @@ func identifier(identifier *flow.Identifier) flow.Identifier {
 	return *identifier
 }
 
-func healthcheckGRPC(apiPort string, context context.Context) error {
+func healthcheckGRPC(context context.Context, apiPort string) error {
 	fmt.Printf("healthchecking...\n")
 	c, err := client.New("localhost:" + apiPort)
 	if err != nil {
@@ -93,7 +93,7 @@ func healthcheckGRPC(apiPort string, context context.Context) error {
 	return c.Ping(context)
 }
 
-func PrepareFlowNetwork(t *testing.T, name string, context context.Context, nodes []*FlowNode) (*FlowNetwork, error) {
+func PrepareFlowNetwork(context context.Context, t *testing.T, name string, nodes []*FlowNode) (*FlowNetwork, error) {
 
 	// count each role occurence
 	identitiesCounts, err := countRoles(nodes)
@@ -189,7 +189,7 @@ func PrepareFlowNetwork(t *testing.T, name string, context context.Context, node
 		// enhance with extras for collection node
 		case flow.RoleCollection:
 
-			collectionNodeApiPort := testingdock.RandomPort(t)
+			collectionNodeAPIPort := testingdock.RandomPort(t)
 
 			opts.Config.ExposedPorts = nat.PortSet{
 				"9000/tcp": struct{}{},
@@ -200,16 +200,16 @@ func PrepareFlowNetwork(t *testing.T, name string, context context.Context, node
 					nat.Port("9000/tcp"): []nat.PortBinding{
 						{
 							HostIP:   "0.0.0.0",
-							HostPort: collectionNodeApiPort,
+							HostPort: collectionNodeAPIPort,
 						},
 					},
 				},
 			}
 			opts.HealthCheck = testingdock.HealthCheckCustom(func() error {
-				return healthcheckGRPC(collectionNodeApiPort, context)
+				return healthcheckGRPC(context, collectionNodeAPIPort)
 			})
 
-			flowContainer.Ports["api"] = collectionNodeApiPort
+			flowContainer.Ports["api"] = collectionNodeAPIPort
 		}
 
 		c := suite.Container(*opts)

@@ -40,7 +40,7 @@ func TestNetworkSetupBasic(t *testing.T) {
 		},
 	}
 
-	flowNetwork, err := network.PrepareFlowNetwork(t, "testing", context.Background(), net)
+	flowNetwork, err := network.PrepareFlowNetwork(context.Background(), t, "testing", net)
 	require.NoError(t, err)
 
 	assert.Len(t, flowNetwork.Containers, 4)
@@ -90,7 +90,7 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 		},
 	}
 
-	flowNetwork, err := network.PrepareFlowNetwork(t, "testing", context.Background(), net)
+	flowNetwork, err := network.PrepareFlowNetwork(context.Background(), t, "testing", net)
 	require.NoError(t, err)
 
 	assert.Len(t, flowNetwork.Containers, 7)
