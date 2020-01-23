@@ -23,7 +23,7 @@ type Guarantees interface {
 
 	// Get will retrieve the given collection guarantees from the memory pool;
 	// it will error if the collection guarantee is not in the memory pool.
-	Get(collID flow.Identifier) (*flow.CollectionGuarantee, error)
+	ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

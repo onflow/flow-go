@@ -23,7 +23,7 @@ type Receipts interface {
 
 	// Get will retrieve the given execution receipt from the memory pool; it will
 	// error if the execution receipt is not in the memory pool.
-	Get(receiptID flow.Identifier) (*flow.ExecutionReceipt, error)
+	ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

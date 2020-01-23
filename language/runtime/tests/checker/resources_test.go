@@ -3534,3 +3534,22 @@ func TestCheckInvalidResourceSelfMoveSwap(t *testing.T) {
 
 	assert.IsType(t, &sema.InvalidSelfInvalidationError{}, errs[0])
 }
+
+func TestCheckResourceCreationAndInvalidationInLoop(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+
+      resource X {}
+
+      fun loop() {
+          var i = 0
+          while i < 10 {
+              let x <- create X()
+              destroy x
+              i = i + 1
+          }
+      }
+    `)
+
+	require.NoError(t, err)
+}

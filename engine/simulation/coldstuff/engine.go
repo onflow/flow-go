@@ -247,19 +247,16 @@ func (e *Engine) sendProposal() error {
 	guarantees := e.pool.All()
 
 	// create the block content
-	content := flow.Content{
+	payload := flow.Payload{
 		Identities: flow.IdentityList{},
 		Guarantees: guarantees,
 	}
-
-	// create the block payload
-	payload := content.Payload()
 
 	// create the block header
 	header := flow.Header{
 		Number:      e.round.Parent().Number + 1,
 		ParentID:    e.round.Parent().ID(),
-		PayloadHash: payload.Root(),
+		PayloadHash: payload.Hash(),
 		Timestamp:   time.Now().UTC(),
 	}
 
@@ -267,7 +264,6 @@ func (e *Engine) sendProposal() error {
 	candidate := &flow.Block{
 		Header:  header,
 		Payload: payload,
-		Content: content,
 	}
 
 	log = log.With().

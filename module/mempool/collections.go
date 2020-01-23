@@ -23,7 +23,7 @@ type Collections interface {
 
 	// Get will retrieve the given collection from the memory pool; it will
 	// error if the collection is not in the memory pool.
-	Get(collID flow.Identifier) (*flow.Collection, error)
+	ByID(collID flow.Identifier) (*flow.Collection, error)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

@@ -30,26 +30,47 @@ func (ch *Chunk) Checksum() Identifier {
 	return MakeID(ch)
 }
 
-// Note that this is the basic version of the List, we need to substitute it with something like Merkel tree at some point
-type ChunkList struct {
-	Chunks []*Chunk
+type ChunkHeader struct {
+	ChunkID     Identifier
+	StartState  StateCommitment
+	RegisterIDs []RegisterID
 }
 
-func (cl *ChunkList) Fingerprint() Identifier {
+// ChunkState represents the state registers used by a particular chunk.
+type ChunkState struct {
+	ChunkID   Identifier
+	Registers Ledger
+}
+
+// ID returns the unique identifier for the concrete view, which is the ID of
+// the chunk the view is for.
+func (c *ChunkState) ID() Identifier {
+	return c.ChunkID
+}
+
+// Checksum returns the checksum of the chunk state.
+func (c *ChunkState) Checksum() Identifier {
+	return MakeID(c)
+}
+
+// Note that this is the basic version of the List, we need to substitute it with something like Merkel tree at some point
+type ChunkList []*Chunk
+
+func (cl ChunkList) Fingerprint() Identifier {
 	return MerkleRoot(GetIDs(cl)...)
 }
 
 func (cl *ChunkList) Insert(ch *Chunk) {
-	cl.Chunks = append(cl.Chunks, ch)
+	*cl = append(*cl, ch)
 }
 
-func (cl *ChunkList) Items() []*Chunk {
-	return cl.Chunks
+func (cl ChunkList) Items() []*Chunk {
+	return cl
 }
 
 // ByChecksum returns an entity from the list by entity fingerprint
-func (cl *ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
-	for _, ch := range cl.Chunks {
+func (cl ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
+	for _, ch := range cl {
 		if ch.Checksum() == cs {
 			return ch, true
 		}
@@ -58,16 +79,16 @@ func (cl *ChunkList) ByChecksum(cs Identifier) (*Chunk, bool) {
 }
 
 // ByIndex returns an entity from the list by index
-func (cl *ChunkList) ByIndex(i uint64) *Chunk {
-	return cl.Chunks[i]
+func (cl ChunkList) ByIndex(i uint64) *Chunk {
+	return cl[i]
 }
 
 // ByIndexWithProof returns an entity from the list by index and proof of membership
-func (cl *ChunkList) ByIndexWithProof(i uint64) (*Chunk, Proof) {
-	return cl.Chunks[i], nil
+func (cl ChunkList) ByIndexWithProof(i uint64) (*Chunk, Proof) {
+	return cl[i], nil
 }
 
 // Size returns the number of Chunks in the list
-func (cl *ChunkList) Size() int {
-	return len(cl.Chunks)
+func (cl ChunkList) Size() int {
+	return len(cl)
 }

@@ -1,6 +1,7 @@
 package virtualmachine
 
 import (
+	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -12,5 +13,16 @@ type TransactionResult struct {
 }
 
 func (r TransactionResult) Succeeded() bool {
+	return r.Error == nil
+}
+
+// A ScriptResult is the result of executing a script.
+type ScriptResult struct {
+	ScriptID flow.Identifier
+	Value    runtime.Value
+	Error    error
+}
+
+func (r ScriptResult) Succeeded() bool {
 	return r.Error == nil
 }

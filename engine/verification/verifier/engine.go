@@ -7,11 +7,13 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
-	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -21,16 +23,11 @@ import (
 // responsible for reception of a execution receipt, verifying that, and
 // emitting its corresponding result approval to the entire system.
 type Engine struct {
-	unit               *engine.Unit        // used to control startup/shutdown
-	log                zerolog.Logger      // used to log relevant actions
-	collectionsConduit network.Conduit     // used to get collections from collection nodes
-	receiptsConduit    network.Conduit     // used to get execution receipts from execution nodes
-	approvalsConduit   network.Conduit     // used to propagate result approvals
-	me                 module.Local        // used to access local node information
-	state              protocol.State      // used to access the  protocol state
-	receipts           mempool.Receipts    // used to store execution receipts in memory
-	blocks             mempool.Blocks      // used to store blocks in memory
-	collections        mempool.Collections // used to store collections in memory
+	unit    *engine.Unit    // used to control startup/shutdown
+	log     zerolog.Logger  // used to log relevant actions
+	conduit network.Conduit // used to propagate result approvals
+	me      module.Local    // used to access local node information
+	state   protocol.State  // used to access the protocol state
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -39,32 +36,17 @@ func New(
 	net module.Network,
 	state protocol.State,
 	me module.Local,
-	receipts mempool.Receipts,
-	blocks mempool.Blocks,
-	collections mempool.Collections,
 ) (*Engine, error) {
+
 	e := &Engine{
-		unit:        engine.NewUnit(),
-		log:         log,
-		state:       state,
-		me:          me,
-		receipts:    receipts,
-		blocks:      blocks,
-		collections: collections,
+		unit:  engine.NewUnit(),
+		log:   log,
+		state: state,
+		me:    me,
 	}
 
 	var err error
-	e.collectionsConduit, err = net.Register(engine.CollectionProvider, e)
-	if err != nil {
-		return nil, fmt.Errorf("could not register engine on collection provider channel: %w", err)
-	}
-
-	e.receiptsConduit, err = net.Register(engine.ReceiptProvider, e)
-	if err != nil {
-		return nil, fmt.Errorf("could not register engine on execution provider channel: %w", err)
-	}
-
-	e.approvalsConduit, err = net.Register(engine.ApprovalProvider, e)
+	e.conduit, err = net.Register(engine.ApprovalProvider, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine on approval provider channel: %w", err)
 	}
@@ -113,201 +95,98 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // process receives and submits an event to the verifier engine for processing.
-// It returns an error so the verifier engine will not propagate an event unless
-// it is successfully processed by the engine.
-// The origin ID indicates the node which originally submitted the event to
-// the peer-to-peer network.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
-	case *flow.Block:
-		return e.handleBlock(resource)
-	case *flow.ExecutionReceipt:
-		return e.handleExecutionReceipt(originID, resource)
-	case *flow.Collection:
-		return e.handleCollection(originID, resource)
-	case *messages.CollectionResponse:
-		return e.handleCollection(originID, &resource.Collection)
+	case *verification.CompleteExecutionResult:
+		return e.verify(originID, resource)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
 }
 
-// handleExecutionReceipt receives an execution receipt (exrcpt), verifies that and emits
-// a result approval upon successful verification
-func (e *Engine) handleExecutionReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+// verify handles the core verification process. It accepts an execution
+// result and all dependent resources, verifies the result, and emits a
+// result approval if applicable.
+//
+// If any part of verification fails, an error is returned, indicating to the
+// initiating engine that the verification must be re-tried.
+// TODO assumes blocks with one chunk
+func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExecutionResult) error {
 
-	e.log.Info().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("receipt_id", logging.Entity(receipt)).
-		Msg("execution receipt received")
+	if originID != e.me.NodeID() {
+		return fmt.Errorf("invalid remote origin for verify")
+	}
 
-	// TODO: correctness check for execution receipts
+	chunkID := res.Receipt.ExecutionResult.Chunks.ByIndex(0).ID()
 
-	// validating identity of the originID
-	id, err := e.state.Final().Identity(originID)
+	computedEndState, err := e.executeChunk(res)
 	if err != nil {
-		// TODO: potential attack on authenticity
-		return fmt.Errorf("invalid origin id (%s): %w", originID[:], err)
+		return fmt.Errorf("could not verify chunk (id=%s): %w", chunkID, err)
 	}
 
-	// validating role of the originID
-	// an execution receipt should be either coming from an execution node through the
-	// Process method, or from the current verifier node itself through the Submit method
-	if id.Role != flow.RoleExecution {
-		// TODO: potential attack on integrity
-		return fmt.Errorf("invalid role for generating an execution receipt, id: %s, role: %s", id.NodeID, id.Role)
-	}
+	// TODO for now, we discard the computed end state and approve the ER
+	_ = computedEndState
 
-	// storing the execution receipt in the store of the engine
-	// this will fail if the receipt already exists in the store
-	err = e.receipts.Add(receipt)
-	if err != nil {
-		return fmt.Errorf("could not store execution receipt: %w", err)
-	}
-
-	// TODO start a verification job asyncronously.
-	// For now, we do it synchronously and submit a RA before checking anything
-	e.verify(originID, receipt)
-
-	return nil
-}
-
-// handleBlock handles an incoming block.
-func (e *Engine) handleBlock(block *flow.Block) error {
-
-	e.log.Info().
-		Hex("block_id", logging.Entity(block)).
-		Uint64("block_number", block.Number).
-		Msg("received block")
-
-	err := e.blocks.Add(block)
-	if err != nil {
-		return fmt.Errorf("could not store block: %w", err)
-	}
-
-	return nil
-}
-
-// handleCollection handles receipt of a new collection, either via push or after
-// a request. It ensures the sender is valid and notifies the main verification
-// process.
-func (e *Engine) handleCollection(originID flow.Identifier, coll *flow.Collection) error {
-
-	e.log.Info().
-		Hex("origin_id", logging.ID(originID)).
-		Hex("collection_id", logging.Entity(coll)).
-		Msg("collection received")
-
-	id, err := e.state.Final().Identity(originID)
-	if err != nil {
-		return fmt.Errorf("invalid origin id (%s): %w", id, err)
-	}
-
-	if id.Role != flow.RoleCollection {
-		return fmt.Errorf("invalid role for receiving collection: %s", id.Role)
-	}
-
-	err = e.collections.Add(coll)
-	if err != nil {
-		return fmt.Errorf("could not add collection to mempool: %w", err)
-	}
-
-	// TODO notify of new collection
-
-	return nil
-}
-
-// requestCollection submits a request for the given collection to collection nodes.
-func (e *Engine) requestCollection(collID flow.Identifier) error {
-
-	collNodes, err := e.state.Final().Identities(identity.HasRole(flow.RoleCollection))
-	if err != nil {
-		return fmt.Errorf("could not load collection node identities: %w", err)
-	}
-
-	req := &messages.CollectionRequest{
-		ID: collID,
-	}
-
-	// TODO we should only submit to cluster which owns the collection
-	err = e.collectionsConduit.Submit(req, collNodes.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not submit request for collection (id=%s): %w", collID, err)
-	}
-
-	return nil
-}
-
-// verify is an internal component of the verifier engine.
-// It receives an execution receipt and does the core verification process.
-// The origin ID indicates the node which originally submitted the event to
-// the peer-to-peer network.
-// If the submission was successful it generates a result approval for the incoming ExecutionReceipt
-// and submits that to the network
-func (e *Engine) verify(originID flow.Identifier, receipt *flow.ExecutionReceipt) {
-
-	result := receipt.ExecutionResult
-	blockID := result.BlockID
-
-	log := e.log.With().
-		Hex("block_id", logging.ID(blockID)).
-		Hex("result_id", logging.Entity(result)).
-		Logger()
-
-	// TODO temporary as log uses are commented
-	_ = log
-
-	// request block if not available
-	// TODO handle this case
-	//block, err := e.blocks.Get(blockID)
-	//if err != nil {
-	//	// TODO should request the block here
-	//	log.Error().
-	//		Err(err).
-	//		Msg("could not get block")
-	//	return
-	//}
-
-	// request collection if not available
-	// TODO handle this case
-	//for _, guarantee := range block.Guarantees {
-	//	err := e.requestCollection(guarantee.ID())
-	//	if err != nil {
-	//		log.Error().
-	//			Err(err).
-	//			Msgf("could not request collection (id=%s): %w", logging.Entity(guarantee), err)
-	//	}
-	//}
-
-	// TODO for now, just submit the result approval without checking anything
-	// extracting list of consensus nodes' ids
-	consIDs, err := e.state.Final().
+	consensusNodes, err := e.state.Final().
 		Identities(identity.HasRole(flow.RoleConsensus))
 	if err != nil {
-		// todo this error needs more advance handling after MVP
-		e.log.Error().
-			Str("error: ", err.Error()).
-			Msg("could not load the consensus nodes ids")
-		return
+		// TODO this error needs more advance handling after MVP
+		return fmt.Errorf("could not load consensus node IDs: %w", err)
 	}
 
-	// emitting a result approval to all consensus nodes
 	approval := &flow.ResultApproval{
 		ResultApprovalBody: flow.ResultApprovalBody{
-			ExecutionResultID:    receipt.ExecutionResult.ID(),
-			AttestationSignature: nil,
-			ChunkIndexList:       nil,
-			Proof:                nil,
-			Spocks:               nil,
+			ExecutionResultID: res.Receipt.ExecutionResult.ID(),
 		},
-		VerifierSignature: nil,
 	}
 
-	// broadcasting result approval to all consensus nodes
-	err = e.approvalsConduit.Submit(approval, consIDs.NodeIDs()...)
+	// broadcast result approval to consensus nodes
+	err = e.conduit.Submit(approval, consensusNodes.NodeIDs()...)
 	if err != nil {
-		e.log.Error().
-			Err(err).
-			Msg("could not submit result approval to consensus nodes")
+		// TODO this error needs more advance handling after MVP
+		return fmt.Errorf("could not submit result approval: %w", err)
 	}
+
+	e.log.Info().
+		Hex("chunk_id", logging.ID(chunkID)).
+		Msg("submitted result approval")
+
+	return nil
+}
+
+// executeChunk executes the transactions for a single chunk and returns the
+// resultant end state, or an error if execution failed.
+func (e *Engine) executeChunk(res *verification.CompleteExecutionResult) (flow.StateCommitment, error) {
+	rt := runtime.NewInterpreterRuntime()
+	blockCtx := virtualmachine.NewBlockContext(rt, res.Block)
+
+	getRegister := func(key string) ([]byte, error) {
+		registers := res.ChunkStates[0].Registers
+
+		val, ok := registers[key]
+		if !ok {
+			return nil, fmt.Errorf("missing register")
+		}
+
+		return val, nil
+	}
+
+	chunkView := state.NewView(getRegister)
+
+	for _, tx := range res.Collections[0].Transactions {
+		txView := chunkView.NewChild()
+
+		result, err := blockCtx.ExecuteTransaction(txView, tx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute transaction: %w", err)
+		}
+
+		if result.Succeeded() {
+			chunkView.ApplyDelta(txView.Delta())
+		}
+	}
+
+	// TODO compute and return state commitment
+
+	return nil, nil
 }
