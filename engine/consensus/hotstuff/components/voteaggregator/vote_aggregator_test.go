@@ -63,6 +63,12 @@ func TestErrDoubleVote(t *testing.T) {
 
 }
 
+// store random votes and QCs from view 1 to 3
+// prune by view 3
+func TestPruneByView(t *testing.T) {
+
+}
+
 func (vp *ViewParameter) ThresholdState() float32 {
 	return vp.thresholdStake
 }

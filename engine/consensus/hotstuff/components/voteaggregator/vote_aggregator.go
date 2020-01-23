@@ -49,6 +49,10 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 		return fmt.Errorf("could not validate the vote: %w", err)
 	}
 
+	if vote.View <= va.lastPrunedView {
+		return fmt.Errorf("the vote is stale")
+	}
+
 	va.pendingVotes[string(vote.BlockMRH)][vote.Hash()] = vote
 	va.log.Info().Msg("new pending vote added")
 	return nil
@@ -136,6 +140,10 @@ func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.Bloc
 	err = va.voteValidator.ValidateIncorporatedVote(vote, bp, identities)
 	if err != nil {
 		return fmt.Errorf("could not validate incorporated vote: %w", err)
+	}
+
+	if vote.View <= va.lastPrunedView {
+		return fmt.Errorf("the vote is stale")
 	}
 
 	voteSender := identities.Get(uint(vote.Signature.SignerIdx))
