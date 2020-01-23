@@ -10,7 +10,8 @@ const VOTE_SIZE int = 10
 const THRESHOLD float32 = 0.66667
 const STAKE uint64 = 10
 
-// threshold stake would be 5
+// threshold stake would be 5,
+// meaning that it is enough to build a QC when receiving 5 votes
 const VALIDATOR_SIZE = 7
 
 type ViewParameter struct {
@@ -24,8 +25,9 @@ func TestHappyPathForIncorporatedVotes(t *testing.T) {
 }
 
 // receive 5 valid votes in total
-// 1. the first 4 votes are pending (threshold stake is not reached)
-//    then receive the missing block and no QC should be generated
+// 1. the first 3 votes are pending (threshold stake is not reached)
+//    then receive the missing block (extracting a vote from the block as the 4th vote)
+//    and no QC should be generated
 //    when receive the 5th vote, a QC should be generated
 // 2. all 5 votes are pending
 //    then receive the missing block and a QC should be generated

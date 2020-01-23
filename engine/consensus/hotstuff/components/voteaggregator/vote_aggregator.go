@@ -81,9 +81,9 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 	return newQC, nil
 }
 
-// BuildQCForBlockProposal will attempt to build a QC for the given block proposal when there are votes
+// BuildQCForBlockProposal will extract a primary vote out of the block proposal and
+// attempt to build a QC for the given block proposal when there are votes
 // with enough stakes.
-// VoteAggregator ALWAYS returns the same QC as the one returned before.
 func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*types.QuorumCertificate, *multierror.Error) {
 	var result *multierror.Error
 	for _, vote := range va.pendingVotes[string(bp.Block.BlockMRH())] {
@@ -94,7 +94,8 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 		}
 	}
 
-	qc, err := va.buildQC(bp.Block)
+	primaryVote := types.NewVote(bp.View(), bp.BlockMRH(), bp.Signature)
+	qc, err := va.StoreVoteAndBuildQC(primaryVote, bp)
 	if err != nil {
 		result = multierror.Append(result, fmt.Errorf("could not build QC: %w", err))
 		return nil, result
