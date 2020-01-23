@@ -8,13 +8,16 @@ package crypto
 import "C"
 
 // TODO: remove -wall after reaching a stable version
-// TDOD: enable QUIET in relic
+// TODO: enable QUIET in relic
 
 // Go wrappers to C types
 type pointG1 C.ep_st
 type pointG2 C.ep2_st
 type scalar C.bn_st
-type ctx *C.ctx_t
+type ctx struct {
+	relicCtx *C.ctx_t
+	precCtx  *C.prec_st
+}
 
 var signatureLengthBLS_BLS12381 = int(C._getSignatureLengthBLS_BLS12381())
 var pubKeyLengthBLS_BLS12381 = int(C._getPubKeyLengthBLS_BLS12381())
@@ -30,11 +33,12 @@ func (a *BLS_BLS12381Algo) init() error {
 	}
 
 	// Inits relic context and sets the B12_381 context
-	c := C._relic_init_BLS12_381()
+	c := C.relic_init_BLS12_381()
 	if c == nil {
 		return cryptoError{"Relic core init failed"}
 	}
-	a.context = c
+	a.context.relicCtx = c
+	a.context.precCtx = C.init_precomputed_data_BLS12_381()
 	return nil
 }
 
@@ -42,7 +46,8 @@ func (a *BLS_BLS12381Algo) init() error {
 // If the implementation evolves and relic has multiple contexts,
 // reinit should be called at every a. operation.
 func (a *BLS_BLS12381Algo) reinit() {
-	C.core_set(a.context)
+	C.core_set(a.context.relicCtx)
+	C.precomputed_data_set(a.context.precCtx)
 }
 
 // Exponentiation in G1 (scalar point multiplication)
@@ -80,9 +85,20 @@ func randZr(x *scalar) error {
 
 // TEST/DEBUG/BENCH
 // returns the hash to G1 point
-func hashToG1(data []byte) {
+func hashToG1(data []byte) *pointG1 {
 	l := len(data)
-	_ = C._hashToG1((*C.uchar)(&data[0]), (C.int)(l))
+	var h pointG1
+	C.mapToG1((*C.ep_st)(&h), (*C.uchar)(&data[0]), (C.int)(l))
+	return &h
+}
+
+// TEST/DEBUG/BENCH
+// wraps a call to optimized SwU algorithm since Cgpo can't be used
+// in go test files
+func OpSwUUnitTest(output []byte, input []byte) {
+	C.opswu_test((*C.uchar)(&output[0]),
+		(*C.uchar)(&input[0]),
+		SignatureLenBLS_BLS12381)
 }
 
 // sets a scalar to a small integer
