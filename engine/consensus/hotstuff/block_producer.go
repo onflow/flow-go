@@ -1,6 +1,10 @@
 package hotstuff
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+import (
+	"fmt"
+
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+)
 
 // BlockProposalProducer is responsible for producing new block proposals
 type BlockProposalProducer struct {
@@ -23,14 +27,14 @@ func NewBlockProposalProducer(signer Signer, viewState ViewState, mempool Mempoo
 }
 
 // MakeBlockProposal will build a proposal for the given view with the given QC
-func (bp *BlockProposalProducer) MakeBlockProposal(view uint64, qc *types.QuorumCertificate) *types.BlockProposal {
+func (bp *BlockProposalProducer) MakeBlockProposal(view uint64, qc *types.QuorumCertificate) (*types.BlockProposal, error) {
 	block := bp.makeBlockForView(view, qc)
 
 	unsignedBlockProposal := bp.propose(block)
 
-	signedBlockProposal := bp.signBlockProposal(unsignedBlockProposal)
+	signedBlockProposal, err := bp.signBlockProposal(unsignedBlockProposal)
 
-	return signedBlockProposal
+	return signedBlockProposal, err
 }
 
 // makeBlockForView gets the payload hash from mempool and build a block on top of the given qc for the given view.
@@ -52,9 +56,13 @@ func (bp *BlockProposalProducer) propose(block *types.Block) *types.UnsignedBloc
 }
 
 // signBlockProposal takes a unsigned proposal, signes it and returns a signed block proposal
-func (bp *BlockProposalProducer) signBlockProposal(proposal *types.UnsignedBlockProposal) *types.BlockProposal {
-	sig := bp.signer.SignBlockProposal(proposal, bp.viewState.GetSelfIdxForView(proposal.View()))
+func (bp *BlockProposalProducer) signBlockProposal(proposal *types.UnsignedBlockProposal) (*types.BlockProposal, error) {
+	selfIdx, err := bp.viewState.GetSelfIdxForBlockID(proposal.BlockMRH())
+	if err != nil {
+		return nil, fmt.Errorf("cannot sign block proposal, because %w", err)
+	}
+	sig := bp.signer.SignBlockProposal(proposal, selfIdx)
 
 	blockProposal := types.NewBlockProposal(proposal.Block, proposal.ConsensusPayload, sig)
-	return blockProposal
+	return blockProposal, nil
 }

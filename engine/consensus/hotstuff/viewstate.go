@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
@@ -29,9 +30,9 @@ func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 	return v.IsSelf(leader)
 }
 
-// GetSelfIdxForView returns my own index in all staked node at a given view.
-func (v *ViewState) GetSelfIdxForView(view uint64) (uint32, error) {
-	identities, err := v.GetIdentitiesForView(view)
+// GetSelfIdxForBlockID returns my own index in all staked node at a given view.
+func (v *ViewState) GetSelfIdxForBlockID(blockID flow.Identifier) (uint32, error) {
+	identities, err := v.GetIdentitiesForBlockID(blockID)
 	if err != nil {
 		return 0, err
 	}
@@ -41,13 +42,31 @@ func (v *ViewState) GetSelfIdxForView(view uint64) (uint32, error) {
 			return uint32(idx), nil
 		}
 	}
-	return 0, fmt.Errorf("can not found my index in view:%v", view)
+	return 0, fmt.Errorf("can not found my index at blockID:%v", blockID)
 }
 
 // GetIdentitiesForView returns all the staked nodes for my role at a certain view.
 // view specifies the view
-func (v *ViewState) GetIdentitiesForView(view uint64) (flow.IdentityList, error) {
-	return v.protocolState.AtNumber(view).Identities(identity.HasRole(v.myRole))
+func (v *ViewState) GetIdentitiesForBlockID(blockID flow.Identifier) (flow.IdentityList, error) {
+	return v.protocolState.AtBlockID(blockID).Identities(identity.HasRole(v.myRole))
+}
+
+func (v *ViewState) GetQCStakeThresholdForBlockID(blockID flow.Identifier) (uint64, error) {
+	identities, err := v.GetIdentitiesForBlockID(blockID)
+	if err != nil {
+		return 0, err
+	}
+	return ComputeStakeThresholdForBuildingQC(identities), nil
+}
+
+func ComputeStakeThresholdForBuildingQC(identities flow.IdentityList) uint64 {
+	// total * 2 / 3
+	total := new(big.Int).SetUint64(identities.TotalStake())
+	two := new(big.Int).SetUint64(2)
+	three := new(big.Int).SetUint64(3)
+	return new(big.Int).Div(
+		new(big.Int).Mul(total, two),
+		three).Uint64()
 }
 
 // LeaderForView get the leader for a certain view

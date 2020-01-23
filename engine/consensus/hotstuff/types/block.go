@@ -2,6 +2,8 @@ package types
 
 import (
 	"time"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type Block struct {
@@ -18,7 +20,7 @@ type Block struct {
 	Timestamp time.Time
 }
 
-func (b *Block) BlockMRH() []byte {
+func (b Block) BlockMRH() flow.Identifier {
 	panic("TODO")
 }
 
