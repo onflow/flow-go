@@ -24,10 +24,10 @@ import (
 type Engine struct {
 	unit   *engine.Unit
 	log    zerolog.Logger
+	tracer trace.Tracer
 	con    network.Conduit
 	me     module.Local
 	state  protocol.State
-	tracer trace.Tracer
 	pool   mempool.Transactions
 }
 
@@ -40,9 +40,9 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, tracer tr
 	e := &Engine{
 		unit:   engine.NewUnit(),
 		log:    logger,
+		tracer: tracer,
 		me:     me,
 		state:  state,
-		tracer: tracer,
 		pool:   pool,
 	}
 

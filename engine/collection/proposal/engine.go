@@ -32,10 +32,10 @@ type Engine struct {
 	unit        *engine.Unit
 	conf        Config
 	log         zerolog.Logger
+	tracer      trace.Tracer
 	con         network.Conduit
 	me          module.Local
 	state       protocol.State
-	tracer      trace.Tracer
 	provider    network.Engine // provider engine to propagate guarantees
 	pool        mempool.Transactions
 	collections storage.Collections

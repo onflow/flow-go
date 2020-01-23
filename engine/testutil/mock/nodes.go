@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -19,11 +20,12 @@ import (
 
 // GenericNode implements a generic in-process node for tests.
 type GenericNode struct {
-	Log   zerolog.Logger
-	DB    *badger.DB
-	State protocol.State
-	Me    module.Local
-	Net   *stub.Network
+	Log    zerolog.Logger
+	Tracer trace.Tracer
+	DB     *badger.DB
+	State  protocol.State
+	Me     module.Local
+	Net    *stub.Network
 }
 
 // CollectionNode implements an in-process collection node for tests.

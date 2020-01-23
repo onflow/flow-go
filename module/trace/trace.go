@@ -45,9 +45,10 @@ func NewTracer(log zerolog.Logger, service string) (Tracer, error) {
 		return nil, err
 	}
 	t := &OpenTracer{
-		Tracer: tracer,
-		closer: closer,
-		log:    log,
+		Tracer:    tracer,
+		closer:    closer,
+		log:       log,
+		openSpans: map[flow.Identifier]opentracing.Span{},
 	}
 	return t, nil
 }
