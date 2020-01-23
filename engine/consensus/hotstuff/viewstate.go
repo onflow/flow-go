@@ -7,7 +7,7 @@ import (
 )
 
 type ViewState struct {
-	protocalState protocol.State
+	protocolState protocol.State
 }
 
 func (v *ViewState) IsSelf(id flow.Identity) bool {
@@ -26,8 +26,11 @@ func (v *ViewState) GetIdxOfPubKeyForView(view uint64) uint32 {
 	panic("TODO")
 }
 
-func (v *ViewState) GetIdentitiesForView(view uint64) (flow.IdentityList, error) {
-	return v.protocolState.AtNumber(view).Identities(identity.HasRole(flow.RoleConsensus))
+// GetIdentitiesForView returns all the staked nodes for a specific role at a certain view.
+// view specifies the view
+// role specifies the role of the nodes. Could be Role.Consensus or Role.Collection
+func (v *ViewState) GetIdentitiesForView(view uint64, role flow.Role) (flow.IdentityList, error) {
+	return v.protocolState.AtNumber(view).Identities(identity.HasRole(role))
 }
 
 func (v *ViewState) LeaderForView(view uint64) flow.Identity {

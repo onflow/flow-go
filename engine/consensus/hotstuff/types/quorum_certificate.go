@@ -5,3 +5,7 @@ type QuorumCertificate struct {
 	BlockMRH            []byte
 	AggregatedSignature *AggregatedSignature
 }
+
+func (qc *QuorumCertificate) BytesForSig() []byte {
+	return voteBytesForSig(qc.View, qc.BlockMRH)
+}

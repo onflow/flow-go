@@ -35,3 +35,7 @@ func voteBytesForSig(view uint64, blockMRH []byte) []byte {
 
 	return bytesForSig
 }
+
+func VoteBytesForSig(view uint64, BlockMRH []byte) []byte {
+	return voteBytesForSig(view, BlockMRH)
+}
