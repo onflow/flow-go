@@ -3,7 +3,7 @@ package hotstuff
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/components/voteaggregator"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotStuff/components/voteaggregator"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 

@@ -1,7 +1,6 @@
 package voteaggregator
 
 import (
-	"debug/macho"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
@@ -11,12 +10,10 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/identity"
-	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 )
 
 type VoteAggregator struct {
 	log            zerolog.Logger
-	protocolState  protocol.State
 	viewState      hotstuff.ViewState
 	voteValidator  hotstuff.Validator
 	lastPrunedView uint64
@@ -32,10 +29,9 @@ type VoteAggregator struct {
 	viewToIDToVote map[uint64]map[string]*types.Vote
 }
 
-func NewVoteAggregator(log zerolog.Logger, protocolState protocol.State, viewState hotstuff.ViewState, voteValidator hotstuff.Validator) *VoteAggregator {
+func NewVoteAggregator(log zerolog.Logger, viewState hotstuff.ViewState, voteValidator hotstuff.Validator) *VoteAggregator {
 	return &VoteAggregator{
 		log:           log,
-		protocolState: protocolState,
 		viewState:     viewState,
 		voteValidator: voteValidator,
 	}

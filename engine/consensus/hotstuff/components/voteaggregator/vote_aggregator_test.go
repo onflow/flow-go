@@ -1,9 +1,10 @@
 package voteaggregator
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/types"
 	"math/rand"
 	"testing"
+
+	"github.com/dapperlabs/flow-go/engine/consensus/HotStuff/types"
 )
 
 const VOTE_SIZE int = 10

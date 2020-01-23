@@ -10,3 +10,5 @@ type ViewState interface {
 	GetIdxOfPubKeyForView(view uint64) uint32
 	LeaderForView(view uint64) types.ID
 }
+
+func (v *ViewState) GetIdentitiesFor
