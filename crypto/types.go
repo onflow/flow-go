@@ -51,6 +51,9 @@ const (
 	PrKeyLenBLS_BLS12381     = 32
 	// the length is divided by 2 if compression is on
 	PubKeyLenBLS_BLS12381 = 96 * (2 - compression)
+	// Input length of the optimized SwU map to G1: 2*(P_size+security)
+	// security being 128 bits
+	OpSwUInputLenBLS_BLS12381 = 128
 
 	// ECDSA
 
