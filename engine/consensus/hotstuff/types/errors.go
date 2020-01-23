@@ -26,6 +26,11 @@ type ErrDoubleVote struct {
 	DoubleVote   *Vote
 }
 
+type ErrStaleVote struct {
+	Vote          *Vote
+	FinalizedView uint64
+}
+
 type ErrExistingQC struct {
 	Vote *Vote
 	QC   *QuorumCertificate
@@ -48,6 +53,10 @@ func (e ErrInvalidView) Error() string {
 
 func (e ErrDoubleVote) Error() string {
 	return fmt.Sprintf("Double voting detected (original vote: %v, double vote: %v)", e.OriginalVote, e.DoubleVote)
+}
+
+func (e ErrStaleVote) Error() string {
+	return fmt.Sprintf("Stale vote found (vote: %v, finalized view: %v)", e.Vote, e.FinalizedView)
 }
 
 func (e ErrExistingQC) Error() string {

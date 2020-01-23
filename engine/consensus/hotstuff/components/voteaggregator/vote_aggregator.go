@@ -1,6 +1,7 @@
 package voteaggregator
 
 import (
+	"debug/macho"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
@@ -50,7 +51,10 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 	}
 
 	if vote.View <= va.lastPrunedView {
-		return fmt.Errorf("the vote is stale")
+		return fmt.Errorf("the vote is stale: %w", types.ErrStaleVote{
+			Vote:          vote,
+			FinalizedView: va.lastPrunedView,
+		})
 	}
 
 	va.pendingVotes[string(vote.BlockMRH)][vote.Hash()] = vote
@@ -143,7 +147,10 @@ func (va *VoteAggregator) storeIncorporatedVote(vote *types.Vote, bp *types.Bloc
 	}
 
 	if vote.View <= va.lastPrunedView {
-		return fmt.Errorf("the vote is stale")
+		return fmt.Errorf("the vote is stale: %w", types.ErrStaleVote{
+			Vote:          vote,
+			FinalizedView: va.lastPrunedView,
+		})
 	}
 
 	voteSender := identities.Get(uint(vote.Signature.SignerIdx))
