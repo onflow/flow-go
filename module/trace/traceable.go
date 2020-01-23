@@ -18,7 +18,8 @@ func (t *Traceable) FinishSpan() {
 		return
 	}
 	t.span.Finish()
-	spanDurationMetric.Observe(float64(t.span.(*jaeger.Span).Duration().Milliseconds()))
+	jaegerSpan := t.span.(*jaeger.Span)
+	spanDurationMetric.WithLabelValues(jaegerSpan.OperationName()).Observe(jaegerSpan.Duration().Seconds())
 }
 
 func (t *Traceable) SetTag(key string, value interface{}) {

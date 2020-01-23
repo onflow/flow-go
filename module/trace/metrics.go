@@ -6,8 +6,8 @@ import (
 )
 
 var (
-	spanDurationMetric = promauto.NewHistogram(prometheus.HistogramOpts{
-		Name: "span_duration_ms",
-		Help: "The duration of the jaeger span",
-	})
+	spanDurationMetric = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "span_duration_s",
+		Help: "The duration of the jaeger span in seconds",
+	}, []string{"name"})
 )
