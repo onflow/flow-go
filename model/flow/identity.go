@@ -51,7 +51,7 @@ func ParseIdentity(identity string) (Identity, error) {
 
 // String returns a string representation of the identity.
 func (id Identity) String() string {
-	return fmt.Sprintf("%s-%x@%s=%d", id.Role, id.NodeID, id.Address, id.Stake)
+	return fmt.Sprintf("%s-%s@%s=%d", id.Role, id.NodeID.String(), id.Address, id.Stake)
 }
 
 // ID returns a unique identifier for the identity.
