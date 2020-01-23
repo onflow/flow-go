@@ -23,7 +23,7 @@ type Seals interface {
 
 	// Get will retrieve the given block seal from the memory pool; it will
 	// error if the block seal is not in the memory pool.
-	Get(sealID flow.Identifier) (*flow.Seal, error)
+	ByID(sealID flow.Identifier) (*flow.Seal, error)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

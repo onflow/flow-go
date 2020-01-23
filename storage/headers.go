@@ -9,9 +9,9 @@ import (
 // Headers represents persistent storage for blocks.
 type Headers interface {
 
-	// ByID returns the block with the given hash. It is available for
+	// ByBlockID returns the header with the given ID. It is available for
 	// finalized and ambiguous blocks.
-	ByID(blockID flow.Identifier) (*flow.Header, error)
+	ByBlockID(blockID flow.Identifier) (*flow.Header, error)
 
 	// ByNumber returns the block with the given number. It is only available
 	// for finalized blocks.

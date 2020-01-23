@@ -18,7 +18,7 @@ type Middleware interface {
 // Overlay represents the interface that middleware uses to interact with the
 // overlay network layer.
 type Overlay interface {
-	Identity() (flow.Identity, error)
+	Identity(nodeID flow.Identifier) (*flow.Identity, error)
 	Receive(nodeID flow.Identifier, msg interface{}) error
 	Cleanup(nodeID flow.Identifier) error
 }

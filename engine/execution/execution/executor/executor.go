@@ -38,7 +38,7 @@ func (e *blockExecutor) ExecuteBlock(
 
 	// TODO: compute block fees & reward payments
 
-	err = e.state.PersistStateCommitment(block.Block.ID(), &endState)
+	err = e.state.PersistStateCommitment(block.Block.ID(), endState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store state commitment: %w", err)
 	}
@@ -108,19 +108,13 @@ func (e *blockExecutor) executeCollection(
 		return nil, nil, fmt.Errorf("failed to apply chunk delta: %w", err)
 	}
 
-	chunk = &flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: uint(index),
-			StartState:      startState,
-			// TODO: include event collection hash
-			EventCollection: flow.ZeroID,
-			// TODO: record gas used
-			TotalComputationUsed: 0,
-			// TODO: record first tx gas used
-			FirstTransactionComputationUsed: 0,
-		},
-		Index:    0,
-		EndState: endState,
+	chunk = generateChunk(index, startState, endState)
+
+	chunkHeader := generateChunkHeader(chunk, chunkView.Reads())
+
+	err = e.state.PersistChunkHeader(chunkHeader)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to save chunk header: %w", err)
 	}
 
 	return chunk, endState, nil
@@ -139,7 +133,43 @@ func generateExecutionResultForBlock(
 			PreviousResultID:     flow.ZeroID,
 			BlockID:              block.Block.ID(),
 			FinalStateCommitment: endState,
-			Chunks:               flow.ChunkList{chunks},
+			Chunks:               chunks,
 		},
+	}
+}
+
+// generateChunk creates a chunk from the provided execution data.
+func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flow.Chunk {
+	return &flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: uint(colIndex),
+			StartState:      startState,
+			// TODO: include event collection hash
+			EventCollection: flow.ZeroID,
+			// TODO: record gas used
+			TotalComputationUsed: 0,
+			// TODO: record first tx gas used
+			FirstTransactionComputationUsed: 0,
+		},
+		Index:    0,
+		EndState: endState,
+	}
+}
+
+// generateChunkHeader creates a chunk header from the provided chunk and register IDs.
+func generateChunkHeader(
+	chunk *flow.Chunk,
+	registerIDs []string,
+) *flow.ChunkHeader {
+	reads := make([]flow.RegisterID, len(registerIDs))
+
+	for i, registerID := range registerIDs {
+		reads[i] = flow.RegisterID(registerID)
+	}
+
+	return &flow.ChunkHeader{
+		ChunkID:     chunk.ID(),
+		StartState:  chunk.StartState,
+		RegisterIDs: reads,
 	}
 }

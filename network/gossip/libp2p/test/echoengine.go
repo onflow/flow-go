@@ -8,14 +8,15 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	libp2pmodel "github.com/dapperlabs/flow-go/model/libp2p/message"
+	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 )
 
-// StubEngine is a simple engine that is used for testing the correctness of
-// driving the engines with libp2p
-type StubEngine struct {
+// EchoEngine is a simple engine that is used for testing the correctness of
+// driving the engines with libp2p, in addition to receiving and storing incoming messages
+// it also echos them back
+type EchoEngine struct {
 	t        *testing.T
 	con      network.Conduit  // used to directly communicate with the network
 	originID flow.Identifier  // used to keep track of the id of the sender of the messages
@@ -25,8 +26,8 @@ type StubEngine struct {
 
 }
 
-func NewEngine(t *testing.T, net module.Network, cap int, engineID uint8) *StubEngine {
-	te := &StubEngine{
+func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID uint8) *EchoEngine {
+	te := &EchoEngine{
 		t:        t,
 		echomsg:  "this is an echo",
 		event:    make(chan interface{}, cap),
@@ -42,34 +43,34 @@ func NewEngine(t *testing.T, net module.Network, cap int, engineID uint8) *StubE
 
 // SubmitLocal is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (te *StubEngine) SubmitLocal(event interface{}) {
+func (te *EchoEngine) SubmitLocal(event interface{}) {
 	require.Fail(te.t, "not implemented")
 }
 
 // Submit is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (te *StubEngine) Submit(originID flow.Identifier, event interface{}) {
+func (te *EchoEngine) Submit(originID flow.Identifier, event interface{}) {
 	require.Fail(te.t, "not implemented")
 }
 
 // ProcessLocal is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (te *StubEngine) ProcessLocal(event interface{}) error {
+func (te *EchoEngine) ProcessLocal(event interface{}) error {
 	require.Fail(te.t, "not implemented")
 	return fmt.Errorf(" unexpected method called")
 }
 
 // Process receives an originID and an event and casts them into the corresponding fields of the
-// StubEngine. It then flags the received channel on reception of an event.
+// EchoEngine. It then flags the received channel on reception of an event.
 // It also sends back an echo of the message to the origin ID
-func (te *StubEngine) Process(originID flow.Identifier, event interface{}) error {
+func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error {
 	// stores the message locally
 	te.originID = originID
 	te.event <- event
 	te.received <- struct{}{}
 
 	// asserting event as string
-	lip2pEvent, ok := (event).(*libp2pmodel.Echo)
+	lip2pEvent, ok := (event).(*message.Echo)
 	require.True(te.t, ok, "could not assert event as Echo")
 	strEvent := lip2pEvent.Text
 	// avoids endless circulation of echos by filtering echoing back the echo messages
@@ -78,7 +79,7 @@ func (te *StubEngine) Process(originID flow.Identifier, event interface{}) error
 	}
 
 	// sends a echo back
-	msg := &libp2pmodel.Echo{
+	msg := &message.Echo{
 		Text: fmt.Sprintf("%s: %s", te.echomsg, strEvent),
 	}
 	err := te.con.Submit(msg, originID)
