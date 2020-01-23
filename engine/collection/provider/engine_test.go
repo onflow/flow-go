@@ -23,12 +23,8 @@ func TestSubmitCollectionGuarantee(t *testing.T) {
 	t.Run("should submit guarantee to consensus nodes", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
 
-		collID := unittest.IdentityFixture(func(id *flow.Identity) {
-			id.Role = flow.RoleCollection
-		})
-		consID := unittest.IdentityFixture(func(id *flow.Identity) {
-			id.Role = flow.RoleConsensus
-		})
+		collID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+		consID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 		identities := flow.IdentityList{collID, consID}
 
 		genesis := mock.Genesis(identities)
@@ -44,10 +40,10 @@ func TestSubmitCollectionGuarantee(t *testing.T) {
 		// flush messages from the collection node
 		net, ok := hub.GetNetwork(collNode.Me.NodeID())
 		require.True(t, ok)
-		net.FlushAll()
+		net.DeliverAllRecursive()
 
 		assert.Eventually(t, func() bool {
-			has := consNode.Pool.Has(guarantee.ID())
+			has := consNode.Guarantees.Has(guarantee.ID())
 			return has
 		}, time.Millisecond*5, time.Millisecond)
 	})
@@ -57,12 +53,8 @@ func TestCollectionRequest(t *testing.T) {
 	t.Run("should respond to request", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
 
-		collID := unittest.IdentityFixture(func(id *flow.Identity) {
-			id.Role = flow.RoleCollection
-		})
-		requesterID := unittest.IdentityFixture(func(id *flow.Identity) {
-			id.Role = flow.RoleExecution
-		})
+		collID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+		requesterID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
 		identities := flow.IdentityList{collID, requesterID}
 		genesis := mock.Genesis(identities)
@@ -94,12 +86,12 @@ func TestCollectionRequest(t *testing.T) {
 		// flush the request
 		net, ok := hub.GetNetwork(requesterID.NodeID)
 		require.True(t, ok)
-		net.FlushAll()
+		net.DeliverAllRecursive()
 
 		// flush the response
 		net, ok = hub.GetNetwork(collID.NodeID)
 		require.True(t, ok)
-		net.FlushAll()
+		net.DeliverAllRecursive()
 
 		//assert we received the right collection
 		requesterEngine.AssertExpectations(t)
@@ -108,9 +100,7 @@ func TestCollectionRequest(t *testing.T) {
 	t.Run("should return error for non-existent collection", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
 
-		collID := unittest.IdentityFixture(func(id *flow.Identity) {
-			id.Role = flow.RoleCollection
-		})
+		collID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
 		identities := flow.IdentityList{collID}
 		genesis := mock.Genesis(identities)

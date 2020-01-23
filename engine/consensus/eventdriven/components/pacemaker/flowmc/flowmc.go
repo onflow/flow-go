@@ -46,33 +46,33 @@ func New(id primary.ID, view uint64, primarySelector primary.Selector, eventProc
 func (p *FlowMC) OnBlockIncorporated(block *def.Block) {
 	// inspired by https://content.pivotal.io/blog/a-channel-based-ring-buffer-in-go
 	select {
-		case p.blockIncorporatedEvents <- block:
-		default:
-			bufferedBlock := <-p.blockIncorporatedEvents
-			if bufferedBlock.QC.View > block.QC.View {
-				// Edge-case: buffered block's qc has a higher view than the new block's qc.
-				// Put the block whose qc has highest view in the buffer;
-				// thereby we guarantee that we keep the block in the buffer whose qc has the highest view.
-				p.blockIncorporatedEvents <- bufferedBlock
-			} else {
-				p.blockIncorporatedEvents <- block
-			}
+	case p.blockIncorporatedEvents <- block:
+	default:
+		bufferedBlock := <-p.blockIncorporatedEvents
+		if bufferedBlock.QC.View > block.QC.View {
+			// Edge-case: buffered block's qc has a higher view than the new block's qc.
+			// Put the block whose qc has highest view in the buffer;
+			// thereby we guarantee that we keep the block in the buffer whose qc has the highest view.
+			p.blockIncorporatedEvents <- bufferedBlock
+		} else {
+			p.blockIncorporatedEvents <- block
+		}
 	}
 }
 
 func (p *FlowMC) OnQcFromVotesIncorporated(qc *def.QuorumCertificate) {
 	select {
-		case p.qcFromVotesIncorporatedEvents <- qc:
-		default:
-			bufferedQC := <-p.qcFromVotesIncorporatedEvents
-			if bufferedQC.View > qc.View {
-				// Edge-case: buffered qc has a higher view than the new qc
-				// Put the qc with highest view in the buffer;
-				// thereby we guarantee that we keep the qc with the highest view in the buffer.
-				p.qcFromVotesIncorporatedEvents <- bufferedQC
-			} else {
-				p.qcFromVotesIncorporatedEvents <- qc
-			}
+	case p.qcFromVotesIncorporatedEvents <- qc:
+	default:
+		bufferedQC := <-p.qcFromVotesIncorporatedEvents
+		if bufferedQC.View > qc.View {
+			// Edge-case: buffered qc has a higher view than the new qc
+			// Put the qc with highest view in the buffer;
+			// thereby we guarantee that we keep the qc with the highest view in the buffer.
+			p.qcFromVotesIncorporatedEvents <- bufferedQC
+		} else {
+			p.qcFromVotesIncorporatedEvents <- qc
+		}
 	}
 }
 
@@ -119,7 +119,7 @@ func (p *FlowMC) processBlock(block *def.Block) {
 	}
 	// Replica is primary at current view
 	// => wait for votes with ReplicaTimeout
-	p.timeout.StartTimeout(p.currentView, VoteCollectionTimeout)
+	p.timeout.StartTimeout(p.currentView, VoteCollectionTimeoutTimeout)
 }
 
 func (p *FlowMC) ExecuteView() {
@@ -134,17 +134,17 @@ func (p *FlowMC) ExecuteView() {
 	for startView == p.currentView { // process until view number changes as effect of any event
 		timeoutChannel := p.timeout.Channel()
 		select {
-			case <-p.stopSignal:
-				return
-			case block := <-p.blockIncorporatedEvents:
-				p.skipAhead(block.QC)
-				p.processBlock(block)
-			case qc := <-p.qcFromVotesIncorporatedEvents:
-				p.skipAhead(qc)
-			case <-timeoutChannel:
-				p.timeout.OnTimeout()
-				p.emitTimeoutEvent()
-				p.currentView += 1
+		case <-p.stopSignal:
+			return
+		case block := <-p.blockIncorporatedEvents:
+			p.skipAhead(block.QC)
+			p.processBlock(block)
+		case qc := <-p.qcFromVotesIncorporatedEvents:
+			p.skipAhead(qc)
+		case <-timeoutChannel:
+			p.timeout.OnTimeout()
+			p.emitTimeoutEvent()
+			p.currentView += 1
 		}
 	}
 
@@ -161,7 +161,7 @@ func (p *FlowMC) CurrentView() uint64 {
 // OnReplicaTimeout is a hook which is called when the replica timeout occurs
 func (p *FlowMC) emitTimeoutEvent() {
 	switch p.timeout.Mode() {
-	case VoteCollectionTimeout:
+	case VoteCollectionTimeoutTimeout:
 		p.eventProcessor.OnWaitingForVotesTimeout(p.currentView)
 	case ReplicaTimeout:
 		p.eventProcessor.OnWaitingForBlockTimeout(p.currentView)

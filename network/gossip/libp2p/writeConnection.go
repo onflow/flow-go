@@ -1,11 +1,12 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package middleware
+package libp2p
 
 import (
 	"bufio"
+	"fmt"
 
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/rs/zerolog"
 
 	ggio "github.com/gogo/protobuf/io"
@@ -16,7 +17,7 @@ import (
 // network.
 type WriteConnection struct {
 	*Connection
-	outbound chan *libp2p.Message
+	outbound chan *message.Message
 }
 
 // NewConnection creates a new connection to a peer on the flow network, using
@@ -26,7 +27,7 @@ func NewWriteConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *WriteC
 	c := NewConnection(log, stream)
 	wc := WriteConnection{
 		Connection: c,
-		outbound:   make(chan *libp2p.Message),
+		outbound:   make(chan *message.Message),
 	}
 	return &wc
 }
@@ -48,10 +49,17 @@ SendLoop:
 		case msg := <-wc.outbound:
 			bufw := bufio.NewWriter(wc.stream)
 			writer := ggio.NewDelimitedWriter(bufw)
+
 			err := writer.WriteMsg(msg)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			bufw.Flush()
+
 			wc.log.Debug().
-				Bytes("sender", msg.SenderID).
-				Int("length", len(msg.Event)).
+				Bytes("sender", msg.OriginID).
+				Hex("eventID", msg.EventID).
 				Msg("sent message")
 
 			if isClosedErr(err) {
@@ -64,7 +72,6 @@ SendLoop:
 				wc.stop()
 				continue
 			}
-			bufw.Flush()
 		}
 	}
 

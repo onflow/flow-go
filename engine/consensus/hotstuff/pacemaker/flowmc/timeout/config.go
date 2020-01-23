@@ -2,6 +2,7 @@ package timeout
 
 import (
 	"fmt"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
@@ -66,7 +67,10 @@ func DefaultConfig() *Config {
 		0.5,
 		1.5,
 		800)
-	if err != nil { // should never happen
+	if err != nil {
+		// this should never happen; Only protects code from future inconsistent modifications.
+		// Initializing a default Config will always work, unless the value checks in NewConfig(...)
+		// above are modified without also updating the default.
 		panic("Default timeout config does not comply with internal TimoutConfig conditions")
 	}
 	return tc
