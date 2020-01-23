@@ -50,7 +50,7 @@ func NewThresholdSigner(size int, hashAlgo HashingAlgorithm) (*ThresholdSigner, 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
 	threshold := optimalThreshold(size)
 	// Hahser to be used
-	hasher, err := NewHasher(hashAlgo)
+	hasher, err := NewHasher(hashAlgo, nil)
 	if err != nil {
 		return nil, err
 	}

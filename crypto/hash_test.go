@@ -138,3 +138,24 @@ func BenchmarkSha2_384(b *testing.B) {
 	}
 	return
 }
+
+// Sanity checks of cSHAKE-128
+func TestCShake_128(t *testing.T) {
+	input := []byte("test")
+	expected, _ := hex.DecodeString("")
+
+	alg, err := NewHasher(CSHAKE_128, nil)
+	if err != nil {
+		t.Error(err.Error())
+		return
+	}
+	hash := alg.ComputeHash(input)
+	checkBytes(t, input, expected, hash)
+
+	alg.Reset()
+	alg.Write([]byte("te"))
+	alg.Write([]byte("s"))
+	alg.Write([]byte("t"))
+	hash = alg.SumHash()
+	checkBytes(t, input, expected, hash)
+}

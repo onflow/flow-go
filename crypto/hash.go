@@ -75,12 +75,23 @@ func NewHasher(algo HashingAlgorithm, params *hasherParameters) (Hasher, error) 
 		return hasher, nil
 
 	case CSHAKE_128:
+		var definer, customizer []byte
+		var size int
+		if params != nil {
+			if params.definer != nil {
+				copy(definer, params.definer)
+			}
+			if params.customizer != nil {
+				copy(customizer, params.customizer)
+			}
+			size = params.outputSize
+		}
 		hasher := &cShake128Algo{
 			commonHasher: &commonHasher{
 				algo:       algo,
-				outputSize: params.outputSize,
+				outputSize: size,
 			},
-			ShakeHash: sha3.NewCShake128(params.definer, params.customizer)}
+			ShakeHash: sha3.NewCShake128(definer, customizer)}
 		return hasher, nil
 
 	default:
