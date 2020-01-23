@@ -21,7 +21,7 @@ func main() {
 
 	var (
 		pool         mempool.Transactions
-		tracer       *trace.Tracer
+		tracer       trace.Tracer
 		collections  *storage.Collections
 		ingressConf  ingress.Config
 		proposalConf proposal.Config
@@ -62,7 +62,7 @@ func main() {
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing provider engine")
 			collections = storage.NewCollections(node.DB)
-			providerEng, err = provider.New(node.Logger, node.Network, node.State, node.Me, collections)
+			providerEng, err = provider.New(node.Logger, node.Network, node.State, tracer, node.Me, collections)
 			node.MustNot(err).Msg("could not initialize proposal engine")
 			return providerEng
 		}).

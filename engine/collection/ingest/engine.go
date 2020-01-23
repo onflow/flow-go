@@ -5,7 +5,6 @@ package ingest
 import (
 	"fmt"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -13,6 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -27,19 +27,16 @@ type Engine struct {
 	con    network.Conduit
 	me     module.Local
 	state  protocol.State
-	tracer opentracing.Tracer
+	tracer trace.Tracer
 	pool   mempool.Transactions
 }
 
 // New creates a new collection ingest engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, tracer opentracing.Tracer, me module.Local, pool mempool.Transactions) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, tracer trace.Tracer, me module.Local, pool mempool.Transactions) (*Engine, error) {
 
 	logger := log.With().
 		Str("engine", "ingest").
 		Logger()
-	if tracer == nil {
-		tracer = opentracing.NoopTracer{}
-	}
 	e := &Engine{
 		unit:   engine.NewUnit(),
 		log:    logger,
@@ -126,7 +123,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) e
 
 	log.Debug().Msg("transaction message received")
 
-	tx.StartSpan(e.tracer, "transactionToCollectionGuarantee").
+	e.tracer.StartSpan(tx.ID(), "transactionToCollectionGuarantee").
 		SetTag("tx_id", tx.ID().String()).
 		SetTag("node_type", "collection").
 		SetTag("origin_id", originID.String()).

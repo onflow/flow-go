@@ -3,17 +3,20 @@ package trace
 import (
 	"io"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
+	"github.com/uber/jaeger-client-go"
 	config "github.com/uber/jaeger-client-go/config"
 	"github.com/uber/jaeger-lib/metrics/prometheus"
 )
 
-// Tracer
-type Tracer struct {
+// OpenTracer
+type OpenTracer struct {
 	opentracing.Tracer
-	closer io.Closer
-	log    zerolog.Logger
+	closer    io.Closer
+	log       zerolog.Logger
+	openSpans map[flow.Identifier]opentracing.Span
 }
 
 type traceLogger struct {
@@ -30,7 +33,7 @@ func (t traceLogger) Infof(msg string, args ...interface{}) {
 }
 
 // NewTracer creates a new tracer
-func NewTracer(log zerolog.Logger, service string) (*Tracer, error) {
+func NewTracer(log zerolog.Logger, service string) (Tracer, error) {
 	cfg, err := config.FromEnv()
 	if err != nil {
 		return nil, err
@@ -41,7 +44,7 @@ func NewTracer(log zerolog.Logger, service string) (*Tracer, error) {
 	if err != nil {
 		return nil, err
 	}
-	t := &Tracer{
+	t := &OpenTracer{
 		Tracer: tracer,
 		closer: closer,
 		log:    log,
@@ -50,7 +53,7 @@ func NewTracer(log zerolog.Logger, service string) (*Tracer, error) {
 }
 
 // Ready returns a channel that will close when the network stack is ready.
-func (t *Tracer) Ready() <-chan struct{} {
+func (t *OpenTracer) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	go func() {
 		close(ready)
@@ -59,11 +62,29 @@ func (t *Tracer) Ready() <-chan struct{} {
 }
 
 // Done returns a channel that will close when shutdown is complete.
-func (t *Tracer) Done() <-chan struct{} {
+func (t *OpenTracer) Done() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		t.closer.Close()
 		close(done)
 	}()
 	return done
+}
+
+func (t *OpenTracer) StartSpan(entity flow.Identifier, spanName string, opts ...opentracing.StartSpanOption) opentracing.Span {
+	t.openSpans[entity] = t.Tracer.StartSpan(spanName, opts...)
+	return t.openSpans[entity]
+}
+func (t *OpenTracer) FinishSpan(entity flow.Identifier) {
+	span, ok := t.openSpans[entity]
+	if ok {
+		span.Finish()
+		jaegerSpan := span.(*jaeger.Span)
+		spanDurationMetric.WithLabelValues(jaegerSpan.OperationName()).Observe(jaegerSpan.Duration().Seconds())
+	}
+	delete(t.openSpans, entity)
+}
+
+func (t *OpenTracer) GetSpan(entity flow.Identifier) opentracing.Span {
+	return t.openSpans[entity]
 }

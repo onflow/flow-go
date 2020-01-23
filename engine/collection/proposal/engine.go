@@ -15,6 +15,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -34,7 +35,7 @@ type Engine struct {
 	con         network.Conduit
 	me          module.Local
 	state       protocol.State
-	tracer      opentracing.Tracer
+	tracer      trace.Tracer
 	provider    network.Engine // provider engine to propagate guarantees
 	pool        mempool.Transactions
 	collections storage.Collections
@@ -47,7 +48,7 @@ func New(
 	net module.Network,
 	me module.Local,
 	state protocol.State,
-	tracer opentracing.Tracer,
+	tracer trace.Tracer,
 	provider network.Engine,
 	pool mempool.Transactions,
 	collections storage.Collections,
@@ -165,10 +166,11 @@ func (e *Engine) createProposal() error {
 	followsFrom := make([]opentracing.StartSpanOption, 0, len(transactions))
 	txIDs := make([]flow.Identifier, 0, len(transactions))
 	for _, tx := range transactions {
-		followsFrom = append(followsFrom, opentracing.FollowsFrom(tx.SpanContext()))
+		txSpan := e.tracer.GetSpan(tx.ID())
+		followsFrom = append(followsFrom, opentracing.FollowsFrom(txSpan.Context()))
 		txIDs = append(txIDs, tx.ID())
 	}
-	guarantee.StartSpan(e.tracer, "collectionGuaranteeProposal", followsFrom...).
+	e.tracer.StartSpan(guarantee.ID(), "collectionGuaranteeProposal", followsFrom...).
 		SetTag("collection_txs", txIDs)
 
 	err = e.guarantees.Store(&guarantee)
@@ -179,6 +181,7 @@ func (e *Engine) createProposal() error {
 	// Collection guarante is saved, we can now delete Txs from the mem pool
 	for _, tx := range transactions {
 		e.pool.Rem(tx.ID())
+		e.tracer.FinishSpan(tx.ID())
 	}
 
 	err = e.provider.ProcessLocal(&messages.SubmitCollectionGuarantee{Guarantee: guarantee})

@@ -5,7 +5,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/tracing"
 )
 
 // TransactionBody includes the main contents of a transaction
@@ -48,7 +47,6 @@ func (tb TransactionBody) ID() Identifier {
 // Transaction is the smallest unit of task.
 type Transaction struct {
 	TransactionBody
-	tracing.Traceable
 	Status           TransactionStatus
 	Events           []Event
 	ComputationSpent uint64
