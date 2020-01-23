@@ -35,7 +35,7 @@ func TestHappyPathForIncorporatedVotes(t *testing.T) {
 // 1. the first 2 of them are invalid
 //    no QC should be generated until receiving the 7th vote
 // 2. when receive the 5th vote, a QC should be generated
-//    on receiving the 6th vote, the old QC will be returned, no new QC should be generated
+//    on receiving the 6th vote, return the same QC generated before
 func TestHappyPathForPendingVotes(t *testing.T) {
 
 }
@@ -56,8 +56,10 @@ func TestUnHappyPathForPendingVotes(t *testing.T) {
 
 }
 
-// receive a vote with the same view of a created QC, qcExistedError should be triggered
-func TestErrExistingQC_Error(t *testing.T) {
+// store one vote in the memory
+// receive another vote with the same voter and the same view
+// should trigger ErrDoubleVote
+func TestErrDoubleVote(t *testing.T) {
 
 }
 
