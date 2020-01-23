@@ -11,6 +11,8 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/language/runtime/encoding"
+	"github.com/dapperlabs/flow-go/language/runtime/values"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
@@ -134,8 +136,17 @@ func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to execute script: %w", result.Error)
 	}
 
-	// TODO: convert return value to bytes
-	return []byte{}, nil
+	value, err := values.Convert(result.Value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to export runtime value: %w", err)
+	}
+
+	encodedValue, err := encoding.Encode(value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
+	}
+
+	return encodedValue, nil
 }
 
 // process processes events for the execution engine on the execution node.
