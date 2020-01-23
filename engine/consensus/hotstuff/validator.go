@@ -12,14 +12,13 @@ import (
 type Validator struct {
 	// viewState provides API for querying identities for a specific view
 	viewState ViewState
-	// role specifies the role of the nodes
-	role flow.Role
 }
 
 // QC is valid (signature is valid and has enough stake)
 func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
+	// TODO: potentially can return a very long list
 	// getting all consensus identities
-	allStakedNode, err := v.viewState.GetIdentitiesForView(qc.View, v.role)
+	allStakedNode, err := v.viewState.GetIdentitiesForView(qc.View)
 	if err != nil {
 		return fmt.Errorf("cannot get identities to validate sig at view %v, because %w", qc.View, err)
 	}
@@ -135,7 +134,7 @@ func computeTotalStakes(signers []*flow.Identity) uint64 {
 
 func (v *Validator) validateVoteSig(vote *types.Vote) error {
 	// getting all consensus identities
-	identities, err := v.viewState.GetIdentitiesForView(vote.View, v.role)
+	identities, err := v.viewState.GetIdentitiesForView(vote.View)
 	if err != nil {
 		return fmt.Errorf("cannot get identities to validate sig at view %v, because %w", vote.View, err)
 	}
@@ -150,7 +149,7 @@ func (v *Validator) validateVoteSig(vote *types.Vote) error {
 
 func (v *Validator) validateBlockSig(bp *types.BlockProposal) error {
 	// getting all consensus identities
-	identities, err := v.viewState.GetIdentitiesForView(bp.View(), v.role)
+	identities, err := v.viewState.GetIdentitiesForView(bp.View())
 	if err != nil {
 		return fmt.Errorf("cannot get identities to validate sig at view %v, because %w", bp.View(), err)
 	}
