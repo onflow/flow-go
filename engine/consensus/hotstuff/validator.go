@@ -82,7 +82,7 @@ func (v *Validator) ValidateBlock(bp *types.BlockProposal, parent *types.BlockPr
 	return signer, nil
 }
 
-// ValidateVote validates the vote
+// ValidateVote validates the vote and returns the signer identity who signed the vote
 // vote is the vote to be validated
 // bp is the voting block
 func (v *Validator) ValidateVote(vote *types.Vote, bp *types.BlockProposal) (*flow.Identity, error) {
