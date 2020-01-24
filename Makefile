@@ -114,7 +114,7 @@ ci: install-tools tidy lint test coverage
 docker-ci:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
-		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.5 \
+		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.6 \
 		make ci
 
 # This command is should only be used by Team City
@@ -125,7 +125,7 @@ docker-ci-team-city:
 		-v ${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK} -e SSH_AUTH_SOCK="${SSH_AUTH_SOCK}" \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
-		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.5 \
+		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.6 \
 		make ci
 
 .PHONY: docker-build-collection
