@@ -21,7 +21,7 @@ import (
 )
 
 type Value interface {
-	isValue()
+	IsValue()
 	Copy() Value
 	GetOwner() string
 	SetOwner(owner string)
@@ -74,7 +74,7 @@ func init() {
 	gob.Register(VoidValue{})
 }
 
-func (VoidValue) isValue() {}
+func (VoidValue) IsValue() {}
 
 func (v VoidValue) Copy() Value {
 	return v
@@ -101,7 +101,7 @@ func init() {
 	gob.Register(BoolValue(true))
 }
 
-func (BoolValue) isValue() {}
+func (BoolValue) IsValue() {}
 
 func (v BoolValue) Copy() Value {
 	return v
@@ -150,7 +150,7 @@ func NewStringValue(str string) *StringValue {
 	return &StringValue{str}
 }
 
-func (*StringValue) isValue() {}
+func (*StringValue) IsValue() {}
 
 func (v *StringValue) Copy() Value {
 	return &StringValue{Str: v.Str}
@@ -303,7 +303,7 @@ func NewArrayValueUnownedNonCopying(values ...Value) *ArrayValue {
 	}
 }
 
-func (*ArrayValue) isValue() {}
+func (*ArrayValue) IsValue() {}
 
 func (v *ArrayValue) Copy() Value {
 	// TODO: optimize, use copy-on-write
@@ -565,7 +565,7 @@ func ConvertInt(value Value) Value {
 	return NewIntValue(int64(value.(IntegerValue).IntValue()))
 }
 
-func (v IntValue) isValue() {}
+func (v IntValue) IsValue() {}
 
 func (v IntValue) Copy() Value {
 	return IntValue{big.NewInt(0).Set(v.Int)}
@@ -677,7 +677,7 @@ func init() {
 	gob.Register(Int8Value(0))
 }
 
-func (Int8Value) isValue() {}
+func (Int8Value) IsValue() {}
 
 func (v Int8Value) Copy() Value {
 	return v
@@ -822,7 +822,7 @@ func init() {
 	gob.Register(Int16Value(0))
 }
 
-func (Int16Value) isValue() {}
+func (Int16Value) IsValue() {}
 
 func (v Int16Value) Copy() Value {
 	return v
@@ -967,7 +967,7 @@ func init() {
 	gob.Register(Int32Value(0))
 }
 
-func (Int32Value) isValue() {}
+func (Int32Value) IsValue() {}
 
 func (v Int32Value) Copy() Value {
 	return v
@@ -1112,7 +1112,7 @@ func init() {
 	gob.Register(Int64Value(0))
 }
 
-func (Int64Value) isValue() {}
+func (Int64Value) IsValue() {}
 
 func (v Int64Value) Copy() Value {
 	return v
@@ -1259,7 +1259,7 @@ func init() {
 	gob.Register(Int128Value{})
 }
 
-func (v Int128Value) isValue() {}
+func (v Int128Value) IsValue() {}
 
 func (v Int128Value) Copy() Value {
 	return Int128Value{big.NewInt(0).Set(v.int)}
@@ -1443,7 +1443,7 @@ func init() {
 	gob.Register(Int256Value{})
 }
 
-func (v Int256Value) isValue() {}
+func (v Int256Value) IsValue() {}
 
 func (v Int256Value) Copy() Value {
 	return Int256Value{big.NewInt(0).Set(v.int)}
@@ -1639,7 +1639,7 @@ func ConvertUInt(value Value) Value {
 	return NewUIntValue(uint64(value.(IntegerValue).IntValue()))
 }
 
-func (v UIntValue) isValue() {}
+func (v UIntValue) IsValue() {}
 
 func (v UIntValue) Copy() Value {
 	return UIntValue{big.NewInt(0).Set(v.Int)}
@@ -1754,7 +1754,7 @@ func init() {
 	gob.Register(UInt8Value(0))
 }
 
-func (UInt8Value) isValue() {}
+func (UInt8Value) IsValue() {}
 
 func (v UInt8Value) Copy() Value {
 	return v
@@ -1864,7 +1864,7 @@ func init() {
 	gob.Register(UInt16Value(0))
 }
 
-func (UInt16Value) isValue() {}
+func (UInt16Value) IsValue() {}
 
 func (v UInt16Value) Copy() Value {
 	return v
@@ -1972,7 +1972,7 @@ func init() {
 	gob.Register(UInt32Value(0))
 }
 
-func (UInt32Value) isValue() {}
+func (UInt32Value) IsValue() {}
 
 func (v UInt32Value) Copy() Value {
 	return v
@@ -2082,7 +2082,7 @@ func init() {
 	gob.Register(UInt64Value(0))
 }
 
-func (UInt64Value) isValue() {}
+func (UInt64Value) IsValue() {}
 
 func (v UInt64Value) Copy() Value {
 	return v
@@ -2194,7 +2194,7 @@ func init() {
 	gob.Register(UInt128Value{})
 }
 
-func (v UInt128Value) isValue() {}
+func (v UInt128Value) IsValue() {}
 
 func (v UInt128Value) Copy() Value {
 	return UInt128Value{big.NewInt(0).Set(v.int)}
@@ -2339,7 +2339,7 @@ func init() {
 	gob.Register(UInt256Value{})
 }
 
-func (v UInt256Value) isValue() {}
+func (v UInt256Value) IsValue() {}
 
 func (v UInt256Value) Copy() Value {
 	return UInt256Value{big.NewInt(0).Set(v.int)}
@@ -2482,7 +2482,7 @@ func init() {
 	gob.Register(Word8Value(0))
 }
 
-func (Word8Value) isValue() {}
+func (Word8Value) IsValue() {}
 
 func (v Word8Value) Copy() Value {
 	return v
@@ -2578,7 +2578,7 @@ func init() {
 	gob.Register(Word16Value(0))
 }
 
-func (Word16Value) isValue() {}
+func (Word16Value) IsValue() {}
 
 func (v Word16Value) Copy() Value {
 	return v
@@ -2672,7 +2672,7 @@ func init() {
 	gob.Register(Word32Value(0))
 }
 
-func (Word32Value) isValue() {}
+func (Word32Value) IsValue() {}
 
 func (v Word32Value) Copy() Value {
 	return v
@@ -2768,7 +2768,7 @@ func init() {
 	gob.Register(Word64Value(0))
 }
 
-func (Word64Value) isValue() {}
+func (Word64Value) IsValue() {}
 
 func (v Word64Value) Copy() Value {
 	return v
@@ -2897,7 +2897,7 @@ func (v *CompositeValue) Destroy(interpreter *Interpreter, location LocationPosi
 	return destructor.Invoke(invocation)
 }
 
-func (*CompositeValue) isValue() {}
+func (*CompositeValue) IsValue() {}
 
 func (v *CompositeValue) Copy() Value {
 	// Resources and contracts are not copied
@@ -3108,7 +3108,7 @@ func init() {
 	gob.Register(&DictionaryValue{})
 }
 
-func (*DictionaryValue) isValue() {}
+func (*DictionaryValue) IsValue() {}
 
 func (v *DictionaryValue) Copy() Value {
 	newKeys := v.Keys.Copy().(*ArrayValue)
@@ -3409,7 +3409,7 @@ func init() {
 	gob.Register(NilValue{})
 }
 
-func (NilValue) isValue() {}
+func (NilValue) IsValue() {}
 
 func (NilValue) isOptionalValue() {}
 
@@ -3452,7 +3452,7 @@ func NewSomeValueOwningNonCopying(value Value) *SomeValue {
 	}
 }
 
-func (*SomeValue) isValue() {}
+func (*SomeValue) IsValue() {}
 
 func (*SomeValue) isOptionalValue() {}
 
@@ -3507,7 +3507,7 @@ func init() {
 	gob.Register(&AnyValue{})
 }
 
-func (*AnyValue) isValue() {}
+func (*AnyValue) IsValue() {}
 
 func (v *AnyValue) Copy() Value {
 	return &AnyValue{
@@ -3542,7 +3542,7 @@ type StorageValue struct {
 	Identifier string
 }
 
-func (StorageValue) isValue() {}
+func (StorageValue) IsValue() {}
 
 func (v StorageValue) Copy() Value {
 	return StorageValue{
@@ -3564,7 +3564,7 @@ type PublishedValue struct {
 	Identifier string
 }
 
-func (PublishedValue) isValue() {}
+func (PublishedValue) IsValue() {}
 
 func (v PublishedValue) Copy() Value {
 	return PublishedValue{
@@ -3592,7 +3592,7 @@ func init() {
 	gob.Register(&ReferenceValue{})
 }
 
-func (*ReferenceValue) isValue() {}
+func (*ReferenceValue) IsValue() {}
 
 func (v *ReferenceValue) Copy() Value {
 	return &ReferenceValue{
@@ -3692,7 +3692,7 @@ func ConvertAddress(value Value) Value {
 	return result
 }
 
-func (AddressValue) isValue() {}
+func (AddressValue) IsValue() {}
 
 func (v AddressValue) Copy() Value {
 	return v
