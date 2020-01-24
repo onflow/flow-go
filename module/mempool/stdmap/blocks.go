@@ -27,9 +27,9 @@ func (a *Blocks) Add(block *flow.Block) error {
 	return a.Backend.Add(block)
 }
 
-// Get returns the block with the given ID from the mempool.
-func (a *Blocks) Get(blockID flow.Identifier) (*flow.Block, error) {
-	entity, err := a.Backend.Get(blockID)
+// ByID returns the block with the given ID from the mempool.
+func (a *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
+	entity, err := a.Backend.ByID(blockID)
 	if err != nil {
 		return nil, err
 	}

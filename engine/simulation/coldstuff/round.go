@@ -14,7 +14,7 @@ type Round interface {
 
 	// Leader returns the leader of this round, who will make the block proposal
 	// and to whom votes should be sent.
-	Leader() flow.Identity
+	Leader() *flow.Identity
 
 	// Quorum returns the current quorum of voting stakes required for a
 	// qualified majority in this round.

@@ -315,35 +315,35 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 }
 
 // create ids creates and initializes count-many flow identifiers instances
-func (s *StubEngineTestSuite) createIDs(count int) []flow.Identity {
-	ids := make([]flow.Identity, 0)
+func (s *StubEngineTestSuite) createIDs(count int) []*flow.Identity {
+	identities := make([]*flow.Identity, 0)
 	for i := 0; i < count; i++ {
 		// defining id of node
 		var nodeID [32]byte
 		nodeID[0] = byte(i + 1)
-		ID := flow.Identity{
-			NodeID: flow.Identifier(nodeID),
+		identity := &flow.Identity{
+			NodeID: nodeID,
 		}
-		ids = append(ids, ID)
+		identities = append(identities, identity)
 	}
-	return ids
+	return identities
 }
 
 // create middleware receives an ids slice and creates and initializes a middleware instances for each id
-func (s *StubEngineTestSuite) createMiddleware(ids []flow.Identity) []*libp2p.Middleware {
-	count := len(ids)
+func (s *StubEngineTestSuite) createMiddleware(identities []*flow.Identity) []*libp2p.Middleware {
+	count := len(identities)
 	mws := make([]*libp2p.Middleware, 0)
 	for i := 0; i < count; i++ {
 		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), "0.0.0.0:0", ids[i].NodeID)
+		mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID)
 		require.NoError(s.Suite.T(), err)
 
 		// retrieves IP and port of the middleware
 		ip, port := mw.GetIPPort()
 
 		// mocks an identity for the middleware
-		ids[i].Address = fmt.Sprintf("%s:%s", ip, port)
-		ids[i].Role = flow.RoleCollection
+		identities[i].Address = fmt.Sprintf("%s:%s", ip, port)
+		identities[i].Role = flow.RoleCollection
 
 		mws = append(mws, mw)
 	}

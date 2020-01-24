@@ -98,14 +98,14 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 		ip, port := m.mws[target].libP2PNode.GetIPPort()
 
 		// mocks an identity
-		flowID := flow.Identity{
+		identity := &flow.Identity{
 			NodeID:  m.ids[target],
 			Address: fmt.Sprintf("%s:%s", ip, port),
 			Role:    flow.RoleCollection,
 		}
 
 		// mocks Overlay.Identity
-		m.ov[i].On("Identity", mockery.Anything).Maybe().Return(flowID, nil)
+		m.ov[i].On("Identity", mockery.Anything).Maybe().Return(identity, nil)
 
 		// start the middleware
 		m.mws[i].Start(m.ov[i])

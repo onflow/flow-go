@@ -37,7 +37,7 @@ func TestAddRem(t *testing.T) {
 		})
 
 		t.Run("should be able to get first", func(t *testing.T) {
-			gotItem, err := pool.Get(item1.ID())
+			gotItem, err := pool.ByID(item1.ID())
 			assert.NoError(t, err)
 			assert.Equal(t, item1, gotItem)
 		})

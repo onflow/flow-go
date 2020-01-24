@@ -28,9 +28,9 @@ func (r *Receipts) Add(receipt *flow.ExecutionReceipt) error {
 	return r.Backend.Add(receipt)
 }
 
-// Get returns the execution receipt with the given ID from the mempool.
-func (r *Receipts) Get(receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {
-	entity, err := r.Backend.Get(receiptID)
+// ByID returns the execution receipt with the given ID from the mempool.
+func (r *Receipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {
+	entity, err := r.Backend.ByID(receiptID)
 	if err != nil {
 		return nil, err
 	}

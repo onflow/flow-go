@@ -20,8 +20,8 @@ func NewGuarantees(db *badger.DB) *Guarantees {
 	}
 }
 
-func (c *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
-	return c.db.Update(func(tx *badger.Txn) error {
+func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
+	return g.db.Update(func(tx *badger.Txn) error {
 		err := operation.InsertGuarantee(guarantee)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection guarantee: %w", err)
@@ -30,10 +30,10 @@ func (c *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
 	})
 }
 
-func (c *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
+func (g *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
 	var guarantee flow.CollectionGuarantee
 
-	err := c.db.View(func(tx *badger.Txn) error {
+	err := g.db.View(func(tx *badger.Txn) error {
 		return operation.RetrieveGuarantee(collID, &guarantee)(tx)
 	})
 	if err != nil {

@@ -184,7 +184,7 @@ func TestInsertIntoKey(t *testing.T) {
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	keys = make([][]byte, 0)
 	values = make([][]byte, 0)
@@ -248,7 +248,7 @@ func TestInsertToEndofKeys(t *testing.T) {
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	keys = make([][]byte, 0)
 	values = make([][]byte, 0)
@@ -365,7 +365,7 @@ func TestUpdateAtomicallyMultiValUpdateAndRead(t *testing.T) {
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 	flags := make([][]byte, 0)
 
 	for _, key := range keys {
@@ -439,7 +439,7 @@ func TestTrustedRead(t *testing.T) {
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	test_vals, _, read_err := trie.Read(keys, true, trie.root.GetValue())
 	if read_err != nil {
@@ -524,7 +524,7 @@ func TestGetProofFlags_MultipleValueTree(t *testing.T) {
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	flag, _, _, _ := trie.GetProof(key1)
 
@@ -602,7 +602,7 @@ func TestGetProofAndVerifyInclusionProof_SingleValueTreeLeft(t *testing.T) {
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	flag, proof, size, inclusion := trie.GetProof(keys[0])
 
@@ -648,7 +648,7 @@ func TestGetProof_SingleValueTreeConstructedLeft(t *testing.T) {
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	flag, proof, _, inclusion := trie.GetProof(keys[0])
 
@@ -707,7 +707,7 @@ func TestGetProofAndVerifyInclusionProof_SingleValueTreeRight(t *testing.T) {
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 	flag, proof, size, inclusion := trie.GetProof(keys[0])
 
 	if inclusion == false {
@@ -759,7 +759,7 @@ func TestGetProof_MultipleValueTree(t *testing.T) {
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	flag, proof, size, inclusion := trie.GetProof(key1)
 	if inclusion == false {
@@ -934,7 +934,7 @@ func TestGetProof_MultipleValueTreeDeeper(t *testing.T) {
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	flag, proof, size, inclusion := trie.GetProof(key1)
 	if inclusion == false {
@@ -996,7 +996,7 @@ func TestNonInclusionProof_MultipleValueTree(t *testing.T) {
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	nonIncludedKey := make([]byte, 1)
 	utils.SetBit(nonIncludedKey, 4)
@@ -1075,7 +1075,7 @@ func TestNonInclusionProof_SingleValueTree(t *testing.T) {
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	nonIncludedKey := make([]byte, 1)
 	utils.SetBit(nonIncludedKey, 2)
@@ -1134,7 +1134,7 @@ func TestNonInclusionProof_IncludedKey(t *testing.T) {
 
 	sOldRoot := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	flag, proof, size, inclusion := trie.GetProof(key1)
 	if inclusion == false {
@@ -1203,7 +1203,7 @@ func TestHistoricalState(t *testing.T) {
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	newvalue1 := []byte{'d'}
 	newvalue2 := []byte{'e'}
@@ -1214,7 +1214,7 @@ func TestHistoricalState(t *testing.T) {
 
 	sOldRoot2 := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, newvalues)
+	_ = trie.Update(keys, newvalues)
 
 	hv1, err := trie.historicalStates[sOldRoot2].GetKVDB(key1)
 	if err != nil {
@@ -1283,7 +1283,7 @@ func TestGetHistoricalProofs(t *testing.T) {
 	trie.database.NewBatch()
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	oldRoot := trie.GetRoot().value
 
@@ -1302,7 +1302,7 @@ func TestGetHistoricalProofs(t *testing.T) {
 
 	sOldRoot2 := hex.EncodeToString(oldRoot)
 
-	trie.Update(keys, newvalues)
+	_ = trie.Update(keys, newvalues)
 
 	hflag1, hproof1, hsize1, hinclusion1, err := trie.GetHistoricalProof(key1, oldRoot, trie.historicalStates[sOldRoot2])
 	if err != nil {
@@ -1402,7 +1402,7 @@ func TestGetHistoricalProofs_NonInclusion(t *testing.T) {
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	oldRoot := trie.GetRoot().value
 
@@ -1426,7 +1426,7 @@ func TestGetHistoricalProofs_NonInclusion(t *testing.T) {
 
 	sOldRoot2 := hex.EncodeToString(oldRoot)
 
-	trie.Update(keys, newvalues)
+	_ = trie.Update(keys, newvalues)
 
 	hflag1, hproof1, hsize1, hinclusion1, err := trie.GetHistoricalProof(nkey1, oldRoot, trie.historicalStates[sOldRoot2])
 	if err != nil {
@@ -1511,7 +1511,7 @@ func TestRead_HistoricalValues(t *testing.T) {
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	oldRoot := trie.GetRoot().value
 	sOldRoot2 := hex.EncodeToString(oldRoot)
@@ -1537,7 +1537,7 @@ func TestRead_HistoricalValues(t *testing.T) {
 	newvalues := make([][]byte, 0)
 	newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
-	trie.Update(keys, newvalues)
+	_ = trie.Update(keys, newvalues)
 
 	test_vals, proofHolder, read_err := trie.Read(keys, false, oldRoot)
 	if read_err != nil {
@@ -1623,7 +1623,7 @@ func TestRead_HistoricalValuesTrusted(t *testing.T) {
 
 	sOldRoot1 := hex.EncodeToString(trie.GetRoot().value)
 
-	trie.Update(keys, values)
+	_ = trie.Update(keys, values)
 
 	oldRoot := trie.GetRoot().value
 	sOldRoot2 := hex.EncodeToString(oldRoot)
@@ -1635,7 +1635,7 @@ func TestRead_HistoricalValuesTrusted(t *testing.T) {
 	newvalues := make([][]byte, 0)
 	newvalues = append(newvalues, newvalue1, newvalue2, newvalue3)
 
-	trie.Update(keys, newvalues)
+	_ = trie.Update(keys, newvalues)
 
 	test_vals, _, read_err := trie.Read(keys, true, oldRoot)
 	if read_err != nil {
