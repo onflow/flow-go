@@ -51,7 +51,11 @@ func (v *Validator) ValidateBlock(bp *types.BlockProposal, parent *types.BlockPr
 		return nil, err
 	}
 
-	// TODO: validate the signer is the leader for that block
+	// validate the signer is the leader for that block
+	leaderID := v.viewState.LeaderForView(bp.View())
+	if leaderID.ID() != signer.ID() {
+		return nil, fmt.Errorf("invalid block. not from the leader: %v", bp.BlockMRH())
+	}
 
 	qc := bp.QC()
 
