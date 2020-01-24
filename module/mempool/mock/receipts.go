@@ -41,8 +41,8 @@ func (_m *Receipts) All() []*flow.ExecutionReceipt {
 	return r0
 }
 
-// Get provides a mock function with given fields: receiptID
-func (_m *Receipts) Get(receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {
+// ByID provides a mock function with given fields: receiptID
+func (_m *Receipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error) {
 	ret := _m.Called(receiptID)
 
 	var r0 *flow.ExecutionReceipt

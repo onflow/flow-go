@@ -10,7 +10,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	mocknetwork "github.com/dapperlabs/flow-go/network/mock"
@@ -23,14 +22,14 @@ func TestSubmitCollectionGuarantee(t *testing.T) {
 	t.Run("should submit guarantee to consensus nodes", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
 
-		collID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-		consID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-		identities := flow.IdentityList{collID, consID}
+		collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+		consIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+		identities := flow.IdentityList{collIdentity, consIdentity}
 
-		genesis := mock.Genesis(identities)
+		genesis := flow.Genesis(identities)
 
-		collNode := testutil.CollectionNode(t, hub, collID, genesis)
-		consNode := testutil.ConsensusNode(t, hub, consID, genesis)
+		collNode := testutil.CollectionNode(t, hub, collIdentity, genesis)
+		consNode := testutil.ConsensusNode(t, hub, consIdentity, genesis)
 
 		guarantee := unittest.CollectionGuaranteeFixture()
 
@@ -40,7 +39,7 @@ func TestSubmitCollectionGuarantee(t *testing.T) {
 		// flush messages from the collection node
 		net, ok := hub.GetNetwork(collNode.Me.NodeID())
 		require.True(t, ok)
-		net.FlushAll()
+		net.DeliverAllRecursive()
 
 		assert.Eventually(t, func() bool {
 			has := consNode.Guarantees.Has(guarantee.ID())
@@ -53,13 +52,13 @@ func TestCollectionRequest(t *testing.T) {
 	t.Run("should respond to request", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
 
-		collID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+		collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 		requesterID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
 
-		identities := flow.IdentityList{collID, requesterID}
-		genesis := mock.Genesis(identities)
+		identities := flow.IdentityList{collIdentity, requesterID}
+		genesis := flow.Genesis(identities)
 
-		collNode := testutil.CollectionNode(t, hub, collID, genesis)
+		collNode := testutil.CollectionNode(t, hub, collIdentity, genesis)
 		requesterNode := testutil.GenericNode(t, hub, requesterID, genesis)
 
 		// set up a mock requester engine that will receive and verify the collection response
@@ -76,22 +75,22 @@ func TestCollectionRequest(t *testing.T) {
 		expectedRes := &messages.CollectionResponse{
 			Collection: coll,
 		}
-		requesterEngine.On("Process", collID.NodeID, expectedRes).Return(nil).Once()
+		requesterEngine.On("Process", collIdentity.NodeID, expectedRes).Return(nil).Once()
 
 		// send a request for the collection
 		req := messages.CollectionRequest{ID: coll.ID()}
-		err = con.Submit(&req, collID.NodeID)
+		err = con.Submit(&req, collIdentity.NodeID)
 		assert.NoError(t, err)
 
 		// flush the request
 		net, ok := hub.GetNetwork(requesterID.NodeID)
 		require.True(t, ok)
-		net.FlushAll()
+		net.DeliverAllRecursive()
 
 		// flush the response
-		net, ok = hub.GetNetwork(collID.NodeID)
+		net, ok = hub.GetNetwork(collIdentity.NodeID)
 		require.True(t, ok)
-		net.FlushAll()
+		net.DeliverAllRecursive()
 
 		//assert we received the right collection
 		requesterEngine.AssertExpectations(t)
@@ -100,12 +99,12 @@ func TestCollectionRequest(t *testing.T) {
 	t.Run("should return error for non-existent collection", func(t *testing.T) {
 		hub := stub.NewNetworkHub()
 
-		collID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+		collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 
-		identities := flow.IdentityList{collID}
-		genesis := mock.Genesis(identities)
+		identities := flow.IdentityList{collIdentity}
+		genesis := flow.Genesis(identities)
 
-		collNode := testutil.CollectionNode(t, hub, collID, genesis)
+		collNode := testutil.CollectionNode(t, hub, collIdentity, genesis)
 
 		// create request with invalid/nonexistent fingerprint
 		req := &messages.CollectionRequest{ID: flow.ZeroID}

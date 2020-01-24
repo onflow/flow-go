@@ -23,7 +23,7 @@ type Transactions interface {
 
 	// Get will retrieve the given transaction from the memory pool; it will
 	// error if the transaction is not in the memory pool.
-	Get(txID flow.Identifier) (*flow.Transaction, error)
+	ByID(txID flow.Identifier) (*flow.Transaction, error)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

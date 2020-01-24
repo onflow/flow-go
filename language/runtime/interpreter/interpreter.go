@@ -2462,6 +2462,12 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 	case *sema.Int64Type:
 		return ConvertInt64(value)
 
+	case *sema.Int128Type:
+		return ConvertInt128(value)
+
+	case *sema.Int256Type:
+		return ConvertInt256(value)
+
 	// UInt*
 	case *sema.UInt8Type:
 		return ConvertUInt8(value)

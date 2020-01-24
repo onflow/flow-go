@@ -1,6 +1,8 @@
 package hotstuff
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/rs/zerolog"
 )
@@ -34,46 +36,38 @@ func (v *Voter) NewVoter(signer Signer, viewState ViewState, forks Forks, isConA
 // This method will only ever _once_ return a `non-nil, true` vote: the very first time it encounters a safe block of the
 //  current view to vote for. Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
 // (including repeated calls with the initial block we voted for also return `nil, false`).
-func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*types.Vote, bool) {
-	log := v.log.With().
-		Hex("block_id", bp.Block.BlockMRH()).
-		Logger()
-
+func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*types.Vote, error) {
 	if !v.isConActor {
-		log.Debug().Msg("we're not a consensus actor, don't vote")
-		return nil, false
+		return nil, fmt.Errorf("we're not a consensus actor, don't vote")
 	}
 
 	if v.forks.IsSafeNode(bp) {
-		log.Info().Msg("received block is not a safe node, don't vote")
-		return nil, false
+		return nil, fmt.Errorf("received block is not a safe node, don't vote")
 	}
 
 	if curView != bp.Block.View {
-		log.Info().Uint64("view", bp.Block.View).Uint64("curView", curView).
-			Msg("received block's view is not our current view, don't vote")
-		return nil, false
+		return nil, fmt.Errorf("received block's view is not our current view, don't vote")
 	}
 
 	if curView <= v.lastVotedView {
-		log.Info().Uint64("lastVotedView", v.lastVotedView).Uint64("curView", curView).
-			Msg("received block's view is <= lastVotedView, don't vote")
-		return nil, false
+		return nil, fmt.Errorf("received block's view is <= lastVotedView, don't vote")
 	}
 
-	return v.produceVote(bp), true
+	vote, err := v.produceVote(bp)
+	if err != nil {
+		return nil, err
+	}
+	return vote, nil
 }
 
-func (v *Voter) produceVote(bp *types.BlockProposal) *types.Vote {
-	log := v.log.With().
-		Hex("block_id", bp.Block.BlockMRH()).
-		Logger()
-
-	signerIdx := v.viewState.GetSelfIdxForView(bp.Block.View)
+func (v *Voter) produceVote(bp *types.BlockProposal) (*types.Vote, error) {
+	signerIdx, err := v.viewState.GetSelfIdxForBlockID(bp.BlockMRH())
+	if err != nil {
+		return nil, err
+	}
 	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.Block.BlockMRH())
 	sig := v.signer.SignVote(unsignedVote, signerIdx)
-	vote := types.NewVote(bp.Block.View, bp.Block.BlockMRH(), sig)
-	log.Info().Msg("successfully produced vote")
+	vote := types.NewVote(bp.Block.View, bp.BlockMRH(), sig)
 
-	return vote
+	return vote, nil
 }

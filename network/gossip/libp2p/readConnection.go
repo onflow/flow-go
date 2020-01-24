@@ -1,6 +1,7 @@
 package libp2p
 
 import (
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
@@ -8,7 +9,7 @@ import (
 
 type ReadConnection struct {
 	*Connection
-	inbound chan *Message
+	inbound chan *message.Message
 }
 
 // NewConnection creates a new connection to a peer on the flow network, using
@@ -17,7 +18,7 @@ func NewReadConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *ReadCon
 	connection := NewConnection(log, stream)
 	c := ReadConnection{
 		Connection: connection,
-		inbound:    make(chan *Message),
+		inbound:    make(chan *message.Message),
 	}
 	return &c
 }
@@ -36,17 +37,17 @@ RecvLoop:
 		default:
 		}
 
-		var msg Message
+		var msg message.Message
 		err := r.ReadMsg(&msg)
 		if err != nil {
 			rc.log.Error().Str("peer", rc.stream.Conn().RemotePeer().String()).Err(err)
-			rc.stream.Close()
+			rc.stop()
 			return
 		}
 
 		rc.log.Debug().Str("peer", rc.stream.Conn().RemotePeer().String()).
-			Bytes("sender", msg.SenderID).
-			Hex("eventID", msg.Event.EventID).
+			Bytes("sender", msg.OriginID).
+			Hex("eventID", msg.EventID).
 			Msg("received message")
 
 		// stash the received message into the inbound queue for handling

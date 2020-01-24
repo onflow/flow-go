@@ -170,7 +170,7 @@ func TestHappyPath(t *testing.T) {
 	assert.Nil(t, err)
 
 	// send the ER from execution to verification node
-	err = verNode.ReceiptsEngine.Process(exeID.NodeID, completeER.Receipt)
+	err = verNode.IngestEngine.Process(exeID.NodeID, completeER.Receipt)
 	assert.Nil(t, err)
 
 	// the receipt should be added to the mempool
@@ -179,30 +179,42 @@ func TestHappyPath(t *testing.T) {
 	// flush the chunk state request
 	verNet, ok := hub.GetNetwork(verID.NodeID)
 	assert.True(t, ok)
-	verNet.FlushAll()
+	verNet.DeliverSome(func(m *stub.PendingMessage) bool {
+		return m.ChannelID == engine.ExecutionStateProvider
+	})
 
 	// flush the chunk state response
 	exeNet, ok := hub.GetNetwork(exeID.NodeID)
 	assert.True(t, ok)
-	exeNet.FlushAll()
+	exeNet.DeliverSome(func(m *stub.PendingMessage) bool {
+		return m.ChannelID == engine.ExecutionStateProvider
+	})
 
 	// the chunk state should be added to the mempool
 	assert.True(t, verNode.ChunkStates.Has(completeER.ChunkStates[0].ID()))
 
 	// flush the collection request
-	verNet.FlushAll()
+	verNet.DeliverSome(func(m *stub.PendingMessage) bool {
+		return m.ChannelID == engine.CollectionProvider
+	})
 
 	// flush the collection response
 	colNet, ok := hub.GetNetwork(colID.NodeID)
 	assert.True(t, ok)
-	colNet.FlushAll()
-
-	// the collection should be stored in the mempool
-	assert.True(t, verNode.Collections.Has(completeER.Collections[0].ID()))
+	colNet.DeliverSome(func(m *stub.PendingMessage) bool {
+		return m.ChannelID == engine.CollectionProvider
+	})
 
 	// flush the result approval broadcast
-	verNet.FlushAll()
+	verNet.DeliverAllRecursive()
 
 	// assert that the RA was received
 	conEngine.AssertExpectations(t)
+
+	// the receipt should be removed from the mempool
+	assert.False(t, verNode.Receipts.Has(completeER.Receipt.ID()))
+	// associated resources should be removed from the mempool
+	assert.False(t, verNode.Collections.Has(completeER.Collections[0].ID()))
+	assert.False(t, verNode.ChunkStates.Has(completeER.ChunkStates[0].ID()))
+	assert.False(t, verNode.Blocks.Has(completeER.Block.ID()))
 }

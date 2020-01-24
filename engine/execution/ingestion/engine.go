@@ -23,31 +23,38 @@ import (
 type Engine struct {
 	unit              *engine.Unit
 	log               zerolog.Logger
+	me                module.Local
+	state             protocol.State
 	conduit           network.Conduit
 	collectionConduit network.Conduit
-	me                module.Local
 	blocks            storage.Blocks
 	collections       storage.Collections
-	state             protocol.State
 	execution         network.Engine
-
-	mempool *Mempool
+	mempool           *Mempool
 }
 
-func NewEngine(logger zerolog.Logger, net module.Network, me module.Local, blocks storage.Blocks, collections storage.Collections, state protocol.State, executionEngine network.Engine) (*Engine, error) {
+func NewEngine(
+	logger zerolog.Logger,
+	net module.Network,
+	me module.Local,
+	state protocol.State,
+	blocks storage.Blocks,
+	collections storage.Collections,
+	executionEngine network.Engine,
+) (*Engine, error) {
 
 	mempool, err := newMempool()
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot create mempool")
+		return nil, errors.Wrap(err, "could not create mempool")
 	}
 
 	eng := Engine{
 		unit:        engine.NewUnit(),
 		log:         logger,
 		me:          me,
+		state:       state,
 		blocks:      blocks,
 		collections: collections,
-		state:       state,
 		execution:   executionEngine,
 		mempool:     mempool,
 	}
@@ -178,7 +185,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 	err = e.mempool.Run(func(backdata *Backdata) error {
 		for _, guarantee := range block.Guarantees {
-			completeBlock, err := backdata.Get(guarantee.ID())
+			completeBlock, err := backdata.ByID(guarantee.ID())
 			if err == mempool.ErrEntityNotFound {
 				emptyCompleteBlock.CompleteCollections[guarantee.ID()] = &execution.CompleteCollection{
 					Guarantee:    guarantee,
@@ -223,7 +230,7 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 	collID := collection.ID()
 
 	return e.mempool.Run(func(backdata *Backdata) error {
-		completeBlock, err := backdata.Get(collID)
+		completeBlock, err := backdata.ByID(collID)
 		if err == nil {
 			if completeCollection, ok := completeBlock.Block.CompleteCollections[collID]; ok {
 				if completeCollection.Transactions == nil {

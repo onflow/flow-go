@@ -22,6 +22,25 @@ func NewCollections(db *badger.DB) *Collections {
 	return &c
 }
 
+func (c *Collections) Store(collection *flow.Collection) error {
+	return c.db.Update(func(btx *badger.Txn) error {
+		light := collection.Light()
+		err := operation.PersistCollection(&light)(btx)
+		if err != nil {
+			return fmt.Errorf("could not insert collection: %w", err)
+		}
+
+		for _, tx := range collection.Transactions {
+			err = operation.PersistTransaction(tx)(btx)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
 func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 	var (
 		light      flow.LightCollection
@@ -57,25 +76,6 @@ func (c *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
 	}
 
 	return &collection, nil
-}
-
-func (c *Collections) Store(collection *flow.Collection) error {
-	return c.db.Update(func(btx *badger.Txn) error {
-		light := collection.Light()
-		err := operation.PersistCollection(&light)(btx)
-		if err != nil {
-			return fmt.Errorf("could not insert collection: %w", err)
-		}
-
-		for _, tx := range collection.Transactions {
-			err = operation.PersistTransaction(tx)(btx)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
 }
 
 func (c *Collections) Remove(collID flow.Identifier) error {

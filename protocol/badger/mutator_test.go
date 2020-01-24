@@ -29,23 +29,22 @@ func TestBootStrapValid(t *testing.T) {
 		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.Role(3), Stake: 3},
 	}
 
-	header := flow.Header{
-		Number:      0,
-		Timestamp:   time.Now().UTC(),
-		ParentID:    flow.ZeroID,
-		PayloadHash: flow.Identifier{0x11},
-		Signatures:  []crypto.Signature{[]byte("signature")},
-	}
-
-	content := flow.Content{
+	payload := flow.Payload{
 		Identities: ids,
 		Guarantees: nil,
 	}
 
+	header := flow.Header{
+		Number:      0,
+		Timestamp:   time.Now().UTC(),
+		ParentID:    flow.ZeroID,
+		PayloadHash: payload.Hash(),
+		Signatures:  []crypto.Signature{[]byte("signature")},
+	}
+
 	genesis := flow.Block{
 		Header:  header,
-		Payload: content.Payload(),
-		Content: content,
+		Payload: payload,
 	}
 
 	blockID := genesis.ID()

@@ -78,6 +78,8 @@ func TestCheckIntegerLiteralRanges(t *testing.T) {
 		&sema.Int16Type{},
 		&sema.Int32Type{},
 		&sema.Int64Type{},
+		&sema.Int128Type{},
+		&sema.Int256Type{},
 		// UInt*
 		&sema.UInt8Type{},
 		&sema.UInt16Type{},
@@ -134,6 +136,8 @@ func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
 		&sema.Int16Type{},
 		&sema.Int32Type{},
 		&sema.Int64Type{},
+		&sema.Int128Type{},
+		&sema.Int256Type{},
 		// UInt*
 		&sema.UInt8Type{},
 		&sema.UInt16Type{},
@@ -294,6 +298,8 @@ func TestCheckSignedIntegerNegate(t *testing.T) {
 		&sema.Int16Type{},
 		&sema.Int32Type{},
 		&sema.Int64Type{},
+		&sema.Int128Type{},
+		&sema.Int256Type{},
 	} {
 		name := ty.String()
 		t.Run(name, func(t *testing.T) {

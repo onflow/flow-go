@@ -15,8 +15,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/libp2p/network"
 	"github.com/dapperlabs/flow-go/network/codec/json"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/mock"
 )
 
@@ -56,21 +56,21 @@ func (m *MiddlewareTestSuit) TestPingRawReception() {
 // it does not evaluate content of the payload
 // it does not evaluate anything related to the sender id
 func (m *MiddlewareTestSuit) TestPingTypeReception() {
-	m.Ping(mockery.Anything, mockery.AnythingOfType("*network.NetworkMessage"))
+	m.Ping(mockery.Anything, mockery.AnythingOfType("*message.Message"))
 }
 
 // TestPingIDType tests the middleware against both the type of sender id
 // and content of the payload of the event upon reception at the receiver side
 // it does not evaluate the actual value of the sender ID
 func (m *MiddlewareTestSuit) TestPingIDType() {
-	msg := m.createNetworkMessage(m.ids[0], m.ids[1])
+	msg := createMessage(m.ids[0], m.ids[1])
 	m.Ping(mockery.AnythingOfType("flow.Identifier"), msg)
 }
 
 // TestPingContentReception tests the middleware against both
 // the payload and sender ID of the event upon reception at the receiver side
 func (m *MiddlewareTestSuit) TestPingContentReception() {
-	msg := m.createNetworkMessage(m.ids[0], m.ids[1])
+	msg := createMessage(m.ids[0], m.ids[1])
 	m.Ping(m.mws[0].me, msg)
 }
 
@@ -98,25 +98,17 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 		ip, port := m.mws[target].libP2PNode.GetIPPort()
 
 		// mocks an identity
-		flowID := flow.Identity{
+		identity := &flow.Identity{
 			NodeID:  m.ids[target],
 			Address: fmt.Sprintf("%s:%s", ip, port),
 			Role:    flow.RoleCollection,
 		}
 
-		// mocks Overlay.Identity for middleware.Overlay.Identity()
-		m.ov[i].On("Identity").Return(flowID, nil)
+		// mocks Overlay.Identity
+		m.ov[i].On("Identity", mockery.Anything).Maybe().Return(identity, nil)
 
-	}
-
-	// starting the middleware
-	for i := 0; i < m.size; i++ {
+		// start the middleware
 		m.mws[i].Start(m.ov[i])
-		time.Sleep(1 * time.Second)
-	}
-
-	for i := 0; i < m.size; i++ {
-		m.ov[i].AssertExpectations(m.T())
 	}
 }
 
@@ -128,7 +120,7 @@ func (m *MiddlewareTestSuit) Ping(expectID, expectPayload interface{}) {
 	ch := make(chan struct{})
 	// extracts sender id based on the mock option
 	var err error
-	// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
+	// mocks Overlay.Receive for middleware.Overlay.Receive(*nodeID, payload)
 	firstNode := 0
 	lastNode := m.size - 1
 	m.ov[lastNode].On("Receive", expectID, expectPayload).Return(nil).Once().
@@ -136,7 +128,7 @@ func (m *MiddlewareTestSuit) Ping(expectID, expectPayload interface{}) {
 			ch <- struct{}{}
 		})
 
-	msg := m.createNetworkMessage(m.ids[firstNode], m.ids[lastNode])
+	msg := createMessage(m.ids[firstNode], m.ids[lastNode])
 
 	err = m.mws[firstNode].Send(m.ids[lastNode], msg)
 	require.NoError(m.Suite.T(), err)
@@ -164,7 +156,7 @@ func (m *MiddlewareTestSuit) MultiPing(count int) {
 	lastNode := m.size - 1
 	for i := 0; i < count; i++ {
 		wg.Add(1)
-		msg := m.createNetworkMessage(m.ids[firstNode], m.ids[lastNode], fmt.Sprintf("hello from: %d", i))
+		msg := createMessage(m.ids[firstNode], m.ids[lastNode], fmt.Sprintf("hello from: %d", i))
 		m.ov[lastNode].On("Receive", m.mws[firstNode].me, msg).Return(nil).Once().
 			Run(func(args mockery.Arguments) {
 				wg.Done()
@@ -197,15 +189,17 @@ func (m *MiddlewareTestSuit) TestEcho() {
 	firstNode := 0
 	lastNode := m.size - 1
 
-	sendMsg := m.createNetworkMessage(m.ids[firstNode], m.ids[lastNode], "hello")
-	replyMsg := m.createNetworkMessage(m.ids[lastNode], m.ids[firstNode], "hello back")
+	sendMsg := createMessage(m.ids[firstNode], m.ids[lastNode], "hello")
+	replyMsg := createMessage(m.ids[lastNode], m.ids[firstNode], "hello back")
 
 	// last node
 	m.ov[lastNode].On("Receive", m.mws[firstNode].me, sendMsg).Return(nil).Once().
 		Run(func(args mockery.Arguments) {
 			wg.Done()
 			// echos back the same message back to the sender
-			m.mws[lastNode].Send(m.mws[firstNode].me, replyMsg)
+			err = m.mws[lastNode].Send(m.mws[firstNode].me, replyMsg)
+			assert.NoError(m.T(), err)
+
 		})
 
 	// first node
@@ -244,7 +238,7 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 		codec := json.NewCodec()
 
 		// creates new middleware
-		mw, err := NewMiddleware(logger, codec, uint(count-1), "0.0.0.0:0", targetID)
+		mw, err := NewMiddleware(logger, codec, "0.0.0.0:0", targetID)
 		require.NoError(m.Suite.T(), err)
 
 		mws = append(mws, mw)
@@ -259,17 +253,20 @@ func (m *MiddlewareTestSuit) createMiddleWares(count int) ([]flow.Identifier, []
 	return ids, mws
 }
 
-func (m *MiddlewareTestSuit) createNetworkMessage(originID flow.Identifier, targetID flow.Identifier, msg ...string) *network.NetworkMessage {
+func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...string) *message.Message {
 	payload := "hello"
+
 	if len(msg) > 0 {
 		payload = msg[0]
 	}
-	nm := &network.NetworkMessage{
+
+	message := &message.Message{
 		ChannelID: 1,
 		EventID:   []byte("1"),
-		OriginID:  originID,
-		TargetIDs: []flow.Identifier{targetID},
+		OriginID:  originID[:],
+		TargetIDs: [][]byte{targetID[:]},
 		Payload:   []byte(payload),
 	}
-	return nm
+
+	return message
 }

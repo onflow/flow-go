@@ -41,8 +41,8 @@ func (_m *ChunkStates) All() []*flow.ChunkState {
 	return r0
 }
 
-// Get provides a mock function with given fields: chunkID
-func (_m *ChunkStates) Get(chunkID flow.Identifier) (*flow.ChunkState, error) {
+// ByID provides a mock function with given fields: chunkID
+func (_m *ChunkStates) ByID(chunkID flow.Identifier) (*flow.ChunkState, error) {
 	ret := _m.Called(chunkID)
 
 	var r0 *flow.ChunkState

@@ -41,8 +41,8 @@ func (_m *Blocks) All() []*flow.Block {
 	return r0
 }
 
-// Get provides a mock function with given fields: blockID
-func (_m *Blocks) Get(blockID flow.Identifier) (*flow.Block, error) {
+// ByID provides a mock function with given fields: blockID
+func (_m *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	ret := _m.Called(blockID)
 
 	var r0 *flow.Block
