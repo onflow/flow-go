@@ -8,7 +8,7 @@ import (
 
 type Access int
 
-// NOTE: order indicates permissiveness: from less to most permissive!
+// NOTE: order indicates permissiveness: from least to most permissive!
 
 const (
 	AccessNotSpecified Access = iota
