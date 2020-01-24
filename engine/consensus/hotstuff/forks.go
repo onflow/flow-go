@@ -29,7 +29,7 @@ type Forks interface {
 	// FinalizedBlock returns the finalized block with the largest view number
 	FinalizedBlock() *types.BlockProposal
 
-	// IsSafeNode returns true if block is safe to vote for
+	// IsSafeBlock returns true if block is safe to vote for
 	// (according to the definition in https://arxiv.org/abs/1803.05069v6).
 	// Returns false for unknown blocks.
 	IsSafeBlock(block *types.BlockProposal) bool
