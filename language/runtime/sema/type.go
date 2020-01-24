@@ -801,6 +801,42 @@ func (*Int256Type) Max() *big.Int {
 	return Int256TypeMax
 }
 
+// UIntType represents the arbitrary-precision unsigned integer type `UInt`
+type UIntType struct{}
+
+func (*UIntType) isType() {}
+
+func (*UIntType) String() string {
+	return "UInt"
+}
+
+func (*UIntType) ID() TypeID {
+	return "UInt"
+}
+
+func (*UIntType) Equal(other Type) bool {
+	_, ok := other.(*UIntType)
+	return ok
+}
+
+func (*UIntType) IsResourceType() bool {
+	return false
+}
+
+func (*UIntType) IsInvalidType() bool {
+	return false
+}
+
+var UIntTypeMin = big.NewInt(0)
+
+func (*UIntType) Min() *big.Int {
+	return UIntTypeMin
+}
+
+func (*UIntType) Max() *big.Int {
+	return nil
+}
+
 // UInt8Type represents the 8-bit unsigned integer type `UInt8`
 // which checks for overflow and underflow
 type UInt8Type struct{}
@@ -951,6 +987,94 @@ func (*UInt64Type) Min() *big.Int {
 
 func (*UInt64Type) Max() *big.Int {
 	return UInt64TypeMax
+}
+
+// UInt128Type represents the 128-bit unsigned integer type `UInt128`
+// which checks for overflow and underflow
+type UInt128Type struct{}
+
+func (*UInt128Type) isType() {}
+
+func (*UInt128Type) String() string {
+	return "UInt128"
+}
+
+func (*UInt128Type) ID() TypeID {
+	return "UInt128"
+}
+
+func (*UInt128Type) Equal(other Type) bool {
+	_, ok := other.(*UInt128Type)
+	return ok
+}
+
+func (*UInt128Type) IsResourceType() bool {
+	return false
+}
+
+func (*UInt128Type) IsInvalidType() bool {
+	return false
+}
+
+var UInt128TypeMin = big.NewInt(0)
+var UInt128TypeMax *big.Int
+
+func init() {
+	UInt128TypeMax = big.NewInt(1)
+	UInt128TypeMax.Lsh(UInt128TypeMax, 128)
+	UInt128TypeMax.Sub(UInt128TypeMax, big.NewInt(1))
+}
+
+func (*UInt128Type) Min() *big.Int {
+	return UInt128TypeMin
+}
+
+func (*UInt128Type) Max() *big.Int {
+	return UInt128TypeMax
+}
+
+// UInt256Type represents the 256-bit unsigned integer type `UInt256`
+// which checks for overflow and underflow
+type UInt256Type struct{}
+
+func (*UInt256Type) isType() {}
+
+func (*UInt256Type) String() string {
+	return "UInt256"
+}
+
+func (*UInt256Type) ID() TypeID {
+	return "UInt256"
+}
+
+func (*UInt256Type) Equal(other Type) bool {
+	_, ok := other.(*UInt256Type)
+	return ok
+}
+
+func (*UInt256Type) IsResourceType() bool {
+	return false
+}
+
+func (*UInt256Type) IsInvalidType() bool {
+	return false
+}
+
+var UInt256TypeMin = big.NewInt(0)
+var UInt256TypeMax *big.Int
+
+func init() {
+	UInt256TypeMax = big.NewInt(1)
+	UInt256TypeMax.Lsh(UInt256TypeMax, 256)
+	UInt256TypeMax.Sub(UInt256TypeMax, big.NewInt(1))
+}
+
+func (*UInt256Type) Min() *big.Int {
+	return UInt256TypeMin
+}
+
+func (*UInt256Type) Max() *big.Int {
+	return UInt256TypeMax
 }
 
 // Word8Type represents the 8-bit unsigned integer type `Word8`
@@ -1611,6 +1735,7 @@ func init() {
 		&BoolType{},
 		&CharacterType{},
 		&IntType{},
+		&UIntType{},
 		&StringType{},
 		&Int8Type{},
 		&Int16Type{},
@@ -1622,6 +1747,8 @@ func init() {
 		&UInt16Type{},
 		&UInt32Type{},
 		&UInt64Type{},
+		&UInt128Type{},
+		&UInt256Type{},
 		&Word8Type{},
 		&Word16Type{},
 		&Word32Type{},
@@ -1681,6 +1808,7 @@ func init() {
 func initIntegerFunctions() {
 	integerTypes := []Type{
 		&IntType{},
+		&UIntType{},
 		// Int*
 		&Int8Type{},
 		&Int16Type{},
@@ -1693,6 +1821,8 @@ func initIntegerFunctions() {
 		&UInt16Type{},
 		&UInt32Type{},
 		&UInt64Type{},
+		&UInt128Type{},
+		&UInt256Type{},
 		// Word*
 		&Word8Type{},
 		&Word16Type{},
@@ -2632,9 +2762,9 @@ func IsSubType(subType Type, superType Type) bool {
 	switch typedSuperType := superType.(type) {
 	case *IntegerType:
 		switch subType.(type) {
-		case *IntegerType, *SignedIntegerType, *IntType,
+		case *IntegerType, *SignedIntegerType, *IntType, *UIntType,
 			*Int8Type, *Int16Type, *Int32Type, *Int64Type, *Int128Type, *Int256Type,
-			*UInt8Type, *UInt16Type, *UInt32Type, *UInt64Type,
+			*UInt8Type, *UInt16Type, *UInt32Type, *UInt64Type, *UInt128Type, *UInt256Type,
 			*Word8Type, *Word16Type, *Word32Type, *Word64Type:
 
 			return true
