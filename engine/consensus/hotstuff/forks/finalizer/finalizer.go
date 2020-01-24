@@ -3,17 +3,15 @@ package finalizer
 import (
 	"bytes"
 	"fmt"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/utils"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/state/forrest"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer/forrest"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
 // Finalizer implements HotStuff finalization logic
 type Finalizer struct {
-	notifier notifications.Distributor
-
+	notifier  notifications.Distributor
 	mainChain forrest.LeveledForrest
 
 	// LockedBlockQC is the QC that POINTS TO the the most recently locked block
@@ -24,15 +22,6 @@ type Finalizer struct {
 }
 
 func New(rootBlock *types.BlockProposal, rootQc *types.QuorumCertificate, notifier notifications.Distributor) (*Finalizer, error) {
-	if utils.IsNil(rootBlock) {
-		return nil, &types.ErrorConfiguration{Msg: "finalizedRootBlock cannot be nil"}
-	}
-	if utils.IsNil(notifier) {
-		return nil, &types.ErrorConfiguration{Msg: "notifications.Distributor cannot be nil"}
-	}
-	if utils.IsNil(rootQc) {
-		return nil, &types.ErrorConfiguration{Msg: "rootQC cannot be nil"}
-	}
 	if !bytes.Equal(rootQc.BlockMRH, rootBlock.BlockMRH()) || (rootQc.View != rootBlock.View()) {
 		return nil, &types.ErrorConfiguration{Msg: "rootQc must be for rootBlock"}
 	}

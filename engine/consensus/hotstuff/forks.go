@@ -14,7 +14,7 @@ import (
 // * From the view-point of Forks, a block B is identified by the pair (B.View, B.blockMRH)
 // * Forks expects that only blocks are added that can be connected to its latest finalized block
 //   (without missing interim ancestors). If this condition is violated, Forks will raise an error
-//   and irgnore the block.
+//   and ignore the block.
 type Forks interface {
 
 	// GetBlockForView returns the BlockProposal at the given view number if exists.
@@ -47,10 +47,15 @@ type Forks interface {
 	AddBlock(block *types.BlockProposal) error
 
 	// AddQC adds a quorum certificate to Forks.
-	// Might error in case the block referenced by the QuorumCertificate is unknown.
-	AddQC(*types.QuorumCertificate) error
+	// Might error in case the block referenced by the qc is unknown.
+	AddQC(qc *types.QuorumCertificate) error
 
-	// MakeForkChoice prompts the ForkChoice to generate a fork choice.
-	// The fork choice is a qc that should be used for building the primaries block
-	MakeForkChoice(viewNumber uint64) *types.QuorumCertificate
+	// MakeForkChoice prompts the ForkChoice to generate a fork choice for the
+	// current view `curView`. The fork choice is a qc that should be used for
+	// building the primaries block.
+	//
+	// Error return indicates incorrect usage. Processing a QC with view v
+	// should result in the PaceMaker being in view v+1 or larger. Hence, given
+	// that the current View is curView, all QCs should have view < curView
+	MakeForkChoice(curView uint64) (*types.QuorumCertificate, error)
 }

@@ -4,7 +4,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/forkchoice"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/utils"
 	"github.com/juju/loggo"
 )
 
