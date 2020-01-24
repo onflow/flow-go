@@ -38,6 +38,6 @@ func (eh *EventHandler) OnBlockRequest(req *types.BlockProposalRequest) {
 	panic("implement me")
 }
 
-func (e *EventHandler) startNewView() error {
+func (eh *EventHandler) startNewView() error {
 	panic("implement me")
 }

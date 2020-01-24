@@ -37,7 +37,7 @@ func NewController(timeoutConfig Config) *Controller {
 }
 
 func DefaultController() *Controller {
-	return NewController(*DefaultConfig())
+	return NewController(DefaultConfig)
 }
 
 func (t *Controller) StartTimeout(mode types.TimeoutMode) {
