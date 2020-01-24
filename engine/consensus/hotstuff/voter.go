@@ -44,7 +44,7 @@ func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*
 		return nil, false
 	}
 
-	if v.forks.IsSafeNode(bp) {
+	if v.forks.IsSafeBlock(bp) {
 		log.Info().Msg("received block is not a safe node, don't vote")
 		return nil, false
 	}
