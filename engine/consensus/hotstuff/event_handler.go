@@ -3,13 +3,12 @@ package hotstuff
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotStuff/components/voteaggregator"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
 type EventHandler struct {
 	paceMaker             *PaceMaker
-	voteAggregator        *voteaggregator.VoteAggregator
+	voteAggregator        *VoteAggregator
 	voter                 *Voter
 	missingBlockRequester *MissingBlockRequester
 	forks                 Forks
@@ -27,15 +26,16 @@ func (eh *EventHandler) OnReceiveVote(vote *types.Vote) {
 	blockProposal, found := eh.forks.GetBlock(vote.View, vote.BlockMRH)
 	if found == false {
 		eh.voteAggregator.StorePendingVote(vote)
-		eh.missingBlockRequester.FetchMissingBlock(vote.View, vote.BlockMRH)
 		return
 	}
-	if newQC, ok := eh.voteAggregator.StoreVoteAndBuildQC(vote, blockProposal); ok == true {
-		if err := eh.forks.AddQC(newQC); err != nil {
-			//	TODO: handle error
-		}
+	newQC, err := eh.voteAggregator.StoreVoteAndBuildQC(vote, blockProposal)
+	if err != nil {
+		//	TODO: handle error
 	} else {
-		//	TODO: handle events
+		err = eh.forks.AddQC(newQC)
+		if err != nil {
+			//	TODO: handle events
+		}
 	}
 }
 

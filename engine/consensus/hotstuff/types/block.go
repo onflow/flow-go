@@ -1,6 +1,9 @@
 package types
 
-import "github.com/golang/protobuf/ptypes/timestamp"
+import (
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/golang/protobuf/ptypes/timestamp"
+)
 
 type Block struct {
 	View        uint64
@@ -12,5 +15,8 @@ type Block struct {
 }
 
 func (b *Block) BlockMRH() []byte {
-	panic("TODO")
+	alg, _ := crypto.NewHasher(crypto.SHA3_256)
+	// TODO: will integrate other fields in the future
+	msgHash := alg.ComputeHash(b.PayloadHash)
+	return msgHash
 }
