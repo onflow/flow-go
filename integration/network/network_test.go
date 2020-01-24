@@ -13,7 +13,7 @@ import (
 )
 
 // data for easy asserting interesting fields
-type data struct {
+type nodeInfo struct {
 	image   string
 	name    string
 	address string
@@ -43,11 +43,11 @@ func TestNetworkSetupBasic(t *testing.T) {
 	flowNetwork, err := network.PrepareFlowNetwork(context.Background(), t, "testing", net)
 	require.NoError(t, err)
 
-	assert.Len(t, flowNetwork.Containers, 4)
+	assert.Len(t, flowNetwork.Containers, len(net))
 
-	realData := getRealData(flowNetwork)
+	realData := getNodeInfos(flowNetwork)
 
-	expectedData := []data{
+	expectedData := []nodeInfo{
 		{image: "gcr.io/dl-flow/collection:latest", name: "collection", address: "collection:2137"},
 		{image: "gcr.io/dl-flow/consensus:latest", name: "consensus", address: "consensus:2137"},
 		{image: "gcr.io/dl-flow/execution:latest", name: "execution", address: "execution:2137"},
@@ -93,11 +93,11 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 	flowNetwork, err := network.PrepareFlowNetwork(context.Background(), t, "testing", net)
 	require.NoError(t, err)
 
-	assert.Len(t, flowNetwork.Containers, 7)
+	assert.Len(t, flowNetwork.Containers, len(net))
 
-	realData := getRealData(flowNetwork)
+	realData := getNodeInfos(flowNetwork)
 
-	expectedData := []data{
+	expectedData := []nodeInfo{
 		{image: "gcr.io/dl-flow/collection:latest", name: "collection_0", address: "collection_0:2137"},
 		{image: "gcr.io/dl-flow/collection:latest", name: "collection_1", address: "collection_1:2137"},
 		{image: "gcr.io/dl-flow/collection:latest", name: "collection_2", address: "collection_2:2137"},
@@ -110,11 +110,11 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 	assert.Subset(t, realData, expectedData)
 }
 
-func getRealData(flowNetwork *network.FlowNetwork) []data {
-	realData := make([]data, len(flowNetwork.Containers))
+func getNodeInfos(flowNetwork *network.FlowNetwork) []nodeInfo {
+	realData := make([]nodeInfo, len(flowNetwork.Containers))
 
 	for i, container := range flowNetwork.Containers {
-		realData[i] = data{
+		realData[i] = nodeInfo{
 			image:   container.Image,
 			name:    container.Name,
 			address: container.Identity.Address,

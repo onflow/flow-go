@@ -44,7 +44,7 @@ func TestContainer_Start(t *testing.T) {
 
 	ctx := context.Background()
 
-	flowNetwork, err := network.PrepareFlowNetwork(t, "mvp", ctx, net)
+	flowNetwork, err := network.PrepareFlowNetwork(ctx, t, "mvp", net)
 	require.NoError(t, err)
 
 	flowNetwork.Suite.Start(ctx)

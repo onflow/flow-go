@@ -7,10 +7,11 @@ import (
 	"testing"
 
 	"github.com/dapperlabs/flow-go-sdk/client"
-	"github.com/dapperlabs/flow-go/utils/unittest"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/m4ksio/testingdock"
+
+	"github.com/dapperlabs/flow-go/utils/unittest"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -38,43 +39,17 @@ type FlowNode struct {
 	Identifier *flow.Identifier
 }
 
-type rolesCounts struct {
-	collectionCounter   uint
-	consensusCounter    uint
-	executionCounter    uint
-	verificationCounter uint
-}
+type rolesCounts map[flow.Role]uint
 
-func countRoles(identities []*FlowNode) (rolesCounts, error) {
-	ret := rolesCounts{}
+// countRoles counts how many times each role occurs
+func countRoles(identities []*FlowNode) rolesCounts {
+	ret := make(rolesCounts)
 
 	for _, identity := range identities {
-		var counter *uint
-		counter, err := ret.toCounter(identity.Role)
-		if err != nil {
-			return rolesCounts{}, err
-		}
-		*counter = (*counter) + 1
+		ret[identity.Role] = ret[identity.Role] + 1
 	}
 
-	return ret, nil
-}
-
-func (r *rolesCounts) toCounter(role flow.Role) (*uint, error) {
-	var counter *uint
-	switch role {
-	case flow.RoleConsensus:
-		counter = &r.consensusCounter
-	case flow.RoleCollection:
-		counter = &r.collectionCounter
-	case flow.RoleExecution:
-		counter = &r.executionCounter
-	case flow.RoleVerification:
-		counter = &r.verificationCounter
-	default:
-		return nil, fmt.Errorf("unknown role %d", role)
-	}
-	return counter, nil
+	return ret
 }
 
 func identifier(identifier *flow.Identifier) flow.Identifier {
@@ -96,10 +71,7 @@ func healthcheckGRPC(context context.Context, apiPort string) error {
 func PrepareFlowNetwork(context context.Context, t *testing.T, name string, nodes []*FlowNode) (*FlowNetwork, error) {
 
 	// count each role occurence
-	identitiesCounts, err := countRoles(nodes)
-	if err != nil {
-		return nil, err
-	}
+	identitiesCounts := countRoles(nodes)
 
 	// counters for every role containers
 	rolesCounters := rolesCounts{}
@@ -117,39 +89,29 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		Name: name,
 	})
 
-	containerName := func(role flow.Role) (string, error) {
-		identitiesCount, err := identitiesCounts.toCounter(role)
-		if err != nil {
-			return "", fmt.Errorf("cannot get container name: %w", err)
+	// containerName assigns a name to a container - if there are multiple instances of the same role, suffix is added
+	containerName := func(role flow.Role) string {
+		identitiesCount := identitiesCounts[role]
+
+		if identitiesCount == 1 {
+			return role.String()
 		}
 
-		if *identitiesCount == 1 {
-			return role.String(), nil
-		}
-
-		counter, err := rolesCounters.toCounter(role)
-		if err != nil {
-			return "", fmt.Errorf("cannot get container name: %w", err)
-		}
-
+		counter := rolesCounters[role]
 		defer func() {
-			*counter = (*counter) + 1
+			rolesCounters[role] = rolesCounters[role] + 1
 		}()
 
-		return fmt.Sprintf("%s_%d", role.String(), *counter), nil
+		return fmt.Sprintf("%s_%d", role.String(), counter)
 	}
 
 	imageName := func(role flow.Role) string {
 		return fmt.Sprintf("gcr.io/dl-flow/%s:latest", role.String())
 	}
 
-	assign := func(node *FlowNode) (*testingdock.ContainerOpts, *flow.Identity, error) {
+	assign := func(node *FlowNode) (*testingdock.ContainerOpts, *flow.Identity) {
 
-		name, err := containerName(node.Role)
-		if err != nil {
-			return nil, nil, fmt.Errorf("cannot conver to container: %w", err)
-		}
-
+		name := containerName(node.Role)
 		imageName := imageName(node.Role)
 
 		opts := &testingdock.ContainerOpts{
@@ -167,10 +129,10 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 			Stake:   node.Stake,
 		}
 
-		return opts, &identity, nil
+		return opts, &identity
 	}
 
-	add := func(opts *testingdock.ContainerOpts, identity *flow.Identity) (*FlowContainer, error) {
+	add := func(opts *testingdock.ContainerOpts, identity *flow.Identity) *FlowContainer {
 
 		flowContainer := &FlowContainer{
 			Identity: *identity,
@@ -217,14 +179,13 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 		network.After(c)
 		flowContainer.Container = c
 
-		return flowContainer, nil
+		return flowContainer
 	}
 
+	// assigns names and addresses, those depends on numbers of each service
 	for i, node := range nodes {
-		ops, identity, err := assign(node)
-		if err != nil {
-			return nil, fmt.Errorf("cannot conver to container opts: %w", err)
-		}
+		ops, identity := assign(node)
+
 		opts[i] = ops
 		identities[i] = identity
 		identitiesStr[i] = identity.String()
@@ -234,10 +195,7 @@ func PrepareFlowNetwork(context context.Context, t *testing.T, name string, node
 
 	for i := range nodes {
 
-		c, err := add(opts[i], identities[i])
-		if err != nil {
-			return nil, fmt.Errorf("cannot create container: %w", err)
-		}
+		c := add(opts[i], identities[i])
 
 		containers[i] = c
 	}
