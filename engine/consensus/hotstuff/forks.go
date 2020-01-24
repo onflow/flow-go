@@ -11,19 +11,17 @@ import (
 // Furthermore, blocks whose view number is smaller than the latest finalized block are pruned automatically.
 //
 // PREREQUISITES:
-// * From the view-point of Forks, a block B is identified by the pair (B.View, B.blockMRH)
-// * Forks expects that only blocks are added that can be connected to its latest finalized block
-//   (without missing interim ancestors). If this condition is violated, Forks will raise an error
-//   and irgnore the block.
+// Forks expects that only blocks are added that can be connected to its latest finalized block
+// (without missing interim ancestors). If this condition is violated, Forks will raise an error
+// and ignore the block.
 type Forks interface {
 
-	// GetBlockForView returns the BlockProposal at the given view number if exists.
-	// When there is multiple proposals for the same view, Forks will only return one.
-	GetBlockForView(view uint64) (*types.BlockProposal, bool)
+	// GetBlocksForView returns all BlockProposals at the given view number.
+	GetBlocksForView(view uint64) []*types.BlockProposal
 
-	// GetBlock returns (BlockProposal, true) if the block with view and blockMRH was found (both values need to match)
-	// or (nil, false) otherwise.
-	GetBlock(view uint64, blockMRH []byte) (*types.BlockProposal, bool)
+	// GetBlock returns (BlockProposal, true) if the block with the specified
+	// id was found (nil, false) otherwise.
+	GetBlock(id []byte) (*types.BlockProposal, bool)
 
 	// FinalizedView returns the largest view number where a finalized block is known
 	FinalizedView() uint64
@@ -34,7 +32,7 @@ type Forks interface {
 	// IsSafeNode returns true if block is safe to vote for
 	// (according to the definition in https://arxiv.org/abs/1803.05069v6).
 	// Returns false for unknown blocks.
-	IsSafeNode(block *types.BlockProposal) bool
+	IsSafeBlock(block *types.BlockProposal) bool
 
 	// AddBlock adds the block to Forks. This might cause an update of the finalized block
 	// and pruning of older blocks.
@@ -47,10 +45,15 @@ type Forks interface {
 	AddBlock(block *types.BlockProposal) error
 
 	// AddQC adds a quorum certificate to Forks.
-	// Might error in case the block referenced by the QuorumCertificate is unknown.
-	AddQC(*types.QuorumCertificate) error
+	// Might error in case the block referenced by the qc is unknown.
+	AddQC(qc *types.QuorumCertificate) error
 
-	// MakeForkChoice prompts the ForkChoice to generate a fork choice.
-	// The fork choice is a qc that should be used for building the primaries block
-	MakeForkChoice(viewNumber uint64) *types.QuorumCertificate
+	// MakeForkChoice prompts the ForkChoice to generate a fork choice for the
+	// current view `curView`. The fork choice is a qc that should be used for
+	// building the primaries block.
+	//
+	// Error return indicates incorrect usage. Processing a QC with view v
+	// should result in the PaceMaker being in view v+1 or larger. Hence, given
+	// that the current View is curView, all QCs should have view < curView
+	MakeForkChoice(curView uint64) (*types.QuorumCertificate, error)
 }
