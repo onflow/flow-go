@@ -49,7 +49,7 @@ func qualifiedIdentifier(identifier string, containerType Type) string {
 type TypeID string
 
 type Type interface {
-	isType()
+	IsType()
 	String() string
 	Equal(other Type) bool
 	IsResourceType() bool
@@ -107,7 +107,7 @@ func NewTypeAnnotation(ty Type) *TypeAnnotation {
 // NOTE: This type is only used internally and not available in programs.
 type AnyType struct{}
 
-func (*AnyType) isType() {}
+func (*AnyType) IsType() {}
 
 func (*AnyType) String() string {
 	return "Any"
@@ -133,7 +133,7 @@ func (*AnyType) IsInvalidType() bool {
 // AnyStructType represents the top type of all non-resource types
 type AnyStructType struct{}
 
-func (*AnyStructType) isType() {}
+func (*AnyStructType) IsType() {}
 
 func (*AnyStructType) String() string {
 	return "AnyStruct"
@@ -159,7 +159,7 @@ func (*AnyStructType) IsInvalidType() bool {
 // AnyResourceType represents the top type of all resource types
 type AnyResourceType struct{}
 
-func (*AnyResourceType) isType() {}
+func (*AnyResourceType) IsType() {}
 
 func (*AnyResourceType) String() string {
 	return "AnyResource"
@@ -185,7 +185,7 @@ func (*AnyResourceType) IsInvalidType() bool {
 // NeverType represents the bottom type
 type NeverType struct{}
 
-func (*NeverType) isType() {}
+func (*NeverType) IsType() {}
 
 func (*NeverType) String() string {
 	return "Never"
@@ -211,7 +211,7 @@ func (*NeverType) IsInvalidType() bool {
 // VoidType represents the void type
 type VoidType struct{}
 
-func (*VoidType) isType() {}
+func (*VoidType) IsType() {}
 
 func (*VoidType) String() string {
 	return "Void"
@@ -240,7 +240,7 @@ func (*VoidType) IsInvalidType() bool {
 //
 type InvalidType struct{}
 
-func (*InvalidType) isType() {}
+func (*InvalidType) IsType() {}
 
 func (t *InvalidType) String() string {
 	return "<<invalid>>"
@@ -268,7 +268,7 @@ type OptionalType struct {
 	Type Type
 }
 
-func (*OptionalType) isType() {}
+func (*OptionalType) IsType() {}
 
 func (t *OptionalType) String() string {
 	if t.Type == nil {
@@ -304,7 +304,7 @@ func (t *OptionalType) IsInvalidType() bool {
 // BoolType represents the boolean type
 type BoolType struct{}
 
-func (*BoolType) isType() {}
+func (*BoolType) IsType() {}
 
 func (*BoolType) String() string {
 	return "Bool"
@@ -331,7 +331,7 @@ func (*BoolType) IsInvalidType() bool {
 
 type CharacterType struct{}
 
-func (*CharacterType) isType() {}
+func (*CharacterType) IsType() {}
 
 func (*CharacterType) String() string {
 	return "Character"
@@ -357,7 +357,7 @@ func (*CharacterType) IsInvalidType() bool {
 // StringType represents the string type
 type StringType struct{}
 
-func (*StringType) isType() {}
+func (*StringType) IsType() {}
 
 func (*StringType) String() string {
 	return "String"
@@ -455,7 +455,7 @@ type Ranged interface {
 // IntegerType represents the super-type of all integer types
 type IntegerType struct{}
 
-func (*IntegerType) isType() {}
+func (*IntegerType) IsType() {}
 
 func (*IntegerType) String() string {
 	return "Integer"
@@ -489,7 +489,7 @@ func (*IntegerType) Max() *big.Int {
 // SignedIntegerType represents the super-type of all signed integer types
 type SignedIntegerType struct{}
 
-func (*SignedIntegerType) isType() {}
+func (*SignedIntegerType) IsType() {}
 
 func (*SignedIntegerType) String() string {
 	return "SignedInteger"
@@ -523,7 +523,7 @@ func (*SignedIntegerType) Max() *big.Int {
 // IntType represents the arbitrary-precision integer type `Int`
 type IntType struct{}
 
-func (*IntType) isType() {}
+func (*IntType) IsType() {}
 
 func (*IntType) String() string {
 	return "Int"
@@ -558,7 +558,7 @@ func (*IntType) Max() *big.Int {
 
 type Int8Type struct{}
 
-func (*Int8Type) isType() {}
+func (*Int8Type) IsType() {}
 
 func (*Int8Type) String() string {
 	return "Int8"
@@ -595,7 +595,7 @@ func (*Int8Type) Max() *big.Int {
 // Int16Type represents the 16-bit signed integer type `Int16`
 type Int16Type struct{}
 
-func (*Int16Type) isType() {}
+func (*Int16Type) IsType() {}
 
 func (*Int16Type) String() string {
 	return "Int16"
@@ -632,7 +632,7 @@ func (*Int16Type) Max() *big.Int {
 // Int32Type represents the 32-bit signed integer type `Int32`
 type Int32Type struct{}
 
-func (*Int32Type) isType() {}
+func (*Int32Type) IsType() {}
 
 func (*Int32Type) String() string {
 	return "Int32"
@@ -669,7 +669,7 @@ func (*Int32Type) Max() *big.Int {
 // Int64Type represents the 64-bit signed integer type `Int64`
 type Int64Type struct{}
 
-func (*Int64Type) isType() {}
+func (*Int64Type) IsType() {}
 
 func (*Int64Type) String() string {
 	return "Int64"
@@ -706,7 +706,7 @@ func (*Int64Type) Max() *big.Int {
 // Int128Type represents the 128-bit signed integer type `Int128`
 type Int128Type struct{}
 
-func (*Int128Type) isType() {}
+func (*Int128Type) IsType() {}
 
 func (*Int128Type) String() string {
 	return "Int128"
@@ -755,7 +755,7 @@ func (*Int128Type) Max() *big.Int {
 // Int256Type represents the 256-bit signed integer type `Int256`
 type Int256Type struct{}
 
-func (*Int256Type) isType() {}
+func (*Int256Type) IsType() {}
 
 func (*Int256Type) String() string {
 	return "Int256"
@@ -804,7 +804,7 @@ func (*Int256Type) Max() *big.Int {
 // UIntType represents the arbitrary-precision unsigned integer type `UInt`
 type UIntType struct{}
 
-func (*UIntType) isType() {}
+func (*UIntType) IsType() {}
 
 func (*UIntType) String() string {
 	return "UInt"
@@ -841,7 +841,7 @@ func (*UIntType) Max() *big.Int {
 // which checks for overflow and underflow
 type UInt8Type struct{}
 
-func (*UInt8Type) isType() {}
+func (*UInt8Type) IsType() {}
 
 func (*UInt8Type) String() string {
 	return "UInt8"
@@ -879,7 +879,7 @@ func (*UInt8Type) Max() *big.Int {
 // which checks for overflow and underflow
 type UInt16Type struct{}
 
-func (*UInt16Type) isType() {}
+func (*UInt16Type) IsType() {}
 
 func (*UInt16Type) String() string {
 	return "UInt16"
@@ -917,7 +917,7 @@ func (*UInt16Type) Max() *big.Int {
 // which checks for overflow and underflow
 type UInt32Type struct{}
 
-func (*UInt32Type) isType() {}
+func (*UInt32Type) IsType() {}
 
 func (*UInt32Type) String() string {
 	return "UInt32"
@@ -955,7 +955,7 @@ func (*UInt32Type) Max() *big.Int {
 // which checks for overflow and underflow
 type UInt64Type struct{}
 
-func (*UInt64Type) isType() {}
+func (*UInt64Type) IsType() {}
 
 func (*UInt64Type) String() string {
 	return "UInt64"
@@ -993,7 +993,7 @@ func (*UInt64Type) Max() *big.Int {
 // which checks for overflow and underflow
 type UInt128Type struct{}
 
-func (*UInt128Type) isType() {}
+func (*UInt128Type) IsType() {}
 
 func (*UInt128Type) String() string {
 	return "UInt128"
@@ -1037,7 +1037,7 @@ func (*UInt128Type) Max() *big.Int {
 // which checks for overflow and underflow
 type UInt256Type struct{}
 
-func (*UInt256Type) isType() {}
+func (*UInt256Type) IsType() {}
 
 func (*UInt256Type) String() string {
 	return "UInt256"
@@ -1081,7 +1081,7 @@ func (*UInt256Type) Max() *big.Int {
 // which does NOT check for overflow and underflow
 type Word8Type struct{}
 
-func (*Word8Type) isType() {}
+func (*Word8Type) IsType() {}
 
 func (*Word8Type) String() string {
 	return "Word8"
@@ -1119,7 +1119,7 @@ func (*Word8Type) Max() *big.Int {
 // which does NOT check for overflow and underflow
 type Word16Type struct{}
 
-func (*Word16Type) isType() {}
+func (*Word16Type) IsType() {}
 
 func (*Word16Type) String() string {
 	return "Word16"
@@ -1157,7 +1157,7 @@ func (*Word16Type) Max() *big.Int {
 // which does NOT check for overflow and underflow
 type Word32Type struct{}
 
-func (*Word32Type) isType() {}
+func (*Word32Type) IsType() {}
 
 func (*Word32Type) String() string {
 	return "Word32"
@@ -1195,7 +1195,7 @@ func (*Word32Type) Max() *big.Int {
 // which does NOT check for overflow and underflow
 type Word64Type struct{}
 
-func (*Word64Type) isType() {}
+func (*Word64Type) IsType() {}
 
 func (*Word64Type) String() string {
 	return "Word64"
@@ -1452,7 +1452,7 @@ type VariableSizedType struct {
 	Type
 }
 
-func (*VariableSizedType) isType()      {}
+func (*VariableSizedType) IsType()      {}
 func (*VariableSizedType) isArrayType() {}
 
 func (t *VariableSizedType) String() string {
@@ -1506,7 +1506,7 @@ type ConstantSizedType struct {
 	Size int
 }
 
-func (*ConstantSizedType) isType()      {}
+func (*ConstantSizedType) IsType()      {}
 func (*ConstantSizedType) isArrayType() {}
 
 func (t *ConstantSizedType) String() string {
@@ -1611,7 +1611,7 @@ func (t *FunctionType) ReturnType(argumentTypes []Type) Type {
 	return t.ReturnTypeAnnotation.Type
 }
 
-func (*FunctionType) isType() {}
+func (*FunctionType) IsType() {}
 
 func (t *FunctionType) InvocationFunctionType() *FunctionType {
 	return t
@@ -1914,7 +1914,7 @@ type CompositeType struct {
 	ContainerType         Type
 }
 
-func (*CompositeType) isType() {}
+func (*CompositeType) IsType() {}
 
 func (t *CompositeType) String() string {
 	return t.Identifier
@@ -1990,7 +1990,7 @@ func (t *CompositeType) TypeRequirements() []*CompositeType {
 
 type AccountType struct{}
 
-func (*AccountType) isType() {}
+func (*AccountType) IsType() {}
 
 func (*AccountType) String() string {
 	return "Account"
@@ -2112,7 +2112,7 @@ func (t *AccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *
 
 type PublicAccountType struct{}
 
-func (*PublicAccountType) isType() {}
+func (*PublicAccountType) IsType() {}
 
 func (*PublicAccountType) String() string {
 	return "PublicAccount"
@@ -2281,7 +2281,7 @@ type InterfaceType struct {
 	NestedTypes           map[string]Type
 }
 
-func (*InterfaceType) isType() {}
+func (*InterfaceType) IsType() {}
 
 func (t *InterfaceType) String() string {
 	return t.Identifier
@@ -2329,7 +2329,7 @@ type DictionaryType struct {
 	ValueType Type
 }
 
-func (*DictionaryType) isType() {}
+func (*DictionaryType) IsType() {}
 
 func (t *DictionaryType) String() string {
 	return fmt.Sprintf(
@@ -2512,7 +2512,7 @@ type DictionaryEntryType struct {
 
 type StorageType struct{}
 
-func (t *StorageType) isType() {}
+func (t *StorageType) IsType() {}
 
 func (t *StorageType) String() string {
 	return "Storage"
@@ -2567,7 +2567,7 @@ type ReferencesType struct {
 	Assignable bool
 }
 
-func (t *ReferencesType) isType() {}
+func (t *ReferencesType) IsType() {}
 
 func (t *ReferencesType) String() string {
 	return "References"
@@ -2617,7 +2617,7 @@ type ReferenceType struct {
 	Type Type
 }
 
-func (*ReferenceType) isType() {}
+func (*ReferenceType) IsType() {}
 
 func (t *ReferenceType) String() string {
 	if t.Type == nil {
@@ -2694,7 +2694,7 @@ func (t *ReferenceType) IndexingType() Type {
 // AddressType represents the address type
 type AddressType struct{}
 
-func (*AddressType) isType() {}
+func (*AddressType) IsType() {}
 
 func (*AddressType) String() string {
 	return "Address"
@@ -3000,7 +3000,7 @@ func (*TransactionType) ExecuteFunctionType() *SpecialFunctionType {
 	}
 }
 
-func (*TransactionType) isType() {}
+func (*TransactionType) IsType() {}
 
 func (*TransactionType) String() string {
 	return "Transaction"
