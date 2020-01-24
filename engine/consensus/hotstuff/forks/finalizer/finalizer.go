@@ -37,6 +37,13 @@ func New(rootBlock *types.BlockProposal, rootQc *types.QuorumCertificate, notifi
 }
 
 func (r *Finalizer) IsKnownBlock(blockID []byte, blockView uint64) bool {
+	vertex, exists := r.mainChain.GetVertex(blockID)
+	if !exists {
+		return false
+	}
+	if blockView != vertex.Level() {
+		what to do ????
+	}
 	return r.mainChain.HasVertex(blockID, blockView)
 }
 
