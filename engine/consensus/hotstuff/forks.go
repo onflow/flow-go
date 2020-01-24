@@ -11,19 +11,17 @@ import (
 // Furthermore, blocks whose view number is smaller than the latest finalized block are pruned automatically.
 //
 // PREREQUISITES:
-// * From the view-point of Forks, a block B is identified by the pair (B.View, B.blockMRH)
-// * Forks expects that only blocks are added that can be connected to its latest finalized block
-//   (without missing interim ancestors). If this condition is violated, Forks will raise an error
-//   and ignore the block.
+// Forks expects that only blocks are added that can be connected to its latest finalized block
+// (without missing interim ancestors). If this condition is violated, Forks will raise an error
+// and ignore the block.
 type Forks interface {
 
-	// GetBlockForView returns the BlockProposal at the given view number if exists.
-	// When there is multiple proposals for the same view, Forks will only return one.
-	GetBlockForView(view uint64) (*types.BlockProposal, bool)
+	// GetBlocksForView returns all BlockProposals at the given view number.
+	GetBlocksForView(view uint64) []*types.BlockProposal
 
-	// GetBlock returns (BlockProposal, true) if the block with view and blockMRH was found (both values need to match)
-	// or (nil, false) otherwise.
-	GetBlock(view uint64, blockMRH []byte) (*types.BlockProposal, bool)
+	// GetBlock returns (BlockProposal, true) if the block with the specified
+	// id was found (nil, false) otherwise.
+	GetBlock(id []byte) (*types.BlockProposal, bool)
 
 	// FinalizedView returns the largest view number where a finalized block is known
 	FinalizedView() uint64
