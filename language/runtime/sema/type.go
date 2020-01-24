@@ -2140,26 +2140,16 @@ func (*PublicAccountType) HasMembers() bool {
 }
 
 func (t *PublicAccountType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
+	newField := func(fieldType Type) *Member {
+		return NewPublicConstantFieldMember(t, identifier, fieldType)
+	}
+
 	switch identifier {
 	case "address":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			TypeAnnotation:  NewTypeAnnotation(&AddressType{}),
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
+		return newField(&AddressType{})
 
 	case "published":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			TypeAnnotation:  NewTypeAnnotation(&ReferencesType{Assignable: false}),
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-		})
+		return newField(&ReferencesType{Assignable: false})
 
 	default:
 		return nil
@@ -2372,16 +2362,17 @@ func (t *DictionaryType) HasMembers() bool {
 }
 
 func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
+	newField := func(fieldType Type) *Member {
+		return NewPublicConstantFieldMember(t, identifier, fieldType)
+	}
+
+	newFunction := func(functionType *FunctionType) *Member {
+		return NewPublicFunctionMember(t, identifier, functionType)
+	}
+
 	switch identifier {
 	case "length":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation:  NewTypeAnnotation(&IntType{}),
-		})
+		return newField(&IntType{})
 
 	case "keys":
 		// TODO: maybe allow for resource key type
@@ -2396,16 +2387,7 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			)
 		}
 
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation: NewTypeAnnotation(
-				&VariableSizedType{Type: t.KeyType},
-			),
-		})
+		return newField(&VariableSizedType{Type: t.KeyType})
 
 	case "values":
 		// TODO: maybe allow for resource value type
@@ -2420,71 +2402,46 @@ func (t *DictionaryType) GetMember(identifier string, targetRange ast.Range, rep
 			)
 		}
 
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindField,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation: NewTypeAnnotation(
-				&VariableSizedType{Type: t.ValueType},
-			),
-		})
+		return newField(&VariableSizedType{Type: t.ValueType})
 
 	case "insert":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation: NewTypeAnnotation(
-				&FunctionType{
-					Parameters: []*Parameter{
-						{
-							Identifier:     "key",
-							TypeAnnotation: NewTypeAnnotation(t.KeyType),
-						},
-						{
-							Label:          ArgumentLabelNotRequired,
-							Identifier:     "value",
-							TypeAnnotation: NewTypeAnnotation(t.ValueType),
-						},
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Identifier:     "key",
+						TypeAnnotation: NewTypeAnnotation(t.KeyType),
 					},
-					ReturnTypeAnnotation: NewTypeAnnotation(
-						&OptionalType{
-							Type: t.ValueType,
-						},
-					),
+					{
+						Label:          ArgumentLabelNotRequired,
+						Identifier:     "value",
+						TypeAnnotation: NewTypeAnnotation(t.ValueType),
+					},
 				},
-			),
-			ArgumentLabels: []string{"key", ArgumentLabelNotRequired},
-		})
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&OptionalType{
+						Type: t.ValueType,
+					},
+				),
+			},
+		)
 
 	case "remove":
-		return NewCheckedMember(&Member{
-			ContainerType:   t,
-			Access:          ast.AccessPublic,
-			Identifier:      ast.Identifier{Identifier: identifier},
-			DeclarationKind: common.DeclarationKindFunction,
-			VariableKind:    ast.VariableKindConstant,
-			TypeAnnotation: NewTypeAnnotation(
-				&FunctionType{
-					Parameters: []*Parameter{
-						{
-							Identifier:     "key",
-							TypeAnnotation: NewTypeAnnotation(t.KeyType),
-						},
+		return newFunction(
+			&FunctionType{
+				Parameters: []*Parameter{
+					{
+						Identifier:     "key",
+						TypeAnnotation: NewTypeAnnotation(t.KeyType),
 					},
-					ReturnTypeAnnotation: NewTypeAnnotation(
-						&OptionalType{
-							Type: t.ValueType,
-						},
-					),
 				},
-			),
-			ArgumentLabels: []string{"key"},
-		})
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&OptionalType{
+						Type: t.ValueType,
+					},
+				),
+			},
+		)
 
 	default:
 		return nil
