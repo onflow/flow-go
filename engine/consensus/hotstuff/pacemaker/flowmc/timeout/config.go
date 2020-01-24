@@ -26,6 +26,14 @@ type Config struct {
 	timeoutDecrease float64
 }
 
+var DefaultConfig = Config{
+	replicaTimeout:                 1200,
+	minReplicaTimeout:              1200,
+	voteAggregationTimeoutFraction: 0.5,
+	timeoutIncrease:                1.5,
+	timeoutDecrease:                800,
+}
+
 // NewTimoutConfig creates a new TimoutConfig.
 // startReplicaTimeout: starting timeout value for replica round [Milliseconds];
 // minReplicaTimeout: minimal timeout value for replica round [Milliseconds];
@@ -58,20 +66,4 @@ func NewConfig(startReplicaTimeout, minReplicaTimeout, voteAggregationTimeoutFra
 		timeoutDecrease:                timeoutDecrease,
 	}
 	return &tc, nil
-}
-
-func DefaultConfig() *Config {
-	tc, err := NewConfig(
-		1200,
-		1200,
-		0.5,
-		1.5,
-		800)
-	if err != nil {
-		// this should never happen; Only protects code from future inconsistent modifications.
-		// Initializing a default Config will always work, unless the value checks in NewConfig(...)
-		// above are modified without also updating the default.
-		panic("Default timeout config does not comply with internal TimoutConfig conditions")
-	}
-	return tc
 }
