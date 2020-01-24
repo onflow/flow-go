@@ -27,8 +27,8 @@ func NewBlockProposalProducer(signer Signer, viewState ViewState, mempool Mempoo
 }
 
 // MakeBlockProposal will build a proposal for the given view with the given QC
-func (bp *BlockProposalProducer) MakeBlockProposal(view uint64, qc *types.QuorumCertificate) (*types.BlockProposal, error) {
-	block := bp.makeBlockForView(view, qc)
+func (bp *BlockProposalProducer) MakeBlockProposal(view uint64, qcblock *types.QCBlock) (*types.BlockProposal, error) {
+	block := bp.makeBlockForView(view, qcblock)
 
 	unsignedBlockProposal := bp.propose(block)
 
@@ -38,13 +38,13 @@ func (bp *BlockProposalProducer) MakeBlockProposal(view uint64, qc *types.Quorum
 }
 
 // makeBlockForView gets the payload hash from mempool and build a block on top of the given qc for the given view.
-func (bp *BlockProposalProducer) makeBlockForView(view uint64, qc *types.QuorumCertificate) *types.Block {
+func (bp *BlockProposalProducer) makeBlockForView(view uint64, qcblock *types.QCBlock) *types.Block {
 	payloadHash := bp.mempool.NewPayloadHash()
 
-	// TODO: current use view as height
-	height := view
+	// new block's height = parent.height + 1
+	height := qcblock.Block.Height() + 1
 
-	block := types.NewBlock(view, qc, payloadHash, height, bp.chainID)
+	block := types.NewBlock(view, qcblock.QC, payloadHash, height, bp.chainID)
 	return block
 }
 
