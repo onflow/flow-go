@@ -104,8 +104,9 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 			Role:    flow.RoleCollection,
 		}
 
+		ids := map[flow.Identifier]flow.Identity{flowID.NodeID: flowID}
 		// mocks Overlay.Identity
-		m.ov[i].On("Identity", mockery.Anything).Maybe().Return(flowID, nil)
+		m.ov[i].On("Identity").Maybe().Return(ids, nil)
 
 		// start the middleware
 		m.mws[i].Start(m.ov[i])

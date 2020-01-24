@@ -269,7 +269,7 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 func (p *P2PNode) Publish(ctx context.Context, t string, data []byte) error {
 	ps, found := p.topics[t]
 	if !found {
-		return fmt.Errorf("topic not found")
+		return fmt.Errorf("topic not found:%s", t)
 	}
 	return ps.Publish(ctx, data)
 }

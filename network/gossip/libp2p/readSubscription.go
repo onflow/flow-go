@@ -11,14 +11,14 @@ import (
 
 type ReadSubscription struct {
 	log     zerolog.Logger
-	sub     pubsub.Subscription
+	sub     *pubsub.Subscription
 	inbound chan *message.Message
 	once    *sync.Once
 	done    chan struct{}
 }
 
 // NewReadSubscription reads the messages coming in on the subscription
-func NewReadSubscription(log zerolog.Logger, sub pubsub.Subscription) *ReadSubscription {
+func NewReadSubscription(log zerolog.Logger, sub *pubsub.Subscription) *ReadSubscription {
 
 	log = log.With().
 		Str("channelid", sub.Topic()).

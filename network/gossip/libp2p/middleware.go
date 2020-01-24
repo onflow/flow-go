@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"sync"
 
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
@@ -123,8 +124,12 @@ func (m *Middleware) Send(targetID flow.Identifier, msg interface{}) error {
 	if !found || stale {
 
 		// get an identity to connect to. The identity provides the destination TCP address.
-		flowIdentity, err := m.ov.Identity(targetID)
+		idsMap, err := m.ov.Identity()
 		if err != nil {
+			return fmt.Errorf("could not get identities: %w", err)
+		}
+		flowIdentity, found := idsMap[targetID]
+		if !found {
 			return fmt.Errorf("could not get identity for %s: %w", targetID.String(), err)
 		}
 
@@ -239,7 +244,7 @@ ProcessLoop:
 				log.Error().Err(err).Msg("could not extract sender ID")
 				continue ProcessLoop
 			}
-			err = m.ov.Receive(*nodeID, msg)
+			err = m.ov.Receive(nodeID, msg)
 			if err != nil {
 				log.Error().Err(err).Msg("could not deliver payload")
 				continue ProcessLoop
@@ -250,14 +255,71 @@ ProcessLoop:
 	log.Info().Msg("middleware closed the connection")
 }
 
-func getSenderID(msg *message.Message) (*flow.Identifier, error) {
+func (m *Middleware) Subscribe(channelID uint8) error {
+	// A Flow ChannelID becomes the topic ID in libp2p.
+	s, err := m.libP2PNode.Subscribe(context.Background(), strconv.Itoa(int(channelID)))
+	if err != nil {
+		return fmt.Errorf("failed to subscribe for channel %d: %w", channelID, err)
+	}
+	rs := NewReadSubscription(m.log, s)
+	go rs.ReceiveLoop()
+	m.wg.Add(1)
+	go m.handleInboundSubscription(rs)
+	return nil
+}
+
+// TODO: Use a common method to for read of a 1-1 stream and reads from a subscription
+func (m *Middleware) handleInboundSubscription(rs *ReadSubscription) {
+	defer m.wg.Done()
+	// process incoming messages for as long as the peer is running
+ProcessLoop:
+	for {
+		select {
+		case <-rs.done:
+			m.log.Info().Msg("middleware stopped reception of incoming messages")
+			break ProcessLoop
+		case msg := <-rs.inbound:
+			log.Info().Msg("middleware received a new message")
+			nodeID, err := getSenderID(msg)
+			if err != nil {
+				log.Error().Err(err).Msg("could not extract sender ID")
+				continue ProcessLoop
+			}
+			err = m.ov.Receive(nodeID, msg)
+			if err != nil {
+				log.Error().Err(err).Msg("could not deliver payload")
+				continue ProcessLoop
+			}
+		}
+	}
+}
+
+// Publish publishes the given payload on the topic
+func (m *Middleware) Publish(topic string, msg interface{}) error {
+	switch msg := msg.(type) {
+	case *message.Message:
+		data, err := msg.Marshal()
+		if err != nil {
+			return fmt.Errorf("failed to marshal the message: %w", err)
+		}
+		err = m.libP2PNode.Publish(context.Background(), topic, data)
+		if err != nil {
+			return fmt.Errorf("failed to publish the message: %w", err)
+		}
+	default:
+		err := fmt.Errorf("middleware received invalid message type (%T)", msg)
+		return err
+	}
+	return nil
+}
+
+func getSenderID(msg *message.Message) (flow.Identifier, error) {
 	// Extract sender id
 	if len(msg.OriginID) < 32 {
 		err := fmt.Errorf("invalid sender id")
-		return nil, err
+		return flow.ZeroID, err
 	}
 	var senderID [32]byte
 	copy(senderID[:], msg.OriginID)
-	var id flow.Identifier = senderID
-	return &id, nil
+	return senderID, nil
 }

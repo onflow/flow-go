@@ -25,20 +25,22 @@ func (_m *Overlay) Cleanup(nodeID flow.Identifier) error {
 	return r0
 }
 
-// Identity provides a mock function with given fields: nodeID
-func (_m *Overlay) Identity(nodeID flow.Identifier) (flow.Identity, error) {
-	ret := _m.Called(nodeID)
+// Identity provides a mock function with given fields:
+func (_m *Overlay) Identity() (map[flow.Identifier]flow.Identity, error) {
+	ret := _m.Called()
 
-	var r0 flow.Identity
-	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identity); ok {
-		r0 = rf(nodeID)
+	var r0 map[flow.Identifier]flow.Identity
+	if rf, ok := ret.Get(0).(func() map[flow.Identifier]flow.Identity); ok {
+		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(flow.Identity)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[flow.Identifier]flow.Identity)
+		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(nodeID)
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}
