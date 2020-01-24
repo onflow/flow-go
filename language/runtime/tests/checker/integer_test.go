@@ -85,6 +85,8 @@ func TestCheckIntegerLiteralRanges(t *testing.T) {
 		&sema.UInt16Type{},
 		&sema.UInt32Type{},
 		&sema.UInt64Type{},
+		&sema.UInt128Type{},
+		&sema.UInt256Type{},
 		// Word*
 		&sema.Word8Type{},
 		&sema.Word16Type{},
@@ -143,6 +145,8 @@ func TestCheckInvalidIntegerLiteralValues(t *testing.T) {
 		&sema.UInt16Type{},
 		&sema.UInt32Type{},
 		&sema.UInt64Type{},
+		&sema.UInt128Type{},
+		&sema.UInt256Type{},
 		// Word*
 		&sema.Word8Type{},
 		&sema.Word16Type{},
@@ -325,6 +329,8 @@ func TestCheckInvalidUnsignedIntegerNegate(t *testing.T) {
 		&sema.UInt16Type{},
 		&sema.UInt32Type{},
 		&sema.UInt64Type{},
+		&sema.UInt128Type{},
+		&sema.UInt256Type{},
 		// Word*
 		&sema.Word8Type{},
 		&sema.Word16Type{},
