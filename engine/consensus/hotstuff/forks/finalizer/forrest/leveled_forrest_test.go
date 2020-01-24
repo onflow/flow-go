@@ -70,22 +70,33 @@ func TestVertexIteratorOnEmpty(t *testing.T) {
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~ Tests for LeveledForrest ~~~~~~~~~~~~~~~~~~~~~~~~ //
 
-// TestLeveledForrest_DoubleAddVertex tests that Vertex can be added twice without problems
+// TestLeveledForrest_AddVertex tests that Vertex can be added twice without problems
 func TestLeveledForrest_AddVertex(t *testing.T) {
 	F := NewLeveledForrest()
+	err := F.AddVertex(NewVertexMock("A", 3, "Genesis", 0))
+	assert.False(t, err != nil)
 
 	// Adding Vertex twice should be fine
-	F.AddVertex(NewVertexMock("A", 3, "Genesis", 0))
-	F.AddVertex(NewVertexMock("A", 3, "Genesis", 0))
+	err = F.AddVertex(NewVertexMock("A", 3, "Genesis", 0))
+	assert.False(t, err != nil)
+}
 
-	// checking that requests panics when it encounters a Vertex with an ID identical to a known reference
-	// BUT whose level is not consistent with the reference
-	assert.Panics(t, func() { // adding KNOWN vertex but with wrong level number
-		F.AddVertex(NewVertexMock("A", 10, "Genesis", 0))
-	})
-	assert.Panics(t, func() { // adding vertex whose PARENT references a known vertex but with mismatching level
-		F.AddVertex(NewVertexMock("F", 4, "Genesis", 10))
-	})
+// TestLeveledForrest_AddInconsistentVertex checks that adding Vertex errors if we try adding a Vertex
+// with an ID identical to a known reference BUT whose level is not consistent with the reference
+func TestLeveledForrest_AddInconsistentVertex(t *testing.T) {
+	F := populateNewForrest()
+
+	// adding KNOWN vertex but with wrong level number
+	err := F.AddVertex(NewVertexMock("D", 10, "C", 2))
+	assert.True(t, err != nil)
+
+	// adding KNOWN vertex whose PARENT references a known vertex but with mismatching level
+	err = F.AddVertex(NewVertexMock("D", 10, "C", 10))
+	assert.True(t, err != nil)
+
+	// adding unknown vertex whose PARENT references a known vertex but with mismatching level
+	err = F.AddVertex(NewVertexMock("F", 4, "Genesis", 10))
+	assert.True(t, err != nil)
 }
 
 // TestLeveledForrest_HasVertex test that vertices as correctly reported as contained in forrest
@@ -93,22 +104,12 @@ func TestLeveledForrest_AddVertex(t *testing.T) {
 //       Vertices that references bvy known vertices but have not themselves are considered to be not in the tree.
 func TestLeveledForrest_HasVertex(t *testing.T) {
 	F := populateNewForrest()
-	assert.True(t, F.HasVertex(toVertexInfo("A", 3)))
-	assert.True(t, F.HasVertex(toVertexInfo("B", 1)))
-	assert.True(t, F.HasVertex(toVertexInfo("X", 5)))
+	assert.True(t, F.HasVertex([]byte("A")))
+	assert.True(t, F.HasVertex([]byte("B")))
+	assert.True(t, F.HasVertex([]byte("X")))
 
-	assert.False(t, F.HasVertex(toVertexInfo("Genesis", 0)))         // Genesis block never directly added (only referenced) => unknown
-	assert.False(t, F.HasVertex(toVertexInfo("NotYetAdded", 10000))) // Block never mentioned before
-
-	// checking that requests panics when it encounters a Vertex with an ID identical to a known reference
-	// BUT whose level is not consistent with the reference
-	assert.Panics(t, func() { // inquiring about KNOWN vertex but with wrong level number
-		F.HasVertex(toVertexInfo("C", 10))
-	})
-	assert.Panics(t, func() { // inquiring about vertex that is NOT in Tree (but known through references)
-		F.HasVertex(toVertexInfo("Genesis", 10))
-	})
-
+	assert.False(t, F.HasVertex([]byte("Genesis")))         // Genesis block never directly added (only referenced) => unknown
+	assert.False(t, F.HasVertex([]byte("NotYetAdded"))) // Block never mentioned before
 }
 
 // TestLeveledForrest_GetChildren tests that children are returned properly
@@ -116,7 +117,7 @@ func TestLeveledForrest_GetChildren(t *testing.T) {
 	F := populateNewForrest()
 
 	// testing children for Block that is contained in Tree
-	it := F.GetChildren(toVertexInfo("X", 5))
+	it := F.GetChildren([]byte("X"))
 	expectedChildren := []*VertexMock{
 		TestVertices["Y"],
 		TestVertices["Z"],
@@ -124,7 +125,7 @@ func TestLeveledForrest_GetChildren(t *testing.T) {
 	assert.ElementsMatch(t, expectedChildren, children2List(&it))
 
 	// testing children for referenced Block that is NOT contained in Tree
-	it = F.GetChildren(toVertexInfo("Genesis", 0))
+	it = F.GetChildren([]byte("Genesis"))
 	expectedChildren = []*VertexMock{
 		TestVertices["A"],
 		TestVertices["B"],
@@ -132,17 +133,8 @@ func TestLeveledForrest_GetChildren(t *testing.T) {
 	assert.ElementsMatch(t, expectedChildren, children2List(&it))
 
 	// testing children for Block that is contained in Tree but no children are known
-	it = F.GetChildren(toVertexInfo("D", 3))
+	it = F.GetChildren([]byte("D"))
 	assert.False(t, it.HasNext())
-
-	// checking that requests panics when it encounters a Vertex with an ID identical to a known reference
-	// BUT whose level is not consistent with the reference
-	assert.Panics(t, func() { // for vertex that IS in Tree but with wrong level number
-		F.GetChildren(toVertexInfo("C", 10))
-	})
-	assert.Panics(t, func() { // for vertex that is NOT in Tree (but known through references)
-		F.GetChildren(toVertexInfo("Genesis", 10))
-	})
 }
 
 // TestLeveledForrest_GetNumberOfChildren tests that children are returned properly
@@ -150,22 +142,13 @@ func TestLeveledForrest_GetNumberOfChildren(t *testing.T) {
 	F := populateNewForrest()
 
 	// testing children for Block that is contained in Tree
-	assert.Equal(t, 2, F.GetNumberOfChildren(toVertexInfo("X", 5)))
+	assert.Equal(t, 2, F.GetNumberOfChildren([]byte("X")))
 
 	// testing children for referenced Block that is NOT contained in Tree
-	assert.Equal(t, 2, F.GetNumberOfChildren(toVertexInfo("Genesis", 0)))
+	assert.Equal(t, 2, F.GetNumberOfChildren([]byte("Genesis")))
 
 	// testing children for Block that is contained in Tree but no children are known
-	assert.Equal(t, 0, F.GetNumberOfChildren(toVertexInfo("D", 3)))
-
-	// checking that requests panics when it encounters a Vertex with an ID identical to a known reference
-	// BUT whose level is not consistent with the reference
-	assert.Panics(t, func() { // for vertex that IS in Tree but with wrong level number
-		F.GetNumberOfChildren(toVertexInfo("C", 10))
-	})
-	assert.Panics(t, func() { // for vertex that is NOT in Tree (but known through references)
-		F.GetNumberOfChildren(toVertexInfo("Genesis", 10))
-	})
+	assert.Equal(t, 0, F.GetNumberOfChildren([]byte("D")))
 }
 
 // TestLeveledForrest_GetVerticesAtLevel tests that Vertex blob is returned properly
@@ -196,7 +179,7 @@ func TestLeveledForrest_GetVerticesAtLevel(t *testing.T) {
 	assert.ElementsMatch(t, []*VertexMock{}, children2List(&it))
 }
 
-// TestLeveledForrest_GetNumberOfVerticesAtLevel tests that Vertex blob is returned properly
+// TestLeveledForrest_GetNumberOfVerticesAtLevel tests that the number of vertices at a specified level is reported correctly. 
 func TestLeveledForrest_GetNumberOfVerticesAtLevel(t *testing.T) {
 	F := populateNewForrest()
 
@@ -216,113 +199,66 @@ func TestLeveledForrest_GetNumberOfVerticesAtLevel(t *testing.T) {
 // TestLeveledForrest_GetVertex tests that Vertex blob is returned properly
 func TestLeveledForrest_GetVertex(t *testing.T) {
 	F := populateNewForrest()
-	v, exists := F.GetVertex(toVertexInfo("D", 3))
+	v, exists := F.GetVertex([]byte("D"))
 	assert.Equal(t, TestVertices["D"], v)
 	assert.True(t, exists)
 
-	v, exists = F.GetVertex(toVertexInfo("X", 5))
+	v, exists = F.GetVertex([]byte("X"))
 	assert.Equal(t, TestVertices["X"], v)
 	assert.True(t, exists)
 
-	v, exists = F.GetVertex(toVertexInfo("Genesis", 0))
+	v, exists = F.GetVertex([]byte("Genesis"))
 	assert.Equal(t, (Vertex)(nil), v)
 	assert.False(t, exists)
-
-	// checking that requests panics when it encounters a Vertex with an ID identical to a known reference
-	// BUT whose level is not consistent with the reference
-	assert.Panics(t, func() { // getting vertex with ID "C" BUT different level
-		F.GetVertex(toVertexInfo("C", 10))
-	})
-	assert.Panics(t, func() { // for vertex that is NOT in Tree (but known through references)
-		F.GetVertex(toVertexInfo("Genesis", 10))
-	})
 }
 
 // TestLeveledForrest_GetVertex tests that Vertex blob is returned properly
 func TestLeveledForrest_PruneAtLevel(t *testing.T) {
 	F := populateNewForrest()
-	F.PruneAtLevel(0)
-	assert.False(t, F.HasVertex(toVertexInfo("Genesis", 0)))
-	assert.True(t, F.HasVertex(toVertexInfo("A", 3)))
-	assert.True(t, F.HasVertex(toVertexInfo("B", 1)))
-	assert.True(t, F.HasVertex(toVertexInfo("C", 2)))
-	assert.True(t, F.HasVertex(toVertexInfo("D", 3)))
-	assert.True(t, F.HasVertex(toVertexInfo("X", 5)))
-	assert.True(t, F.HasVertex(toVertexInfo("Y", 6)))
-	assert.True(t, F.HasVertex(toVertexInfo("Z", 6)))
+	err := F.PruneAtLevel(0)
+	assert.False(t, err != nil)
+	assert.False(t, F.HasVertex([]byte("Genesis")))
+	assert.True(t, F.HasVertex([]byte("A")))
+	assert.True(t, F.HasVertex([]byte("B")))
+	assert.True(t, F.HasVertex([]byte("C")))
+	assert.True(t, F.HasVertex([]byte("D")))
+	assert.True(t, F.HasVertex([]byte("X")))
+	assert.True(t, F.HasVertex([]byte("Y")))
+	assert.True(t, F.HasVertex([]byte("Z")))
 
-	F.PruneAtLevel(2)
-	assert.False(t, F.HasVertex(toVertexInfo("Genesis", 0)))
-	assert.True(t, F.HasVertex(toVertexInfo("A", 3)))
-	assert.False(t, F.HasVertex(toVertexInfo("B", 1)))
-	assert.False(t, F.HasVertex(toVertexInfo("C", 2)))
-	assert.True(t, F.HasVertex(toVertexInfo("D", 3)))
-	assert.True(t, F.HasVertex(toVertexInfo("X", 5)))
-	assert.True(t, F.HasVertex(toVertexInfo("Y", 6)))
-	assert.True(t, F.HasVertex(toVertexInfo("Z", 6)))
+	err = F.PruneAtLevel(2)
+	assert.False(t, err != nil)
+	assert.False(t, F.HasVertex([]byte("Genesis")))
+	assert.True(t, F.HasVertex([]byte("A")))
+	assert.False(t, F.HasVertex([]byte("B")))
+	assert.False(t, F.HasVertex([]byte("C")))
+	assert.True(t, F.HasVertex([]byte("D")))
+	assert.True(t, F.HasVertex([]byte("X")))
+	assert.True(t, F.HasVertex([]byte("Y")))
+	assert.True(t, F.HasVertex([]byte("Z")))
 
-	F.PruneAtLevel(5)
-	assert.False(t, F.HasVertex(toVertexInfo("Genesis", 0)))
-	assert.False(t, F.HasVertex(toVertexInfo("A", 3)))
-	assert.False(t, F.HasVertex(toVertexInfo("B", 1)))
-	assert.False(t, F.HasVertex(toVertexInfo("C", 2)))
-	assert.False(t, F.HasVertex(toVertexInfo("D", 3)))
-	assert.False(t, F.HasVertex(toVertexInfo("X", 5)))
-	assert.True(t, F.HasVertex(toVertexInfo("Y", 6)))
-	assert.True(t, F.HasVertex(toVertexInfo("Z", 6)))
+	err = F.PruneAtLevel(5)
+	assert.False(t, err != nil)
+	assert.False(t, F.HasVertex([]byte("Genesis")))
+	assert.False(t, F.HasVertex([]byte("A")))
+	assert.False(t, F.HasVertex([]byte("B")))
+	assert.False(t, F.HasVertex([]byte("C")))
+	assert.False(t, F.HasVertex([]byte("D")))
+	assert.False(t, F.HasVertex([]byte("X")))
+	assert.True(t, F.HasVertex([]byte("Y")))
+	assert.True(t, F.HasVertex([]byte("Z")))
 
 	// pruning at same level repeatedly should be fine
-	F.PruneAtLevel(5)
-	assert.True(t, F.HasVertex(toVertexInfo("Y", 6)))
-	assert.True(t, F.HasVertex(toVertexInfo("Z", 6)))
+	err = F.PruneAtLevel(5)
+	assert.False(t, err != nil)
+	assert.True(t, F.HasVertex([]byte("Y")))
+	assert.True(t, F.HasVertex([]byte("Z")))
 
-	// checking that pruning at lower level than what is already pruned results in panic
-	assert.Panics(t, func() { // getting vertex with ID "C" BUT different level
-		F.PruneAtLevel(4)
-	})
+	// checking that pruning at lower level than what is already pruned results in error
+	err = F.PruneAtLevel(4)
+	assert.True(t, err != nil)
 }
 
-// TestLeveledForrest_CopyDescendants tests that CopyDescendants copies the Sub-tree from the specified root
-// (but not the root itself) to the target forrest
-func TestLeveledForrest_CopyDescendants(t *testing.T) {
-	source := populateNewForrest()
-	target := NewLeveledForrest()
-
-	id, level := toVertexInfo("A", 3)
-	source.CopyDescendants(id, level, target) // Copies descendants of A but not A itself
-	id, level = toVertexInfo("B", 1)
-	source.CopyDescendants(id, level, target)
-	assert.False(t, target.HasVertex(toVertexInfo("Genesis", 0)))
-	assert.False(t, target.HasVertex(toVertexInfo("A", 3)))
-	assert.False(t, target.HasVertex(toVertexInfo("B", 1)))
-	assert.True(t, target.HasVertex(toVertexInfo("C", 2)))
-	assert.True(t, target.HasVertex(toVertexInfo("D", 3)))
-	assert.False(t, target.HasVertex(toVertexInfo("X", 5)))
-	assert.False(t, target.HasVertex(toVertexInfo("Y", 6)))
-	assert.False(t, target.HasVertex(toVertexInfo("Z", 6)))
-
-	id, level = toVertexInfo("Missing2", 4)
-	source.CopyDescendants(id, level, target)
-	assert.False(t, target.HasVertex(toVertexInfo("Genesis", 0)))
-	assert.False(t, target.HasVertex(toVertexInfo("A", 3)))
-	assert.False(t, target.HasVertex(toVertexInfo("B", 1)))
-	assert.True(t, target.HasVertex(toVertexInfo("C", 2)))
-	assert.True(t, target.HasVertex(toVertexInfo("D", 3)))
-	assert.True(t, target.HasVertex(toVertexInfo("X", 5)))
-	assert.True(t, target.HasVertex(toVertexInfo("Y", 6)))
-	assert.True(t, target.HasVertex(toVertexInfo("Z", 6)))
-
-	// checking that requests panics when it encounters a Vertex with an ID identical to a known reference
-	// BUT whose level is not consistent with the reference
-	assert.Panics(t, func() { // getting vertex with ID "C" BUT different level
-		id, level = toVertexInfo("C", 10)
-		source.CopyDescendants(id, level, target)
-	})
-	assert.Panics(t, func() { // for vertex that is NOT in Tree (but known through references)
-		id, level = toVertexInfo("Genesis", 10)
-		source.CopyDescendants(id, level, target)
-	})
-}
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~ Helper Functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
@@ -345,6 +281,3 @@ func children2List(it *VertexIterator) []*VertexMock {
 	return l
 }
 
-func toVertexInfo(vertexId string, vertexLevel uint64) ([]byte, uint64) {
-	return []byte(vertexId), vertexLevel
-}

@@ -14,19 +14,6 @@ type Vertex interface {
 	Parent() ([]byte, uint64)
 }
 
-type ErrorIncompatibleVertex struct {
-	ExistingVertex Vertex
-	NewVertexLevel uint64
-	NewVertexID []byte
-}
-
-func (e *ErrorIncompatibleVertex) Error() string {
-	return fmt.Sprintf(
-		"new vertex (level=%d, id=%s) is incompatible with existing vertex (%d, %s)",
-		e.NewVertexID, e.NewVertexLevel, e.ExistingVertex.Level(), e.ExistingVertex.VertexID(),
-	)
-}
-
 // vertexContainer holds information about a tree vertex. Internally, we distinguish between
 // * FULL container: has non-nil value for vertex.
 //   Used for vertices, which have been added to the tree.
@@ -118,7 +105,7 @@ func (f *LeveledForrest) getOrCreateVertexContainer(id []byte, level uint64) (*v
 		if container.level != level {
 			return nil, fmt.Errorf(
 				"new vertex (level=%d, id=%s) is incompatible with existing vertex (%d, %s)",
-				container.vertex.Level(), container.vertex.VertexID(), level, id,
+				container.level, container.id, level, id,
 			)
 		}
 	}
@@ -169,14 +156,14 @@ func (f *LeveledForrest) GetVertex(id []byte) (Vertex, bool) {
 
 // GetChildren returns a VertexIterator to iterate over the children
 // An empty VertexIterator is returned, if no vertices are known whose parent is `id` , `level`
-func (f *LeveledForrest) GetChildren(id []byte) *VertexIterator {
+func (f *LeveledForrest) GetChildren(id []byte) VertexIterator {
 	container, _ := f.vertices[string(id)]
 	// if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
 	return newVertexIterator(container.children) // VertexIterator gracefully handles nil slices
 }
 
 // GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified height
-func (f *LeveledForrest) GetNumberOfChildren(id []byte, level uint64) (int, error) {
+func (f *LeveledForrest) GetNumberOfChildren(id []byte) int {
 	container, _ := f.vertices[string(id)] // if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
 	num := 0
 	for _, child := range container.children {
@@ -184,12 +171,12 @@ func (f *LeveledForrest) GetNumberOfChildren(id []byte, level uint64) (int, erro
 			num++
 		}
 	}
-	return num, nil
+	return num
 }
 
 // GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified height
 // An empty VertexIterator is returned, if no vertices are known at the specified `level`
-func (f *LeveledForrest) GetVerticesAtLevel(level uint64) *VertexIterator {
+func (f *LeveledForrest) GetVerticesAtLevel(level uint64) VertexIterator {
 	return newVertexIterator(f.verticesAtLevel[level]) // go returns the zero value for a missing level. Here, a nil slice
 }
 
@@ -237,10 +224,10 @@ func (it *VertexIterator) HasNext() bool {
 	return it.next != nil
 }
 
-func newVertexIterator(vertexList VertexList) *VertexIterator {
+func newVertexIterator(vertexList VertexList) VertexIterator {
 	it := VertexIterator{
 		data: vertexList,
 	}
 	it.preLoad()
-	return &it
+	return it
 }
