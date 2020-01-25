@@ -59,7 +59,7 @@ test: generate-mocks
 	$(MAKE) -C integration test
 
 .PHONY: integration-test
-integration-test:
+integration-test: docker-build-flow
 	$(MAKE) -C integration integration-test
 
 .PHONY: coverage
