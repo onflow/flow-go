@@ -595,6 +595,828 @@ func TestMulUInt64(t *testing.T) {
 	}
 }
 
+func TestMulUInt128(t *testing.T) {
+
+	// NOTE: hex values are integer values, not bit patterns!
+
+	tests := []struct {
+		a, b  UInt128Value
+		valid bool
+	}{
+		{uint128("0x0"), uint128("0x0"), true},
+		{uint128("0x1"), uint128("0x0"), true},
+		{uint128("0x2"), uint128("0x0"), true},
+		{uint128("0x7fffffffffffffff"), uint128("0x0"), true},
+		{uint128("0x8000000000000000"), uint128("0x0"), true},
+		{uint128("0xffffffffffffffff"), uint128("0x0"), true},
+		{uint128("0x10000000000000000"), uint128("0x0"), true},
+		{uint128("0x20000000000000000"), uint128("0x0"), true},
+		{uint128("0x7fffffffffffffffffffffffffffffff"), uint128("0x0"), true},
+		{uint128("0x80000000000000000000000000000000"), uint128("0x0"), true},
+		{uint128("0xffffffffffffffffffffffffffffffff"), uint128("0x0"), true},
+
+		{uint128("0x0"), uint128("0x1"), true},
+		{uint128("0x1"), uint128("0x1"), true},
+		{uint128("0x2"), uint128("0x1"), true},
+		{uint128("0x7fffffffffffffff"), uint128("0x1"), true},
+		{uint128("0x8000000000000000"), uint128("0x1"), true},
+		{uint128("0xffffffffffffffff"), uint128("0x1"), true},
+		{uint128("0x10000000000000000"), uint128("0x1"), true},
+		{uint128("0x20000000000000000"), uint128("0x1"), true},
+		{uint128("0x7fffffffffffffffffffffffffffffff"), uint128("0x1"), true},
+		{uint128("0x80000000000000000000000000000000"), uint128("0x1"), true},
+		{uint128("0xffffffffffffffffffffffffffffffff"), uint128("0x1"), true},
+
+		{uint128("0x0"), uint128("0x2"), true},
+		{uint128("0x1"), uint128("0x2"), true},
+		{uint128("0x2"), uint128("0x2"), true},
+		{uint128("0x7fffffffffffffff"), uint128("0x2"), true},
+		{uint128("0x8000000000000000"), uint128("0x2"), true},
+		{uint128("0xffffffffffffffff"), uint128("0x2"), true},
+		{uint128("0x10000000000000000"), uint128("0x2"), true},
+		{uint128("0x20000000000000000"), uint128("0x2"), true},
+		{uint128("0x7fffffffffffffffffffffffffffffff"), uint128("0x2"), true},
+		{uint128("0x80000000000000000000000000000000"), uint128("0x2"), false},
+		{uint128("0xffffffffffffffffffffffffffffffff"), uint128("0x2"), false},
+
+		{uint128("0x0"), uint128("0x7fffffffffffffff"), true},
+		{uint128("0x1"), uint128("0x7fffffffffffffff"), true},
+		{uint128("0x2"), uint128("0x7fffffffffffffff"), true},
+		{uint128("0x7fffffffffffffff"), uint128("0x7fffffffffffffff"), true},
+		{uint128("0x8000000000000000"), uint128("0x7fffffffffffffff"), true},
+		{uint128("0xffffffffffffffff"), uint128("0x7fffffffffffffff"), true},
+		{uint128("0x10000000000000000"), uint128("0x7fffffffffffffff"), true},
+		{uint128("0x20000000000000000"), uint128("0x7fffffffffffffff"), true},
+		{uint128("0x7fffffffffffffffffffffffffffffff"), uint128("0x7fffffffffffffff"), false},
+		{uint128("0x80000000000000000000000000000000"), uint128("0x7fffffffffffffff"), false},
+		{uint128("0xffffffffffffffffffffffffffffffff"), uint128("0x7fffffffffffffff"), false},
+
+		{uint128("0x0"), uint128("0x8000000000000000"), true},
+		{uint128("0x1"), uint128("0x8000000000000000"), true},
+		{uint128("0x2"), uint128("0x8000000000000000"), true},
+		{uint128("0x7fffffffffffffff"), uint128("0x8000000000000000"), true},
+		{uint128("0x8000000000000000"), uint128("0x8000000000000000"), true},
+		{uint128("0xffffffffffffffff"), uint128("0x8000000000000000"), true},
+		{uint128("0x10000000000000000"), uint128("0x8000000000000000"), true},
+		{uint128("0x20000000000000000"), uint128("0x8000000000000000"), false},
+		{uint128("0x7fffffffffffffffffffffffffffffff"), uint128("0x8000000000000000"), false},
+		{uint128("0x80000000000000000000000000000000"), uint128("0x8000000000000000"), false},
+		{uint128("0xffffffffffffffffffffffffffffffff"), uint128("0x8000000000000000"), false},
+
+		{uint128("0x0"), uint128("0xffffffffffffffff"), true},
+		{uint128("0x1"), uint128("0xffffffffffffffff"), true},
+		{uint128("0x2"), uint128("0xffffffffffffffff"), true},
+		{uint128("0x7fffffffffffffff"), uint128("0xffffffffffffffff"), true},
+		{uint128("0x8000000000000000"), uint128("0xffffffffffffffff"), true},
+		{uint128("0xffffffffffffffff"), uint128("0xffffffffffffffff"), true},
+		{uint128("0x10000000000000000"), uint128("0xffffffffffffffff"), true},
+		{uint128("0x20000000000000000"), uint128("0xffffffffffffffff"), false},
+		{uint128("0x7fffffffffffffffffffffffffffffff"), uint128("0xffffffffffffffff"), false},
+		{uint128("0x80000000000000000000000000000000"), uint128("0xffffffffffffffff"), false},
+		{uint128("0xffffffffffffffffffffffffffffffff"), uint128("0xffffffffffffffff"), false},
+
+		{uint128("0x0"), uint128("0x10000000000000000"), true},
+		{uint128("0x1"), uint128("0x10000000000000000"), true},
+		{uint128("0x2"), uint128("0x10000000000000000"), true},
+		{uint128("0x7fffffffffffffff"), uint128("0x10000000000000000"), true},
+		{uint128("0x8000000000000000"), uint128("0x10000000000000000"), true},
+		{uint128("0xffffffffffffffff"), uint128("0x10000000000000000"), true},
+		{uint128("0x10000000000000000"), uint128("0x10000000000000000"), false},
+		{uint128("0x20000000000000000"), uint128("0x10000000000000000"), false},
+		{uint128("0x7fffffffffffffffffffffffffffffff"), uint128("0x10000000000000000"), false},
+		{uint128("0x80000000000000000000000000000000"), uint128("0x10000000000000000"), false},
+		{uint128("0xffffffffffffffffffffffffffffffff"), uint128("0x10000000000000000"), false},
+
+		{uint128("0x0"), uint128("0x20000000000000000"), true},
+		{uint128("0x1"), uint128("0x20000000000000000"), true},
+		{uint128("0x2"), uint128("0x20000000000000000"), true},
+		{uint128("0x7fffffffffffffff"), uint128("0x20000000000000000"), true},
+		{uint128("0x8000000000000000"), uint128("0x20000000000000000"), false},
+		{uint128("0xffffffffffffffff"), uint128("0x20000000000000000"), false},
+		{uint128("0x10000000000000000"), uint128("0x20000000000000000"), false},
+		{uint128("0x20000000000000000"), uint128("0x20000000000000000"), false},
+		{uint128("0x7fffffffffffffffffffffffffffffff"), uint128("0x20000000000000000"), false},
+		{uint128("0x80000000000000000000000000000000"), uint128("0x20000000000000000"), false},
+		{uint128("0xffffffffffffffffffffffffffffffff"), uint128("0x20000000000000000"), false},
+
+		{uint128("0x0"), uint128("0x7fffffffffffffffffffffffffffffff"), true},
+		{uint128("0x1"), uint128("0x7fffffffffffffffffffffffffffffff"), true},
+		{uint128("0x2"), uint128("0x7fffffffffffffffffffffffffffffff"), true},
+		{uint128("0x7fffffffffffffff"), uint128("0x7fffffffffffffffffffffffffffffff"), false},
+		{uint128("0x8000000000000000"), uint128("0x7fffffffffffffffffffffffffffffff"), false},
+		{uint128("0xffffffffffffffff"), uint128("0x7fffffffffffffffffffffffffffffff"), false},
+		{uint128("0x10000000000000000"), uint128("0x7fffffffffffffffffffffffffffffff"), false},
+		{uint128("0x20000000000000000"), uint128("0x7fffffffffffffffffffffffffffffff"), false},
+		{uint128("0x7fffffffffffffffffffffffffffffff"), uint128("0x7fffffffffffffffffffffffffffffff"), false},
+		{uint128("0x80000000000000000000000000000000"), uint128("0x7fffffffffffffffffffffffffffffff"), false},
+		{uint128("0xffffffffffffffffffffffffffffffff"), uint128("0x7fffffffffffffffffffffffffffffff"), false},
+
+		{uint128("0x0"), uint128("0x80000000000000000000000000000000"), true},
+		{uint128("0x1"), uint128("0x80000000000000000000000000000000"), true},
+		{uint128("0x2"), uint128("0x80000000000000000000000000000000"), false},
+		{uint128("0x7fffffffffffffff"), uint128("0x80000000000000000000000000000000"), false},
+		{uint128("0x8000000000000000"), uint128("0x80000000000000000000000000000000"), false},
+		{uint128("0xffffffffffffffff"), uint128("0x80000000000000000000000000000000"), false},
+		{uint128("0x10000000000000000"), uint128("0x80000000000000000000000000000000"), false},
+		{uint128("0x20000000000000000"), uint128("0x80000000000000000000000000000000"), false},
+		{uint128("0x7fffffffffffffffffffffffffffffff"), uint128("0x80000000000000000000000000000000"), false},
+		{uint128("0x80000000000000000000000000000000"), uint128("0x80000000000000000000000000000000"), false},
+		{uint128("0xffffffffffffffffffffffffffffffff"), uint128("0x80000000000000000000000000000000"), false},
+
+		{uint128("0x0"), uint128("0xffffffffffffffffffffffffffffffff"), true},
+		{uint128("0x1"), uint128("0xffffffffffffffffffffffffffffffff"), true},
+		{uint128("0x2"), uint128("0xffffffffffffffffffffffffffffffff"), false},
+		{uint128("0x7fffffffffffffff"), uint128("0xffffffffffffffffffffffffffffffff"), false},
+		{uint128("0x8000000000000000"), uint128("0xffffffffffffffffffffffffffffffff"), false},
+		{uint128("0xffffffffffffffff"), uint128("0xffffffffffffffffffffffffffffffff"), false},
+		{uint128("0x10000000000000000"), uint128("0xffffffffffffffffffffffffffffffff"), false},
+		{uint128("0x20000000000000000"), uint128("0xffffffffffffffffffffffffffffffff"), false},
+		{uint128("0x7fffffffffffffffffffffffffffffff"), uint128("0xffffffffffffffffffffffffffffffff"), false},
+		{uint128("0x80000000000000000000000000000000"), uint128("0xffffffffffffffffffffffffffffffff"), false},
+		{uint128("0xffffffffffffffffffffffffffffffff"), uint128("0xffffffffffffffffffffffffffffffff"), false},
+
+		// Special case - force addition overflow case
+		{uint128("0xffffffffffffffffffffffffffffffff"), uint128("0x10000000000000000000000000000002"), false},
+	}
+
+	for _, test := range tests {
+		f := func() {
+			test.a.Mul(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+	}
+}
+
+func TestMulUInt256(t *testing.T) {
+
+	// NOTE: hex values are integer values, not bit patterns!
+
+	tests := []struct {
+		a, b  UInt256Value
+		valid bool
+	}{
+		// 0x0
+
+		{
+			uint256("0x0"),
+			uint256("0x0"),
+			true,
+		},
+		{
+			uint256("0x1"),
+			uint256("0x0"),
+			true,
+		},
+		{
+			uint256("0x2"),
+			uint256("0x0"),
+			true,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			uint256("0x0"),
+			true,
+		},
+		{
+			uint256("0x80000000000000000000000000000000"),
+			uint256("0x0"),
+			true,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			uint256("0x0"),
+			true,
+		},
+		{
+			uint256("0x100000000000000000000000000000000"),
+			uint256("0x0"),
+			true,
+		},
+		{
+			uint256("0x2000000000000000000000000000000000"),
+			uint256("0x0"),
+			true,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x0"),
+			true,
+		},
+		{
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			uint256("0x0"),
+			true,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x0"),
+			true,
+		},
+
+		// 0x1
+
+		{
+			uint256("0x0"),
+			uint256("0x1"),
+			true,
+		},
+		{
+			uint256("0x1"),
+			uint256("0x1"),
+			true,
+		},
+		{
+			uint256("0x2"),
+			uint256("0x1"),
+			true,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			uint256("0x1"),
+			true,
+		},
+		{
+			uint256("0x80000000000000000000000000000000"),
+			uint256("0x1"),
+			true,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			uint256("0x1"),
+			true,
+		},
+		{
+			uint256("0x100000000000000000000000000000000"),
+			uint256("0x1"),
+			true,
+		},
+		{
+			uint256("0x200000000000000000000000000000000"),
+			uint256("0x1"),
+			true,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x1"),
+			true,
+		},
+		{
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			uint256("0x1"),
+			true,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x1"),
+			true,
+		},
+
+		// 0x2
+
+		{
+			uint256("0x0"),
+			uint256("0x2"),
+			true,
+		},
+		{
+			uint256("0x1"),
+			uint256("0x2"),
+			true,
+		},
+		{
+			uint256("0x2"),
+			uint256("0x2"),
+			true,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			uint256("0x2"),
+			true,
+		},
+		{
+			uint256("0x80000000000000000000000000000000"),
+			uint256("0x2"),
+			true,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			uint256("0x2"),
+			true,
+		},
+		{
+			uint256("0x100000000000000000000000000000000"),
+			uint256("0x2"),
+			true,
+		},
+		{
+			uint256("0x200000000000000000000000000000000"),
+			uint256("0x2"),
+			true,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x2"),
+			true,
+		},
+		{
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			uint256("0x2"),
+			false,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x2"),
+			false,
+		},
+
+		// 0x7fffffffffffffffffffffffffffffff
+
+		{
+			uint256("0x0"),
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x1"),
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x2"),
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x80000000000000000000000000000000"),
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x100000000000000000000000000000000"),
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x200000000000000000000000000000000"),
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			false,
+		},
+
+		// 0x80000000000000000000000000000000
+
+		{
+			uint256("0x0"),
+			uint256("0x80000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x1"),
+			uint256("0x80000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x2"),
+			uint256("0x80000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			uint256("0x80000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x80000000000000000000000000000000"),
+			uint256("0x80000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			uint256("0x80000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x100000000000000000000000000000000"),
+			uint256("0x80000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x200000000000000000000000000000000"),
+			uint256("0x80000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x80000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			uint256("0x80000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x80000000000000000000000000000000"),
+			false,
+		},
+
+		// 0xffffffffffffffffffffffffffffffff
+
+		{
+			uint256("0x0"),
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x1"),
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x2"),
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x80000000000000000000000000000000"),
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x100000000000000000000000000000000"),
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x200000000000000000000000000000000"),
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x8000000000000000000000000000000080000000000000000000000000000000"),
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			false,
+		},
+
+		// 0x100000000000000000000000000000000
+
+		{
+			uint256("0x0"),
+			uint256("0x100000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x1"),
+			uint256("0x100000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x2"),
+			uint256("0x100000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			uint256("0x100000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x80000000000000000000000000000000"),
+			uint256("0x100000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			uint256("0x100000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x100000000000000000000000000000000"),
+			uint256("0x100000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x200000000000000000000000000000000"),
+			uint256("0x100000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x100000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			uint256("0x100000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x100000000000000000000000000000000"),
+			false,
+		},
+
+		// 0x200000000000000000000000000000000
+
+		{
+			uint256("0x0"),
+			uint256("0x200000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x1"),
+			uint256("0x200000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x2"),
+			uint256("0x200000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			uint256("0x200000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x80000000000000000000000000000000"),
+			uint256("0x200000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			uint256("0x200000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x100000000000000000000000000000000"),
+			uint256("0x200000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x200000000000000000000000000000000"),
+			uint256("0x200000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x200000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			uint256("0x200000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x200000000000000000000000000000000"),
+			false,
+		},
+
+		// 0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+		{
+			uint256("0x0"),
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x1"),
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x2"),
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x7ffffffffffffffffffffffffffffff"),
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x8000000000000000000000000000000"),
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x100000000000000000000000000000000"),
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x200000000000000000000000000000000"),
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x80000000000000000000000000000000"),
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+
+		// 0x8000000000000000000000000000000000000000000000000000000000000000
+
+		{
+			uint256("0x0"),
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x1"),
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			true,
+		},
+		{
+			uint256("0x2"),
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x80000000000000000000000000000000"),
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x100000000000000000000000000000000"),
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x200000000000000000000000000000000"),
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			false,
+		},
+
+		// 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+
+		{
+			uint256("0x0"),
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x1"),
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			true,
+		},
+		{
+			uint256("0x2"),
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffff"),
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x80000000000000000000000000000000"),
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffff"),
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x100000000000000000000000000000000"),
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x200000000000000000000000000000000"),
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0x8000000000000000000000000000000000000000000000000000000000000000"),
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+		{
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			false,
+		},
+
+		// Special case - force addition overflow case
+		{
+			uint256("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			uint256("0x1000000000000000000000000000000000000000000000000000000000000002"),
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		f := func() {
+			test.a.Mul(test.b)
+		}
+		if test.valid {
+			assert.NotPanics(t, f)
+		} else {
+			assert.Panics(t, f)
+		}
+	}
+}
+
 func TestMulInt8(t *testing.T) {
 
 	tests := []struct {
