@@ -21,6 +21,7 @@ type Finalizer struct {
 	LastFinalizedBlockQC *types.QuorumCertificate
 }
 
+
 func New(rootBlock *types.BlockProposal, rootQc *types.QuorumCertificate, notifier notifications.Distributor) (*Finalizer, error) {
 	if !bytes.Equal(rootQc.BlockMRH, rootBlock.BlockMRH()) || (rootQc.View != rootBlock.View()) {
 		return nil, &types.ErrorConfiguration{Msg: "rootQc must be for rootBlock"}
@@ -32,21 +33,19 @@ func New(rootBlock *types.BlockProposal, rootQc *types.QuorumCertificate, notifi
 		LockedBlockQC:        rootQc,
 		LastFinalizedBlockQC: rootQc,
 	}
-
 	return &fnlzr, nil
 }
 
-func (r *Finalizer) IsKnownBlock(blockID []byte, blockView uint64) bool {
-	vertex, exists := r.mainChain.GetVertex(blockID)
-	if !exists {
-		return false
+// GetBlock returns block for given ID
+func (r *Finalizer) GetBlock(blockID []byte) (*types.BlockProposal, bool) {
+	blockContainer, hasBlock := r.mainChain.GetVertex(blockID)
+	if !hasBlock {
+		return nil, false
 	}
-	if blockView != vertex.Level() {
-		what to do ????
-	}
-	return r.mainChain.HasVertex(blockID, blockView)
+	return blockContainer.(*BlockContainer).Block(), true
 }
 
+// GetBlock returns all known blocks for the given
 func (r *Finalizer) GetBlocksForView(view uint64) []*types.BlockProposal {
 	vertexIterator := r.mainChain.GetVerticesAtLevel(view)
 	l := make([]*types.BlockProposal, 0, 1) // in the vast majority of cases, there will only be one proposal for a particular view
@@ -57,40 +56,83 @@ func (r *Finalizer) GetBlocksForView(view uint64) []*types.BlockProposal {
 	return l
 }
 
-func (r *Finalizer) GetBlock(blockID []byte, view uint64) (*types.BlockProposal, bool) {
-	blockContainer, hasBlock := r.mainChain.GetVertex(blockID, view)
-	if !hasBlock {
-		return nil, false
+// IsKnownBlock checks whether block is known.
+// Can error with ErrorBlockHashCollision.
+func (r *Finalizer) IsKnownBlock(block *types.BlockProposal) (bool, error) {
+	vertex, exists := r.mainChain.GetVertex(block.BlockMRH())
+	if !exists {
+		return false, nil
 	}
-	return blockContainer.(*BlockContainer).Block(), true
+	return r.areBlocksRedundant(block, vertex.(*BlockContainer).block) // errors with ErrorBlockHashCollision
 }
 
-// IsProcessingNeeded performs basic checks whether or not block needs processing
+
+// areBlocksRedundant [errors with ErrorBlockHashCollision]
+// evaluates whether two blocks carry redundant information from the view-point of the finalizer.
+//
+// (1) return value (false, nil)
+// Two block are NOT REDUNDANT if they have different IDs (Hashes).
+//
+// (2) return value (true, nil)
+// Two blocks ARE REDUNDANT if their respective fields are identical:
+// ID (Hash), view number, and quorum Certificate (qc), i.e qc.view and qc.blockID.
+// (ignoring any other potential fields the blocks might have.
+//
+// (3) return value (false, ErrorBlockHashCollision)
+// areBlocksRedundant errors if the blocks' IDs are identical but they differ
+// in any of the _relevant_ fields (as defined in (2)).
+func (r *Finalizer) areBlocksRedundant(block1, block2 *types.BlockProposal) (bool, error) {
+	if !bytes.Equal(block1.BlockMRH(), block2.BlockMRH()) {
+		return false, nil
+	}
+
+	// hashes of blocks are identical => we expect all relevant values to be identical
+	if block1.View() != block2.View() { // view number
+		return false, &ErrorBlockHashCollision{block1: block1, block2: block2, location: "View"}
+	}
+	if !bytes.Equal(block1.QC().BlockMRH, block2.QC().BlockMRH) { // qc.blockID
+		return false, &ErrorBlockHashCollision{block1: block1, block2: block2, location: "qc.blockID"}
+	}
+	if block1.QC().View != block2.QC().View { // qc.view
+		return false, &ErrorBlockHashCollision{block1: block1, block2: block2, location: "qc.view"}
+	}
+	// all _relevant_ fields identical
+	return true, nil
+}
+
+// isProcessingNeeded performs basic checks whether or not block needs processing
 // only considering the block's height and Hash
 // Returns false if any of the following conditions applies
 //  * block is for already finalized views
 //  * known block
-func (r *Finalizer) IsProcessingNeeded(blockID []byte, blockView uint64) bool {
-	if blockView <= r.LastFinalizedBlockQC.View || r.IsKnownBlock(blockID, blockView) {
-		return false
+// Can error with ErrorBlockHashCollision.
+func (r *Finalizer) IsProcessingNeeded(block *types.BlockProposal) (bool, error) {
+	if block.View() <= r.LastFinalizedBlockQC.View {
+		return false, nil
 	}
-	return true
+	isKnownBlock, err := r.IsKnownBlock(block) // errors with ErrorBlockHashCollision
+	if  err != nil {
+		return false, fmt.Errorf("cannot evaluate whether block should be processed: %w", err)
+	}
+	return !isKnownBlock, nil
 }
 
 // IsSafeBlock returns true if block is safe to vote for
 // (according to the definition in https://arxiv.org/abs/1803.05069v6).
-// Returns false for unknown blocks.
-func (r *Finalizer) IsSafeBlock(block *types.BlockProposal) bool {
-	blockContainer, hasBlock := r.mainChain.GetVertex(block.BlockMRH(), block.View())
-	if !hasBlock {
-		return false
+//
+// In the current architecture, the block is stored _before_ evaluating its safety.
+// Consequently, IsSafeBlock accepts only known, valid blocks. Should a block be
+// unknown (not previously added to Forks) or violate some consistency requirements,
+// IsSafeBlock errors. All errors are fatal.
+func (r *Finalizer) IsSafeBlock(block *types.BlockProposal) (bool, error) {
+	isKnownBlock, err := r.IsKnownBlock(block) // errors with ErrorBlockHashCollision
+	if err!= nil {
+		return false, fmt.Errorf("cannot evaluate whether block is safe to vote for: %w", err)
 	}
-	return r.isSafeBlock(blockContainer.(*BlockContainer))
-}
+	if !isKnownBlock {
+		return false, fmt.Errorf("IsSafeBlock only accepts known blocks", err)
+	}
 
-// isSafeBlock should only be called on blocks that are connected to the main chain.
-// Function returns true iff block is safe to vote for block.
-func (r *Finalizer) isSafeBlock(block *BlockContainer) bool {
 	// According to the paper, a block is considered a safe block if
 	//  * it extends from locked block (safety rule),
 	//  * or the view of the parent block is higher than the view number of locked block (liveness rule).
@@ -100,70 +142,103 @@ func (r *Finalizer) isSafeBlock(block *BlockContainer) bool {
 	// 3. If block.QC.View equals to locked view: parent must be the locked block.
 	qc := block.QC()
 	if qc.View > r.LockedBlockQC.View {
-		return true
+		return true, nil
 	}
 	if (qc.View == r.LockedBlockQC.View) && bytes.Equal(qc.BlockMRH, r.LockedBlockQC.BlockMRH) {
-		return true
+		return true, nil
 	}
-	return false
+	return false, nil
 }
+
 
 // ProcessBlock adds `block` to the consensus state.
 // Calling this method with previously-processed blocks leaves the consensus state invariant
 // (though, it will potentially cause some duplicate processing).
 // CAUTION: method assumes that `block` is well-formed (i.e. all fields are set)
-func (r *Finalizer) ProcessBlock(block *types.BlockProposal) error {
-	if !r.IsProcessingNeeded(block.BlockMRH(), block.View()) {
+func (r *Finalizer) AddBlock(block *types.BlockProposal) error {
+	isProcessingNeeded, err := r.IsProcessingNeeded(block) // errors with ErrorBlockHashCollision
+	if err != nil {
+		return fmt.Errorf("cannot process block: %w", err)
+	}
+	if !isProcessingNeeded {
 		return nil
 	}
-	bc := &BlockContainer{block: block}
-	parent, isParentKnown := r.mainChain.GetVertex(block.QC().BlockMRH, block.QC().View)
-	if !isParentKnown { //parent not in mainchain
-		return &types.ErrorMissingBlock{
-			View:    block.QC().View,
-			BlockID: block.QC().BlockMRH,
-		}
-	}
-	// parent in mainchain:
-	err := r.addToMainChain(bc, parent.(*BlockContainer))
-	if err != nil {
-		return fmt.Errorf("could not process block: %w", err)
-	}
-	return nil
-}
 
-// addToMainChain adds the block to the main chain and updates consensus state.
-// Calling this method with previously-processed blocks leaves the consensus state invariant.
-// UNSAFE: assumes that the block is properly formatted and all signatures and QCs are valid
-func (r *Finalizer) addToMainChain(blockContainer, mainChainParent *BlockContainer) error {
-	err := r.setMainChainProperties(blockContainer, mainChainParent)
+	blockContainer, err := r.wrapAsBlockContainer(block)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot add invalid block: %w", err)
 	}
-	r.mainChain.AddVertex(blockContainer)
+	r.mainChain.AddVertex(blockContainer) // store blockContainer in mainChain
+	if err != nil {
+		return fmt.Errorf("cannot add store: %w", err)
+	}
+
 	r.updateLockedQc(blockContainer)
 	r.updateFinalizedBlockQc(blockContainer)
 	r.notifier.OnBlockIncorporated(blockContainer.Block())
 	return nil
 }
 
-// setMainChainProperties defines all fields in the BlockContainer
-// Enforces:
+// wrapAsBlockContainer constructs a BlockContainer for holding block.
+// Errors with ErrorMissingBlock if the parent is unknown.
+// Errors with ErrorInvalidBlock is the block is inconsistent with the current consensus state.
+func (r *Finalizer) wrapAsBlockContainer(block *types.BlockProposal) (*BlockContainer, error) {
+	blockContainer := &BlockContainer{block: block}
+	parentContainer, err := r.getParentContainer(block)
+	if err != nil {
+		fmt.Errorf("cannot get parent container for block: %w", err)
+	}
+	blockContainer.twoChainHead = parentContainer.OneChainHead()
+	blockContainer.threeChainHead = parentContainer.TwoChainHead()
+	return blockContainer, nil
+}
+
+// retrieves parent from mainChain by hash and enforces
+// Errors with
+// * ErrorMissingBlock is parent is unknown
+// * ErrorInvalidBlock block's view is not greater than its parent's view.
+// * ErrorInvalidBlock if qc points to known block with same hash,
+//   but it has mismatching view number
+// Erroring on these conditions enforces:
 //  * Block's ViewNumber is strictly monotonously increasing
-// Prerequisites:
-//  * parent must point to correct parent (no check performed!)
-func (r *Finalizer) setMainChainProperties(block, parent *BlockContainer) error {
-	if block.View() <= parent.View() {
-		return &types.ErrorInvalidBlock{
+//  * QC is consistent with parent in both variables: ID (Hash) and View
+func (r *Finalizer) getParentContainer(block *types.BlockProposal) (*BlockContainer, error) {
+	parentVertex, isParentKnown := r.mainChain.GetVertex(block.QC().BlockMRH)
+	if !isParentKnown { //parent not in mainchain
+		return nil, &types.ErrorMissingBlock{
+			View:    block.QC().View,
+			BlockID: block.QC().BlockMRH,
+		}
+	}
+
+	parent := parentVertex.(*BlockContainer)
+	if !(block.View() > parent.View()) {
+		return nil, &types.ErrorInvalidBlock{
 			View:    block.View(),
-			BlockID: block.ID(),
+			BlockID: block.BlockMRH(),
 			Msg:     fmt.Sprintf("block's view (%d) is SMALLER than its parent's view (%d)", block.View(), parent.View()),
 		}
 	}
-	block.twoChainHead = parent.OneChainHead()
-	block.threeChainHead = parent.TwoChainHead()
+	if parent.View() != block.QC().View {
+		return nil, &types.ErrorInvalidBlock{
+			View:    block.View(),
+			BlockID: block.BlockMRH(),
+			Msg:     "qc points to known block with same hash, but it has mismatching view number",
+		}
+	}
+	return parent, nil
+}
+
+// updateConsensusState updates consensus state.
+// Calling this method with previously-processed blocks leaves the consensus state invariant.
+// UNSAFE: assumes that relevant block properties are consistent with previous blocks
+func (r *Finalizer) updateConsensusState(blockContainer *BlockContainer) error {
+	r.updateLockedQc(blockContainer)
+	r.updateFinalizedBlockQc(blockContainer)
+	r.notifier.OnBlockIncorporated(blockContainer.Block())
 	return nil
 }
+
 
 // updateLockedBlock updates `LockedBlockQC`
 // We use the locking rule from 'Event-driven HotStuff Protocol' where the condition is:
@@ -218,7 +293,7 @@ func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) {
 		return
 	}
 	// get Block
-	blockVertex, _ := r.mainChain.GetVertex(blockQC.BlockMRH, blockQC.View)
+	blockVertex, _ := r.mainChain.GetVertex(blockQC.BlockMRH)
 	blockContainer := blockVertex.(*BlockContainer)
 
 	// finalize Parent, i.e. the block pointed to by the block's QC
