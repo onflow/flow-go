@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -12,6 +13,10 @@ type Vote struct {
 	View      uint64
 	BlockMRH  flow.Identifier
 	Signature *Signature
+}
+
+func (v *Vote) BlockMRHStr() string {
+	return fmt.Sprintf("%x", v.BlockMRH)
 }
 
 func (v *Vote) Hash() string {

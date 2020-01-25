@@ -1,30 +1,43 @@
 package hotstuff
 
 import (
+	"fmt"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type VotingStatus struct {
+	blockMRH         flow.Identifier
 	thresholdStake   uint64
 	accumulatedStake uint64
 	voteSender       *flow.Identity
-	validVotes       map[string]*types.Vote
+	// assume votes are all valid to build QC
+	votes map[string]*types.Vote
 }
 
-func NewVotingStatus(thresholdStake uint64, voteSender *flow.Identity) *VotingStatus {
+func NewVotingStatus(thresholdStake uint64, voteSender *flow.Identity, blockMRH flow.Identifier) *VotingStatus {
 	return &VotingStatus{
 		thresholdStake: thresholdStake,
 		voteSender:     voteSender,
-		validVotes:     map[string]*types.Vote{},
+		blockMRH:       blockMRH,
+		votes:          map[string]*types.Vote{},
 	}
 }
 
+// assume vote are valid
 func (vs *VotingStatus) AddVote(vote *types.Vote) {
-	vs.validVotes[vote.Hash()] = vote
+	vs.votes[vote.Hash()] = vote
 	vs.accumulatedStake += vs.voteSender.Stake
 }
 
-func (vs *VotingStatus) canBuildQC() bool {
+func (vs *VotingStatus) CanBuildQC() bool {
 	return vs.accumulatedStake >= vs.thresholdStake
+}
+
+func (vs *VotingStatus) BlockID() flow.Identifier {
+	return vs.blockMRH
+}
+
+func (vs *VotingStatus) BlockMRHStr() string {
+	return fmt.Sprintf("%x", vs.blockMRH)
 }
