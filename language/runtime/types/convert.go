@@ -59,9 +59,9 @@ func Convert(typ runtime.Type, prog *ast.Program, variable *sema.Variable) (Type
 func wrapVariable(t Type, variable *sema.Variable) Type {
 	if variable != nil {
 		return Variable{Type: t}
-	} else {
-		return t
 	}
+
+	return t
 }
 
 func convertOptionalType(t *sema.OptionalType, prog *ast.Program, variable *sema.Variable) (Type, error) {
@@ -122,39 +122,39 @@ func convertFunctionType(t *sema.FunctionType, prog *ast.Program, variable *sema
 			ReturnType:     convertedReturnType,
 		}, nil
 
-	} else {
-		functionDeclaration := func() *ast.FunctionDeclaration {
-			for _, fn := range prog.FunctionDeclarations() {
-				if fn.Identifier.Identifier == variable.Identifier && fn.Identifier.Pos == *variable.Pos {
-					return fn
-				}
-			}
+	}
 
-			panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
-		}()
-
-		parameters := make([]Parameter, len(t.Parameters))
-
-		for i, parameter := range t.Parameters {
-			astParam := functionDeclaration.ParameterList.Parameters[i]
-
-			convertedParameterType, err := Convert(parameter.TypeAnnotation.Type, prog, nil)
-			if err != nil {
-				return nil, err
-			}
-
-			parameters[i] = Parameter{
-				Label:      astParam.Label,
-				Identifier: astParam.Identifier.Identifier,
-				Type:       convertedParameterType,
+	functionDeclaration := func() *ast.FunctionDeclaration {
+		for _, fn := range prog.FunctionDeclarations() {
+			if fn.Identifier.Identifier == variable.Identifier && fn.Identifier.Pos == *variable.Pos {
+				return fn
 			}
 		}
 
-		return Function{
-			Parameters: parameters,
-			ReturnType: convertedReturnType,
-		}.WithID(string(t.ID())), nil
+		panic(fmt.Sprintf("cannot find type %v declaration in AST tree", t))
+	}()
+
+	parameters := make([]Parameter, len(t.Parameters))
+
+	for i, parameter := range t.Parameters {
+		astParam := functionDeclaration.ParameterList.Parameters[i]
+
+		convertedParameterType, err := Convert(parameter.TypeAnnotation.Type, prog, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		parameters[i] = Parameter{
+			Label:      astParam.Label,
+			Identifier: astParam.Identifier.Identifier,
+			Type:       convertedParameterType,
+		}
 	}
+
+	return Function{
+		Parameters: parameters,
+		ReturnType: convertedReturnType,
+	}.WithID(string(t.ID())), nil
 }
 
 func convertCompositeType(t *sema.CompositeType, prog *ast.Program, variable *sema.Variable) (Type, error) {
@@ -188,7 +188,7 @@ func convertCompositeType(t *sema.CompositeType, prog *ast.Program, variable *se
 
 		// TODO: do not sort fields before export, store in order declared
 		fieldNames := make([]string, 0, len(t.Members))
-		for identifer, _ := range t.Members {
+		for identifer := range t.Members {
 			fieldNames = append(fieldNames, identifer)
 		}
 
