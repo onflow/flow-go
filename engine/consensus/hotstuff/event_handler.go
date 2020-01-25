@@ -10,7 +10,6 @@ type EventHandler struct {
 	paceMaker             PaceMaker
 	voteAggregator        *VoteAggregator
 	voter                 *Voter
-	missingBlockRequester *MissingBlockRequester
 	forks                 Forks
 	validator             *Validator
 	blockProposalProducer BlockProposalProducer
