@@ -261,7 +261,7 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 	p.topics[topic] = nil
 	delete(p.topics, topic)
 
-	p.logger.Debug().Str("topic", string(topic)).Str("name", p.name).Msg("unsubscribed from topic")
+	p.logger.Debug().Str("topic", topic).Str("name", p.name).Msg("unsubscribed from topic")
 	return err
 }
 
@@ -271,7 +271,11 @@ func (p *P2PNode) Publish(ctx context.Context, t string, data []byte) error {
 	if !found {
 		return fmt.Errorf("topic not found:%s", t)
 	}
-	return ps.Publish(ctx, data)
+	err := ps.Publish(ctx, data)
+	if err != nil {
+		return fmt.Errorf("failed to publish to topic %s:%w", t, err)
+	}
+	return nil
 }
 
 // multiaddressStr receives a node address and returns

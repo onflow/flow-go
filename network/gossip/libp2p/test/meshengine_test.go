@@ -28,7 +28,7 @@ func TestMeshNetTestSuite(t *testing.T) {
 }
 
 func (m *MeshNetTestSuite) SetupTest() {
-	const count = 3 // defines total number of nodes in our network
+	const count = 10 // defines total number of nodes in our network
 	golog.SetAllLoggers(gologging.DEBUG)
 	m.ids = m.createIDs(count)
 	m.mws = m.createMiddleware(m.ids)
@@ -43,6 +43,8 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 	count := len(m.nets)
 	engs := make([]*MeshEngine, 0)
 	wg := sync.WaitGroup{}
+
+	time.Sleep(time.Second * 5)
 
 	// log[i][j] keeps the message that node i sends to node j
 	log := make(map[int][]string)
@@ -63,6 +65,8 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 		wg.Add(count - 1)
 	}
 
+	time.Sleep(time.Second * 5)
+
 	// fires a goroutine for each engine that listens to incoming messages
 	for i := range m.nets {
 		go func(e *MeshEngine) {
@@ -82,7 +86,7 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 	select {
 	case <-c:
 	case <-time.After(2 * time.Second):
-		fmt.Printf("test timed out on broadcast dissemination")
+		assert.Fail(m.Suite.T(), "test timed out on broadcast dissemination")
 	}
 
 	// evaluates that all messages are received

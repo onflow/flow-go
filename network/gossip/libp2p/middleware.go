@@ -74,6 +74,25 @@ func (m *Middleware) GetIPPort() (string, string) {
 
 // Start will start the middleware.
 func (m *Middleware) Start(ov middleware.Overlay) {
+	ids, err := ov.Identity()
+	// remove self from list of nodes
+	delete(ids, m.me)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get ids")
+	}
+
+	for _, id := range ids {
+		// Create a new NodeAddress
+		ip, port, err := net.SplitHostPort(id.Address)
+		if err != nil {
+			log.Error().Err(err).Msg(fmt.Sprintf("could not parse address %s", id.Address))
+		}
+		nodeAddress := NodeAddress{Name: id.NodeID.String(), IP: ip, Port: port}
+		err = m.libP2PNode.AddPeers(context.Background(), nodeAddress)
+		if err != nil {
+			log.Error().Err(err).Msg(fmt.Sprintf("could not add flow ID as peer %s", id.String()))
+		}
+	}
 	m.ov = ov
 }
 
@@ -272,23 +291,26 @@ func (m *Middleware) Subscribe(channelID uint8) error {
 func (m *Middleware) handleInboundSubscription(rs *ReadSubscription) {
 	defer m.wg.Done()
 	// process incoming messages for as long as the peer is running
-ProcessLoop:
+SubscriptionLoop:
 	for {
 		select {
 		case <-rs.done:
 			m.log.Info().Msg("middleware stopped reception of incoming messages")
-			break ProcessLoop
+			break SubscriptionLoop
 		case msg := <-rs.inbound:
 			log.Info().Msg("middleware received a new message")
 			nodeID, err := getSenderID(msg)
+			if nodeID == m.me {
+				continue SubscriptionLoop
+			}
 			if err != nil {
 				log.Error().Err(err).Msg("could not extract sender ID")
-				continue ProcessLoop
+				continue SubscriptionLoop
 			}
 			err = m.ov.Receive(nodeID, msg)
 			if err != nil {
 				log.Error().Err(err).Msg("could not deliver payload")
-				continue ProcessLoop
+				continue SubscriptionLoop
 			}
 		}
 	}

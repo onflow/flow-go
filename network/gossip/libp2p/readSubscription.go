@@ -25,10 +25,11 @@ func NewReadSubscription(log zerolog.Logger, sub *pubsub.Subscription) *ReadSubs
 		Logger()
 
 	c := ReadSubscription{
-		log:  log,
-		sub:  sub,
-		once: &sync.Once{},
-		done: make(chan struct{}),
+		log:     log,
+		sub:     sub,
+		inbound: make(chan *message.Message),
+		once:    &sync.Once{},
+		done:    make(chan struct{}),
 	}
 
 	return &c
@@ -61,29 +62,27 @@ RecvLoop:
 		default:
 		}
 		var msg message.Message
-		for {
-			rawMsg, err := r.sub.Next(c)
 
-			r.log.Debug().Str("topic_message", msg.String()).Msg("received message")
-
-			if err != nil {
-				r.log.Err(err).Msg("failed to read subscription message")
-				break RecvLoop
-			}
-
-			err = msg.Unmarshal(rawMsg.Data)
-			if err != nil {
-				r.log.Err(err).Str("topic_message", msg.String()).Msg("failed to unmarshal message")
-				break RecvLoop
-			}
-
-			r.log.Debug().
-				Bytes("sender", msg.OriginID).
-				Hex("eventID", msg.EventID).
-				Msg("received message")
-
-			// stash the received message into the inbound queue for handling
-			r.inbound <- &msg
+		rawMsg, err := r.sub.Next(c)
+		if err != nil {
+			r.log.Err(err).Msg("failed to read subscription message")
+			break RecvLoop
 		}
+
+		r.log.Debug().Str("topic_message", msg.String()).Msg("received message")
+
+		err = msg.Unmarshal(rawMsg.Data)
+		if err != nil {
+			r.log.Err(err).Str("topic_message", msg.String()).Msg("failed to unmarshal message")
+			break RecvLoop
+		}
+
+		r.log.Debug().
+			Bytes("sender", msg.OriginID).
+			Hex("eventID", msg.EventID).
+			Msg("received message")
+
+		// stash the received message into the inbound queue for handling
+		r.inbound <- &msg
 	}
 }
