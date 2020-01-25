@@ -15,7 +15,7 @@ type EventHandler struct {
 	validator             *Validator
 	blockProposalProducer BlockProposalProducer
 	viewState             ViewState
-	network               NetworkSender
+	network               Network
 }
 
 func (eh *EventHandler) OnReceiveBlockProposal(block *types.BlockProposal) {
