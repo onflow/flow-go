@@ -57,8 +57,8 @@ type Type interface {
 	ID() TypeID
 }
 
-// ValueIndexableType
-
+// ValueIndexableType is a type which can be indexed into using a value
+//
 type ValueIndexableType interface {
 	Type
 	isValueIndexableType() bool
@@ -66,14 +66,42 @@ type ValueIndexableType interface {
 	IndexingType() Type
 }
 
-// TypeIndexableType
-
+// TypeIndexableType is a type which can be indexed into using a type
+//
 type TypeIndexableType interface {
 	Type
 	isTypeIndexableType()
 	IsAssignable() bool
 	IsValidIndexingType(indexingType Type) (isValid bool, expectedTypeDescription string)
 	ElementType(indexingType Type, isAssignment bool) Type
+}
+
+// MemberAccessibleType is a type which might have members
+//
+type MemberAccessibleType interface {
+	Type
+	HasMembers() bool
+	GetMember(identifier string, targetRange ast.Range, report func(error)) *Member
+}
+
+// ContainedType is a type which might have a container type
+//
+type ContainedType interface {
+	Type
+	GetContainerType() Type
+}
+
+// CompositeKindedType is a type which has a composite kind
+//
+type CompositeKindedType interface {
+	Type
+	GetCompositeKind() common.CompositeKind
+}
+
+// LocatedType is a type which has a location
+type LocatedType interface {
+	Type
+	GetLocation() ast.Location
 }
 
 // TypeAnnotation
@@ -1920,6 +1948,18 @@ func (t *CompositeType) String() string {
 	return t.Identifier
 }
 
+func (t *CompositeType) GetContainerType() Type {
+	return t.ContainerType
+}
+
+func (t *CompositeType) GetCompositeKind() common.CompositeKind {
+	return t.Kind
+}
+
+func (t *CompositeType) GetLocation() ast.Location {
+	return t.Location
+}
+
 func (t *CompositeType) QualifiedIdentifier() string {
 	return qualifiedIdentifier(t.Identifier, t.ContainerType)
 }
@@ -2262,12 +2302,6 @@ func NewPublicConstantFieldMember(containerType Type, identifier string, fieldTy
 	}
 }
 
-type MemberAccessibleType interface {
-	Type
-	HasMembers() bool
-	GetMember(identifier string, targetRange ast.Range, report func(error)) *Member
-}
-
 // InterfaceType
 
 type InterfaceType struct {
@@ -2285,6 +2319,18 @@ func (*InterfaceType) isType() {}
 
 func (t *InterfaceType) String() string {
 	return t.Identifier
+}
+
+func (t *InterfaceType) GetContainerType() Type {
+	return t.ContainerType
+}
+
+func (t *InterfaceType) GetCompositeKind() common.CompositeKind {
+	return t.CompositeKind
+}
+
+func (t *InterfaceType) GetLocation() ast.Location {
+	return t.Location
 }
 
 func (t *InterfaceType) QualifiedIdentifier() string {
