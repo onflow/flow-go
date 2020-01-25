@@ -1,6 +1,7 @@
 package flowmc
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
@@ -31,13 +32,25 @@ func New(startView uint64, timeoutController *timeout.Controller, notifier notif
 	return &pm, nil
 }
 
-func (p *FlowMC) gotoView(newView uint64) {
+// gotoView updates the current view to newView. Currently, the calling code
+// ensures that the view number is STRICTLY monotonously increasing. The method
+// gotoView panics as a last resort if FlowMC is modified to violate this condition.
+// Hence, gotoView will _always_ return a NewViewEvent for an _increased_ view number.
+func (p *FlowMC) gotoView(newView uint64) *types.NewViewEvent {
+	if newView <= p.currentView {
+		// This should never happen: in the current implementation, it is trivially apparent that
+		// newView is _always_ larger than currentView. This check is to protect the code from
+		// future modifications that violate the necessary condition for
+		// STRICTLY monotonously increasing view numbers.
+		panic(fmt.Sprintf("cannot move from view %d to %d: currentView must be strictly monotonously increasing", p.currentView, newView))
+	}
 	if newView > p.currentView+1 {
 		p.notifier.OnSkippedAhead(newView)
 	}
 	p.currentView = newView
 	p.notifier.OnStartingBlockTimeout(newView)
 	p.timeoutControl.StartTimeout(types.ReplicaTimeout)
+	return &types.NewViewEvent{View: p.currentView}
 }
 
 // CurView returns the current view
@@ -57,9 +70,7 @@ func (p *FlowMC) UpdateCurViewWithQC(qc *types.QuorumCertificate) (*types.NewVie
 	// 2/3 of replicas have already voted for round p.currentView + k, hence proceeded past currentView
 	// => 2/3 of replicas are at least in view qc.view + 1.
 	// => replica can skip ahead to view qc.view + 1
-	newView := qc.View + 1
-	p.gotoView(newView)
-	return &types.NewViewEvent{View: newView}, true
+	return p.gotoView(qc.View + 1), true
 }
 
 func (p *FlowMC) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
@@ -94,10 +105,7 @@ func (p *FlowMC) processBlockForCurView(block *types.BlockProposal, isLeaderForN
 		p.notifier.OnStartingVotesTimeout(p.currentView)
 		return nil, false
 	}
-
-	newView := p.currentView + 1
-	p.gotoView(newView)
-	return &types.NewViewEvent{View: newView}, true
+	return p.gotoView(p.currentView + 1), true
 }
 
 func (p *FlowMC) OnTimeout(timeout *types.Timeout) (*types.NewViewEvent, error) {
@@ -107,9 +115,7 @@ func (p *FlowMC) OnTimeout(timeout *types.Timeout) (*types.NewViewEvent, error) 
 
 	// timeout is for current condition
 	p.emitTimeoutNotifications()
-	newView := p.currentView + 1
-	p.gotoView(newView)
-	return &types.NewViewEvent{View: newView}, nil
+	return p.gotoView(p.currentView + 1), nil
 }
 
 func (p *FlowMC) ensureMatchingTimeout(timeout *types.Timeout) error {
@@ -135,5 +141,6 @@ func (p *FlowMC) Start() {
 	if p.started.Swap(true) {
 		return
 	}
-	p.gotoView(p.currentView)
+	p.notifier.OnStartingBlockTimeout(p.currentView)
+	p.timeoutControl.StartTimeout(types.ReplicaTimeout)
 }
