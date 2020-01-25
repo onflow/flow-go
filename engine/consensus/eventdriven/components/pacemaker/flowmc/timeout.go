@@ -6,7 +6,7 @@ type TimeoutMode int
 
 const (
 	ReplicaTimeout        TimeoutMode = iota
-	VoteCollectionTimeoutTimeout TimeoutMode = iota
+	VoteCollectionTimeout TimeoutMode = iota
 )
 
 type activatedTimeout struct {
@@ -35,10 +35,10 @@ func (t *Timeout) StartTimeout(view uint64, mode TimeoutMode) {
 		panic("View for Timers must be strictly monotonously increasing")
 	}
 	if t.activatedTimeout.view == view {
-		if !(t.activatedTimeout.mode == ReplicaTimeout && mode == VoteCollectionTimeoutTimeout) {
-			panic("For same view: can only transition from ReplicaTimeout to VoteCollectionTimeoutTimeout")
+		if !(t.activatedTimeout.mode == ReplicaTimeout && mode == VoteCollectionTimeout) {
+			panic("For same view: can only transition from ReplicaTimeout to VoteCollectionTimeout")
 		}
-		// we are transitioning from ReplicaTimeout to VoteCollectionTimeoutTimeout
+		// we are transitioning from ReplicaTimeout to VoteCollectionTimeout
 		t.initTimeout(view, mode)
 	}
 	// t.activatedTimeout.view < view
@@ -54,8 +54,8 @@ func (t *Timeout) initTimeout(view uint64, mode TimeoutMode) {
 	t.activatedTimeout.view = view
 	t.activatedTimeout.mode = mode
 	switch mode {
-	case VoteCollectionTimeoutTimeout:
-		t.activatedTimeout.timer = time.NewTimer(t.VoteCollectionTimeoutTimeout())
+	case VoteCollectionTimeout:
+		t.activatedTimeout.timer = time.NewTimer(t.VoteCollectionTimeout())
 	case ReplicaTimeout:
 		t.activatedTimeout.timer = time.NewTimer(t.ReplicaTimeout())
 	default:
@@ -118,9 +118,9 @@ func (t *TimoutController) ReplicaTimeout() time.Duration {
 	return time.Duration(t.replicaTimeout * 1e6)
 }
 
-// VoteCollectionTimeoutTimeout returns the duration of Vote aggregation _after_ receiving a block
+// VoteCollectionTimeout returns the duration of Vote aggregation _after_ receiving a block
 // during which the primary tries to aggregate votes for the view where it is leader
-func (t *TimoutController) VoteCollectionTimeoutTimeout() time.Duration {
+func (t *TimoutController) VoteCollectionTimeout() time.Duration {
 	// time.Duration expects an int64 as input which specifies the duration in units of nanoseconds (1E-9)
 	return time.Duration(t.replicaTimeout * 1e6 * t.voteAggregationTimeoutFraction)
 }
