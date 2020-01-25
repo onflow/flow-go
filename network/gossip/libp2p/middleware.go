@@ -239,7 +239,7 @@ ProcessLoop:
 				log.Error().Err(err).Msg("could not extract sender ID")
 				continue ProcessLoop
 			}
-			err = m.ov.Receive(*nodeID, msg)
+			err = m.ov.Receive(nodeID, msg)
 			if err != nil {
 				log.Error().Err(err).Msg("could not deliver payload")
 				continue ProcessLoop
@@ -250,14 +250,13 @@ ProcessLoop:
 	log.Info().Msg("middleware closed the connection")
 }
 
-func getSenderID(msg *message.Message) (*flow.Identifier, error) {
+func getSenderID(msg *message.Message) (flow.Identifier, error) {
 	// Extract sender id
 	if len(msg.OriginID) < 32 {
 		err := fmt.Errorf("invalid sender id")
-		return nil, err
+		return flow.ZeroID, err
 	}
-	var senderID [32]byte
-	copy(senderID[:], msg.OriginID)
-	var id flow.Identifier = senderID
-	return &id, nil
+	var id flow.Identifier
+	copy(id[:], msg.OriginID)
+	return id, nil
 }
