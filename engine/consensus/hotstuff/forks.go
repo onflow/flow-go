@@ -75,9 +75,9 @@ type Forks interface {
 // prove a Byzantine super-minority of consensus replicas. A 'Byzantine super-minority'
 // is defined as a group of byzantine consensus replicase with at least 1/3 stake.
 type ErrorByzantineSuperminority struct {
-	evidence string
+	Evidence string
 }
 
 func (e *ErrorByzantineSuperminority) Error() string {
-	return e.evidence
+	return e.Evidence
 }

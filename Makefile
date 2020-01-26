@@ -97,6 +97,8 @@ generate-mocks:
 	mockery -name '.*' -dir=engine/execution/execution/virtualmachine -case=underscore -output="./engine/execution/execution/virtualmachine/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network/gossip/libp2p/middleware -case=underscore -output="./network/gossip/libp2p/mock" -outpkg="mock"
 	mockery -name 'Distributor' -dir="./engine/consensus/hotstuff/notifications/" -case=underscore -output="./engine/consensus/hotstuff/notifications/mock" -outpkg="mock"
+	mockery -name 'Vertex' -dir="./engine/consensus/hotstuff/forks/finalizer/forrest" -case=underscore -output="./engine/consensus/hotstuff/forks/finalizer/forrest/mock" -outpkg="mock"
+
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy

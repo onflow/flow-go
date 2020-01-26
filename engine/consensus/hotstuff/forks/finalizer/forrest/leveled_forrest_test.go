@@ -3,6 +3,7 @@ package forrest
 import (
 	"testing"
 
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer/forrest/mock"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,16 +20,15 @@ func (v *VertexMock) VertexID() []byte         { return v.id }
 func (v *VertexMock) Level() uint64            { return v.level }
 func (v *VertexMock) Parent() ([]byte, uint64) { return v.parentId, v.parentLevel }
 
-func NewVertexMock(vertexId string, vertexLevel uint64, parentId string, parentLevel uint64) *VertexMock {
-	return &VertexMock{
-		id:          []byte(vertexId),
-		level:       vertexLevel,
-		parentId:    []byte(parentId),
-		parentLevel: parentLevel,
-	}
+func NewVertexMock(vertexId string, vertexLevel uint64, parentId string, parentLevel uint64) *mock.Vertex {
+	v := &mock.Vertex{}
+	v.On("VertexID").Return([]byte(vertexId))
+	v.On("Level").Return(vertexLevel)
+	v.On("Parent").Return([]byte(parentId), parentLevel)
+	return v
 }
 
-var TestVertices = map[string]*VertexMock{
+var TestVertices = map[string]*mock.Vertex{
 	"A": NewVertexMock("A", 3, "Genesis", 0),
 	"B": NewVertexMock("B", 1, "Genesis", 0),
 	"C": NewVertexMock("C", 2, "B", 1),
@@ -73,30 +73,65 @@ func TestVertexIteratorOnEmpty(t *testing.T) {
 // TestLeveledForrest_AddVertex tests that Vertex can be added twice without problems
 func TestLeveledForrest_AddVertex(t *testing.T) {
 	F := NewLeveledForrest()
-	err := F.AddVertex(NewVertexMock("A", 3, "Genesis", 0))
-	assert.False(t, err != nil)
+	F.AddVertex(NewVertexMock("A", 3, "Genesis", 0))
+	assert.True(t, F.HasVertex([]byte("A")))
 
 	// Adding Vertex twice should be fine
-	err = F.AddVertex(NewVertexMock("A", 3, "Genesis", 0))
-	assert.False(t, err != nil)
+	F.AddVertex(NewVertexMock("A", 3, "Genesis", 0))
+	assert.True(t, F.HasVertex([]byte("A")))
 }
 
-// TestLeveledForrest_AddInconsistentVertex checks that adding Vertex errors if we try adding a Vertex
+// TestLeveledForrest_AcceptingGenesis checks that Levelled forrest accepts vertices
+// whose level are at LeveledForrest.LowestLevel without requiring the parent.
+// we test this by having the mock.vertex.Parent() panic
+func TestLeveledForrest_AcceptingGenesis(t *testing.T) {
+	// LeveledForrest.LowestLevel on initial conditions
+	F := populateNewForrest()
+	v1 := &mock.Vertex{}
+	v1.On("VertexID").Return([]byte("Root-Vertex-A_@Level0"))
+	v1.On("Level").Return(uint64(0))
+	v1.On("Parent").Return(func() ([]byte, uint64) { panic("Parent() should not have been called")})
+	assert.NotPanics(t, func(){ F.AddVertex(v1) })
+
+	v2 := &mock.Vertex{}
+	v2.On("VertexID").Return([]byte("Root-Vertex-B_@Level0"))
+	v2.On("Level").Return(uint64(0))
+	v2.On("Parent").Return(func() ([]byte, uint64) { panic("Parent() should not have been called")})
+	assert.NotPanics(t, func(){ F.AddVertex(v2) })
+	assert.NotPanics(t, func(){ F.AddVertex(v2) })
+
+	F = populateNewForrest()
+	F.PruneAtLevel(7)// LeveledForrest.LowestLevel on initial conditions
+	v3 := &mock.Vertex{}
+	v3.On("VertexID").Return([]byte("Root-Vertex-A_@Level8"))
+	v3.On("Level").Return(uint64(8))
+	v3.On("Parent").Return(func() ([]byte, uint64) { panic("Parent() should not have been called")})
+	assert.NotPanics(t, func(){ F.AddVertex(v3) })
+
+	v4 := &mock.Vertex{}
+	v4.On("VertexID").Return([]byte("Root-Vertex-B_@Level8"))
+	v4.On("Level").Return(uint64(8))
+	v4.On("Parent").Return(func() ([]byte, uint64) { panic("Parent() should not have been called")})
+	assert.NotPanics(t, func(){ F.AddVertex(v4) })
+	assert.NotPanics(t, func(){ F.AddVertex(v4) })
+}
+
+// TestLeveledForrest_VerifyVertex checks that invalid Vertices are detected.
 // with an ID identical to a known reference BUT whose level is not consistent with the reference
-func TestLeveledForrest_AddInconsistentVertex(t *testing.T) {
+func TestLeveledForrest_VerifyVertex(t *testing.T) {
 	F := populateNewForrest()
 
-	// adding KNOWN vertex but with wrong level number
-	err := F.AddVertex(NewVertexMock("D", 10, "C", 2))
-	assert.True(t, err != nil)
+	// KNOWN vertex but with wrong level number
+	err := F.VerifyVertex(NewVertexMock("D", 10, "C", 2))
+	assert.True(t, err != nil, err.Error())
 
-	// adding KNOWN vertex whose PARENT references a known vertex but with mismatching level
-	err = F.AddVertex(NewVertexMock("D", 10, "C", 10))
-	assert.True(t, err != nil)
+	// KNOWN vertex whose PARENT references a known vertex but with mismatching level
+	err = F.VerifyVertex(NewVertexMock("D", 10, "C", 10))
+	assert.True(t, err != nil, err.Error())
 
 	// adding unknown vertex whose PARENT references a known vertex but with mismatching level
-	err = F.AddVertex(NewVertexMock("F", 4, "Genesis", 10))
-	assert.True(t, err != nil)
+	err = F.VerifyVertex(NewVertexMock("F", 4, "Genesis", 10))
+	assert.True(t, err != nil, err.Error())
 }
 
 // TestLeveledForrest_HasVertex test that vertices as correctly reported as contained in forrest
@@ -118,7 +153,7 @@ func TestLeveledForrest_GetChildren(t *testing.T) {
 
 	// testing children for Block that is contained in Tree
 	it := F.GetChildren([]byte("X"))
-	expectedChildren := []*VertexMock{
+	expectedChildren := []*mock.Vertex{
 		TestVertices["Y"],
 		TestVertices["Z"],
 	}
@@ -126,7 +161,7 @@ func TestLeveledForrest_GetChildren(t *testing.T) {
 
 	// testing children for referenced Block that is NOT contained in Tree
 	it = F.GetChildren([]byte("Genesis"))
-	expectedChildren = []*VertexMock{
+	expectedChildren = []*mock.Vertex{
 		TestVertices["A"],
 		TestVertices["B"],
 	}
@@ -157,7 +192,7 @@ func TestLeveledForrest_GetVerticesAtLevel(t *testing.T) {
 
 	// testing vertices for level that are contained in Tree
 	it := F.GetVerticesAtLevel(6)
-	expectedChildren := []*VertexMock{
+	expectedChildren := []*mock.Vertex{
 		TestVertices["Y"],
 		TestVertices["Z"],
 	}
@@ -165,18 +200,18 @@ func TestLeveledForrest_GetVerticesAtLevel(t *testing.T) {
 
 	// testing vertices for level that are not in Tree but referenced by vertices in the Tree
 	it = F.GetVerticesAtLevel(0)
-	assert.ElementsMatch(t, []*VertexMock{}, children2List(&it))
+	assert.ElementsMatch(t, []*mock.Vertex{}, children2List(&it))
 
 	// testing vertices for level with a mixture of referenced but unknown vertices and known vertices
 	it = F.GetVerticesAtLevel(4)
-	expectedChildren = []*VertexMock{
+	expectedChildren = []*mock.Vertex{
 		TestVertices["W"],
 	}
 	assert.ElementsMatch(t, expectedChildren, children2List(&it))
 
 	// testing vertices for level that are neither in Tree nor referenced by vertices in the Tree
 	it = F.GetVerticesAtLevel(100000)
-	assert.ElementsMatch(t, []*VertexMock{}, children2List(&it))
+	assert.ElementsMatch(t, []*mock.Vertex{}, children2List(&it))
 }
 
 // TestLeveledForrest_GetNumberOfVerticesAtLevel tests that the number of vertices at a specified level is reported correctly. 
@@ -270,12 +305,12 @@ func populateNewForrest() *LeveledForrest {
 	return F
 }
 
-func children2List(it *VertexIterator) []*VertexMock {
-	l := []*VertexMock{}
+func children2List(it *VertexIterator) []*mock.Vertex {
+	l := []*mock.Vertex{}
 	for it.HasNext() {
-		// Vertex interface is implemented by VertexMock POINTER!
-		// Hence, the concrete type is *VertexMock
-		v := it.NextVertex().(*VertexMock)
+		// Vertex interface is implemented by mock.Vertex POINTER!
+		// Hence, the concrete type is *mock.Vertex
+		v := it.NextVertex().(*mock.Vertex)
 		l = append(l, v)
 	}
 	return l

@@ -5,14 +5,21 @@ import (
 	"fmt"
 )
 
-type Vertex interface {
-	// VertexID returns the vertex's ID (in most cases its hash)
-	VertexID() []byte
-	// Level returns the vertex's level
-	Level() uint64
-	// Parent returns the returns the parents (level, ID)
-	Parent() ([]byte, uint64)
+// LeveledForrest contains multiple trees (which is a potentially disconnected planar graph).
+// Each vertexContainer in the graph has a level (view) and a hash. A vertexContainer can only have one parent
+// with strictly smaller level (view). A vertexContainer can have multiple children, all with
+// strictly larger level (view).
+// A LeveledForrest provides the ability to prune all vertices up to a specific level.
+// A tree whose root is below the pruning threshold might decompose into multiple
+// disconnected subtrees as a result of pruning.
+type LeveledForrest struct {
+	vertices        VertexSet
+	verticesAtLevel map[uint64]VertexList
+	LowestLevel     uint64
 }
+
+type VertexList []*vertexContainer
+type VertexSet map[string]*vertexContainer
 
 // vertexContainer holds information about a tree vertex. Internally, we distinguish between
 // * FULL container: has non-nil value for vertex.
@@ -28,22 +35,6 @@ type vertexContainer struct {
 
 	// the following are only set if the block is actually known
 	vertex Vertex
-}
-
-type VertexList []*vertexContainer
-type VertexSet map[string]*vertexContainer
-
-// LeveledForrest contains multiple trees (which is a potentially disconnected planar graph).
-// Each vertexContainer in the graph has a level (view) and a hash. A vertexContainer can only have one parent
-// with strictly smaller level (view). A vertexContainer can have multiple children, all with
-// strictly larger level (view).
-// A LeveledForrest provides the ability to prune all vertices up to a specific level.
-// A tree whose root is below the pruning threshold might decompose into multiple
-// disconnected subtrees as a result of pruning.
-type LeveledForrest struct {
-	vertices        VertexSet
-	verticesAtLevel map[uint64]VertexList
-	LowestLevel     uint64
 }
 
 // NewLeveledForrest initializes a LeveledForrest
@@ -80,7 +71,6 @@ func (f *LeveledForrest) isEmptyContainer(vertexContainer *vertexContainer) bool
 	return vertexContainer.vertex == nil
 }
 
-
 // GetVertex returns (<full vertex>, true) if the vertex with `id` and `level` was found
 // (nil, false) if full vertex is unknown
 func (f *LeveledForrest) GetVertex(id []byte) (Vertex, bool) {
@@ -90,17 +80,6 @@ func (f *LeveledForrest) GetVertex(id []byte) (Vertex, bool) {
 	}
 	return container.vertex, true
 }
-
-//// GetVertex returns (<full vertex>, true) if the vertex with `id` and `level` was found
-//// (nil, false) if full vertex is unknown
-//func (f *LeveledForrest) VertexOrError(id []byte, level uint64) (Vertex, error) {
-//	container, exists := f.vertices[string(id)]
-//	if !exists || f.isEmptyContainer(container) {
-//		return nil, fmt.Errorf("missing vertex with level %d and id %s, ", level, id)
-//	}
-//	if container.level !=
-//	return container.vertex, true
-//}
 
 // GetChildren returns a VertexIterator to iterate over the children
 // An empty VertexIterator is returned, if no vertices are known whose parent is `id` , `level`
@@ -140,107 +119,141 @@ func (f *LeveledForrest) GetNumberOfVerticesAtLevel(level uint64) int {
 }
 
 // AddVertex adds vertex to forrest if vertex is within non-pruned levels
-// Safe:
-// * Gracefully handles repeated addition of same vertex (keeps first added vertex)
-// * if vertex is at or below pruning level: NoOp
-// * checks for inconsistencies: vertex with same id but different level will cause error
-//   (instead of leaving the data structure in an inconsistent state).
-func (f *LeveledForrest) AddVertex(vertex Vertex) error {
+// Handles repeated addition of same vertex (keeps first added vertex).
+// If vertex is at or below pruning level: method is NoOp.
+// UNVALIDATED:
+// requires that vertex would pass validity check LeveledForrest.VerifyVertex(vertex).
+func (f *LeveledForrest) AddVertex(vertex Vertex) {
 	if vertex.Level() < f.LowestLevel {
-		return nil
+		return
+	}
+	container := f.getOrCreateVertexContainer(vertex.VertexID(), vertex.Level())
+	if !f.isEmptyContainer(container) { // the vertex was already stored
+		return
+	}
+	// container is empty, i.e. full vertex is new and should be stored in container
+	container.vertex = vertex // add vertex to container
+	f.registerWithParent(container)
+	return
+}
+
+func (f *LeveledForrest) registerWithParent(vertexContainer *vertexContainer) {
+	// caution: do not modify this combination of check (a) and (a)
+	// Deliberate handling of root vertex (genesis block) whose view is _exactly_ at LowestLevel
+	// For this block, we don't care about its parent and the exception is allowed where
+	// vertex.level = vertex.Parent().Level = LowestLevel = 0
+	if vertexContainer.level <= f.LowestLevel { // check (a)
+		return
 	}
 
-	container, err := f.getOrCreateVertexContainer(vertex.VertexID(), vertex.Level())
-	if err != nil {
-		return fmt.Errorf("Cannot add Vertex: %w", err)
+	_, parentView := vertexContainer.vertex.Parent()
+	if parentView < f.LowestLevel {
+		return
 	}
-	if f.isEmptyContainer(container) { // container is empty, i.e. full vertex itself has not been added
-		container.vertex = vertex
-		parentContainer, err := f.getOrCreateVertexContainer(vertex.Parent())
-		if err != nil {
-			return fmt.Errorf("Cannot add Vertex: %w", err)
-		}
-		parentContainer.children = append(parentContainer.children, container) // append works on nil slices: creates slice with capacity 2
-	} else { // sanity check: check that both vertices reference same parent
-		p1Id, p1Level := vertex.Parent()
-		p2Id, p2Level := container.vertex.Parent()
-		if !bytes.Equal(p1Id, p2Id) || (p1Level != p2Level) {
-			return fmt.Errorf("Encountered same vertex but with mismatching parents")
-		}
-	}
-	return nil
+	parentContainer := f.getOrCreateVertexContainer(vertexContainer.vertex.Parent())
+	parentContainer.children = append(parentContainer.children, vertexContainer) // append works on nil slices: creates slice with capacity 2
+	return
 }
 
 // getOrCreateVertexContainer returns the vertexContainer if there exists one
 // or creates a new vertexContainer and adds it to the internal data structures.
 // It errors if a vertex with same id but different Level is already known
 // (i.e. there exists an empty or full container with the same id but different level).
-func (f *LeveledForrest) getOrCreateVertexContainer(id []byte, level uint64) (*vertexContainer, error) {
-	container, exists := f.vertices[string(id)]
-	if !exists {
-		container = f.uncheckedAddEmptyVertexContainer(id, level)
-	} else {
-		if container.level != level {
-			return nil, fmt.Errorf(
-				"new vertex (level=%d, id=%s) is incompatible with existing vertex (%d, %s)",
-				container.level, container.id, level, id,
-			)
+func (f *LeveledForrest) getOrCreateVertexContainer(id []byte, level uint64) *vertexContainer {
+	container, exists := f.vertices[string(id)] // try to find vertex container with same ID
+	if !exists { // if no vertex container found, create one and store it
+		container = &vertexContainer{
+			id:    id,
+			level: level,
 		}
+		f.vertices[string(container.id)] = container
+		vtcs := f.verticesAtLevel[container.level]                   // returns nil slice if not yet present
+		f.verticesAtLevel[container.level] = append(vtcs, container) // append works on nil slices: creates slice with capacity 2
 	}
-	return container, nil
+	return container
 }
 
-// uncheckedAddEmptyVertexContainer adds a vertexContainer to the internal data structures.
-// UNSAFE: will override potentially existing values and/or introduce duplicates
-func (f *LeveledForrest) uncheckedAddEmptyVertexContainer(id []byte, level uint64) *vertexContainer {
-	v := &vertexContainer{
-		id:    id,
-		level: level,
+// VerifyVertex verifies that vertex satisfies the following conditions
+// (1)
+// Can error with ErrorBlockHashCollision.
+func (f *LeveledForrest) VerifyVertex(vertex Vertex) error {
+	if vertex.Level() < f.LowestLevel {
+		return nil
 	}
-	f.vertices[string(v.id)] = v
-	vtcs := f.verticesAtLevel[v.level]           // returns nil slice if not yet present
-	f.verticesAtLevel[v.level] = append(vtcs, v) // append works on nil slices: creates slice with capacity 2
-	return v
-}
-
-
-// VertexIterator is a stateful iterator for VertexList.
-// Internally operates directly on the Vertex Containers
-// It has one-element look ahead for skipping empty vertex containers.
-type VertexIterator struct {
-	data VertexList
-	idx  int
-	next Vertex
-}
-
-func (it *VertexIterator) preLoad() {
-	for it.idx < len(it.data) {
-		v := it.data[it.idx].vertex
-		it.idx++
-		if v != nil {
-			it.next = v
-			return
-		}
+	isKnownVertex, err := f.isEquivalentToStoredVertex(vertex)
+	if err != nil {
+		return fmt.Errorf("invalid Vertex: %w", err)
 	}
-	it.next = nil
-}
-
-// NextVertex returns the next Vertex or nil if there is none
-func (it *VertexIterator) NextVertex() Vertex {
-	res := it.next
-	it.preLoad()
-	return res
-}
-
-// HasNext returns true if and only if there is a next Vertex
-func (it *VertexIterator) HasNext() bool {
-	return it.next != nil
-}
-
-func newVertexIterator(vertexList VertexList) VertexIterator {
-	it := VertexIterator{
-		data: vertexList,
+	if isKnownVertex {
+		return nil
 	}
-	it.preLoad()
-	return it
+	// vertex not found in storage => new vertex
+
+	// verify new vertex
+	if vertex.Level() == f.LowestLevel {
+		return nil
+	}
+	return f.verifyParent(vertex)
+}
+
+// isEquivalentToStoredVertex
+// evaluates whether a vertex is equivalent to already stored vertex.
+// for vertices at pruning level, parents are ignored
+//
+// (1) return value (false, nil)
+// Two vertices are _not equivalent_ if they have different IDs (Hashes).
+//
+// (2) return value (true, nil)
+// Two vertices _are equivalent_ if their respective fields are identical:
+// ID, Level, and Parent (both parent ID and parent Level)
+//
+// (3) return value (false, error)
+// errors if the vertices' IDs are identical but they differ
+// in any of the _relevant_ fields (as defined in (2)).
+func (f *LeveledForrest) isEquivalentToStoredVertex(vertex Vertex) (bool, error) {
+	storedVertex, haveStoredVertex := f.GetVertex(vertex.VertexID())
+	if !haveStoredVertex {
+		return false, nil //have no vertex with same id stored
+	}
+
+	// found vertex in storage with identical ID
+	// => we expect all other (relevant) fields to be identical
+	if vertex.Level() != storedVertex.Level() { // view number
+		return false, fmt.Errorf("conflicting vertices wirh ID %s", string(vertex.VertexID()))
+	}
+	if vertex.Level() <= f.LowestLevel {
+		return true, nil
+	}
+	newParentId, newParentView := vertex.Parent()
+	storedParentId, storedParentView := storedVertex.Parent()
+	if !bytes.Equal(newParentId, storedParentId) { // qc.blockID
+		return false, fmt.Errorf("conflicting vertices wirh ID %s", string(vertex.VertexID()))
+	}
+	if newParentView != storedParentView { // qc.view
+		return false, fmt.Errorf("conflicting vertices wirh ID %s", string(vertex.VertexID()))
+	}
+	// all _relevant_ fields identical
+	return true, nil
+}
+
+// verifyParent verifies whether vertex.Parent() is consistent with current forrest.
+// An error is raised if
+// * there is a parent with the same id but different view;
+// * the parent's level is _not_ smaller than the vertex's level
+func (f *LeveledForrest) verifyParent(vertex Vertex) error {
+	// verify parent
+	parentID, parentLevel := vertex.Parent()
+	if !(vertex.Level() > parentLevel) {
+		return fmt.Errorf("parent vertex's level (%d) must be smaller than the vertex's level (%d)", parentLevel, vertex.Level())
+	}
+	parentVertex, haveParentStored := f.GetVertex(parentID)
+	if !haveParentStored {
+		return nil
+	}
+	if parentVertex.Level() != parentLevel {
+		return fmt.Errorf("parent vertex of %s has different level (%d) than the stored vertex (%d)",
+			string(vertex.VertexID()), parentLevel, parentVertex.Level(),
+		)
+	}
+	return nil
 }

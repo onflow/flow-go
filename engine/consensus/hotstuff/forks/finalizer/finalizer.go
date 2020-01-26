@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer/forrest"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
@@ -24,6 +25,18 @@ type Finalizer struct {
 	LastFinalizedBlockQC *types.QuorumCertificate
 }
 
+type threeChain struct {
+	block *BlockContainer
+	oneChainQC *types.QuorumCertificate
+	oneChainBlock *BlockContainer
+	twoChainQC *types.QuorumCertificate
+	twoChainBlock *BlockContainer
+	threeChainQC *types.QuorumCertificate
+	threeChainBlock *BlockContainer
+}
+
+// ############ :-) ############# //
+
 
 func New(rootBlock *types.BlockProposal, rootQc *types.QuorumCertificate, notifier notifications.Distributor) (*Finalizer, error) {
 	if !bytes.Equal(rootQc.BlockMRH, rootBlock.BlockMRH()) || (rootQc.View != rootBlock.View()) {
@@ -38,20 +51,24 @@ func New(rootBlock *types.BlockProposal, rootQc *types.QuorumCertificate, notifi
 		LastLockedBlockQC:    rootQc,
 		LastFinalizedBlockQC: rootQc,
 	}
-	err := fnlzr.mainChain.AddVertex(rootBlockContainer)
-	if err != nil {
-		return nil, fmt.Errorf("error initialzing Finalizer: %w", err)
-	}
+
+	// If rootBlock has view > 0, we can already pre-prune the levelled Forrest to the view below it.
+	// Thereby, the levelled forrest won't event store older (unnecessary) blocks
 	if rootBlock.View() > 0 {
-		// If rootBlock has view > 0, we can already pre-prune the levelled Forrest
-		// to the view belo it. Thereby, the levelled forrest
-		err = fnlzr.mainChain.PruneAtLevel(rootBlock.View()-1)
+		err := fnlzr.mainChain.PruneAtLevel(rootBlock.View()-1)
+		if err != nil {
+			return nil, fmt.Errorf("internal leveled forrest error: %w", err)
+		}
 	}
+	// verify and add root block to leveled forrest
+	err := fnlzr.VerifyBlock(rootBlock)
 	if err != nil {
-		return nil, fmt.Errorf("error initialzing Finalizer: %w", err)
+		return nil, fmt.Errorf("invalid root block: %w", err)
 	}
+	fnlzr.mainChain.AddVertex(&BlockContainer{block: rootBlock})
 	return &fnlzr, nil
 }
+
 
 // GetBlock returns block for given ID
 func (r *Finalizer) GetBlock(blockID []byte) (*types.BlockProposal, bool) {
@@ -74,95 +91,30 @@ func (r *Finalizer) GetBlocksForView(view uint64) []*types.BlockProposal {
 }
 
 // IsKnownBlock checks whether block is known.
-// Can error with ErrorBlockHashCollision.
-func (r *Finalizer) VerifyBlock(block *types.BlockProposal) error {
-	if !(block.View() > block.QC().View) {
-		return &types.ErrorInvalidBlock{
-			View:    block.View(),
-			BlockID: block.BlockMRH(),
-			Msg:     fmt.Sprintf("block's view (%d) must be LARGER than its qc.view (%d)", block.View(), block.QC().View),
-		}
-	}
-	return nil
-}
-
-// IsKnownBlock checks whether block is known.
-// Can error with ErrorBlockHashCollision.
-func (r *Finalizer) IsKnownBlock(block *types.BlockProposal) (bool, error) {
-	vertex, exists := r.mainChain.GetVertex(block.BlockMRH())
-	if !exists {
-		return false, r.VerifyBlock(block)
-	}
-	return r.areEquivalentBlocks(block, vertex.(*BlockContainer).block) // errors with ErrorBlockHashCollision
-}
-
-
-// areEquivalentBlocks [errors with ErrorBlockHashCollision]
-// evaluates whether two blocks carry redundant information from the view-point of the finalizer.
-//
-// (1) return value (false, nil)
-// Two block are NOT REDUNDANT if they have different IDs (Hashes).
-//
-// (2) return value (true, nil)
-// Two blocks ARE REDUNDANT if their respective fields are identical:
-// ID (Hash), view number, and quorum Certificate (qc), i.e qc.view and qc.blockID.
-// (ignoring any other potential fields the blocks might have.
-//
-// (3) return value (false, ErrorBlockHashCollision)
-// areEquivalentBlocks errors if the blocks' IDs are identical but they differ
-// in any of the _relevant_ fields (as defined in (2)).
-func (r *Finalizer) areEquivalentBlocks(block1, block2 *types.BlockProposal) (bool, error) {
-	if !bytes.Equal(block1.BlockMRH(), block2.BlockMRH()) {
-		return false, nil
-	}
-
-	// hashes of blocks are identical => we expect all relevant values to be identical
-	if block1.View() != block2.View() { // view number
-		return false, &ErrorBlockHashCollision{block1: block1, block2: block2, location: "View"}
-	}
-	if !bytes.Equal(block1.QC().BlockMRH, block2.QC().BlockMRH) { // qc.blockID
-		return false, &ErrorBlockHashCollision{block1: block1, block2: block2, location: "qc.blockID"}
-	}
-	if block1.QC().View != block2.QC().View { // qc.view
-		return false, &ErrorBlockHashCollision{block1: block1, block2: block2, location: "qc.view"}
-	}
-	// all _relevant_ fields identical
-	return true, nil
+// UNVALIDATED: expects block to pass Finalizer.VerifyBlock(block)
+func (r *Finalizer) IsKnownBlock(block *types.BlockProposal) bool {
+	_, hasBlock := r.mainChain.GetVertex(block.BlockMRH())
+	return hasBlock
 }
 
 // isProcessingNeeded performs basic checks whether or not block needs processing
 // only considering the block's height and Hash
 // Returns false if any of the following conditions applies
-//  * block is for already finalized views
+//  * block view is _below_ the most recently finalized block
 //  * known block
-// Can error with ErrorBlockHashCollision.
-func (r *Finalizer) IsProcessingNeeded(block *types.BlockProposal) (bool, error) {
-	if block.View() <= r.LastFinalizedBlockQC.View {
-		return false, nil
+// UNVALIDATED: expects block to pass Finalizer.VerifyBlock(block)
+func (r *Finalizer) IsProcessingNeeded(block *types.BlockProposal) bool {
+	if block.View() < r.LastFinalizedBlockQC.View || r.IsKnownBlock(block) {
+		return false
 	}
-	isKnownBlock, err := r.IsKnownBlock(block) // errors with ErrorBlockHashCollision
-	if  err != nil {
-		return false, fmt.Errorf("cannot evaluate whether block should be processed: %w", err)
-	}
-	return !isKnownBlock, nil
+	return true
 }
 
 // IsSafeBlock returns true if block is safe to vote for
 // (according to the definition in https://arxiv.org/abs/1803.05069v6).
-//
-// In the current architecture, the block is stored _before_ evaluating its safety.
-// Consequently, IsSafeBlock accepts only known, valid blocks. Should a block be
-// unknown (not previously added to Forks) or violate some consistency requirements,
-// IsSafeBlock errors. All errors are fatal.
+// NO MODIFICATION of consensus state (read only)
+// UNVALIDATED: expects block to pass Finalizer.VerifyBlock(block)
 func (r *Finalizer) IsSafeBlock(block *types.BlockProposal) (bool, error) {
-	isKnownBlock, err := r.IsKnownBlock(block) // errors with ErrorBlockHashCollision
-	if err!= nil {
-		return false, fmt.Errorf("cannot evaluate whether block is safe to vote for: %w", err)
-	}
-	if !isKnownBlock {
-		return false, fmt.Errorf("IsSafeBlock only accepts known blocks", err)
-	}
-
 	// According to the paper, a block is considered a safe block if
 	//  * it extends from locked block (safety rule),
 	//  * or the view of the parent block is higher than the view number of locked block (liveness rule).
@@ -180,103 +132,68 @@ func (r *Finalizer) IsSafeBlock(block *types.BlockProposal) (bool, error) {
 	return false, nil
 }
 
-
 // ProcessBlock adds `block` to the consensus state.
 // Calling this method with previously-processed blocks leaves the consensus state invariant
 // (though, it will potentially cause some duplicate processing).
-// CAUTION: method assumes that `block` is well-formed (i.e. all fields are set)
+// UNVALIDATED: expects block to pass Finalizer.VerifyBlock(block)
 func (r *Finalizer) AddBlock(block *types.BlockProposal) error {
-	isProcessingNeeded, err := r.IsProcessingNeeded(block) // errors with ErrorBlockHashCollision
-	if err != nil {
-		return fmt.Errorf("cannot add block: %w", err)
-	}
-	if !isProcessingNeeded {
+	if !r.IsProcessingNeeded(block) {
 		return nil
 	}
-
 	blockContainer := &BlockContainer{block: block}
-
-	if block.QC().View < r.LastFinalizedBlock.View() {
-		// the parent of block is already pruned
-		err := r.mainChain.AddVertex(blockContainer)
-		if err != nil {
-			return fmt.Errorf("error adding block: %w", err)
-		}
-		return nil
-	}
-	// block.QC().View > r.LastFinalizedBlock.View() Hence, block's parent should be in mainChain
-
-	err = r.computeAncestors(blockContainer)
-	if err != nil {
-		return fmt.Errorf("cannot add invalid block: %w", err)
-	}
-	err = r.mainChain.AddVertex(blockContainer) // store blockContainer in mainChain
-	if err != nil {
-		return fmt.Errorf("cannot add store: %w", err)
-	}
-
-	err = r.updateConsensusState(blockContainer)
-	if err != nil {
-		return fmt.Errorf("cannot add store: %w", err)
-	}
+	r.mainChain.AddVertex(blockContainer)
+	r.updateConsensusState(blockContainer)
 	return nil
 }
 
-// computeAncestors computes and stores ancestors in blockContainer
-// Errors with ErrorMissingBlock if the parent is unknown.
-// Errors with ErrorInvalidBlock is the block is inconsistent with the current consensus state.
-func (r *Finalizer) computeAncestors(blockContainer *BlockContainer) error {
-	parentContainer, err := r.getParentContainer(blockContainer)
-	if err != nil {
-		fmt.Errorf("cannot get parent container for block: %w", err)
+// getParentBlockAndQC parent from mainChain.
+// returns parent BlockContainer and in addition the qc pointing to the parent
+// (i.e. the blockContainer.QC())
+// UNVALIDATED: expects block to pass Finalizer.VerifyBlock(block)
+func (r *Finalizer) getParentBlockAndQC(blockContainer *BlockContainer) (*BlockContainer, *types.QuorumCertificate, error) {
+	oneChainVertex, oneChainBlockKnown := r.mainChain.GetVertex(blockContainer.QC().BlockMRH)
+	if !oneChainBlockKnown {
+		return nil, nil, &ErrorPruned3Chain{blockContainer}
 	}
-	blockContainer.twoChainHead = parentContainer.OneChainHead()
-	blockContainer.threeChainHead = parentContainer.TwoChainHead()
-	return nil
+	return oneChainVertex.(*BlockContainer), blockContainer.QC(), nil
 }
 
-// retrieves parent from mainChain by hash and enforces
-// Errors with
-// * ErrorMissingBlock is parent is unknown
-// * ErrorInvalidBlock block's view is not greater than its parent's view.
-// * ErrorInvalidBlock if qc points to known block with same hash,
-//   but it has mismatching view number
-// Erroring on these conditions enforces:
-//  * Block's ViewNumber is strictly monotonously increasing
-//  * QC is consistent with parent in both variables: ID (Hash) and View
-func (r *Finalizer) getParentContainer(blockContainer *BlockContainer) (*BlockContainer, error) {
-	parentVertex, isParentKnown := r.mainChain.GetVertex(blockContainer.QC().BlockMRH)
-	if !isParentKnown { //parent not in mainchain
-		return nil, &types.ErrorMissingBlock{
-			View:    blockContainer.QC().View,
-			BlockID: blockContainer.QC().BlockMRH,
-		}
+// getThreeChain returns the three chain or a ErrorPruned3Chain sentinel error
+// to indicate that the 3-chain from blockContainer is (partially) pruned
+func (r *Finalizer) getThreeChain(blockContainer *BlockContainer) (*threeChain, error) {
+	threeChain := threeChain{block:blockContainer}
+
+	var err error
+	threeChain.oneChainBlock, threeChain.oneChainQC, err = r.getParentBlockAndQC(blockContainer)
+	if err != nil {
+		return nil, err
 	}
-	parent := parentVertex.(*BlockContainer)
-	if !(blockContainer.View() > parent.View()) {
-		return nil, &types.ErrorInvalidBlock{
-			View:    blockContainer.View(),
-			BlockID: blockContainer.ID(),
-			Msg:     fmt.Sprintf("block's view (%d) is SMALLER than its parent's view (%d)", block.View(), parent.View()),
-		}
+	threeChain.twoChainBlock, threeChain.twoChainQC, err = r.getParentBlockAndQC(threeChain.oneChainBlock)
+	if err != nil {
+		return nil, err
 	}
-	if parent.View() != blockContainer.QC().View {
-		return nil, &types.ErrorInvalidBlock{
-			View:    blockContainer.View(),
-			BlockID: blockContainer.ID(),
-			Msg:     "qc points to known block with same hash, but it has mismatching view number",
-		}
+	threeChain.threeChainBlock, threeChain.threeChainQC, err = r.getParentBlockAndQC(threeChain.twoChainBlock)
+	if err != nil {
+		return nil, err
 	}
-	return parent, nil
+	return &threeChain, nil
 }
 
 // updateConsensusState updates consensus state.
 // Calling this method with previously-processed blocks leaves the consensus state invariant.
-// UNSAFE: assumes that relevant block properties are consistent with previous blocks
+// UNVALIDATED: assumes that relevant block properties are consistent with previous blocks
 func (r *Finalizer) updateConsensusState(blockContainer *BlockContainer) error {
-	blockContainer.TwoChainHead() != nil
-	r.updateLockedQc(blockContainer)
-	r.updateFinalizedBlockQc(blockContainer)
+	threeChain, err := r.getThreeChain(blockContainer)
+	if err != nil {
+		switch err.(type) {
+		case *ErrorPruned3Chain:
+			return nil // for finalization, we ignore all blocks which do not have a full un-pruned 3-chain
+		default:
+			fmt.Errorf("unexpected error while updarting consensus state: %w", err)
+		}
+	}
+	r.updateLockedQc(threeChain)
+	r.updateFinalizedBlockQc(threeChain)
 	r.notifier.OnBlockIncorporated(blockContainer.Block())
 	return nil
 }
@@ -291,18 +208,11 @@ func (r *Finalizer) updateConsensusState(blockContainer *BlockContainer) error {
 //   LastLockedBlockQC should be a QC POINTING TO this block
 //
 // Calling this method with previously-processed blocks leaves consensus state invariant.
-func (r *Finalizer) updateLockedQc(block *BlockContainer) {
-	if block.TwoChainHead() == nil {
-		// <2-chain head> points below pruned view, which implies:
-		// <2-chain head>.view < LastFinalizedBlockQC.View <= LastLockedBlockQC.View
-		// which implies:
-		//    <2-chain head>.view < LastLockedBlockQC.View
+func (r *Finalizer) updateLockedQc(threeChain *threeChain) {
+	if threeChain.twoChainQC.View <= r.LastLockedBlockQC.View {
 		return
 	}
-	if block.TwoChainHead().View <= r.LastLockedBlockQC.View {
-		return
-	}
-	r.LastLockedBlockQC = block.TwoChainHead() // update qc to newer block with any 2-chain on top of it
+	r.LastLockedBlockQC = threeChain.twoChainQC // update qc to newer block with any 2-chain on top of it
 }
 
 // updateFinalizedBlockQc updates `lastFinalizedBlockQC`
@@ -314,13 +224,7 @@ func (r *Finalizer) updateLockedQc(block *BlockContainer) {
 //   lastFinalizedBlockQC should a QC POINTING TO this block
 //
 // Calling this method with previously-processed blocks leaves consensus state invariant.
-func (r *Finalizer) updateFinalizedBlockQc(block *BlockContainer) {
-	if block.ThreeChainHead() == nil {
-		// <3-chain head> points below pruned view, which implies
-		// that block should not lead to a different block being finalized
-		return
-	}
-
+func (r *Finalizer) updateFinalizedBlockQc(threeChain *threeChain) {
 	// Note: when adding blocks to mainchain, we enforce that Block's ViewNumber is strictly monotonously
 	// increasing (method setMainChainProperties). We denote:
 	//  * a DIRECT 1-chain as '<-'
@@ -329,33 +233,78 @@ func (r *Finalizer) updateFinalizedBlockQc(block *BlockContainer) {
 	//     b <- b' <- b'' <~ b*     (aka a DIRECT 2-chain PLUS any 1-chain)
 	// where b* is the input block to this method.
 	// Hence, we can finalize b, if and only the viewNumber of b'' is exactly 2 higher than the view of b
-	b := block.ThreeChainHead() // note that b is actually not the block itself here but rather the QC pointing to it
-	if block.OneChainHead().View == b.View+2 {
+	b := threeChain.threeChainQC // note that b is actually not the block itself here but rather the QC pointing to it
+	if threeChain.oneChainQC.View == b.View+2 {
 		r.finalizeUpToBlock(b)
 	}
 }
 
+
+
+// ############ :-) ############# //x
+
+
 // finalizeUpToBlock finalizes all blocks up to (and including) the block pointed to by `blockQC`.
 // Finalization starts with the child of `LastFinalizedBlockQC` (explicitly checked);
 // and calls OnFinalizedBlock on the newly finalized blocks in the respective order
-func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) {
+func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) (*BlockContainer, error) {
 	if blockQC.View <= r.LastFinalizedBlockQC.View {
 		// Sanity check: the previously last Finalized Block must be an ancestor of `block`
 		if !bytes.Equal(r.LastFinalizedBlockQC.BlockMRH, blockQC.BlockMRH) {
-			// this should never happen unless the finalization logic in `updateFinalizedBlockQc` is broken
-			panic("Internal Error: About to finalize a block which CONFLICTS with last finalized block!")
+			return nil, &hotstuff.ErrorByzantineSuperminority{fmt.Sprintf(
+				"finalizing blocks at conflicting forks: %s and %s",
+				string(blockQC.BlockMRH), string(r.LastFinalizedBlockQC.BlockMRH),
+			)}
 		}
-		return
+		return r.LastFinalizedBlock, nil
 	}
-	// get Block
-	blockVertex, _ := r.mainChain.GetVertex(blockQC.BlockMRH)
+	// Have:
+	//   (1) blockQC.View > r.LastFinalizedBlockQC.View => finalizing new block
+	// Corollary
+	//   (2) blockContainer.View >= 1
+	// Explanation: We require that Forks is initialized with a _finalized_ rootBlock,
+	// which has view >= 0. Hence, r.LastFinalizedBlockQC.View >= 0, by which (1) implies (2)
+
+	// get Block and finalize everything up to the block's parent
+	blockVertex, _ := r.mainChain.GetVertex(blockQC.BlockMRH) // require block to resolve parent
 	blockContainer := blockVertex.(*BlockContainer)
+	r.finalizeUpToBlock(blockContainer.QC()) // finalize Parent, i.e. the block pointed to by the block's QC
 
-	// finalize Parent, i.e. the block pointed to by the block's QC
-	r.finalizeUpToBlock(blockContainer.QC())
-
-	// finalize block itself
+	// finalize block itself:
 	r.LastFinalizedBlockQC = blockQC
 	r.LastFinalizedBlock = blockContainer
+	r.mainChain.PruneAtLevel(blockContainer.View()-1) // cannot underflow as of (2)
 	r.notifier.OnFinalizedBlock(blockContainer.Block())
+	return blockContainer, nil
+}
+
+// hasPrunedView returns if givem view number is already in the pruned rande.
+func (r *Finalizer) isPrunedView(view uint64) bool {
+	return view < r.mainChain.LowestLevel
+}
+
+
+// VerifyBlock checks block for validity
+func (r *Finalizer) VerifyBlock(block *types.BlockProposal) error {
+	if r.isPrunedView(block.View()) {
+		return nil
+	}
+	blockContainer := &BlockContainer{block: block}
+	err := r.mainChain.VerifyVertex(blockContainer)
+	if err != nil {
+		fmt.Errorf("invalid block: %w", err)
+	}
+
+	// omit checking existence of parent if block at lowest non-pruned view number
+	if (block.View() == r.mainChain.LowestLevel) || (block.QC().View < r.mainChain.LowestLevel) {
+		return nil
+	}
+	// for block whose parents are _not_ below the pruning height, we expect the parent to be known.
+	if _, isParentKnown := r.mainChain.GetVertex(block.QC().BlockMRH); !isParentKnown { // we are missing the parent
+		return &types.ErrorMissingBlock{
+			View:    block.QC().View,
+			BlockID: block.QC().BlockMRH,
+		}
+	}
+	return nil
 }

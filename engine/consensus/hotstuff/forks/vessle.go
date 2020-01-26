@@ -1,6 +1,9 @@
 package forks
 
 import (
+	"bytes"
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/utils"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer"
@@ -19,6 +22,8 @@ type Forks struct {
 	finalizer *finalizer.Finalizer
 	forkchoice        ForkChoice
 }
+
+
 
 func (f Forks) GetBlocksForView(view uint64) []*types.BlockProposal {
 	return f.finalizer.GetBlocksForView(view)
@@ -52,7 +57,9 @@ func (f Forks) LockedBlockQC() *types.QuorumCertificate {
 // lastFinalizedBlockQC is the QC that POINTS TO the most recently finalized locked block
 
 func (f Forks) IsSafeBlock(block *types.BlockProposal) (bool, error) {
-	panic("implement me")
+	if !r.IsKnownBlock(block) {
+		return false, fmt.Errorf("IsSafeBlock only accepts known blocks", err)
+	}
 }
 
 func (f Forks) AddBlock(block *types.BlockProposal) error {
