@@ -14,8 +14,11 @@ type Finalizer struct {
 	notifier  notifications.Distributor
 	mainChain forrest.LeveledForrest
 
-	// LockedBlockQC is the QC that POINTS TO the the most recently locked block
-	LockedBlockQC *types.QuorumCertificate
+	// LastLockedBlockQC is the QC that POINTS TO the the most recently locked block
+	LastLockedBlockQC *types.QuorumCertificate
+
+	// LastFinalizedBlock is the last most recently finalized locked block
+	LastFinalizedBlock   *BlockContainer
 
 	// lastFinalizedBlockQC is the QC that POINTS TO the most recently finalized locked block
 	LastFinalizedBlockQC *types.QuorumCertificate
@@ -27,11 +30,25 @@ func New(rootBlock *types.BlockProposal, rootQc *types.QuorumCertificate, notifi
 		return nil, &types.ErrorConfiguration{Msg: "rootQc must be for rootBlock"}
 	}
 
+	rootBlockContainer := &BlockContainer{block: rootBlock}
 	fnlzr := Finalizer{
 		notifier:             notifier,
 		mainChain:            *forrest.NewLeveledForrest(),
-		LockedBlockQC:        rootQc,
+		LastFinalizedBlock: rootBlockContainer,
+		LastLockedBlockQC:    rootQc,
 		LastFinalizedBlockQC: rootQc,
+	}
+	err := fnlzr.mainChain.AddVertex(rootBlockContainer)
+	if err != nil {
+		return nil, fmt.Errorf("error initialzing Finalizer: %w", err)
+	}
+	if rootBlock.View() > 0 {
+		// If rootBlock has view > 0, we can already pre-prune the levelled Forrest
+		// to the view belo it. Thereby, the levelled forrest
+		err = fnlzr.mainChain.PruneAtLevel(rootBlock.View()-1)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error initialzing Finalizer: %w", err)
 	}
 	return &fnlzr, nil
 }
@@ -141,10 +158,10 @@ func (r *Finalizer) IsSafeBlock(block *types.BlockProposal) (bool, error) {
 	// 2. If block.QC.View is lower than locked view, it definitely is not a safe block.
 	// 3. If block.QC.View equals to locked view: parent must be the locked block.
 	qc := block.QC()
-	if qc.View > r.LockedBlockQC.View {
+	if qc.View > r.LastLockedBlockQC.View {
 		return true, nil
 	}
-	if (qc.View == r.LockedBlockQC.View) && bytes.Equal(qc.BlockMRH, r.LockedBlockQC.BlockMRH) {
+	if (qc.View == r.LastLockedBlockQC.View) && bytes.Equal(qc.BlockMRH, r.LastLockedBlockQC.BlockMRH) {
 		return true, nil
 	}
 	return false, nil
@@ -156,6 +173,13 @@ func (r *Finalizer) IsSafeBlock(block *types.BlockProposal) (bool, error) {
 // (though, it will potentially cause some duplicate processing).
 // CAUTION: method assumes that `block` is well-formed (i.e. all fields are set)
 func (r *Finalizer) AddBlock(block *types.BlockProposal) error {
+	if !(block.View() > block.QC().View) {
+		return &types.ErrorInvalidBlock{
+			View:    block.View(),
+			BlockID: block.BlockMRH(),
+			Msg:     fmt.Sprintf("block's view (%d) is SMALLER than its qc.view (%d)", block.View(), parent.View()),
+		}
+	}
 	isProcessingNeeded, err := r.IsProcessingNeeded(block) // errors with ErrorBlockHashCollision
 	if err != nil {
 		return fmt.Errorf("cannot process block: %w", err)
@@ -163,6 +187,17 @@ func (r *Finalizer) AddBlock(block *types.BlockProposal) error {
 	if !isProcessingNeeded {
 		return nil
 	}
+
+	if block.QC().View < r.LastFinalizedBlock.View() {
+		// the parent of block is already pruned
+		blockContainer := &BlockContainer{block: block}
+		err := r.mainChain.AddVertex(blockContainer)
+		if err != nil {
+			return fmt.Errorf("error adding block: %w", err)
+		}
+		return nil
+	}
+	// block.QC().View > r.LastFinalizedBlock.View() Hence, block's parent should be in mainChain
 
 	blockContainer, err := r.wrapAsBlockContainer(block)
 	if err != nil {
@@ -240,20 +275,27 @@ func (r *Finalizer) updateConsensusState(blockContainer *BlockContainer) error {
 }
 
 
-// updateLockedBlock updates `LockedBlockQC`
+// updateLockedBlock updates `LastLockedBlockQC`
 // We use the locking rule from 'Event-driven HotStuff Protocol' where the condition is:
 //
 // * Consider the set S of all blocks that have a INDIRECT 2-chain on top of it
 //
 // * The 'Locked Block' is the block in S with the _highest view number_ (newest);
-//   LockedBlockQC should be a QC POINTING TO this block
+//   LastLockedBlockQC should be a QC POINTING TO this block
 //
 // Calling this method with previously-processed blocks leaves consensus state invariant.
 func (r *Finalizer) updateLockedQc(block *BlockContainer) {
-	if block.TwoChainHead().View <= r.LockedBlockQC.View {
+	if block.TwoChainHead() == nil {
+		// <2-chain head> points below pruned view, which implies:
+		// <2-chain head>.view < LastFinalizedBlockQC.View <= LastLockedBlockQC.View
+		// which implies:
+		//    <2-chain head>.view < LastLockedBlockQC.View
 		return
 	}
-	r.LockedBlockQC = block.TwoChainHead() // update qc to newer block with any 2-chain on top of it
+	if block.TwoChainHead().View <= r.LastLockedBlockQC.View {
+		return
+	}
+	r.LastLockedBlockQC = block.TwoChainHead() // update qc to newer block with any 2-chain on top of it
 }
 
 // updateFinalizedBlockQc updates `lastFinalizedBlockQC`
@@ -266,6 +308,12 @@ func (r *Finalizer) updateLockedQc(block *BlockContainer) {
 //
 // Calling this method with previously-processed blocks leaves consensus state invariant.
 func (r *Finalizer) updateFinalizedBlockQc(block *BlockContainer) {
+	if block.ThreeChainHead() == nil {
+		// <3-chain head> points below pruned view, which implies
+		// that block should not lead to a different block being finalized
+		return
+	}
+
 	// Note: when adding blocks to mainchain, we enforce that Block's ViewNumber is strictly monotonously
 	// increasing (method setMainChainProperties). We denote:
 	//  * a DIRECT 1-chain as '<-'
@@ -301,5 +349,6 @@ func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) {
 
 	// finalize block itself
 	r.LastFinalizedBlockQC = blockQC
+	r.LastFinalizedBlock = blockContainer
 	r.notifier.OnFinalizedBlock(blockContainer.Block())
 }

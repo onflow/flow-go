@@ -1,6 +1,8 @@
 package forks
 
 import (
+	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/modules/utils"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/forkchoice"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
@@ -9,11 +11,64 @@ import (
 
 var ConsensusLogger loggo.Logger
 
+var defaultForks hotstuff.Forks = Forks{}
+
+
 // Vessle implements the hotstuff.Reactor API
-type Vessle struct {
-	finalizationLogic *finalizer.ReactorCore
-	forkchoice        forkchoice.ForkChoice
+type Forks struct {
+	finalizer *finalizer.Finalizer
+	forkchoice        ForkChoice
 }
+
+func (f Forks) GetBlocksForView(view uint64) []*types.BlockProposal {
+	return f.finalizer.GetBlocksForView(view)
+}
+
+func (f Forks) GetBlock(id []byte) (*types.BlockProposal, bool) {
+	return f.finalizer.GetBlock(id)
+}
+
+func (f Forks) FinalizedView() uint64 {
+	return f.finalizer.LastFinalizedBlockQC.View
+}
+
+func (f Forks) FinalizedBlock() *types.BlockProposal {
+	f.finalizer.GetBlock(f.finalizer.LastFinalizedBlockQC.BlockMRH)
+
+	return
+}
+
+func (f Forks) LockedBlockQc() *types.QuorumCertificate {
+	return f.finalizer.LastLockedBlockQC
+}
+
+func (f Forks) LockedBlockQC() *types.QuorumCertificate {
+	return f.finalizer.LastFinalizedBlockQC
+}
+
+// LastLockedBlockQC is the QC that POINTS TO the the most recently locked block
+ *types.QuorumCertificate
+
+// lastFinalizedBlockQC is the QC that POINTS TO the most recently finalized locked block
+
+func (f Forks) IsSafeBlock(block *types.BlockProposal) (bool, error) {
+	panic("implement me")
+}
+
+func (f Forks) AddBlock(block *types.BlockProposal) error {
+	panic("implement me")
+}
+
+func (f Forks) AddQC(qc *types.QuorumCertificate) error {
+	panic("implement me")
+}
+
+func (f Forks) MakeForkChoice(curView uint64) (*types.QuorumCertificate, error) {
+	panic("implement me")
+}
+
+
+
 
 func (v *Vessle) GetBlocksForView(view uint64) []*types.BlockProposal {
 	return v.finalizationLogic.GetBlocksForView(view)
