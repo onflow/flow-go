@@ -75,16 +75,29 @@ func (r *Finalizer) GetBlocksForView(view uint64) []*types.BlockProposal {
 
 // IsKnownBlock checks whether block is known.
 // Can error with ErrorBlockHashCollision.
+func (r *Finalizer) VerifyBlock(block *types.BlockProposal) error {
+	if !(block.View() > block.QC().View) {
+		return &types.ErrorInvalidBlock{
+			View:    block.View(),
+			BlockID: block.BlockMRH(),
+			Msg:     fmt.Sprintf("block's view (%d) must be LARGER than its qc.view (%d)", block.View(), block.QC().View),
+		}
+	}
+	return nil
+}
+
+// IsKnownBlock checks whether block is known.
+// Can error with ErrorBlockHashCollision.
 func (r *Finalizer) IsKnownBlock(block *types.BlockProposal) (bool, error) {
 	vertex, exists := r.mainChain.GetVertex(block.BlockMRH())
 	if !exists {
-		return false, nil
+		return false, r.VerifyBlock(block)
 	}
-	return r.areBlocksRedundant(block, vertex.(*BlockContainer).block) // errors with ErrorBlockHashCollision
+	return r.areEquivalentBlocks(block, vertex.(*BlockContainer).block) // errors with ErrorBlockHashCollision
 }
 
 
-// areBlocksRedundant [errors with ErrorBlockHashCollision]
+// areEquivalentBlocks [errors with ErrorBlockHashCollision]
 // evaluates whether two blocks carry redundant information from the view-point of the finalizer.
 //
 // (1) return value (false, nil)
@@ -96,9 +109,9 @@ func (r *Finalizer) IsKnownBlock(block *types.BlockProposal) (bool, error) {
 // (ignoring any other potential fields the blocks might have.
 //
 // (3) return value (false, ErrorBlockHashCollision)
-// areBlocksRedundant errors if the blocks' IDs are identical but they differ
+// areEquivalentBlocks errors if the blocks' IDs are identical but they differ
 // in any of the _relevant_ fields (as defined in (2)).
-func (r *Finalizer) areBlocksRedundant(block1, block2 *types.BlockProposal) (bool, error) {
+func (r *Finalizer) areEquivalentBlocks(block1, block2 *types.BlockProposal) (bool, error) {
 	if !bytes.Equal(block1.BlockMRH(), block2.BlockMRH()) {
 		return false, nil
 	}
@@ -173,24 +186,18 @@ func (r *Finalizer) IsSafeBlock(block *types.BlockProposal) (bool, error) {
 // (though, it will potentially cause some duplicate processing).
 // CAUTION: method assumes that `block` is well-formed (i.e. all fields are set)
 func (r *Finalizer) AddBlock(block *types.BlockProposal) error {
-	if !(block.View() > block.QC().View) {
-		return &types.ErrorInvalidBlock{
-			View:    block.View(),
-			BlockID: block.BlockMRH(),
-			Msg:     fmt.Sprintf("block's view (%d) is SMALLER than its qc.view (%d)", block.View(), parent.View()),
-		}
-	}
 	isProcessingNeeded, err := r.IsProcessingNeeded(block) // errors with ErrorBlockHashCollision
 	if err != nil {
-		return fmt.Errorf("cannot process block: %w", err)
+		return fmt.Errorf("cannot add block: %w", err)
 	}
 	if !isProcessingNeeded {
 		return nil
 	}
 
+	blockContainer := &BlockContainer{block: block}
+
 	if block.QC().View < r.LastFinalizedBlock.View() {
 		// the parent of block is already pruned
-		blockContainer := &BlockContainer{block: block}
 		err := r.mainChain.AddVertex(blockContainer)
 		if err != nil {
 			return fmt.Errorf("error adding block: %w", err)
@@ -199,33 +206,33 @@ func (r *Finalizer) AddBlock(block *types.BlockProposal) error {
 	}
 	// block.QC().View > r.LastFinalizedBlock.View() Hence, block's parent should be in mainChain
 
-	blockContainer, err := r.wrapAsBlockContainer(block)
+	err = r.computeAncestors(blockContainer)
 	if err != nil {
 		return fmt.Errorf("cannot add invalid block: %w", err)
 	}
-	r.mainChain.AddVertex(blockContainer) // store blockContainer in mainChain
+	err = r.mainChain.AddVertex(blockContainer) // store blockContainer in mainChain
 	if err != nil {
 		return fmt.Errorf("cannot add store: %w", err)
 	}
 
-	r.updateLockedQc(blockContainer)
-	r.updateFinalizedBlockQc(blockContainer)
-	r.notifier.OnBlockIncorporated(blockContainer.Block())
+	err = r.updateConsensusState(blockContainer)
+	if err != nil {
+		return fmt.Errorf("cannot add store: %w", err)
+	}
 	return nil
 }
 
-// wrapAsBlockContainer constructs a BlockContainer for holding block.
+// computeAncestors computes and stores ancestors in blockContainer
 // Errors with ErrorMissingBlock if the parent is unknown.
 // Errors with ErrorInvalidBlock is the block is inconsistent with the current consensus state.
-func (r *Finalizer) wrapAsBlockContainer(block *types.BlockProposal) (*BlockContainer, error) {
-	blockContainer := &BlockContainer{block: block}
-	parentContainer, err := r.getParentContainer(block)
+func (r *Finalizer) computeAncestors(blockContainer *BlockContainer) error {
+	parentContainer, err := r.getParentContainer(blockContainer)
 	if err != nil {
 		fmt.Errorf("cannot get parent container for block: %w", err)
 	}
 	blockContainer.twoChainHead = parentContainer.OneChainHead()
 	blockContainer.threeChainHead = parentContainer.TwoChainHead()
-	return blockContainer, nil
+	return nil
 }
 
 // retrieves parent from mainChain by hash and enforces
@@ -237,27 +244,26 @@ func (r *Finalizer) wrapAsBlockContainer(block *types.BlockProposal) (*BlockCont
 // Erroring on these conditions enforces:
 //  * Block's ViewNumber is strictly monotonously increasing
 //  * QC is consistent with parent in both variables: ID (Hash) and View
-func (r *Finalizer) getParentContainer(block *types.BlockProposal) (*BlockContainer, error) {
-	parentVertex, isParentKnown := r.mainChain.GetVertex(block.QC().BlockMRH)
+func (r *Finalizer) getParentContainer(blockContainer *BlockContainer) (*BlockContainer, error) {
+	parentVertex, isParentKnown := r.mainChain.GetVertex(blockContainer.QC().BlockMRH)
 	if !isParentKnown { //parent not in mainchain
 		return nil, &types.ErrorMissingBlock{
-			View:    block.QC().View,
-			BlockID: block.QC().BlockMRH,
+			View:    blockContainer.QC().View,
+			BlockID: blockContainer.QC().BlockMRH,
 		}
 	}
-
 	parent := parentVertex.(*BlockContainer)
-	if !(block.View() > parent.View()) {
+	if !(blockContainer.View() > parent.View()) {
 		return nil, &types.ErrorInvalidBlock{
-			View:    block.View(),
-			BlockID: block.BlockMRH(),
+			View:    blockContainer.View(),
+			BlockID: blockContainer.ID(),
 			Msg:     fmt.Sprintf("block's view (%d) is SMALLER than its parent's view (%d)", block.View(), parent.View()),
 		}
 	}
-	if parent.View() != block.QC().View {
+	if parent.View() != blockContainer.QC().View {
 		return nil, &types.ErrorInvalidBlock{
-			View:    block.View(),
-			BlockID: block.BlockMRH(),
+			View:    blockContainer.View(),
+			BlockID: blockContainer.ID(),
 			Msg:     "qc points to known block with same hash, but it has mismatching view number",
 		}
 	}
@@ -268,6 +274,7 @@ func (r *Finalizer) getParentContainer(block *types.BlockProposal) (*BlockContai
 // Calling this method with previously-processed blocks leaves the consensus state invariant.
 // UNSAFE: assumes that relevant block properties are consistent with previous blocks
 func (r *Finalizer) updateConsensusState(blockContainer *BlockContainer) error {
+	blockContainer.TwoChainHead() != nil
 	r.updateLockedQc(blockContainer)
 	r.updateFinalizedBlockQc(blockContainer)
 	r.notifier.OnBlockIncorporated(blockContainer.Block())
