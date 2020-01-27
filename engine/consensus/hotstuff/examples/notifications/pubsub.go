@@ -6,7 +6,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 )
 
-// PubSubDistributor implements notifications.Distributor
+// PubSubDistributor implements notifications.Consumer
 // It allows thread-safe subscription of consumers to events
 type PubSubDistributor struct {
 	skippedAheadConsumers         []SkippedAheadConsumer
@@ -18,7 +18,7 @@ type PubSubDistributor struct {
 	lock                          sync.RWMutex
 }
 
-func NewPubSubDistributor() notifications.Distributor {
+func NewPubSubDistributor() notifications.Consumer {
 	return &PubSubDistributor{}
 }
 

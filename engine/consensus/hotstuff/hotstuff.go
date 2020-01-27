@@ -17,17 +17,17 @@ type HotStuff interface {
 	// a fatal error occurs.
 	Start() error
 
-	// Proposals returns a write-only channel for submitting new block
-	// proposals to the HotStuff core algorithm.
-	Proposals() chan<- *types.BlockProposal
+	// SubmitProposal submits a new block proposal to the HotStuff event loop.
+	// TODO assumptions about proposals
+	SubmitProposal(*types.BlockProposal) error
 
-	// Votes returns a write-only channel for submitting new votes to the
-	// HotStuff core algorithm.
-	Votes() chan<- *types.Vote
+	// SubmitVote submits a new vote to the HotStuff event loop.
+	// TODO assumptions about votes
+	SubmitVote(*types.Vote) error
 }
 
 // New sets up and instantiates an instance of the HotStuff core algorithm.
 // TODO
-func New(signer Signer, network Network, consumer notifications.Consumer) (HotStuff, error) {
+func New(signer Signer, network NetworkSender, consumer notifications.Consumer) (HotStuff, error) {
 	panic("TODO")
 }

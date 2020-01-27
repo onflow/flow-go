@@ -15,11 +15,11 @@ import (
 type FlowMC struct {
 	currentView    uint64
 	timeoutControl *timeout.Controller
-	notifier       notifications.Distributor
+	notifier       notifications.Consumer
 	started        *atomic.Bool
 }
 
-func New(startView uint64, timeoutController *timeout.Controller, notifier notifications.Distributor) (hotstuff.PaceMaker, error) {
+func New(startView uint64, timeoutController *timeout.Controller, notifier notifications.Consumer) (hotstuff.PaceMaker, error) {
 	if startView < 1 {
 		return nil, &types.ErrorConfiguration{Msg: "Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)"}
 	}

@@ -5,10 +5,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Network defines the interface between the HotStuff core algorithm and a
+// NetworkSender defines the interface between the HotStuff core algorithm and a
 // networking layer that handles delivering messages to other nodes
 // participating in the consensus process.
-type Network interface {
+type NetworkSender interface {
 
 	// SendVote sends the given vote to the given node.
 	SendVote(vote *types.Vote, to flow.Identifier) error
