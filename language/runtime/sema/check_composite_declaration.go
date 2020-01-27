@@ -39,7 +39,6 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 		declaration.DeclarationKind(),
 		declaration.StartPos,
 		true,
-		false,
 	)
 
 	// NOTE: functions are checked separately
@@ -101,7 +100,6 @@ func (checker *Checker) visitCompositeDeclaration(declaration *ast.CompositeDecl
 		checker.checkInterfaceFunctions(
 			declaration.Members.Functions,
 			compositeType,
-			declaration.CompositeKind,
 			declaration.DeclarationKind(),
 		)
 
@@ -1203,8 +1201,6 @@ func (checker *Checker) checkCompositeFunctions(
 	functions []*ast.FunctionDeclaration,
 	selfType *CompositeType,
 ) {
-	inResource := selfType.Kind == common.CompositeKindResource
-
 	for _, function := range functions {
 		// NOTE: new activation, as function declarations
 		// shouldn't be visible in other function declarations,
@@ -1219,10 +1215,9 @@ func (checker *Checker) checkCompositeFunctions(
 			checker.visitFunctionDeclaration(
 				function,
 				functionDeclarationOptions{
-					mustExit:                true,
-					declareFunction:         false,
-					checkResourceLoss:       true,
-					allowAuthAccessModifier: inResource,
+					mustExit:          true,
+					declareFunction:   false,
+					checkResourceLoss: true,
 				},
 			)
 		}()

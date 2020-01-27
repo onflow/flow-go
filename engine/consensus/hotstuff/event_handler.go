@@ -50,3 +50,7 @@ func (eh *EventHandler) OnLocalTimeout() {
 func (eh *EventHandler) OnBlockRequest(req *types.BlockProposalRequest) {
 	panic("implement me")
 }
+
+func (eh *EventHandler) startNewView() error {
+	panic("implement me")
+}
