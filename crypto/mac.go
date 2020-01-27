@@ -36,13 +36,22 @@ func NewKMAC128(key []byte, customizer []byte, outputSize int) Hasher {
 		outputSize: outputSize}
 	// initialize the cSHAKE128 instance
 	k.ShakeHash = sha3.NewCShake128([]byte("KMAC"), customizer)
-	// KMAC length should be larger than the bit-security level
+	// key length should be larger than the bit-security level
 	// This is not checked here as the key is public and only used
 	// as a domain tag
 	// store the encoding of the key
-	k.initBlock = bytepad(key, cSHAKE128BlockSize)
+	k.initBlock = bytepad(encodeString(key), cSHAKE128BlockSize)
 	k.Write(k.initBlock)
 	return &k
+}
+
+// endocee_string function as defined in NIST SP 800-185 (for value < 2^64)
+func encodeString(s []byte) []byte {
+	// leftEncode returns max 9 bytes
+	out := make([]byte, 0, 9+len(s))
+	out = append(out, leftEncode(uint64(len(s)*8))...)
+	out = append(out, s...)
+	return out
 }
 
 // left_Encode function as defined in NIST SP 800-185 (for value < 2^64)
@@ -97,7 +106,7 @@ func (k *kmac128) Reset() {
 func (k *kmac128) ComputeHash(data []byte) Hash {
 	cshake := k.ShakeHash.Clone()
 	cshake.Write(data)
-	cshake.Write(rightEncode(uint64(k.Size())))
+	cshake.Write(rightEncode(uint64(k.Size() * 8)))
 	// read the cshake output
 	h := make([]byte, k.outputSize)
 	cshake.Read(h)
@@ -109,7 +118,7 @@ func (k *kmac128) ComputeHash(data []byte) Hash {
 // It does not change the underlying hash state.
 func (k *kmac128) SumHash() Hash {
 	cshake := k.ShakeHash.Clone()
-	cshake.Write(rightEncode(uint64(k.Size())))
+	cshake.Write(rightEncode(uint64(k.Size() * 8)))
 	// read the cshake output
 	h := make([]byte, k.outputSize)
 	cshake.Read(h)
@@ -118,7 +127,7 @@ func (k *kmac128) SumHash() Hash {
 
 // Size returns the output length of the KMAC instance
 func (k *kmac128) Size() int {
-	return k.commonHasher.outputSize
+	return k.outputSize
 }
 
 // KMAC128 as defined in NIST SP 800-185
