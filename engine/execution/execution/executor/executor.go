@@ -51,7 +51,7 @@ func (e *blockExecutor) ExecuteBlock(
 func (e *blockExecutor) executeBlock(
 	block *execution.CompleteBlock,
 ) (chunk []*flow.Chunk, endState flow.StateCommitment, err error) {
-	blockCtx := e.vm.NewBlockContext(block.Block)
+	blockCtx := e.vm.NewBlockContext(&block.Block.Header)
 
 	var startState flow.StateCommitment
 
