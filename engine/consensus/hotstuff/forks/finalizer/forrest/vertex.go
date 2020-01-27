@@ -1,6 +1,5 @@
 package forrest
 
-
 type Vertex interface {
 	// VertexID returns the vertex's ID (in most cases its hash)
 	VertexID() []byte
@@ -9,7 +8,6 @@ type Vertex interface {
 	// Parent returns the returns the parents (level, ID)
 	Parent() ([]byte, uint64)
 }
-
 
 // VertexIterator is a stateful iterator for VertexList.
 // Internally operates directly on the Vertex Containers

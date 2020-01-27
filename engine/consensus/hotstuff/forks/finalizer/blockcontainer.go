@@ -28,4 +28,3 @@ func (b *BlockContainer) QC() *types.QuorumCertificate { return b.block.QC() }
 // QC returns the block's embedded QC pointing to the block's parent
 // (this is the QC that points to the other end of a 1-chain)
 func (b *BlockContainer) Block() *types.BlockProposal { return b.block }
-

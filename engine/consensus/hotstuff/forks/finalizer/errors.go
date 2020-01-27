@@ -14,8 +14,8 @@ import (
 // (1) the block is invalid (manipulated) but has passed the validity check (bug);
 // (2) there is a true hash collision. This is extre..e-17..emly unlikely
 type ErrorBlockHashCollision struct {
-	block1            *types.BlockProposal
-	block2            *types.BlockProposal
+	block1   *types.BlockProposal
+	block2   *types.BlockProposal
 	location string
 }
 
@@ -25,7 +25,6 @@ func (e *ErrorBlockHashCollision) Error() string {
 		e.block1.BlockMRH(), e.block1.View(), e.block2.BlockMRH(),
 	)
 }
-
 
 // ErrorPruned3Chain sentinel error
 type ErrorPruned3Chain struct {

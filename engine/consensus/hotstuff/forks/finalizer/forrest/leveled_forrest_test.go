@@ -73,11 +73,19 @@ func TestVertexIteratorOnEmpty(t *testing.T) {
 // TestLeveledForrest_AddVertex tests that Vertex can be added twice without problems
 func TestLeveledForrest_AddVertex(t *testing.T) {
 	F := NewLeveledForrest()
-	F.AddVertex(NewVertexMock("A", 3, "Genesis", 0))
+	v := NewVertexMock("A", 3, "Genesis", 0)
+	if err := F.VerifyVertex(v); err != nil {
+		assert.Fail(t, err.Error())
+	}
+	F.AddVertex(v)
 	assert.True(t, F.HasVertex([]byte("A")))
 
 	// Adding Vertex twice should be fine
-	F.AddVertex(NewVertexMock("A", 3, "Genesis", 0))
+	v = NewVertexMock("A", 3, "Genesis", 0)
+	if err := F.VerifyVertex(v); err != nil {
+		assert.Fail(t, err.Error())
+	}
+	F.AddVertex(v)
 	assert.True(t, F.HasVertex([]byte("A")))
 }
 
@@ -86,40 +94,40 @@ func TestLeveledForrest_AddVertex(t *testing.T) {
 // we test this by having the mock.vertex.Parent() panic
 func TestLeveledForrest_AcceptingGenesis(t *testing.T) {
 	// LeveledForrest.LowestLevel on initial conditions
-	F := populateNewForrest()
+	F := populateNewForrest(t)
 	v1 := &mock.Vertex{}
 	v1.On("VertexID").Return([]byte("Root-Vertex-A_@Level0"))
 	v1.On("Level").Return(uint64(0))
-	v1.On("Parent").Return(func() ([]byte, uint64) { panic("Parent() should not have been called")})
-	assert.NotPanics(t, func(){ F.AddVertex(v1) })
+	v1.On("Parent").Return(func() ([]byte, uint64) { panic("Parent() should not have been called") })
+	assert.NotPanics(t, func() { F.AddVertex(v1) })
 
 	v2 := &mock.Vertex{}
 	v2.On("VertexID").Return([]byte("Root-Vertex-B_@Level0"))
 	v2.On("Level").Return(uint64(0))
-	v2.On("Parent").Return(func() ([]byte, uint64) { panic("Parent() should not have been called")})
-	assert.NotPanics(t, func(){ F.AddVertex(v2) })
-	assert.NotPanics(t, func(){ F.AddVertex(v2) })
+	v2.On("Parent").Return(func() ([]byte, uint64) { panic("Parent() should not have been called") })
+	assert.NotPanics(t, func() { F.AddVertex(v2) })
+	assert.NotPanics(t, func() { F.AddVertex(v2) })
 
-	F = populateNewForrest()
-	F.PruneAtLevel(7)// LeveledForrest.LowestLevel on initial conditions
+	F = populateNewForrest(t)
+	F.PruneAtLevel(7) // LeveledForrest.LowestLevel on initial conditions
 	v3 := &mock.Vertex{}
 	v3.On("VertexID").Return([]byte("Root-Vertex-A_@Level8"))
 	v3.On("Level").Return(uint64(8))
-	v3.On("Parent").Return(func() ([]byte, uint64) { panic("Parent() should not have been called")})
-	assert.NotPanics(t, func(){ F.AddVertex(v3) })
+	v3.On("Parent").Return(func() ([]byte, uint64) { panic("Parent() should not have been called") })
+	assert.NotPanics(t, func() { F.AddVertex(v3) })
 
 	v4 := &mock.Vertex{}
 	v4.On("VertexID").Return([]byte("Root-Vertex-B_@Level8"))
 	v4.On("Level").Return(uint64(8))
-	v4.On("Parent").Return(func() ([]byte, uint64) { panic("Parent() should not have been called")})
-	assert.NotPanics(t, func(){ F.AddVertex(v4) })
-	assert.NotPanics(t, func(){ F.AddVertex(v4) })
+	v4.On("Parent").Return(func() ([]byte, uint64) { panic("Parent() should not have been called") })
+	assert.NotPanics(t, func() { F.AddVertex(v4) })
+	assert.NotPanics(t, func() { F.AddVertex(v4) })
 }
 
 // TestLeveledForrest_VerifyVertex checks that invalid Vertices are detected.
 // with an ID identical to a known reference BUT whose level is not consistent with the reference
 func TestLeveledForrest_VerifyVertex(t *testing.T) {
-	F := populateNewForrest()
+	F := populateNewForrest(t)
 
 	// KNOWN vertex but with wrong level number
 	err := F.VerifyVertex(NewVertexMock("D", 10, "C", 2))
@@ -138,18 +146,18 @@ func TestLeveledForrest_VerifyVertex(t *testing.T) {
 // NOTE: We consider a vertex added only if it has been directly added through the AddVertex method.
 //       Vertices that references bvy known vertices but have not themselves are considered to be not in the tree.
 func TestLeveledForrest_HasVertex(t *testing.T) {
-	F := populateNewForrest()
+	F := populateNewForrest(t)
 	assert.True(t, F.HasVertex([]byte("A")))
 	assert.True(t, F.HasVertex([]byte("B")))
 	assert.True(t, F.HasVertex([]byte("X")))
 
-	assert.False(t, F.HasVertex([]byte("Genesis")))         // Genesis block never directly added (only referenced) => unknown
+	assert.False(t, F.HasVertex([]byte("Genesis")))     // Genesis block never directly added (only referenced) => unknown
 	assert.False(t, F.HasVertex([]byte("NotYetAdded"))) // Block never mentioned before
 }
 
 // TestLeveledForrest_GetChildren tests that children are returned properly
 func TestLeveledForrest_GetChildren(t *testing.T) {
-	F := populateNewForrest()
+	F := populateNewForrest(t)
 
 	// testing children for Block that is contained in Tree
 	it := F.GetChildren([]byte("X"))
@@ -174,7 +182,7 @@ func TestLeveledForrest_GetChildren(t *testing.T) {
 
 // TestLeveledForrest_GetNumberOfChildren tests that children are returned properly
 func TestLeveledForrest_GetNumberOfChildren(t *testing.T) {
-	F := populateNewForrest()
+	F := populateNewForrest(t)
 
 	// testing children for Block that is contained in Tree
 	assert.Equal(t, 2, F.GetNumberOfChildren([]byte("X")))
@@ -188,7 +196,7 @@ func TestLeveledForrest_GetNumberOfChildren(t *testing.T) {
 
 // TestLeveledForrest_GetVerticesAtLevel tests that Vertex blob is returned properly
 func TestLeveledForrest_GetVerticesAtLevel(t *testing.T) {
-	F := populateNewForrest()
+	F := populateNewForrest(t)
 
 	// testing vertices for level that are contained in Tree
 	it := F.GetVerticesAtLevel(6)
@@ -216,7 +224,7 @@ func TestLeveledForrest_GetVerticesAtLevel(t *testing.T) {
 
 // TestLeveledForrest_GetNumberOfVerticesAtLevel tests that the number of vertices at a specified level is reported correctly. 
 func TestLeveledForrest_GetNumberOfVerticesAtLevel(t *testing.T) {
-	F := populateNewForrest()
+	F := populateNewForrest(t)
 
 	// testing vertices for level that are contained in Tree
 	assert.Equal(t, 2, F.GetNumberOfVerticesAtLevel(6))
@@ -233,7 +241,7 @@ func TestLeveledForrest_GetNumberOfVerticesAtLevel(t *testing.T) {
 
 // TestLeveledForrest_GetVertex tests that Vertex blob is returned properly
 func TestLeveledForrest_GetVertex(t *testing.T) {
-	F := populateNewForrest()
+	F := populateNewForrest(t)
 	v, exists := F.GetVertex([]byte("D"))
 	assert.Equal(t, TestVertices["D"], v)
 	assert.True(t, exists)
@@ -249,7 +257,7 @@ func TestLeveledForrest_GetVertex(t *testing.T) {
 
 // TestLeveledForrest_GetVertex tests that Vertex blob is returned properly
 func TestLeveledForrest_PruneAtLevel(t *testing.T) {
-	F := populateNewForrest()
+	F := populateNewForrest(t)
 	err := F.PruneAtLevel(0)
 	assert.False(t, err != nil)
 	assert.False(t, F.HasVertex([]byte("Genesis")))
@@ -294,12 +302,14 @@ func TestLeveledForrest_PruneAtLevel(t *testing.T) {
 	assert.True(t, err != nil)
 }
 
-
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~ Helper Functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
-func populateNewForrest() *LeveledForrest {
+func populateNewForrest(t *testing.T) *LeveledForrest {
 	F := NewLeveledForrest()
 	for _, v := range TestVertices {
+		if err := F.VerifyVertex(v); err != nil {
+			assert.Fail(t, err.Error())
+		}
 		F.AddVertex(v)
 	}
 	return F
@@ -315,4 +325,3 @@ func children2List(it *VertexIterator) []*mock.Vertex {
 	}
 	return l
 }
-
