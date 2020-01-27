@@ -185,11 +185,29 @@ func (s *BaseCadenceListener) EnterFullType(ctx *FullTypeContext) {}
 // ExitFullType is called when production fullType is exited.
 func (s *BaseCadenceListener) ExitFullType(ctx *FullTypeContext) {}
 
+// EnterReferenceType is called when production referenceType is entered.
+func (s *BaseCadenceListener) EnterReferenceType(ctx *ReferenceTypeContext) {}
+
+// ExitReferenceType is called when production referenceType is exited.
+func (s *BaseCadenceListener) ExitReferenceType(ctx *ReferenceTypeContext) {}
+
+// EnterNonReferenceType is called when production nonReferenceType is entered.
+func (s *BaseCadenceListener) EnterNonReferenceType(ctx *NonReferenceTypeContext) {}
+
+// ExitNonReferenceType is called when production nonReferenceType is exited.
+func (s *BaseCadenceListener) ExitNonReferenceType(ctx *NonReferenceTypeContext) {}
+
 // EnterBaseType is called when production baseType is entered.
 func (s *BaseCadenceListener) EnterBaseType(ctx *BaseTypeContext) {}
 
 // ExitBaseType is called when production baseType is exited.
 func (s *BaseCadenceListener) ExitBaseType(ctx *BaseTypeContext) {}
+
+// EnterTypeRestrictions is called when production typeRestrictions is entered.
+func (s *BaseCadenceListener) EnterTypeRestrictions(ctx *TypeRestrictionsContext) {}
+
+// ExitTypeRestrictions is called when production typeRestrictions is exited.
+func (s *BaseCadenceListener) ExitTypeRestrictions(ctx *TypeRestrictionsContext) {}
 
 // EnterNominalType is called when production nominalType is entered.
 func (s *BaseCadenceListener) EnterNominalType(ctx *NominalTypeContext) {}

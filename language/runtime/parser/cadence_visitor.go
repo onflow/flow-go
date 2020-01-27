@@ -92,8 +92,17 @@ type CadenceVisitor interface {
 	// Visit a parse tree produced by CadenceParser#fullType.
 	VisitFullType(ctx *FullTypeContext) interface{}
 
+	// Visit a parse tree produced by CadenceParser#referenceType.
+	VisitReferenceType(ctx *ReferenceTypeContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#nonReferenceType.
+	VisitNonReferenceType(ctx *NonReferenceTypeContext) interface{}
+
 	// Visit a parse tree produced by CadenceParser#baseType.
 	VisitBaseType(ctx *BaseTypeContext) interface{}
+
+	// Visit a parse tree produced by CadenceParser#typeRestrictions.
+	VisitTypeRestrictions(ctx *TypeRestrictionsContext) interface{}
 
 	// Visit a parse tree produced by CadenceParser#nominalType.
 	VisitNominalType(ctx *NominalTypeContext) interface{}

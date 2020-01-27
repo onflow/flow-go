@@ -716,32 +716,95 @@ func (v *ProgramVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interfa
 }
 
 func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
-	baseTypeResult := ctx.BaseType().Accept(v)
-	if baseTypeResult == nil {
-		return nil
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitReferenceType(ctx *ReferenceTypeContext) interface{} {
+
+	// A type line `&R` is parsed as `ReferenceType{NominalType{}}`.
+	// A type like `&R{I}` is parsed as `ReferenceType{RestrictedType{NominalType{}}}`.
+	// A type like `&{I}` is parsed as `ReferenceType{RestrictedType{}}`.
+
+	// base type
+	baseTypeContext := ctx.BaseType()
+	var result ast.Type
+	if baseTypeContext != nil {
+		result = baseTypeContext.Accept(v).(ast.Type)
 	}
-	result := baseTypeResult.(ast.Type)
 
-	// NOTE: only allow reference or optionals – prevent ambiguous
-	// and not particular useful types like `&R?`
+	// restrictions
+	typeRestrictionsCtx := ctx.TypeRestrictions()
+	if typeRestrictionsCtx != nil {
+		restrictions := typeRestrictionsCtx.Accept(v).([]*ast.NominalType)
 
-	if ctx.reference != nil {
-		startPos := ast.PositionFromToken(ctx.reference)
-		result = &ast.ReferenceType{
-			Type:     result,
-			StartPos: startPos,
+		endPos := PositionFromToken(typeRestrictionsCtx.GetStop())
+
+		result = &ast.RestrictedType{
+			Type:         result,
+			Restrictions: restrictions,
+			EndPos:       endPos,
 		}
-	} else {
-		for _, optional := range ctx.optionals {
-			endPos := ast.PositionFromToken(optional)
-			result = &ast.OptionalType{
-				Type:   result,
-				EndPos: endPos,
-			}
+	}
+
+	// reference
+	startPos := PositionFromToken(ctx.GetStart())
+	result = &ast.ReferenceType{
+		Type:     result,
+		StartPos: startPos,
+	}
+
+	return result
+}
+
+func (v *ProgramVisitor) VisitNonReferenceType(ctx *NonReferenceTypeContext) interface{} {
+
+	// A type line `R` is parsed as `NominalType{}`.
+	// A type like `R{I}` is parsed as `RestrictedType{NominalType{}}`.
+	// A type like `R{I}?` is parsed as `OptionalType{RestrictedType{NominalType{}}}`.
+	// A type like `{I}` is parsed as `RestrictedType{NominalType{}}`.
+
+	// base type
+	baseTypeContext := ctx.BaseType()
+	var result ast.Type
+	if baseTypeContext != nil {
+		result = baseTypeContext.Accept(v).(ast.Type)
+	}
+
+	// restrictions
+	typeRestrictionsCtx := ctx.TypeRestrictions()
+	if typeRestrictionsCtx != nil {
+		restrictions := typeRestrictionsCtx.Accept(v).([]*ast.NominalType)
+
+		endPos := PositionFromToken(typeRestrictionsCtx.GetStop())
+
+		result = &ast.RestrictedType{
+			Type:         result,
+			Restrictions: restrictions,
+			EndPos:       endPos,
+		}
+	}
+
+	// optionals
+	for _, optional := range ctx.optionals {
+		endPos := PositionFromToken(optional)
+		result = &ast.OptionalType{
+			Type:   result,
+			EndPos: endPos,
 		}
 	}
 
 	return result
+}
+
+func (v *ProgramVisitor) VisitTypeRestrictions(ctx *TypeRestrictionsContext) interface{} {
+	nominalTypeContexts := ctx.AllNominalType()
+	nominalTypes := make([]*ast.NominalType, len(nominalTypeContexts))
+
+	for i, context := range nominalTypeContexts {
+		nominalTypes[i] = context.Accept(v).(*ast.NominalType)
+	}
+
+	return nominalTypes
 }
 
 func (v *ProgramVisitor) VisitBlock(ctx *BlockContext) interface{} {

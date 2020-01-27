@@ -1,4 +1,4 @@
-package tests
+package parser
 
 import (
 	"fmt"
@@ -6143,6 +6143,241 @@ func TestParseInvalidReferenceToOptionalType(t *testing.T) {
 	assert.Nil(t, actual)
 
 	assert.IsType(t, parser.Error{}, err)
+}
+
+// TODO:
+//format.MaxDepth = 100
+//
+//println(format.Object(actual, 4))
+
+// TODO: &{I}, @{I}
+
+func TestParseRestrictedReferenceTypeWithBaseType(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+       let x: &R{I} = 1
+	`)
+
+	require.NoError(t, err)
+
+	expected := &Program{
+		Declarations: []Declaration{
+			&VariableDeclaration{
+				IsConstant: true,
+				Identifier: Identifier{
+					Identifier: "x",
+					Pos:        Position{Offset: 12, Line: 2, Column: 11},
+				},
+				TypeAnnotation: &TypeAnnotation{
+					IsResource: false,
+					Type: &ReferenceType{
+						Type: &RestrictedType{
+							Type: &NominalType{
+								Identifier: Identifier{
+									Identifier: "R",
+									Pos:        Position{Offset: 16, Line: 2, Column: 15},
+								},
+							},
+							Restrictions: []*NominalType{
+								{
+									Identifier: Identifier{
+										Identifier: "I",
+										Pos:        Position{Offset: 18, Line: 2, Column: 17},
+									},
+								},
+							},
+							EndPos: Position{Offset: 19, Line: 2, Column: 18},
+						},
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
+					},
+					StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				},
+				Value: &IntExpression{
+					Value: big.NewInt(1),
+					Base:  10,
+					Range: Range{
+						StartPos: Position{Offset: 23, Line: 2, Column: 22},
+						EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+					},
+				},
+				Transfer: &Transfer{
+					Operation: TransferOperationCopy,
+					Pos:       Position{Offset: 21, Line: 2, Column: 20},
+				},
+				StartPos: Position{Offset: 8, Line: 2, Column: 7},
+			},
+		},
+	}
+
+	utils.AssertEqualWithDiff(t, expected, actual)
+}
+
+func TestParseRestrictedReferenceTypeWithoutBaseType(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+       let x: &{I} = 1
+	`)
+
+	require.NoError(t, err)
+
+	expected := &Program{
+		Declarations: []Declaration{
+			&VariableDeclaration{
+				IsConstant: true,
+				Identifier: Identifier{
+					Identifier: "x",
+					Pos:        Position{Offset: 12, Line: 2, Column: 11},
+				},
+				TypeAnnotation: &TypeAnnotation{
+					IsResource: false,
+					Type: &ReferenceType{
+						Type: &RestrictedType{
+							Restrictions: []*NominalType{
+								{
+									Identifier: Identifier{
+										Identifier: "I",
+										Pos:        Position{Offset: 17, Line: 2, Column: 16},
+									},
+								},
+							},
+							EndPos: Position{Offset: 18, Line: 2, Column: 17},
+						},
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
+					},
+					StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				},
+				Value: &IntExpression{
+					Value: big.NewInt(1),
+					Base:  10,
+					Range: Range{
+						StartPos: Position{Offset: 22, Line: 2, Column: 21},
+						EndPos:   Position{Offset: 22, Line: 2, Column: 21},
+					},
+				},
+				Transfer: &Transfer{
+					Operation: TransferOperationCopy,
+					Pos:       Position{Offset: 20, Line: 2, Column: 19},
+				},
+				StartPos: Position{Offset: 8, Line: 2, Column: 7},
+			},
+		},
+	}
+
+	utils.AssertEqualWithDiff(t, expected, actual)
+}
+
+func TestParseOptionalRestrictedResourceType(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+       let x: @R{I}? = 1
+	`)
+
+	require.NoError(t, err)
+
+	expected := &Program{
+		Declarations: []Declaration{
+			&VariableDeclaration{
+				IsConstant: true,
+				Identifier: Identifier{
+					Identifier: "x",
+					Pos:        Position{Offset: 12, Line: 2, Column: 11},
+				},
+				TypeAnnotation: &TypeAnnotation{
+					IsResource: true,
+					Type: &OptionalType{
+						Type: &RestrictedType{
+							Type: &NominalType{
+								Identifier: Identifier{
+									Identifier: "R",
+									Pos:        Position{Offset: 16, Line: 2, Column: 15},
+								},
+							},
+							Restrictions: []*NominalType{
+								{
+									Identifier: Identifier{
+										Identifier: "I",
+										Pos:        Position{Offset: 18, Line: 2, Column: 17},
+									},
+								},
+							},
+							EndPos: Position{Offset: 19, Line: 2, Column: 18},
+						},
+						EndPos: Position{Offset: 20, Line: 2, Column: 19},
+					},
+					StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				},
+				Value: &IntExpression{
+					Value: big.NewInt(1),
+					Base:  10,
+					Range: Range{
+						StartPos: Position{Offset: 24, Line: 2, Column: 23},
+						EndPos:   Position{Offset: 24, Line: 2, Column: 23},
+					},
+				},
+				Transfer: &Transfer{
+					Operation: TransferOperationCopy,
+					Pos:       Position{Offset: 22, Line: 2, Column: 21},
+				},
+				StartPos: Position{Offset: 8, Line: 2, Column: 7},
+			},
+		},
+	}
+
+	utils.AssertEqualWithDiff(t, expected, actual)
+}
+
+func TestParseOptionalRestrictedResourceTypeOnlyRestrictions(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+       let x: @{I}? = 1
+	`)
+
+	require.NoError(t, err)
+
+	expected := &Program{
+		Declarations: []Declaration{
+			&VariableDeclaration{
+				IsConstant: true,
+				Identifier: Identifier{
+					Identifier: "x",
+					Pos:        Position{Offset: 12, Line: 2, Column: 11},
+				},
+				TypeAnnotation: &TypeAnnotation{
+					IsResource: true,
+					Type: &OptionalType{
+						Type: &RestrictedType{
+							Restrictions: []*NominalType{
+								{
+									Identifier: Identifier{
+										Identifier: "I",
+										Pos:        Position{Offset: 17, Line: 2, Column: 16},
+									},
+								},
+							},
+							EndPos: Position{Offset: 18, Line: 2, Column: 17},
+						},
+						EndPos: Position{Offset: 19, Line: 2, Column: 18},
+					},
+					StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				},
+				Value: &IntExpression{
+					Value: big.NewInt(1),
+					Base:  10,
+					Range: Range{
+						StartPos: Position{Offset: 23, Line: 2, Column: 22},
+						EndPos:   Position{Offset: 23, Line: 2, Column: 22},
+					},
+				},
+				Transfer: &Transfer{
+					Operation: TransferOperationCopy,
+					Pos:       Position{Offset: 21, Line: 2, Column: 20},
+				},
+				StartPos: Position{Offset: 8, Line: 2, Column: 7},
+			},
+		},
+	}
+
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseReference(t *testing.T) {

@@ -190,8 +190,24 @@ typeAnnotation
 // NOTE: only allow reference or optionals – prevent ambiguous
 // and not particular useful types like `&R?`
 fullType
-    : reference=Ampersand {p.noWhitespace()}? baseType
-    | baseType ({p.noWhitespace()}? optionals+=Optional)*
+    : referenceType
+    | nonReferenceType
+    ;
+
+referenceType
+    : Ampersand {p.noWhitespace()}?
+      (
+           typeRestrictions
+         | ( baseType ({p.noWhitespace()}? typeRestrictions)? )
+      )
+    ;
+
+nonReferenceType
+    : (
+          typeRestrictions
+        | ( baseType ({p.noWhitespace()}? typeRestrictions)? )
+      )
+      ({p.noWhitespace()}? optionals+=Optional)*
     ;
 
 baseType
@@ -200,6 +216,10 @@ baseType
     | variableSizedType
     | constantSizedType
     | dictionaryType
+    ;
+
+typeRestrictions
+    : '{' (nominalType (',' nominalType)*)? '}'
     ;
 
 nominalType
