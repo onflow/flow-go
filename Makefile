@@ -44,7 +44,7 @@ endif
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	GO111MODULE=on go get zombiezen.com/go/capnproto2@v0.0.0-20190505172156-0c36f8f86ab2; \
-	GO111MODULE=on go get github.com/mgechev/revive@master; \
+	GO111MODULE=on go get github.com/mgechev/revive@v1.0.1; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v0.0.0-20181123154057-e78b021dcbb5; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
@@ -100,8 +100,8 @@ generate-mocks:
 	mockery -name '.*' -dir=engine/execution/execution/executor -case=underscore -output="./engine/execution/execution/executor/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/state -case=underscore -output="./engine/execution/execution/state/mock" -outpkg="mock"
 	mockery -name '.*' -dir=engine/execution/execution/virtualmachine -case=underscore -output="./engine/execution/execution/virtualmachine/mock" -outpkg="mock"
-	mockery -name 'Processor' -dir="./engine/consensus/eventdriven/components/pacemaker/events" -case=underscore -output="./engine/consensus/eventdriven/components/pacemaker/mock" -outpkg="mock"
 	mockery -name '.*' -dir=network/gossip/libp2p/middleware -case=underscore -output="./network/gossip/libp2p/mock" -outpkg="mock"
+	mockery -name 'Distributor' -dir="./engine/consensus/hotstuff/notifications/" -case=underscore -output="./engine/consensus/hotstuff/notifications/mock" -outpkg="mock"
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
@@ -119,7 +119,7 @@ ci: install-tools tidy lint test coverage
 docker-ci:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
-		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.5 \
+		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.6 \
 		make ci
 
 # This command is should only be used by Team City
@@ -127,25 +127,31 @@ docker-ci:
 .PHONY: docker-ci-team-city
 docker-ci-team-city:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
-		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" -v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
-		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.5 \
+		-v ${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK} -e SSH_AUTH_SOCK="${SSH_AUTH_SOCK}" \
+		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
+		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
+		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.6 \
 		make ci
 
 .PHONY: docker-build-collection
 docker-build-collection:
-	docker build -f cmd/Dockerfile --build-arg TARGET=collection -t gcr.io/dl-flow/collection:latest -t "gcr.io/dl-flow/collection:$(SHORT_COMMIT)" -t gcr.io/dl-flow/collection:$(IMAGE_TAG) .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=collection \
+		-t gcr.io/dl-flow/collection:latest -t "gcr.io/dl-flow/collection:$(SHORT_COMMIT)" -t gcr.io/dl-flow/collection:$(IMAGE_TAG) .
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
-	docker build -f cmd/Dockerfile --build-arg TARGET=consensus -t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/consensus:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=consensus \
+		-t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/consensus:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-execution
 docker-build-execution:
-	docker build -f cmd/Dockerfile --build-arg TARGET=execution -t gcr.io/dl-flow/execution:latest -t "gcr.io/dl-flow/execution:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/execution:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=execution \
+		-t gcr.io/dl-flow/execution:latest -t "gcr.io/dl-flow/execution:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/execution:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-verification
 docker-build-verification:
-	docker build -f cmd/Dockerfile --build-arg TARGET=verification -t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification:$(IMAGE_TAG)" .
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification \
+		-t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification
