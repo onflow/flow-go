@@ -17,7 +17,7 @@ type Validator struct {
 // It doesn't validate the block that this QC is pointing to
 func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 	// TODO: potentially can return a very long list. need to find a better way for verifying QC
-	allStakedNode, err := v.viewState.GetIdentitiesForBlockID(qc.BlockMRH)
+	stakedNodes, err := v.viewState.GetIdentitiesForBlockID(qc.BlockMRH)
 	if err != nil {
 		return fmt.Errorf("cannot get identities to validate sig at view %v: %w", qc.View, err)
 	}
@@ -25,7 +25,7 @@ func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 	signedBytes := qc.BytesForSig()
 
 	// validate signatures. If valid, get back all signers
-	signers, err := validateAggregatedSigWithSignedBytes(allStakedNode, signedBytes, qc.AggregatedSignature)
+	signers, err := validateAggregatedSigWithSignedBytes(stakedNodes, signedBytes, qc.AggregatedSignature)
 	if err != nil {
 		return fmt.Errorf("qc contains invalid signature: %w", err)
 	}
@@ -34,7 +34,7 @@ func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 	totalStakes := computeTotalStakes(signers)
 
 	// compute the threshold of stake required for a valid QC
-	threshold := ComputeStakeThresholdForBuildingQC(allStakedNode)
+	threshold := ComputeStakeThresholdForBuildingQC(stakedNodes)
 
 	// check if there are enough stake for building QC
 	if totalStakes < threshold {
@@ -107,15 +107,16 @@ func (v *Validator) ValidateVote(vote *types.Vote, bp *types.BlockProposal) (*fl
 	return voter, nil
 }
 
-func validateAggregatedSigWithSignedBytes(allStakedNode flow.IdentityList, signedBytes []byte, aggsig *types.AggregatedSignature) ([]*flow.Identity, error) {
+func validateAggregatedSigWithSignedBytes(stakedNodes flow.IdentityList, signedBytes []byte, aggsig *types.AggregatedSignature) ([]*flow.Identity, error) {
 	signers := make([]*flow.Identity, 0)
 	for signerIdx, signed := range aggsig.Signers {
 		if signed {
 			// read the signer identity
-			signer, err := findSignerByIndex(allStakedNode, uint(signerIdx))
-			if err != nil {
-				return nil, err
+			if uint(signerIdx) > stakedNodes.Count() {
+				return nil, fmt.Errorf("signer not found by signerIdx: %v", signerIdx)
 			}
+
+			signer := stakedNodes.Get(uint(signerIdx))
 
 			// read the public key of the signer
 			pubkey := readPubKey(signer)
@@ -180,15 +181,14 @@ func (v *Validator) validateBlockSig(bp *types.BlockProposal) (*flow.Identity, e
 // validateSignatureWithSignedBytes validates the signature and returns an identity if the sig is valid and the signer is staked.
 func validateSignatureWithSignedBytes(identities flow.IdentityList, hash []byte, sig *types.Signature) (*flow.Identity, error) {
 	// getting signer's public key
-	signer, err := findSignerByIndex(identities, uint(sig.SignerIdx))
-	if err != nil {
-		return nil, fmt.Errorf("can not find signer: %w", err)
+	if uint(sig.SignerIdx) > identities.Count() {
+		return nil, fmt.Errorf("signer not found by signerIdx: %v", sig.SignerIdx)
 	}
-
+	signer := identities.Get(uint(sig.SignerIdx))
 	signerPubKey := readPubKey(signer)
 
 	// verify the signature
-	err = verifySignature(sig.RawSignature, hash, signerPubKey)
+	err := verifySignature(sig.RawSignature, hash, signerPubKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid sig: %w", err)
 	}
@@ -198,16 +198,6 @@ func validateSignatureWithSignedBytes(identities flow.IdentityList, hash []byte,
 		return nil, fmt.Errorf("signer has 0 stake, signer id: %v", signer.NodeID)
 	}
 
-	return signer, nil
-}
-
-func findSignerByIndex(identities flow.IdentityList, idx uint) (*flow.Identity, error) {
-	// signer must exist
-	if idx > identities.Count() {
-		return nil, fmt.Errorf("signer not found by signerIdx: %v", idx)
-	}
-
-	signer := identities.Get(idx)
 	return signer, nil
 }
 
