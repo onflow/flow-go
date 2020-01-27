@@ -55,11 +55,6 @@ func (s *sha3_384Algo) SumHash() Hash {
 	return digest
 }
 
-// Add adds data to the state data to be hashed
-/*func (s *sha3_384Algo) Add(data []byte) {
-	s.Write(data)
-}*/
-
 // cShake128Algo, embeds commonHasher
 type cShake128Algo struct {
 	*commonHasher
@@ -82,11 +77,6 @@ func (s *cShake128Algo) SumHash() Hash {
 	s.Reset()
 	return digest
 }
-
-// Add adds data to the state data to be hashed
-/*func (s *cShake128Algo) Add(data []byte) {
-	s.Write(data)
-}*/
 
 func (s *cShake128Algo) Size() int {
 	return s.commonHasher.outputSize

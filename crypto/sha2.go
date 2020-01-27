@@ -24,11 +24,6 @@ func (s *sha2_256Algo) SumHash() Hash {
 	return digest
 }
 
-// Add adds data to the state data to be hashed
-/*func (s *sha2_256Algo) Add(data []byte) {
-	s.Write(data)
-}*/
-
 // sha2_384Algo, embeds commonHasher
 type sha2_384Algo struct {
 	*commonHasher
@@ -50,8 +45,3 @@ func (s *sha2_384Algo) SumHash() Hash {
 	s.Reset()
 	return digest
 }
-
-// Add adds data to the state data to be hashed
-/*func (s *sha2_384Algo) Add(data []byte) {
-	s.Write(data)
-}*/
