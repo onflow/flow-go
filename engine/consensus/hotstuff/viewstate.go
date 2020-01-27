@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/protocol"
 )
 
@@ -15,8 +14,8 @@ type ViewState struct {
 
 	// my own identifier
 	myID flow.Identifier
-	// my role. Could be flow.Role.Consensus or flow.Role.Collection
-	myRole flow.Role
+	// identityFilter to find only the consensus members for the cluster
+	consensusMembersFilter flow.IdentityFilter
 }
 
 // IsSelf returns if a given identity is myself
@@ -48,7 +47,7 @@ func (v *ViewState) GetSelfIdxForBlockID(blockID flow.Identifier) (uint32, error
 // GetIdentitiesForView returns all the staked nodes for my role at a certain block.
 // view specifies the view
 func (v *ViewState) GetIdentitiesForBlockID(blockID flow.Identifier) (flow.IdentityList, error) {
-	return v.protocolState.AtBlockID(blockID).Identities(identity.HasRole(v.myRole))
+	return v.protocolState.AtBlockID(blockID).Identities(v.consensusMembersFilter)
 }
 
 // GetQCStakeThresholdForBlockID returns the stack threshold for building QC at a given block
