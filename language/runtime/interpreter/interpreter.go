@@ -2446,6 +2446,9 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 	case *sema.IntType:
 		return ConvertInt(value)
 
+	case *sema.UIntType:
+		return ConvertUInt(value)
+
 	case *sema.AddressType:
 		return ConvertAddress(value)
 
@@ -2480,6 +2483,12 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 
 	case *sema.UInt64Type:
 		return ConvertUInt64(value)
+
+	case *sema.UInt128Type:
+		return ConvertUInt128(value)
+
+	case *sema.UInt256Type:
+		return ConvertUInt256(value)
 
 	// Word*
 	case *sema.Word8Type:
