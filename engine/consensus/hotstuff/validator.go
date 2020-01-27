@@ -22,10 +22,10 @@ func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 		return fmt.Errorf("cannot get identities to validate sig at view %v, because %w", qc.View, err)
 	}
 
-	hash := qc.BytesForSig()
+	signedBytes := qc.BytesForSig()
 
 	// validate signatures. If valid, get back all signers
-	signers, err := validateSignaturesForHash(allStakedNode, hash, qc.AggregatedSignature)
+	signers, err := validateAggregatedSigWithSignedBytes(allStakedNode, signedBytes, qc.AggregatedSignature)
 	if err != nil {
 		return fmt.Errorf("qc contains invalid signature: %w", err)
 	}
@@ -107,7 +107,7 @@ func (v *Validator) ValidateVote(vote *types.Vote, bp *types.BlockProposal) (*fl
 	return voter, nil
 }
 
-func validateSignaturesForHash(allStakedNode flow.IdentityList, hash []byte, aggsig *types.AggregatedSignature) ([]*flow.Identity, error) {
+func validateAggregatedSigWithSignedBytes(allStakedNode flow.IdentityList, signedBytes []byte, aggsig *types.AggregatedSignature) ([]*flow.Identity, error) {
 	signers := make([]*flow.Identity, 0)
 	for signerIdx, signed := range aggsig.Signers {
 		if signed {
@@ -121,7 +121,7 @@ func validateSignaturesForHash(allStakedNode flow.IdentityList, hash []byte, agg
 			pubkey := readPubKey(signer)
 
 			// verify if the signer's signature
-			valid := aggsig.Verify(hash, pubkey)
+			valid := aggsig.Verify(signedBytes, pubkey)
 			if !valid {
 				return nil, fmt.Errorf("invalid aggregated signature. sig not match for pubkey: %v", pubkey)
 			}
@@ -148,11 +148,11 @@ func (v *Validator) validateVoteSig(vote *types.Vote) (*flow.Identity, error) {
 		return nil, fmt.Errorf("cannot get identities to validate sig at view %v, because %w", vote.View, err)
 	}
 
-	// get the hash
-	hashToSign := vote.BytesForSig()
+	// get the signed bytes
+	bytesToSign := vote.BytesForSig()
 
 	// verify the signature
-	signer, err := validateSignatureForHash(identities, hashToSign, vote.Signature)
+	signer, err := validateSignatureWithSignedBytes(identities, bytesToSign, vote.Signature)
 	if err != nil {
 		return nil, fmt.Errorf("invalid signature for vote %v, because %w", vote.BlockMRH, err)
 	}
@@ -170,15 +170,15 @@ func (v *Validator) validateBlockSig(bp *types.BlockProposal) (*flow.Identity, e
 	hashToSign := bp.BytesForSig()
 
 	// verify the signature
-	signer, err := validateSignatureForHash(identities, hashToSign, bp.Signature)
+	signer, err := validateSignatureWithSignedBytes(identities, hashToSign, bp.Signature)
 	if err != nil {
 		return nil, fmt.Errorf("invalid signature for block %v, because %w", bp.BlockMRH(), err)
 	}
 	return signer, nil
 }
 
-// validateSignatureForHash validates the signature and returns an identity if the sig is valid and the signer is staked.
-func validateSignatureForHash(identities flow.IdentityList, hash []byte, sig *types.Signature) (*flow.Identity, error) {
+// validateSignatureWithSignedBytes validates the signature and returns an identity if the sig is valid and the signer is staked.
+func validateSignatureWithSignedBytes(identities flow.IdentityList, hash []byte, sig *types.Signature) (*flow.Identity, error) {
 	// getting signer's public key
 	signer, err := findSignerByIndex(identities, uint(sig.SignerIdx))
 	if err != nil {
