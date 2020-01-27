@@ -7,7 +7,7 @@ import (
 )
 
 type EventHandler struct {
-	paceMaker             *PaceMaker
+	paceMaker             PaceMaker
 	voteAggregator        *VoteAggregator
 	voter                 *Voter
 	missingBlockRequester *MissingBlockRequester
@@ -23,7 +23,7 @@ func (eh *EventHandler) OnReceiveBlockProposal(block *types.BlockProposal) {
 }
 
 func (eh *EventHandler) OnReceiveVote(vote *types.Vote) {
-	blockProposal, found := eh.forks.GetBlock(vote.View, vote.BlockMRH)
+	blockProposal, found := eh.forks.GetBlock(vote.BlockMRH[:])
 	if found == false {
 		eh.voteAggregator.StorePendingVote(vote)
 		return

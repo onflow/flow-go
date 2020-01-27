@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 const VOTE_SIZE int = 10
@@ -18,43 +17,6 @@ const STAKE uint64 = 10
 // threshold stake would be 5,
 // meaning that it is enough to build a QC when receiving 5 votes
 const VALIDATOR_SIZE = 7
-
-type ViewParameter struct {
-	thresholdStake uint64
-}
-
-func (vs ViewParameter) IsSelfLeaderForView(view uint64) bool {
-	return true
-}
-
-func (vs ViewParameter) IsSelf(id types.ID) bool {
-	return true
-}
-
-func (vs ViewParameter) GetSelfIdxForView(view uint64) uint32 {
-	var selfId uint32
-	return selfId
-}
-
-func (vs ViewParameter) GetIdxOfPubKeyForView(view uint64) uint32 {
-	var id uint32
-	return id
-}
-
-func (vs ViewParameter) LeaderForView(view uint64) types.ID {
-	var id types.ID
-	return id
-}
-
-func (vs ViewParameter) GetIdentitiesAtBlockID(blockID []byte) (flow.IdentityList, error) {
-	var identities flow.IdentityList
-
-	return identities, nil
-}
-
-func (vs ViewParameter) ComputeQCStakeThresholdAtBlockID(blockID []byte) uint64 {
-	return vs.thresholdStake
-}
 
 // receive 5 valid incorporated votes in total
 // a QC will be generated on receiving the 5th vote
@@ -100,7 +62,7 @@ func TestUnHappyPathForPendingVotes(t *testing.T) {
 func TestErrDoubleVote(t *testing.T) {
 	var vaLogger zerolog.Logger
 
-	va := NewVoteAggregator(vaLogger, ViewParameter{}, Validator{})
+	va := NewVoteAggregator(vaLogger, &ViewState{}, &Validator{})
 	bp1 := &types.BlockProposal{
 		Block: &types.Block{
 			View:        1,
@@ -138,14 +100,14 @@ func TestPruneByView(t *testing.T) {
 func generateMockVotes(size int, view uint64) []*types.Vote {
 	var votes []*types.Vote
 	for i := 0; i < size; i++ {
-		mockVote := newMockVote(view, nil, rand.Uint32())
+		mockVote := newMockVote(view, [32]byte{}, rand.Uint32())
 		votes = append(votes, mockVote)
 	}
 
 	return votes
 }
 
-func newMockVote(view uint64, blockMRH []byte, signer uint32) *types.Vote {
+func newMockVote(view uint64, blockMRH [32]byte, signer uint32) *types.Vote {
 	vote := &types.Vote{
 		View:     view,
 		BlockMRH: blockMRH,

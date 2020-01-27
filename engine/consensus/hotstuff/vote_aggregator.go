@@ -12,8 +12,8 @@ import (
 
 type VoteAggregator struct {
 	log            zerolog.Logger
-	viewState      ViewState
-	voteValidator  Validator
+	viewState      *ViewState
+	voteValidator  *Validator
 	lastPrunedView uint64
 	// For pruning
 	viewToBlockMRH map[uint64][][]byte
@@ -27,7 +27,7 @@ type VoteAggregator struct {
 	viewToIDToVote map[uint64]map[string]*types.Vote
 }
 
-func NewVoteAggregator(log zerolog.Logger, viewState ViewState, voteValidator Validator) *VoteAggregator {
+func NewVoteAggregator(log zerolog.Logger, viewState *ViewState, voteValidator *Validator) *VoteAggregator {
 	return &VoteAggregator{
 		log:                     log,
 		viewState:               viewState,
