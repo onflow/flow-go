@@ -24,7 +24,7 @@ type VoteAggregator struct {
 	// keeps track of accumulated votes and stakes for blocks
 	blockHashToVotingStatus map[string]*VotingStatus
 	// For detecting double voting
-	viewToIDToVote map[uint64]map[string]*types.Vote
+	viewToIDToVote map[uint64]map[flow.Identifier]*types.Vote
 }
 
 func NewVoteAggregator(log zerolog.Logger, viewState *ViewState, voteValidator *Validator) *VoteAggregator {
@@ -46,7 +46,6 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 			FinalizedView: va.lastPrunedView,
 		})
 	}
-
 	voteMap, exists := va.pendingVotes[vote.BlockMRHStr()]
 	if exists {
 		voteMap[vote.Hash()] = vote
@@ -80,8 +79,8 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 	if err != nil {
 		return nil, fmt.Errorf("could not store incorporated vote: %w", err)
 	}
-	newQC, canBuild := va.tryBuildQC(votingStatus)
-	if !canBuild {
+	newQC, err := va.tryBuildQC(votingStatus)
+	if err != nil {
 		return nil, fmt.Errorf("could not build QC: %w", err)
 	}
 	return newQC, nil
@@ -99,7 +98,7 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 	for _, vote := range va.pendingVotes[bp.BlockMRHStr()] {
 		voteStatus, err := va.validateAndStoreIncorporatedVote(vote, bp)
 		if err != nil {
-			va.log.Debug().Msg("invalid pending vote found")
+			va.log.Debug().Msg("invalid vote found")
 			result = multierror.Append(result, fmt.Errorf("could not save pending vote: %w", err))
 		}
 		voteStatus.AddVote(vote)
@@ -111,8 +110,6 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 		result = multierror.Append(result, fmt.Errorf("could not build QC on receiving block proposal: %w", err))
 		return nil, result
 	}
-
-	va.log.Info().Msg("new QC created")
 
 	return qc, result
 }
@@ -157,20 +154,19 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 		va.blockHashToVotingStatus[vote.BlockMRHStr()] = votingStatus
 	}
 	votingStatus.AddVote(vote)
-	va.viewToIDToVote[vote.View][voter.String()] = vote
+	va.viewToIDToVote[vote.View][voter.ID()] = vote
 	return votingStatus, nil
 }
 
-func (va *VoteAggregator) tryBuildQC(votingStatus *VotingStatus) (*types.QuorumCertificate, bool) {
+func (va *VoteAggregator) tryBuildQC(votingStatus *VotingStatus) (*types.QuorumCertificate, error) {
 	if !votingStatus.CanBuildQC() {
-		return nil, false
+		return nil, types.ErrInsufficientVotes{}
 	}
-
-	//sigs := getSigsSliceFromVotes(votingStatus.votes)
+	// TODO: to create aggregate sig
 	qc := &types.QuorumCertificate{}
 	va.createdQC[votingStatus.BlockMRHStr()] = qc
-
-	return qc, true
+	va.log.Info().Msg("new QC created")
+	return qc, nil
 }
 
 // double voting is detected when the voter has voted a different block at the same view before
@@ -180,7 +176,7 @@ func (va *VoteAggregator) checkDoubleVote(vote *types.Vote, sender *flow.Identit
 		// never voted by anyone
 		return nil
 	}
-	originalVote, exists := idToVotes[fmt.Sprintf("%x", sender.ID())]
+	originalVote, exists := idToVotes[sender.ID()]
 	if !exists {
 		// never voted by this sender
 		return nil

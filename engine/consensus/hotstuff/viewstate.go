@@ -36,7 +36,7 @@ func (v *ViewState) GetSelfIdxForBlockID(blockID flow.Identifier) (uint32, error
 	if err != nil {
 		return 0, err
 	}
-	// TODO: using the index might be volnerble for attacks that has a big long list of identities
+	// TODO: using the index might be vulnerable for attacks that has a big long list of identities
 	for idx, id := range identities {
 		if v.IsSelf(id) {
 			return uint32(idx), nil
