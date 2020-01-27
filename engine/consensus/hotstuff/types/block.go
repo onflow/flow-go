@@ -1,8 +1,6 @@
 package types
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"time"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -23,17 +21,7 @@ type Block struct {
 }
 
 func (b Block) BlockMRH() flow.Identifier {
-	data := bytes.Join(
-		[][]byte{
-			b.QC.BytesForSig(),
-			make([]byte, b.View),
-			b.PayloadHash,
-			//	TODO: put the rest fields here
-		},
-		[]byte{},
-	)
-
-	return sha256.Sum256(data)
+	return flow.MakeID(b)
 }
 
 func NewBlock(view uint64, qc *QuorumCertificate, payloadHash []byte, height uint64, chainID string) *Block {
