@@ -7,12 +7,14 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// Validator provides functions to validate QC, Block and Vote
 type Validator struct {
 	// viewState provides API for querying identities for a specific view
 	viewState ViewState
 }
 
-// QC is valid (signature is valid and has enough stake)
+// ValidateQC validates the QC
+// It doesn't validate the block that this QC is pointing to
 func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 	// TODO: potentially can return a very long list. need to find a better way for verifying QC
 	allStakedNode, err := v.viewState.GetIdentitiesForBlockID(qc.BlockMRH)
@@ -42,8 +44,8 @@ func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 }
 
 // ValidateBlock validates the block proposal
-// bp is the block proposal to be validated.
-// parent is the parent of the block proposal.
+// bp - the block proposal to be validated.
+// parent - the parent of the block proposal.
 func (v *Validator) ValidateBlock(bp *types.BlockProposal, parent *types.BlockProposal) (*flow.Identity, error) {
 	// validate signature
 	signer, err := v.validateBlockSig(bp)
@@ -83,8 +85,8 @@ func (v *Validator) ValidateBlock(bp *types.BlockProposal, parent *types.BlockPr
 }
 
 // ValidateVote validates the vote and returns the signer identity who signed the vote
-// vote is the vote to be validated
-// bp is the voting block
+// vote - the vote to be validated
+// bp - the voting block
 func (v *Validator) ValidateVote(vote *types.Vote, bp *types.BlockProposal) (*flow.Identity, error) {
 	// validate signature
 	voter, err := v.validateVoteSig(vote)
@@ -215,7 +217,7 @@ func readPubKey(id *flow.Identity) [32]byte {
 	return id.NodeID
 }
 
-// verify signature
+// verify the signature
 func verifySignature(signature [32]byte, hashToSign []byte, pubkey [32]byte) error {
 	panic("TODO")
 }
