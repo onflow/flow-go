@@ -18,12 +18,14 @@ type HotStuff interface {
 	Start() error
 
 	// SubmitProposal submits a new block proposal to the HotStuff event loop.
+	// This method blocks until the proposal is accepted to the event queue.
 	// TODO assumptions about proposals
-	SubmitProposal(*types.BlockProposal) error
+	SubmitProposal(*types.BlockProposal)
 
 	// SubmitVote submits a new vote to the HotStuff event loop.
+	// This method blocks until the vote is accepted to the event queue.
 	// TODO assumptions about votes
-	SubmitVote(*types.Vote) error
+	SubmitVote(*types.Vote)
 }
 
 // New sets up and instantiates an instance of the HotStuff core algorithm.
