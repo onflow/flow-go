@@ -11,7 +11,6 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/m4ksio/testingdock v0.4.1
 	github.com/stretchr/testify v1.4.0
-
 )
 
 replace github.com/dapperlabs/flow-go => ../
