@@ -197,6 +197,12 @@ func (s *BaseCadenceListener) EnterNonReferenceType(ctx *NonReferenceTypeContext
 // ExitNonReferenceType is called when production nonReferenceType is exited.
 func (s *BaseCadenceListener) ExitNonReferenceType(ctx *NonReferenceTypeContext) {}
 
+// EnterInnerType is called when production innerType is entered.
+func (s *BaseCadenceListener) EnterInnerType(ctx *InnerTypeContext) {}
+
+// ExitInnerType is called when production innerType is exited.
+func (s *BaseCadenceListener) ExitInnerType(ctx *InnerTypeContext) {}
+
 // EnterBaseType is called when production baseType is entered.
 func (s *BaseCadenceListener) EnterBaseType(ctx *BaseTypeContext) {}
 

@@ -6145,13 +6145,6 @@ func TestParseInvalidReferenceToOptionalType(t *testing.T) {
 	assert.IsType(t, parser.Error{}, err)
 }
 
-// TODO:
-//format.MaxDepth = 100
-//
-//println(format.Object(actual, 4))
-
-// TODO: &{I}, @{I}
-
 func TestParseRestrictedReferenceTypeWithBaseType(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`

@@ -123,6 +123,10 @@ func (v *BaseCadenceVisitor) VisitNonReferenceType(ctx *NonReferenceTypeContext)
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCadenceVisitor) VisitInnerType(ctx *InnerTypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCadenceVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }

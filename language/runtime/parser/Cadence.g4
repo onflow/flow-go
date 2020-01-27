@@ -195,19 +195,16 @@ fullType
     ;
 
 referenceType
-    : Ampersand {p.noWhitespace()}?
-      (
-           typeRestrictions
-         | ( baseType ({p.noWhitespace()}? typeRestrictions)? )
-      )
+    : Ampersand {p.noWhitespace()}? innerType
     ;
 
 nonReferenceType
-    : (
-          typeRestrictions
-        | ( baseType ({p.noWhitespace()}? typeRestrictions)? )
-      )
-      ({p.noWhitespace()}? optionals+=Optional)*
+    : innerType ({p.noWhitespace()}? optionals+=Optional)*
+    ;
+
+innerType
+    : typeRestrictions
+    | baseType ({p.noWhitespace()}? typeRestrictions)?
     ;
 
 baseType

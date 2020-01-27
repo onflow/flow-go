@@ -94,6 +94,9 @@ type CadenceListener interface {
 	// EnterNonReferenceType is called when entering the nonReferenceType production.
 	EnterNonReferenceType(c *NonReferenceTypeContext)
 
+	// EnterInnerType is called when entering the innerType production.
+	EnterInnerType(c *InnerTypeContext)
+
 	// EnterBaseType is called when entering the baseType production.
 	EnterBaseType(c *BaseTypeContext)
 
@@ -402,6 +405,9 @@ type CadenceListener interface {
 
 	// ExitNonReferenceType is called when exiting the nonReferenceType production.
 	ExitNonReferenceType(c *NonReferenceTypeContext)
+
+	// ExitInnerType is called when exiting the innerType production.
+	ExitInnerType(c *InnerTypeContext)
 
 	// ExitBaseType is called when exiting the baseType production.
 	ExitBaseType(c *BaseTypeContext)

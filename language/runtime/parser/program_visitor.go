@@ -725,26 +725,7 @@ func (v *ProgramVisitor) VisitReferenceType(ctx *ReferenceTypeContext) interface
 	// A type like `&R{I}` is parsed as `ReferenceType{RestrictedType{NominalType{}}}`.
 	// A type like `&{I}` is parsed as `ReferenceType{RestrictedType{}}`.
 
-	// base type
-	baseTypeContext := ctx.BaseType()
-	var result ast.Type
-	if baseTypeContext != nil {
-		result = baseTypeContext.Accept(v).(ast.Type)
-	}
-
-	// restrictions
-	typeRestrictionsCtx := ctx.TypeRestrictions()
-	if typeRestrictionsCtx != nil {
-		restrictions := typeRestrictionsCtx.Accept(v).([]*ast.NominalType)
-
-		endPos := PositionFromToken(typeRestrictionsCtx.GetStop())
-
-		result = &ast.RestrictedType{
-			Type:         result,
-			Restrictions: restrictions,
-			EndPos:       endPos,
-		}
-	}
+	result := ctx.InnerType().Accept(v).(ast.Type)
 
 	// reference
 	startPos := PositionFromToken(ctx.GetStart())
@@ -763,6 +744,21 @@ func (v *ProgramVisitor) VisitNonReferenceType(ctx *NonReferenceTypeContext) int
 	// A type like `R{I}?` is parsed as `OptionalType{RestrictedType{NominalType{}}}`.
 	// A type like `{I}` is parsed as `RestrictedType{NominalType{}}`.
 
+	result := ctx.InnerType().Accept(v).(ast.Type)
+
+	// optionals
+	for _, optional := range ctx.optionals {
+		endPos := PositionFromToken(optional)
+		result = &ast.OptionalType{
+			Type:   result,
+			EndPos: endPos,
+		}
+	}
+
+	return result
+}
+
+func (v *ProgramVisitor) VisitInnerType(ctx *InnerTypeContext) interface{} {
 	// base type
 	baseTypeContext := ctx.BaseType()
 	var result ast.Type
@@ -784,13 +780,8 @@ func (v *ProgramVisitor) VisitNonReferenceType(ctx *NonReferenceTypeContext) int
 		}
 	}
 
-	// optionals
-	for _, optional := range ctx.optionals {
-		endPos := PositionFromToken(optional)
-		result = &ast.OptionalType{
-			Type:   result,
-			EndPos: endPos,
-		}
+	if result == nil {
+		panic(errors.NewUnreachableError())
 	}
 
 	return result

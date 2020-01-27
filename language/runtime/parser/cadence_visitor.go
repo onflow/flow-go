@@ -98,6 +98,9 @@ type CadenceVisitor interface {
 	// Visit a parse tree produced by CadenceParser#nonReferenceType.
 	VisitNonReferenceType(ctx *NonReferenceTypeContext) interface{}
 
+	// Visit a parse tree produced by CadenceParser#innerType.
+	VisitInnerType(ctx *InnerTypeContext) interface{}
+
 	// Visit a parse tree produced by CadenceParser#baseType.
 	VisitBaseType(ctx *BaseTypeContext) interface{}
 
