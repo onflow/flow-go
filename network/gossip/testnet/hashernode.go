@@ -3,12 +3,13 @@ package testnet
 import (
 	"context"
 	"errors"
+	"net"
+	"sync"
+
 	"github.com/dapperlabs/flow-go/network/gossip"
 	protocols "github.com/dapperlabs/flow-go/network/gossip/protocols/grpc"
 	"github.com/dapperlabs/flow-go/network/gossip/registry"
 	"github.com/rs/zerolog"
-	"net"
-	"sync"
 
 	"github.com/dapperlabs/flow-go/crypto"
 )
@@ -23,7 +24,7 @@ type hasherNode struct {
 }
 
 func newHasherNode(wg *sync.WaitGroup) (*hasherNode, error) {
-	h, err := crypto.NewHasher(crypto.SHA3_256)
+	h, err := crypto.NewSha3_256()
 	if err != nil {
 		return &hasherNode{}, nil
 	}

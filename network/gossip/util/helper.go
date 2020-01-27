@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+
 	"github.com/golang/protobuf/proto"
 
 	"github.com/dapperlabs/flow-go/crypto"
@@ -49,7 +50,7 @@ func RandomSubSet(list []string, size int) ([]string, error) {
 // computeHash computes the hash of GossipMessage using sha256 algorithm
 func ComputeHash(msg *messages.GossipMessage) ([]byte, error) {
 
-	alg, err := crypto.NewHasher(crypto.SHA3_256)
+	alg := crypto.NewSha3_256()
 	if err != nil {
 		return nil, err
 	}

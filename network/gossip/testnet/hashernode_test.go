@@ -27,7 +27,7 @@ func TestHasherNodeOneToAll(t *testing.T) {
 	// fanoutSet size for each node
 	fanoutSize := 5
 
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
+	hasher, err := crypto.NewSha3_256()
 	require.Nil(err, "could not create hasher")
 
 	// hashes keeps the hash of all the messages sent
@@ -116,7 +116,7 @@ func TestHasherNode(t *testing.T) {
 	fanoutSize := 5
 	wg := &sync.WaitGroup{}
 
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
+	hasher := crypto.NewSha3_256()
 	assert.Nil(err, "could not create hasher")
 
 	testParams := []struct {
