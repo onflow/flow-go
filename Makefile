@@ -40,11 +40,11 @@ endif
 ifeq ($(UNAME), Darwin)
 	brew install capnp
 endif
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.23.1; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	GO111MODULE=on go get zombiezen.com/go/capnproto2@v0.0.0-20190505172156-0c36f8f86ab2; \
-	GO111MODULE=on go get github.com/mgechev/revive@v1.0.1; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v0.0.0-20181123154057-e78b021dcbb5; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
@@ -110,7 +110,8 @@ tidy:
 
 .PHONY: lint
 lint:
-	GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
+	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
+	golangci-lint run -v ./...
 
 .PHONY: ci
 ci: install-tools tidy lint test coverage
@@ -119,7 +120,7 @@ ci: install-tools tidy lint test coverage
 docker-ci:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
-		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.6 \
+		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
 		make ci
 
 # This command is should only be used by Team City
@@ -127,10 +128,10 @@ docker-ci:
 .PHONY: docker-ci-team-city
 docker-ci-team-city:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
-		-v ${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK} -e SSH_AUTH_SOCK="${SSH_AUTH_SOCK}" \
+		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
-		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.6 \
+		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.7 \
 		make ci
 
 .PHONY: docker-build-collection
