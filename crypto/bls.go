@@ -18,29 +18,6 @@ func (sk *PrKeyBLS_BLS12381) signHash(h Hash) (Signature, error) {
 	return sk.alg.blsSign(&sk.scalar, h), nil
 }
 
-// hashes an input data to a hash of an arbitrary input length
-// using a chaining of the input Hasher
-func hashToArbitraryLength(data []byte, outLen int, alg Hasher) Hash {
-	// the overall output hash
-	h := make([]byte, outLen)
-	// concatenate the input to a counter byte
-	dataToHash := make([]byte, len(data)+1)
-	copy(dataToHash[1:], data)
-	i := 0
-	for ; i < outLen; i += alg.Size() {
-		// update the counter byte
-		dataToHash[0] = byte(i / alg.Size())
-		// copy the round output to the overall output
-		copy(h[i:], alg.ComputeHash(dataToHash))
-	}
-	i -= alg.Size()
-	// update the counter byte
-	dataToHash[0] = byte(i / alg.Size())
-	// copy the last round bytes to the overall output
-	copy(h[i:], alg.ComputeHash(dataToHash)[:outLen-i])
-	return h
-}
-
 // Sign signs an array of bytes
 func (sk *PrKeyBLS_BLS12381) Sign(data []byte, kmac Hasher) (Signature, error) {
 	if kmac == nil {
@@ -52,10 +29,10 @@ func (sk *PrKeyBLS_BLS12381) Sign(data []byte, kmac Hasher) (Signature, error) {
 }
 
 // NewBlsKmac returns a new KMAC128 instance with the right parameters
-// chosen for BLS signnatures and verifications
+// chosen for BLS signatures and verifications
 // tag is the domain separation tag
 func NewBlsKmac(tag string) Hasher {
-	return NewKMAC128([]byte(tag), []byte("H2C"), OpSwUInputLenBLS_BLS12381)
+	return NewKmac128([]byte(tag), []byte("H2C"), OpSwUInputLenBLS_BLS12381)
 }
 
 // verifyHash implements BLS signature verification on BLS12381 curve

@@ -16,7 +16,7 @@ type kmac128 struct {
 	// Using the io.Writer interface changes the internal state
 	// of the KMAC
 	sha3.ShakeHash
-	// the block initialized by NewKMAC128
+	// the block initialized by NewKmac128
 	// stores the encoding of the key
 	initBlock []byte
 }
@@ -24,12 +24,12 @@ type kmac128 struct {
 // the cSHAKE128 rate as defined in NIST SP 800-185
 const cSHAKE128BlockSize = 168
 
-// NewKMAC128 returns a new KMAC instance
+// NewKmac128 returns a new KMAC instance
 // - key is the KMAC key (in this function, the length is not compared
 // against the security level, this function should not be used in
 // the general KMAC case)
 // - customizer is the customization string
-func NewKMAC128(key []byte, customizer []byte, outputSize int) Hasher {
+func NewKmac128(key []byte, customizer []byte, outputSize int) Hasher {
 	var k kmac128
 	k.commonHasher = &commonHasher{
 		algo:       KMAC128,
@@ -129,23 +129,3 @@ func (k *kmac128) SumHash() Hash {
 func (k *kmac128) Size() int {
 	return k.outputSize
 }
-
-// KMAC128 as defined in NIST SP 800-185
-// there is no restriction on the key size as the KMAC key
-// is only used as a domain separation tag
-/*func (k *kmac128) ComputeHash(key []byte, customizer []byte, outputSize int, data []byte) Hash {
-	// initialize the cSHAKE128 instance
-	cshake = sha3.NewCShake128("KMAC", customizer)
-	rate := cshake.BlockSize()
-	// KMAC length should be larger than the bit-security level
-	// it is not checked here as the key is public and only used
-	// as a domain tag
-	// dataToHash = bytepad(key,168) || data || rightEncode(len)
-	cshake.Write(bytepad(key, rate))
-	cshake.Write(data)
-	cshake.Write(rightEncode(uint64(outputSize)))
-	// read the cshake output
-	h := make([]byte, outputSize)
-	cshake.Read(h)
-	return h
-}*/

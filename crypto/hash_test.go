@@ -141,8 +141,8 @@ func BenchmarkSha2_384(b *testing.B) {
 
 // Sanity checks of cSHAKE-128
 // the test vector is taken from the NIST document
-// https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/KMAC_samples.pdf
-func TestKMAC128(t *testing.T) {
+// https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/examples/Kmac_samples.pdf
+func TestKmac128(t *testing.T) {
 
 	input := []byte{0x00, 0x01, 0x02, 0x03}
 	expected := [][]byte{
@@ -159,14 +159,14 @@ func TestKMAC128(t *testing.T) {
 	}
 	outputSize := 32
 
-	alg := NewKMAC128(key, customizers[0], outputSize)
+	alg := NewKmac128(key, customizers[0], outputSize)
 	alg.Write(input[0:2])
 	alg.Write(input[2:])
 	hash := alg.SumHash()
 	checkBytes(t, input, expected[0], hash)
 
 	for i := 0; i < len(customizers); i++ {
-		alg = NewKMAC128(key, customizers[i], outputSize)
+		alg = NewKmac128(key, customizers[i], outputSize)
 		hash = alg.ComputeHash(input)
 		checkBytes(t, input, expected[i], hash)
 	}
