@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	registry "github.com/dapperlabs/flow-go/network/gossip/registry"
 	proto "github.com/golang/protobuf/proto"
+
+	registry "github.com/dapperlabs/flow-go/network/gossip/registry"
 )
 
 //go:generate stringer -type=registry.MessageType
