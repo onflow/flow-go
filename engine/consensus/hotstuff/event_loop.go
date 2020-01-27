@@ -53,4 +53,3 @@ func (el *EventLoop) Start() error {
 	el.loop()
 	return nil
 }
-

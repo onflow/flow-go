@@ -8,7 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	mockdist "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications/mock"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/pacemaker/flowmc/timeout"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -217,7 +217,6 @@ func Test_FutureBlockWithQcForFutureFutureView(t *testing.T) {
 	assert.Equal(t, uint64(14), pm.CurView())
 	assert.True(t, nveOccured && nve.View == 14)
 }
-
 
 // Test_IgnoreBlockDuplicates tests that PaceMaker ignores duplicate blocks
 func Test_IgnoreBlockDuplicates(t *testing.T) {

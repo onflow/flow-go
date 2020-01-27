@@ -18,7 +18,7 @@ func (e *ErrorConfiguration) Error() string {
 }
 
 type ErrorInvalidTimeout struct {
-	Timeout *Timeout
+	Timeout     *Timeout
 	CurrentView uint64
 	CurrentMode TimeoutMode
 }
@@ -27,5 +27,5 @@ func (e *ErrorInvalidTimeout) Error() string {
 	return fmt.Sprintf(
 		"received timeout (view, mode) (%d, %s) but current state is (%d, %s)",
 		e.Timeout.View, e.Timeout.Mode.String(), e.CurrentView, e.CurrentMode.String(),
-		)
+	)
 }

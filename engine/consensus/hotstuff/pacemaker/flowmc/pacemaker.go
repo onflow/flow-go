@@ -5,7 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/pacemaker/flowmc/timeout"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"go.uber.org/atomic"
 )

@@ -41,7 +41,7 @@ func DefaultController() *Controller {
 }
 
 func (t *Controller) Channel() <-chan *types.Timeout { return t.timeoutChannel }
-func (t *Controller) Mode() types.TimeoutMode   { return t.mode }
+func (t *Controller) Mode() types.TimeoutMode        { return t.mode }
 
 func (t *Controller) StartTimeout(mode types.TimeoutMode, view uint64) {
 	t.mode = mode
@@ -59,7 +59,7 @@ func (t *Controller) StartTimeout(mode types.TimeoutMode, view uint64) {
 	}
 	timeoutChannel := make(chan *types.Timeout)
 	go func() {
-		time := <- timerChannel
+		time := <-timerChannel
 		timeoutChannel <- &types.Timeout{
 			Mode:         mode,
 			View:         view,
@@ -68,9 +68,6 @@ func (t *Controller) StartTimeout(mode types.TimeoutMode, view uint64) {
 	}()
 	t.timeoutChannel = timeoutChannel
 }
-
-
-
 
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
