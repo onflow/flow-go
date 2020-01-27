@@ -20,6 +20,7 @@ type Block struct {
 	Timestamp time.Time
 }
 
+// BlockMRH returns the Merkle Root Hash of the Block, which is computed from (View, QC, PayloadHash)
 func (b Block) BlockMRH() flow.Identifier {
 	return flow.MakeID(b)
 }

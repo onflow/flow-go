@@ -1,6 +1,10 @@
 package hotstuff
 
 import (
+	"github.com/dapperlabs/flow-go/model/flow"
+	protocol "github.com/dapperlabs/flow-go/protocol/badger"
+	"github.com/dapperlabs/flow-go/protocol/mocks"
+	"github.com/golang/mock/gomock"
 	"log"
 	"math/rand"
 	"testing"
@@ -17,6 +21,33 @@ const STAKE uint64 = 10
 // threshold stake would be 5,
 // meaning that it is enough to build a QC when receiving 5 votes
 const VALIDATOR_SIZE = 7
+
+type State struct {
+}
+
+// AtBlockID provides a mock function with given fields: blockID
+func (_m *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
+	var r0 protocol.Snapshot
+	return r0
+}
+
+// AtNumber provides a mock function with given fields: number
+func (_m *State) AtNumber(number uint64) protocol.Snapshot {
+	var r0 protocol.Snapshot
+	return r0
+}
+
+// Final provides a mock function with given fields:
+func (_m *State) Final() protocol.Snapshot {
+	var r0 protocol.Snapshot
+	return r0
+}
+
+// Mutate provides a mock function with given fields:
+func (_m *State) Mutate() protocol.Mutator {
+	var r0 protocol.Mutator
+	return r0
+}
 
 // receive 5 valid incorporated votes in total
 // a QC will be generated on receiving the 5th vote
@@ -61,8 +92,10 @@ func TestUnHappyPathForPendingVotes(t *testing.T) {
 // should trigger ErrDoubleVote
 func TestErrDoubleVote(t *testing.T) {
 	var vaLogger zerolog.Logger
-
-	va := NewVoteAggregator(vaLogger, &ViewState{}, &Validator{})
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	state := mocks.NewMockState(ctrl)
+	va := NewVoteAggregator(vaLogger, &ViewState{protocolState: state}, &Validator{})
 	bp1 := &types.BlockProposal{
 		Block: &types.Block{
 			QC:          &types.QuorumCertificate{},

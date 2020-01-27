@@ -9,7 +9,7 @@ import (
 
 type Voter struct {
 	signer    Signer
-	viewState ViewState
+	viewState *ViewState
 	forks     Forks
 	// Flag to turn on/off consensus acts (voting, block production etc)
 	isConActor bool
@@ -18,7 +18,7 @@ type Voter struct {
 	log           zerolog.Logger
 }
 
-func (v *Voter) NewVoter(signer Signer, viewState ViewState, forks Forks, isConActor bool, log zerolog.Logger) *Voter {
+func (v *Voter) NewVoter(signer Signer, viewState *ViewState, forks Forks, isConActor bool, log zerolog.Logger) *Voter {
 	return &Voter{
 		signer:        signer,
 		viewState:     viewState,

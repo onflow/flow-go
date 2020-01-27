@@ -2,18 +2,22 @@ package types
 
 import "fmt"
 
+// AggregatedSignature is the aggregated signatures for a group signers.
+// TODO: will be replaced by crypto library's aggregated signature type
 type AggregatedSignature struct {
+	// RawSignature is the raw signature for the entire aggregated signature
 	RawSignature []byte
 	Signers      []bool
 }
 
-type RawSignature = [32]byte
+// rawSignature is the signature of one signer's signature
+type rawSignature [32]byte
 
 // FromSignatures builds an aggregated signature from a slice of signature and a signerCount
 // sigs is the slice of signatures from all the signers
 // signers is the flag from the entire identity list for who signed it and who didn't.
 func FromSignatures(sigs []*Signature, signerCount uint32) (*AggregatedSignature, error) {
-	rawSigs := make([]RawSignature, len(sigs))
+	rawSigs := make([]rawSignature, len(sigs))
 	signers := make([]bool, signerCount)
 
 	for i, sig := range sigs {
@@ -37,7 +41,7 @@ func FromSignatures(sigs []*Signature, signerCount uint32) (*AggregatedSignature
 }
 
 // buildAggregatedSignature will use cryto library to generate aggregated signature
-func buildAggregatedSignature(sigs []RawSignature, signers []bool) []byte {
+func buildAggregatedSignature(sigs []rawSignature, signers []bool) []byte {
 	panic("TODO")
 }
 
