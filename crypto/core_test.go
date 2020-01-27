@@ -93,6 +93,8 @@ func BenchmarkHashToG1(b *testing.B) {
 }
 
 // test the optimized SwU algorithm core against a valid test vector
+// the test vector is taken from the original implementation used by the authors of
+// the paper https://eprint.iacr.org/2019/403.pdf
 func TestOpSwuHashToG1(t *testing.T) {
 	NewSigner(BLS_BLS12381)
 	inputs := []string{

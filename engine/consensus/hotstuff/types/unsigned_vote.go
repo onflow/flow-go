@@ -5,8 +5,8 @@ type UnsignedVote struct {
 	BlockMRH []byte
 }
 
-func NewUnsignedVote(view uint64, blockMRH []byte) *Vote {
-	return &Vote{
+func NewUnsignedVote(view uint64, blockMRH []byte) *UnsignedVote {
+	return &UnsignedVote{
 		View:     view,
 		BlockMRH: blockMRH,
 	}
