@@ -6,8 +6,8 @@ import (
 )
 
 // HotStuff defines the interface to the core HotStuff algorithm. It includes
-// a method to start the event loop, and channels to submit proposals and votes
-// received from the network.
+// a method to start the event loop, and utilities to submit block proposals
+// and votes received from other replicas.
 //
 // TODO Define assumptions that the chain compliance layer (ie the user of this
 // TODO interface) must satisfy. ie submit blocks in order, etc.
