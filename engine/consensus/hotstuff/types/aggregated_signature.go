@@ -11,7 +11,7 @@ type AggregatedSignature struct {
 }
 
 // rawSignature is the signature of one signer's signature
-type rawSignature = [32]byte
+type rawSignature [32]byte
 
 // FromSignatures builds an aggregated signature from a slice of signature and a signerCount
 // sigs is the slice of signatures from all the signers

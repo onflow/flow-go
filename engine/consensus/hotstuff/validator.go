@@ -31,7 +31,7 @@ func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 	}
 
 	// compute total stakes of all signers from the QC
-	totalStakes := computeTotalStakes(signers)
+	totalStakes := flow.IdentityList(signers).TotalStake()
 
 	// compute the threshold of stake required for a valid QC
 	threshold := ComputeStakeThresholdForBuildingQC(stakedNodes)
@@ -132,14 +132,6 @@ func validateAggregatedSigWithSignedBytes(stakedNodes flow.IdentityList, signedB
 		}
 	}
 	return signers, nil
-}
-
-func computeTotalStakes(signers []*flow.Identity) uint64 {
-	var total uint64
-	for _, signer := range signers {
-		total += signer.Stake
-	}
-	return total
 }
 
 func (v *Validator) validateVoteSig(vote *types.Vote) (*flow.Identity, error) {
