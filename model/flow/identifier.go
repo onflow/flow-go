@@ -87,7 +87,7 @@ func ConcatSum(ids ...Identifier) Identifier {
 	var sum Identifier
 	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
 	for _, id := range ids {
-		hasher.Add(id[:])
+		hasher.Write(id[:])
 	}
 	hash := hasher.SumHash()
 	copy(sum[:], hash)
