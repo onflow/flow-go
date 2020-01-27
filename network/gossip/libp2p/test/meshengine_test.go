@@ -29,7 +29,7 @@ func TestMeshNetTestSuite(t *testing.T) {
 
 func (m *MeshNetTestSuite) SetupTest() {
 	const count = 10 // defines total number of nodes in our network
-	golog.SetAllLoggers(gologging.DEBUG)
+	golog.SetAllLoggers(gologging.INFO)
 	m.ids = m.createIDs(count)
 	m.mws = m.createMiddleware(m.ids)
 	m.nets = m.createNetworks(m.mws, m.ids)
@@ -44,7 +44,7 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 	engs := make([]*MeshEngine, 0)
 	wg := sync.WaitGroup{}
 
-	time.Sleep(time.Second * 5)
+	//time.Sleep(time.Second * 5)
 
 	// log[i][j] keeps the message that node i sends to node j
 	log := make(map[int][]string)
@@ -54,7 +54,7 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 		log[i] = make([]string, 0)
 	}
 
-	time.Sleep(time.Second * 5)
+	//time.Sleep(time.Second * 5)
 
 	// Each node broadcasting a message to all others
 	for i := range m.nets {
@@ -65,7 +65,7 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 		wg.Add(count - 1)
 	}
 
-	time.Sleep(time.Second * 5)
+	//time.Sleep(time.Second * 5)
 
 	// fires a goroutine for each engine that listens to incoming messages
 	for i := range m.nets {
