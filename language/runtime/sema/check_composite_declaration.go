@@ -738,17 +738,45 @@ func (checker *Checker) checkCompositeConformance(
 
 // TODO: return proper error
 func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member) bool {
+
+	// Check declaration kind
+
+	if compositeMember.DeclarationKind != interfaceMember.DeclarationKind {
+		return false
+	}
+
 	// Check type
 
-	// TODO: subtype?
 	compositeMemberType := compositeMember.TypeAnnotation.Type
 	interfaceMemberType := interfaceMember.TypeAnnotation.Type
 
 	if !compositeMemberType.IsInvalidType() &&
-		!interfaceMemberType.IsInvalidType() &&
-		!compositeMemberType.Equal(interfaceMemberType) {
+		!interfaceMemberType.IsInvalidType() {
 
-		return false
+		switch interfaceMember.DeclarationKind {
+		case common.DeclarationKindField:
+			// If the member is just a field, check the types are equal
+
+			// TODO: subtype?
+			if !compositeMemberType.Equal(interfaceMemberType) {
+				return false
+			}
+
+		case common.DeclarationKindFunction:
+			// If the member is a function, check the types are equal,
+			// but also check that the argument labels match
+
+			interfaceMemberFunctionType := interfaceMemberType.(*FunctionType)
+			compositeMemberFunctionType := compositeMemberType.(*FunctionType)
+
+			// TODO: subtype?
+			if !compositeMemberFunctionType.EqualIncludingArgumentLabels(interfaceMemberFunctionType) {
+				return false
+			}
+
+		default:
+			panic(errors.NewUnreachableError())
+		}
 	}
 
 	// Check variable kind
@@ -765,8 +793,7 @@ func (checker *Checker) memberSatisfied(compositeMember, interfaceMember *Member
 		return false
 	}
 
-	if interfaceMember.DeclarationKind == common.DeclarationKindField &&
-		interfaceMember.Access != ast.AccessNotSpecified &&
+	if interfaceMember.Access != ast.AccessNotSpecified &&
 		compositeMember.Access.IsLessPermissiveThan(interfaceMember.Access) {
 
 		return false
@@ -897,7 +924,7 @@ func (checker *Checker) compositeConstructorType(
 	if len(initializers) > 0 {
 		firstInitializer := initializers[0]
 
-		argumentLabels = firstInitializer.ParameterList.ArgumentLabels()
+		argumentLabels = firstInitializer.ParameterList.EffectiveArgumentLabels()
 
 		constructorFunctionType.Parameters = compositeType.ConstructorParameters
 
@@ -1006,7 +1033,7 @@ func (checker *Checker) nonEventMembersAndOrigins(
 
 		functionType := checker.functionType(function.ParameterList, function.ReturnTypeAnnotation)
 
-		argumentLabels := function.ParameterList.ArgumentLabels()
+		argumentLabels := function.ParameterList.EffectiveArgumentLabels()
 
 		fieldTypeAnnotation := &TypeAnnotation{Type: functionType}
 
