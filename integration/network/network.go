@@ -36,7 +36,7 @@ type CollectionContainer struct {
 type FlowNode struct {
 	Role       flow.Role
 	Stake      uint64
-	Identifier *flow.Identifier
+	Identifier flow.Identifier
 }
 
 type rolesCounts map[flow.Role]uint
@@ -52,11 +52,12 @@ func countRoles(identities []*FlowNode) rolesCounts {
 	return ret
 }
 
-func identifier(identifier *flow.Identifier) flow.Identifier {
-	if identifier == nil {
+func identifier(identifier flow.Identifier) flow.Identifier {
+	// Substitute magic zero value for random on
+	if identifier == flow.ZeroID {
 		return unittest.IdentifierFixture()
 	}
-	return *identifier
+	return identifier
 }
 
 func healthcheckGRPC(context context.Context, apiPort string) error {
