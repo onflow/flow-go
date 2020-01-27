@@ -28,6 +28,7 @@ type Engine struct {
 	conduit network.Conduit // used to propagate result approvals
 	me      module.Local    // used to access local node information
 	state   protocol.State  // used to access the protocol state
+	runtime runtime.Runtime // used to execute transactions
 }
 
 // New creates and returns a new instance of a verifier engine.
@@ -39,10 +40,11 @@ func New(
 ) (*Engine, error) {
 
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   log,
-		state: state,
-		me:    me,
+		unit:    engine.NewUnit(),
+		log:     log,
+		state:   state,
+		me:      me,
+		runtime: runtime.NewInterpreterRuntime(),
 	}
 
 	var err error
@@ -157,8 +159,7 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 // executeChunk executes the transactions for a single chunk and returns the
 // resultant end state, or an error if execution failed.
 func (e *Engine) executeChunk(res *verification.CompleteExecutionResult) (flow.StateCommitment, error) {
-	rt := runtime.NewInterpreterRuntime()
-	blockCtx := virtualmachine.NewBlockContext(rt, &res.Block.Header)
+	blockCtx := virtualmachine.NewBlockContext(e.runtime, &res.Block.Header)
 
 	getRegister := func(key string) ([]byte, error) {
 		registers := res.ChunkStates[0].Registers
