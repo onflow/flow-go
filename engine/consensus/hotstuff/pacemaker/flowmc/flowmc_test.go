@@ -218,7 +218,6 @@ func Test_FutureBlockWithQcForFutureFutureView(t *testing.T) {
 	assert.True(t, nveOccured && nve.View == 14)
 }
 
-
 // Test_IgnoreBlockDuplicates tests that PaceMaker ignores duplicate blocks
 func Test_IgnoreBlockDuplicates(t *testing.T) {
 	// NOT Primary for the Block's view

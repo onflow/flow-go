@@ -1,5 +1,7 @@
 package notifications
 
+import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+
 // SkippedAheadConsumer consumes notifications of type `OnSkippedAhead`
 // which are produced by PaceMaker when it decides to skip over one or more view numbers.
 // Prerequisites:
@@ -61,4 +63,24 @@ type StartingVotesTimeoutConsumer interface {
 // and must handle repetition of the same events (with some processing overhead).
 type ReachedVotesTimeoutConsumer interface {
 	OnReachedVotesTimeout(viewNumber uint64)
+}
+
+type QcIncorporatedConsumer interface {
+	OnQcIncorporated(*types.QuorumCertificate)
+}
+
+type ForkChoiceGeneratedConsumer interface {
+	OnForkChoiceGenerated(uint64, *types.QuorumCertificate)
+}
+
+type BlockIncorporatedConsumer interface {
+	OnBlockIncorporated(*types.BlockProposal)
+}
+
+type FinalizedBlockConsumer interface {
+	OnFinalizedBlock(*types.BlockProposal)
+}
+
+type DoubleProposeDetectedConsumer interface {
+	OnDoubleProposeDetected(*types.BlockProposal, *types.BlockProposal)
 }

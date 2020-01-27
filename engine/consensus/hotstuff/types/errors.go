@@ -18,7 +18,7 @@ func (e *ErrorConfiguration) Error() string {
 }
 
 type ErrorInvalidTimeout struct {
-	Timeout *Timeout
+	Timeout     *Timeout
 	CurrentView uint64
 	CurrentMode TimeoutMode
 }
@@ -27,12 +27,12 @@ func (e *ErrorInvalidTimeout) Error() string {
 	return fmt.Sprintf(
 		"received timeout (view, mode) (%d, %s) but current state is (%d, %s)",
 		e.Timeout.View, e.Timeout.Mode.String(), e.CurrentView, e.CurrentMode.String(),
-		)
+	)
 }
 
 type ErrorConflictingQCs struct {
 	View uint64
-	Qcs []*QuorumCertificate
+	Qcs  []*QuorumCertificate
 }
 
 func (e *ErrorConflictingQCs) Error() string {
@@ -40,7 +40,7 @@ func (e *ErrorConflictingQCs) Error() string {
 }
 
 type ErrorMissingBlock struct {
-	View uint64
+	View    uint64
 	BlockID []byte
 }
 
@@ -49,9 +49,9 @@ func (e *ErrorMissingBlock) Error() string {
 }
 
 type ErrorInvalidBlock struct {
-	View uint64
+	View    uint64
 	BlockID []byte
-	Msg string
+	Msg     string
 }
 
 func (e *ErrorInvalidBlock) Error() string {

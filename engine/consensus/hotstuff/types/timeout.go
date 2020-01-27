@@ -3,7 +3,7 @@ package types
 type TimeoutMode int
 
 const (
-	ReplicaTimeout TimeoutMode = iota
+	ReplicaTimeout        TimeoutMode = iota
 	VoteCollectionTimeout TimeoutMode = iota
 )
 
@@ -15,4 +15,3 @@ type Timeout struct {
 func (m TimeoutMode) String() string {
 	return [...]string{"ReplicaTimeout", "VoteCollectionTimeout"}[m]
 }
-
