@@ -10,7 +10,7 @@ import (
 // Validator provides functions to validate QC, Block and Vote
 type Validator struct {
 	// viewState provides API for querying identities for a specific view
-	viewState ViewState
+	viewState *ViewState
 }
 
 // ValidateQC validates the QC

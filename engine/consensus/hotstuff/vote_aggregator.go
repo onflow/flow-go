@@ -7,7 +7,7 @@ import (
 type VoteAggregator struct {
 	pendingVotes map[string][]*types.Vote
 	createdQC    map[string]*types.QuorumCertificate
-	viewState    ViewState
+	viewState    *ViewState
 }
 
 // StorePendingVote stores the vote as a pending vote assuming the caller has checked that the voting

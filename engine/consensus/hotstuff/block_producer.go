@@ -9,14 +9,14 @@ import (
 // BlockProposalProducer is responsible for producing new block proposals
 type BlockProposalProducer struct {
 	signer    Signer
-	viewState ViewState
+	viewState *ViewState
 	mempool   Mempool
 
 	// chainID is used for specifying the chainID field for new blocks
 	chainID string
 }
 
-func NewBlockProposalProducer(signer Signer, viewState ViewState, mempool Mempool, chainID string) (*BlockProposalProducer, error) {
+func NewBlockProposalProducer(signer Signer, viewState *ViewState, mempool Mempool, chainID string) (*BlockProposalProducer, error) {
 	bp := &BlockProposalProducer{
 		signer:    signer,
 		viewState: viewState,
