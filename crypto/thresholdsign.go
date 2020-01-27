@@ -50,10 +50,7 @@ func NewThresholdSigner(size int, hashAlgo HashingAlgorithm) (*ThresholdSigner, 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
 	threshold := optimalThreshold(size)
 	// Hahser to be used
-	hasher, err := NewHasher(hashAlgo, nil)
-	if err != nil {
-		return nil, err
-	}
+	hasher := NewBlsKmac("Threshold Signatures")
 	shares := make([]byte, 0, size*SignatureLenBLS_BLS12381)
 	signers := make([]index, 0, size)
 

@@ -42,10 +42,20 @@ func hashToArbitraryLength(data []byte, outLen int, alg Hasher) Hash {
 }
 
 // Sign signs an array of bytes
-func (sk *PrKeyBLS_BLS12381) Sign(data []byte, alg Hasher) (Signature, error) {
+func (sk *PrKeyBLS_BLS12381) Sign(data []byte, kmac Hasher) (Signature, error) {
+	if kmac == nil {
+		return nil, cryptoError{"Sign requires a Hasher"}
+	}
 	// hash the input to 128 bytes
-	h := hashToArbitraryLength(data, OpSwUInputLenBLS_BLS12381, alg)
+	h := kmac.ComputeHash(data)
 	return sk.signHash(h)
+}
+
+// NewBlsKmac returns a new KMAC128 instance with the right parameters
+// chosen for BLS signnatures and verifications
+// tag is the domain separation tag
+func NewBlsKmac(tag string) Hasher {
+	return NewKMAC128([]byte(tag), []byte("H2C"), OpSwUInputLenBLS_BLS12381)
 }
 
 // verifyHash implements BLS signature verification on BLS12381 curve
@@ -54,12 +64,12 @@ func (pk *PubKeyBLS_BLS12381) verifyHash(s Signature, h Hash) (bool, error) {
 }
 
 // Verify verifies a signature of a byte array
-func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, alg Hasher) (bool, error) {
-	if alg == nil {
+func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, kmac Hasher) (bool, error) {
+	if kmac == nil {
 		return false, cryptoError{"VerifyBytes requires a Hasher"}
 	}
 	// hash the input to 128 bytes
-	h := hashToArbitraryLength(data, OpSwUInputLenBLS_BLS12381, alg)
+	h := kmac.ComputeHash(data)
 	return pk.verifyHash(s, h)
 }
 

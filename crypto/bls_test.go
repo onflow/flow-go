@@ -16,7 +16,7 @@ func TestBLS_BLS12381(t *testing.T) {
 		log.Error(err.Error())
 		return
 	}
-	halg, err := NewHasher(SHA3_384, nil)
+	halg, err := NewHasher(SHA3_384)
 	input := []byte("test input")
 	// test the consistency with different inputs
 	for i := 0; i < 256; i++ {
@@ -27,12 +27,12 @@ func TestBLS_BLS12381(t *testing.T) {
 
 // Signing bench
 func BenchmarkBLS_BLS12381Sign(b *testing.B) {
-	halg, _ := NewHasher(SHA3_384, nil)
+	halg, _ := NewHasher(SHA3_384)
 	benchSign(b, BLS_BLS12381, halg)
 }
 
 // Verifying bench
 func BenchmarkBLS_BLS12381Verify(b *testing.B) {
-	halg, _ := NewHasher(SHA3_384, nil)
+	halg, _ := NewHasher(SHA3_384)
 	benchVerify(b, BLS_BLS12381, halg)
 }

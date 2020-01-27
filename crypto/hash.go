@@ -13,7 +13,7 @@ import (
 )
 
 // NewHasher initializes and chooses a hashing algorithm
-func NewHasher(algo HashingAlgorithm, params *hasherParameters) (Hasher, error) {
+func NewHasher(algo HashingAlgorithm) (Hasher, error) {
 	switch algo {
 	case SHA3_256:
 		hasher := &sha3_256Algo{
@@ -74,25 +74,25 @@ func NewHasher(algo HashingAlgorithm, params *hasherParameters) (Hasher, error) 
 		}
 		return hasher, nil
 
-	case CSHAKE_128:
-		var definer, customizer []byte
-		var size int
-		if params != nil {
-			if params.definer != nil {
-				copy(definer, params.definer)
-			}
-			if params.customizer != nil {
-				copy(customizer, params.customizer)
-			}
-			size = params.outputSize
+	/*case CSHAKE_128:
+	var definer, customizer []byte
+	var size int
+	if params != nil {
+		if params.definer != nil {
+			copy(definer, params.definer)
 		}
-		hasher := &cShake128Algo{
-			commonHasher: &commonHasher{
-				algo:       algo,
-				outputSize: size,
-			},
-			ShakeHash: sha3.NewCShake128(definer, customizer)}
-		return hasher, nil
+		if params.customizer != nil {
+			copy(customizer, params.customizer)
+		}
+		size = params.outputSize
+	}
+	hasher := &cShake128Algo{
+		commonHasher: &commonHasher{
+			algo:       algo,
+			outputSize: size,
+		},
+		ShakeHash: sha3.NewCShake128(definer, customizer)}
+	return hasher, nil*/
 
 	default:
 		return nil, cryptoError{
@@ -121,7 +121,7 @@ type Hasher interface {
 	Algorithm() HashingAlgorithm
 	// Size returns the hash output length
 	Size() int
-	// ComputeHash returns the hash output
+	// ComputeHash returns the hash output regardless of the hash state
 	ComputeHash([]byte) Hash
 	// Write([]bytes) (using the io.Writer interface) adds more bytes to the
 	// current hash state
@@ -132,14 +132,32 @@ type Hasher interface {
 	Reset()
 }
 
+// Hasher interface
+
+/*type MACer interface {
+	// Algorithm returns the MAC algorithm
+	Algorithm() MacAlgorithm
+	// Size returns the MAC output length
+	Size() int
+	// Write([]bytes) (using the io.Writer interface) adds more
+	// bytes to the current MAC state
+	io.Writer
+	// ComputeHash returns the MAC output of the input data
+	// the MAC state is reinitialized with same key and same customization string
+	ComputeHash(data []byte) Hash
+	// Reset resets the MAC state and reinitializes it with
+	// the same key and same customization string
+	Reset()
+}*/
+
 // some hashers can be parameterized
 // hasherParameters contains the parameters required when
 // a Hasher is initialized
-type hasherParameters struct {
+/*type hasherParameters struct {
 	outputSize int
 	definer    []byte
 	customizer []byte
-}
+}*/
 
 // commonHasher holds the common data for all hashers
 type commonHasher struct {

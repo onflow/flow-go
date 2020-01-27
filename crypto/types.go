@@ -28,12 +28,12 @@ const (
 	SHA2_384
 	SHA3_256
 	SHA3_384
-	CSHAKE128
+	KMAC128
 )
 
 // String returns the string representation of this hashing algorithm.
 func (f HashingAlgorithm) String() string {
-	return [...]string{"UNKNOWN", "SHA2_256", "SHA2_384", "SHA3_256", "SHA3_384", "CSHAKE_128"}[f]
+	return [...]string{"UNKNOWN", "SHA2_256", "SHA2_384", "SHA3_256", "SHA3_384", "KMAC128"}[f]
 }
 
 const (
@@ -70,10 +70,14 @@ const (
 	PubKeyLenECDSA_SECp256k1        = 64
 	KeyGenSeedMinLenECDSA_SECp256k1 = 40
 
+	// DKG and Threshold Signatures
 	DKGMinSize       int = 3
 	ThresholdMinSize     = DKGMinSize
 	DKGMaxSize       int = 254
 	ThresholdMaxSize     = DKGMaxSize
+
+	// MAC
+	MACMinKeySize int = 16
 )
 
 // Signature is a generic type, regardless of the signature scheme
