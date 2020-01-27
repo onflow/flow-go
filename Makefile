@@ -44,7 +44,6 @@ endif
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	GO111MODULE=on go get zombiezen.com/go/capnproto2@v0.0.0-20190505172156-0c36f8f86ab2; \
-	GO111MODULE=on go get github.com/mgechev/revive@v1.0.1; \
 	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v0.0.0-20181123154057-e78b021dcbb5; \
 	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
@@ -105,7 +104,8 @@ tidy:
 
 .PHONY: lint
 lint:
-	GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
+	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
+	docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:v1.23.1 golangci-lint run -v ./...
 
 .PHONY: ci
 ci: install-tools tidy lint test coverage

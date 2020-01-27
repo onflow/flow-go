@@ -141,7 +141,7 @@ func (fnb *FlowNodeBuilder) initLogger() {
 
 func (fnb *FlowNodeBuilder) initDatabase() {
 	//Pre-create DB path (Badger creates only one-level dirs)
-	err := os.MkdirAll(fnb.BaseConfig.datadir, 700)
+	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Msgf("could not create datadir %s", fnb.BaseConfig.datadir)
 
 	db, err := badger.Open(badger.DefaultOptions(fnb.BaseConfig.datadir).WithLogger(nil))

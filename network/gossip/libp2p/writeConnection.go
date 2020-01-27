@@ -6,11 +6,11 @@ import (
 	"bufio"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
-	"github.com/rs/zerolog"
-
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
+	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 )
 
 // Connection represents a direct connection to another peer on the flow
