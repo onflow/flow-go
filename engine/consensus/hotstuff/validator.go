@@ -19,7 +19,7 @@ func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 	// TODO: potentially can return a very long list. need to find a better way for verifying QC
 	allStakedNode, err := v.viewState.GetIdentitiesForBlockID(qc.BlockMRH)
 	if err != nil {
-		return fmt.Errorf("cannot get identities to validate sig at view %v, because %w", qc.View, err)
+		return fmt.Errorf("cannot get identities to validate sig at view %v: %w", qc.View, err)
 	}
 
 	signedBytes := qc.BytesForSig()
@@ -69,17 +69,17 @@ func (v *Validator) ValidateBlock(bp *types.BlockProposal, parent *types.BlockPr
 
 	// validate block hash
 	if qc.BlockMRH != parent.BlockMRH() {
-		return nil, fmt.Errorf("invalid block. block must link to its parent. (qc, parent): (%v, %v)", qc.BlockMRH, parent.BlockMRH())
+		return nil, fmt.Errorf("invalid block. block must link to its parent. (qc: %x, parent: %x)", qc.BlockMRH, parent.BlockMRH())
 	}
 
 	// validate height
 	if bp.Height() != parent.Height()+1 {
-		return nil, fmt.Errorf("invalid block. block height must be 1 block higher than its parent. (block, parent): (%v, %v)", bp.Height(), parent.Height())
+		return nil, fmt.Errorf("invalid block. block height must be 1 block higher than its parent. (block: %v, parent: %v)", bp.Height(), parent.Height())
 	}
 
 	// validate view
 	if bp.View() <= qc.View {
-		return nil, fmt.Errorf("invalid block. block's view must be higher than QC's view. (block, qc): (%v, %v)", bp.View(), qc.View)
+		return nil, fmt.Errorf("invalid block. block's view must be higher than QC's view. (block: %v, qc: %v)", bp.View(), qc.View)
 	}
 	return signer, nil
 }
@@ -145,7 +145,7 @@ func (v *Validator) validateVoteSig(vote *types.Vote) (*flow.Identity, error) {
 	// getting all consensus identities
 	identities, err := v.viewState.GetIdentitiesForBlockID(vote.BlockMRH)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get identities to validate sig at view %v, because %w", vote.View, err)
+		return nil, fmt.Errorf("cannot get identities to validate sig at view %v: %w", vote.View, err)
 	}
 
 	// get the signed bytes
@@ -154,7 +154,7 @@ func (v *Validator) validateVoteSig(vote *types.Vote) (*flow.Identity, error) {
 	// verify the signature
 	signer, err := validateSignatureWithSignedBytes(identities, bytesToSign, vote.Signature)
 	if err != nil {
-		return nil, fmt.Errorf("invalid signature for vote %v, because %w", vote.BlockMRH, err)
+		return nil, fmt.Errorf("invalid signature for vote: %v: %w", vote.BlockMRH, err)
 	}
 	return signer, nil
 }
@@ -163,7 +163,7 @@ func (v *Validator) validateBlockSig(bp *types.BlockProposal) (*flow.Identity, e
 	// getting all consensus identities
 	identities, err := v.viewState.GetIdentitiesForBlockID(bp.BlockMRH())
 	if err != nil {
-		return nil, fmt.Errorf("cannot get identities to validate sig at view %v, because %w", bp.View(), err)
+		return nil, fmt.Errorf("cannot get identities to validate sig at view %v: %w", bp.View(), err)
 	}
 
 	// get the hash
@@ -172,7 +172,7 @@ func (v *Validator) validateBlockSig(bp *types.BlockProposal) (*flow.Identity, e
 	// verify the signature
 	signer, err := validateSignatureWithSignedBytes(identities, hashToSign, bp.Signature)
 	if err != nil {
-		return nil, fmt.Errorf("invalid signature for block %v, because %w", bp.BlockMRH(), err)
+		return nil, fmt.Errorf("invalid signature for block %v: %w", bp.BlockMRH(), err)
 	}
 	return signer, nil
 }
@@ -182,7 +182,7 @@ func validateSignatureWithSignedBytes(identities flow.IdentityList, hash []byte,
 	// getting signer's public key
 	signer, err := findSignerByIndex(identities, uint(sig.SignerIdx))
 	if err != nil {
-		return nil, fmt.Errorf("can not find signer, because %w", err)
+		return nil, fmt.Errorf("can not find signer: %w", err)
 	}
 
 	signerPubKey := readPubKey(signer)
