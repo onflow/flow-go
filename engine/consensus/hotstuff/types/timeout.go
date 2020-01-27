@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 type TimeoutMode int
 
 const (
@@ -10,6 +12,7 @@ const (
 type Timeout struct {
 	Mode TimeoutMode
 	View uint64
+	TimeoutFired time.Time
 }
 
 func (m TimeoutMode) String() string {

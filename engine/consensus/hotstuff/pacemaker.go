@@ -1,8 +1,6 @@
 package hotstuff
 
 import (
-	"time"
-
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
@@ -53,7 +51,7 @@ type PaceMaker interface {
 
 	// TimeoutChannel returns the timeout channel for the CURRENTLY ACTIVE timeout.
 	// Each time the pace maker starts a new timeout, this channel is replaced.
-	TimeoutChannel() <-chan time.Time
+	TimeoutChannel() <-chan *types.Timeout
 
 	// OnTimeout is called when a timeout, which was previously created by the PaceMaker, has
 	// looped through the event loop. When used correctly, OnTimeout will always return

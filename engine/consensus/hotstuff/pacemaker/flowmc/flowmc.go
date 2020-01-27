@@ -2,7 +2,6 @@ package flowmc
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
@@ -49,7 +48,7 @@ func (p *FlowMC) gotoView(newView uint64) *types.NewViewEvent {
 	}
 	p.currentView = newView
 	p.notifier.OnStartingBlockTimeout(newView)
-	p.timeoutControl.StartTimeout(types.ReplicaTimeout)
+	p.timeoutControl.StartTimeout(types.ReplicaTimeout, newView)
 	return &types.NewViewEvent{View: p.currentView}
 }
 
@@ -58,7 +57,7 @@ func (p *FlowMC) CurView() uint64 {
 	return p.currentView
 }
 
-func (p *FlowMC) TimeoutChannel() <-chan time.Time {
+func (p *FlowMC) TimeoutChannel() <-chan *types.Timeout {
 	return p.timeoutControl.Channel()
 }
 
@@ -101,7 +100,7 @@ func (p *FlowMC) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForN
 
 func (p *FlowMC) processBlockForCurView(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
 	if isLeaderForNextView {
-		p.timeoutControl.StartTimeout(types.VoteCollectionTimeout)
+		p.timeoutControl.StartTimeout(types.VoteCollectionTimeout, p.currentView)
 		p.notifier.OnStartingVotesTimeout(p.currentView)
 		return nil, false
 	}
@@ -142,5 +141,5 @@ func (p *FlowMC) Start() {
 		return
 	}
 	p.notifier.OnStartingBlockTimeout(p.currentView)
-	p.timeoutControl.StartTimeout(types.ReplicaTimeout)
+	p.timeoutControl.StartTimeout(types.ReplicaTimeout, p.currentView)
 }

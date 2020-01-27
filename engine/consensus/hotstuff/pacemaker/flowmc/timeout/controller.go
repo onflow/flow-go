@@ -14,7 +14,7 @@ import (
 type Controller struct {
 	Config
 	mode           types.TimeoutMode
-	timeoutChannel <-chan time.Time
+	timeoutChannel <-chan *types.Timeout
 }
 
 // timeoutCap this is an internal cap on the timeout to avoid numerical overflows.
@@ -26,7 +26,7 @@ const timeoutCap float64 = 1E9
 func NewController(timeoutConfig Config) *Controller {
 	// the initial value for the timeout channel is a closed channel which returns immediately
 	// this prevents indefinite blocking when no timeout has been started
-	startChannel := make(chan time.Time)
+	startChannel := make(chan *types.Timeout)
 	close(startChannel)
 
 	tc := Controller{
@@ -40,24 +40,37 @@ func DefaultController() *Controller {
 	return NewController(DefaultConfig)
 }
 
-func (t *Controller) StartTimeout(mode types.TimeoutMode) {
+func (t *Controller) Channel() <-chan *types.Timeout { return t.timeoutChannel }
+func (t *Controller) Mode() types.TimeoutMode   { return t.mode }
+
+func (t *Controller) StartTimeout(mode types.TimeoutMode, view uint64) {
 	t.mode = mode
+	var timerChannel <-chan time.Time
 	switch mode {
 	case types.VoteCollectionTimeout:
-		t.timeoutChannel = time.NewTimer(t.VoteCollectionTimeoutTimeout()).C
+		timerChannel = time.NewTimer(t.VoteCollectionTimeoutTimeout()).C
 	case types.ReplicaTimeout:
-		t.timeoutChannel = time.NewTimer(t.ReplicaTimeout()).C
+		timerChannel = time.NewTimer(t.ReplicaTimeout()).C
 	default:
 		// This should never happen; Only protects code from future inconsistent modifications.
 		// There are only the two timeout modes explicitly handled above. Unless the enum
 		// containing the timeout mode is extended, the default case will never be reached.
 		panic("unknown timeout mode")
 	}
-
+	timeoutChannel := make(chan *types.Timeout)
+	go func() {
+		time := <- timerChannel
+		timeoutChannel <- &types.Timeout{
+			Mode:         mode,
+			View:         view,
+			TimeoutFired: time,
+		}
+	}()
+	t.timeoutChannel = timeoutChannel
 }
 
-func (t *Controller) Channel() <-chan time.Time { return t.timeoutChannel }
-func (t *Controller) Mode() types.TimeoutMode   { return t.mode }
+
+
 
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
