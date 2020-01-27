@@ -51,9 +51,6 @@ func RandomSubSet(list []string, size int) ([]string, error) {
 func ComputeHash(msg *messages.GossipMessage) ([]byte, error) {
 
 	alg := crypto.NewSha3_256()
-	if err != nil {
-		return nil, err
-	}
 	msgHash := alg.ComputeHash(msg.GetPayload())
 
 	return msgHash, nil

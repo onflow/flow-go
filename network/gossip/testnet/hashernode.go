@@ -24,10 +24,7 @@ type hasherNode struct {
 }
 
 func newHasherNode(wg *sync.WaitGroup) (*hasherNode, error) {
-	h, err := crypto.NewSha3_256()
-	if err != nil {
-		return &hasherNode{}, nil
-	}
+	h := crypto.NewSha3_256()
 	return &hasherNode{
 		wg:       wg,
 		messages: make([]string, 0),
