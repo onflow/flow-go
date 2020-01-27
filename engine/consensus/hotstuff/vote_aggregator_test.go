@@ -65,6 +65,7 @@ func TestErrDoubleVote(t *testing.T) {
 	va := NewVoteAggregator(vaLogger, &ViewState{}, &Validator{})
 	bp1 := &types.BlockProposal{
 		Block: &types.Block{
+			QC:          &types.QuorumCertificate{},
 			View:        1,
 			PayloadHash: []byte("first block"),
 		},

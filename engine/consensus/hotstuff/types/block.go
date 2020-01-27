@@ -28,9 +28,7 @@ func (b Block) BlockMRH() flow.Identifier {
 			b.QC.BytesForSig(),
 			make([]byte, b.View),
 			b.PayloadHash,
-			make([]byte, b.Height),
-			[]byte(b.ChainID),
-			//	TODO: put Timestamp here
+			//	TODO: put the rest fields here
 		},
 		[]byte{},
 	)
