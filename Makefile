@@ -128,7 +128,7 @@ docker-ci:
 .PHONY: docker-ci-team-city
 docker-ci-team-city:
 	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
-		-v ${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK} -e SSH_AUTH_SOCK="${SSH_AUTH_SOCK}" \
+		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
 		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
 		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
 		-w "/go/flow" gcr.io/dl-flow/golang-cmake:v0.0.6 \
