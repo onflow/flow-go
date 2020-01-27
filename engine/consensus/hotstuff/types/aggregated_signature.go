@@ -2,6 +2,7 @@ package types
 
 import "fmt"
 
+// AggregatedSignature is the aggregated signatures for a group signers.
 type AggregatedSignature struct {
 	RawSignature []byte
 	Signers      []bool
