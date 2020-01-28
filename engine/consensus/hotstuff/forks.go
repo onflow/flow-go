@@ -65,7 +65,7 @@ type Forks interface {
 	// Processing a QC with view v should result in the PaceMaker being in
 	// view v+1 or larger. Hence, given that the current View is curView,
 	// all QCs should have view < curView.
-	// To prevent accidental miss-usage, ForkChoices will error if `curView`
+	// To prevent accidental misusage, ForkChoices will error if `curView`
 	// is smaller than the view of any qc ForkChoice has seen.
 	// Note that tracking the view of the newest qc is for safety purposes
 	// and _independent_ of the fork-choice rule.
