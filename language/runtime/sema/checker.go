@@ -649,123 +649,157 @@ func (checker *Checker) findAndCheckVariable(identifier ast.Identifier, recordOc
 func (checker *Checker) ConvertType(t ast.Type) Type {
 	switch t := t.(type) {
 	case *ast.NominalType:
-		identifier := t.Identifier.Identifier
-		result := checker.FindType(identifier)
+		return checker.convertNominalType(t)
+
+	case *ast.VariableSizedType:
+		return checker.convertVariableSizedType(t)
+
+	case *ast.ConstantSizedType:
+		return checker.convertConstantSizedType(t)
+
+	case *ast.FunctionType:
+		return checker.convertFunctionType(t)
+
+	case *ast.OptionalType:
+		return checker.convertOptionalType(t)
+
+	case *ast.DictionaryType:
+		return checker.convertDictionaryType(t)
+
+	case *ast.ReferenceType:
+		return checker.convertReferenceType(t)
+
+	}
+
+	panic(&astTypeConversionError{invalidASTType: t})
+}
+
+
+func (checker *Checker) convertReferenceType(t *ast.ReferenceType) Type {
+	ty := checker.ConvertType(t.Type)
+	return &ReferenceType{
+		Type: ty,
+	}
+}
+
+func (checker *Checker) convertDictionaryType(t *ast.DictionaryType) Type {
+	keyType := checker.ConvertType(t.KeyType)
+	valueType := checker.ConvertType(t.ValueType)
+
+	if !IsValidDictionaryKeyType(keyType) {
+		checker.report(
+			&InvalidDictionaryKeyTypeError{
+				Type:  keyType,
+				Range: ast.NewRangeFromPositioned(t.KeyType),
+			},
+		)
+	}
+
+	return &DictionaryType{
+		KeyType:   keyType,
+		ValueType: valueType,
+	}
+}
+
+func (checker *Checker) convertOptionalType(t *ast.OptionalType) Type {
+	ty := checker.ConvertType(t.Type)
+	return &OptionalType{
+		Type: ty,
+	}
+}
+
+func (checker *Checker) convertFunctionType(t *ast.FunctionType) Type {
+	var parameters []*Parameter
+	for _, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+		parameterTypeAnnotation := checker.ConvertTypeAnnotation(parameterTypeAnnotation)
+		parameters = append(parameters,
+			&Parameter{
+				TypeAnnotation: parameterTypeAnnotation,
+			},
+		)
+	}
+
+	returnTypeAnnotation := checker.ConvertTypeAnnotation(t.ReturnTypeAnnotation)
+
+	return &FunctionType{
+		Parameters:           parameters,
+		ReturnTypeAnnotation: returnTypeAnnotation,
+	}
+}
+
+func (checker *Checker) convertConstantSizedType(t *ast.ConstantSizedType) Type {
+	elementType := checker.ConvertType(t.Type)
+	return &ConstantSizedType{
+		Type: elementType,
+		Size: t.Size,
+	}
+}
+
+func (checker *Checker) convertVariableSizedType(t *ast.VariableSizedType) Type {
+	elementType := checker.ConvertType(t.Type)
+	return &VariableSizedType{
+		Type: elementType,
+	}
+}
+
+func (checker *Checker) convertNominalType(t *ast.NominalType) Type {
+	identifier := t.Identifier.Identifier
+	result := checker.FindType(identifier)
+	if result == nil {
+		checker.report(
+			&NotDeclaredError{
+				ExpectedKind: common.DeclarationKindType,
+				Name:         identifier,
+				Pos:          t.StartPosition(),
+			},
+		)
+		return &InvalidType{}
+	}
+
+	var resolvedIdentifiers []ast.Identifier
+
+	for _, identifier := range t.NestedIdentifiers {
+		switch typedResult := result.(type) {
+		case *CompositeType:
+			result = typedResult.NestedTypes[identifier.Identifier]
+
+		case *InterfaceType:
+			result = typedResult.NestedTypes[identifier.Identifier]
+
+		default:
+			if !typedResult.IsInvalidType() {
+				checker.report(
+					&InvalidNestedTypeError{
+						Type: &ast.NominalType{
+							Identifier:        t.Identifier,
+							NestedIdentifiers: resolvedIdentifiers,
+						},
+					},
+				)
+			}
+
+			return &InvalidType{}
+		}
+
+		resolvedIdentifiers = append(resolvedIdentifiers, identifier)
+
 		if result == nil {
+			nonExistentType := &ast.NominalType{
+				Identifier:        t.Identifier,
+				NestedIdentifiers: resolvedIdentifiers,
+			}
 			checker.report(
 				&NotDeclaredError{
 					ExpectedKind: common.DeclarationKindType,
-					Name:         identifier,
+					Name:         nonExistentType.String(),
 					Pos:          t.StartPosition(),
 				},
 			)
 			return &InvalidType{}
 		}
-
-		var resolvedIdentifiers []ast.Identifier
-
-		for _, identifier := range t.NestedIdentifiers {
-			switch typedResult := result.(type) {
-			case *CompositeType:
-				result = typedResult.NestedTypes[identifier.Identifier]
-
-			case *InterfaceType:
-				result = typedResult.NestedTypes[identifier.Identifier]
-
-			default:
-				if !typedResult.IsInvalidType() {
-					checker.report(
-						&InvalidNestedTypeError{
-							Type: &ast.NominalType{
-								Identifier:        t.Identifier,
-								NestedIdentifiers: resolvedIdentifiers,
-							},
-						},
-					)
-				}
-
-				return &InvalidType{}
-			}
-
-			resolvedIdentifiers = append(resolvedIdentifiers, identifier)
-
-			if result == nil {
-				nonExistentType := &ast.NominalType{
-					Identifier:        t.Identifier,
-					NestedIdentifiers: resolvedIdentifiers,
-				}
-				checker.report(
-					&NotDeclaredError{
-						ExpectedKind: common.DeclarationKindType,
-						Name:         nonExistentType.String(),
-						Pos:          t.StartPosition(),
-					},
-				)
-				return &InvalidType{}
-			}
-		}
-
-		return result
-
-	case *ast.VariableSizedType:
-		elementType := checker.ConvertType(t.Type)
-		return &VariableSizedType{
-			Type: elementType,
-		}
-
-	case *ast.ConstantSizedType:
-		elementType := checker.ConvertType(t.Type)
-		return &ConstantSizedType{
-			Type: elementType,
-			Size: t.Size,
-		}
-
-	case *ast.FunctionType:
-		var parameters []*Parameter
-		for _, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
-			parameterTypeAnnotation := checker.ConvertTypeAnnotation(parameterTypeAnnotation)
-			parameters = append(parameters,
-				&Parameter{
-					TypeAnnotation: parameterTypeAnnotation,
-				},
-			)
-		}
-
-		returnTypeAnnotation := checker.ConvertTypeAnnotation(t.ReturnTypeAnnotation)
-
-		return &FunctionType{
-			Parameters:           parameters,
-			ReturnTypeAnnotation: returnTypeAnnotation,
-		}
-
-	case *ast.OptionalType:
-		ty := checker.ConvertType(t.Type)
-		return &OptionalType{ty}
-
-	case *ast.DictionaryType:
-		keyType := checker.ConvertType(t.KeyType)
-		valueType := checker.ConvertType(t.ValueType)
-
-		if !IsValidDictionaryKeyType(keyType) {
-			checker.report(
-				&InvalidDictionaryKeyTypeError{
-					Type:  keyType,
-					Range: ast.NewRangeFromPositioned(t.KeyType),
-				},
-			)
-		}
-
-		return &DictionaryType{
-			KeyType:   keyType,
-			ValueType: valueType,
-		}
-
-	case *ast.ReferenceType:
-		ty := checker.ConvertType(t.Type)
-		return &ReferenceType{ty}
 	}
 
-	panic(&astTypeConversionError{invalidASTType: t})
+	return result
 }
 
 // ConvertTypeAnnotation converts an AST type annotation representation
