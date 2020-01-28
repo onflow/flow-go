@@ -13,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/module/ingress"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/trace"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
 )
 
@@ -21,7 +20,6 @@ func main() {
 
 	var (
 		pool         mempool.Transactions
-		tracer       trace.Tracer
 		collections  *storage.Collections
 		ingressConf  ingress.Config
 		proposalConf proposal.Config
@@ -39,16 +37,9 @@ func main() {
 			flags.DurationVarP(&proposalConf.ProposalPeriod, "proposal-period", "p", time.Second*5, "period at which collections are proposed")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000", "the address the ingress server listens on")
 		}).
-		Component("tracer", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing tracer")
-
-			tracer, err = trace.NewTracer(node.Logger, "collection")
-			node.MustNot(err).Msg("could not initialize tracer")
-			return tracer
-		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing ingestion engine")
-			ingestEng, err = ingest.New(node.Logger, node.Network, node.State, tracer, node.Me, pool)
+			ingestEng, err = ingest.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, pool)
 			node.MustNot(err).Msg("could not initialize ingestion engine")
 
 			return ingestEng
@@ -62,14 +53,14 @@ func main() {
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing provider engine")
 			collections = storage.NewCollections(node.DB)
-			providerEng, err = provider.New(node.Logger, node.Network, node.State, tracer, node.Me, collections)
+			providerEng, err = provider.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, collections)
 			node.MustNot(err).Msg("could not initialize proposal engine")
 			return providerEng
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing proposal engine")
 			guarantees := storage.NewGuarantees(node.DB)
-			eng, err := proposal.New(node.Logger, proposalConf, node.Network, node.Me, node.State, tracer, providerEng, pool, collections, guarantees)
+			eng, err := proposal.New(node.Logger, proposalConf, node.Network, node.Me, node.State, node.Tracer, providerEng, pool, collections, guarantees)
 			node.MustNot(err).Msg("could not initialize proposal engine")
 			return eng
 		}).

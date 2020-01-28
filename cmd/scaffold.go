@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
@@ -60,6 +61,7 @@ type FlowNodeBuilder struct {
 	flags          *pflag.FlagSet
 	name           string
 	Logger         zerolog.Logger
+	Tracer         trace.Tracer
 	DB             *badger.DB
 	Me             *local.Local
 	State          *protocol.State
@@ -147,6 +149,12 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 	db, err := badger.Open(badger.DefaultOptions(fnb.BaseConfig.datadir).WithLogger(nil))
 	fnb.MustNot(err).Msg("could not open key-value store")
 	fnb.DB = db
+}
+
+func (fnb *FlowNodeBuilder) initTracer() {
+	tracer, err := trace.NewTracer(fnb.Logger, "collection")
+	fnb.MustNot(err).Msg("could not initialize tracer")
+	fnb.Tracer = tracer
 }
 
 func (fnb *FlowNodeBuilder) initState() {
@@ -315,6 +323,8 @@ func (fnb *FlowNodeBuilder) Run() {
 	fnb.initNodeID()
 
 	fnb.initLogger()
+
+	fnb.initTracer()
 
 	fnb.initDatabase()
 

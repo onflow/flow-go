@@ -179,7 +179,7 @@ func (e *Engine) createProposal() error {
 		return fmt.Errorf("could not save proposed collection guarantee %s: %w", guarantee.ID(), err)
 	}
 
-	// Collection guarante is saved, we can now delete Txs from the mem pool
+	// Collection guarantee is saved, we can now delete Txs from the mem pool
 	for _, tx := range transactions {
 		e.pool.Rem(tx.ID())
 		e.tracer.FinishSpan(tx.ID())
