@@ -74,6 +74,9 @@ func (m *Middleware) GetIPPort() (string, string) {
 
 // Start will start the middleware.
 func (m *Middleware) Start(ov middleware.Overlay) {
+
+	// TODO: Add only a subset of the total nodes in the network Issue#2244
+	// Add all the other nodes as peers
 	ids, err := ov.Identity()
 	// remove self from list of nodes
 	delete(ids, m.me)
@@ -102,7 +105,7 @@ func (m *Middleware) Stop() {
 
 	// Stop all the connections
 	for _, conn := range m.cc.GetAll() {
-		conn.stop()
+		conn.Stop()
 	}
 
 	// Stop libp2p
@@ -257,23 +260,15 @@ ProcessLoop:
 			m.log.Info().Msg("middleware stopped reception of incoming messages")
 			break ProcessLoop
 		case msg := <-conn.inbound:
-			log.Info().Msg("middleware received a new message")
-			nodeID, err := getSenderID(msg)
-			if err != nil {
-				log.Error().Err(err).Msg("could not extract sender ID")
-				continue ProcessLoop
-			}
-			err = m.ov.Receive(nodeID, msg)
-			if err != nil {
-				log.Error().Err(err).Msg("could not deliver payload")
-				continue ProcessLoop
-			}
+			m.processMessage(msg)
+			continue ProcessLoop
 		}
 	}
 
 	log.Info().Msg("middleware closed the connection")
 }
 
+// Subscribe will subscribe the middleware for a topic with the same name as the channelID
 func (m *Middleware) Subscribe(channelID uint8) error {
 	// A Flow ChannelID becomes the topic ID in libp2p.
 	s, err := m.libP2PNode.Subscribe(context.Background(), strconv.Itoa(int(channelID)))
@@ -287,7 +282,6 @@ func (m *Middleware) Subscribe(channelID uint8) error {
 	return nil
 }
 
-// TODO: Use a common method to for read of a 1-1 stream and reads from a subscription
 func (m *Middleware) handleInboundSubscription(rs *ReadSubscription) {
 	defer m.wg.Done()
 	// process incoming messages for as long as the peer is running
@@ -298,21 +292,23 @@ SubscriptionLoop:
 			m.log.Info().Msg("middleware stopped reception of incoming messages")
 			break SubscriptionLoop
 		case msg := <-rs.inbound:
-			log.Info().Msg("middleware received a new message")
-			nodeID, err := getSenderID(msg)
-			if nodeID == m.me {
-				continue SubscriptionLoop
-			}
-			if err != nil {
-				log.Error().Err(err).Msg("could not extract sender ID")
-				continue SubscriptionLoop
-			}
-			err = m.ov.Receive(nodeID, msg)
-			if err != nil {
-				log.Error().Err(err).Msg("could not deliver payload")
-				continue SubscriptionLoop
-			}
+			m.processMessage(msg)
+			continue SubscriptionLoop
 		}
+	}
+}
+
+func (m *Middleware) processMessage(msg *message.Message) {
+	nodeID, err := getSenderID(msg)
+	if err != nil {
+		log.Error().Err(err).Msg("could not extract sender ID")
+	}
+	if nodeID == m.me {
+		return
+	}
+	err = m.ov.Receive(nodeID, msg)
+	if err != nil {
+		log.Error().Err(err).Msg("could not deliver payload")
 	}
 }
 

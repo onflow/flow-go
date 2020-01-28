@@ -18,6 +18,7 @@ type ReadSubscription struct {
 }
 
 // NewReadSubscription reads the messages coming in on the subscription
+// TODO: Make read subscription, read connection and write connection implement a common interface Collection
 func NewReadSubscription(log zerolog.Logger, sub *pubsub.Subscription) *ReadSubscription {
 
 	log = log.With().
@@ -35,7 +36,7 @@ func NewReadSubscription(log zerolog.Logger, sub *pubsub.Subscription) *ReadSubs
 	return &c
 }
 
-// stop will stop by closing the done channel and closing the connection.
+// Stop will Stop by closing the done channel and closing the connection.
 func (r *ReadSubscription) stop() {
 	r.once.Do(func() {
 		close(r.done)

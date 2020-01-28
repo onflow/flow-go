@@ -98,7 +98,7 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 		return nil, fmt.Errorf("engine already registered (%d)", engine)
 	}
 
-	// Register the for the channelID topic
+	// Register the middleware for the channelID topic
 	err := n.mw.Subscribe(channelID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to channel %d: %w", channelID, err)
@@ -118,11 +118,11 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 	return conduit, nil
 }
 
-// Identity returns the flow identity for a given flow identifier by querying the flow state
+// Identity returns a map of all flow.Identifier to flow identity by querying the flow state
 func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 	ids, err := n.state.Final().Identities()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not get identities")
+		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
 	identifierToID := make(map[flow.Identifier]flow.Identity)
 	for _, id := range ids {
@@ -142,7 +142,6 @@ func (n *Network) Cleanup(nodeID flow.Identifier) error {
 func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
 
 	var err error
-
 	switch m := msg.(type) {
 	case *message.Message:
 		err = n.processNetworkMessage(nodeID, m)
@@ -248,7 +247,7 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 // once it is called, the message slips through the network layer towards the middleware
 // If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.send
 // Otherwise, middleware.Publish is used, which uses the PubSub method of communication.
-// TODO: Move this decision making to the Middleware
+// TODO: Move this decision making to the Middleware Issue#2246
 func (n *Network) send(channelID uint8, msg *message.Message, nodeIDs ...flow.Identifier) error {
 	var err error
 	switch len(nodeIDs) {
