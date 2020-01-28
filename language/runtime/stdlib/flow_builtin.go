@@ -76,12 +76,17 @@ var logFunctionType = &sema.FunctionType{
 	),
 }
 
+var getCurrentBlockFunctionType = &sema.FunctionType{
+	ReturnTypeAnnotation: sema.NewTypeAnnotation(&BlockType{}),
+}
+
 // FlowBuiltinImpls defines the set of functions needed to implement the Flow
 // built-in functions.
 type FlowBuiltinImpls struct {
-	CreateAccount interpreter.HostFunction
-	GetAccount    interpreter.HostFunction
-	Log           interpreter.HostFunction
+	CreateAccount   interpreter.HostFunction
+	GetAccount      interpreter.HostFunction
+	Log             interpreter.HostFunction
+	GetCurrentBlock interpreter.HostFunction
 }
 
 // FlowBuiltInFunctions returns a list of standard library functions, bound to
@@ -104,6 +109,12 @@ func FlowBuiltInFunctions(impls FlowBuiltinImpls) StandardLibraryFunctions {
 			"log",
 			logFunctionType,
 			impls.Log,
+			nil,
+		),
+		NewStandardLibraryFunction(
+			"getCurrentBlock",
+			getCurrentBlockFunctionType,
+			impls.GetCurrentBlock,
 			nil,
 		),
 	}
@@ -201,3 +212,73 @@ var AccountCodeUpdatedEventType = newFlowEventType(
 		),
 	},
 )
+
+// BlockType
+
+type BlockType struct{}
+
+func (*BlockType) IsType() {}
+
+func (*BlockType) String() string {
+	return "Block"
+}
+
+func (*BlockType) ID() sema.TypeID {
+	return "Block"
+}
+
+func (*BlockType) Equal(other sema.Type) bool {
+	_, ok := other.(*BlockType)
+	return ok
+}
+
+func (*BlockType) IsResourceType() bool {
+	return false
+}
+
+func (*BlockType) IsInvalidType() bool {
+	return false
+}
+
+func (*BlockType) HasMembers() bool {
+	return true
+}
+
+const BlockIDSize = 32
+
+func (t *BlockType) GetMember(identifier string, _ ast.Range, _ func(error)) *sema.Member {
+	newField := func(fieldType sema.Type) *sema.Member {
+		return sema.NewPublicConstantFieldMember(t, identifier, fieldType)
+	}
+
+	switch identifier {
+	case "number":
+		return newField(&sema.UInt64Type{})
+
+	case "id":
+		return newField(
+			&sema.ConstantSizedType{
+				Type: &sema.UInt8Type{},
+				Size: BlockIDSize,
+			},
+		)
+
+	case "previousBlock", "nextBlock":
+		return newField(
+			&sema.OptionalType{
+				Type: &BlockType{},
+			},
+		)
+
+	default:
+		return nil
+	}
+}
+
+var FlowBuiltInTypes = StandardLibraryTypes{
+	StandardLibraryType{
+		Name: "Block",
+		Type: &BlockType{},
+		Kind: common.DeclarationKindType,
+	},
+}

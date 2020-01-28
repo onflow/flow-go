@@ -108,7 +108,7 @@ func (s *state) GetChunkRegisters(chunkID flow.Identifier) (flow.Ledger, error) 
 }
 
 func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
-	commit, err := s.commits.ByBlockID(blockID)
+	commit, err := s.commits.ByFinalID(blockID)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			//TODO ? Shouldn't happen in MVP, in multi-node should query a state from other nodes

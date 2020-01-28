@@ -10,6 +10,8 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
 	"github.com/dapperlabs/flow-go/engine/simulation/subzero"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/builder"
+	"github.com/dapperlabs/flow-go/module/cleaner"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -50,7 +52,8 @@ func main() {
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing result matching engine")
-			match, err := matching.New(node.Logger, node.Network, node.State, node.Me, receipts, approvals, seals)
+			results := storage.NewResults(node.DB)
+			match, err := matching.New(node.Logger, node.Network, node.State, node.Me, results, receipts, approvals, seals)
 			node.MustNot(err).Msg("could not initialize matching engine")
 			return match
 		}).
@@ -68,7 +71,12 @@ func main() {
 		}).
 		Component("subzero engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing subzero consensus engine")
-			sub, err := subzero.New(node.Logger, prov, storage.NewBlocks(node.DB), node.State, node.Me, guarantees)
+			headersDB := storage.NewHeaders(node.DB)
+			guaranteesDB := storage.NewGuarantees(node.DB)
+			sealsDB := storage.NewSeals(node.DB)
+			build := builder.New(node.State, guarantees, seals)
+			clean := cleaner.New(guaranteesDB, sealsDB, guarantees, seals)
+			sub, err := subzero.New(node.Logger, prov, headersDB, node.State, node.Me, build, clean)
 			node.MustNot(err).Msg("could not initialize subzero engine")
 			return sub
 		}).
