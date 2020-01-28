@@ -40,7 +40,7 @@ COPY --from=build-relic /build/relic/build ./crypto/relic/build
 RUN --mount=type=ssh \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o ./app ./cmd/${TARGET}
+    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags -static" -o ./app ./cmd/${TARGET}
 
 ## (3) Add the binary to a fresh Alpine image
 FROM alpine:3.10
