@@ -1,7 +1,6 @@
 package hotstuff
 
 import (
-	"fmt"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -36,8 +35,4 @@ func (vs *VotingStatus) CanBuildQC() bool {
 
 func (vs *VotingStatus) BlockID() flow.Identifier {
 	return vs.blockMRH
-}
-
-func (vs *VotingStatus) BlockMRHStr() string {
-	return fmt.Sprintf("%x", vs.blockMRH)
 }

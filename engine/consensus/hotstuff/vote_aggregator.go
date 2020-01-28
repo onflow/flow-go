@@ -46,12 +46,12 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 			FinalizedView: va.lastPrunedView,
 		})
 	}
-	voteMap, exists := va.pendingVotes[vote.BlockMRHStr()]
+	voteMap, exists := va.pendingVotes[vote.BlockMRH.String()]
 	if exists {
 		voteMap[vote.Hash()] = vote
 	} else {
-		va.pendingVotes[vote.BlockMRHStr()] = make(map[string]*types.Vote)
-		va.pendingVotes[vote.BlockMRHStr()][vote.Hash()] = vote
+		va.pendingVotes[vote.BlockMRH.String()] = make(map[string]*types.Vote)
+		va.pendingVotes[vote.BlockMRH.String()][vote.Hash()] = vote
 	}
 	return nil
 }
@@ -95,7 +95,7 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 	if built {
 		return oldQC, nil
 	}
-	for _, vote := range va.pendingVotes[bp.BlockMRHStr()] {
+	for _, vote := range va.pendingVotes[bp.BlockMRH().String()] {
 		voteStatus, err := va.validateAndStoreIncorporatedVote(vote, bp)
 		if err != nil {
 			va.log.Debug().Msg("invalid vote found")
@@ -144,14 +144,14 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 		return nil, fmt.Errorf("double voting detected: %w", err)
 	}
 	// update existing voting status or create a new one
-	votingStatus, exists := va.blockHashToVotingStatus[vote.BlockMRHStr()]
+	votingStatus, exists := va.blockHashToVotingStatus[vote.BlockMRH.String()]
 	if !exists {
 		threshold, err := va.viewState.GetQCStakeThresholdForBlockID(votingStatus.BlockID())
 		if err != nil {
 			return nil, fmt.Errorf("could not get stake threshold %w", err)
 		}
 		votingStatus = NewVotingStatus(threshold, voter, vote.BlockMRH)
-		va.blockHashToVotingStatus[vote.BlockMRHStr()] = votingStatus
+		va.blockHashToVotingStatus[vote.BlockMRH.String()] = votingStatus
 	}
 	votingStatus.AddVote(vote)
 	va.viewToIDToVote[vote.View][voter.ID()] = vote
@@ -164,7 +164,7 @@ func (va *VoteAggregator) tryBuildQC(votingStatus *VotingStatus) (*types.QuorumC
 	}
 	// TODO: to create aggregate sig
 	qc := &types.QuorumCertificate{}
-	va.createdQC[votingStatus.BlockMRHStr()] = qc
+	va.createdQC[votingStatus.blockMRH.String()] = qc
 	va.log.Info().Msg("new QC created")
 	return qc, nil
 }
