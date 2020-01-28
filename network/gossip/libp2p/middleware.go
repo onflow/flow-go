@@ -78,11 +78,12 @@ func (m *Middleware) Start(ov middleware.Overlay) {
 	// TODO: Add only a subset of the total nodes in the network Issue#2244
 	// Add all the other nodes as peers
 	ids, err := ov.Identity()
-	// remove self from list of nodes
-	delete(ids, m.me)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get ids")
 	}
+
+	// remove self from list of nodes
+	delete(ids, m.me)
 
 	for _, id := range ids {
 		// Create a new NodeAddress
@@ -277,11 +278,14 @@ func (m *Middleware) Subscribe(channelID uint8) error {
 	}
 	rs := NewReadSubscription(m.log, s)
 	go rs.ReceiveLoop()
+
+	// add to waitgroup to wait for the inbound subscription go routine during stop
 	m.wg.Add(1)
 	go m.handleInboundSubscription(rs)
 	return nil
 }
 
+// handleInboundSubscription reads the messages from the channel written to by readsSubscription and processes them
 func (m *Middleware) handleInboundSubscription(rs *ReadSubscription) {
 	defer m.wg.Done()
 	// process incoming messages for as long as the peer is running
@@ -298,6 +302,7 @@ SubscriptionLoop:
 	}
 }
 
+// processMessager processes a message and eventuall passes it to the overlay
 func (m *Middleware) processMessage(msg *message.Message) {
 	nodeID, err := getSenderID(msg)
 	if err != nil {
@@ -316,10 +321,14 @@ func (m *Middleware) processMessage(msg *message.Message) {
 func (m *Middleware) Publish(topic string, msg interface{}) error {
 	switch msg := msg.(type) {
 	case *message.Message:
+
+		// convert the message to bytes to be put on the wire.
 		data, err := msg.Marshal()
 		if err != nil {
 			return fmt.Errorf("failed to marshal the message: %w", err)
 		}
+
+		// publish the bytes on the topic
 		err = m.libP2PNode.Publish(context.Background(), topic, data)
 		if err != nil {
 			return fmt.Errorf("failed to publish the message: %w", err)

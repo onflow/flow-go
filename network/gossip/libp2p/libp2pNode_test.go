@@ -159,7 +159,7 @@ func (l *LibP2PNodeTestSuite) TestPubSub() {
 	defer l.cancel()
 	topic := "testtopic"
 	count := 5
-	golog.SetAllLoggers(gologging.DEBUG)
+	golog.SetAllLoggers(gologging.INFO)
 
 	// Step 1: Creates nodes
 	nodes := l.CreateNodes(count)
