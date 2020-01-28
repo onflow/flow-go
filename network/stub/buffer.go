@@ -30,10 +30,16 @@ func NewBuffer() *Buffer {
 }
 
 // Save stores a pending message to the buffer
-func (b *Buffer) Save(m *PendingMessage) {
+func (b *Buffer) Save(from flow.Identifier, channelID uint8, event interface{}, targetIDs []flow.Identifier) {
 	b.Lock()
 	defer b.Unlock()
-	b.pending = append(b.pending, m)
+
+	b.pending = append(b.pending, &PendingMessage{
+		From:      from,
+		ChannelID: channelID,
+		Event:     event,
+		TargetIDs: targetIDs,
+	})
 }
 
 // DeliverRecursive recursively delivers all pending messages using the provided
