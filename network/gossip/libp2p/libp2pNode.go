@@ -82,6 +82,8 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	// Creating a new PubSub instance of the type GossipSub
 	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost)
 
+	// TODO: Adjust pubsub.GossipSubD, pubsub.GossipSubDLo and pubsub.GossipSubDHi as per fanout provided in the future
+
 	if err != nil {
 		return errors.Wrapf(err, "unable to start pubsub %s", p.name)
 	}
