@@ -2,6 +2,7 @@ package trace
 
 import (
 	"io"
+	"sync"
 
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
@@ -11,12 +12,13 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// OpenTracer
+// OpenTracer is the implementation of the Tracer interface
 type OpenTracer struct {
 	opentracing.Tracer
 	closer    io.Closer
 	log       zerolog.Logger
 	openSpans map[flow.Identifier]opentracing.Span
+	lock      sync.RWMutex
 }
 
 type traceLogger struct {
@@ -70,11 +72,18 @@ func (t *OpenTracer) Done() <-chan struct{} {
 	return done
 }
 
+// StartSpan starts a span using the flow identifier as a key into the span map
 func (t *OpenTracer) StartSpan(entity flow.Identifier, spanName string, opts ...opentracing.StartSpanOption) opentracing.Span {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	t.openSpans[entity] = t.Tracer.StartSpan(spanName, opts...)
 	return t.openSpans[entity]
 }
+
+// FinishSpan finishes a span started with the passed in flow identifier
 func (t *OpenTracer) FinishSpan(entity flow.Identifier) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	span, ok := t.openSpans[entity]
 	if ok {
 		span.Finish()
@@ -84,7 +93,10 @@ func (t *OpenTracer) FinishSpan(entity flow.Identifier) {
 	delete(t.openSpans, entity)
 }
 
+// GetSpan will get the span started with the passed in flow identifier
 func (t *OpenTracer) GetSpan(entity flow.Identifier) (opentracing.Span, bool) {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 	span, exists := t.openSpans[entity]
 	return span, exists
 }
