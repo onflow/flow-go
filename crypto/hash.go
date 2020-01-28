@@ -3,83 +3,8 @@ package crypto
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"io"
-
-	"crypto/sha256"
-	"crypto/sha512"
-
-	"golang.org/x/crypto/sha3"
 )
-
-// NewHasher initializes and chooses a hashing algorithm
-func NewHasher(algo HashingAlgorithm) (Hasher, error) {
-	switch algo {
-	case SHA3_256:
-		hasher := &sha3_256Algo{
-			commonHasher: &commonHasher{
-				algo:       algo,
-				outputSize: HashLenSha3_256},
-			Hash: sha3.New256()}
-
-		// Output length sanity check, size() is provided by Hash.hash
-		if hasher.outputSize != hasher.Hash.Size() {
-			return nil, cryptoError{
-				fmt.Sprintf("%s requires an output length %d", SHA3_256, hasher.Hash.Size()),
-			}
-		}
-		return hasher, nil
-
-	case SHA3_384:
-		hasher := &sha3_384Algo{
-			commonHasher: &commonHasher{
-				algo:       algo,
-				outputSize: HashLenSha3_384},
-			Hash: sha3.New384()}
-		// Output length sanity check, size() is provided by Hash.hash
-		if hasher.outputSize != hasher.Hash.Size() {
-			return nil, cryptoError{
-				fmt.Sprintf("%s requires an output length %d", SHA3_384, hasher.Hash.Size()),
-			}
-		}
-		return hasher, nil
-
-	case SHA2_256:
-		hasher := &sha2_256Algo{
-			commonHasher: &commonHasher{
-				algo:       algo,
-				outputSize: HashLenSha2_256},
-			Hash: sha256.New()}
-
-		// Output length sanity check, size() is provided by Hash.hash
-		if hasher.outputSize != hasher.Hash.Size() {
-			return nil, cryptoError{
-				fmt.Sprintf("%s requires an output length %d", SHA2_256, hasher.Hash.Size()),
-			}
-		}
-		return hasher, nil
-
-	case SHA2_384:
-		hasher := &sha2_384Algo{
-			commonHasher: &commonHasher{
-				algo:       algo,
-				outputSize: HashLenSha2_384},
-			Hash: sha512.New384()}
-
-		// Output length sanity check, size() is provided by Hash.hash
-		if hasher.outputSize != hasher.Hash.Size() {
-			return nil, cryptoError{
-				fmt.Sprintf("%s requires an output length %d", SHA2_384, hasher.Hash.Size()),
-			}
-		}
-		return hasher, nil
-
-	default:
-		return nil, cryptoError{
-			fmt.Sprintf("the hashing algorithm %s is not supported.", algo),
-		}
-	}
-}
 
 // Hash is the hash algorithms output types
 type Hash []byte

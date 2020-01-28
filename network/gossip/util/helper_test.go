@@ -16,7 +16,7 @@ func TestComputeHash(t *testing.T) {
 	require := require.New(t)
 	msg1, err := generateGossipMessage([]byte("hi"), []string{}, 0)
 	require.Nil(err, "non-nil error")
-	alg, err := crypto.NewHasher(crypto.SHA3_256)
+	alg := crypto.NewSha3_256()
 	require.Nil(err, "non-nil error")
 	h1 := alg.ComputeHash(msg1.GetPayload())
 

@@ -7,11 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/network/gossip"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestHasherNodeOneToAll initializes hasherNodes and sends messages using gossip from each node to
@@ -21,16 +19,13 @@ func TestHasherNodeOneToAll(t *testing.T) {
 	t.Skip("skipping broken hashernode test")
 
 	assert := assert.New(t)
-	require := require.New(t)
 	wg := &sync.WaitGroup{}
 	// number of nodes to initialize, to add more, increase the size of the portPool in the initializer
 	numNodes := 10
 	// fanoutSet size for each node
 	fanoutSize := 5
 
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
-	require.Nil(err, "could not create hasher")
-
+	hasher := crypto.NewSha3_256()
 	// hashes keeps the hash of all the messages sent
 	hashes := make([]string, numNodes)
 
@@ -61,7 +56,7 @@ func TestHasherNodeOneToAll(t *testing.T) {
 
 		//Number of nodes that should receive this message
 		wg.Add(numNodes - 1)
-		_, err = gn.Gossip(context.Background(), []byte(message), nil, Receive)
+		_, err := gn.Gossip(context.Background(), []byte(message), nil, Receive)
 
 		assert.Nil(err, "at index %v", i)
 	}
@@ -117,8 +112,7 @@ func TestHasherNode(t *testing.T) {
 	fanoutSize := 5
 	wg := &sync.WaitGroup{}
 
-	hasher, err := crypto.NewHasher(crypto.SHA3_256)
-	assert.Nil(err, "could not create hasher")
+	hasher := crypto.NewSha3_256()
 
 	testParams := []struct {
 		numRecipients int
@@ -186,7 +180,7 @@ func TestHasherNode(t *testing.T) {
 			//Number of nodes that should receive this message
 			wg.Add(numRecipients)
 			//send the message to the selected recipients by OneToMany
-			_, err = gNodes[i].Gossip(context.Background(), []byte(message), addresses, Receive)
+			_, err := gNodes[i].Gossip(context.Background(), []byte(message), addresses, Receive)
 			assert.Nil(err, "at index %v", i)
 
 			// Giving gossip calls time to finish propagating
