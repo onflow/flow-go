@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -163,16 +162,9 @@ func (e *Engine) createProposal() error {
 
 	guarantee := coll.Guarantee()
 
-	followsFrom := make([]opentracing.StartSpanOption, 0, len(transactions))
-	txIDs := make([]flow.Identifier, 0, len(transactions))
-	for _, tx := range transactions {
-		if txSpan, exists := e.tracer.GetSpan(tx.ID()); exists {
-			followsFrom = append(followsFrom, opentracing.FollowsFrom(txSpan.Context()))
-		}
-		txIDs = append(txIDs, tx.ID())
-	}
-	e.tracer.StartSpan(guarantee.ID(), "collectionGuaranteeProposal", followsFrom...).
-		SetTag("collection_txs", txIDs)
+	trace.StartCollectionGuaranteeSpan(e.tracer, guarantee, transactions).
+		SetTag("node_type", "collection").
+		SetTag("node_id", e.me.NodeID().String())
 
 	err = e.guarantees.Store(&guarantee)
 	if err != nil {
