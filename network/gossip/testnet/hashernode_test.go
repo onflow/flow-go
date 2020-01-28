@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/network/gossip"
-	"github.com/stretchr/testify/assert"
 )
 
 // TestHasherNodeOneToAll initializes hasherNodes and sends messages using gossip from each node to
