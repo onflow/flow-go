@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
@@ -19,6 +18,7 @@ import (
 
 func TestExecutionFlow(t *testing.T) {
 	hub := stub.NewNetworkHub()
+	hub.EnableSyncDelivery()
 
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
@@ -62,6 +62,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	colNode := testutil.GenericNode(t, hub, colID, genesis)
 	verNode := testutil.GenericNode(t, hub, verID, genesis)
+	conNode := testutil.GenericNode(t, hub, conID, genesis)
 
 	colEngine := new(network.Engine)
 	colConduit, _ := colNode.Net.Register(engine.CollectionProvider, colEngine)
@@ -82,34 +83,34 @@ func TestExecutionFlow(t *testing.T) {
 		Return(nil).
 		Once()
 
+	var receipt *flow.ExecutionReceipt
+
 	verEngine := new(network.Engine)
 	_, _ = verNode.Net.Register(engine.ReceiptProvider, verEngine)
 	verEngine.On("Process", exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			req, _ := args[1].(*flow.ExecutionReceipt)
 
-			assert.Equal(t, block.ID(), req.ExecutionResult.BlockID)
+			receipt = req
+			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
 		}).
 		Return(nil).
 		Once()
 
-	exeNet, ok := hub.GetNetwork(exeNode.Me.NodeID())
-	require.True(t, ok)
+	conEngine := new(network.Engine)
+	_, _ = conNode.Net.Register(engine.ReceiptProvider, conEngine)
+	conEngine.On("Process", exeID.NodeID, mock.Anything).
+		Run(func(args mock.Arguments) {
+			req, _ := args[1].(*flow.ExecutionReceipt)
 
-	colNet, ok := hub.GetNetwork(colNode.Me.NodeID())
-	require.True(t, ok)
+			receipt = req
+			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
+		}).
+		Return(nil).
+		Once()
 
 	// submit block from consensus node
 	exeNode.BlocksEngine.Submit(conID.NodeID, block)
 
-	assert.Eventually(t, func() bool {
-		exeNet.DeliverAllRecursive()
-		colNet.DeliverAllRecursive()
-		return colEngine.AssertExpectations(t)
-	}, time.Second*3, time.Millisecond*500)
-
-	assert.Eventually(t, func() bool {
-		exeNet.DeliverAllRecursive()
-		return verEngine.AssertExpectations(t)
-	}, time.Second*3, time.Millisecond*500)
+	assert.Eventually(t, func() bool { return receipt != nil }, time.Second*3, time.Millisecond*500)
 }
