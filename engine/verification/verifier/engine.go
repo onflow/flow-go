@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -130,7 +130,7 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 	_ = computedEndState
 
 	consensusNodes, err := e.state.Final().
-		Identities(identity.HasRole(flow.RoleConsensus))
+		Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		// TODO this error needs more advance handling after MVP
 		return fmt.Errorf("could not load consensus node IDs: %w", err)

@@ -10,7 +10,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -96,7 +96,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
 	defer e.tracer.FinishSpan(guarantee.ID())
-	consensusNodes, err := e.state.Final().Identities(identity.HasRole(flow.RoleConsensus))
+	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get consensus consensusNodes: %w", err)
 	}

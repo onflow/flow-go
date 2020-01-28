@@ -13,7 +13,7 @@ import (
 type BlockContext interface {
 	// ExecuteTransaction computes the result of a transaction.
 	ExecuteTransaction(ledger Ledger, tx *flow.TransactionBody) (*TransactionResult, error)
-	// ExecuteScript computes the result of a ready-only script.
+	// ExecuteScript computes the result of a read-only script.
 	ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error)
 }
 

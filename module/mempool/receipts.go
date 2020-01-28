@@ -21,9 +21,12 @@ type Receipts interface {
 	// will return true if the execution receipt was known and removed.
 	Rem(receiptID flow.Identifier) bool
 
-	// Get will retrieve the given execution receipt from the memory pool; it will
+	// ByID will retrieve the given execution receipt from the memory pool; it will
 	// error if the execution receipt is not in the memory pool.
 	ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, error)
+
+	// ByResultID will retrieve a receipt by its result ID.
+	ByResultID(resultID flow.Identifier) (*flow.ExecutionReceipt, error)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

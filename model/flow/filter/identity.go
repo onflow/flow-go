@@ -1,6 +1,6 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package identity
+package filter
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"

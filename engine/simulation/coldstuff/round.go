@@ -25,10 +25,10 @@ type Round interface {
 	Participants() flow.IdentityList
 
 	// Propose will store a block as the candidate for consensus in this round.
-	Propose(candidate *flow.Block)
+	Propose(candidate *flow.Header)
 
 	// Candidate will return the block that we are voting for in this round.
-	Candidate() *flow.Block
+	Candidate() *flow.Header
 
 	// Voted will check if the given node has already voted this round.
 	Voted(nodeID flow.Identifier) bool
