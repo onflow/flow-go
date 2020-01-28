@@ -10,17 +10,18 @@ import (
 // and votes received from other replicas.
 type HotStuff interface {
 
-	// Start starts the HotStuff event loop. It blocks until stopped, or until
-	// a fatal error occurs.
-	Start() error
-
-	// Finish causes the HotStuff event loop to gracefully exit. After this is
-	// called, no further events will be accepted into the event queue. Any
-	// events pending in the event queue will be drained and handled. Once the
-	// event queue is empty, the event loop will exit.
+	// Start starts the HotStuff event loop in a goroutine. It returns a
+	// function to exit the loop and a channel that is closed when the event
+	// loop exits for any reason.
 	//
-	// This method blocks until the event loop exits.
-	Finish()
+	// The exit function gracefully exits the loop. After it is called, no
+	// further events will be accepted into the event queue. Any events
+	// pending in the event queue will be drained and handled. Once the event
+	// queue is empty, the event loop will exit.
+	//
+	// The done channel is closed when the event loop exits, either by calling
+	// the exit function, or as a result of a fatal error.
+	Start() (exit func(), done <-chan struct{})
 
 	// SubmitProposal submits a new block proposal to the HotStuff event loop.
 	// This method blocks until the proposal is accepted to the event queue.
