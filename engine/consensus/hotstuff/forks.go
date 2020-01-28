@@ -31,7 +31,11 @@ type Forks interface {
 
 	// IsSafeBlock returns true if block is safe to vote for
 	// (according to the definition in https://arxiv.org/abs/1803.05069v6).
-	// Returns false for unknown blocks.
+	//
+	// In the current architecture, the block is stored _before_ evaluating its safety.
+	// Consequently, IsSafeBlock accepts only known, valid blocks. Should a block be
+	// unknown (not previously added to Forks) or violate some consistency requirements,
+	// IsSafeBlock errors. All errors are fatal.
 	IsSafeBlock(block *types.BlockProposal) bool
 
 	// AddBlock adds the block to Forks. This might cause an update of the finalized block
@@ -41,11 +45,13 @@ type Forks interface {
 	// Forks must be able to connect `block` to its latest finalized block
 	// (without missing interim ancestors). Otherwise, an error is raised.
 	// When the new block causes the conflicting finalized blocks, it will return
-	// FinalizationFatalError
+	// Might error with ErrorByzantineThresholdExceeded (e.g. if finalizing conflicting forks)
 	AddBlock(block *types.BlockProposal) error
 
 	// AddQC adds a quorum certificate to Forks.
 	// Might error in case the block referenced by the qc is unknown.
+	// Might error with ErrorByzantineThresholdExceeded (e.g. if two conflicting QCs for the
+	// same view are found)
 	AddQC(qc *types.QuorumCertificate) error
 
 	// MakeForkChoice prompts the ForkChoice to generate a fork choice for the
@@ -59,9 +65,20 @@ type Forks interface {
 	// Processing a QC with view v should result in the PaceMaker being in
 	// view v+1 or larger. Hence, given that the current View is curView,
 	// all QCs should have view < curView.
-	// To prevent accidental misusage, ForkChoices will error if `curView`
+	// To prevent accidental miss-usage, ForkChoices will error if `curView`
 	// is smaller than the view of any qc ForkChoice has seen.
 	// Note that tracking the view of the newest qc is for safety purposes
 	// and _independent_ of the fork-choice rule.
-	MakeForkChoice(curView uint64) (*types.QuorumCertificate, error)
+	MakeForkChoice(curView uint64) (*types.QCBlock, error)
+}
+
+// ErrorByzantineThresholdExceeded is raised if HotStuff detects malicious conditions which
+// prove a Byzantine super-minority of consensus replicas. A 'Byzantine super-minority'
+// is defined as a group of byzantine consensus replicas with at least 1/3 stake.
+type ErrorByzantineThresholdExceeded struct {
+	Evidence string
+}
+
+func (e *ErrorByzantineThresholdExceeded) Error() string {
+	return e.Evidence
 }

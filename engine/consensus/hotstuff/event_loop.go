@@ -8,10 +8,9 @@ import (
 type EventLoop struct {
 	eventHandler *EventHandler
 
-	blockproposals chan *types.BlockProposal
-	votes          chan *types.Vote
-	blockreqs      chan *types.BlockProposalRequest
-	started        *atomic.Bool
+	blockheaders chan *types.BlockHeader
+	votes        chan *types.Vote
+	started      *atomic.Bool
 }
 
 func (el *EventLoop) loop() {
@@ -25,18 +24,16 @@ func (el *EventLoop) loop() {
 		select {
 		case <-timeoutChannel:
 			el.eventHandler.OnLocalTimeout()
-		case b := <-el.blockproposals:
-			el.eventHandler.OnReceiveBlockProposal(b)
+		case b := <-el.blockheaders:
+			el.eventHandler.OnReceiveBlockHeader(b)
 		case v := <-el.votes:
 			el.eventHandler.OnReceiveVote(v)
-		case req := <-el.blockreqs:
-			el.eventHandler.OnBlockRequest(req)
 		}
 	}
 }
 
-func (el *EventLoop) OnReceiveBlockProposal(block *types.BlockProposal) {
-	el.blockproposals <- block
+func (el *EventLoop) OnReceiveBlockHeader(block *types.BlockHeader) {
+	el.blockheaders <- block
 }
 
 func (el *EventLoop) OnReceiveVote(vote *types.Vote) {
@@ -53,4 +50,3 @@ func (el *EventLoop) Start() error {
 	el.loop()
 	return nil
 }
-
