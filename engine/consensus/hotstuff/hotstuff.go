@@ -8,9 +8,6 @@ import (
 // HotStuff defines the interface to the core HotStuff algorithm. It includes
 // a method to start the event loop, and utilities to submit block proposals
 // and votes received from other replicas.
-//
-// TODO Define assumptions that the chain compliance layer (ie the user of this
-// TODO interface) must satisfy. ie submit blocks in order, etc.
 type HotStuff interface {
 
 	// Start starts the HotStuff event loop. It blocks until stopped, or until
@@ -19,12 +16,15 @@ type HotStuff interface {
 
 	// SubmitProposal submits a new block proposal to the HotStuff event loop.
 	// This method blocks until the proposal is accepted to the event queue.
-	// TODO assumptions about proposals
+	//
+	// Block proposals must be submitted in order and only if they extend a
+	// block already known to HotStuff core.
 	SubmitProposal(*types.BlockProposal)
 
 	// SubmitVote submits a new vote to the HotStuff event loop.
 	// This method blocks until the vote is accepted to the event queue.
-	// TODO assumptions about votes
+	//
+	// Votes may be submitted in any order.
 	SubmitVote(*types.Vote)
 }
 

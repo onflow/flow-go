@@ -6,8 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 )
 
-// PubSubDistributor implements notifications.Consumer
-// It allows thread-safe subscription of consumers to events
+// PubSubDistributor is an example implementation of notifications.Consumer.
+// It allows thread-safe subscription of consumers to events.
 type PubSubDistributor struct {
 	skippedAheadConsumers         []SkippedAheadConsumer
 	enteringViewConsumers         []EnteringViewConsumer
