@@ -41,7 +41,7 @@ func NewKmac128(key []byte, customizer []byte, outputSize int) Hasher {
 	// as a domain tag
 	// store the encoding of the key
 	k.initBlock = bytepad(encodeString(key), cSHAKE128BlockSize)
-	k.Write(k.initBlock)
+	_, _ = k.Write(k.initBlock)
 	return &k
 }
 
@@ -97,7 +97,7 @@ func rightEncode(value uint64) []byte {
 // Reset resets the hash to initial state.
 func (k *kmac128) Reset() {
 	k.ShakeHash.Reset()
-	k.Write(k.initBlock)
+	_, _ = k.Write(k.initBlock)
 }
 
 // ComputeHash adds the input data to the a mac state copy

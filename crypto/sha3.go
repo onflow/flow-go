@@ -24,7 +24,7 @@ func NewSha3_256() Hasher {
 // ComputeHash calculates and returns the SHA3-256 output of input byte array
 func (s *sha3_256Algo) ComputeHash(data []byte) Hash {
 	s.Reset()
-	s.Write(data)
+	_, _ = s.Write(data)
 	digest := make(Hash, 0, HashLenSha3_256)
 	return s.Sum(digest)
 }
@@ -39,7 +39,7 @@ func (s *sha3_256Algo) SumHash() Hash {
 
 // Add adds data to the state data to be hashed
 func (s *sha3_256Algo) Add(data []byte) {
-	s.Write(data)
+	_, _ = s.Write(data)
 }
 
 // sha3_384Algo, embeds commonHasher
@@ -51,7 +51,7 @@ type sha3_384Algo struct {
 // ComputeHash calculates and returns the SHA3-256 output of input byte array
 func (s *sha3_384Algo) ComputeHash(data []byte) Hash {
 	s.Reset()
-	s.Write(data)
+	_, _ = s.Write(data)
 	digest := make(Hash, 0, HashLenSha3_384)
 	return s.Sum(digest)
 }
@@ -82,7 +82,7 @@ func NewSha3_384() Hasher {
 // ComputeHash calculates and returns the cSHAKE-128 output of input byte array
 func (s *cShake128Algo) ComputeHash(data []byte) Hash {
 	s.Reset()
-	s.Write(data)
+	_, _ = s.Write(data)
 	digest := make(Hash, s.outputSize)
 	s.Read(digest)
 	return digest

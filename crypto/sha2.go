@@ -24,7 +24,7 @@ func NewSha2_256() Hasher {
 // ComputeHash calculates and returns the SHA2-256 output of input byte array
 func (s *sha2_256Algo) ComputeHash(data []byte) Hash {
 	s.Reset()
-	s.Write(data)
+	_, _ = s.Write(data)
 	digest := make(Hash, 0, HashLenSha2_256)
 	return s.Sum(digest)
 }
@@ -55,7 +55,7 @@ func NewSha2_384() Hasher {
 // ComputeHash calculates and returns the SHA2-384 output of input byte array
 func (s *sha2_384Algo) ComputeHash(data []byte) Hash {
 	s.Reset()
-	s.Write(data)
+	_, _ = s.Write(data)
 	digest := make(Hash, 0, HashLenSha2_384)
 	return s.Sum(digest)
 }

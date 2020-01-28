@@ -24,9 +24,9 @@ func TestSha3_256(t *testing.T) {
 	checkBytes(t, input, expected, hash)
 
 	alg.Reset()
-	alg.Write([]byte("te"))
-	alg.Write([]byte("s"))
-	alg.Write([]byte("t"))
+	_, _ = alg.Write([]byte("te"))
+	_, _ = alg.Write([]byte("s"))
+	_, _ = alg.Write([]byte("t"))
 	hash = alg.SumHash()
 	checkBytes(t, input, expected, hash)
 }
@@ -41,9 +41,9 @@ func TestSha3_384(t *testing.T) {
 	checkBytes(t, input, expected, hash)
 
 	alg.Reset()
-	alg.Write([]byte("te"))
-	alg.Write([]byte("s"))
-	alg.Write([]byte("t"))
+	_, _ = alg.Write([]byte("te"))
+	_, _ = alg.Write([]byte("s"))
+	_, _ = alg.Write([]byte("t"))
 	hash = alg.SumHash()
 	checkBytes(t, input, expected, hash)
 }
@@ -58,9 +58,9 @@ func TestSha2_256(t *testing.T) {
 	checkBytes(t, input, expected, hash)
 
 	alg.Reset()
-	alg.Write([]byte("te"))
-	alg.Write([]byte("s"))
-	alg.Write([]byte("t"))
+	_, _ = alg.Write([]byte("te"))
+	_, _ = alg.Write([]byte("s"))
+	_, _ = alg.Write([]byte("t"))
 	hash = alg.SumHash()
 	checkBytes(t, input, expected, hash)
 }
@@ -75,9 +75,9 @@ func TestSha2_384(t *testing.T) {
 	checkBytes(t, input, expected, hash)
 
 	alg.Reset()
-	alg.Write([]byte("te"))
-	alg.Write([]byte("s"))
-	alg.Write([]byte("t"))
+	_, _ = alg.Write([]byte("te"))
+	_, _ = alg.Write([]byte("s"))
+	_, _ = alg.Write([]byte("t"))
 	hash = alg.SumHash()
 	checkBytes(t, input, expected, hash)
 }
@@ -144,8 +144,8 @@ func TestKmac128(t *testing.T) {
 	outputSize := 32
 
 	alg := NewKmac128(key, customizers[0], outputSize)
-	alg.Write(input[0:2])
-	alg.Write(input[2:])
+	_, _ = alg.Write(input[0:2])
+	_, _ = alg.Write(input[2:])
 	hash := alg.SumHash()
 	checkBytes(t, input, expected[0], hash)
 
