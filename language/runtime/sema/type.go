@@ -80,7 +80,7 @@ type TypeIndexableType interface {
 //
 type MemberAccessibleType interface {
 	Type
-	HasMembers() bool
+	CanHaveMembers() bool
 	GetMember(identifier string, targetRange ast.Range, report func(error)) *Member
 }
 
@@ -408,7 +408,7 @@ func (*StringType) IsInvalidType() bool {
 	return false
 }
 
-func (*StringType) HasMembers() bool {
+func (*StringType) CanHaveMembers() bool {
 	return true
 }
 
@@ -1500,7 +1500,7 @@ func (t *VariableSizedType) Equal(other Type) bool {
 	return t.Type.Equal(otherArray.Type)
 }
 
-func (t *VariableSizedType) HasMembers() bool {
+func (t *VariableSizedType) CanHaveMembers() bool {
 	return true
 }
 
@@ -1555,7 +1555,7 @@ func (t *ConstantSizedType) Equal(other Type) bool {
 		t.Size == otherArray.Size
 }
 
-func (t *ConstantSizedType) HasMembers() bool {
+func (t *ConstantSizedType) CanHaveMembers() bool {
 	return true
 }
 
@@ -1725,7 +1725,7 @@ type SpecialFunctionType struct {
 	Members map[string]*Member
 }
 
-func (t *SpecialFunctionType) HasMembers() bool {
+func (t *SpecialFunctionType) CanHaveMembers() bool {
 	return true
 }
 
@@ -1978,7 +1978,7 @@ func (t *CompositeType) Equal(other Type) bool {
 		otherStructure.Identifier == t.Identifier
 }
 
-func (t *CompositeType) HasMembers() bool {
+func (t *CompositeType) CanHaveMembers() bool {
 	return true
 }
 
@@ -2053,7 +2053,7 @@ func (*AccountType) IsInvalidType() bool {
 	return false
 }
 
-func (*AccountType) HasMembers() bool {
+func (*AccountType) CanHaveMembers() bool {
 	return true
 }
 
@@ -2175,7 +2175,7 @@ func (*PublicAccountType) IsInvalidType() bool {
 	return false
 }
 
-func (*PublicAccountType) HasMembers() bool {
+func (*PublicAccountType) CanHaveMembers() bool {
 	return true
 }
 
@@ -2351,7 +2351,7 @@ func (t *InterfaceType) Equal(other Type) bool {
 		otherInterface.Identifier == t.Identifier
 }
 
-func (t *InterfaceType) HasMembers() bool {
+func (t *InterfaceType) CanHaveMembers() bool {
 	return true
 }
 
@@ -2413,7 +2413,7 @@ func (t *DictionaryType) IsInvalidType() bool {
 		t.ValueType.IsInvalidType()
 }
 
-func (t *DictionaryType) HasMembers() bool {
+func (t *DictionaryType) CanHaveMembers() bool {
 	return true
 }
 
@@ -2696,12 +2696,12 @@ func (t *ReferenceType) IsInvalidType() bool {
 	return t.Type.IsInvalidType()
 }
 
-func (t *ReferenceType) HasMembers() bool {
+func (t *ReferenceType) CanHaveMembers() bool {
 	referencedType, ok := t.Type.(MemberAccessibleType)
 	if !ok {
 		return false
 	}
-	return referencedType.HasMembers()
+	return referencedType.CanHaveMembers()
 }
 
 func (t *ReferenceType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
@@ -3069,7 +3069,7 @@ func (*TransactionType) IsInvalidType() bool {
 	return false
 }
 
-func (t *TransactionType) HasMembers() bool {
+func (t *TransactionType) CanHaveMembers() bool {
 	return true
 }
 
