@@ -3,11 +3,12 @@ package trace
 import (
 	"io"
 
-	"github.com/dapperlabs/flow-go/model/flow"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"github.com/uber/jaeger-client-go"
 	config "github.com/uber/jaeger-client-go/config"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // OpenTracer

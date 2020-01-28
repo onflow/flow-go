@@ -1,8 +1,9 @@
 package trace
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
 	opentracing "github.com/opentracing/opentracing-go"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // StartCollectionGuaranteeSpan starts a collection guarantee span, and returns the span for chaining

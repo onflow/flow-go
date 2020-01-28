@@ -1,9 +1,10 @@
 package trace
 
 import (
+	opentracing "github.com/opentracing/opentracing-go"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
-	opentracing "github.com/opentracing/opentracing-go"
 )
 
 type Tracer interface {
