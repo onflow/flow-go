@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -23,36 +22,20 @@ func init() {
 
 func TestBootStrapValid(t *testing.T) {
 
-	ids := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.Role(1), Stake: 1},
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.Role(2), Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.Role(3), Stake: 3},
+	identities := flow.IdentityList{
+		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
+		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
+		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
+		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
 	}
 
-	payload := flow.Payload{
-		Identities: ids,
-		Guarantees: nil,
-	}
-
-	header := flow.Header{
-		Number:      0,
-		Timestamp:   time.Now().UTC(),
-		ParentID:    flow.ZeroID,
-		PayloadHash: payload.Hash(),
-		Signatures:  []crypto.Signature{[]byte("signature")},
-	}
-
-	genesis := flow.Block{
-		Header:  header,
-		Payload: payload,
-	}
-
+	genesis := flow.Genesis(identities)
 	blockID := genesis.ID()
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		mutator := &Mutator{state: &State{db: db}}
-		err := mutator.Bootstrap(&genesis)
+		err := mutator.Bootstrap(genesis)
 		require.Nil(t, err)
 
 		var boundary uint64
@@ -60,39 +43,24 @@ func TestBootStrapValid(t *testing.T) {
 		require.Nil(t, err)
 
 		var storedID flow.Identifier
-		err = db.View(operation.RetrieveBlockID(0, &storedID))
+		err = db.View(operation.RetrieveNumber(0, &storedID))
 		require.Nil(t, err)
 
 		var storedHeader flow.Header
 		err = db.View(operation.RetrieveHeader(genesis.ID(), &storedHeader))
 		require.Nil(t, err)
 
-		var storedIDs flow.IdentityList
-		err = db.View(operation.RetrieveIdentities(genesis.ID(), &storedIDs))
-		require.Nil(t, err)
-
 		assert.Zero(t, boundary)
 		assert.Equal(t, blockID, storedID)
-		assert.Equal(t, header, storedHeader)
-		assert.Equal(t, ids, storedIDs)
+		assert.Equal(t, genesis.Header, storedHeader)
 
-		for _, id := range ids {
-
-			var role flow.Role
-			err = db.View(operation.RetrieveRole(id.NodeID, &role))
-			require.Nil(t, err)
-
-			var address string
-			err = db.View(operation.RetrieveAddress(id.NodeID, &address))
-			require.Nil(t, err)
+		for _, identity := range identities {
 
 			var delta int64
-			err = db.View(operation.RetrieveDelta(header.Number, id.Role, id.NodeID, &delta))
+			err = db.View(operation.RetrieveDelta(genesis.Header.Number, identity.Role, identity.NodeID, &delta))
 			require.Nil(t, err)
 
-			assert.Equal(t, id.Role, role)
-			assert.Equal(t, id.Address, address)
-			assert.Equal(t, int64(id.Stake), delta)
+			assert.Equal(t, int64(identity.Stake), delta)
 		}
 	})
 }

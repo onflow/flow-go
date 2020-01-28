@@ -465,7 +465,6 @@ func testConcurrency(t *testing.T, erCount, senderCount int) {
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
 	identities := flow.IdentityList{colID, conID, exeID, verID}
-	genesis := flow.Genesis(identities)
 
 	// create `erCount` ER fixtures that will be concurrently delivered
 	ers := make([]verification.CompleteExecutionResult, 0, erCount)
@@ -477,12 +476,12 @@ func testConcurrency(t *testing.T, erCount, senderCount int) {
 	// to the verifier exactly once.
 	verifierEng, verifierEngWG := setupMockVerifierEng(t, ers)
 
-	colNode := testutil.CollectionNode(t, hub, colID, genesis)
-	verNode := testutil.VerificationNode(t, hub, verID, genesis, testutil.WithVerifierEngine(verifierEng))
+	colNode := testutil.CollectionNode(t, hub, colID, identities)
+	verNode := testutil.VerificationNode(t, hub, verID, identities, testutil.WithVerifierEngine(verifierEng))
 
 	// mock the execution node with a generic node and mocked engine
 	// to handle requests for chunk state
-	exeNode := testutil.GenericNode(t, hub, exeID, genesis)
+	exeNode := testutil.GenericNode(t, hub, exeID, identities)
 	setupMockExeNode(t, exeNode, verID.NodeID, ers)
 
 	verNet, ok := hub.GetNetwork(verID.NodeID)

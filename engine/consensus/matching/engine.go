@@ -3,6 +3,7 @@
 package matching
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -12,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/protocol"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
@@ -22,13 +24,14 @@ type Engine struct {
 	log       zerolog.Logger    // used to log relevant actions with context
 	state     protocol.State    // used to access the  protocol state
 	me        module.Local      // used to access local node information
+	results   storage.Results   // used to permanently store results
 	receipts  mempool.Receipts  // holds collection guarantees in memory
 	approvals mempool.Approvals // holds result approvals in memory
 	seals     mempool.Seals     // holds block seals in memory
 }
 
 // New creates a new collection propagation engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, results storage.Results, receipts mempool.Receipts, approvals mempool.Approvals, seals mempool.Seals) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -36,6 +39,7 @@ func New(log zerolog.Logger, net module.Network, state protocol.State, me module
 		log:       log.With().Str("engine", "matching").Logger(),
 		state:     state,
 		me:        me,
+		results:   results,
 		receipts:  receipts,
 		approvals: approvals,
 		seals:     seals,
@@ -138,7 +142,10 @@ func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionRece
 		return fmt.Errorf("could not store receipt: %w", err)
 	}
 
-	// TODO: check if we have already enough matching approvals
+	err = e.matchReceipt(receipt)
+	if err != nil {
+		return fmt.Errorf("could not match receipt: %w", err)
+	}
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
@@ -174,12 +181,92 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 		return fmt.Errorf("could not store approval: %w", err)
 	}
 
-	// TODO: check if we have already enough matching approvals
+	err = e.matchApproval(approval)
+	if err != nil {
+		return fmt.Errorf("could not match approval: %w", err)
+	}
 
 	e.log.Info().
 		Hex("origin_id", originID[:]).
 		Hex("approval_id", logging.Entity(approval)).
-		Msg("execution receipt forwarded")
+		Msg("result approval processed")
+
+	return nil
+}
+
+// matchReceipt will check if the given receipt can already be used to create a
+// block seal.
+func (e *Engine) matchReceipt(receipt *flow.ExecutionReceipt) error {
+
+	// try to find a matching approval
+	approval, err := e.approvals.ByResultID(receipt.ExecutionResult.ID())
+	if errors.Is(err, mempool.ErrEntityNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("could not query approval: %w", err)
+	}
+
+	// create the block seal if we found a match
+	err = e.createSeal(receipt, approval)
+	if err != nil {
+		return fmt.Errorf("could not create seal: %w", err)
+	}
+
+	return nil
+}
+
+// matchApproval will check if the given approval can be used to finalize a
+// block seal.
+func (e *Engine) matchApproval(approval *flow.ResultApproval) error {
+
+	// try to find a matching receipt
+	receipt, err := e.receipts.ByResultID(approval.ResultApprovalBody.ExecutionResultID)
+	if errors.Is(err, mempool.ErrEntityNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("could not query receipt: %w", err)
+	}
+
+	// create the block seal if we found a match
+	err = e.createSeal(receipt, approval)
+	if err != nil {
+		return fmt.Errorf("could not create seal: %w", err)
+	}
+
+	return nil
+}
+
+// createSeal will check the receipt against the approval and create a seal if
+// valid, which is stored in the seal memory pool.
+func (e *Engine) createSeal(receipt *flow.ExecutionReceipt, approval *flow.ResultApproval) error {
+
+	// get the previous result ID
+	previous, err := e.results.ByID(receipt.ExecutionResult.PreviousResultID)
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("could not get previous result: %w", err)
+	}
+
+	// store the new result
+	err = e.results.Store(&receipt.ExecutionResult)
+	if err != nil {
+		return fmt.Errorf("could not store result: %w", err)
+	}
+
+	// add the seal to the block seal memory pool
+	seal := flow.Seal{
+		BlockID:       receipt.ExecutionResult.BlockID,
+		PreviousState: previous.FinalStateCommit,
+		FinalState:    receipt.ExecutionResult.FinalStateCommit,
+	}
+	err = e.seals.Add(&seal)
+	if err != nil {
+		return fmt.Errorf("could not store seal: %v", err)
+	}
 
 	return nil
 }

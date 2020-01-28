@@ -63,7 +63,7 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 
-	engine, err := NewEngine(log, net, me, state, blocks, collections, executionEngine)
+	engine, err := New(log, net, me, state, blocks, collections, executionEngine)
 	require.NoError(t, err)
 
 	f(t, engine, blocks, collections, state, conduit, collectionConduit, executionEngine)

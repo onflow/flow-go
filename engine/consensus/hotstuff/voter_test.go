@@ -4,12 +4,16 @@ import (
 	"fmt"
 	"testing"
 
+<<<<<<< HEAD
 	"github.com/dgraph-io/badger/v2"
+=======
+	badger "github.com/dgraph-io/badger/v2"
+	"github.com/stretchr/testify/require"
+>>>>>>> c9d51eec24357b70777fd972eb5dbb058dbdbcb5
 
 	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/voter"
+	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/local"
-	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -26,24 +30,16 @@ func TestProduceVote(t *testing.T) {
 // implemented to test produceVote. CreateProtocolState will be used then.
 func CreateProtocolState(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		state, err := protocol.NewState(db)
-		ids := unittest.IdentityListFixture(5, func(node *flow.Identity) {
-			node.Role = flow.RoleConsensus
+		identities := unittest.IdentityListFixture(5, func(identity *flow.Identity) {
+			identity.Role = flow.RoleConsensus
 		})
 
-		err = state.Mutate().Bootstrap(flow.Genesis(ids))
-		if err != nil {
-			panic("could not bootstrap protocol State")
-		}
+		state, err := testutil.UncheckedState(db, identities)
+		require.NoError(t, err)
 
-		trueID, err := flow.HexStringToIdentifier("node1")
 		allIdentities, err := state.Final().Identities()
-		fmt.Sprintf("%v", allIdentities)
+		require.NoError(t, err)
 
-		id, err := state.Final().Identity(trueID)
-		// fnb.MustNot(err).Msg("could not get identity")
-
-		me, err := local.New(id)
-		fmt.Sprintf("%v", me)
+		t.Log(allIdentities)
 	})
 }
