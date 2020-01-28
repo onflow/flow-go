@@ -159,7 +159,7 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 // executeChunk executes the transactions for a single chunk and returns the
 // resultant end state, or an error if execution failed.
 func (e *Engine) executeChunk(res *verification.CompleteExecutionResult) (flow.StateCommitment, error) {
-	blockCtx := virtualmachine.NewBlockContext(e.runtime, res.Block)
+	blockCtx := virtualmachine.NewBlockContext(e.runtime, &res.Block.Header)
 
 	getRegister := func(key string) ([]byte, error) {
 		registers := res.ChunkStates[0].Registers
