@@ -21,7 +21,7 @@ type Transactions interface {
 	// will return true if the transaction was known and removed.
 	Rem(txID flow.Identifier) bool
 
-	// Get will retrieve the given transaction from the memory pool; it will
+	// ByID will retrieve the given transaction from the memory pool; it will
 	// error if the transaction is not in the memory pool.
 	ByID(txID flow.Identifier) (*flow.Transaction, error)
 

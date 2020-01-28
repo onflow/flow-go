@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/protocol"
 )
@@ -20,7 +20,7 @@ type Round struct {
 	leader       *flow.Identity
 	quorum       uint64
 	participants flow.IdentityList
-	candidate    *flow.Block
+	candidate    *flow.Header
 	votes        map[flow.Identifier]uint64
 }
 
@@ -35,7 +35,7 @@ func New(state protocol.State, me module.Local) (*Round, error) {
 
 	// get participants to the consensus algorithm
 	ids, err := state.Final().Identities(
-		identity.HasRole(flow.RoleConsensus),
+		filter.HasRole(flow.RoleConsensus),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not retrieve identities")
@@ -52,7 +52,7 @@ func New(state protocol.State, me module.Local) (*Round, error) {
 	// remove ourselves from the participants
 	leader := ids[0]
 	quorum := ids.TotalStake()
-	participants := ids.Filter(identity.Not(identity.HasNodeID(me.NodeID())))
+	participants := ids.Filter(filter.Not(filter.HasNodeID(me.NodeID())))
 
 	s := &Round{
 		parent:       head,
@@ -85,12 +85,12 @@ func (r *Round) Leader() *flow.Identity {
 }
 
 // Propose sets the current candidate header.
-func (r *Round) Propose(candidate *flow.Block) {
+func (r *Round) Propose(candidate *flow.Header) {
 	r.candidate = candidate
 }
 
 // Candidate returns the current candidate header.
-func (r *Round) Candidate() *flow.Block {
+func (r *Round) Candidate() *flow.Header {
 	return r.candidate
 }
 
