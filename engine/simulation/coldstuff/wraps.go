@@ -8,7 +8,7 @@ import (
 
 type proposalWrap struct {
 	originID flow.Identifier
-	block    *flow.Block
+	header   *flow.Header
 }
 
 type voteWrap struct {

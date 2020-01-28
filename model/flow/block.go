@@ -64,7 +64,7 @@ type Header struct {
 	ParentID    Identifier
 	PayloadHash Identifier
 	ProposerID  Identifier
-	Signatures  []crypto.Signature
+	ParentSigs  []crypto.Signature // this will be the aggregated signature
 }
 
 // Body returns the immutable part of the block header.
@@ -75,12 +75,14 @@ func (h Header) Body() interface{} {
 		ParentID    Identifier
 		PayloadHash Identifier
 		ProposerID  Identifier
+		ParentSigs  []crypto.Signature
 	}{
 		Number:      h.Number,
 		Timestamp:   h.Timestamp,
 		ParentID:    h.ParentID,
 		PayloadHash: h.PayloadHash,
 		ProposerID:  h.ProposerID,
+		ParentSigs:  h.ParentSigs,
 	}
 }
 

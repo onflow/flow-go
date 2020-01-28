@@ -20,7 +20,7 @@ type Round struct {
 	leader       *flow.Identity
 	quorum       uint64
 	participants flow.IdentityList
-	candidate    *flow.Block
+	candidate    *flow.Header
 	votes        map[flow.Identifier]uint64
 }
 
@@ -85,12 +85,12 @@ func (r *Round) Leader() *flow.Identity {
 }
 
 // Propose sets the current candidate header.
-func (r *Round) Propose(candidate *flow.Block) {
+func (r *Round) Propose(candidate *flow.Header) {
 	r.candidate = candidate
 }
 
 // Candidate returns the current candidate header.
-func (r *Round) Candidate() *flow.Block {
+func (r *Round) Candidate() *flow.Header {
 	return r.candidate
 }
 

@@ -6,18 +6,21 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module/mempool"
 )
 
 // Seals implements the block seals memory pool of the consensus nodes,
 // used to store block seals.
 type Seals struct {
 	*Backend
+	byParent map[string]flow.Identifier
 }
 
 // NewSeals creates a new memory pool for block seals.
 func NewSeals() (*Seals, error) {
 	s := &Seals{
-		Backend: NewBackend(),
+		Backend:  NewBackend(),
+		byParent: make(map[string]flow.Identifier),
 	}
 
 	return s, nil
@@ -25,7 +28,12 @@ func NewSeals() (*Seals, error) {
 
 // Add adds an block seal to the mempool.
 func (s *Seals) Add(seal *flow.Seal) error {
-	return s.Backend.Add(seal)
+	err := s.Backend.Add(seal)
+	if err != nil {
+		return err
+	}
+	s.byParent[string(seal.ParentCommit)] = seal.ID()
+	return nil
 }
 
 // ByID returns the block seal with the given ID from the mempool.
@@ -39,6 +47,16 @@ func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 		panic(fmt.Sprintf("invalid entity in seal pool (%T)", entity))
 	}
 	return seal, nil
+}
+
+// ByParentCommit returns the block seal associated with the given parent state
+// commitment.
+func (s *Seals) ByParentCommit(commit flow.StateCommitment) (*flow.Seal, error) {
+	sealID, ok := s.byParent[string(commit)]
+	if !ok {
+		return nil, mempool.ErrEntityNotFound
+	}
+	return s.ByID(sealID)
 }
 
 // All returns all block seals from the pool.

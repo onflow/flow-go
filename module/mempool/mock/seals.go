@@ -64,6 +64,29 @@ func (_m *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	return r0, r1
 }
 
+// ByParentCommit provides a mock function with given fields: parent
+func (_m *Seals) ByParentCommit(parent []byte) (*flow.Seal, error) {
+	ret := _m.Called(parent)
+
+	var r0 *flow.Seal
+	if rf, ok := ret.Get(0).(func([]byte) *flow.Seal); ok {
+		r0 = rf(parent)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Seal)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func([]byte) error); ok {
+		r1 = rf(parent)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Has provides a mock function with given fields: sealID
 func (_m *Seals) Has(sealID flow.Identifier) bool {
 	ret := _m.Called(sealID)

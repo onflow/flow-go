@@ -22,7 +22,11 @@ func NewHeaders(db *badger.DB) *Headers {
 	return h
 }
 
-func (h *Headers) ByID(blockID flow.Identifier) (*flow.Header, error) {
+func (h *Headers) Store(header *flow.Header) error {
+	return h.db.Update(operation.InsertHeader(header))
+}
+
+func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	var header flow.Header
 	err := h.db.View(operation.RetrieveHeader(blockID, &header))
 	return &header, err

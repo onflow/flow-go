@@ -82,9 +82,9 @@ func ExecutionReceiptFixture() flow.ExecutionReceipt {
 func ExecutionResultFixture() flow.ExecutionResult {
 	return flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID:     IdentifierFixture(),
-			BlockID:              IdentifierFixture(),
-			FinalStateCommitment: StateCommitmentFixture(),
+			PreviousResultID: IdentifierFixture(),
+			BlockID:          IdentifierFixture(),
+			FinalStateCommit: StateCommitmentFixture(),
 			Chunks: flow.ChunkList{
 				ChunkFixture(),
 				ChunkFixture(),
