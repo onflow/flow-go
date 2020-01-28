@@ -272,7 +272,7 @@ func Test_ReplicaTimeout(t *testing.T) {
 	case <-time.NewTimer(time.Duration(2) * time.Duration(startRepTimeout) * time.Millisecond).C:
 		t.Fail() // to prevent test from hanging
 	}
-	duration := float64(time.Now().Sub(start).Milliseconds()) // in millisecond
+	duration := float64(time.Since(start).Milliseconds()) // in millisecond
 	fmt.Println(duration)
 	assert.True(t, math.Abs(duration-startRepTimeout) < 0.1*startRepTimeout)
 	// While the timeout event has been put in the channel,
@@ -310,7 +310,7 @@ func Test_VoteTimeout(t *testing.T) {
 	case <-time.NewTimer(time.Duration(2) * time.Duration(expectedTimeout) * time.Millisecond).C:
 		t.Fail() // to prevent test from hanging
 	}
-	duration := float64(time.Now().Sub(start).Milliseconds()) // in millisecond
+	duration := float64(time.Since(start).Milliseconds()) // in millisecond
 	fmt.Println(duration)
 	assert.True(t, math.Abs(duration-expectedTimeout) < 0.1*expectedTimeout)
 	// While the timeout event has been put in the channel,
