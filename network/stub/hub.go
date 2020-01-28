@@ -6,6 +6,7 @@ import (
 
 // Hub is a value that stores mocked networks in order for them to send events directly
 type Hub struct {
+	isSync   bool
 	networks map[flow.Identifier]*Network
 	Buffer   *Buffer
 }
@@ -13,9 +14,14 @@ type Hub struct {
 // NewNetworkHub returns a MockHub value with empty network slice
 func NewNetworkHub() *Hub {
 	return &Hub{
+		isSync:   false,
 		networks: make(map[flow.Identifier]*Network),
 		Buffer:   NewBuffer(),
 	}
+}
+
+func (hub *Hub) EnableSyncDelivery() {
+	hub.isSync = true
 }
 
 // GetNetwork returns the Network by the network ID (or node ID)

@@ -35,7 +35,7 @@ type Engine struct {
 }
 
 func New(
-	log zerolog.Logger,
+	logger zerolog.Logger,
 	net module.Network,
 	me module.Local,
 	protoState protocol.State,
@@ -43,6 +43,8 @@ func New(
 	receipts network.Engine,
 	vm virtualmachine.VirtualMachine,
 ) (*Engine, error) {
+	log := logger.With().Str("engine", "execution").Logger()
+
 	executor := executor.NewBlockExecutor(vm, execState)
 
 	e := Engine{
@@ -176,8 +178,17 @@ func (e *Engine) onCompleteBlock(originID flow.Identifier, block *execution.Comp
 
 	result, err := e.executor.ExecuteBlock(block)
 	if err != nil {
+		e.log.Error().
+			Hex("block_id", logging.Entity(block.Block)).
+			Msg("failed to compute block result")
+
 		return fmt.Errorf("failed to execute block: %w", err)
 	}
+
+	e.log.Debug().
+		Hex("block_id", logging.Entity(block.Block)).
+		Hex("result_id", logging.Entity(result)).
+		Msg("computed block result")
 
 	// submit execution result to receipt engine
 	e.receipts.SubmitLocal(result)

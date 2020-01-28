@@ -1,9 +1,7 @@
 package unittest
 
 import (
-	"fmt"
-	"math/rand"
-	"os"
+	"io/ioutil"
 	"path/filepath"
 	"testing"
 	"time"
@@ -44,22 +42,23 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 	}
 }
 
-func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+func tempDBDir() (string, error) {
+	return ioutil.TempDir("", "flow-test-db")
+}
+
+func TempBadgerDB(t *testing.T) *badger.DB {
+	dir, err := tempDBDir()
+	require.Nil(t, err)
 
 	db, err := badger.Open(badger.DefaultOptions(dir).WithLogger(nil))
 	require.Nil(t, err)
 
-	defer func() {
-		db.Close()
-		os.RemoveAll(dir)
-	}()
-
-	f(db)
+	return db
 }
 
-func RunWithLevelDB(t *testing.T, f func(db *leveldb.LevelDB)) {
-	dir := filepath.Join(os.TempDir(), fmt.Sprintf("flow-test-db-%d", rand.Uint64()))
+func TempLevelDB(t *testing.T) *leveldb.LevelDB {
+	dir, err := tempDBDir()
+	require.Nil(t, err)
 
 	kvdbPath := filepath.Join(dir, "kvdb")
 	tdbPath := filepath.Join(dir, "tdb")
@@ -67,9 +66,27 @@ func RunWithLevelDB(t *testing.T, f func(db *leveldb.LevelDB)) {
 	db, err := leveldb.NewLevelDB(kvdbPath, tdbPath)
 	require.Nil(t, err)
 
+	return db
+}
+
+func RunWithBadgerDB(t *testing.T, f func(*badger.DB)) {
+	db := TempBadgerDB(t)
+
 	defer func() {
-		db.SafeClose()
-		os.RemoveAll(dir)
+		err := db.Close()
+		require.Nil(t, err)
+	}()
+
+	f(db)
+}
+
+func RunWithLevelDB(t *testing.T, f func(db *leveldb.LevelDB)) {
+	db := TempLevelDB(t)
+
+	defer func() {
+		err1, err2 := db.SafeClose()
+		require.Nil(t, err1)
+		require.Nil(t, err2)
 	}()
 
 	f(db)
