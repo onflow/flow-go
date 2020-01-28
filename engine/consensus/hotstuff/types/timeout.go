@@ -6,7 +6,7 @@ type TimeoutMode int
 
 const (
 	ReplicaTimeout        TimeoutMode = iota
-	VoteCollectionTimeout TimeoutMode = iota
+	VoteCollectionTimeout
 )
 
 type TimerInfo struct {
@@ -18,7 +18,7 @@ type TimerInfo struct {
 
 type Timeout struct {
 	TimerInfo
-	TimeoutFired time.Time
+	CreatedAt time.Time
 }
 
 func (m TimeoutMode) String() string {

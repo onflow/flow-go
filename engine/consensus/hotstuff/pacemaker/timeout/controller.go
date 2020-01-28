@@ -62,7 +62,7 @@ func (t *Controller) StartTimeout(mode types.TimeoutMode, view uint64) *types.Ti
 	timeoutChannel := make(chan *types.Timeout)
 	go func() {
 		time := <-timer.C
-		timeoutChannel <- &types.Timeout{TimerInfo: timerInfo, TimeoutFired: time}
+		timeoutChannel <- &types.Timeout{TimerInfo: timerInfo, CreatedAt: time}
 	}()
 	t.timeoutChannel = timeoutChannel
 	t.timerInfo = &timerInfo
