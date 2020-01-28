@@ -12,7 +12,6 @@ type Signer interface {
 
 	// Sign generates a signature for the given vote, using the node's
 	// private key.
-	// TODO this is assuming we consolidate the "signable" model to the vote type
 	// TODO should return a BLS partial signature
-	Sign(*types.Vote) (crypto.Signature, error)
+	Sign(vote *types.UnsignedVote) (crypto.Signature, error)
 }
