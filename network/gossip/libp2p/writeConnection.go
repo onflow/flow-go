@@ -64,12 +64,12 @@ SendLoop:
 
 			if isClosedErr(err) {
 				wc.log.Error().Err(err).Msg("connection closed, stopping writes")
-				wc.Stop()
+				wc.stop()
 				continue
 			}
 			if err != nil {
 				wc.log.Error().Err(err).Msg("could not send data, stopping writes")
-				wc.Stop()
+				wc.stop()
 				continue
 			}
 		}

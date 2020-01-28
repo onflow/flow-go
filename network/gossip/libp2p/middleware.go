@@ -105,7 +105,7 @@ func (m *Middleware) Stop() {
 
 	// Stop all the connections
 	for _, conn := range m.cc.GetAll() {
-		conn.Stop()
+		conn.stop()
 	}
 
 	// Stop libp2p
@@ -245,7 +245,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	conn := NewReadConnection(log, s)
 
 	// make sure we close the connection when we are done handling the peer
-	defer conn.Stop()
+	defer conn.stop()
 
 	log.Info().Msg("incoming connection established")
 
