@@ -244,7 +244,7 @@ func (*BlockType) HasMembers() bool {
 	return true
 }
 
-const BlockHashSize = 32
+const BlockIDSize = 32
 
 func (t *BlockType) GetMember(identifier string, _ ast.Range, _ func(error)) *sema.Member {
 	newField := func(fieldType sema.Type) *sema.Member {
@@ -255,11 +255,11 @@ func (t *BlockType) GetMember(identifier string, _ ast.Range, _ func(error)) *se
 	case "number":
 		return newField(&sema.UInt64Type{})
 
-	case "hash":
+	case "id":
 		return newField(
 			&sema.ConstantSizedType{
 				Type: &sema.UInt8Type{},
-				Size: BlockHashSize,
+				Size: BlockIDSize,
 			},
 		)
 

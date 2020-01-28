@@ -860,12 +860,13 @@ func (r *interpreterRuntime) newGetCurrentBlockFunction(_ Interface) interpreter
 				panic(err)
 			}
 
-			var hash [stdlib.BlockHashSize]byte
-			copy(hash[:], buf.Bytes())
+			encoded := buf.Bytes()
+			var hash [stdlib.BlockIDSize]byte
+			copy(hash[stdlib.BlockIDSize-len(encoded):], encoded)
 
 			return BlockValue{
 				Number: number,
-				Hash:   hash,
+				ID:     hash,
 				NextBlock: func() *BlockValue {
 					nextBlock := makeBlock(number + 1)
 					return &nextBlock
@@ -924,7 +925,7 @@ func fromBytes(buf []byte) *interpreter.ArrayValue {
 
 type BlockValue struct {
 	Number        uint64
-	Hash          [stdlib.BlockHashSize]byte
+	ID            [stdlib.BlockIDSize]byte
 	NextBlock     func() *BlockValue
 	PreviousBlock func() *BlockValue
 }
@@ -953,9 +954,9 @@ func (v BlockValue) GetMember(_ *interpreter.Interpreter, _ interpreter.Location
 	case "number":
 		return interpreter.UInt64Value(v.Number)
 
-	case "hash":
-		var values = make([]Value, stdlib.BlockHashSize)
-		for i, b := range v.Hash {
+	case "id":
+		var values = make([]Value, stdlib.BlockIDSize)
+		for i, b := range v.ID {
 			values[i] = interpreter.UInt8Value(b)
 		}
 		return &interpreter.ArrayValue{Values: values}
@@ -986,6 +987,6 @@ func (v BlockValue) SetMember(_ *interpreter.Interpreter, _ interpreter.Location
 func (v BlockValue) String() string {
 	return fmt.Sprintf(
 		"Block(number: %d, hash: 0x%x)",
-		v.Number, v.Hash,
+		v.Number, v.ID,
 	)
 }

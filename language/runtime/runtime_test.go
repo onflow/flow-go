@@ -2180,12 +2180,15 @@ func TestRuntimeBlock(t *testing.T) {
         prepare() {
           let block = getCurrentBlock()
           log(block.number)
+          log(block.id)
 
           let previousBlock = block.previousBlock
           log(previousBlock?.number)
+          log(previousBlock?.id)
 
           let nextBlock = block.nextBlock
           log(nextBlock?.number)
+          log(nextBlock?.id)
         }
       }
     `)
@@ -2204,5 +2207,15 @@ func TestRuntimeBlock(t *testing.T) {
 	err := runtime.ExecuteTransaction(script, runtimeInterface, utils.TestLocation)
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{"1", "nil", "2"}, loggedMessages)
+	assert.Equal(t,
+		[]string{
+			"1",
+			"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]",
+			"nil",
+			"nil",
+			"2",
+			"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]",
+		},
+		loggedMessages,
+	)
 }
