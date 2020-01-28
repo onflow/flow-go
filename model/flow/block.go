@@ -11,27 +11,23 @@ import (
 func Genesis(ids IdentityList) *Block {
 
 	// create the raw content for the genesis block
-	content := Content{
+	payload := Payload{
 		Identities: ids,
 		Guarantees: nil,
 	}
-
-	// create the payload hash summaries
-	payload := content.Payload()
 
 	// create the header
 	header := Header{
 		Number:      0,
 		Timestamp:   time.Unix(1575244800, 0),
 		ParentID:    ZeroID,
-		PayloadHash: payload.Root(),
+		PayloadHash: payload.Hash(),
 	}
 
 	// combine to block
 	genesis := Block{
 		Header:  header,
 		Payload: payload,
-		Content: content,
 	}
 
 	return &genesis
@@ -42,23 +38,12 @@ func Genesis(ids IdentityList) *Block {
 type Block struct {
 	Header
 	Payload
-	Content
 }
 
 // Valid will check whether the block is valid bottom-up.
 func (b Block) Valid() bool {
-
-	// check that the content hashes are correct
-	if b.Payload != b.Content.Payload() {
-		return false
-	}
-
 	// check that the payload hash is correct
-	if b.PayloadHash != b.Payload.Root() {
-		return false
-	}
-
-	return true
+	return b.PayloadHash == b.Payload.Hash()
 }
 
 // Header contains all meta-data for a block, as well as a hash representing
@@ -69,6 +54,7 @@ type Header struct {
 	Timestamp   time.Time
 	ParentID    Identifier
 	PayloadHash Identifier
+	ProposerID  Identifier
 	Signatures  []crypto.Signature
 }
 
@@ -79,11 +65,13 @@ func (h Header) Body() interface{} {
 		Timestamp   time.Time
 		ParentID    Identifier
 		PayloadHash Identifier
+		ProposerID  Identifier
 	}{
 		Number:      h.Number,
 		Timestamp:   h.Timestamp,
 		ParentID:    h.ParentID,
 		PayloadHash: h.PayloadHash,
+		ProposerID:  h.ProposerID,
 	}
 }
 
@@ -100,29 +88,14 @@ func (h Header) Checksum() Identifier {
 
 // Payload represents the second level of the block payload merkle tree.
 type Payload struct {
-	IdentitiesHash  Identifier
-	CollectionsHash Identifier
-}
-
-// Root returns the hash of the payload.
-func (p Payload) Root() Identifier {
-	return ConcatSum(
-		p.IdentitiesHash,
-		p.CollectionsHash,
-	)
-}
-
-// Content is the actual content of each block.
-type Content struct {
 	Identities IdentityList
 	Guarantees []*CollectionGuarantee
 }
 
-// Payload creates the payload for the given content.
-func (c Content) Payload() Payload {
-	p := Payload{
-		IdentitiesHash:  MerkleRoot(GetIDs(c.Identities)...),
-		CollectionsHash: MerkleRoot(GetIDs(c.Guarantees)...),
-	}
-	return p
+// Root returns the hash of the payload.
+func (p Payload) Hash() Identifier {
+	return ConcatSum(
+		MerkleRoot(GetIDs(p.Identities)...),
+		MerkleRoot(GetIDs(p.Guarantees)...),
+	)
 }

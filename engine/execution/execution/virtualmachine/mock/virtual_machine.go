@@ -12,11 +12,11 @@ type VirtualMachine struct {
 }
 
 // NewBlockContext provides a mock function with given fields: b
-func (_m *VirtualMachine) NewBlockContext(b *flow.Block) virtualmachine.BlockContext {
+func (_m *VirtualMachine) NewBlockContext(b *flow.Header) virtualmachine.BlockContext {
 	ret := _m.Called(b)
 
 	var r0 virtualmachine.BlockContext
-	if rf, ok := ret.Get(0).(func(*flow.Block) virtualmachine.BlockContext); ok {
+	if rf, ok := ret.Get(0).(func(*flow.Header) virtualmachine.BlockContext); ok {
 		r0 = rf(b)
 	} else {
 		if ret.Get(0) != nil {

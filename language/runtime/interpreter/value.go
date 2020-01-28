@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -557,6 +558,7 @@ func NewIntValue(value int64) IntValue {
 }
 
 func ConvertInt(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	if intValue, ok := value.(IntValue); ok {
 		return intValue.Copy()
 	}
@@ -596,28 +598,46 @@ func (v IntValue) Negate() IntegerValue {
 }
 
 func (v IntValue) Plus(other IntegerValue) IntegerValue {
-	newValue := big.NewInt(0).Add(v.Int, other.(IntValue).Int)
-	return IntValue{newValue}
+	o := other.(IntValue)
+	res := big.NewInt(0)
+	res.Add(v.Int, o.Int)
+	return IntValue{res}
 }
 
 func (v IntValue) Minus(other IntegerValue) IntegerValue {
-	newValue := big.NewInt(0).Sub(v.Int, other.(IntValue).Int)
-	return IntValue{newValue}
+	o := other.(IntValue)
+	res := big.NewInt(0)
+	res.Sub(v.Int, o.Int)
+	return IntValue{res}
 }
 
 func (v IntValue) Mod(other IntegerValue) IntegerValue {
-	newValue := big.NewInt(0).Mod(v.Int, other.(IntValue).Int)
-	return IntValue{newValue}
+	o := other.(IntValue)
+	res := big.NewInt(0)
+	// INT33-C
+	if o.Int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.Mod(v.Int, o.Int)
+	return IntValue{res}
 }
 
 func (v IntValue) Mul(other IntegerValue) IntegerValue {
-	newValue := big.NewInt(0).Mul(v.Int, other.(IntValue).Int)
-	return IntValue{newValue}
+	o := other.(IntValue)
+	res := big.NewInt(0)
+	res.Mul(v.Int, o.Int)
+	return IntValue{res}
 }
 
 func (v IntValue) Div(other IntegerValue) IntegerValue {
-	newValue := big.NewInt(0).Div(v.Int, other.(IntValue).Int)
-	return IntValue{newValue}
+	o := other.(IntValue)
+	res := big.NewInt(0)
+	// INT33-C
+	if o.Int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.Div(v.Int, o.Int)
+	return IntValue{res}
 }
 
 func (v IntValue) Less(other IntegerValue) BoolValue {
@@ -685,27 +705,81 @@ func (v Int8Value) IntValue() int {
 }
 
 func (v Int8Value) Negate() IntegerValue {
+	// INT32-C
+	if v == math.MinInt8 {
+		panic(&OverflowError{})
+	}
 	return -v
 }
 
 func (v Int8Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(Int8Value)
+	o := other.(Int8Value)
+	// INT32-C
+	if (o > 0) && (v > (math.MaxInt8 - o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v < (math.MinInt8 - o)) {
+		panic(&UnderflowError{})
+	}
+	return v + o
 }
 
 func (v Int8Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(Int8Value)
+	o := other.(Int8Value)
+	// INT32-C
+	if (o > 0) && (v < (math.MinInt8 + o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v > (math.MaxInt8 + o)) {
+		panic(&UnderflowError{})
+	}
+	return v - o
 }
 
 func (v Int8Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(Int8Value)
+	o := other.(Int8Value)
+	// INT33-C
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
 }
 
 func (v Int8Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(Int8Value)
+	o := other.(Int8Value)
+	// INT32-C
+	if v > 0 {
+		if o > 0 {
+			if v > (math.MaxInt8 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if o < (math.MinInt8 / v) {
+				panic(&OverflowError{})
+			}
+		}
+	} else {
+		if o > 0 {
+			if v < (math.MinInt8 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if (v != 0) && (o < (math.MaxInt8 / v)) {
+				panic(&OverflowError{})
+			}
+		}
+	}
+	return v * o
 }
 
 func (v Int8Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(Int8Value)
+	o := other.(Int8Value)
+	// INT33-C
+	// https://golang.org/ref/spec#Integer_operators
+	if o == 0 {
+		panic(DivisionByZeroError{})
+	} else if (v == math.MinInt8) && (o == -1) {
+		panic(OverflowError{})
+	}
+	return v / o
 }
 
 func (v Int8Value) Less(other IntegerValue) BoolValue {
@@ -733,6 +807,7 @@ func (v Int8Value) Equal(other Value) BoolValue {
 }
 
 func ConvertInt8(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Int8Value(value.(IntegerValue).IntValue())
 }
 
@@ -772,27 +847,81 @@ func (v Int16Value) IntValue() int {
 }
 
 func (v Int16Value) Negate() IntegerValue {
+	// INT32-C
+	if v == math.MinInt16 {
+		panic(&OverflowError{})
+	}
 	return -v
 }
 
 func (v Int16Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(Int16Value)
+	o := other.(Int16Value)
+	// INT32-C
+	if (o > 0) && (v > (math.MaxInt16 - o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v < (math.MinInt16 - o)) {
+		panic(&UnderflowError{})
+	}
+	return v + o
 }
 
 func (v Int16Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(Int16Value)
+	o := other.(Int16Value)
+	// INT32-C
+	if (o > 0) && (v < (math.MinInt16 + o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v > (math.MaxInt16 + o)) {
+		panic(&UnderflowError{})
+	}
+	return v - o
 }
 
 func (v Int16Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(Int16Value)
+	o := other.(Int16Value)
+	// INT33-C
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
 }
 
 func (v Int16Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(Int16Value)
+	o := other.(Int16Value)
+	// INT32-C
+	if v > 0 {
+		if o > 0 {
+			if v > (math.MaxInt16 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if o < (math.MinInt16 / v) {
+				panic(&OverflowError{})
+			}
+		}
+	} else {
+		if o > 0 {
+			if v < (math.MinInt16 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if (v != 0) && (o < (math.MaxInt16 / v)) {
+				panic(&OverflowError{})
+			}
+		}
+	}
+	return v * o
 }
 
 func (v Int16Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(Int16Value)
+	o := other.(Int16Value)
+	// INT33-C
+	// https://golang.org/ref/spec#Integer_operators
+	if o == 0 {
+		panic(DivisionByZeroError{})
+	} else if (v == math.MinInt16) && (o == -1) {
+		panic(OverflowError{})
+	}
+	return v / o
 }
 
 func (v Int16Value) Less(other IntegerValue) BoolValue {
@@ -820,6 +949,7 @@ func (v Int16Value) Equal(other Value) BoolValue {
 }
 
 func ConvertInt16(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Int16Value(value.(IntegerValue).IntValue())
 }
 
@@ -859,27 +989,81 @@ func (v Int32Value) IntValue() int {
 }
 
 func (v Int32Value) Negate() IntegerValue {
+	// INT32-C
+	if v == math.MinInt32 {
+		panic(&OverflowError{})
+	}
 	return -v
 }
 
 func (v Int32Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(Int32Value)
+	o := other.(Int32Value)
+	// INT32-C
+	if (o > 0) && (v > (math.MaxInt32 - o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v < (math.MinInt32 - o)) {
+		panic(&UnderflowError{})
+	}
+	return v + o
 }
 
 func (v Int32Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(Int32Value)
+	o := other.(Int32Value)
+	// INT32-C
+	if (o > 0) && (v < (math.MinInt32 + o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v > (math.MaxInt32 + o)) {
+		panic(&UnderflowError{})
+	}
+	return v - o
 }
 
 func (v Int32Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(Int32Value)
+	o := other.(Int32Value)
+	// INT33-C
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
 }
 
 func (v Int32Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(Int32Value)
+	o := other.(Int32Value)
+	// INT32-C
+	if v > 0 {
+		if o > 0 {
+			if v > (math.MaxInt32 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if o < (math.MinInt32 / v) {
+				panic(&OverflowError{})
+			}
+		}
+	} else {
+		if o > 0 {
+			if v < (math.MinInt32 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if (v != 0) && (o < (math.MaxInt32 / v)) {
+				panic(&OverflowError{})
+			}
+		}
+	}
+	return v * o
 }
 
 func (v Int32Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(Int32Value)
+	o := other.(Int32Value)
+	// INT33-C
+	// https://golang.org/ref/spec#Integer_operators
+	if o == 0 {
+		panic(DivisionByZeroError{})
+	} else if (v == math.MinInt32) && (o == -1) {
+		panic(OverflowError{})
+	}
+	return v / o
 }
 
 func (v Int32Value) Less(other IntegerValue) BoolValue {
@@ -907,6 +1091,7 @@ func (v Int32Value) Equal(other Value) BoolValue {
 }
 
 func ConvertInt32(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Int32Value(value.(IntegerValue).IntValue())
 }
 
@@ -946,27 +1131,81 @@ func (v Int64Value) IntValue() int {
 }
 
 func (v Int64Value) Negate() IntegerValue {
+	// INT32-C
+	if v == math.MinInt64 {
+		panic(&OverflowError{})
+	}
 	return -v
 }
 
 func (v Int64Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(Int64Value)
+	o := other.(Int64Value)
+	// INT32-C
+	if (o > 0) && (v > (math.MaxInt64 - o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v < (math.MinInt64 - o)) {
+		panic(&UnderflowError{})
+	}
+	return v + o
 }
 
 func (v Int64Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(Int64Value)
+	o := other.(Int64Value)
+	// INT32-C
+	if (o > 0) && (v < (math.MinInt64 + o)) {
+		panic(&OverflowError{})
+	} else if (o < 0) && (v > (math.MaxInt64 + o)) {
+		panic(&UnderflowError{})
+	}
+	return v - o
 }
 
 func (v Int64Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(Int64Value)
+	o := other.(Int64Value)
+	// INT33-C
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
 }
 
 func (v Int64Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(Int64Value)
+	o := other.(Int64Value)
+	// INT32-C
+	if v > 0 {
+		if o > 0 {
+			if v > (math.MaxInt64 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if o < (math.MinInt64 / v) {
+				panic(&OverflowError{})
+			}
+		}
+	} else {
+		if o > 0 {
+			if v < (math.MinInt64 / o) {
+				panic(&OverflowError{})
+			}
+		} else {
+			if (v != 0) && (o < (math.MaxInt64 / v)) {
+				panic(&OverflowError{})
+			}
+		}
+	}
+	return v * o
 }
 
 func (v Int64Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(Int64Value)
+	o := other.(Int64Value)
+	// INT33-C
+	// https://golang.org/ref/spec#Integer_operators
+	if o == 0 {
+		panic(DivisionByZeroError{})
+	} else if (v == math.MinInt64) && (o == -1) {
+		panic(OverflowError{})
+	}
+	return v / o
 }
 
 func (v Int64Value) Less(other IntegerValue) BoolValue {
@@ -994,7 +1233,487 @@ func (v Int64Value) Equal(other Value) BoolValue {
 }
 
 func ConvertInt64(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return Int64Value(value.(IntegerValue).IntValue())
+}
+
+// Int128Value
+
+type Int128Value struct {
+	int *big.Int
+}
+
+func init() {
+	gob.Register(Int128Value{})
+}
+
+func (v Int128Value) isValue() {}
+
+func (v Int128Value) Copy() Value {
+	return Int128Value{big.NewInt(0).Set(v.int)}
+}
+
+func (Int128Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Int128Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v Int128Value) IntValue() int {
+	// TODO: handle overflow
+	return int(v.int.Int64())
+}
+
+func (v Int128Value) String() string {
+	return v.int.String()
+}
+
+func (v Int128Value) KeyString() string {
+	return v.int.String()
+}
+
+func (v Int128Value) Negate() IntegerValue {
+	// INT32-C
+	//   if v == Int128TypeMin {
+	//       ...
+	//   }
+	if v.int.Cmp(sema.Int128TypeMin) == 0 {
+		panic(&OverflowError{})
+	}
+	return Int128Value{big.NewInt(0).Neg(v.int)}
+}
+
+func (v Int128Value) Plus(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just add and check the range of the result.
+	//
+	// If Go gains a native int128 type and we switch this value
+	// to be based on it, then we need to follow INT32-C:
+	//
+	//   if (o > 0) && (v > (Int128TypeMax - o)) {
+	//       ...
+	//   } else if (o < 0) && (v < (Int128TypeMin - o)) {
+	//       ...
+	//   }
+	//
+	res := big.NewInt(0)
+	res.Add(v.int, o.int)
+	if res.Cmp(sema.Int128TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int128TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return Int128Value{res}
+}
+
+func (v Int128Value) Minus(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just subtract and check the range of the result.
+	//
+	// If Go gains a native int128 type and we switch this value
+	// to be based on it, then we need to follow INT32-C:
+	//
+	//   if (o > 0) && (v < (Int128TypeMin + o)) {
+	// 	     ...
+	//   } else if (o < 0) && (v > (Int128TypeMax + o)) {
+	//       ...
+	//   }
+	//
+	res := big.NewInt(0)
+	res.Sub(v.int, o.int)
+	if res.Cmp(sema.Int128TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int128TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return Int128Value{res}
+}
+
+func (v Int128Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	res := big.NewInt(0)
+	// INT33-C
+	if o.int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.Mod(v.int, o.int)
+	return Int128Value{res}
+}
+
+func (v Int128Value) Mul(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	res := big.NewInt(0)
+	res.Mul(v.int, o.int)
+	if res.Cmp(sema.Int128TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int128TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return Int128Value{res}
+}
+
+func (v Int128Value) Div(other IntegerValue) IntegerValue {
+	o := other.(Int128Value)
+	res := big.NewInt(0)
+	// INT33-C:
+	//   if o == 0 {
+	//       ...
+	//   } else if (v == Int128TypeMin) && (o == -1) {
+	//       ...
+	//   }
+	if o.int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.SetInt64(-1)
+	if (v.int.Cmp(sema.Int128TypeMin) == 0) && (o.int.Cmp(res) == 0) {
+		panic(OverflowError{})
+	}
+	res.Div(v.int, o.int)
+	return Int128Value{res}
+}
+
+func (v Int128Value) Less(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int128Value).int)
+	return cmp == -1
+}
+
+func (v Int128Value) LessEqual(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int128Value).int)
+	return cmp <= 0
+}
+
+func (v Int128Value) Greater(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int128Value).int)
+	return cmp == 1
+}
+
+func (v Int128Value) GreaterEqual(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int128Value).int)
+	return cmp >= 0
+}
+
+func (v Int128Value) Equal(other Value) BoolValue {
+	otherInt, ok := other.(Int128Value)
+	if !ok {
+		return false
+	}
+	cmp := v.int.Cmp(otherInt.int)
+	return cmp == 0
+}
+
+func ConvertInt128(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+	intValue := value.(IntegerValue).IntValue()
+	return Int128Value{big.NewInt(0).SetInt64(int64(intValue))}
+}
+
+// Int256Value
+
+type Int256Value struct {
+	int *big.Int
+}
+
+func init() {
+	gob.Register(Int256Value{})
+}
+
+func (v Int256Value) isValue() {}
+
+func (v Int256Value) Copy() Value {
+	return Int256Value{big.NewInt(0).Set(v.int)}
+}
+
+func (Int256Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Int256Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v Int256Value) IntValue() int {
+	// TODO: handle overflow
+	return int(v.int.Int64())
+}
+
+func (v Int256Value) String() string {
+	return v.int.String()
+}
+
+func (v Int256Value) KeyString() string {
+	return v.int.String()
+}
+
+func (v Int256Value) Negate() IntegerValue {
+	// INT32-C
+	//   if v == Int256TypeMin {
+	//       ...
+	//   }
+	if v.int.Cmp(sema.Int256TypeMin) == 0 {
+		panic(&OverflowError{})
+	}
+	return Int256Value{big.NewInt(0).Neg(v.int)}
+}
+
+func (v Int256Value) Plus(other IntegerValue) IntegerValue {
+	o := other.(Int256Value)
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just add and check the range of the result.
+	//
+	// If Go gains a native int256 type and we switch this value
+	// to be based on it, then we need to follow INT32-C:
+	//
+	//   if (o > 0) && (v > (Int256TypeMax - o)) {
+	//       ...
+	//   } else if (o < 0) && (v < (Int256TypeMin - o)) {
+	//       ...
+	//   }
+	//
+	res := big.NewInt(0)
+	res.Add(v.int, o.int)
+	if res.Cmp(sema.Int256TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int256TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return Int256Value{res}
+}
+
+func (v Int256Value) Minus(other IntegerValue) IntegerValue {
+	o := other.(Int256Value)
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just subtract and check the range of the result.
+	//
+	// If Go gains a native int256 type and we switch this value
+	// to be based on it, then we need to follow INT32-C:
+	//
+	//   if (o > 0) && (v < (Int256TypeMin + o)) {
+	// 	     ...
+	//   } else if (o < 0) && (v > (Int256TypeMax + o)) {
+	//       ...
+	//   }
+	//
+	res := big.NewInt(0)
+	res.Sub(v.int, o.int)
+	if res.Cmp(sema.Int256TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int256TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return Int256Value{res}
+}
+
+func (v Int256Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(Int256Value)
+	res := big.NewInt(0)
+	// INT33-C
+	if o.int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.Mod(v.int, o.int)
+	return Int256Value{res}
+}
+
+func (v Int256Value) Mul(other IntegerValue) IntegerValue {
+	o := other.(Int256Value)
+	res := big.NewInt(0)
+	res.Mul(v.int, o.int)
+	if res.Cmp(sema.Int256TypeMin) < 0 {
+		panic(UnderflowError{})
+	} else if res.Cmp(sema.Int256TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return Int256Value{res}
+}
+
+func (v Int256Value) Div(other IntegerValue) IntegerValue {
+	o := other.(Int256Value)
+	res := big.NewInt(0)
+	// INT33-C:
+	//   if o == 0 {
+	//       ...
+	//   } else if (v == Int256TypeMin) && (o == -1) {
+	//       ...
+	//   }
+	if o.int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.SetInt64(-1)
+	if (v.int.Cmp(sema.Int256TypeMin) == 0) && (o.int.Cmp(res) == 0) {
+		panic(OverflowError{})
+	}
+	res.Div(v.int, o.int)
+	return Int256Value{res}
+}
+
+func (v Int256Value) Less(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int256Value).int)
+	return cmp == -1
+}
+
+func (v Int256Value) LessEqual(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int256Value).int)
+	return cmp <= 0
+}
+
+func (v Int256Value) Greater(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int256Value).int)
+	return cmp == 1
+}
+
+func (v Int256Value) GreaterEqual(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(Int256Value).int)
+	return cmp >= 0
+}
+
+func (v Int256Value) Equal(other Value) BoolValue {
+	otherInt, ok := other.(Int256Value)
+	if !ok {
+		return false
+	}
+	cmp := v.int.Cmp(otherInt.int)
+	return cmp == 0
+}
+
+func ConvertInt256(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+	intValue := value.(IntegerValue).IntValue()
+	return Int256Value{big.NewInt(0).SetInt64(int64(intValue))}
+}
+
+// UIntValue
+
+type UIntValue struct {
+	Int *big.Int
+}
+
+func init() {
+	gob.Register(UIntValue{})
+}
+
+func NewUIntValue(value uint64) UIntValue {
+	return UIntValue{Int: big.NewInt(0).SetUint64(value)}
+}
+
+func ConvertUInt(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+	if intValue, ok := value.(UIntValue); ok {
+		return intValue.Copy()
+	}
+	return NewUIntValue(uint64(value.(IntegerValue).IntValue()))
+}
+
+func (v UIntValue) isValue() {}
+
+func (v UIntValue) Copy() Value {
+	return UIntValue{big.NewInt(0).Set(v.Int)}
+}
+
+func (UIntValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (UIntValue) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v UIntValue) IntValue() int {
+	// TODO: handle overflow
+	return int(v.Int.Int64())
+}
+
+func (v UIntValue) String() string {
+	return v.Int.String()
+}
+
+func (v UIntValue) KeyString() string {
+	return v.Int.String()
+}
+
+func (v UIntValue) Negate() IntegerValue {
+	panic(errors.NewUnreachableError())
+}
+
+func (v UIntValue) Plus(other IntegerValue) IntegerValue {
+	o := other.(UIntValue)
+	res := big.NewInt(0)
+	res.Add(v.Int, o.Int)
+	return UIntValue{res}
+}
+
+func (v UIntValue) Minus(other IntegerValue) IntegerValue {
+	o := other.(UIntValue)
+	res := big.NewInt(0)
+	res.Sub(v.Int, o.Int)
+	if res.Sign() < 0 {
+		panic(&UnderflowError{})
+	}
+	return UIntValue{res}
+}
+
+func (v UIntValue) Mod(other IntegerValue) IntegerValue {
+	o := other.(UIntValue)
+	res := big.NewInt(0)
+	// INT33-C
+	if o.Int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.Mod(v.Int, o.Int)
+	return UIntValue{res}
+}
+
+func (v UIntValue) Mul(other IntegerValue) IntegerValue {
+	o := other.(UIntValue)
+	res := big.NewInt(0)
+	res.Mul(v.Int, o.Int)
+	return UIntValue{res}
+}
+
+func (v UIntValue) Div(other IntegerValue) IntegerValue {
+	o := other.(UIntValue)
+	res := big.NewInt(0)
+	// INT33-C
+	if o.Int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.Div(v.Int, o.Int)
+	return UIntValue{res}
+}
+
+func (v UIntValue) Less(other IntegerValue) BoolValue {
+	cmp := v.Int.Cmp(other.(UIntValue).Int)
+	return cmp == -1
+}
+
+func (v UIntValue) LessEqual(other IntegerValue) BoolValue {
+	cmp := v.Int.Cmp(other.(UIntValue).Int)
+	return cmp <= 0
+}
+
+func (v UIntValue) Greater(other IntegerValue) BoolValue {
+	cmp := v.Int.Cmp(other.(UIntValue).Int)
+	return cmp == 1
+}
+
+func (v UIntValue) GreaterEqual(other IntegerValue) BoolValue {
+	cmp := v.Int.Cmp(other.(UIntValue).Int)
+	return cmp >= 0
+}
+
+func (v UIntValue) Equal(other Value) BoolValue {
+	otherUInt, ok := other.(UIntValue)
+	if !ok {
+		return false
+	}
+	cmp := v.Int.Cmp(otherUInt.Int)
+	return cmp == 0
 }
 
 // UInt8Value
@@ -1033,27 +1752,49 @@ func (v UInt8Value) IntValue() int {
 }
 
 func (v UInt8Value) Negate() IntegerValue {
-	return -v
+	panic(errors.NewUnreachableError())
 }
 
 func (v UInt8Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(UInt8Value)
+	sum := v + other.(UInt8Value)
+	// INT30-C
+	if sum < v {
+		panic(OverflowError{})
+	}
+	return sum
 }
 
 func (v UInt8Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(UInt8Value)
+	diff := v - other.(UInt8Value)
+	// INT30-C
+	if diff > v {
+		panic(UnderflowError{})
+	}
+	return diff
 }
 
 func (v UInt8Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(UInt8Value)
+	o := other.(UInt8Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
 }
 
 func (v UInt8Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(UInt8Value)
+	o := other.(UInt8Value)
+	if (v > 0) && (o > 0) && (v > (math.MaxUint8 / o)) {
+		panic(&OverflowError{})
+	}
+	return v * o
 }
 
 func (v UInt8Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(UInt8Value)
+	o := other.(UInt8Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
 }
 
 func (v UInt8Value) Less(other IntegerValue) BoolValue {
@@ -1081,6 +1822,7 @@ func (v UInt8Value) Equal(other Value) BoolValue {
 }
 
 func ConvertUInt8(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return UInt8Value(value.(IntegerValue).IntValue())
 }
 
@@ -1118,27 +1860,49 @@ func (v UInt16Value) IntValue() int {
 	return int(v)
 }
 func (v UInt16Value) Negate() IntegerValue {
-	return -v
+	panic(errors.NewUnreachableError())
 }
 
 func (v UInt16Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(UInt16Value)
+	sum := v + other.(UInt16Value)
+	// INT30-C
+	if sum < v {
+		panic(OverflowError{})
+	}
+	return sum
 }
 
 func (v UInt16Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(UInt16Value)
+	diff := v - other.(UInt16Value)
+	// INT30-C
+	if diff > v {
+		panic(UnderflowError{})
+	}
+	return diff
 }
 
 func (v UInt16Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(UInt16Value)
+	o := other.(UInt16Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
 }
 
 func (v UInt16Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(UInt16Value)
+	o := other.(UInt16Value)
+	if (v > 0) && (o > 0) && (v > (math.MaxUint16 / o)) {
+		panic(&OverflowError{})
+	}
+	return v * o
 }
 
 func (v UInt16Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(UInt16Value)
+	o := other.(UInt16Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
 }
 
 func (v UInt16Value) Less(other IntegerValue) BoolValue {
@@ -1166,6 +1930,7 @@ func (v UInt16Value) Equal(other Value) BoolValue {
 }
 
 func ConvertUInt16(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return UInt16Value(value.(IntegerValue).IntValue())
 }
 
@@ -1205,27 +1970,49 @@ func (v UInt32Value) IntValue() int {
 }
 
 func (v UInt32Value) Negate() IntegerValue {
-	return -v
+	panic(errors.NewUnreachableError())
 }
 
 func (v UInt32Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(UInt32Value)
+	sum := v + other.(UInt32Value)
+	// INT30-C
+	if sum < v {
+		panic(OverflowError{})
+	}
+	return sum
 }
 
 func (v UInt32Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(UInt32Value)
+	diff := v - other.(UInt32Value)
+	// INT30-C
+	if diff > v {
+		panic(UnderflowError{})
+	}
+	return diff
 }
 
 func (v UInt32Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(UInt32Value)
+	o := other.(UInt32Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
 }
 
 func (v UInt32Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(UInt32Value)
+	o := other.(UInt32Value)
+	if (v > 0) && (o > 0) && (v > (math.MaxUint32 / o)) {
+		panic(&OverflowError{})
+	}
+	return v * o
 }
 
 func (v UInt32Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(UInt32Value)
+	o := other.(UInt32Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
 }
 
 func (v UInt32Value) Less(other IntegerValue) BoolValue {
@@ -1253,6 +2040,7 @@ func (v UInt32Value) Equal(other Value) BoolValue {
 }
 
 func ConvertUInt32(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return UInt32Value(value.(IntegerValue).IntValue())
 }
 
@@ -1292,27 +2080,49 @@ func (v UInt64Value) IntValue() int {
 }
 
 func (v UInt64Value) Negate() IntegerValue {
-	return -v
+	panic(errors.NewUnreachableError())
 }
 
 func (v UInt64Value) Plus(other IntegerValue) IntegerValue {
-	return v + other.(UInt64Value)
+	sum := v + other.(UInt64Value)
+	// INT30-C
+	if sum < v {
+		panic(OverflowError{})
+	}
+	return sum
 }
 
 func (v UInt64Value) Minus(other IntegerValue) IntegerValue {
-	return v - other.(UInt64Value)
+	diff := v - other.(UInt64Value)
+	// INT30-C
+	if diff > v {
+		panic(UnderflowError{})
+	}
+	return diff
 }
 
 func (v UInt64Value) Mod(other IntegerValue) IntegerValue {
-	return v % other.(UInt64Value)
+	o := other.(UInt64Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
 }
 
 func (v UInt64Value) Mul(other IntegerValue) IntegerValue {
-	return v * other.(UInt64Value)
+	o := other.(UInt64Value)
+	if (v > 0) && (o > 0) && (v > (math.MaxUint64 / o)) {
+		panic(&OverflowError{})
+	}
+	return v * o
 }
 
 func (v UInt64Value) Div(other IntegerValue) IntegerValue {
-	return v / other.(UInt64Value)
+	o := other.(UInt64Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
 }
 
 func (v UInt64Value) Less(other IntegerValue) BoolValue {
@@ -1340,7 +2150,680 @@ func (v UInt64Value) Equal(other Value) BoolValue {
 }
 
 func ConvertUInt64(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	return UInt64Value(value.(IntegerValue).IntValue())
+}
+
+// UInt128Value
+
+type UInt128Value struct {
+	int *big.Int
+}
+
+func init() {
+	gob.Register(UInt128Value{})
+}
+
+func (v UInt128Value) isValue() {}
+
+func (v UInt128Value) Copy() Value {
+	return UInt128Value{big.NewInt(0).Set(v.int)}
+}
+
+func (UInt128Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (UInt128Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v UInt128Value) IntValue() int {
+	// TODO: handle overflow
+	return int(v.int.Int64())
+}
+
+func (v UInt128Value) String() string {
+	return v.int.String()
+}
+
+func (v UInt128Value) KeyString() string {
+	return v.int.String()
+}
+
+func (v UInt128Value) Negate() IntegerValue {
+	panic(errors.NewUnreachableError())
+}
+
+func (v UInt128Value) Plus(other IntegerValue) IntegerValue {
+	sum := big.NewInt(0)
+	sum.Add(v.int, other.(UInt128Value).int)
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just add and check the range of the result.
+	//
+	// If Go gains a native uint128 type and we switch this value
+	// to be based on it, then we need to follow INT30-C:
+	//
+	//  if sum < v {
+	//      ...
+	//  }
+	//
+	if sum.Cmp(sema.UInt128TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return UInt128Value{sum}
+}
+
+func (v UInt128Value) Minus(other IntegerValue) IntegerValue {
+	diff := big.NewInt(0)
+	diff.Sub(v.int, other.(UInt128Value).int)
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just subtract and check the range of the result.
+	//
+	// If Go gains a native uint128 type and we switch this value
+	// to be based on it, then we need to follow INT30-C:
+	//
+	//   if diff > v {
+	// 	     ...
+	//   }
+	//
+	if diff.Cmp(sema.UInt128TypeMin) < 0 {
+		panic(UnderflowError{})
+	}
+	return UInt128Value{diff}
+}
+
+func (v UInt128Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(UInt128Value)
+	res := big.NewInt(0)
+	if o.int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.Mod(v.int, o.int)
+	return UInt128Value{res}
+}
+
+func (v UInt128Value) Mul(other IntegerValue) IntegerValue {
+	o := other.(UInt128Value)
+	res := big.NewInt(0)
+	res.Mul(v.int, o.int)
+	if res.Cmp(sema.UInt128TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return UInt128Value{res}
+}
+
+func (v UInt128Value) Div(other IntegerValue) IntegerValue {
+	o := other.(UInt128Value)
+	res := big.NewInt(0)
+	if o.int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.Div(v.int, o.int)
+	return UInt128Value{res}
+}
+
+func (v UInt128Value) Less(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(UInt128Value).int)
+	return cmp == -1
+}
+
+func (v UInt128Value) LessEqual(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(UInt128Value).int)
+	return cmp <= 0
+}
+
+func (v UInt128Value) Greater(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(UInt128Value).int)
+	return cmp == 1
+}
+
+func (v UInt128Value) GreaterEqual(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(UInt128Value).int)
+	return cmp >= 0
+}
+
+func (v UInt128Value) Equal(other Value) BoolValue {
+	otherInt, ok := other.(UInt128Value)
+	if !ok {
+		return false
+	}
+	cmp := v.int.Cmp(otherInt.int)
+	return cmp == 0
+}
+
+func ConvertUInt128(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+	intValue := value.(IntegerValue).IntValue()
+	return UInt128Value{big.NewInt(0).SetInt64(int64(intValue))}
+}
+
+// UInt256Value
+
+type UInt256Value struct {
+	int *big.Int
+}
+
+func init() {
+	gob.Register(UInt256Value{})
+}
+
+func (v UInt256Value) isValue() {}
+
+func (v UInt256Value) Copy() Value {
+	return UInt256Value{big.NewInt(0).Set(v.int)}
+}
+
+func (UInt256Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (UInt256Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v UInt256Value) IntValue() int {
+	// TODO: handle overflow
+	return int(v.int.Int64())
+}
+
+func (v UInt256Value) String() string {
+	return v.int.String()
+}
+
+func (v UInt256Value) KeyString() string {
+	return v.int.String()
+}
+
+func (v UInt256Value) Negate() IntegerValue {
+	panic(errors.NewUnreachableError())
+}
+
+func (v UInt256Value) Plus(other IntegerValue) IntegerValue {
+	sum := big.NewInt(0)
+	sum.Add(v.int, other.(UInt256Value).int)
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just add and check the range of the result.
+	//
+	// If Go gains a native uint256 type and we switch this value
+	// to be based on it, then we need to follow INT30-C:
+	//
+	//  if sum < v {
+	//      ...
+	//  }
+	//
+	if sum.Cmp(sema.UInt256TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return UInt256Value{sum}
+}
+
+func (v UInt256Value) Minus(other IntegerValue) IntegerValue {
+	diff := big.NewInt(0)
+	diff.Sub(v.int, other.(UInt256Value).int)
+	// Given that this value is backed by an arbitrary size integer,
+	// we can just subtract and check the range of the result.
+	//
+	// If Go gains a native uint256 type and we switch this value
+	// to be based on it, then we need to follow INT30-C:
+	//
+	//   if diff > v {
+	// 	     ...
+	//   }
+	//
+	if diff.Cmp(sema.UInt256TypeMin) < 0 {
+		panic(UnderflowError{})
+	}
+	return UInt256Value{diff}
+}
+
+func (v UInt256Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(UInt256Value)
+	res := big.NewInt(0)
+	if o.int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.Mod(v.int, o.int)
+	return UInt256Value{res}
+}
+
+func (v UInt256Value) Mul(other IntegerValue) IntegerValue {
+	o := other.(UInt256Value)
+	res := big.NewInt(0)
+	res.Mul(v.int, o.int)
+	if res.Cmp(sema.UInt256TypeMax) > 0 {
+		panic(OverflowError{})
+	}
+	return UInt256Value{res}
+}
+
+func (v UInt256Value) Div(other IntegerValue) IntegerValue {
+	o := other.(UInt256Value)
+	res := big.NewInt(0)
+	if o.int.Cmp(res) == 0 {
+		panic(DivisionByZeroError{})
+	}
+	res.Div(v.int, o.int)
+	return UInt256Value{res}
+}
+
+func (v UInt256Value) Less(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(UInt256Value).int)
+	return cmp == -1
+}
+
+func (v UInt256Value) LessEqual(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(UInt256Value).int)
+	return cmp <= 0
+}
+
+func (v UInt256Value) Greater(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(UInt256Value).int)
+	return cmp == 1
+}
+
+func (v UInt256Value) GreaterEqual(other IntegerValue) BoolValue {
+	cmp := v.int.Cmp(other.(UInt256Value).int)
+	return cmp >= 0
+}
+
+func (v UInt256Value) Equal(other Value) BoolValue {
+	otherInt, ok := other.(UInt256Value)
+	if !ok {
+		return false
+	}
+	cmp := v.int.Cmp(otherInt.int)
+	return cmp == 0
+}
+
+func ConvertUInt256(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+	intValue := value.(IntegerValue).IntValue()
+	return UInt256Value{big.NewInt(0).SetInt64(int64(intValue))}
+}
+
+// Word8Value
+
+type Word8Value uint8
+
+func init() {
+	gob.Register(Word8Value(0))
+}
+
+func (Word8Value) isValue() {}
+
+func (v Word8Value) Copy() Value {
+	return v
+}
+
+func (Word8Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Word8Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v Word8Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word8Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word8Value) IntValue() int {
+	return int(v)
+}
+
+func (v Word8Value) Negate() IntegerValue {
+	panic(errors.NewUnreachableError())
+}
+
+func (v Word8Value) Plus(other IntegerValue) IntegerValue {
+	return v + other.(Word8Value)
+}
+
+func (v Word8Value) Minus(other IntegerValue) IntegerValue {
+	return v - other.(Word8Value)
+}
+
+func (v Word8Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(Word8Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
+}
+
+func (v Word8Value) Mul(other IntegerValue) IntegerValue {
+	return v * other.(Word8Value)
+}
+
+func (v Word8Value) Div(other IntegerValue) IntegerValue {
+	o := other.(Word8Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
+}
+
+func (v Word8Value) Less(other IntegerValue) BoolValue {
+	return v < other.(Word8Value)
+}
+
+func (v Word8Value) LessEqual(other IntegerValue) BoolValue {
+	return v <= other.(Word8Value)
+}
+
+func (v Word8Value) Greater(other IntegerValue) BoolValue {
+	return v > other.(Word8Value)
+}
+
+func (v Word8Value) GreaterEqual(other IntegerValue) BoolValue {
+	return v >= other.(Word8Value)
+}
+
+func (v Word8Value) Equal(other Value) BoolValue {
+	otherWord8, ok := other.(Word8Value)
+	if !ok {
+		return false
+	}
+	return v == otherWord8
+}
+
+func ConvertWord8(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+	return Word8Value(value.(IntegerValue).IntValue())
+}
+
+// Word16Value
+
+type Word16Value uint16
+
+func init() {
+	gob.Register(Word16Value(0))
+}
+
+func (Word16Value) isValue() {}
+
+func (v Word16Value) Copy() Value {
+	return v
+}
+func (Word16Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Word16Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v Word16Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word16Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word16Value) IntValue() int {
+	return int(v)
+}
+func (v Word16Value) Negate() IntegerValue {
+	panic(errors.NewUnreachableError())
+}
+
+func (v Word16Value) Plus(other IntegerValue) IntegerValue {
+	return v + other.(Word16Value)
+}
+
+func (v Word16Value) Minus(other IntegerValue) IntegerValue {
+	return v - other.(Word16Value)
+}
+
+func (v Word16Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(Word16Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
+}
+
+func (v Word16Value) Mul(other IntegerValue) IntegerValue {
+	return v * other.(Word16Value)
+}
+
+func (v Word16Value) Div(other IntegerValue) IntegerValue {
+	o := other.(Word16Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
+}
+
+func (v Word16Value) Less(other IntegerValue) BoolValue {
+	return v < other.(Word16Value)
+}
+
+func (v Word16Value) LessEqual(other IntegerValue) BoolValue {
+	return v <= other.(Word16Value)
+}
+
+func (v Word16Value) Greater(other IntegerValue) BoolValue {
+	return v > other.(Word16Value)
+}
+
+func (v Word16Value) GreaterEqual(other IntegerValue) BoolValue {
+	return v >= other.(Word16Value)
+}
+
+func (v Word16Value) Equal(other Value) BoolValue {
+	otherWord16, ok := other.(Word16Value)
+	if !ok {
+		return false
+	}
+	return v == otherWord16
+}
+
+func ConvertWord16(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+	return Word16Value(value.(IntegerValue).IntValue())
+}
+
+// Word32Value
+
+type Word32Value uint32
+
+func init() {
+	gob.Register(Word32Value(0))
+}
+
+func (Word32Value) isValue() {}
+
+func (v Word32Value) Copy() Value {
+	return v
+}
+
+func (Word32Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Word32Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v Word32Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word32Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word32Value) IntValue() int {
+	return int(v)
+}
+
+func (v Word32Value) Negate() IntegerValue {
+	panic(errors.NewUnreachableError())
+}
+
+func (v Word32Value) Plus(other IntegerValue) IntegerValue {
+	return v + other.(Word32Value)
+}
+
+func (v Word32Value) Minus(other IntegerValue) IntegerValue {
+	return v - other.(Word32Value)
+}
+
+func (v Word32Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(Word32Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
+}
+
+func (v Word32Value) Mul(other IntegerValue) IntegerValue {
+	return v * other.(Word32Value)
+}
+
+func (v Word32Value) Div(other IntegerValue) IntegerValue {
+	o := other.(Word32Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
+}
+
+func (v Word32Value) Less(other IntegerValue) BoolValue {
+	return v < other.(Word32Value)
+}
+
+func (v Word32Value) LessEqual(other IntegerValue) BoolValue {
+	return v <= other.(Word32Value)
+}
+
+func (v Word32Value) Greater(other IntegerValue) BoolValue {
+	return v > other.(Word32Value)
+}
+
+func (v Word32Value) GreaterEqual(other IntegerValue) BoolValue {
+	return v >= other.(Word32Value)
+}
+
+func (v Word32Value) Equal(other Value) BoolValue {
+	otherWord32, ok := other.(Word32Value)
+	if !ok {
+		return false
+	}
+	return v == otherWord32
+}
+
+func ConvertWord32(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+	return Word32Value(value.(IntegerValue).IntValue())
+}
+
+// Word64Value
+
+type Word64Value uint64
+
+func init() {
+	gob.Register(Word64Value(0))
+}
+
+func (Word64Value) isValue() {}
+
+func (v Word64Value) Copy() Value {
+	return v
+}
+
+func (Word64Value) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (Word64Value) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v Word64Value) String() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word64Value) KeyString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
+func (v Word64Value) IntValue() int {
+	return int(v)
+}
+
+func (v Word64Value) Negate() IntegerValue {
+	panic(errors.NewUnreachableError())
+}
+
+func (v Word64Value) Plus(other IntegerValue) IntegerValue {
+	return v + other.(Word64Value)
+}
+
+func (v Word64Value) Minus(other IntegerValue) IntegerValue {
+	return v - other.(Word64Value)
+}
+
+func (v Word64Value) Mod(other IntegerValue) IntegerValue {
+	o := other.(Word64Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v % o
+}
+
+func (v Word64Value) Mul(other IntegerValue) IntegerValue {
+	return v * other.(Word64Value)
+}
+
+func (v Word64Value) Div(other IntegerValue) IntegerValue {
+	o := other.(Word64Value)
+	if o == 0 {
+		panic(&DivisionByZeroError{})
+	}
+	return v / o
+}
+
+func (v Word64Value) Less(other IntegerValue) BoolValue {
+	return v < other.(Word64Value)
+}
+
+func (v Word64Value) LessEqual(other IntegerValue) BoolValue {
+	return v <= other.(Word64Value)
+}
+
+func (v Word64Value) Greater(other IntegerValue) BoolValue {
+	return v > other.(Word64Value)
+}
+
+func (v Word64Value) GreaterEqual(other IntegerValue) BoolValue {
+	return v >= other.(Word64Value)
+}
+
+func (v Word64Value) Equal(other Value) BoolValue {
+	otherWord64, ok := other.(Word64Value)
+	if !ok {
+		return false
+	}
+	return v == otherWord64
+}
+
+func ConvertWord64(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
+	return Word64Value(value.(IntegerValue).IntValue())
 }
 
 // CompositeValue
@@ -2145,10 +3628,14 @@ func (v *ReferenceValue) Equal(other Value) BoolValue {
 
 // AddressValue
 
-type AddressValue [common.AddressLength]byte
+type AddressValue common.Address
 
 func init() {
 	gob.Register(AddressValue{})
+}
+
+func NewAddressValue(a common.Address) AddressValue {
+	return NewAddressValueFromBytes(a[:])
 }
 
 func NewAddressValueFromBytes(b []byte) AddressValue {
@@ -2158,6 +3645,7 @@ func NewAddressValueFromBytes(b []byte) AddressValue {
 }
 
 func ConvertAddress(value Value) Value {
+	// TODO: https://github.com/dapperlabs/flow-go/issues/2141
 	result := AddressValue{}
 	if intValue, ok := value.(IntValue); ok {
 		bigEndianBytes := intValue.Int.Bytes()
@@ -2202,7 +3690,11 @@ func (v AddressValue) Equal(other Value) BoolValue {
 }
 
 func (v AddressValue) Hex() string {
-	return fmt.Sprintf("%x", [common.AddressLength]byte(v))
+	return v.ToAddress().Hex()
+}
+
+func (v AddressValue) ToAddress() common.Address {
+	return common.Address(v)
 }
 
 // AccountValue

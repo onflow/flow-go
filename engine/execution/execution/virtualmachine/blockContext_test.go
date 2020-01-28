@@ -17,10 +17,10 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	ledger := &vmmock.Ledger{}
 
-	b := unittest.BlockFixture()
+	h := unittest.BlockHeaderFixture()
 
 	vm := virtualmachine.New(rt)
-	bc := vm.NewBlockContext(&b)
+	bc := vm.NewBlockContext(&h)
 
 	t.Run("transaction success", func(t *testing.T) {
 		tx := &flow.TransactionBody{
@@ -61,6 +61,44 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 		}
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
+
+		assert.NoError(t, err)
+		assert.False(t, result.Succeeded())
+		assert.Error(t, result.Error)
+	})
+}
+
+func TestBlockContext_ExecuteScript(t *testing.T) {
+	rt := runtime.NewInterpreterRuntime()
+
+	ledger := &vmmock.Ledger{}
+
+	h := unittest.BlockHeaderFixture()
+
+	vm := virtualmachine.New(rt)
+	bc := vm.NewBlockContext(&h)
+
+	t.Run("script success", func(t *testing.T) {
+		script := []byte(`
+			pub fun main(): Int {
+				return 42
+			}
+		`)
+
+		result, err := bc.ExecuteScript(ledger, script)
+		assert.NoError(t, err)
+		assert.True(t, result.Succeeded())
+	})
+
+	t.Run("script failure", func(t *testing.T) {
+		script := []byte(`
+			pub fun main(): Int {
+				assert 1 == 2
+				return 42
+			}
+		`)
+
+		result, err := bc.ExecuteScript(ledger, script)
 
 		assert.NoError(t, err)
 		assert.False(t, result.Succeeded())

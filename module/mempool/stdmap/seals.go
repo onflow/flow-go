@@ -28,9 +28,9 @@ func (s *Seals) Add(seal *flow.Seal) error {
 	return s.Backend.Add(seal)
 }
 
-// Get returns the block seal with the given ID from the mempool.
-func (s *Seals) Get(sealID flow.Identifier) (*flow.Seal, error) {
-	entity, err := s.Backend.Get(sealID)
+// ByID returns the block seal with the given ID from the mempool.
+func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
+	entity, err := s.Backend.ByID(sealID)
 	if err != nil {
 		return nil, err
 	}

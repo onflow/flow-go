@@ -27,9 +27,9 @@ func (g *Collections) Add(coll *flow.Collection) error {
 	return g.Backend.Add(coll)
 }
 
-// Get returns the collection with the given ID from the mempool.
-func (g *Collections) Get(collID flow.Identifier) (*flow.Collection, error) {
-	entity, err := g.Backend.Get(collID)
+// ByID returns the collection with the given ID from the mempool.
+func (g *Collections) ByID(collID flow.Identifier) (*flow.Collection, error) {
+	entity, err := g.Backend.ByID(collID)
 	if err != nil {
 		return nil, err
 	}

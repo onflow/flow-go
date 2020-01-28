@@ -1,8 +1,9 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"time"
+
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
 type EventHandler struct {
@@ -10,7 +11,7 @@ type EventHandler struct {
 	voteAggregator        *VoteAggregator
 	voter                 *Voter
 	missingBlockRequester *MissingBlockRequester
-	reactor               Crown
+	forks                 Forks
 	validator             *Validator
 	blockProposalProducer BlockProposalProducer
 	viewState             ViewState
@@ -25,6 +26,10 @@ func (eh *EventHandler) OnReceiveVote(vote *types.Vote) {
 	panic("implement me")
 }
 
+func (eh *EventHandler) TimeoutChannel() <-chan time.Time {
+	panic("implement me")
+}
+
 func (eh *EventHandler) OnLocalTimeout() {
 	panic("implement me")
 }
@@ -33,6 +38,6 @@ func (eh *EventHandler) OnBlockRequest(req *types.BlockProposalRequest) {
 	panic("implement me")
 }
 
-func (eh *EventHandler) TimeoutChannel() <-chan time.Time {
+func (eh *EventHandler) startNewView() error {
 	panic("implement me")
 }

@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
-	"strings"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/go-test/deep"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/databases/leveldb"
@@ -26,34 +24,22 @@ func ExpectPanic(expectedMsg string, t *testing.T) {
 	t.Errorf("Expected to panic with `%s`, but did not panic", expectedMsg)
 }
 
-// AssertEqualWithDiff asserts that two objects are equal.
-//
-// If the objects are not equal, this function prints a human-readable diff.
-func AssertEqualWithDiff(t *testing.T, expected, actual interface{}) {
-	// the maximum levels of a struct to recurse into
-	// this prevents infinite recursion from circular references
-	deep.MaxDepth = 100
+// AssertReturnsBefore asserts that the given function returns before the
+// duration expires.
+func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
+	done := make(chan struct{})
 
-	diff := deep.Equal(expected, actual)
+	go func() {
+		f()
+		close(done)
+	}()
 
-	if len(diff) != 0 {
-		s := strings.Builder{}
-
-		for i, d := range diff {
-			if i == 0 {
-				s.WriteString("diff    : ")
-			} else {
-				s.WriteString("          ")
-			}
-
-			s.WriteString(d)
-			s.WriteString("\n")
-		}
-
-		assert.Fail(t, fmt.Sprintf("Not equal: \n"+
-			"expected: %s\n"+
-			"actual  : %s\n\n"+
-			"%s", expected, actual, s.String()))
+	select {
+	case <-time.After(duration):
+		t.Log("function did not return in time")
+		t.Fail()
+	case <-done:
+		return
 	}
 }
 

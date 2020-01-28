@@ -29,8 +29,8 @@ func (a *Approvals) Add(approval *flow.ResultApproval) error {
 }
 
 // Get returns the result approval with the given ID from the mempool.
-func (a *Approvals) Get(approvalID flow.Identifier) (*flow.ResultApproval, error) {
-	entity, err := a.Backend.Get(approvalID)
+func (a *Approvals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, error) {
+	entity, err := a.Backend.ByID(approvalID)
 	if err != nil {
 		return nil, err
 	}

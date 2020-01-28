@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dapperlabs/flow-go/network/gossip"
-	protocols "github.com/dapperlabs/flow-go/network/gossip/protocols/grpc"
-	"github.com/rs/zerolog"
 	"net"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/network/gossip"
+	protocols "github.com/dapperlabs/flow-go/network/gossip/protocols/grpc"
 )
 
 type chatNode struct {
@@ -75,7 +76,11 @@ func (cn *chatNode) startNode(logger zerolog.Logger, fanoutSize int, totalNumNod
 
 	node.SetProtocol(sp)
 
-	go node.Serve(listener)
+	go func() {
+		if err := node.Serve(listener); err != nil {
+			logger.Err(err).Msg("node shutdown")
+		}
+	}()
 
 	return node, nil
 }

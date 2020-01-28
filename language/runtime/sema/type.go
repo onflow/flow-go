@@ -57,8 +57,8 @@ type Type interface {
 	ID() TypeID
 }
 
-// ValueIndexableType
-
+// ValueIndexableType is a type which can be indexed into using a value
+//
 type ValueIndexableType interface {
 	Type
 	isValueIndexableType() bool
@@ -66,14 +66,42 @@ type ValueIndexableType interface {
 	IndexingType() Type
 }
 
-// TypeIndexableType
-
+// TypeIndexableType is a type which can be indexed into using a type
+//
 type TypeIndexableType interface {
 	Type
 	isTypeIndexableType()
 	IsAssignable() bool
 	IsValidIndexingType(indexingType Type) (isValid bool, expectedTypeDescription string)
 	ElementType(indexingType Type, isAssignment bool) Type
+}
+
+// MemberAccessibleType is a type which might have members
+//
+type MemberAccessibleType interface {
+	Type
+	HasMembers() bool
+	GetMember(identifier string, targetRange ast.Range, report func(error)) *Member
+}
+
+// ContainedType is a type which might have a container type
+//
+type ContainedType interface {
+	Type
+	GetContainerType() Type
+}
+
+// CompositeKindedType is a type which has a composite kind
+//
+type CompositeKindedType interface {
+	Type
+	GetCompositeKind() common.CompositeKind
+}
+
+// LocatedType is a type which has a location
+type LocatedType interface {
+	Type
+	GetLocation() ast.Location
 }
 
 // TypeAnnotation
@@ -486,6 +514,40 @@ func (*IntegerType) Max() *big.Int {
 	return nil
 }
 
+// SignedIntegerType represents the super-type of all signed integer types
+type SignedIntegerType struct{}
+
+func (*SignedIntegerType) isType() {}
+
+func (*SignedIntegerType) String() string {
+	return "SignedInteger"
+}
+
+func (*SignedIntegerType) ID() TypeID {
+	return "SignedInteger"
+}
+
+func (*SignedIntegerType) Equal(other Type) bool {
+	_, ok := other.(*SignedIntegerType)
+	return ok
+}
+
+func (*SignedIntegerType) IsResourceType() bool {
+	return false
+}
+
+func (*SignedIntegerType) IsInvalidType() bool {
+	return false
+}
+
+func (*SignedIntegerType) Min() *big.Int {
+	return nil
+}
+
+func (*SignedIntegerType) Max() *big.Int {
+	return nil
+}
+
 // IntType represents the arbitrary-precision integer type `Int`
 type IntType struct{}
 
@@ -669,7 +731,142 @@ func (*Int64Type) Max() *big.Int {
 	return Int64TypeMax
 }
 
+// Int128Type represents the 128-bit signed integer type `Int128`
+type Int128Type struct{}
+
+func (*Int128Type) isType() {}
+
+func (*Int128Type) String() string {
+	return "Int128"
+}
+
+func (*Int128Type) ID() TypeID {
+	return "Int128"
+}
+
+func (*Int128Type) Equal(other Type) bool {
+	_, ok := other.(*Int128Type)
+	return ok
+}
+
+func (*Int128Type) IsResourceType() bool {
+	return false
+}
+
+func (*Int128Type) IsInvalidType() bool {
+	return false
+}
+
+var Int128TypeMin *big.Int
+
+func init() {
+	Int128TypeMin = big.NewInt(-1)
+	Int128TypeMin.Lsh(Int128TypeMin, 127)
+}
+
+var Int128TypeMax *big.Int
+
+func init() {
+	Int128TypeMax = big.NewInt(1)
+	Int128TypeMax.Lsh(Int128TypeMax, 127)
+	Int128TypeMax.Sub(Int128TypeMax, big.NewInt(1))
+}
+
+func (*Int128Type) Min() *big.Int {
+	return Int128TypeMin
+}
+
+func (*Int128Type) Max() *big.Int {
+	return Int128TypeMax
+}
+
+// Int256Type represents the 256-bit signed integer type `Int256`
+type Int256Type struct{}
+
+func (*Int256Type) isType() {}
+
+func (*Int256Type) String() string {
+	return "Int256"
+}
+
+func (*Int256Type) ID() TypeID {
+	return "Int256"
+}
+
+func (*Int256Type) Equal(other Type) bool {
+	_, ok := other.(*Int256Type)
+	return ok
+}
+
+func (*Int256Type) IsResourceType() bool {
+	return false
+}
+
+func (*Int256Type) IsInvalidType() bool {
+	return false
+}
+
+var Int256TypeMin *big.Int
+
+func init() {
+	Int256TypeMin = big.NewInt(-1)
+	Int256TypeMin.Lsh(Int256TypeMin, 255)
+}
+
+var Int256TypeMax *big.Int
+
+func init() {
+	Int256TypeMax = big.NewInt(1)
+	Int256TypeMax.Lsh(Int256TypeMax, 255)
+	Int256TypeMax.Sub(Int256TypeMax, big.NewInt(1))
+}
+
+func (*Int256Type) Min() *big.Int {
+	return Int256TypeMin
+}
+
+func (*Int256Type) Max() *big.Int {
+	return Int256TypeMax
+}
+
+// UIntType represents the arbitrary-precision unsigned integer type `UInt`
+type UIntType struct{}
+
+func (*UIntType) isType() {}
+
+func (*UIntType) String() string {
+	return "UInt"
+}
+
+func (*UIntType) ID() TypeID {
+	return "UInt"
+}
+
+func (*UIntType) Equal(other Type) bool {
+	_, ok := other.(*UIntType)
+	return ok
+}
+
+func (*UIntType) IsResourceType() bool {
+	return false
+}
+
+func (*UIntType) IsInvalidType() bool {
+	return false
+}
+
+var UIntTypeMin = big.NewInt(0)
+
+func (*UIntType) Min() *big.Int {
+	return UIntTypeMin
+}
+
+func (*UIntType) Max() *big.Int {
+	return nil
+}
+
 // UInt8Type represents the 8-bit unsigned integer type `UInt8`
+// which checks for overflow and underflow
 type UInt8Type struct{}
 
 func (*UInt8Type) isType() {}
@@ -707,6 +904,7 @@ func (*UInt8Type) Max() *big.Int {
 }
 
 // UInt16Type represents the 16-bit unsigned integer type `UInt16`
+// which checks for overflow and underflow
 type UInt16Type struct{}
 
 func (*UInt16Type) isType() {}
@@ -744,6 +942,7 @@ func (*UInt16Type) Max() *big.Int {
 }
 
 // UInt32Type represents the 32-bit unsigned integer type `UInt32`
+// which checks for overflow and underflow
 type UInt32Type struct{}
 
 func (*UInt32Type) isType() {}
@@ -781,6 +980,7 @@ func (*UInt32Type) Max() *big.Int {
 }
 
 // UInt64Type represents the 64-bit unsigned integer type `UInt64`
+// which checks for overflow and underflow
 type UInt64Type struct{}
 
 func (*UInt64Type) isType() {}
@@ -815,6 +1015,246 @@ func (*UInt64Type) Min() *big.Int {
 
 func (*UInt64Type) Max() *big.Int {
 	return UInt64TypeMax
+}
+
+// UInt128Type represents the 128-bit unsigned integer type `UInt128`
+// which checks for overflow and underflow
+type UInt128Type struct{}
+
+func (*UInt128Type) isType() {}
+
+func (*UInt128Type) String() string {
+	return "UInt128"
+}
+
+func (*UInt128Type) ID() TypeID {
+	return "UInt128"
+}
+
+func (*UInt128Type) Equal(other Type) bool {
+	_, ok := other.(*UInt128Type)
+	return ok
+}
+
+func (*UInt128Type) IsResourceType() bool {
+	return false
+}
+
+func (*UInt128Type) IsInvalidType() bool {
+	return false
+}
+
+var UInt128TypeMin = big.NewInt(0)
+var UInt128TypeMax *big.Int
+
+func init() {
+	UInt128TypeMax = big.NewInt(1)
+	UInt128TypeMax.Lsh(UInt128TypeMax, 128)
+	UInt128TypeMax.Sub(UInt128TypeMax, big.NewInt(1))
+}
+
+func (*UInt128Type) Min() *big.Int {
+	return UInt128TypeMin
+}
+
+func (*UInt128Type) Max() *big.Int {
+	return UInt128TypeMax
+}
+
+// UInt256Type represents the 256-bit unsigned integer type `UInt256`
+// which checks for overflow and underflow
+type UInt256Type struct{}
+
+func (*UInt256Type) isType() {}
+
+func (*UInt256Type) String() string {
+	return "UInt256"
+}
+
+func (*UInt256Type) ID() TypeID {
+	return "UInt256"
+}
+
+func (*UInt256Type) Equal(other Type) bool {
+	_, ok := other.(*UInt256Type)
+	return ok
+}
+
+func (*UInt256Type) IsResourceType() bool {
+	return false
+}
+
+func (*UInt256Type) IsInvalidType() bool {
+	return false
+}
+
+var UInt256TypeMin = big.NewInt(0)
+var UInt256TypeMax *big.Int
+
+func init() {
+	UInt256TypeMax = big.NewInt(1)
+	UInt256TypeMax.Lsh(UInt256TypeMax, 256)
+	UInt256TypeMax.Sub(UInt256TypeMax, big.NewInt(1))
+}
+
+func (*UInt256Type) Min() *big.Int {
+	return UInt256TypeMin
+}
+
+func (*UInt256Type) Max() *big.Int {
+	return UInt256TypeMax
+}
+
+// Word8Type represents the 8-bit unsigned integer type `Word8`
+// which does NOT check for overflow and underflow
+type Word8Type struct{}
+
+func (*Word8Type) isType() {}
+
+func (*Word8Type) String() string {
+	return "Word8"
+}
+
+func (*Word8Type) ID() TypeID {
+	return "Word8"
+}
+
+func (*Word8Type) Equal(other Type) bool {
+	_, ok := other.(*Word8Type)
+	return ok
+}
+
+func (*Word8Type) IsResourceType() bool {
+	return false
+}
+
+func (*Word8Type) IsInvalidType() bool {
+	return false
+}
+
+var Word8TypeMin = big.NewInt(0)
+var Word8TypeMax = big.NewInt(0).SetUint64(math.MaxUint8)
+
+func (*Word8Type) Min() *big.Int {
+	return Word8TypeMin
+}
+
+func (*Word8Type) Max() *big.Int {
+	return Word8TypeMax
+}
+
+// Word16Type represents the 16-bit unsigned integer type `Word16`
+// which does NOT check for overflow and underflow
+type Word16Type struct{}
+
+func (*Word16Type) isType() {}
+
+func (*Word16Type) String() string {
+	return "Word16"
+}
+
+func (*Word16Type) ID() TypeID {
+	return "Word16"
+}
+
+func (*Word16Type) Equal(other Type) bool {
+	_, ok := other.(*Word16Type)
+	return ok
+}
+
+func (*Word16Type) IsResourceType() bool {
+	return false
+}
+
+func (*Word16Type) IsInvalidType() bool {
+	return false
+}
+
+var Word16TypeMin = big.NewInt(0)
+var Word16TypeMax = big.NewInt(0).SetUint64(math.MaxUint16)
+
+func (*Word16Type) Min() *big.Int {
+	return Word16TypeMin
+}
+
+func (*Word16Type) Max() *big.Int {
+	return Word16TypeMax
+}
+
+// Word32Type represents the 32-bit unsigned integer type `Word32`
+// which does NOT check for overflow and underflow
+type Word32Type struct{}
+
+func (*Word32Type) isType() {}
+
+func (*Word32Type) String() string {
+	return "Word32"
+}
+
+func (*Word32Type) ID() TypeID {
+	return "Word32"
+}
+
+func (*Word32Type) Equal(other Type) bool {
+	_, ok := other.(*Word32Type)
+	return ok
+}
+
+func (*Word32Type) IsResourceType() bool {
+	return false
+}
+
+func (*Word32Type) IsInvalidType() bool {
+	return false
+}
+
+var Word32TypeMin = big.NewInt(0)
+var Word32TypeMax = big.NewInt(0).SetUint64(math.MaxUint32)
+
+func (*Word32Type) Min() *big.Int {
+	return Word32TypeMin
+}
+
+func (*Word32Type) Max() *big.Int {
+	return Word32TypeMax
+}
+
+// Word64Type represents the 64-bit unsigned integer type `Word64`
+// which does NOT check for overflow and underflow
+type Word64Type struct{}
+
+func (*Word64Type) isType() {}
+
+func (*Word64Type) String() string {
+	return "Word64"
+}
+
+func (*Word64Type) ID() TypeID {
+	return "Word64"
+}
+
+func (*Word64Type) Equal(other Type) bool {
+	_, ok := other.(*Word64Type)
+	return ok
+}
+
+func (*Word64Type) IsResourceType() bool {
+	return false
+}
+
+func (*Word64Type) IsInvalidType() bool {
+	return false
+}
+
+var Word64TypeMin = big.NewInt(0)
+var Word64TypeMax = big.NewInt(0).SetUint64(math.MaxUint64)
+
+func (*Word64Type) Min() *big.Int {
+	return Word64TypeMin
+}
+
+func (*Word64Type) Max() *big.Int {
+	return Word64TypeMax
 }
 
 // ArrayType
@@ -1159,25 +1599,37 @@ type Parameter struct {
 	TypeAnnotation *TypeAnnotation
 }
 
-func (t *Parameter) String() string {
-	if t.Label != "" {
+func (p *Parameter) String() string {
+	if p.Label != "" {
 		return fmt.Sprintf(
 			"%s %s: %s",
-			t.Label,
-			t.Identifier,
-			t.TypeAnnotation.String(),
+			p.Label,
+			p.Identifier,
+			p.TypeAnnotation.String(),
 		)
 	}
 
-	if t.Identifier != "" {
+	if p.Identifier != "" {
 		return fmt.Sprintf(
 			"%s: %s",
-			t.Identifier,
-			t.TypeAnnotation.String(),
+			p.Identifier,
+			p.TypeAnnotation.String(),
 		)
 	}
 
-	return t.TypeAnnotation.String()
+	return p.TypeAnnotation.String()
+}
+
+// EffectiveArgumentLabel returns the effective argument label that
+// an argument in a call must use:
+// If no argument label is declared for parameter,
+// the parameter name is used as the argument label
+//
+func (p *Parameter) EffectiveArgumentLabel() string {
+	if p.Label != "" {
+		return p.Label
+	}
+	return p.Identifier
 }
 
 // FunctionType
@@ -1259,6 +1711,24 @@ func (t *FunctionType) Equal(other Type) bool {
 	return t.ReturnTypeAnnotation.Equal(otherFunction.ReturnTypeAnnotation)
 }
 
+// NOTE: argument labels *are* considered! parameter names are intentionally *not* considered!
+func (t *FunctionType) EqualIncludingArgumentLabels(other Type) bool {
+	if !t.Equal(other) {
+		return false
+	}
+
+	otherFunction := other.(*FunctionType)
+
+	for i, parameter := range t.Parameters {
+		otherParameter := otherFunction.Parameters[i]
+		if parameter.EffectiveArgumentLabel() != otherParameter.EffectiveArgumentLabel() {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (*FunctionType) IsResourceType() bool {
 	return false
 }
@@ -1323,15 +1793,24 @@ func init() {
 		&BoolType{},
 		&CharacterType{},
 		&IntType{},
+		&UIntType{},
 		&StringType{},
 		&Int8Type{},
 		&Int16Type{},
 		&Int32Type{},
 		&Int64Type{},
+		&Int128Type{},
+		&Int256Type{},
 		&UInt8Type{},
 		&UInt16Type{},
 		&UInt32Type{},
 		&UInt64Type{},
+		&UInt128Type{},
+		&UInt256Type{},
+		&Word8Type{},
+		&Word16Type{},
+		&Word32Type{},
+		&Word64Type{},
 		&AddressType{},
 		&AccountType{},
 	}
@@ -1387,14 +1866,26 @@ func init() {
 func initIntegerFunctions() {
 	integerTypes := []Type{
 		&IntType{},
+		&UIntType{},
+		// Int*
 		&Int8Type{},
 		&Int16Type{},
 		&Int32Type{},
 		&Int64Type{},
+		&Int128Type{},
+		&Int256Type{},
+		// UInt*
 		&UInt8Type{},
 		&UInt16Type{},
 		&UInt32Type{},
 		&UInt64Type{},
+		&UInt128Type{},
+		&UInt256Type{},
+		// Word*
+		&Word8Type{},
+		&Word16Type{},
+		&Word32Type{},
+		&Word64Type{},
 	}
 
 	for _, integerType := range integerTypes {
@@ -1485,6 +1976,18 @@ func (*CompositeType) isType() {}
 
 func (t *CompositeType) String() string {
 	return t.Identifier
+}
+
+func (t *CompositeType) GetContainerType() Type {
+	return t.ContainerType
+}
+
+func (t *CompositeType) GetCompositeKind() common.CompositeKind {
+	return t.Kind
+}
+
+func (t *CompositeType) GetLocation() ast.Location {
+	return t.Location
 }
 
 func (t *CompositeType) QualifiedIdentifier() string {
@@ -1829,12 +2332,6 @@ func NewPublicConstantFieldMember(containerType Type, identifier string, fieldTy
 	}
 }
 
-type MemberAccessibleType interface {
-	Type
-	HasMembers() bool
-	GetMember(identifier string, targetRange ast.Range, report func(error)) *Member
-}
-
 // InterfaceType
 
 type InterfaceType struct {
@@ -1852,6 +2349,18 @@ func (*InterfaceType) isType() {}
 
 func (t *InterfaceType) String() string {
 	return t.Identifier
+}
+
+func (t *InterfaceType) GetContainerType() Type {
+	return t.ContainerType
+}
+
+func (t *InterfaceType) GetCompositeKind() common.CompositeKind {
+	return t.CompositeKind
+}
+
+func (t *InterfaceType) GetLocation() ast.Location {
+	return t.Location
 }
 
 func (t *InterfaceType) QualifiedIdentifier() string {
@@ -2329,9 +2838,21 @@ func IsSubType(subType Type, superType Type) bool {
 	switch typedSuperType := superType.(type) {
 	case *IntegerType:
 		switch subType.(type) {
-		case *IntType,
-			*Int8Type, *Int16Type, *Int32Type, *Int64Type,
-			*UInt8Type, *UInt16Type, *UInt32Type, *UInt64Type:
+		case *IntegerType, *SignedIntegerType, *IntType, *UIntType,
+			*Int8Type, *Int16Type, *Int32Type, *Int64Type, *Int128Type, *Int256Type,
+			*UInt8Type, *UInt16Type, *UInt32Type, *UInt64Type, *UInt128Type, *UInt256Type,
+			*Word8Type, *Word16Type, *Word32Type, *Word64Type:
+
+			return true
+
+		default:
+			return false
+		}
+
+	case *SignedIntegerType:
+		switch subType.(type) {
+		case *SignedIntegerType, *IntType,
+			*Int8Type, *Int16Type, *Int32Type, *Int64Type, *Int128Type, *Int256Type:
 
 			return true
 

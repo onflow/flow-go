@@ -36,23 +36,47 @@ func (b *Buffer) Save(m *PendingMessage) {
 	b.pending = append(b.pending, m)
 }
 
-// Flush recursively delivers the pending messages until the buffer is empty
-func (b *Buffer) Flush(sendOne func(*PendingMessage) error) {
+// DeliverRecursive recursively delivers all pending messages using the provided
+// sendOne method until the buffer is empty. If sendOne does not deliver the
+// message, it is permanently dropped.
+func (b *Buffer) DeliverRecursive(sendOne func(*PendingMessage)) {
 	for {
-		toSend := b.takeAll()
+		// get all pending messages, and clear the buffer
+		messages := b.takeAll()
 
-		// This check is necessary to exit the endless forloop
-		if len(toSend) == 0 {
+		// This check is necessary to exit the endless for loop
+		if len(messages) == 0 {
 			return
 		}
 
-		for _, msg := range toSend {
-			_ = sendOne(msg)
+		for _, msg := range messages {
+			sendOne(msg)
 		}
 	}
 }
 
-// popAll takes all pending messages from the buffer and empty the buffer.
+// Deliver delivers all pending messages currently in the buffer using the
+// provided sendOne method. If sendOne returns false, the message was not sent
+// and will remain in the buffer.
+func (b *Buffer) Deliver(sendOne func(*PendingMessage) bool) {
+
+	messages := b.takeAll()
+	var unsent []*PendingMessage
+
+	for _, msg := range messages {
+		ok := sendOne(msg)
+		if !ok {
+			unsent = append(unsent, msg)
+		}
+	}
+
+	// add the unsent messages back to the buffer
+	b.Lock()
+	b.pending = append(unsent, b.pending...)
+	b.Unlock()
+}
+
+// takeAll takes all pending messages from the buffer and empties the buffer.
 func (b *Buffer) takeAll() []*PendingMessage {
 	b.Lock()
 	defer b.Unlock()

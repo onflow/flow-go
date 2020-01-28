@@ -7,15 +7,16 @@ import (
 	collectioningest "github.com/dapperlabs/flow-go/engine/collection/ingest"
 	"github.com/dapperlabs/flow-go/engine/collection/provider"
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
+	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
-	"github.com/dapperlabs/flow-go/engine/execution/blocks"
 	"github.com/dapperlabs/flow-go/engine/execution/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/engine/execution/receipts"
-	"github.com/dapperlabs/flow-go/engine/verification/verifier"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -43,15 +44,19 @@ type CollectionNode struct {
 // ConsensusNode implements an in-process consensus node for tests.
 type ConsensusNode struct {
 	GenericNode
-	Pool              mempool.Guarantees
+	Guarantees        mempool.Guarantees
+	Approvals         mempool.Approvals
+	Receipts          mempool.Receipts
+	Seals             mempool.Seals
 	IngestionEngine   *consensusingest.Engine
 	PropagationEngine *propagation.Engine
+	MatchingEngine    *matching.Engine
 }
 
 // ExecutionNode implements a mocked execution node for tests.
 type ExecutionNode struct {
 	GenericNode
-	BlocksEngine    *blocks.Engine
+	BlocksEngine    *ingestion.Engine
 	ExecutionEngine *execution.Engine
 	ReceiptsEngine  *receipts.Engine
 	BadgerDB        *badger.DB
@@ -66,5 +71,7 @@ type VerificationNode struct {
 	Receipts       mempool.Receipts
 	Blocks         mempool.Blocks
 	Collections    mempool.Collections
-	VerifierEngine *verifier.Engine
+	ChunkStates    mempool.ChunkStates
+	IngestEngine   network.Engine
+	VerifierEngine network.Engine
 }

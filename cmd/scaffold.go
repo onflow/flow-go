@@ -19,8 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
 	"github.com/dapperlabs/flow-go/network/codec/json"
-	"github.com/dapperlabs/flow-go/network/trickle"
-	"github.com/dapperlabs/flow-go/network/trickle/middleware"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 )
 
@@ -67,7 +66,7 @@ type FlowNodeBuilder struct {
 	readyDoneFns   []namedReadyFn
 	doneObject     []namedDoneObject
 	sig            chan os.Signal
-	Network        *trickle.Network
+	Network        *libp2p.Network
 	genesisHandler func(node *FlowNodeBuilder, block *flow.Block)
 	postInitFns    []func(*FlowNodeBuilder)
 	genesis        *flow.Block
@@ -88,17 +87,17 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
-	fnb.Component("trickle network", func(builder *FlowNodeBuilder) module.ReadyDoneAware {
+	fnb.Component("flow network", func(builder *FlowNodeBuilder) module.ReadyDoneAware {
 
 		fnb.Logger.Info().Msg("initializing network stack")
 
 		codec := json.NewCodec()
 
-		mw, err := middleware.New(fnb.Logger, codec, fnb.BaseConfig.Connections, fnb.Me.Address())
-		fnb.MustNot(err).Msg("could not initialize trickle middleware")
+		mw, err := libp2p.NewMiddleware(fnb.Logger, codec, fnb.Me.Address(), fnb.Me.NodeID())
+		fnb.MustNot(err).Msg("could not initialize flow middleware")
 
-		net, err := trickle.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, mw)
-		fnb.MustNot(err).Msg("could not initialize trickle network")
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, mw)
+		fnb.MustNot(err).Msg("could not initialize flow network")
 		fnb.Network = net
 		return net
 	})
@@ -141,6 +140,10 @@ func (fnb *FlowNodeBuilder) initLogger() {
 }
 
 func (fnb *FlowNodeBuilder) initDatabase() {
+	//Pre-create DB path (Badger creates only one-level dirs)
+	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
+	fnb.MustNot(err).Msgf("could not create datadir %s", fnb.BaseConfig.datadir)
+
 	db, err := badger.Open(badger.DefaultOptions(fnb.BaseConfig.datadir).WithLogger(nil))
 	fnb.MustNot(err).Msg("could not open key-value store")
 	fnb.DB = db
