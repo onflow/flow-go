@@ -61,7 +61,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		},
 	}
 
-	vm.On("NewBlockContext", &block).Return(bc)
+	vm.On("NewBlockContext", &block.Header).Return(bc)
 
 	bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
 		Return(&virtualmachine.TransactionResult{}, nil).

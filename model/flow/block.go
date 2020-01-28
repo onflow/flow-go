@@ -6,22 +6,32 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
 func Genesis(ids IdentityList) *Block {
+
+	// create the first seal with zero references
+	seal := Seal{
+		BlockID:       ZeroID,
+		PreviousState: nil,
+		FinalState:    trie.Hash(trie.EmptySlice),
+	}
 
 	// create the raw content for the genesis block
 	payload := Payload{
 		Identities: ids,
 		Guarantees: nil,
+		Seals:      []*Seal{&seal},
 	}
 
 	// create the header
 	header := Header{
 		Number:      0,
-		Timestamp:   time.Unix(1575244800, 0),
+		Timestamp:   time.Unix(1575244800, 0).UTC(),
 		ParentID:    ZeroID,
 		PayloadHash: payload.Hash(),
+		ProposerID:  ZeroID,
 	}
 
 	// combine to block
@@ -42,13 +52,7 @@ type Block struct {
 
 // Valid will check whether the block is valid bottom-up.
 func (b Block) Valid() bool {
-
-	// check that the payload hash is correct
-	if b.PayloadHash != b.Payload.Hash() {
-		return false
-	}
-
-	return true
+	return b.PayloadHash == b.Payload.Hash()
 }
 
 // Header contains all meta-data for a block, as well as a hash representing
@@ -60,7 +64,7 @@ type Header struct {
 	ParentID    Identifier
 	PayloadHash Identifier
 	ProposerID  Identifier
-	Signatures  []crypto.Signature
+	ParentSigs  []crypto.Signature // this will be the aggregated signature
 }
 
 // Body returns the immutable part of the block header.
@@ -71,12 +75,14 @@ func (h Header) Body() interface{} {
 		ParentID    Identifier
 		PayloadHash Identifier
 		ProposerID  Identifier
+		ParentSigs  []crypto.Signature
 	}{
 		Number:      h.Number,
 		Timestamp:   h.Timestamp,
 		ParentID:    h.ParentID,
 		PayloadHash: h.PayloadHash,
 		ProposerID:  h.ProposerID,
+		ParentSigs:  h.ParentSigs,
 	}
 }
 
@@ -91,16 +97,17 @@ func (h Header) Checksum() Identifier {
 	return MakeID(h)
 }
 
-// Payload represents the second level of the block payload merkle tree.
+// Payload is the actual content of each block.
 type Payload struct {
 	Identities IdentityList
 	Guarantees []*CollectionGuarantee
+	Seals      []*Seal
 }
 
-// Root returns the hash of the payload.
+// Hash returns the root hash of the payload.
 func (p Payload) Hash() Identifier {
-	return ConcatSum(
-		MerkleRoot(GetIDs(p.Identities)...),
-		MerkleRoot(GetIDs(p.Guarantees)...),
-	)
+	idHash := MerkleRoot(GetIDs(p.Identities)...)
+	collHash := MerkleRoot(GetIDs(p.Guarantees)...)
+	sealHash := MerkleRoot(GetIDs(p.Seals)...)
+	return ConcatSum(idHash, collHash, sealHash)
 }

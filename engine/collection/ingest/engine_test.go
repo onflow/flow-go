@@ -23,8 +23,7 @@ func TestInvalidTransaction(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
 	t.Run("missing field", func(t *testing.T) {
-		genesis := flow.Genesis(flow.IdentityList{identity})
-		node := testutil.CollectionNode(t, hub, identity, genesis)
+		node := testutil.CollectionNode(t, hub, identity, []*flow.Identity{identity})
 
 		tx := unittest.TransactionFixture()
 		tx.Script = nil

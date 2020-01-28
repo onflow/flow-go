@@ -64,6 +64,29 @@ func (_m *Approvals) ByID(approvalID flow.Identifier) (*flow.ResultApproval, err
 	return r0, r1
 }
 
+// ByResultID provides a mock function with given fields: resultID
+func (_m *Approvals) ByResultID(resultID flow.Identifier) (*flow.ResultApproval, error) {
+	ret := _m.Called(resultID)
+
+	var r0 *flow.ResultApproval
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ResultApproval); ok {
+		r0 = rf(resultID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.ResultApproval)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(resultID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Has provides a mock function with given fields: approvalID
 func (_m *Approvals) Has(approvalID flow.Identifier) bool {
 	ret := _m.Called(approvalID)

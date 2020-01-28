@@ -737,11 +737,8 @@ func (v Int8Value) Minus(other IntegerValue) IntegerValue {
 func (v Int8Value) Mod(other IntegerValue) IntegerValue {
 	o := other.(Int8Value)
 	// INT33-C
-	// https://golang.org/ref/spec#Integer_operators
 	if o == 0 {
 		panic(&DivisionByZeroError{})
-	} else if (v == math.MinInt8) && (o == -1) {
-		panic(OverflowError{})
 	}
 	return v % o
 }
@@ -882,11 +879,8 @@ func (v Int16Value) Minus(other IntegerValue) IntegerValue {
 func (v Int16Value) Mod(other IntegerValue) IntegerValue {
 	o := other.(Int16Value)
 	// INT33-C
-	// https://golang.org/ref/spec#Integer_operators
 	if o == 0 {
 		panic(&DivisionByZeroError{})
-	} else if (v == math.MinInt16) && (o == -1) {
-		panic(OverflowError{})
 	}
 	return v % o
 }
@@ -1027,11 +1021,8 @@ func (v Int32Value) Minus(other IntegerValue) IntegerValue {
 func (v Int32Value) Mod(other IntegerValue) IntegerValue {
 	o := other.(Int32Value)
 	// INT33-C
-	// https://golang.org/ref/spec#Integer_operators
 	if o == 0 {
 		panic(&DivisionByZeroError{})
-	} else if (v == math.MinInt32) && (o == -1) {
-		panic(OverflowError{})
 	}
 	return v % o
 }
@@ -1172,11 +1163,8 @@ func (v Int64Value) Minus(other IntegerValue) IntegerValue {
 func (v Int64Value) Mod(other IntegerValue) IntegerValue {
 	o := other.(Int64Value)
 	// INT33-C
-	// https://golang.org/ref/spec#Integer_operators
 	if o == 0 {
 		panic(&DivisionByZeroError{})
-	} else if (v == math.MinInt64) && (o == -1) {
-		panic(OverflowError{})
 	}
 	return v % o
 }
@@ -1349,18 +1337,9 @@ func (v Int128Value) Minus(other IntegerValue) IntegerValue {
 func (v Int128Value) Mod(other IntegerValue) IntegerValue {
 	o := other.(Int128Value)
 	res := big.NewInt(0)
-	// INT33-C:
-	//   if o == 0 {
-	//       ...
-	//   } else if (v == Int128TypeMin) && (o == -1) {
-	//       ...
-	//   }
+	// INT33-C
 	if o.int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
-	}
-	res.SetInt64(-1)
-	if (v.int.Cmp(sema.Int128TypeMin) == 0) && (o.int.Cmp(res) == 0) {
-		panic(OverflowError{})
 	}
 	res.Mod(v.int, o.int)
 	return Int128Value{res}
@@ -1533,18 +1512,9 @@ func (v Int256Value) Minus(other IntegerValue) IntegerValue {
 func (v Int256Value) Mod(other IntegerValue) IntegerValue {
 	o := other.(Int256Value)
 	res := big.NewInt(0)
-	// INT33-C:
-	//   if o == 0 {
-	//       ...
-	//   } else if (v == Int256TypeMin) && (o == -1) {
-	//       ...
-	//   }
+	// INT33-C
 	if o.int.Cmp(res) == 0 {
 		panic(DivisionByZeroError{})
-	}
-	res.SetInt64(-1)
-	if (v.int.Cmp(sema.Int256TypeMin) == 0) && (o.int.Cmp(res) == 0) {
-		panic(OverflowError{})
 	}
 	res.Mod(v.int, o.int)
 	return Int256Value{res}

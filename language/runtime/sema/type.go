@@ -57,8 +57,8 @@ type Type interface {
 	ID() TypeID
 }
 
-// ValueIndexableType
-
+// ValueIndexableType is a type which can be indexed into using a value
+//
 type ValueIndexableType interface {
 	Type
 	isValueIndexableType() bool
@@ -66,14 +66,42 @@ type ValueIndexableType interface {
 	IndexingType() Type
 }
 
-// TypeIndexableType
-
+// TypeIndexableType is a type which can be indexed into using a type
+//
 type TypeIndexableType interface {
 	Type
 	isTypeIndexableType()
 	IsAssignable() bool
 	IsValidIndexingType(indexingType Type) (isValid bool, expectedTypeDescription string)
 	ElementType(indexingType Type, isAssignment bool) Type
+}
+
+// MemberAccessibleType is a type which might have members
+//
+type MemberAccessibleType interface {
+	Type
+	HasMembers() bool
+	GetMember(identifier string, targetRange ast.Range, report func(error)) *Member
+}
+
+// ContainedType is a type which might have a container type
+//
+type ContainedType interface {
+	Type
+	GetContainerType() Type
+}
+
+// CompositeKindedType is a type which has a composite kind
+//
+type CompositeKindedType interface {
+	Type
+	GetCompositeKind() common.CompositeKind
+}
+
+// LocatedType is a type which has a location
+type LocatedType interface {
+	Type
+	GetLocation() ast.Location
 }
 
 // TypeAnnotation
@@ -1571,25 +1599,37 @@ type Parameter struct {
 	TypeAnnotation *TypeAnnotation
 }
 
-func (t *Parameter) String() string {
-	if t.Label != "" {
+func (p *Parameter) String() string {
+	if p.Label != "" {
 		return fmt.Sprintf(
 			"%s %s: %s",
-			t.Label,
-			t.Identifier,
-			t.TypeAnnotation.String(),
+			p.Label,
+			p.Identifier,
+			p.TypeAnnotation.String(),
 		)
 	}
 
-	if t.Identifier != "" {
+	if p.Identifier != "" {
 		return fmt.Sprintf(
 			"%s: %s",
-			t.Identifier,
-			t.TypeAnnotation.String(),
+			p.Identifier,
+			p.TypeAnnotation.String(),
 		)
 	}
 
-	return t.TypeAnnotation.String()
+	return p.TypeAnnotation.String()
+}
+
+// EffectiveArgumentLabel returns the effective argument label that
+// an argument in a call must use:
+// If no argument label is declared for parameter,
+// the parameter name is used as the argument label
+//
+func (p *Parameter) EffectiveArgumentLabel() string {
+	if p.Label != "" {
+		return p.Label
+	}
+	return p.Identifier
 }
 
 // FunctionType
@@ -1669,6 +1709,24 @@ func (t *FunctionType) Equal(other Type) bool {
 	}
 
 	return t.ReturnTypeAnnotation.Equal(otherFunction.ReturnTypeAnnotation)
+}
+
+// NOTE: argument labels *are* considered! parameter names are intentionally *not* considered!
+func (t *FunctionType) EqualIncludingArgumentLabels(other Type) bool {
+	if !t.Equal(other) {
+		return false
+	}
+
+	otherFunction := other.(*FunctionType)
+
+	for i, parameter := range t.Parameters {
+		otherParameter := otherFunction.Parameters[i]
+		if parameter.EffectiveArgumentLabel() != otherParameter.EffectiveArgumentLabel() {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (*FunctionType) IsResourceType() bool {
@@ -1918,6 +1976,18 @@ func (*CompositeType) IsType() {}
 
 func (t *CompositeType) String() string {
 	return t.Identifier
+}
+
+func (t *CompositeType) GetContainerType() Type {
+	return t.ContainerType
+}
+
+func (t *CompositeType) GetCompositeKind() common.CompositeKind {
+	return t.Kind
+}
+
+func (t *CompositeType) GetLocation() ast.Location {
+	return t.Location
 }
 
 func (t *CompositeType) QualifiedIdentifier() string {
@@ -2252,12 +2322,6 @@ func NewPublicConstantFieldMember(containerType Type, identifier string, fieldTy
 	}
 }
 
-type MemberAccessibleType interface {
-	Type
-	HasMembers() bool
-	GetMember(identifier string, targetRange ast.Range, report func(error)) *Member
-}
-
 // InterfaceType
 
 type InterfaceType struct {
@@ -2275,6 +2339,18 @@ func (*InterfaceType) IsType() {}
 
 func (t *InterfaceType) String() string {
 	return t.Identifier
+}
+
+func (t *InterfaceType) GetContainerType() Type {
+	return t.ContainerType
+}
+
+func (t *InterfaceType) GetCompositeKind() common.CompositeKind {
+	return t.CompositeKind
+}
+
+func (t *InterfaceType) GetLocation() ast.Location {
+	return t.Location
 }
 
 func (t *InterfaceType) QualifiedIdentifier() string {

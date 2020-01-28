@@ -21,7 +21,7 @@ type Guarantees interface {
 	// will return true if the collection guarantees was known and removed.
 	Rem(collID flow.Identifier) bool
 
-	// Get will retrieve the given collection guarantees from the memory pool;
+	// ByID will retrieve the given collection guarantees from the memory pool;
 	// it will error if the collection guarantee is not in the memory pool.
 	ByID(collID flow.Identifier) (*flow.CollectionGuarantee, error)
 

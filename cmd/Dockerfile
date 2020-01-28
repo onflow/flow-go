@@ -2,12 +2,7 @@
 # NOTE: Must be run in the context of the repo's root directory
 
 ## (1) Build Relic first to maximize caching
-FROM golang:1.13-alpine3.10 AS build-relic
-
-RUN apk update && apk add \
-    build-base \
-    cmake \
-    bash
+FROM golang:1.13 AS build-relic
 
 RUN mkdir /build
 WORKDIR /build
@@ -22,9 +17,11 @@ COPY crypto/relic_build.sh .
 RUN bash ./relic_build.sh
 
 ## (2) Build the app binary
-FROM golang:1.13-alpine3.10 AS build-app
+FROM golang:1.13 AS build-app
 
-RUN apk update && apk add build-base
+# add the pubkey of github.com to knownhosts, so ssh-agent doesn't bark
+RUN mkdir -p /root/.ssh && ssh-keyscan -t rsa github.com >> /root/.ssh/known_hosts
+RUN git config --global 'url.ssh://git@github.com/.insteadof' https://github.com/
 
 # Build the app binary in /app
 RUN mkdir /app
@@ -39,14 +36,17 @@ COPY --from=build-relic /build/relic/build ./crypto/relic/build
 
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
-RUN --mount=type=cache,target=/go/pkg/mod \
+# Also, allow ssh access
+RUN --mount=type=ssh \
+    --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o ./app ./cmd/${TARGET}
+    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags -static" -o ./app ./cmd/${TARGET}
 
-## (3) Add the binary to a fresh Alpine image
-FROM alpine:3.10
+RUN chmod a+x /app/app
+
+## (3) Add the statically linked binary to a distroless image
+FROM gcr.io/distroless/static
 
 COPY --from=build-app /app/app /bin/app
-RUN chmod a+x /bin/app
 
 ENTRYPOINT ["/bin/app"]

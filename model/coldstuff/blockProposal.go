@@ -8,5 +8,5 @@ import (
 
 // BlockProposal is a coldstuff consensus event to propose a block.
 type BlockProposal struct {
-	Block *flow.Block
+	Header *flow.Header
 }

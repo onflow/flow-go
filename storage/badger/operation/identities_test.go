@@ -15,20 +15,15 @@ import (
 
 func TestIdentitiesInsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		blockID := flow.Identifier{0x13, 0x37}
-		expected := flow.IdentityList{
-			{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.Role(1), Stake: 1},
-			{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.Role(2), Stake: 2},
-			{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.Role(3), Stake: 3},
-		}
+		expected := unittest.IdentityFixture()
 
-		err := db.Update(InsertIdentities(blockID, expected))
+		err := db.Update(InsertIdentity(expected))
 		require.Nil(t, err)
 
-		var actual flow.IdentityList
-		err = db.View(RetrieveIdentities(blockID, &actual))
+		var actual flow.Identity
+		err = db.View(RetrieveIdentity(expected.ID(), &actual))
 		require.Nil(t, err)
 
-		assert.Equal(t, expected, actual)
+		assert.Equal(t, expected, &actual)
 	})
 }

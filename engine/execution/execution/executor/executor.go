@@ -51,7 +51,7 @@ func (e *blockExecutor) ExecuteBlock(
 func (e *blockExecutor) executeBlock(
 	block *execution.CompleteBlock,
 ) (chunk []*flow.Chunk, endState flow.StateCommitment, err error) {
-	blockCtx := e.vm.NewBlockContext(block.Block)
+	blockCtx := e.vm.NewBlockContext(&block.Block.Header)
 
 	var startState flow.StateCommitment
 
@@ -130,10 +130,10 @@ func generateExecutionResultForBlock(
 	return &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			// TODO: populate with real value
-			PreviousResultID:     flow.ZeroID,
-			BlockID:              block.Block.ID(),
-			FinalStateCommitment: endState,
-			Chunks:               chunks,
+			PreviousResultID: flow.ZeroID,
+			BlockID:          block.Block.ID(),
+			FinalStateCommit: endState,
+			Chunks:           chunks,
 		},
 	}
 }
