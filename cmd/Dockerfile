@@ -42,10 +42,11 @@ RUN --mount=type=ssh \
     --mount=type=cache,target=/root/.cache/go-build \
     GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags -static" -o ./app ./cmd/${TARGET}
 
+RUN chmod a+x /app/app
+
 ## (3) Add the binary to a fresh Alpine image
-FROM alpine:3.10
+FROM gcr.io/distroless/static
 
 COPY --from=build-app /app/app /bin/app
-RUN chmod a+x /bin/app
 
 ENTRYPOINT ["/bin/app"]
