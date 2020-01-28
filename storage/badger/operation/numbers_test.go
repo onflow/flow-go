@@ -13,18 +13,17 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestAddressInsertRetrieve(t *testing.T) {
-
+func TestNumberInsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		nodeID := flow.Identifier{0x01}
-		expected := "address"
+		number := uint64(1337)
+		expected := flow.Identifier{0x01, 0x02, 0x03}
 
-		err := db.Update(InsertAddress(nodeID, expected))
+		err := db.Update(InsertNumber(number, expected))
 		require.Nil(t, err)
 
-		var actual string
-		err = db.View(RetrieveAddress(nodeID, &actual))
+		var actual flow.Identifier
+		err = db.View(RetrieveNumber(number, &actual))
 		require.Nil(t, err)
 
 		assert.Equal(t, expected, actual)

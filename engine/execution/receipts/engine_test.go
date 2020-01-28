@@ -43,7 +43,7 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		ss.On("Identities", mock.Anything, mock.Anything).
 			Return(nil, fmt.Errorf("identity error"))
 
-		err := e.onExecutionResult(e.me.NodeID(), &result)
+		err := e.onExecutionResult(e.me.NodeID(), result)
 		assert.Error(t, err)
 
 		state.AssertExpectations(t)
@@ -73,7 +73,7 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		).
 			Return(fmt.Errorf("network error"))
 
-		err := e.onExecutionResult(e.me.NodeID(), &result)
+		err := e.onExecutionResult(e.me.NodeID(), result)
 		assert.Error(t, err)
 
 		state.AssertExpectations(t)
@@ -88,7 +88,7 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		e := Engine{me: me}
 
 		// submit using origin ID that does not match node ID
-		err := e.onExecutionResult(flow.Identifier{42}, &result)
+		err := e.onExecutionResult(flow.Identifier{42}, result)
 		assert.Error(t, err)
 	})
 
@@ -116,11 +116,11 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 			Run(func(args mock.Arguments) {
 				// check the receipt is properly formed
 				receipt := args[0].(*flow.ExecutionReceipt)
-				assert.Equal(t, result, receipt.ExecutionResult)
+				assert.Equal(t, result, &receipt.ExecutionResult)
 			}).
 			Return(nil)
 
-		err := e.onExecutionResult(e.me.NodeID(), &result)
+		err := e.onExecutionResult(e.me.NodeID(), result)
 		assert.NoError(t, err)
 
 		state.AssertExpectations(t)

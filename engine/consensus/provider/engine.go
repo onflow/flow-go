@@ -8,7 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -126,7 +126,7 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 	}
 
 	// get all non-consensus nodes in the system
-	identities, err := e.state.Final().Identities(identity.Not(identity.HasNodeID(localID)))
+	identities, err := e.state.Final().Identities(filter.Not(filter.HasNodeID(localID)))
 	if err != nil {
 		return errors.Wrap(err, "could not get identities")
 	}

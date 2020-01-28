@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/order"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -143,15 +143,15 @@ func TestPropagateCollectionGuarantee(t *testing.T) {
 	}
 
 	// generate our own node identity
-	var ids flow.IdentityList
-	id := &flow.Identity{
+	var identities flow.IdentityList
+	identity := &flow.Identity{
 		NodeID:  flow.Identifier{0x09, 0x09, 0x09, 0x09},
 		Address: "home",
 		Role:    flow.RoleConsensus,
 	}
-	ids = append(ids, id)
+	identities = append(identities, identity)
 
-	// generate another 1000 node ids
+	// generate another 1000 node identities
 	var targetIDs flow.IdentityList
 	for i := 0; i < 1000; i++ {
 		var nodeID flow.Identifier
@@ -170,24 +170,24 @@ func TestPropagateCollectionGuarantee(t *testing.T) {
 		case 4:
 			role = flow.RoleObservation
 		}
-		id := &flow.Identity{
+		identity := &flow.Identity{
 			NodeID:  nodeID,
 			Address: address,
 			Role:    role,
 		}
-		ids = append(ids, id)
+		identities = append(identities, identity)
 		if role == flow.RoleConsensus {
-			targetIDs = append(targetIDs, id)
+			targetIDs = append(targetIDs, identity)
 		}
 	}
 
-	// sort by node id
-	sort.Slice(ids, func(i int, j int) bool {
-		return identity.ByNodeIDAsc(ids[i], ids[j])
+	// sort by node identity
+	sort.Slice(identities, func(i int, j int) bool {
+		return order.ByNodeIDAsc(identities[i], identities[j])
 	})
 
 	// set up the committee mock for good
-	me.On("NodeID").Return(id.NodeID)
+	me.On("NodeID").Return(identity.NodeID)
 	state.On("Final").Return(ss)
 	ss.On("Identities", mock.Anything, mock.Anything).Return(targetIDs, nil)
 

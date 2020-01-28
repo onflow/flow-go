@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/gammazero/deque"
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"

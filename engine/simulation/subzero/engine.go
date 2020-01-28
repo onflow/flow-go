@@ -12,7 +12,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -26,26 +25,28 @@ type Engine struct {
 	unit     *engine.Unit
 	log      zerolog.Logger
 	prov     network.Engine
-	blocks   storage.Blocks
+	headers  storage.Headers
 	state    protocol.State
 	me       module.Local
-	pool     mempool.Guarantees
+	builder  module.Builder
+	cleaner  module.Cleaner
 	interval time.Duration
 }
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, prov network.Engine, blocks storage.Blocks, state protocol.State, me module.Local, pool mempool.Guarantees) (*Engine, error) {
+func New(log zerolog.Logger, prov network.Engine, headers storage.Headers, state protocol.State, me module.Local, builder module.Builder, cleaner module.Cleaner) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "subzero").Logger(),
 		prov:     prov,
-		blocks:   blocks,
+		headers:  headers,
 		state:    state,
 		me:       me,
-		pool:     pool,
+		builder:  builder,
+		cleaner:  cleaner,
 		interval: 10 * time.Second,
 	}
 
@@ -123,104 +124,89 @@ ConsentLoop:
 
 			log := e.log
 
-			block, err := e.createBlock()
+			proposal, err := e.createProposal()
 			if err != nil {
-				log.Error().Err(err).Msg("could not create block")
+				log.Error().Err(err).Msg("could not create proposal")
 				continue ConsentLoop
 			}
 
-			blockID := block.ID()
+			proposalID := proposal.ID()
 
 			log = log.With().
-				Uint64("block_number", block.Number).
-				Hex("block_id", blockID[:]).
-				Int("num_guarantees", len(block.Guarantees)).
+				Uint64("proposal_number", proposal.Number).
+				Hex("proposal_id", proposalID[:]).
 				Logger()
 
-			log.Info().Msg("block created")
+			log.Info().Msg("proposal created")
 
-			err = e.commitBlock(block)
+			err = e.commitProposal(proposal)
 			if err != nil {
-				e.log.Error().Err(err).Msg("could not commit block")
+				e.log.Error().Err(err).Msg("could not commit proposal")
 				continue ConsentLoop
 			}
 
-			log = log.With().
-				Uint("mempool_size", e.pool.Size()).
-				Logger()
+			log.Info().Msg("proposal committed")
 
-			log.Info().Msg("block committed")
-
-			e.prov.SubmitLocal(block)
+			e.prov.SubmitLocal(proposal)
 		}
 	}
 }
 
-// createBlock will create a block. It will be signed by the one consensus node,
+// createProposal will create a header. It will be signed by the one consensus node,
 // which will stand in for all of the consensus nodes finding consensus on the
 // block.
-func (e *Engine) createBlock() (*flow.Block, error) {
+func (e *Engine) createProposal() (*flow.Header, error) {
 
 	// get the latest finalized block to build on
-	head, err := e.state.Final().Head()
+	parent, err := e.state.Final().Head()
 	if err != nil {
-		return nil, fmt.Errorf("could not get head: %w", err)
+		return nil, fmt.Errorf("could not get parent: %w", err)
 	}
 
-	// get the collection guarantees from the collection pool
-	guarantees := e.pool.All()
-
-	// create the block content with the collection guarantees
-	payload := flow.Payload{
-		Identities: nil,
-		Guarantees: guarantees,
+	// create the proposal payload on top of the parent
+	payloadHash, err := e.builder.BuildOn(parent.ID())
+	if err != nil {
+		return nil, fmt.Errorf("could not create block: %w", err)
 	}
 
-	// create the block header from the current head
-	header := flow.Header{
-		Number:      head.Number + 1,
-		ParentID:    head.ID(),
-		PayloadHash: payload.Hash(),
+	// create the proposal
+	proposal := flow.Header{
+		Number:      parent.Number + 1,
 		Timestamp:   time.Now().UTC(),
+		ParentID:    parent.ID(),
+		PayloadHash: payloadHash,
+		ProposerID:  e.me.NodeID(),
 	}
 
-	// create the new block using header, payload & content
-	block := flow.Block{
-		Header:  header,
-		Payload: payload,
-	}
-
-	return &block, nil
+	return &proposal, nil
 }
 
-// commitBlock will insert the block into our local block database, then it
+// commitProposal will insert the block into our local block database, then it
 // will extend the current blockchain state with it and finalize it.
-func (e *Engine) commitBlock(block *flow.Block) error {
+func (e *Engine) commitProposal(proposal *flow.Header) error {
 
-	// store the block in our database
-	err := e.blocks.Store(block)
+	// store the proposal in our database
+	err := e.headers.Store(proposal)
 	if err != nil {
-		return errors.Wrap(err, "could not store block")
+		return fmt.Errorf("could not store proposal: %w", err)
 	}
 
-	// extend our blockchain state with the block
-	err = e.state.Mutate().Extend(block.ID())
+	// extend our blockchain state with the proposal
+	err = e.state.Mutate().Extend(proposal.ID())
 	if err != nil {
-		return errors.Wrap(err, "could not extend state")
+		return fmt.Errorf("could not extend state: %w", err)
 	}
 
-	// remove the block collection guarantees from the memory pool
-	for _, guarantee := range block.Guarantees {
-		ok := e.pool.Rem(guarantee.ID())
-		if !ok {
-			return errors.Errorf("guarantee missing from pool (%x)", guarantee.ID())
-		}
+	// finalize the blockchain state with the proposal
+	err = e.state.Mutate().Finalize(proposal.ID())
+	if err != nil {
+		return fmt.Errorf("could not finalize state: %w", err)
 	}
 
-	// finalize the blockchain state with the block
-	err = e.state.Mutate().Finalize(block.ID())
+	// remove the finalized entities from the memory pools
+	err = e.cleaner.CleanAfter(proposal.ID())
 	if err != nil {
-		return errors.Wrap(err, "could not finalize state")
+		return fmt.Errorf("could not clean up temporary state: %w", err)
 	}
 
 	return nil

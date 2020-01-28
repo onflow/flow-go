@@ -9,6 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // Blocks implements a simple read-only block storage around a badger DB.
@@ -23,36 +24,35 @@ func NewBlocks(db *badger.DB) *Blocks {
 	return b
 }
 
-func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
-
-	var block *flow.Block
-	err := b.db.View(func(tx *badger.Txn) error {
-
-		var err error
-		block, err = b.retrieveBlock(tx, blockID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve block: %w", err)
-		}
-
-		return nil
+func (b *Blocks) Store(block *flow.Block) error {
+	err := b.db.Update(func(tx *badger.Txn) error {
+		return procedure.InsertBlock(block)(tx)
 	})
+	return err
+}
 
-	return block, err
+func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
+	var block flow.Block
+	err := b.db.View(func(tx *badger.Txn) error {
+		return procedure.RetrieveBlock(blockID, &block)(tx)
+	})
+	return &block, err
 }
 
 func (b *Blocks) ByNumber(number uint64) (*flow.Block, error) {
-
-	var block *flow.Block
+	var block flow.Block
 	err := b.db.View(func(tx *badger.Txn) error {
 
-		// get the hash
+		// retrieve the block ID by number
 		var blockID flow.Identifier
-		err := operation.RetrieveBlockID(number, &blockID)(tx)
+		err := operation.RetrieveNumber(number, &blockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve block ID: %w", err)
 		}
 
-		block, err = b.retrieveBlock(tx, blockID)
+		// retrieve the block by block ID
+		var block flow.Block
+		err = procedure.RetrieveBlock(blockID, &block)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
@@ -60,74 +60,5 @@ func (b *Blocks) ByNumber(number uint64) (*flow.Block, error) {
 		return nil
 	})
 
-	return block, err
-}
-
-func (b *Blocks) retrieveBlock(tx *badger.Txn, blockID flow.Identifier) (*flow.Block, error) {
-
-	// get the header
-	var header flow.Header
-	err := operation.RetrieveHeader(blockID, &header)(tx)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve header: %w", err)
-	}
-
-	// get the new identities
-	var identities flow.IdentityList
-	err = operation.RetrieveIdentities(blockID, &identities)(tx)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve identities: %w", err)
-	}
-
-	// get the collection guarantees
-	var guarantees []*flow.CollectionGuarantee
-	err = operation.RetrieveGuarantees(blockID, &guarantees)(tx)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve collection guarantees: %w", err)
-	}
-
-	// create the block content
-	payload := flow.Payload{
-		Identities: identities,
-		Guarantees: guarantees,
-	}
-
-	// create the block
-	block := &flow.Block{
-		Header:  header,
-		Payload: payload,
-	}
-
-	return block, nil
-}
-
-func (b *Blocks) Store(block *flow.Block) error {
-
-	err := b.db.Update(func(tx *badger.Txn) error {
-
-		err := operation.PersistHeader(&block.Header)(tx)
-		if err != nil {
-			return fmt.Errorf("could not save header: %w", err)
-		}
-
-		err = operation.PersistIdentities(block.ID(), block.Identities)(tx)
-		if err != nil {
-			return fmt.Errorf("could not save block: %w", err)
-		}
-
-		for _, cg := range block.Guarantees {
-			err = operation.PersistGuarantee(cg)(tx)
-			if err != nil {
-				return fmt.Errorf("could not save collection guarantee: %w", err)
-			}
-			err = operation.IndexGuarantee(block.ID(), cg)(tx)
-			if err != nil {
-				return fmt.Errorf("could not index collection guarantee by block ID: %w", err)
-			}
-		}
-
-		return nil
-	})
-
-	return err
+	return &block, err
 }

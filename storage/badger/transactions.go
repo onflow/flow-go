@@ -20,6 +20,16 @@ func NewTransactions(db *badger.DB) *Transactions {
 	return &t
 }
 
+func (t *Transactions) Store(tx *flow.TransactionBody) error {
+	return t.db.Update(func(btx *badger.Txn) error {
+		err := operation.InsertTransaction(tx)(btx)
+		if err != nil {
+			return fmt.Errorf("could not insert transaction: %w", err)
+		}
+		return nil
+	})
+}
+
 func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
 
 	var tx flow.TransactionBody
@@ -32,24 +42,4 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error)
 	})
 
 	return &tx, err
-}
-
-func (t *Transactions) Store(tx *flow.TransactionBody) error {
-	return t.db.Update(func(btx *badger.Txn) error {
-		err := operation.InsertTransaction(tx)(btx)
-		if err != nil {
-			return fmt.Errorf("could not insert transaction: %w", err)
-		}
-		return nil
-	})
-}
-
-func (t *Transactions) Remove(txID flow.Identifier) error {
-	return t.db.Update(func(btx *badger.Txn) error {
-		err := operation.RemoveTransaction(txID)(btx)
-		if err != nil {
-			return fmt.Errorf("could not remove transaction: %w", err)
-		}
-		return nil
-	})
 }
