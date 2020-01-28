@@ -1,4 +1,4 @@
-package flowmc
+package pacemaker
 
 import (
 	"fmt"
@@ -10,19 +10,19 @@ import (
 	"go.uber.org/atomic"
 )
 
-// FlowMC is a basic implementation of hotstuff.PaceMaker
-type FlowMC struct {
+// FlowPaceMaker is a basic implementation of hotstuff.PaceMaker
+type FlowPaceMaker struct {
 	currentView    uint64
 	timeoutControl *timeout.Controller
 	notifier       notifications.Distributor
 	started        *atomic.Bool
 }
 
-func New(startView uint64, timeoutController *timeout.Controller, notifier notifications.Distributor) (hotstuff.PaceMaker, error) {
+func NewFlowPaceMaker(startView uint64, timeoutController *timeout.Controller, notifier notifications.Distributor) (hotstuff.PaceMaker, error) {
 	if startView < 1 {
 		return nil, &types.ErrorConfiguration{Msg: "Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)"}
 	}
-	pm := FlowMC{
+	pm := FlowPaceMaker{
 		currentView:    startView,
 		timeoutControl: timeoutController,
 		notifier:       notifier,
@@ -33,9 +33,9 @@ func New(startView uint64, timeoutController *timeout.Controller, notifier notif
 
 // gotoView updates the current view to newView. Currently, the calling code
 // ensures that the view number is STRICTLY monotonously increasing. The method
-// gotoView panics as a last resort if FlowMC is modified to violate this condition.
+// gotoView panics as a last resort if FlowPaceMaker is modified to violate this condition.
 // Hence, gotoView will _always_ return a NewViewEvent for an _increased_ view number.
-func (p *FlowMC) gotoView(newView uint64) *types.NewViewEvent {
+func (p *FlowPaceMaker) gotoView(newView uint64) *types.NewViewEvent {
 	if newView <= p.currentView {
 		// This should never happen: in the current implementation, it is trivially apparent that
 		// newView is _always_ larger than currentView. This check is to protect the code from
@@ -47,21 +47,21 @@ func (p *FlowMC) gotoView(newView uint64) *types.NewViewEvent {
 		p.notifier.OnSkippedAhead(newView)
 	}
 	p.currentView = newView
-	p.notifier.OnStartingBlockTimeout(newView)
-	p.timeoutControl.StartTimeout(types.ReplicaTimeout, newView)
+	timerInfo := p.timeoutControl.StartTimeout(types.ReplicaTimeout, newView)
+	p.notifier.OnStartingTimeout(timerInfo)
 	return &types.NewViewEvent{View: p.currentView}
 }
 
 // CurView returns the current view
-func (p *FlowMC) CurView() uint64 {
+func (p *FlowPaceMaker) CurView() uint64 {
 	return p.currentView
 }
 
-func (p *FlowMC) TimeoutChannel() <-chan *types.Timeout {
+func (p *FlowPaceMaker) TimeoutChannel() <-chan *types.Timeout {
 	return p.timeoutControl.Channel()
 }
 
-func (p *FlowMC) UpdateCurViewWithQC(qc *types.QuorumCertificate) (*types.NewViewEvent, bool) {
+func (p *FlowPaceMaker) UpdateCurViewWithQC(qc *types.QuorumCertificate) (*types.NewViewEvent, bool) {
 	if qc.View < p.currentView {
 		return nil, false
 	}
@@ -72,7 +72,7 @@ func (p *FlowMC) UpdateCurViewWithQC(qc *types.QuorumCertificate) (*types.NewVie
 	return p.gotoView(qc.View + 1), true
 }
 
-func (p *FlowMC) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
+func (p *FlowPaceMaker) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
 	// use block's QC to fast-forward if possible
 	newViewOnQc, newViewOccuredOnQc := p.UpdateCurViewWithQC(block.QC())
 	if block.View() != p.currentView {
@@ -80,7 +80,7 @@ func (p *FlowMC) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForN
 	}
 	// block is for current view
 
-	if p.timeoutControl.Mode() != types.ReplicaTimeout {
+	if p.timeoutControl.TimerInfo().Mode != types.ReplicaTimeout {
 		// i.e. we are already on timeout.VoteCollectionTimeout.
 		// This edge case can occur as follows:
 		// * we previously already have processed a block for the current view
@@ -98,48 +98,44 @@ func (p *FlowMC) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForN
 	return newViewOnBlock, newViewOccuredOnBlock
 }
 
-func (p *FlowMC) processBlockForCurView(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
+func (p *FlowPaceMaker) processBlockForCurView(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
 	if isLeaderForNextView {
-		p.timeoutControl.StartTimeout(types.VoteCollectionTimeout, p.currentView)
-		p.notifier.OnStartingVotesTimeout(p.currentView)
+		timerInfo := p.timeoutControl.StartTimeout(types.VoteCollectionTimeout, p.currentView)
+		p.notifier.OnStartingTimeout(timerInfo)
 		return nil, false
 	}
 	return p.gotoView(p.currentView + 1), true
 }
 
-func (p *FlowMC) OnTimeout(timeout *types.Timeout) (*types.NewViewEvent, error) {
+func (p *FlowPaceMaker) OnTimeout(timeout *types.Timeout) (*types.NewViewEvent, error) {
 	if err := p.ensureMatchingTimeout(timeout); err != nil {
 		return nil, err
 	}
 
 	// timeout is for current condition
-	p.emitTimeoutNotifications()
+	p.emitTimeoutNotifications(timeout)
 	return p.gotoView(p.currentView + 1), nil
 }
 
-func (p *FlowMC) ensureMatchingTimeout(timeout *types.Timeout) error {
-	if timeout.View != p.currentView || p.timeoutControl.Mode() != timeout.Mode {
+func (p *FlowPaceMaker) ensureMatchingTimeout(timeout *types.Timeout) error {
+	if timeout.View != p.currentView || p.timeoutControl.TimerInfo().Mode != timeout.Mode {
 		// this indicates a bug in the usage of the PaceMaker
-		return &types.ErrorInvalidTimeout{Timeout: timeout, CurrentView: p.currentView, CurrentMode: p.timeoutControl.Mode()}
+		return &types.ErrorInvalidTimeout{
+			Timeout:     timeout,
+			CurrentView: p.currentView,
+			CurrentMode: p.timeoutControl.TimerInfo().Mode}
 	}
 	return nil
 }
 
-func (p *FlowMC) emitTimeoutNotifications() {
-	switch p.timeoutControl.Mode() {
-	case types.ReplicaTimeout:
-		p.notifier.OnReachedBlockTimeout(p.currentView)
-	case types.VoteCollectionTimeout:
-		p.notifier.OnReachedVotesTimeout(p.currentView)
-	default: // this should never happen unless the number of TimeoutModes are extended without updating this code
-		panic("unknown timeout mode " + string(p.timeoutControl.Mode()))
-	}
+func (p *FlowPaceMaker) emitTimeoutNotifications(timeout *types.Timeout) {
+	p.notifier.OnReachedTimeout(timeout)
 }
 
-func (p *FlowMC) Start() {
+func (p *FlowPaceMaker) Start() {
 	if p.started.Swap(true) {
 		return
 	}
-	p.notifier.OnStartingBlockTimeout(p.currentView)
-	p.timeoutControl.StartTimeout(types.ReplicaTimeout, p.currentView)
+	timerInfo := p.timeoutControl.StartTimeout(types.ReplicaTimeout, p.currentView)
+	p.notifier.OnStartingTimeout(timerInfo)
 }

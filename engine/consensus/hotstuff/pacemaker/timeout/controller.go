@@ -13,7 +13,7 @@ import (
 // - on progress: decrease timeout by subtrahend `timeoutDecrease`
 type Controller struct {
 	Config
-	mode           types.TimeoutMode
+	timerInfo      *types.TimerInfo
 	timeoutChannel <-chan *types.Timeout
 }
 
@@ -40,33 +40,50 @@ func DefaultController() *Controller {
 	return NewController(DefaultConfig)
 }
 
-func (t *Controller) Channel() <-chan *types.Timeout { return t.timeoutChannel }
-func (t *Controller) Mode() types.TimeoutMode        { return t.mode }
+// TimerInfo returns TimerInfo for the current timer.
+// New struct is created for each timer.
+// Is nil if no timer has been started.
+func (t *Controller) TimerInfo() *types.TimerInfo { return t.timerInfo }
 
-func (t *Controller) StartTimeout(mode types.TimeoutMode, view uint64) {
-	t.mode = mode
-	var timerChannel <-chan time.Time
+// Channel returns a channel that will receive the specific timeout.
+// New channel is created for each timer.
+// in the event the timeout is reached (specified as TimerInfo).
+// returns closed channel if no timer has been started.
+func (t *Controller) Channel() <-chan *types.Timeout { return t.timeoutChannel }
+
+// StartTimeout starts the timeout of the specified type and returns the
+func (t *Controller) StartTimeout(mode types.TimeoutMode, view uint64) *types.TimerInfo {
+	duration := t.computeTimeoutDuration(mode)
+
+	startTime := time.Now()
+	timer := time.NewTimer(duration)
+	timerInfo := types.TimerInfo{Mode: mode, View: view, StartTime: startTime, Duration: duration}
+
+	timeoutChannel := make(chan *types.Timeout)
+	go func() {
+		time := <-timer.C
+		timeoutChannel <- &types.Timeout{TimerInfo: timerInfo, TimeoutFired: time}
+	}()
+	t.timeoutChannel = timeoutChannel
+	t.timerInfo = &timerInfo
+
+	return &timerInfo
+}
+
+func (t *Controller) computeTimeoutDuration(mode types.TimeoutMode) time.Duration {
+	var duration time.Duration
 	switch mode {
 	case types.VoteCollectionTimeout:
-		timerChannel = time.NewTimer(t.VoteCollectionTimeoutTimeout()).C
+		duration = t.VoteCollectionTimeoutTimeout()
 	case types.ReplicaTimeout:
-		timerChannel = time.NewTimer(t.ReplicaTimeout()).C
+		duration = t.ReplicaTimeout()
 	default:
 		// This should never happen; Only protects code from future inconsistent modifications.
 		// There are only the two timeout modes explicitly handled above. Unless the enum
 		// containing the timeout mode is extended, the default case will never be reached.
 		panic("unknown timeout mode")
 	}
-	timeoutChannel := make(chan *types.Timeout)
-	go func() {
-		time := <-timerChannel
-		timeoutChannel <- &types.Timeout{
-			Mode:         mode,
-			View:         view,
-			TimeoutFired: time,
-		}
-	}()
-	t.timeoutChannel = timeoutChannel
+	return duration
 }
 
 // ReplicaTimeout returns the duration of the current view before we time out

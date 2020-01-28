@@ -9,9 +9,15 @@ const (
 	VoteCollectionTimeout TimeoutMode = iota
 )
 
+type TimerInfo struct {
+	Mode      TimeoutMode
+	View      uint64
+	StartTime time.Time
+	Duration  time.Duration
+}
+
 type Timeout struct {
-	Mode         TimeoutMode
-	View         uint64
+	TimerInfo
 	TimeoutFired time.Time
 }
 
