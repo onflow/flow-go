@@ -3,14 +3,15 @@ package testnet
 import (
 	"context"
 	"errors"
-	"github.com/dapperlabs/flow-go/network/gossip"
-	protocols "github.com/dapperlabs/flow-go/network/gossip/protocols/grpc"
-	"github.com/dapperlabs/flow-go/network/gossip/registry"
-	"github.com/rs/zerolog"
 	"net"
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/network/gossip"
+	protocols "github.com/dapperlabs/flow-go/network/gossip/protocols/grpc"
+	"github.com/dapperlabs/flow-go/network/gossip/registry"
 )
 
 // hashernode implements a simple node that has a "hash" function which takes the hash of any payload delivered to it and saves it.
@@ -84,7 +85,11 @@ func (hn *hasherNode) startNode(logger zerolog.Logger, fanoutSize int, totalNumN
 
 	node.SetProtocol(sp)
 
-	go node.Serve(listener)
+	go func() {
+		if err := node.Serve(listener); err != nil {
+			logger.Err(err).Msg("node shutdown")
+		}
+	}()
 
 	return node, nil
 }

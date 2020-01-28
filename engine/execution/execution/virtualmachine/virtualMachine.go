@@ -9,7 +9,7 @@ import (
 // to execute transactions.
 type VirtualMachine interface {
 	// NewBlockContext creates a new block context for executing transactions.
-	NewBlockContext(b *flow.Block) BlockContext
+	NewBlockContext(b *flow.Header) BlockContext
 }
 
 // New creates a new virtual machine instance with the provided runtime.
@@ -23,10 +23,10 @@ type virtualMachine struct {
 	rt runtime.Runtime
 }
 
-func (vm *virtualMachine) NewBlockContext(b *flow.Block) BlockContext {
+func (vm *virtualMachine) NewBlockContext(header *flow.Header) BlockContext {
 	return &blockContext{
-		vm:    vm,
-		block: b,
+		vm:     vm,
+		header: header,
 	}
 }
 
