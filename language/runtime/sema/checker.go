@@ -691,20 +691,12 @@ func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
 		)
 	}
 
-	// Prepare a set of all the conformances of the resource
-
-	allConformances := resourceType.AllConformances()
-	conformancesSet := make(map[*InterfaceType]bool, len(allConformances))
-	for _, conformance := range allConformances {
-		conformancesSet[conformance] = true
-	}
-
 	// Convert the restrictions
 
-	restrictions := make([]*InterfaceType, len(t.Restrictions))
-	restrictionSet := make(map[*InterfaceType]bool, len(t.Restrictions))
+	var restrictions []*InterfaceType
+	restrictionRanges := make(map[*InterfaceType]ast.Range, len(t.Restrictions))
 
-	for i, restriction := range t.Restrictions {
+	for _, restriction := range t.Restrictions {
 		restrictionResult := checker.ConvertType(restriction)
 
 		// The restriction must be a resource interface type
@@ -720,11 +712,11 @@ func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
 			continue
 		}
 
-		restrictions[i] = interfaceType
+		restrictions = append(restrictions, interfaceType)
 
 		// The restriction must not be duplicated
 
-		if restrictionSet[interfaceType] {
+		if _, exists := restrictionRanges[interfaceType]; exists {
 			checker.report(
 				&InvalidRestrictionTypeDuplicateError{
 					Type:  interfaceType,
@@ -732,19 +724,36 @@ func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
 				},
 			)
 		} else {
-			restrictionSet[interfaceType] = true
+			restrictionRanges[interfaceType] =
+				ast.NewRangeFromPositioned(restriction)
+		}
+	}
+
+	// If the restricted type is a concrete resource type,
+	// check that the restrictions are conformances
+
+	if resourceType != nil && resourceType.Kind == common.CompositeKindResource {
+
+		// Prepare a set of all the conformances of the resource
+
+		allConformances := resourceType.AllConformances()
+		conformancesSet := make(map[*InterfaceType]bool, len(allConformances))
+		for _, conformance := range allConformances {
+			conformancesSet[conformance] = true
 		}
 
-		// The restriction must be an explicit or implicit conformance
-		// of the resource (restricted type)
+		for _, restriction := range restrictions {
+			// The restriction must be an explicit or implicit conformance
+			// of the resource (restricted type)
 
-		if !conformancesSet[interfaceType] {
-			checker.report(
-				&InvalidNonConformanceRestrictionError{
-					Type:  interfaceType,
-					Range: ast.NewRangeFromPositioned(restriction),
-				},
-			)
+			if !conformancesSet[restriction] {
+				checker.report(
+					&InvalidNonConformanceRestrictionError{
+						Type:  restriction,
+						Range: restrictionRanges[restriction],
+					},
+				)
+			}
 		}
 	}
 

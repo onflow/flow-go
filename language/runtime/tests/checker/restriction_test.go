@@ -96,4 +96,18 @@ func TestCheckRestrictedResourceType(t *testing.T) {
 		assert.IsType(t, &sema.InvalidRestrictionTypeError{}, errs[1])
 		assert.IsType(t, &sema.MissingResourceAnnotationError{}, errs[2])
 	})
+
+	t.Run("non-concrete resource restriction", func(t *testing.T) {
+		_, err := ParseAndCheckWithPanic(t, `
+            resource interface I {}
+
+            resource R: I {}
+
+            let r: @[R]{I} <- panic("")
+        `)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidRestrictedTypeError{}, errs[0])
+	})
 }
