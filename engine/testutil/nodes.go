@@ -153,7 +153,7 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNod
 	return nodes
 }
 
-func ExecutionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis *flow.Block) mock.ExecutionNode {
+func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, genesis *flow.Block) mock.ExecutionNode {
 	node := GenericNode(t, hub, identity, genesis)
 
 	blocksStorage := storage.NewBlocks(node.DB)
@@ -170,6 +170,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity flow.Identity, genesis 
 	levelDB := unittest.TempLevelDB(t)
 
 	ls, err := ledger.NewTrieStorage(levelDB)
+	require.NoError(t, err)
+
+	initialStateCommitment := ls.LatestStateCommitment()
+
+	err = commitsStorage.Store(genesis.ID(), initialStateCommitment)
 	require.NoError(t, err)
 
 	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage)

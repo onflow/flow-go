@@ -94,7 +94,7 @@ func main() {
 			blocks := badger.NewBlocks(node.DB)
 			collections := badger.NewCollections(node.DB)
 
-			ingestionEng, err := ingestion.NewEngine(
+			ingestionEng, err := ingestion.New(
 				node.Logger,
 				node.Network,
 				node.Me,

@@ -129,7 +129,7 @@ func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 
 	blockView := e.execState.NewView(stateCommit)
 
-	result, err := e.vm.NewBlockContext(block.).ExecuteScript(blockView, script)
+	result, err := e.vm.NewBlockContext(block).ExecuteScript(blockView, script)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
 	}

@@ -9,7 +9,6 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
-	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/network/stub"
@@ -25,7 +24,7 @@ func TestExecutionFlow(t *testing.T) {
 
 	identities := flow.IdentityList{colID, conID, exeID}
 
-	genesis := mock.Genesis(identities)
+	genesis := flow.Genesis(identities)
 
 	exeNode := testutil.ExecutionNode(t, hub, exeID, genesis)
 
@@ -56,7 +55,8 @@ func TestExecutionFlow(t *testing.T) {
 			ParentID: genesis.ID(),
 			Number:   42,
 		},
-		Content: flow.Content{
+		Payload: flow.Payload{
+			Identities: nil,
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},
 	}

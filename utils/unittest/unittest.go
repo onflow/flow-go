@@ -1,7 +1,6 @@
 package unittest
 
 import (
-	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"testing"
