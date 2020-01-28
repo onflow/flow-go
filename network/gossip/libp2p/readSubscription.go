@@ -26,7 +26,7 @@ func NewReadSubscription(log zerolog.Logger, sub *pubsub.Subscription) *ReadSubs
 		Str("channelid", sub.Topic()).
 		Logger()
 
-	c := ReadSubscription{
+	r := ReadSubscription{
 		log:     log,
 		sub:     sub,
 		inbound: make(chan *message.Message),
@@ -34,10 +34,10 @@ func NewReadSubscription(log zerolog.Logger, sub *pubsub.Subscription) *ReadSubs
 		done:    make(chan struct{}),
 	}
 
-	return &c
+	return &r
 }
 
-// Stop will Stop by closing the done channel and closing the connection.
+// Stop closes the done channel as well as the connection
 func (r *ReadSubscription) stop() {
 	r.once.Do(func() {
 		close(r.done)
@@ -45,8 +45,8 @@ func (r *ReadSubscription) stop() {
 	})
 }
 
-// recv must be run in a goroutine and takes care of continuously receiving
-// messages from the peer connection until the connection fails.
+// RceiveLoop must be run in a goroutine. It takes care of continuously receiving
+// messages from the peer connection until the connection fails
 func (r *ReadSubscription) ReceiveLoop() {
 	defer r.stop()
 	// close and drain the inbound channel
