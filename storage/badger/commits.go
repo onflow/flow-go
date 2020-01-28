@@ -22,7 +22,7 @@ func NewCommits(db *badger.DB) *Commits {
 
 func (c *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) error {
 	return c.db.Update(func(btx *badger.Txn) error {
-		err := operation.PersistCommit(blockID, commit)(btx)
+		err := operation.InsertCommit(blockID, commit)(btx)
 		if err != nil {
 			return fmt.Errorf("could not insert state commitment: %w", err)
 		}
@@ -30,10 +30,10 @@ func (c *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) er
 	})
 }
 
-func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
-	var commit flow.StateCommitment
+func (c *Commits) ByID(blockID flow.Identifier) (flow.StateCommitment, error) {
+	var commitment flow.StateCommitment
 	err := c.db.View(func(btx *badger.Txn) error {
-		err := operation.RetrieveCommit(blockID, &commit)(btx)
+		err := operation.RetrieveCommit(blockID, &commitment)(btx)
 		if err != nil {
 			if err == storage.ErrNotFound {
 				return err
@@ -46,5 +46,24 @@ func (c *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, erro
 	if err != nil {
 		return nil, err
 	}
-	return commit, nil
+	return commitment, nil
+}
+
+func (c *Commits) ByFinalID(finalID flow.Identifier) (flow.StateCommitment, error) {
+	var commitment flow.StateCommitment
+	err := c.db.View(func(btx *badger.Txn) error {
+		err := operation.LookupCommit(finalID, &commitment)(btx)
+		if err != nil {
+			if err == storage.ErrNotFound {
+				return err
+			}
+			return fmt.Errorf("could not retrerieve state commitment: %w", err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return commitment, nil
 }

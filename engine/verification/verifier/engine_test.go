@@ -111,27 +111,26 @@ func (suite *TestSuite) TestVerify() {
 func TestHappyPath(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	conIDList := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
-	conID := conIDList.Get(0)
+	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	conIdentityList := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleConsensus))
+	conIdentity := conIdentityList.Get(0)
 
-	identities := flow.IdentityList{colID, conID, exeID, verID}
-	genesis := flow.Genesis(identities)
+	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity, verIdentity}
 
-	verNode := testutil.VerificationNode(t, hub, verID, genesis)
-	colNode := testutil.CollectionNode(t, hub, colID, genesis)
+	verNode := testutil.VerificationNode(t, hub, verIdentity, identities)
+	colNode := testutil.CollectionNode(t, hub, colIdentity, identities)
 
 	completeER := unittest.CompleteExecutionResultFixture()
 
 	// mock the execution node with a generic node and mocked engine
 	// to handle request for chunk state
-	exeNode := testutil.GenericNode(t, hub, exeID, genesis)
+	exeNode := testutil.GenericNode(t, hub, exeIdentity, identities)
 	exeEngine := new(network.Engine)
 	exeConduit, err := exeNode.Net.Register(engine.ExecutionStateProvider, exeEngine)
 	assert.Nil(t, err)
-	exeEngine.On("Process", verID.NodeID, testifymock.Anything).
+	exeEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			req, ok := args[1].(*messages.ExecutionStateRequest)
 			require.True(t, ok)
@@ -140,7 +139,7 @@ func TestHappyPath(t *testing.T) {
 			res := &messages.ExecutionStateResponse{
 				State: *completeER.ChunkStates[0],
 			}
-			err := exeConduit.Submit(res, verID.NodeID)
+			err := exeConduit.Submit(res, verIdentity.NodeID)
 			assert.Nil(t, err)
 		}).
 		Return(nil).
@@ -148,9 +147,9 @@ func TestHappyPath(t *testing.T) {
 
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
-	conNode := testutil.GenericNode(t, hub, conID, genesis)
+	conNode := testutil.GenericNode(t, hub, conIdentity, identities)
 	conEngine := new(network.Engine)
-	conEngine.On("Process", verID.NodeID, testifymock.Anything).
+	conEngine.On("Process", verIdentity.NodeID, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			ra, ok := args[1].(*flow.ResultApproval)
 			assert.True(t, ok)
@@ -170,21 +169,21 @@ func TestHappyPath(t *testing.T) {
 	assert.Nil(t, err)
 
 	// send the ER from execution to verification node
-	err = verNode.IngestEngine.Process(exeID.NodeID, completeER.Receipt)
+	err = verNode.IngestEngine.Process(exeIdentity.NodeID, completeER.Receipt)
 	assert.Nil(t, err)
 
 	// the receipt should be added to the mempool
 	assert.True(t, verNode.Receipts.Has(completeER.Receipt.ID()))
 
 	// flush the chunk state request
-	verNet, ok := hub.GetNetwork(verID.NodeID)
+	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
 	assert.True(t, ok)
 	verNet.DeliverSome(func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.ExecutionStateProvider
 	})
 
 	// flush the chunk state response
-	exeNet, ok := hub.GetNetwork(exeID.NodeID)
+	exeNet, ok := hub.GetNetwork(exeIdentity.NodeID)
 	assert.True(t, ok)
 	exeNet.DeliverSome(func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.ExecutionStateProvider
@@ -199,7 +198,7 @@ func TestHappyPath(t *testing.T) {
 	})
 
 	// flush the collection response
-	colNet, ok := hub.GetNetwork(colID.NodeID)
+	colNet, ok := hub.GetNetwork(colIdentity.NodeID)
 	assert.True(t, ok)
 	colNet.DeliverSome(func(m *stub.PendingMessage) bool {
 		return m.ChannelID == engine.CollectionProvider

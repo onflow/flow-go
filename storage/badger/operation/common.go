@@ -10,6 +10,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
 )
 
@@ -45,44 +46,20 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 	}
 }
 
-// persist will encode the given entity using JSON and will insert the resulting
-// binary data in the badger DB under the provided key. It will error if the
-// key already exists and data under the key is different than the one to be saved
-func persist(key []byte, entity interface{}) func(*badger.Txn) error {
+// check will simply check if the entry with the given key exists in the DB.
+func check(key []byte, exists *bool) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// check if the key already exists in the db
-		item, err := tx.Get(key)
-
-		// error other than key not found
-		if err != nil && err != badger.ErrKeyNotFound {
-			return fmt.Errorf("could not check key: %w", err)
+		// retrieve the item from the key-value store
+		_, err := tx.Get(key)
+		if err == badger.ErrKeyNotFound {
+			*exists = false
+			return nil
 		}
-
-		val, errEnc := json.Marshal(entity)
-		if errEnc != nil {
-			return fmt.Errorf("could not encode entity: %w", errEnc)
-		}
-
-		// value in a database
-		if err == nil {
-			err := item.Value(func(existingVal []byte) error {
-				if bytes.Equal(val, existingVal) {
-					return nil
-				}
-				return storage.ErrDataMismatch
-			})
-			if err != nil {
-				return err
-			}
-		}
-
-		// persist the entity data into the DB
-		err = tx.Set(key, val)
 		if err != nil {
-			return fmt.Errorf("could not store data: %w", err)
+			return fmt.Errorf("could not check existence: %w", err)
 		}
-
+		*exists = true
 		return nil
 	}
 }
@@ -98,7 +75,6 @@ func update(key []byte, entity interface{}) func(*badger.Txn) error {
 		if err == badger.ErrKeyNotFound {
 			return storage.ErrNotFound
 		}
-
 		if err != nil {
 			return fmt.Errorf("could not check key: %w", err)
 		}
@@ -187,6 +163,26 @@ type handleFunc func() error
 // key-value pair. This a consumer of the API to decode when to skip the loading
 // of values, the initialization of entities and the processing.
 type iterationFunc func() (checkFunc, createFunc, handleFunc)
+
+// lookup is the default iteration function allowing us to collect a list of
+// entity IDs from an index.
+func lookup(entityIDs *[]flow.Identifier) iterationFunc {
+	*entityIDs = make([]flow.Identifier, 0)
+	return func() (checkFunc, createFunc, handleFunc) {
+		check := func(key []byte) bool {
+			return true
+		}
+		var entityID flow.Identifier
+		create := func() interface{} {
+			return &entityID
+		}
+		handle := func() error {
+			*entityIDs = append(*entityIDs, entityID)
+			return nil
+		}
+		return check, create, handle
+	}
+}
 
 // iterate iterates over a range of keys defined by a start and end key.
 //

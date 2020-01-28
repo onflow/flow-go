@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -33,7 +33,7 @@ type Engine struct {
 	mempool           *Mempool
 }
 
-func NewEngine(
+func New(
 	logger zerolog.Logger,
 	net module.Network,
 	me module.Local,
@@ -42,6 +42,7 @@ func NewEngine(
 	collections storage.Collections,
 	executionEngine network.Engine,
 ) (*Engine, error) {
+	log := logger.With().Str("engine", "blocks").Logger()
 
 	mempool, err := newMempool()
 	if err != nil {
@@ -50,7 +51,7 @@ func NewEngine(
 
 	eng := Engine{
 		unit:        engine.NewUnit(),
-		log:         logger,
+		log:         log,
 		me:          me,
 		state:       state,
 		blocks:      blocks,
@@ -124,7 +125,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
-	identities, err := e.state.Final().Identities(identity.HasRole(flow.RoleCollection))
+	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve identities: %w", err)
 	}
@@ -198,6 +199,11 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 				if err != nil {
 					return fmt.Errorf("cannot save collection-block mapping: %w", err)
 				}
+
+				e.log.Debug().
+					Hex("block_id", logging.Entity(block)).
+					Hex("collection_id", logging.ID(guarantee.ID())).
+					Msg("requesting collection")
 
 				err = e.collectionConduit.Submit(&messages.CollectionRequest{ID: guarantee.ID()}, collectionIdentifiers...)
 				if err != nil {

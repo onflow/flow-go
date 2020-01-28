@@ -8,10 +8,18 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func PersistCommit(commitID flow.Identifier, commit flow.StateCommitment) func(*badger.Txn) error {
-	return persist(makePrefix(codeHashToStateCommitment, commitID), commit)
+func InsertCommit(blockID flow.Identifier, commit flow.StateCommitment) func(*badger.Txn) error {
+	return insert(makePrefix(codeCommit, blockID), commit)
 }
 
-func RetrieveCommit(commitID flow.Identifier, commit *flow.StateCommitment) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeHashToStateCommitment, commitID), commit)
+func RetrieveCommit(blockID flow.Identifier, commit *flow.StateCommitment) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeCommit, blockID), commit)
+}
+
+func IndexCommit(finalID flow.Identifier, commit flow.StateCommitment) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexCommit, finalID), commit)
+}
+
+func LookupCommit(finalID flow.Identifier, commit *flow.StateCommitment) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeIndexCommit, finalID), commit)
 }

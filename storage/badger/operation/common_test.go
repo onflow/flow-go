@@ -50,7 +50,6 @@ func TestInsertDuplicate(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		e := Entity{ID: 1337}
-		e2 := Entity{ID: 1338}
 		key := []byte{0x01, 0x02, 0x03}
 
 		// persist first time
@@ -61,16 +60,6 @@ func TestInsertDuplicate(t *testing.T) {
 		err = db.Update(insert(key, e))
 		require.Error(t, err)
 		require.Equal(t, err, storage.ErrAlreadyExists)
-
-		// persist again, but using different method
-		err = db.Update(persist(key, e))
-		require.NoError(t, err)
-
-		// again with different data
-		err = db.Update(persist(key, e2))
-		require.Error(t, err)
-		require.Equal(t, err, storage.ErrDataMismatch)
-
 	})
 }
 

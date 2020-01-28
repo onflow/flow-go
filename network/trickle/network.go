@@ -13,7 +13,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/trickle"
 	"github.com/dapperlabs/flow-go/model/trickle/peer"
 	"github.com/dapperlabs/flow-go/module"
@@ -120,7 +120,7 @@ func (n *Network) Address() (string, error) {
 	// get a list of other nodes that are not us, and we are not connected to
 	nodeIDs := n.top.Peers().NodeIDs()
 	nodeIDs = append(nodeIDs, n.me.NodeID())
-	ids, err := n.state.Final().Identities(identity.Not(identity.HasNodeID(nodeIDs...)))
+	ids, err := n.state.Final().Identities(filter.Not(filter.HasNodeID(nodeIDs...)))
 	if err != nil {
 		return "", errors.Wrap(err, "could not get identities")
 	}
