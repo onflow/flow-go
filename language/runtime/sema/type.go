@@ -3076,3 +3076,104 @@ func (t *TransactionType) CanHaveMembers() bool {
 func (t *TransactionType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
 	return t.Members[identifier]
 }
+
+// RestrictedResourceType
+//
+// No restrictions implies the type is fully restricted,
+// i.e. no members of the underlying resource type are available.
+//
+type RestrictedResourceType struct {
+	Type         *CompositeType
+	Restrictions []*InterfaceType
+}
+
+func (*RestrictedResourceType) isType() {}
+
+func (t *RestrictedResourceType) String() string {
+	var result strings.Builder
+	if t.Type != nil {
+		result.WriteString(string(t.Type.String()))
+	}
+	result.WriteRune('{')
+	for i, restriction := range t.Restrictions {
+		if i > 0 {
+			result.WriteString(", ")
+		}
+		result.WriteString(restriction.String())
+	}
+	result.WriteRune('}')
+	return result.String()
+}
+
+func (t *RestrictedResourceType) ID() TypeID {
+	var result strings.Builder
+	if t.Type != nil {
+		result.WriteString(string(t.Type.ID()))
+	}
+	result.WriteRune('{')
+	for i, restriction := range t.Restrictions {
+		if i > 0 {
+			result.WriteString(",")
+		}
+		result.WriteString(string(restriction.ID()))
+	}
+	result.WriteRune('}')
+	return TypeID(result.String())
+}
+
+func (t *RestrictedResourceType) Equal(other Type) bool {
+	otherRestrictedResourceType, ok := other.(*RestrictedResourceType)
+	if !ok {
+		return false
+	}
+
+	if !otherRestrictedResourceType.Type.Equal(t.Type) {
+		return false
+	}
+
+	// Check that the set of restrictions are equal; order does not matter
+
+	restrictions := t.Restrictions
+	otherRestrictions := otherRestrictedResourceType.Restrictions
+
+	count := len(restrictions)
+	if count != len(otherRestrictions) {
+		return false
+	}
+
+	otherRestrictionsByID := make(map[TypeID]bool, count)
+
+	for _, otherRestriction := range otherRestrictions {
+		otherRestrictionsByID[otherRestriction.ID()] = true
+	}
+
+	for _, restriction := range restrictions {
+		if !otherRestrictionsByID[restriction.ID()] {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (*RestrictedResourceType) IsResourceType() bool {
+	return true
+}
+
+func (*RestrictedResourceType) IsInvalidType() bool {
+	return false
+}
+
+func (t *RestrictedResourceType) CanHaveMembers() bool {
+	return true
+}
+
+func (t *RestrictedResourceType) GetMember(identifier string, r ast.Range, reportError func(error)) *Member {
+	for _, restriction := range t.Restrictions {
+		member := restriction.GetMember(identifier, r, reportError)
+		if member != nil {
+			return member
+		}
+	}
+	return nil
+}
