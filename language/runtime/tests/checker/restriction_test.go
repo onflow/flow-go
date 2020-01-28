@@ -16,7 +16,7 @@ func TestCheckRestrictedResourceType(t *testing.T) {
 		_, err := ParseAndCheckWithPanic(t, `
             resource R {}
 
-            let r: @R{} <- panic("") 
+            let r: @R{} <- panic("")
         `)
 
 		require.NoError(t, err)
@@ -30,7 +30,17 @@ func TestCheckRestrictedResourceType(t *testing.T) {
 
             resource R: I1, I2 {}
 
-            let r: @R{I1} <- panic("") 
+            let r: @R{I1} <- panic("")
+        `)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("reference to restriction", func(t *testing.T) {
+		_, err := ParseAndCheckWithPanic(t, `
+            resource R {}
+
+            let r: &R{} = panic("")
         `)
 
 		require.NoError(t, err)
@@ -43,7 +53,7 @@ func TestCheckRestrictedResourceType(t *testing.T) {
             // NOTE: R does not conform to I
             resource R {}
 
-            let r: @R{I} <- panic("") 
+            let r: @R{I} <- panic("")
         `)
 
 		errs := ExpectCheckerErrors(t, err, 1)
@@ -58,7 +68,7 @@ func TestCheckRestrictedResourceType(t *testing.T) {
             resource R: I {}
 
             // NOTE: I is duplicated
-            let r: @R{I, I} <- panic("") 
+            let r: @R{I, I} <- panic("")
         `)
 
 		errs := ExpectCheckerErrors(t, err, 1)
@@ -72,7 +82,7 @@ func TestCheckRestrictedResourceType(t *testing.T) {
 
             resource R: I {}
 
-            let r: @R{I} <- panic("") 
+            let r: @R{I} <- panic("")
         `)
 
 		errs := ExpectCheckerErrors(t, err, 2)
@@ -87,7 +97,7 @@ func TestCheckRestrictedResourceType(t *testing.T) {
 
             struct S: I {}
 
-            let r: S{I} <- panic("") 
+            let r: S{I} <- panic("")
         `)
 
 		errs := ExpectCheckerErrors(t, err, 3)
@@ -104,6 +114,18 @@ func TestCheckRestrictedResourceType(t *testing.T) {
             resource R: I {}
 
             let r: @[R]{I} <- panic("")
+        `)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidRestrictedTypeError{}, errs[0])
+	})
+
+	t.Run("resource interface restriction", func(t *testing.T) {
+		_, err := ParseAndCheckWithPanic(t, `
+            resource interface I {}
+
+            let r: @I{} <- panic("")
         `)
 
 		errs := ExpectCheckerErrors(t, err, 1)
