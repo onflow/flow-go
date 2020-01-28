@@ -35,12 +35,15 @@ func (t traceLogger) Infof(msg string, args ...interface{}) {
 }
 
 // NewTracer creates a new tracer
-func NewTracer(log zerolog.Logger, service string) (Tracer, error) {
+func NewTracer(log zerolog.Logger) (Tracer, error) {
 	cfg, err := config.FromEnv()
 	if err != nil {
 		return nil, err
 	}
-	tracer, closer, err := cfg.New(service, config.Logger(traceLogger{log}))
+	if cfg.ServiceName == "" {
+		cfg.ServiceName = "tracer"
+	}
+	tracer, closer, err := cfg.NewTracer(config.Logger(traceLogger{log}))
 	if err != nil {
 		return nil, err
 	}

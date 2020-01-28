@@ -50,7 +50,7 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 
 	stub := stub.NewNetwork(state, me, hub)
 
-	tracer, err := trace.NewTracer(log, "mock")
+	tracer, err := trace.NewTracer(log)
 	require.NoError(t, err)
 
 	return mock.GenericNode{

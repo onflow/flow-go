@@ -233,6 +233,8 @@ spec:
                 configMapKeyRef:
                   name: flow-node-config-map
                   key: entries
+            - name: JAEGER_SERVICE_NAME
+              value: collection
             - name: JAEGER_AGENT_HOST
               value: jaeger-agent
             - name: JAEGER_SAMPLER_TYPE

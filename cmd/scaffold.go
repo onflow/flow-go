@@ -152,7 +152,7 @@ func (fnb *FlowNodeBuilder) initDatabase() {
 }
 
 func (fnb *FlowNodeBuilder) initTracer() {
-	tracer, err := trace.NewTracer(fnb.Logger, "collection")
+	tracer, err := trace.NewTracer(fnb.Logger)
 	fnb.MustNot(err).Msg("could not initialize tracer")
 	fnb.Tracer = tracer
 }

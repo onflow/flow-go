@@ -39,7 +39,7 @@ func WithEngine(t *testing.T, run func(testcontext, *Engine)) {
 	var ctx testcontext
 
 	log := zerolog.New(os.Stderr)
-	tracer, err := trace.NewTracer(log, "collection")
+	tracer, err := trace.NewTracer(log)
 	require.NoError(t, err)
 
 	ctx.state = new(protocol.State)
