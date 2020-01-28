@@ -3074,7 +3074,7 @@ type RestrictedResourceType struct {
 	Restrictions []*InterfaceType
 }
 
-func (*RestrictedResourceType) isType() {}
+func (*RestrictedResourceType) IsType() {}
 
 func (t *RestrictedResourceType) String() string {
 	var result strings.Builder

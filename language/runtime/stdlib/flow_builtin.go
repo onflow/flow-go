@@ -240,7 +240,7 @@ func (*BlockType) IsInvalidType() bool {
 	return false
 }
 
-func (*BlockType) HasMembers() bool {
+func (*BlockType) CanHaveMembers() bool {
 	return true
 }
 
