@@ -175,7 +175,6 @@ func (f *LeveledForrest) getOrCreateVertexContainer(id []byte, level uint64) *ve
 
 // VerifyVertex verifies that vertex satisfies the following conditions
 // (1)
-// Can error with ErrorBlockHashCollision.
 func (f *LeveledForrest) VerifyVertex(vertex Vertex) error {
 	if vertex.Level() < f.LowestLevel {
 		return nil

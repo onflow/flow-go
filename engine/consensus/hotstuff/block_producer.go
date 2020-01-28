@@ -38,9 +38,9 @@ func (bp *BlockProposalProducer) makeBlockForView(view uint64, qcblock *types.QC
 	payloadHash := bp.mempool.NewPayloadHash()
 
 	// new block's height = parent.height + 1
-	height := qcblock.Block.Height() + 1
+	height := qcblock.Block().Height() + 1
 
-	block := types.NewBlock(view, qcblock.QC, payloadHash, height, bp.chainID)
+	block := types.NewBlock(view, qcblock.QC(), payloadHash, height, bp.chainID)
 	return block
 }
 

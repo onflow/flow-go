@@ -165,7 +165,7 @@ func (r *Finalizer) checkForByzantineQC(block *BlockContainer) error {
 			if otherChildren.HasNext() {
 				otherChild := otherChildren.NextVertex()
 				conflictingQC := otherChild.(*BlockContainer).QC()
-				return &hotstuff.ErrorByzantineSuperminority{Evidence: fmt.Sprintf(
+				return &hotstuff.ErrorByzantineThresholdExceeded{Evidence: fmt.Sprintf(
 					"conflicting QCs at view %d: %s and %s",
 					parentView, string(parentBlockID), string(conflictingQC.BlockMRH),
 				)}
@@ -288,7 +288,7 @@ func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) (*BlockC
 	if blockQC.View <= r.lastFinalizedBlockQC.View {
 		// Sanity check: the previously last Finalized Block must be an ancestor of `block`
 		if !bytes.Equal(r.lastFinalizedBlockQC.BlockMRH, blockQC.BlockMRH) {
-			return nil, &hotstuff.ErrorByzantineSuperminority{Evidence: fmt.Sprintf(
+			return nil, &hotstuff.ErrorByzantineThresholdExceeded{Evidence: fmt.Sprintf(
 				"finalizing blocks at conflicting forks: %s and %s",
 				string(blockQC.BlockMRH), string(r.lastFinalizedBlockQC.BlockMRH),
 			)}
