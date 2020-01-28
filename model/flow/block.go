@@ -13,9 +13,9 @@ func Genesis(ids IdentityList) *Block {
 
 	// create the first seal with zero references
 	seal := Seal{
-		BlockID:      ZeroID,
-		ParentCommit: nil,
-		StateCommit:  trie.Hash(trie.EmptySlice),
+		BlockID:       ZeroID,
+		PreviousState: nil,
+		FinalState:    trie.Hash(trie.EmptySlice),
 	}
 
 	// create the raw content for the genesis block

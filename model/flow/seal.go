@@ -7,21 +7,21 @@ import (
 )
 
 type Seal struct {
-	BlockID      Identifier
-	ParentCommit StateCommitment
-	StateCommit  StateCommitment
-	Signature    crypto.Signature
+	BlockID       Identifier
+	PreviousState StateCommitment
+	FinalState    StateCommitment
+	Signature     crypto.Signature
 }
 
 func (s Seal) Body() interface{} {
 	return struct {
-		BlockID      Identifier
-		ParentCommit StateCommitment
-		StateCommit  StateCommitment
+		BlockID       Identifier
+		PreviousState StateCommitment
+		FinalState    StateCommitment
 	}{
-		BlockID:      s.BlockID,
-		ParentCommit: s.ParentCommit,
-		StateCommit:  s.StateCommit,
+		BlockID:       s.BlockID,
+		PreviousState: s.PreviousState,
+		FinalState:    s.FinalState,
 	}
 }
 

@@ -11,15 +11,15 @@ type Builder struct {
 }
 
 // BuildOn provides a mock function with given fields: parentID
-func (_m *Builder) BuildOn(parentID flow.Identifier) (*flow.Block, error) {
+func (_m *Builder) BuildOn(parentID flow.Identifier) (flow.Identifier, error) {
 	ret := _m.Called(parentID)
 
-	var r0 *flow.Block
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.Block); ok {
+	var r0 flow.Identifier
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Identifier); ok {
 		r0 = rf(parentID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Block)
+			r0 = ret.Get(0).(flow.Identifier)
 		}
 	}
 

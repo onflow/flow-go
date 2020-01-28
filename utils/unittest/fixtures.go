@@ -70,17 +70,17 @@ func CollectionFixture(n int) flow.Collection {
 	return flow.Collection{Transactions: transactions}
 }
 
-func ExecutionReceiptFixture() flow.ExecutionReceipt {
-	return flow.ExecutionReceipt{
+func ExecutionReceiptFixture() *flow.ExecutionReceipt {
+	return &flow.ExecutionReceipt{
 		ExecutorID:        IdentifierFixture(),
-		ExecutionResult:   ExecutionResultFixture(),
+		ExecutionResult:   *ExecutionResultFixture(),
 		Spocks:            nil,
 		ExecutorSignature: SignatureFixture(),
 	}
 }
 
-func ExecutionResultFixture() flow.ExecutionResult {
-	return flow.ExecutionResult{
+func ExecutionResultFixture() *flow.ExecutionResult {
+	return &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			PreviousResultID: IdentifierFixture(),
 			BlockID:          IdentifierFixture(),
@@ -100,7 +100,7 @@ func WithExecutionResultID(id flow.Identifier) func(*flow.ResultApproval) {
 	}
 }
 
-func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) flow.ResultApproval {
+func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultApproval {
 	approval := flow.ResultApproval{
 		ResultApprovalBody: flow.ResultApprovalBody{
 			ExecutionResultID:    IdentifierFixture(),
@@ -116,7 +116,7 @@ func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) flow.ResultApprov
 		apply(&approval)
 	}
 
-	return approval
+	return &approval
 }
 
 func StateCommitmentFixture() flow.StateCommitment {

@@ -48,13 +48,13 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 		seal := genesis.Seals[0]
 
 		// insert the block seal commit
-		err = operation.InsertCommit(seal.BlockID, seal.StateCommit)(tx)
+		err = operation.InsertCommit(seal.BlockID, seal.FinalState)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert state commit: %w", err)
 		}
 
 		// index the block seal commit
-		err = operation.IndexCommit(genesis.ID(), seal.StateCommit)(tx)
+		err = operation.IndexCommit(genesis.ID(), seal.FinalState)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index state commit: %w", err)
 		}
@@ -120,7 +120,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		// create a lookup for each seal by parent
 		lookup := make(map[string]*flow.Seal, len(block.Seals))
 		for _, seal := range block.Seals {
-			lookup[string(seal.ParentCommit)] = seal
+			lookup[string(seal.PreviousState)] = seal
 		}
 
 		// starting with what was the state commitment at the parent block, we
@@ -136,7 +136,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 			// delete matched seal from lookup and forward to point to seal commit
 			delete(lookup, string(nextCommit))
-			nextCommit = nextSeal.StateCommit
+			nextCommit = nextSeal.FinalState
 		}
 
 		// insert the the commit state into our state commitment timeline
@@ -270,7 +270,7 @@ func checkGenesisPayload(tx *badger.Txn, payload *flow.Payload) error {
 	}
 
 	// seal should have zero ID as parent state commit
-	if seal.ParentCommit != nil {
+	if seal.PreviousState != nil {
 		return fmt.Errorf("initial seal needs nil parent commit")
 	}
 

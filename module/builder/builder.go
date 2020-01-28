@@ -11,14 +11,14 @@ import (
 	"github.com/dapperlabs/flow-go/protocol"
 )
 
-// Builder is a simply block builder.
+// Builder is a simple block payload builder.
 type Builder struct {
 	state      protocol.State
 	guarantees mempool.Guarantees
 	seals      mempool.Seals
 }
 
-// New initializes a new block builder that builds blocks using the given
+// New initializes a new block builder that builds block payloads using the given
 // protocol state and the provided memory pools.
 func New(state protocol.State, guarantees mempool.Guarantees, seals mempool.Seals) *Builder {
 	b := &Builder{
@@ -29,7 +29,7 @@ func New(state protocol.State, guarantees mempool.Guarantees, seals mempool.Seal
 	return b
 }
 
-// BuildOn creates a new block on top of the provided block.
+// BuildOn creates a new block payload on top of the provided parent.
 func (b *Builder) BuildOn(parentID flow.Identifier) (flow.Identifier, error) {
 
 	// at the moment, we simply include all new guarantees
@@ -60,7 +60,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier) (flow.Identifier, error) {
 	for {
 
 		// first, we get the seal that has the current state as parent
-		seal, err := b.seals.ByParentCommit(commit)
+		seal, err := b.seals.ByPreviousState(commit)
 		if errors.Is(err, mempool.ErrEntityNotFound) {
 			break
 		}
@@ -78,7 +78,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier) (flow.Identifier, error) {
 
 		// if it exists, we can include it and forward to next seal
 		seals = append(seals, seal)
-		commit = seal.StateCommit
+		commit = seal.FinalState
 	}
 
 	// create the block content with the collection guarantees

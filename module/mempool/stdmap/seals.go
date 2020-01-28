@@ -13,14 +13,14 @@ import (
 // used to store block seals.
 type Seals struct {
 	*Backend
-	byParent map[string]flow.Identifier
+	byPrevious map[string]flow.Identifier
 }
 
 // NewSeals creates a new memory pool for block seals.
 func NewSeals() (*Seals, error) {
 	s := &Seals{
-		Backend:  NewBackend(),
-		byParent: make(map[string]flow.Identifier),
+		Backend:    NewBackend(),
+		byPrevious: make(map[string]flow.Identifier),
 	}
 
 	return s, nil
@@ -32,7 +32,7 @@ func (s *Seals) Add(seal *flow.Seal) error {
 	if err != nil {
 		return err
 	}
-	s.byParent[string(seal.ParentCommit)] = seal.ID()
+	s.byPrevious[string(seal.PreviousState)] = seal.ID()
 	return nil
 }
 
@@ -49,10 +49,10 @@ func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	return seal, nil
 }
 
-// ByParentCommit returns the block seal associated with the given parent state
+// ByPreviousState returns the block seal associated with the given parent state
 // commitment.
-func (s *Seals) ByParentCommit(commit flow.StateCommitment) (*flow.Seal, error) {
-	sealID, ok := s.byParent[string(commit)]
+func (s *Seals) ByPreviousState(commit flow.StateCommitment) (*flow.Seal, error) {
+	sealID, ok := s.byPrevious[string(commit)]
 	if !ok {
 		return nil, mempool.ErrEntityNotFound
 	}

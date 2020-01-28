@@ -25,8 +25,8 @@ type Seals interface {
 	// error if the block seal is not in the memory pool.
 	ByID(sealID flow.Identifier) (*flow.Seal, error)
 
-	// ByParentCommit will retrieve a block seal that has the given parent state.
-	ByParentCommit(parent flow.StateCommitment) (*flow.Seal, error)
+	// ByPreviousState will retrieve a block seal that has the given parent state.
+	ByPreviousState(commit flow.StateCommitment) (*flow.Seal, error)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

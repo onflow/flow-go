@@ -203,6 +203,9 @@ func (e *Engine) matchReceipt(receipt *flow.ExecutionReceipt) error {
 	if errors.Is(err, mempool.ErrEntityNotFound) {
 		return nil
 	}
+	if err != nil {
+		return fmt.Errorf("could not query approval: %w", err)
+	}
 
 	// create the block seal if we found a match
 	err = e.createSeal(receipt, approval)
@@ -222,6 +225,9 @@ func (e *Engine) matchApproval(approval *flow.ResultApproval) error {
 	if errors.Is(err, mempool.ErrEntityNotFound) {
 		return nil
 	}
+	if err != nil {
+		return fmt.Errorf("could not query receipt: %w", err)
+	}
 
 	// create the block seal if we found a match
 	err = e.createSeal(receipt, approval)
@@ -236,11 +242,11 @@ func (e *Engine) matchApproval(approval *flow.ResultApproval) error {
 // valid, which is stored in the seal memory pool.
 func (e *Engine) createSeal(receipt *flow.ExecutionReceipt, approval *flow.ResultApproval) error {
 
-	// TODO: check that the results between execution & verification match
-	_ = approval
-
 	// get the previous result ID
-	result, err := e.results.ByID(receipt.ExecutionResult.PreviousResultID)
+	previous, err := e.results.ByID(receipt.ExecutionResult.PreviousResultID)
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("could not get previous result: %w", err)
 	}
@@ -253,9 +259,9 @@ func (e *Engine) createSeal(receipt *flow.ExecutionReceipt, approval *flow.Resul
 
 	// add the seal to the block seal memory pool
 	seal := flow.Seal{
-		BlockID:      receipt.ExecutionResult.BlockID,
-		ParentCommit: result.FinalStateCommit,
-		StateCommit:  receipt.ExecutionResult.FinalStateCommit,
+		BlockID:       receipt.ExecutionResult.BlockID,
+		PreviousState: previous.FinalStateCommit,
+		FinalState:    receipt.ExecutionResult.FinalStateCommit,
 	}
 	err = e.seals.Add(&seal)
 	if err != nil {

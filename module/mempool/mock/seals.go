@@ -64,13 +64,13 @@ func (_m *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	return r0, r1
 }
 
-// ByParentCommit provides a mock function with given fields: parent
-func (_m *Seals) ByParentCommit(parent []byte) (*flow.Seal, error) {
-	ret := _m.Called(parent)
+// ByPreviousState provides a mock function with given fields: commit
+func (_m *Seals) ByPreviousState(commit []byte) (*flow.Seal, error) {
+	ret := _m.Called(commit)
 
 	var r0 *flow.Seal
 	if rf, ok := ret.Get(0).(func([]byte) *flow.Seal); ok {
-		r0 = rf(parent)
+		r0 = rf(commit)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*flow.Seal)
@@ -79,7 +79,7 @@ func (_m *Seals) ByParentCommit(parent []byte) (*flow.Seal, error) {
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func([]byte) error); ok {
-		r1 = rf(parent)
+		r1 = rf(commit)
 	} else {
 		r1 = ret.Error(1)
 	}

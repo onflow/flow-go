@@ -32,13 +32,13 @@ func UncheckedState(db *badger.DB, identities flow.IdentityList) (*protocol.Stat
 		seal := genesis.Seals[0]
 
 		// insert the block seal commit
-		err = operation.InsertCommit(seal.BlockID, seal.StateCommit)(tx)
+		err = operation.InsertCommit(seal.BlockID, seal.FinalState)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert state commit: %w", err)
 		}
 
 		// index the block seal commit
-		err = operation.IndexCommit(genesis.ID(), seal.StateCommit)(tx)
+		err = operation.IndexCommit(genesis.ID(), seal.FinalState)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index state commit: %w", err)
 		}
