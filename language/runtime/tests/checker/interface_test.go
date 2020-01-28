@@ -10,7 +10,6 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -239,7 +238,7 @@ func TestCheckInterfaceUse(t *testing.T) {
 
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheckWithOptions(t,
+			_, err := ParseAndCheckWithPanic(t,
 				fmt.Sprintf(
 					`
                       pub %[1]s interface Test %[2]s
@@ -252,15 +251,6 @@ func TestCheckInterfaceUse(t *testing.T) {
 					kind.Annotation(),
 					kind.TransferOperator(),
 				),
-				ParseAndCheckOptions{
-					Options: []sema.Option{
-						sema.WithPredeclaredValues(
-							stdlib.StandardLibraryFunctions{
-								stdlib.PanicFunction,
-							}.ToValueDeclarations(),
-						),
-					},
-				},
 			)
 
 			require.NoError(t, err)
