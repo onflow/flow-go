@@ -86,9 +86,9 @@ func TestExecutionFlow(t *testing.T) {
 			stub.ChannelID(engine.ReceiptProvider),
 		).
 		Do(func(m *stub.PendingMessage) {
-			event, ok := m.Event.(*flow.ExecutionReceipt)
+			r, ok := m.Event.(*flow.ExecutionReceipt)
 			if ok {
-				receipt = event
+				receipt = r
 			}
 		})
 
