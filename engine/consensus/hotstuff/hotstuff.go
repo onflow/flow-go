@@ -14,6 +14,14 @@ type HotStuff interface {
 	// a fatal error occurs.
 	Start() error
 
+	// Finish causes the HotStuff event loop to gracefully exit. After this is
+	// called, no further events will be accepted into the event queue. Any
+	// events pending in the event queue will be drained and handled. Once the
+	// event queue is empty, the event loop will exit.
+	//
+	// This method blocks until the event loop exits.
+	Finish()
+
 	// SubmitProposal submits a new block proposal to the HotStuff event loop.
 	// This method blocks until the proposal is accepted to the event queue.
 	//
