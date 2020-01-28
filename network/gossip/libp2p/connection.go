@@ -37,7 +37,7 @@ func NewConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *Connection 
 	return &c
 }
 
-// Stop will Stop by closing the done channel and closing the connection.
+// stop will close the done channel and reset the stream
 func (c *Connection) stop() {
 	c.once.Do(func() {
 		close(c.done)
