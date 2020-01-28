@@ -669,11 +669,90 @@ func (checker *Checker) ConvertType(t ast.Type) Type {
 	case *ast.ReferenceType:
 		return checker.convertReferenceType(t)
 
+	case *ast.RestrictedType:
+		return checker.convertRestrictedType(t)
 	}
 
 	panic(&astTypeConversionError{invalidASTType: t})
 }
 
+func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
+	typeResult := checker.ConvertType(t.Type)
+
+	// The restricted type must be a concrete resource type
+
+	resourceType, ok := typeResult.(*CompositeType)
+	if !ok || resourceType.Kind != common.CompositeKindResource {
+		checker.report(
+			&InvalidRestrictedTypeError{
+				Type:  resourceType,
+				Range: ast.NewRangeFromPositioned(t.Type),
+			},
+		)
+	}
+
+	// Prepare a set of all the conformances of the resource
+
+	allConformances := resourceType.AllConformances()
+	conformancesSet := make(map[*InterfaceType]bool, len(allConformances))
+	for _, conformance := range allConformances {
+		conformancesSet[conformance] = true
+	}
+
+	// Convert the restrictions
+
+	restrictions := make([]*InterfaceType, len(t.Restrictions))
+	restrictionSet := make(map[*InterfaceType]bool, len(t.Restrictions))
+
+	for i, restriction := range t.Restrictions {
+		restrictionResult := checker.ConvertType(restriction)
+
+		// The restriction must be a resource interface type
+
+		interfaceType, ok := restrictionResult.(*InterfaceType)
+		if !ok || interfaceType.CompositeKind != common.CompositeKindResource {
+			checker.report(
+				&InvalidRestrictionTypeError{
+					Type:  interfaceType,
+					Range: ast.NewRangeFromPositioned(restriction),
+				},
+			)
+			continue
+		}
+
+		restrictions[i] = interfaceType
+
+		// The restriction must not be duplicated
+
+		if restrictionSet[interfaceType] {
+			checker.report(
+				&InvalidRestrictionTypeDuplicateError{
+					Type:  interfaceType,
+					Range: ast.NewRangeFromPositioned(restriction),
+				},
+			)
+		} else {
+			restrictionSet[interfaceType] = true
+		}
+
+		// The restriction must be an explicit or implicit conformance
+		// of the resource (restricted type)
+
+		if !conformancesSet[interfaceType] {
+			checker.report(
+				&InvalidNonConformanceRestrictionError{
+					Type:  interfaceType,
+					Range: ast.NewRangeFromPositioned(restriction),
+				},
+			)
+		}
+	}
+
+	return &RestrictedResourceType{
+		Type:         resourceType,
+		Restrictions: restrictions,
+	}
+}
 
 func (checker *Checker) convertReferenceType(t *ast.ReferenceType) Type {
 	ty := checker.ConvertType(t.Type)

@@ -2056,6 +2056,12 @@ func (t *CompositeType) TypeRequirements() []*CompositeType {
 	return typeRequirements
 }
 
+func (t *CompositeType) AllConformances() []*InterfaceType {
+	// TODO: also return conformances' conformances recursively
+	//   once interface can have conformances
+	return t.Conformances
+}
+
 // AccountType
 
 type AccountType struct{}
