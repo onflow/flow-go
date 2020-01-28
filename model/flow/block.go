@@ -6,22 +6,32 @@ import (
 	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
 func Genesis(ids IdentityList) *Block {
+
+	// create the first seal with zero references
+	seal := Seal{
+		BlockID:      ZeroID,
+		ParentCommit: nil,
+		StateCommit:  trie.Hash(trie.EmptySlice),
+	}
 
 	// create the raw content for the genesis block
 	payload := Payload{
 		Identities: ids,
 		Guarantees: nil,
+		Seals:      []*Seal{&seal},
 	}
 
 	// create the header
 	header := Header{
 		Number:      0,
-		Timestamp:   time.Unix(1575244800, 0),
+		Timestamp:   time.Unix(1575244800, 0).UTC(),
 		ParentID:    ZeroID,
 		PayloadHash: payload.Hash(),
+		ProposerID:  ZeroID,
 	}
 
 	// combine to block
@@ -42,7 +52,6 @@ type Block struct {
 
 // Valid will check whether the block is valid bottom-up.
 func (b Block) Valid() bool {
-	// check that the payload hash is correct
 	return b.PayloadHash == b.Payload.Hash()
 }
 
@@ -86,16 +95,17 @@ func (h Header) Checksum() Identifier {
 	return MakeID(h)
 }
 
-// Payload represents the second level of the block payload merkle tree.
+// Payload is the actual content of each block.
 type Payload struct {
 	Identities IdentityList
 	Guarantees []*CollectionGuarantee
+	Seals      []*Seal
 }
 
-// Root returns the hash of the payload.
+// Hash returns the root hash of the payload.
 func (p Payload) Hash() Identifier {
-	return ConcatSum(
-		MerkleRoot(GetIDs(p.Identities)...),
-		MerkleRoot(GetIDs(p.Guarantees)...),
-	)
+	idHash := MerkleRoot(GetIDs(p.Identities)...)
+	collHash := MerkleRoot(GetIDs(p.Guarantees)...)
+	sealHash := MerkleRoot(GetIDs(p.Seals)...)
+	return ConcatSum(idHash, collHash, sealHash)
 }

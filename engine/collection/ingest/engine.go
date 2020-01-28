@@ -9,7 +9,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
@@ -159,7 +159,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) e
 	// if the transaction is submitted locally, propagate it
 	if originID == localID {
 		log.Debug().Msg("propagating transaction to cluster")
-		targetIDs := txCluster.Filter(identity.Not(identity.HasNodeID(localID)))
+		targetIDs := txCluster.Filter(filter.Not(filter.HasNodeID(localID)))
 		err = e.con.Submit(tx, targetIDs.NodeIDs()...)
 		if err != nil {
 			return fmt.Errorf("could not route transaction to cluster: %w", err)

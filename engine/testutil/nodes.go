@@ -32,16 +32,17 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, genesis *flow.Block, options ...func(*protocol.State)) mock.GenericNode {
+func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.GenericNode {
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 
 	db := unittest.TempBadgerDB(t)
 
-	state, err := protocol.NewState(db, options...)
+	state, err := UncheckedState(db, identities)
 	require.NoError(t, err)
 
-	err = state.Mutate().Bootstrap(genesis)
-	require.NoError(t, err)
+	for _, option := range options {
+		option(state)
+	}
 
 	me, err := local.New(identity)
 	require.NoError(t, err)
@@ -58,9 +59,9 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, genesis *
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, genesis *flow.Block, options ...func(*protocol.State)) mock.CollectionNode {
+func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, options ...func(*protocol.State)) mock.CollectionNode {
 
-	node := GenericNode(t, hub, identity, genesis, options...)
+	node := GenericNode(t, hub, identity, identities, options...)
 
 	pool, err := stdmap.NewTransactions()
 	require.NoError(t, err)
@@ -88,19 +89,17 @@ func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, options ...func(*p
 		node.Role = flow.RoleCollection
 	})
 
-	genesis := flow.Genesis(identities)
-
 	nodes := make([]mock.CollectionNode, 0, len(identities))
 	for _, identity := range identities {
-		nodes = append(nodes, CollectionNode(t, hub, identity, genesis, options...))
+		nodes = append(nodes, CollectionNode(t, hub, identity, identities, options...))
 	}
 
 	return nodes
 }
 
-func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, genesis *flow.Block) mock.ConsensusNode {
+func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity) mock.ConsensusNode {
 
-	node := GenericNode(t, hub, identity, genesis)
+	node := GenericNode(t, hub, identity, identities)
 
 	guarantees, err := stdmap.NewGuarantees()
 	require.NoError(t, err)
@@ -143,18 +142,16 @@ func ConsensusNodes(t *testing.T, hub *stub.Hub, nNodes int) []mock.ConsensusNod
 		t.Log(id.String())
 	}
 
-	genesis := flow.Genesis(identities)
-
 	nodes := make([]mock.ConsensusNode, 0, len(identities))
 	for _, identity := range identities {
-		nodes = append(nodes, ConsensusNode(t, hub, identity, genesis))
+		nodes = append(nodes, ConsensusNode(t, hub, identity, identities))
 	}
 
 	return nodes
 }
 
-func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, genesis *flow.Block) mock.ExecutionNode {
-	node := GenericNode(t, hub, identity, genesis)
+func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity) mock.ExecutionNode {
+	node := GenericNode(t, hub, identity, identities)
 
 	blocksStorage := storage.NewBlocks(node.DB)
 	collectionsStorage := storage.NewCollections(node.DB)
@@ -170,11 +167,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, genesis
 	levelDB := unittest.TempLevelDB(t)
 
 	ls, err := ledger.NewTrieStorage(levelDB)
-	require.NoError(t, err)
-
-	initialStateCommitment := ls.LatestStateCommitment()
-
-	err = commitsStorage.Store(genesis.ID(), initialStateCommitment)
 	require.NoError(t, err)
 
 	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage)
@@ -221,11 +213,11 @@ func WithVerifierEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
-func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, genesis *flow.Block, opts ...VerificationOpt) mock.VerificationNode {
+func VerificationNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, opts ...VerificationOpt) mock.VerificationNode {
 
 	var err error
 	node := mock.VerificationNode{
-		GenericNode: GenericNode(t, hub, identity, genesis),
+		GenericNode: GenericNode(t, hub, identity, identities),
 	}
 
 	for _, apply := range opts {

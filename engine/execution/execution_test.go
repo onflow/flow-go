@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
@@ -13,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
+	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -57,12 +59,12 @@ func TestExecutionFlow(t *testing.T) {
 		},
 	}
 
-	exeNode := testutil.ExecutionNode(t, hub, exeID, genesis)
+	exeNode := testutil.ExecutionNode(t, hub, exeID, identities)
 	defer exeNode.Done()
 
-	colNode := testutil.GenericNode(t, hub, colID, genesis)
-	verNode := testutil.GenericNode(t, hub, verID, genesis)
-	conNode := testutil.GenericNode(t, hub, conID, genesis)
+	colNode := testutil.GenericNode(t, hub, colID, identities)
+	verNode := testutil.GenericNode(t, hub, verID, identities)
+	conNode := testutil.GenericNode(t, hub, conID, identities)
 
 	colEngine := new(network.Engine)
 	colConduit, _ := colNode.Net.Register(engine.CollectionProvider, colEngine)
@@ -108,6 +110,10 @@ func TestExecutionFlow(t *testing.T) {
 		}).
 		Return(nil).
 		Once()
+
+	guarantees := badger.NewGuarantees(exeNode.DB)
+	err := guarantees.Store(&guarantee)
+	require.NoError(t, err)
 
 	// submit block from consensus node
 	exeNode.BlocksEngine.Submit(conID.NodeID, block)

@@ -8,7 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -121,7 +121,7 @@ func (e *Engine) broadcastExecutionReceipt(receipt *flow.ExecutionReceipt) error
 		Hex("receipt_id", logging.Entity(receipt)).
 		Msg("broadcasting execution receipt")
 
-	identities, err := e.state.Final().Identities(identity.HasRole(flow.RoleConsensus, flow.RoleVerification))
+	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus, flow.RoleVerification))
 	if err != nil {
 		return fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}
