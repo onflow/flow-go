@@ -2,6 +2,7 @@
 package crypto
 
 import (
+	goecdsa "crypto/ecdsa"
 	"crypto/elliptic"
 	"fmt"
 	"strconv"
@@ -129,6 +130,8 @@ type PrivateKey interface {
 	KeySize() int
 	// Sign generates a signature using the provided hasher.
 	Sign([]byte, Hasher) (Signature, error)
+
+	SignData([]byte) (Signature, error)
 	// PublicKey returns the public key.
 	PublicKey() PublicKey
 	// Encode returns a bytes representation of the private key
@@ -143,6 +146,11 @@ type PublicKey interface {
 	KeySize() int
 	// Verify verifies a signature using the provided hasher.
 	Verify(Signature, []byte, Hasher) (bool, error)
+
+	VerifyData(Signature, []byte) (bool, error)
 	// Encode returns a bytes representation of the public key.
 	Encode() ([]byte, error)
+
+	Get() *goecdsa.PublicKey
+
 }

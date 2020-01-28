@@ -55,6 +55,11 @@ func (sk *PrKeyECDSA) Sign(data []byte, alg Hasher) (Signature, error) {
 	return sk.signHash(h)
 }
 
+func (sk *PrKeyECDSA) SignData(b []byte) (Signature, error) {
+	return sk.signHash(b)
+}
+
+
 // verifyHash implements ECDSA signature verification
 func (pk *PubKeyECDSA) verifyHash(sig Signature, h Hash) (bool, error) {
 	var r big.Int
@@ -73,6 +78,11 @@ func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg Hasher) (bool, err
 	h := alg.ComputeHash(data)
 	return pk.verifyHash(sig, h)
 }
+
+func (pk *PubKeyECDSA)  VerifyData(sig Signature, h []byte) (bool, error) {
+	return pk.verifyHash(sig, h)
+}
+
 
 // GeneratePrKey generates a private key for ECDSA
 // This is only a test function!
@@ -263,4 +273,8 @@ func (pk *PubKeyECDSA) Encode() ([]byte, error) {
 		return pk.rawEncode()
 	}
 	return nil, cryptoError{"curve is not supported"}
+}
+
+func (pk *PubKeyECDSA) Get() *goecdsa.PublicKey {
+	return pk.goPubKey
 }
