@@ -13,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/parser"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 )
 
 // TestLocation is used as the default location for programs in tests.
@@ -120,19 +119,4 @@ func AssertEqualWithDiff(t *testing.T, expected, actual interface{}) {
 			"actual  : %s\n\n"+
 			"%s", expected, actual, s.String()))
 	}
-}
-
-func ParseAndCheckWithPanic(t *testing.T, code string) (*sema.Checker, error) {
-	return ParseAndCheckWithOptions(t,
-		code,
-		ParseAndCheckOptions{
-			Options: []sema.Option{
-				sema.WithPredeclaredValues(
-					stdlib.StandardLibraryFunctions{
-						stdlib.PanicFunction,
-					}.ToValueDeclarations(),
-				),
-			},
-		},
-	)
 }

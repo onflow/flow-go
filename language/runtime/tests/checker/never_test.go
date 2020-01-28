@@ -3,9 +3,7 @@ package checker
 import (
 	"testing"
 
-	require "github.com/stretchr/testify/require"
-
-	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCheckNever(t *testing.T) {
