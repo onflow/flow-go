@@ -65,6 +65,14 @@ type ExecutionNode struct {
 	State           state.ExecutionState
 }
 
+func (en ExecutionNode) Done() {
+	<-en.BlocksEngine.Done()
+	<-en.ExecutionEngine.Done()
+	<-en.ReceiptsEngine.Done()
+	en.BadgerDB.Close()
+	en.LevelDB.SafeClose()
+}
+
 // VerificationNode implements an in-process verification node for tests.
 type VerificationNode struct {
 	GenericNode

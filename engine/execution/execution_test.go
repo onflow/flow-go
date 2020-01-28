@@ -5,12 +5,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
+	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -21,17 +23,11 @@ func TestExecutionFlow(t *testing.T) {
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
-	identities := flow.IdentityList{colID, conID, exeID}
+	identities := flow.IdentityList{colID, conID, exeID, verID}
 
 	genesis := flow.Genesis(identities)
-
-	exeNode := testutil.ExecutionNode(t, hub, exeID, genesis)
-
-	defer func() {
-		exeNode.BadgerDB.Close()
-		exeNode.LevelDB.SafeClose()
-	}()
 
 	tx1 := flow.TransactionBody{
 		Script: []byte("transaction { execute {} }"),
@@ -61,43 +57,59 @@ func TestExecutionFlow(t *testing.T) {
 		},
 	}
 
-	net, ok := hub.GetNetwork(exeNode.Me.NodeID())
+	exeNode := testutil.ExecutionNode(t, hub, exeID, genesis)
+	defer exeNode.Done()
+
+	colNode := testutil.GenericNode(t, hub, colID, genesis)
+	verNode := testutil.GenericNode(t, hub, verID, genesis)
+
+	colEngine := new(network.Engine)
+	colConduit, _ := colNode.Net.Register(engine.CollectionProvider, colEngine)
+	colEngine.On("Process", exeID.NodeID, mock.Anything).
+		Run(func(args mock.Arguments) {
+			originID, _ := args[0].(flow.Identifier)
+			req, _ := args[1].(*messages.CollectionRequest)
+
+			assert.Equal(t, col.ID(), req.ID)
+
+			res := &messages.CollectionResponse{
+				Collection: col,
+			}
+
+			err := colConduit.Submit(res, originID)
+			assert.NoError(t, err)
+		}).
+		Return(nil).
+		Once()
+
+	verEngine := new(network.Engine)
+	_, _ = verNode.Net.Register(engine.ReceiptProvider, verEngine)
+	verEngine.On("Process", exeID.NodeID, mock.Anything).
+		Run(func(args mock.Arguments) {
+			req, _ := args[1].(*flow.ExecutionReceipt)
+
+			assert.Equal(t, block.ID(), req.ExecutionResult.BlockID)
+		}).
+		Return(nil).
+		Once()
+
+	exeNet, ok := hub.GetNetwork(exeNode.Me.NodeID())
 	require.True(t, ok)
 
-	// intercept collection request message
-	net.
-		OnMessage(
-			stub.FromID(exeNode.Me.NodeID()),
-			stub.ChannelID(engine.CollectionProvider),
-		).
-		Do(func(m *stub.PendingMessage) {
-			// submit collection from collection node
-			exeNode.BlocksEngine.Submit(colID.NodeID, &messages.CollectionResponse{
-				Collection: col,
-			})
-		})
-
-	var receipt *flow.ExecutionReceipt
-
-	// intercept receipt broadcast message
-	net.
-		OnMessage(
-			stub.FromID(exeNode.Me.NodeID()),
-			stub.ChannelID(engine.ReceiptProvider),
-		).
-		Do(func(m *stub.PendingMessage) {
-			r, ok := m.Event.(*flow.ExecutionReceipt)
-			if ok {
-				receipt = r
-			}
-		})
+	colNet, ok := hub.GetNetwork(colNode.Me.NodeID())
+	require.True(t, ok)
 
 	// submit block from consensus node
 	exeNode.BlocksEngine.Submit(conID.NodeID, block)
 
 	assert.Eventually(t, func() bool {
-		return receipt != nil
+		exeNet.DeliverAllRecursive()
+		colNet.DeliverAllRecursive()
+		return colEngine.AssertExpectations(t)
 	}, time.Second*3, time.Millisecond*500)
 
-	assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
+	assert.Eventually(t, func() bool {
+		exeNet.DeliverAllRecursive()
+		return verEngine.AssertExpectations(t)
+	}, time.Second*3, time.Millisecond*500)
 }
