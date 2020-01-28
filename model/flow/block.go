@@ -42,13 +42,8 @@ type Block struct {
 
 // Valid will check whether the block is valid bottom-up.
 func (b Block) Valid() bool {
-
 	// check that the payload hash is correct
-	if b.PayloadHash != b.Payload.Hash() {
-		return false
-	}
-
-	return true
+	return b.PayloadHash == b.Payload.Hash()
 }
 
 // Header contains all meta-data for a block, as well as a hash representing

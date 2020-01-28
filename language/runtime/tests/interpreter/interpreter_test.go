@@ -6737,9 +6737,9 @@ const fungibleTokenContract = `
              return <-create Vault(balance: amount)
          }
 
-         pub fun deposit(from: @Vault) {
-            self.balance = self.balance + from.balance
-            destroy from
+         pub fun deposit(vault: @Vault) {
+            self.balance = self.balance + vault.balance
+            destroy vault
          }
      }
 
@@ -6765,7 +6765,7 @@ func TestInterpretFungibleTokenContract(t *testing.T) {
           let receiver <- ExampleToken.sprout()
 
           let withdrawn <- publisher.withdraw(amount: 60)
-          receiver.deposit(from: <-withdrawn)
+          receiver.deposit(vault: <-withdrawn)
 
           let publisherBalance = publisher.balance
           let receiverBalance = receiver.balance
