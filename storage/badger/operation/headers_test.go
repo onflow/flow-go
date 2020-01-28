@@ -22,7 +22,8 @@ func TestHeaderInsertRetrieve(t *testing.T) {
 			Timestamp:   time.Now().UTC(),
 			ParentID:    flow.Identifier{0x11},
 			PayloadHash: flow.Identifier{0x22},
-			Signatures:  []crypto.Signature{{0x99}},
+			ProposerID:  flow.Identifier{0x33},
+			ParentSigs:  []crypto.Signature{{0x99}},
 		}
 		blockID := expected.ID()
 

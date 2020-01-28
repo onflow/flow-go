@@ -130,10 +130,10 @@ func generateExecutionResultForBlock(
 	return &flow.ExecutionResult{
 		ExecutionResultBody: flow.ExecutionResultBody{
 			// TODO: populate with real value
-			PreviousResultID:     flow.ZeroID,
-			BlockID:              block.Block.ID(),
-			FinalStateCommitment: endState,
-			Chunks:               chunks,
+			PreviousResultID: flow.ZeroID,
+			BlockID:          block.Block.ID(),
+			FinalStateCommit: endState,
+			Chunks:           chunks,
 		},
 	}
 }

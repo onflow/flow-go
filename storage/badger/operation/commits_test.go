@@ -16,7 +16,7 @@ func TestStateCommitments(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		expected := unittest.StateCommitmentFixture()
 		id := unittest.IdentifierFixture()
-		err := db.Update(PersistCommit(id, expected))
+		err := db.Update(InsertCommit(id, expected))
 		require.Nil(t, err)
 
 		var actual flow.StateCommitment

@@ -19,7 +19,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestExecutionEngine_OnCompleteBlock(t *testing.T) {
+func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 	tx1 := flow.TransactionBody{
 		Script: []byte("transaction { execute {} }"),
 	}

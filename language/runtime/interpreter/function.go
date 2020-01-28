@@ -41,7 +41,7 @@ type InterpretedFunctionValue struct {
 	PostConditions   ast.Conditions
 }
 
-func (InterpretedFunctionValue) isValue() {}
+func (InterpretedFunctionValue) IsValue() {}
 
 func (f InterpretedFunctionValue) Copy() Value {
 	return f
@@ -79,7 +79,7 @@ func NewHostFunctionValue(
 	}
 }
 
-func (HostFunctionValue) isValue() {}
+func (HostFunctionValue) IsValue() {}
 
 func (f HostFunctionValue) Copy() Value {
 	return f
@@ -115,7 +115,7 @@ type BoundFunctionValue struct {
 	Self     *CompositeValue
 }
 
-func (BoundFunctionValue) isValue() {}
+func (BoundFunctionValue) IsValue() {}
 
 func (f BoundFunctionValue) Copy() Value {
 	return f
