@@ -1,6 +1,9 @@
 package hotstuff
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+import (
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"go.uber.org/atomic"
+)
 
 type EventLoop struct {
 	eventHandler *EventHandler
@@ -8,6 +11,7 @@ type EventLoop struct {
 	blockproposals chan *types.BlockProposal
 	votes          chan *types.Vote
 	blockreqs      chan *types.BlockProposalRequest
+	started        *atomic.Bool
 }
 
 func (el *EventLoop) loop() {
@@ -38,3 +42,15 @@ func (el *EventLoop) OnReceiveBlockProposal(block *types.BlockProposal) {
 func (el *EventLoop) OnReceiveVote(vote *types.Vote) {
 	el.votes <- vote
 }
+
+func (el *EventLoop) Start() error {
+	if el.started.Swap(true) {
+		return nil
+	}
+	el.eventHandler.paceMaker.Start() // start Pacemaker;
+	// Wait with starting EventLoop until Pacemaker is started, i.e. above call returned
+	el.eventHandler.startNewView()
+	el.loop()
+	return nil
+}
+

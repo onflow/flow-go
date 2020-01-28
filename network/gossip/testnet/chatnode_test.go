@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dapperlabs/flow-go/network/gossip"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dapperlabs/flow-go/network/gossip"
 )
 
 // TestChatNodeOneToAll initializes chatNodes and sends messages using gossip from each node to

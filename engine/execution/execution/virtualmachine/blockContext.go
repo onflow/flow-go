@@ -17,9 +17,21 @@ type BlockContext interface {
 	ExecuteScript(ledger Ledger, script []byte) (*ScriptResult, error)
 }
 
+// NewBlockContext creates a new block context given a runtime and block.
+func NewBlockContext(rt runtime.Runtime, header *flow.Header) BlockContext {
+	vm := &virtualMachine{
+		rt: rt,
+	}
+
+	return &blockContext{
+		vm:     vm,
+		header: header,
+	}
+}
+
 type blockContext struct {
-	vm    *virtualMachine
-	block *flow.Block
+	vm     *virtualMachine
+	header *flow.Header
 }
 
 func (bc *blockContext) newTransactionContext(ledger Ledger, tx *flow.TransactionBody) *transactionContext {

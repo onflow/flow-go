@@ -17,7 +17,7 @@ import (
 // Round keeps track of the current consensus state.
 type Round struct {
 	parent       *flow.Header
-	leader       flow.Identity
+	leader       *flow.Identity
 	quorum       uint64
 	participants flow.IdentityList
 	candidate    *flow.Block
@@ -80,7 +80,7 @@ func (r *Round) Quorum() uint64 {
 }
 
 // Leader returns the the leader of the current round.
-func (r *Round) Leader() flow.Identity {
+func (r *Round) Leader() *flow.Identity {
 	return r.leader
 }
 

@@ -41,7 +41,7 @@ func TestExecutionEngine_OnCompleteBlock(t *testing.T) {
 		Header: flow.Header{
 			Number: 42,
 		},
-		Content: flow.Content{
+		Payload: flow.Payload{
 			Guarantees: []*flow.CollectionGuarantee{&guarantee},
 		},
 	}

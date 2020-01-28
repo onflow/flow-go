@@ -185,7 +185,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 	err = e.mempool.Run(func(backdata *Backdata) error {
 		for _, guarantee := range block.Guarantees {
-			completeBlock, err := backdata.Get(guarantee.ID())
+			completeBlock, err := backdata.ByID(guarantee.ID())
 			if err == mempool.ErrEntityNotFound {
 				emptyCompleteBlock.CompleteCollections[guarantee.ID()] = &execution.CompleteCollection{
 					Guarantee:    guarantee,
@@ -230,7 +230,7 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 	collID := collection.ID()
 
 	return e.mempool.Run(func(backdata *Backdata) error {
-		completeBlock, err := backdata.Get(collID)
+		completeBlock, err := backdata.ByID(collID)
 		if err == nil {
 			if completeCollection, ok := completeBlock.Block.CompleteCollections[collID]; ok {
 				if completeCollection.Transactions == nil {

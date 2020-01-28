@@ -41,6 +41,9 @@ func NewConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *Connection 
 func (c *Connection) Stop() {
 	c.once.Do(func() {
 		close(c.done)
-		c.stream.Close()
+		// Close the underlying libp2p stream
+		if err := c.stream.Reset(); err != nil {
+			c.log.Err(err).Msg("Error resetting connection stream")
+		}
 	})
 }

@@ -38,7 +38,7 @@ func TestTransactionPool(t *testing.T) {
 	})
 
 	t.Run("should be able to get first", func(t *testing.T) {
-		got, err := pool.Get(item1.ID())
+		got, err := pool.ByID(item1.ID())
 		assert.NoError(t, err)
 		assert.Equal(t, item1, got)
 	})

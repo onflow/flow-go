@@ -4,9 +4,10 @@ import (
 	"context"
 	"sync"
 
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 )
 
 type ReadSubscription struct {

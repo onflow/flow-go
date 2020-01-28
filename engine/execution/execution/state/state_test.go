@@ -26,11 +26,11 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 			ctrl := gomock.NewController(t)
 
-			stateCommitments := mocks.NewMockStateCommitments(ctrl)
+			stateCommitments := mocks.NewMockCommits(ctrl)
 
 			stateCommitment := unittest.StateCommitmentFixture()
 
-			stateCommitments.EXPECT().ByID(gomock.Any()).Return(&stateCommitment, nil)
+			stateCommitments.EXPECT().ByBlockID(gomock.Any()).Return(stateCommitment, nil)
 
 			chunkHeaders := new(storage.ChunkHeaders)
 
@@ -142,7 +142,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 func TestState_GetChunkRegisters(t *testing.T) {
 	t.Run("non-existent chunk", func(t *testing.T) {
 		ls := new(storage.Ledger)
-		sc := new(storage.StateCommitments)
+		sc := new(storage.Commits)
 		ch := new(storage.ChunkHeaders)
 
 		chunkID := unittest.IdentifierFixture()
@@ -158,7 +158,7 @@ func TestState_GetChunkRegisters(t *testing.T) {
 
 	t.Run("ledger storage error", func(t *testing.T) {
 		ls := new(storage.Ledger)
-		sc := new(storage.StateCommitments)
+		sc := new(storage.Commits)
 		ch := new(storage.ChunkHeaders)
 
 		chunkHeader := unittest.ChunkHeaderFixture()
@@ -182,7 +182,7 @@ func TestState_GetChunkRegisters(t *testing.T) {
 
 	t.Run("existing chunk", func(t *testing.T) {
 		ls := new(storage.Ledger)
-		sc := new(storage.StateCommitments)
+		sc := new(storage.Commits)
 		ch := new(storage.ChunkHeaders)
 
 		chunkHeader := unittest.ChunkHeaderFixture()

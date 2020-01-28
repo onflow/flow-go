@@ -126,7 +126,7 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 	}
 	identifierToID := make(map[flow.Identifier]flow.Identity)
 	for _, id := range ids {
-		identifierToID[id.NodeID] = id
+		identifierToID[id.NodeID] = *id
 	}
 	return identifierToID, nil
 }

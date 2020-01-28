@@ -26,7 +26,7 @@ type Snapshot struct {
 func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList, error) {
 
 	// execute the transaction that retrieves everything
-	var ids flow.IdentityList
+	var identities flow.IdentityList
 	err := s.state.db.View(func(tx *badger.Txn) error {
 
 		// check if height is max uint64 to get latest finalized state
@@ -68,20 +68,20 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 			for head.ID() != finalID {
 
 				// get the identities for pending block
-				var ids flow.IdentityList
-				err = operation.RetrieveIdentities(head.ID(), &ids)(tx)
+				var identities flow.IdentityList
+				err = operation.RetrieveIdentities(head.ID(), &identities)(tx)
 				if err != nil {
 					return fmt.Errorf("could not add deltas: %w", err)
 				}
 
-				// manually add the deltas for valid ids
-				for _, id := range ids {
+				// manually add the deltas for valid identities
+				for _, identity := range identities {
 					for _, filter := range filters {
-						if !filter(id) {
+						if !filter(identity) {
 							continue
 						}
 					}
-					deltas[id.NodeID] += int64(id.Stake)
+					deltas[identity.NodeID] += int64(identity.Stake)
 				}
 
 				// set the head to the parent
@@ -102,47 +102,47 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 			}
 
 			// create the identity
-			id := flow.Identity{
+			identity := flow.Identity{
 				NodeID: nodeID,
 				Stake:  uint64(delta),
 			}
 
 			// retrieve the identity role
-			err = operation.RetrieveRole(id.NodeID, &id.Role)(tx)
+			err = operation.RetrieveRole(identity.NodeID, &identity.Role)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve role (%x): %w", nodeID, err)
 			}
 
 			// retrieve the identity address
-			err = operation.RetrieveAddress(id.NodeID, &id.Address)(tx)
+			err = operation.RetrieveAddress(identity.NodeID, &identity.Address)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve address (%x): %w", nodeID, err)
 			}
 
-			ids = append(ids, id)
+			identities = append(identities, &identity)
 		}
 
-		sort.Slice(ids, func(i int, j int) bool {
-			return identity.ByNodeIDAsc(ids[i], ids[j])
+		sort.Slice(identities, func(i int, j int) bool {
+			return identity.ByNodeIDAsc(identities[i], identities[j])
 		})
 
 		return nil
 	})
 
-	return ids, err
+	return identities, err
 }
 
-func (s *Snapshot) Identity(nodeID flow.Identifier) (flow.Identity, error) {
+func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 
 	// get the ids
 	ids, err := s.Identities(identity.HasNodeID(nodeID))
 	if err != nil {
-		return flow.Identity{}, fmt.Errorf("could not get identities: %w", err)
+		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
 
 	// return error if he doesn't exist
 	if len(ids) == 0 {
-		return flow.Identity{}, fmt.Errorf("identity not staked (%x)", nodeID)
+		return nil, fmt.Errorf("identity not staked (%x)", nodeID)
 	}
 
 	return ids[0], nil

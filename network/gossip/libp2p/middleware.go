@@ -236,9 +236,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	m.wg.Add(1)
 	defer m.wg.Done()
 
-	// make sure we close the connection when we are done handling the peer
-	defer s.Close()
-
 	log := m.log.With().
 		Str("local_addr", s.Conn().LocalPeer().String()).
 		Str("remote_addr", s.Conn().RemotePeer().String()).
@@ -246,6 +243,9 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// initialize the encoder/decoder and create the connection handler
 	conn := NewReadConnection(log, s)
+
+	// make sure we close the connection when we are done handling the peer
+	defer conn.Stop()
 
 	log.Info().Msg("incoming connection established")
 
@@ -337,7 +337,7 @@ func getSenderID(msg *message.Message) (flow.Identifier, error) {
 		err := fmt.Errorf("invalid sender id")
 		return flow.ZeroID, err
 	}
-	var senderID [32]byte
-	copy(senderID[:], msg.OriginID)
-	return senderID, nil
+	var id flow.Identifier
+	copy(id[:], msg.OriginID)
+	return id, nil
 }

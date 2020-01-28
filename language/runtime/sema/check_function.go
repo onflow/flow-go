@@ -10,10 +10,9 @@ func (checker *Checker) VisitFunctionDeclaration(declaration *ast.FunctionDeclar
 	return checker.visitFunctionDeclaration(
 		declaration,
 		functionDeclarationOptions{
-			mustExit:                true,
-			declareFunction:         true,
-			checkResourceLoss:       true,
-			allowAuthAccessModifier: false,
+			mustExit:          true,
+			declareFunction:   true,
+			checkResourceLoss: true,
 		},
 	)
 }
@@ -30,8 +29,6 @@ type functionDeclarationOptions struct {
 	// checkResourceLoss if the function should be checked for resource loss.
 	// For example, function declarations in interfaces should not be checked.
 	checkResourceLoss bool
-	// allowAuthAccessModifier if the function may have the authorized access modifier
-	allowAuthAccessModifier bool
 }
 
 func (checker *Checker) visitFunctionDeclaration(
@@ -44,7 +41,6 @@ func (checker *Checker) visitFunctionDeclaration(
 		declaration.DeclarationKind(),
 		declaration.StartPos,
 		true,
-		options.allowAuthAccessModifier,
 	)
 
 	// global functions were previously declared, see `declareFunctionDeclaration`
@@ -77,7 +73,7 @@ func (checker *Checker) declareFunctionDeclaration(
 	declaration *ast.FunctionDeclaration,
 	functionType *FunctionType,
 ) {
-	argumentLabels := declaration.ParameterList.ArgumentLabels()
+	argumentLabels := declaration.ParameterList.EffectiveArgumentLabels()
 
 	variable, err := checker.valueActivations.Declare(
 		declaration.Identifier.Identifier,

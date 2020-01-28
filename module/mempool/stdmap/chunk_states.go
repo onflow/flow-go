@@ -27,9 +27,9 @@ func (a *ChunkStates) Add(chunkState *flow.ChunkState) error {
 	return a.Backend.Add(chunkState)
 }
 
-// Get returns the chunk state with the given ID from the mempool.
-func (a *ChunkStates) Get(chunkID flow.Identifier) (*flow.ChunkState, error) {
-	entity, err := a.Backend.Get(chunkID)
+// ByID returns the chunk state with the given ID from the mempool.
+func (a *ChunkStates) ByID(chunkID flow.Identifier) (*flow.ChunkState, error) {
+	entity, err := a.Backend.ByID(chunkID)
 	if err != nil {
 		return nil, err
 	}
