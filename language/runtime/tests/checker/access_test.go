@@ -70,12 +70,9 @@ func TestCheckAccessModifierCompositeFunctionDeclaration(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKindsWithBody {
 
-		isAuthAllowed := compositeKind == common.CompositeKindResource
-
 		tests := map[ast.Access]bool{
 			ast.AccessNotSpecified:   true,
 			ast.AccessPrivate:        true,
-			ast.AccessAuthorized:     isAuthAllowed,
 			ast.AccessPublic:         true,
 			ast.AccessPublicSettable: false,
 		}
@@ -133,7 +130,6 @@ func TestCheckAccessModifierCompositeConstantFieldDeclaration(t *testing.T) {
 	tests := map[ast.Access]bool{
 		ast.AccessNotSpecified:   true,
 		ast.AccessPrivate:        true,
-		ast.AccessAuthorized:     true,
 		ast.AccessPublic:         true,
 		ast.AccessPublicSettable: false,
 	}
@@ -237,7 +233,6 @@ func TestCheckAccessModifierGlobalFunctionDeclaration(t *testing.T) {
 	tests := map[ast.Access]bool{
 		ast.AccessNotSpecified:   true,
 		ast.AccessPrivate:        true,
-		ast.AccessAuthorized:     false,
 		ast.AccessPublic:         true,
 		ast.AccessPublicSettable: false,
 	}
@@ -273,7 +268,6 @@ func TestCheckAccessModifierGlobalVariableDeclaration(t *testing.T) {
 	tests := map[ast.Access]bool{
 		ast.AccessNotSpecified:   true,
 		ast.AccessPrivate:        true,
-		ast.AccessAuthorized:     false,
 		ast.AccessPublic:         true,
 		ast.AccessPublicSettable: true,
 	}
@@ -309,7 +303,6 @@ func TestCheckAccessModifierGlobalConstantDeclaration(t *testing.T) {
 	tests := map[ast.Access]bool{
 		ast.AccessNotSpecified:   true,
 		ast.AccessPrivate:        true,
-		ast.AccessAuthorized:     false,
 		ast.AccessPublic:         true,
 		ast.AccessPublicSettable: false,
 	}
@@ -345,7 +338,6 @@ func TestCheckAccessModifierLocalVariableDeclaration(t *testing.T) {
 	tests := map[ast.Access]bool{
 		ast.AccessNotSpecified:   true,
 		ast.AccessPrivate:        false,
-		ast.AccessAuthorized:     false,
 		ast.AccessPublic:         false,
 		ast.AccessPublicSettable: false,
 	}
@@ -393,7 +385,6 @@ func TestCheckAccessModifierLocalOptionalBinding(t *testing.T) {
 	tests := map[ast.Access]bool{
 		ast.AccessNotSpecified:   true,
 		ast.AccessPrivate:        false,
-		ast.AccessAuthorized:     false,
 		ast.AccessPublic:         false,
 		ast.AccessPublicSettable: false,
 	}
@@ -432,7 +423,6 @@ func TestCheckAccessModifierLocalFunctionDeclaration(t *testing.T) {
 	tests := map[ast.Access]bool{
 		ast.AccessNotSpecified:   true,
 		ast.AccessPrivate:        false,
-		ast.AccessAuthorized:     false,
 		ast.AccessPublic:         false,
 		ast.AccessPublicSettable: false,
 	}
@@ -483,28 +473,24 @@ func TestCheckAccessModifierGlobalCompositeDeclaration(t *testing.T) {
 		sema.AccessCheckModeStrict: {
 			ast.AccessNotSpecified:   expectMissingAccessModifierError,
 			ast.AccessPrivate:        expectInvalidAccessModifierError,
-			ast.AccessAuthorized:     expectInvalidAccessModifierError,
 			ast.AccessPublic:         expectSuccess,
 			ast.AccessPublicSettable: expectInvalidAccessModifierError,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
 			ast.AccessNotSpecified:   expectMissingAccessModifierError,
 			ast.AccessPrivate:        expectInvalidAccessModifierError,
-			ast.AccessAuthorized:     expectInvalidAccessModifierError,
 			ast.AccessPublic:         expectSuccess,
 			ast.AccessPublicSettable: expectInvalidAccessModifierError,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectInvalidAccessModifierError,
-			ast.AccessAuthorized:     expectInvalidAccessModifierError,
 			ast.AccessPublic:         expectSuccess,
 			ast.AccessPublicSettable: expectInvalidAccessModifierError,
 		},
 		sema.AccessCheckModeNone: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectInvalidAccessModifierError,
-			ast.AccessAuthorized:     expectInvalidAccessModifierError,
 			ast.AccessPublic:         expectSuccess,
 			ast.AccessPublicSettable: expectInvalidAccessModifierError,
 		},
@@ -681,38 +667,28 @@ func TestCheckAccessCompositeFunction(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKindsWithBody {
 
-		isAuthAllowed := compositeKind == common.CompositeKindResource
-		authExpectation := expectSuccess
-		if !isAuthAllowed {
-			authExpectation = nil
-		}
-
 		checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
 			sema.AccessCheckModeStrict: {
 				ast.AccessNotSpecified:   nil,
 				ast.AccessPrivate:        expectInvalidAccessError,
-				ast.AccessAuthorized:     authExpectation,
 				ast.AccessPublic:         expectSuccess,
 				ast.AccessPublicSettable: nil,
 			},
 			sema.AccessCheckModeNotSpecifiedRestricted: {
 				ast.AccessNotSpecified:   expectInvalidAccessError,
 				ast.AccessPrivate:        expectInvalidAccessError,
-				ast.AccessAuthorized:     authExpectation,
 				ast.AccessPublic:         expectSuccess,
 				ast.AccessPublicSettable: nil,
 			},
 			sema.AccessCheckModeNotSpecifiedUnrestricted: {
 				ast.AccessNotSpecified:   expectSuccess,
 				ast.AccessPrivate:        expectInvalidAccessError,
-				ast.AccessAuthorized:     authExpectation,
 				ast.AccessPublic:         expectSuccess,
 				ast.AccessPublicSettable: nil,
 			},
 			sema.AccessCheckModeNone: {
 				ast.AccessNotSpecified:   expectSuccess,
 				ast.AccessPrivate:        expectSuccess,
-				ast.AccessAuthorized:     authExpectation,
 				ast.AccessPublic:         expectSuccess,
 				ast.AccessPublicSettable: nil,
 			},
@@ -796,38 +772,28 @@ func TestCheckAccessInterfaceFunction(t *testing.T) {
 
 	for _, compositeKind := range common.CompositeKindsWithBody {
 
-		isAuthAllowed := compositeKind == common.CompositeKindResource
-		authExpectation := expectSuccess
-		if !isAuthAllowed {
-			authExpectation = nil
-		}
-
 		checkModeTests := map[sema.AccessCheckMode]map[ast.Access]func(*testing.T, error){
 			sema.AccessCheckModeStrict: {
 				ast.AccessNotSpecified:   nil,
 				ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
-				ast.AccessAuthorized:     authExpectation,
 				ast.AccessPublic:         expectSuccess,
 				ast.AccessPublicSettable: nil,
 			},
 			sema.AccessCheckModeNotSpecifiedRestricted: {
 				ast.AccessNotSpecified:   expectInvalidAccessError,
 				ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
-				ast.AccessAuthorized:     authExpectation,
 				ast.AccessPublic:         expectSuccess,
 				ast.AccessPublicSettable: nil,
 			},
 			sema.AccessCheckModeNotSpecifiedUnrestricted: {
 				ast.AccessNotSpecified:   expectSuccess,
 				ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
-				ast.AccessAuthorized:     authExpectation,
 				ast.AccessPublic:         expectSuccess,
 				ast.AccessPublicSettable: nil,
 			},
 			sema.AccessCheckModeNone: {
 				ast.AccessNotSpecified:   expectSuccess,
 				ast.AccessPrivate:        expectConformanceError,
-				ast.AccessAuthorized:     authExpectation,
 				ast.AccessPublic:         expectSuccess,
 				ast.AccessPublicSettable: nil,
 			},
@@ -918,7 +884,6 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
 		sema.AccessCheckModeStrict: {
 			ast.AccessNotSpecified:   nil,
 			ast.AccessPrivate:        expectInvalidAccessError,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectSuccess,
 			ast.AccessPublicSettable: expectSuccess,
 		},
@@ -926,21 +891,18 @@ func TestCheckAccessCompositeFieldRead(t *testing.T) {
 			ast.AccessNotSpecified:   expectInvalidAccessError,
 			ast.AccessPrivate:        expectInvalidAccessError,
 			ast.AccessPublic:         expectSuccess,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectInvalidAccessError,
 			ast.AccessPublic:         expectSuccess,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectSuccess,
 			ast.AccessPublic:         expectSuccess,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 	}
@@ -1031,28 +993,24 @@ func TestCheckAccessInterfaceFieldRead(t *testing.T) {
 		sema.AccessCheckModeStrict: {
 			ast.AccessNotSpecified:   nil,
 			ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectSuccess,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
 			ast.AccessNotSpecified:   expectInvalidAccessError,
 			ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectSuccess,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectConformanceAndInvalidAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectSuccess,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectConformanceError,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectSuccess,
 			ast.AccessPublicSettable: expectSuccess,
 		},
@@ -1149,28 +1107,24 @@ func TestCheckAccessCompositeFieldAssignmentAndSwap(t *testing.T) {
 		sema.AccessCheckModeStrict: {
 			ast.AccessNotSpecified:   nil,
 			ast.AccessPrivate:        expectTwoAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectTwoInvalidAssignmentAccessErrors,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
 			ast.AccessNotSpecified:   expectTwoAccessErrors,
 			ast.AccessPrivate:        expectTwoAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectTwoInvalidAssignmentAccessErrors,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectTwoAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectTwoInvalidAssignmentAccessErrors,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectSuccess,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectSuccess,
 			ast.AccessPublicSettable: expectSuccess,
 		},
@@ -1277,28 +1231,24 @@ func TestCheckAccessInterfaceFieldWrite(t *testing.T) {
 		sema.AccessCheckModeStrict: {
 			ast.AccessNotSpecified:   nil,
 			ast.AccessPrivate:        expectConformanceAndAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectTwoInvalidAssignmentAccessErrors,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
 			ast.AccessNotSpecified:   expectTwoAccessErrors,
 			ast.AccessPrivate:        expectConformanceAndAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectTwoInvalidAssignmentAccessErrors,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectConformanceAndAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectTwoInvalidAssignmentAccessErrors,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectConformanceError,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectSuccess,
 			ast.AccessPublicSettable: expectSuccess,
 		},
@@ -1398,28 +1348,24 @@ func TestCheckAccessCompositeFieldVariableDeclarationWithSecondValue(t *testing.
 		sema.AccessCheckModeStrict: {
 			ast.AccessNotSpecified:   nil,
 			ast.AccessPrivate:        expectAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectInvalidAssignmentAccessError,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
 			ast.AccessNotSpecified:   expectAccessErrors,
 			ast.AccessPrivate:        expectAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectInvalidAssignmentAccessError,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectInvalidAssignmentAccessError,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectSuccess,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectSuccess,
 			ast.AccessPublicSettable: expectSuccess,
 		},
@@ -1502,28 +1448,24 @@ func TestCheckAccessInterfaceFieldVariableDeclarationWithSecondValue(t *testing.
 		sema.AccessCheckModeStrict: {
 			ast.AccessNotSpecified:   nil,
 			ast.AccessPrivate:        expectConformanceAndInvalidAccessAndAssignmentAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectInvalidAssignmentAccessError,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedRestricted: {
 			ast.AccessNotSpecified:   expectAccessErrors,
 			ast.AccessPrivate:        expectConformanceAndInvalidAccessAndAssignmentAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectInvalidAssignmentAccessError,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNotSpecifiedUnrestricted: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectConformanceAndInvalidAccessAndAssignmentAccessErrors,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectInvalidAssignmentAccessError,
 			ast.AccessPublicSettable: expectSuccess,
 		},
 		sema.AccessCheckModeNone: {
 			ast.AccessNotSpecified:   expectSuccess,
 			ast.AccessPrivate:        expectConformanceError,
-			ast.AccessAuthorized:     expectSuccess,
 			ast.AccessPublic:         expectSuccess,
 			ast.AccessPublicSettable: expectSuccess,
 		},
@@ -1895,4 +1837,188 @@ func TestCheckContractNestedDeclarationPrivateAccess(t *testing.T) {
 
 		assert.IsType(t, &sema.InvalidAccessError{}, errs[0])
 	})
+}
+
+func TestCheckAccessSameContractInnerStructField(t *testing.T) {
+
+	tests := map[ast.Access]bool{
+		ast.AccessPrivate:  false,
+		ast.AccessContract: true,
+		ast.AccessAccount:  true,
+		ast.AccessPublic:   true,
+	}
+
+	for access, expectSuccess := range tests {
+
+		t.Run(access.Keyword(), func(t *testing.T) {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+	                  contract A {
+
+                          struct B {
+                              %s let field: Int
+
+                              init() {
+                                  self.field = 42
+                              }
+                          }
+
+                          fun useB() {
+                              let b = A.B()
+                              b.field
+                          }
+                      }
+	                `,
+					access.Keyword(),
+				),
+			)
+
+			if expectSuccess {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestCheckAccessSameContractInnerStructInterfaceField(t *testing.T) {
+
+	tests := map[ast.Access]bool{
+		ast.AccessPrivate:  false,
+		ast.AccessContract: true,
+		ast.AccessAccount:  true,
+		ast.AccessPublic:   true,
+	}
+
+	for access, expectSuccess := range tests {
+
+		t.Run(access.Keyword(), func(t *testing.T) {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+	                  contract A {
+
+                          struct interface B {
+                              %[1]s let field: Int
+                          }
+
+                          struct BImpl: B {
+                              %[1]s let field: Int
+
+                              init() {
+                                  self.field = 42
+                              }
+                          }
+
+                          fun useB() {
+                              let b: B = A.BImpl()
+                              b.field
+                          }
+                      }
+	                `,
+					access.Keyword(),
+				),
+			)
+
+			if expectSuccess {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestCheckAccessOtherContractInnerStructField(t *testing.T) {
+
+	tests := map[ast.Access]bool{
+		ast.AccessPrivate:  false,
+		ast.AccessContract: false,
+		ast.AccessAccount:  true,
+		ast.AccessPublic:   true,
+	}
+
+	for access, expectSuccess := range tests {
+
+		t.Run(access.Keyword(), func(t *testing.T) {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+	                  contract A {
+
+                          struct B {
+                              %s let field: Int
+
+                              init() {
+                                  self.field = 42
+                              }
+                          }
+                      }
+
+                      contract C {
+                          fun useB() {
+                              let b = A.B()
+                              b.field
+                          }
+                      }
+	                `,
+					access.Keyword(),
+				),
+			)
+
+			if expectSuccess {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
+func TestCheckAccessOtherContractInnerStructInterfaceField(t *testing.T) {
+
+	tests := map[ast.Access]bool{
+		ast.AccessPrivate:  false,
+		ast.AccessContract: false,
+		ast.AccessAccount:  true,
+		ast.AccessPublic:   true,
+	}
+
+	for access, expectSuccess := range tests {
+
+		t.Run(access.Keyword(), func(t *testing.T) {
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+	                  contract A {
+
+                          struct interface B {
+                              %[1]s let field: Int
+                          }
+
+                          struct BImpl: B {
+                              %[1]s let field: Int
+
+                              init() {
+                                  self.field = 42
+                              }
+                          }
+                      }
+
+                      contract C {
+                          fun useB() {
+                              let b: A.B = A.BImpl()
+                              b.field
+                          }
+                      }
+	                `,
+					access.Keyword(),
+				),
+			)
+
+			if expectSuccess {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
 }

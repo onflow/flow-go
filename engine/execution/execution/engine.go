@@ -10,6 +10,9 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/language/runtime/encoding"
+	"github.com/dapperlabs/flow-go/language/runtime/values"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
@@ -27,6 +30,7 @@ type Engine struct {
 	execState        state.ExecutionState
 	execStateConduit network.Conduit
 	receipts         network.Engine
+	vm               virtualmachine.VirtualMachine
 	executor         executor.BlockExecutor
 }
 
@@ -37,8 +41,9 @@ func New(
 	protoState protocol.State,
 	execState state.ExecutionState,
 	receipts network.Engine,
-	executor executor.BlockExecutor,
+	vm virtualmachine.VirtualMachine,
 ) (*Engine, error) {
+	executor := executor.NewBlockExecutor(vm, execState)
 
 	e := Engine{
 		unit:       engine.NewUnit(),
@@ -47,6 +52,7 @@ func New(
 		protoState: protoState,
 		execState:  execState,
 		receipts:   receipts,
+		vm:         vm,
 		executor:   executor,
 	}
 
@@ -105,6 +111,42 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
+}
+
+func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
+	// TODO: replace with latest sealed block
+	block, err := e.protoState.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest block: %w", err)
+	}
+
+	stateCommit, err := e.execState.StateCommitmentByBlockID(block.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest block state commitment: %w", err)
+	}
+
+	blockView := e.execState.NewView(stateCommit)
+
+	result, err := e.vm.NewBlockContext(block).ExecuteScript(blockView, script)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
+	}
+
+	if !result.Succeeded() {
+		return nil, fmt.Errorf("failed to execute script: %w", result.Error)
+	}
+
+	value, err := values.Convert(result.Value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to export runtime value: %w", err)
+	}
+
+	encodedValue, err := encoding.Encode(value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
+	}
+
+	return encodedValue, nil
 }
 
 // process processes events for the execution engine on the execution node.

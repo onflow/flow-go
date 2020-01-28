@@ -209,9 +209,6 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	m.wg.Add(1)
 	defer m.wg.Done()
 
-	// make sure we close the connection when we are done handling the peer
-	defer s.Close()
-
 	log := m.log.With().
 		Str("local_addr", s.Conn().LocalPeer().String()).
 		Str("remote_addr", s.Conn().RemotePeer().String()).
@@ -219,6 +216,9 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// initialize the encoder/decoder and create the connection handler
 	conn := NewReadConnection(log, s)
+
+	// make sure we close the connection when we are done handling the peer
+	defer conn.stop()
 
 	log.Info().Msg("incoming connection established")
 
@@ -239,7 +239,7 @@ ProcessLoop:
 				log.Error().Err(err).Msg("could not extract sender ID")
 				continue ProcessLoop
 			}
-			err = m.ov.Receive(*nodeID, msg)
+			err = m.ov.Receive(nodeID, msg)
 			if err != nil {
 				log.Error().Err(err).Msg("could not deliver payload")
 				continue ProcessLoop
@@ -250,14 +250,13 @@ ProcessLoop:
 	log.Info().Msg("middleware closed the connection")
 }
 
-func getSenderID(msg *message.Message) (*flow.Identifier, error) {
+func getSenderID(msg *message.Message) (flow.Identifier, error) {
 	// Extract sender id
 	if len(msg.OriginID) < 32 {
 		err := fmt.Errorf("invalid sender id")
-		return nil, err
+		return flow.ZeroID, err
 	}
-	var senderID [32]byte
-	copy(senderID[:], msg.OriginID)
-	var id flow.Identifier = senderID
-	return &id, nil
+	var id flow.Identifier
+	copy(id[:], msg.OriginID)
+	return id, nil
 }

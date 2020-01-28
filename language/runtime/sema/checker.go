@@ -1161,7 +1161,6 @@ func (checker *Checker) checkDeclarationAccessModifier(
 	declarationKind common.DeclarationKind,
 	startPos ast.Position,
 	isConstant bool,
-	allowAuth bool,
 ) {
 	if checker.functionActivations.IsLocal() {
 
@@ -1181,8 +1180,9 @@ func (checker *Checker) checkDeclarationAccessModifier(
 		switch access {
 		case ast.AccessPublicSettable:
 			// Public settable access for a constant is not sensible
+			// and type declarations must be public for now
 
-			if isConstant {
+			if isConstant || isTypeDeclaration {
 				checker.report(
 					&InvalidAccessModifierError{
 						Access:          access,
@@ -1193,10 +1193,25 @@ func (checker *Checker) checkDeclarationAccessModifier(
 			}
 
 		case ast.AccessPrivate:
-			// Type declarations cannot be private for now
+			// Type declarations must be public for now
 
 			if isTypeDeclaration {
 
+				checker.report(
+					&InvalidAccessModifierError{
+						Access:          access,
+						DeclarationKind: declarationKind,
+						Pos:             startPos,
+					},
+				)
+			}
+
+		case ast.AccessContract,
+			ast.AccessAccount:
+
+			// Type declarations must be public for now
+
+			if isTypeDeclaration {
 				checker.report(
 					&InvalidAccessModifierError{
 						Access:          access,
@@ -1231,17 +1246,6 @@ func (checker *Checker) checkDeclarationAccessModifier(
 					},
 				)
 			}
-
-		case ast.AccessAuthorized:
-			if !allowAuth {
-				checker.report(
-					&InvalidAccessModifierError{
-						Access:          access,
-						DeclarationKind: declarationKind,
-						Pos:             startPos,
-					},
-				)
-			}
 		}
 	}
 }
@@ -1255,7 +1259,6 @@ func (checker *Checker) checkFieldsAccessModifier(fields []*ast.FieldDeclaration
 			field.DeclarationKind(),
 			field.StartPos,
 			isConstant,
-			true,
 		)
 	}
 }
@@ -1283,14 +1286,12 @@ func (checker *Checker) isReadableAccess(access ast.Access) bool {
 	case AccessCheckModeStrict,
 		AccessCheckModeNotSpecifiedRestricted:
 
-		return access == ast.AccessAuthorized ||
-			access == ast.AccessPublic ||
+		return access == ast.AccessPublic ||
 			access == ast.AccessPublicSettable
 
 	case AccessCheckModeNotSpecifiedUnrestricted:
 
 		return access == ast.AccessNotSpecified ||
-			access == ast.AccessAuthorized ||
 			access == ast.AccessPublic ||
 			access == ast.AccessPublicSettable
 
@@ -1307,13 +1308,11 @@ func (checker *Checker) isWriteableAccess(access ast.Access) bool {
 	case AccessCheckModeStrict,
 		AccessCheckModeNotSpecifiedRestricted:
 
-		return access == ast.AccessAuthorized ||
-			access == ast.AccessPublicSettable
+		return access == ast.AccessPublicSettable
 
 	case AccessCheckModeNotSpecifiedUnrestricted:
 
 		return access == ast.AccessNotSpecified ||
-			access == ast.AccessAuthorized ||
 			access == ast.AccessPublicSettable
 
 	case AccessCheckModeNone:
@@ -1384,13 +1383,9 @@ func (checker *Checker) checkVariableMove(expression ast.Expression) {
 	case *TransactionType:
 		reportInvalidMove(common.DeclarationKindTransaction)
 
-	case *CompositeType:
-		if ty.Kind == common.CompositeKindContract {
-			reportInvalidMove(common.DeclarationKindContract)
-		}
-
-	case *InterfaceType:
-		if ty.CompositeKind == common.CompositeKindContract {
+	case CompositeKindedType:
+		kind := ty.GetCompositeKind()
+		if kind == common.CompositeKindContract {
 			reportInvalidMove(common.DeclarationKindContract)
 		}
 	}
