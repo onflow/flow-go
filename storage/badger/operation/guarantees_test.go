@@ -15,9 +15,11 @@ import (
 func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		blockID := flow.Identifier{0x12, 0x34}
+		collID1 := flow.Identifier{0x01}
+		collID2 := flow.Identifier{0x02}
 		expected := []*flow.CollectionGuarantee{
-			{CollectionID: flow.Identifier{0x01}, Signatures: []crypto.Signature{{0x10}}},
-			{CollectionID: flow.Identifier{0x02}, Signatures: []crypto.Signature{{0x20}}},
+			{CollectionID: collID1, Signatures: []crypto.Signature{{0x10}}},
+			{CollectionID: collID2, Signatures: []crypto.Signature{{0x20}}},
 		}
 
 		err := db.Update(func(tx *badger.Txn) error {
@@ -25,7 +27,7 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 				if err := InsertGuarantee(coll)(tx); err != nil {
 					return err
 				}
-				if err := IndexGuarantee(blockID, coll)(tx); err != nil {
+				if err := IndexGuarantee(blockID, coll.ID())(tx); err != nil {
 					return err
 				}
 			}
@@ -33,11 +35,11 @@ func TestIndexGuaranteedCollectionByBlockHashInsertRetrieve(t *testing.T) {
 		})
 		require.Nil(t, err)
 
-		var actual []*flow.CollectionGuarantee
-		err = db.View(RetrieveGuarantees(blockID, &actual))
+		var actual []flow.Identifier
+		err = db.View(LookupGuarantees(blockID, &actual))
 		require.Nil(t, err)
 
-		assert.Equal(t, expected, actual)
+		assert.Equal(t, []flow.Identifier{collID1, collID2}, actual)
 	})
 }
 
@@ -45,20 +47,26 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		blockID1 := flow.Identifier{0x10}
 		blockID2 := flow.Identifier{0x20}
-		expected1 := []*flow.CollectionGuarantee{
-			{CollectionID: flow.Identifier{0x1}, Signatures: []crypto.Signature{{0x1}}},
+		collID1 := flow.Identifier{0x01}
+		collID2 := flow.Identifier{0x02}
+		collID3 := flow.Identifier{0x03}
+		collID4 := flow.Identifier{0x04}
+		set1 := []*flow.CollectionGuarantee{
+			{CollectionID: collID1, Signatures: []crypto.Signature{{0x1}}},
 		}
-		expected2 := []*flow.CollectionGuarantee{
-			{CollectionID: flow.Identifier{0x2}, Signatures: []crypto.Signature{{0x2}}},
+		set2 := []*flow.CollectionGuarantee{
+			{CollectionID: collID2, Signatures: []crypto.Signature{{0x2}}},
+			{CollectionID: collID3, Signatures: []crypto.Signature{{0x3}}},
+			{CollectionID: collID4, Signatures: []crypto.Signature{{0x1}}},
 		}
 
 		// insert block 1
 		err := db.Update(func(tx *badger.Txn) error {
-			for _, coll := range expected1 {
+			for _, coll := range set1 {
 				if err := InsertGuarantee(coll)(tx); err != nil {
 					return err
 				}
-				if err := IndexGuarantee(blockID1, coll)(tx); err != nil {
+				if err := IndexGuarantee(blockID1, coll.ID())(tx); err != nil {
 					return err
 				}
 			}
@@ -68,11 +76,11 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 
 		// insert block 2
 		err = db.Update(func(tx *badger.Txn) error {
-			for _, coll := range expected2 {
+			for _, coll := range set2 {
 				if err := InsertGuarantee(coll)(tx); err != nil {
 					return err
 				}
-				if err := IndexGuarantee(blockID2, coll)(tx); err != nil {
+				if err := IndexGuarantee(blockID2, coll.ID())(tx); err != nil {
 					return err
 				}
 			}
@@ -81,16 +89,16 @@ func TestIndexGuaranteedCollectionByBlockHashMultipleBlocks(t *testing.T) {
 		require.Nil(t, err)
 
 		t.Run("should retrieve collections for block", func(t *testing.T) {
-			var actual1 []*flow.CollectionGuarantee
-			err = db.View(RetrieveGuarantees(blockID1, &actual1))
+			var actual1 []flow.Identifier
+			err = db.View(LookupGuarantees(blockID1, &actual1))
 			assert.NoError(t, err)
-			assert.Equal(t, expected1, actual1)
+			assert.ElementsMatch(t, []flow.Identifier{collID1}, actual1)
 
 			// get block 2
-			var actual2 []*flow.CollectionGuarantee
-			err = db.View(RetrieveGuarantees(blockID2, &actual2))
+			var actual2 []flow.Identifier
+			err = db.View(LookupGuarantees(blockID2, &actual2))
 			assert.NoError(t, err)
-			assert.Equal(t, expected1, actual1)
+			assert.Equal(t, []flow.Identifier{collID2, collID3, collID4}, actual2)
 		})
 	})
 }

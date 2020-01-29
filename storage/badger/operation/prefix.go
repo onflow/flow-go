@@ -10,19 +10,31 @@ import (
 )
 
 const (
-	codeRole                  = 10
-	codeAddress               = 11
-	codeDelta                 = 12
-	codeHeader                = 20
-	codeIdentities            = 21
-	codeTransaction           = 22
-	codeCollection            = 23
-	codeGuarantee             = 24
-	codeBlockID               = 100
-	codeBoundary              = 101
-	codeCollectionIndex       = 102
-	codeHashToStateCommitment = 103
-	codeChunkHeader           = 104
+
+	// special database markers
+	codeBoundary = 1 // latest finalized block number
+	codeNumber   = 2 // lookup for block by number
+	codeDelta    = 3 // history of stake changes
+
+	// block header and entities included in block contents
+	codeHeader    = 10
+	codeIdentity  = 11
+	codeGuarantee = 12
+	codeSeal      = 13
+
+	// entities that are related to block formation & validation
+	codeTransaction = 21
+	codeCollection  = 22
+	codeCommit      = 23
+	codeResult      = 24
+	// codeReceipt     = 25
+	// codeApproval    = 26
+	codeChunkHeader = 27
+
+	codeIndexIdentity  = 100
+	codeIndexGuarantee = 101
+	codeIndexSeal      = 102
+	codeIndexCommit    = 103
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {

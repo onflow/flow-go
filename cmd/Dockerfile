@@ -21,7 +21,7 @@ FROM golang:1.13 AS build-app
 
 # add the pubkey of github.com to knownhosts, so ssh-agent doesn't bark
 RUN mkdir -p /root/.ssh && ssh-keyscan -t rsa github.com >> /root/.ssh/known_hosts
-RUN echo '[url "ssh://git@github.com/"] insteadOf = https://github.com/' > ~/.gitconfig
+RUN git config --global 'url.ssh://git@github.com/.insteadof' https://github.com/
 
 # Build the app binary in /app
 RUN mkdir /app
@@ -40,12 +40,13 @@ COPY --from=build-relic /build/relic/build ./crypto/relic/build
 RUN --mount=type=ssh \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o ./app ./cmd/${TARGET}
+    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags -static" -o ./app ./cmd/${TARGET}
 
-## (3) Add the binary to a fresh Alpine image
-FROM alpine:3.10
+RUN chmod a+x /app/app
+
+## (3) Add the statically linked binary to a distroless image
+FROM gcr.io/distroless/static
 
 COPY --from=build-app /app/app /bin/app
-RUN chmod a+x /bin/app
 
 ENTRYPOINT ["/bin/app"]
