@@ -45,7 +45,7 @@ RUN --mount=type=ssh \
 RUN chmod a+x /app/app
 
 ## (3) Add the statically linked binary to a distroless image
-FROM gcr.io/distroless/static
+FROM gcr.io/distroless/base
 
 COPY --from=build-app /app/app /bin/app
 
