@@ -101,7 +101,7 @@ func Test_MinCutoff(t *testing.T) {
 func Test_MaxCutoff(t *testing.T) {
 	// here we use a different timeout controller with a larger timeoutIncrease to avoid too many iterations
 	c, err := NewConfig(
-		time.Duration(200*1E6),
+		time.Duration(200 * float64(time.Millisecond)),
 		time.Duration(minRepTimeout*1E6),
 		voteTimeoutFraction,
 		10,
