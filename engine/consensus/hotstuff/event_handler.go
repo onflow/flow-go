@@ -7,14 +7,14 @@ import (
 )
 
 type EventHandler struct {
-	paceMaker             PaceMaker
-	voteAggregator        *VoteAggregator
-	voter                 *Voter
-	forks                 Forks
-	validator             *Validator
-	blockProposalProducer BlockProposalProducer
-	viewState             ViewState
-	network               NetworkSender
+	paceMaker      PaceMaker
+	voteAggregator *VoteAggregator
+	voter          *Voter
+	forks          Forks
+	validator      *Validator
+	blockProducer  *BlockProducer
+	viewState      *ViewState
+	network        NetworkSender
 }
 
 func (eh *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) {

@@ -7,24 +7,24 @@ import (
 )
 
 type UnsignedVote struct {
-	View     uint64
-	BlockMRH flow.Identifier
+	View    uint64
+	BlockID flow.Identifier
 }
 
 func NewUnsignedVote(view uint64, blockMRH flow.Identifier) *UnsignedVote {
 	return &UnsignedVote{
-		View:     view,
-		BlockMRH: blockMRH,
+		View:    view,
+		BlockID: blockMRH,
 	}
 }
 
 func (uv UnsignedVote) BytesForSig() []byte {
-	return voteBytesForSig(uv.View, uv.BlockMRH)
+	return voteBytesForSig(uv.View, uv.BlockID)
 }
 
-func voteBytesForSig(view uint64, blockMRH flow.Identifier) []byte {
+func voteBytesForSig(view uint64, blockID flow.Identifier) []byte {
 	prefix := []byte("vote")
-	bytes := marshalForSig(NewUnsignedVote(view, blockMRH))
+	bytes := marshalForSig(NewUnsignedVote(view, blockID))
 	return append(prefix, bytes...)
 }
 

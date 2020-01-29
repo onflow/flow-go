@@ -17,7 +17,7 @@ type Validator struct {
 // It doesn't validate the block that this QC is pointing to
 func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 	// TODO: potentially can return a very long list. need to find a better way for verifying QC
-	stakedNodes, err := v.viewState.GetIdentitiesForBlockID(qc.BlockMRH)
+	stakedNodes, err := v.viewState.GetIdentitiesForBlockID(qc.BlockID)
 	if err != nil {
 		return fmt.Errorf("cannot get identities to validate sig at view %v: %w", qc.View, err)
 	}
@@ -38,7 +38,7 @@ func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 
 	// check if there are enough stake for building QC
 	if totalStakes < threshold {
-		return fmt.Errorf("invalid QC: not enough stake, qc BlockMRH: %v", qc.BlockMRH)
+		return fmt.Errorf("invalid QC: not enough stake, qc BlockID: %v", qc.BlockID)
 	}
 	return nil
 }
@@ -56,7 +56,7 @@ func (v *Validator) ValidateBlock(bh *types.BlockHeader, parent *types.BlockProp
 	// validate the signer is the leader for that block
 	leaderID := v.viewState.LeaderForView(bh.View())
 	if leaderID.ID() != signer.ID() {
-		return nil, nil, fmt.Errorf("invalid block. not from the leader: %v", bh.BlockMRH())
+		return nil, nil, fmt.Errorf("invalid block. not from the leader: %v", bh.BlockID())
 	}
 
 	qc := bh.QC()
@@ -68,8 +68,8 @@ func (v *Validator) ValidateBlock(bh *types.BlockHeader, parent *types.BlockProp
 	}
 
 	// validate block hash
-	if qc.BlockMRH != parent.BlockMRH() {
-		return nil, nil, fmt.Errorf("invalid block. block must link to its parent. (qc: %x, parent: %x)", qc.BlockMRH, parent.BlockMRH())
+	if qc.BlockID != parent.BlockID() {
+		return nil, nil, fmt.Errorf("invalid block. block must link to its parent. (qc: %x, parent: %x)", qc.BlockID, parent.BlockID())
 	}
 
 	// validate height
@@ -104,7 +104,7 @@ func (v *Validator) ValidateVote(vote *types.Vote, bp *types.BlockProposal) (*fl
 	}
 
 	// block hash must match
-	if vote.BlockMRH != bp.BlockMRH() {
+	if vote.BlockID != bp.BlockID() {
 		return nil, fmt.Errorf("invalid vote: wrong block hash")
 	}
 
@@ -140,7 +140,7 @@ func validateAggregatedSigWithSignedBytes(stakedNodes flow.IdentityList, signedB
 
 func (v *Validator) validateVoteSig(vote *types.Vote) (*flow.Identity, error) {
 	// getting all consensus identities
-	identities, err := v.viewState.GetIdentitiesForBlockID(vote.BlockMRH)
+	identities, err := v.viewState.GetIdentitiesForBlockID(vote.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get identities to validate sig at view %v: %w", vote.View, err)
 	}
@@ -151,14 +151,14 @@ func (v *Validator) validateVoteSig(vote *types.Vote) (*flow.Identity, error) {
 	// verify the signature
 	signer, err := validateSignatureWithSignedBytes(identities, bytesToSign, vote.Signature)
 	if err != nil {
-		return nil, fmt.Errorf("invalid signature for vote: %v: %w", vote.BlockMRH, err)
+		return nil, fmt.Errorf("invalid signature for vote: %v: %w", vote.BlockID, err)
 	}
 	return signer, nil
 }
 
 func (v *Validator) validateBlockSig(bh *types.BlockHeader) (*flow.Identity, error) {
 	// getting all consensus identities
-	identities, err := v.viewState.GetIdentitiesForBlockID(bh.BlockMRH())
+	identities, err := v.viewState.GetIdentitiesForBlockID(bh.BlockID())
 	if err != nil {
 		return nil, fmt.Errorf("cannot get identities to validate sig at view %v: %w", bh.View(), err)
 	}
@@ -169,13 +169,13 @@ func (v *Validator) validateBlockSig(bh *types.BlockHeader) (*flow.Identity, err
 	// verify the signature
 	signer, err := validateSignatureWithSignedBytes(identities, hashToSign, bh.Signature)
 	if err != nil {
-		return nil, fmt.Errorf("invalid signature for block %v: %w", bh.BlockMRH(), err)
+		return nil, fmt.Errorf("invalid signature for block %v: %w", bh.BlockID(), err)
 	}
 	return signer, nil
 }
 
 func toBlockProposal(bh *types.BlockHeader) *types.BlockProposal {
-	return types.NewBlockProposal(bh.Block, bh.ConsensusPayload, bh.Signature)
+	return types.NewBlockProposal(bh.Block, bh.Signature)
 }
 
 // validateSignatureWithSignedBytes validates the signature and returns

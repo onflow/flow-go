@@ -13,5 +13,5 @@ func NewVote(unsigned *UnsignedVote, sig *Signature) *Vote {
 }
 
 func (uv Vote) BytesForSig() []byte {
-	return voteBytesForSig(uv.View, uv.BlockMRH)
+	return voteBytesForSig(uv.View, uv.BlockID)
 }
