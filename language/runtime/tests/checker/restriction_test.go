@@ -250,3 +250,172 @@ func TestCheckRestrictedResourceTypeMemberAccess(t *testing.T) {
 		assert.IsType(t, &sema.UnreachableStatementError{}, errs[2])
 	})
 }
+
+func TestCheckRestrictedResourceTypeSubtyping(t *testing.T) {
+
+	t.Run("resource type to restricted resource type with same type, no restriction", func(t *testing.T) {
+
+		_, err := ParseAndCheckWithPanic(t, `
+            resource R {}
+
+            fun test() {
+                let r: @R{} <- create R()
+                destroy r
+            }
+        `)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("resource type to restricted resource type with same type, one restriction", func(t *testing.T) {
+
+		_, err := ParseAndCheckWithPanic(t, `
+            resource interface I1 {}
+
+            resource interface I2 {}
+
+            resource R: I1, I2 {}
+
+            fun test() {
+                let r: @R{I1} <- create R()
+                destroy r
+            }
+        `)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("resource type to restricted resource type with different restricted type", func(t *testing.T) {
+
+		_, err := ParseAndCheckWithPanic(t, `
+            resource R {}
+
+            resource S {}
+
+            fun test() {
+                let s: @S{} <- create R()
+                destroy s
+            }
+        `)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	t.Run("restricted resource type to restricted resource type with same type, no restrictions", func(t *testing.T) {
+
+		_, err := ParseAndCheckWithPanic(t, `
+            resource R {}
+
+            fun test() {
+                let r: @R{} <- create R()
+                let r2: @R{} <- r
+                destroy r2
+            }
+        `)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("restricted resource type to restricted resource type with same type, 0 to 1 restriction", func(t *testing.T) {
+
+		_, err := ParseAndCheckWithPanic(t, `
+            resource interface I1 {}
+
+            resource interface I2 {}
+
+            resource R: I1, I2 {}
+
+            fun test() {
+                let r: @R{} <- create R()
+                let r2: @R{I1} <- r
+                destroy r2
+            }
+        `)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	t.Run("restricted resource type to restricted resource type with same type, 1 to 2 restrictions", func(t *testing.T) {
+
+		_, err := ParseAndCheckWithPanic(t, `
+            resource interface I1 {}
+
+            resource interface I2 {}
+
+            resource R: I1, I2 {}
+
+            fun test() {
+                let r: @R{I2} <- create R()
+                let r2: @R{I1, I2} <- r
+                destroy r2
+            }
+        `)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	t.Run("restricted resource type to restricted resource type with same type, reordered restrictions", func(t *testing.T) {
+
+		_, err := ParseAndCheckWithPanic(t, `
+            resource interface I1 {}
+
+            resource interface I2 {}
+
+            resource R: I1, I2 {}
+
+            fun test() {
+                let r: @R{I2, I1} <- create R()
+                let r2: @R{I1, I2} <- r
+                destroy r2
+            }
+        `)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("restricted resource type to restricted resource type with same type, fewer restrictions", func(t *testing.T) {
+
+		_, err := ParseAndCheckWithPanic(t, `
+            resource interface I1 {}
+
+            resource interface I2 {}
+
+            resource R: I1, I2 {}
+
+            fun test() {
+                let r: @R{I1, I2} <- create R()
+                let r2: @R{I2} <- r
+                destroy r2
+            }
+        `)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("restricted resource type to resource type", func(t *testing.T) {
+
+		_, err := ParseAndCheckWithPanic(t, `
+            resource interface I1 {}
+
+            resource interface I2 {}
+
+            resource R: I1, I2 {}
+
+            fun test() {
+                let r: @R{I1} <- create R()
+                let r2: @R <- r
+                destroy r2
+            }
+        `)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+}
