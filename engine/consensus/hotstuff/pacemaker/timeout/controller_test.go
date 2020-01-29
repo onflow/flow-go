@@ -105,7 +105,7 @@ func Test_MaxCutoff(t *testing.T) {
 		time.Duration(minRepTimeout * float64(time.Millisecond)),
 		voteTimeoutFraction,
 		10,
-		time.Duration(additiveDecrease*1E6))
+		time.Duration(additiveDecrease * float64(time.Millisecond)))
 	if err != nil {
 		t.Fail()
 	}
