@@ -200,8 +200,8 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	transactionFunctionParameterCount := len(transactionFunctionType.Parameters)
 	if signingAccountsCount != transactionFunctionParameterCount {
 		return newError(InvalidTransactionParameterCountError{
-			Expected: transactionFunctionParameterCount,
-			Actual:   signingAccountsCount,
+			Expected: signingAccountsCount,
+			Actual:   transactionFunctionParameterCount,
 		})
 	}
 

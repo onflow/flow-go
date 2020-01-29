@@ -23,6 +23,7 @@ type EchoEngine struct {
 	event    chan interface{} // used to keep track of the events that the node receives
 	received chan struct{}    // used as an indicator on reception of messages for testing
 	echomsg  string           // used as a fix string to be included in the reply echos
+	seen     map[string]int   // used to track the seen events
 
 }
 
@@ -32,6 +33,7 @@ func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID uint8) *E
 		echomsg:  "this is an echo",
 		event:    make(chan interface{}, cap),
 		received: make(chan struct{}, cap),
+		seen:     make(map[string]int),
 	}
 
 	c2, err := net.Register(engineID, te)
@@ -64,7 +66,6 @@ func (te *EchoEngine) ProcessLocal(event interface{}) error {
 // EchoEngine. It then flags the received channel on reception of an event.
 // It also sends back an echo of the message to the origin ID
 func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error {
-	// stores the message locally
 	te.originID = originID
 	te.event <- event
 	te.received <- struct{}{}
@@ -72,7 +73,13 @@ func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error
 	// asserting event as string
 	lip2pEvent, ok := (event).(*message.Echo)
 	require.True(te.t, ok, "could not assert event as Echo")
+
+	// checks for duplication
 	strEvent := lip2pEvent.Text
+
+	// marks event as seen
+	te.seen[strEvent]++
+
 	// avoids endless circulation of echos by filtering echoing back the echo messages
 	if strings.HasPrefix(strEvent, te.echomsg) {
 		return nil
