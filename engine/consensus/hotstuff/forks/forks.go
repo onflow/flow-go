@@ -28,6 +28,7 @@ func (f *Forks) IsSafeBlock(block *types.BlockProposal) bool {
 
 func (f *Forks) AddBlock(block *types.BlockProposal) error {
 	if err := f.finalizer.VerifyBlock(block); err != nil {
+		// technically, this not strictly required. However, we leave this as a sanity check for now
 		return fmt.Errorf("cannot add invalid block to Forks: %w", err)
 	}
 	err := f.finalizer.AddBlock(block)
@@ -65,7 +66,7 @@ func (f *Forks) ensureBlockStored(qc *types.QuorumCertificate) (*types.BlockProp
 
 func (f *Forks) VerifyBlock(header *flow.Header) error {
 	// ToDo implement
-	panic("implement me")
+	panic("convert header to ")
 }
 
 func New(finalizer *finalizer.Finalizer, forkchoice ForkChoice) hotstuff.Forks {
