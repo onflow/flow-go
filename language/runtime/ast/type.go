@@ -174,3 +174,35 @@ func (t *ReferenceType) StartPosition() Position {
 func (t *ReferenceType) EndPosition() Position {
 	return t.Type.EndPosition()
 }
+
+// RestrictedType
+
+type RestrictedType struct {
+	Type         Type
+	Restrictions []*NominalType
+	EndPos       Position
+}
+
+func (*RestrictedType) isType() {}
+
+func (t *RestrictedType) String() string {
+	var builder strings.Builder
+	builder.WriteString(t.Type.String())
+	builder.WriteRune('{')
+	for i, restriction := range t.Restrictions {
+		if i > 0 {
+			builder.WriteString(", ")
+		}
+		builder.WriteString(restriction.String())
+	}
+	builder.WriteRune('}')
+	return builder.String()
+}
+
+func (t *RestrictedType) StartPosition() Position {
+	return t.Type.StartPosition()
+}
+
+func (t *RestrictedType) EndPosition() Position {
+	return t.EndPos
+}

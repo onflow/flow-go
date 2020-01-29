@@ -85,7 +85,7 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 		functionBlock = functionBlockContext.Accept(v).(*ast.FunctionBlock)
 	}
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	return &ast.FunctionDeclaration{
 		Access:               access,
@@ -102,7 +102,7 @@ func (v *ProgramVisitor) VisitFunctionDeclaration(ctx *FunctionDeclarationContex
 func (v *ProgramVisitor) visitReturnTypeAnnotation(ctx ITypeAnnotationContext, tokenBefore antlr.Token) *ast.TypeAnnotation {
 	if ctx == nil {
 		positionBeforeMissingReturnType :=
-			ast.PositionFromToken(tokenBefore)
+			PositionFromToken(tokenBefore)
 		returnType := &ast.NominalType{
 			Identifier: ast.Identifier{
 				Pos: positionBeforeMissingReturnType,
@@ -150,7 +150,7 @@ func (v *ProgramVisitor) VisitAccess(ctx *AccessContext) interface{} {
 }
 
 func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) interface{} {
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	var location ast.Location
 	var locationPos ast.Position
@@ -184,7 +184,7 @@ func (v *ProgramVisitor) VisitImportDeclaration(ctx *ImportDeclarationContext) i
 		}
 		location = ast.AddressLocation(address)
 		symbol := hexadecimalLiteralNode.GetSymbol()
-		locationPos = ast.PositionFromToken(symbol)
+		locationPos = PositionFromToken(symbol)
 		endPos = ast.EndPosition(locationPos, symbol.GetStop())
 	}
 
@@ -239,7 +239,7 @@ func (v *ProgramVisitor) VisitTransactionDeclaration(ctx *TransactionDeclaration
 		postConditions = &conditions
 	}
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.TransactionDeclaration{
 		Fields:         fields,
@@ -262,7 +262,7 @@ func (v *ProgramVisitor) VisitExecute(ctx *ExecuteContext) interface{} {
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 	block := ctx.Block().Accept(v).(*ast.Block)
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	return &ast.SpecialFunctionDeclaration{
 		DeclarationKind: common.DeclarationKindExecute,
@@ -299,7 +299,7 @@ func (v *ProgramVisitor) VisitEventDeclaration(ctx *EventDeclarationContext) int
 		)
 	}
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.CompositeDeclaration{
 		Access:        access,
@@ -323,7 +323,7 @@ func (v *ProgramVisitor) VisitEmitStatement(ctx *EmitStatementContext) interface
 			Identifier: identifier,
 		}
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	return &ast.EmitStatement{
 		InvocationExpression: invocation,
@@ -338,7 +338,7 @@ func (v *ProgramVisitor) VisitCompositeDeclaration(ctx *CompositeDeclarationCont
 	conformances := ctx.Conformances().Accept(v).([]*ast.NominalType)
 	membersAndNestedDeclarations := ctx.MembersAndNestedDeclarations().Accept(v).(membersAndNestedDeclarations)
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.CompositeDeclaration{
 		Access:                access,
@@ -442,7 +442,7 @@ func (v *ProgramVisitor) VisitField(ctx *FieldContext) interface{} {
 	typeAnnotationContext := ctx.TypeAnnotation()
 	typeAnnotation := typeAnnotationContext.Accept(v).(*ast.TypeAnnotation)
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 	endPosition := ast.EndPosition(startPosition, typeAnnotationContext.GetStop().GetStop())
 
 	return &ast.FieldDeclaration{
@@ -474,7 +474,7 @@ func (v *ProgramVisitor) VisitSpecialFunctionDeclaration(ctx *SpecialFunctionDec
 		functionBlock = functionBlockContext.Accept(v).(*ast.FunctionBlock)
 	}
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	declarationKind := common.DeclarationKindUnknown
 	switch identifier.Identifier {
@@ -500,7 +500,7 @@ func (v *ProgramVisitor) VisitInterfaceDeclaration(ctx *InterfaceDeclarationCont
 	kind := ctx.CompositeKind().Accept(v).(common.CompositeKind)
 	identifier := ctx.Identifier().Accept(v).(ast.Identifier)
 	membersAndNestedDeclarations := ctx.MembersAndNestedDeclarations().Accept(v).(membersAndNestedDeclarations)
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.InterfaceDeclaration{
 		Access:                access,
@@ -544,7 +544,7 @@ func (v *ProgramVisitor) VisitFunctionExpression(ctx *FunctionExpressionContext)
 
 	functionBlock := ctx.FunctionBlock().Accept(v).(*ast.FunctionBlock)
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	return &ast.FunctionExpression{
 		ParameterList:        parameterList,
@@ -564,7 +564,7 @@ func (v *ProgramVisitor) VisitParameterList(ctx *ParameterListContext) interface
 		)
 	}
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.ParameterList{
 		Parameters: parameters,
@@ -586,7 +586,7 @@ func (v *ProgramVisitor) VisitParameter(ctx *ParameterContext) interface{} {
 
 	typeAnnotation := ctx.TypeAnnotation().Accept(v).(*ast.TypeAnnotation)
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.Parameter{
 		Label:          label,
@@ -640,7 +640,7 @@ func (v *ProgramVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{}
 	}
 	returnTypeAnnotation := ctx.returnType.Accept(v).(*ast.TypeAnnotation)
 
-	startPosition := ast.PositionFromToken(ctx.OpenParen(0).GetSymbol())
+	startPosition := PositionFromToken(ctx.OpenParen(0).GetSymbol())
 	endPosition := returnTypeAnnotation.EndPosition()
 
 	return &ast.FunctionType{
@@ -656,7 +656,7 @@ func (v *ProgramVisitor) VisitFunctionType(ctx *FunctionTypeContext) interface{}
 func (v *ProgramVisitor) VisitVariableSizedType(ctx *VariableSizedTypeContext) interface{} {
 	elementType := ctx.FullType().Accept(v).(ast.Type)
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.VariableSizedType{
 		Type: elementType,
@@ -675,7 +675,7 @@ func (v *ProgramVisitor) VisitConstantSizedType(ctx *ConstantSizedTypeContext) i
 		return nil
 	}
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.ConstantSizedType{
 		Type: elementType,
@@ -691,7 +691,7 @@ func (v *ProgramVisitor) VisitDictionaryType(ctx *DictionaryTypeContext) interfa
 	keyType := ctx.keyType.Accept(v).(ast.Type)
 	valueType := ctx.valueType.Accept(v).(ast.Type)
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.DictionaryType{
 		KeyType:   keyType,
@@ -706,7 +706,7 @@ func (v *ProgramVisitor) VisitDictionaryType(ctx *DictionaryTypeContext) interfa
 func (v *ProgramVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interface{} {
 	isResource := ctx.ResourceAnnotation() != nil
 	fullType := ctx.FullType().Accept(v).(ast.Type)
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	return &ast.TypeAnnotation{
 		IsResource: isResource,
@@ -716,32 +716,86 @@ func (v *ProgramVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interfa
 }
 
 func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
-	baseTypeResult := ctx.BaseType().Accept(v)
-	if baseTypeResult == nil {
-		return nil
+	return v.VisitChildren(ctx.BaseParserRuleContext)
+}
+
+func (v *ProgramVisitor) VisitReferenceType(ctx *ReferenceTypeContext) interface{} {
+
+	// A type line `&R` is parsed as `ReferenceType{NominalType{}}`.
+	// A type like `&R{I}` is parsed as `ReferenceType{RestrictedType{NominalType{}}}`.
+	// A type like `&{I}` is parsed as `ReferenceType{RestrictedType{}}`.
+
+	result := ctx.InnerType().Accept(v).(ast.Type)
+
+	// reference
+	startPos := PositionFromToken(ctx.GetStart())
+	result = &ast.ReferenceType{
+		Type:     result,
+		StartPos: startPos,
 	}
-	result := baseTypeResult.(ast.Type)
 
-	// NOTE: only allow reference or optionals – prevent ambiguous
-	// and not particular useful types like `&R?`
+	return result
+}
 
-	if ctx.reference != nil {
-		startPos := ast.PositionFromToken(ctx.reference)
-		result = &ast.ReferenceType{
-			Type:     result,
-			StartPos: startPos,
-		}
-	} else {
-		for _, optional := range ctx.optionals {
-			endPos := ast.PositionFromToken(optional)
-			result = &ast.OptionalType{
-				Type:   result,
-				EndPos: endPos,
-			}
+func (v *ProgramVisitor) VisitNonReferenceType(ctx *NonReferenceTypeContext) interface{} {
+
+	// A type line `R` is parsed as `NominalType{}`.
+	// A type like `R{I}` is parsed as `RestrictedType{NominalType{}}`.
+	// A type like `R{I}?` is parsed as `OptionalType{RestrictedType{NominalType{}}}`.
+	// A type like `{I}` is parsed as `RestrictedType{NominalType{}}`.
+
+	result := ctx.InnerType().Accept(v).(ast.Type)
+
+	// optionals
+	for _, optional := range ctx.optionals {
+		endPos := PositionFromToken(optional)
+		result = &ast.OptionalType{
+			Type:   result,
+			EndPos: endPos,
 		}
 	}
 
 	return result
+}
+
+func (v *ProgramVisitor) VisitInnerType(ctx *InnerTypeContext) interface{} {
+	// base type
+	baseTypeContext := ctx.BaseType()
+	var result ast.Type
+	if baseTypeContext != nil {
+		result = baseTypeContext.Accept(v).(ast.Type)
+	}
+
+	// restrictions
+	typeRestrictionsCtx := ctx.TypeRestrictions()
+	if typeRestrictionsCtx != nil {
+		restrictions := typeRestrictionsCtx.Accept(v).([]*ast.NominalType)
+
+		endPos := PositionFromToken(typeRestrictionsCtx.GetStop())
+
+		result = &ast.RestrictedType{
+			Type:         result,
+			Restrictions: restrictions,
+			EndPos:       endPos,
+		}
+	}
+
+	if result == nil {
+		panic(errors.NewUnreachableError())
+	}
+
+	return result
+}
+
+func (v *ProgramVisitor) VisitTypeRestrictions(ctx *TypeRestrictionsContext) interface{} {
+	nominalTypeContexts := ctx.AllNominalType()
+	nominalTypes := make([]*ast.NominalType, len(nominalTypeContexts))
+
+	for i, context := range nominalTypeContexts {
+		nominalTypes[i] = context.Accept(v).(*ast.NominalType)
+	}
+
+	return nominalTypes
 }
 
 func (v *ProgramVisitor) VisitBlock(ctx *BlockContext) interface{} {
@@ -774,7 +828,7 @@ func (v *ProgramVisitor) VisitFunctionBlock(ctx *FunctionBlockContext) interface
 
 func (v *ProgramVisitor) visitBlock(ctx antlr.ParserRuleContext, statementsCtx IStatementsContext) *ast.Block {
 	statements := statementsCtx.Accept(v).([]ast.Statement)
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 	return &ast.Block{
 		Statements: statements,
 		Range: ast.Range{
@@ -877,7 +931,7 @@ func (v *ProgramVisitor) VisitReturnStatement(ctx *ReturnStatementContext) inter
 		expression = expressionNode.Accept(v).(ast.Expression)
 	}
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	var endPosition ast.Position
 	if expression != nil {
@@ -897,7 +951,7 @@ func (v *ProgramVisitor) VisitReturnStatement(ctx *ReturnStatementContext) inter
 }
 
 func (v *ProgramVisitor) VisitBreakStatement(ctx *BreakStatementContext) interface{} {
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 	endPosition := ast.EndPosition(startPosition, ctx.Break().GetSymbol().GetStop())
 
 	return &ast.BreakStatement{
@@ -909,7 +963,7 @@ func (v *ProgramVisitor) VisitBreakStatement(ctx *BreakStatementContext) interfa
 }
 
 func (v *ProgramVisitor) VisitContinueStatement(ctx *ContinueStatementContext) interface{} {
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 	endPosition := ast.EndPosition(startPosition, ctx.Continue().GetSymbol().GetStop())
 
 	return &ast.ContinueStatement{
@@ -958,7 +1012,7 @@ func (v *ProgramVisitor) VisitVariableDeclaration(ctx *VariableDeclarationContex
 		rightExpression = rightExpressionResult.(ast.Expression)
 	}
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	variableDeclaration := &ast.VariableDeclaration{
 		Access:         access,
@@ -1022,7 +1076,7 @@ func (v *ProgramVisitor) VisitIfStatement(ctx *IfStatementContext) interface{} {
 		}
 	}
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	ifStatement := &ast.IfStatement{
 		Test:     test,
@@ -1042,7 +1096,7 @@ func (v *ProgramVisitor) VisitWhileStatement(ctx *WhileStatementContext) interfa
 	test := ctx.Expression().Accept(v).(ast.Expression)
 	block := ctx.Block().Accept(v).(*ast.Block)
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.WhileStatement{
 		Test:  test,
@@ -1090,7 +1144,7 @@ func (v *ProgramVisitor) VisitTransfer(ctx *TransferContext) interface{} {
 		operation = ast.TransferOperationMove
 	}
 
-	position := ast.PositionFromToken(ctx.GetStart())
+	position := PositionFromToken(ctx.GetStart())
 
 	return &ast.Transfer{
 		Operation: operation,
@@ -1337,7 +1391,7 @@ func (v *ProgramVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) inter
 
 	// ensure unary operators are not juxtaposed
 	if ctx.GetChildCount() > 2 {
-		position := ast.PositionFromToken(ctx.UnaryOp(0).GetStart())
+		position := PositionFromToken(ctx.UnaryOp(0).GetStart())
 		v.report(
 			&JuxtaposedUnaryOperatorsError{
 				Pos: position,
@@ -1348,7 +1402,7 @@ func (v *ProgramVisitor) VisitUnaryExpression(ctx *UnaryExpressionContext) inter
 	expression := unaryContext.Accept(v).(ast.Expression)
 	operation := ctx.UnaryOp(0).Accept(v).(ast.Operation)
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 	endPosition := expression.EndPosition()
 
 	return &ast.UnaryExpression{
@@ -1457,7 +1511,7 @@ func (v *ProgramVisitor) VisitBracketExpression(ctx *BracketExpressionContext) i
 		indexType = ctx.FullType().Accept(v).(ast.Type)
 	}
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	// NOTE: partial, expression is filled later
 	return &ast.IndexExpression{
@@ -1489,7 +1543,7 @@ func (v *ProgramVisitor) VisitCreateExpression(ctx *CreateExpressionContext) int
 		}
 	}
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	return &ast.CreateExpression{
 		InvocationExpression: invocation,
@@ -1500,7 +1554,7 @@ func (v *ProgramVisitor) VisitCreateExpression(ctx *CreateExpressionContext) int
 func (v *ProgramVisitor) VisitDestroyExpression(ctx *DestroyExpressionContext) interface{} {
 	expression := ctx.Expression().Accept(v).(ast.Expression)
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	return &ast.DestroyExpression{
 		Expression: expression,
@@ -1512,7 +1566,7 @@ func (v *ProgramVisitor) VisitReferenceExpression(ctx *ReferenceExpressionContex
 	expression := ctx.Expression().Accept(v).(ast.Expression)
 	ty := ctx.FullType().Accept(v).(ast.Type)
 
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	return &ast.ReferenceExpression{
 		Expression: expression,
@@ -1539,7 +1593,7 @@ func (v *ProgramVisitor) VisitIntegerLiteral(ctx *IntegerLiteralContext) interfa
 }
 
 func (v *ProgramVisitor) parseIntExpression(token antlr.Token, text string, kind IntegerLiteralKind) *ast.IntExpression {
-	startPosition := ast.PositionFromToken(token)
+	startPosition := PositionFromToken(token)
 	endPosition := ast.EndPosition(startPosition, token.GetStop())
 
 	// check literal has no leading underscore
@@ -1604,7 +1658,7 @@ func (v *ProgramVisitor) parseIntExpression(token antlr.Token, text string, kind
 }
 
 func (v *ProgramVisitor) VisitInvalidNumberLiteral(ctx *InvalidNumberLiteralContext) interface{} {
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 	endPosition := ast.EndPosition(startPosition, ctx.GetStop().GetStop())
 
 	v.report(
@@ -1664,7 +1718,7 @@ func (v *ProgramVisitor) VisitNestedExpression(ctx *NestedExpressionContext) int
 }
 
 func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interface{} {
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 
 	trueNode := ctx.True()
 	if trueNode != nil {
@@ -1696,14 +1750,14 @@ func (v *ProgramVisitor) VisitBooleanLiteral(ctx *BooleanLiteralContext) interfa
 }
 
 func (v *ProgramVisitor) VisitNilLiteral(ctx *NilLiteralContext) interface{} {
-	position := ast.PositionFromToken(ctx.GetStart())
+	position := PositionFromToken(ctx.GetStart())
 	return &ast.NilExpression{
 		Pos: position,
 	}
 }
 
 func (v *ProgramVisitor) VisitStringLiteral(ctx *StringLiteralContext) interface{} {
-	startPosition := ast.PositionFromToken(ctx.GetStart())
+	startPosition := PositionFromToken(ctx.GetStart())
 	endPosition := ast.EndPosition(startPosition, ctx.StringLiteral().GetSymbol().GetStop())
 
 	stringLiteral := ctx.StringLiteral().GetText()
@@ -1797,7 +1851,7 @@ func (v *ProgramVisitor) VisitArrayLiteral(ctx *ArrayLiteralContext) interface{}
 		)
 	}
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.ArrayExpression{
 		Values: expressions,
@@ -1817,7 +1871,7 @@ func (v *ProgramVisitor) VisitDictionaryLiteral(ctx *DictionaryLiteralContext) i
 		)
 	}
 
-	startPosition, endPosition := ast.PositionRangeFromContext(ctx)
+	startPosition, endPosition := PositionRangeFromContext(ctx)
 
 	return &ast.DictionaryExpression{
 		Entries: entries,
@@ -1849,7 +1903,7 @@ func (v *ProgramVisitor) VisitIdentifierExpression(ctx *IdentifierExpressionCont
 func (v *ProgramVisitor) VisitIdentifier(ctx *IdentifierContext) interface{} {
 
 	text := ctx.GetText()
-	pos := ast.PositionFromToken(ctx.GetStart())
+	pos := PositionFromToken(ctx.GetStart())
 
 	return ast.Identifier{
 		Identifier: text,
@@ -1866,7 +1920,7 @@ func (v *ProgramVisitor) VisitInvocation(ctx *InvocationContext) interface{} {
 		)
 	}
 
-	endPosition := ast.PositionFromToken(ctx.GetStop())
+	endPosition := PositionFromToken(ctx.GetStop())
 
 	// NOTE: partial, argument is filled later
 	return &ast.InvocationExpression{
@@ -1882,7 +1936,7 @@ func (v *ProgramVisitor) VisitArgument(ctx *ArgumentContext) interface{} {
 	if identifierNode != nil {
 		label = identifierNode.GetText()
 		symbol := identifierNode.GetStart()
-		startPos := ast.PositionFromToken(symbol)
+		startPos := PositionFromToken(symbol)
 		endPos := ast.EndPosition(startPos, symbol.GetStop())
 		labelStartPos = &startPos
 		labelEndPos = &endPos
