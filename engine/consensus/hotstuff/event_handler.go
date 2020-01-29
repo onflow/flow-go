@@ -10,7 +10,6 @@ type EventHandler struct {
 	paceMaker             PaceMaker
 	voteAggregator        *VoteAggregator
 	voter                 *Voter
-	missingBlockRequester *MissingBlockRequester
 	forks                 Forks
 	validator             *Validator
 	blockProposalProducer BlockProposalProducer
@@ -18,7 +17,7 @@ type EventHandler struct {
 	network               NetworkSender
 }
 
-func (eh *EventHandler) OnReceiveBlockProposal(block *types.BlockProposal) {
+func (eh *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) {
 	panic("implement me")
 }
 
@@ -31,10 +30,6 @@ func (eh *EventHandler) TimeoutChannel() <-chan time.Time {
 }
 
 func (eh *EventHandler) OnLocalTimeout() {
-	panic("implement me")
-}
-
-func (eh *EventHandler) OnBlockRequest(req *types.BlockProposalRequest) {
 	panic("implement me")
 }
 
