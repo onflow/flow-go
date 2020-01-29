@@ -1,17 +1,10 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
-	protocol "github.com/dapperlabs/flow-go/protocol/badger"
-	"github.com/dapperlabs/flow-go/protocol/mocks"
-	"github.com/golang/mock/gomock"
-	"log"
-	"math/rand"
 	"testing"
 
-	"github.com/rs/zerolog"
-
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/flow"
+	protocol "github.com/dapperlabs/flow-go/protocol/badger"
 )
 
 const VOTE_SIZE int = 10
@@ -91,65 +84,9 @@ func TestUnHappyPathForPendingVotes(t *testing.T) {
 // receive another vote with the same voter and the same view
 // should trigger ErrDoubleVote
 func TestErrDoubleVote(t *testing.T) {
-	var vaLogger zerolog.Logger
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	state := mocks.NewMockState(ctrl)
-	va := NewVoteAggregator(vaLogger, &ViewState{protocolState: state}, &Validator{})
-	bp1 := &types.BlockProposal{
-		Block: &types.Block{
-			QC:          &types.QuorumCertificate{},
-			View:        1,
-			PayloadHash: []byte("first block"),
-		},
-	}
-	vote1 := newMockVote(1, bp1.BlockMRH(), uint32(1))
-	va.StoreVoteAndBuildQC(vote1, bp1)
-	bp2 := &types.BlockProposal{
-		Block: &types.Block{
-			View:        1,
-			PayloadHash: []byte("second block"),
-		},
-	}
-	vote2 := newMockVote(1, bp2.BlockMRH(), uint32(1))
-	_, err := va.StoreVoteAndBuildQC(vote2, bp2)
-	if err != nil {
-		switch err.(type) {
-		case types.ErrDoubleVote:
-			log.Printf("double vote detected %v", err)
-		default:
-			t.Errorf("double vote not detected")
-		}
-	} else {
-		t.Errorf("double vote not detected")
-	}
 }
 
 // store random votes and QCs from view 1 to 3
 // prune by view 3
 func TestPruneByView(t *testing.T) {
-
-}
-
-func generateMockVotes(size int, view uint64) []*types.Vote {
-	var votes []*types.Vote
-	for i := 0; i < size; i++ {
-		mockVote := newMockVote(view, [32]byte{}, rand.Uint32())
-		votes = append(votes, mockVote)
-	}
-
-	return votes
-}
-
-func newMockVote(view uint64, blockMRH [32]byte, signer uint32) *types.Vote {
-	vote := &types.Vote{
-		View:     view,
-		BlockMRH: blockMRH,
-		Signature: &types.Signature{
-			RawSignature: [32]byte{},
-			SignerIdx:    signer,
-		},
-	}
-
-	return vote
 }
