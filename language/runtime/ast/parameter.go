@@ -7,22 +7,33 @@ type Parameter struct {
 	Range
 }
 
+// EffectiveArgumentLabel returns the effective argument label that
+// an argument in a call must use:
+// If no argument label is declared for parameter,
+// the parameter name is used as the argument label
+//
+func (p Parameter) EffectiveArgumentLabel() string {
+	if p.Label != "" {
+		return p.Label
+	}
+	return p.Identifier.Identifier
+}
+
 type ParameterList struct {
 	Parameters []*Parameter
 	Range
 }
 
-func (l *ParameterList) ArgumentLabels() []string {
+// EffectiveArgumentLabels returns the effective argument labels that
+// the arguments of a call must use:
+// If no argument label is declared for parameter,
+// the parameter name is used as the argument label
+//
+func (l *ParameterList) EffectiveArgumentLabels() []string {
 	argumentLabels := make([]string, len(l.Parameters))
 
 	for i, parameter := range l.Parameters {
-		argumentLabel := parameter.Label
-		// if no argument label is given, the parameter name
-		// is used as the argument labels and is required
-		if argumentLabel == "" {
-			argumentLabel = parameter.Identifier.Identifier
-		}
-		argumentLabels[i] = argumentLabel
+		argumentLabels[i] = parameter.EffectiveArgumentLabel()
 	}
 
 	return argumentLabels

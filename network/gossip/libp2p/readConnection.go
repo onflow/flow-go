@@ -1,10 +1,11 @@
 package libp2p
 
 import (
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 )
 
 type ReadConnection struct {
