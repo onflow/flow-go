@@ -98,7 +98,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		mw, err := libp2p.NewMiddleware(fnb.Logger, codec, fnb.Me.Address(), fnb.Me.NodeID())
 		fnb.MustNot(err).Msg("could not initialize flow middleware")
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, mw)
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, mw, 10e6)
 		fnb.MustNot(err).Msg("could not initialize flow network")
 		fnb.Network = net
 		return net
