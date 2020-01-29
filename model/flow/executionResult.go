@@ -5,10 +5,10 @@ import (
 )
 
 type ExecutionResultBody struct {
-	PreviousResultID     Identifier      // commit of the previous ER
-	BlockID              Identifier      // commit of the current block
-	FinalStateCommitment StateCommitment // final state commitment
-	Chunks               ChunkList
+	PreviousResultID Identifier      // commit of the previous ER
+	BlockID          Identifier      // commit of the current block
+	FinalStateCommit StateCommitment // final state commitment
+	Chunks           ChunkList
 }
 
 type ExecutionResult struct {

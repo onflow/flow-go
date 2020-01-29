@@ -10,7 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/verification"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
@@ -259,7 +259,7 @@ func (e *Engine) handleExecutionStateResponse(originID flow.Identifier, res *mes
 // requestCollection submits a request for the given collection to collection nodes.
 func (e *Engine) requestCollection(collID flow.Identifier) error {
 
-	collNodes, err := e.state.Final().Identities(identity.HasRole(flow.RoleCollection))
+	collNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleCollection))
 	if err != nil {
 		return fmt.Errorf("could not load collection node identities: %w", err)
 	}
@@ -281,7 +281,7 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 // given chunk to execution nodes.
 func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 
-	exeNodes, err := e.state.Final().Identities(identity.HasRole(flow.RoleExecution))
+	exeNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
 		return fmt.Errorf("could not load execution node identities: %w", err)
 	}

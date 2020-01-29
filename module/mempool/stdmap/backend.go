@@ -9,15 +9,15 @@ import (
 	"github.com/dapperlabs/flow-go/module/mempool"
 )
 
-// backdata implements a generic memory pool backed by a Go map.
+// Backdata implements a generic memory pool backed by a Go map.
 type Backdata struct {
 	entities map[flow.Identifier]flow.Entity
 }
 
-// Backend provides synchronized access to a backend
-type Backend struct {
-	*Backdata
-	sync.RWMutex
+func NewBackdata() *Backdata {
+	return &Backdata{
+		entities: make(map[flow.Identifier]flow.Entity),
+	}
 }
 
 // Has checks if we already contain the item with the given hash.
@@ -76,18 +76,18 @@ func (b *Backdata) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(b.All())...)
 }
 
+// Backend provides synchronized access to a backend
+type Backend struct {
+	*Backdata
+	sync.RWMutex
+}
+
 // NewBackend creates a new memory pool backend.
 func NewBackend() *Backend {
 	b := &Backend{
 		Backdata: NewBackdata(),
 	}
 	return b
-}
-
-func NewBackdata() *Backdata {
-	return &Backdata{
-		entities: make(map[flow.Identifier]flow.Entity),
-	}
 }
 
 // Has checks if we already contain the item with the given hash.
