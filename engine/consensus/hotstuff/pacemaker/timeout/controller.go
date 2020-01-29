@@ -13,7 +13,7 @@ import (
 // - on progress: decrease timeout by subtrahend `timeoutDecrease`
 type Controller struct {
 	config
-	timer *time.Timer
+	timer          *time.Timer
 	timerInfo      *types.TimerInfo
 	timeoutChannel <-chan time.Time
 }
@@ -54,7 +54,7 @@ func (t *Controller) Channel() <-chan time.Time { return t.timeoutChannel }
 
 // StartTimeout starts the timeout of the specified type and returns the
 func (t *Controller) StartTimeout(mode types.TimeoutMode, view uint64) *types.TimerInfo {
-	if t.timer != nil{ 	// stop old timer
+	if t.timer != nil { // stop old timer
 		t.timer.Stop()
 	}
 	duration := t.computeTimeoutDuration(mode)

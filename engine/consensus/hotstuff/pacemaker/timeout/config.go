@@ -48,7 +48,6 @@ func NewConfig(
 	timeoutIncrease float64,
 	timeoutDecrease time.Duration,
 ) (*config, error) {
-	startReplicaTimeout.Milliseconds()
 	if startReplicaTimeout < minReplicaTimeout {
 		msg := fmt.Sprintf(
 			"startReplicaTimeout (%dms) cannot be smaller than minReplicaTimeout (%dms)",

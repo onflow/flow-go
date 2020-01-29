@@ -40,7 +40,7 @@ func Test_TimeoutInitialization(t *testing.T) {
 	case <-tc.Channel():
 		break
 	default:
-		assert.Fail(t,"timeout channel did not return")
+		assert.Fail(t, "timeout channel did not return")
 	}
 	assert.True(t, tc.TimerInfo() == nil)
 	tc.Channel()
