@@ -39,8 +39,7 @@ func main() {
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing ingestion engine")
-
-			ingestEng, err = ingest.New(node.Logger, node.Network, node.State, node.Me, pool)
+			ingestEng, err = ingest.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, pool)
 			node.MustNot(err).Msg("could not initialize ingestion engine")
 
 			return ingestEng
@@ -54,14 +53,14 @@ func main() {
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing provider engine")
 			collections = storage.NewCollections(node.DB)
-			providerEng, err = provider.New(node.Logger, node.Network, node.State, node.Me, collections)
+			providerEng, err = provider.New(node.Logger, node.Network, node.State, node.Tracer, node.Me, collections)
 			node.MustNot(err).Msg("could not initialize proposal engine")
 			return providerEng
 		}).
 		Component("proposal engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing proposal engine")
 			guarantees := storage.NewGuarantees(node.DB)
-			eng, err := proposal.New(node.Logger, proposalConf, node.Network, node.Me, node.State, providerEng, pool, collections, guarantees)
+			eng, err := proposal.New(node.Logger, proposalConf, node.Network, node.Me, node.State, node.Tracer, providerEng, pool, collections, guarantees)
 			node.MustNot(err).Msg("could not initialize proposal engine")
 			return eng
 		}).

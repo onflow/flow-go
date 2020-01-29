@@ -14,7 +14,7 @@ metadata:
   labels:
     app: flow-test-net
     node: consensus
-    env: staging
+    env: local
     owner: Kan
     version: v1
 
@@ -25,7 +25,7 @@ spec:
     matchLabels:
       app: flow-test-net
       node: consensus
-      env: staging
+      env: local
       version: v1
   podManagementPolicy: Parallel
   template:
@@ -41,7 +41,7 @@ spec:
       labels:
         app: flow-test-net
         node: consensus
-        env: staging
+        env: local
         owner: Kan
         version: v1
         kind: web

@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   # This is the full name of your deployment. It must be unique
-  name: flow-consensus-node-v1
+  name: flow-execution-node-v1
   namespace: flow
 
   # Best practice labels:
@@ -13,8 +13,8 @@ metadata:
   #   version: the major version of this service (v1/v2/v1beta1)
   labels:
     app: flow-test-net
-    node: consensus
-    env: staging
+    node: execution
+    env: local
     owner: Kan
     version: v1
 
@@ -24,8 +24,8 @@ spec:
   selector:
     matchLabels:
       app: flow-test-net
-      node: consensus
-      env: staging
+      node: execution
+      env: local
       version: v1
   podManagementPolicy: Parallel
   template:
@@ -40,8 +40,8 @@ spec:
 
       labels:
         app: flow-test-net
-        node: consensus
-        env: staging
+        node: execution
+        env: local
         owner: Kan
         version: v1
         kind: web
@@ -52,7 +52,7 @@ spec:
       containers:
         - name: flow-test-net
           # No tag, will be attached by teamcity
-          image: gcr.io/dl-flow/consensus
+          image: gcr.io/dl-flow/execution
           args: 
             - '--nodename'
             - '$(POD_NAME)'
@@ -92,11 +92,11 @@ spec:
           # Resource requests and constraints
           resources:
             requests:
-              cpu: '250m'
-              memory: '512Mi'
+              cpu: '125m'
+              memory: '128Mi'
             limits:
-              cpu: '500m'
-              memory: '2Gi'
+              cpu: '250m'
+              memory: '256Mi'
           volumeMounts:
             - name: badger-volume
               mountPath: /flowdb
@@ -130,5 +130,5 @@ spec:
         - ReadWriteOnce
         resources:
           requests:
-            storage: 10Gi
+            storage: 20Gi
         storageClassName: standard
