@@ -1,6 +1,6 @@
 package types
 
 type Signature struct {
-	RawSignature [32]byte
+	RawSignature []byte
 	SignerIdx    uint32
 }

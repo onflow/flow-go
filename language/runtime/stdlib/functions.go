@@ -9,6 +9,8 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 )
 
+// StandardLibraryFunction
+
 type StandardLibraryFunction struct {
 	Name           string
 	Type           *sema.FunctionType

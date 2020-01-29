@@ -12,8 +12,9 @@ import (
 //   this results in exponential growing timeout duration on multiple subsequent timeouts
 // - on progress: decrease timeout by subtrahend `timeoutDecrease`
 type Controller struct {
-	Config
-	mode           types.TimeoutMode
+	config
+	timer          *time.Timer
+	timerInfo      *types.TimerInfo
 	timeoutChannel <-chan time.Time
 }
 
@@ -23,14 +24,14 @@ type Controller struct {
 const timeoutCap float64 = 1E9
 
 // NewController creates a new Controller.
-func NewController(timeoutConfig Config) *Controller {
+func NewController(timeoutConfig config) *Controller {
 	// the initial value for the timeout channel is a closed channel which returns immediately
 	// this prevents indefinite blocking when no timeout has been started
 	startChannel := make(chan time.Time)
 	close(startChannel)
 
 	tc := Controller{
-		Config:         timeoutConfig,
+		config:         timeoutConfig,
 		timeoutChannel: startChannel,
 	}
 	return &tc
@@ -40,24 +41,49 @@ func DefaultController() *Controller {
 	return NewController(DefaultConfig)
 }
 
-func (t *Controller) StartTimeout(mode types.TimeoutMode) {
-	t.mode = mode
+// TimerInfo returns TimerInfo for the current timer.
+// New struct is created for each timer.
+// Is nil if no timer has been started.
+func (t *Controller) TimerInfo() *types.TimerInfo { return t.timerInfo }
+
+// Channel returns a channel that will receive the specific timeout.
+// New channel is created for each timer.
+// in the event the timeout is reached (specified as TimerInfo).
+// returns closed channel if no timer has been started.
+func (t *Controller) Channel() <-chan time.Time { return t.timeoutChannel }
+
+// StartTimeout starts the timeout of the specified type and returns the
+func (t *Controller) StartTimeout(mode types.TimeoutMode, view uint64) *types.TimerInfo {
+	if t.timer != nil { // stop old timer
+		t.timer.Stop()
+	}
+	duration := t.computeTimeoutDuration(mode)
+
+	startTime := time.Now()
+	timer := time.NewTimer(duration)
+	timerInfo := types.TimerInfo{Mode: mode, View: view, StartTime: startTime, Duration: duration}
+	t.timer = timer
+	t.timeoutChannel = t.timer.C
+	t.timerInfo = &timerInfo
+
+	return &timerInfo
+}
+
+func (t *Controller) computeTimeoutDuration(mode types.TimeoutMode) time.Duration {
+	var duration time.Duration
 	switch mode {
 	case types.VoteCollectionTimeout:
-		t.timeoutChannel = time.NewTimer(t.VoteCollectionTimeoutTimeout()).C
+		duration = t.VoteCollectionTimeout()
 	case types.ReplicaTimeout:
-		t.timeoutChannel = time.NewTimer(t.ReplicaTimeout()).C
+		duration = t.ReplicaTimeout()
 	default:
 		// This should never happen; Only protects code from future inconsistent modifications.
 		// There are only the two timeout modes explicitly handled above. Unless the enum
 		// containing the timeout mode is extended, the default case will never be reached.
 		panic("unknown timeout mode")
 	}
-
+	return duration
 }
-
-func (t *Controller) Channel() <-chan time.Time { return t.timeoutChannel }
-func (t *Controller) Mode() types.TimeoutMode   { return t.mode }
 
 // ReplicaTimeout returns the duration of the current view before we time out
 func (t *Controller) ReplicaTimeout() time.Duration {
@@ -66,7 +92,7 @@ func (t *Controller) ReplicaTimeout() time.Duration {
 
 // VoteCollectionTimeout returns the duration of Vote aggregation _after_ receiving a block
 // during which the primary tries to aggregate votes for the view where it is leader
-func (t *Controller) VoteCollectionTimeoutTimeout() time.Duration {
+func (t *Controller) VoteCollectionTimeout() time.Duration {
 	// time.Duration expects an int64 as input which specifies the duration in units of nanoseconds (1E-9)
 	return time.Duration(t.replicaTimeout * 1E6 * t.voteAggregationTimeoutFraction)
 }
