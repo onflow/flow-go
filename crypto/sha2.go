@@ -12,8 +12,8 @@ type sha2_256Algo struct {
 	hash.Hash
 }
 
-// NewSha2_256 returns a new instance of SHA2-256 hasher
-func NewSha2_256() Hasher {
+// NewSHA2_256 returns a new instance of SHA2-256 hasher
+func NewSHA2_256() Hasher {
 	return &sha2_256Algo{
 		commonHasher: &commonHasher{
 			algo:       SHA2_256,
@@ -43,8 +43,8 @@ type sha2_384Algo struct {
 	hash.Hash
 }
 
-// NewSha2_384 returns a new instance of SHA2-384 hasher
-func NewSha2_384() Hasher {
+// NewSHA2_384 returns a new instance of SHA2-384 hasher
+func NewSHA2_384() Hasher {
 	return &sha2_384Algo{
 		commonHasher: &commonHasher{
 			algo:       SHA2_384,

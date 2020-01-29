@@ -8,5 +8,5 @@ import (
 var DefaultHasher crypto.Hasher
 
 func init() {
-	DefaultHasher = crypto.NewSha3_256()
+	DefaultHasher = crypto.NewSHA3_256()
 }

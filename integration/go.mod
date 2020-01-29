@@ -14,3 +14,4 @@ require (
 )
 
 replace github.com/dapperlabs/flow-go => ../
+replace github.com/dapperlabs/flow-go/crypto => ../crypto

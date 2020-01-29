@@ -28,11 +28,13 @@ func (sk *PrKeyBLS_BLS12381) Sign(data []byte, kmac Hasher) (Signature, error) {
 	return sk.signHash(h)
 }
 
-// NewBlsKmac returns a new KMAC128 instance with the right parameters
+const BLS_KMACFunction = "H2C"
+
+// NewBLS_KMAC returns a new KMAC128 instance with the right parameters
 // chosen for BLS signatures and verifications
 // tag is the domain separation tag
-func NewBlsKmac(tag string) Hasher {
-	return NewKmac128([]byte(tag), []byte("H2C"), OpSwUInputLenBLS_BLS12381)
+func NewBLS_KMAC(tag string) Hasher {
+	return NewKMAC_128([]byte(tag), []byte("BLS_KMACFunction"), OpSwUInputLenBLS_BLS12381)
 }
 
 // verifyHash implements BLS signature verification on BLS12381 curve

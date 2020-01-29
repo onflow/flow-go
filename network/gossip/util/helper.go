@@ -50,7 +50,7 @@ func RandomSubSet(list []string, size int) ([]string, error) {
 // computeHash computes the hash of GossipMessage using sha256 algorithm
 func ComputeHash(msg *messages.GossipMessage) ([]byte, error) {
 
-	alg := crypto.NewSha3_256()
+	alg := crypto.NewSHA3_256()
 	msgHash := alg.ComputeHash(msg.GetPayload())
 
 	return msgHash, nil

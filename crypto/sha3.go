@@ -12,8 +12,8 @@ type sha3_256Algo struct {
 	hash.Hash
 }
 
-// NewSha3_256 returns a new instance of SHA3-256 hasher
-func NewSha3_256() Hasher {
+// NewSHA3_256 returns a new instance of SHA3-256 hasher
+func NewSHA3_256() Hasher {
 	return &sha3_256Algo{
 		commonHasher: &commonHasher{
 			algo:       SHA3_256,
@@ -37,15 +37,19 @@ func (s *sha3_256Algo) SumHash() Hash {
 	return digest
 }
 
-// Add adds data to the state data to be hashed
-func (s *sha3_256Algo) Add(data []byte) {
-	_, _ = s.Write(data)
-}
-
 // sha3_384Algo, embeds commonHasher
 type sha3_384Algo struct {
 	*commonHasher
 	hash.Hash
+}
+
+// NewSHA3_384 returns a new instance of SHA3-384 hasher
+func NewSHA3_384() Hasher {
+	return &sha3_384Algo{
+		commonHasher: &commonHasher{
+			algo:       SHA3_384,
+			outputSize: HashLenSha3_384},
+		Hash: sha3.New384()}
 }
 
 // ComputeHash calculates and returns the SHA3-256 output of input byte array
@@ -68,15 +72,6 @@ func (s *sha3_384Algo) SumHash() Hash {
 type cShake128Algo struct {
 	*commonHasher
 	sha3.ShakeHash
-}
-
-// NewSha3_384 returns a new instance of SHA3-384 hasher
-func NewSha3_384() Hasher {
-	return &sha3_384Algo{
-		commonHasher: &commonHasher{
-			algo:       SHA3_384,
-			outputSize: HashLenSha3_384},
-		Hash: sha3.New384()}
 }
 
 // ComputeHash calculates and returns the cSHAKE-128 output of input byte array

@@ -16,7 +16,7 @@ type kmac128 struct {
 	// Using the io.Writer interface changes the internal state
 	// of the KMAC
 	sha3.ShakeHash
-	// the block initialized by NewKmac128
+	// the block initialized by NewKMAC_128
 	// stores the encoding of the key
 	initBlock []byte
 }
@@ -24,12 +24,12 @@ type kmac128 struct {
 // the cSHAKE128 rate as defined in NIST SP 800-185
 const cSHAKE128BlockSize = 168
 
-// NewKmac128 returns a new KMAC instance
+// NewKMAC_128 returns a new KMAC instance
 // - key is the KMAC key (in this function, the length is not compared
 // against the security level, this function should not be used in
 // the general KMAC case)
 // - customizer is the customization string
-func NewKmac128(key []byte, customizer []byte, outputSize int) Hasher {
+func NewKMAC_128(key []byte, customizer []byte, outputSize int) Hasher {
 	var k kmac128
 	k.commonHasher = &commonHasher{
 		algo:       KMAC128,
@@ -45,19 +45,21 @@ func NewKmac128(key []byte, customizer []byte, outputSize int) Hasher {
 	return &k
 }
 
+const maxEncodeLen = 9
+
 // endocee_string function as defined in NIST SP 800-185 (for value < 2^64)
 func encodeString(s []byte) []byte {
 	// leftEncode returns max 9 bytes
-	out := make([]byte, 0, 9+len(s))
+	out := make([]byte, 0, maxEncodeLen+len(s))
 	out = append(out, leftEncode(uint64(len(s)*8))...)
 	out = append(out, s...)
 	return out
 }
 
-// left_Encode function as defined in NIST SP 800-185 (for value < 2^64)
+// "left_encode" function as defined in NIST SP 800-185 (for value < 2^64)
 // copied from golang.org/x/crypto/sha3
 func leftEncode(value uint64) []byte {
-	var b [9]byte
+	var b [maxEncodeLen]byte
 	binary.BigEndian.PutUint64(b[1:], value)
 	// Trim all but last leading zero bytes
 	i := byte(1)
@@ -65,7 +67,7 @@ func leftEncode(value uint64) []byte {
 		i++
 	}
 	// Prepend number of encoded bytes
-	b[i-1] = 9 - i
+	b[i-1] = maxEncodeLen - i
 	return b[i-1:]
 }
 
@@ -73,16 +75,16 @@ func leftEncode(value uint64) []byte {
 // copied from golang.org/x/crypto/sha3
 func bytepad(input []byte, w int) []byte {
 	// leftEncode always returns max 9 bytes
-	buf := make([]byte, 0, 9+len(input)+w)
+	buf := make([]byte, 0, maxEncodeLen+len(input)+w)
 	buf = append(buf, leftEncode(uint64(w))...)
 	buf = append(buf, input...)
 	padlen := w - (len(buf) % w)
 	return append(buf, make([]byte, padlen)...)
 }
 
-// right_Encode function as defined in NIST SP 800-185 (for value < 2^64)
+// "right_encode" function as defined in NIST SP 800-185 (for value < 2^64)
 func rightEncode(value uint64) []byte {
-	var b [9]byte
+	var b [maxEncodeLen]byte
 	binary.BigEndian.PutUint64(b[:8], value)
 	// Trim all but last leading zero bytes
 	i := byte(0)
@@ -90,7 +92,7 @@ func rightEncode(value uint64) []byte {
 		i++
 	}
 	// Append number of encoded bytes
-	b[8] = 8 - i
+	b[8] = maxEncodeLen - 1 - i
 	return b[i:]
 }
 

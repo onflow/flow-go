@@ -26,7 +26,7 @@ func TestHasherNodeOneToAll(t *testing.T) {
 	// fanoutSet size for each node
 	fanoutSize := 5
 
-	hasher := crypto.NewSha3_256()
+	hasher := crypto.NewSHA3_256()
 	// hashes keeps the hash of all the messages sent
 	hashes := make([]string, numNodes)
 
@@ -113,7 +113,7 @@ func TestHasherNode(t *testing.T) {
 	fanoutSize := 5
 	wg := &sync.WaitGroup{}
 
-	hasher := crypto.NewSha3_256()
+	hasher := crypto.NewSHA3_256()
 
 	testParams := []struct {
 		numRecipients int

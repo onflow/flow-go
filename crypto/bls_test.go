@@ -16,7 +16,7 @@ func TestBLS_BLS12381(t *testing.T) {
 		log.Error(err.Error())
 		return
 	}
-	halg := NewBlsKmac("test tag")
+	halg := NewBLS_KMAC("test tag")
 	input := []byte("test input")
 	// test the consistency with different inputs
 	for i := 0; i < 256; i++ {
@@ -27,12 +27,12 @@ func TestBLS_BLS12381(t *testing.T) {
 
 // Signing bench
 func BenchmarkBLS_BLS12381Sign(b *testing.B) {
-	halg := NewBlsKmac("bench tag")
+	halg := NewBLS_KMAC("bench tag")
 	benchSign(b, BLS_BLS12381, halg)
 }
 
 // Verifying bench
 func BenchmarkBLS_BLS12381Verify(b *testing.B) {
-	halg := NewBlsKmac("bench tag")
+	halg := NewBLS_KMAC("bench tag")
 	benchVerify(b, BLS_BLS12381, halg)
 }

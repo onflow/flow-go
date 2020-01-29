@@ -20,7 +20,7 @@ func TestECDSA(t *testing.T) {
 	for i, curve := range ECDSAcurves {
 		t.Logf("Testing ECDSA for curve %s", curve)
 
-		halg := NewSha3_256()
+		halg := NewSHA3_256()
 		seed := make([]byte, ECDSAseedLen[i])
 		for j := 0; j < len(seed); j++ {
 			seed[j] = byte(j)
@@ -37,25 +37,25 @@ func TestECDSA(t *testing.T) {
 
 // Signing bench
 func BenchmarkECDSA_P256Sign(b *testing.B) {
-	halg := NewSha3_256()
+	halg := NewSHA3_256()
 	benchSign(b, ECDSA_P256, halg)
 }
 
 // Verifying bench
 func BenchmarkECDSA_P256Verify(b *testing.B) {
-	halg := NewSha3_256()
+	halg := NewSHA3_256()
 	benchVerify(b, ECDSA_P256, halg)
 }
 
 // Signing bench
 func BenchmarkECDSA_SECp256k1Sign(b *testing.B) {
-	halg := NewSha3_256()
+	halg := NewSHA3_256()
 	benchSign(b, ECDSA_SECp256k1, halg)
 }
 
 // Verifying bench
 func BenchmarkECDSA_SECp256k1Verify(b *testing.B) {
-	halg := NewSha3_256()
+	halg := NewSHA3_256()
 	benchVerify(b, ECDSA_SECp256k1, halg)
 }
 

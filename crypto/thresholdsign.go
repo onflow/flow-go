@@ -39,6 +39,8 @@ type ThresholdSigner struct {
 	thresholdSignature Signature
 }
 
+const ThresholdSignaureTag = "Threshold Signatures"
+
 // NewThresholdSigner creates a new instance of Threshold signer using BLS
 // hash is the hashing algorithm to be used
 // size is the number of participants
@@ -50,7 +52,7 @@ func NewThresholdSigner(size int, hashAlgo HashingAlgorithm) (*ThresholdSigner, 
 	// optimal threshold (t) to allow the largest number of malicious nodes (m)
 	threshold := optimalThreshold(size)
 	// Hahser to be used
-	hasher := NewBlsKmac("Threshold Signatures")
+	hasher := NewBLS_KMAC(ThresholdSignaureTag)
 	shares := make([]byte, 0, size*SignatureLenBLS_BLS12381)
 	signers := make([]index, 0, size)
 

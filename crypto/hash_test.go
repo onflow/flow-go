@@ -19,7 +19,7 @@ func TestSha3_256(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80")
 
-	alg := NewSha3_256()
+	alg := NewSHA3_256()
 	hash := alg.ComputeHash(input)
 	checkBytes(t, input, expected, hash)
 
@@ -36,7 +36,7 @@ func TestSha3_384(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("e516dabb23b6e30026863543282780a3ae0dccf05551cf0295178d7ff0f1b41eecb9db3ff219007c4e097260d58621bd")
 
-	alg := NewSha3_384()
+	alg := NewSHA3_384()
 	hash := alg.ComputeHash(input)
 	checkBytes(t, input, expected, hash)
 
@@ -53,7 +53,7 @@ func TestSha2_256(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08")
 
-	alg := NewSha2_256()
+	alg := NewSHA2_256()
 	hash := alg.ComputeHash(input)
 	checkBytes(t, input, expected, hash)
 
@@ -70,7 +70,7 @@ func TestSha2_384(t *testing.T) {
 	input := []byte("test")
 	expected, _ := hex.DecodeString("768412320f7b0aa5812fce428dc4706b3cae50e02a64caa16a782249bfe8efc4b7ef1ccb126255d196047dfedf17a0a9")
 
-	alg := NewSha2_384()
+	alg := NewSHA2_384()
 	hash := alg.ComputeHash(input)
 	checkBytes(t, input, expected, hash)
 
@@ -85,7 +85,7 @@ func TestSha2_384(t *testing.T) {
 // SHA3_256 bench
 func BenchmarkSha3_256(b *testing.B) {
 	a := []byte("Bench me!")
-	alg := NewSha3_256()
+	alg := NewSHA3_256()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		alg.ComputeHash(a)
@@ -96,7 +96,7 @@ func BenchmarkSha3_256(b *testing.B) {
 // SHA3_384 bench
 func BenchmarkSha3_384(b *testing.B) {
 	a := []byte("Bench me!")
-	alg := NewSha3_384()
+	alg := NewSHA3_384()
 	for i := 0; i < b.N; i++ {
 		alg.ComputeHash(a)
 	}
@@ -106,7 +106,7 @@ func BenchmarkSha3_384(b *testing.B) {
 // SHA2_256 bench
 func BenchmarkSha2_256(b *testing.B) {
 	a := []byte("Bench me!")
-	alg := NewSha2_256()
+	alg := NewSHA2_256()
 	for i := 0; i < b.N; i++ {
 		alg.ComputeHash(a)
 	}
@@ -116,7 +116,7 @@ func BenchmarkSha2_256(b *testing.B) {
 // SHA2_256 bench
 func BenchmarkSha2_384(b *testing.B) {
 	a := []byte("Bench me!")
-	alg := NewSha2_384()
+	alg := NewSHA2_384()
 	for i := 0; i < b.N; i++ {
 		alg.ComputeHash(a)
 	}
@@ -143,14 +143,14 @@ func TestKmac128(t *testing.T) {
 	}
 	outputSize := 32
 
-	alg := NewKmac128(key, customizers[0], outputSize)
+	alg := NewKMAC_128(key, customizers[0], outputSize)
 	_, _ = alg.Write(input[0:2])
 	_, _ = alg.Write(input[2:])
 	hash := alg.SumHash()
 	checkBytes(t, input, expected[0], hash)
 
 	for i := 0; i < len(customizers); i++ {
-		alg = NewKmac128(key, customizers[i], outputSize)
+		alg = NewKMAC_128(key, customizers[i], outputSize)
 		hash = alg.ComputeHash(input)
 		checkBytes(t, input, expected[i], hash)
 	}
