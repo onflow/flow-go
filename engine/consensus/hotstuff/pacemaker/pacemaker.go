@@ -2,6 +2,7 @@ package pacemaker
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
@@ -57,7 +58,7 @@ func (p *FlowPaceMaker) CurView() uint64 {
 	return p.currentView
 }
 
-func (p *FlowPaceMaker) TimeoutChannel() <-chan *types.Timeout {
+func (p *FlowPaceMaker) TimeoutChannel() <-chan time.Time {
 	return p.timeoutControl.Channel()
 }
 
@@ -74,9 +75,9 @@ func (p *FlowPaceMaker) UpdateCurViewWithQC(qc *types.QuorumCertificate) (*types
 
 func (p *FlowPaceMaker) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
 	// use block's QC to fast-forward if possible
-	newViewOnQc, newViewOccuredOnQc := p.UpdateCurViewWithQC(block.QC())
+	newViewOnQc, newViewOccurredOnQc := p.UpdateCurViewWithQC(block.QC())
 	if block.View() != p.currentView {
-		return newViewOnQc, newViewOccuredOnQc
+		return newViewOnQc, newViewOccurredOnQc
 	}
 	// block is for current view
 
@@ -89,13 +90,13 @@ func (p *FlowPaceMaker) UpdateCurViewWithBlock(block *types.BlockProposal, isLea
 		// if we get a second block for the current View.
 		return nil, false
 	}
-	newViewOnBlock, newViewOccuredOnBlock := p.processBlockForCurView(block, isLeaderForNextView)
-	if !newViewOccuredOnBlock { // if processing current block didn't lead to NewView event,
+	newViewOnBlock, newViewOccurredOnBlock := p.processBlockForCurView(block, isLeaderForNextView)
+	if !newViewOccurredOnBlock { // if processing current block didn't lead to NewView event,
 		// the initial processing of the block's QC still might have changes the view:
-		return newViewOnQc, newViewOccuredOnQc
+		return newViewOnQc, newViewOccurredOnQc
 	}
 	// processing current block created NewView event, which is always newer than any potential newView event from processing the block's QC
-	return newViewOnBlock, newViewOccuredOnBlock
+	return newViewOnBlock, newViewOccurredOnBlock
 }
 
 func (p *FlowPaceMaker) processBlockForCurView(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
@@ -107,28 +108,12 @@ func (p *FlowPaceMaker) processBlockForCurView(block *types.BlockProposal, isLea
 	return p.gotoView(p.currentView + 1), true
 }
 
-func (p *FlowPaceMaker) OnTimeout(timeout *types.Timeout) (*types.NewViewEvent, error) {
-	if err := p.ensureMatchingTimeout(timeout); err != nil {
-		return nil, err
-	}
-
-	// timeout is for current condition
-	p.emitTimeoutNotifications(timeout)
-	return p.gotoView(p.currentView + 1), nil
+func (p *FlowPaceMaker) OnTimeout() *types.NewViewEvent {
+	p.emitTimeoutNotifications(p.timeoutControl.TimerInfo())
+	return p.gotoView(p.currentView + 1)
 }
 
-func (p *FlowPaceMaker) ensureMatchingTimeout(timeout *types.Timeout) error {
-	if timeout.View != p.currentView || p.timeoutControl.TimerInfo().Mode != timeout.Mode {
-		// this indicates a bug in the usage of the PaceMaker
-		return &types.ErrorInvalidTimeout{
-			Timeout:     timeout,
-			CurrentView: p.currentView,
-			CurrentMode: p.timeoutControl.TimerInfo().Mode}
-	}
-	return nil
-}
-
-func (p *FlowPaceMaker) emitTimeoutNotifications(timeout *types.Timeout) {
+func (p *FlowPaceMaker) emitTimeoutNotifications(timeout *types.TimerInfo) {
 	p.notifier.OnReachedTimeout(timeout)
 }
 

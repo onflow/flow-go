@@ -37,5 +37,5 @@ type Distributor interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnReachedTimeout(timeout *types.Timeout)
+	OnReachedTimeout(*types.TimerInfo)
 }

@@ -3,20 +3,26 @@ package timeout
 import (
 	"math"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
 const (
-	startRepTimeout         float64 = 120.0
-	minRepTimeout           float64 = 100.0
-	voteTimeoutFraction     float64 = 0.5
-	multiplicateiveIncrease float64 = 1.5
-	additiveDecrease        float64 = 50
+	startRepTimeout        float64 = 120 // Milliseconds
+	minRepTimeout          float64 = 100 // Milliseconds
+	voteTimeoutFraction    float64 = 0.5 // multiplicative factor
+	multiplicativeIncrease float64 = 1.5 // multiplicative factor
+	additiveDecrease       float64 = 50  // Milliseconds
 )
 
 func initTimeoutController(t *testing.T) *Controller {
-	tc, err := NewConfig(startRepTimeout, minRepTimeout, voteTimeoutFraction, multiplicateiveIncrease, additiveDecrease)
+	tc, err := NewConfig(
+		time.Duration(startRepTimeout*1E6),
+		time.Duration(minRepTimeout*1E6),
+		voteTimeoutFraction,
+		multiplicativeIncrease,
+		time.Duration(additiveDecrease*1E6))
 	if err != nil {
 		t.Fail()
 	}
@@ -27,7 +33,17 @@ func initTimeoutController(t *testing.T) *Controller {
 func Test_TimeoutInitialization(t *testing.T) {
 	tc := initTimeoutController(t)
 	assert.Equal(t, tc.ReplicaTimeout().Milliseconds(), int64(startRepTimeout))
-	assert.Equal(t, tc.VoteCollectionTimeoutTimeout().Milliseconds(), int64(startRepTimeout*voteTimeoutFraction))
+	assert.Equal(t, tc.VoteCollectionTimeout().Milliseconds(), int64(startRepTimeout*voteTimeoutFraction))
+
+	// verify that returned timeout channel
+	select {
+	case <-tc.Channel():
+		break
+	default:
+		assert.Fail(t,"timeout channel did not return")
+	}
+	assert.True(t, tc.TimerInfo() == nil)
+	tc.Channel()
 }
 
 // Test_TimeoutIncrease verifies that timeout increases exponentially
@@ -38,11 +54,11 @@ func Test_TimeoutIncrease(t *testing.T) {
 		tc.OnTimeout()
 		assert.Equal(t,
 			tc.ReplicaTimeout().Milliseconds(),
-			int64(startRepTimeout*math.Pow(multiplicateiveIncrease, float64(i))),
+			int64(startRepTimeout*math.Pow(multiplicativeIncrease, float64(i))),
 		)
 		assert.Equal(t,
-			tc.VoteCollectionTimeoutTimeout().Milliseconds(),
-			int64(startRepTimeout*voteTimeoutFraction*math.Pow(multiplicateiveIncrease, float64(i))),
+			tc.VoteCollectionTimeout().Milliseconds(),
+			int64(startRepTimeout*voteTimeoutFraction*math.Pow(multiplicativeIncrease, float64(i))),
 		)
 	}
 }
@@ -54,7 +70,7 @@ func Test_TimeoutDecrease(t *testing.T) {
 	tc.OnTimeout()
 	tc.OnTimeout()
 
-	repTimeout := startRepTimeout * math.Pow(multiplicateiveIncrease, 3.0)
+	repTimeout := startRepTimeout * math.Pow(multiplicativeIncrease, 3.0)
 	for i := 1; i <= 6; i += 1 {
 		tc.OnProgressBeforeTimeout()
 		assert.Equal(t,
@@ -62,7 +78,7 @@ func Test_TimeoutDecrease(t *testing.T) {
 			int64(repTimeout-float64(i)*additiveDecrease),
 		)
 		assert.Equal(t,
-			tc.VoteCollectionTimeoutTimeout().Milliseconds(),
+			tc.VoteCollectionTimeout().Milliseconds(),
 			int64((repTimeout-float64(i)*additiveDecrease)*voteTimeoutFraction),
 		)
 	}
@@ -78,13 +94,18 @@ func Test_MinCutoff(t *testing.T) {
 
 	tc.OnProgressBeforeTimeout()
 	assert.Equal(t, tc.ReplicaTimeout().Milliseconds(), int64(minRepTimeout))
-	assert.Equal(t, tc.VoteCollectionTimeoutTimeout().Milliseconds(), int64(minRepTimeout*voteTimeoutFraction))
+	assert.Equal(t, tc.VoteCollectionTimeout().Milliseconds(), int64(minRepTimeout*voteTimeoutFraction))
 }
 
 // Test_MinCutoff verifies that timeout does not decrease below minRepTimeout
 func Test_MaxCutoff(t *testing.T) {
 	// here we use a different timeout controller with a larger timeoutIncrease to avoid too many iterations
-	c, err := NewConfig(200, minRepTimeout, voteTimeoutFraction, 10, additiveDecrease)
+	c, err := NewConfig(
+		time.Duration(200*1E6),
+		time.Duration(minRepTimeout*1E6),
+		voteTimeoutFraction,
+		10,
+		time.Duration(additiveDecrease*1E6))
 	if err != nil {
 		t.Fail()
 	}
@@ -93,6 +114,6 @@ func Test_MaxCutoff(t *testing.T) {
 	for i := 1; i <= 50; i += 1 {
 		tc.OnTimeout() // after already 7 iterations we should have reached the max value
 		assert.True(t, float64(tc.ReplicaTimeout().Milliseconds()) <= timeoutCap)
-		assert.True(t, float64(tc.VoteCollectionTimeoutTimeout().Milliseconds()) <= timeoutCap*voteTimeoutFraction)
+		assert.True(t, float64(tc.VoteCollectionTimeout().Milliseconds()) <= timeoutCap*voteTimeoutFraction)
 	}
 }

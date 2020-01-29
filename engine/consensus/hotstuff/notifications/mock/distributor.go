@@ -16,9 +16,9 @@ func (_m *Distributor) OnEnteringView(_a0 uint64) {
 	_m.Called(_a0)
 }
 
-// OnReachedTimeout provides a mock function with given fields: timeout
-func (_m *Distributor) OnReachedTimeout(timeout *types.Timeout) {
-	_m.Called(timeout)
+// OnReachedTimeout provides a mock function with given fields: _a0
+func (_m *Distributor) OnReachedTimeout(_a0 *types.TimerInfo) {
+	_m.Called(_a0)
 }
 
 // OnSkippedAhead provides a mock function with given fields: _a0

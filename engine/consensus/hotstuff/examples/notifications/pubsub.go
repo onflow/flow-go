@@ -45,7 +45,7 @@ func (p *PubSubDistributor) OnStartingTimeout(timerInfo *types.TimerInfo) {
 	}
 }
 
-func (p *PubSubDistributor) OnReachedTimeout(timeout *types.Timeout) {
+func (p *PubSubDistributor) OnReachedTimeout(timeout *types.TimerInfo) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.reachedTimeoutConsumers {
