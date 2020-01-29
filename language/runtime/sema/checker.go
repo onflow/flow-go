@@ -696,6 +696,8 @@ func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
 	var restrictions []*InterfaceType
 	restrictionRanges := make(map[*InterfaceType]ast.Range, len(t.Restrictions))
 
+	memberSet := map[string]*InterfaceType{}
+
 	for _, restriction := range t.Restrictions {
 		restrictionResult := checker.ConvertType(restriction)
 
@@ -726,6 +728,26 @@ func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
 		} else {
 			restrictionRanges[interfaceType] =
 				ast.NewRangeFromPositioned(restriction)
+		}
+
+		// The restrictions may not have clashing members
+
+		// TODO: also include interface conformances's members
+		//   once interfaces can have conformances
+
+		for name := range interfaceType.Members {
+			if previousDeclaringInterfaceType, ok := memberSet[name]; ok {
+				checker.report(
+					&RestrictionMemberClashError{
+						Name:                  name,
+						RedeclaringType:       interfaceType,
+						OriginalDeclaringType: previousDeclaringInterfaceType,
+						Range:                 ast.NewRangeFromPositioned(restriction),
+					},
+				)
+			} else {
+				memberSet[name] = interfaceType
+			}
 		}
 	}
 

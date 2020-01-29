@@ -2154,3 +2154,35 @@ func (e *InvalidNonConformanceRestrictionError) Error() string {
 }
 
 func (*InvalidNonConformanceRestrictionError) isSemanticError() {}
+
+// InvalidRestrictedTypeMemberAccessError
+
+type InvalidRestrictedTypeMemberAccessError struct {
+	Name string
+	ast.Range
+}
+
+func (e *InvalidRestrictedTypeMemberAccessError) Error() string {
+	return fmt.Sprintf("member of restricted type is not accessible: %s", e.Name)
+}
+
+func (*InvalidRestrictedTypeMemberAccessError) isSemanticError() {}
+
+// RestrictionMemberClashError
+
+type RestrictionMemberClashError struct {
+	Name                  string
+	RedeclaringType       *InterfaceType
+	OriginalDeclaringType *InterfaceType
+	ast.Range
+}
+
+func (e *RestrictionMemberClashError) Error() string {
+	return fmt.Sprintf(
+		"restriction has member clash with previous restriction `%s`: %s",
+		e.OriginalDeclaringType.String(),
+		e.Name,
+	)
+}
+
+func (*RestrictionMemberClashError) isSemanticError() {}
