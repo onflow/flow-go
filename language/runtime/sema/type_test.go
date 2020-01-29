@@ -379,7 +379,7 @@ func TestRestrictedResourceType_Equals(t *testing.T) {
 
 func TestRestrictedResourceType_GetMember(t *testing.T) {
 
-	t.Run("forbid unlisted members", func(t *testing.T) {
+	t.Run("forbid undeclared members", func(t *testing.T) {
 		ty := &RestrictedResourceType{
 			Type: &CompositeType{
 				Kind:       common.CompositeKindResource,
@@ -393,10 +393,16 @@ func TestRestrictedResourceType_GetMember(t *testing.T) {
 		fieldName := "s"
 		ty.Type.Members[fieldName] = NewPublicConstantFieldMember(ty.Type, fieldName, &IntType{})
 
-		assert.Nil(t, ty.GetMember(fieldName, ast.Range{}, nil))
+		var reportedError error
+		member := ty.GetMember(fieldName, ast.Range{}, func(err error) {
+			reportedError = err
+		})
+
+		assert.IsType(t, &InvalidRestrictedTypeMemberAccessError{}, reportedError)
+		assert.NotNil(t, member)
 	})
 
-	t.Run("forbid unlisted members", func(t *testing.T) {
+	t.Run("allow declared members", func(t *testing.T) {
 		interfaceType := &InterfaceType{
 			CompositeKind: common.CompositeKindResource,
 			Identifier:    "I",

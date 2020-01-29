@@ -2056,6 +2056,12 @@ func (t *CompositeType) TypeRequirements() []*CompositeType {
 	return typeRequirements
 }
 
+func (t *CompositeType) AllConformances() []*InterfaceType {
+	// TODO: also return conformances' conformances recursively
+	//   once interface can have conformances
+	return t.Conformances
+}
+
 // AccountType
 
 type AccountType struct{}
@@ -3155,12 +3161,34 @@ func (t *RestrictedResourceType) CanHaveMembers() bool {
 	return true
 }
 
-func (t *RestrictedResourceType) GetMember(identifier string, r ast.Range, reportError func(error)) *Member {
+func (t *RestrictedResourceType) GetMember(identifier string, targetRange ast.Range, reportError func(error)) *Member {
+
+	// Return the first member of any restriction.
+	// The invariant that restrictions may not have overlapping members is not checked here,
+	// but implicitly when the resource declaration's conformances are checked.
+
 	for _, restriction := range t.Restrictions {
-		member := restriction.GetMember(identifier, r, reportError)
+		member := restriction.GetMember(identifier, targetRange, reportError)
 		if member != nil {
 			return member
 		}
 	}
-	return nil
+
+	// If none of the restrictions had a member, see if the restricted type
+	// has a member with the identifier. Still return it for convenience
+	// to help check the rest of the program and improve the developer experience,
+	// *but* also report an error that this access is invalid
+
+	member := t.Type.GetMember(identifier, targetRange, reportError)
+
+	if member != nil {
+		reportError(
+			&InvalidRestrictedTypeMemberAccessError{
+				Name:  identifier,
+				Range: targetRange,
+			},
+		)
+	}
+
+	return member
 }
