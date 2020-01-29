@@ -21,7 +21,7 @@ func (b BlockProposal) View() uint64              { return b.Block.View }
 func (b BlockProposal) BlockMRH() flow.Identifier { return b.Block.BlockMRH() }
 func (b BlockProposal) Height() uint64            { return b.Block.Height }
 
-func (b BlockProposal) BytesForSig() []byte {
-	// the bytes for signing a block proposal is the same as the bytes for signing a vote
-	return voteBytesForSig(b.View(), b.BlockMRH())
+// ToVote converts a BlockProposal to a Vote
+func (b BlockProposal) ToVote() *Vote {
+	return NewVote(NewUnsignedVote(b.View(), b.BlockMRH()), b.Signature)
 }

@@ -164,7 +164,7 @@ func (v *Validator) validateBlockSig(bh *types.BlockHeader) (*flow.Identity, err
 	}
 
 	// get the hash
-	hashToSign := bh.BytesForSig()
+	hashToSign := bh.ToVote().BytesForSig()
 
 	// verify the signature
 	signer, err := validateSignatureWithSignedBytes(identities, hashToSign, bh.Signature)

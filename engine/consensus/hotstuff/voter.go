@@ -67,7 +67,7 @@ func (v *Voter) produceVote(bp *types.BlockProposal) (*types.Vote, error) {
 	}
 	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.Block.BlockMRH())
 	sig := v.signer.SignVote(unsignedVote, signerIdx)
-	vote := types.NewVote(bp.Block.View, bp.BlockMRH(), sig)
+	vote := types.NewVote(unsignedVote, sig)
 
 	return vote, nil
 }
