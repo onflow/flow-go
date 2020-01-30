@@ -50,7 +50,7 @@ func (bp *BlockProducer) makeBlockForView(view uint64, qcblock *types.QCBlock) *
 // signBlockProposal takes a unsigned proposal, signes it and returns a signed block proposal
 func (bp *BlockProducer) signBlockProposal(proposal *types.Block) (*types.BlockProposal, error) {
 	// getting the my index in my cluster
-	selfIdx, err := bp.viewState.GetSelfIdxForBlockID(proposal.BlockID())
+	selfIdx, err := bp.viewState.GetSelfIdxForBlockID(proposal.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot sign block proposal, because %w", err)
 	}

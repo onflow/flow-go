@@ -25,7 +25,7 @@ type Block struct {
 // BlockID returns the Merkle Root Hash of the Block, which is computed from (View, QC, PayloadHash)
 
 // NewBlock creates an instance of Block
-func NewBlock(view uint64, qc *QuorumCertificate, payloadHash []byte, height uint64, chainID string, blockID flow.Identifier) *Block {
+func NewBlock(view uint64, qc *QuorumCertificate, payloadHash []byte, height uint64, chainID string) *Block {
 
 	t := time.Now()
 
@@ -36,7 +36,6 @@ func NewBlock(view uint64, qc *QuorumCertificate, payloadHash []byte, height uin
 		Height:      height,
 		ChainID:     chainID,
 		Timestamp:   t,
-		BlockID:     blockID,
 	}
 }
 

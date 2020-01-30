@@ -42,7 +42,8 @@ func FromSignatures(sigs []*Signature, signerCount uint32) (*AggregatedSignature
 
 // buildAggregatedSignature will use cryto library to generate aggregated signature
 func buildAggregatedSignature(sigs []rawSignature, signers []bool) []byte {
-	panic("TODO")
+	//	TODO
+	return []byte{}
 }
 
 // Verify that the aggregated signature contains a signature from a given public key for signing the given hash
