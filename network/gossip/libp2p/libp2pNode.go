@@ -11,7 +11,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-tcp-transport"
@@ -46,7 +45,7 @@ type P2PNode struct {
 }
 
 // Start starts a libp2p node on the given address.
-func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, handler network.StreamHandler) error {
+func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, handler network.StreamHandler, psOption ...pubsub.Option) error {
 	p.Lock()
 	defer p.Unlock()
 	p.name = n.Name
@@ -79,8 +78,8 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 	host.SetStreamHandler(FlowLibP2PProtocolID, handler)
 
-	// Creating a new PubSub instance of the type GossipSub
-	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost)
+	// Creating a new PubSub instance of the type GossipSub with psOption
+	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost, psOption...)
 
 	// TODO: Adjust pubsub.GossipSubD, pubsub.GossipSubDLo and pubsub.GossipSubDHi as per fanout provided in the future
 
@@ -115,23 +114,23 @@ func (p *P2PNode) Stop() error {
 
 // AddPeers adds other nodes as peers to this node by adding them to the node's peerstore and connecting to them
 func (p *P2PNode) AddPeers(ctx context.Context, peers ...NodeAddress) error {
-	p.Lock()
-	defer p.Unlock()
-	for _, peer := range peers {
-		pInfo, err := GetPeerInfo(peer)
-		if err != nil {
-			return err
-		}
-
-		// Add the destination's peer multiaddress in the peerstore.
-		// This will be used during connection and stream creation by libp2p.
-		p.libP2PHost.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.PermanentAddrTTL)
-
-		err = p.libP2PHost.Connect(ctx, pInfo)
-		if err != nil {
-			return err
-		}
-	}
+	//p.Lock()
+	//defer p.Unlock()
+	//for _, peer := range peers {
+	//	pInfo, err := GetPeerInfo(peer)
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	// Add the destination's peer multiaddress in the peerstore.
+	//	// This will be used during connection and stream creation by libp2p.
+	//	p.libP2PHost.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.PermanentAddrTTL)
+	//
+	//	err = p.libP2PHost.Connect(ctx, pInfo)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
 	return nil
 }
 

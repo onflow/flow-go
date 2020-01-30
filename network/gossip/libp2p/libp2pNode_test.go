@@ -5,19 +5,15 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/network"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	gologging "github.com/whyrusleeping/go-logging"
 )
 
 // Workaround for https://github.com/stretchr/testify/pull/808
@@ -151,101 +147,6 @@ func (l *LibP2PNodeTestSuite) TestAddPeers() {
 		assert.Eventuallyf(l.Suite.T(), func() bool {
 			return network.Connected == nodes[0].libP2PHost.Network().Connectedness(peer)
 		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf(" first node is not connected to %s", peer.String()))
-	}
-}
-
-// TestPubSub checks if nodes can subscribe to a topic and send and receive a message
-func (l *LibP2PNodeTestSuite) TestPubSub() {
-	defer l.cancel()
-	topic := "testtopic"
-	count := 5
-	golog.SetAllLoggers(gologging.INFO)
-
-	// Step 1: Creates nodes
-	nodes := l.CreateNodes(count)
-	defer l.StopNodes(nodes)
-
-	// Step 2: Subscribes to a Flow topic
-	// A node will receive its own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
-	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
-	ch := make(chan string, count)
-	for _, n := range nodes {
-		m := n.name
-		// defines a func to read from the subscription
-		subReader := func(s *pubsub.Subscription) {
-			msg, err := s.Next(l.ctx)
-			assert.NoError(l.Suite.T(), err)
-			assert.Equal(l.Suite.T(), []byte("hello"), msg.Data)
-			ch <- m
-		}
-
-		// Subscribes to the test topic
-		s, err := n.Subscribe(l.ctx, topic)
-		require.NoError(l.Suite.T(), err)
-
-		// kick off the reader
-		go subReader(s)
-
-	}
-
-	// Step 3: Connects each node i to its subsequent node i+1 in a chain
-	for i := 0; i < count-1; i++ {
-		// defines this node on the chain
-		this := nodes[i]
-
-		// defines next node to this on the chain
-		next := nodes[i+1]
-		nextIP, nextPort := next.GetIPPort()
-		nextAddr := NodeAddress{
-			Name: next.name,
-			IP:   nextIP,
-			Port: nextPort,
-		}
-
-		// adds next node as the peer to this node and verifies their connection
-		require.NoError(l.Suite.T(), this.AddPeers(l.ctx, nextAddr))
-		assert.Eventuallyf(l.Suite.T(), func() bool {
-			return network.Connected == this.libP2PHost.Network().Connectedness(next.libP2PHost.ID())
-		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf(" %s not connected with %s", this.name, next.name))
-
-		// Number of connected peers on the chain should be always 2 except for the
-		// first and last nodes that should be one
-		peerNum := 2
-		if i == 0 || i == count {
-			peerNum = 1
-		}
-		assert.Equal(l.Suite.T(), peerNum, len(this.ps.ListPeers(topic)))
-	}
-
-	// Step 4: Waits for nodes to heartbeat each other
-	time.Sleep(2 * time.Second)
-
-	// Step 5: Publish a message from the first node on the chain
-	// and verify all nodes get it.
-	// All nodes including node 0 - the sender, should receive it
-	require.NoError(l.Suite.T(), nodes[0].Publish(l.ctx, topic, []byte("hello")))
-
-	// A hash set to keep track of the nodes who received the message
-	recv := make(map[string]bool, count)
-	for i := 0; i < count; i++ {
-		select {
-		case res := <-ch:
-			recv[res] = true
-		case <-time.After(10 * time.Second):
-			missing := make([]string, 0)
-			for _, n := range nodes {
-				if _, found := recv[n.name]; !found {
-					missing = append(missing, n.name)
-				}
-			}
-			assert.Fail(l.Suite.T(), " messages not received by nodes: "+strings.Join(missing, ", "))
-			break
-		}
-	}
-
-	// Step 6: Unsubscribes all nodes from the topic
-	for _, n := range nodes {
-		assert.NoError(l.Suite.T(), n.UnSubscribe(topic))
 	}
 }
 
@@ -431,7 +332,7 @@ func (l *LibP2PNodeTestSuite) TestStreamReuse() {
 	}
 }
 
-// CreateNodes creates a number of libp2pnodes equal to the count with the given callback function for stream handling
+// CreateNode creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
 func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHandler) (nodes []*P2PNode) {

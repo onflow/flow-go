@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -56,8 +57,11 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		me:         flowID,
 	}
 
+	// set the appropriate PubSub options to operate with
+	psOption := pubsub.WithDiscovery(&Discovery{}, pubsub.WithDiscoveryOpts(Options()...))
+
 	// Start the libp2p node
-	err = p2p.Start(context.Background(), nodeAddress, log, m.handleIncomingStream)
+	err = p2p.Start(context.Background(), nodeAddress, log, m.handleIncomingStream, psOption)
 
 	return m, err
 }
