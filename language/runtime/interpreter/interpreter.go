@@ -3031,7 +3031,7 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 			indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
 			key := interpreter.storageKeyHandler(interpreter, storage.Identifier, indexingType)
 
-			referenceValue := &ReferenceValue{
+			referenceValue := &StorageReferenceValue{
 				TargetStorageIdentifier: storage.Identifier,
 				TargetKey:               key,
 				// NOTE: new value has no owner
