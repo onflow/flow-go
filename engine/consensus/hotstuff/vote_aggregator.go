@@ -26,9 +26,10 @@ type VoteAggregator struct {
 	viewToIDToVote map[uint64]map[flow.Identifier]*types.Vote
 }
 
-func NewVoteAggregator(log zerolog.Logger, viewState *ViewState, voteValidator *Validator) *VoteAggregator {
+func NewVoteAggregator(log zerolog.Logger, lastPruneView uint64, viewState *ViewState, voteValidator *Validator) *VoteAggregator {
 	return &VoteAggregator{
 		log:                     log,
+		lastPrunedView:          lastPruneView,
 		viewState:               viewState,
 		voteValidator:           voteValidator,
 		viewToBlockID:           map[uint64][][]byte{},
