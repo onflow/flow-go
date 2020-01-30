@@ -58,34 +58,18 @@ func TestUnHappyPathForPendingVotes(t *testing.T) {
 
 }
 
-// receive vote1 and 2 vote2
-// the stake of vote2 should only be accumulated once
-func TestDuplicateVotes(t *testing.T) {
-
-}
-
 // store one vote in the memory
 // receive another vote with the same voter and the same view
 // should trigger ErrDoubleVote
 func TestErrDoubleVote(t *testing.T) {
-	// mock vote aggregator
-	log := zerolog.Logger{}
-	ctrl := gomock.NewController(t)
-	ids := unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleConsensus))
-	snapshot := protocol.NewMockSnapshot(ctrl)
-	mockProtocolState := mocks.NewMockState(ctrl)
-	mockProtocolState.EXPECT().AtBlockID(gomock.Any()).Return(snapshot).AnyTimes()
-	snapshot.EXPECT().Identities(gomock.Any()).Return(ids, nil).AnyTimes()
-	viewState := &ViewState{protocolState: mockProtocolState}
-	voteValidator := &Validator{viewState: viewState}
-	va := NewVoteAggregator(log, viewState, voteValidator)
-
+	va := newMockVoteAggregator(t)
 	// mock blocks and votes
 	b1 := newMockBlock(10)
 	b2 := newMockBlock(10)
 	vote1 := newMockVote(10, b1.BlockID(), uint32(1))
 	_, err := va.StoreVoteAndBuildQC(vote1, b1)
 	require.NoError(t, err)
+	// vote2 is double voting
 	vote2 := newMockVote(10, b2.BlockID(), uint32(1))
 	_, err = va.StoreVoteAndBuildQC(vote2, b2)
 	if err != nil {
@@ -103,21 +87,36 @@ func TestErrDoubleVote(t *testing.T) {
 // store random votes and QCs from view 1 to 3
 // prune by view 3
 func TestPruneByView(t *testing.T) {
-}
-
-func mockIdentities(size int) flow.IdentityList {
-	var identities flow.IdentityList
-
-	for i := 0; i < size; i++ {
-		identity := &flow.Identity{
-			NodeID: flow.Identifier{byte(i)},
-			Role:   flow.RoleConsensus,
-			Stake:  1,
+	va := newMockVoteAggregator(t)
+	for i := 1; i <= 3; i++ {
+		view := uint64(i)
+		blockID := unittest.IdentifierFixture()
+		voterID := unittest.IdentifierFixture()
+		vote := newMockVote(view, blockID, 2)
+		voteIDStr := string(vote.ID())
+		blockIDStr := blockID.String()
+		voteMap := make(map[string]*types.Vote)
+		voteMap[voteIDStr] = vote
+		va.pendingVoteMap[blockIDStr] = voteMap
+		vs := &VotingStatus{}
+		vs.AddVote(vote)
+		va.blockHashToVotingStatus[blockIDStr] = vs
+		qc := &types.QuorumCertificate{
+			View:    view,
+			BlockID: blockID,
 		}
-		identities = append(identities, identity)
+		va.createdQC[blockIDStr] = qc
+		va.viewToBlockID[view] = append(va.viewToBlockID[view], blockID[:])
+		va.viewToIDToVote[view][voterID] = vote
 	}
 
-	return identities
+	va.PruneByView(3)
+
+	//delete(va.pendingVoteMap, blockMRHStr)
+	//delete(va.blockHashToVotingStatus, blockMRHStr)
+	//delete(va.createdQC, blockMRHStr)
+	//delete(va.viewToBlockID, i)
+	//delete(va.viewToIDToVote, i)
 }
 
 func newMockBlock(view uint64) *types.BlockProposal {
@@ -143,4 +142,17 @@ func newMockVote(view uint64, blockID flow.Identifier, signerIndex uint32) *type
 	}
 
 	return vote
+}
+
+func newMockVoteAggregator(t *testing.T) *VoteAggregator {
+	ctrl := gomock.NewController(t)
+	ids := unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleConsensus))
+	snapshot := protocol.NewMockSnapshot(ctrl)
+	mockProtocolState := mocks.NewMockState(ctrl)
+	mockProtocolState.EXPECT().AtBlockID(gomock.Any()).Return(snapshot).AnyTimes()
+	snapshot.EXPECT().Identities(gomock.Any()).Return(ids, nil).AnyTimes()
+	viewState := &ViewState{protocolState: mockProtocolState}
+	voteValidator := &Validator{viewState: viewState}
+
+	return NewVoteAggregator(zerolog.Logger{}, viewState, voteValidator)
 }

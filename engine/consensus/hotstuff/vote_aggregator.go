@@ -31,9 +31,11 @@ func NewVoteAggregator(log zerolog.Logger, viewState *ViewState, voteValidator *
 		log:                     log,
 		viewState:               viewState,
 		voteValidator:           voteValidator,
+		pendingVoteMap:          map[string]map[string]*types.Vote{},
 		blockHashToVotingStatus: map[string]*VotingStatus{},
 		createdQC:               map[string]*types.QuorumCertificate{},
 		viewToIDToVote:          map[uint64]map[flow.Identifier]*types.Vote{},
+		viewToBlockID:           map[uint64][][]byte{},
 	}
 }
 
