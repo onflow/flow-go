@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // Guarantees implements persistent storage for collection guarantees.
@@ -41,4 +42,17 @@ func (g *Guarantees) ByID(collID flow.Identifier) (*flow.CollectionGuarantee, er
 	}
 
 	return &guarantee, nil
+}
+
+func (g *Guarantees) ByBlockID(blockID flow.Identifier) ([]*flow.CollectionGuarantee, error) {
+	var guarantees []*flow.CollectionGuarantee
+
+	err := g.db.View(func(tx *badger.Txn) error {
+		return procedure.RetrieveGuarantees(blockID, &guarantees)(tx)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve guarantees: %w", err)
+	}
+
+	return guarantees, nil
 }

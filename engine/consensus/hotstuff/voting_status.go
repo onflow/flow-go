@@ -8,6 +8,8 @@ import (
 
 type VotingStatus struct {
 	blockMRH         flow.Identifier
+	signerCount      uint32
+	view             uint64
 	thresholdStake   uint64
 	accumulatedStake uint64
 	voteSender       *flow.Identity
@@ -15,17 +17,23 @@ type VotingStatus struct {
 	votes map[string]*types.Vote
 }
 
-func NewVotingStatus(thresholdStake uint64, voteSender *flow.Identity, blockMRH flow.Identifier) *VotingStatus {
+func NewVotingStatus(thresholdStake uint64, view uint64, signerCount uint32, voteSender *flow.Identity, blockMRH flow.Identifier) *VotingStatus {
 	return &VotingStatus{
 		thresholdStake: thresholdStake,
+		view:           view,
+		signerCount:    signerCount,
 		voteSender:     voteSender,
 		blockMRH:       blockMRH,
 		votes:          map[string]*types.Vote{},
 	}
 }
 
-// assume vote are valid
+// assume votes are valid
 func (vs *VotingStatus) AddVote(vote *types.Vote) {
+	_, exists := vs.votes[vote.Hash()]
+	if exists {
+		return
+	}
 	vs.votes[vote.Hash()] = vote
 	vs.accumulatedStake += vs.voteSender.Stake
 }
@@ -38,6 +46,28 @@ func (vs *VotingStatus) BlockID() flow.Identifier {
 	return vs.blockMRH
 }
 
-func (vs *VotingStatus) BlockMRHStr() string {
-	return fmt.Sprintf("%x", vs.blockMRH)
+func (vs *VotingStatus) tryBuildQC() (*types.QuorumCertificate, error) {
+	sigs := vs.getSigsSliceFromVotes()
+	aggregatedSig, err := types.FromSignatures(sigs, vs.signerCount)
+	if err != nil {
+		return nil, fmt.Errorf("could not build QC: %w", err)
+	}
+	qc := &types.QuorumCertificate{
+		View:                vs.view,
+		BlockID:             vs.BlockID(),
+		AggregatedSignature: aggregatedSig,
+	}
+
+	return qc, nil
+}
+
+func (vs *VotingStatus) getSigsSliceFromVotes() []*types.Signature {
+	var signatures = make([]*types.Signature, len(vs.votes))
+	i := 0
+	for _, vote := range vs.votes {
+		signatures[i] = vote.Signature
+		i++
+	}
+
+	return signatures
 }

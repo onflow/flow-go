@@ -40,12 +40,6 @@ func NewNetwork(state protocol.State, me module.Local, hub *Hub) *Network {
 	return o
 }
 
-// submit is called when an Engine is sending an event to an Engine on another node or nodes.
-func (mn *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
-	mn.buffer(mn.GetID(), channelID, event, targetIDs)
-	return nil
-}
-
 // GetID returns the identity of the Node.
 func (mn *Network) GetID() flow.Identifier {
 	return mn.me.NodeID()
@@ -65,10 +59,26 @@ func (mn *Network) Register(channelID uint8, engine network.Engine) (network.Con
 	return conduit, nil
 }
 
+// submit is called when an Engine is sending an event to an Engine on another node or nodes.
+func (mn *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
+	m := &PendingMessage{
+		From:      mn.GetID(),
+		ChannelID: channelID,
+		Event:     event,
+		TargetIDs: targetIDs,
+	}
+
+	if mn.hub.isSync {
+		return mn.sendToAllTargets(m)
+	}
+
+	mn.buffer(m)
+
+	return nil
+}
+
 // return a certain node has seen a certain key
 func (mn *Network) haveSeen(key string) bool {
-	mn.Lock()
-	defer mn.Unlock()
 	seen, ok := mn.seenEventIDs[key]
 	if !ok {
 		return false
@@ -78,14 +88,12 @@ func (mn *Network) haveSeen(key string) bool {
 
 // mark a certain node has seen a certain event for a certain engine
 func (mn *Network) seen(key string) {
-	mn.Lock()
-	defer mn.Unlock()
 	mn.seenEventIDs[key] = true
 }
 
 // buffer saves the request into pending buffer
-func (mn *Network) buffer(from flow.Identifier, channelID uint8, event interface{}, targetIDs []flow.Identifier) {
-	mn.hub.Buffer.Save(from, channelID, event, targetIDs)
+func (mn *Network) buffer(m *PendingMessage) {
+	mn.hub.Buffer.Save(m)
 }
 
 // DeliverAllRecursive sends all pending messages to the receivers. The receivers
@@ -125,6 +133,9 @@ func (mn *Network) DeliverSome(shouldDeliver func(*PendingMessage) bool) {
 // sendToAllTargets send a message to all its targeted nodes if the targeted
 // node has not yet seen it.
 func (mn *Network) sendToAllTargets(m *PendingMessage) error {
+	mn.Lock()
+	defer mn.Unlock()
+
 	key := eventKey(m.ChannelID, m.Event)
 	for _, nodeID := range m.TargetIDs {
 		// Find the network of the targeted node

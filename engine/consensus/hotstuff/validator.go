@@ -17,7 +17,7 @@ type Validator struct {
 // It doesn't validate the block that this QC is pointing to
 func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 	// TODO: potentially can return a very long list. need to find a better way for verifying QC
-	stakedNodes, err := v.viewState.GetIdentitiesForBlockID(qc.BlockMRH)
+	stakedNodes, err := v.viewState.GetIdentitiesForBlockID(qc.BlockID)
 	if err != nil {
 		return fmt.Errorf("cannot get identities to validate sig at view %v: %w", qc.View, err)
 	}
@@ -38,50 +38,54 @@ func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
 
 	// check if there are enough stake for building QC
 	if totalStakes < threshold {
-		return fmt.Errorf("invalid QC: not enough stake, qc BlockMRH: %v", qc.BlockMRH)
+		return fmt.Errorf("invalid QC: not enough stake, qc BlockID: %v", qc.BlockID)
 	}
 	return nil
 }
 
-// ValidateBlock validates the block proposal
-// bp - the block proposal to be validated.
+// ValidateBlock validates the block header, returns the signer and a validated block proposal
+// bp - the block header to be validated.
 // parent - the parent of the block proposal.
-func (v *Validator) ValidateBlock(bp *types.BlockProposal, parent *types.BlockProposal) (*flow.Identity, error) {
+func (v *Validator) ValidateBlock(bh *types.BlockHeader, parent *types.BlockProposal) (*flow.Identity, *types.BlockProposal, error) {
 	// validate signature
-	signer, err := v.validateBlockSig(bp)
+	signer, err := v.validateBlockSig(bh)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// validate the signer is the leader for that block
-	leaderID := v.viewState.LeaderForView(bp.View())
+	leaderID := v.viewState.LeaderForView(bh.View())
 	if leaderID.ID() != signer.ID() {
-		return nil, fmt.Errorf("invalid block. not from the leader: %v", bp.BlockMRH())
+		return nil, nil, fmt.Errorf("invalid block. not from the leader: %v", bh.BlockID())
 	}
 
-	qc := bp.QC()
+	qc := bh.QC()
 
 	// validate QC
 	err = v.ValidateQC(qc)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// validate block hash
-	if qc.BlockMRH != parent.BlockMRH() {
-		return nil, fmt.Errorf("invalid block. block must link to its parent. (qc: %x, parent: %x)", qc.BlockMRH, parent.BlockMRH())
+	if qc.BlockID != parent.BlockID() {
+		return nil, nil, fmt.Errorf("invalid block. block must link to its parent. (qc: %x, parent: %x)", qc.BlockID, parent.BlockID())
 	}
 
 	// validate height
-	if bp.Height() != parent.Height()+1 {
-		return nil, fmt.Errorf("invalid block. block height must be 1 block higher than its parent. (block: %v, parent: %v)", bp.Height(), parent.Height())
+	if bh.Height() != parent.Height()+1 {
+		return nil, nil, fmt.Errorf("invalid block. block height must be 1 block higher than its parent. (block: %v, parent: %v)", bh.Height(), parent.Height())
 	}
 
 	// validate view
-	if bp.View() <= qc.View {
-		return nil, fmt.Errorf("invalid block. block's view must be higher than QC's view. (block: %v, qc: %v)", bp.View(), qc.View)
+	if bh.View() <= qc.View {
+		return nil, nil, fmt.Errorf("invalid block. block's view must be higher than QC's view. (block: %v, qc: %v)", bh.View(), qc.View)
 	}
-	return signer, nil
+
+	// only all the validation has passed, a block proposal will be constructed
+	bp := toBlockProposal(bh)
+
+	return signer, bp, nil
 }
 
 // ValidateVote validates the vote and returns the signer identity who signed the vote
@@ -100,7 +104,7 @@ func (v *Validator) ValidateVote(vote *types.Vote, bp *types.BlockProposal) (*fl
 	}
 
 	// block hash must match
-	if vote.BlockMRH != bp.BlockMRH() {
+	if vote.BlockID != bp.BlockID() {
 		return nil, fmt.Errorf("invalid vote: wrong block hash")
 	}
 
@@ -136,7 +140,7 @@ func validateAggregatedSigWithSignedBytes(stakedNodes flow.IdentityList, signedB
 
 func (v *Validator) validateVoteSig(vote *types.Vote) (*flow.Identity, error) {
 	// getting all consensus identities
-	identities, err := v.viewState.GetIdentitiesForBlockID(vote.BlockMRH)
+	identities, err := v.viewState.GetIdentitiesForBlockID(vote.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get identities to validate sig at view %v: %w", vote.View, err)
 	}
@@ -147,30 +151,35 @@ func (v *Validator) validateVoteSig(vote *types.Vote) (*flow.Identity, error) {
 	// verify the signature
 	signer, err := validateSignatureWithSignedBytes(identities, bytesToSign, vote.Signature)
 	if err != nil {
-		return nil, fmt.Errorf("invalid signature for vote: %v: %w", vote.BlockMRH, err)
+		return nil, fmt.Errorf("invalid signature for vote: %v: %w", vote.BlockID, err)
 	}
 	return signer, nil
 }
 
-func (v *Validator) validateBlockSig(bp *types.BlockProposal) (*flow.Identity, error) {
+func (v *Validator) validateBlockSig(bh *types.BlockHeader) (*flow.Identity, error) {
 	// getting all consensus identities
-	identities, err := v.viewState.GetIdentitiesForBlockID(bp.BlockMRH())
+	identities, err := v.viewState.GetIdentitiesForBlockID(bh.BlockID())
 	if err != nil {
-		return nil, fmt.Errorf("cannot get identities to validate sig at view %v: %w", bp.View(), err)
+		return nil, fmt.Errorf("cannot get identities to validate sig at view %v: %w", bh.View(), err)
 	}
 
 	// get the hash
-	hashToSign := bp.BytesForSig()
+	hashToSign := bh.ToVote().BytesForSig()
 
 	// verify the signature
-	signer, err := validateSignatureWithSignedBytes(identities, hashToSign, bp.Signature)
+	signer, err := validateSignatureWithSignedBytes(identities, hashToSign, bh.Signature)
 	if err != nil {
-		return nil, fmt.Errorf("invalid signature for block %v: %w", bp.BlockMRH(), err)
+		return nil, fmt.Errorf("invalid signature for block %v: %w", bh.BlockID(), err)
 	}
 	return signer, nil
 }
 
-// validateSignatureWithSignedBytes validates the signature and returns an identity if the sig is valid and the signer is staked.
+func toBlockProposal(bh *types.BlockHeader) *types.BlockProposal {
+	return types.NewBlockProposal(bh.Block, bh.Signature)
+}
+
+// validateSignatureWithSignedBytes validates the signature and returns
+// an identity if the sig is valid and the signer is staked.
 func validateSignatureWithSignedBytes(identities flow.IdentityList, hash []byte, sig *types.Signature) (*flow.Identity, error) {
 	// getting signer's public key
 	if uint(sig.SignerIdx) > identities.Count() {

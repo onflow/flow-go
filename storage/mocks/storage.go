@@ -166,19 +166,34 @@ func (m *MockCommits) EXPECT() *MockCommitsMockRecorder {
 	return m.recorder
 }
 
-// ByBlockID mocks base method
-func (m *MockCommits) ByBlockID(arg0 flow.Identifier) ([]byte, error) {
+// ByFinalID mocks base method
+func (m *MockCommits) ByFinalID(arg0 flow.Identifier) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ByBlockID", arg0)
+	ret := m.ctrl.Call(m, "ByFinalID", arg0)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ByBlockID indicates an expected call of ByBlockID
-func (mr *MockCommitsMockRecorder) ByBlockID(arg0 interface{}) *gomock.Call {
+// ByFinalID indicates an expected call of ByFinalID
+func (mr *MockCommitsMockRecorder) ByFinalID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByBlockID", reflect.TypeOf((*MockCommits)(nil).ByBlockID), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByFinalID", reflect.TypeOf((*MockCommits)(nil).ByFinalID), arg0)
+}
+
+// ByID mocks base method
+func (m *MockCommits) ByID(arg0 flow.Identifier) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ByID", arg0)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ByID indicates an expected call of ByID
+func (mr *MockCommitsMockRecorder) ByID(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByID", reflect.TypeOf((*MockCommits)(nil).ByID), arg0)
 }
 
 // Store mocks base method

@@ -1,7 +1,6 @@
 package ast
 
 import (
-	"github.com/antlr/antlr4/runtime/Go/antlr"
 	"github.com/segmentio/fasthash/fnv1"
 )
 
@@ -40,20 +39,6 @@ func (position Position) Compare(other Position) int {
 	default:
 		return 0
 	}
-}
-
-func PositionFromToken(token antlr.Token) Position {
-	return Position{
-		Offset: token.GetStart(),
-		Line:   token.GetLine(),
-		Column: token.GetColumn(),
-	}
-}
-
-func PositionRangeFromContext(ctx antlr.ParserRuleContext) (start, end Position) {
-	start = PositionFromToken(ctx.GetStart())
-	end = PositionFromToken(ctx.GetStop())
-	return start, end
 }
 
 func EndPosition(startPosition Position, end int) Position {

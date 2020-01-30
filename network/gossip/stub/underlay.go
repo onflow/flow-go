@@ -50,6 +50,7 @@ func (u *Underlay) Dial(address string) (*Connection, error) {
 }
 
 // mark a certain address as whitelist peer
+//nolint:unused
 func (u *Underlay) whitelistPeer(address string) {
 	u.whitePeers[address] = true
 }

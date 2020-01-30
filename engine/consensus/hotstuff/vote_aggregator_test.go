@@ -2,20 +2,18 @@ package hotstuff
 
 import (
 	"fmt"
-	bstorage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/stretchr/testify/require"
-	"math/rand"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/module/local"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
+	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -84,6 +82,12 @@ func TestUnHappyPathForPendingVotes(t *testing.T) {
 
 }
 
+// receive vote1 and 2 vote2
+// the stake of vote2 should only be accumulated once
+func TestDuplicateVotes(t *testing.T) {
+
+}
+
 // store one vote in the memory
 // receive another vote with the same voter and the same view
 // should trigger ErrDoubleVote
@@ -122,7 +126,7 @@ func TestErrDoubleVote(t *testing.T) {
 
 		var vaLogger zerolog.Logger
 		va := NewVoteAggregator(vaLogger, &ViewState{protocolState: state}, &Validator{&ViewState{protocolState: state}})
-		identities, err := va.viewState.protocolState.AtBlockID(b1.ID()).Identities(identity.HasRole(flow.RoleConsensus))
+		identities, err := va.viewState.protocolState.AtBlockID(b1.ID()).Identities(filter.HasRole(flow.RoleConsensus))
 		if err != nil {
 			fmt.Printf("%v", err)
 		}
@@ -176,30 +180,6 @@ func TestErrDoubleVote(t *testing.T) {
 // store random votes and QCs from view 1 to 3
 // prune by view 3
 func TestPruneByView(t *testing.T) {
-
-}
-
-func generateMockVotes(size int, view uint64) []*types.Vote {
-	var votes []*types.Vote
-	for i := 0; i < size; i++ {
-		mockVote := newMockVote(view, [32]byte{}, rand.Uint32())
-		votes = append(votes, mockVote)
-	}
-
-	return votes
-}
-
-func newMockVote(view uint64, blockMRH [32]byte, signer uint32) *types.Vote {
-	vote := &types.Vote{
-		View:     view,
-		BlockMRH: blockMRH,
-		Signature: &types.Signature{
-			RawSignature: [32]byte{},
-			SignerIdx:    signer,
-		},
-	}
-
-	return vote
 }
 
 func mockIdentities(size int) flow.IdentityList {

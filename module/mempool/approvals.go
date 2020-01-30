@@ -21,9 +21,12 @@ type Approvals interface {
 	// will return true if the result approval was known and removed.
 	Rem(approvalID flow.Identifier) bool
 
-	// Get will retrieve the given result approval from the memory pool; it will
+	// ByID will retrieve the given result approval from the memory pool; it will
 	// error if the result approval is not in the memory pool.
 	ByID(approvalID flow.Identifier) (*flow.ResultApproval, error)
+
+	// ByResultID will retrieve the approval by receipt ID.
+	ByResultID(resultID flow.Identifier) (*flow.ResultApproval, error)
 
 	// Size will return the current size of the memory pool.
 	Size() uint

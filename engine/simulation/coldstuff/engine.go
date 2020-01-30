@@ -3,6 +3,7 @@
 package coldstuff
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -14,7 +15,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -30,10 +30,11 @@ type Engine struct {
 	log       zerolog.Logger
 	con       network.Conduit
 	exp       network.Engine
-	blocks    storage.Blocks
+	headers   storage.Headers
 	state     protocol.State
 	me        module.Local
-	pool      mempool.Guarantees
+	builder   module.Builder
+	cleaner   module.Cleaner
 	round     Round
 	interval  time.Duration
 	timeout   time.Duration
@@ -44,17 +45,18 @@ type Engine struct {
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, net module.Network, exp network.Engine, blocks storage.Blocks, state protocol.State, me module.Local, pool mempool.Guarantees) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, exp network.Engine, headers storage.Headers, state protocol.State, me module.Local, builder module.Builder, cleaner module.Cleaner) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{
 		unit:      engine.NewUnit(),
 		log:       log.With().Str("engine", "coldstuff").Logger(),
 		exp:       exp,
-		blocks:    blocks,
+		headers:   headers,
 		state:     state,
 		me:        me,
-		pool:      pool,
+		builder:   builder,
+		cleaner:   cleaner,
 		round:     nil, // initialized for each consensus round
 		interval:  4 * time.Second,
 		timeout:   1 * time.Second,
@@ -66,7 +68,7 @@ func New(log zerolog.Logger, net module.Network, exp network.Engine, blocks stor
 	// register the engine with the network layer to get our conduit
 	con, err := net.Register(engine.SimulationColdstuff, e)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register engine")
+		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 
 	e.con = con
@@ -121,7 +123,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *coldstuff.BlockProposal:
-		e.proposals <- proposalWrap{originID: originID, block: ev.Block}
+		e.proposals <- proposalWrap{originID: originID, header: ev.Header}
 		return nil
 	case *coldstuff.BlockVote:
 		e.votes <- voteWrap{originID: originID, blockID: ev.BlockID}
@@ -240,54 +242,45 @@ func (e *Engine) sendProposal() error {
 	// get our own ID to tally our stake
 	id, err := e.state.Final().Identity(e.me.NodeID())
 	if err != nil {
-		return errors.Wrap(err, "could not get own current ID")
+		return fmt.Errorf("could not get own current ID: %w", err)
 	}
 
-	// get the collections from the pool
-	guarantees := e.pool.All()
-
-	// create the block content
-	payload := flow.Payload{
-		Identities: flow.IdentityList{},
-		Guarantees: guarantees,
+	// get the payload for the next hash
+	payloadHash, err := e.builder.BuildOn(e.round.Parent().ID())
+	if err != nil {
+		return fmt.Errorf("could not build on parent: %w", err)
 	}
 
-	// create the block header
-	header := flow.Header{
+	// create the header
+	candidate := flow.Header{
 		Number:      e.round.Parent().Number + 1,
-		ParentID:    e.round.Parent().ID(),
-		PayloadHash: payload.Hash(),
 		Timestamp:   time.Now().UTC(),
-	}
-
-	// create a block with the current mempool collections as payload
-	candidate := &flow.Block{
-		Header:  header,
-		Payload: payload,
+		ParentID:    e.round.Parent().ID(),
+		PayloadHash: payloadHash,
+		ProposerID:  e.me.NodeID(),
 	}
 
 	log = log.With().
 		Uint64("number", candidate.Number).
-		Int("guarantees", len(guarantees)).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Logger()
 
 	// store the block proposal
-	err = e.blocks.Store(candidate)
+	err = e.headers.Store(&candidate)
 	if err != nil {
-		return errors.Wrap(err, "could not store candidate")
+		return fmt.Errorf("could not store candidate: %w", err)
 	}
 
 	// cache the candidate block
-	e.round.Propose(candidate)
+	e.round.Propose(&candidate)
 
 	// send the block proposal
 	proposal := &coldstuff.BlockProposal{
-		Block: candidate,
+		Header: &candidate,
 	}
 	err = e.con.Submit(proposal, e.round.Participants().NodeIDs()...)
 	if err != nil {
-		return errors.Wrap(err, "could not submit proposal")
+		return fmt.Errorf("could not submit proposal: %w", err)
 	}
 
 	// add our own vote to the engine
@@ -308,7 +301,6 @@ func (e *Engine) waitForVotes() error {
 	log := e.log.With().
 		Uint64("number", candidate.Number).
 		Hex("candidate_id", logging.Entity(candidate)).
-		Int("collections", len(candidate.Guarantees)).
 		Str("action", "wait_votes").
 		Logger()
 
@@ -381,7 +373,6 @@ func (e *Engine) sendCommit() error {
 	log := e.log.With().
 		Uint64("number", candidate.Number).
 		Hex("candidate_id", logging.Entity(candidate)).
-		Int("collections", len(candidate.Guarantees)).
 		Str("action", "send_commit").
 		Logger()
 
@@ -391,7 +382,7 @@ func (e *Engine) sendCommit() error {
 	}
 	err := e.con.Submit(commit, e.round.Participants().NodeIDs()...)
 	if err != nil {
-		return errors.Wrap(err, "could not submit commit")
+		return fmt.Errorf("could not submit commit: %w", err)
 	}
 
 	log.Info().Msg("block commit sent")
@@ -414,10 +405,10 @@ func (e *Engine) waitForProposal() error {
 
 		// process each proposal we receive
 		case w := <-e.proposals:
-			proposerID, candidate := w.originID, w.block
+			proposerID, candidate := w.originID, w.header
 
 			// store every proposal
-			err := e.blocks.Store(candidate)
+			err := e.headers.Store(candidate)
 			if err != nil {
 				log.Error().Err(err).Msg("could not store candidate")
 				continue
@@ -456,7 +447,6 @@ func (e *Engine) waitForProposal() error {
 
 			log.Info().
 				Uint64("number", candidate.Number).
-				Int("collections", len(candidate.Guarantees)).
 				Hex("candidate_id", logging.Entity(candidate)).
 				Msg("block proposal received")
 
@@ -478,7 +468,6 @@ func (e *Engine) voteOnProposal() error {
 	log := e.log.With().
 		Uint64("number", candidate.Number).
 		Hex("candidate_id", logging.Entity(candidate)).
-		Int("collections", len(candidate.Guarantees)).
 		Str("action", "send_vote").
 		Logger()
 
@@ -488,7 +477,7 @@ func (e *Engine) voteOnProposal() error {
 	}
 	err := e.con.Submit(vote, e.round.Leader().NodeID)
 	if err != nil {
-		return errors.Wrap(err, "could not submit vote")
+		return fmt.Errorf("could not submit vote: %w", err)
 	}
 
 	log.Info().Msg("block vote sent")
@@ -506,7 +495,6 @@ func (e *Engine) waitForCommit() error {
 	log := e.log.With().
 		Uint64("number", candidate.Number).
 		Hex("candidate_id", logging.Entity(candidate)).
-		Int("collections", len(candidate.Guarantees)).
 		Str("action", "wait_commit").
 		Logger()
 
@@ -547,35 +535,31 @@ func (e *Engine) commitCandidate() error {
 	log := e.log.With().
 		Uint64("number", candidate.Number).
 		Hex("candidate_id", logging.Entity(candidate)).
-		Int("collections", len(candidate.Guarantees)).
 		Str("action", "exec_commit").
 		Logger()
 
 	// commit the block to our chain state
 	err := e.state.Mutate().Extend(candidate.ID())
 	if err != nil {
-		return errors.Wrap(err, "could not extend state")
+		return fmt.Errorf("could not extend state: %w", err)
 	}
 
 	// finalize the state
 	err = e.state.Mutate().Finalize(candidate.ID())
 	if err != nil {
-		return errors.Wrap(err, "could not finalize state")
+		return fmt.Errorf("could not finalize state: %w", err)
 	}
 
 	// hand the finalized block to expulsion engine to spread to all nodes
 	e.exp.Submit(e.round.Leader().NodeID, e.round.Candidate())
 
-	// remove all collections from the block from the mempool
-	removed := uint(0)
-	for _, guarantee := range candidate.Guarantees {
-		ok := e.pool.Rem(guarantee.ID())
-		if ok {
-			removed++
-		}
+	// make sure all pending ambiguous state is now cleared up
+	err = e.cleaner.CleanAfter(candidate.ID())
+	if err != nil {
+		return fmt.Errorf("could not drop ambiguous state: %w", err)
 	}
 
-	log.Info().Uint("removed_collections", removed).Msg("block candidate committed")
+	log.Info().Msg("block candidate committed")
 
 	return nil
 }

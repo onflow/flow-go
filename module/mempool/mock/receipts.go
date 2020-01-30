@@ -64,6 +64,29 @@ func (_m *Receipts) ByID(receiptID flow.Identifier) (*flow.ExecutionReceipt, err
 	return r0, r1
 }
 
+// ByResultID provides a mock function with given fields: resultID
+func (_m *Receipts) ByResultID(resultID flow.Identifier) (*flow.ExecutionReceipt, error) {
+	ret := _m.Called(resultID)
+
+	var r0 *flow.ExecutionReceipt
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ExecutionReceipt); ok {
+		r0 = rf(resultID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.ExecutionReceipt)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(resultID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Has provides a mock function with given fields: receiptID
 func (_m *Receipts) Has(receiptID flow.Identifier) bool {
 	ret := _m.Called(receiptID)

@@ -20,11 +20,12 @@ type Block struct {
 	Timestamp time.Time
 }
 
-// BlockMRH returns the Merkle Root Hash of the Block, which is computed from (View, QC, PayloadHash)
-func (b Block) BlockMRH() flow.Identifier {
-	return flow.MakeID(b)
+// BlockID returns the Merkle Root Hash of the Block, which is computed from (View, QC, PayloadHash)
+func (b Block) BlockID() flow.Identifier {
+	panic("TODO")
 }
 
+// NewBlock creates an instance of Block
 func NewBlock(view uint64, qc *QuorumCertificate, payloadHash []byte, height uint64, chainID string) *Block {
 
 	t := time.Now()
@@ -37,4 +38,9 @@ func NewBlock(view uint64, qc *QuorumCertificate, payloadHash []byte, height uin
 		ChainID:     chainID,
 		Timestamp:   t,
 	}
+}
+
+// ToVote converts a UnsignedBlockProposal to a UnsignedVote
+func (b Block) ToVote() *UnsignedVote {
+	return NewUnsignedVote(b.View, b.BlockID())
 }
