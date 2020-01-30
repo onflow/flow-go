@@ -2,19 +2,17 @@ package hotstuff
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"testing"
-
-	"github.com/dgraph-io/badger/v2"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/protocol/mocks"
+	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"testing"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
-	bstorage "github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/dgraph-io/badger/v2"
 )
 
 const VOTE_SIZE int = 10
@@ -92,60 +90,93 @@ func TestDuplicateVotes(t *testing.T) {
 // receive another vote with the same voter and the same view
 // should trigger ErrDoubleVote
 func TestErrDoubleVote(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		// pre-setup
-		state, err := protocol.NewState(db)
-		ids := unittest.IdentityListFixture(7, func(node *flow.Identity) {
-			node.Role = flow.RoleConsensus
-		})
+	// mock vote aggregator
+	log := zerolog.Logger{}
+	ctrl := gomock.NewController(t)
+	ids := unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleConsensus))
+	mockProtocolState := mocks.NewMockState(ctrl)
+	mockProtocolState.EXPECT().AtBlockID(gomock.Any()).Return(ids)
+	viewState := &ViewState{protocolState: mockProtocolState}
+	voteValidator := &Validator{viewState: viewState}
+	va := NewVoteAggregator(log, viewState, voteValidator)
 
-		err = state.Mutate().Bootstrap(flow.Genesis(ids))
-		require.NoError(t, err)
-		b1 := unittest.BlockFixture()
-		b2 := unittest.BlockFixture()
-		b1.Number = 10
-		b2.Number = 10
-		b1.Payload.Identities = ids
-		b2.Payload.Identities = ids
-
-		assert.NotEqual(t, b1.ID(), b2.ID())
-
-		blocks := bstorage.NewBlocks(db)
-		err = blocks.Store(&b1)
-		require.NoError(t, err)
-		err = blocks.Store(&b2)
-		require.NoError(t, err)
-
-		err = state.Mutate().Extend(b1.ID())
-		if err != nil {
-			fmt.Printf("%v", err)
+	// mock blocks and votes
+	b1 := newMockBlock(10)
+	b2 := newMockBlock(10)
+	vote1 := newMockVote(10, b1.BlockID(), uint32(1))
+	va.StoreVoteAndBuildQC(vote1, b1)
+	vote2 := newMockVote(10, b2.BlockID(), uint32(1))
+	_, err := va.StoreVoteAndBuildQC(vote2, b2)
+	if err != nil {
+		switch err.(type) {
+		case types.ErrDoubleVote:
+			fmt.Printf("double vote detected %v", err)
+		default:
+			fmt.Printf("error detected %v", err)
 		}
-		require.NoError(t, err)
-		err = state.Mutate().Extend(b2.ID())
-		require.NoError(t, err)
-
-		var vaLogger zerolog.Logger
-		va := NewVoteAggregator(vaLogger, &ViewState{protocolState: state}, &Validator{&ViewState{protocolState: state}})
-		identities, err := va.viewState.protocolState.AtBlockID(b1.ID()).Identities(filter.HasRole(flow.RoleConsensus))
-		if err != nil {
-			fmt.Printf("%v", err)
-		}
-		assert.NotNil(t, identities)
-		//vote1 := newMockVote(10, b1.ID(), uint32(1))
-		//va.StoreVoteAndBuildQC(vote1, b1)
-		//vote2 := newMockVote(10, bp2.BlockMRH(), uint32(1))
-		//_, err = va.StoreVoteAndBuildQC(vote2, bp2)
-		//if err != nil {
-		//	switch err.(type) {
-		//	case types.ErrDoubleVote:
-		//		fmt.Printf("double vote detected %v", err)
-		//	default:
-		//		fmt.Printf("error detected %v", err)
-		//	}
-		//} else {
-		//	t.Errorf("double vote not detected")
-		//}
-	})
+	} else {
+		t.Errorf("double vote not detected")
+	}
+	////unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	////	// pre-setup
+	////	var ids flow.IdentityList
+	////	state, err := protocol.NewState(db)
+	////	collIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	////	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	////	veriIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	////	conIdentities := unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleConsensus))
+	////	ids = append(ids, collIdentity, exeIdentity, veriIdentity)
+	////	ids = append(ids, conIdentities...)
+	////
+	////	err = state.Mutate().Bootstrap(flow.Genesis(ids))
+	////	require.NoError(t, err)
+	////	b1 := unittest.BlockFixture()
+	////	b2 := unittest.BlockFixture()
+	////	b1.Identities = ids
+	////	b2.Identities = ids
+	////	b1.Number = 10
+	////	b2.Number = 10
+	////	b1.Guarantees = unittest.CollectionGuaranteesFixture(7)
+	////	b2.Guarantees = unittest.CollectionGuaranteesFixture(7)
+	////
+	////	assert.NotEqual(t, b1.ID(), b2.ID())
+	////
+	////	blocks := bstorage.NewBlocks(db)
+	////	err = blocks.Store(&b1)
+	////	require.NoError(t, err)
+	////	err = blocks.Store(&b2)
+	////	require.NoError(t, err)
+	////
+	////	err = state.Mutate().Extend(b1.ID())
+	////	if err != nil {
+	////		fmt.Printf("%v", err)
+	////	}
+	////	require.NoError(t, err)
+	////	err = state.Mutate().Extend(b2.ID())
+	////	require.NoError(t, err)
+	////
+	////	var vaLogger zerolog.Logger
+	////	va := NewVoteAggregator(vaLogger, &ViewState{protocolState: state}, &Validator{&ViewState{protocolState: state}})
+	////	identities, err := va.viewState.protocolState.AtBlockID(b1.ID()).Identities(filter.HasRole(flow.RoleConsensus))
+	////	if err != nil {
+	////		fmt.Printf("%v", err)
+	////	}
+	////	assert.NotNil(t, identities)
+	//	//vote1 := newMockVote(10, b1.ID(), uint32(1))
+	//	//va.StoreVoteAndBuildQC(vote1, b1)
+	//	//vote2 := newMockVote(10, bp2.BlockMRH(), uint32(1))
+	//	//_, err = va.StoreVoteAndBuildQC(vote2, bp2)
+	//	//if err != nil {
+	//	//	switch err.(type) {
+	//	//	case types.ErrDoubleVote:
+	//	//		fmt.Printf("double vote detected %v", err)
+	//	//	default:
+	//	//		fmt.Printf("error detected %v", err)
+	//	//	}
+	//	//} else {
+	//	//	t.Errorf("double vote not detected")
+	//	//}
+	//})
 	//var vaLogger zerolog.Logger
 	//va := NewVoteAggregator(vaLogger, &ViewState{protocolState: state}, &Validator{})
 	//bp1 := &types.BlockProposal{
@@ -195,4 +226,29 @@ func mockIdentities(size int) flow.IdentityList {
 	}
 
 	return identities
+}
+
+func newMockBlock(view uint64) *types.BlockProposal {
+	blockHeader := unittest.BlockHeaderFixture()
+	blockHeader.Number = view
+	block := &types.Block{
+		View:    view,
+		BlockID: blockHeader.ID(),
+	}
+	return types.NewBlockProposal(block, nil)
+}
+
+func newMockVote(view uint64, blockID flow.Identifier, signerIndex uint32) *types.Vote {
+	vote := &types.Vote{
+		UnsignedVote: types.UnsignedVote{
+			View:    view,
+			BlockID: blockID,
+		},
+		Signature: &types.Signature{
+			RawSignature: [32]byte{},
+			SignerIdx:    signerIndex,
+		},
+	}
+
+	return vote
 }

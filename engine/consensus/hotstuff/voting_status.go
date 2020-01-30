@@ -30,11 +30,11 @@ func NewVotingStatus(thresholdStake uint64, view uint64, signerCount uint32, vot
 
 // assume votes are valid
 func (vs *VotingStatus) AddVote(vote *types.Vote) {
-	_, exists := vs.votes[vote.Hash()]
+	_, exists := vs.votes[string(vote.ID())]
 	if exists {
 		return
 	}
-	vs.votes[vote.Hash()] = vote
+	vs.votes[string(vote.ID())] = vote
 	vs.accumulatedStake += vs.voteSender.Stake
 }
 

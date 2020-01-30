@@ -18,7 +18,7 @@ func NewBlockHeader(block *Block, sig *Signature) *BlockProposal {
 
 func (b BlockHeader) QC() *QuorumCertificate   { return b.Block.QC }
 func (b BlockHeader) View() uint64             { return b.Block.View }
-func (b BlockHeader) BlockID() flow.Identifier { return b.Block.BlockID() }
+func (b BlockHeader) BlockID() flow.Identifier { return b.Block.BlockID }
 func (b BlockHeader) Height() uint64           { return b.Block.Height }
 
 // ToVote converts a BlockProposal to a Vote

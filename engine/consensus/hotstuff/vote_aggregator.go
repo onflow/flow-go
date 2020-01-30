@@ -3,7 +3,6 @@ package hotstuff
 import (
 	"fmt"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
@@ -18,7 +17,7 @@ type VoteAggregator struct {
 	// For pruning
 	viewToBlockID map[uint64][][]byte
 	// keeps track of votes whose blocks can not be found
-	pendingVotes map[string]map[string]*types.Vote
+	pendingVoteMap map[string]map[string]*types.Vote
 	// keeps track of QCs that have been made for blocks
 	createdQC map[string]*types.QuorumCertificate
 	// keeps track of accumulated votes and stakes for blocks
@@ -46,12 +45,14 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 			FinalizedView: va.lastPrunedView,
 		})
 	}
-	voteMap, exists := va.pendingVotes[vote.BlockID.String()]
+	blockIDStr := vote.BlockID.String()
+	voteMap, exists := va.pendingVoteMap[blockIDStr]
+	voteIDStr := string(vote.ID())
 	if exists {
-		voteMap[vote.Hash()] = vote
+		voteMap[voteIDStr] = vote
 	} else {
-		va.pendingVotes[vote.BlockID.String()] = make(map[string]*types.Vote)
-		va.pendingVotes[vote.BlockID.String()][vote.Hash()] = vote
+		va.pendingVoteMap[blockIDStr] = make(map[string]*types.Vote)
+		va.pendingVoteMap[blockIDStr][voteIDStr] = vote
 	}
 	return nil
 }
@@ -89,30 +90,24 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 // BuildQCForBlockProposal will extract a primary vote out of the block proposal and
 // attempt to build a QC for the given block proposal when there are votes
 // with enough stakes.
-func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*types.QuorumCertificate, *multierror.Error) {
-	var result *multierror.Error
-	oldQC, built := va.createdQC[bp.BlockID().String()]
+func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*types.QuorumCertificate, error) {
+	blockIDStr := bp.BlockID().String()
+	oldQC, built := va.createdQC[blockIDStr]
 	if built {
 		return oldQC, nil
 	}
-	for _, vote := range va.pendingVotes[bp.BlockID().String()] {
+	for _, vote := range va.pendingVoteMap[blockIDStr] {
 		voteStatus, err := va.validateAndStoreIncorporatedVote(vote, bp)
 		if err != nil {
-			va.log.Debug().Msg("invalid vote found")
-			result = multierror.Append(result, fmt.Errorf("could not save pending vote: %w", err))
+			va.log.Warn().Msg("invalid vote found")
 		} else {
 			voteStatus.AddVote(vote)
-			delete(va.pendingVotes, vote.BlockID.String())
 		}
 	}
-	primaryVote := bp.ToVote()
-	qc, err := va.StoreVoteAndBuildQC(primaryVote, bp)
-	if err != nil {
-		result = multierror.Append(result, fmt.Errorf("could not build QC on receiving block proposal: %w", err))
-		return nil, result
-	}
+	delete(va.pendingVoteMap, blockIDStr)
 
-	return qc, result
+	primaryVote := bp.ToVote()
+	return va.StoreVoteAndBuildQC(primaryVote, bp)
 }
 
 // PruneByView will delete all votes equal or below to the given view, as well as related indexes.
@@ -124,7 +119,7 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 		blockMRHs := va.viewToBlockID[i]
 		for _, blockMRH := range blockMRHs {
 			blockMRHStr := string(blockMRH)
-			delete(va.pendingVotes, blockMRHStr)
+			delete(va.pendingVoteMap, blockMRHStr)
 			delete(va.blockHashToVotingStatus, blockMRHStr)
 			delete(va.createdQC, blockMRHStr)
 		}
@@ -148,7 +143,8 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 		return nil, fmt.Errorf("double voting detected: %w", err)
 	}
 	// update existing voting status or create a new one
-	votingStatus, exists := va.blockHashToVotingStatus[vote.BlockID.String()]
+	blockIDStr := vote.BlockID.String()
+	votingStatus, exists := va.blockHashToVotingStatus[blockIDStr]
 	if !exists {
 		threshold, err := va.viewState.GetQCStakeThresholdForBlockID(votingStatus.BlockID())
 		if err != nil {
@@ -159,10 +155,16 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 			return nil, fmt.Errorf("could not get identities: %w", err)
 		}
 		votingStatus = NewVotingStatus(threshold, vote.View, uint32(len(identities)), voter, vote.BlockID)
-		va.blockHashToVotingStatus[vote.BlockID.String()] = votingStatus
+		va.blockHashToVotingStatus[blockIDStr] = votingStatus
 	}
 	votingStatus.AddVote(vote)
-	va.viewToIDToVote[vote.View][voter.ID()] = vote
+	idToVote, exists := va.viewToIDToVote[vote.View]
+	if exists {
+		idToVote[voter.ID()] = vote
+	} else {
+		va.viewToIDToVote[vote.View] = make(map[flow.Identifier]*types.Vote)
+		va.viewToIDToVote[vote.View][voter.ID()] = vote
+	}
 	return votingStatus, nil
 }
 

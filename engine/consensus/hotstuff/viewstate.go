@@ -2,10 +2,10 @@ package hotstuff
 
 import (
 	"fmt"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"math/big"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
 	"github.com/dapperlabs/flow-go/protocol"
 )
 
@@ -48,7 +48,7 @@ func (v *ViewState) GetSelfIdxForBlockID(blockID flow.Identifier) (uint32, error
 // GetIdentitiesForView returns all the staked nodes for my role at a certain block.
 // view specifies the view
 func (v *ViewState) GetIdentitiesForBlockID(blockID flow.Identifier) (flow.IdentityList, error) {
-	return v.protocolState.AtBlockID(blockID).Identities(identity.HasRole(v.myRole))
+	return v.protocolState.AtBlockID(blockID).Identities(filter.HasRole(flow.RoleConsensus))
 }
 
 // GetQCStakeThresholdForBlockID returns the stack threshold for building QC at a given block

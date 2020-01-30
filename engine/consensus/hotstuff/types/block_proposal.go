@@ -23,7 +23,7 @@ func (b BlockProposal) QC() *QuorumCertificate { return b.Block.QC }
 func (b BlockProposal) View() uint64 { return b.Block.View }
 
 // BlockID is the Merkle Root Hash of a Block
-func (b BlockProposal) BlockID() flow.Identifier { return b.Block.BlockID() }
+func (b BlockProposal) BlockID() flow.Identifier { return b.Block.BlockID }
 
 // Height is the height of the Block. It equals to the parent block's height + 1
 func (b BlockProposal) Height() uint64 { return b.Block.Height }
