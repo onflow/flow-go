@@ -80,6 +80,12 @@ func TestUnHappyPathForPendingVotes(t *testing.T) {
 
 }
 
+// receive vote1 and 2 vote2
+// the stake of vote2 should only be accumulated once
+func TestDuplicateVotes(t *testing.T) {
+
+}
+
 // store one vote in the memory
 // receive another vote with the same voter and the same view
 // should trigger ErrDoubleVote

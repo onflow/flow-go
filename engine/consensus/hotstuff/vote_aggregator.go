@@ -63,7 +63,7 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 // VoteAggregator ALWAYS returns the same QC as the one returned before.
 func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockProposal) (*types.QuorumCertificate, error) {
 	// if the QC for the block has been created before, return the QC
-	oldQC, built := va.createdQC[fmt.Sprintf("%x", bp.BlockID())]
+	oldQC, built := va.createdQC[bp.BlockID().String()]
 	if built {
 		return oldQC, nil
 	}
@@ -91,7 +91,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 // with enough stakes.
 func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*types.QuorumCertificate, *multierror.Error) {
 	var result *multierror.Error
-	oldQC, built := va.createdQC[fmt.Sprintf("%x", bp.BlockID())]
+	oldQC, built := va.createdQC[bp.BlockID().String()]
 	if built {
 		return oldQC, nil
 	}
@@ -100,14 +100,12 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 		if err != nil {
 			va.log.Debug().Msg("invalid vote found")
 			result = multierror.Append(result, fmt.Errorf("could not save pending vote: %w", err))
+		} else {
+			voteStatus.AddVote(vote)
+			delete(va.pendingVotes, vote.BlockID.String())
 		}
-		voteStatus.AddVote(vote)
 	}
-
-	primaryVote := types.NewVote(&types.UnsignedVote{
-		View:    bp.View(),
-		BlockID: bp.BlockID(),
-	}, bp.Signature)
+	primaryVote := bp.ToVote()
 	qc, err := va.StoreVoteAndBuildQC(primaryVote, bp)
 	if err != nil {
 		result = multierror.Append(result, fmt.Errorf("could not build QC on receiving block proposal: %w", err))
@@ -119,16 +117,19 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 
 // PruneByView will delete all votes equal or below to the given view, as well as related indexes.
 func (va *VoteAggregator) PruneByView(view uint64) {
+	if view <= va.lastPrunedView {
+		return
+	}
 	for i := va.lastPrunedView + 1; i <= view; i++ {
 		blockMRHs := va.viewToBlockID[i]
 		for _, blockMRH := range blockMRHs {
 			blockMRHStr := string(blockMRH)
-			delete(va.viewToBlockID, i)
 			delete(va.pendingVotes, blockMRHStr)
 			delete(va.blockHashToVotingStatus, blockMRHStr)
 			delete(va.createdQC, blockMRHStr)
-			delete(va.viewToIDToVote, view)
 		}
+		delete(va.viewToBlockID, i)
+		delete(va.viewToIDToVote, i)
 	}
 	va.lastPrunedView = view
 
@@ -151,9 +152,13 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 	if !exists {
 		threshold, err := va.viewState.GetQCStakeThresholdForBlockID(votingStatus.BlockID())
 		if err != nil {
-			return nil, fmt.Errorf("could not get stake threshold %w", err)
+			return nil, fmt.Errorf("could not get stake threshold: %w", err)
 		}
-		votingStatus = NewVotingStatus(threshold, voter, vote.BlockID)
+		identities, err := va.viewState.GetIdentitiesForBlockID(votingStatus.BlockID())
+		if err != nil {
+			return nil, fmt.Errorf("could not get identities: %w", err)
+		}
+		votingStatus = NewVotingStatus(threshold, vote.View, uint32(len(identities)), voter, vote.BlockID)
 		va.blockHashToVotingStatus[vote.BlockID.String()] = votingStatus
 	}
 	votingStatus.AddVote(vote)
@@ -162,11 +167,11 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 }
 
 func (va *VoteAggregator) tryBuildQC(votingStatus *VotingStatus) (*types.QuorumCertificate, error) {
-	if !votingStatus.CanBuildQC() {
-		return nil, types.ErrInsufficientVotes{}
+	qc, err := votingStatus.tryBuildQC()
+	if err != nil {
+		return nil, err
 	}
-	// TODO: to create aggregate sig
-	qc := &types.QuorumCertificate{}
+
 	va.createdQC[votingStatus.blockMRH.String()] = qc
 	va.log.Info().Msg("new QC created")
 	return qc, nil
@@ -192,15 +197,4 @@ func (va *VoteAggregator) checkDoubleVote(vote *types.Vote, sender *flow.Identit
 		OriginalVote: originalVote,
 		DoubleVote:   vote,
 	}
-}
-
-func getSigsSliceFromVotes(votes map[string]*types.Vote) []*types.Signature {
-	var signatures = make([]*types.Signature, len(votes))
-	i := 0
-	for _, vote := range votes {
-		signatures[i] = vote.Signature
-		i++
-	}
-
-	return signatures
 }
