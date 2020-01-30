@@ -17,7 +17,7 @@ type VoteAggregator struct {
 	// For pruning
 	viewToBlockID map[uint64][][]byte
 	// keeps track of votes whose blocks can not be found
-	pendingVotes map[string]map[string]*types.Vote
+	pendingVoteMap map[string]map[string]*types.Vote
 	// keeps track of QCs that have been made for blocks
 	createdQC map[string]*types.QuorumCertificate
 	// keeps track of accumulated votes and stakes for blocks
@@ -46,13 +46,13 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 		})
 	}
 	blockIDStr := vote.BlockID.String()
-	voteMap, exists := va.pendingVotes[blockIDStr]
+	voteMap, exists := va.pendingVoteMap[blockIDStr]
 	voteIDStr := string(vote.ID())
 	if exists {
 		voteMap[voteIDStr] = vote
 	} else {
-		va.pendingVotes[blockIDStr] = make(map[string]*types.Vote)
-		va.pendingVotes[blockIDStr][voteIDStr] = vote
+		va.pendingVoteMap[blockIDStr] = make(map[string]*types.Vote)
+		va.pendingVoteMap[blockIDStr][voteIDStr] = vote
 	}
 	return nil
 }
@@ -96,7 +96,7 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 	if built {
 		return oldQC, nil
 	}
-	for _, vote := range va.pendingVotes[blockIDStr] {
+	for _, vote := range va.pendingVoteMap[blockIDStr] {
 		voteStatus, err := va.validateAndStoreIncorporatedVote(vote, bp)
 		if err != nil {
 			va.log.Warn().Msg("invalid vote found")
@@ -104,7 +104,7 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 			voteStatus.AddVote(vote)
 		}
 	}
-	delete(va.pendingVotes, blockIDStr)
+	delete(va.pendingVoteMap, blockIDStr)
 
 	primaryVote := bp.ToVote()
 	return va.StoreVoteAndBuildQC(primaryVote, bp)
@@ -119,7 +119,7 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 		blockMRHs := va.viewToBlockID[i]
 		for _, blockMRH := range blockMRHs {
 			blockMRHStr := string(blockMRH)
-			delete(va.pendingVotes, blockMRHStr)
+			delete(va.pendingVoteMap, blockMRHStr)
 			delete(va.blockHashToVotingStatus, blockMRHStr)
 			delete(va.createdQC, blockMRHStr)
 		}
@@ -158,7 +158,13 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 		va.blockHashToVotingStatus[blockIDStr] = votingStatus
 	}
 	votingStatus.AddVote(vote)
-	va.viewToIDToVote[vote.View][voter.ID()] = vote
+	idToVote, exists := va.viewToIDToVote[vote.View]
+	if exists {
+		idToVote[voter.ID()] = vote
+	} else {
+		va.viewToIDToVote[vote.View] = make(map[flow.Identifier]*types.Vote)
+		va.viewToIDToVote[vote.View][voter.ID()] = vote
+	}
 	return votingStatus, nil
 }
 
