@@ -727,12 +727,15 @@ func (v *ProgramVisitor) VisitReferenceType(ctx *ReferenceTypeContext) interface
 
 	authorized := ctx.Auth() != nil
 
+	storable := ctx.Storable() != nil
+
 	result := ctx.InnerType().Accept(v).(ast.Type)
 
 	startPos := PositionFromToken(ctx.GetStart())
 
 	result = &ast.ReferenceType{
 		Authorized: authorized,
+		Storable:   storable,
 		Type:       result,
 		StartPos:   startPos,
 	}
