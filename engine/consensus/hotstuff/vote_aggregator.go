@@ -146,7 +146,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 	blockIDStr := vote.BlockID.String()
 	votingStatus, exists := va.blockHashToVotingStatus[blockIDStr]
 	if !exists {
-		threshold, err := va.viewState.GetQCStakeThresholdForBlockID(votingStatus.BlockID())
+		threshold, err := va.viewState.GetQCStakeThresholdForBlockID(vote.BlockID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get stake threshold: %w", err)
 		}
