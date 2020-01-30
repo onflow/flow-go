@@ -464,3 +464,65 @@ func TestCheckAuthReferenceTypeSubTyping(t *testing.T) {
 		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 }
+
+func TestCheckReferenceExpressionReferenceType(t *testing.T) {
+
+	t.Run("non-auth reference", func(t *testing.T) {
+
+		checker, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let ref = &storage[R] as &R
+        `,
+		)
+
+		require.NoError(t, err)
+
+		refValueType := checker.GlobalValues["ref"].Type
+
+		require.IsType(t,
+			&sema.ReferenceType{},
+			refValueType,
+		)
+
+		referenceType := refValueType.(*sema.ReferenceType)
+
+		assert.IsType(t,
+			&sema.CompositeType{},
+			referenceType.Type,
+		)
+
+		assert.False(t, referenceType.Authorized)
+
+	})
+
+	t.Run("auth reference", func(t *testing.T) {
+
+		checker, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let ref = &storage[R] as auth &R
+        `,
+		)
+
+		require.NoError(t, err)
+
+		refValueType := checker.GlobalValues["ref"].Type
+
+		require.IsType(t,
+			&sema.ReferenceType{},
+			refValueType,
+		)
+
+		referenceType := refValueType.(*sema.ReferenceType)
+
+		assert.IsType(t,
+			&sema.CompositeType{},
+			referenceType.Type,
+		)
+
+		assert.True(t, referenceType.Authorized)
+
+	})
+
+}
