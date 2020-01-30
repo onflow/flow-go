@@ -195,7 +195,7 @@ fullType
     ;
 
 referenceType
-    : Ampersand {p.noWhitespace()}? innerType
+    : Auth? Ampersand {p.noWhitespace()}? innerType
     ;
 
 nonReferenceType
@@ -463,6 +463,7 @@ Mul : '*' ;
 Div : '/' ;
 Mod : '%' ;
 
+Auth : 'auth' ;
 Ampersand : '&';
 
 unaryOp
