@@ -185,34 +185,76 @@ func TestCheckInvalidReferenceExpressionTypeMismatch(t *testing.T) {
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
-func TestCheckInvalidReferenceToNonIndex(t *testing.T) {
+func TestCheckReferenceToNonStorage(t *testing.T) {
 
-	_, err := ParseAndCheckStorage(t, `
+	t.Run("non-resource variable", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+          struct S {}
+
+          let s = S()
+          let ref = &s as &S
+        `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 2)
+
+		assert.IsType(t, &sema.NonResourceTypeReferenceError{}, errs[0])
+		assert.IsType(t, &sema.NonResourceReferenceTypeError{}, errs[1])
+	})
+
+	t.Run("resource variable, non-storable", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
           resource R {}
 
           let r <- create R()
           let ref = &r as &R
         `,
-	)
+		)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+		require.NoError(t, err)
+	})
 
-	assert.IsType(t, &sema.NonStorageReferenceError{}, errs[0])
-}
+	t.Run("resource array indexing", func(t *testing.T) {
 
-func TestCheckInvalidReferenceToNonStorage(t *testing.T) {
-
-	_, err := ParseAndCheckStorage(t, `
+		_, err := ParseAndCheckStorage(t, `
           resource R {}
 
           let rs <- [<-create R()]
           let ref = &rs[0] as &R
         `,
-	)
+		)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+		require.NoError(t, err)
+	})
 
-	assert.IsType(t, &sema.NonStorageReferenceError{}, errs[0])
+	t.Run("resource variable, storable", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let r <- create R()
+          let ref = &r as storable &R
+        `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidNonStorageStorableReferenceError{}, errs[0])
+	})
+
+	t.Run("storage, storable", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let ref = &storage[R] as storable &R
+        `,
+		)
+
+		require.NoError(t, err)
+	})
 }
 
 func TestCheckReferenceUse(t *testing.T) {

@@ -1685,17 +1685,17 @@ func (e *NonResourceTypeReferenceError) Error() string {
 
 func (*NonResourceTypeReferenceError) isSemanticError() {}
 
-// NonStorageReferenceError
+// InvalidNonStorageStorableReferenceError
 
-type NonStorageReferenceError struct {
+type InvalidNonStorageStorableReferenceError struct {
 	ast.Range
 }
 
-func (e *NonStorageReferenceError) Error() string {
-	return "cannot create reference which is not into storage"
+func (e *InvalidNonStorageStorableReferenceError) Error() string {
+	return "cannot create storable reference which is not into storage"
 }
 
-func (*NonStorageReferenceError) isSemanticError() {}
+func (*InvalidNonStorageStorableReferenceError) isSemanticError() {}
 
 // CreateImportedResourceError
 

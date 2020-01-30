@@ -2071,7 +2071,7 @@ func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
 				`
 	              import TestContractInterface from 0x2
 
-                  // NOTE: *not* importing concrete implementation. 
+                  // NOTE: *not* importing concrete implementation.
                   //   Should be imported automatically when loading the value from storage
 
 	              // import TestContract from 0x3
