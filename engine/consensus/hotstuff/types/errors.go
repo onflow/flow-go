@@ -14,4 +14,3 @@ type ErrorConfiguration struct {
 func (e *ErrorConfiguration) Error() string {
 	return e.Msg
 }
-
