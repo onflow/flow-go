@@ -48,6 +48,9 @@ func (vs *VotingStatus) BlockID() flow.Identifier {
 
 func (vs *VotingStatus) tryBuildQC() (*types.QuorumCertificate, error) {
 	sigs := vs.getSigsSliceFromVotes()
+	if !vs.CanBuildQC() {
+		return nil, fmt.Errorf("could not build QC: %w", types.ErrInsufficientVotes{})
+	}
 	aggregatedSig, err := types.FromSignatures(sigs, vs.signerCount)
 	if err != nil {
 		return nil, fmt.Errorf("could not build QC: %w", err)
