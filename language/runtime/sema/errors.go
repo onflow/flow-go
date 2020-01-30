@@ -2102,3 +2102,87 @@ func (e *ConstantSizedArrayLiteralSizeError) Error() string {
 }
 
 func (*ConstantSizedArrayLiteralSizeError) isSemanticError() {}
+
+// InvalidRestrictedTypeError
+
+type InvalidRestrictedTypeError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidRestrictedTypeError) Error() string {
+	return fmt.Sprintf("cannot restrict non-resource type: %s", e.Type.String())
+}
+
+func (*InvalidRestrictedTypeError) isSemanticError() {}
+
+// InvalidRestrictionTypeError
+
+type InvalidRestrictionTypeError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidRestrictionTypeError) Error() string {
+	return fmt.Sprintf("cannot restrict using non-resource interface type: %s", e.Type.String())
+}
+
+func (*InvalidRestrictionTypeError) isSemanticError() {}
+
+// InvalidRestrictionTypeDuplicateError
+
+type InvalidRestrictionTypeDuplicateError struct {
+	Type *InterfaceType
+	ast.Range
+}
+
+func (e *InvalidRestrictionTypeDuplicateError) Error() string {
+	return fmt.Sprintf("duplicate restriction: %s", e.Type.String())
+}
+
+func (*InvalidRestrictionTypeDuplicateError) isSemanticError() {}
+
+// InvalidNonConformanceRestrictionError
+
+type InvalidNonConformanceRestrictionError struct {
+	Type *InterfaceType
+	ast.Range
+}
+
+func (e *InvalidNonConformanceRestrictionError) Error() string {
+	return fmt.Sprintf("restricted type does not conform to restricting type: %s", e.Type.String())
+}
+
+func (*InvalidNonConformanceRestrictionError) isSemanticError() {}
+
+// InvalidRestrictedTypeMemberAccessError
+
+type InvalidRestrictedTypeMemberAccessError struct {
+	Name string
+	ast.Range
+}
+
+func (e *InvalidRestrictedTypeMemberAccessError) Error() string {
+	return fmt.Sprintf("member of restricted type is not accessible: %s", e.Name)
+}
+
+func (*InvalidRestrictedTypeMemberAccessError) isSemanticError() {}
+
+// RestrictionMemberClashError
+
+type RestrictionMemberClashError struct {
+	Name                  string
+	RedeclaringType       *InterfaceType
+	OriginalDeclaringType *InterfaceType
+	ast.Range
+}
+
+func (e *RestrictionMemberClashError) Error() string {
+	return fmt.Sprintf(
+		"restriction has member clash with previous restriction `%s`: %s",
+		e.OriginalDeclaringType.String(),
+		e.Name,
+	)
+}
+
+func (*RestrictionMemberClashError) isSemanticError() {}
