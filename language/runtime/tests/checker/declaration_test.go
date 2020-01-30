@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
@@ -409,10 +410,12 @@ func TestCheckTopLevelContractRestriction(t *testing.T) {
         `,
 		ParseAndCheckOptions{
 			Options: []sema.Option{
-				sema.WithValidTopLevelDeclarations(
-					[]common.DeclarationKind{
-						common.DeclarationKindContract,
-						common.DeclarationKindImport,
+				sema.WithValidTopLevelDeclarationsHandler(
+					func(_ ast.Location) []common.DeclarationKind {
+						return []common.DeclarationKind{
+							common.DeclarationKindContract,
+							common.DeclarationKindImport,
+						}
 					},
 				),
 			},
@@ -442,11 +445,13 @@ func TestCheckInvalidTopLevelContractRestriction(t *testing.T) {
 				code,
 				ParseAndCheckOptions{
 					Options: []sema.Option{
-						sema.WithValidTopLevelDeclarations(
-							[]common.DeclarationKind{
-								common.DeclarationKindContractInterface,
-								common.DeclarationKindContract,
-								common.DeclarationKindImport,
+						sema.WithValidTopLevelDeclarationsHandler(
+							func(_ ast.Location) []common.DeclarationKind {
+								return []common.DeclarationKind{
+									common.DeclarationKindContractInterface,
+									common.DeclarationKindContract,
+									common.DeclarationKindImport,
+								}
 							},
 						),
 					},
