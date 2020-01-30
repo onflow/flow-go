@@ -31,7 +31,11 @@ func NewVoteAggregator(log zerolog.Logger, viewState *ViewState, voteValidator *
 		log:                     log,
 		viewState:               viewState,
 		voteValidator:           voteValidator,
+		viewToBlockID:           map[uint64][][]byte{},
+		pendingVoteMap:          map[string]map[string]*types.Vote{},
 		blockHashToVotingStatus: map[string]*VotingStatus{},
+		createdQC:               map[string]*types.QuorumCertificate{},
+		viewToIDToVote:          map[uint64]map[flow.Identifier]*types.Vote{},
 	}
 }
 
@@ -150,7 +154,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 		if err != nil {
 			return nil, fmt.Errorf("could not get stake threshold: %w", err)
 		}
-		identities, err := va.viewState.GetIdentitiesForBlockID(votingStatus.BlockID())
+		identities, err := va.viewState.GetIdentitiesForBlockID(vote.BlockID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get identities: %w", err)
 		}
