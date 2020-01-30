@@ -1,8 +1,8 @@
 package types
 
 import (
-	"bytes"
-	"crypto/sha256"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/encoding"
 )
 
 type Vote struct {
@@ -10,19 +10,12 @@ type Vote struct {
 	Signature *Signature
 }
 
-func (v *Vote) Hash() string {
-	data := bytes.Join(
-		[][]byte{
-			v.BytesForSig(),
-			v.Signature.RawSignature[:],
-			make([]byte, v.Signature.SignerIdx),
-		},
-		[]byte{},
-	)
-
-	voteHash := sha256.Sum256(data)
-
-	return string(voteHash[:])
+func (v *Vote) ID() []byte {
+	// TODO: replace this to generic hash function
+	data := encoding.DefaultEncoder.MustEncode(v)
+	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
+	hash := hasher.ComputeHash(data)
+	return hash
 }
 
 func NewVote(unsigned *UnsignedVote, sig *Signature) *Vote {

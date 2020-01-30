@@ -22,7 +22,7 @@ func (eh *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) {
 }
 
 func (eh *EventHandler) OnReceiveVote(vote *types.Vote) {
-	blockProposal, found := eh.forks.GetBlock(vote.BlockMRH[:])
+	blockProposal, found := eh.forks.GetBlock(vote.BlockID[:])
 	if found == false {
 		eh.voteAggregator.StorePendingVote(vote)
 		return
