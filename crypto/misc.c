@@ -36,6 +36,7 @@ void _ep2_print(char* s, ep2_st* p) {
     g2_print(p);
 }
 
+
 // Reads a prime field element from a digit vecotor in little-endian format.
 void fp_read_raw(fp_t a, const dig_t *raw, int len) {
      bn_t t;
@@ -87,6 +88,68 @@ void _bn_randZr(bn_t x) {
     bn_free(r);
 }
 
+
+// reads a bit in a prime field element at a given index
+// whether the field element is in Montgomery domain or not
+static int fp_get_bit_generic(const fp_t a, int bit) {
+#if (FP_RDC == MONTY)
+    bn_st tmp;
+    bn_new(&tmp);
+    fp_prime_back(&tmp, a);
+    int res = bn_get_bit(&tmp, bit);
+    bn_free(&tmp);
+    return res;
+#else
+    return fp_get_bit(a, bit);
+#endif
+}
+
+// uncompress a G1 point p into r taken into account the coordinate x
+// and the LS bit of the y coordinate.
+// the (y) bit is the LS of (y*R mod p) if Montgomery domain is used, otherwise
+// is the LS bit of y 
+// (taken and modifed from Relic ep_upk function)
+static int ep_upk_generic(ep_t r, const ep_t p) {
+    fp_t t;
+    int result = 0;
+    fp_null(t);
+    TRY {
+        fp_new(t);
+        ep_rhs(t, p);
+        /* t0 = sqrt(x1^3 + a * x1 + b). */
+        result = fp_srt(t, t);
+        if (result) {
+            /* Verify if least significant bit of the result matches the
+            * compressed y-coordinate. */
+            #if (FP_RDC == MONTY)
+            bn_st tmp;
+            bn_new(&tmp);
+            fp_prime_back(&tmp, t);
+            if (bn_get_bit(&tmp, 0) != fp_get_bit(p->y, 0)) {
+                fp_neg(t, t);
+            }
+            bn_free(&tmp);
+            #else
+            if (fp_get_bit(t, 0) != fp_get_bit(p->y, 0)) {
+                fp_neg(t, t);
+            }
+            #endif
+            fp_copy(r->x, p->x);
+            fp_copy(r->y, t);
+            fp_set_dig(r->z, 1);
+            r->norm = 1;
+        }
+    }
+    CATCH_ANY {
+        THROW(ERR_CAUGHT);
+    }
+    FINALLY {
+        fp_free(t);
+    }
+    return result;
+}
+
+
 // ep_write_bin_compact exports a point a in E(Fp) to a buffer bin in a compressed or uncompressed form.
 // len is the allocated size of the buffer bin for sanity check
 // The encoding is inspired from zkcrypto (https://github.com/zkcrypto/pairing/tree/master/src/bls12_381) with a small change to accomodate Relic lib
@@ -119,7 +182,7 @@ void _ep_write_bin_compact(byte *bin, const ep_st *a, const int len) {
         fp_write_bin(bin, Fp_BYTES, t->x);
 
         if (SERIALIZATION == COMPRESSED) {
-            bin[0] |= (fp_get_bit(t->y, 0) << 5);
+            bin[0] |= (fp_get_bit_generic(t->y, 0) << 5);
         } else {
             fp_write_bin(bin + Fp_BYTES, Fp_BYTES, t->y);
         }
@@ -185,8 +248,54 @@ void _ep_read_bin_compact(ep_st* a, const byte *bin, const int len) {
     else {
         fp_zero(a->y);
         fp_set_bit(a->y, 0, y_is_odd);
-        ep_upk(a, a);
+        ep_upk_generic(a, a);
     }
+}
+
+// uncompress a G2 point p into r taken into account the coordinate x
+// and the LS bit of the y lower coordinate.
+// the (y0) bit is the LS of (y0*R mod p) if Montgomery domain is used, otherwise
+// is the LS bit of y0 
+// (taken and modifed from Relic ep_upk function)
+static  int ep2_upk_generic(ep2_t r, ep2_t p) {
+    fp2_t t;
+    int result = 0;
+    fp2_null(t);
+    TRY {
+        fp2_new(t);
+        ep2_rhs(t, p);
+        /* t0 = sqrt(x1^3 + a * x1 + b). */
+        result = fp2_srt(t, t);
+        if (result) {
+            /* Verify if least significant bit of the result matches the
+             * compressed y-coordinate. */
+            #if (FP_RDC == MONTY)
+            bn_st tmp;
+            bn_new(&tmp);
+            fp_prime_back(&tmp, t[0]);
+            if (bn_get_bit(&tmp, 0) != fp_get_bit(p->y[0], 0)) {
+                fp2_neg(t, t);
+            }
+            bn_free(&tmp);
+            #else
+            if (fp_get_bit(t[0], 0) != fp_get_bit(p->y[0], 0)) {
+                fp2_neg(t, t);
+            }
+            #endif
+            fp2_copy(r->x, p->x);
+            fp2_copy(r->y, t);
+            fp_set_dig(r->z[0], 1);
+            fp_zero(r->z[1]);
+            r->norm = 1;
+        }
+    }
+    CATCH_ANY {
+        THROW(ERR_CAUGHT);
+    }
+    FINALLY {
+        fp2_free(t);
+    }
+    return result;
 }
 
 // _ep2_write_bin_compact exports a point in E(Fp^2) to a buffer in a compressed or uncompressed form.
@@ -219,7 +328,7 @@ void _ep2_write_bin_compact(byte *bin, const ep2_st *a, const int len) {
         fp2_write_bin(bin, 2*Fp_BYTES, t->x, 0);
 
         if (SERIALIZATION == COMPRESSED) {
-            bin[0] |= (fp_get_bit(t->y[0], 0) << 5);
+            bin[0] |= (fp_get_bit_generic(t->y[0], 0) << 5);
         } else {
             fp2_write_bin(bin + 2*Fp_BYTES, 2*Fp_BYTES, t->y, 0);
         }
@@ -284,6 +393,6 @@ void _ep2_read_bin_compact(ep2_st* a, const byte *bin, const int len) {
         fp2_zero(a->y);
         fp_set_bit(a->y[0], 0, y_is_odd);
 		fp_zero(a->y[1]);
-        ep2_upk(a, a);
+        ep2_upk_generic(a, a);
     }
 }

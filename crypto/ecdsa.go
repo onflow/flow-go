@@ -51,6 +51,9 @@ func (sk *PrKeyECDSA) signHash(h Hash) (Signature, error) {
 
 // Sign signs an array of bytes
 func (sk *PrKeyECDSA) Sign(data []byte, alg Hasher) (Signature, error) {
+	if alg == nil {
+		return nil, cryptoError{"Sign requires a Hasher"}
+	}
 	h := alg.ComputeHash(data)
 	return sk.signHash(h)
 }
@@ -68,7 +71,7 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h Hash) (bool, error) {
 // Verify verifies a signature of a byte array
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg Hasher) (bool, error) {
 	if alg == nil {
-		return false, cryptoError{"VerifyBytes requires a Hasher"}
+		return false, cryptoError{"Verify requires a Hasher"}
 	}
 	h := alg.ComputeHash(data)
 	return pk.verifyHash(sig, h)
