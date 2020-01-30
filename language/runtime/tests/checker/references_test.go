@@ -68,7 +68,7 @@ func TestCheckInvalidReferencesIndexingAssignment(t *testing.T) {
           resource R {}
 
           fun test() {
-              references[&R] = &storage[R] as R
+              references[&R] = &storage[R] as &R
           }
         `,
 	)
@@ -88,7 +88,7 @@ func TestCheckReferencesIndexingAssignment(t *testing.T) {
           resource R {}
 
           fun test() {
-              references[&R] = &storage[R] as R
+              references[&R] = &storage[R] as &R
           }
         `,
 	)

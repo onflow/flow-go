@@ -1637,21 +1637,53 @@ func (e *InvalidResourceDictionaryMemberError) Error() string {
 
 func (*InvalidResourceDictionaryMemberError) isSemanticError() {}
 
-// NonResourceReferenceError
+// NonResourceReferenceTypeError
 
-type NonResourceReferenceError struct {
+type NonResourceReferenceTypeError struct {
 	ActualType Type
 	ast.Range
 }
 
-func (e *NonResourceReferenceError) Error() string {
+func (e *NonResourceReferenceTypeError) Error() string {
 	return fmt.Sprintf(
-		"cannot create reference: expected resource or resource interface, got `%s`",
+		"invalid reference type: expected resource type, got `%s`",
 		e.ActualType,
 	)
 }
 
-func (*NonResourceReferenceError) isSemanticError() {}
+func (*NonResourceReferenceTypeError) isSemanticError() {}
+
+// NonReferenceTypeReferenceError
+
+type NonReferenceTypeReferenceError struct {
+	ActualType Type
+	ast.Range
+}
+
+func (e *NonReferenceTypeReferenceError) Error() string {
+	return fmt.Sprintf(
+		"cannot create reference: expected reference type, got `%s`",
+		e.ActualType,
+	)
+}
+
+func (*NonReferenceTypeReferenceError) isSemanticError() {}
+
+// NonResourceTypeReferenceError
+
+type NonResourceTypeReferenceError struct {
+	ActualType Type
+	ast.Range
+}
+
+func (e *NonResourceTypeReferenceError) Error() string {
+	return fmt.Sprintf(
+		"cannot create reference: expected resource type, got `%s`",
+		e.ActualType,
+	)
+}
+
+func (*NonResourceTypeReferenceError) isSemanticError() {}
 
 // NonStorageReferenceError
 

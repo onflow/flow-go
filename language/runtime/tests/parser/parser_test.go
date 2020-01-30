@@ -6376,7 +6376,7 @@ func TestParseOptionalRestrictedResourceTypeOnlyRestrictions(t *testing.T) {
 func TestParseReference(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-       let x = &account.storage[R] as R
+       let x = &account.storage[R] as &R
 	`)
 
 	require.NoError(t, err)

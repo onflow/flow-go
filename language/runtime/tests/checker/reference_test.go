@@ -17,7 +17,7 @@ func TestCheckReferenceTypeSubTyping(t *testing.T) {
 
           resource R: RI {}
 
-          let ref = &storage[R] as RI
+          let ref = &storage[R] as &RI
           let ref2: &RI = ref
         `,
 	)
@@ -33,7 +33,7 @@ func TestCheckInvalidReferenceTypeSubTyping(t *testing.T) {
           // NOTE: R does not conform to RI
           resource R {}
 
-          let ref = &storage[R] as RI
+          let ref = &storage[R] as &RI
         `,
 	)
 
@@ -72,7 +72,7 @@ func TestCheckNestedReferenceType(t *testing.T) {
       fun test(r: &[&R]) {}
     `)
 
-	require.NoError(t, err)
+	require.Error(t, err)
 }
 
 func TestCheckInvalidReferenceType(t *testing.T) {
@@ -91,7 +91,7 @@ func TestCheckReferenceExpressionWithResourceResultType(t *testing.T) {
 	checker, err := ParseAndCheckStorage(t, `
           resource R {}
 
-          let ref = &storage[R] as R
+          let ref = &storage[R] as &R
         `,
 	)
 
@@ -116,7 +116,7 @@ func TestCheckReferenceExpressionWithResourceInterfaceResultType(t *testing.T) {
           resource interface T {}
           resource R: T {}
 
-          let ref = &storage[R] as T
+          let ref = &storage[R] as &T
         `,
 	)
 
@@ -128,7 +128,7 @@ func TestCheckInvalidReferenceExpressionType(t *testing.T) {
 	_, err := ParseAndCheckStorage(t, `
           resource R {}
 
-          let ref = &storage[R] as X
+          let ref = &storage[R] as &X
         `,
 	)
 
@@ -142,7 +142,7 @@ func TestCheckInvalidReferenceExpressionStorageIndexType(t *testing.T) {
 	_, err := ParseAndCheckStorage(t, `
           resource R {}
 
-          let ref = &storage[X] as R
+          let ref = &storage[X] as &R
         `,
 	)
 
@@ -154,17 +154,17 @@ func TestCheckInvalidReferenceExpressionStorageIndexType(t *testing.T) {
 func TestCheckInvalidReferenceExpressionNonResourceReferencedType(t *testing.T) {
 
 	_, err := ParseAndCheckStorage(t, `
-          struct R {}
-          resource T {}
+          struct S {}
+          resource R {}
 
-          let ref = &storage[R] as T
+          let ref = &storage[S] as &R
         `,
 	)
 
 	errs := ExpectCheckerErrors(t, err, 3)
 
 	assert.IsType(t, &sema.TypeMismatchWithDescriptionError{}, errs[0])
-	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[1])
+	assert.IsType(t, &sema.NonResourceTypeReferenceError{}, errs[1])
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[2])
 }
 
@@ -172,33 +172,33 @@ func TestCheckInvalidReferenceExpressionNonResourceResultType(t *testing.T) {
 
 	_, err := ParseAndCheckStorage(t, `
           resource R {}
-          struct T {}
+          struct S {}
 
-          let ref = &storage[R] as T
+          let ref = &storage[R] as &S
         `,
 	)
 
 	errs := ExpectCheckerErrors(t, err, 2)
 
-	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[0])
+	assert.IsType(t, &sema.NonResourceReferenceTypeError{}, errs[0])
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
 }
 
 func TestCheckInvalidReferenceExpressionNonResourceTypes(t *testing.T) {
 
 	_, err := ParseAndCheckStorage(t, `
-          struct R {}
+          struct S {}
           struct T {}
 
-          let ref = &storage[R] as T
+          let ref = &storage[S] as &T
         `,
 	)
 
 	errs := ExpectCheckerErrors(t, err, 4)
 
 	assert.IsType(t, &sema.TypeMismatchWithDescriptionError{}, errs[0])
-	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[1])
-	assert.IsType(t, &sema.NonResourceReferenceError{}, errs[2])
+	assert.IsType(t, &sema.NonResourceTypeReferenceError{}, errs[1])
+	assert.IsType(t, &sema.NonResourceReferenceTypeError{}, errs[2])
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[3])
 }
 
@@ -208,7 +208,7 @@ func TestCheckInvalidReferenceExpressionTypeMismatch(t *testing.T) {
           resource R {}
           resource T {}
 
-          let ref = &storage[R] as T
+          let ref = &storage[R] as &T
         `,
 	)
 
@@ -223,7 +223,7 @@ func TestCheckInvalidReferenceToNonIndex(t *testing.T) {
           resource R {}
 
           let r <- create R()
-          let ref = &r as R
+          let ref = &r as &R
         `,
 	)
 
@@ -238,7 +238,7 @@ func TestCheckInvalidReferenceToNonStorage(t *testing.T) {
           resource R {}
 
           let rs <- [<-create R()]
-          let ref = &rs[0] as R
+          let ref = &rs[0] as &R
         `,
 	)
 
@@ -268,7 +268,7 @@ func TestCheckReferenceUse(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy r
 
-              let ref = &storage[R] as R
+              let ref = &storage[R] as &R
               ref.x = 1
               let x1 = ref.x
               ref.setX(2)
@@ -302,7 +302,7 @@ func TestCheckReferenceUseArray(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy rs
 
-              let ref = &storage[[R]] as [R]
+              let ref = &storage[[R]] as &[R]
               ref[0].x = 1
               let x1 = ref[0].x
               ref[0].setX(2)
@@ -326,7 +326,7 @@ func TestCheckReferenceIndexingIfReferencedIndexable(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy rs
 
-              let ref = &storage[[R]] as [R]
+              let ref = &storage[[R]] as &[R]
               var other <- create R()
               ref[0] <-> other
               destroy other
@@ -348,7 +348,7 @@ func TestCheckInvalidReferenceResourceLoss(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy rs
 
-              let ref = &storage[[R]] as [R]
+              let ref = &storage[[R]] as &[R]
               ref[0]
           }
         `,
@@ -370,7 +370,7 @@ func TestCheckInvalidReferenceIndexingIfReferencedNotIndexable(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy r
 
-              let ref = &storage[R] as R
+              let ref = &storage[R] as &R
               ref[0]
           }
         `,
@@ -398,7 +398,7 @@ func TestCheckResourceInterfaceReferenceFunctionCall(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy r
 
-              let ref = &storage[R] as I
+              let ref = &storage[R] as &I
               ref.foo()
           }
         `,
@@ -422,7 +422,7 @@ func TestCheckInvalidResourceInterfaceReferenceFunctionCall(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy r
 
-              let ref = &storage[R] as I
+              let ref = &storage[R] as &I
               ref.foo()
           }
         `,
