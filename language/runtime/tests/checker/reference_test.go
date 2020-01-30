@@ -22,7 +22,7 @@ func TestCheckReferenceTypeSubTyping(t *testing.T) {
         `,
 	)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidReferenceTypeSubTyping(t *testing.T) {
@@ -95,7 +95,7 @@ func TestCheckReferenceExpressionWithResourceResultType(t *testing.T) {
         `,
 	)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	refValueType := checker.GlobalValues["ref"].Type
 

@@ -362,7 +362,7 @@ func TestCheckVariableDeclarationSecondValueDictionary(t *testing.T) {
      let r <- ys.remove(key: "r")
    `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.IsType(t,
 		&sema.CompositeType{},

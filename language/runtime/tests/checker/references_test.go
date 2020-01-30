@@ -46,7 +46,7 @@ func TestCheckReferencesIndexing(t *testing.T) {
           let a = references[&R]
         `,
 	)
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.OptionalType{
@@ -93,7 +93,7 @@ func TestCheckReferencesIndexingAssignment(t *testing.T) {
         `,
 	)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 }
 
 func TestCheckInvalidReferencesIndexingAssignmentNonReference(t *testing.T) {
