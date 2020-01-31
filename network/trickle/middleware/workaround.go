@@ -1,5 +1,4 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package middleware
 
 import (
