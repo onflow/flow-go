@@ -9,22 +9,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type PendingStatus struct {
-	orderedVotes []*types.Vote
-	voteMap      map[string]*types.Vote
-}
-
-func (ps *PendingStatus) AddVote(vote *types.Vote) {
-	ps.voteMap[string(vote.ID())] = vote
-	ps.orderedVotes = append(ps.orderedVotes, vote)
-}
-
-func NewPendingStatus() *PendingStatus {
-	return &PendingStatus{
-		voteMap: map[string]*types.Vote{},
-	}
-}
-
 type VoteAggregator struct {
 	log            zerolog.Logger
 	viewState      *ViewState
