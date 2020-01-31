@@ -102,11 +102,13 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 	if bp.View() <= va.lastPrunedView {
 		return nil, fmt.Errorf("could not build QC on receiving block: %w", types.ErrStaleBlock{BlockProposal: bp, FinalizedView: bp.View()})
 	}
+	// accumulate primary vote first
 	primaryVote := bp.ToVote()
 	voteStatus, err := va.validateAndStoreIncorporatedVote(primaryVote, bp)
 	if err != nil {
 		va.log.Warn().Msg("primary vote is invalid")
 	}
+	// accumulate pending votes by order
 	pendingStatus, exists := va.pendingVoteMap[blockIDStr]
 	if exists {
 		va.convertPendingVotes(pendingStatus.orderedVotes, bp)
