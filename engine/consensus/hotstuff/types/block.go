@@ -2,6 +2,8 @@ package types
 
 import (
 	"time"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type Block struct {
@@ -18,7 +20,7 @@ type Block struct {
 	Timestamp time.Time
 }
 
-func (b *Block) BlockID() []byte {
+func (b *Block) BlockID() flow.Identifier {
 	panic("TODO")
 }
 
@@ -34,4 +36,8 @@ func NewBlock(view uint64, qc *QuorumCertificate, payloadHash []byte, height uin
 		ChainID:     chainID,
 		Timestamp:   t,
 	}
+}
+
+func (b *Block) ToVote() *UnsignedVote {
+	panic("")
 }

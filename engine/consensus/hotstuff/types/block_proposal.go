@@ -1,5 +1,7 @@
 package types
 
+import "github.com/dapperlabs/flow-go/model/flow"
+
 type BlockProposal struct {
 	Block     *Block
 	Signature *Signature // CAUTION: this is sign(Block), i.e. it does NOT include ConsensusPayload
@@ -12,7 +14,7 @@ func NewBlockProposal(block *Block, sig *Signature) *BlockProposal {
 	}
 }
 
-func (b *BlockProposal) QC() *QuorumCertificate { return b.Block.QC }
-func (b *BlockProposal) View() uint64           { return b.Block.View }
-func (b *BlockProposal) BlockID() []byte        { return b.Block.BlockID() }
-func (b *BlockProposal) Height() uint64         { return b.Block.Height }
+func (b *BlockProposal) QC() *QuorumCertificate   { return b.Block.QC }
+func (b *BlockProposal) View() uint64             { return b.Block.View }
+func (b *BlockProposal) BlockID() flow.Identifier { return b.Block.BlockID() }
+func (b *BlockProposal) Height() uint64           { return b.Block.Height }

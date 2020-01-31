@@ -1,6 +1,8 @@
 package hotstuff
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/rs/zerolog"
 )
@@ -36,7 +38,7 @@ func (v *Voter) NewVoter(signer Signer, viewState ViewState, forks Forks, isConA
 // (including repeated calls with the initial block we voted for also return `nil, false`).
 func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*types.Vote, bool) {
 	log := v.log.With().
-		Hex("block_id", bp.Block.BlockID()).
+		Str("block_id", bp.BlockID().String()).
 		Logger()
 
 	if !v.isConActor {
@@ -61,19 +63,20 @@ func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*
 		return nil, false
 	}
 
-	return v.produceVote(bp), true
+	vote, err := v.produceVote(bp)
+	if err != nil {
+		return nil, false
+	}
+	return vote, true
 }
 
-func (v *Voter) produceVote(bp *types.BlockProposal) *types.Vote {
-	log := v.log.With().
-		Hex("block_id", bp.Block.BlockID()).
-		Logger()
-
-	signerIdx := v.viewState.GetSelfIdxForView(bp.Block.View)
-	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.Block.BlockID())
+func (v *Voter) produceVote(bp *types.BlockProposal) (*types.Vote, error) {
+	signerIdx, err := v.viewState.GetSelfIdxForBlockID(bp.BlockID())
+	if err != nil {
+		return nil, fmt.Errorf("can not find self index for block %v: %w", bp.BlockID(), err)
+	}
+	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.BlockID())
 	sig := v.signer.SignVote(unsignedVote, signerIdx)
-	vote := types.NewVote(bp.Block.View, bp.Block.BlockID(), sig)
-	log.Info().Msg("successfully produced vote")
-
-	return vote
+	vote := types.NewVote(bp.Block.View, bp.BlockID(), sig)
+	return vote, nil
 }
