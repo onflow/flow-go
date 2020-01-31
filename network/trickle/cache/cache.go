@@ -1,5 +1,4 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package cache
 
 import (
@@ -9,6 +8,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
+// Deprecated: use libp2p.RcvCache instead
+//
 // Cache implements a naive cache for peers.
 type Cache struct {
 	sync.Mutex

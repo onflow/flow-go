@@ -1,5 +1,4 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package topology
 
 import (
@@ -10,6 +9,9 @@ import (
 	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
+// Deprecated: Topology has been completely removed from new architecture. Use libp2p
+// instead.
+//
 // Topology implements a naive network state.
 type Topology struct {
 	sync.Mutex

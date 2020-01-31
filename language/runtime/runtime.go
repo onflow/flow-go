@@ -1,6 +1,9 @@
 package runtime
 
 import (
+	"bytes"
+	"encoding/binary"
+	"encoding/gob"
 	"errors"
 	"fmt"
 
@@ -59,7 +62,10 @@ type Runtime interface {
 	ParseAndCheckProgram(code []byte, runtimeInterface Interface, location Location) error
 }
 
-var typeDeclarations = stdlib.BuiltinTypes.ToTypeDeclarations()
+var typeDeclarations = append(
+	stdlib.FlowBuiltInTypes,
+	stdlib.BuiltinTypes...,
+).ToTypeDeclarations()
 
 type ImportResolver = func(location Location) (program *ast.Program, e error)
 
@@ -194,8 +200,8 @@ func (r *interpreterRuntime) ExecuteTransaction(
 	transactionFunctionParameterCount := len(transactionFunctionType.Parameters)
 	if signingAccountsCount != transactionFunctionParameterCount {
 		return newError(InvalidTransactionParameterCountError{
-			Expected: transactionFunctionParameterCount,
-			Actual:   signingAccountsCount,
+			Expected: signingAccountsCount,
+			Actual:   transactionFunctionParameterCount,
 		})
 	}
 
@@ -399,9 +405,10 @@ func (r *interpreterRuntime) standardLibraryFunctions(
 ) stdlib.StandardLibraryFunctions {
 	return append(
 		stdlib.FlowBuiltInFunctions(stdlib.FlowBuiltinImpls{
-			CreateAccount: r.newCreateAccountFunction(runtimeInterface, runtimeStorage),
-			GetAccount:    r.newGetAccountFunction(runtimeInterface),
-			Log:           r.newLogFunction(runtimeInterface),
+			CreateAccount:   r.newCreateAccountFunction(runtimeInterface, runtimeStorage),
+			GetAccount:      r.newGetAccountFunction(runtimeInterface),
+			Log:             r.newLogFunction(runtimeInterface),
+			GetCurrentBlock: r.newGetCurrentBlockFunction(runtimeInterface),
 		}),
 		stdlib.BuiltinFunctions...,
 	)
@@ -840,6 +847,44 @@ func (r *interpreterRuntime) newLogFunction(runtimeInterface Interface) interpre
 	}
 }
 
+func (r *interpreterRuntime) newGetCurrentBlockFunction(_ Interface) interpreter.HostFunction {
+	return func(invocation interpreter.Invocation) trampoline.Trampoline {
+		// TODO: https://github.com/dapperlabs/flow-go/issues/552
+
+		var makeBlock func(uint64) BlockValue
+		makeBlock = func(number uint64) BlockValue {
+
+			buf := new(bytes.Buffer)
+			err := binary.Write(buf, binary.BigEndian, number)
+			if err != nil {
+				panic(err)
+			}
+
+			encoded := buf.Bytes()
+			var hash [stdlib.BlockIDSize]byte
+			copy(hash[stdlib.BlockIDSize-len(encoded):], encoded)
+
+			return BlockValue{
+				Number: number,
+				ID:     hash,
+				NextBlock: func() *BlockValue {
+					nextBlock := makeBlock(number + 1)
+					return &nextBlock
+				},
+				PreviousBlock: func() *BlockValue {
+					if number == 1 {
+						return nil
+					}
+					previousBlock := makeBlock(number - 1)
+					return &previousBlock
+				},
+			}
+		}
+
+		return trampoline.Done{Result: makeBlock(1)}
+	}
+}
+
 func toBytes(value interpreter.Value) ([]byte, error) {
 	array, ok := value.(*interpreter.ArrayValue)
 	if !ok {
@@ -874,4 +919,74 @@ func fromBytes(buf []byte) *interpreter.ArrayValue {
 	return &interpreter.ArrayValue{
 		Values: values,
 	}
+}
+
+// Block
+
+type BlockValue struct {
+	Number        uint64
+	ID            [stdlib.BlockIDSize]byte
+	NextBlock     func() *BlockValue
+	PreviousBlock func() *BlockValue
+}
+
+func init() {
+	gob.Register(&BlockValue{})
+}
+
+func (BlockValue) IsValue() {}
+
+func (v BlockValue) Copy() Value {
+	return v
+}
+
+func (BlockValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (BlockValue) SetOwner(_ string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v BlockValue) GetMember(_ *interpreter.Interpreter, _ interpreter.LocationRange, name string) Value {
+	switch name {
+	case "number":
+		return interpreter.UInt64Value(v.Number)
+
+	case "id":
+		var values = make([]Value, stdlib.BlockIDSize)
+		for i, b := range v.ID {
+			values[i] = interpreter.UInt8Value(b)
+		}
+		return &interpreter.ArrayValue{Values: values}
+
+	case "previousBlock":
+		previousBlock := v.PreviousBlock()
+		if previousBlock == nil {
+			return interpreter.NilValue{}
+		}
+		return interpreter.NewSomeValueOwningNonCopying(previousBlock)
+
+	case "nextBlock":
+		nextBlock := v.NextBlock()
+		if nextBlock == nil {
+			return interpreter.NilValue{}
+		}
+		return interpreter.NewSomeValueOwningNonCopying(nextBlock)
+
+	default:
+		panic(runtimeErrors.NewUnreachableError())
+	}
+}
+
+func (v BlockValue) SetMember(_ *interpreter.Interpreter, _ interpreter.LocationRange, _ string, _ Value) {
+	panic(runtimeErrors.NewUnreachableError())
+}
+
+func (v BlockValue) String() string {
+	return fmt.Sprintf(
+		"Block(number: %d, hash: 0x%x)",
+		v.Number, v.ID,
+	)
 }

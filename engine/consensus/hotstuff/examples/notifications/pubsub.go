@@ -4,18 +4,17 @@ import (
 	"sync"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
 // PubSubDistributor is an example implementation of notifications.Consumer.
 // It allows thread-safe subscription of consumers to events.
 type PubSubDistributor struct {
-	skippedAheadConsumers         []SkippedAheadConsumer
-	enteringViewConsumers         []EnteringViewConsumer
-	startingBlockTimeoutConsumers []StartingBlockTimeoutConsumer
-	reachedBlockTimeoutConsumers  []ReachedBlockTimeoutConsumer
-	startingVotesTimeoutConsumers []StartingVotesTimeoutConsumer
-	reachedVotesTimeoutConsumers  []ReachedVotesTimeoutConsumer
-	lock                          sync.RWMutex
+	skippedAheadConsumers    []SkippedAheadConsumer
+	enteringViewConsumers    []EnteringViewConsumer
+	startingTimeoutConsumers []StartingTimeoutConsumer
+	reachedTimeoutConsumers  []ReachedTimeoutConsumer
+	lock                     sync.RWMutex
 }
 
 func NewPubSubDistributor() notifications.Consumer {
@@ -38,35 +37,19 @@ func (p *PubSubDistributor) OnEnteringView(view uint64) {
 	}
 }
 
-func (p *PubSubDistributor) OnStartingBlockTimeout(view uint64) {
+func (p *PubSubDistributor) OnStartingTimeout(timerInfo *types.TimerInfo) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	for _, subscriber := range p.startingBlockTimeoutConsumers {
-		subscriber.OnStartingBlockTimeout(view)
+	for _, subscriber := range p.startingTimeoutConsumers {
+		subscriber.OnStartingTimeout(timerInfo)
 	}
 }
 
-func (p *PubSubDistributor) OnReachedBlockTimeout(view uint64) {
+func (p *PubSubDistributor) OnReachedTimeout(timeout *types.TimerInfo) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	for _, subscriber := range p.reachedBlockTimeoutConsumers {
-		subscriber.OnReachedBlockTimeout(view)
-	}
-}
-
-func (p *PubSubDistributor) OnStartingVotesTimeout(view uint64) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.startingVotesTimeoutConsumers {
-		subscriber.OnStartingVotesTimeout(view)
-	}
-}
-
-func (p *PubSubDistributor) OnReachedVotesTimeout(view uint64) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-	for _, subscriber := range p.reachedVotesTimeoutConsumers {
-		subscriber.OnReachedVotesTimeout(view)
+	for _, subscriber := range p.reachedTimeoutConsumers {
+		subscriber.OnReachedTimeout(timeout)
 	}
 }
 
@@ -88,38 +71,20 @@ func (p *PubSubDistributor) AddEnteringViewConsumer(cons EnteringViewConsumer) *
 	return p
 }
 
-// AddStartingBlockTimeoutConsumer adds an StartingBlockTimeoutConsumer to the PubSubDistributor;
+// AddStartingTimeoutConsumer adds an StartingTimeoutConsumer to the PubSubDistributor;
 // concurrency safe; returns self-reference for chaining
-func (p *PubSubDistributor) AddStartingBlockTimeoutConsumer(cons StartingBlockTimeoutConsumer) *PubSubDistributor {
+func (p *PubSubDistributor) AddStartingTimeoutConsumer(cons StartingTimeoutConsumer) *PubSubDistributor {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.startingBlockTimeoutConsumers = append(p.startingBlockTimeoutConsumers, cons)
+	p.startingTimeoutConsumers = append(p.startingTimeoutConsumers, cons)
 	return p
 }
 
-// AddReachedBlockTimeoutConsumer adds an StartingBlockTimeoutConsumer to the PubSubDistributor;
+// AddReachedTimeoutConsumer adds an ReachedTimeoutConsumer to the PubSubDistributor;
 // concurrency safe; returns self-reference for chaining
-func (p *PubSubDistributor) AddReachedBlockTimeoutConsumer(cons ReachedBlockTimeoutConsumer) *PubSubDistributor {
+func (p *PubSubDistributor) AddReachedTimeoutConsumer(cons ReachedTimeoutConsumer) *PubSubDistributor {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.reachedBlockTimeoutConsumers = append(p.reachedBlockTimeoutConsumers, cons)
-	return p
-}
-
-// AddStartingVotesTimeoutConsumer adds an StartingVoteTimeoutConsumer to the PubSubDistributor;
-// concurrency safe; returns self-reference for chaining
-func (p *PubSubDistributor) AddStartingVotesTimeoutConsumer(cons StartingVotesTimeoutConsumer) *PubSubDistributor {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	p.startingVotesTimeoutConsumers = append(p.startingVotesTimeoutConsumers, cons)
-	return p
-}
-
-// AddReachedVotesTimeoutConsumer adds an StartingVoteTimeoutConsumer to the PubSubDistributor;
-// concurrency safe; returns self-reference for chaining
-func (p *PubSubDistributor) AddReachedVotesTimeoutConsumer(cons ReachedVotesTimeoutConsumer) *PubSubDistributor {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	p.reachedVotesTimeoutConsumers = append(p.reachedVotesTimeoutConsumers, cons)
+	p.reachedTimeoutConsumers = append(p.reachedTimeoutConsumers, cons)
 	return p
 }
