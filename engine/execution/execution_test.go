@@ -69,7 +69,6 @@ func TestExecutionFlow(t *testing.T) {
 					CollectionID: col2.ID(),
 				},
 			},
-			Identities: identities,
 		},
 	}
 
