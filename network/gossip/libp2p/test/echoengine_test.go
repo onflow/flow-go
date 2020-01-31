@@ -352,16 +352,9 @@ func (s *StubEngineTestSuite) createNetworks(mws []*libp2p.Middleware, ids flow.
 
 	// creates and mocks the state
 	state := &protocol.State{}
-	snapshot := &protocol.Snapshot{}
-
-	idLst := &flow.IdentityList{}
+	snapshot := &SnapshotMock{ids: flow.IdentityList{}}
 	for i := 0; i < count; i++ {
 		state.On("Final").Return(snapshot)
-		rFun := func() flow.IdentityList {
-			fmt.Println(" callleeed ")
-			return *idLst
-		}
-		snapshot.On("Identities").Return(rFun(), nil)
 	}
 
 	for i := 0; i < count; i++ {
@@ -391,8 +384,32 @@ func (s *StubEngineTestSuite) createNetworks(mws []*libp2p.Middleware, ids flow.
 			Role:    flow.RoleCollection,
 			Stake:   0,
 		}
-		*idLst = append(*idLst, id)
+		snapshot.ids = append(snapshot.ids, id)
 	}
 
 	return nets
+}
+
+type SnapshotMock struct {
+	ids flow.IdentityList
+}
+
+func (s *SnapshotMock) Identities(filters ...flow.IdentityFilter) (flow.IdentityList, error) {
+	return s.ids, nil
+}
+
+func (s *SnapshotMock) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
+	return nil, fmt.Errorf(" not implemented")
+}
+
+func (s *SnapshotMock) Commit() (flow.StateCommitment, error) {
+	return nil, fmt.Errorf(" not implemented")
+}
+
+func (s *SnapshotMock) Clusters() (*flow.ClusterList, error) {
+	return nil, fmt.Errorf(" not implemented")
+}
+
+func (s *SnapshotMock) Head() (*flow.Header, error) {
+	return nil, fmt.Errorf(" not implemented")
 }
