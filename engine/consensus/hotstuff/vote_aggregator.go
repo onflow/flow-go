@@ -9,6 +9,22 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+type PendingStatus struct {
+	orderedVotes []*types.Vote
+	voteMap      map[string]*types.Vote
+}
+
+func (ps *PendingStatus) AddVote(vote *types.Vote) {
+	ps.voteMap[string(vote.ID())] = vote
+	ps.orderedVotes = append(ps.orderedVotes, vote)
+}
+
+func NewPendingStatus() *PendingStatus {
+	return &PendingStatus{
+		voteMap: map[string]*types.Vote{},
+	}
+}
+
 type VoteAggregator struct {
 	log            zerolog.Logger
 	viewState      *ViewState
@@ -17,7 +33,7 @@ type VoteAggregator struct {
 	// For pruning
 	viewToBlockID map[uint64][][]byte
 	// keeps track of votes whose blocks can not be found
-	pendingVoteMap map[string]map[string]*types.Vote
+	pendingVoteMap map[string]*PendingStatus
 	// keeps track of QCs that have been made for blocks
 	createdQC map[string]*types.QuorumCertificate
 	// keeps track of accumulated votes and stakes for blocks
@@ -33,7 +49,7 @@ func NewVoteAggregator(log zerolog.Logger, lastPruneView uint64, viewState *View
 		viewState:               viewState,
 		voteValidator:           voteValidator,
 		viewToBlockID:           map[uint64][][]byte{},
-		pendingVoteMap:          map[string]map[string]*types.Vote{},
+		pendingVoteMap:          map[string]*PendingStatus{},
 		blockHashToVotingStatus: map[string]*VotingStatus{},
 		createdQC:               map[string]*types.QuorumCertificate{},
 		viewToIDToVote:          map[uint64]map[flow.Identifier]*types.Vote{},
@@ -50,14 +66,12 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 			FinalizedView: va.lastPrunedView,
 		})
 	}
-	blockIDStr := vote.BlockID.String()
-	voteMap, exists := va.pendingVoteMap[blockIDStr]
-	voteIDStr := string(vote.ID())
+	pendingStatus, exists := va.pendingVoteMap[vote.BlockID.String()]
 	if exists {
-		voteMap[voteIDStr] = vote
+		pendingStatus.AddVote(vote)
 	} else {
-		va.pendingVoteMap[blockIDStr] = make(map[string]*types.Vote)
-		va.pendingVoteMap[blockIDStr][voteIDStr] = vote
+		pendingStatus = NewPendingStatus()
+		pendingStatus.AddVote(vote)
 	}
 	return nil
 }
@@ -101,18 +115,37 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 	if built {
 		return oldQC, nil
 	}
-	for _, vote := range va.pendingVoteMap[blockIDStr] {
+	if bp.View() <= va.lastPrunedView {
+		return nil, fmt.Errorf("could not build QC on receiving block: %w", types.ErrStaleBlock{BlockProposal: bp, FinalizedView: bp.View()})
+	}
+	primaryVote := bp.ToVote()
+	voteStatus, err := va.validateAndStoreIncorporatedVote(primaryVote, bp)
+	if err != nil {
+		va.log.Warn().Msg("primary vote is invalid")
+	}
+	pendingStatus, exists := va.pendingVoteMap[blockIDStr]
+	if exists {
+		va.convertPendingVotes(pendingStatus.orderedVotes, bp)
+	}
+	qc, err := va.tryBuildQC(voteStatus)
+	if err != nil {
+		return nil, fmt.Errorf("could not build QC on receiving block: %w", err)
+	}
+	return qc, nil
+}
+
+func (va *VoteAggregator) convertPendingVotes(pendingVotes []*types.Vote, bp *types.BlockProposal) {
+	for _, vote := range pendingVotes {
 		voteStatus, err := va.validateAndStoreIncorporatedVote(vote, bp)
 		if err != nil {
 			va.log.Warn().Msg("invalid vote found")
-		} else {
-			voteStatus.AddVote(vote)
+		}
+		// if threshold is reached, the rest of the votes can be deleted
+		if voteStatus.CanBuildQC() {
+			delete(va.pendingVoteMap, bp.BlockID().String())
+			return
 		}
 	}
-	delete(va.pendingVoteMap, blockIDStr)
-
-	primaryVote := bp.ToVote()
-	return va.StoreVoteAndBuildQC(primaryVote, bp)
 }
 
 // PruneByView will delete all votes equal or below to the given view, as well as related indexes.
