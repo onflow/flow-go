@@ -61,7 +61,7 @@ func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Op
 	for _, reg := range s.peers {
 		ch <- reg
 	}
-	//close(ch)
+	close(ch)
 	return ch, nil
 }
 
@@ -73,10 +73,6 @@ func (p *PubSubTestSuite) TestPubSub() {
 	golog.SetAllLoggers(gologging.DEBUG)
 
 	// Step 1: Creates nodes
-	ds := make([]*mockDiscovery, count)
-	for i := 0; i < count; i++ {
-		ds = append(ds, &mockDiscovery{})
-	}
 	d := &mockDiscovery{}
 
 	nodes := p.CreateNodes(count, d)
@@ -105,15 +101,6 @@ func (p *PubSubTestSuite) TestPubSub() {
 		go subReader(s)
 
 	}
-
-	var pInfos []peer.AddrInfo
-	// Step 3: Setup discovery
-	for _, n := range nodes {
-		id := n.libP2PHost.ID()
-		addrs := n.libP2PHost.Peerstore().Addrs(id)
-		pInfos = append(pInfos, peer.AddrInfo{ID: id, Addrs: addrs})
-	}
-	d.SetPeers(pInfos)
 
 	// Step 3: Connects each node i to its subsequent node i+1 in a chain
 
@@ -151,8 +138,28 @@ func (p *PubSubTestSuite) TestPubSub() {
 	// Step 5: Publish a message from the first node on the chain
 	// and verify all nodes get it.
 	// All nodes including node 0 - the sender, should receive it
-	time.Sleep(time.Second * 5)
-	require.NoError(p.Suite.T(), nodes[0].Publish(p.ctx, topic, []byte("hello")))
+	//time.Sleep(time.Second * 5)
+	t := make(chan struct{})
+
+	go func() {
+		require.NoError(p.Suite.T(), nodes[0].Publish(p.ctx, topic, []byte("hello")))
+		t <- struct{}{}
+	}()
+
+	select {
+	case <-t:
+		assert.Fail(p.Suite.T(), "publish did not block")
+	case <-time.After(3 * time.Second):
+	}
+
+	var pInfos []peer.AddrInfo
+	// Step 3: Setup discovery
+	for _, n := range nodes {
+		id := n.libP2PHost.ID()
+		addrs := n.libP2PHost.Addrs()
+		pInfos = append(pInfos, peer.AddrInfo{ID: id, Addrs: addrs})
+	}
+	d.SetPeers(pInfos)
 
 	// A hash set to keep track of the nodes who received the message
 	recv := make(map[string]bool, count)

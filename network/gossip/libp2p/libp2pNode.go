@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	peerstore "github.com/libp2p/go-libp2p-peerstore"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
@@ -114,23 +115,23 @@ func (p *P2PNode) Stop() error {
 
 // AddPeers adds other nodes as peers to this node by adding them to the node's peerstore and connecting to them
 func (p *P2PNode) AddPeers(ctx context.Context, peers ...NodeAddress) error {
-	//p.Lock()
-	//defer p.Unlock()
-	//for _, peer := range peers {
-	//	pInfo, err := GetPeerInfo(peer)
-	//	if err != nil {
-	//		return err
-	//	}
-	//
-	//	// Add the destination's peer multiaddress in the peerstore.
-	//	// This will be used during connection and stream creation by libp2p.
-	//	p.libP2PHost.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.PermanentAddrTTL)
-	//
-	//	err = p.libP2PHost.Connect(ctx, pInfo)
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
+	p.Lock()
+	defer p.Unlock()
+	for _, peer := range peers {
+		pInfo, err := GetPeerInfo(peer)
+		if err != nil {
+			return err
+		}
+
+		// Add the destination's peer multiaddress in the peerstore.
+		// This will be used during connection and stream creation by libp2p.
+		p.libP2PHost.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.PermanentAddrTTL)
+
+		err = p.libP2PHost.Connect(ctx, pInfo)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -272,7 +273,7 @@ func (p *P2PNode) Publish(ctx context.Context, t string, data []byte) error {
 	if !found {
 		return fmt.Errorf("topic not found:%s", t)
 	}
-	err := ps.Publish(ctx, data)
+	err := ps.Publish(ctx, data, pubsub.WithReadiness(pubsub.MinTopicSize(3)))
 	if err != nil {
 		return fmt.Errorf("failed to publish to topic %s:%w", t, err)
 	}
