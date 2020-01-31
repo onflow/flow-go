@@ -338,13 +338,6 @@ func (s *StubEngineTestSuite) createMiddleware(identities []*flow.Identity) []*l
 		mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID)
 		require.NoError(s.Suite.T(), err)
 
-		// retrieves IP and port of the middleware
-		ip, port := mw.GetIPPort()
-
-		// mocks an identity for the middleware
-		identities[i].Address = fmt.Sprintf("%s:%s", ip, port)
-		identities[i].Role = flow.RoleCollection
-
 		mws = append(mws, mw)
 	}
 	return mws
@@ -361,9 +354,14 @@ func (s *StubEngineTestSuite) createNetworks(mws []*libp2p.Middleware, ids flow.
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}
 
+	idLst := &flow.IdentityList{}
 	for i := 0; i < count; i++ {
 		state.On("Final").Return(snapshot)
-		snapshot.On("Identities").Return(ids, nil)
+		rFun := func() flow.IdentityList {
+			fmt.Println(" callleeed ")
+			return *idLst
+		}
+		snapshot.On("Identities").Return(rFun(), nil)
 	}
 
 	for i := 0; i < count; i++ {
@@ -380,6 +378,20 @@ func (s *StubEngineTestSuite) createNetworks(mws []*libp2p.Middleware, ids flow.
 		done := net.Ready()
 		<-done
 		// time.Sleep(1 * time.Second)
+	}
+
+	for i, m := range mws {
+		// retrieves IP and port of the middleware
+		ip, port := m.GetIPPort()
+
+		// mocks an identity for the middleware
+		id := &flow.Identity{
+			NodeID:  ids[i].NodeID,
+			Address: fmt.Sprintf("%s:%s", ip, port),
+			Role:    flow.RoleCollection,
+			Stake:   0,
+		}
+		*idLst = append(*idLst, id)
 	}
 
 	return nets

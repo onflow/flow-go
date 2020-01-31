@@ -41,12 +41,6 @@ type mockDiscovery struct {
 	peers []peer.AddrInfo
 }
 
-func newDiscovery(index int, count int) *mockDiscovery {
-	return &mockDiscovery{
-		peers: make([]peer.AddrInfo, count),
-	}
-}
-
 func (s *mockDiscovery) SetPeers(peers []peer.AddrInfo) {
 	s.peers = peers
 }
@@ -78,7 +72,7 @@ func (p *PubSubTestSuite) TestPubSub() {
 	nodes := p.CreateNodes(count, d)
 	defer p.StopNodes(nodes)
 
-	// Step 2: Subscribes to a Flow topic
+	// Step 2: Subscribe to a Flow topic
 	// A node will receive its own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
 	ch := make(chan string, count)
@@ -102,65 +96,30 @@ func (p *PubSubTestSuite) TestPubSub() {
 
 	}
 
-	// Step 3: Connects each node i to its subsequent node i+1 in a chain
-
-	//for i := 0; i < count-1; i++ {
-	//	// defines this node on the chain
-	//	this := nodes[i]
-	//
-	//	// defines next node to this on the chain
-	//	next := nodes[i+1]
-	//	nextIP, nextPort := next.GetIPPort()
-	//	nextAddr := NodeAddress{
-	//		Name: next.name,
-	//		IP:   nextIP,
-	//		Port: nextPort,
-	//	}
-	//
-	//	// adds next node as the peer to this node and verifies their connection
-	//	//require.NoError(p.Suite.T(), this.AddPeers(p.ctx, nextAddr))
-	//	//assert.Eventuallyf(l.Suite.T(), func() bool {
-	//	//	return network.Connected == this.libP2PHost.Network().Connectedness(next.libP2PHost.ID())
-	//	//}, 3*time.Second, tickForAssertEventually, fmt.Sprintf(" %s not connected with %s", this.name, next.name))
-	//
-	//	// Number of connected peers on the chain should be always 2 except for the
-	//	// first and last nodes that should be one
-	//	//peerNum := 2
-	//	//if i == 0 || i == count {
-	//	//	peerNum = 1
-	//	//}
-	//	//assert.Equal(l.Suite.T(), peerNum, len(this.ps.ListPeers(topic)))
-	//}
-
-	// Step 4: Waits for nodes to heartbeat each other
-	//time.Sleep(2 * time.Second)
-
-	// Step 5: Publish a message from the first node on the chain
-	// and verify all nodes get it.
-	// All nodes including node 0 - the sender, should receive it
-	//time.Sleep(time.Second * 5)
-	t := make(chan struct{})
-
+	// Step 3 publish a message to the topic and check if publish blocks
+	blk := make(chan struct{})
 	go func() {
-		require.NoError(p.Suite.T(), nodes[0].Publish(p.ctx, topic, []byte("hello")))
-		t <- struct{}{}
+		require.NoError(p.Suite.T(), nodes[0].Publish(p.ctx, topic, []byte("hello"), count-1))
+		blk <- struct{}{}
 	}()
 
 	select {
-	case <-t:
+	case <-blk:
 		assert.Fail(p.Suite.T(), "publish did not block")
 	case <-time.After(3 * time.Second):
 	}
 
+	// Step 4: Now setup discovery to allow nodes to find each other
 	var pInfos []peer.AddrInfo
-	// Step 3: Setup discovery
 	for _, n := range nodes {
 		id := n.libP2PHost.ID()
 		addrs := n.libP2PHost.Addrs()
 		pInfos = append(pInfos, peer.AddrInfo{ID: id, Addrs: addrs})
 	}
+	// set the common discovery object shared by all nodes with the list of all peer.AddrInfos
 	d.SetPeers(pInfos)
 
+	// Step 5: By now, all peers would have been discovered and the message should have been successfully published
 	// A hash set to keep track of the nodes who received the message
 	recv := make(map[string]bool, count)
 	for i := 0; i < count; i++ {
@@ -179,7 +138,7 @@ func (p *PubSubTestSuite) TestPubSub() {
 		}
 	}
 
-	// Step 6: Unsubscribes all nodes from the topic
+	// Step 6: unsubscribes all nodes from the topic
 	for _, n := range nodes {
 		assert.NoError(p.Suite.T(), n.UnSubscribe(topic))
 	}

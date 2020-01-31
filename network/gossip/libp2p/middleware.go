@@ -33,17 +33,18 @@ type Middleware struct {
 	libP2PNode *P2PNode
 	stop       chan struct{}
 	me         flow.Identifier
+	host       string
+	port       string
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier) (*Middleware, error) {
-	ip, port, err := net.SplitHostPort(address)
+	host, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
 	}
 
-	nodeAddress := NodeAddress{Name: flowID.String(), IP: ip, Port: port}
 	p2p := &P2PNode{}
 
 	// create the node entity and inject dependencies & config
@@ -55,13 +56,9 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		wg:         &sync.WaitGroup{},
 		stop:       make(chan struct{}),
 		me:         flowID,
+		host:       host,
+		port:       port,
 	}
-
-	// set the appropriate PubSub options to operate with
-	psOption := pubsub.WithDiscovery(&Discovery{}, pubsub.WithDiscoveryOpts(Options()...))
-
-	// Start the libp2p node
-	err = p2p.Start(context.Background(), nodeAddress, log, m.handleIncomingStream, psOption)
 
 	return m, err
 }
@@ -77,31 +74,29 @@ func (m *Middleware) GetIPPort() (string, string) {
 }
 
 // Start will start the middleware.
-func (m *Middleware) Start(ov middleware.Overlay) {
+func (m *Middleware) Start(ov middleware.Overlay) error {
 
-	// TODO: Add only a subset of the total nodes in the network Issue#2244
-	// Add all the other nodes as peers
-	ids, err := ov.Identity()
-	if err != nil {
-		log.Error().Err(err).Msg("failed to get ids")
-	}
-
-	// remove self from list of nodes
-	delete(ids, m.me)
-
-	for _, id := range ids {
-		// Create a new NodeAddress
-		ip, port, err := net.SplitHostPort(id.Address)
-		if err != nil {
-			log.Error().Err(err).Msg(fmt.Sprintf("could not parse address %s", id.Address))
-		}
-		nodeAddress := NodeAddress{Name: id.NodeID.String(), IP: ip, Port: port}
-		err = m.libP2PNode.AddPeers(context.Background(), nodeAddress)
-		if err != nil {
-			log.Error().Err(err).Msg(fmt.Sprintf("could not add flow ID as peer %s", id.String()))
-		}
-	}
 	m.ov = ov
+
+	// create a discovery object to help libp2p discover peers
+	d := NewDiscovery(m.log, m.ov, m.me)
+
+	// create PubSub options for libp2p to use the discovery object
+	psOption := pubsub.WithDiscovery(d)
+
+	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
+
+	// start the libp2p node
+	err := m.libP2PNode.Start(context.Background(), nodeAddress, m.log, m.handleIncomingStream, psOption)
+
+	if err != nil {
+		return fmt.Errorf("failed to start libp2p node: %w", err)
+	}
+
+	// the ip,port may change after libp2p has been started. e.g. 0.0.0.0:0 would change to an actual IP and port
+	m.host, m.port = m.libP2PNode.GetIPPort()
+
+	return nil
 }
 
 // Stop will end the execution of the middleware and wait for it to end.
@@ -332,8 +327,15 @@ func (m *Middleware) Publish(topic string, msg interface{}) error {
 			return fmt.Errorf("failed to marshal the message: %w", err)
 		}
 
+		// find how many nodes at a minimum should we publish to
+		ids, err := m.ov.Identity()
+		if err != nil {
+			return fmt.Errorf("failed to get ids: %w", err)
+		}
+		minPeers := len(ids)
+
 		// publish the bytes on the topic
-		err = m.libP2PNode.Publish(context.Background(), topic, data)
+		err = m.libP2PNode.Publish(context.Background(), topic, data, minPeers)
 		if err != nil {
 			return fmt.Errorf("failed to publish the message: %w", err)
 		}

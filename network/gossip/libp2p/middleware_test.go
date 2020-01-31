@@ -89,12 +89,29 @@ func (m *MiddlewareTestSuit) TestMultiPing() {
 
 // StartMiddleware creates mock overlays for each middleware, and starts the middlewares
 func (m *MiddlewareTestSuit) StartMiddlewares() {
-	// generates and mocks an overlay for each middleware
+
+	idMaps := make([]map[flow.Identifier]flow.Identity, m.size)
+
+	// start all the middlewares
+	for i := 0; i < m.size; i++ {
+		idMap := make(map[flow.Identifier]flow.Identity)
+		// mocks Overlay.Identity with an empty map for now (till we start middleware)
+		m.ov[i].On("Identity").Maybe().Return(idMap, nil)
+
+		// start the middleware
+		err := m.mws[i].Start(m.ov[i])
+		require.NoError(m.Suite.T(), err)
+
+		idMaps[i] = idMap
+	}
+
+	// change the overlay mock to return valid ids (now that middleware have been started and we have valid IP & port)
 	for i := 0; i < m.size; i++ {
 		target := i + 1
 		if i == m.size-1 {
 			target = 0
 		}
+
 		ip, port := m.mws[target].libP2PNode.GetIPPort()
 
 		// mocks an identity
@@ -103,13 +120,8 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 			Address: fmt.Sprintf("%s:%s", ip, port),
 			Role:    flow.RoleCollection,
 		}
-
-		ids := map[flow.Identifier]flow.Identity{flowID.NodeID: flowID}
-		// mocks Overlay.Identity
-		m.ov[i].On("Identity").Maybe().Return(ids, nil)
-
-		// start the middleware
-		m.mws[i].Start(m.ov[i])
+		idMap := idMaps[i]
+		idMap[flowID.NodeID] = flowID
 	}
 }
 
