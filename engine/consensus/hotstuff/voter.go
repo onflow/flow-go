@@ -36,7 +36,7 @@ func (v *Voter) NewVoter(signer Signer, viewState ViewState, forks Forks, isConA
 // (including repeated calls with the initial block we voted for also return `nil, false`).
 func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*types.Vote, bool) {
 	log := v.log.With().
-		Hex("block_id", bp.Block.BlockMRH()).
+		Hex("block_id", bp.Block.BlockID()).
 		Logger()
 
 	if !v.isConActor {
@@ -66,13 +66,13 @@ func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*
 
 func (v *Voter) produceVote(bp *types.BlockProposal) *types.Vote {
 	log := v.log.With().
-		Hex("block_id", bp.Block.BlockMRH()).
+		Hex("block_id", bp.Block.BlockID()).
 		Logger()
 
 	signerIdx := v.viewState.GetSelfIdxForView(bp.Block.View)
-	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.Block.BlockMRH())
+	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.Block.BlockID())
 	sig := v.signer.SignVote(unsignedVote, signerIdx)
-	vote := types.NewVote(bp.Block.View, bp.Block.BlockMRH(), sig)
+	vote := types.NewVote(bp.Block.View, bp.Block.BlockID(), sig)
 	log.Info().Msg("successfully produced vote")
 
 	return vote

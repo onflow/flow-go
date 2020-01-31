@@ -18,7 +18,7 @@ type Block struct {
 	Timestamp time.Time
 }
 
-func (b *Block) BlockMRH() []byte {
+func (b *Block) BlockID() []byte {
 	panic("TODO")
 }
 

@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/pkg/errors"
 )
 
@@ -17,6 +18,7 @@ type Identity struct {
 	Address string
 	Role    Role
 	Stake   uint64
+	PubKey  crypto.PublicKey
 }
 
 // ParseIdentity parses a string representation of an identity.
