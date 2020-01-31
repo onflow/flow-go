@@ -2,10 +2,10 @@ package hotstuff
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"math/big"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/protocol"
 )
 

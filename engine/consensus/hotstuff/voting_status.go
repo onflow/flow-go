@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"fmt"
+
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
