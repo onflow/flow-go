@@ -3023,23 +3023,33 @@ func (interpreter *Interpreter) VisitDestroyExpression(expression *ast.DestroyEx
 }
 
 func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *ast.ReferenceExpression) ast.Repr {
-	indexExpression := referenceExpression.Expression.(*ast.IndexExpression)
-	return indexExpression.TargetExpression.Accept(interpreter).(Trampoline).
-		FlatMap(func(result interface{}) Trampoline {
-			storage := result.(StorageValue)
 
-			indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
-			key := interpreter.storageKeyHandler(interpreter, storage.Identifier, indexingType)
+	if interpreter.Checker.Elaboration.IsReferenceIntoStorage[referenceExpression] {
+		indexExpression := referenceExpression.Expression.(*ast.IndexExpression)
+		return indexExpression.TargetExpression.Accept(interpreter).(Trampoline).
+			FlatMap(func(result interface{}) Trampoline {
+				storage := result.(StorageValue)
 
-			referenceValue := &StorageReferenceValue{
-				TargetStorageIdentifier: storage.Identifier,
-				TargetKey:               key,
-				// NOTE: new value has no owner
-				Owner: "",
-			}
+				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
+				key := interpreter.storageKeyHandler(interpreter, storage.Identifier, indexingType)
 
-			return Done{Result: referenceValue}
-		})
+				referenceValue := &StorageReferenceValue{
+					TargetStorageIdentifier: storage.Identifier,
+					TargetKey:               key,
+					// NOTE: new value has no owner
+					Owner: "",
+				}
+
+				return Done{Result: referenceValue}
+			})
+	} else {
+		return referenceExpression.Expression.Accept(interpreter).(Trampoline).
+			Map(func(result interface{}) interface{} {
+				return &EphemeralReferenceValue{
+					Value: result.(Value),
+				}
+			})
+	}
 }
 
 func (interpreter *Interpreter) readStored(storageIdentifier string, key string) OptionalValue {

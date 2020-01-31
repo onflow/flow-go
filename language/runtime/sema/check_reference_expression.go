@@ -40,6 +40,8 @@ func (checker *Checker) VisitReferenceExpression(referenceExpression *ast.Refere
 		referencedType = UnwrapOptionalType(referencedExpression.Accept(checker).(Type))
 	}
 
+	checker.Elaboration.IsReferenceIntoStorage[referenceExpression] = targetIsStorage
+
 	// Check that the referenced expression's type is a resource type
 
 	if !referencedType.IsInvalidType() &&
