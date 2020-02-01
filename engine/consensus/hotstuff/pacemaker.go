@@ -59,9 +59,8 @@ type PaceMaker interface {
 	// looped through the event loop. When used correctly, OnTimeout will always return
 	// a NewViewEvent.
 	// It is the responsibility of the calling code to ensure that NO STALE timeouts are
-	// delivered to the PaceMaker. OnTimeout errors if the timeout is inconsistent with
-	// the PaceMaker's current state (curView, TimeoutMode).
-	OnTimeout(timeout *types.Timeout) (*types.NewViewEvent, error)
+	// delivered to the PaceMaker.
+	OnTimeout() *types.NewViewEvent
 
 	// Start starts the PaceMaker (i.e. the timeout for the configured starting value for view)
 	Start()

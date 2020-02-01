@@ -1,5 +1,4 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package trickle
 
 import (
@@ -7,6 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/trickle"
 )
 
+// Deprecated: completely removed in new libp2p package architecture
+//
 // Topology represents the state of the overlay network, such as which peers we
 // are connected to, as well as which events they have seen.
 type Topology interface {

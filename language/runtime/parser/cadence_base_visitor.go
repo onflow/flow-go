@@ -115,7 +115,23 @@ func (v *BaseCadenceVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCadenceVisitor) VisitReferenceType(ctx *ReferenceTypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCadenceVisitor) VisitNonReferenceType(ctx *NonReferenceTypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCadenceVisitor) VisitInnerType(ctx *InnerTypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCadenceVisitor) VisitBaseType(ctx *BaseTypeContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCadenceVisitor) VisitTypeRestrictions(ctx *TypeRestrictionsContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

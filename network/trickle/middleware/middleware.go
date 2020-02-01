@@ -1,5 +1,4 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package middleware
 
 import (
@@ -15,6 +14,8 @@ import (
 	"github.com/dapperlabs/flow-go/network/trickle"
 )
 
+// Deprecated: use libp2p.Middleware instead
+//
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
