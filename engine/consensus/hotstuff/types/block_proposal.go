@@ -4,10 +4,10 @@ import "github.com/dapperlabs/flow-go/model/flow"
 
 type BlockProposal struct {
 	Block     *Block
-	Signature *Signature // CAUTION: this is sign(Block), i.e. it does NOT include ConsensusPayload
+	Signature *VoteSignature // CAUTION: this is sign(Block), i.e. it does NOT include ConsensusPayload
 }
 
-func NewBlockProposal(block *Block, sig *Signature) *BlockProposal {
+func NewBlockProposal(block *Block, sig *VoteSignature) *BlockProposal {
 	return &BlockProposal{
 		Block:     block,
 		Signature: sig,

@@ -9,10 +9,10 @@ import (
 type Vote struct {
 	View      uint64
 	BlockID   flow.Identifier
-	Signature *Signature
+	Signature *VoteSignature
 }
 
-func NewVote(view uint64, blockID flow.Identifier, sig *Signature) *Vote {
+func NewVote(view uint64, blockID flow.Identifier, sig *VoteSignature) *Vote {
 	return &Vote{
 		View:      view,
 		BlockID:   blockID,

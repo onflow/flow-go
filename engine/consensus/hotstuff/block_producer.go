@@ -44,7 +44,7 @@ func (bp *BlockProducer) makeBlockForView(view uint64, qcblock *types.QCBlock) *
 
 // signBlockProposal takes a unsigned proposal, signes it and returns a signed block proposal
 func (bp *BlockProducer) signBlockProposal(proposal *types.Block) (*types.BlockProposal, error) {
-	// get my index
+	// get my identity index
 	idx, err := bp.viewState.GetSelfIdxForBlockID(proposal.BlockID())
 	if err != nil {
 		return nil, err
