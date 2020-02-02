@@ -78,7 +78,9 @@ func (n *Network) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	go func() {
 		err := n.mw.Start(n)
-		n.logger.Err(err).Msg("failed to start middleware")
+		if err != nil {
+			n.logger.Err(err).Msg("failed to start middleware")
+		}
 		close(ready)
 	}()
 	return ready
