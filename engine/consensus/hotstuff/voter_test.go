@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	badger "github.com/dgraph-io/badger/v2"
+	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/eventdriven/components/voter"

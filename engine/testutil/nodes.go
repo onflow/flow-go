@@ -24,6 +24,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
@@ -49,12 +50,16 @@ func GenericNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identitie
 
 	stub := stub.NewNetwork(state, me, hub)
 
+	tracer, err := trace.NewTracer(log)
+	require.NoError(t, err)
+
 	return mock.GenericNode{
-		Log:   log,
-		DB:    db,
-		State: state,
-		Me:    me,
-		Net:   stub,
+		Log:    log,
+		Tracer: tracer,
+		DB:     db,
+		State:  state,
+		Me:     me,
+		Net:    stub,
 	}
 }
 
@@ -68,10 +73,10 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 
 	collections := storage.NewCollections(node.DB)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Me, pool)
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Tracer, node.Me, pool)
 	require.Nil(t, err)
 
-	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Me, collections)
+	providerEngine, err := provider.New(node.Log, node.Net, node.State, node.Tracer, node.Me, collections)
 	require.Nil(t, err)
 
 	return mock.CollectionNode{

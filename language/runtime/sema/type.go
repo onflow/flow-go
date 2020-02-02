@@ -80,7 +80,7 @@ type TypeIndexableType interface {
 //
 type MemberAccessibleType interface {
 	Type
-	HasMembers() bool
+	CanHaveMembers() bool
 	GetMember(identifier string, targetRange ast.Range, report func(error)) *Member
 }
 
@@ -408,7 +408,7 @@ func (*StringType) IsInvalidType() bool {
 	return false
 }
 
-func (*StringType) HasMembers() bool {
+func (*StringType) CanHaveMembers() bool {
 	return true
 }
 
@@ -1500,7 +1500,7 @@ func (t *VariableSizedType) Equal(other Type) bool {
 	return t.Type.Equal(otherArray.Type)
 }
 
-func (t *VariableSizedType) HasMembers() bool {
+func (t *VariableSizedType) CanHaveMembers() bool {
 	return true
 }
 
@@ -1555,7 +1555,7 @@ func (t *ConstantSizedType) Equal(other Type) bool {
 		t.Size == otherArray.Size
 }
 
-func (t *ConstantSizedType) HasMembers() bool {
+func (t *ConstantSizedType) CanHaveMembers() bool {
 	return true
 }
 
@@ -1755,7 +1755,7 @@ type SpecialFunctionType struct {
 	Members map[string]*Member
 }
 
-func (t *SpecialFunctionType) HasMembers() bool {
+func (t *SpecialFunctionType) CanHaveMembers() bool {
 	return true
 }
 
@@ -2008,7 +2008,7 @@ func (t *CompositeType) Equal(other Type) bool {
 		otherStructure.Identifier == t.Identifier
 }
 
-func (t *CompositeType) HasMembers() bool {
+func (t *CompositeType) CanHaveMembers() bool {
 	return true
 }
 
@@ -2056,6 +2056,12 @@ func (t *CompositeType) TypeRequirements() []*CompositeType {
 	return typeRequirements
 }
 
+func (t *CompositeType) AllConformances() []*InterfaceType {
+	// TODO: also return conformances' conformances recursively
+	//   once interface can have conformances
+	return t.Conformances
+}
+
 // AccountType
 
 type AccountType struct{}
@@ -2083,7 +2089,7 @@ func (*AccountType) IsInvalidType() bool {
 	return false
 }
 
-func (*AccountType) HasMembers() bool {
+func (*AccountType) CanHaveMembers() bool {
 	return true
 }
 
@@ -2205,7 +2211,7 @@ func (*PublicAccountType) IsInvalidType() bool {
 	return false
 }
 
-func (*PublicAccountType) HasMembers() bool {
+func (*PublicAccountType) CanHaveMembers() bool {
 	return true
 }
 
@@ -2371,7 +2377,7 @@ func (t *InterfaceType) Equal(other Type) bool {
 		otherInterface.Identifier == t.Identifier
 }
 
-func (t *InterfaceType) HasMembers() bool {
+func (t *InterfaceType) CanHaveMembers() bool {
 	return true
 }
 
@@ -2433,7 +2439,7 @@ func (t *DictionaryType) IsInvalidType() bool {
 		t.ValueType.IsInvalidType()
 }
 
-func (t *DictionaryType) HasMembers() bool {
+func (t *DictionaryType) CanHaveMembers() bool {
 	return true
 }
 
@@ -2683,12 +2689,12 @@ func (t *ReferenceType) IsInvalidType() bool {
 	return t.Type.IsInvalidType()
 }
 
-func (t *ReferenceType) HasMembers() bool {
+func (t *ReferenceType) CanHaveMembers() bool {
 	referencedType, ok := t.Type.(MemberAccessibleType)
 	if !ok {
 		return false
 	}
-	return referencedType.HasMembers()
+	return referencedType.CanHaveMembers()
 }
 
 func (t *ReferenceType) GetMember(identifier string, targetRange ast.Range, report func(error)) *Member {
@@ -3056,10 +3062,133 @@ func (*TransactionType) IsInvalidType() bool {
 	return false
 }
 
-func (t *TransactionType) HasMembers() bool {
+func (t *TransactionType) CanHaveMembers() bool {
 	return true
 }
 
 func (t *TransactionType) GetMember(identifier string, _ ast.Range, _ func(error)) *Member {
 	return t.Members[identifier]
+}
+
+// RestrictedResourceType
+//
+// No restrictions implies the type is fully restricted,
+// i.e. no members of the underlying resource type are available.
+//
+type RestrictedResourceType struct {
+	Type         *CompositeType
+	Restrictions []*InterfaceType
+}
+
+func (*RestrictedResourceType) IsType() {}
+
+func (t *RestrictedResourceType) String() string {
+	var result strings.Builder
+	if t.Type != nil {
+		result.WriteString(string(t.Type.String()))
+	}
+	result.WriteRune('{')
+	for i, restriction := range t.Restrictions {
+		if i > 0 {
+			result.WriteString(", ")
+		}
+		result.WriteString(restriction.String())
+	}
+	result.WriteRune('}')
+	return result.String()
+}
+
+func (t *RestrictedResourceType) ID() TypeID {
+	var result strings.Builder
+	if t.Type != nil {
+		result.WriteString(string(t.Type.ID()))
+	}
+	result.WriteRune('{')
+	for i, restriction := range t.Restrictions {
+		if i > 0 {
+			result.WriteString(",")
+		}
+		result.WriteString(string(restriction.ID()))
+	}
+	result.WriteRune('}')
+	return TypeID(result.String())
+}
+
+func (t *RestrictedResourceType) Equal(other Type) bool {
+	otherRestrictedResourceType, ok := other.(*RestrictedResourceType)
+	if !ok {
+		return false
+	}
+
+	if !otherRestrictedResourceType.Type.Equal(t.Type) {
+		return false
+	}
+
+	// Check that the set of restrictions are equal; order does not matter
+
+	restrictions := t.Restrictions
+	otherRestrictions := otherRestrictedResourceType.Restrictions
+
+	count := len(restrictions)
+	if count != len(otherRestrictions) {
+		return false
+	}
+
+	otherRestrictionsByID := make(map[TypeID]bool, count)
+
+	for _, otherRestriction := range otherRestrictions {
+		otherRestrictionsByID[otherRestriction.ID()] = true
+	}
+
+	for _, restriction := range restrictions {
+		if !otherRestrictionsByID[restriction.ID()] {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (*RestrictedResourceType) IsResourceType() bool {
+	return true
+}
+
+func (*RestrictedResourceType) IsInvalidType() bool {
+	return false
+}
+
+func (t *RestrictedResourceType) CanHaveMembers() bool {
+	return true
+}
+
+func (t *RestrictedResourceType) GetMember(identifier string, targetRange ast.Range, reportError func(error)) *Member {
+
+	// Return the first member of any restriction.
+	// The invariant that restrictions may not have overlapping members is not checked here,
+	// but implicitly when the resource declaration's conformances are checked.
+
+	for _, restriction := range t.Restrictions {
+		member := restriction.GetMember(identifier, targetRange, reportError)
+		if member != nil {
+			return member
+		}
+	}
+
+	// If none of the restrictions had a member, see if the restricted type
+	// has a member with the identifier. Still return it for convenience
+	// to help check the rest of the program and improve the developer experience,
+	// *but* also report an error that this access is invalid
+
+	member := t.Type.GetMember(identifier, targetRange, reportError)
+
+	if member != nil {
+		reportError(
+			&InvalidRestrictedTypeMemberAccessError{
+				Name:  identifier,
+				Range: targetRange,
+			},
+		)
+	}
+
+	return member
 }

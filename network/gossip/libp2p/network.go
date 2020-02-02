@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/cache"
+	libp2perrors "github.com/dapperlabs/flow-go/network/gossip/libp2p/errors"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/topology"
@@ -29,23 +30,30 @@ type Network struct {
 	state   protocol.State
 	me      module.Local
 	mw      middleware.Middleware
-	cache   *cache.Cache
 	top     *topology.Topology
 	sip     hash.Hash
 	engines map[uint8]network.Engine
+	rcache  *cache.RcvCache // used to deduplicate incoming messages
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & cache interfaces to track volatile information.
-func NewNetwork(log zerolog.Logger, codec network.Codec, state protocol.State, me module.Local, mw middleware.Middleware) (*Network, error) {
+// csize determines the size of the cache dedicated to keep track of received messages
+func NewNetwork(
+	log zerolog.Logger,
+	codec network.Codec,
+	state protocol.State,
+	me module.Local,
+	mw middleware.Middleware,
+	csize int) (*Network, error) {
 
 	top, err := topology.New()
 	if err != nil {
 		return nil, errors.Wrap(err, "could not initialize topology")
 	}
 
-	ca, err := cache.New()
+	rcache, err := cache.NewRcvCache(csize)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not initialize cache")
 	}
@@ -57,9 +65,9 @@ func NewNetwork(log zerolog.Logger, codec network.Codec, state protocol.State, m
 		me:      me,
 		mw:      mw,
 		top:     top,
-		cache:   ca,
 		sip:     siphash.New([]byte("daflowtrickleson")),
 		engines: make(map[uint8]network.Engine),
+		rcache:  rcache,
 	}
 
 	return o, nil
@@ -104,9 +112,6 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to channel %d: %w", channelID, err)
 	}
-
-	// add the engine ID to the cache
-	n.cache.Add(channelID)
 
 	// create the conduit
 	conduit := &Conduit{
@@ -157,15 +162,20 @@ func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
 }
 
 func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
+	// checks the cache for deduplication
+	if n.rcache.Seen(message.EventID, message.ChannelID) {
+		// drops duplicate message
+		n.logger.Debug().Bytes("event ID", message.EventID).
+			Msg(" dropping message due to duplication")
+		return nil
+	}
+	n.rcache.Add(message.EventID, message.ChannelID)
 
 	// Extract channel id and find the registered engine
 	channelID := uint8(message.ChannelID)
 	en, found := n.engines[channelID]
 	if !found {
-		n.logger.Debug().Str("sender", senderID.String()).
-			Uint8("channel", channelID).
-			Msg(" dropping message since no engine to receive it was found")
-		return nil
+		return libp2perrors.NewInvalidEngineError(channelID, senderID.String())
 	}
 
 	// Convert message payload to a known message type
@@ -204,7 +214,7 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 	originID := selfID[:]
 
 	//cast event to a libp2p.Message
-	message := &message.Message{
+	msg := &message.Message{
 		ChannelID: uint32(channelID),
 		EventID:   sip.Sum(payload),
 		OriginID:  originID,
@@ -212,31 +222,21 @@ func (n *Network) genNetworkMessage(channelID uint8, event interface{}, targetID
 		Payload:   payload,
 	}
 
-	return message, nil
+	return msg, nil
 }
 
 // submit method submits the given event for the given channel to the overlay layer
 // for processing; it is used by engines through conduits.
 func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.Identifier) error {
 	// genNetworkMessage the event to get payload and event ID
-	message, err := n.genNetworkMessage(channelID, event, targetIDs...)
+	msg, err := n.genNetworkMessage(channelID, event, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not cast the event into network message")
 	}
 
-	// checks if the event is already in the cache
-	ok := n.cache.Has(channelID, message.EventID)
-	if ok {
-		// returns nil and terminates sending the message since
-		// the message already submitted to the network
-		return nil
-	}
-	// storing event in the cache
-	n.cache.Set(channelID, message.EventID, message)
-
 	// TODO: debup the message here
 
-	err = n.send(channelID, message, targetIDs...)
+	err = n.send(channelID, msg, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not gossip event")
 	}

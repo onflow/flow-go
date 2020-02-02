@@ -93,7 +93,7 @@ func hashToG1(data []byte) *pointG1 {
 }
 
 // TEST/DEBUG/BENCH
-// wraps a call to optimized SwU algorithm since Cgpo can't be used
+// wraps a call to optimized SwU algorithm since cgo can't be used
 // in go test files
 func OpSwUUnitTest(output []byte, input []byte) {
 	C.opswu_test((*C.uchar)(&output[0]),

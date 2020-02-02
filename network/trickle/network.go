@@ -1,5 +1,4 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
-
 package trickle
 
 import (
@@ -23,6 +22,8 @@ import (
 	"github.com/dapperlabs/flow-go/protocol"
 )
 
+// Deprecated: use libp2p.Network instead
+//
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
