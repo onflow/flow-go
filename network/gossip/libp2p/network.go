@@ -254,7 +254,8 @@ func (n *Network) send(channelID uint8, msg *message.Message, nodeIDs ...flow.Id
 	var err error
 	switch len(nodeIDs) {
 	case 0:
-		return fmt.Errorf("list of target node IDs empty")
+		n.logger.Debug().Msg("list of target node IDs empty")
+		return nil
 	case 1:
 		if nodeIDs[0] == n.me.NodeID() {
 			// to avoid self dial by the underlay
