@@ -3177,19 +3177,6 @@ func IsSubType(subType Type, superType Type) bool {
 		// Optionals are covariant: T? <: U? if T <: U
 		return IsSubType(optionalSubType.Type, typedSuperType.Type)
 
-	case *InterfaceType:
-		compositeSubType, ok := subType.(*CompositeType)
-		if !ok {
-			return false
-		}
-		// TODO: optimize, use set
-		for _, conformance := range compositeSubType.Conformances {
-			if typedSuperType.Equal(conformance) {
-				return true
-			}
-		}
-		return false
-
 	case *DictionaryType:
 		typedSubType, ok := subType.(*DictionaryType)
 		if !ok {
@@ -3286,25 +3273,82 @@ func IsSubType(subType Type, superType Type) bool {
 			return true
 		}
 
-		return false
-
 	case *RestrictedResourceType:
 		switch typedSubType := subType.(type) {
+
+		case *RestrictedResourceType:
+			// A restricted resource type `T{Us}` is a subtype of a restricted resource type `V{Ws}`.
+			// NOTE: `Us` and `Ws` do NOT have to be subsets –
+			// The owner of the resource may freely restrict and unrestrict the resource.
+
+			return typedSubType.Type == typedSuperType.Type
 
 		case *CompositeType:
 			// A resource type `T` is a subtype of a restricted resource type `U{Vs}`, if `T == U`
 
 			return typedSubType == typedSuperType.Type
 
+		case *InterfaceType:
+			// A resource interface type `T` is not a (static) subtype of a restricted resource type `U{Vs}.
+			// However, a dynamic cast is valid.
+
+			return false
+		}
+
+	case *CompositeType:
+
+		switch typedSubType := subType.(type) {
 		case *RestrictedResourceType:
-			// A restricted resource type `T{Us}` is a subtype of a restricted resource type `V{Ws}`,
-			// if `T == V` and `Ws` is a subset of `Us`
+			// A restricted resource type `T{Us}` is a subtype of a resource type `V`, if `T == V`
 
-			return typedSubType.Type == typedSuperType.Type &&
-				typedSuperType.RestrictionSet().
-					IsSubsetOf(typedSubType.RestrictionSet())
+			return typedSuperType.Kind == common.CompositeKindResource &&
+				typedSubType.Type == typedSuperType
 
-		default:
+		case *InterfaceType:
+			// A resource interface type `T` is not a (static) subtype of a resource type `U`.
+			// However, a dynamic cast is valid.
+
+			return false
+
+		case *CompositeType:
+			// A composite type is never a subtype of another composite type
+
+			return false
+		}
+
+	case *InterfaceType:
+
+		switch typedSubType := subType.(type) {
+		case *CompositeType:
+			// A composite type `T` is a subtype of a interface type `V`, if `T` conforms to `V`
+
+			// TODO: optimize, use set
+			for _, conformance := range typedSubType.Conformances {
+				if typedSuperType.Equal(conformance) {
+					return true
+				}
+			}
+
+			return false
+
+		case *RestrictedResourceType:
+			// A restricted resource type `T{Us}` is a subtype of a resource interface type `V`, if `V in Us`
+
+			if typedSuperType.CompositeKind != common.CompositeKindResource {
+				return false
+			}
+
+			// TODO: optimize, use set
+			for _, restriction := range typedSubType.Restrictions {
+				if typedSuperType.Equal(restriction) {
+					return true
+				}
+			}
+
+			return false
+
+		case *InterfaceType:
+			// TODO: Once interfaces can conform to inheritance, check conformances here
 			return false
 		}
 	}
