@@ -63,7 +63,7 @@ func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Op
 func (p *PubSubTestSuite) TestPubSub() {
 	defer p.cancel()
 	topic := "testtopic"
-	count := 3
+	count := 4
 	golog.SetAllLoggers(gologging.DEBUG)
 
 	// Step 1: Creates nodes

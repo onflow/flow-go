@@ -75,6 +75,7 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	if err != nil {
 		return errors.Wrapf(err, "could not construct libp2p host for %s", p.name)
 	}
+
 	p.libP2PHost = host
 
 	host.SetStreamHandler(FlowLibP2PProtocolID, handler)

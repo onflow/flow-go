@@ -327,15 +327,11 @@ func (m *Middleware) Publish(topic string, msg interface{}) error {
 			return fmt.Errorf("failed to marshal the message: %w", err)
 		}
 
-		// find how many nodes at a minimum should we publish to
-		ids, err := m.ov.Identity()
-		if err != nil {
-			return fmt.Errorf("failed to get ids: %w", err)
-		}
-		minPeers := len(ids)
-
 		// publish the bytes on the topic
-		err = m.libP2PNode.Publish(context.Background(), topic, data, minPeers)
+		// pubsub.GossipSubDlo is the minimal number of peer connections that libp2p will maintain
+		// for this node.
+		// TODO: specify a minpeers that makes more sense for Flow (this however requires GossipSubDlo to be adjusted.
+		err = m.libP2PNode.Publish(context.Background(), topic, data, pubsub.GossipSubDlo)
 		if err != nil {
 			return fmt.Errorf("failed to publish the message: %w", err)
 		}
