@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
 	module "github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/module/trace"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
@@ -38,6 +39,8 @@ func WithEngine(t *testing.T, run func(testcontext, *Engine)) {
 	var ctx testcontext
 
 	log := zerolog.New(os.Stderr)
+	tracer, err := trace.NewTracer(log)
+	require.NoError(t, err)
 
 	ctx.state = new(protocol.State)
 	ctx.me = new(module.Local)
@@ -55,7 +58,7 @@ func WithEngine(t *testing.T, run func(testcontext, *Engine)) {
 	ctx.collections = new(storage.Collections)
 	ctx.guarantees = new(storage.Guarantees)
 
-	e, err := New(log, conf, ctx.net, ctx.me, ctx.state, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees)
+	e, err := New(log, conf, ctx.net, ctx.me, ctx.state, tracer, ctx.provider, ctx.pool, ctx.collections, ctx.guarantees)
 	require.NoError(t, err)
 
 	run(ctx, e)

@@ -5,9 +5,9 @@ import (
 )
 
 type ViewState interface {
-	IsSelf(id flow.Identity) bool
+	IsSelf(id *flow.Identity) bool
 	IsSelfLeaderForView(view uint64) bool
 	GetSelfIdxForView(view uint64) uint32
 	GetIdxOfPubKeyForView(view uint64) uint32
-	LeaderForView(view uint64) flow.Identity
+	LeaderForView(view uint64) *flow.Identity
 }

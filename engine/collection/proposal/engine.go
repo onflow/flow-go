@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -30,6 +31,7 @@ type Engine struct {
 	unit        *engine.Unit
 	conf        Config
 	log         zerolog.Logger
+	tracer      trace.Tracer
 	con         network.Conduit
 	me          module.Local
 	state       protocol.State
@@ -45,6 +47,7 @@ func New(
 	net module.Network,
 	me module.Local,
 	state protocol.State,
+	tracer trace.Tracer,
 	provider network.Engine,
 	pool mempool.Transactions,
 	collections storage.Collections,
@@ -57,6 +60,7 @@ func New(
 		log:         log.With().Str("engine", "proposal").Logger(),
 		me:          me,
 		state:       state,
+		tracer:      tracer,
 		provider:    provider,
 		pool:        pool,
 		collections: collections,
@@ -157,18 +161,25 @@ func (e *Engine) createProposal() error {
 	}
 
 	guarantee := coll.Guarantee()
+
+	trace.StartCollectionGuaranteeSpan(e.tracer, guarantee, transactions).
+		SetTag("node_type", "collection").
+		SetTag("node_id", e.me.NodeID().String())
+
 	err = e.guarantees.Store(&guarantee)
 	if err != nil {
-		return fmt.Errorf("could not save proposed collection guarantee: %w", err)
+		return fmt.Errorf("could not save proposed collection guarantee %s: %w", guarantee.ID(), err)
+	}
+
+	// Collection guarantee is saved, we can now delete Txs from the mem pool
+	for _, tx := range transactions {
+		e.pool.Rem(tx.ID())
+		e.tracer.FinishSpan(tx.ID())
 	}
 
 	err = e.provider.ProcessLocal(&messages.SubmitCollectionGuarantee{Guarantee: guarantee})
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
-	}
-
-	for _, tx := range transactions {
-		e.pool.Rem(tx.ID())
 	}
 
 	return nil

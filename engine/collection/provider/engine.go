@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
@@ -23,16 +24,18 @@ import (
 type Engine struct {
 	unit        *engine.Unit
 	log         zerolog.Logger
+	tracer      trace.Tracer
 	con         network.Conduit
 	me          module.Local
 	state       protocol.State
 	collections storage.Collections
 }
 
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, collections storage.Collections) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, tracer trace.Tracer, me module.Local, collections storage.Collections) (*Engine, error) {
 	e := &Engine{
 		unit:        engine.NewUnit(),
 		log:         log.With().Str("engine", "provider").Logger(),
+		tracer:      tracer,
 		me:          me,
 		state:       state,
 		collections: collections,
@@ -92,6 +95,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // SubmitCollectionGuarantee submits the collection guarantee to all
 // consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
+	defer e.tracer.FinishSpan(guarantee.ID())
 	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get consensus consensusNodes: %w", err)
