@@ -334,9 +334,7 @@ func TestCheckRestrictedResourceTypeSubtyping(t *testing.T) {
             }
         `)
 
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		require.NoError(t, err)
 	})
 
 	t.Run("restricted resource type to restricted resource type with same type, 1 to 2 restrictions", func(t *testing.T) {
@@ -355,9 +353,7 @@ func TestCheckRestrictedResourceTypeSubtyping(t *testing.T) {
             }
         `)
 
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		require.NoError(t, err)
 	})
 
 	t.Run("restricted resource type to restricted resource type with same type, reordered restrictions", func(t *testing.T) {
@@ -414,8 +410,6 @@ func TestCheckRestrictedResourceTypeSubtyping(t *testing.T) {
             }
         `)
 
-		errs := ExpectCheckerErrors(t, err, 1)
-
-		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+		require.NoError(t, err)
 	})
 }
