@@ -9,18 +9,27 @@ import (
 	"time"
 
 	golog "github.com/ipfs/go-log"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	gologging "github.com/whyrusleeping/go-logging"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
+	"github.com/dapperlabs/flow-go/module/mock"
+	"github.com/dapperlabs/flow-go/network/codec/json"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
+	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
 // MesgNetTestSuite evaluates the message delivery functionality for the overlay
 // of engines over a complete graph
 type MeshNetTestSuite struct {
-	StubEngineTestSuite
+	suite.Suite
+	nets []*libp2p.Network    // used to keep track of the networks
+	mws  []*libp2p.Middleware // used to keep track of the middlewares associated with networks
+	ids  flow.IdentityList    // used to keep track of the identifiers associated with networks
 }
 
 func TestMeshNetTestSuite(t *testing.T) {
@@ -147,4 +156,76 @@ func extractSenderID(enginesNum int, events chan interface{}, expectedMsgTxt str
 		}
 	}
 	return indices, nil
+}
+
+// create ids creates and initializes count-many flow identifiers instances
+func (m *MeshNetTestSuite) createIDs(count int) []*flow.Identity {
+	identities := make([]*flow.Identity, 0)
+	for i := 0; i < count; i++ {
+		// defining id of node
+		var nodeID [32]byte
+		nodeID[0] = byte(i + 1)
+		identity := &flow.Identity{
+			NodeID: nodeID,
+		}
+		identities = append(identities, identity)
+	}
+	return identities
+}
+
+// create middleware receives an ids slice and creates and initializes a middleware instances for each id
+func (m *MeshNetTestSuite) createMiddleware(identities []*flow.Identity) []*libp2p.Middleware {
+	count := len(identities)
+	mws := make([]*libp2p.Middleware, 0)
+	for i := 0; i < count; i++ {
+		// creating middleware of nodes
+		mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID)
+		require.NoError(m.Suite.T(), err)
+
+		mws = append(mws, mw)
+	}
+	return mws
+}
+
+// createNetworks receives a slice of middlewares their associated flow identifiers,
+// and for each middleware creates a network instance on top
+// it returns the slice of created middlewares
+func (m *MeshNetTestSuite) createNetworks(mws []*libp2p.Middleware, ids flow.IdentityList) []*libp2p.Network {
+	count := len(mws)
+	nets := make([]*libp2p.Network, 0)
+
+	// creates and mocks the state
+	state := &protocol.State{}
+	snapshot := &SnapshotMock{ids: flow.IdentityList{}}
+	state.On("Final").Return(snapshot)
+
+	for i := 0; i < count; i++ {
+		// creates and mocks me
+		me := &mock.Local{}
+		me.On("NodeID").Return(ids[i].NodeID)
+		net, err := libp2p.NewNetwork(zerolog.Logger{}, json.NewCodec(), state, me, mws[i], 100)
+		require.NoError(m.Suite.T(), err)
+
+		nets = append(nets, net)
+
+		// starts the middlewares
+		done := net.Ready()
+		<-done
+	}
+
+	for i, m := range mws {
+		// retrieves IP and port of the middleware
+		ip, port := m.GetIPPort()
+
+		// mocks an identity for the middleware
+		id := &flow.Identity{
+			NodeID:  ids[i].NodeID,
+			Address: fmt.Sprintf("%s:%s", ip, port),
+			Role:    flow.RoleCollection,
+			Stake:   0,
+		}
+		snapshot.ids = append(snapshot.ids, id)
+	}
+
+	return nets
 }

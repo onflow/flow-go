@@ -38,7 +38,7 @@ func TestStubEngineTestSuite(t *testing.T) {
 
 func (s *StubEngineTestSuite) SetupTest() {
 	const count = 2
-	golog.SetAllLoggers(gologging.DEBUG)
+	golog.SetAllLoggers(gologging.INFO)
 	s.ids = s.createIDs(count)
 	s.mws = s.createMiddleware(s.ids)
 	s.nets = s.createNetworks(s.mws, s.ids)
@@ -68,7 +68,6 @@ func (s *StubEngineTestSuite) TestMultiMsgSync() {
 // it also evaluates the correct reception of an echo message back for each send
 // sender and receiver are synced over reception
 func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
-	s.T().Skip("re-run from the subclass meshengine test is causing intermittent failure")
 	// set to true for an echo expectation
 	s.multiMessageSync(true, 10)
 }
@@ -76,7 +75,6 @@ func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
 // TestMultiMsgAsync tests sending multiple messages from sender to receiver
 // sender and receiver are not synchronized
 func (s *StubEngineTestSuite) TestMultiMsgAsync() {
-	s.T().Skip("re-run from the subclass meshengine test is causing intermittent failure")
 	// set to false for no echo expectation
 	s.multiMessageAsync(false, 10)
 }
