@@ -114,7 +114,31 @@ func TestUnHappyPathForIncorporatedVotes(t *testing.T) {
 // 2. all 7 votes are pending and can pass ValidatePendingVotes, but cannot pass ValidateIncorporatedVotes
 //    when receiving the block, no vote should be moved to incorporatedVotes, and no QC should be generated
 func TestUnHappyPathForPendingVotes(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	testView := uint64(5)
+	block := newMockBlock(testView)
+	for i := 0; i < 7; i++ {
+		// signerIndex is invalid
+		vote := newMockVote(uint64(0), block.BlockID(), uint32(10))
+		err := va.StorePendingVote(vote)
+		require.NotNil(t, err)
+		fmt.Println(err.Error())
+		qc, err := va.BuildQCOnReceivingBlock(block)
+		require.Nil(t, qc)
+		require.NotNil(t, err)
+		fmt.Println(err.Error())
+	}
 
+	for i := 0; i < 7; i++ {
+		// view is invalid
+		vote := newMockVote(testView-1, block.BlockID(), uint32(10))
+		err := va.StorePendingVote(vote)
+		require.Nil(t, err)
+		qc, err := va.BuildQCOnReceivingBlock(block)
+		require.Nil(t, qc)
+		require.NotNil(t, err)
+		fmt.Println(err.Error())
+	}
 }
 
 // store one vote in the memory
