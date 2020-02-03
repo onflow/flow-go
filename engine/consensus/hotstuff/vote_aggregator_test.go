@@ -16,9 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-const VOTE_SIZE int = 10
-const THRESHOLD float32 = 0.66667
-
 // threshold stake would be 5,
 // meaning that it is enough to build a QC when receiving 5 votes
 const VALIDATOR_SIZE = 7
@@ -66,7 +63,21 @@ func TestHappyPathForPendingVotes(t *testing.T) {
 //    i.e., 1.valid, 2. invalid, ..., 6. valid, 7. invalid
 //    no QC should be generated in the whole process
 func TestUnHappyPathForIncorporatedVotes(t *testing.T) {
-
+	va := newMockVoteAggregator(t)
+	testView := uint64(5)
+	block := newMockBlock(testView)
+	for i := 0; i < 7; i++ {
+		var vote *types.Vote
+		if i == 1 || i == 3 || i == 5 {
+			vote = newMockVote(testView-1, block.BlockID(), uint32(i))
+		} else {
+			vote = newMockVote(testView, block.BlockID(), uint32(i))
+		}
+		qc, err := va.StoreVoteAndBuildQC(vote, block)
+		require.NotNil(t, err)
+		require.Nil(t, qc)
+		fmt.Println(err.Error())
+	}
 }
 
 // receive 7 votes in total
@@ -108,7 +119,7 @@ func TestErrDoubleVote(t *testing.T) {
 func TestPruneByView(t *testing.T) {
 	va := newMockVoteAggregator(t)
 	pruneByView := 3
-	for i := 1; i <= int(pruneByView); i++ {
+	for i := 1; i <= pruneByView; i++ {
 		view := uint64(i)
 		block := unittest.BlockHeaderFixture()
 		blockID := block.ID()
@@ -176,7 +187,7 @@ func newMockVote(view uint64, blockID flow.Identifier, signerIndex uint32) *type
 
 func newMockVoteAggregator(t *testing.T) *VoteAggregator {
 	ctrl := gomock.NewController(t)
-	ids := unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleConsensus))
+	ids := unittest.IdentityListFixture(VALIDATOR_SIZE, unittest.WithRole(flow.RoleConsensus))
 	snapshot := protocol.NewMockSnapshot(ctrl)
 	mockProtocolState := mocks.NewMockState(ctrl)
 	mockProtocolState.EXPECT().AtBlockID(gomock.Any()).Return(snapshot).AnyTimes()
