@@ -2950,11 +2950,12 @@ func IsSubType(subType Type, superType Type) bool {
 		}
 
 	case *RestrictedResourceType:
-		switch typedSubType := subType.(type) {
 
+		switch typedSubType := subType.(type) {
 		case *RestrictedResourceType:
 			// A restricted resource type `T{Us}` is a subtype of a restricted resource type `V{Ws}`.
-			// NOTE: `Us` and `Ws` do NOT have to be subsets –
+			// NOTE: `Us` and `Ws` do NOT have to be subsets.
+			//
 			// The owner of the resource may freely restrict and unrestrict the resource.
 
 			return typedSubType.Type == typedSuperType.Type
@@ -2962,7 +2963,8 @@ func IsSubType(subType Type, superType Type) bool {
 		case *CompositeType:
 			// A resource type `T` is a subtype of a restricted resource type `U{Vs}`, if `T == U`
 
-			return typedSubType == typedSuperType.Type
+			return typedSubType.Kind == common.CompositeKindResource &&
+				typedSubType == typedSuperType.Type
 
 		case *InterfaceType:
 			// A resource interface type `T` is not a (static) subtype of a restricted resource type `U{Vs}.
@@ -3008,15 +3010,16 @@ func IsSubType(subType Type, superType Type) bool {
 			return false
 
 		case *RestrictedResourceType:
-			// A restricted resource type `T{Us}` is a subtype of a resource interface type `V`, if `V in Us`
+			// A restricted resource type `T{Us}` is a subtype of a resource interface type `V`,
+			// if `T` conforms to `V`. `Us` does not have to contain `V`.
 
 			if typedSuperType.CompositeKind != common.CompositeKindResource {
 				return false
 			}
 
 			// TODO: optimize, use set
-			for _, restriction := range typedSubType.Restrictions {
-				if typedSuperType.Equal(restriction) {
+			for _, conformance := range typedSubType.Type.Conformances {
+				if typedSuperType.Equal(conformance) {
 					return true
 				}
 			}
@@ -3024,7 +3027,7 @@ func IsSubType(subType Type, superType Type) bool {
 			return false
 
 		case *InterfaceType:
-			// TODO: Once interfaces can conform to inheritance, check conformances here
+			// TODO: Once interfaces can conform to interfaces, check conformances here
 			return false
 		}
 	}
