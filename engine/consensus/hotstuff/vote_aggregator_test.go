@@ -3,14 +3,15 @@ package hotstuff
 import (
 	"errors"
 	"fmt"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
-	"github.com/dapperlabs/flow-go/protocol/mocks"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
-	"testing"
 
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/protocol/mocks"
 	protocol "github.com/dapperlabs/flow-go/protocol/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
