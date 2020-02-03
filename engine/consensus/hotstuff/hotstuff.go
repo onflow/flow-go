@@ -39,6 +39,6 @@ type HotStuff interface {
 
 // New sets up and instantiates an instance of the HotStuff core algorithm.
 // TODO
-func New(signer Signer, network NetworkSender, consumer notifications.Consumer) (HotStuff, error) {
+func New(signer Signer, communicator Communicator, consumer notifications.Consumer) (HotStuff, error) {
 	panic("TODO")
 }

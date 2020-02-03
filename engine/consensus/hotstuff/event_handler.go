@@ -23,7 +23,7 @@ type EventHandler struct {
 	validator             *Validator
 	blockProposalProducer BlockProposalProducer
 	viewState             ViewState
-	network               NetworkSender
+	network               Communicator
 }
 
 // NewEventHandler creates an EventHandler instance with initial components.
@@ -36,7 +36,7 @@ func NewEventHandler(
 	validator *Validator,
 	blockProposalProducer BlockProposalProducer,
 	viewState ViewState,
-	network NetworkSender,
+	network Communicator,
 ) (*EventHandler, error) {
 	e := &EventHandler{
 		log:                   log.With().Str("hotstuff", "event_handler").Logger(),
