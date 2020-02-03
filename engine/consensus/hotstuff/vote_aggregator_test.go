@@ -88,9 +88,9 @@ func TestBuildQCAfterReceivingBlock(t *testing.T) {
 }
 
 // receive 7 votes in total
-// 1. 3 of them are invalid and located every other valid vote
-//    i.e., 1.valid, 2. invalid, ..., 6. valid, 7. invalid
-//    no QC should be generated in the whole process
+// 3 of them are invalid and located every other valid vote
+// i.e., 1.valid, 2. invalid, ..., 6. valid, 7. invalid
+// no QC should be generated in the whole process
 func TestUnHappyPathForIncorporatedVotes(t *testing.T) {
 	va := newMockVoteAggregator(t)
 	testView := uint64(5)
@@ -117,6 +117,7 @@ func TestUnHappyPathForPendingVotes(t *testing.T) {
 	va := newMockVoteAggregator(t)
 	testView := uint64(5)
 	block := newMockBlock(testView)
+	// testing invalid pending votes
 	for i := 0; i < 7; i++ {
 		// signerIndex is invalid
 		vote := newMockVote(uint64(0), block.BlockID(), uint32(10))
@@ -128,7 +129,7 @@ func TestUnHappyPathForPendingVotes(t *testing.T) {
 		require.NotNil(t, err)
 		fmt.Println(err.Error())
 	}
-
+	// testing valid pending votes with invalid view
 	for i := 0; i < 7; i++ {
 		// view is invalid
 		vote := newMockVote(testView-1, block.BlockID(), uint32(10))
