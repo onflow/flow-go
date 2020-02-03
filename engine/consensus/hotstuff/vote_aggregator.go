@@ -55,6 +55,7 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 	} else {
 		pendingStatus = NewPendingStatus()
 		pendingStatus.AddVote(vote)
+		va.pendingVoteMap[vote.BlockID.String()] = pendingStatus
 	}
 	return nil
 }

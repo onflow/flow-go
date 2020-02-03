@@ -26,10 +26,10 @@ func TestHappyPathForIncorporatedVotes(t *testing.T) {
 	va := newMockVoteAggregator(t)
 	testView := uint64(5)
 	block := newMockBlock(testView)
-	for i := 1; i <= 5; i++ {
+	for i := 0; i < 5; i++ {
 		vote := newMockVote(testView, block.BlockID(), uint32(i))
 		qc, err := va.StoreVoteAndBuildQC(vote, block)
-		if i < 5 {
+		if i < 4 {
 			require.NotNil(t, err)
 			require.True(t, errors.Is(err, types.ErrInsufficientVotes{}))
 			fmt.Println(err.Error())
@@ -42,13 +42,28 @@ func TestHappyPathForIncorporatedVotes(t *testing.T) {
 	}
 }
 
+// receive 4 valid pending votes and QC should not be built
+// on receiving the block proposal, a QC should be built because of the primary vote
+func TestBuildQCOnReceivingBlock(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	testView := uint64(5)
+	block := newMockBlock(testView)
+	fmt.Println(block.BlockID().String())
+	for i := 0; i < 4; i++ {
+		vote := newMockVote(testView, block.BlockID(), uint32(i))
+		err := va.StorePendingVote(vote)
+		require.Nil(t, err)
+	}
+	qc, err := va.BuildQCOnReceivingBlock(block)
+	require.Nil(t, err)
+	require.Equal(t, block.BlockID(), qc.BlockID)
+}
+
 // receive 5 valid votes in total
 // 1. the first 3 votes are pending (threshold stake is not reached)
 //    then receive the missing block (extracting a vote from the block as the 4th vote)
 //    and no QC should be generated
 //    when receive the 5th vote, a QC should be generated
-// 2. all 5 votes are pending
-//    then receive the missing block and a QC should be generated
 // receive 7 votes in total
 // 1. the first 2 of them are invalid
 //    no QC should be generated until receiving the 7th vote
@@ -167,7 +182,11 @@ func newMockBlock(view uint64) *types.BlockProposal {
 		View:    view,
 		BlockID: blockHeader.ID(),
 	}
-	return types.NewBlockProposal(block, nil)
+	sig := &types.Signature{
+		RawSignature: [32]byte{},
+		SignerIdx:    VALIDATOR_SIZE - 1,
+	}
+	return types.NewBlockProposal(block, sig)
 }
 
 func newMockVote(view uint64, blockID flow.Identifier, signerIndex uint32) *types.Vote {
