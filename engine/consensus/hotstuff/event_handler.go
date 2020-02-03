@@ -247,7 +247,7 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *types.
 
 	// send my vote if I should vote and I'm not the leader
 	if shouldVote {
-		e.network.SendVote(ownVote, nextLeader)
+		e.network.SendVote(ownVote, nextLeader.NodeID)
 	}
 
 	// inform pacemaker that we've done the work for the current view, it should increment the current view

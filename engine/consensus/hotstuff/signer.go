@@ -1,7 +1,6 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
@@ -10,8 +9,7 @@ import (
 // stake.
 type Signer interface {
 
-	// Sign generates a signature for the given vote, using the node's
-	// private key.
-	// TODO should return a BLS partial signature
-	Sign(vote *types.UnsignedVote) (crypto.Signature, error)
+	// TODO will be changed based on https://github.com/dapperlabs/flow-go/pull/2365
+	SignVote(*types.UnsignedVote, uint32) *types.Signature
+	SignBlockProposal(*types.UnsignedBlockProposal, uint32) *types.Signature
 }
