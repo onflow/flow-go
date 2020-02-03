@@ -129,7 +129,6 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 // Identity returns a map of all flow.Identifier to flow identity by querying the flow state
 func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 	ids, err := n.state.Final().Identities()
-
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
