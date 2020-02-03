@@ -3,11 +3,13 @@
 package procedure
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/storage"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -25,7 +27,7 @@ func IndexGuarantees(payloadHash flow.Identifier, guarantees []*flow.CollectionG
 				return fmt.Errorf("node guarantee missing in DB (%x)", guarantee.CollectionID)
 			}
 			err = operation.IndexGuarantee(payloadHash, guarantee.CollectionID)(tx)
-			if err != nil {
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return fmt.Errorf("could not index guarantee (%x): %w", guarantee.CollectionID, err)
 			}
 		}

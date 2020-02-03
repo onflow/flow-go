@@ -15,7 +15,6 @@ import (
 )
 
 var EmptySlice []byte
-var defaultLeafHash []byte = Hash(EmptySlice)
 var nilChild []byte = make([]byte, 32)
 
 // node is a struct for constructing our Tree
@@ -30,7 +29,6 @@ type node struct {
 // SMT is a Basic Sparse Merkle Tree struct
 type SMT struct {
 	root                 *node                    // Root
-	defaultHashes        [256][]byte              // The zero hashes of the level of the tree
 	height               int                      // Height of the tree
 	database             databases.DAL            // The Database Interface for the trie
 	historicalStates     map[string]databases.DAL // Map of string representations of Historical States to Historical Database references
@@ -98,14 +96,8 @@ func NewSMT(
 	s.database = db
 	s.height = height
 
-	// Creates the Default hashes from base to level height
-	s.defaultHashes[0] = defaultLeafHash
-	for i := 1; i < height; i++ {
-		s.defaultHashes[i] = Hash(s.defaultHashes[i-1], s.defaultHashes[i-1])
-	}
-
 	// Set root to the highest level default node
-	s.root = newNode(s.defaultHashes[height-1], height-1)
+	s.root = newNode(defaultHashes[height-1], height-1)
 	s.historicalStates = make(map[string]databases.DAL)
 	s.numHistoricalStates = numHistoricalStates
 	s.numFullStates = numFullStates
@@ -232,7 +224,6 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root []byte) ([][]byte, *proofHo
 	}
 
 	values := make([][]byte, len(keys))
-
 	// the case where we are reading from current state
 	if bytes.Equal(root, currRoot) {
 		for i, key := range keys {
@@ -557,7 +548,6 @@ func (s *SMT) updateHistoricalStates(root []byte) error {
 	}
 	s.historicalStates[oldRoot] = historicDB
 	numStates := s.historicalStateRoots.Len()
-
 	switch {
 	case numStates > s.numHistoricalStates:
 		return errors.New("We have more Historical States stored than the Maximum Allowed Amount!")
@@ -637,14 +627,6 @@ func (s *SMT) GetRoot() *node {
 	return s.root
 }
 
-// GetDefaultHashes returns the default hashes of the SMT.
-//
-// For each tree level N, there is a default hash equal to the chained
-// hashing of the default value N times.
-func (s *SMT) GetDefaultHashes() [256][]byte {
-	return s.defaultHashes
-}
-
 func (s *SMT) insertIntoKeys(insert []byte, keys [][]byte, values [][]byte) ([][]byte, [][]byte, error) {
 	for i, key := range keys {
 		if bytes.Equal(insert, key) {
@@ -705,7 +687,7 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 	}
 
 	//We initialize the nodes as empty to prevent nil pointer exceptions later
-	lnode, rnode := rootNode.GetandSetChildren(s.defaultHashes)
+	lnode, rnode := rootNode.GetandSetChildren(defaultHashes)
 
 	// Split the keys and values array so we can update the trie in parallel
 	lkeys, rkeys, splitIndex := utils.SplitKeys(keys, s.height-height-1)
@@ -810,7 +792,7 @@ func (s *SMT) interiorNode(lnode *node, rnode *node, height int) *node {
 		s.database.PutIntoBatcher(in.value, append(in.Lchild.value, in.Rchild.value...))
 		return in
 	} else if lnode == nil && rnode != nil {
-		in := newNode(Hash(s.defaultHashes[height-1], rnode.value), height)
+		in := newNode(Hash(defaultHashes[height-1], rnode.value), height)
 		in.Lchild = lnode
 		in.Rchild = rnode
 		// if the left node is nil value of the Rchild attached to key in DB will be prefaced by
@@ -820,7 +802,7 @@ func (s *SMT) interiorNode(lnode *node, rnode *node, height int) *node {
 		s.database.PutIntoBatcher(in.value, append(lFlag, in.Rchild.value...))
 		return in
 	} else if rnode == nil && lnode != nil {
-		in := newNode(Hash(lnode.value, s.defaultHashes[height-1]), height)
+		in := newNode(Hash(lnode.value, defaultHashes[height-1]), height)
 		in.Lchild = lnode
 		in.Rchild = rnode
 		rFlag := make([]byte, 1)
