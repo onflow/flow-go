@@ -2,10 +2,10 @@ package hotstuff
 
 import (
 	"fmt"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"math/big"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/protocol"
 )
 
@@ -15,8 +15,8 @@ type ViewState struct {
 
 	// my own identifier
 	myID flow.Identifier
-	// my role. Could be flow.Role.Consensus or flow.Role.Collection
-	myRole flow.Role
+	// identityFilter to find only the consensus members for the cluster
+	consensusMembersFilter flow.IdentityFilter
 }
 
 // IsSelf returns if a given identity is myself

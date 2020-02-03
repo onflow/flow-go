@@ -11,6 +11,7 @@ type Vote struct {
 }
 
 func (v *Vote) ID() []byte {
+	// TODO: replace this to generic hash function
 	data := encoding.DefaultEncoder.MustEncode(v)
 	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
 	hash := hasher.ComputeHash(data)

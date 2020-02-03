@@ -31,6 +31,11 @@ type ErrStaleVote struct {
 	FinalizedView uint64
 }
 
+type ErrStaleBlock struct {
+	BlockProposal *BlockProposal
+	FinalizedView uint64
+}
+
 type ErrExistingQC struct {
 	Vote *Vote
 	QC   *QuorumCertificate
@@ -57,6 +62,10 @@ func (e ErrDoubleVote) Error() string {
 
 func (e ErrStaleVote) Error() string {
 	return fmt.Sprintf("Stale vote found (vote: %v, finalized view: %v)", e.Vote, e.FinalizedView)
+}
+
+func (e ErrStaleBlock) Error() string {
+	return fmt.Sprintf("Stale block found (block: %v, finalized view: %v)", e.BlockProposal, e.FinalizedView)
 }
 
 func (e ErrExistingQC) Error() string {

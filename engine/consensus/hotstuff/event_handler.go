@@ -24,12 +24,15 @@ func (eh *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) {
 func (eh *EventHandler) OnReceiveVote(vote *types.Vote) {
 	blockProposal, found := eh.forks.GetBlock(vote.BlockID[:])
 	if found == false {
-		eh.voteAggregator.StorePendingVote(vote)
+		err := eh.voteAggregator.StorePendingVote(vote)
+		if err != nil {
+			//	TODO: handle err
+		}
 		return
 	}
 	newQC, err := eh.voteAggregator.StoreVoteAndBuildQC(vote, blockProposal)
 	if err != nil {
-		//	TODO: handle error
+		//	TODO: handle err
 	} else {
 		err = eh.forks.AddQC(newQC)
 		if err != nil {

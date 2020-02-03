@@ -95,9 +95,9 @@ func TestPruneByView(t *testing.T) {
 		vote := newMockVote(view, blockID, 2)
 		voteIDStr := string(vote.ID())
 		blockIDStr := blockID.String()
-		voteMap := make(map[string]*types.Vote)
-		voteMap[voteIDStr] = vote
-		va.pendingVoteMap[blockIDStr] = voteMap
+		pendingStatus := NewPendingStatus()
+		pendingStatus.AddVote(vote)
+		va.pendingVoteMap[voteIDStr] = pendingStatus
 		vs := &VotingStatus{}
 		vs.AddVote(vote)
 		va.blockHashToVotingStatus[blockIDStr] = vs
@@ -154,5 +154,5 @@ func newMockVoteAggregator(t *testing.T) *VoteAggregator {
 	viewState := &ViewState{protocolState: mockProtocolState}
 	voteValidator := &Validator{viewState: viewState}
 
-	return NewVoteAggregator(zerolog.Logger{}, viewState, voteValidator)
+	return NewVoteAggregator(zerolog.Logger{}, 0, viewState, voteValidator)
 }
