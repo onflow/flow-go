@@ -20,12 +20,14 @@ import (
 // meaning that it is enough to build a QC when receiving 5 votes
 const VALIDATOR_SIZE = 7
 
-// receive 5 valid incorporated votes in total
+// receive 6 valid incorporated votes in total
 // a QC will be generated on receiving the 5th vote
+// when receiving the 6th vote, the same QC should be returned
 func TestHappyPathForIncorporatedVotes(t *testing.T) {
 	va := newMockVoteAggregator(t)
 	testView := uint64(5)
 	block := newMockBlock(testView)
+	var lastQC *types.QuorumCertificate
 	for i := 0; i < 5; i++ {
 		vote := newMockVote(testView, block.BlockID(), uint32(i))
 		qc, err := va.StoreVoteAndBuildQC(vote, block)
@@ -37,9 +39,14 @@ func TestHappyPathForIncorporatedVotes(t *testing.T) {
 			require.Nil(t, err)
 			require.NotNil(t, qc)
 			require.Equal(t, block.BlockID(), qc.BlockID)
+			lastQC = qc
 			fmt.Println("QC generated")
 		}
 	}
+	lastVote := newMockVote(testView, block.BlockID(), uint32(5))
+	newQC, err := va.StoreVoteAndBuildQC(lastVote, block)
+	require.Nil(t, err)
+	require.Equal(t, lastQC, newQC)
 }
 
 // receive 4 valid pending votes and QC should not be built
@@ -48,7 +55,6 @@ func TestBuildQCOnReceivingBlock(t *testing.T) {
 	va := newMockVoteAggregator(t)
 	testView := uint64(5)
 	block := newMockBlock(testView)
-	fmt.Println(block.BlockID().String())
 	for i := 0; i < 4; i++ {
 		vote := newMockVote(testView, block.BlockID(), uint32(i))
 		err := va.StorePendingVote(vote)
@@ -59,18 +65,26 @@ func TestBuildQCOnReceivingBlock(t *testing.T) {
 	require.Equal(t, block.BlockID(), qc.BlockID)
 }
 
-// receive 5 valid votes in total
-// 1. the first 3 votes are pending (threshold stake is not reached)
-//    then receive the missing block (extracting a vote from the block as the 4th vote)
-//    and no QC should be generated
-//    when receive the 5th vote, a QC should be generated
-// receive 7 votes in total
-// 1. the first 2 of them are invalid
-//    no QC should be generated until receiving the 7th vote
-// 2. when receive the 5th vote, a QC should be generated
-//    on receiving the 6th vote, return the same QC generated before
-func TestHappyPathForPendingVotes(t *testing.T) {
-
+// receive 3 pending votes and then receive the block,
+// a QC should not be built because of insufficient votes,
+// when receiving the 5th vote, a QC should be generated
+func TestBuildQCAfterReceivingBlock(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	testView := uint64(5)
+	block := newMockBlock(testView)
+	fmt.Println(block.BlockID().String())
+	for i := 0; i < 3; i++ {
+		vote := newMockVote(testView, block.BlockID(), uint32(i))
+		err := va.StorePendingVote(vote)
+		require.Nil(t, err)
+	}
+	qc, err := va.BuildQCOnReceivingBlock(block)
+	require.Nil(t, qc)
+	require.NotNil(t, err)
+	lastVote := newMockVote(testView, block.BlockID(), uint32(3))
+	qc, err = va.StoreVoteAndBuildQC(lastVote, block)
+	require.Nil(t, err)
+	require.NotNil(t, qc)
 }
 
 // receive 7 votes in total
