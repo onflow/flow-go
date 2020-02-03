@@ -126,6 +126,7 @@ func (va *VoteAggregator) convertPendingVotes(pendingVotes []*types.Vote, bp *ty
 		voteStatus, err := va.validateAndStoreIncorporatedVote(vote, bp)
 		if err != nil {
 			va.log.Warn().Msg("invalid vote found")
+			continue
 		}
 		// if threshold is reached, the rest of the votes can be deleted
 		if voteStatus.CanBuildQC() {
