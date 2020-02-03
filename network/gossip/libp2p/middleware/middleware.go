@@ -13,12 +13,14 @@ type Middleware interface {
 	Start(overlay Overlay)
 	Stop()
 	Send(nodeID flow.Identifier, msg interface{}) error
+	Publish(topic string, msg interface{}) error
+	Subscribe(channelID uint8) error
 }
 
 // Overlay represents the interface that middleware uses to interact with the
 // overlay network layer.
 type Overlay interface {
-	Identity(nodeID flow.Identifier) (*flow.Identity, error)
+	Identity() (map[flow.Identifier]flow.Identity, error)
 	Receive(nodeID flow.Identifier, msg interface{}) error
 	Cleanup(nodeID flow.Identifier) error
 }

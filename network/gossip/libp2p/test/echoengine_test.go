@@ -482,9 +482,10 @@ func (s *StubEngineTestSuite) createNetworks(mws []*libp2p.Middleware, ids flow.
 	// creates and mocks the state
 	state := &protocol.State{}
 	snapshot := &protocol.Snapshot{}
+
 	for i := 0; i < count; i++ {
 		state.On("Final").Return(snapshot)
-		snapshot.On("Identity", ids[i].NodeID).Return(ids[i], nil)
+		snapshot.On("Identities").Return(ids, nil)
 	}
 
 	for i := 0; i < count; i++ {
