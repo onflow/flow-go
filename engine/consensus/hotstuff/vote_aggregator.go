@@ -15,7 +15,7 @@ type VoteAggregator struct {
 	voteValidator  *Validator
 	lastPrunedView uint64
 	// For pruning
-	viewToBlockID map[uint64][][]byte
+	viewToBlockIDStrSet map[uint64]map[string]bool
 	// keeps track of votes whose blocks can not be found
 	pendingVoteMap map[string]*PendingStatus
 	// keeps track of QCs that have been made for blocks
@@ -32,7 +32,7 @@ func NewVoteAggregator(log zerolog.Logger, lastPruneView uint64, viewState *View
 		lastPrunedView:          lastPruneView,
 		viewState:               viewState,
 		voteValidator:           voteValidator,
-		viewToBlockID:           map[uint64][][]byte{},
+		viewToBlockIDStrSet:     map[uint64]map[string]bool{},
 		pendingVoteMap:          map[string]*PendingStatus{},
 		blockHashToVotingStatus: map[string]*VotingStatus{},
 		createdQC:               map[string]*types.QuorumCertificate{},
@@ -140,14 +140,13 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 		return
 	}
 	for i := va.lastPrunedView + 1; i <= view; i++ {
-		blockMRHs := va.viewToBlockID[i]
-		for _, blockMRH := range blockMRHs {
-			blockMRHStr := string(blockMRH)
-			delete(va.pendingVoteMap, blockMRHStr)
-			delete(va.blockHashToVotingStatus, blockMRHStr)
-			delete(va.createdQC, blockMRHStr)
+		blockIDStrSet := va.viewToBlockIDStrSet[i]
+		for blockIDStr, _ := range blockIDStrSet {
+			delete(va.pendingVoteMap, blockIDStr)
+			delete(va.blockHashToVotingStatus, blockIDStr)
+			delete(va.createdQC, blockIDStr)
 		}
-		delete(va.viewToBlockID, i)
+		delete(va.viewToBlockIDStrSet, i)
 		delete(va.viewToIDToVote, i)
 	}
 	va.lastPrunedView = view
@@ -186,8 +185,15 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 	if exists {
 		idToVote[voter.ID()] = vote
 	} else {
-		va.viewToIDToVote[vote.View] = make(map[flow.Identifier]*types.Vote)
+		va.viewToIDToVote[vote.View] = map[flow.Identifier]*types.Vote{}
 		va.viewToIDToVote[vote.View][voter.ID()] = vote
+	}
+	blockIDStrSet, exists := va.viewToBlockIDStrSet[vote.View]
+	if exists {
+		blockIDStrSet[blockIDStr] = true
+	} else {
+		va.viewToBlockIDStrSet[vote.View] = map[string]bool{}
+		va.viewToBlockIDStrSet[vote.View][blockIDStr] = true
 	}
 	return votingStatus, nil
 }
