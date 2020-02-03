@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"errors"
 	"fmt"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/protocol/mocks"
@@ -24,6 +25,23 @@ const VALIDATOR_SIZE = 7
 // receive 5 valid incorporated votes in total
 // a QC will be generated on receiving the 5th vote
 func TestHappyPathForIncorporatedVotes(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	testView := uint64(5)
+	block := newMockBlock(testView)
+	for i := 1; i <= 5; i++ {
+		vote := newMockVote(testView, block.BlockID(), uint32(i))
+		qc, err := va.StoreVoteAndBuildQC(vote, block)
+		if i < 5 {
+			require.NotNil(t, err)
+			require.True(t, errors.Is(err, types.ErrInsufficientVotes{}))
+			fmt.Println(err.Error())
+		} else {
+			require.Nil(t, err)
+			require.NotNil(t, qc)
+			require.Equal(t, block.BlockID(), qc.BlockID)
+			fmt.Println("QC generated")
+		}
+	}
 }
 
 // receive 5 valid votes in total
