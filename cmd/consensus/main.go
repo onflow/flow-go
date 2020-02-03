@@ -10,7 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
 	"github.com/dapperlabs/flow-go/engine/simulation/subzero"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/builder"
+	"github.com/dapperlabs/flow-go/module/builder/consensus"
 	"github.com/dapperlabs/flow-go/module/cleaner"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
@@ -75,7 +75,7 @@ func main() {
 			payloadsDB := storage.NewPayloads(node.DB)
 			guaranteesDB := storage.NewGuarantees(node.DB)
 			sealsDB := storage.NewSeals(node.DB)
-			build := builder.New(node.State, guarantees, seals)
+			build := consensus.NewBuilder(node.DB, guarantees, seals)
 			clean := cleaner.New(guaranteesDB, sealsDB, guarantees, seals)
 			sub, err := subzero.New(node.Logger, prov, headersDB, payloadsDB, node.State, node.Me, build, clean)
 			node.MustNot(err).Msg("could not initialize subzero engine")
