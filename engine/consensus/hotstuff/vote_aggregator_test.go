@@ -107,14 +107,15 @@ func TestPruneByView(t *testing.T) {
 			BlockID: blockID,
 		}
 		va.createdQC[blockIDStr] = qc
-		va.viewToBlockIDStrs[view] = append(va.viewToBlockIDStrs[view], blockIDStr)
-		idToVote := make(map[flow.Identifier]*types.Vote)
-		va.viewToIDToVote[view] = idToVote
+		va.viewToBlockIDStrSet[view] = map[string]bool{}
+		va.viewToBlockIDStrSet[view][blockIDStr] = true
+		va.viewToIDToVote[view] = map[flow.Identifier]*types.Vote{}
+		va.viewToIDToVote[view][voter.ID()] = vote
 	}
 
 	// verify that all insertion is successful
 	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToIDToVote))
-	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToBlockIDStrs))
+	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToBlockIDStrSet))
 	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.createdQC))
 	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.pendingVoteMap))
 	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.blockHashToVotingStatus))
@@ -123,7 +124,7 @@ func TestPruneByView(t *testing.T) {
 
 	// verify that all deletion is successful
 	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToIDToVote))
-	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToBlockIDStrs))
+	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToBlockIDStrSet))
 	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.blockHashToVotingStatus))
 	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.createdQC))
 	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.pendingVoteMap))
