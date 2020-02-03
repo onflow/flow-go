@@ -294,7 +294,7 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("restricted resource -> conforming resource interface", func(t *testing.T) {
+	t.Run("restricted resource -> conforming resource interface: in restriction", func(t *testing.T) {
 
 		checker, err := ParseAndCheckStorage(t, `
 	         resource interface I {}
@@ -314,6 +314,49 @@ func TestCheckCastStaticResourceType(t *testing.T) {
 			&sema.InterfaceType{},
 			r2Type,
 		)
+	})
+
+	t.Run("restricted resource -> conforming resource interface: not in restriction", func(t *testing.T) {
+
+		checker, err := ParseAndCheckStorage(t, `
+	         resource interface I1 {}
+
+	         resource interface I2 {}
+
+	         resource R: I1, I2 {}
+
+	         let r: @R{I1} <- create R()
+	         let r2 <- r as @I2
+	       `,
+		)
+
+		require.NoError(t, err)
+
+		r2Type := checker.GlobalValues["r2"].Type
+
+		require.IsType(t,
+			&sema.InterfaceType{},
+			r2Type,
+		)
+	})
+
+	t.Run("restricted resource -> non-conforming resource interface", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+	         resource interface I1 {}
+
+	         resource interface I2 {}
+
+	         resource R: I1 {}
+
+	         let r: @R{I1} <- create R()
+	         let r2 <- r as @I2
+	       `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 	})
 }
 
