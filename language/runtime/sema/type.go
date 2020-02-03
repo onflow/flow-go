@@ -3213,26 +3213,140 @@ func IsSubType(subType Type, superType Type) bool {
 		)
 
 	case *ReferenceType:
+		// References types are only subtypes of reference types
+
 		typedSubType, ok := subType.(*ReferenceType)
 		if !ok {
 			return false
 		}
 
-		// Unauthorized references are *not* subtypes of authorized references.
+		// A storable reference type `T` is a subtype of a reference type `U`,
+		// if the non-storable variant of `T` is a subtype of `U`
 
-		if !typedSubType.Authorized && typedSuperType.Authorized {
+		if typedSubType.Storable {
+			return IsSubType(
+				&ReferenceType{
+					Type:       typedSubType.Type,
+					Authorized: typedSubType.Authorized,
+					Storable:   false,
+				},
+				typedSuperType,
+			)
+		}
+
+		// A non-storable reference type is not a (static) subtype of a storable reference.
+		// However, a dynamic cast is valid, if the reference is authorized.
+		//
+		// The holder of the may not gain more permissions without having authorization.
+
+		if typedSuperType.Storable {
 			return false
 		}
 
-		// Non-storable references are *not* subtypes of storable references.
+		// An authorized reference type `auth &T` (storable or non-storable)
+		// is a subtype of a reference type `&U` (authorized or non-authorized, storable or non-storable),
+		// if `T` is a subtype of `U`
 
-		if !typedSubType.Storable && typedSuperType.Storable {
+		if typedSubType.Authorized {
+			return IsSubType(typedSubType.Type, typedSuperType.Type)
+		}
+
+		// An unauthorized reference type is not a subtype of an authorized reference type.
+		// Not even dynamically.
+		//
+		// The holder of the may not gain more permissions.
+
+		if typedSuperType.Authorized {
 			return false
 		}
 
-		// References are covariant: &T <: &U if T <: U
+		switch typedInnerSuperType := typedSuperType.Type.(type) {
+		case *RestrictedResourceType:
 
-		return IsSubType(typedSubType.Type, typedSuperType.Type)
+			switch typedInnerSubType := typedSubType.Type.(type) {
+			case *RestrictedResourceType:
+				// An unauthorized reference to a restricted resource type `&T{Us}` is a subtype of
+				// a reference to a reference to a restricted resource type `&V{Ws}`,
+				// if `T == V` and `Ws` is a subset of `Us`.
+				//
+				// The holder of the reference may only further restrict the resource.
+
+				return typedInnerSubType.Type == typedInnerSuperType.Type &&
+					typedInnerSuperType.RestrictionSet().
+						IsSubsetOf(typedInnerSubType.RestrictionSet())
+
+			case *CompositeType:
+				// An unauthorized reference to a resource type `&T` is a subtype of
+				// a reference to a restricted resource type `&T{Us}`, if `T == U`.
+				//
+				// The holder of the reference may restrict the resource.
+
+				return typedInnerSubType.Kind == common.CompositeKindResource &&
+					typedInnerSubType == typedInnerSuperType.Type
+
+			case *InterfaceType:
+				// An unauthorized reference to a resource interface type
+				// is not a subtype of a reference to a restricted resource type.
+				// Not even dynamically.
+				//
+				// The holder of the reference may not gain more permissions or knowledge.
+
+				return false
+			}
+
+		case *InterfaceType:
+
+			if typedInnerSuperType.CompositeKind != common.CompositeKindResource {
+				return false
+			}
+
+			switch typedInnerSubType := typedSubType.Type.(type) {
+			case *CompositeType:
+				// An unauthorized reference to a resource type `&T`
+				// is a subtype of a reference to a resource interface type `&V`,
+				// if `T` conforms to `V`
+
+				if typedInnerSubType.Kind != common.CompositeKindResource {
+					return false
+				}
+
+				// TODO: optimize, use set
+				for _, conformance := range typedInnerSubType.Conformances {
+					if typedInnerSuperType.Equal(conformance) {
+						return true
+					}
+				}
+
+				return false
+
+			case *RestrictedResourceType:
+				// An unauthorized reference to a restricted resource type `&T{Us}` is a subtype of
+				// a reference to a resource interface type `&V`, if `Us` contains `V`.
+				//
+				// The holder of the reference may not gain more permissions or knowledge.
+
+				// TODO: optimize, use set
+				for _, restriction := range typedInnerSubType.Restrictions {
+					if typedInnerSuperType.Equal(restriction) {
+						return true
+					}
+				}
+
+				return false
+
+			case *InterfaceType:
+				// TODO: Once interfaces can conform to interfaces, check conformances here. Only allow upcasting.
+				return false
+			}
+
+		case *CompositeType:
+			// An unauthorized reference is not a subtype of a reference to a resource type `&V`
+			// (e.g. reference to a restricted resource type `&T{Us}`, or reference to a resource interface type `&T`)
+			//
+			// The holder of the reference may not gain more permissions or knowledge.
+
+			return false
+		}
 
 	case *FunctionType:
 		typedSubType, ok := subType.(*FunctionType)
