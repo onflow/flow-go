@@ -5,9 +5,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Communicator defines the interface between the HotStuff core algorithm and a
-// network layer that handles delivering messages to other nodes participating
-// in the consensus process.
+// Communicator defines how the HotStuff core algorithm communicates with other
+// actors participating in the consensus process.
 type Communicator interface {
 
 	// SendVote sends the given vote to the given node.
