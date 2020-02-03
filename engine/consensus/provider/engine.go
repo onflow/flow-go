@@ -101,6 +101,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch entity := event.(type) {
 	case *flow.Block:
 		err = e.onBlock(originID, entity)
+	case *flow.Header:
+		err = e.onHeader(originID, entity)
 	default:
 		err = errors.Errorf("invalid event type (%T)", event)
 	}
@@ -131,6 +133,44 @@ func (e *Engine) onBlock(originID flow.Identifier, block *flow.Block) error {
 		return errors.Wrap(err, "could not get identities")
 	}
 
+	// submit the block proposal to the targets
+	err = e.con.Submit(block, identities.NodeIDs()...)
+	if err != nil {
+		return errors.Wrap(err, "could not broadcast block")
+	}
+
+	e.log.Info().
+		Hex("origin_id", originID[:]).
+		Hex("block_id", logging.Entity(block)).
+		Msg("block broadcasted")
+
+	return nil
+}
+
+// onHeader is used when a block has been finalized locally and we want to
+// broadcast it's header to the network.
+func (e *Engine) onHeader(originID flow.Identifier, header *flow.Header) error {
+
+	e.log.Info().
+		Hex("origin_id", originID[:]).
+		Hex("block_id", logging.Entity(header)).
+		Msg("block submitted")
+
+	// currently, only accept blocks that come from our local consensus
+	localID := e.me.NodeID()
+	if originID != localID {
+		return errors.Errorf("non-local block (nodeID: %x)", originID)
+	}
+
+	// get all non-consensus nodes in the system
+	identities, err := e.state.Final().Identities(filter.Not(filter.HasNodeID(localID)))
+	if err != nil {
+		return errors.Wrap(err, "could not get identities")
+	}
+
+	block := &flow.Block{
+		Header: *header,
+	}
 	// submit the block proposal to the targets
 	err = e.con.Submit(block, identities.NodeIDs()...)
 	if err != nil {

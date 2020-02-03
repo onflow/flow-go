@@ -35,15 +35,13 @@ func RetrieveBlock(blockID flow.Identifier, block *flow.Block) func(*badger.Txn)
 	return func(tx *badger.Txn) error {
 
 		// get the block header
-		var header flow.Header
-		err := operation.RetrieveHeader(blockID, &header)(tx)
+		err := operation.RetrieveHeader(blockID, &block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header: %w", err)
 		}
 
 		// get the block payload
-		var payload flow.Payload
-		err = RetrievePayload(header.PayloadHash, &payload)(tx)
+		err = RetrievePayload(block.Header.PayloadHash, &block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve payload: %w", err)
 		}
