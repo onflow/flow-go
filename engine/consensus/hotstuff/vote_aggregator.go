@@ -15,7 +15,7 @@ type VoteAggregator struct {
 	voteValidator  *Validator
 	lastPrunedView uint64
 	// For pruning
-	viewToBlockID map[uint64][][]byte
+	viewToBlockIDStrs map[uint64][]string
 	// keeps track of votes whose blocks can not be found
 	pendingVoteMap map[string]*PendingStatus
 	// keeps track of QCs that have been made for blocks
@@ -32,7 +32,7 @@ func NewVoteAggregator(log zerolog.Logger, lastPruneView uint64, viewState *View
 		lastPrunedView:          lastPruneView,
 		viewState:               viewState,
 		voteValidator:           voteValidator,
-		viewToBlockID:           map[uint64][][]byte{},
+		viewToBlockIDStrs:       map[uint64][]string{},
 		pendingVoteMap:          map[string]*PendingStatus{},
 		blockHashToVotingStatus: map[string]*VotingStatus{},
 		createdQC:               map[string]*types.QuorumCertificate{},
@@ -140,14 +140,14 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 		return
 	}
 	for i := va.lastPrunedView + 1; i <= view; i++ {
-		blockMRHs := va.viewToBlockID[i]
+		blockMRHs := va.viewToBlockIDStrs[i]
 		for _, blockMRH := range blockMRHs {
 			blockMRHStr := string(blockMRH)
 			delete(va.pendingVoteMap, blockMRHStr)
 			delete(va.blockHashToVotingStatus, blockMRHStr)
 			delete(va.createdQC, blockMRHStr)
 		}
-		delete(va.viewToBlockID, i)
+		delete(va.viewToBlockIDStrs, i)
 		delete(va.viewToIDToVote, i)
 	}
 	va.lastPrunedView = view

@@ -88,17 +88,18 @@ func TestErrDoubleVote(t *testing.T) {
 // prune by view 3
 func TestPruneByView(t *testing.T) {
 	va := newMockVoteAggregator(t)
-	for i := 1; i <= 3; i++ {
+	pruneByView := 3
+	for i := 1; i <= int(pruneByView); i++ {
 		view := uint64(i)
-		blockID := unittest.IdentifierFixture()
-		voterID := unittest.IdentifierFixture()
-		vote := newMockVote(view, blockID, 2)
-		voteIDStr := string(vote.ID())
+		block := unittest.BlockHeaderFixture()
+		blockID := block.ID()
 		blockIDStr := blockID.String()
+		voter := unittest.IdentityFixture()
+		vote := newMockVote(view, blockID, 2)
 		pendingStatus := NewPendingStatus()
 		pendingStatus.AddVote(vote)
-		va.pendingVoteMap[voteIDStr] = pendingStatus
-		vs := &VotingStatus{}
+		va.pendingVoteMap[blockIDStr] = pendingStatus
+		vs := NewVotingStatus(uint64(10), vote.View, uint32(7), voter, vote.BlockID)
 		vs.AddVote(vote)
 		va.blockHashToVotingStatus[blockIDStr] = vs
 		qc := &types.QuorumCertificate{
@@ -106,17 +107,26 @@ func TestPruneByView(t *testing.T) {
 			BlockID: blockID,
 		}
 		va.createdQC[blockIDStr] = qc
-		va.viewToBlockID[view] = append(va.viewToBlockID[view], blockID[:])
-		va.viewToIDToVote[view][voterID] = vote
+		va.viewToBlockIDStrs[view] = append(va.viewToBlockIDStrs[view], blockIDStr)
+		idToVote := make(map[flow.Identifier]*types.Vote)
+		va.viewToIDToVote[view] = idToVote
 	}
 
-	va.PruneByView(3)
+	// verify that all insertion is successful
+	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToIDToVote))
+	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToBlockIDStrs))
+	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.createdQC))
+	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.pendingVoteMap))
+	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.blockHashToVotingStatus))
 
-	//delete(va.pendingVoteMap, blockMRHStr)
-	//delete(va.blockHashToVotingStatus, blockMRHStr)
-	//delete(va.createdQC, blockMRHStr)
-	//delete(va.viewToBlockID, i)
-	//delete(va.viewToIDToVote, i)
+	va.PruneByView(uint64(pruneByView))
+
+	// verify that all deletion is successful
+	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToIDToVote))
+	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToBlockIDStrs))
+	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.blockHashToVotingStatus))
+	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.createdQC))
+	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.pendingVoteMap))
 }
 
 func newMockBlock(view uint64) *types.BlockProposal {
