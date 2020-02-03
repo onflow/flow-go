@@ -332,7 +332,7 @@ func (l *LibP2PNodeTestSuite) TestStreamReuse() {
 	}
 }
 
-// CreateNode creates a number of libp2pnodes equal to the count with the given callback function for stream handling
+// CreateNodes creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
 func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHandler) (nodes []*P2PNode) {
