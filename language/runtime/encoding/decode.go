@@ -8,7 +8,7 @@ import (
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 
-	"github.com/dapperlabs/flow-go/language/runtime/types"
+	"github.com/dapperlabs/flow-go/language"
 	"github.com/dapperlabs/flow-go/language/runtime/values"
 )
 
@@ -21,7 +21,7 @@ type Decoder struct {
 //
 // This function returns an error if the bytes do not match the given type
 // definition.
-func Decode(t types.Type, b []byte) (values.Value, error) {
+func Decode(t language.Type, b []byte) (values.Value, error) {
 	r := bytes.NewReader(b)
 	dec := NewDecoder(r)
 
@@ -44,52 +44,52 @@ func NewDecoder(r io.Reader) *Decoder {
 //
 // This function returns an error if the bytes do not match the given type
 // definition.
-func (e *Decoder) Decode(t types.Type) (values.Value, error) {
+func (e *Decoder) Decode(t language.Type) (values.Value, error) {
 	switch x := t.(type) {
-	case types.Void:
+	case language.VoidType:
 		return e.DecodeVoid()
-	case types.Optional:
+	case language.OptionalType:
 		return e.DecodeOptional(x)
-	case types.Bool:
+	case language.BoolType:
 		return e.DecodeBool()
-	case types.String:
+	case language.StringType:
 		return e.DecodeString()
-	case types.Bytes:
+	case language.BytesType:
 		return e.DecodeBytes()
-	case types.Address:
+	case language.AddressType:
 		return e.DecodeAddress()
-	case types.Int:
+	case language.IntType:
 		return e.DecodeInt()
-	case types.Int8:
+	case language.Int8Type:
 		return e.DecodeInt8()
-	case types.Int16:
+	case language.Int16Type:
 		return e.DecodeInt16()
-	case types.Int32:
+	case language.Int32Type:
 		return e.DecodeInt32()
-	case types.Int64:
+	case language.Int64Type:
 		return e.DecodeInt64()
-	case types.UInt8:
+	case language.UInt8Type:
 		return e.DecodeUInt8()
-	case types.UInt16:
+	case language.UInt16Type:
 		return e.DecodeUInt16()
-	case types.UInt32:
+	case language.UInt32Type:
 		return e.DecodeUInt32()
-	case types.UInt64:
+	case language.UInt64Type:
 		return e.DecodeUInt64()
-	case types.VariableSizedArray:
+	case language.VariableSizedArrayType:
 		return e.DecodeVariableSizedArray(x)
-	case types.ConstantSizedArray:
+	case language.ConstantSizedArrayType:
 		return e.DecodeConstantSizedArray(x)
-	case types.Dictionary:
+	case language.DictionaryType:
 		return e.DecodeDictionary(x)
-	case types.Composite:
+	case language.CompositeType:
 		return e.DecodeComposite(x)
-	case types.Resource:
-		return e.DecodeComposite(x.Composite)
-	case types.Struct:
-		return e.DecodeComposite(x.Composite)
-	case types.Event:
-		return e.DecodeComposite(x.Composite)
+	case language.ResourceType:
+		return e.DecodeComposite(x.CompositeType)
+	case language.StructType:
+		return e.DecodeComposite(x.CompositeType)
+	case language.EventType:
+		return e.DecodeComposite(x.CompositeType)
 
 	default:
 		return nil, fmt.Errorf("unsupported type: %T", t)
@@ -98,7 +98,7 @@ func (e *Decoder) Decode(t types.Type) (values.Value, error) {
 
 // DecodeVoid reads the XDR-encoded representation of a void value.
 //
-// Void values are skipped by the decoder because they are empty by
+// VoidType values are skipped by the decoder because they are empty by
 // definition, but this function still exists in order to support composite
 // types that contain void values.
 func (e *Decoder) DecodeVoid() (values.Void, error) {
@@ -111,7 +111,7 @@ func (e *Decoder) DecodeVoid() (values.Void, error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.19
 //  RFC Section 4.19 - Optional-Data
 //  Union of boolean and encoded value
-func (e *Decoder) DecodeOptional(t types.Optional) (v values.Optional, err error) {
+func (e *Decoder) DecodeOptional(t language.OptionalType) (v values.Optional, err error) {
 	hasValue, err := e.DecodeBool()
 	if err != nil {
 		return v, err
@@ -146,7 +146,7 @@ func (e *Decoder) DecodeBool() (v values.Bool, err error) {
 // DecodeString reads the XDR-encoded representation of a string value.
 //
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.11
-//  RFC Section 4.11 - String
+//  RFC Section 4.11 - StringType
 //  Unsigned integer length followed by bytes zero-padded to a multiple of four
 func (e *Decoder) DecodeString() (v values.String, err error) {
 	str, _, err := e.dec.DecodeString()
@@ -334,7 +334,7 @@ func (e *Decoder) DecodeUInt64() (v values.UInt64, err error) {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.13
 //  RFC Section 4.13 - Variable-Length Array
 //  Unsigned integer length followed by individually XDR-encoded array elements
-func (e *Decoder) DecodeVariableSizedArray(t types.VariableSizedArray) (v values.VariableSizedArray, err error) {
+func (e *Decoder) DecodeVariableSizedArray(t language.VariableSizedArrayType) (v values.VariableSizedArray, err error) {
 	size, _, err := e.dec.DecodeUint()
 	if err != nil {
 		return v, err
@@ -354,7 +354,7 @@ func (e *Decoder) DecodeVariableSizedArray(t types.VariableSizedArray) (v values
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.12
 //  RFC Section 4.12 - Fixed-Length Array
 //  Individually XDR-encoded array elements
-func (e *Decoder) DecodeConstantSizedArray(t types.ConstantSizedArray) (v values.ConstantSizedArray, err error) {
+func (e *Decoder) DecodeConstantSizedArray(t language.ConstantSizedArrayType) (v values.ConstantSizedArray, err error) {
 	vals, err := e.decodeArray(t.ElementType, t.Size)
 	if err != nil {
 		return v, err
@@ -368,7 +368,7 @@ func (e *Decoder) DecodeConstantSizedArray(t types.ConstantSizedArray) (v values
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.12
 //  RFC Section 4.12 - Fixed-Length Array
 //  Individually XDR-encoded array elements
-func (e *Decoder) decodeArray(t types.Type, size uint) ([]values.Value, error) {
+func (e *Decoder) decodeArray(t language.Type, size uint) ([]values.Value, error) {
 	array := make([]values.Value, size)
 
 	var i uint
@@ -389,7 +389,7 @@ func (e *Decoder) decodeArray(t types.Type, size uint) ([]values.Value, error) {
 // The size of the dictionary is encoded as an unsigned integer, followed by
 // the dictionary keys, then elements, each represented as individually
 // XDR-encoded array elements.
-func (e *Decoder) DecodeDictionary(t types.Dictionary) (v values.Dictionary, err error) {
+func (e *Decoder) DecodeDictionary(t language.DictionaryType) (v values.Dictionary, err error) {
 	size, _, err := e.dec.DecodeUint()
 	if err != nil {
 		return v, err
@@ -423,7 +423,7 @@ func (e *Decoder) DecodeDictionary(t types.Dictionary) (v values.Dictionary, err
 // DecodeComposite reads the XDR-encoded representation of a composite value.
 //
 // A composite is encoded as a fixed-length array of its field values.
-func (e *Decoder) DecodeComposite(t types.Composite) (v values.Composite, err error) {
+func (e *Decoder) DecodeComposite(t language.CompositeType) (v values.Composite, err error) {
 	vals := make([]values.Value, len(t.Fields))
 
 	for i, field := range t.Fields {

@@ -1,4 +1,4 @@
-package types_test
+package language_test
 
 import (
 	"testing"
@@ -6,10 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dapperlabs/flow-go/language"
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/language/runtime/types"
 )
 
 const testLocation = ast.StringLocation("test")
@@ -88,26 +88,26 @@ func TestConvert(t *testing.T) {
 			Pos:             &position,
 		}
 
-		ex, err := types.Convert(ty, program, variable)
+		ex, err := language.Convert(ty, program, variable)
 		assert.NoError(t, err)
 
-		assert.IsType(t, types.Struct{}, ex)
-		s := ex.(types.Struct)
+		assert.IsType(t, language.StructType{}, ex)
+		s := ex.(language.StructType)
 
 		assert.Equal(t, identifier, s.Identifier)
 		require.Len(t, s.Fields, 1)
 
 		assert.Equal(t, "fieldA", s.Fields[0].Identifier)
-		assert.IsType(t, types.Int{}, s.Fields[0].Type)
+		assert.IsType(t, language.IntType{}, s.Fields[0].Type)
 	})
 
 	t.Run("string", func(t *testing.T) {
 		ty := &sema.StringType{}
 
-		ex, err := types.Convert(ty, nil, nil)
+		ex, err := language.Convert(ty, nil, nil)
 		assert.NoError(t, err)
 
-		assert.IsType(t, types.String{}, ex)
+		assert.IsType(t, language.StringType{}, ex)
 	})
 
 	t.Run("events", func(t *testing.T) {
@@ -192,19 +192,19 @@ func TestConvert(t *testing.T) {
 			Pos:        &position,
 		}
 
-		ex, err := types.Convert(ty, program, variable)
+		ex, err := language.Convert(ty, program, variable)
 		assert.NoError(t, err)
 
-		assert.IsType(t, types.Event{}, ex)
+		assert.IsType(t, language.EventType{}, ex)
 
-		event := ex.(types.Event)
+		event := ex.(language.EventType)
 
 		require.Len(t, event.Fields, 2)
 		assert.Equal(t, "where", event.Fields[0].Identifier)
-		assert.IsType(t, types.Int{}, event.Fields[0].Type)
+		assert.IsType(t, language.IntType{}, event.Fields[0].Type)
 
 		assert.Equal(t, "who", event.Fields[1].Identifier)
-		assert.IsType(t, types.String{}, event.Fields[1].Type)
+		assert.IsType(t, language.StringType{}, event.Fields[1].Type)
 
 		require.Len(t, event.Initializers[0], 2)
 		assert.Equal(t, "magic_caster", event.Initializers[0][0].Label)

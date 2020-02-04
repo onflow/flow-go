@@ -1,4 +1,4 @@
-package types
+package language
 
 import (
 	"fmt"
@@ -14,33 +14,33 @@ import (
 func Convert(typ runtime.Type, prog *ast.Program, variable *sema.Variable) (Type, error) {
 	switch t := typ.(type) {
 	case *sema.AnyStructType:
-		return wrapVariable(AnyStruct{}, variable), nil
+		return wrapVariable(AnyStructType{}, variable), nil
 	case *sema.VoidType:
-		return wrapVariable(Void{}, variable), nil
+		return wrapVariable(VoidType{}, variable), nil
 	case *sema.OptionalType:
 		return convertOptionalType(t, prog, variable)
 	case *sema.BoolType:
-		return wrapVariable(Bool{}, variable), nil
+		return wrapVariable(BoolType{}, variable), nil
 	case *sema.StringType:
-		return wrapVariable(String{}, variable), nil
+		return wrapVariable(StringType{}, variable), nil
 	case *sema.IntType:
-		return wrapVariable(Int{}, variable), nil
+		return wrapVariable(IntType{}, variable), nil
 	case *sema.Int8Type:
-		return wrapVariable(Int8{}, variable), nil
+		return wrapVariable(Int8Type{}, variable), nil
 	case *sema.Int16Type:
-		return wrapVariable(Int16{}, variable), nil
+		return wrapVariable(Int16Type{}, variable), nil
 	case *sema.Int32Type:
-		return wrapVariable(Int32{}, variable), nil
+		return wrapVariable(Int32Type{}, variable), nil
 	case *sema.Int64Type:
-		return wrapVariable(Int64{}, variable), nil
+		return wrapVariable(Int64Type{}, variable), nil
 	case *sema.UInt8Type:
-		return wrapVariable(UInt8{}, variable), nil
+		return wrapVariable(UInt8Type{}, variable), nil
 	case *sema.UInt16Type:
-		return wrapVariable(UInt16{}, variable), nil
+		return wrapVariable(UInt16Type{}, variable), nil
 	case *sema.UInt32Type:
-		return wrapVariable(UInt32{}, variable), nil
+		return wrapVariable(UInt32Type{}, variable), nil
 	case *sema.UInt64Type:
-		return wrapVariable(UInt64{}, variable), nil
+		return wrapVariable(UInt64Type{}, variable), nil
 	case *sema.VariableSizedType:
 		return convertVariableSizedType(t, prog, variable)
 	case *sema.ConstantSizedType:
@@ -70,7 +70,7 @@ func convertOptionalType(t *sema.OptionalType, prog *ast.Program, variable *sema
 		return nil, err
 	}
 
-	return wrapVariable(Optional{Type: convertedType}, variable), nil
+	return wrapVariable(OptionalType{Type: convertedType}, variable), nil
 }
 
 func convertVariableSizedType(t *sema.VariableSizedType, prog *ast.Program, variable *sema.Variable) (Type, error) {
@@ -79,7 +79,7 @@ func convertVariableSizedType(t *sema.VariableSizedType, prog *ast.Program, vari
 		return nil, err
 	}
 
-	return wrapVariable(VariableSizedArray{ElementType: convertedElement}, variable), nil
+	return wrapVariable(VariableSizedArrayType{ElementType: convertedElement}, variable), nil
 }
 
 func convertConstantSizedType(t *sema.ConstantSizedType, prog *ast.Program, variable *sema.Variable) (Type, error) {
@@ -89,7 +89,7 @@ func convertConstantSizedType(t *sema.ConstantSizedType, prog *ast.Program, vari
 	}
 
 	return wrapVariable(
-		ConstantSizedArray{
+		ConstantSizedArrayType{
 			Size:        uint(t.Size),
 			ElementType: convertedElement,
 		},
@@ -172,7 +172,7 @@ func convertCompositeType(t *sema.CompositeType, prog *ast.Program, variable *se
 		panic(fmt.Sprintf("cannot convert type %v of unknown kind %v", t, t.Kind))
 	}
 
-	convert := func() (Composite, error) {
+	convert := func() (CompositeType, error) {
 
 		compositeDeclaration := func() *ast.CompositeDeclaration {
 			for _, cd := range prog.CompositeDeclarations() {
@@ -200,7 +200,7 @@ func convertCompositeType(t *sema.CompositeType, prog *ast.Program, variable *se
 
 			convertedFieldType, err := Convert(field.TypeAnnotation.Type, prog, nil)
 			if err != nil {
-				return Composite{}, err
+				return CompositeType{}, err
 			}
 
 			fields = append(fields, Field{
@@ -217,7 +217,7 @@ func convertCompositeType(t *sema.CompositeType, prog *ast.Program, variable *se
 			semaType := t.ConstructorParameters[i].TypeAnnotation.Type
 			convertedType, err := Convert(semaType, prog, nil)
 			if err != nil {
-				return Composite{}, err
+				return CompositeType{}, err
 			}
 
 			parameters[i] = Parameter{
@@ -227,7 +227,7 @@ func convertCompositeType(t *sema.CompositeType, prog *ast.Program, variable *se
 			}
 		}
 
-		return Composite{
+		return CompositeType{
 			Identifier:   t.Identifier,
 			Fields:       fields,
 			Initializers: [][]Parameter{parameters},
@@ -241,18 +241,18 @@ func convertCompositeType(t *sema.CompositeType, prog *ast.Program, variable *se
 
 	switch t.Kind {
 	case common.CompositeKindStructure:
-		return Struct{
-			Composite: composite,
+		return StructType{
+			CompositeType: composite,
 		}, nil
 
 	case common.CompositeKindResource:
-		return Resource{
-			Composite: composite,
+		return ResourceType{
+			CompositeType: composite,
 		}, nil
 
 	case common.CompositeKindEvent:
-		return Event{
-			Composite: composite,
+		return EventType{
+			CompositeType: composite,
 		}, nil
 	}
 
@@ -270,7 +270,7 @@ func convertDictionaryType(t *sema.DictionaryType, prog *ast.Program, variable *
 		return nil, err
 	}
 
-	return wrapVariable(Dictionary{
+	return wrapVariable(DictionaryType{
 		KeyType:     convertedKeyType,
 		ElementType: convertedElementType,
 	}, variable), nil
