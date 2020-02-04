@@ -138,7 +138,7 @@ func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to execute script: %w", result.Error)
 	}
 
-	value, err := language.Convert(result.Value)
+	value, err := language.ConvertValue(result.Value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to export runtime value: %w", err)
 	}
