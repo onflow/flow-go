@@ -114,7 +114,7 @@ func TestInteriorNodeLNil(t *testing.T) {
 	rn := newNode(Hash(s), 200)
 	rn.value = Hash(s)
 
-	exp := newNode(Hash(Hash(s), GetDefaultHashes()[200]), 201)
+	exp := newNode(Hash(Hash(s), GetDefaultHashForHeight(201)), 201)
 	res := trie.interiorNode(nil, rn, 201)
 
 	if (res.height != exp.height) && (bytes.Equal(exp.value, res.value)) {
