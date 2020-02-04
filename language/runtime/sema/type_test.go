@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 )
 
@@ -122,4 +123,289 @@ func TestIsResourceType_StructNestedInDictionary(t *testing.T) {
 	}
 
 	assert.False(t, ty.IsResourceType())
+}
+
+func TestRestrictedResourceType_StringAndID(t *testing.T) {
+
+	t.Run("base type and restriction", func(t *testing.T) {
+		interfaceType := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I",
+			Location:      ast.StringLocation("b"),
+		}
+
+		ty := &RestrictedResourceType{
+			Type: &CompositeType{
+				Kind:       common.CompositeKindResource,
+				Identifier: "R",
+				Location:   ast.StringLocation("a"),
+			},
+			Restrictions: []*InterfaceType{interfaceType},
+		}
+
+		assert.Equal(t, ty.String(), "R{I}")
+		assert.Equal(t, ty.ID(), TypeID("a.R{b.I}"))
+	})
+
+	t.Run("base type and restrictions", func(t *testing.T) {
+		i1 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I1",
+			Location:      ast.StringLocation("b"),
+		}
+
+		i2 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I2",
+			Location:      ast.StringLocation("c"),
+		}
+
+		ty := &RestrictedResourceType{
+			Type: &CompositeType{
+				Kind:       common.CompositeKindResource,
+				Identifier: "R",
+				Location:   ast.StringLocation("a"),
+			},
+			Restrictions: []*InterfaceType{i1, i2},
+		}
+
+		assert.Equal(t, ty.String(), "R{I1, I2}")
+		assert.Equal(t, ty.ID(), TypeID("a.R{b.I1,c.I2}"))
+	})
+
+	t.Run("no restrictions", func(t *testing.T) {
+		ty := &RestrictedResourceType{
+			Type: &CompositeType{
+				Kind:       common.CompositeKindResource,
+				Identifier: "R",
+				Location:   ast.StringLocation("a"),
+			},
+		}
+
+		assert.Equal(t, ty.String(), "R{}")
+		assert.Equal(t, ty.ID(), TypeID("a.R{}"))
+	})
+
+	t.Run("no base type", func(t *testing.T) {
+
+		interfaceType := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I",
+			Location:      ast.StringLocation("b"),
+		}
+
+		ty := &RestrictedResourceType{
+			Restrictions: []*InterfaceType{interfaceType},
+		}
+
+		assert.Equal(t, ty.String(), "{I}")
+		assert.Equal(t, ty.ID(), TypeID("{b.I}"))
+	})
+
+	t.Run("no restrictions, no base type", func(t *testing.T) {
+		ty := &RestrictedResourceType{}
+
+		assert.Equal(t, ty.String(), "{}")
+		assert.Equal(t, ty.ID(), TypeID("{}"))
+	})
+}
+
+func TestRestrictedResourceType_Equals(t *testing.T) {
+
+	t.Run("same base type and more restrictions", func(t *testing.T) {
+
+		i1 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I1",
+			Location:      ast.StringLocation("b"),
+		}
+
+		i2 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I2",
+			Location:      ast.StringLocation("b"),
+		}
+
+		a := &RestrictedResourceType{
+			Type: &CompositeType{
+				Kind:       common.CompositeKindResource,
+				Identifier: "R",
+				Location:   ast.StringLocation("a"),
+			},
+			Restrictions: []*InterfaceType{i1},
+		}
+
+		b := &RestrictedResourceType{
+			Type: &CompositeType{
+				Kind:       common.CompositeKindResource,
+				Identifier: "R",
+				Location:   ast.StringLocation("a"),
+			},
+			Restrictions: []*InterfaceType{i1, i2},
+		}
+
+		assert.False(t, a.Equal(b))
+	})
+
+	t.Run("same base type and fewer restrictions", func(t *testing.T) {
+
+		i1 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I1",
+			Location:      ast.StringLocation("b"),
+		}
+
+		i2 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I2",
+			Location:      ast.StringLocation("b"),
+		}
+
+		a := &RestrictedResourceType{
+			Type: &CompositeType{
+				Kind:       common.CompositeKindResource,
+				Identifier: "R",
+				Location:   ast.StringLocation("a"),
+			},
+			Restrictions: []*InterfaceType{i1, i2},
+		}
+
+		b := &RestrictedResourceType{
+			Type: &CompositeType{
+				Kind:       common.CompositeKindResource,
+				Identifier: "R",
+				Location:   ast.StringLocation("a"),
+			},
+			Restrictions: []*InterfaceType{i1},
+		}
+
+		assert.False(t, a.Equal(b))
+	})
+
+	t.Run("same base type and same restrictions", func(t *testing.T) {
+		i1 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I1",
+			Location:      ast.StringLocation("b"),
+		}
+
+		i2 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I2",
+			Location:      ast.StringLocation("b"),
+		}
+
+		a := &RestrictedResourceType{
+			Type: &CompositeType{
+				Kind:       common.CompositeKindResource,
+				Identifier: "R",
+				Location:   ast.StringLocation("a"),
+			},
+			Restrictions: []*InterfaceType{i1, i2},
+		}
+
+		b := &RestrictedResourceType{
+			Type: &CompositeType{
+				Kind:       common.CompositeKindResource,
+				Identifier: "R",
+				Location:   ast.StringLocation("a"),
+			},
+			Restrictions: []*InterfaceType{i1, i2},
+		}
+
+		assert.True(t, a.Equal(b))
+	})
+
+	t.Run("different base type and same restrictions", func(t *testing.T) {
+
+		i1 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I1",
+			Location:      ast.StringLocation("b"),
+		}
+
+		i2 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I2",
+			Location:      ast.StringLocation("b"),
+		}
+
+		a := &RestrictedResourceType{
+			Type: &CompositeType{
+				Kind:       common.CompositeKindResource,
+				Identifier: "R1",
+				Location:   ast.StringLocation("a"),
+			},
+			Restrictions: []*InterfaceType{i1, i2},
+		}
+
+		b := &RestrictedResourceType{
+			Type: &CompositeType{
+				Kind:       common.CompositeKindResource,
+				Identifier: "R2",
+				Location:   ast.StringLocation("a"),
+			},
+			Restrictions: []*InterfaceType{i1, i2},
+		}
+
+		assert.False(t, a.Equal(b))
+	})
+}
+
+func TestRestrictedResourceType_GetMember(t *testing.T) {
+
+	t.Run("forbid undeclared members", func(t *testing.T) {
+		ty := &RestrictedResourceType{
+			Type: &CompositeType{
+				Kind:       common.CompositeKindResource,
+				Identifier: "R",
+				Location:   ast.StringLocation("a"),
+				Members:    map[string]*Member{},
+			},
+			Restrictions: []*InterfaceType{},
+		}
+
+		fieldName := "s"
+		ty.Type.Members[fieldName] = NewPublicConstantFieldMember(ty.Type, fieldName, &IntType{})
+
+		var reportedError error
+		member := ty.GetMember(fieldName, ast.Range{}, func(err error) {
+			reportedError = err
+		})
+
+		assert.IsType(t, &InvalidRestrictedTypeMemberAccessError{}, reportedError)
+		assert.NotNil(t, member)
+	})
+
+	t.Run("allow declared members", func(t *testing.T) {
+		interfaceType := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I",
+			Members:       map[string]*Member{},
+		}
+
+		restrictedType := &RestrictedResourceType{
+			Type: &CompositeType{
+				Kind:       common.CompositeKindResource,
+				Identifier: "R",
+				Location:   ast.StringLocation("a"),
+				Members:    map[string]*Member{},
+			},
+			Restrictions: []*InterfaceType{
+				interfaceType,
+			},
+		}
+
+		fieldName := "s"
+
+		resourceMember := NewPublicConstantFieldMember(restrictedType.Type, fieldName, &IntType{})
+		restrictedType.Type.Members[fieldName] = resourceMember
+
+		interfaceMember := NewPublicConstantFieldMember(restrictedType.Type, fieldName, &IntType{})
+		interfaceType.Members[fieldName] = interfaceMember
+
+		actualMember := restrictedType.GetMember(fieldName, ast.Range{}, nil)
+		assert.Same(t, interfaceMember, actualMember)
+	})
+
 }

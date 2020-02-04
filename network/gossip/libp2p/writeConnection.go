@@ -6,11 +6,11 @@ import (
 	"bufio"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
-	"github.com/rs/zerolog"
-
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
+	"github.com/rs/zerolog"
+
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 )
 
 // Connection represents a direct connection to another peer on the flow
@@ -34,15 +34,19 @@ func NewWriteConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *WriteC
 
 // send must be run in a goroutine and takes care of continuously sending
 // messages to the peer until the message queue is closed.
-func (wc *WriteConnection) SendLoop() {
+func (wc *WriteConnection) SendLoop(stop <-chan struct{}) {
 
 SendLoop:
 	for {
 		select {
-
 		// check if we should stop
+		case <-stop:
+			wc.log.Debug().Msg("exiting send routine: middleware stops")
+			break SendLoop
+
 		case <-wc.done:
-			wc.log.Debug().Msg("exiting send routine")
+			// connection stops
+			wc.log.Debug().Msg("exiting send routine: connection stops")
 			break SendLoop
 
 			// if we have a message in the outbound queue, write it to the connection

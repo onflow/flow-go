@@ -22,7 +22,7 @@ type Forks interface {
 
 	// GetBlock returns (BlockProposal, true) if the block with the specified
 	// id was found (nil, false) otherwise.
-	GetBlock(id []byte) (*types.BlockProposal, bool)
+	GetBlock(id flow.Identifier) (*types.BlockProposal, bool)
 
 	// FinalizedView returns the largest view number where a finalized block is known
 	FinalizedView() uint64
@@ -66,13 +66,11 @@ type Forks interface {
 	// Processing a QC with view v should result in the PaceMaker being in
 	// view v+1 or larger. Hence, given that the current View is curView,
 	// all QCs should have view < curView.
-	// To prevent accidental miss-usage, ForkChoices will error if `curView`
+	// To prevent accidental misusage, ForkChoices will error if `curView`
 	// is smaller than the view of any qc ForkChoice has seen.
 	// Note that tracking the view of the newest qc is for safety purposes
 	// and _independent_ of the fork-choice rule.
 	MakeForkChoice(curView uint64) (*types.QCBlock, error)
-
-	VerifyBlock(header *flow.Header) error
 }
 
 // ErrorByzantineThresholdExceeded is raised if HotStuff detects malicious conditions which

@@ -2171,3 +2171,51 @@ func TestRuntimeInvokeStoredInterfaceFunction(t *testing.T) {
 		}
 	}
 }
+
+func TestRuntimeBlock(t *testing.T) {
+	runtime := NewInterpreterRuntime()
+
+	script := []byte(`
+      transaction {
+        prepare() {
+          let block = getCurrentBlock()
+          log(block.number)
+          log(block.id)
+
+          let previousBlock = block.previousBlock
+          log(previousBlock?.number)
+          log(previousBlock?.id)
+
+          let nextBlock = block.nextBlock
+          log(nextBlock?.number)
+          log(nextBlock?.id)
+        }
+      }
+    `)
+
+	var loggedMessages []string
+
+	runtimeInterface := &testRuntimeInterface{
+		getSigningAccounts: func() []Address {
+			return nil
+		},
+		log: func(message string) {
+			loggedMessages = append(loggedMessages, message)
+		},
+	}
+
+	err := runtime.ExecuteTransaction(script, runtimeInterface, utils.TestLocation)
+	require.NoError(t, err)
+
+	assert.Equal(t,
+		[]string{
+			"1",
+			"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]",
+			"nil",
+			"nil",
+			"2",
+			"[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]",
+		},
+		loggedMessages,
+	)
+}

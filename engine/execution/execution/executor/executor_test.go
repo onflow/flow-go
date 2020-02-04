@@ -17,77 +17,148 @@ import (
 )
 
 func TestBlockExecutor_ExecuteBlock(t *testing.T) {
-	vm := new(vmmock.VirtualMachine)
-	bc := new(vmmock.BlockContext)
-	es := new(statemock.ExecutionState)
 
-	exe := executor.NewBlockExecutor(vm, es)
+	t.Run("single collection", func(t *testing.T) {
+		vm := new(vmmock.VirtualMachine)
+		bc := new(vmmock.BlockContext)
+		es := new(statemock.ExecutionState)
 
-	tx1 := flow.TransactionBody{
-		Script: []byte("transaction { execute {} }"),
-	}
+		exe := executor.NewBlockExecutor(vm, es)
 
-	tx2 := flow.TransactionBody{
-		Script: []byte("transaction { execute {} }"),
-	}
+		// create a block with 1 collection with 2 transactions
+		block := generateBlock(1, 2)
 
-	transactions := []*flow.TransactionBody{&tx1, &tx2}
+		vm.On("NewBlockContext", &block.Block.Header).Return(bc)
 
-	col := flow.Collection{Transactions: transactions}
+		bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
+			Return(&virtualmachine.TransactionResult{}, nil).
+			Twice()
 
-	guarantee := flow.CollectionGuarantee{
-		CollectionID: col.ID(),
-		Signatures:   nil,
-	}
+		es.On("StateCommitmentByBlockID", block.Block.ParentID).
+			Return(unittest.StateCommitmentFixture(), nil)
 
-	payload := flow.Payload{
-		Guarantees: []*flow.CollectionGuarantee{&guarantee},
+		es.On("NewView", mock.Anything).
+			Return(
+				state.NewView(func(key string) (bytes []byte, e error) {
+					return nil, nil
+				}))
+
+		es.On("CommitDelta", mock.Anything).Return(nil, nil)
+		es.On("PersistChunkHeader", mock.Anything, mock.Anything).Return(nil)
+		es.On("PersistStateCommitment", block.Block.ID(), mock.Anything).Return(nil)
+
+		result, err := exe.ExecuteBlock(block)
+		assert.NoError(t, err)
+		assert.Len(t, result.Chunks, 1)
+
+		chunk := result.Chunks[0]
+		assert.EqualValues(t, 0, chunk.CollectionIndex)
+
+		vm.AssertExpectations(t)
+		bc.AssertExpectations(t)
+		es.AssertExpectations(t)
+	})
+
+	t.Run("multiple collections", func(t *testing.T) {
+		vm := new(vmmock.VirtualMachine)
+		bc := new(vmmock.BlockContext)
+		es := new(statemock.ExecutionState)
+
+		exe := executor.NewBlockExecutor(vm, es)
+
+		collectionCount := 2
+		transactionsPerCollection := 2
+		totalTransactionCount := collectionCount * transactionsPerCollection
+
+		// create a block with 2 collections with 2 transactions each
+		block := generateBlock(collectionCount, transactionsPerCollection)
+
+		vm.On("NewBlockContext", &block.Block.Header).Return(bc)
+
+		bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
+			Return(&virtualmachine.TransactionResult{}, nil).
+			Times(totalTransactionCount)
+
+		es.On("StateCommitmentByBlockID", block.Block.ParentID).
+			Return(unittest.StateCommitmentFixture(), nil)
+
+		es.On("NewView", mock.Anything).
+			Return(
+				state.NewView(func(key string) (bytes []byte, e error) {
+					return nil, nil
+				})).
+			Times(collectionCount)
+
+		es.On("CommitDelta", mock.Anything).
+			Return(nil, nil).
+			Times(collectionCount)
+
+		es.On("PersistChunkHeader", mock.Anything, mock.Anything).
+			Return(nil).
+			Times(collectionCount)
+
+		es.On("PersistStateCommitment", block.Block.ID(), mock.Anything).
+			Return(nil)
+
+		result, err := exe.ExecuteBlock(block)
+		assert.NoError(t, err)
+
+		// chunk count should match collection count
+		assert.Len(t, result.Chunks, collectionCount)
+
+		// chunks should follow the same order as collections
+		for i, chunk := range result.Chunks {
+			assert.EqualValues(t, i, chunk.CollectionIndex)
+		}
+
+		vm.AssertExpectations(t)
+		bc.AssertExpectations(t)
+		es.AssertExpectations(t)
+	})
+}
+
+func generateBlock(collectionCount, transactionCount int) *execution.CompleteBlock {
+	collections := make([]*execution.CompleteCollection, collectionCount)
+	guarantees := make([]*flow.CollectionGuarantee, collectionCount)
+	completeCollections := make(map[flow.Identifier]*execution.CompleteCollection)
+
+	for i := 0; i < collectionCount; i++ {
+		collection := generateCollection(transactionCount)
+		collections[i] = collection
+		guarantees[i] = collection.Guarantee
+		completeCollections[collection.Guarantee.ID()] = collection
 	}
 
 	block := flow.Block{
 		Header: flow.Header{
 			Number: 42,
 		},
-		Payload: payload,
-	}
-
-	completeBlock := &execution.CompleteBlock{
-		Block: &block,
-		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{
-			guarantee.ID(): {
-				Guarantee:    &guarantee,
-				Transactions: transactions,
-			},
+		Payload: flow.Payload{
+			Guarantees: guarantees,
 		},
 	}
 
-	vm.On("NewBlockContext", &block).Return(bc)
+	return &execution.CompleteBlock{
+		Block:               &block,
+		CompleteCollections: completeCollections,
+	}
+}
 
-	bc.On("ExecuteTransaction", mock.Anything, mock.Anything).
-		Return(&virtualmachine.TransactionResult{}, nil).
-		Twice()
+func generateCollection(transactionCount int) *execution.CompleteCollection {
+	transactions := make([]*flow.TransactionBody, transactionCount)
 
-	es.On("StateCommitmentByBlockID", block.ParentID).
-		Return(unittest.StateCommitmentFixture(), nil)
+	for i := 0; i < transactionCount; i++ {
+		transactions[i] = &flow.TransactionBody{
+			Script: []byte("transaction { execute {} }"),
+		}
+	}
 
-	es.On("NewView", mock.Anything).
-		Return(
-			state.NewView(func(key string) (bytes []byte, e error) {
-				return nil, nil
-			}))
+	collection := flow.Collection{Transactions: transactions}
 
-	es.On("CommitDelta", mock.Anything).Return(nil, nil)
-	es.On("PersistStateCommitment", block.ID(), mock.Anything).Return(nil)
-	es.On("PersistChunkHeader", mock.Anything, mock.Anything).Return(nil)
+	guarantee := &flow.CollectionGuarantee{CollectionID: collection.ID()}
 
-	result, err := exe.ExecuteBlock(completeBlock)
-	assert.NoError(t, err)
-	assert.Len(t, result.Chunks, 1)
-
-	chunk := result.Chunks[0]
-	assert.EqualValues(t, 0, chunk.CollectionIndex)
-
-	vm.AssertExpectations(t)
-	bc.AssertExpectations(t)
-	es.AssertExpectations(t)
+	return &execution.CompleteCollection{
+		Guarantee:    guarantee,
+		Transactions: transactions,
+	}
 }

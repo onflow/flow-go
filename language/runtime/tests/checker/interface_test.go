@@ -10,7 +10,6 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/errors"
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -239,7 +238,7 @@ func TestCheckInterfaceUse(t *testing.T) {
 
 		t.Run(kind.Keyword(), func(t *testing.T) {
 
-			_, err := ParseAndCheckWithOptions(t,
+			_, err := ParseAndCheckWithPanic(t,
 				fmt.Sprintf(
 					`
                       pub %[1]s interface Test %[2]s
@@ -252,15 +251,6 @@ func TestCheckInterfaceUse(t *testing.T) {
 					kind.Annotation(),
 					kind.TransferOperator(),
 				),
-				ParseAndCheckOptions{
-					Options: []sema.Option{
-						sema.WithPredeclaredValues(
-							stdlib.StandardLibraryFunctions{
-								stdlib.PanicFunction,
-							}.ToValueDeclarations(),
-						),
-					},
-				},
 			)
 
 			require.NoError(t, err)
@@ -899,7 +889,7 @@ func TestCheckInvalidInterfaceConformanceFieldPrivateAccessModifier(t *testing.T
 	}
 }
 
-func TestCheckInvalidInterfaceConformanceFieldMismatchAccessModifier(t *testing.T) {
+func TestCheckInvalidInterfaceConformanceFieldMismatchAccessModifierMoreRestrictive(t *testing.T) {
 
 	for _, kind := range common.CompositeKindsWithBody {
 		t.Run(kind.Keyword(), func(t *testing.T) {
@@ -917,6 +907,33 @@ func TestCheckInvalidInterfaceConformanceFieldMismatchAccessModifier(t *testing.
                           init(x: Int) {
                              self.x = x
                           }
+                      }
+	                `,
+					kind.Keyword(),
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.ConformanceError{}, errs[0])
+		})
+	}
+}
+
+func TestCheckInvalidInterfaceConformanceFunctionMismatchAccessModifierMoreRestrictive(t *testing.T) {
+
+	for _, kind := range common.CompositeKindsWithBody {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface Test {
+                          pub fun x()
+                      }
+
+                      %[1]s TestImpl: Test {
+                          access(account) fun x() {}
                       }
 	                `,
 					kind.Keyword(),
@@ -1068,6 +1085,58 @@ func TestCheckInvalidInterfaceConformanceFieldKindVarLetMismatch(t *testing.T) {
                           init(x: Bool) {
                              self.x = x
                           }
+                      }
+	                `,
+					kind.Keyword(),
+				),
+			)
+
+			errs := ExpectCheckerErrors(t, err, 1)
+
+			assert.IsType(t, &sema.ConformanceError{}, errs[0])
+		})
+	}
+}
+
+func TestCheckInterfaceConformanceFunctionArgumentLabelMatch(t *testing.T) {
+
+	for _, kind := range common.CompositeKindsWithBody {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface Test {
+                          fun x(z: Int)
+                      }
+
+                      %[1]s TestImpl: Test {
+                          fun x(z: Int) {}
+                      }
+	                `,
+					kind.Keyword(),
+				),
+			)
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestCheckInvalidInterfaceConformanceFunctionArgumentLabelMismatch(t *testing.T) {
+
+	for _, kind := range common.CompositeKindsWithBody {
+		t.Run(kind.Keyword(), func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(
+					`
+                      %[1]s interface Test {
+                          fun x(y: Int)
+                      }
+
+                      %[1]s TestImpl: Test {
+                          fun x(z: Int) {}
                       }
 	                `,
 					kind.Keyword(),
@@ -1612,9 +1681,9 @@ const validExampleFungibleTokenContract = `
              return <-create Vault(balance: amount)
          }
 
-         pub fun deposit(from: @Vault) {
-            self.balance = self.balance + from.balance
-            destroy from
+         pub fun deposit(vault: @Vault) {
+            self.balance = self.balance + vault.balance
+            destroy vault
          }
      }
 
@@ -1649,7 +1718,7 @@ func TestCheckContractInterfaceFungibleTokenUse(t *testing.T) {
           let receiver <- ExampleToken.sprout()
 
           let withdrawn <- publisher.withdraw(amount: 60)
-          receiver.deposit(from: <-withdrawn)
+          receiver.deposit(vault: <-withdrawn)
 
           let publisherBalance = publisher.balance
           let receiverBalance = receiver.balance

@@ -1,15 +1,19 @@
 package types
 
+import "time"
+
 type TimeoutMode int
 
 const (
-	ReplicaTimeout        TimeoutMode = iota
-	VoteCollectionTimeout TimeoutMode = iota
+	ReplicaTimeout TimeoutMode = iota
+	VoteCollectionTimeout
 )
 
-type Timeout struct {
-	Mode TimeoutMode
-	View uint64
+type TimerInfo struct {
+	Mode      TimeoutMode
+	View      uint64
+	StartTime time.Time
+	Duration  time.Duration
 }
 
 func (m TimeoutMode) String() string {

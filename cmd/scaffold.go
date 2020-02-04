@@ -18,6 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	protocol "github.com/dapperlabs/flow-go/protocol/badger"
@@ -60,6 +61,7 @@ type FlowNodeBuilder struct {
 	flags          *pflag.FlagSet
 	name           string
 	Logger         zerolog.Logger
+	Tracer         trace.Tracer
 	DB             *badger.DB
 	Me             *local.Local
 	State          *protocol.State
@@ -96,7 +98,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		mw, err := libp2p.NewMiddleware(fnb.Logger, codec, fnb.Me.Address(), fnb.Me.NodeID())
 		fnb.MustNot(err).Msg("could not initialize flow middleware")
 
-		net, err := libp2p.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, mw)
+		net, err := libp2p.NewNetwork(fnb.Logger, codec, fnb.State, fnb.Me, mw, 10e6)
 		fnb.MustNot(err).Msg("could not initialize flow network")
 		fnb.Network = net
 		return net
@@ -141,12 +143,18 @@ func (fnb *FlowNodeBuilder) initLogger() {
 
 func (fnb *FlowNodeBuilder) initDatabase() {
 	//Pre-create DB path (Badger creates only one-level dirs)
-	err := os.MkdirAll(fnb.BaseConfig.datadir, 700)
+	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Msgf("could not create datadir %s", fnb.BaseConfig.datadir)
 
 	db, err := badger.Open(badger.DefaultOptions(fnb.BaseConfig.datadir).WithLogger(nil))
 	fnb.MustNot(err).Msg("could not open key-value store")
 	fnb.DB = db
+}
+
+func (fnb *FlowNodeBuilder) initTracer() {
+	tracer, err := trace.NewTracer(fnb.Logger)
+	fnb.MustNot(err).Msg("could not initialize tracer")
+	fnb.Tracer = tracer
 }
 
 func (fnb *FlowNodeBuilder) initState() {
@@ -315,6 +323,8 @@ func (fnb *FlowNodeBuilder) Run() {
 	fnb.initNodeID()
 
 	fnb.initLogger()
+
+	fnb.initTracer()
 
 	fnb.initDatabase()
 

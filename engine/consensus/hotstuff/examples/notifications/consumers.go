@@ -1,6 +1,8 @@
 package notifications
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+import (
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+)
 
 // SkippedAheadConsumer consumes notifications of type `OnSkippedAhead`
 // which are produced by PaceMaker when it decides to skip over one or more view numbers.
@@ -22,47 +24,25 @@ type EnteringViewConsumer interface {
 	OnEnteringView(viewNumber uint64)
 }
 
-// StartingBlockTimeoutConsumer consumes notifications of type `OnStartingBlockTimeout`,
-// which are produced by PaceMaker.
-// It indicates that the PaceMaker is now waiting for the system to (receive) and process
-// the block for the current view.
+// StartingTimeoutConsumer consumes notifications of type `OnStartingTimeout`,
+// which are produced by PaceMaker. Such a notification indicates that the
+// PaceMaker is now waiting for the system to (receive and) process blocks or votes.
+// The specific timeout type is contained in the TimerInfo.
 // Prerequisites:
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
-type StartingBlockTimeoutConsumer interface {
-	OnStartingBlockTimeout(viewNumber uint64)
+type StartingTimeoutConsumer interface {
+	OnStartingTimeout(timerInfo *types.TimerInfo)
 }
 
-// ReachedBlockTimeoutConsumer consumes notifications of type `OnReachedBlockTimeout`,
-// which are produced by PaceMaker.
-// It indicates that the PaceMaker's timeout event was processed by the system.
+// ReachedTimeoutConsumer consumes notifications of type `OnReachedTimeout`,
+// which are produced by PaceMaker. Such a notification indicates that the
+// PaceMaker's timeout was processed by the system.
 // Prerequisites:
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
-type ReachedBlockTimeoutConsumer interface {
-	OnReachedBlockTimeout(viewNumber uint64)
-}
-
-// StartingVoteTimeoutConsumer consumes notifications of type `OnStartingVotesTimeout`,
-// which are produced by PaceMaker.
-// It indicates that the PaceMaker is now waiting for the system to (receive) and process
-// votes block for the current view.
-// Prerequisites:
-// Implementation must be concurrency safe; Non-blocking;
-// and must handle repetition of the same events (with some processing overhead).
-type StartingVotesTimeoutConsumer interface {
-	OnStartingVotesTimeout(viewNumber uint64)
-}
-
-// ReachedVotesConsumer consumes notifications of type `OnReachedVotesTimeout`,
-// which are produced by PaceMaker.
-// It indicates that the PaceMaker is now waiting for the system to (receive) and process
-// votes block for the current view.
-// Prerequisites:
-// Implementation must be concurrency safe; Non-blocking;
-// and must handle repetition of the same events (with some processing overhead).
-type ReachedVotesTimeoutConsumer interface {
-	OnReachedVotesTimeout(viewNumber uint64)
+type ReachedTimeoutConsumer interface {
+	OnReachedTimeout(timeout *types.TimerInfo)
 }
 
 type QcIncorporatedConsumer interface {
