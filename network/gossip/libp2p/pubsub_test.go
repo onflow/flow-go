@@ -50,17 +50,18 @@ func (s *mockDiscovery) Advertise(_ context.Context, _ string, _ ...discovery.Op
 }
 
 func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option) (<-chan peer.AddrInfo, error) {
+	fmt.Println("FindPeers called")
 	count := len(s.peers)
 	ch := make(chan peer.AddrInfo, count)
 	for _, reg := range s.peers {
 		ch <- reg
 	}
-	close(ch)
+	//close(ch)
 	return ch, nil
 }
 
 // TestPubSub checks if nodes can subscribe to a topic and send and receive a message
-func (p *PubSubTestSuite) TestPubSub() {
+func (p *PubSubTestSuite) TestOneToManyMessage() {
 	defer p.cancel()
 	topic := "testtopic"
 	count := 4
@@ -99,7 +100,7 @@ func (p *PubSubTestSuite) TestPubSub() {
 	// Step 3 publish a message to the topic and check if publish blocks
 	blk := make(chan struct{})
 	go func() {
-		require.NoError(p.Suite.T(), nodes[0].Publish(p.ctx, topic, []byte("hello"), count-1))
+		require.NoError(p.Suite.T(), nodes[count-1].Publish(p.ctx, topic, []byte("hello"), count-1))
 		blk <- struct{}{}
 	}()
 
@@ -136,6 +137,119 @@ func (p *PubSubTestSuite) TestPubSub() {
 			assert.Fail(p.Suite.T(), " messages not received by nodes: "+strings.Join(missing, ", "))
 			break
 		}
+	}
+
+	// Step 6: unsubscribes all nodes from the topic
+	for _, n := range nodes {
+		assert.NoError(p.Suite.T(), n.UnSubscribe(topic))
+	}
+}
+
+// TestPubSub checks if nodes can subscribe to a topic and send and receive a message
+func (p *PubSubTestSuite) TestManyToManyMessage() {
+	defer p.cancel()
+	topic := p.Suite.T().Name()
+	count := 4
+	golog.SetAllLoggers(gologging.DEBUG)
+
+	// Creates nodes
+	d := &mockDiscovery{}
+	nodes := p.CreateNodes(count, d)
+	defer p.StopNodes(nodes)
+
+	// define what each node does on reception of a message
+	type rcvMsg struct {
+		id  int
+		msg string
+	}
+	ch := make(chan rcvMsg, 100)
+	done := make(chan struct{})
+	defer close(done)
+	for i, n := range nodes {
+		// defines a func to read from the subscription
+		subReader := func(index int, s *pubsub.Subscription) {
+			for {
+				// block reading the next message
+				msg, err := s.Next(p.ctx)
+				select {
+				case <-done:
+					// if the test has finished stop
+					break
+				default:
+					require.NoError(p.Suite.T(), err)
+					require.NotNil(p.Suite.T(), msg)
+					ch <- rcvMsg{id: index, msg: string(msg.Data)}
+				}
+			}
+		}
+
+		// subscribe to the test topic
+		s, err := n.Subscribe(p.ctx, topic)
+		require.NoError(p.Suite.T(), err)
+
+		// kick off the reader
+		go subReader(i, s)
+	}
+
+	// Step 4: Now setup discovery to allow nodes to find each other
+	var pInfos []peer.AddrInfo
+	for _, n := range nodes {
+		id := n.libP2PHost.ID()
+		addrs := n.libP2PHost.Addrs()
+		pInfos = append(pInfos, peer.AddrInfo{ID: id, Addrs: addrs})
+	}
+
+	// set the common discovery object shared by all nodes with the list of all peer.AddrInfos
+	d.SetPeers(pInfos)
+
+	time.Sleep(time.Hour)
+
+	// create the messages that will be sent out by each node
+	var psMsgs []string
+	for i := 0; i < count; i++ {
+		psMsgs = append(psMsgs, fmt.Sprintf("pubsub hello from %d", i))
+	}
+
+	pch := make(chan struct{}, len(nodes))
+	// Step 3 publish a message to the topic through each node
+	for i, n := range nodes {
+		go func(j int, n *P2PNode) {
+			require.NoError(p.Suite.T(), n.Publish(p.ctx, topic, []byte(psMsgs[j]), count-1))
+			pch <- struct{}{}
+		}(i, n)
+	}
+
+	//by now, all peers should have been discovered and the message should have been successfully published
+	published := 0
+PublishCheck:
+	for published < len(nodes) {
+		select {
+		case <-pch:
+			published++
+		case <-time.After(5 * time.Hour):
+			require.Fail(p.T(), "timed out when sending messages")
+			break PublishCheck
+		}
+	}
+
+	// find which messages made it
+	// A map to keep track of which node received what message
+	recv := make(map[int][]string, count)
+	msgs := 0
+	// each node produces a message hence total number of messages = n * n
+	for msgs < (count * count) {
+		select {
+		case res := <-ch:
+			recv[res.id] = append(recv[res.id], res.msg)
+			msgs++
+		case <-time.After(3 * time.Hour):
+			require.Fail(p.T(), "message not received")
+			break
+		}
+	}
+
+	for k, v := range recv {
+		assert.Len(p.T(), v, count, "incorrect number of messages received by node %d: %s", k, v)
 	}
 
 	// Step 6: unsubscribes all nodes from the topic

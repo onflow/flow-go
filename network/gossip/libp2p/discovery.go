@@ -66,7 +66,7 @@ func (d *Discovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option
 	}
 
 	// close the channel as nothing else is going to be written to it
-	close(ch)
+	// close(ch)
 
 	return ch, nil
 }
