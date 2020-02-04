@@ -264,8 +264,9 @@ func (n *Network) send(channelID uint8, msg *message.Message, nodeIDs ...flow.Id
 	default:
 		err = n.mw.Publish(strconv.Itoa(int(channelID)), msg)
 	}
+
 	if err != nil {
-		err = fmt.Errorf("failed to send message to %s:%w", nodeIDs, err)
+		return fmt.Errorf("failed to send message to %s:%w", nodeIDs, err)
 	}
-	return err
+	return nil
 }

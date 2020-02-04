@@ -162,7 +162,12 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		Uint64("block_number", block.Number).
 		Msg("received block")
 
-	err := e.blocks.Store(block)
+	err := e.state.Mutate().StorePayload(&block.Payload)
+	if err != nil {
+		return fmt.Errorf("could not save block payload: %w", err)
+	}
+
+	err = e.blocks.Store(block)
 	if err != nil {
 		return fmt.Errorf("could not save block: %w", err)
 	}

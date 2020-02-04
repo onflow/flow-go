@@ -25,5 +25,5 @@ func IndexIdentity(payloadHash flow.Identifier, nodeID flow.Identifier) func(*ba
 }
 
 func LookupIdentities(payloadHash flow.Identifier, nodeIDs *[]flow.Identifier) func(*badger.Txn) error {
-	return traverse(makePrefix(codeIndexSeal, payloadHash), lookup(nodeIDs))
+	return traverse(makePrefix(codeIndexIdentity, payloadHash), lookup(nodeIDs))
 }
