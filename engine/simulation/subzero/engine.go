@@ -26,6 +26,7 @@ type Engine struct {
 	log      zerolog.Logger
 	prov     network.Engine
 	headers  storage.Headers
+	payloads storage.Payloads
 	state    protocol.State
 	me       module.Local
 	builder  module.Builder
@@ -35,7 +36,7 @@ type Engine struct {
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, prov network.Engine, headers storage.Headers, state protocol.State, me module.Local, builder module.Builder, cleaner module.Cleaner) (*Engine, error) {
+func New(log zerolog.Logger, prov network.Engine, headers storage.Headers, payloads storage.Payloads, state protocol.State, me module.Local, builder module.Builder, cleaner module.Cleaner) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{
@@ -43,6 +44,7 @@ func New(log zerolog.Logger, prov network.Engine, headers storage.Headers, state
 		log:      log.With().Str("engine", "subzero").Logger(),
 		prov:     prov,
 		headers:  headers,
+		payloads: payloads,
 		state:    state,
 		me:       me,
 		builder:  builder,
@@ -146,8 +148,18 @@ ConsentLoop:
 			}
 
 			log.Info().Msg("proposal committed")
+			payload, err := e.payloads.ByPayloadHash(proposal.PayloadHash)
+			if err != nil {
+				e.log.Error().Err(err).Msg("could retrieve payload hash")
+				continue ConsentLoop
+			}
+			block := flow.Block{
+				Header:  *proposal,
+				Payload: *payload,
+			}
 
-			e.prov.SubmitLocal(proposal)
+			// Broadcast block
+			e.prov.SubmitLocal(&block)
 		}
 	}
 }

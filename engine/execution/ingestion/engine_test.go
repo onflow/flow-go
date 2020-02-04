@@ -55,6 +55,9 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 	snapshot.EXPECT().Identities(gomock.Any()).DoAndReturn(func(f flow.IdentityFilter) (flow.IdentityList, error) {
 		return identityList.Filter(f), nil
 	})
+	mutator := protocol.NewMockMutator(ctrl)
+	state.EXPECT().Mutate().Return(mutator).AnyTimes()
+	mutator.EXPECT().StorePayload(gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
 

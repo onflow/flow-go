@@ -34,15 +34,19 @@ func NewWriteConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *WriteC
 
 // send must be run in a goroutine and takes care of continuously sending
 // messages to the peer until the message queue is closed.
-func (wc *WriteConnection) SendLoop() {
+func (wc *WriteConnection) SendLoop(stop <-chan struct{}) {
 
 SendLoop:
 	for {
 		select {
-
 		// check if we should stop
+		case <-stop:
+			wc.log.Debug().Msg("exiting send routine: middleware stops")
+			break SendLoop
+
 		case <-wc.done:
-			wc.log.Debug().Msg("exiting send routine")
+			// connection stops
+			wc.log.Debug().Msg("exiting send routine: connection stops")
 			break SendLoop
 
 			// if we have a message in the outbound queue, write it to the connection

@@ -72,11 +72,12 @@ func main() {
 		Component("subzero engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing subzero consensus engine")
 			headersDB := storage.NewHeaders(node.DB)
+			payloadsDB := storage.NewPayloads(node.DB)
 			guaranteesDB := storage.NewGuarantees(node.DB)
 			sealsDB := storage.NewSeals(node.DB)
 			build := builder.New(node.State, guarantees, seals)
 			clean := cleaner.New(guaranteesDB, sealsDB, guarantees, seals)
-			sub, err := subzero.New(node.Logger, prov, headersDB, node.State, node.Me, build, clean)
+			sub, err := subzero.New(node.Logger, prov, headersDB, payloadsDB, node.State, node.Me, build, clean)
 			node.MustNot(err).Msg("could not initialize subzero engine")
 			return sub
 		}).
