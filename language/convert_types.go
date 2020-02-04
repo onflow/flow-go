@@ -10,8 +10,8 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
 )
 
-// Convert converts a runtime type to its corresponding Go representation.
-func Convert(typ runtime.Type, prog *ast.Program, variable *sema.Variable) (Type, error) {
+// ConvertType converts a runtime type to its corresponding Go representation.
+func ConvertType(typ runtime.Type, prog *ast.Program, variable *sema.Variable) (Type, error) {
 	switch t := typ.(type) {
 	case *sema.AnyStructType:
 		return wrapVariable(AnyStructType{}, variable), nil
@@ -65,7 +65,7 @@ func wrapVariable(t Type, variable *sema.Variable) Type {
 }
 
 func convertOptionalType(t *sema.OptionalType, prog *ast.Program, variable *sema.Variable) (Type, error) {
-	convertedType, err := Convert(t.Type, prog, nil)
+	convertedType, err := ConvertType(t.Type, prog, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func convertOptionalType(t *sema.OptionalType, prog *ast.Program, variable *sema
 }
 
 func convertVariableSizedType(t *sema.VariableSizedType, prog *ast.Program, variable *sema.Variable) (Type, error) {
-	convertedElement, err := Convert(t.Type, prog, nil)
+	convertedElement, err := ConvertType(t.Type, prog, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func convertVariableSizedType(t *sema.VariableSizedType, prog *ast.Program, vari
 }
 
 func convertConstantSizedType(t *sema.ConstantSizedType, prog *ast.Program, variable *sema.Variable) (Type, error) {
-	convertedElement, err := Convert(t.Type, prog, nil)
+	convertedElement, err := ConvertType(t.Type, prog, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func convertConstantSizedType(t *sema.ConstantSizedType, prog *ast.Program, vari
 }
 
 func convertFunctionType(t *sema.FunctionType, prog *ast.Program, variable *sema.Variable) (Type, error) {
-	convertedReturnType, err := Convert(t.ReturnTypeAnnotation.Type, prog, nil)
+	convertedReturnType, err := ConvertType(t.ReturnTypeAnnotation.Type, prog, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func convertFunctionType(t *sema.FunctionType, prog *ast.Program, variable *sema
 		parameterTypes := make([]Type, len(t.Parameters))
 
 		for i, parameter := range t.Parameters {
-			convertedParameterType, err := Convert(parameter.TypeAnnotation.Type, prog, nil)
+			convertedParameterType, err := ConvertType(parameter.TypeAnnotation.Type, prog, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -139,7 +139,7 @@ func convertFunctionType(t *sema.FunctionType, prog *ast.Program, variable *sema
 	for i, parameter := range t.Parameters {
 		astParam := functionDeclaration.ParameterList.Parameters[i]
 
-		convertedParameterType, err := Convert(parameter.TypeAnnotation.Type, prog, nil)
+		convertedParameterType, err := ConvertType(parameter.TypeAnnotation.Type, prog, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -198,7 +198,7 @@ func convertCompositeType(t *sema.CompositeType, prog *ast.Program, variable *se
 		for _, identifer := range fieldNames {
 			field := t.Members[identifer]
 
-			convertedFieldType, err := Convert(field.TypeAnnotation.Type, prog, nil)
+			convertedFieldType, err := ConvertType(field.TypeAnnotation.Type, prog, nil)
 			if err != nil {
 				return CompositeType{}, err
 			}
@@ -215,7 +215,7 @@ func convertCompositeType(t *sema.CompositeType, prog *ast.Program, variable *se
 		// as this is post SEMA we really hope AST list of params matches SEMA type one
 		for i, parameter := range compositeDeclaration.Members.Initializers()[0].ParameterList.Parameters {
 			semaType := t.ConstructorParameters[i].TypeAnnotation.Type
-			convertedType, err := Convert(semaType, prog, nil)
+			convertedType, err := ConvertType(semaType, prog, nil)
 			if err != nil {
 				return CompositeType{}, err
 			}
@@ -260,12 +260,12 @@ func convertCompositeType(t *sema.CompositeType, prog *ast.Program, variable *se
 }
 
 func convertDictionaryType(t *sema.DictionaryType, prog *ast.Program, variable *sema.Variable) (Type, error) {
-	convertedKeyType, err := Convert(t.KeyType, prog, nil)
+	convertedKeyType, err := ConvertType(t.KeyType, prog, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	convertedElementType, err := Convert(t.ValueType, prog, nil)
+	convertedElementType, err := ConvertType(t.ValueType, prog, nil)
 	if err != nil {
 		return nil, err
 	}

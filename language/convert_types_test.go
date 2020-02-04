@@ -88,7 +88,7 @@ func TestConvert(t *testing.T) {
 			Pos:             &position,
 		}
 
-		ex, err := language.Convert(ty, program, variable)
+		ex, err := language.ConvertType(ty, program, variable)
 		assert.NoError(t, err)
 
 		assert.IsType(t, language.StructType{}, ex)
@@ -104,7 +104,7 @@ func TestConvert(t *testing.T) {
 	t.Run("string", func(t *testing.T) {
 		ty := &sema.StringType{}
 
-		ex, err := language.Convert(ty, nil, nil)
+		ex, err := language.ConvertType(ty, nil, nil)
 		assert.NoError(t, err)
 
 		assert.IsType(t, language.StringType{}, ex)
@@ -192,7 +192,7 @@ func TestConvert(t *testing.T) {
 			Pos:        &position,
 		}
 
-		ex, err := language.Convert(ty, program, variable)
+		ex, err := language.ConvertType(ty, program, variable)
 		assert.NoError(t, err)
 
 		assert.IsType(t, language.EventType{}, ex)
