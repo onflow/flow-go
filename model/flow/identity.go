@@ -7,6 +7,8 @@ import (
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/pkg/errors"
+
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
 // rxid is the regex for parsing node identity entries.

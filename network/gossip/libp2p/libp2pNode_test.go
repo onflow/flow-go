@@ -11,6 +11,7 @@ import (
 
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/network"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -156,6 +157,7 @@ func (l *LibP2PNodeTestSuite) TestAddPeers() {
 // TestPubSub checks if nodes can subscribe to a topic and send and receive a message
 func (l *LibP2PNodeTestSuite) TestPubSub() {
 	defer l.cancel()
+	topic := "testtopic"
 	count := 5
 	golog.SetAllLoggers(gologging.INFO)
 
@@ -169,14 +171,21 @@ func (l *LibP2PNodeTestSuite) TestPubSub() {
 	ch := make(chan string, count)
 	for _, n := range nodes {
 		m := n.name
-		// Defines a callback to be called whenever a message is received
-		callback := func(msg []byte) {
-			assert.Equal(l.Suite.T(), []byte("hello"), msg)
+		// defines a func to read from the subscription
+		subReader := func(s *pubsub.Subscription) {
+			msg, err := s.Next(l.ctx)
+			assert.NoError(l.Suite.T(), err)
+			assert.Equal(l.Suite.T(), []byte("hello"), msg.Data)
 			ch <- m
 		}
 
-		// Subscribes to "Consensus" topic with the defined callback
-		require.NoError(l.Suite.T(), n.Subscribe(l.ctx, Consensus, callback))
+		// Subscribes to the test topic
+		s, err := n.Subscribe(l.ctx, topic)
+		require.NoError(l.Suite.T(), err)
+
+		// kick off the reader
+		go subReader(s)
+
 	}
 
 	// Step 3: Connects each node i to its subsequent node i+1 in a chain
@@ -205,7 +214,7 @@ func (l *LibP2PNodeTestSuite) TestPubSub() {
 		if i == 0 || i == count {
 			peerNum = 1
 		}
-		assert.Equal(l.Suite.T(), peerNum, len(this.ps.ListPeers(string(Consensus))))
+		assert.Equal(l.Suite.T(), peerNum, len(this.ps.ListPeers(topic)))
 	}
 
 	// Step 4: Waits for nodes to heartbeat each other
@@ -214,7 +223,7 @@ func (l *LibP2PNodeTestSuite) TestPubSub() {
 	// Step 5: Publish a message from the first node on the chain
 	// and verify all nodes get it.
 	// All nodes including node 0 - the sender, should receive it
-	require.NoError(l.Suite.T(), nodes[0].Publish(l.ctx, Consensus, []byte("hello")))
+	require.NoError(l.Suite.T(), nodes[0].Publish(l.ctx, topic, []byte("hello")))
 
 	// A hash set to keep track of the nodes who received the message
 	recv := make(map[string]bool, count)
@@ -236,7 +245,7 @@ func (l *LibP2PNodeTestSuite) TestPubSub() {
 
 	// Step 6: Unsubscribes all nodes from the topic
 	for _, n := range nodes {
-		assert.NoError(l.Suite.T(), n.UnSubscribe(Consensus))
+		assert.NoError(l.Suite.T(), n.UnSubscribe(topic))
 	}
 }
 

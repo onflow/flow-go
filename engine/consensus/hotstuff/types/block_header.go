@@ -9,7 +9,7 @@ type BlockHeader struct {
 	Signature *VoteSignature // CAUTION: this is sign(Block), i.e. it does NOT include ConsensusPayload
 }
 
-func NewBlockHeader(block *Block, sig *VoteSignature) *BlockProposal {
+func NewBlockHeader(block *Block, sig *Signature) *BlockProposal {
 	return &BlockProposal{
 		Block:     block,
 		Signature: sig,
@@ -18,5 +18,5 @@ func NewBlockHeader(block *Block, sig *VoteSignature) *BlockProposal {
 
 func (b BlockHeader) QC() *QuorumCertificate   { return b.Block.QC }
 func (b BlockHeader) View() uint64             { return b.Block.View }
-func (b BlockHeader) BlockID() flow.Identifier { return b.Block.BlockID() }
+func (b BlockHeader) BlockID() flow.Identifier { return b.Block.ID() }
 func (b BlockHeader) Height() uint64           { return b.Block.Height }

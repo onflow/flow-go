@@ -11,19 +11,16 @@ type Voter struct {
 	signer    Signer
 	viewState ViewState
 	forks     Forks
-	// Flag to turn on/off consensus acts (voting, block production etc)
-	isConActor bool
 	// Need to keep track of the last view we voted for so we don't double vote accidentally
 	lastVotedView uint64
 	log           zerolog.Logger
 }
 
-func (v *Voter) NewVoter(signer Signer, viewState ViewState, forks Forks, isConActor bool, log zerolog.Logger) *Voter {
+func (v *Voter) NewVoter(signer Signer, viewState ViewState, forks Forks, log zerolog.Logger) *Voter {
 	return &Voter{
 		signer:        signer,
 		viewState:     viewState,
 		forks:         forks,
-		isConActor:    isConActor,
 		lastVotedView: 0,
 		log:           log,
 	}
@@ -40,11 +37,6 @@ func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*
 	log := v.log.With().
 		Str("block_id", bp.BlockID().String()).
 		Logger()
-
-	if !v.isConActor {
-		log.Debug().Msg("we're not a consensus actor, don't vote")
-		return nil, false
-	}
 
 	if v.forks.IsSafeBlock(bp) {
 		log.Info().Msg("received block is not a safe node, don't vote")
@@ -71,12 +63,12 @@ func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*
 }
 
 func (v *Voter) produceVote(bp *types.BlockProposal) (*types.Vote, error) {
-	signerIdx, err := v.viewState.GetSelfIdxForBlockID(bp.BlockID())
+	myIdentity, err := v.viewState.GetSelfIdentityForBlockID(bp.BlockID())
 	if err != nil {
 		return nil, fmt.Errorf("can not find self index for block %v: %w", bp.BlockID(), err)
 	}
 	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.BlockID())
-	sig := v.signer.SignVote(unsignedVote, signerIdx)
-	vote := types.NewVote(bp.Block.View, bp.BlockID(), sig)
+	sig := v.signer.SignVote(unsignedVote, myIdentity.PubKey)
+	vote := unsignedVote.WithSignature(sig)
 	return vote, nil
 }

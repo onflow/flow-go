@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // EventHandler is the main handler for individual events that trigger state transition.
@@ -57,7 +58,7 @@ func NewEventHandler(
 func (e *EventHandler) OnReceiveVote(vote *types.Vote) error {
 
 	e.log.Info().
-		Str("vote_block", vote.BlockID.String()).
+		Hex("vote_block", logging.ID(vote.BlockID)).
 		Uint64("vote_view", vote.View).
 		Msg("vote received")
 
@@ -70,7 +71,7 @@ func (e *EventHandler) OnReceiveVote(vote *types.Vote) error {
 func (e *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) error {
 
 	e.log.Info().
-		Str("block", block.BlockID().String()).
+		Hex("block", logging.ID(block.BlockID())).
 		Uint64("qc_view", block.QC().View).
 		Uint64("block_view", block.View()).
 		Msg("block proposal received")
@@ -291,7 +292,7 @@ func (e *EventHandler) processVote(vote *types.Vote) error {
 
 		e.log.Info().
 			Uint64("vote_view", vote.View).
-			Str("voting_block", vote.BlockID.String()).
+			Hex("voting_block", logging.ID(vote.BlockID)).
 			Msg("block for vote not found")
 
 		return nil

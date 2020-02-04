@@ -12,12 +12,12 @@ type ViewState interface {
 	// IsSelfLeaderForView returns if myself is the leader at a given view
 	IsSelfLeaderForView(view uint64) bool
 
-	// GetSelfIdxForBlockID returns my own index in all staked node at a given block.
-	GetSelfIdxForBlockID(blockID flow.Identifier) (uint32, error)
+	// GetSelfIdentityForBlockID returns my own identity in all staked node at a given block.
+	GetSelfIdentityForBlockID(blockID flow.Identifier) (flow.Identity, error)
 
 	// GetIdentitiesForView returns all the staked nodes in my cluster at a certain block.
 	// view specifies the view
-	GetIdentitiesForBlockID(blockID flow.Identity) (flow.IdentityList, error)
+	GetIdentitiesForBlockID(blockID flow.Identifier) (flow.IdentityList, error)
 
 	// GetIdentitiesForBlockIDAndSignerIndexes returns all the staked nodes in my cluster
 	// at a certain block for the given signer indexes

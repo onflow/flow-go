@@ -20,7 +20,7 @@ type Block struct {
 	Timestamp time.Time
 }
 
-func (b *Block) BlockID() flow.Identifier {
+func (b *Block) ID() flow.Identifier {
 	panic("TODO")
 }
 
@@ -39,5 +39,5 @@ func NewBlock(view uint64, qc *QuorumCertificate, payloadHash []byte, height uin
 }
 
 func (b *Block) ToVote() *UnsignedVote {
-	panic("")
+	panic("TODO")
 }

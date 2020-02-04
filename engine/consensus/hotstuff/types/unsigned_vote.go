@@ -17,3 +17,11 @@ func NewUnsignedVote(view uint64, blockID flow.Identifier) *UnsignedVote {
 func (uv *UnsignedVote) BytesForSig() []byte {
 	return voteBytesForSig(uv.View, uv.BlockID)
 }
+
+func (uv UnsignedVote) WithSignature(sig *Signature) *Vote {
+	return &Vote{
+		View:      uv.View,
+		BlockID:   uv.BlockID,
+		Signature: sig,
+	}
+}
