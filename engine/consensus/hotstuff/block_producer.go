@@ -2,8 +2,8 @@ package hotstuff
 
 import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 
-// BlockProposalProducer is responsible for producing new block proposals
-type BlockProposalProducer struct {
+// BlockProducer is responsible for producing new block proposals
+type BlockProducer struct {
 	signer    Signer
 	viewState ViewState
 	mempool   Mempool
@@ -12,8 +12,8 @@ type BlockProposalProducer struct {
 	chainID string
 }
 
-func NewBlockProposalProducer(signer Signer, viewState ViewState, mempool Mempool, chainID string) (*BlockProposalProducer, error) {
-	bp := &BlockProposalProducer{
+func NewBlockProducer(signer Signer, viewState ViewState, mempool Mempool, chainID string) (*BlockProducer, error) {
+	bp := &BlockProducer{
 		signer:    signer,
 		viewState: viewState,
 		mempool:   mempool,
@@ -23,18 +23,16 @@ func NewBlockProposalProducer(signer Signer, viewState ViewState, mempool Mempoo
 }
 
 // MakeBlockProposal will build a proposal for the given view with the given QC
-func (bp *BlockProposalProducer) MakeBlockProposal(view uint64, qcblock *types.QCBlock) *types.BlockProposal {
+func (bp *BlockProducer) MakeBlockProposal(view uint64, qcblock *types.QCBlock) (*types.BlockProposal, error) {
 	block := bp.makeBlockForView(view, qcblock)
 
-	unsignedBlockProposal := bp.propose(block)
+	signedBlockProposal, err := bp.signBlockProposal(block)
 
-	signedBlockProposal := bp.signBlockProposal(unsignedBlockProposal)
-
-	return signedBlockProposal
+	return signedBlockProposal, err
 }
 
 // makeBlockForView gets the payload hash from mempool and build a block on top of the given qc for the given view.
-func (bp *BlockProposalProducer) makeBlockForView(view uint64, qcblock *types.QCBlock) *types.Block {
+func (bp *BlockProducer) makeBlockForView(view uint64, qcblock *types.QCBlock) *types.Block {
 	payloadHash := bp.mempool.NewPayloadHash()
 
 	// new block's height = parent.height + 1
@@ -44,17 +42,20 @@ func (bp *BlockProposalProducer) makeBlockForView(view uint64, qcblock *types.QC
 	return block
 }
 
-// propose get the consensus payload from mempool and make unsigned block proposal with the given block
-func (bp *BlockProposalProducer) propose(block *types.Block) *types.UnsignedBlockProposal {
-	consensusPayload := bp.mempool.NewConsensusPayload()
-	unsignedBlockProposal := types.NewUnsignedBlockProposal(block, consensusPayload)
-	return unsignedBlockProposal
-}
-
 // signBlockProposal takes a unsigned proposal, signes it and returns a signed block proposal
-func (bp *BlockProposalProducer) signBlockProposal(proposal *types.UnsignedBlockProposal) *types.BlockProposal {
-	sig := bp.signer.SignBlockProposal(proposal, bp.viewState.GetSelfIdxForView(proposal.View()))
+func (bp *BlockProducer) signBlockProposal(proposal *types.Block) (*types.BlockProposal, error) {
+	// get my identity
+	myIdentity, err := bp.viewState.GetSelfIdentityForBlockID(proposal.ID())
+	if err != nil {
+		return nil, err
+	}
 
-	blockProposal := types.NewBlockProposal(proposal.Block, proposal.ConsensusPayload, sig)
-	return blockProposal
+	// convert the proposal into a vote
+	unsignedVote := proposal.ToVote()
+
+	// signing the proposal is equivalent of signing the vote
+	sig := bp.signer.SignVote(unsignedVote, myIdentity.PubKey)
+
+	blockProposal := types.NewBlockProposal(proposal, sig)
+	return blockProposal, nil
 }
