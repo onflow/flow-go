@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/pkg/errors"
 
 	"github.com/dapperlabs/flow-go/crypto"

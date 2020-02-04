@@ -2,7 +2,6 @@ package hotstuff
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/jrick/bitset"
 )
 
 type ViewState interface {
@@ -21,7 +20,7 @@ type ViewState interface {
 
 	// GetIdentitiesForBlockIDAndSignerIndexes returns all the staked nodes in my cluster
 	// at a certain block for the given signer indexes
-	GetIdentitiesForBlockIDAndSignerIndexes(blockID flow.Identifier, signerIndexes bitset.Bytes) (flow.IdentityList, error)
+	GetIdentitiesForBlockIDAndSignerIndexes(blockID flow.Identifier, signerIndexes []byte) (flow.IdentityList, error)
 
 	// GetQCStakeThresholdForBlockID returns the stack threshold for building QC at a given block
 	GetQCStakeThresholdForBlockID(blockID flow.Identifier) (uint64, error)
