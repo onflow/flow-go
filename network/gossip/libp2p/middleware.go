@@ -227,7 +227,7 @@ func (m *Middleware) handleOutboundConnection(targetID flow.Identifier, conn *Wr
 	// make sure we close the stream once the handling is done
 	defer conn.stream.Close()
 	// kick off the send loop
-	conn.SendLoop()
+	conn.SendLoop(m.stop)
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
@@ -257,8 +257,11 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 ProcessLoop:
 	for {
 		select {
+		case <-m.stop:
+			m.log.Info().Msg("exiting process loop: middleware stops")
+			break ProcessLoop
 		case <-conn.done:
-			m.log.Info().Msg("middleware stopped reception of incoming messages")
+			m.log.Info().Msg("exiting process loop: connection stops")
 			break ProcessLoop
 		case msg := <-conn.inbound:
 			m.processMessage(msg)
@@ -292,8 +295,13 @@ func (m *Middleware) handleInboundSubscription(rs *ReadSubscription) {
 SubscriptionLoop:
 	for {
 		select {
+		case <-m.stop:
+			// middleware stops
+			m.log.Info().Msg("exiting subscription loop: middleware stops")
+			break SubscriptionLoop
 		case <-rs.done:
-			m.log.Info().Msg("middleware stopped reception of incoming messages")
+			// subscription stops
+			m.log.Info().Msg("exiting subscription loop: connection stops")
 			break SubscriptionLoop
 		case msg := <-rs.inbound:
 			m.processMessage(msg)
