@@ -227,6 +227,10 @@ func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages
 	if err != nil {
 		return fmt.Errorf("could not submit response for chunk state (id=%s): %w", chunkID, err)
 	}
+	e.log.Info().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("chunk_id", logging.ID(chunkID)).
+		Msg("responded to execution state request")
 
 	return nil
 }
