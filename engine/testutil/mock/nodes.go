@@ -13,6 +13,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
+	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/trace"
@@ -59,7 +60,7 @@ type ExecutionNode struct {
 	GenericNode
 	BlocksEngine    *ingestion.Engine
 	ExecutionEngine *execution.Engine
-	ReceiptsEngine  *provider.Engine
+	ReceiptsEngine  *executionprovider.Engine
 	BadgerDB        *badger.DB
 	LevelDB         *leveldb.LevelDB
 	VM              virtualmachine.VirtualMachine

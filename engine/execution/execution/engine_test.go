@@ -80,7 +80,7 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 		}
 
 		receipts.On("SubmitLocal", mock.Anything)
-		exec.On("ExecuteBlock", completeBlock).Return(&flow.ExecutionResult{}, nil)
+		exec.On("ExecuteBlock", completeBlock, mock.AnythingOfType("*state.View")).Return(&flow.ExecutionResult{}, nil)
 
 		view := realState.NewView(func(key string) (bytes []byte, e error) {
 			return nil, nil

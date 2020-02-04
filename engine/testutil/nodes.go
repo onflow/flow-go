@@ -16,6 +16,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
+	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
@@ -164,7 +165,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
 
-	receiptsEngine, err := provider.New(node.Log, node.Net, node.State, node.Tracer, node.Me, collectionsStorage)
+	receiptsEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me)
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()

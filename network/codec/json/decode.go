@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -58,6 +59,11 @@ func decode(env Envelope) (interface{}, error) {
 
 	case CodeExecutionStateResponse:
 		v = &messages.ExecutionStateResponse{}
+
+	case CodeExecutionCompleteBlock:
+		v = &execution.CompleteBlock{}
+	case CodeExecutionExecutionOrder:
+			v = &execution.ExecutionOrder{}
 
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)
