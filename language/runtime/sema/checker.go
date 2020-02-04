@@ -198,12 +198,13 @@ func (checker *Checker) SetAllCheckers(allCheckers map[ast.LocationID]*Checker) 
 
 func (checker *Checker) declareBaseValues() {
 	for name, declaration := range BaseValues {
-		checker.declareValue(name, declaration)
+		variable := checker.declareValue(name, declaration)
+		variable.IsBaseValue = true
 		checker.declareGlobalValue(name)
 	}
 }
 
-func (checker *Checker) declareValue(name string, declaration ValueDeclaration) {
+func (checker *Checker) declareValue(name string, declaration ValueDeclaration) *Variable {
 	variable, err := checker.valueActivations.Declare(
 		name,
 		declaration.ValueDeclarationType(),
@@ -216,6 +217,7 @@ func (checker *Checker) declareValue(name string, declaration ValueDeclaration) 
 	)
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(name, variable)
+	return variable
 }
 
 func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDeclaration) {
@@ -279,28 +281,14 @@ func (checker *Checker) report(err error) {
 	checker.errors = append(checker.errors, err)
 }
 
-//TODO Once we have a flag which allows us to distinguish builtin from user defined
-// types we can remove this silly list
-// See https://github.com/dapperlabs/flow-go/issues/1627
-var blacklist = map[string]interface{}{
-	"Int":     nil,
-	"Int8":    nil,
-	"Int16":   nil,
-	"Int32":   nil,
-	"Int64":   nil,
-	"UInt8":   nil,
-	"UInt16":  nil,
-	"UInt32":  nil,
-	"UInt64":  nil,
-	"Address": nil,
-}
-
 func (checker *Checker) UserDefinedValues() map[string]*Variable {
-	ret := map[string]*Variable{}
+	variables := map[string]*Variable{}
+
 	for key, value := range checker.GlobalValues {
-		if _, ok := blacklist[key]; ok {
+		if value.IsBaseValue {
 			continue
 		}
+
 		if _, ok := checker.PredeclaredValues[key]; ok {
 			continue
 		}
@@ -308,13 +296,16 @@ func (checker *Checker) UserDefinedValues() map[string]*Variable {
 		if _, ok := checker.PredeclaredTypes[key]; ok {
 			continue
 		}
+
 		if typeValue, ok := checker.GlobalTypes[key]; ok {
-			ret[key] = typeValue
+			variables[key] = typeValue
 			continue
 		}
-		ret[key] = value
+
+		variables[key] = value
 	}
-	return ret
+
+	return variables
 }
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
