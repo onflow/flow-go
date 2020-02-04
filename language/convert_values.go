@@ -1,4 +1,4 @@
-package values
+package language
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
 )
 
-// Convert converts a runtime value to its corresponding Go representation.
-func Convert(value runtime.Value) (Value, error) {
+// ConvertValue converts a runtime value to its corresponding Go representation.
+func ConvertValue(value runtime.Value) (Value, error) {
 	switch v := value.(type) {
 	case interpreter.VoidValue:
 		return NewVoid(), nil
@@ -54,7 +54,7 @@ func Convert(value runtime.Value) (Value, error) {
 }
 
 func convertSomeValue(v *interpreter.SomeValue) (Value, error) {
-	convertedValue, err := Convert(v.Value)
+	convertedValue, err := ConvertValue(v.Value)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func convertArrayValue(v *interpreter.ArrayValue) (Value, error) {
 	vals := make([]Value, len(v.Values))
 
 	for i, value := range v.Values {
-		convertedValue, err := Convert(value)
+		convertedValue, err := ConvertValue(value)
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +91,7 @@ func convertCompositeValue(v *interpreter.CompositeValue) (Value, error) {
 	for i, key := range keys {
 		field := v.Fields[key]
 
-		convertedField, err := Convert(field)
+		convertedField, err := ConvertValue(field)
 		if err != nil {
 			return nil, err
 		}
@@ -109,12 +109,12 @@ func convertDictionaryValue(v *interpreter.DictionaryValue) (Value, error) {
 		key := keyValue.(interpreter.HasKeyString).KeyString()
 		value := v.Entries[key]
 
-		convertedKey, err := Convert(keyValue)
+		convertedKey, err := ConvertValue(keyValue)
 		if err != nil {
 			return nil, err
 		}
 
-		convertedValue, err := Convert(value)
+		convertedValue, err := ConvertValue(value)
 		if err != nil {
 			return nil, err
 		}
