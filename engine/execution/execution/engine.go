@@ -12,7 +12,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/language"
-	"github.com/dapperlabs/flow-go/language/runtime/encoding"
+	"github.com/dapperlabs/flow-go/language/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"

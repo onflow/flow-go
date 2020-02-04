@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language"
-	"github.com/dapperlabs/flow-go/language/runtime/encoding"
+	"github.com/dapperlabs/flow-go/language/encoding"
 )
 
 type encodeTest struct {
