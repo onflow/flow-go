@@ -128,19 +128,19 @@ func TestIsResourceType_StructNestedInDictionary(t *testing.T) {
 func TestRestrictedResourceType_StringAndID(t *testing.T) {
 
 	t.Run("base type and restriction", func(t *testing.T) {
+		interfaceType := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I",
+			Location:      ast.StringLocation("b"),
+		}
+
 		ty := &RestrictedResourceType{
 			Type: &CompositeType{
 				Kind:       common.CompositeKindResource,
 				Identifier: "R",
 				Location:   ast.StringLocation("a"),
 			},
-			Restrictions: []*InterfaceType{
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I",
-					Location:      ast.StringLocation("b"),
-				},
-			},
+			Restrictions: []*InterfaceType{interfaceType},
 		}
 
 		assert.Equal(t, ty.String(), "R{I}")
@@ -148,24 +148,25 @@ func TestRestrictedResourceType_StringAndID(t *testing.T) {
 	})
 
 	t.Run("base type and restrictions", func(t *testing.T) {
+		i1 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I1",
+			Location:      ast.StringLocation("b"),
+		}
+
+		i2 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I2",
+			Location:      ast.StringLocation("c"),
+		}
+
 		ty := &RestrictedResourceType{
 			Type: &CompositeType{
 				Kind:       common.CompositeKindResource,
 				Identifier: "R",
 				Location:   ast.StringLocation("a"),
 			},
-			Restrictions: []*InterfaceType{
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I1",
-					Location:      ast.StringLocation("b"),
-				},
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I2",
-					Location:      ast.StringLocation("c"),
-				},
-			},
+			Restrictions: []*InterfaceType{i1, i2},
 		}
 
 		assert.Equal(t, ty.String(), "R{I1, I2}")
@@ -186,14 +187,15 @@ func TestRestrictedResourceType_StringAndID(t *testing.T) {
 	})
 
 	t.Run("no base type", func(t *testing.T) {
+
+		interfaceType := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I",
+			Location:      ast.StringLocation("b"),
+		}
+
 		ty := &RestrictedResourceType{
-			Restrictions: []*InterfaceType{
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I",
-					Location:      ast.StringLocation("b"),
-				},
-			},
+			Restrictions: []*InterfaceType{interfaceType},
 		}
 
 		assert.Equal(t, ty.String(), "{I}")
@@ -211,19 +213,26 @@ func TestRestrictedResourceType_StringAndID(t *testing.T) {
 func TestRestrictedResourceType_Equals(t *testing.T) {
 
 	t.Run("same base type and more restrictions", func(t *testing.T) {
+
+		i1 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I1",
+			Location:      ast.StringLocation("b"),
+		}
+
+		i2 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I2",
+			Location:      ast.StringLocation("b"),
+		}
+
 		a := &RestrictedResourceType{
 			Type: &CompositeType{
 				Kind:       common.CompositeKindResource,
 				Identifier: "R",
 				Location:   ast.StringLocation("a"),
 			},
-			Restrictions: []*InterfaceType{
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I1",
-					Location:      ast.StringLocation("b"),
-				},
-			},
+			Restrictions: []*InterfaceType{i1},
 		}
 
 		b := &RestrictedResourceType{
@@ -232,42 +241,33 @@ func TestRestrictedResourceType_Equals(t *testing.T) {
 				Identifier: "R",
 				Location:   ast.StringLocation("a"),
 			},
-			Restrictions: []*InterfaceType{
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I1",
-					Location:      ast.StringLocation("b"),
-				},
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I2",
-					Location:      ast.StringLocation("b"),
-				},
-			},
+			Restrictions: []*InterfaceType{i1, i2},
 		}
 
 		assert.False(t, a.Equal(b))
 	})
 
 	t.Run("same base type and fewer restrictions", func(t *testing.T) {
+
+		i1 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I1",
+			Location:      ast.StringLocation("b"),
+		}
+
+		i2 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I2",
+			Location:      ast.StringLocation("b"),
+		}
+
 		a := &RestrictedResourceType{
 			Type: &CompositeType{
 				Kind:       common.CompositeKindResource,
 				Identifier: "R",
 				Location:   ast.StringLocation("a"),
 			},
-			Restrictions: []*InterfaceType{
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I1",
-					Location:      ast.StringLocation("b"),
-				},
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I2",
-					Location:      ast.StringLocation("b"),
-				},
-			},
+			Restrictions: []*InterfaceType{i1, i2},
 		}
 
 		b := &RestrictedResourceType{
@@ -276,37 +276,32 @@ func TestRestrictedResourceType_Equals(t *testing.T) {
 				Identifier: "R",
 				Location:   ast.StringLocation("a"),
 			},
-			Restrictions: []*InterfaceType{
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I1",
-					Location:      ast.StringLocation("b"),
-				},
-			},
+			Restrictions: []*InterfaceType{i1},
 		}
 
 		assert.False(t, a.Equal(b))
 	})
 
 	t.Run("same base type and same restrictions", func(t *testing.T) {
+		i1 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I1",
+			Location:      ast.StringLocation("b"),
+		}
+
+		i2 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I2",
+			Location:      ast.StringLocation("b"),
+		}
+
 		a := &RestrictedResourceType{
 			Type: &CompositeType{
 				Kind:       common.CompositeKindResource,
 				Identifier: "R",
 				Location:   ast.StringLocation("a"),
 			},
-			Restrictions: []*InterfaceType{
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I1",
-					Location:      ast.StringLocation("b"),
-				},
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I2",
-					Location:      ast.StringLocation("b"),
-				},
-			},
+			Restrictions: []*InterfaceType{i1, i2},
 		}
 
 		b := &RestrictedResourceType{
@@ -315,42 +310,33 @@ func TestRestrictedResourceType_Equals(t *testing.T) {
 				Identifier: "R",
 				Location:   ast.StringLocation("a"),
 			},
-			Restrictions: []*InterfaceType{
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I1",
-					Location:      ast.StringLocation("b"),
-				},
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I2",
-					Location:      ast.StringLocation("b"),
-				},
-			},
+			Restrictions: []*InterfaceType{i1, i2},
 		}
 
 		assert.True(t, a.Equal(b))
 	})
 
 	t.Run("different base type and same restrictions", func(t *testing.T) {
+
+		i1 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I1",
+			Location:      ast.StringLocation("b"),
+		}
+
+		i2 := &InterfaceType{
+			CompositeKind: common.CompositeKindResource,
+			Identifier:    "I2",
+			Location:      ast.StringLocation("b"),
+		}
+
 		a := &RestrictedResourceType{
 			Type: &CompositeType{
 				Kind:       common.CompositeKindResource,
 				Identifier: "R1",
 				Location:   ast.StringLocation("a"),
 			},
-			Restrictions: []*InterfaceType{
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I1",
-					Location:      ast.StringLocation("b"),
-				},
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I2",
-					Location:      ast.StringLocation("b"),
-				},
-			},
+			Restrictions: []*InterfaceType{i1, i2},
 		}
 
 		b := &RestrictedResourceType{
@@ -359,18 +345,7 @@ func TestRestrictedResourceType_Equals(t *testing.T) {
 				Identifier: "R2",
 				Location:   ast.StringLocation("a"),
 			},
-			Restrictions: []*InterfaceType{
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I1",
-					Location:      ast.StringLocation("b"),
-				},
-				{
-					CompositeKind: common.CompositeKindResource,
-					Identifier:    "I2",
-					Location:      ast.StringLocation("b"),
-				},
-			},
+			Restrictions: []*InterfaceType{i1, i2},
 		}
 
 		assert.False(t, a.Equal(b))

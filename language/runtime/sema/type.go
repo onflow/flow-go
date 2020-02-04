@@ -2930,6 +2930,26 @@ func IsSubType(subType Type, superType Type) bool {
 		}
 
 		return false
+
+	case *RestrictedResourceType:
+		switch typedSubType := subType.(type) {
+
+		case *CompositeType:
+			// A resource type `T` is a subtype of a restricted resource type `U{Vs}`, if `T == U`
+
+			return typedSubType == typedSuperType.Type
+
+		case *RestrictedResourceType:
+			// A restricted resource type `T{Us}` is a subtype of a restricted resource type `V{Ws}`,
+			// if `T == V` and `Ws` is a subset of `Us`
+
+			return typedSubType.Type == typedSuperType.Type &&
+				typedSuperType.RestrictionSet().
+					IsSubsetOf(typedSubType.RestrictionSet())
+
+		default:
+			return false
+		}
 	}
 
 	return false
@@ -3070,6 +3090,20 @@ func (t *TransactionType) GetMember(identifier string, _ ast.Range, _ func(error
 	return t.Members[identifier]
 }
 
+// RestrictionSet
+
+type RestrictionSet map[*InterfaceType]struct{}
+
+func (s RestrictionSet) IsSubsetOf(other RestrictionSet) bool {
+	for restriction := range s {
+		if _, ok := other[restriction]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
 // RestrictedResourceType
 //
 // No restrictions implies the type is fully restricted,
@@ -3078,6 +3112,18 @@ func (t *TransactionType) GetMember(identifier string, _ ast.Range, _ func(error
 type RestrictedResourceType struct {
 	Type         *CompositeType
 	Restrictions []*InterfaceType
+	// an internal set of `Restrictions`
+	restrictionSet RestrictionSet
+}
+
+func (t *RestrictedResourceType) RestrictionSet() RestrictionSet {
+	if t.restrictionSet == nil {
+		t.restrictionSet = make(RestrictionSet, len(t.Restrictions))
+		for _, restriction := range t.Restrictions {
+			t.restrictionSet[restriction] = struct{}{}
+		}
+	}
+	return t.restrictionSet
 }
 
 func (*RestrictedResourceType) IsType() {}
@@ -3085,7 +3131,7 @@ func (*RestrictedResourceType) IsType() {}
 func (t *RestrictedResourceType) String() string {
 	var result strings.Builder
 	if t.Type != nil {
-		result.WriteString(string(t.Type.String()))
+		result.WriteString(t.Type.String())
 	}
 	result.WriteRune('{')
 	for i, restriction := range t.Restrictions {
@@ -3126,27 +3172,15 @@ func (t *RestrictedResourceType) Equal(other Type) bool {
 
 	// Check that the set of restrictions are equal; order does not matter
 
-	restrictions := t.Restrictions
-	otherRestrictions := otherRestrictedResourceType.Restrictions
+	restrictionSet := t.RestrictionSet()
+	otherRestrictionSet := otherRestrictedResourceType.RestrictionSet()
 
-	count := len(restrictions)
-	if count != len(otherRestrictions) {
+	count := len(restrictionSet)
+	if count != len(otherRestrictionSet) {
 		return false
 	}
 
-	otherRestrictionsByID := make(map[TypeID]bool, count)
-
-	for _, otherRestriction := range otherRestrictions {
-		otherRestrictionsByID[otherRestriction.ID()] = true
-	}
-
-	for _, restriction := range restrictions {
-		if !otherRestrictionsByID[restriction.ID()] {
-			return false
-		}
-	}
-
-	return true
+	return restrictionSet.IsSubsetOf(otherRestrictionSet)
 }
 
 func (*RestrictedResourceType) IsResourceType() bool {

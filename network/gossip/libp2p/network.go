@@ -3,10 +3,10 @@ package libp2p
 import (
 	"fmt"
 	"hash"
+	"strconv"
 	"sync"
 
 	"github.com/dchest/siphash"
-	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
@@ -103,7 +103,13 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 	// check if the engine engineID is already taken
 	_, ok := n.engines[channelID]
 	if ok {
-		return nil, errors.Errorf("engine already registered (%d)", engine)
+		return nil, fmt.Errorf("engine already registered (%d)", engine)
+	}
+
+	// Register the middleware for the channelID topic
+	err := n.mw.Subscribe(channelID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to subscribe to channel %d: %w", channelID, err)
 	}
 
 	// create the conduit
@@ -117,13 +123,17 @@ func (n *Network) Register(channelID uint8, engine network.Engine) (network.Cond
 	return conduit, nil
 }
 
-// Identity returns the flow identity for a given flow identifier by querying the flow state
-func (n *Network) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
-	id, err := n.state.Final().Identity(nodeID)
+// Identity returns a map of all flow.Identifier to flow identity by querying the flow state
+func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
+	ids, err := n.state.Final().Identities()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not get identity")
+		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
-	return id, nil
+	identifierToID := make(map[flow.Identifier]flow.Identity)
+	for _, id := range ids {
+		identifierToID[id.NodeID] = *id
+	}
+	return identifierToID, nil
 }
 
 // Cleanup implements a callback to handle peers that have been dropped
@@ -137,7 +147,6 @@ func (n *Network) Cleanup(nodeID flow.Identifier) error {
 func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
 
 	var err error
-
 	switch m := msg.(type) {
 	case *message.Message:
 		err = n.processNetworkMessage(nodeID, m)
@@ -224,7 +233,8 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 	}
 
 	// TODO: debup the message here
-	err = n.send(msg, targetIDs...)
+
+	err = n.send(channelID, msg, targetIDs...)
 	if err != nil {
 		return errors.Wrap(err, "could not gossip event")
 	}
@@ -235,20 +245,28 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 // send sends the message to the set of target ids through the middleware
 // send is the last method within the pipeline of message shipping in network layer
 // once it is called, the message slips through the network layer towards the middleware
-func (n *Network) send(msg interface{}, nodeIDs ...flow.Identifier) error {
-	// send the message through the peer connection
-	var result *multierror.Error
-	for _, nodeID := range nodeIDs {
-		if nodeID == n.me.NodeID() {
+// If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.send
+// Otherwise, middleware.Publish is used, which uses the PubSub method of communication.
+// TODO: Move this decision making to the Middleware Issue#2246
+func (n *Network) send(channelID uint8, msg *message.Message, nodeIDs ...flow.Identifier) error {
+	var err error
+	switch len(nodeIDs) {
+	case 0:
+		n.logger.Debug().Msg("list of target node IDs empty")
+		return nil
+	case 1:
+		if nodeIDs[0] == n.me.NodeID() {
 			// to avoid self dial by the underlay
 			n.logger.Debug().Msg("self dial attempt")
-			continue
+			return nil
 		}
-		err := n.mw.Send(nodeID, msg)
-		if err != nil {
-			result = multierror.Append(result, err)
-		}
+		err = n.mw.Send(nodeIDs[0], msg)
+	default:
+		err = n.mw.Publish(strconv.Itoa(int(channelID)), msg)
 	}
 
-	return result.ErrorOrNil()
+	if err != nil {
+		return fmt.Errorf("failed to send message to %s:%w", nodeIDs, err)
+	}
+	return nil
 }

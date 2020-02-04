@@ -40,11 +40,11 @@ func expectedTimeoutInfo(view uint64, mode types.TimeoutMode) interface{} {
 func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mockdist.Distributor) {
 	notifier := &mockdist.Distributor{}
 	tc, err := timeout.NewConfig(
-		time.Duration(startRepTimeout*1E6),
-		time.Duration(minRepTimeout*1E6),
+		time.Duration(startRepTimeout*1e6),
+		time.Duration(minRepTimeout*1e6),
 		voteTimeoutFraction,
 		multiplicativeIncrease,
-		time.Duration(additiveDecrease*1E6))
+		time.Duration(additiveDecrease*1e6))
 	if err != nil {
 		t.Fail()
 	}
