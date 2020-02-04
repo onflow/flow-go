@@ -97,7 +97,7 @@ func NewSMT(
 	s.height = height
 
 	// Set root to the highest level default node
-	s.root = newNode(defaultHashes[height-1], height-1)
+	s.root = newNode(GetDefaultHashForHeight(height), height-1)
 	s.historicalStates = make(map[string]databases.DAL)
 	s.numHistoricalStates = numHistoricalStates
 	s.numFullStates = numFullStates
@@ -687,7 +687,7 @@ func (s *SMT) UpdateAtomically(rootNode *node, keys [][]byte, values [][]byte, h
 	}
 
 	//We initialize the nodes as empty to prevent nil pointer exceptions later
-	lnode, rnode := rootNode.GetandSetChildren(defaultHashes)
+	lnode, rnode := rootNode.GetandSetChildren(GetDefaultHashes())
 
 	// Split the keys and values array so we can update the trie in parallel
 	lkeys, rkeys, splitIndex := utils.SplitKeys(keys, s.height-height-1)
@@ -792,7 +792,7 @@ func (s *SMT) interiorNode(lnode *node, rnode *node, height int) *node {
 		s.database.PutIntoBatcher(in.value, append(in.Lchild.value, in.Rchild.value...))
 		return in
 	} else if lnode == nil && rnode != nil {
-		in := newNode(Hash(defaultHashes[height-1], rnode.value), height)
+		in := newNode(Hash(GetDefaultHashForHeight(height), rnode.value), height)
 		in.Lchild = lnode
 		in.Rchild = rnode
 		// if the left node is nil value of the Rchild attached to key in DB will be prefaced by
@@ -802,7 +802,7 @@ func (s *SMT) interiorNode(lnode *node, rnode *node, height int) *node {
 		s.database.PutIntoBatcher(in.value, append(lFlag, in.Rchild.value...))
 		return in
 	} else if rnode == nil && lnode != nil {
-		in := newNode(Hash(lnode.value, defaultHashes[height-1]), height)
+		in := newNode(Hash(lnode.value, GetDefaultHashForHeight(height)), height)
 		in.Lchild = lnode
 		in.Rchild = rnode
 		rFlag := make([]byte, 1)
