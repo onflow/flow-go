@@ -17,10 +17,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 	ledger := &vmmock.Ledger{}
 
-	h := unittest.BlockHeaderFixture()
-
 	vm := virtualmachine.New(rt)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext()
 
 	t.Run("transaction success", func(t *testing.T) {
 		tx := &flow.TransactionBody{
@@ -73,10 +71,9 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 
 	ledger := &vmmock.Ledger{}
 
-	h := unittest.BlockHeaderFixture()
 
 	vm := virtualmachine.New(rt)
-	bc := vm.NewBlockContext(&h)
+	bc := vm.NewBlockContext()
 
 	t.Run("script success", func(t *testing.T) {
 		script := []byte(`

@@ -16,7 +16,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	"github.com/dapperlabs/flow-go/engine/execution/receipts"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
@@ -165,7 +164,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
 
-	receiptsEngine, err := receipts.New(node.Log, node.Net, node.State, node.Me)
+	receiptsEngine, err := provider.New(node.Log, node.Net, node.State, node.Tracer, node.Me, collectionsStorage)
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
@@ -183,21 +182,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Net,
 		node.Me,
 		node.State,
-		execState,
 		receiptsEngine,
 		vm,
 	)
 	require.NoError(t, err)
 
-	blocksEngine, err := ingestion.New(
-		node.Log,
-		node.Net,
-		node.Me,
-		node.State,
-		blocksStorage,
-		collectionsStorage,
-		execEngine,
-	)
+	blocksEngine, err := ingestion.New(node.Log, node.Net, node.Me, node.State, blocksStorage, collectionsStorage, execEngine, execState)
 	require.NoError(t, err)
 
 	return mock.ExecutionNode{

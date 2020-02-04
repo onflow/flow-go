@@ -18,20 +18,20 @@ type BlockContext interface {
 }
 
 // NewBlockContext creates a new block context given a runtime and block.
-func NewBlockContext(rt runtime.Runtime, header *flow.Header) BlockContext {
+func NewBlockContext(rt runtime.Runtime) BlockContext {
 	vm := &virtualMachine{
 		rt: rt,
 	}
 
 	return &blockContext{
 		vm:     vm,
-		header: header,
+		//header: header,
 	}
 }
 
 type blockContext struct {
 	vm     *virtualMachine
-	header *flow.Header
+	//header *flow.Header
 }
 
 func (bc *blockContext) newTransactionContext(ledger Ledger, tx *flow.TransactionBody) *transactionContext {

@@ -8,7 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	"github.com/dapperlabs/flow-go/engine/execution/receipts"
+	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/rpc"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/module"
@@ -23,7 +23,7 @@ func main() {
 	var (
 		stateCommitments storage.Commits
 		ledgerStorage    storage.Ledger
-		receiptsEng      *receipts.Engine
+		receiptsEng      *provider.Engine
 		executionEng     *execution.Engine
 		rpcConf          rpc.Config
 		err              error
@@ -46,7 +46,7 @@ func main() {
 		Component("receipts engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing receipts engine")
 
-			receiptsEng, err = receipts.New(
+			receiptsEng, err = provider.New(
 				node.Logger,
 				node.Network,
 				node.State,
@@ -62,16 +62,11 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 
-			chunkHeaders := badger.NewChunkHeaders(node.DB)
-
-			execState := state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
-
 			executionEng, err = execution.New(
 				node.Logger,
 				node.Network,
 				node.Me,
 				node.State,
-				execState,
 				receiptsEng,
 				vm,
 			)
@@ -85,7 +80,11 @@ func main() {
 			blocks := badger.NewBlocks(node.DB)
 			collections := badger.NewCollections(node.DB)
 
-			ingestionEng, err := ingestion.New(
+		chunkHeaders := badger.NewChunkHeaders(node.DB)
+
+		execState := state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
+
+		ingestionEng, err := ingestion.New(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -93,6 +92,7 @@ func main() {
 				blocks,
 				collections,
 				executionEng,
+				execState,
 			)
 			node.MustNot(err).Msg("could not initialize ingestion engine")
 

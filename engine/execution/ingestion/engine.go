@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -31,17 +32,10 @@ type Engine struct {
 	collections       storage.Collections
 	execution         network.Engine
 	mempool           *Mempool
+	execState 			state.ExecutionState
 }
 
-func New(
-	logger zerolog.Logger,
-	net module.Network,
-	me module.Local,
-	state protocol.State,
-	blocks storage.Blocks,
-	collections storage.Collections,
-	executionEngine network.Engine,
-) (*Engine, error) {
+func New(logger zerolog.Logger, net module.Network, me module.Local, state protocol.State, blocks storage.Blocks, collections storage.Collections, executionEngine network.Engine, execState state.ExecutionState) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
 
 	mempool, err := newMempool()
@@ -58,6 +52,7 @@ func New(
 		collections: collections,
 		execution:   executionEngine,
 		mempool:     mempool,
+		execState: execState,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)

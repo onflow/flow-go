@@ -10,6 +10,7 @@ import (
 
 	engineCommon "github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	module "github.com/dapperlabs/flow-go/module/mocks"
@@ -45,13 +46,14 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 	blocks := storage.NewMockBlocks(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	executionEngine := network.NewMockEngine(ctrl)
-	state := protocol.NewMockState(ctrl)
+	protocolState := protocol.NewMockState(ctrl)
+	execState := new(state.ExecutionState)
 
 	snapshot := protocol.NewMockSnapshot(ctrl)
 
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
 
-	state.EXPECT().Final().Return(snapshot).AnyTimes()
+	protocolState.EXPECT().Final().Return(snapshot).AnyTimes()
 	snapshot.EXPECT().Identities(gomock.Any()).DoAndReturn(func(f flow.IdentityFilter) (flow.IdentityList, error) {
 		return identityList.Filter(f), nil
 	})
@@ -63,10 +65,11 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 
-	engine, err := New(log, net, me, state, blocks, collections, executionEngine)
+
+	engine, err := New(log, net, me, protocolState, blocks, collections, executionEngine, *execState)
 	require.NoError(t, err)
 
-	f(t, engine, blocks, collections, state, conduit, collectionConduit, executionEngine)
+	f(t, engine, blocks, collections, protocolState, conduit, collectionConduit, executionEngine)
 }
 
 // TODO Currently those tests check if objects are stored directly

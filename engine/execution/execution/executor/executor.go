@@ -11,68 +11,83 @@ import (
 
 // A BlockExecutor executes the transactions in a block.
 type BlockExecutor interface {
-	ExecuteBlock(*execution.CompleteBlock) (*flow.ExecutionResult, error)
+	ExecuteBlock(*execution.CompleteBlock, *state.View) (*flow.ExecutionResult, error)
 }
 
 type blockExecutor struct {
 	vm    virtualmachine.VirtualMachine
-	state state.ExecutionState
+	//state state.ExecutionState
 }
 
 // NewBlockExecutor creates a new block executor.
-func NewBlockExecutor(vm virtualmachine.VirtualMachine, state state.ExecutionState) BlockExecutor {
+func NewBlockExecutor(vm virtualmachine.VirtualMachine) BlockExecutor {
 	return &blockExecutor{
 		vm:    vm,
-		state: state,
+		//state: state,
 	}
 }
 
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *blockExecutor) ExecuteBlock(
 	block *execution.CompleteBlock,
+	view *state.View,
 ) (*flow.ExecutionResult, error) {
-	chunks, endState, err := e.executeBlock(block)
+	_, _, err := e.executeBlock(block, view)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
 
 	// TODO: compute block fees & reward payments
 
-	err = e.state.PersistStateCommitment(block.Block.ID(), endState)
-	if err != nil {
-		return nil, fmt.Errorf("failed to store state commitment: %w", err)
-	}
+	//err = e.state.PersistStateCommitment(block.Block.ID(), endState)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to store state commitment: %w", err)
+	//}
+	//
+	//result := generateExecutionResultForBlock(block, chunks, endState)
 
-	result := generateExecutionResultForBlock(block, chunks, endState)
-
-	return result, nil
+	return nil, nil
 }
 
 func (e *blockExecutor) executeBlock(
 	block *execution.CompleteBlock,
+	view *state.View,
 ) (chunk []*flow.Chunk, endState flow.StateCommitment, err error) {
-	blockCtx := e.vm.NewBlockContext(&block.Block.Header)
 
-	var startState flow.StateCommitment
+	blockCtx := e.vm.NewBlockContext()
+
+	//var startState flow.StateCommitment
 
 	// get initial start state from parent block
-	startState, err = e.state.StateCommitmentByBlockID(block.Block.ParentID)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch starting state commitment: %w", err)
-	}
+	//startState, err = e.state.StateCommitmentByBlockID(block.Block.ParentID)
+	//if err != nil {
+	//	return nil, nil, fmt.Errorf("failed to fetch starting state commitment: %w", err)
+	//}
 
 	collections := block.Collections()
 
+
 	chunks := make([]*flow.Chunk, len(collections))
+	deltas := make([]*state.Delta, len(collections))
+
+	//chunkView := e.state.NewView(startState)
+
+	blockView := view.NewChild()
 
 	for i, collection := range collections {
-		chunk, endState, err := e.executeCollection(i, blockCtx, startState, collection)
+
+
+		_, err := e.executeCollection(i, blockCtx, blockView, collection)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
 
-		chunks[i] = chunk
-		startState = endState
+
+		chunkDelta := blockView.Delta()
+		deltas[i] = &chunkDelta
+
+		blockView.ApplyDelta(chunkDelta)
+		//startState = endState
 	}
 
 	return chunks, endState, nil
@@ -81,21 +96,18 @@ func (e *blockExecutor) executeBlock(
 func (e *blockExecutor) executeCollection(
 	index int,
 	blockCtx virtualmachine.BlockContext,
-	startState flow.StateCommitment,
+	//startState flow.StateCommitment,
+	chunkView *state.View,
 	collection *execution.CompleteCollection,
-) (
-	chunk *flow.Chunk,
-	endState flow.StateCommitment,
-	err error,
-) {
-	chunkView := e.state.NewView(startState)
+) (*state.View, error) {
+	//chunkView := e.state.NewView(startState)
 
 	for _, tx := range collection.Transactions {
 		txView := chunkView.NewChild()
 
 		result, err := blockCtx.ExecuteTransaction(txView, tx)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to execute transaction: %w", err)
+			return nil, fmt.Errorf("failed to execute transaction: %w", err)
 		}
 
 		if result.Succeeded() {
@@ -103,21 +115,23 @@ func (e *blockExecutor) executeCollection(
 		}
 	}
 
-	endState, err = e.state.CommitDelta(chunkView.Delta())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to apply chunk delta: %w", err)
-	}
+	return chunkView, nil
 
-	chunk = generateChunk(index, startState, endState)
-
-	chunkHeader := generateChunkHeader(chunk, chunkView.Reads())
-
-	err = e.state.PersistChunkHeader(chunkHeader)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to save chunk header: %w", err)
-	}
-
-	return chunk, endState, nil
+	//endState, err = e.state.CommitDelta(chunkView.Delta())
+	//if err != nil {
+	//	return nil, nil, fmt.Errorf("failed to apply chunk delta: %w", err)
+	//}
+	//
+	//chunk = generateChunk(index, startState, endState)
+	//
+	//chunkHeader := generateChunkHeader(chunk, chunkView.Reads())
+	//
+	//err = e.state.PersistChunkHeader(chunkHeader)
+	//if err != nil {
+	//	return nil, nil, fmt.Errorf("failed to save chunk header: %w", err)
+	//}
+	//
+	//return chunk, endState, nil
 }
 
 // generateExecutionResultForBlock creates a new execution result for a block from
