@@ -3,6 +3,7 @@ package hotstuff
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/module"
 )
 
 // HotStuff defines the interface to the core HotStuff algorithm. It includes
@@ -39,6 +40,12 @@ type HotStuff interface {
 
 // New sets up and instantiates an instance of the HotStuff core algorithm.
 // TODO
-func New(signer Signer, communicator Communicator, consumer notifications.Consumer) (HotStuff, error) {
+func New(
+	signer Signer,
+	communicator Communicator,
+	consumer notifications.Consumer,
+	finalizer Finalizer,
+	builder module.Builder,
+) (HotStuff, error) {
 	panic("TODO")
 }
