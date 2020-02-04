@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
 // EventHandler is the main handler for individual events that trigger state transition.
@@ -16,14 +17,14 @@ import (
 type EventHandler struct {
 	log zerolog.Logger
 
-	paceMaker             PaceMaker
-	voteAggregator        *VoteAggregator
-	voter                 *Voter
-	forks                 Forks
-	validator             *Validator
-	blockProposalProducer BlockProposalProducer
-	viewState             ViewState
-	network               Communicator
+	paceMaker      PaceMaker
+	voteAggregator *VoteAggregator
+	voter          *Voter
+	forks          Forks
+	validator      *Validator
+	blockProducer  *BlockProducer
+	viewState      ViewState
+	network        Communicator
 }
 
 // NewEventHandler creates an EventHandler instance with initial components.
@@ -34,20 +35,20 @@ func NewEventHandler(
 	voter *Voter,
 	forks Forks,
 	validator *Validator,
-	blockProposalProducer BlockProposalProducer,
+	blockProducer *BlockProducer,
 	viewState ViewState,
 	network Communicator,
 ) (*EventHandler, error) {
 	e := &EventHandler{
-		log:                   log.With().Str("hotstuff", "event_handler").Logger(),
-		paceMaker:             paceMaker,
-		voteAggregator:        voteAggregator,
-		voter:                 voter,
-		forks:                 forks,
-		validator:             validator,
-		blockProposalProducer: blockProposalProducer,
-		viewState:             viewState,
-		network:               network,
+		log:            log.With().Str("hotstuff", "event_handler").Logger(),
+		paceMaker:      paceMaker,
+		voteAggregator: voteAggregator,
+		voter:          voter,
+		forks:          forks,
+		validator:      validator,
+		blockProducer:  blockProducer,
+		viewState:      viewState,
+		network:        network,
 	}
 	return e, nil
 }
@@ -57,7 +58,7 @@ func NewEventHandler(
 func (e *EventHandler) OnReceiveVote(vote *types.Vote) error {
 
 	e.log.Info().
-		Hex("vote_block", vote.BlockMRH).
+		Hex("vote_block", logging.ID(vote.BlockID)).
 		Uint64("vote_view", vote.View).
 		Msg("vote received")
 
@@ -70,15 +71,15 @@ func (e *EventHandler) OnReceiveVote(vote *types.Vote) error {
 func (e *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) error {
 
 	e.log.Info().
-		Hex("block", block.BlockMRH()).
+		Hex("block", logging.ID(block.BlockID())).
 		Uint64("qc_view", block.QC().View).
 		Uint64("block_view", block.View()).
 		Msg("block proposal received")
 
 	// find the parent of the block
-	parent, found := e.forks.GetBlock(block.QC().BlockMRH)
+	parent, found := e.forks.GetBlock(block.QC().BlockID)
 	if !found {
-		return fmt.Errorf("cannot find block's parent when receiving block header: %v", block.QC().BlockMRH)
+		return fmt.Errorf("cannot find block's parent when receiving block header: %v", block.QC().BlockID)
 	}
 
 	// validate the block
@@ -159,7 +160,10 @@ func (e *EventHandler) startNewView() error {
 			return fmt.Errorf("can not make for choice for view %v: %w", curView, err)
 		}
 
-		curProposal := e.blockProposalProducer.MakeBlockProposal(curView, qcForCurProposal)
+		curProposal, err := e.blockProducer.MakeBlockProposal(curView, qcForCurProposal)
+		if err != nil {
+			return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
+		}
 
 		err = e.forks.AddBlock(curProposal)
 		if err != nil {
@@ -279,7 +283,7 @@ func (e *EventHandler) tryBuildQCForBlock(block *types.BlockProposal) error {
 // It assumes the voting block can be found in forks
 func (e *EventHandler) processVote(vote *types.Vote) error {
 	// read the voting block
-	block, found := e.forks.GetBlock(vote.BlockMRH)
+	block, found := e.forks.GetBlock(vote.BlockID)
 	if !found {
 		// store the pending vote if voting block is not found.
 		// We don't need to proactively fetch the missing voting block, because the chain compliance layer has acknowledged
@@ -288,7 +292,7 @@ func (e *EventHandler) processVote(vote *types.Vote) error {
 
 		e.log.Info().
 			Uint64("vote_view", vote.View).
-			Hex("voting_block", vote.BlockMRH).
+			Hex("voting_block", logging.ID(vote.BlockID)).
 			Msg("block for vote not found")
 
 		return nil
