@@ -168,6 +168,36 @@ func (Int64Type) ID() string {
 	return "Int64"
 }
 
+// Int128Type
+
+type Int128Type struct{}
+
+func (Int128Type) isType() {}
+
+func (Int128Type) ID() string {
+	return "Int128"
+}
+
+// Int256Type
+
+type Int256Type struct{}
+
+func (Int256Type) isType() {}
+
+func (Int256Type) ID() string {
+	return "Int256"
+}
+
+// UIntType
+
+type UIntType struct{}
+
+func (UIntType) isType() {}
+
+func (UIntType) ID() string {
+	return "UInt"
+}
+
 // UInt8Type
 
 type UInt8Type struct{}
@@ -206,6 +236,66 @@ func (UInt64Type) isType() {}
 
 func (UInt64Type) ID() string {
 	return "UInt64"
+}
+
+// UInt128Type
+
+type UInt128Type struct{}
+
+func (UInt128Type) isType() {}
+
+func (UInt128Type) ID() string {
+	return "UInt128"
+}
+
+// UInt256Type
+
+type UInt256Type struct{}
+
+func (UInt256Type) isType() {}
+
+func (UInt256Type) ID() string {
+	return "UInt256"
+}
+
+// Word8Type
+
+type Word8Type struct{}
+
+func (Word8Type) isType() {}
+
+func (Word8Type) ID() string {
+	return "Word8"
+}
+
+// Word16Type
+
+type Word16Type struct{}
+
+func (Word16Type) isType() {}
+
+func (Word16Type) ID() string {
+	return "Word16"
+}
+
+// Word32Type
+
+type Word32Type struct{}
+
+func (Word32Type) isType() {}
+
+func (Word32Type) ID() string {
+	return "Word32"
+}
+
+// Word64Type
+
+type Word64Type struct{}
+
+func (Word64Type) isType() {}
+
+func (Word64Type) ID() string {
+	return "Word64"
 }
 
 // VariableSizedArrayType
