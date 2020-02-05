@@ -7,7 +7,6 @@ import (
 	"time"
 
 	golog "github.com/ipfs/go-log"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -15,10 +14,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
-	"github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/network/codec/json"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
-	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
 // StubEngineTestSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
@@ -39,9 +35,15 @@ func TestStubEngineTestSuite(t *testing.T) {
 func (s *StubEngineTestSuite) SetupTest() {
 	const count = 2
 	golog.SetAllLoggers(gologging.INFO)
-	s.ids = s.createIDs(count)
-	s.mws = s.createMiddleware(s.ids)
-	s.nets = s.createNetworks(s.mws, s.ids)
+	s.ids = CreateIDs(count)
+
+	mws, err := CreateMiddleware(s.ids)
+	require.NoError(s.Suite.T(), err)
+	s.mws = mws
+
+	nets, err := CreateNetworks(s.mws, s.ids, 100)
+	require.NoError(s.Suite.T(), err)
+	s.nets = nets
 }
 
 // TearDownTest closes the networks within a specified timeout
