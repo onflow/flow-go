@@ -786,7 +786,8 @@ func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
 func (checker *Checker) convertReferenceType(t *ast.ReferenceType) Type {
 	ty := checker.ConvertType(t.Type)
 	return &ReferenceType{
-		Type: ty,
+		Authorized: t.Authorized,
+		Type:       ty,
 	}
 }
 

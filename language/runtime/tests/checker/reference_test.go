@@ -432,3 +432,35 @@ func TestCheckInvalidResourceInterfaceReferenceFunctionCall(t *testing.T) {
 
 	assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
 }
+
+func TestCheckAuthReferenceTypeSubTyping(t *testing.T) {
+
+	// TODO: replace panic with actual reference expression
+	// once it supports non-storage references
+
+	t.Run("auth to non-auth", func(t *testing.T) {
+		_, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let ref: auth &R = panic("")
+          let ref2: &R = ref
+        `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("non-auth to auth", func(t *testing.T) {
+		_, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let ref: &R = panic("")
+          let ref2: auth &R = ref
+        `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+}
