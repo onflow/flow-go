@@ -88,7 +88,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier) (flow.Identifier, error) {
 		Seals:      seals,
 	}
 
-	// TODO: remember the payload here
+	err = b.state.Mutate().StorePayload(&payload)
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("could not store payload: %w", err)
+	}
 
 	return payload.Hash(), nil
 }

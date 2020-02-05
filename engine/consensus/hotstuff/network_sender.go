@@ -6,7 +6,6 @@ import (
 )
 
 type NetworkSender interface {
-	SendVote(vote *types.Vote, id flow.Identity)
+	SendVote(vote *types.Vote, id *flow.Identity)
 	BroadcastProposal(b *types.BlockProposal)
-	RespondBlockProposalRequest(req *types.BlockProposalRequest, b *types.BlockProposal)
 }

@@ -20,4 +20,7 @@ type Variable struct {
 	ArgumentLabels []string
 	// Pos is the position where the variable was declared
 	Pos *ast.Position
+	// IsBaseValue indicates if the variable is a base value,
+	// i.e. it is defined by the checker and not the program
+	IsBaseValue bool
 }
