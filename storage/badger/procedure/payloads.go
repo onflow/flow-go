@@ -16,7 +16,7 @@ func InsertPayload(payload *flow.Payload) func(*badger.Txn) error {
 
 		// insert the block identities
 		for _, identity := range payload.Identities {
-			err := operation.InsertIdentity(identity)(tx)
+			err := operation.AllowDuplicates(operation.InsertIdentity(identity))(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert identity (%x): %w", identity.NodeID, err)
 			}
@@ -26,7 +26,7 @@ func InsertPayload(payload *flow.Payload) func(*badger.Txn) error {
 		for _, guarantee := range payload.Guarantees {
 			err := operation.InsertGuarantee(guarantee)(tx)
 			if err != nil {
-				return fmt.Errorf("could not insert identity (%x): %w", guarantee.CollectionID, err)
+				return fmt.Errorf("could not insert guarantee (%x): %w", guarantee.CollectionID, err)
 			}
 		}
 

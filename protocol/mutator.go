@@ -30,4 +30,7 @@ type Mutator interface {
 	// protocol state accordingly and forwards the pointer to the latest
 	// finalized state.
 	Finalize(blockID flow.Identifier) error
+
+	// StorePayload simply wraps procedures.InsertPayload
+	StorePayload(payload *flow.Payload) error
 }

@@ -44,6 +44,19 @@ func (s *StubEngineTestSuite) SetupTest() {
 	s.nets = s.createNetworks(s.mws, s.ids)
 }
 
+// TearDownTest closes the networks within a specified timeout
+func (s *StubEngineTestSuite) TearDownTest() {
+	for _, net := range s.nets {
+		select {
+		// closes the network
+		case <-net.Done():
+			continue
+		case <-time.After(1 * time.Second):
+			s.Suite.Fail("could not stop the network")
+		}
+	}
+}
+
 // TestSingleMessage tests sending a single message from sender to receiver
 func (s *StubEngineTestSuite) TestSingleMessage() {
 	// set to false for no echo expectation
