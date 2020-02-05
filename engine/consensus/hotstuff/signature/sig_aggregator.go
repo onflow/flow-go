@@ -15,5 +15,5 @@ type SigAggregator interface {
 	// will be returned; otherwise an error will be returned.
 	// AddSig also calls verifies the signature internally. It returns error if the signature
 	// to be added is invalid.
-	AddSig(sig *types.VoteSignatureWithIndexedPubKey) (*types.AggregatedSignature, error)
+	AddSig(sig *types.VoteSignatureWithPubKey) (*types.AggregatedSignature, error)
 }
