@@ -53,7 +53,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*fl
 
 		// for each unfinalized ancestor of the payload we are building, we retrieve
 		// a list of all pending IDs for guarantees and seals; we can use them to
-		// exclude entities from being included in two block on the same fork
+		// exclude entities from being included in two block on the same fork.
+		// TODO we do not check that we aren't duplicating payload items from FINALIZED blocks yet
 		ancestorID := parentID
 		guaranteeLookup := make(map[flow.Identifier]struct{})
 		sealLookup := make(map[flow.Identifier]struct{})
