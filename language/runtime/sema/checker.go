@@ -61,7 +61,7 @@ type Checker struct {
 	allowSelfResourceFieldInvalidation bool
 	Elaboration                        *Elaboration
 	currentMemberExpression            *ast.MemberExpression
-	validTopLevelDeclarations          []common.DeclarationKind
+	validTopLevelDeclarationsHandler   func(ast.Location) []common.DeclarationKind
 	beforeExtractor                    *BeforeExtractor
 }
 
@@ -102,12 +102,14 @@ func WithAccessCheckMode(mode AccessCheckMode) Option {
 	}
 }
 
-// WithValidTopLevelDeclarations returns a checker option which sets
-// the given slice of declaration kinds as the valid top-level declarations.
+// WithValidTopLevelDeclarationsHandler returns a checker option which sets
+// the given handler as function which is used to determine
+// the slice of declaration kinds which are valid at the top-level
+// for a given location.
 //
-func WithValidTopLevelDeclarations(validTopLevelDeclarations []common.DeclarationKind) Option {
+func WithValidTopLevelDeclarationsHandler(handler func(location ast.Location) []common.DeclarationKind) Option {
 	return func(checker *Checker) error {
-		checker.validTopLevelDeclarations = validTopLevelDeclarations
+		checker.validTopLevelDeclarationsHandler = handler
 		return nil
 	}
 }
@@ -363,13 +365,18 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 }
 
 func (checker *Checker) checkTopLevelDeclarationValidity(declarations []ast.Declaration) {
-	if checker.validTopLevelDeclarations == nil {
+	if checker.validTopLevelDeclarationsHandler == nil {
 		return
 	}
 
 	validDeclarationKinds := map[common.DeclarationKind]bool{}
 
-	for _, declarationKind := range checker.validTopLevelDeclarations {
+	validTopLevelDeclarations := checker.validTopLevelDeclarationsHandler(checker.Location)
+	if validTopLevelDeclarations == nil {
+		return
+	}
+
+	for _, declarationKind := range validTopLevelDeclarations {
 		validDeclarationKinds[declarationKind] = true
 	}
 
