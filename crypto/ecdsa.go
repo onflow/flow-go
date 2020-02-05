@@ -10,6 +10,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 )
@@ -34,6 +35,10 @@ func (sk *PrKeyECDSA) signHash(h Hash) (Signature, error) {
 	}
 	rBytes := r.Bytes()
 	sBytes := s.Bytes()
+
+	fmt.Printf("\nR : %s\n", hex.EncodeToString(r.Bytes()))
+	fmt.Printf("S:  %s\n", hex.EncodeToString(s.Bytes()))
+
 	Nlen := bitsToBytes((sk.alg.curve.Params().N).BitLen())
 	signature := make([]byte, 2*Nlen)
 	// pad the signature with zeroes
@@ -52,10 +57,26 @@ func (sk *PrKeyECDSA) signHash(h Hash) (Signature, error) {
 // Sign signs an array of bytes
 func (sk *PrKeyECDSA) Sign(data []byte, alg Hasher) (Signature, error) {
 	h := alg.ComputeHash(data)
+	skB, _ := sk.Encode()
+	fmt.Print(hex.EncodeToString(skB))
 	return sk.signHash(h)
 }
 
+func toHexInt(n *big.Int) string {
+	return fmt.Sprintf("%x", n) // or %X or upper case
+}
+
 func (sk *PrKeyECDSA) SignData(b []byte) (Signature, error) {
+	skB, _ := sk.Encode()
+
+
+
+	fmt.Printf("D1: %s\n", hex.EncodeToString(sk.goPrKey.D.Bytes()))
+	fmt.Printf("D2: %s\n", toHexInt(sk.goPrKey.D))
+	fmt.Printf("D2: %s\n", sk.goPrKey.D.Text(16))
+	fmt.Printf("X: %s\n", hex.EncodeToString(sk.goPrKey.X.Bytes()))
+	fmt.Printf("Y: %s\n", hex.EncodeToString(sk.goPrKey.Y.Bytes()))
+	fmt.Print(hex.EncodeToString(skB))
 	return sk.signHash(b)
 }
 
