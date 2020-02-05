@@ -4,11 +4,11 @@ import "github.com/dapperlabs/flow-go/model/flow"
 
 type Vertex interface {
 	// VertexID returns the vertex's ID (in most cases its hash)
-	VertexID() *flow.Identifier
+	VertexID() flow.Identifier
 	// Level returns the vertex's level
 	Level() uint64
 	// Parent returns the returns the parents (level, ID)
-	Parent() (*flow.Identifier, uint64)
+	Parent() (flow.Identifier, uint64)
 }
 
 // VertexIterator is a stateful iterator for VertexList.

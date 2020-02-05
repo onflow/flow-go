@@ -77,7 +77,7 @@ func (e *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) error {
 		Msg("block proposal received")
 
 	// find the parent of the block
-	parent, found := e.forks.GetBlock(&block.QC().BlockID)
+	parent, found := e.forks.GetBlock(block.QC().BlockID)
 	if !found {
 		return fmt.Errorf("cannot find block's parent when receiving block header: %v", block.QC().BlockID)
 	}
@@ -283,7 +283,7 @@ func (e *EventHandler) tryBuildQCForBlock(block *types.BlockProposal) error {
 // It assumes the voting block can be found in forks
 func (e *EventHandler) processVote(vote *types.Vote) error {
 	// read the voting block
-	block, found := e.forks.GetBlock(&vote.BlockID)
+	block, found := e.forks.GetBlock(vote.BlockID)
 	if !found {
 		// store the pending vote if voting block is not found.
 		// We don't need to proactively fetch the missing voting block, because the chain compliance layer has acknowledged

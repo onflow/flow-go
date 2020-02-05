@@ -13,14 +13,13 @@ type BlockContainer struct {
 }
 
 // functions implementing forest.vertex
-func (b *BlockContainer) VertexID() *flow.Identifier         { return b.ID() }
+func (b *BlockContainer) VertexID() flow.Identifier         { return b.ID() }
 func (b *BlockContainer) Level() uint64                      { return b.View() }
-func (b *BlockContainer) Parent() (*flow.Identifier, uint64) { return b.ID(), b.block.QC().View }
+func (b *BlockContainer) Parent() (flow.Identifier, uint64) { return b.ID(), b.block.QC().View }
 
 // ID returns the block's hash
-func (b *BlockContainer) ID() *flow.Identifier {
-	id := b.block.BlockID()
-	return &id
+func (b *BlockContainer) ID() flow.Identifier {
+	return b.block.BlockID()
 }
 
 // View returns the block's view number

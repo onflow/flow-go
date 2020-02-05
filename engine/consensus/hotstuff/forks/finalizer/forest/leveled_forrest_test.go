@@ -10,16 +10,16 @@ import (
 
 // ~~~~~~~~~~~~~~~~~~~~~ Mock implementation for Vertex ~~~~~~~~~~~~~~~~~~~~~ //
 type VertexMock struct {
-	id    *flow.Identifier
+	id    flow.Identifier
 	level uint64
 
-	parentId    *flow.Identifier
+	parentId    flow.Identifier
 	parentLevel uint64
 }
 
-func (v *VertexMock) VertexID() *flow.Identifier         { return v.id }
+func (v *VertexMock) VertexID() flow.Identifier         { return v.id }
 func (v *VertexMock) Level() uint64                      { return v.level }
-func (v *VertexMock) Parent() (*flow.Identifier, uint64) { return v.parentId, v.parentLevel }
+func (v *VertexMock) Parent() (flow.Identifier, uint64) { return v.parentId, v.parentLevel }
 
 func NewVertexMock(vertexId string, vertexLevel uint64, parentId string, parentLevel uint64) *mock.Vertex {
 	v := &mock.Vertex{}
@@ -99,13 +99,13 @@ func TestLevelledForest_AcceptingGenesis(t *testing.T) {
 	v1 := &mock.Vertex{}
 	v1.On("VertexID").Return(string2Identifyer("Root-Vertex-A_@Level0"))
 	v1.On("Level").Return(uint64(0))
-	v1.On("Parent").Return(func() (*flow.Identifier, uint64) { panic("Parent() should not have been called") })
+	v1.On("Parent").Return(func() (flow.Identifier, uint64) { panic("Parent() should not have been called") })
 	assert.NotPanics(t, func() { F.AddVertex(v1) })
 
 	v2 := &mock.Vertex{}
 	v2.On("VertexID").Return(string2Identifyer("Root-Vertex-B_@Level0"))
 	v2.On("Level").Return(uint64(0))
-	v2.On("Parent").Return(func() (*flow.Identifier, uint64) { panic("Parent() should not have been called") })
+	v2.On("Parent").Return(func() (flow.Identifier, uint64) { panic("Parent() should not have been called") })
 	assert.NotPanics(t, func() { F.AddVertex(v2) })
 	assert.NotPanics(t, func() { F.AddVertex(v2) })
 
@@ -115,13 +115,13 @@ func TestLevelledForest_AcceptingGenesis(t *testing.T) {
 	v3 := &mock.Vertex{}
 	v3.On("VertexID").Return(string2Identifyer("Root-Vertex-A_@Level8"))
 	v3.On("Level").Return(uint64(8))
-	v3.On("Parent").Return(func() (*flow.Identifier, uint64) { panic("Parent() should not have been called") })
+	v3.On("Parent").Return(func() (flow.Identifier, uint64) { panic("Parent() should not have been called") })
 	assert.NotPanics(t, func() { F.AddVertex(v3) })
 
 	v4 := &mock.Vertex{}
 	v4.On("VertexID").Return(string2Identifyer("Root-Vertex-B_@Level8"))
 	v4.On("Level").Return(uint64(8))
-	v4.On("Parent").Return(func() (*flow.Identifier, uint64) { panic("Parent() should not have been called") })
+	v4.On("Parent").Return(func() (flow.Identifier, uint64) { panic("Parent() should not have been called") })
 	assert.NotPanics(t, func() { F.AddVertex(v4) })
 	assert.NotPanics(t, func() { F.AddVertex(v4) })
 }
@@ -328,8 +328,8 @@ func children2List(it *VertexIterator) []*mock.Vertex {
 	return l
 }
 
-func string2Identifyer(s string) *flow.Identifier {
+func string2Identifyer(s string) flow.Identifier {
 	var identifier flow.Identifier
 	copy(identifier[:], []byte(s))
-	return &identifier
+	return identifier
 }

@@ -18,7 +18,7 @@ type Forks struct {
 func (f *Forks) GetBlocksForView(view uint64) []*types.BlockProposal {
 	return f.finalizer.GetBlocksForView(view)
 }
-func (f *Forks) GetBlock(id *flow.Identifier) (*types.BlockProposal, bool) {
+func (f *Forks) GetBlock(id flow.Identifier) (*types.BlockProposal, bool) {
 	return f.finalizer.GetBlock(id)
 }
 func (f *Forks) FinalizedView() uint64                { return f.finalizer.FinalizedBlock().View() }
@@ -52,7 +52,7 @@ func (f *Forks) AddQC(qc *types.QuorumCertificate) error {
 }
 
 func (f *Forks) ensureBlockStored(qc *types.QuorumCertificate) (*types.BlockProposal, error) {
-	block, haveBlock := f.finalizer.GetBlock(&qc.BlockID)
+	block, haveBlock := f.finalizer.GetBlock(qc.BlockID)
 	if !haveBlock {
 		return nil, &types.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID}
 	}

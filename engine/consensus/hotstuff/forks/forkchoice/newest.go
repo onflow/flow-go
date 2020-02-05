@@ -54,11 +54,10 @@ func (fc *NewestForkChoice) MakeForkChoice(curView uint64) (*types.QCBlock, erro
 		// sanity check;
 		// processing a QC with view v should result in the PaceMaker being in view v+1 or larger
 		// Hence, given that the current View is curView, all QCs should have view < curView
-		err := fmt.Errorf(
+		return nil, fmt.Errorf(
 			"ForkChoice slected qc with view %d which is larger than requested view %d",
-			choice.View, curView,
+			choice.View(), curView,
 		)
-		return nil, err
 	}
 	fc.notifier.OnForkChoiceGenerated(curView, choice.QC())
 	return choice, nil
@@ -86,7 +85,7 @@ func (fc *NewestForkChoice) AddQC(qc *types.QuorumCertificate) error {
 }
 
 func (fc *NewestForkChoice) ensureBlockStored(qc *types.QuorumCertificate) (*types.BlockProposal, error) {
-	block, haveBlock := fc.finalizer.GetBlock(&qc.BlockID)
+	block, haveBlock := fc.finalizer.GetBlock(qc.BlockID)
 	if !haveBlock {
 		return nil, &types.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID}
 	}
