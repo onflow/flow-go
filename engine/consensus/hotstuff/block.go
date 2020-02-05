@@ -32,10 +32,17 @@ func (b *Block) View() uint64 {
 }
 
 // BlockProposal represents a proposal for a new block. This is used generating
-// a new block
+// a new block as a leader as
 type BlockProposal struct {
 	Block
 
 	// Signature is the signature over the proposal by the proposer.
 	Signature crypto.Signature
+}
+
+// UnsafeBlockProposal represents a block proposal that has not been validated
+// and may be invalid. Before proceeding through the HotStuff core logic, it
+// should be validated and unwrapped.
+type UnsafeBlockProposal struct {
+	BlockProposal
 }
