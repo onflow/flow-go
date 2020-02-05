@@ -59,13 +59,19 @@ func (b Block) Valid() bool {
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
-	Number      uint64
-	Timestamp   time.Time
-	ParentID    Identifier
-	PayloadHash Identifier
-	ProposerID  Identifier
-	ParentSigs  []crypto.Signature // this will be the aggregated signature
+	ChainID      string
+	Number       uint64
+	Height       uint64
+	Timestamp    time.Time
+	ParentID     Identifier
+	ParentNumber uint64
+	PayloadHash  Identifier
+	ProposerID   Identifier
+	ParentSigs   AggregatedSignature
 }
+
+// AggregatedSignature represents a signature from multiple nodes.
+type AggregatedSignature []crypto.Signature
 
 // Body returns the immutable part of the block header.
 func (h Header) Body() interface{} {
@@ -75,7 +81,7 @@ func (h Header) Body() interface{} {
 		ParentID    Identifier
 		PayloadHash Identifier
 		ProposerID  Identifier
-		ParentSigs  []crypto.Signature
+		ParentSigs  AggregatedSignature
 	}{
 		Number:      h.Number,
 		Timestamp:   h.Timestamp,

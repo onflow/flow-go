@@ -9,7 +9,9 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -17,14 +19,16 @@ import (
 // also memorizes which entities were included into the payload.
 type Builder struct {
 	db         *badger.DB
+	state      protocol.State
 	guarantees mempool.Guarantees
 	seals      mempool.Seals
 }
 
 // NewBuilder creates a new block builder.
-func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals) *Builder {
+func NewBuilder(db *badger.DB, state protocol.State, guarantees mempool.Guarantees, seals mempool.Seals) *Builder {
 	b := &Builder{
 		db:         db,
+		state:      state,
 		guarantees: guarantees,
 		seals:      seals,
 	}
@@ -32,8 +36,8 @@ func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seal
 }
 
 // BuildOn creates a new block payload on top of the provided parent.
-func (b *Builder) BuildOn(parentID flow.Identifier) (flow.Identifier, error) {
-	payloadHash := flow.ZeroID
+func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*flow.Header, error) {
+	var header *flow.Header
 	err := b.db.Update(func(tx *badger.Txn) error {
 
 		// STEP ONE: get the payload entity IDs for all entities that are included
@@ -145,7 +149,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier) (flow.Identifier, error) {
 			Guarantees: guarantees,
 			Seals:      seals,
 		}
-		payloadHash = payload.Hash()
+		payloadHash := payload.Hash()
 
 		// index the guarantees for the payload
 		for _, guarantee := range guarantees {
@@ -163,8 +167,20 @@ func (b *Builder) BuildOn(parentID flow.Identifier) (flow.Identifier, error) {
 			}
 		}
 
+		// generate the block using the hotstuff function
+		header, err = build(payloadHash)
+		if err != nil {
+			return fmt.Errorf("could not build block: %w", err)
+		}
+
+		// convert into flow header and store
+		err = operation.InsertHeader(header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert header: %w", err)
+		}
+
 		return nil
 	})
 
-	return payloadHash, err
+	return header, err
 }

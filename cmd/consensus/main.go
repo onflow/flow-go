@@ -75,7 +75,7 @@ func main() {
 			payloadsDB := storage.NewPayloads(node.DB)
 			guaranteesDB := storage.NewGuarantees(node.DB)
 			sealsDB := storage.NewSeals(node.DB)
-			build := consensus.NewBuilder(node.DB, guarantees, seals)
+			build := consensus.NewBuilder(node.DB, node.State, guarantees, seals)
 			clean := cleaner.New(guaranteesDB, sealsDB, guarantees, seals)
 			sub, err := subzero.New(node.Logger, prov, headersDB, payloadsDB, node.State, node.Me, build, clean)
 			node.MustNot(err).Msg("could not initialize subzero engine")
