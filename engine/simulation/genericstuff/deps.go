@@ -7,7 +7,7 @@ import (
 type Communicator interface {
 	SendVote(vote *Vote, to flow.Identifier) error
 	BroadcastProposal(proposal *Proposal) error
-	SendCommit(commit *Commit) error
+	BroadcastCommit(commit *Commit) error
 }
 
 type Finalizer interface {

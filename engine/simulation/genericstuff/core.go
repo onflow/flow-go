@@ -7,6 +7,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff/round"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/protocol"
 )
 
 type ColdStuff interface {
@@ -20,7 +21,7 @@ type ColdStuff interface {
 // internal implementation of ColdStuff
 type coldStuff struct {
 	log     zerolog.Logger
-	round   round.Round
+	round   *round.Round
 	builder module.Builder
 	comms   Communicator
 
@@ -32,8 +33,49 @@ type coldStuff struct {
 	commits   chan Commit
 }
 
+func New(
+	log zerolog.Logger,
+	state protocol.State,
+	me module.Local,
+	builder module.Builder,
+	comms Communicator,
+	interval time.Duration,
+	timeout time.Duration,
+) (ColdStuff, error) {
+	round, err := round.New(state, me)
+	if err != nil {
+		return nil, err
+	}
+
+	cold := coldStuff{
+		log:       log,
+		round:     round,
+		builder:   builder,
+		comms:     comms,
+		interval:  interval,
+		timeout:   timeout,
+		proposals: make(chan Proposal, 1),
+		votes:     make(chan Vote, 1),
+		commits:   make(chan Commit, 1),
+	}
+
+	return &cold, nil
+}
+
 func (c *coldStuff) Start() (exit func(), done chan struct{}) {
 	return nil, nil
+}
+
+func (c *coldStuff) SubmitProposal(proposal *Proposal) {
+
+}
+
+func (c *coldStuff) SubmitVote(vote *Vote) {
+
+}
+
+func (c *coldStuff) SubmitCommit(commit *Commit) {
+
 }
 
 func (c *coldStuff) loop() error {
