@@ -785,8 +785,21 @@ func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
 
 func (checker *Checker) convertReferenceType(t *ast.ReferenceType) Type {
 	ty := checker.ConvertType(t.Type)
+
+	if !ty.IsInvalidType() &&
+		!ty.IsResourceType() {
+
+		checker.report(
+			&NonResourceReferenceTypeError{
+				ActualType: ty,
+				Range:      ast.NewRangeFromPositioned(t),
+			},
+		)
+	}
+
 	return &ReferenceType{
 		Authorized: t.Authorized,
+		Storable:   t.Storable,
 		Type:       ty,
 	}
 }

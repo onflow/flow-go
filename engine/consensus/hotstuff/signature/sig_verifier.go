@@ -14,7 +14,7 @@ type SigVerifier interface {
 	// The signer index in the signature and the blockID determines the public key, which will
 	// be used to verify the signature.
 	// blockID also determines the group public key to verify threshold signature.
-	VerifySig(sig *types.VoteSignature, message types.VoteBytes, blockID flow.Identifier) (bool, error)
+	VerifySig(sig *flow.PartialSignature, message types.VoteBytes, blockID flow.Identifier) (bool, error)
 
 	// VerifyAggregatedSig verifies the aggregated signature.
 	// VerifyAggregatedSig checks if the given aggregated signature is aggregated from signatures

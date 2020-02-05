@@ -6,13 +6,33 @@ import "github.com/dapperlabs/flow-go/model/flow"
 // received from the outside network. Will be placed
 type BlockHeader struct {
 	Block     *Block
-	Signature *VoteSignature // CAUTION: this is sign(Block), i.e. it does NOT include ConsensusPayload
+	Signature *flow.PartialSignature // CAUTION: this is sign(Block), i.e. it does NOT include ConsensusPayload
 }
 
-func NewBlockHeader(block *Block, sig *VoteSignature) *BlockProposal {
-	return &BlockProposal{
+func NewBlockHeader(block *Block, sig *flow.PartialSignature) *BlockProposal {
+	return &BlockHeader{
 		Block:     block,
 		Signature: sig,
+	}
+}
+
+// BlockHeaderFromFlow converts a flow header to the corresponding internal
+// HotStuff block proposal.
+func BlockHeaderFromFlow(header *flow.Header) *BlockHeader {
+	return &BlockHeader{
+		Block: &Block{
+			View: header.View,
+			QC: &QuorumCertificate{
+				View:                header.ParentView,
+				BlockID:             header.ParentID,
+				AggregatedSignature: header.ParentSig,
+			},
+			PayloadHash: header.PayloadHash[:],
+			Height:      header.Number,
+			ChainID:     header.ChainID,
+			Timestamp:   header.Timestamp,
+		},
+		Signature: header.ProposerSig,
 	}
 }
 

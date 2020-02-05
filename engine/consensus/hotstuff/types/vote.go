@@ -9,7 +9,7 @@ import (
 type Vote struct {
 	View      uint64
 	BlockID   flow.Identifier
-	Signature *VoteSignature
+	Signature *flow.PartialSignature
 }
 
 func (uv *Vote) BytesForSig() []byte {

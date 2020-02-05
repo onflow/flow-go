@@ -641,7 +641,7 @@ func TestCheckAccessImportGlobalValue(t *testing.T) {
 
 				imported, _, err := parser.ParseProgram(test)
 
-				require.Nil(t, err)
+				require.NoError(t, err)
 
 				_, err = ParseAndCheckWithOptions(t,
 					`
@@ -1706,7 +1706,7 @@ func TestCheckAccessImportGlobalValueAssignmentAndSwap(t *testing.T) {
 				),
 			)
 
-			require.Nil(t, err)
+			require.NoError(t, err)
 
 			_, err = ParseAndCheckWithOptions(t,
 				`
@@ -1758,7 +1758,7 @@ func TestCheckAccessImportGlobalValueVariableDeclarationWithSecondValue(t *testi
        pub var y <- createR()
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`

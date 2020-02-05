@@ -24,7 +24,7 @@ func TestCheckOptionalChainingFieldRead(t *testing.T) {
       let x = test?.x
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.OptionalType{Type: &sema.IntType{}},
@@ -45,7 +45,7 @@ func TestCheckOptionalChainingFunctionRead(t *testing.T) {
       let x = test?.x
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.True(t,
 		checker.GlobalValues["x"].Type.Equal(
@@ -73,7 +73,7 @@ func TestCheckOptionalChainingFunctionCall(t *testing.T) {
       let x = test?.x()
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.True(t,
 		checker.GlobalValues["x"].Type.Equal(

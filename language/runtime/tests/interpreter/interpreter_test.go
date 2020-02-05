@@ -5689,7 +5689,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
           pub resource R {}
 
           pub fun test(): &R {
-              return &storage[R] as R
+              return &storage[R] as &R
           }
         `,
 		ParseCheckAndInterpretOptions{
@@ -5713,14 +5713,14 @@ func TestInterpretReferenceExpression(t *testing.T) {
 	require.NoError(t, err)
 
 	require.IsType(t,
-		&interpreter.ReferenceValue{},
+		&interpreter.StorageReferenceValue{},
 		value,
 	)
 
 	rType := inter.Checker.GlobalTypes["R"].Type
 
 	require.Equal(t,
-		&interpreter.ReferenceValue{
+		&interpreter.StorageReferenceValue{
 			TargetStorageIdentifier: storageValue.Identifier,
 			// TODO: improve
 			TargetKey: string(rType.ID()),
@@ -5775,8 +5775,8 @@ func TestInterpretReferenceUse(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy r
 
-              let ref1 = &storage[R] as R
-              let ref2 = &storage[R] as R
+              let ref1 = &storage[R] as &R
+              let ref2 = &storage[R] as &R
 
               ref1.x = 1
               let x1 = ref1.x
@@ -5861,7 +5861,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy rs
 
-              let ref = &storage[[R]] as [R]
+              let ref = &storage[[R]] as &[R]
               let x0 = ref[0].x
               ref[0].x = 1
               let x1 = ref[0].x
@@ -5935,7 +5935,7 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
           }
 
           pub fun test() {
-              let ref = &storage[R] as R
+              let ref = &storage[R] as &R
               ref.foo()
           }
         `,
@@ -7241,20 +7241,20 @@ func TestInterpretConstantSizedArrayAllocation(t *testing.T) {
 
 	inter := parseCheckAndInterpretWithOptions(t,
 		`
-            struct Person {
-                let id: Int
+          struct Person {
+              let id: Int
 
-                init(id: Int) {
-                    self.id = id
-                }
-            }
+              init(id: Int) {
+                  self.id = id
+              }
+          }
 
-            let persons = Array(
-                size: 3,
-                generate: fun(index: Int): Person {
-                    return Person(id: index + 1)
-                }
-            )
+          let persons = Array(
+              size: 3,
+              generate: fun(index: Int): Person {
+                  return Person(id: index + 1)
+              }
+          )
         `,
 		ParseCheckAndInterpretOptions{
 			CheckerOptions: []sema.Option{
@@ -7288,4 +7288,69 @@ func TestInterpretConstantSizedArrayAllocation(t *testing.T) {
 		),
 		inter.Globals["persons"].Value,
 	)
+}
+
+func TestInterpretNonStorageReference(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          resource NFT {
+              var id: Int
+
+              init(id: Int) {
+                  self.id = id
+              }
+          }
+
+          fun test(): Int {
+              let resources <- [
+                  <-create NFT(id: 1),
+                  <-create NFT(id: 2)
+              ]
+
+              let nftRef = &resources[1] as &NFT
+              let nftRef2 = nftRef
+              nftRef2.id = 3
+
+              let nft <- resources.remove(at: 1)
+              destroy resources
+              let newID = nft.id
+              destroy nft
+
+              return newID
+          }
+        `,
+	)
+
+	value, err := inter.Invoke("test")
+	require.NoError(t, err)
+
+	assert.Equal(t, interpreter.NewIntValue(3), value)
+}
+
+func TestInterpretNonStorageReferenceAfterDestruction(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          resource NFT {
+              var id: Int
+
+              init(id: Int) {
+                  self.id = id
+              }
+          }
+
+          fun test(): Int {
+              let nft <- create NFT(id: 1)
+              let nftRef = &nft as &NFT
+              destroy nft
+              return nftRef.id
+          }
+        `,
+	)
+
+	_, err := inter.Invoke("test")
+	require.Error(t, err)
+
+	assert.IsType(t, &interpreter.DestroyedCompositeError{}, err)
 }

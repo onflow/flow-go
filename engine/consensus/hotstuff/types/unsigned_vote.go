@@ -18,7 +18,7 @@ func (uv *UnsignedVote) BytesForSig() []byte {
 	return voteBytesForSig(uv.View, uv.BlockID)
 }
 
-func (uv UnsignedVote) WithSignature(sig *VoteSignature) *Vote {
+func (uv UnsignedVote) WithSignature(sig *flow.PartialSignature) *Vote {
 	return &Vote{
 		View:      uv.View,
 		BlockID:   uv.BlockID,

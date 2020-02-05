@@ -157,7 +157,7 @@ func TestCheckStorageIndexingAssignment(t *testing.T) {
               resource R {}
 
               fun test() {
-                  storage[&R] = &storage[R] as R
+                  storage[&R] = &storage[R] as &R
               }
             `,
 		)
