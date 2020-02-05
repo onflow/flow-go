@@ -6,11 +6,9 @@ import (
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	gologging "github.com/whyrusleeping/go-logging"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
@@ -34,14 +32,14 @@ func TestStubEngineTestSuite(t *testing.T) {
 
 func (s *StubEngineTestSuite) SetupTest() {
 	const count = 2
-	golog.SetAllLoggers(gologging.INFO)
+	//golog.SetAllLoggers(gologging.INFO)
 	s.ids = CreateIDs(count)
 
 	mws, err := CreateMiddleware(s.ids)
 	require.NoError(s.Suite.T(), err)
 	s.mws = mws
 
-	nets, err := CreateNetworks(s.mws, s.ids, 100)
+	nets, err := CreateNetworks(s.mws, s.ids, 100, false)
 	require.NoError(s.Suite.T(), err)
 	s.nets = nets
 }
@@ -448,101 +446,4 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 			}
 		}
 	}
-
-}
-
-// create ids creates and initializes count-many flow identifiers instances
-func (s *StubEngineTestSuite) createIDs(count int) []*flow.Identity {
-	identities := make([]*flow.Identity, 0)
-	for i := 0; i < count; i++ {
-		// defining id of node
-		var nodeID [32]byte
-		nodeID[0] = byte(i + 1)
-		identity := &flow.Identity{
-			NodeID: nodeID,
-		}
-		identities = append(identities, identity)
-	}
-	return identities
-}
-
-// create middleware receives an ids slice and creates and initializes a middleware instances for each id
-func (s *StubEngineTestSuite) createMiddleware(identities []*flow.Identity) []*libp2p.Middleware {
-	count := len(identities)
-	mws := make([]*libp2p.Middleware, 0)
-	for i := 0; i < count; i++ {
-		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID)
-		require.NoError(s.Suite.T(), err)
-
-		mws = append(mws, mw)
-	}
-	return mws
-}
-
-// createNetworks receives a slice of middlewares their associated flow identifiers,
-// and for each middleware creates a network instance on top
-// it returns the slice of created middlewares
-func (s *StubEngineTestSuite) createNetworks(mws []*libp2p.Middleware, ids flow.IdentityList) []*libp2p.Network {
-	count := len(mws)
-	nets := make([]*libp2p.Network, 0)
-
-	// creates and mocks the state
-	state := &protocol.State{}
-	snapshot := &SnapshotMock{ids: flow.IdentityList{}}
-	state.On("Final").Return(snapshot)
-
-	for i := 0; i < count; i++ {
-		// creates and mocks me
-		me := &mock.Local{}
-		me.On("NodeID").Return(ids[i].NodeID)
-		net, err := libp2p.NewNetwork(zerolog.Logger{}, json.NewCodec(), state, me, mws[i], 100)
-		require.NoError(s.Suite.T(), err)
-
-		nets = append(nets, net)
-
-		// starts the middlewares
-		done := net.Ready()
-		<-done
-	}
-
-	for i, m := range mws {
-		// retrieves IP and port of the middleware
-		ip, port := m.GetIPPort()
-
-		// mocks an identity for the middleware
-		id := &flow.Identity{
-			NodeID:  ids[i].NodeID,
-			Address: fmt.Sprintf("%s:%s", ip, port),
-			Role:    flow.RoleCollection,
-			Stake:   0,
-		}
-		snapshot.ids = append(snapshot.ids, id)
-	}
-
-	return nets
-}
-
-type SnapshotMock struct {
-	ids flow.IdentityList
-}
-
-func (s *SnapshotMock) Identities(filters ...flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.ids, nil
-}
-
-func (s *SnapshotMock) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
-	return nil, fmt.Errorf(" not implemented")
-}
-
-func (s *SnapshotMock) Commit() (flow.StateCommitment, error) {
-	return nil, fmt.Errorf(" not implemented")
-}
-
-func (s *SnapshotMock) Clusters() (*flow.ClusterList, error) {
-	return nil, fmt.Errorf(" not implemented")
-}
-
-func (s *SnapshotMock) Head() (*flow.Header, error) {
-	return nil, fmt.Errorf(" not implemented")
 }

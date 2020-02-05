@@ -97,7 +97,7 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 		idMap := make(map[flow.Identifier]flow.Identity)
 		// mocks Overlay.Identity with an empty map for now (till we start middleware)
 		m.ov[i].On("Identity").Maybe().Return(idMap, nil)
-        m.ov[i].On("Topology").Maybe().Return(idMap, nil)
+		m.ov[i].On("Topology").Maybe().Return(idMap, nil)
 
 		// start the middleware
 		err := m.mws[i].Start(m.ov[i])
