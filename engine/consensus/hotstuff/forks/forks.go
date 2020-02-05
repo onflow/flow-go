@@ -9,7 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// Vessle implements the hotstuff.Reactor API
+// Forks implements the hotstuff.Reactor API
 type Forks struct {
 	finalizer  *finalizer.Finalizer
 	forkchoice ForkChoice

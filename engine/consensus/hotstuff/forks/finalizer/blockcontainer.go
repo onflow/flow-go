@@ -5,7 +5,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// BlockContainer wraps a block to implement forrest.Vertex
+// BlockContainer wraps a block to implement forest.Vertex
 // In addition, it holds some additional properties for efficient processing of blocks
 // by the Finalizer
 type BlockContainer struct {

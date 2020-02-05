@@ -1,4 +1,4 @@
-package forrest
+package forest
 
 import "github.com/dapperlabs/flow-go/model/flow"
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer/forrest"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer/forest"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -13,7 +13,7 @@ import (
 // Finalizer implements HotStuff finalization logic
 type Finalizer struct {
 	notifier notifications.Distributor
-	forrest  forrest.LeveledForrest
+	forest  forest.LevelledForest
 
 	lastLockedBlock   *BlockContainer          // lastLockedBlockQC is the QC that POINTS TO the the most recently locked block
 	lastLockedBlockQC *types.QuorumCertificate // lastLockedBlockQC is the QC that POINTS TO the the most recently locked block
@@ -40,27 +40,27 @@ func New(rootBlock *types.BlockProposal, rootQc *types.QuorumCertificate, notifi
 	rootBlockContainer := &BlockContainer{block: rootBlock}
 	fnlzr := Finalizer{
 		notifier:             notifier,
-		forrest:              *forrest.NewLeveledForrest(),
+		forest:              *forest.NewLevelledForest(),
 		lastLockedBlock:      rootBlockContainer,
 		lastLockedBlockQC:    rootQc,
 		lastFinalizedBlock:   rootBlockContainer,
 		lastFinalizedBlockQC: rootQc,
 	}
 
-	// If rootBlock has view > 0, we can already pre-prune the levelled Forrest to the view below it.
-	// Thereby, the levelled forrest won't event store older (unnecessary) blocks
+	// If rootBlock has view > 0, we can already pre-prune the levelled forest to the view below it.
+	// Thereby, the levelled forest won't event store older (unnecessary) blocks
 	if rootBlock.View() > 0 {
-		err := fnlzr.forrest.PruneAtLevel(rootBlock.View() - 1)
+		err := fnlzr.forest.PruneAtLevel(rootBlock.View() - 1)
 		if err != nil {
-			return nil, fmt.Errorf("internal leveled forrest error: %w", err)
+			return nil, fmt.Errorf("internal levelled forest error: %w", err)
 		}
 	}
-	// verify and add root block to leveled forrest
+	// verify and add root block to levelled forest
 	err := fnlzr.VerifyBlock(rootBlock)
 	if err != nil {
 		return nil, fmt.Errorf("invalid root block: %w", err)
 	}
-	fnlzr.forrest.AddVertex(&BlockContainer{block: rootBlock})
+	fnlzr.forest.AddVertex(&BlockContainer{block: rootBlock})
 	return &fnlzr, nil
 }
 
@@ -71,7 +71,7 @@ func (r *Finalizer) FinalizedBlockQC() *types.QuorumCertificate { return r.lastF
 
 // GetBlock returns block for given ID
 func (r *Finalizer) GetBlock(blockID *flow.Identifier) (*types.BlockProposal, bool) {
-	blockContainer, hasBlock := r.forrest.GetVertex(blockID)
+	blockContainer, hasBlock := r.forest.GetVertex(blockID)
 	if !hasBlock {
 		return nil, false
 	}
@@ -80,7 +80,7 @@ func (r *Finalizer) GetBlock(blockID *flow.Identifier) (*types.BlockProposal, bo
 
 // GetBlock returns all known blocks for the given
 func (r *Finalizer) GetBlocksForView(view uint64) []*types.BlockProposal {
-	vertexIterator := r.forrest.GetVerticesAtLevel(view)
+	vertexIterator := r.forest.GetVerticesAtLevel(view)
 	l := make([]*types.BlockProposal, 0, 1) // in the vast majority of cases, there will only be one proposal for a particular view
 	for vertexIterator.HasNext() {
 		v := vertexIterator.NextVertex().(*BlockContainer)
@@ -93,7 +93,7 @@ func (r *Finalizer) GetBlocksForView(view uint64) []*types.BlockProposal {
 // UNVALIDATED: expects block to pass Finalizer.VerifyBlock(block)
 func (r *Finalizer) IsKnownBlock(block *types.BlockProposal) bool {
 	id := block.BlockID()
-	_, hasBlock := r.forrest.GetVertex(&id)
+	_, hasBlock := r.forest.GetVertex(&id)
 	return hasBlock
 }
 
@@ -145,13 +145,13 @@ func (r *Finalizer) AddBlock(block *types.BlockProposal) error {
 		return err
 	}
 	r.checkForDoubleProposal(blockContainer)
-	r.forrest.AddVertex(blockContainer)
+	r.forest.AddVertex(blockContainer)
 	return r.updateConsensusState(blockContainer)
 }
 
 func (r *Finalizer) checkForByzantineQC(block *BlockContainer) error {
 	parentBlockID, parentView := block.Parent()
-	it := r.forrest.GetVerticesAtLevel(parentView)
+	it := r.forest.GetVerticesAtLevel(parentView)
 	for it.HasNext() {
 		otherBlock := it.NextVertex() // by construction, must have same view as parentView
 		if parentBlockID != otherBlock.VertexID() {
@@ -160,7 +160,7 @@ func (r *Finalizer) checkForByzantineQC(block *BlockContainer) error {
 			//   c.qc.view = parentView
 			//   c.qc.ID != parentBlockID
 			// => conflicting qc
-			otherChildren := r.forrest.GetChildren(otherBlock.VertexID())
+			otherChildren := r.forest.GetChildren(otherBlock.VertexID())
 			if otherChildren.HasNext() {
 				otherChild := otherChildren.NextVertex()
 				conflictingQC := otherChild.(*BlockContainer).QC()
@@ -177,7 +177,7 @@ func (r *Finalizer) checkForByzantineQC(block *BlockContainer) error {
 // checkForDoubleProposal checks if Block is a doubl;e proposal. In case it is,
 // notifications.OnDoubleProposeDetected is triggered
 func (r *Finalizer) checkForDoubleProposal(block *BlockContainer) {
-	it := r.forrest.GetVerticesAtLevel(block.View())
+	it := r.forest.GetVerticesAtLevel(block.View())
 	for it.HasNext() {
 		otherVertex := it.NextVertex() // by construction, must have same view as parentView
 		if block.ID() != otherVertex.VertexID() {
@@ -229,13 +229,13 @@ func (r *Finalizer) getThreeChain(blockContainer *BlockContainer) (*ancestryChai
 	return &ancestryChain, nil
 }
 
-// getParentBlockAndQC parent from forrest.
+// getParentBlockAndQC parent from forest.
 // returns parent BlockContainer and, for convenience, the qc pointing to the parent
 // (i.e. blockContainer.QC())
 // UNVALIDATED: expects block to pass Finalizer.VerifyBlock(block)
 func (r *Finalizer) getParentBlockAndQC(blockContainer *BlockContainer) (*BlockContainer, *types.QuorumCertificate, error) {
 	id := blockContainer.QC().BlockID
-	parentVertex, parentBlockKnown := r.forrest.GetVertex(&id)
+	parentVertex, parentBlockKnown := r.forest.GetVertex(&id)
 	if !parentBlockKnown {
 		return nil, nil, &types.ErrorMissingBlock{View: blockContainer.QC().View, BlockID: blockContainer.QC().BlockID}
 	}
@@ -307,7 +307,7 @@ func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) error {
 	// which has view >= 0. Hence, r.lastFinalizedBlockQC.View >= 0, by which (1) implies (2)
 
 	// get Block and finalize everything up to the block's parent
-	blockVertex, _ := r.forrest.GetVertex(&blockQC.BlockID) // require block to resolve parent
+	blockVertex, _ := r.forest.GetVertex(&blockQC.BlockID) // require block to resolve parent
 	blockContainer := blockVertex.(*BlockContainer)
 	err := r.finalizeUpToBlock(blockContainer.QC()) // finalize Parent, i.e. the block pointed to by the block's QC
 	if err != nil {
@@ -317,7 +317,7 @@ func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) error {
 	// finalize block itself:
 	r.lastFinalizedBlockQC = blockQC
 	r.lastFinalizedBlock = blockContainer
-	err = r.forrest.PruneAtLevel(blockContainer.View() - 1) // cannot underflow as of (2)
+	err = r.forest.PruneAtLevel(blockContainer.View() - 1) // cannot underflow as of (2)
 	if err != nil {
 		return fmt.Errorf("pruning levelled forest failed: %w", err)
 	}
@@ -327,21 +327,21 @@ func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) error {
 
 // VerifyBlock checks block for validity
 func (r *Finalizer) VerifyBlock(block *types.BlockProposal) error {
-	if block.View() < r.forrest.LowestLevel {
+	if block.View() < r.forest.LowestLevel {
 		return nil
 	}
 	blockContainer := &BlockContainer{block: block}
-	err := r.forrest.VerifyVertex(blockContainer)
+	err := r.forest.VerifyVertex(blockContainer)
 	if err != nil {
 		return fmt.Errorf("invalid block: %w", err)
 	}
 
 	// omit checking existence of parent if block at lowest non-pruned view number
-	if (block.View() == r.forrest.LowestLevel) || (block.QC().View < r.forrest.LowestLevel) {
+	if (block.View() == r.forest.LowestLevel) || (block.QC().View < r.forest.LowestLevel) {
 		return nil
 	}
 	// for block whose parents are _not_ below the pruning height, we expect the parent to be known.
-	if _, isParentKnown := r.forrest.GetVertex(&block.QC().BlockID); !isParentKnown { // we are missing the parent
+	if _, isParentKnown := r.forest.GetVertex(&block.QC().BlockID); !isParentKnown { // we are missing the parent
 		return &types.ErrorMissingBlock{
 			View:    block.QC().View,
 			BlockID: block.QC().BlockID,
