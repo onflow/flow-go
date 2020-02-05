@@ -10,7 +10,7 @@ import (
 // our direct neighbours on the network. It handles the creation & teardown of
 // connections, as well as reading & writing to/from the connections.
 type Middleware interface {
-	Start(overlay Overlay)
+	Start(overlay Overlay) error
 	Stop()
 	Send(nodeID flow.Identifier, msg interface{}) error
 	Publish(topic string, msg interface{}) error
@@ -20,6 +20,9 @@ type Middleware interface {
 // Overlay represents the interface that middleware uses to interact with the
 // overlay network layer.
 type Overlay interface {
+	// Topology returns the identities of a uniform subset of nodes in protocol state
+	Topology() (map[flow.Identifier]flow.Identity, error)
+	// Identity returns a map of all identifier to flow identity
 	Identity() (map[flow.Identifier]flow.Identity, error)
 	Receive(nodeID flow.Identifier, msg interface{}) error
 	Cleanup(nodeID flow.Identifier) error

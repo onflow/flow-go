@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
+
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
@@ -46,7 +47,7 @@ type P2PNode struct {
 }
 
 // Start starts a libp2p node on the given address.
-func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, handler network.StreamHandler) error {
+func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, handler network.StreamHandler, psOption ...pubsub.Option) error {
 	p.Lock()
 	defer p.Unlock()
 	p.name = n.Name
@@ -75,12 +76,13 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	if err != nil {
 		return errors.Wrapf(err, "could not construct libp2p host for %s", p.name)
 	}
+
 	p.libP2PHost = host
 
 	host.SetStreamHandler(FlowLibP2PProtocolID, handler)
 
-	// Creating a new PubSub instance of the type GossipSub
-	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost)
+	// Creating a new PubSub instance of the type GossipSub with psOption
+	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost, psOption...)
 
 	// TODO: Adjust pubsub.GossipSubD, pubsub.GossipSubDLo and pubsub.GossipSubDHi as per fanout provided in the future
 
@@ -268,14 +270,16 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 }
 
 // Publish publishes the given payload on the topic
-func (p *P2PNode) Publish(ctx context.Context, t string, data []byte) error {
+// if the nodes doesn't has at least minPeers number of nodes as it peers,
+// then the publish will block until at least minSize number of have been found as peers.
+func (p *P2PNode) Publish(ctx context.Context, t string, data []byte, minPeers int) error {
 	ps, found := p.topics[t]
 	if !found {
 		return fmt.Errorf("topic not found:%s", t)
 	}
-	err := ps.Publish(ctx, data)
+	err := ps.Publish(ctx, data, pubsub.WithReadiness(pubsub.MinTopicSize(minPeers)))
 	if err != nil {
-		return fmt.Errorf("failed to publish to topic %s:%w", t, err)
+		return fmt.Errorf("failed to publish to topic %s: %w", t, err)
 	}
 	return nil
 }

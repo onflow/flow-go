@@ -8,7 +8,7 @@ import (
 
 	xdr "github.com/davecgh/go-xdr/xdr2"
 
-	"github.com/dapperlabs/flow-go/language/runtime/values"
+	"github.com/dapperlabs/flow-go/language"
 )
 
 // An Encoder converts Cadence values into XDR-encoded bytes.
@@ -17,7 +17,7 @@ type Encoder struct {
 }
 
 // Encode returns the XDR-encoded representation of the given value.
-func Encode(v values.Value) ([]byte, error) {
+func Encode(v language.Value) ([]byte, error) {
 	var w bytes.Buffer
 	enc := NewEncoder(&w)
 
@@ -40,45 +40,63 @@ func NewEncoder(w io.Writer) *Encoder {
 //
 // This function returns an error if the given value's type is not supported
 // by this encoder.
-func (e *Encoder) Encode(v values.Value) error {
+func (e *Encoder) Encode(v language.Value) error {
 	switch x := v.(type) {
-	case values.Void:
+	case language.Void:
 		return e.EncodeVoid()
-	case values.Optional:
+	case language.Optional:
 		return e.EncodeOptional(x)
-	case values.Bool:
+	case language.Bool:
 		return e.EncodeBool(x)
-	case values.String:
+	case language.String:
 		return e.EncodeString(x)
-	case values.Bytes:
+	case language.Bytes:
 		return e.EncodeBytes(x)
-	case values.Address:
+	case language.Address:
 		return e.EncodeAddress(x)
-	case values.Int:
+	case language.Int:
 		return e.EncodeInt(x)
-	case values.Int8:
+	case language.Int8:
 		return e.EncodeInt8(x)
-	case values.Int16:
+	case language.Int16:
 		return e.EncodeInt16(x)
-	case values.Int32:
+	case language.Int32:
 		return e.EncodeInt32(x)
-	case values.Int64:
+	case language.Int64:
 		return e.EncodeInt64(x)
-	case values.UInt8:
-		return e.EncodeUint8(x)
-	case values.UInt16:
-		return e.EncodeUint16(x)
-	case values.UInt32:
-		return e.EncodeUint32(x)
-	case values.UInt64:
-		return e.EncodeUint64(x)
-	case values.VariableSizedArray:
+	case language.Int128:
+		return e.EncodeInt128(x)
+	case language.Int256:
+		return e.EncodeInt256(x)
+	case language.UInt:
+		return e.EncodeUInt(x)
+	case language.UInt8:
+		return e.EncodeUInt8(x)
+	case language.UInt16:
+		return e.EncodeUInt16(x)
+	case language.UInt32:
+		return e.EncodeUInt32(x)
+	case language.UInt64:
+		return e.EncodeUInt64(x)
+	case language.UInt128:
+		return e.EncodeUInt128(x)
+	case language.UInt256:
+		return e.EncodeUInt256(x)
+	case language.Word8:
+		return e.EncodeWord8(x)
+	case language.Word16:
+		return e.EncodeWord16(x)
+	case language.Word32:
+		return e.EncodeWord32(x)
+	case language.Word64:
+		return e.EncodeWord64(x)
+	case language.VariableSizedArray:
 		return e.EncodeVariableSizedArray(x)
-	case values.ConstantSizedArray:
+	case language.ConstantSizedArray:
 		return e.EncodeConstantSizedArray(x)
-	case values.Dictionary:
+	case language.Dictionary:
 		return e.EncodeDictionary(x)
-	case values.Composite:
+	case language.Composite:
 		return e.EncodeComposite(x)
 	default:
 		return fmt.Errorf("unsupported value: %T, %v", v, v)
@@ -100,7 +118,7 @@ func (e *Encoder) EncodeVoid() error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.19
 //  RFC Section 4.19 - Optional-Data
 //  Union of boolean and encoded value
-func (e *Encoder) EncodeOptional(v values.Optional) error {
+func (e *Encoder) EncodeOptional(v language.Optional) error {
 	hasValue := v.Value != nil
 	_, err := e.enc.EncodeBool(hasValue)
 	if err != nil {
@@ -119,7 +137,7 @@ func (e *Encoder) EncodeOptional(v values.Optional) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.4
 //  RFC Section 4.4 - Boolean
 //  Represented as an XDR encoded enumeration where 0 is false and 1 is true
-func (e *Encoder) EncodeBool(v values.Bool) error {
+func (e *Encoder) EncodeBool(v language.Bool) error {
 	_, err := e.enc.EncodeBool(bool(v))
 	return err
 }
@@ -129,7 +147,7 @@ func (e *Encoder) EncodeBool(v values.Bool) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.11
 //  RFC Section 4.11 - String
 //  Unsigned integer length followed by bytes zero-padded to a multiple of four
-func (e *Encoder) EncodeString(v values.String) error {
+func (e *Encoder) EncodeString(v language.String) error {
 	_, err := e.enc.EncodeString(string(v))
 	return err
 }
@@ -139,7 +157,7 @@ func (e *Encoder) EncodeString(v values.String) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.10
 //  RFC Section 4.10 - Variable-Length Opaque Data
 //  Unsigned integer length followed by fixed opaque data of that length
-func (e *Encoder) EncodeBytes(v values.Bytes) error {
+func (e *Encoder) EncodeBytes(v language.Bytes) error {
 	_, err := e.enc.EncodeOpaque(v)
 	return err
 }
@@ -149,7 +167,7 @@ func (e *Encoder) EncodeBytes(v values.Bytes) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.9
 //  RFC Section 4.9 - Fixed-Length Opaque Data
 //  Fixed-length uninterpreted data zero-padded to a multiple of four
-func (e *Encoder) EncodeAddress(v values.Address) error {
+func (e *Encoder) EncodeAddress(v language.Address) error {
 	_, err := e.enc.EncodeFixedOpaque(v.Bytes())
 	return err
 }
@@ -164,20 +182,30 @@ func (e *Encoder) EncodeAddress(v values.Address) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.10
 //  RFC Section 4.10 - Variable-Length Opaque Data
 //  Unsigned integer length followed by fixed opaque data of that length
-func (e *Encoder) EncodeInt(v values.Int) error {
-	val := v.Big()
+func (e *Encoder) EncodeInt(v language.Int) error {
+	return e.encodeBig(v.Big())
+}
 
-	isPositive := val.Cmp(big.NewInt(0)) >= 0
-
+// encodeBig writes the XDR-encoded representation of an arbitrary-precision
+// integer value.
+//
+// An arbitrary-precision integer is encoded as follows:
+//   Sign as a byte flag (positive is 1, negative is 0)
+//   Absolute value as variable-length big-endian byte array
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.10
+//  RFC Section 4.10 - Variable-Length Opaque Data
+//  Unsigned integer length followed by fixed opaque data of that length
+func (e *Encoder) encodeBig(v *big.Int) error {
 	var b []byte
 
-	if isPositive {
+	if v.Sign() >= 0 {
 		b = []byte{1}
 	} else {
 		b = []byte{0}
 	}
 
-	b = append(b, val.Bytes()...)
+	b = append(b, v.Bytes()...)
 
 	_, err := e.enc.EncodeOpaque(b)
 	return err
@@ -188,7 +216,7 @@ func (e *Encoder) EncodeInt(v values.Int) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.1
 //  RFC Section 4.1 - Integer
 //  32-bit big-endian signed integer in range [-2147483648, 2147483647]
-func (e *Encoder) EncodeInt8(v values.Int8) error {
+func (e *Encoder) EncodeInt8(v language.Int8) error {
 	_, err := e.enc.EncodeInt(int32(v))
 	return err
 }
@@ -198,7 +226,7 @@ func (e *Encoder) EncodeInt8(v values.Int8) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.1
 //  RFC Section 4.1 - Integer
 //  32-bit big-endian signed integer in range [-2147483648, 2147483647]
-func (e *Encoder) EncodeInt16(v values.Int16) error {
+func (e *Encoder) EncodeInt16(v language.Int16) error {
 	_, err := e.enc.EncodeInt(int32(v))
 	return err
 }
@@ -208,7 +236,7 @@ func (e *Encoder) EncodeInt16(v values.Int16) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.1
 //  RFC Section 4.1 - Integer
 //  32-bit big-endian signed integer in range [-2147483648, 2147483647]
-func (e *Encoder) EncodeInt32(v values.Int32) error {
+func (e *Encoder) EncodeInt32(v language.Int32) error {
 	_, err := e.enc.EncodeInt(int32(v))
 	return err
 }
@@ -218,47 +246,157 @@ func (e *Encoder) EncodeInt32(v values.Int32) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.5
 //  RFC Section 4.5 - Hyper Integer
 //  64-bit big-endian signed integer in range [-9223372036854775808, 9223372036854775807]
-func (e *Encoder) EncodeInt64(v values.Int64) error {
+func (e *Encoder) EncodeInt64(v language.Int64) error {
 	_, err := e.enc.EncodeHyper(int64(v))
 	return err
 }
 
-// EncodeUint8 writes the XDR-encoded representation of a uint-8 value.
+// EncodeInt128 writes the XDR-encoded representation of an arbitrary-precision
+// integer value.
+//
+// An arbitrary-precision integer is encoded as follows:
+//   Sign as a byte flag (positive is 1, negative is 0)
+//   Absolute value as variable-length big-endian byte array
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.10
+//  RFC Section 4.10 - Variable-Length Opaque Data
+//  Unsigned integer length followed by fixed opaque data of that length
+func (e *Encoder) EncodeInt128(v language.Int128) error {
+	return e.encodeBig(v.Big())
+}
+
+// EncodeInt256 writes the XDR-encoded representation of an arbitrary-precision
+// integer value.
+//
+// An arbitrary-precision integer is encoded as follows:
+//   Sign as a byte flag (positive is 1, negative is 0)
+//   Absolute value as variable-length big-endian byte array
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.10
+//  RFC Section 4.10 - Variable-Length Opaque Data
+//  Unsigned integer length followed by fixed opaque data of that length
+func (e *Encoder) EncodeInt256(v language.Int256) error {
+	return e.encodeBig(v.Big())
+}
+
+// EncodeUInt writes the XDR-encoded representation of an arbitrary-precision
+// integer value.
+//
+// An arbitrary-precision integer is encoded as follows:
+//   Sign as a byte flag (positive is 1, negative is 0)
+//   Absolute value as variable-length big-endian byte array
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.10
+//  RFC Section 4.10 - Variable-Length Opaque Data
+//  Unsigned integer length followed by fixed opaque data of that length
+func (e *Encoder) EncodeUInt(v language.UInt) error {
+	return e.encodeBig(v.Big())
+}
+
+// EncodeUInt8 writes the XDR-encoded representation of a uint-8 value.
 //
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Encoder) EncodeUint8(v values.UInt8) error {
+func (e *Encoder) EncodeUInt8(v language.UInt8) error {
 	_, err := e.enc.EncodeUint(uint32(v))
 	return err
 }
 
-// EncodeUint16 writes the XDR-encoded representation of a uint-16 value.
+// EncodeUInt16 writes the XDR-encoded representation of a uint-16 value.
 //
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Encoder) EncodeUint16(v values.UInt16) error {
+func (e *Encoder) EncodeUInt16(v language.UInt16) error {
 	_, err := e.enc.EncodeUint(uint32(v))
 	return err
 }
 
-// EncodeUint32 writes the XDR-encoded representation of a uint-32 value.
+// EncodeUInt32 writes the XDR-encoded representation of a uint-32 value.
 //
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.2
 //  RFC Section 4.2 - Unsigned Integer
 //  32-bit big-endian unsigned integer in range [0, 4294967295]
-func (e *Encoder) EncodeUint32(v values.UInt32) error {
+func (e *Encoder) EncodeUInt32(v language.UInt32) error {
 	_, err := e.enc.EncodeUint(uint32(v))
 	return err
 }
 
-// EncodeUint64 writes the XDR-encoded representation of a uint-64 value.
+// EncodeUInt64 writes the XDR-encoded representation of a uint-64 value.
 //
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.5
 //  RFC Section 4.5 - Unsigned Hyper Integer
 //  64-bit big-endian unsigned integer in range [0, 18446744073709551615]
-func (e *Encoder) EncodeUint64(v values.UInt64) error {
+func (e *Encoder) EncodeUInt64(v language.UInt64) error {
+	_, err := e.enc.EncodeUhyper(uint64(v))
+	return err
+}
+
+// EncodeUInt128 writes the XDR-encoded representation of an arbitrary-precision
+// integer value.
+//
+// An arbitrary-precision integer is encoded as follows:
+//   Sign as a byte flag (positive is 1, negative is 0)
+//   Absolute value as variable-length big-endian byte array
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.10
+//  RFC Section 4.10 - Variable-Length Opaque Data
+//  Unsigned integer length followed by fixed opaque data of that length
+func (e *Encoder) EncodeUInt128(v language.UInt128) error {
+	return e.encodeBig(v.Big())
+}
+
+// EncodeUInt256 writes the XDR-encoded representation of an arbitrary-precision
+// integer value.
+//
+// An arbitrary-precision integer is encoded as follows:
+//   Sign as a byte flag (positive is 1, negative is 0)
+//   Absolute value as variable-length big-endian byte array
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.10
+//  RFC Section 4.10 - Variable-Length Opaque Data
+//  Unsigned integer length followed by fixed opaque data of that length
+func (e *Encoder) EncodeUInt256(v language.UInt256) error {
+	return e.encodeBig(v.Big())
+}
+
+// EncodeWord8 writes the XDR-encoded representation of a uint-8 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.2
+//  RFC Section 4.2 - Unsigned Integer
+//  32-bit big-endian unsigned integer in range [0, 4294967295]
+func (e *Encoder) EncodeWord8(v language.Word8) error {
+	_, err := e.enc.EncodeUint(uint32(v))
+	return err
+}
+
+// EncodeWord16 writes the XDR-encoded representation of a uint-16 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.2
+//  RFC Section 4.2 - Unsigned Integer
+//  32-bit big-endian unsigned integer in range [0, 4294967295]
+func (e *Encoder) EncodeWord16(v language.Word16) error {
+	_, err := e.enc.EncodeUint(uint32(v))
+	return err
+}
+
+// EncodeWord32 writes the XDR-encoded representation of a uint-32 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.2
+//  RFC Section 4.2 - Unsigned Integer
+//  32-bit big-endian unsigned integer in range [0, 4294967295]
+func (e *Encoder) EncodeWord32(v language.Word32) error {
+	_, err := e.enc.EncodeUint(uint32(v))
+	return err
+}
+
+// EncodeWord64 writes the XDR-encoded representation of a uint-64 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.5
+//  RFC Section 4.5 - Unsigned Hyper Integer
+//  64-bit big-endian unsigned integer in range [0, 18446744073709551615]
+func (e *Encoder) EncodeWord64(v language.Word64) error {
 	_, err := e.enc.EncodeUhyper(uint64(v))
 	return err
 }
@@ -269,7 +407,7 @@ func (e *Encoder) EncodeUint64(v values.UInt64) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.13
 //  RFC Section 4.13 - Variable-Length Array
 //  Unsigned integer length followed by individually XDR-encoded array elements
-func (e *Encoder) EncodeVariableSizedArray(v values.VariableSizedArray) error {
+func (e *Encoder) EncodeVariableSizedArray(v language.VariableSizedArray) error {
 	size := uint32(len(v.Values))
 
 	_, err := e.enc.EncodeUint(size)
@@ -286,7 +424,7 @@ func (e *Encoder) EncodeVariableSizedArray(v values.VariableSizedArray) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.12
 //  RFC Section 4.12 - Fixed-Length Array
 //  Individually XDR-encoded array elements
-func (e *Encoder) EncodeConstantSizedArray(v values.ConstantSizedArray) error {
+func (e *Encoder) EncodeConstantSizedArray(v language.ConstantSizedArray) error {
 	return e.encodeArray(v.Values)
 }
 
@@ -295,7 +433,7 @@ func (e *Encoder) EncodeConstantSizedArray(v values.ConstantSizedArray) error {
 // Reference: https://tools.ietf.org/html/rfc4506#section-4.12
 //  RFC Section 4.12 - Fixed-Length Array
 //  Individually XDR-encoded array elements
-func (e *Encoder) encodeArray(v []values.Value) error {
+func (e *Encoder) encodeArray(v []language.Value) error {
 	for _, value := range v {
 		if err := e.Encode(value); err != nil {
 			return err
@@ -310,7 +448,7 @@ func (e *Encoder) encodeArray(v []values.Value) error {
 // The size of the dictionary is encoded as an unsigned integer, followed by
 // the dictionary keys, then elements, each represented as individually
 // XDR-encoded array elements.
-func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
+func (e *Encoder) EncodeDictionary(v language.Dictionary) error {
 	size := uint32(len(v.Pairs))
 
 	// size is encoded as an unsigned integer
@@ -320,8 +458,8 @@ func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
 	}
 
 	// keys and elements are encoded as separate fixed-length arrays
-	keys := make([]values.Value, size)
-	elements := make([]values.Value, size)
+	keys := make([]language.Value, size)
+	elements := make([]language.Value, size)
 
 	for i, pair := range v.Pairs {
 		keys[i] = pair.Key
@@ -340,6 +478,6 @@ func (e *Encoder) EncodeDictionary(v values.Dictionary) error {
 // EncodeComposite writes the XDR-encoded representation of a composite value.
 //
 // A composite is encoded as a fixed-length array of its field values.
-func (e *Encoder) EncodeComposite(v values.Composite) error {
+func (e *Encoder) EncodeComposite(v language.Composite) error {
 	return e.encodeArray(v.Fields)
 }
