@@ -5,7 +5,6 @@ package flow
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
@@ -100,7 +99,7 @@ func (h Header) Body() interface{} {
 		PayloadHash Identifier
 		ProposerID  Identifier
 		ParentView  uint64
-		ParentSig   []crypto.Signature
+		ParentSig   AggregatedSignature
 	}{
 		Number:      h.Number,
 		ChainID:     h.ChainID,
