@@ -79,13 +79,13 @@ type Header struct {
 	// ParentView is the view number of the parent of this block.
 	ParentView uint64
 	// ParentSig is an aggregated signature for the parent block.
-	ParentSig AggregatedSignature
+	ParentSig *AggregatedSignature
 	// ProposerID is the ID of the node that proposed this block.
 	ProposerID Identifier
 
 	// ProposerSig is the signature of the proposer over the header body.
 	// NOTE: This is omitted from the ID.
-	ProposerSig PartialSignature
+	ProposerSig *PartialSignature
 }
 
 // Body returns the immutable part of the block header.
@@ -99,7 +99,7 @@ func (h Header) Body() interface{} {
 		PayloadHash Identifier
 		ProposerID  Identifier
 		ParentView  uint64
-		ParentSig   AggregatedSignature
+		ParentSig   *AggregatedSignature
 	}{
 		Number:      h.Number,
 		ChainID:     h.ChainID,

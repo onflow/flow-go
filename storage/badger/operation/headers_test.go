@@ -22,7 +22,7 @@ func TestHeaderInsertRetrieve(t *testing.T) {
 			ParentID:    flow.Identifier{0x11},
 			PayloadHash: flow.Identifier{0x22},
 			ProposerID:  flow.Identifier{0x33},
-			ParentSig: flow.AggregatedSignature{
+			ParentSig: &flow.AggregatedSignature{
 				Raw:     []byte{0x44},
 				Signers: []bool{true},
 			},

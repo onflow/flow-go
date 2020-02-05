@@ -6,7 +6,7 @@ import "github.com/dapperlabs/flow-go/model/flow"
 // received from the outside network. Will be placed
 type BlockHeader BlockProposal
 
-func NewBlockHeader(block *Block, sig flow.PartialSignature) *BlockHeader {
+func NewBlockHeader(block *Block, sig *flow.PartialSignature) *BlockHeader {
 	return &BlockHeader{
 		Block:     block,
 		Signature: sig,
