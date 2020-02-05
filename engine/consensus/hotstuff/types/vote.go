@@ -12,14 +12,6 @@ type Vote struct {
 	Signature *VoteSignature
 }
 
-func NewVote(view uint64, blockID flow.Identifier, sig *VoteSignature) *Vote {
-	return &Vote{
-		View:      view,
-		BlockID:   blockID,
-		Signature: sig,
-	}
-}
-
 func (uv *Vote) BytesForSig() []byte {
 	return voteBytesForSig(uv.View, uv.BlockID)
 }
