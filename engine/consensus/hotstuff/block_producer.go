@@ -75,7 +75,7 @@ func (bp *BlockProducer) makeBlockForView(view uint64, qcblock *types.QCBlock) (
 
 	// turn the header into a block header proposal as known by hotstuff
 	// TODO: probably need to populate a few more fields
-	block := types.NewBlock(header.ID(), header.Number, qcblock.QC, header.PayloadHash[:], header.Number, header.ChainID)
+	block := types.NewBlock(header.ID(), header.View, qcblock.QC, header.PayloadHash[:], header.Number, header.ChainID)
 
 	return block, nil
 }
