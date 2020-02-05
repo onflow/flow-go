@@ -3,13 +3,14 @@ package hotstuff
 import (
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/module"
 )
 
 // BlockProducer is responsible for producing new block proposals
 type BlockProducer struct {
-	signer    Signer
+	signer    signature.Signer
 	viewState ViewState
 	builder   module.Builder
 
@@ -17,7 +18,7 @@ type BlockProducer struct {
 	chainID string
 }
 
-func NewBlockProducer(signer Signer, viewState ViewState, builder module.Builder, chainID string) (*BlockProducer, error) {
+func NewBlockProducer(signer signature.Signer, viewState ViewState, builder module.Builder, chainID string) (*BlockProducer, error) {
 	bp := &BlockProducer{
 		signer:    signer,
 		viewState: viewState,
@@ -71,7 +72,7 @@ func (bp *BlockProducer) signBlockProposal(proposal *types.Block) (*types.BlockP
 	unsignedVote := proposal.ToVote()
 
 	// signing the proposal is equivalent of signing the vote
-	sig := bp.signer.SignVote(unsignedVote, myIndexedPubKey)
+	sig := bp.signer.SignVote(unsignedVote, myIndexedPubKey.SignerIndex)
 
 	blockProposal := types.NewBlockProposal(proposal, sig)
 	return blockProposal, nil

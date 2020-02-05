@@ -4,5 +4,5 @@ package types
 // within its consensus cluster.
 type IndexedPubKey struct {
 	PubKey      PubKey
-	SignerIndex SignerIndex
+	SignerIndex uint32
 }

@@ -1,4 +1,4 @@
-package hotstuff
+package signature
 
 // SigProvider is a combination of signature related components.
 // Since signature's creation and verification are separated into

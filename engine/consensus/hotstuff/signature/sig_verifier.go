@@ -1,4 +1,4 @@
-package hotstuff
+package signature
 
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"

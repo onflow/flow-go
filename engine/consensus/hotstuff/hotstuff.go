@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
@@ -42,7 +43,7 @@ type HotStuff interface {
 // New sets up and instantiates an instance of the HotStuff core algorithm.
 // TODO
 func New(
-	signer Signer,
+	signer signature.Signer,
 	communicator Communicator,
 	consumer notifications.Consumer,
 	finalizer Finalizer,

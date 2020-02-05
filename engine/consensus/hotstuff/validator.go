@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -9,7 +10,7 @@ type Validator struct {
 	// Validator depends on ViewState to query the list of staked nodes on certain fork
 	viewState ViewState
 	// Validator depends on SigVerifier to verify signatures and aggregated signatures
-	verifier SigVerifier
+	verifier signature.SigVerifier
 }
 
 // ValidateQC validates the QC

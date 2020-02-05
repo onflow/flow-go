@@ -9,7 +9,7 @@ type BlockHeader struct {
 	Signature *flow.PartialSignature // CAUTION: this is sign(Block), i.e. it does NOT include ConsensusPayload
 }
 
-func NewBlockHeader(block *Block, sig *flow.PartialSignature) *BlockProposal {
+func NewBlockHeader(block *Block, sig *flow.PartialSignature) *BlockHeader {
 	return &BlockHeader{
 		Block:     block,
 		Signature: sig,

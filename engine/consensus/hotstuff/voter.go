@@ -3,12 +3,13 @@ package hotstuff
 import (
 	"fmt"
 
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/rs/zerolog"
 )
 
 type Voter struct {
-	signer    Signer
+	signer    signature.Signer
 	viewState ViewState
 	forks     Forks
 	// Need to keep track of the last view we voted for so we don't double vote accidentally
@@ -16,7 +17,7 @@ type Voter struct {
 	log           zerolog.Logger
 }
 
-func (v *Voter) NewVoter(signer Signer, viewState ViewState, forks Forks, log zerolog.Logger) *Voter {
+func (v *Voter) NewVoter(signer signature.Signer, viewState ViewState, forks Forks, log zerolog.Logger) *Voter {
 	return &Voter{
 		signer:        signer,
 		viewState:     viewState,
@@ -68,7 +69,7 @@ func (v *Voter) produceVote(bp *types.BlockProposal) (*types.Vote, error) {
 		return nil, fmt.Errorf("can not find self index for block %v: %w", bp.BlockID(), err)
 	}
 	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.BlockID())
-	sig := v.signer.SignVote(unsignedVote, myIndexedPubKey)
+	sig := v.signer.SignVote(unsignedVote, myIndexedPubKey.SignerIndex)
 	vote := unsignedVote.WithSignature(sig)
 	return vote, nil
 }
