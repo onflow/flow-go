@@ -40,7 +40,7 @@ type Middleware struct {
 // NewMiddleware creates a new middleware instance with the given config and using the
 // given codec to encode/decode messages to our peers.
 func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flowID flow.Identifier) (*Middleware, error) {
-	host, port, err := net.SplitHostPort(address)
+	ip, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		wg:         &sync.WaitGroup{},
 		stop:       make(chan struct{}),
 		me:         flowID,
-		host:       host,
+		host:       ip,
 		port:       port,
 	}
 

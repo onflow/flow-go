@@ -213,8 +213,7 @@ func (m *MeshNetTestSuite) createNetworks(mws []*libp2p.Middleware, ids flow.Ide
 		nets = append(nets, net)
 
 		// starts the middlewares
-		done := net.Ready()
-		<-done
+		<-net.Ready()
 	}
 
 	for i, m := range mws {
