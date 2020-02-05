@@ -24,7 +24,7 @@ import (
 // Engine manages execution of transactions.
 type Engine struct {
 	unit             *engine.Unit
-	log              zerolog.Logger
+	log              engine.FlowLogger
 	me               module.Local
 	protoState       protocol.State
 	execState        state.ExecutionState
@@ -43,7 +43,7 @@ func New(
 	receipts network.Engine,
 	vm virtualmachine.VirtualMachine,
 ) (*Engine, error) {
-	log := logger.With().Str("engine", "execution").Logger()
+	log := engine.FlowLogger{logger.With().Str("engine", "execution").Logger()}
 
 	executor := executor.NewBlockExecutor(vm, execState)
 
@@ -169,7 +169,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // then submits the result to the receipts engine.
 func (e *Engine) onCompleteBlock(originID flow.Identifier, block *execution.CompleteBlock) error {
 	e.log.Debug().
-		Hex("block_id", logging.Entity(block.Block)).
+		Entity("block_id", block.Block).
 		Msg("received complete block")
 
 	if originID != e.me.NodeID() {
