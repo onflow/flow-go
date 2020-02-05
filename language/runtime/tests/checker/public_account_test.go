@@ -55,7 +55,7 @@ func TestCheckPublicAccount(t *testing.T) {
               resource R {}
 
               fun test() {
-                  publicAccount.published[&R] = &publicAccount.storage[R] as R
+                  publicAccount.published[&R] = &publicAccount.storage[R] as &R
               }
             `,
 		)

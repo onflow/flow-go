@@ -173,3 +173,26 @@ type DivisionByZeroError struct{}
 func (e DivisionByZeroError) Error() string {
 	return "division by zero"
 }
+
+// DestroyedCompositeError
+
+type DestroyedCompositeError struct {
+	CompositeKind common.CompositeKind
+	LocationRange LocationRange
+}
+
+func (e *DestroyedCompositeError) ImportLocation() ast.Location {
+	return e.LocationRange.Location
+}
+
+func (e *DestroyedCompositeError) Error() string {
+	return fmt.Sprintf("%s is destroyed", e.CompositeKind)
+}
+
+func (e *DestroyedCompositeError) StartPosition() ast.Position {
+	return e.LocationRange.StartPos
+}
+
+func (e *DestroyedCompositeError) EndPosition() ast.Position {
+	return e.LocationRange.EndPos
+}

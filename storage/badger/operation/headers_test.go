@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -23,8 +22,9 @@ func TestHeaderInsertRetrieve(t *testing.T) {
 			ParentID:    flow.Identifier{0x11},
 			PayloadHash: flow.Identifier{0x22},
 			ProposerID:  flow.Identifier{0x33},
-			ParentSigs: flow.AggregatedSignature{
-				crypto.Signature{0x13, 0x37},
+			ParentSig: &flow.AggregatedSignature{
+				Raw:     []byte{0x44},
+				Signers: []bool{true},
 			},
 		}
 		blockID := expected.ID()

@@ -4850,7 +4850,7 @@ followed by the storage location,the `as` keyword,
 and the type through which the stored location should be accessed.
 
 ```cadence,file=reference-ex.cdc
-let nameRef: &Name = &account.storage[Name] as Name
+let nameRef: &Name = &account.storage[Name] as &Name
 ```
 
 The storage location must be a subtype of the type given after the `as` keyword.
@@ -4896,7 +4896,7 @@ account.storage[Counter] <-> counter
 // Create a reference to the storage location `account.storage[Counter]`
 // and allow access to it as the type `Counter`.
 //
-let counterReference: &Counter = &account.storage[Counter] as Counter
+let counterReference: &Counter = &account.storage[Counter] as &Counter
 
 counterReference.count  // is `42`
 
@@ -4936,7 +4936,7 @@ resource interface HasCount {
 // Create another reference to the storage location `account.storage[Counter]`
 // and only allow access to it as the type `HasCount`.
 //
-let limitedReference: &HasCount = &account.storage[Counter] as HasCount
+let limitedReference: &HasCount = &account.storage[Counter] as &HasCount
 
 // Read the counter's current count through the limited reference.
 //
@@ -4975,7 +4975,7 @@ resource interface HasCount {
 // Create another reference to the storage location `account.storage[Counter]`
 // and only allow access to it as the type `HasCount`.
 //
-let limitedReference: &HasCount = &account.storage[Counter] as HasCount
+let limitedReference: &HasCount = &account.storage[Counter] as &HasCount
 
 // Store the reference in the `published` object.
 //
@@ -5668,12 +5668,12 @@ transaction {
         // because an account will usually want anyone to be able to read
         // their balance and call their deposit function
         //
-        signer.published[&Receiver] = &signer.storage[ExampleToken] as Receiver
+        signer.published[&Receiver] = &signer.storage[ExampleToken] as &Receiver
 
         // The `Provider` reference is stored in account storage
         // because an account will not want to expose its withdraw method
         // to the public
-        signer.storage[&Provider] = &signer.storage[ExampleToken] as Provider
+        signer.storage[&Provider] = &signer.storage[ExampleToken] as &Provider
     }
 }
 ```

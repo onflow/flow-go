@@ -725,13 +725,19 @@ func (v *ProgramVisitor) VisitReferenceType(ctx *ReferenceTypeContext) interface
 	// A type like `&R{I}` is parsed as `ReferenceType{RestrictedType{NominalType{}}}`.
 	// A type like `&{I}` is parsed as `ReferenceType{RestrictedType{}}`.
 
+	authorized := ctx.Auth() != nil
+
+	storable := ctx.Storable() != nil
+
 	result := ctx.InnerType().Accept(v).(ast.Type)
 
-	// reference
 	startPos := PositionFromToken(ctx.GetStart())
+
 	result = &ast.ReferenceType{
-		Type:     result,
-		StartPos: startPos,
+		Authorized: authorized,
+		Storable:   storable,
+		Type:       result,
+		StartPos:   startPos,
 	}
 
 	return result

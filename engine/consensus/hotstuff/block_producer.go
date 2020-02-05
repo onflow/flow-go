@@ -6,6 +6,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+
 	"github.com/dapperlabs/flow-go/module"
 )
 
@@ -19,10 +20,11 @@ type BlockProducer struct {
 	chainID string
 }
 
-func NewBlockProducer(signer Signer, viewState ViewState, mempool Mempool, chainID string) (*BlockProducer, error) {
+func NewBlockProducer(signer Signer, viewState ViewState, builder module.Builder, chainID string) (*BlockProducer, error) {
 	bp := &BlockProducer{
 		signer:    signer,
 		viewState: viewState,
+		builder:   builder,
 		chainID:   chainID,
 	}
 	return bp, nil
@@ -52,14 +54,14 @@ func (bp *BlockProducer) makeBlockForView(view uint64, qcblock *types.QCBlock) (
 	// define the block header build function
 	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
 		header := flow.Header{
-			ChainID:      bp.chainID,
-			Number:       view,
-			Height:       qcblock.Block.Height() + 1,
-			Timestamp:    time.Now().UTC(),
-			ParentID:     qcblock.Block.BlockID(),
-			ParentNumber: qcblock.Block.View(),
-			PayloadHash:  payloadHash,
-			ProposerID:   flow.ZeroID, // TODO: fill in our own ID here
+			ChainID:     bp.chainID,
+			View:        view,
+			Number:      qcblock.Block.Height() + 1,
+			Timestamp:   time.Now().UTC(),
+			ParentID:    qcblock.Block.BlockID(),
+			ParentView:  qcblock.Block.View(),
+			PayloadHash: payloadHash,
+			ProposerID:  flow.ZeroID, // TODO: fill in our own ID here
 		}
 		return &header, nil
 	}
@@ -68,6 +70,7 @@ func (bp *BlockProducer) makeBlockForView(view uint64, qcblock *types.QCBlock) (
 	header, err := bp.builder.BuildOn(qcblock.Block.BlockID(), build)
 	if err != nil {
 		return nil, fmt.Errorf("could not build header: %w", err)
+
 	}
 
 	// turn the header into a block header proposal as known by hotstuff
