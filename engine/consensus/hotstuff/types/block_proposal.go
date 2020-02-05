@@ -4,10 +4,10 @@ import "github.com/dapperlabs/flow-go/model/flow"
 
 type BlockProposal struct {
 	Block     *Block
-	Signature *Signature // this is sign(Block)
+	Signature flow.PartialSignature // this is sign(Block)
 }
 
-func NewBlockProposal(block *Block, sig *Signature) *BlockProposal {
+func NewBlockProposal(block *Block, sig flow.PartialSignature) *BlockProposal {
 	return &BlockProposal{
 		Block:     block,
 		Signature: sig,

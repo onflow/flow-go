@@ -3,6 +3,7 @@ package hotstuff
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 )
 
@@ -29,7 +30,7 @@ type HotStuff interface {
 	//
 	// Block proposals must be submitted in order and only if they extend a
 	// block already known to HotStuff core.
-	SubmitProposal(*types.BlockProposal)
+	SubmitProposal(header *flow.Header)
 
 	// SubmitVote submits a new vote to the HotStuff event loop.
 	// This method blocks until the vote is accepted to the event queue.

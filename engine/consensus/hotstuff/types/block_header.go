@@ -4,15 +4,32 @@ import "github.com/dapperlabs/flow-go/model/flow"
 
 // BlockHeader is a temporary type for the abstraction of block proposal that hotstuff
 // received from the outside network. Will be placed
-type BlockHeader struct {
-	Block     *Block
-	Signature *Signature // this is sign(Block)
-}
+type BlockHeader BlockProposal
 
-func NewBlockHeader(block *Block, sig *Signature) *BlockProposal {
-	return &BlockProposal{
+func NewBlockHeader(block *Block, sig flow.PartialSignature) *BlockHeader {
+	return &BlockHeader{
 		Block:     block,
 		Signature: sig,
+	}
+}
+
+// BlockHeaderFromFlow converts a flow header to the corresponding internal
+// HotStuff block proposal.
+func BlockHeaderFromFlow(header *flow.Header) *BlockHeader {
+	return &BlockHeader{
+		Block: &Block{
+			View: header.View,
+			QC: &QuorumCertificate{
+				View:                header.ParentView,
+				BlockID:             header.ParentID,
+				AggregatedSignature: header.ParentSig,
+			},
+			PayloadHash: header.PayloadHash[:],
+			Height:      header.Number,
+			ChainID:     header.ChainID,
+			Timestamp:   header.Timestamp,
+		},
+		Signature: header.ProposerSig,
 	}
 }
 
