@@ -141,7 +141,7 @@ type PublicKey interface {
 	Algorithm() SigningAlgorithm
 	// KeySize return the key size in bytes.
 	KeySize() int
-	// Verify verifies a signature using the provided hasher.
+	// Verify verifies a signature of an input message using the provided hasher.
 	Verify(Signature, []byte, Hasher) (bool, error)
 	// Encode returns a bytes representation of the public key.
 	Encode() ([]byte, error)
