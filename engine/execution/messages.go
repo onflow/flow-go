@@ -14,8 +14,8 @@ type CompleteCollection struct {
 // sending view as local data, but that would be much greater refactor of storage anyway
 
 type ExecutionOrder struct {
-	Block        CompleteBlock
-	View state.View
+	Block        *CompleteBlock
+	View *state.View
 }
 
 type CompleteBlock struct {

@@ -225,6 +225,24 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	return err
 }
 
+func (e *Engine) sendExecutionOrder(completeBlock *execution.CompleteBlock) {
+
+	//get initial start state from parent block
+	startState, err := e.execState.StateCommitmentByBlockID(completeBlock.Block.ParentID)
+
+	if err != nil {
+		e.log.Warn().
+			Hex("block_id", logging.Entity(block.Block)).
+			Msg("received complete block")
+		return
+	}
+
+	e.execution.SubmitLocal(execution.ExecutionOrder{
+		Block: completeBlock,
+		View:  state.View{},
+	})
+}
+
 func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse) error {
 
 	collection := response.Collection
@@ -243,7 +261,7 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 					completeCollection.Transactions = collection.Transactions
 					if e.checkForCompleteness(completeBlock.Block) {
 						e.removeCollections(completeBlock.Block, backdata)
-						e.execution.SubmitLocal(completeBlock.Block)
+						e.sendExecutionOrder(completeBlock.Block)
 					}
 				}
 			} else {

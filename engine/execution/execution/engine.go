@@ -11,8 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
-	"github.com/dapperlabs/flow-go/language"
-	"github.com/dapperlabs/flow-go/language/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -149,7 +147,7 @@ func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *execution.ExecutionOrder:
-		return e.onCompleteBlock(originID, &ev.Block, &ev.View)
+		return e.onCompleteBlock(originID, ev.Block, ev.View)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}

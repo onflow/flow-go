@@ -42,7 +42,7 @@ func TestSubmitCollectionGuarantee(t *testing.T) {
 		assert.Eventually(t, func() bool {
 			has := consNode.Guarantees.Has(guarantee.ID())
 			return has
-		}, time.Millisecond*5, time.Millisecond)
+		}, time.Millisecond*15, time.Millisecond)
 	})
 }
 

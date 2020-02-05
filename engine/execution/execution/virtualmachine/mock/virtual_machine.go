@@ -2,6 +2,7 @@
 
 package mock
 
+import flow "github.com/dapperlabs/flow-go/model/flow"
 import mock "github.com/stretchr/testify/mock"
 import virtualmachine "github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 
@@ -10,13 +11,13 @@ type VirtualMachine struct {
 	mock.Mock
 }
 
-// NewBlockContext provides a mock function with given fields:
-func (_m *VirtualMachine) NewBlockContext() virtualmachine.BlockContext {
-	ret := _m.Called()
+// NewBlockContext provides a mock function with given fields: b
+func (_m *VirtualMachine) NewBlockContext(b *flow.Header) virtualmachine.BlockContext {
+	ret := _m.Called(b)
 
 	var r0 virtualmachine.BlockContext
-	if rf, ok := ret.Get(0).(func() virtualmachine.BlockContext); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(*flow.Header) virtualmachine.BlockContext); ok {
+		r0 = rf(b)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(virtualmachine.BlockContext)

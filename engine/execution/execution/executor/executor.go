@@ -54,15 +54,11 @@ func (e *blockExecutor) executeBlock(
 	view *state.View,
 ) (chunk []*flow.Chunk, endState flow.StateCommitment, err error) {
 
-	blockCtx := e.vm.NewBlockContext()
+	blockCtx := e.vm.NewBlockContext(&block.Block.Header)
 
 	//var startState flow.StateCommitment
 
-	// get initial start state from parent block
-	//startState, err = e.state.StateCommitmentByBlockID(block.Block.ParentID)
-	//if err != nil {
-	//	return nil, nil, fmt.Errorf("failed to fetch starting state commitment: %w", err)
-	//}
+
 
 	collections := block.Collections()
 
