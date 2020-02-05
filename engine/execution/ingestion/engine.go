@@ -232,14 +232,16 @@ func (e *Engine) sendExecutionOrder(completeBlock *execution.CompleteBlock) {
 
 	if err != nil {
 		e.log.Warn().
-			Hex("block_id", logging.Entity(block.Block)).
+			Hex("block_id", logging.Entity(completeBlock.Block)).
 			Msg("received complete block")
 		return
 	}
 
-	e.execution.SubmitLocal(execution.ExecutionOrder{
+	view := e.execState.NewView(startState)
+
+	e.execution.SubmitLocal(&execution.ExecutionOrder{
 		Block: completeBlock,
-		View:  state.View{},
+		View:  view,
 	})
 }
 

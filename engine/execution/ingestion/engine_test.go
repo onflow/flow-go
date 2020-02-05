@@ -58,7 +58,7 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 		return identityList.Filter(f), nil
 	})
 	mutator := protocol.NewMockMutator(ctrl)
-	//state.EXPECT().Mutate().Return(mutator).AnyTimes()
+	protocolState.EXPECT().Mutate().Return(mutator).AnyTimes()
 	mutator.EXPECT().StorePayload(gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}

@@ -175,10 +175,10 @@ func (e *Engine) onCompleteBlock(originID flow.Identifier, block *execution.Comp
 		return fmt.Errorf("failed to execute block: %w", err)
 	}
 
-	e.log.Debug().
-		Hex("block_id", logging.Entity(block.Block)).
-		Hex("result_id", logging.Entity(result)).
-		Msg("computed block result")
+	//e.log.Debug().
+	//	Hex("block_id", logging.Entity(block.Block)).
+	//	Hex("result_id", logging.Entity(result)).
+	//	Msg("computed block result")
 
 	// submit execution result to receipt engine
 	e.provider.SubmitLocal(result)
