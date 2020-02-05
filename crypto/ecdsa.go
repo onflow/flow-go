@@ -45,7 +45,7 @@ func (sk *PrKeyECDSA) signHash(h Hash) (Signature, error) {
 // Sign signs an array of bytes
 // This function does not modify the private key, even temporarily
 // For most of the hashers (including sha2 and sha3), the input alg
-// is modified temporarly
+// is modified temporarily
 func (sk *PrKeyECDSA) Sign(data []byte, alg Hasher) (Signature, error) {
 	if alg == nil {
 		return nil, cryptoError{"Sign requires a Hasher"}
@@ -67,7 +67,7 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h Hash) (bool, error) {
 // Verify verifies a signature of a byte array
 // This function does not modify the public key, even temporarily
 // For most of the hashers (including sha2 and sha3), the input alg
-// is modified temporarly
+// is modified temporarily
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg Hasher) (bool, error) {
 	if alg == nil {
 		return false, cryptoError{"Verify requires a Hasher"}
