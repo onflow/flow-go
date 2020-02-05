@@ -6376,7 +6376,7 @@ func TestParseOptionalRestrictedResourceTypeOnlyRestrictions(t *testing.T) {
 func TestParseReference(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-       let x = &account.storage[R] as R
+       let x = &account.storage[R] as &R
 	`)
 
 	require.NoError(t, err)
@@ -6415,11 +6415,14 @@ func TestParseReference(t *testing.T) {
 							EndPos:   Position{Offset: 34, Line: 2, Column: 33},
 						},
 					},
-					Type: &NominalType{
-						Identifier: Identifier{
-							Identifier: "R",
-							Pos:        Position{Offset: 39, Line: 2, Column: 38},
+					Type: &ReferenceType{
+						Type: &NominalType{
+							Identifier: Identifier{
+								Identifier: "R",
+								Pos:        Position{Offset: 40, Line: 2, Column: 39},
+							},
 						},
+						StartPos: Position{Offset: 39, Line: 2, Column: 38},
 					},
 					StartPos: Position{Offset: 16, Line: 2, Column: 15},
 				},

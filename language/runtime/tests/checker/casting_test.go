@@ -16,7 +16,7 @@ func TestCheckCastingIntLiteralToInt8(t *testing.T) {
       let x = 1 as Int8
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.Int8Type{},
@@ -43,7 +43,7 @@ func TestCheckCastingIntLiteralToAnyStruct(t *testing.T) {
       let x = 1 as AnyStruct
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.AnyStructType{},
@@ -65,7 +65,7 @@ func TestCheckCastingResourceToAnyResource(t *testing.T) {
       }
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.NotEmpty(t, checker.Elaboration.CastingTargetTypes)
 }
@@ -82,5 +82,5 @@ func TestCheckCastingArrayLiteral(t *testing.T) {
       }
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 }

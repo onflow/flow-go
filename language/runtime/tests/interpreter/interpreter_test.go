@@ -5689,7 +5689,7 @@ func TestInterpretReferenceExpression(t *testing.T) {
           pub resource R {}
 
           pub fun test(): &R {
-              return &storage[R] as R
+              return &storage[R] as &R
           }
         `,
 		ParseCheckAndInterpretOptions{
@@ -5775,8 +5775,8 @@ func TestInterpretReferenceUse(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy r
 
-              let ref1 = &storage[R] as R
-              let ref2 = &storage[R] as R
+              let ref1 = &storage[R] as &R
+              let ref2 = &storage[R] as &R
 
               ref1.x = 1
               let x1 = ref1.x
@@ -5861,7 +5861,7 @@ func TestInterpretReferenceUseAccess(t *testing.T) {
               // there was no old value, but it must be discarded
               destroy rs
 
-              let ref = &storage[[R]] as [R]
+              let ref = &storage[[R]] as &[R]
               let x0 = ref[0].x
               ref[0].x = 1
               let x1 = ref[0].x
@@ -5935,7 +5935,7 @@ func TestInterpretReferenceDereferenceFailure(t *testing.T) {
           }
 
           pub fun test() {
-              let ref = &storage[R] as R
+              let ref = &storage[R] as &R
               ref.foo()
           }
         `,

@@ -49,50 +49,59 @@ func (checker *Checker) VisitReferenceExpression(referenceExpression *ast.Refere
 		referencedType = UnwrapOptionalType(referencedExpression.Accept(checker).(Type))
 	}
 
-	// Check the result type
-
-	resultType := checker.ConvertType(referenceExpression.Type)
-
 	// Check that the referenced expression's type is a resource or resource interface
 
 	if !referencedType.IsInvalidType() &&
 		!referencedType.IsResourceType() {
 
 		checker.report(
-			&NonResourceReferenceError{
+			&NonResourceTypeReferenceError{
 				ActualType: referencedType,
 				Range:      ast.NewRangeFromPositioned(referencedExpression),
 			},
 		)
 	}
 
-	// Check that the result type is a resource or resource interface
+	// Check the result type
 
-	if !resultType.IsInvalidType() &&
-		!resultType.IsResourceType() {
+	resultType := checker.ConvertType(referenceExpression.Type)
 
-		checker.report(
-			&NonResourceReferenceError{
-				ActualType: resultType,
-				Range:      ast.NewRangeFromPositioned(referencedExpression),
-			},
-		)
+	// Check that the result type is a reference type
+
+	var referenceType *ReferenceType
+
+	if !resultType.IsInvalidType() {
+		var ok bool
+		referenceType, ok = resultType.(*ReferenceType)
+		if !ok {
+			checker.report(
+				&NonReferenceTypeReferenceError{
+					ActualType: resultType,
+					Range:      ast.NewRangeFromPositioned(referencedExpression),
+				},
+			)
+		}
 	}
 
 	// Check that the referenced expression's type is a subtype of the result type
 
 	if !referencedType.IsInvalidType() &&
-		!resultType.IsInvalidType() &&
-		!IsSubType(referencedType, resultType) {
+		referenceType != nil &&
+		!referenceType.Type.IsInvalidType() &&
+		!IsSubType(referencedType, referenceType.Type) {
 
 		checker.report(
 			&TypeMismatchError{
-				ExpectedType: resultType,
+				ExpectedType: referenceType.Type,
 				ActualType:   referencedType,
 				Range:        ast.NewRangeFromPositioned(referencedExpression),
 			},
 		)
 	}
 
-	return &ReferenceType{Type: resultType}
+	if referenceType == nil {
+		return &InvalidType{}
+	}
+
+	return referenceType
 }

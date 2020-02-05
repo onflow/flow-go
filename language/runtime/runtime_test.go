@@ -222,7 +222,7 @@ func TestRuntimeStorage(t *testing.T) {
           let oldR <- signer.storage[R] <- createR()
           destroy oldR
 
-          signer.storage[&R] = &signer.storage[R] as R
+          signer.storage[&R] = &signer.storage[R] as &R
           log(signer.storage[&R] != nil)
         `,
 		"resource array": `
@@ -331,7 +331,7 @@ func TestRuntimeStorageMultipleTransactionsResourceWithArray(t *testing.T) {
           var container: @Container? <- createContainer()
           signer.storage[Container] <-> container
           destroy container
-          let ref = &signer.storage[Container] as Container
+          let ref = &signer.storage[Container] as &Container
           signer.storage[&Container] = ref
         }
       }
@@ -676,7 +676,7 @@ func TestRuntimeResourceContractUseThroughReference(t *testing.T) {
       transaction {
 
         prepare(signer: Account) {
-          let ref = &signer.storage[R] as R
+          let ref = &signer.storage[R] as &R
           ref.x()
         }
       }
@@ -746,7 +746,7 @@ func TestRuntimeResourceContractUseThroughStoredReference(t *testing.T) {
           }
           destroy r
 
-          signer.storage[&R] = &signer.storage[R] as R
+          signer.storage[&R] = &signer.storage[R] as &R
         }
       }
     `)
@@ -835,7 +835,7 @@ func TestRuntimeResourceContractWithInterface(t *testing.T) {
           }
           destroy r
 
-          signer.storage[&RI] = &signer.storage[R] as RI
+          signer.storage[&RI] = &signer.storage[R] as &RI
         }
       }
     `)
@@ -972,7 +972,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
           signer.storage[X] <-> x
           destroy x
 
-          let ref = &signer.storage[X] as X
+          let ref = &signer.storage[X] as &X
           ref.x = 1
         }
       }
@@ -983,7 +983,7 @@ func TestRuntimeStorageChanges(t *testing.T) {
 
       transaction {
         prepare(signer: Account) {
-          let ref = &signer.storage[X] as X
+          let ref = &signer.storage[X] as &X
           log(ref.x)
         }
       }
@@ -1108,7 +1108,7 @@ func TestRuntimeAccountPublishAndAccess(t *testing.T) {
         prepare(signer: Account) {
           let existing <- signer.storage[R] <- createR()
           destroy existing
-          signer.published[&R] = &signer.storage[R] as R
+          signer.published[&R] = &signer.storage[R] as &R
         }
       }
     `)
@@ -1823,8 +1823,8 @@ func TestRuntimeFungibleTokenUpdateAccountCode(t *testing.T) {
 
       transaction {
           prepare(acct: Account) {
-              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as FungibleToken.Receiver
-              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as FungibleToken.Vault
+              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Receiver
+              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Vault
           }
       }
     `)
@@ -1844,8 +1844,8 @@ func TestRuntimeFungibleTokenUpdateAccountCode(t *testing.T) {
               let oldVault <- acct.storage[FungibleToken.Vault] <- vaultA
               destroy oldVault
 
-              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as FungibleToken.Receiver
-              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as FungibleToken.Vault
+              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Receiver
+              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Vault
           }
       }
     `)
@@ -1926,8 +1926,8 @@ func TestRuntimeFungibleTokenCreateAccount(t *testing.T) {
 
       transaction {
           prepare(acct: Account) {
-              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as FungibleToken.Receiver
-              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as FungibleToken.Vault
+              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Receiver
+              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Vault
           }
       }
     `)
@@ -1947,8 +1947,8 @@ func TestRuntimeFungibleTokenCreateAccount(t *testing.T) {
               let oldVault <- acct.storage[FungibleToken.Vault] <- vaultA
               destroy oldVault
 
-              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as FungibleToken.Receiver
-              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as FungibleToken.Vault
+              acct.published[&FungibleToken.Receiver] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Receiver
+              acct.storage[&FungibleToken.Vault] = &acct.storage[FungibleToken.Vault] as &FungibleToken.Vault
           }
       }
     `)
