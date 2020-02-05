@@ -25,5 +25,5 @@ type PartialSignature struct {
 	Raw []byte
 	// SignerIndex is the index of the signer. Tracking the identity list this
 	// index corresponds to is the responsibility of the user of this type.
-	SignerIndex uint
+	SignerIndex uint32
 }

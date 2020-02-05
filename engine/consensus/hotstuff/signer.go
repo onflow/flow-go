@@ -9,5 +9,5 @@ import (
 // HotStuff algorithm. This component must have use the private key used to
 // stake.
 type Signer interface {
-	SignVote(*types.UnsignedVote, types.PubKey) flow.PartialSignature
+	SignVote(*types.UnsignedVote, types.PubKey) *flow.PartialSignature
 }
