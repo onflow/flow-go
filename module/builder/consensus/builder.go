@@ -139,9 +139,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*fl
 			commit = seal.FinalState
 		}
 
-		// STEP THREE: we now have the guarantees and seals we can validly
-		// include in the payload built on top of the given block; but we still
-		// need to memorize them before returning, so we can rebuild it later
+		// STEP THREE: we have the guarantees and seals we can validly include
+		// in the payload built on top of the given block. Now we need to build
+		// and store the block header, as well as index the payload contents.
 
 		// build the payload so we can get the hash
 		payload := flow.Payload{
@@ -167,13 +167,13 @@ func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*fl
 			}
 		}
 
-		// generate the block using the hotstuff function
+		// generate the block header using the hotstuff-provided function
 		header, err = build(payloadHash)
 		if err != nil {
 			return fmt.Errorf("could not build block: %w", err)
 		}
 
-		// convert into flow header and store
+		// insert the block header
 		err = operation.InsertHeader(header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
