@@ -10,5 +10,8 @@ import (
 // up after a block is finalized, such as memory pools and caches used for
 // forking awareness.
 type Cleaner interface {
+
+	// CleanAfter cleans up all temporary state for the given block. This should
+	// be called when a block is finalized.
 	CleanAfter(blockID flow.Identifier) error
 }
