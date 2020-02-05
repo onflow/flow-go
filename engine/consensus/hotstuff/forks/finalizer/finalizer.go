@@ -13,7 +13,7 @@ import (
 // Finalizer implements HotStuff finalization logic
 type Finalizer struct {
 	notifier notifications.Distributor
-	forest  forest.LevelledForest
+	forest   forest.LevelledForest
 
 	lastLockedBlock   *BlockContainer          // lastLockedBlockQC is the QC that POINTS TO the the most recently locked block
 	lastLockedBlockQC *types.QuorumCertificate // lastLockedBlockQC is the QC that POINTS TO the the most recently locked block
@@ -40,7 +40,7 @@ func New(rootBlock *types.BlockProposal, rootQc *types.QuorumCertificate, notifi
 	rootBlockContainer := &BlockContainer{block: rootBlock}
 	fnlzr := Finalizer{
 		notifier:             notifier,
-		forest:              *forest.NewLevelledForest(),
+		forest:               *forest.NewLevelledForest(),
 		lastLockedBlock:      rootBlockContainer,
 		lastLockedBlockQC:    rootQc,
 		lastFinalizedBlock:   rootBlockContainer,
@@ -140,21 +140,35 @@ func (r *Finalizer) AddBlock(block *types.BlockProposal) error {
 		return nil
 	}
 	blockContainer := &BlockContainer{block: block}
-	if err := r.checkForByzantineQC(blockContainer); err != nil {
+	if err := r.checkForByzantineQC(blockContainer.QC()); err != nil {
 		return err
 	}
 	r.checkForDoubleProposal(blockContainer)
 	r.forest.AddVertex(blockContainer)
-	return r.updateConsensusState(blockContainer)
+	err := r.updateConsensusState(blockContainer)
+	if err != nil {
+		return fmt.Errorf("adding block to finalized failed: %w", err)
+	}
+	r.notifier.OnBlockIncorporated(blockContainer.Block())
+	return nil
 }
 
-func (r *Finalizer) checkForByzantineQC(block *BlockContainer) error {
-	parentBlockID, parentView := block.Parent()
-	it := r.forest.GetVerticesAtLevel(parentView)
+
+// checkForByzantineQC checks if qc conflicts with a stored Quorum Certificate.
+// In case a conflicting QC is found, an ErrorByzantineThresholdExceeded is returned.
+//
+// Two Quorum Certificates q1 and q2 are defined as conflicting iff:
+//     * q1.View == q2.View
+//     * q1.BlockID != q2.BlockID
+// This means there are two Quorums for conflicting blocks at the same view.
+// Per Lemma 1 from the HotStuff paper https://arxiv.org/abs/1803.05069v6, two
+// conflicting QCs can exists if and onluy of the Byzantine threshold is exceeded.
+func (r *Finalizer) checkForByzantineQC(qc *types.QuorumCertificate) error {
+	it := r.forest.GetVerticesAtLevel(qc.View)
 	for it.HasNext() {
-		otherBlock := it.NextVertex() // by construction, must have same view as parentView
-		if parentBlockID != otherBlock.VertexID() {
-			// * we have just found another block at the same view number as block.qc but with different hash
+		otherBlock := it.NextVertex() // by construction, must have same view as qc.View
+		if qc.BlockID != otherBlock.VertexID() {
+			// * we have just found another block at the same view number as qc.View but with different hash
 			// * if this block has a child c, this child will have
 			//   c.qc.view = parentView
 			//   c.qc.ID != parentBlockID
@@ -165,7 +179,7 @@ func (r *Finalizer) checkForByzantineQC(block *BlockContainer) error {
 				conflictingQC := otherChild.(*BlockContainer).QC()
 				return &hotstuff.ErrorByzantineThresholdExceeded{Evidence: fmt.Sprintf(
 					"conflicting QCs at view %d: %v and %v",
-					parentView, parentBlockID, conflictingQC.BlockID,
+					qc.View, qc.BlockID, conflictingQC.BlockID,
 				)}
 			}
 		}
@@ -203,7 +217,6 @@ func (r *Finalizer) updateConsensusState(blockContainer *BlockContainer) error {
 	if err != nil {
 		return err
 	}
-	r.notifier.OnBlockIncorporated(blockContainer.Block())
 	return nil
 }
 

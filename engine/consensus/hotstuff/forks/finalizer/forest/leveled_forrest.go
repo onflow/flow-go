@@ -162,7 +162,7 @@ func (f *LevelledForest) registerWithParent(vertexContainer *vertexContainer) {
 // (i.e. there exists an empty or full container with the same id but different level).
 func (f *LevelledForest) getOrCreateVertexContainer(id flow.Identifier, level uint64) *vertexContainer {
 	container, exists := f.vertices[id] // try to find vertex container with same ID
-	if !exists {                         // if no vertex container found, create one and store it
+	if !exists {                        // if no vertex container found, create one and store it
 		container = &vertexContainer{
 			id:    id,
 			level: level,

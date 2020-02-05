@@ -66,11 +66,14 @@ func (fc *NewestForkChoice) MakeForkChoice(curView uint64) (*types.QCBlock, erro
 // updateQC updates `preferredParent` according to the fork-choice rule.
 // Currently, we implement 'Chained HotStuff Protocol' where the fork-choice
 // rule is: "build on newest QC"
-// Returns true if and only if preferredParent was updated
 func (fc *NewestForkChoice) AddQC(qc *types.QuorumCertificate) error {
 	if qc.View <= fc.preferredParent.View() {
+		// Per construction, preferredParent.View() is always larger than the last finalized block's view.
+		// Hence, this check suffices to drop all QCs with qc.View <= last_finalized_block.View().
 		return nil
 	}
+
+	// Have qc.View > last_finalized_block.View(). Hence, block referenced by qc should be stored:
 	block, err := fc.ensureBlockStored(qc)
 	if err != nil {
 		return fmt.Errorf("cannot add QC: %w", err)

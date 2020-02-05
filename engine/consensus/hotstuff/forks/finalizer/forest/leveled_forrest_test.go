@@ -18,7 +18,7 @@ type VertexMock struct {
 }
 
 func (v *VertexMock) VertexID() flow.Identifier         { return v.id }
-func (v *VertexMock) Level() uint64                      { return v.level }
+func (v *VertexMock) Level() uint64                     { return v.level }
 func (v *VertexMock) Parent() (flow.Identifier, uint64) { return v.parentId, v.parentLevel }
 
 func NewVertexMock(vertexId string, vertexLevel uint64, parentId string, parentLevel uint64) *mock.Vertex {

@@ -5,12 +5,12 @@ import (
 )
 
 // ForkChoice determines the fork-choice.
-// It is the highest level of the consensus reactor and feeds the underlying layer
-// reactor.core with data
+// ForkChoice directly interfaces with the Finalizer to query required information
+// (such as finalized View, stored block, etc).
 type ForkChoice interface {
 
-	// AddQC adds a quorum certificate to Forks.
-	// Might error in case the block referenced by the qc is unknown.
+	// AddQC adds a Quorum Certificate to Forks;
+	// Errors in case the block referenced by the qc is unknown.
 	AddQC(qc *types.QuorumCertificate) error
 
 	// MakeForkChoice prompts the ForkChoice to generate a fork choice for the
