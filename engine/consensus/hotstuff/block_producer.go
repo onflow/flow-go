@@ -44,8 +44,8 @@ func (bp *BlockProducer) makeBlockForView(view uint64, qcblock *types.QCBlock) *
 
 // signBlockProposal takes a unsigned proposal, signes it and returns a signed block proposal
 func (bp *BlockProducer) signBlockProposal(proposal *types.Block) (*types.BlockProposal, error) {
-	// get my identity
-	myIdentity, err := bp.viewState.GetSelfIdentityForBlockID(proposal.ID())
+	// get my public key and signer index
+	myIndexedPubKey, err := bp.viewState.GetSelfIndexPubKeyForBlockID(proposal.ID())
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (bp *BlockProducer) signBlockProposal(proposal *types.Block) (*types.BlockP
 	unsignedVote := proposal.ToVote()
 
 	// signing the proposal is equivalent of signing the vote
-	sig := bp.signer.SignVote(unsignedVote, myIdentity.PubKey)
+	sig := bp.signer.SignVote(unsignedVote, myIndexedPubKey)
 
 	blockProposal := types.NewBlockProposal(proposal, sig)
 	return blockProposal, nil

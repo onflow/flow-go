@@ -4,15 +4,16 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
-// SigAggregator provides abstraction of how vote signatures can be aggregated into an aggregated signature
-// and how to verify a single signature and aggregated signature
-// SigAggregator is a stateful component. It accumulatively builds an aggregated signature.
-// The main reason for SigAggregator to be a stateful component is so that HotStuff doesn't need to know
-// the implementation detail of threshold, and check whether threshold has met.
+// SigAggregator is a stateful component to aggregate signatures into aggregated signatures.
+// The main reason for it to be stateful is to hide how the threshold is implemented.
+// Since BLS signature and threshold signature works differently, hotstuff doesn't need to
+// know the implementation detail, but only care about at what point an aggregated signature
+// has created.
 type SigAggregator interface {
 	// AddSig accumulatively builds an aggregated signature by adding one signature at a time.
-	// When the threshold for signatures to be aggregated has reached, an aggregated signature will be returned,
-	// otherwise it will return error.
-	// AddSig also calls `VerifySingleSig` internally to validate the input signature.
-	AddSig(sig *types.VoteSignatureWithPubKey) (*types.AggregatedSignature, error)
+	// When the threshold for signatures to be aggregated has reached, an aggregated signature
+	// will be returned; otherwise an error will be returned.
+	// AddSig also calls verifies the signature internally. It returns error if the signature
+	// to be added is invalid.
+	AddSig(sig *types.VoteSignatureWithIndexedPubKey) (*types.AggregatedSignature, error)
 }

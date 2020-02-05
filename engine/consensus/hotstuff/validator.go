@@ -6,10 +6,10 @@ import (
 )
 
 type Validator struct {
-	// Validator depends on view state to query the list of staked nodes on certain fork
+	// Validator depends on ViewState to query the list of staked nodes on certain fork
 	viewState ViewState
-	// Validator depends on aggregator to aggregate signatures and verify aggregated signatures
-	aggregator SigAggregator
+	// Validator depends on SigVerifier to verify signatures and aggregated signatures
+	verifier SigVerifier
 }
 
 // ValidateQC validates the QC

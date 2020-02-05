@@ -9,7 +9,7 @@ type BlockHeader struct {
 	Signature *VoteSignature // CAUTION: this is sign(Block), i.e. it does NOT include ConsensusPayload
 }
 
-func NewBlockHeader(block *Block, sig *Signature) *BlockProposal {
+func NewBlockHeader(block *Block, sig *VoteSignature) *BlockProposal {
 	return &BlockProposal{
 		Block:     block,
 		Signature: sig,

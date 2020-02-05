@@ -4,10 +4,5 @@ package types
 // It's an abstraction of the signature and data about who signed it.
 type VoteSignature struct {
 	RawSignature []byte
-	SignerIndex  []byte
-}
-
-type VoteSignatureWithPubKey struct {
-	VoteSignature *VoteSignature
-	PubKey        PubKey
+	SignerIndex  SignerIndex
 }

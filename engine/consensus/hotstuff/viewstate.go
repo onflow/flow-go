@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -11,8 +12,8 @@ type ViewState interface {
 	// IsSelfLeaderForView returns if myself is the leader at a given view
 	IsSelfLeaderForView(view uint64) bool
 
-	// GetSelfIdentityForBlockID returns my own identity in all staked node at a given block.
-	GetSelfIdentityForBlockID(blockID flow.Identifier) (flow.Identity, error)
+	// GetSelfIndexPubKeyForBlockID returns my own identity in all staked node at a given block.
+	GetSelfIndexPubKeyForBlockID(blockID flow.Identifier) (*types.IndexedPubKey, error)
 
 	// GetIdentitiesForView returns all the staked nodes in my cluster at a certain block.
 	// view specifies the view
