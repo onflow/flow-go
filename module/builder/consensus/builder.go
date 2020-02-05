@@ -71,14 +71,14 @@ func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*fl
 				break
 			}
 
-			// index the ancestor's guarantees
+			// look up the ancestor's guarantees
 			var guaranteeIDs []flow.Identifier
 			err := operation.LookupGuarantees(ancestor.PayloadHash, &guaranteeIDs)(tx)
 			if err != nil {
 				return fmt.Errorf("could not look up ancestor guarantees (%x): %w", ancestor.PayloadHash, err)
 			}
 
-			// index the ancestor's seals
+			// look up the ancestor's seals
 			var sealIDs []flow.Identifier
 			err = operation.LookupSeals(ancestor.PayloadHash, &sealIDs)(tx)
 			if err != nil {
