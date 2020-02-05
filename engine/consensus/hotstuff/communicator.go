@@ -14,5 +14,5 @@ type Communicator interface {
 
 	// BroadcastProposal sends the given block proposal to all nodes
 	// participating in the consensus process.
-	BroadcastProposal(proposal *types.BlockProposal) error
+	BroadcastProposal(proposal *flow.Header) error
 }

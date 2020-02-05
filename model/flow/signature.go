@@ -1,9 +1,5 @@
 package flow
 
-import (
-	"github.com/dapperlabs/flow-go/crypto"
-)
-
 // NodeSignature is the outcome of a node signing an entity
 type NodeSignature struct {
 	// the unique id of node
@@ -14,11 +10,16 @@ type NodeSignature struct {
 	Signature []byte
 }
 
-// AggregatedSignature represents an aggregated BLS signature.
-// TODO should be replaced with BLS signature from crypto library
-type AggregatedSignature []crypto.Signature
+// AggregatedSignature represents an aggregated signature.
+type AggregatedSignature struct {
+	// Raw is the raw signature bytes.
+	Raw []byte
+	// Signers is a "bitmap" of signer indices. Tracking the identity list the
+	// indices correspond to is the responsibility of the user of the type.
+	Signers []bool
+}
 
-// PartialSignature represents a partial BLS signature.
+// PartialSignature represents a partial signature.
 type PartialSignature struct {
 	// Raw is the raw signature bytes.
 	Raw []byte
