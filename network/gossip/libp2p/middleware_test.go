@@ -106,6 +106,7 @@ func (m *MiddlewareTestSuit) StartMiddlewares() {
 
 		ids := map[flow.Identifier]flow.Identity{flowID.NodeID: flowID}
 		// mocks Overlay.Identity
+		m.ov[i].On("Topology").Maybe().Return(ids, nil)
 		m.ov[i].On("Identity").Maybe().Return(ids, nil)
 
 		// start the middleware

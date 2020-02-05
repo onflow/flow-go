@@ -77,7 +77,7 @@ func (m *Middleware) Start(ov middleware.Overlay) {
 
 	// TODO: Add only a subset of the total nodes in the network Issue#2244
 	// Add all the other nodes as peers
-	ids, err := ov.Identity()
+	ids, err := ov.Topology()
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get ids")
 	}
