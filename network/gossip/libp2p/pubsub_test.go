@@ -38,11 +38,13 @@ func (p *PubSubTestSuite) SetupTest() {
 }
 
 type mockDiscovery struct {
+	done  bool
 	peers []peer.AddrInfo
 }
 
 func (s *mockDiscovery) SetPeers(peers []peer.AddrInfo) {
 	s.peers = peers
+	s.done = false
 }
 
 func (s *mockDiscovery) Advertise(_ context.Context, _ string, _ ...discovery.Option) (time.Duration, error) {
@@ -50,13 +52,22 @@ func (s *mockDiscovery) Advertise(_ context.Context, _ string, _ ...discovery.Op
 }
 
 func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option) (<-chan peer.AddrInfo, error) {
-	fmt.Println("FindPeers called")
+	if s.done {
+		emptyCh := make(chan peer.AddrInfo, 0)
+		return emptyCh, nil
+	}
+	//fmt.Println("find peers")
 	count := len(s.peers)
+	if count <= 0 {
+		return nil, fmt.Errorf("no peers")
+	}
+	fmt.Println("find peers")
 	ch := make(chan peer.AddrInfo, count)
 	for _, reg := range s.peers {
 		ch <- reg
 	}
-	//close(ch)
+	close(ch)
+	s.done = true
 	return ch, nil
 }
 
@@ -64,7 +75,7 @@ func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Op
 func (p *PubSubTestSuite) TestOneToManyMessage() {
 	defer p.cancel()
 	topic := "testtopic"
-	count := 4
+	count := 10
 	golog.SetAllLoggers(gologging.DEBUG)
 
 	// Step 1: Creates nodes
@@ -149,8 +160,8 @@ func (p *PubSubTestSuite) TestOneToManyMessage() {
 func (p *PubSubTestSuite) TestManyToManyMessage() {
 	defer p.cancel()
 	topic := p.Suite.T().Name()
-	count := 4
-	golog.SetAllLoggers(gologging.DEBUG)
+	count := 10
+	golog.SetAllLoggers(gologging.INFO)
 
 	// Creates nodes
 	d := &mockDiscovery{}
@@ -164,7 +175,7 @@ func (p *PubSubTestSuite) TestManyToManyMessage() {
 	}
 	ch := make(chan rcvMsg, 100)
 	done := make(chan struct{})
-	defer close(done)
+
 	for i, n := range nodes {
 		// defines a func to read from the subscription
 		subReader := func(index int, s *pubsub.Subscription) {
@@ -202,7 +213,7 @@ func (p *PubSubTestSuite) TestManyToManyMessage() {
 	// set the common discovery object shared by all nodes with the list of all peer.AddrInfos
 	d.SetPeers(pInfos)
 
-	time.Sleep(time.Hour)
+	//time.Sleep(time.Hour)
 
 	// create the messages that will be sent out by each node
 	var psMsgs []string
@@ -226,7 +237,7 @@ PublishCheck:
 		select {
 		case <-pch:
 			published++
-		case <-time.After(5 * time.Hour):
+		case <-time.After(30 * time.Second):
 			require.Fail(p.T(), "timed out when sending messages")
 			break PublishCheck
 		}
@@ -242,12 +253,13 @@ PublishCheck:
 		case res := <-ch:
 			recv[res.id] = append(recv[res.id], res.msg)
 			msgs++
-		case <-time.After(3 * time.Hour):
+		case <-time.After(10 * time.Second):
 			require.Fail(p.T(), "message not received")
 			break
 		}
 	}
 
+	close(done)
 	for k, v := range recv {
 		assert.Len(p.T(), v, count, "incorrect number of messages received by node %d: %s", k, v)
 	}
