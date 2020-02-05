@@ -1,10 +1,15 @@
 package hotstuff
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+import (
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+)
 
 // Signer returns a signature for the given types
 type Signer interface {
-	// SignVote takes a message and public key, returns a vote signature
-	// view is needed to query the signer index
-	SignVote(vote *types.UnsignedVote, pubKey *types.IndexedPubKey) *types.VoteSignature
+	// SignVote signs a vote with the signer index, returns a vote signature
+	// vote - the vote to be signed
+	// signerIndex - the index of the signer in its cluster. The signerIndex
+	// along with the BlockID field in the vote, determines the public key,
+	// of which the private key will be used to sign the vote.
+	SignVote(vote *types.UnsignedVote, signerIndex SignerIndex) *types.VoteSignature
 }
