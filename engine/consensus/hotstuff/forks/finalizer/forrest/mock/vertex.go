@@ -26,15 +26,15 @@ func (_m *Vertex) Level() uint64 {
 }
 
 // Parent provides a mock function with given fields:
-func (_m *Vertex) Parent() (flow.Identifier, uint64) {
+func (_m *Vertex) Parent() (*flow.Identifier, uint64) {
 	ret := _m.Called()
 
-	var r0 flow.Identifier
-	if rf, ok := ret.Get(0).(func() flow.Identifier); ok {
+	var r0 *flow.Identifier
+	if rf, ok := ret.Get(0).(func() *flow.Identifier); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.Identifier)
+			r0 = ret.Get(0).(*flow.Identifier)
 		}
 	}
 
@@ -49,15 +49,15 @@ func (_m *Vertex) Parent() (flow.Identifier, uint64) {
 }
 
 // VertexID provides a mock function with given fields:
-func (_m *Vertex) VertexID() flow.Identifier {
+func (_m *Vertex) VertexID() *flow.Identifier {
 	ret := _m.Called()
 
-	var r0 flow.Identifier
-	if rf, ok := ret.Get(0).(func() flow.Identifier); ok {
+	var r0 *flow.Identifier
+	if rf, ok := ret.Get(0).(func() *flow.Identifier); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.Identifier)
+			r0 = ret.Get(0).(*flow.Identifier)
 		}
 	}
 

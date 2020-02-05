@@ -2,6 +2,7 @@ package finalizer
 
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // BlockContainer wraps a block to implement forrest.Vertex
@@ -11,12 +12,16 @@ type BlockContainer struct {
 	block *types.BlockProposal
 }
 
-func (b *BlockContainer) VertexID() []byte         { return b.block.BlockMRH() }
-func (b *BlockContainer) Level() uint64            { return b.View() }
-func (b *BlockContainer) Parent() ([]byte, uint64) { return b.block.QC().BlockMRH, b.block.QC().View }
+// functions implementing forest.vertex
+func (b *BlockContainer) VertexID() *flow.Identifier         { return b.ID() }
+func (b *BlockContainer) Level() uint64                      { return b.View() }
+func (b *BlockContainer) Parent() (*flow.Identifier, uint64) { return b.ID(), b.block.QC().View }
 
-// Hash returns the block's hash
-func (b *BlockContainer) ID() []byte { return b.block.BlockMRH() }
+// ID returns the block's hash
+func (b *BlockContainer) ID() *flow.Identifier {
+	id := b.block.BlockID()
+	return &id
+}
 
 // View returns the block's view number
 func (b *BlockContainer) View() uint64 { return b.block.View() }
@@ -25,6 +30,5 @@ func (b *BlockContainer) View() uint64 { return b.block.View() }
 // (this is the QC that points to the other end of a 1-chain)
 func (b *BlockContainer) QC() *types.QuorumCertificate { return b.block.QC() }
 
-// QC returns the block's embedded QC pointing to the block's parent
-// (this is the QC that points to the other end of a 1-chain)
+// Block returns the block in the container (or nil of container is empty)
 func (b *BlockContainer) Block() *types.BlockProposal { return b.block }

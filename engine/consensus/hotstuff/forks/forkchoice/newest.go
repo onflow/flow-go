@@ -74,11 +74,11 @@ func (fc *NewestForkChoice) AddQC(qc *types.QuorumCertificate) error {
 	}
 	block, err := fc.ensureBlockStored(qc)
 	if err != nil {
-		fmt.Errorf("cannot add QC: %w", err)
+		return fmt.Errorf("cannot add QC: %w", err)
 	}
 	fc.preferredParent, err = types.NewQcBlock(qc, block)
 	if err != nil {
-		fmt.Errorf("cannot add QC: %w", err)
+		return fmt.Errorf("cannot add QC: %w", err)
 	}
 	fc.notifier.OnQcIncorporated(qc)
 
@@ -86,9 +86,9 @@ func (fc *NewestForkChoice) AddQC(qc *types.QuorumCertificate) error {
 }
 
 func (fc *NewestForkChoice) ensureBlockStored(qc *types.QuorumCertificate) (*types.BlockProposal, error) {
-	block, haveBlock := fc.finalizer.GetBlock(qc.BlockMRH)
+	block, haveBlock := fc.finalizer.GetBlock(&qc.BlockID)
 	if !haveBlock {
-		return nil, &types.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockMRH}
+		return nil, &types.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID}
 	}
 	if block.View() != qc.View {
 		return nil, fmt.Errorf("invalid qc with mismatching view")

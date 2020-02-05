@@ -11,8 +11,33 @@ type Distributor struct {
 	mock.Mock
 }
 
+// OnBlockIncorporated provides a mock function with given fields: _a0
+func (_m *Distributor) OnBlockIncorporated(_a0 *types.BlockProposal) {
+	_m.Called(_a0)
+}
+
+// OnDoubleProposeDetected provides a mock function with given fields: _a0, _a1
+func (_m *Distributor) OnDoubleProposeDetected(_a0 *types.BlockProposal, _a1 *types.BlockProposal) {
+	_m.Called(_a0, _a1)
+}
+
 // OnEnteringView provides a mock function with given fields: _a0
 func (_m *Distributor) OnEnteringView(_a0 uint64) {
+	_m.Called(_a0)
+}
+
+// OnFinalizedBlock provides a mock function with given fields: _a0
+func (_m *Distributor) OnFinalizedBlock(_a0 *types.BlockProposal) {
+	_m.Called(_a0)
+}
+
+// OnForkChoiceGenerated provides a mock function with given fields: _a0, _a1
+func (_m *Distributor) OnForkChoiceGenerated(_a0 uint64, _a1 *types.QuorumCertificate) {
+	_m.Called(_a0, _a1)
+}
+
+// OnQcIncorporated provides a mock function with given fields: _a0
+func (_m *Distributor) OnQcIncorporated(_a0 *types.QuorumCertificate) {
 	_m.Called(_a0)
 }
 

@@ -40,7 +40,7 @@ type Distributor interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnReachedVotesTimeout(uint64)
+	OnReachedTimeout(*types.TimerInfo)
 
 	// OnQcIncorporated consumes the notifications are produced by ForkChoice
 	// whenever a quorum certificate is incorporated into the consensus state.

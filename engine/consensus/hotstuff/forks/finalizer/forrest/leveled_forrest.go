@@ -30,7 +30,7 @@ type VertexSet map[flow.Identifier]*vertexContainer
 //   referenced by vertices in the tree. An empty container is converted to a
 //   full container when the respective vertex is added to the tree
 type vertexContainer struct {
-	id       flow.Identifier
+	id       *flow.Identifier
 	level    uint64
 	children VertexList
 
@@ -49,11 +49,11 @@ func NewLeveledForrest() *LeveledForrest {
 // pruneAtView prunes all blocks up to and INCLUDING `level`
 func (f *LeveledForrest) PruneAtLevel(level uint64) error {
 	if level+1 < f.LowestLevel {
-		return fmt.Errorf("Cannot prune tree slice up to level %d because we only save up to level %d", level, f.LowestLevel)
+		return fmt.Errorf("cannot prune tree slice up to level %d because we only save up to level %d", level, f.LowestLevel)
 	}
 	for l := f.LowestLevel; l <= level; l++ {
 		for _, v := range f.verticesAtLevel[l] { // nil map behaves like empty map when iterating over it
-			delete(f.vertices, v.id)
+			delete(f.vertices, *v.id)
 		}
 		delete(f.verticesAtLevel, l)
 	}
@@ -62,8 +62,8 @@ func (f *LeveledForrest) PruneAtLevel(level uint64) error {
 }
 
 // HasVertex returns true iff full vertex exists
-func (f *LeveledForrest) HasVertex(id flow.Identifier) bool {
-	container, exists := f.vertices[id]
+func (f *LeveledForrest) HasVertex(id *flow.Identifier) bool {
+	container, exists := f.vertices[*id]
 	return exists && !f.isEmptyContainer(container)
 }
 
@@ -74,8 +74,8 @@ func (f *LeveledForrest) isEmptyContainer(vertexContainer *vertexContainer) bool
 
 // GetVertex returns (<full vertex>, true) if the vertex with `id` and `level` was found
 // (nil, false) if full vertex is unknown
-func (f *LeveledForrest) GetVertex(id flow.Identifier) (Vertex, bool) {
-	container, exists := f.vertices[id]
+func (f *LeveledForrest) GetVertex(id *flow.Identifier) (Vertex, bool) {
+	container, exists := f.vertices[*id]
 	if !exists || f.isEmptyContainer(container) {
 		return nil, false
 	}
@@ -84,15 +84,15 @@ func (f *LeveledForrest) GetVertex(id flow.Identifier) (Vertex, bool) {
 
 // GetChildren returns a VertexIterator to iterate over the children
 // An empty VertexIterator is returned, if no vertices are known whose parent is `id` , `level`
-func (f *LeveledForrest) GetChildren(id flow.Identifier) VertexIterator {
-	container, _ := f.vertices[id]
+func (f *LeveledForrest) GetChildren(id *flow.Identifier) VertexIterator {
+	container, _ := f.vertices[*id]
 	// if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
 	return newVertexIterator(container.children) // VertexIterator gracefully handles nil slices
 }
 
 // GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified height
-func (f *LeveledForrest) GetNumberOfChildren(id flow.Identifier) int {
-	container, _ := f.vertices[id] // if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
+func (f *LeveledForrest) GetNumberOfChildren(id *flow.Identifier) int {
+	container, _ := f.vertices[*id] // if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
 	num := 0
 	for _, child := range container.children {
 		if child.vertex != nil {
@@ -160,14 +160,14 @@ func (f *LeveledForrest) registerWithParent(vertexContainer *vertexContainer) {
 // or creates a new vertexContainer and adds it to the internal data structures.
 // It errors if a vertex with same id but different Level is already known
 // (i.e. there exists an empty or full container with the same id but different level).
-func (f *LeveledForrest) getOrCreateVertexContainer(id flow.Identifier, level uint64) *vertexContainer {
-	container, exists := f.vertices[id] // try to find vertex container with same ID
-	if !exists {                                // if no vertex container found, create one and store it
+func (f *LeveledForrest) getOrCreateVertexContainer(id *flow.Identifier, level uint64) *vertexContainer {
+	container, exists := f.vertices[*id] // try to find vertex container with same ID
+	if !exists {                         // if no vertex container found, create one and store it
 		container = &vertexContainer{
 			id:    id,
 			level: level,
 		}
-		f.vertices[container.id] = container
+		f.vertices[*container.id] = container
 		vtcs := f.verticesAtLevel[container.level]                   // returns nil slice if not yet present
 		f.verticesAtLevel[container.level] = append(vtcs, container) // append works on nil slices: creates slice with capacity 2
 	}
@@ -219,18 +219,18 @@ func (f *LeveledForrest) isEquivalentToStoredVertex(vertex Vertex) (bool, error)
 	// found vertex in storage with identical ID
 	// => we expect all other (relevant) fields to be identical
 	if vertex.Level() != storedVertex.Level() { // view number
-		return false, fmt.Errorf("conflicting vertices wirh ID %s", vertex.VertexID())
+		return false, fmt.Errorf("conflicting vertices with ID %v", vertex.VertexID())
 	}
 	if vertex.Level() <= f.LowestLevel {
 		return true, nil
 	}
 	newParentId, newParentView := vertex.Parent()
 	storedParentId, storedParentView := storedVertex.Parent()
-	if newParentId != storedParentId { // qc.blockID
-		return false, fmt.Errorf("conflicting vertices wirh ID %s", vertex.VertexID())
+	if *newParentId != *storedParentId { // qc.blockID
+		return false, fmt.Errorf("conflicting vertices with ID %v", vertex.VertexID())
 	}
 	if newParentView != storedParentView { // qc.view
-		return false, fmt.Errorf("conflicting vertices wirh ID %s", vertex.VertexID())
+		return false, fmt.Errorf("conflicting vertices with ID %v", vertex.VertexID())
 	}
 	// all _relevant_ fields identical
 	return true, nil
@@ -251,7 +251,7 @@ func (f *LeveledForrest) verifyParent(vertex Vertex) error {
 		return nil
 	}
 	if parentVertex.Level() != parentLevel {
-		return fmt.Errorf("parent vertex of %s has different level (%d) than the stored vertex (%d)",
+		return fmt.Errorf("parent vertex of %v has different level (%d) than the stored vertex (%d)",
 			vertex.VertexID(), parentLevel, parentVertex.Level(),
 		)
 	}

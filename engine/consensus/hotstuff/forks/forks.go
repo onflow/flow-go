@@ -18,9 +18,11 @@ type Forks struct {
 func (f *Forks) GetBlocksForView(view uint64) []*types.BlockProposal {
 	return f.finalizer.GetBlocksForView(view)
 }
-func (f *Forks) GetBlock(id []byte) (*types.BlockProposal, bool) { return f.finalizer.GetBlock(id) }
-func (f *Forks) FinalizedView() uint64                           { return f.finalizer.FinalizedBlock().View() }
-func (f *Forks) FinalizedBlock() *types.BlockProposal            { return f.finalizer.FinalizedBlock() }
+func (f *Forks) GetBlock(id *flow.Identifier) (*types.BlockProposal, bool) {
+	return f.finalizer.GetBlock(id)
+}
+func (f *Forks) FinalizedView() uint64                { return f.finalizer.FinalizedBlock().View() }
+func (f *Forks) FinalizedBlock() *types.BlockProposal { return f.finalizer.FinalizedBlock() }
 
 func (f *Forks) IsSafeBlock(block *types.BlockProposal) bool {
 	return f.finalizer.IsKnownBlock(block)
@@ -50,14 +52,14 @@ func (f *Forks) AddQC(qc *types.QuorumCertificate) error {
 }
 
 func (f *Forks) ensureBlockStored(qc *types.QuorumCertificate) (*types.BlockProposal, error) {
-	block, haveBlock := f.finalizer.GetBlock(qc.BlockMRH)
+	block, haveBlock := f.finalizer.GetBlock(&qc.BlockID)
 	if !haveBlock {
-		return nil, &types.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockMRH}
+		return nil, &types.ErrorMissingBlock{View: qc.View, BlockID: qc.BlockID}
 	}
 	if block.View() != qc.View {
 		return nil, &types.ErrorInvalidBlock{
 			View:    qc.View,
-			BlockID: qc.BlockMRH,
+			BlockID: qc.BlockID,
 			Msg:     fmt.Sprintf("block with this ID has view %d", block.View()),
 		}
 	}

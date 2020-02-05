@@ -21,8 +21,8 @@ type ErrorBlockHashCollision struct {
 
 func (e *ErrorBlockHashCollision) Error() string {
 	return fmt.Sprintf(
-		"Got two blocks with same ID %s but different views %d, %d",
-		e.block1.BlockMRH(), e.block1.View(), e.block2.BlockMRH(),
+		"Got two blocks different views %d and %d but same ID %v",
+		e.block1.View(), e.block2.View(), e.block1.BlockID(),
 	)
 }
 
@@ -32,5 +32,8 @@ type ErrorPruned3Chain struct {
 }
 
 func (e *ErrorPruned3Chain) Error() string {
-	return fmt.Sprintf("Block with view %d and ID %s has pruned 3-chain history", e.block.View(), string(e.block.ID()))
+	return fmt.Sprintf(
+		"Block with view %d and ID %s has pruned 3-chain history",
+		e.block.View(), e.block.ID(),
+	)
 }

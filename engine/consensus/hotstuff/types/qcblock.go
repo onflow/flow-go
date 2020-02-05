@@ -1,8 +1,9 @@
 package types
 
 import (
-	"bytes"
 	"fmt"
+
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // QCBlock contains a QC and a Block that the QC is pointing to
@@ -14,8 +15,8 @@ type QCBlock struct {
 // NewQcBlock creates a QCBlock from a QC and the block its pointing to
 func NewQcBlock(qc *QuorumCertificate, block *BlockProposal) (*QCBlock, error) {
 	// sanity check
-	if block.View() != qc.View || bytes.Equal(qc.BlockMRH, block.BlockMRH()) {
-		return nil, fmt.Errorf("missmatching Block and qc")
+	if block.View() != qc.View || qc.BlockID != block.BlockID() {
+		return nil, fmt.Errorf("QC does not mathc block")
 	}
 	return &QCBlock{qc: qc, block: block}, nil
 }
@@ -23,3 +24,4 @@ func NewQcBlock(qc *QuorumCertificate, block *BlockProposal) (*QCBlock, error) {
 func (qcb *QCBlock) View() uint64           { return qcb.qc.View }
 func (qcb *QCBlock) QC() *QuorumCertificate { return qcb.qc }
 func (qcb *QCBlock) Block() *BlockProposal  { return qcb.block }
+func (qcb *QCBlock) BlockID() flow.Identifier  { return qcb.block.BlockID() }

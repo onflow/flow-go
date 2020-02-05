@@ -1,34 +1,22 @@
 package types
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/dapperlabs/flow-go/model/flow"
+)
 
 type ErrorFinalizationFatal struct {
+	Msg string
 }
 
-func (e *ErrorFinalizationFatal) Error() string {
-	panic("implement me")
-}
+func (e *ErrorFinalizationFatal) Error() string { return e.Msg }
 
 type ErrorConfiguration struct {
 	Msg string
 }
 
-func (e *ErrorConfiguration) Error() string {
-	return e.Msg
-}
-
-type ErrorInvalidTimeout struct {
-	Timeout     *Timeout
-	CurrentView uint64
-	CurrentMode TimeoutMode
-}
-
-func (e *ErrorInvalidTimeout) Error() string {
-	return fmt.Sprintf(
-		"received timeout (view, mode) (%d, %s) but current state is (%d, %s)",
-		e.Timeout.View, e.Timeout.Mode.String(), e.CurrentView, e.CurrentMode.String(),
-	)
-}
+func (e *ErrorConfiguration) Error() string { return e.Msg }
 
 type ErrorConflictingQCs struct {
 	View uint64
@@ -36,24 +24,24 @@ type ErrorConflictingQCs struct {
 }
 
 func (e *ErrorConflictingQCs) Error() string {
-	return fmt.Sprintf("%d conflicting QCs at view %d", e.View, len(e.Qcs))
+	return fmt.Sprintf("%d conflicting QCs at view %d", len(e.Qcs), e.View)
 }
 
 type ErrorMissingBlock struct {
 	View    uint64
-	BlockID []byte
+	BlockID flow.Identifier
 }
 
 func (e *ErrorMissingBlock) Error() string {
-	return fmt.Sprintf("missing Block at view %d with ID %s", e.View, string(e.BlockID))
+	return fmt.Sprintf("missing Block at view %d with ID %v", e.View, e.BlockID)
 }
 
 type ErrorInvalidBlock struct {
 	View    uint64
-	BlockID []byte
+	BlockID flow.Identifier
 	Msg     string
 }
 
 func (e *ErrorInvalidBlock) Error() string {
-	return fmt.Sprintf("invalid block (view %d; ID %s): %s", e.View, string(e.BlockID), e.Msg)
+	return fmt.Sprintf("invalid block (view %d; ID %v): %s", e.View, e.BlockID, e.Msg)
 }

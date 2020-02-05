@@ -22,7 +22,7 @@ type Forks interface {
 
 	// GetBlock returns (BlockProposal, true) if the block with the specified
 	// id was found (nil, false) otherwise.
-	GetBlock(id flow.Identifier) (*types.BlockProposal, bool)
+	GetBlock(id *flow.Identifier) (*types.BlockProposal, bool)
 
 	// FinalizedView returns the largest view number where a finalized block is known
 	FinalizedView() uint64
