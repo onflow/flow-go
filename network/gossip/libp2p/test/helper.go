@@ -32,22 +32,22 @@ func CreateIDs(count int) []*flow.Identity {
 // and for each middleware creates a network instance on top
 // it returns the slice of created middlewares
 // csize is the receive cache size of the nodes
-func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int) ([]*libp2p.Network, error) {
+func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool) ([]*libp2p.Network, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
 
 	// creates and mocks the state
-	state := &protocol.State{}
-	snapshot := &protocol.Snapshot{}
-
-	for i := 0; i < count; i++ {
-		state.On("Final").Return(snapshot)
-		snapshot.On("Identities").Return(ids, nil)
+	var snapshot *SnapshotMock
+	if dryrun {
+		snapshot = &SnapshotMock{ids: ids}
+	} else {
+		snapshot = &SnapshotMock{ids: flow.IdentityList{}}
 	}
+	state := &protocol.State{}
+	state.On("Final").Return(snapshot)
 
 	for i := 0; i < count; i++ {
 		// creates and mocks me
-		// creating network of node-1
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
 		net, err := libp2p.NewNetwork(zerolog.Logger{}, json.NewCodec(), state, me, mws[i], csize)
@@ -56,10 +56,29 @@ func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int) 
 		}
 
 		nets = append(nets, net)
+	}
 
-		// starts the middlewares
-		done := net.Ready()
-		<-done
+	// if dryrun then don't actually start the network just return the network objects
+	if dryrun {
+		return nets, nil
+	}
+
+	for _, net := range nets {
+		<-net.Ready()
+	}
+
+	for i, m := range mws {
+		// retrieves IP and port of the middleware
+		ip, port := m.GetIPPort()
+
+		// mocks an identity for the middleware
+		id := &flow.Identity{
+			NodeID:  ids[i].NodeID,
+			Address: fmt.Sprintf("%s:%s", ip, port),
+			Role:    flow.RoleCollection,
+			Stake:   0,
+		}
+		snapshot.ids = append(snapshot.ids, id)
 	}
 
 	return nets, nil
@@ -76,14 +95,31 @@ func CreateMiddleware(identities []*flow.Identity) ([]*libp2p.Middleware, error)
 			return nil, err
 		}
 
-		// retrieves IP and port of the middleware
-		ip, port := mw.GetIPPort()
-
-		// mocks an identity for the middleware
-		identities[i].Address = fmt.Sprintf("%s:%s", ip, port)
-		identities[i].Role = flow.RoleCollection
-
 		mws = append(mws, mw)
 	}
 	return mws, nil
+}
+
+type SnapshotMock struct {
+	ids flow.IdentityList
+}
+
+func (s *SnapshotMock) Identities(filters ...flow.IdentityFilter) (flow.IdentityList, error) {
+	return s.ids, nil
+}
+
+func (s *SnapshotMock) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
+	return nil, fmt.Errorf(" not implemented")
+}
+
+func (s *SnapshotMock) Commit() (flow.StateCommitment, error) {
+	return nil, fmt.Errorf(" not implemented")
+}
+
+func (s *SnapshotMock) Clusters() (*flow.ClusterList, error) {
+	return nil, fmt.Errorf(" not implemented")
+}
+
+func (s *SnapshotMock) Head() (*flow.Header, error) {
+	return nil, fmt.Errorf(" not implemented")
 }

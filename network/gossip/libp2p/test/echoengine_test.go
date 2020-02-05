@@ -6,11 +6,9 @@ import (
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	gologging "github.com/whyrusleeping/go-logging"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
@@ -34,14 +32,14 @@ func TestStubEngineTestSuite(t *testing.T) {
 
 func (s *StubEngineTestSuite) SetupTest() {
 	const count = 2
-	golog.SetAllLoggers(gologging.INFO)
+	//golog.SetAllLoggers(gologging.INFO)
 	s.ids = CreateIDs(count)
 
 	mws, err := CreateMiddleware(s.ids)
 	require.NoError(s.Suite.T(), err)
 	s.mws = mws
 
-	nets, err := CreateNetworks(s.mws, s.ids, 100)
+	nets, err := CreateNetworks(s.mws, s.ids, 100, false)
 	require.NoError(s.Suite.T(), err)
 	s.nets = nets
 }
@@ -448,5 +446,4 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 			}
 		}
 	}
-
 }
