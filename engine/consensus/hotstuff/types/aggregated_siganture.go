@@ -7,7 +7,8 @@ type AggregatedSignature struct {
 	// will be responsible for the encoding/decoding between the actual signature type and
 	// raw bytes.
 	RawSignature []byte
+
 	// SignerIndexes is the indexes of all the signers. The signers public key can be determined
 	// by signerIndex, the cluster filter and the blockID.
-	SignerIndexes []byte
+	SignerIndexes SignerIndexes
 }

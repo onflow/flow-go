@@ -23,6 +23,13 @@ type ViewState interface {
 	// at a certain block for the given signer indexes
 	GetIdentitiesForBlockIDAndSignerIndexes(blockID flow.Identifier, signerIndexes []byte) (flow.IdentityList, error)
 
+	// GetIdentityForBlockIDAndSignerIndex returns the identity at a certain block for
+	// the given signer index
+	GetIdentityForBlockIDAndSignerIndex(blockID flow.Identifier, signerIndex []byte) (flow.Identity, error)
+
+	// Combine Signer Indexes
+	CombineSignerIndexes(signerIndexes []types.SignerIndex) types.SignerIndexes
+
 	// GetQCStakeThresholdForBlockID returns the stack threshold for building QC at a given block
 	GetQCStakeThresholdForBlockID(blockID flow.Identifier) (uint64, error)
 
