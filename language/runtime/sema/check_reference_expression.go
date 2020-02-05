@@ -16,6 +16,9 @@ func (checker *Checker) VisitReferenceExpression(referenceExpression *ast.Refere
 	// Check that the referenced expression is an index expression and type-check it
 
 	var referencedType Type
+	var targetIsStorage bool
+
+	// If the referenced expression is an index expression, it might be into storage
 
 	indexExpression, isIndexExpression := referencedExpression.(*ast.IndexExpression)
 	if isIndexExpression {
@@ -26,30 +29,18 @@ func (checker *Checker) VisitReferenceExpression(referenceExpression *ast.Refere
 
 		referencedType = UnwrapOptionalType(referencedType)
 
-		// Check that the index expression's target expression is a storage type
+		// Check if the index expression's target expression is a storage type
 
 		if !targetType.IsInvalidType() {
-			if _, isStorageType := targetType.(*StorageType); !isStorageType {
-				checker.report(
-					&NonStorageReferenceError{
-						Range: ast.NewRangeFromPositioned(indexExpression.TargetExpression),
-					},
-				)
-			}
+			_, targetIsStorage = targetType.(*StorageType)
 		}
 	} else {
-		checker.report(
-			&NonStorageReferenceError{
-				Range: ast.NewRangeFromPositioned(referencedExpression),
-			},
-		)
-
-		// If the referenced expression is not an index expression, still type check it
+		// If the referenced expression is not an index expression, check it normally
 
 		referencedType = UnwrapOptionalType(referencedExpression.Accept(checker).(Type))
 	}
 
-	// Check that the referenced expression's type is a resource or resource interface
+	// Check that the referenced expression's type is a resource type
 
 	if !referencedType.IsInvalidType() &&
 		!referencedType.IsResourceType() {
@@ -62,11 +53,9 @@ func (checker *Checker) VisitReferenceExpression(referenceExpression *ast.Refere
 		)
 	}
 
-	// Check the result type
+	// Check the result type and ensure it is a reference type
 
 	resultType := checker.ConvertType(referenceExpression.Type)
-
-	// Check that the result type is a reference type
 
 	var referenceType *ReferenceType
 
@@ -77,7 +66,16 @@ func (checker *Checker) VisitReferenceExpression(referenceExpression *ast.Refere
 			checker.report(
 				&NonReferenceTypeReferenceError{
 					ActualType: resultType,
-					Range:      ast.NewRangeFromPositioned(referencedExpression),
+					Range:      ast.NewRangeFromPositioned(referenceExpression.Type),
+				},
+			)
+		} else if !targetIsStorage && referenceType.Storable {
+
+			// References which are not into storage cannot be storable
+
+			checker.report(
+				&InvalidNonStorageStorableReferenceError{
+					Range: ast.NewRangeFromPositioned(referenceExpression.Type),
 				},
 			)
 		}
