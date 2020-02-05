@@ -2653,7 +2653,8 @@ func (t *ReferencesType) IsValidIndexingType(indexingType Type) (isValid bool, e
 
 // ReferenceType represents the reference to a value
 type ReferenceType struct {
-	Type Type
+	Authorized bool
+	Type       Type
 }
 
 func (*ReferenceType) IsType() {}
@@ -2662,15 +2663,25 @@ func (t *ReferenceType) String() string {
 	if t.Type == nil {
 		return "reference"
 	}
-	return fmt.Sprintf("&%s", t.Type)
+	var builder strings.Builder
+	if t.Authorized {
+		builder.WriteString("auth ")
+	}
+	builder.WriteRune('&')
+	builder.WriteString(t.Type.String())
+	return builder.String()
 }
 
 func (t *ReferenceType) ID() TypeID {
-	var id string
-	if t.Type != nil {
-		id = string(t.Type.ID())
+	var builder strings.Builder
+	if t.Authorized {
+		builder.WriteString("auth")
 	}
-	return TypeID(fmt.Sprintf("&%s", id))
+	builder.WriteRune('&')
+	if t.Type != nil {
+		builder.WriteString(string(t.Type.ID()))
+	}
+	return TypeID(builder.String())
 }
 
 func (t *ReferenceType) Equal(other Type) bool {
@@ -2678,7 +2689,8 @@ func (t *ReferenceType) Equal(other Type) bool {
 	if !ok {
 		return false
 	}
-	return t.Type.Equal(otherReference.Type)
+	return t.Authorized == otherReference.Authorized &&
+		t.Type.Equal(otherReference.Type)
 }
 
 func (t *ReferenceType) IsResourceType() bool {
@@ -2887,6 +2899,11 @@ func IsSubType(subType Type, superType Type) bool {
 		}
 
 		// References are covariant: &T <: &U if T <: U
+		// Unauthorized references are *not* subtypes of authorized subtypes.
+
+		if !typedSubType.Authorized && typedSuperType.Authorized {
+			return false
+		}
 
 		return IsSubType(typedSubType.Type, typedSuperType.Type)
 
