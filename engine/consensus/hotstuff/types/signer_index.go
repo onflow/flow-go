@@ -5,8 +5,10 @@ package types
 // It's a more compressed form than public key to identify a node.
 // A signer's identify can be found by specifiying the following three information:
 //   (SignerIndex, IdentifierFilter, BlockID).
-// A slice of bytes is used in order to abstract the implementation detail.
-type SignerIndex []byte
+// a uint32 value is enough to cover the possible range.
+type SignerIndex uint32
 
 // SignerIndexes is the compressed form of a list of SignerIndex
-type SignerIndexes []byte
+// Currently it's implemented as []bool, but more compressed form like bitset
+// could be explored.
+type SignerIndexes []bool
