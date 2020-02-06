@@ -11,6 +11,10 @@ type PendingStatus struct {
 }
 
 func (ps *PendingStatus) AddVote(vote *types.Vote) {
+	_, exists := ps.voteMap[string(vote.ID())]
+	if exists {
+		return
+	}
 	ps.voteMap[string(vote.ID())] = vote
 	ps.orderedVotes = append(ps.orderedVotes, vote)
 }

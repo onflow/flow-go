@@ -178,21 +178,6 @@ func TestErrStaleVote(t *testing.T) {
 	require.Equal(t, 0, len(va.pendingVoteMap))
 }
 
-// UNHAPPY PATH (votes with invalid view and the block arrives after votes)
-// there should not be error when being stored as pending votes, but
-// error should be raised when converting from pending votes
-func TestErrInvalidView(t *testing.T) {
-	va := newMockVoteAggregator(t)
-	testView := uint64(5)
-	block := newMockBlock(testView)
-	vote := newMockVote(testView-1, block.BlockID(), uint32(1))
-	err := va.StorePendingVote(vote)
-	require.Nil(t, err)
-	qc, err := va.BuildQCOnReceivingBlock(block)
-	require.Nil(t, qc)
-	require.NotNil(t, err)
-}
-
 // UNHAPPY PATH (double voting)
 // store one vote in the memory
 // receive another vote with the same voter and the same view
@@ -274,6 +259,117 @@ func TestUnHappyPathForPendingVotes(t *testing.T) {
 		require.NotNil(t, err)
 		fmt.Println(err.Error())
 	}
+}
+
+// INVALID VOTES
+// receive 4 invalid votes, and then the block, no QC should be built
+func TestInvalidVotesOnly(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	testView := uint64(5)
+	block := newMockBlock(testView)
+	// testing invalid pending votes
+	for i := 0; i < 4; i++ {
+		// vote view is invalid
+		vote := newMockVote(testView-1, block.BlockID(), uint32(i))
+		err := va.StorePendingVote(vote)
+		require.Nil(t, err)
+	}
+	qc, err := va.BuildQCOnReceivingBlock(block)
+	require.Nil(t, qc)
+	require.NotNil(t, err)
+	// no votes should be added to blockHashToVotingStatus since the view is invalid
+	require.Equal(t, 1, len(va.blockHashToVotingStatus))
+	// the only vote added should be the primary vote
+	primaryVote, exists := va.blockHashToVotingStatus[block.BlockID().String()].votes[string(block.ToVote().ID())]
+	require.True(t, exists)
+	require.Equal(t, block.ToVote(), primaryVote)
+}
+
+// INVALID VOTES
+// receive 1 invalid vote, and 4 valid votes, and then the block, a QC should be built
+func TestVoteMixtureBeforeBlock(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	testView := uint64(5)
+	block := newMockBlock(testView)
+	// testing invalid pending votes
+	for i := 0; i < 5; i++ {
+		var vote *types.Vote
+		if i == 0 {
+			// vote view is invalid
+			vote = newMockVote(testView-1, block.BlockID(), uint32(i))
+		} else {
+			vote = newMockVote(testView, block.BlockID(), uint32(i))
+		}
+		err := va.StorePendingVote(vote)
+		require.Nil(t, err)
+	}
+	qc, err := va.BuildQCOnReceivingBlock(block)
+	require.Nil(t, err)
+	require.NotNil(t, qc)
+}
+
+// INVALID VOTES
+// receive the block, and 3 valid vote, and 1 invalid vote, no QC should be built
+func TestVoteMixtureAfterBlock(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	testView := uint64(5)
+	block := newMockBlock(testView)
+	qc, err := va.BuildQCOnReceivingBlock(block)
+	require.Nil(t, qc)
+	require.NotNil(t, err)
+	// testing invalid pending votes
+	for i := 0; i < 4; i++ {
+		var vote *types.Vote
+		if i < 3 {
+			vote = newMockVote(testView, block.BlockID(), uint32(i))
+		} else {
+			// vote view is invalid
+			vote = newMockVote(testView-1, block.BlockID(), uint32(i))
+		}
+		qc, err = va.StoreVoteAndBuildQC(vote, block)
+		require.Nil(t, qc)
+		require.NotNil(t, err)
+	}
+}
+
+// DUPLICATION
+// receive the block, and the same valid votes for 5 times, no QC should be built
+func TestDuplicateVotesAfterBlock(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	testView := uint64(5)
+	block := newMockBlock(testView)
+	qc, err := va.BuildQCOnReceivingBlock(block)
+	require.Nil(t, qc)
+	require.NotNil(t, err)
+	vote := newMockVote(testView, block.BlockID(), uint32(1))
+	// testing invalid pending votes
+	for i := 0; i < 4; i++ {
+		qc, err = va.StoreVoteAndBuildQC(vote, block)
+		require.Nil(t, qc)
+		require.NotNil(t, err)
+		// only this vote and the primary vote are added
+		require.Equal(t, 2, len(va.blockHashToVotingStatus[block.BlockID().String()].votes))
+	}
+}
+
+// DUPLICATION
+// receive same valid votes for 5 times, then the block, no QC should be built
+func TestDuplicateVotesBeforeBlock(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	testView := uint64(5)
+	block := newMockBlock(testView)
+	vote := newMockVote(testView, block.BlockID(), uint32(1))
+	for i := 0; i < 4; i++ {
+		err := va.StorePendingVote(vote)
+		require.Nil(t, err)
+	}
+	blockIDStr := block.BlockID().String()
+	require.Equal(t, 1, len(va.pendingVoteMap[blockIDStr].voteMap))
+	require.Equal(t, 1, len(va.pendingVoteMap[blockIDStr].orderedVotes))
+	qc, err := va.BuildQCOnReceivingBlock(block)
+	require.Nil(t, qc)
+	require.NotNil(t, err)
+	require.Equal(t, 2, len(va.blockHashToVotingStatus[block.BlockID().String()].votes))
 }
 
 // store random votes and QCs from view 1 to 3
