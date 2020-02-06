@@ -53,7 +53,7 @@ func (vs *VotingStatus) tryBuildQC() (*types.QuorumCertificate, error) {
 	if !vs.CanBuildQC() {
 		return nil, fmt.Errorf("could not build QC: %w", types.ErrInsufficientVotes{})
 	}
-	aggregatedSig, err := types.FromSignatures(sigs, vs.signerCount)
+	aggregatedSig, err := FromSignatures(sigs, vs.signerCount)
 	if err != nil {
 		return nil, fmt.Errorf("could not build QC: %w", err)
 	}
@@ -66,8 +66,8 @@ func (vs *VotingStatus) tryBuildQC() (*types.QuorumCertificate, error) {
 	return qc, nil
 }
 
-func (vs *VotingStatus) getSigsSliceFromVotes() []*types.Signature {
-	var signatures = make([]*types.Signature, len(vs.votes))
+func (vs *VotingStatus) getSigsSliceFromVotes() []*flow.PartialSignature {
+	var signatures = make([]*flow.PartialSignature, len(vs.votes))
 	i := 0
 	for _, vote := range vs.votes {
 		signatures[i] = vote.Signature
@@ -75,4 +75,11 @@ func (vs *VotingStatus) getSigsSliceFromVotes() []*types.Signature {
 	}
 
 	return signatures
+}
+
+// FromSignatures builds an aggregated signature from a slice of signature and a signerCount
+// sigs is the slice of signatures from all the signers
+// signers is the flag from the entire identity list for who signed it and who didn't.
+func FromSignatures(sigs []*flow.PartialSignature, signerCount uint32) (*flow.AggregatedSignature, error) {
+	panic("TODO")
 }
