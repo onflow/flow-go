@@ -9,16 +9,8 @@ import (
 type Vote struct {
 	View      uint64
 	BlockID   flow.Identifier
-	Signature *flow.PartialSignature
+	Signature *Signature
 }
-
-// func NewVote(view uint64, blockID flow.Identifier, sig *Signature) *Vote {
-// 	return &Vote{
-// 		View:      view,
-// 		BlockID:   blockID,
-// 		Signature: sig,
-// 	}
-// }
 
 func (uv *Vote) ID() flow.Identifier {
 	panic("TODO")
