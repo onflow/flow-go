@@ -11,7 +11,7 @@ import (
 
 type VoteAggregator struct {
 	log            zerolog.Logger
-	viewState      *ViewState
+	viewState      ViewState
 	voteValidator  *Validator
 	lastPrunedView uint64
 	// For pruning
@@ -26,7 +26,7 @@ type VoteAggregator struct {
 	viewToIDToVote map[uint64]map[flow.Identifier]*types.Vote
 }
 
-func NewVoteAggregator(log zerolog.Logger, lastPruneView uint64, viewState *ViewState, voteValidator *Validator) *VoteAggregator {
+func NewVoteAggregator(log zerolog.Logger, lastPruneView uint64, viewState ViewState, voteValidator *Validator) *VoteAggregator {
 	return &VoteAggregator{
 		log:                     log,
 		lastPrunedView:          lastPruneView,
