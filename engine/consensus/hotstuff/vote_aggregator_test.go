@@ -399,6 +399,38 @@ func TestVoteOrderAfterBlock(t *testing.T) {
 	}
 }
 
+// PRUNE
+// receive votes for view 2, 3, 4, 5 without the block
+// prune by 4, should have only vote for view 5 left
+func TestPartialPrune(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	pruneView := uint64(4)
+	var voteList []*types.Vote
+	for i := 2; i <= 5; i++ {
+		view := uint64(i)
+		vote := newMockVote(view, unittest.IdentifierFixture(), uint32(i))
+		err := va.StorePendingVote(vote)
+		require.Nil(t, err)
+		voteList = append(voteList, vote)
+	}
+	require.Equal(t, 4, len(va.viewToBlockIDStrSet))
+	require.Equal(t, 4, len(va.viewToIDToVote))
+	require.Equal(t, 4, len(va.pendingVoteMap))
+	va.PruneByView(pruneView)
+	require.Equal(t, pruneView, va.lastPrunedView)
+	require.Equal(t, 1, len(va.viewToBlockIDStrSet))
+	require.Equal(t, 1, len(va.viewToIDToVote))
+	require.Equal(t, 1, len(va.pendingVoteMap))
+	testVote := voteList[len(voteList)-1]
+	require.True(t, va.viewToBlockIDStrSet[uint64(5)][testVote.BlockID.String()])
+	voter, err := va.voteValidator.ValidateVote(testVote, nil)
+	require.Nil(t, err)
+	require.NotNil(t, voter)
+	require.Equal(t, testVote, va.viewToIDToVote[uint64(5)][voter.ID()])
+	_, exists := va.pendingVoteMap[testVote.BlockID.String()]
+	require.True(t, exists)
+}
+
 // store random votes and QCs from view 1 to 3
 // prune by view 3
 func TestPruneByView(t *testing.T) {

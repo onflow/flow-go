@@ -97,7 +97,10 @@ func (v *Validator) ValidateVote(vote *types.Vote, bp *types.BlockProposal) (*fl
 	if err != nil {
 		return nil, err
 	}
-
+	// the block is missing
+	if bp == nil {
+		return voter, nil
+	}
 	// view must match with the block's view
 	if vote.View != bp.View() {
 		return nil, fmt.Errorf("invalid vote: wrong view number")
