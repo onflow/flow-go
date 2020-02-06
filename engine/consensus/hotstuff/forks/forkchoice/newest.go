@@ -16,10 +16,10 @@ type NewestForkChoice struct {
 	// preferredParent.QC called 'GenericQC' in 'Chained HotStuff Protocol' https://arxiv.org/abs/1803.05069v6
 	preferredParent *types.QCBlock
 	finalizer       *finalizer.Finalizer
-	notifier        notifications.Distributor
+	notifier        notifications.Consumer
 }
 
-func NewNewestForkChoice(finalizer *finalizer.Finalizer, notifier notifications.Distributor) (ForkChoice, error) {
+func NewNewestForkChoice(finalizer *finalizer.Finalizer, notifier notifications.Consumer) (ForkChoice, error) {
 	fc := &NewestForkChoice{
 		finalizer: finalizer,
 		notifier:  notifier,

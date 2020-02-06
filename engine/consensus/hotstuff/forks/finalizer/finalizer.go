@@ -12,7 +12,7 @@ import (
 
 // Finalizer implements HotStuff finalization logic
 type Finalizer struct {
-	notifier notifications.Distributor
+	notifier notifications.Consumer
 	forest   forest.LevelledForest
 
 	lastLocked *types.QCBlock // lastLockedBlockQC is the QC that POINTS TO the the most recently locked block
@@ -27,7 +27,7 @@ type ancestryChain struct {
 	threeChain *types.QCBlock
 }
 
-func New(trustedRoot *types.QCBlock, notifier notifications.Distributor) (*Finalizer, error) {
+func New(trustedRoot *types.QCBlock, notifier notifications.Consumer) (*Finalizer, error) {
 	if (trustedRoot.BlockID() != trustedRoot.QC().BlockID) || (trustedRoot.View() != trustedRoot.QC().View) {
 		return nil, &types.ErrorConfiguration{Msg: "invalid root: root qc is not pointing to root block"}
 	}

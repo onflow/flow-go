@@ -59,37 +59,37 @@ func TestForks_3ChainFinalization(t *testing.T) {
 
 	targetBlock := makeBlock(2, root.QC(), nil)
 	notifier.On("OnBlockIncorporated", targetBlock).Return().Once()
-	addBlock2Forks(t, targetBlock, forks, notifier)
+	addBlock2Forks(t, targetBlock, forks)
 	notifier.AssertExpectations(t)
 
 	targetBlockPlus1 := makeBlock(3, qc(targetBlock.View(), targetBlock.BlockID()), nil)
 	notifier.On("OnBlockIncorporated", targetBlockPlus1).Return().Once()
 	notifier.On("OnQcIncorporated", targetBlockPlus1.QC()).Return().Once()
-	addBlock2Forks(t, targetBlockPlus1, forks, notifier)
+	addBlock2Forks(t, targetBlockPlus1, forks)
 	notifier.AssertExpectations(t)
 
 	targetBlockPlus2 := makeBlock(4, qc(targetBlockPlus1.View(), targetBlockPlus1.BlockID()), nil)
 	notifier.On("OnBlockIncorporated", targetBlockPlus2).Return().Once()
 	notifier.On("OnQcIncorporated", targetBlockPlus2.QC()).Return().Once()
-	addBlock2Forks(t, targetBlockPlus2, forks, notifier)
+	addBlock2Forks(t, targetBlockPlus2, forks)
 	notifier.AssertExpectations(t)
 
 	targetBlockPlus3 := makeBlock(5, qc(targetBlockPlus2.View(), targetBlockPlus2.BlockID()), nil)
 	notifier.On("OnBlockIncorporated", targetBlockPlus3).Return().Once()
 	notifier.On("OnQcIncorporated", targetBlockPlus3.QC()).Return().Once()
 	notifier.On("OnFinalizedBlock", targetBlock).Return().Once()
-	addBlock2Forks(t, targetBlockPlus3, forks, notifier)
+	addBlock2Forks(t, targetBlockPlus3, forks)
 	notifier.AssertExpectations(t)
 
 	targetBlockPlus4 := makeBlock(6, qc(targetBlockPlus3.View(), targetBlockPlus3.BlockID()), nil)
 	notifier.On("OnBlockIncorporated", targetBlockPlus4).Return().Once()
 	notifier.On("OnQcIncorporated", targetBlockPlus4.QC()).Return().Once()
 	notifier.On("OnFinalizedBlock", targetBlockPlus1).Return().Once()
-	addBlock2Forks(t, targetBlockPlus4, forks, notifier)
+	addBlock2Forks(t, targetBlockPlus4, forks)
 	notifier.AssertExpectations(t)
 }
 
-func addBlock2Forks(t *testing.T, block *types.BlockProposal, forks hotstuff.Forks, notifier *mockdist.Distributor) {
+func addBlock2Forks(t *testing.T, block *types.BlockProposal, forks hotstuff.Forks) {
 	err := forks.AddBlock(block)
 	if err != nil {
 		assert.Fail(t, err.Error())
@@ -118,8 +118,8 @@ func verifyStored(t *testing.T, block *types.BlockProposal, forks hotstuff.Forks
 	assert.True(t, found, fmt.Sprintf("Did not find block: %v", block.BlockID()))
 }
 
-func initForks(t *testing.T, view uint64) (*Forks, *mockdist.Distributor, *types.QCBlock) {
-	notifier := &mockdist.Distributor{}
+func initForks(t *testing.T, view uint64) (*Forks, *mockdist.Consumer, *types.QCBlock) {
+	notifier := &mockdist.Consumer{}
 
 	// construct Finalizer
 	root := makeRootBlock(t, view)

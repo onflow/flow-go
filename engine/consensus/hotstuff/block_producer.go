@@ -46,16 +46,16 @@ func (bp *BlockProducer) MakeBlockProposal(view uint64, qcblock *types.QCBlock) 
 // view using the builder module to generate a payload.
 func (bp *BlockProducer) makeBlockForView(view uint64, qcblock *types.QCBlock) (*types.Block, error) {
 	// TODO block should use flow.Identifier, bubble up error
-	parentID := qcblock.Block.BlockID()
+	parentID := qcblock.BlockID()
 	payloadHash, err := bp.builder.BuildOn(parentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate payload: %w", err)
 	}
 
 	// new block's height = parent.height + 1
-	height := qcblock.Block.Height() + 1
+	height := qcblock.Block().Height() + 1
 
-	block := types.NewBlock(view, qcblock.QC, payloadHash[:], height, bp.chainID)
+	block := types.NewBlock(view, qcblock.QC(), payloadHash[:], height, bp.chainID)
 	return block, nil
 }
 
