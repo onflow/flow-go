@@ -3391,7 +3391,7 @@ func IsSubType(subType Type, superType Type) bool {
 
 		switch typedSubType := subType.(type) {
 		case *RestrictedResourceType:
-			// A restricted resource type `T{Us}` is a subtype of a restricted resource type `V{Ws}`.
+			// A restricted resource type `T{Us}` is a subtype of a restricted resource type `V{Ws}`, if `T == V`.
 			// NOTE: `Us` and `Ws` do NOT have to be subsets.
 			//
 			// The owner of the resource may freely restrict and unrestrict the resource.
