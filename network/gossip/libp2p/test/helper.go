@@ -32,6 +32,9 @@ func CreateIDs(count int) []*flow.Identity {
 // and for each middleware creates a network instance on top
 // it returns the slice of created middlewares
 // csize is the receive cache size of the nodes
+// dryrun is a boolean for topology generation tests, in case it is switched to true, the ids is directly
+// mocked for every node as their state, otherwise, ids is only used to assign the ids of the nodes, and the
+// state is constructed based on the IPs collected from libp2p
 func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool) ([]*libp2p.Network, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
