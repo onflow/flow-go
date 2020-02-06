@@ -93,7 +93,7 @@ func TestCheckDictionaryIndexingString(t *testing.T) {
       let y = x["abc"]
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.OptionalType{Type: &sema.IntType{}},
@@ -207,7 +207,7 @@ func TestCheckDictionaryKeys(t *testing.T) {
         let keys = {"abc": 1, "def": 2}.keys
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.VariableSizedType{Type: &sema.StringType{}},
@@ -221,7 +221,7 @@ func TestCheckDictionaryValues(t *testing.T) {
         let values = {"abc": 1, "def": 2}.values
     `)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t,
 		&sema.VariableSizedType{Type: &sema.IntType{}},

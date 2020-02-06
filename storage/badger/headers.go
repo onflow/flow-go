@@ -22,6 +22,10 @@ func NewHeaders(db *badger.DB) *Headers {
 	return h
 }
 
+func (h *Headers) Store(header *flow.Header) error {
+	return h.db.Update(operation.InsertHeader(header))
+}
+
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
 	var header flow.Header
 	err := h.db.View(operation.RetrieveHeader(blockID, &header))
@@ -35,7 +39,7 @@ func (h *Headers) ByNumber(number uint64) (*flow.Header, error) {
 
 		// get the hash by height
 		var blockID flow.Identifier
-		err := operation.RetrieveBlockID(number, &blockID)(tx)
+		err := operation.RetrieveNumber(number, &blockID)(tx)
 		if err != nil {
 			return errors.Wrap(err, "could not retrieve blockID")
 		}

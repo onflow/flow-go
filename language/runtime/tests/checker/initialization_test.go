@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/language/runtime/sema"
-	"github.com/dapperlabs/flow-go/language/runtime/stdlib"
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -428,31 +427,21 @@ func TestCheckFieldInitializationWithReturn(t *testing.T) {
 
 func TestCheckFieldInitializationWithPotentialNeverCallInElse(t *testing.T) {
 
-	code := `
-      struct Test {
-          let foo: Int
+	_, err := ParseAndCheckWithPanic(
+		t,
+		`
+          struct Test {
+              let foo: Int
 
-          init(foo: Int?) {
-              if let foo = foo {
-                  self.foo = foo
-              } else {
-                  panic("no x")
+              init(foo: Int?) {
+                  if let foo = foo {
+                      self.foo = foo
+                  } else {
+                      panic("no x")
+                  }
               }
           }
-      }
-    `
-	_, err := ParseAndCheckWithOptions(
-		t,
-		code,
-		ParseAndCheckOptions{
-			Options: []sema.Option{
-				sema.WithPredeclaredValues(
-					stdlib.StandardLibraryFunctions{
-						stdlib.PanicFunction,
-					}.ToValueDeclarations(),
-				),
-			},
-		},
+        `,
 	)
 
 	require.NoError(t, err)
@@ -460,27 +449,16 @@ func TestCheckFieldInitializationWithPotentialNeverCallInElse(t *testing.T) {
 
 func TestCheckFieldInitializationWithPotentialNeverCallInNilCoalescing(t *testing.T) {
 
-	code := `
-      struct Test {
-          let foo: Int
+	_, err := ParseAndCheckWithPanic(t,
+		`
+          struct Test {
+              let foo: Int
 
-          init(foo: Int?) {
-              self.foo = foo ?? panic("no x")
+              init(foo: Int?) {
+                  self.foo = foo ?? panic("no x")
+              }
           }
-      }
-    `
-	_, err := ParseAndCheckWithOptions(
-		t,
-		code,
-		ParseAndCheckOptions{
-			Options: []sema.Option{
-				sema.WithPredeclaredValues(
-					stdlib.StandardLibraryFunctions{
-						stdlib.PanicFunction,
-					}.ToValueDeclarations(),
-				),
-			},
-		},
+        `,
 	)
 
 	require.NoError(t, err)

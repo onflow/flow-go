@@ -21,7 +21,7 @@ import (
 )
 
 type Value interface {
-	isValue()
+	IsValue()
 	Copy() Value
 	GetOwner() string
 	SetOwner(owner string)
@@ -74,7 +74,7 @@ func init() {
 	gob.Register(VoidValue{})
 }
 
-func (VoidValue) isValue() {}
+func (VoidValue) IsValue() {}
 
 func (v VoidValue) Copy() Value {
 	return v
@@ -101,7 +101,7 @@ func init() {
 	gob.Register(BoolValue(true))
 }
 
-func (BoolValue) isValue() {}
+func (BoolValue) IsValue() {}
 
 func (v BoolValue) Copy() Value {
 	return v
@@ -150,7 +150,7 @@ func NewStringValue(str string) *StringValue {
 	return &StringValue{str}
 }
 
-func (*StringValue) isValue() {}
+func (*StringValue) IsValue() {}
 
 func (v *StringValue) Copy() Value {
 	return &StringValue{Str: v.Str}
@@ -303,7 +303,7 @@ func NewArrayValueUnownedNonCopying(values ...Value) *ArrayValue {
 	}
 }
 
-func (*ArrayValue) isValue() {}
+func (*ArrayValue) IsValue() {}
 
 func (v *ArrayValue) Copy() Value {
 	// TODO: optimize, use copy-on-write
@@ -565,7 +565,7 @@ func ConvertInt(value Value) Value {
 	return NewIntValue(int64(value.(IntegerValue).IntValue()))
 }
 
-func (v IntValue) isValue() {}
+func (v IntValue) IsValue() {}
 
 func (v IntValue) Copy() Value {
 	return IntValue{big.NewInt(0).Set(v.Int)}
@@ -677,7 +677,7 @@ func init() {
 	gob.Register(Int8Value(0))
 }
 
-func (Int8Value) isValue() {}
+func (Int8Value) IsValue() {}
 
 func (v Int8Value) Copy() Value {
 	return v
@@ -819,7 +819,7 @@ func init() {
 	gob.Register(Int16Value(0))
 }
 
-func (Int16Value) isValue() {}
+func (Int16Value) IsValue() {}
 
 func (v Int16Value) Copy() Value {
 	return v
@@ -961,7 +961,7 @@ func init() {
 	gob.Register(Int32Value(0))
 }
 
-func (Int32Value) isValue() {}
+func (Int32Value) IsValue() {}
 
 func (v Int32Value) Copy() Value {
 	return v
@@ -1103,7 +1103,7 @@ func init() {
 	gob.Register(Int64Value(0))
 }
 
-func (Int64Value) isValue() {}
+func (Int64Value) IsValue() {}
 
 func (v Int64Value) Copy() Value {
 	return v
@@ -1247,7 +1247,7 @@ func init() {
 	gob.Register(Int128Value{})
 }
 
-func (v Int128Value) isValue() {}
+func (v Int128Value) IsValue() {}
 
 func (v Int128Value) Copy() Value {
 	return Int128Value{big.NewInt(0).Set(v.int)}
@@ -1422,7 +1422,7 @@ func init() {
 	gob.Register(Int256Value{})
 }
 
-func (v Int256Value) isValue() {}
+func (v Int256Value) IsValue() {}
 
 func (v Int256Value) Copy() Value {
 	return Int256Value{big.NewInt(0).Set(v.int)}
@@ -1609,7 +1609,7 @@ func ConvertUInt(value Value) Value {
 	return NewUIntValue(uint64(value.(IntegerValue).IntValue()))
 }
 
-func (v UIntValue) isValue() {}
+func (v UIntValue) IsValue() {}
 
 func (v UIntValue) Copy() Value {
 	return UIntValue{big.NewInt(0).Set(v.Int)}
@@ -1724,7 +1724,7 @@ func init() {
 	gob.Register(UInt8Value(0))
 }
 
-func (UInt8Value) isValue() {}
+func (UInt8Value) IsValue() {}
 
 func (v UInt8Value) Copy() Value {
 	return v
@@ -1834,7 +1834,7 @@ func init() {
 	gob.Register(UInt16Value(0))
 }
 
-func (UInt16Value) isValue() {}
+func (UInt16Value) IsValue() {}
 
 func (v UInt16Value) Copy() Value {
 	return v
@@ -1942,7 +1942,7 @@ func init() {
 	gob.Register(UInt32Value(0))
 }
 
-func (UInt32Value) isValue() {}
+func (UInt32Value) IsValue() {}
 
 func (v UInt32Value) Copy() Value {
 	return v
@@ -2052,7 +2052,7 @@ func init() {
 	gob.Register(UInt64Value(0))
 }
 
-func (UInt64Value) isValue() {}
+func (UInt64Value) IsValue() {}
 
 func (v UInt64Value) Copy() Value {
 	return v
@@ -2164,7 +2164,7 @@ func init() {
 	gob.Register(UInt128Value{})
 }
 
-func (v UInt128Value) isValue() {}
+func (v UInt128Value) IsValue() {}
 
 func (v UInt128Value) Copy() Value {
 	return UInt128Value{big.NewInt(0).Set(v.int)}
@@ -2309,7 +2309,7 @@ func init() {
 	gob.Register(UInt256Value{})
 }
 
-func (v UInt256Value) isValue() {}
+func (v UInt256Value) IsValue() {}
 
 func (v UInt256Value) Copy() Value {
 	return UInt256Value{big.NewInt(0).Set(v.int)}
@@ -2452,7 +2452,7 @@ func init() {
 	gob.Register(Word8Value(0))
 }
 
-func (Word8Value) isValue() {}
+func (Word8Value) IsValue() {}
 
 func (v Word8Value) Copy() Value {
 	return v
@@ -2548,7 +2548,7 @@ func init() {
 	gob.Register(Word16Value(0))
 }
 
-func (Word16Value) isValue() {}
+func (Word16Value) IsValue() {}
 
 func (v Word16Value) Copy() Value {
 	return v
@@ -2642,7 +2642,7 @@ func init() {
 	gob.Register(Word32Value(0))
 }
 
-func (Word32Value) isValue() {}
+func (Word32Value) IsValue() {}
 
 func (v Word32Value) Copy() Value {
 	return v
@@ -2738,7 +2738,7 @@ func init() {
 	gob.Register(Word64Value(0))
 }
 
-func (Word64Value) isValue() {}
+func (Word64Value) IsValue() {}
 
 func (v Word64Value) Copy() Value {
 	return v
@@ -2838,6 +2838,7 @@ type CompositeValue struct {
 	Functions      map[string]FunctionValue
 	Destructor     FunctionValue
 	Owner          string
+	Destroyed      bool
 }
 
 func init() {
@@ -2852,22 +2853,29 @@ func (v *CompositeValue) Destroy(interpreter *Interpreter, location LocationPosi
 	}
 
 	destructor := v.Destructor
+
+	var tramp trampoline.Trampoline
+
 	if destructor == nil {
-		return trampoline.Done{Result: VoidValue{}}
+		tramp = trampoline.Done{Result: VoidValue{}}
+	} else {
+		invocation := Invocation{
+			Self:          v,
+			Arguments:     nil,
+			ArgumentTypes: nil,
+			Location:      location,
+			Interpreter:   interpreter,
+		}
+
+		tramp = destructor.Invoke(invocation)
 	}
 
-	invocation := Invocation{
-		Self:          v,
-		Arguments:     nil,
-		ArgumentTypes: nil,
-		Location:      location,
-		Interpreter:   interpreter,
-	}
-
-	return destructor.Invoke(invocation)
+	return tramp.Then(func(_ interface{}) {
+		v.Destroyed = true
+	})
 }
 
-func (*CompositeValue) isValue() {}
+func (*CompositeValue) IsValue() {}
 
 func (v *CompositeValue) Copy() Value {
 	// Resources and contracts are not copied
@@ -2895,8 +2903,18 @@ func (v *CompositeValue) Copy() Value {
 		NestedValues:   v.NestedValues,
 		Functions:      v.Functions,
 		Destructor:     v.Destructor,
+		Destroyed:      v.Destroyed,
 		// NOTE: new value has no owner
 		Owner: "",
+	}
+}
+
+func (v *CompositeValue) checkStatus(locationRange LocationRange) {
+	if v.Destroyed {
+		panic(&DestroyedCompositeError{
+			CompositeKind: v.Kind,
+			LocationRange: locationRange,
+		})
 	}
 }
 
@@ -2916,7 +2934,9 @@ func (v *CompositeValue) SetOwner(owner string) {
 	}
 }
 
-func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, name string) Value {
+func (v *CompositeValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
+	v.checkStatus(locationRange)
+
 	value, ok := v.Fields[name]
 	if ok {
 		return value
@@ -2970,7 +2990,9 @@ func (v *CompositeValue) GetMember(interpreter *Interpreter, _ LocationRange, na
 	return nil
 }
 
-func (v *CompositeValue) SetMember(_ *Interpreter, _ LocationRange, name string, value Value) {
+func (v *CompositeValue) SetMember(_ *Interpreter, locationRange LocationRange, name string, value Value) {
+	v.checkStatus(locationRange)
+
 	value.SetOwner(v.Owner)
 
 	v.Fields[name] = value
@@ -3078,7 +3100,7 @@ func init() {
 	gob.Register(&DictionaryValue{})
 }
 
-func (*DictionaryValue) isValue() {}
+func (*DictionaryValue) IsValue() {}
 
 func (v *DictionaryValue) Copy() Value {
 	newKeys := v.Keys.Copy().(*ArrayValue)
@@ -3379,7 +3401,7 @@ func init() {
 	gob.Register(NilValue{})
 }
 
-func (NilValue) isValue() {}
+func (NilValue) IsValue() {}
 
 func (NilValue) isOptionalValue() {}
 
@@ -3422,7 +3444,7 @@ func NewSomeValueOwningNonCopying(value Value) *SomeValue {
 	}
 }
 
-func (*SomeValue) isValue() {}
+func (*SomeValue) IsValue() {}
 
 func (*SomeValue) isOptionalValue() {}
 
@@ -3477,7 +3499,7 @@ func init() {
 	gob.Register(&AnyValue{})
 }
 
-func (*AnyValue) isValue() {}
+func (*AnyValue) IsValue() {}
 
 func (v *AnyValue) Copy() Value {
 	return &AnyValue{
@@ -3512,7 +3534,7 @@ type StorageValue struct {
 	Identifier string
 }
 
-func (StorageValue) isValue() {}
+func (StorageValue) IsValue() {}
 
 func (v StorageValue) Copy() Value {
 	return StorageValue{
@@ -3534,7 +3556,7 @@ type PublishedValue struct {
 	Identifier string
 }
 
-func (PublishedValue) isValue() {}
+func (PublishedValue) IsValue() {}
 
 func (v PublishedValue) Copy() Value {
 	return PublishedValue{
@@ -3550,22 +3572,22 @@ func (PublishedValue) SetOwner(_ string) {
 	// NO-OP: ownership cannot be changed
 }
 
-// ReferenceValue
+// StorageReferenceValue
 
-type ReferenceValue struct {
+type StorageReferenceValue struct {
 	TargetStorageIdentifier string
 	TargetKey               string
 	Owner                   string
 }
 
 func init() {
-	gob.Register(&ReferenceValue{})
+	gob.Register(&StorageReferenceValue{})
 }
 
-func (*ReferenceValue) isValue() {}
+func (*StorageReferenceValue) IsValue() {}
 
-func (v *ReferenceValue) Copy() Value {
-	return &ReferenceValue{
+func (v *StorageReferenceValue) Copy() Value {
+	return &StorageReferenceValue{
 		TargetStorageIdentifier: v.TargetStorageIdentifier,
 		TargetKey:               v.TargetKey,
 		// NOTE: new value has no owner
@@ -3573,15 +3595,15 @@ func (v *ReferenceValue) Copy() Value {
 	}
 }
 
-func (v *ReferenceValue) GetOwner() string {
+func (v *StorageReferenceValue) GetOwner() string {
 	return v.Owner
 }
 
-func (v *ReferenceValue) SetOwner(owner string) {
+func (v *StorageReferenceValue) SetOwner(owner string) {
 	v.Owner = owner
 }
 
-func (v *ReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
+func (v *StorageReferenceValue) referencedValue(interpreter *Interpreter, locationRange LocationRange) Value {
 	key := PrefixedStorageKey(v.TargetKey, AccessLevelPrivate)
 
 	switch referenced := interpreter.readStored(v.TargetStorageIdentifier, key).(type) {
@@ -3596,34 +3618,84 @@ func (v *ReferenceValue) referencedValue(interpreter *Interpreter, locationRange
 	}
 }
 
-func (v *ReferenceValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
+func (v *StorageReferenceValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
 	return v.referencedValue(interpreter, locationRange).(MemberAccessibleValue).
 		GetMember(interpreter, locationRange, name)
 }
 
-func (v *ReferenceValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
+func (v *StorageReferenceValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
 	v.referencedValue(interpreter, locationRange).(MemberAccessibleValue).
 		SetMember(interpreter, locationRange, name, value)
 }
 
-func (v *ReferenceValue) Get(interpreter *Interpreter, locationRange LocationRange, key Value) Value {
+func (v *StorageReferenceValue) Get(interpreter *Interpreter, locationRange LocationRange, key Value) Value {
 	return v.referencedValue(interpreter, locationRange).(ValueIndexableValue).
 		Get(interpreter, locationRange, key)
 }
 
-func (v *ReferenceValue) Set(interpreter *Interpreter, locationRange LocationRange, key Value, value Value) {
+func (v *StorageReferenceValue) Set(interpreter *Interpreter, locationRange LocationRange, key Value, value Value) {
 	v.referencedValue(interpreter, locationRange).(ValueIndexableValue).
 		Set(interpreter, locationRange, key, value)
 }
 
-func (v *ReferenceValue) Equal(other Value) BoolValue {
-	otherReference, ok := other.(*ReferenceValue)
+func (v *StorageReferenceValue) Equal(other Value) BoolValue {
+	otherReference, ok := other.(*StorageReferenceValue)
 	if !ok {
 		return false
 	}
 
 	return v.TargetStorageIdentifier == otherReference.TargetStorageIdentifier &&
 		v.TargetKey == otherReference.TargetKey
+}
+
+// EphemeralReferenceValue
+
+type EphemeralReferenceValue struct {
+	Value Value
+}
+
+func (*EphemeralReferenceValue) IsValue() {}
+
+func (v *EphemeralReferenceValue) Copy() Value {
+	return v
+}
+
+func (v *EphemeralReferenceValue) GetOwner() string {
+	// value is never owned
+	return ""
+}
+
+func (v *EphemeralReferenceValue) SetOwner(owner string) {
+	// NO-OP: value cannot be owned
+}
+
+func (v *EphemeralReferenceValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
+	return v.Value.(MemberAccessibleValue).
+		GetMember(interpreter, locationRange, name)
+}
+
+func (v *EphemeralReferenceValue) SetMember(interpreter *Interpreter, locationRange LocationRange, name string, value Value) {
+	v.Value.(MemberAccessibleValue).
+		SetMember(interpreter, locationRange, name, value)
+}
+
+func (v *EphemeralReferenceValue) Get(interpreter *Interpreter, locationRange LocationRange, key Value) Value {
+	return v.Value.(ValueIndexableValue).
+		Get(interpreter, locationRange, key)
+}
+
+func (v *EphemeralReferenceValue) Set(interpreter *Interpreter, locationRange LocationRange, key Value, value Value) {
+	v.Value.(ValueIndexableValue).
+		Set(interpreter, locationRange, key, value)
+}
+
+func (v *EphemeralReferenceValue) Equal(other Value) BoolValue {
+	otherReference, ok := other.(*EphemeralReferenceValue)
+	if !ok {
+		return false
+	}
+
+	return otherReference.Value == v.Value
 }
 
 // AddressValue
@@ -3662,7 +3734,7 @@ func ConvertAddress(value Value) Value {
 	return result
 }
 
-func (AddressValue) isValue() {}
+func (AddressValue) IsValue() {}
 
 func (v AddressValue) Copy() Value {
 	return v

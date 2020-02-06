@@ -10,8 +10,10 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/flow/order"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 // Snapshot represents a read-only immutable snapshot of the protocol state.
@@ -26,10 +28,10 @@ type Snapshot struct {
 func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList, error) {
 
 	// execute the transaction that retrieves everything
-	var identities flow.IdentityList
+	var identities []*flow.Identity
 	err := s.state.db.View(func(tx *badger.Txn) error {
 
-		// check if height is max uint64 to get latest finalized state
+		// get the top header at the requested snapshot
 		var head flow.Header
 		err := s.head(&head)(tx)
 		if err != nil {
@@ -59,7 +61,7 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 
 			// get the final block we want to reach
 			var finalID flow.Identifier
-			err = operation.RetrieveBlockID(boundary, &finalID)(tx)
+			err = operation.RetrieveNumber(boundary, &finalID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not get final hash: %w", err)
 			}
@@ -67,14 +69,15 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 			// track back from head block to latest finalized block
 			for head.ID() != finalID {
 
-				// get the identities for pending block
-				var identities flow.IdentityList
-				err = operation.RetrieveIdentities(head.ID(), &identities)(tx)
+				// get the stake deltas
+				// TODO: separate this from identities
+				var identities []*flow.Identity
+				err = procedure.RetrieveIdentities(head.PayloadHash, &identities)(tx)
 				if err != nil {
 					return fmt.Errorf("could not add deltas: %w", err)
 				}
 
-				// manually add the deltas for valid identities
+				// manually add the deltas for valid ids
 				for _, identity := range identities {
 					for _, filter := range filters {
 						if !filter(identity) {
@@ -93,7 +96,7 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 
 		}
 
-		// get role & address for each non-zero stake
+		// get identity for each non-zero stake
 		for nodeID, delta := range deltas {
 
 			// discard nodes where the remaining stake is zero
@@ -101,29 +104,21 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 				continue
 			}
 
-			// create the identity
-			identity := flow.Identity{
-				NodeID: nodeID,
-				Stake:  uint64(delta),
-			}
-
-			// retrieve the identity role
-			err = operation.RetrieveRole(identity.NodeID, &identity.Role)(tx)
+			// retrieve the identity
+			var identity flow.Identity
+			err = operation.RetrieveIdentity(nodeID, &identity)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve role (%x): %w", nodeID, err)
 			}
 
-			// retrieve the identity address
-			err = operation.RetrieveAddress(identity.NodeID, &identity.Address)(tx)
-			if err != nil {
-				return fmt.Errorf("could not retrieve address (%x): %w", nodeID, err)
-			}
+			// set the stake for the node
+			identity.Stake = uint64(delta)
 
 			identities = append(identities, &identity)
 		}
 
 		sort.Slice(identities, func(i int, j int) bool {
-			return identity.ByNodeIDAsc(identities[i], identities[j])
+			return order.ByNodeIDAsc(identities[i], identities[j])
 		})
 
 		return nil
@@ -135,17 +130,45 @@ func (s *Snapshot) Identities(filters ...flow.IdentityFilter) (flow.IdentityList
 func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 
 	// get the ids
-	ids, err := s.Identities(identity.HasNodeID(nodeID))
+	identities, err := s.Identities(filter.HasNodeID(nodeID))
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
 
 	// return error if he doesn't exist
-	if len(ids) == 0 {
+	if len(identities) == 0 {
 		return nil, fmt.Errorf("identity not staked (%x)", nodeID)
 	}
 
-	return ids[0], nil
+	return identities[0], nil
+}
+
+func (s *Snapshot) Commit() (flow.StateCommitment, error) {
+
+	var commit flow.StateCommitment
+	err := s.state.db.View(func(tx *badger.Txn) error {
+
+		// get the head at the requested snapshot
+		var header flow.Header
+		err := s.head(&header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve head: %w", err)
+		}
+
+		// try getting the commit directly from the block
+		var commit flow.StateCommitment
+		err = operation.LookupCommit(header.ID(), &commit)(tx)
+		if err != nil {
+			return fmt.Errorf("could not get commit: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve commit: %w", err)
+	}
+
+	return commit, nil
 }
 
 // Clusters sorts the list of node identities after filtering into the given
@@ -156,14 +179,14 @@ func (s *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 func (s *Snapshot) Clusters() (*flow.ClusterList, error) {
 
 	// get the node identities
-	identities, err := s.Identities(identity.HasRole(flow.RoleCollection))
+	identities, err := s.Identities(filter.HasRole(flow.RoleCollection))
 	if err != nil {
 		return nil, fmt.Errorf("could not get identities: %w", err)
 	}
 
 	// order the identities by node ID
 	sort.Slice(identities, func(i, j int) bool {
-		return identity.ByNodeIDAsc(identities[i], identities[j])
+		return order.ByNodeIDAsc(identities[i], identities[j])
 	})
 
 	// create the desired number of clusters and assign nodes
@@ -189,7 +212,7 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 
 		// check if hash is nil and try to get it from height
 		if s.blockID == flow.ZeroID {
-			err := operation.RetrieveBlockID(s.number, &s.blockID)(tx)
+			err := operation.RetrieveNumber(s.number, &s.blockID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve hash (%d): %w", s.number, err)
 			}

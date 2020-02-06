@@ -45,7 +45,7 @@ func HashToID(hash []byte) Identifier {
 // MakeID creates an ID from the hash of encoded data.
 func MakeID(body interface{}) Identifier {
 	data := encoding.DefaultEncoder.MustEncode(body)
-	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
+	hasher := crypto.NewSHA3_256()
 	hash := hasher.ComputeHash(data)
 	return HashToID(hash)
 }
@@ -85,9 +85,9 @@ func CheckMerkleRoot(root Identifier, ids ...Identifier) bool {
 
 func ConcatSum(ids ...Identifier) Identifier {
 	var sum Identifier
-	hasher, _ := crypto.NewHasher(crypto.SHA3_256)
+	hasher := crypto.NewSHA3_256()
 	for _, id := range ids {
-		hasher.Add(id[:])
+		_, _ = hasher.Write(id[:])
 	}
 	hash := hasher.SumHash()
 	copy(sum[:], hash)

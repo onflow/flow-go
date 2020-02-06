@@ -8,7 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/network"
@@ -156,8 +156,8 @@ func (e *Engine) propagateGuarantee(guarantee *flow.CollectionGuarantee) error {
 
 	// select all the collection nodes on the network as our targets
 	ids, err := e.state.Final().Identities(
-		identity.HasRole(flow.RoleConsensus),
-		identity.Not(identity.HasNodeID(e.me.NodeID())),
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	)
 	if err != nil {
 		return errors.Wrap(err, "could not get identities")

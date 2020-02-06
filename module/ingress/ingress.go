@@ -23,13 +23,13 @@ type Config struct {
 	ListenAddr string
 }
 
-// Ingress implements a GRPC server with a simplified version of the Observation
+// Ingress implements a gRPC server with a simplified version of the Observation
 // API to enable receiving transactions into the system.
 type Ingress struct {
 	unit    *engine.Unit
 	logger  zerolog.Logger
-	handler *handler     // the GRPC service implementation
-	server  *grpc.Server // the GRPC server
+	handler *handler     // the gRPC service implementation
+	server  *grpc.Server // the gRPC server
 	config  Config
 }
 
@@ -50,7 +50,7 @@ func New(config Config, e *ingest.Engine) *Ingress {
 }
 
 // Ready returns a ready channel that is closed once the module has fully
-// started. The ingress module is ready when the GRPC server has successfully
+// started. The ingress module is ready when the gRPC server has successfully
 // started.
 func (i *Ingress) Ready() <-chan struct{} {
 	i.unit.Launch(i.serve)
@@ -58,12 +58,12 @@ func (i *Ingress) Ready() <-chan struct{} {
 }
 
 // Done returns a done channel that is closed once the module has fully stopped.
-// It sends a signal to stop the GRPC server, then closes the channel.
+// It sends a signal to stop the gRPC server, then closes the channel.
 func (i *Ingress) Done() <-chan struct{} {
 	return i.unit.Done(i.server.GracefulStop)
 }
 
-// serve starts the GRPC server .
+// serve starts the gRPC server .
 //
 // When this function returns, the server is considered ready.
 func (i *Ingress) serve() {

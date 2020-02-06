@@ -9,9 +9,10 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/identity"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
+	"github.com/dapperlabs/flow-go/module/trace"
 	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -21,27 +22,28 @@ import (
 // transactions are delegated to the correct collection cluster, and prepared
 // to be included in a collection.
 type Engine struct {
-	unit  *engine.Unit
-	log   zerolog.Logger
-	con   network.Conduit
-	me    module.Local
-	state protocol.State
-	pool  mempool.Transactions
+	unit   *engine.Unit
+	log    zerolog.Logger
+	tracer trace.Tracer
+	con    network.Conduit
+	me     module.Local
+	state  protocol.State
+	pool   mempool.Transactions
 }
 
 // New creates a new collection ingest engine.
-func New(log zerolog.Logger, net module.Network, state protocol.State, me module.Local, pool mempool.Transactions) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, state protocol.State, tracer trace.Tracer, me module.Local, pool mempool.Transactions) (*Engine, error) {
 
 	logger := log.With().
 		Str("engine", "ingest").
 		Logger()
-
 	e := &Engine{
-		unit:  engine.NewUnit(),
-		log:   logger,
-		me:    me,
-		state: state,
-		pool:  pool,
+		unit:   engine.NewUnit(),
+		log:    logger,
+		tracer: tracer,
+		me:     me,
+		state:  state,
+		pool:   pool,
 	}
 
 	con, err := net.Register(engine.CollectionIngest, e)
@@ -97,7 +99,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-// pocess processes engine events.
+// process processes engine events.
 //
 // Transactions are validated and routed to the correct cluster, then added
 // to the transaction mempool.
@@ -120,6 +122,12 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) e
 		Logger()
 
 	log.Debug().Msg("transaction message received")
+
+	e.tracer.StartSpan(tx.ID(), "transactionToCollectionGuarantee").
+		SetTag("tx_id", tx.ID().String()).
+		SetTag("node_type", "collection").
+		SetTag("origin_id", originID.String()).
+		SetTag("node_id", e.me.NodeID().String())
 
 	// first, we check if the transaction is valid
 	err := e.validateTransaction(tx)
@@ -159,7 +167,7 @@ func (e *Engine) onTransaction(originID flow.Identifier, tx *flow.Transaction) e
 	// if the transaction is submitted locally, propagate it
 	if originID == localID {
 		log.Debug().Msg("propagating transaction to cluster")
-		targetIDs := txCluster.Filter(identity.Not(identity.HasNodeID(localID)))
+		targetIDs := txCluster.Filter(filter.Not(filter.HasNodeID(localID)))
 		err = e.con.Submit(tx, targetIDs.NodeIDs()...)
 		if err != nil {
 			return fmt.Errorf("could not route transaction to cluster: %w", err)

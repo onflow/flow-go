@@ -1637,33 +1637,65 @@ func (e *InvalidResourceDictionaryMemberError) Error() string {
 
 func (*InvalidResourceDictionaryMemberError) isSemanticError() {}
 
-// NonResourceReferenceError
+// NonResourceReferenceTypeError
 
-type NonResourceReferenceError struct {
+type NonResourceReferenceTypeError struct {
 	ActualType Type
 	ast.Range
 }
 
-func (e *NonResourceReferenceError) Error() string {
+func (e *NonResourceReferenceTypeError) Error() string {
 	return fmt.Sprintf(
-		"cannot create reference: expected resource or resource interface, got `%s`",
+		"invalid reference type: expected resource type, got `%s`",
 		e.ActualType,
 	)
 }
 
-func (*NonResourceReferenceError) isSemanticError() {}
+func (*NonResourceReferenceTypeError) isSemanticError() {}
 
-// NonStorageReferenceError
+// NonReferenceTypeReferenceError
 
-type NonStorageReferenceError struct {
+type NonReferenceTypeReferenceError struct {
+	ActualType Type
 	ast.Range
 }
 
-func (e *NonStorageReferenceError) Error() string {
-	return "cannot create reference which is not into storage"
+func (e *NonReferenceTypeReferenceError) Error() string {
+	return fmt.Sprintf(
+		"cannot create reference: expected reference type, got `%s`",
+		e.ActualType,
+	)
 }
 
-func (*NonStorageReferenceError) isSemanticError() {}
+func (*NonReferenceTypeReferenceError) isSemanticError() {}
+
+// NonResourceTypeReferenceError
+
+type NonResourceTypeReferenceError struct {
+	ActualType Type
+	ast.Range
+}
+
+func (e *NonResourceTypeReferenceError) Error() string {
+	return fmt.Sprintf(
+		"cannot create reference: expected resource type, got `%s`",
+		e.ActualType,
+	)
+}
+
+func (*NonResourceTypeReferenceError) isSemanticError() {}
+
+// InvalidNonStorageStorableReferenceError
+
+type InvalidNonStorageStorableReferenceError struct {
+	ast.Range
+}
+
+func (e *InvalidNonStorageStorableReferenceError) Error() string {
+	return "cannot create storable reference which is not into storage"
+}
+
+func (*InvalidNonStorageStorableReferenceError) isSemanticError() {}
 
 // CreateImportedResourceError
 
@@ -2102,3 +2134,87 @@ func (e *ConstantSizedArrayLiteralSizeError) Error() string {
 }
 
 func (*ConstantSizedArrayLiteralSizeError) isSemanticError() {}
+
+// InvalidRestrictedTypeError
+
+type InvalidRestrictedTypeError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidRestrictedTypeError) Error() string {
+	return fmt.Sprintf("cannot restrict non-resource type: %s", e.Type.String())
+}
+
+func (*InvalidRestrictedTypeError) isSemanticError() {}
+
+// InvalidRestrictionTypeError
+
+type InvalidRestrictionTypeError struct {
+	Type Type
+	ast.Range
+}
+
+func (e *InvalidRestrictionTypeError) Error() string {
+	return fmt.Sprintf("cannot restrict using non-resource interface type: %s", e.Type.String())
+}
+
+func (*InvalidRestrictionTypeError) isSemanticError() {}
+
+// InvalidRestrictionTypeDuplicateError
+
+type InvalidRestrictionTypeDuplicateError struct {
+	Type *InterfaceType
+	ast.Range
+}
+
+func (e *InvalidRestrictionTypeDuplicateError) Error() string {
+	return fmt.Sprintf("duplicate restriction: %s", e.Type.String())
+}
+
+func (*InvalidRestrictionTypeDuplicateError) isSemanticError() {}
+
+// InvalidNonConformanceRestrictionError
+
+type InvalidNonConformanceRestrictionError struct {
+	Type *InterfaceType
+	ast.Range
+}
+
+func (e *InvalidNonConformanceRestrictionError) Error() string {
+	return fmt.Sprintf("restricted type does not conform to restricting type: %s", e.Type.String())
+}
+
+func (*InvalidNonConformanceRestrictionError) isSemanticError() {}
+
+// InvalidRestrictedTypeMemberAccessError
+
+type InvalidRestrictedTypeMemberAccessError struct {
+	Name string
+	ast.Range
+}
+
+func (e *InvalidRestrictedTypeMemberAccessError) Error() string {
+	return fmt.Sprintf("member of restricted type is not accessible: %s", e.Name)
+}
+
+func (*InvalidRestrictedTypeMemberAccessError) isSemanticError() {}
+
+// RestrictionMemberClashError
+
+type RestrictionMemberClashError struct {
+	Name                  string
+	RedeclaringType       *InterfaceType
+	OriginalDeclaringType *InterfaceType
+	ast.Range
+}
+
+func (e *RestrictionMemberClashError) Error() string {
+	return fmt.Sprintf(
+		"restriction has member clash with previous restriction `%s`: %s",
+		e.OriginalDeclaringType.String(),
+		e.Name,
+	)
+}
+
+func (*RestrictionMemberClashError) isSemanticError() {}

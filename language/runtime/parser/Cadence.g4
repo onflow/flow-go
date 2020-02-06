@@ -190,8 +190,21 @@ typeAnnotation
 // NOTE: only allow reference or optionals – prevent ambiguous
 // and not particular useful types like `&R?`
 fullType
-    : reference=Ampersand {p.noWhitespace()}? baseType
-    | baseType ({p.noWhitespace()}? optionals+=Optional)*
+    : referenceType
+    | nonReferenceType
+    ;
+
+referenceType
+    : ((Auth? Storable?) | (Storable? Auth?)) Ampersand {p.noWhitespace()}? innerType
+    ;
+
+nonReferenceType
+    : innerType ({p.noWhitespace()}? optionals+=Optional)*
+    ;
+
+innerType
+    : typeRestrictions
+    | baseType ({p.noWhitespace()}? typeRestrictions)?
     ;
 
 baseType
@@ -200,6 +213,10 @@ baseType
     | variableSizedType
     | constantSizedType
     | dictionaryType
+    ;
+
+typeRestrictions
+    : '{' (nominalType (',' nominalType)*)? '}'
     ;
 
 nominalType
@@ -446,6 +463,8 @@ Mul : '*' ;
 Div : '/' ;
 Mod : '%' ;
 
+Auth : 'auth' ;
+Storable : 'storable' ;
 Ampersand : '&';
 
 unaryOp
@@ -639,6 +658,8 @@ identifier
     | Access
     | Account
     | Self
+    | Auth
+    | Storable
     ;
 
 Identifier

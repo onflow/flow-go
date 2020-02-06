@@ -61,7 +61,7 @@ type Checker struct {
 	allowSelfResourceFieldInvalidation bool
 	Elaboration                        *Elaboration
 	currentMemberExpression            *ast.MemberExpression
-	validTopLevelDeclarations          []common.DeclarationKind
+	validTopLevelDeclarationsHandler   func(ast.Location) []common.DeclarationKind
 	beforeExtractor                    *BeforeExtractor
 }
 
@@ -102,12 +102,14 @@ func WithAccessCheckMode(mode AccessCheckMode) Option {
 	}
 }
 
-// WithValidTopLevelDeclarations returns a checker option which sets
-// the given slice of declaration kinds as the valid top-level declarations.
+// WithValidTopLevelDeclarationsHandler returns a checker option which sets
+// the given handler as function which is used to determine
+// the slice of declaration kinds which are valid at the top-level
+// for a given location.
 //
-func WithValidTopLevelDeclarations(validTopLevelDeclarations []common.DeclarationKind) Option {
+func WithValidTopLevelDeclarationsHandler(handler func(location ast.Location) []common.DeclarationKind) Option {
 	return func(checker *Checker) error {
-		checker.validTopLevelDeclarations = validTopLevelDeclarations
+		checker.validTopLevelDeclarationsHandler = handler
 		return nil
 	}
 }
@@ -198,12 +200,13 @@ func (checker *Checker) SetAllCheckers(allCheckers map[ast.LocationID]*Checker) 
 
 func (checker *Checker) declareBaseValues() {
 	for name, declaration := range BaseValues {
-		checker.declareValue(name, declaration)
+		variable := checker.declareValue(name, declaration)
+		variable.IsBaseValue = true
 		checker.declareGlobalValue(name)
 	}
 }
 
-func (checker *Checker) declareValue(name string, declaration ValueDeclaration) {
+func (checker *Checker) declareValue(name string, declaration ValueDeclaration) *Variable {
 	variable, err := checker.valueActivations.Declare(
 		name,
 		declaration.ValueDeclarationType(),
@@ -216,6 +219,7 @@ func (checker *Checker) declareValue(name string, declaration ValueDeclaration) 
 	)
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(name, variable)
+	return variable
 }
 
 func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDeclaration) {
@@ -279,28 +283,14 @@ func (checker *Checker) report(err error) {
 	checker.errors = append(checker.errors, err)
 }
 
-//TODO Once we have a flag which allows us to distinguish builtin from user defined
-// types we can remove this silly list
-// See https://github.com/dapperlabs/flow-go/issues/1627
-var blacklist = map[string]interface{}{
-	"Int":     nil,
-	"Int8":    nil,
-	"Int16":   nil,
-	"Int32":   nil,
-	"Int64":   nil,
-	"UInt8":   nil,
-	"UInt16":  nil,
-	"UInt32":  nil,
-	"UInt64":  nil,
-	"Address": nil,
-}
-
 func (checker *Checker) UserDefinedValues() map[string]*Variable {
-	ret := map[string]*Variable{}
+	variables := map[string]*Variable{}
+
 	for key, value := range checker.GlobalValues {
-		if _, ok := blacklist[key]; ok {
+		if value.IsBaseValue {
 			continue
 		}
+
 		if _, ok := checker.PredeclaredValues[key]; ok {
 			continue
 		}
@@ -308,13 +298,16 @@ func (checker *Checker) UserDefinedValues() map[string]*Variable {
 		if _, ok := checker.PredeclaredTypes[key]; ok {
 			continue
 		}
+
 		if typeValue, ok := checker.GlobalTypes[key]; ok {
-			ret[key] = typeValue
+			variables[key] = typeValue
 			continue
 		}
-		ret[key] = value
+
+		variables[key] = value
 	}
-	return ret
+
+	return variables
 }
 
 func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
@@ -372,13 +365,18 @@ func (checker *Checker) VisitProgram(program *ast.Program) ast.Repr {
 }
 
 func (checker *Checker) checkTopLevelDeclarationValidity(declarations []ast.Declaration) {
-	if checker.validTopLevelDeclarations == nil {
+	if checker.validTopLevelDeclarationsHandler == nil {
 		return
 	}
 
 	validDeclarationKinds := map[common.DeclarationKind]bool{}
 
-	for _, declarationKind := range checker.validTopLevelDeclarations {
+	validTopLevelDeclarations := checker.validTopLevelDeclarationsHandler(checker.Location)
+	if validTopLevelDeclarations == nil {
+		return
+	}
+
+	for _, declarationKind := range validTopLevelDeclarations {
 		validDeclarationKinds[declarationKind] = true
 	}
 
@@ -649,123 +647,281 @@ func (checker *Checker) findAndCheckVariable(identifier ast.Identifier, recordOc
 func (checker *Checker) ConvertType(t ast.Type) Type {
 	switch t := t.(type) {
 	case *ast.NominalType:
-		identifier := t.Identifier.Identifier
-		result := checker.FindType(identifier)
+		return checker.convertNominalType(t)
+
+	case *ast.VariableSizedType:
+		return checker.convertVariableSizedType(t)
+
+	case *ast.ConstantSizedType:
+		return checker.convertConstantSizedType(t)
+
+	case *ast.FunctionType:
+		return checker.convertFunctionType(t)
+
+	case *ast.OptionalType:
+		return checker.convertOptionalType(t)
+
+	case *ast.DictionaryType:
+		return checker.convertDictionaryType(t)
+
+	case *ast.ReferenceType:
+		return checker.convertReferenceType(t)
+
+	case *ast.RestrictedType:
+		return checker.convertRestrictedType(t)
+	}
+
+	panic(&astTypeConversionError{invalidASTType: t})
+}
+
+func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
+	typeResult := checker.ConvertType(t.Type)
+
+	// The restricted type must be a concrete resource type
+
+	resourceType, ok := typeResult.(*CompositeType)
+	if !ok || resourceType.Kind != common.CompositeKindResource {
+		checker.report(
+			&InvalidRestrictedTypeError{
+				Type:  resourceType,
+				Range: ast.NewRangeFromPositioned(t.Type),
+			},
+		)
+	}
+
+	// Convert the restrictions
+
+	var restrictions []*InterfaceType
+	restrictionRanges := make(map[*InterfaceType]ast.Range, len(t.Restrictions))
+
+	memberSet := map[string]*InterfaceType{}
+
+	for _, restriction := range t.Restrictions {
+		restrictionResult := checker.ConvertType(restriction)
+
+		// The restriction must be a resource interface type
+
+		interfaceType, ok := restrictionResult.(*InterfaceType)
+		if !ok || interfaceType.CompositeKind != common.CompositeKindResource {
+			checker.report(
+				&InvalidRestrictionTypeError{
+					Type:  interfaceType,
+					Range: ast.NewRangeFromPositioned(restriction),
+				},
+			)
+			continue
+		}
+
+		restrictions = append(restrictions, interfaceType)
+
+		// The restriction must not be duplicated
+
+		if _, exists := restrictionRanges[interfaceType]; exists {
+			checker.report(
+				&InvalidRestrictionTypeDuplicateError{
+					Type:  interfaceType,
+					Range: ast.NewRangeFromPositioned(restriction),
+				},
+			)
+		} else {
+			restrictionRanges[interfaceType] =
+				ast.NewRangeFromPositioned(restriction)
+		}
+
+		// The restrictions may not have clashing members
+
+		// TODO: also include interface conformances's members
+		//   once interfaces can have conformances
+
+		for name := range interfaceType.Members {
+			if previousDeclaringInterfaceType, ok := memberSet[name]; ok {
+				checker.report(
+					&RestrictionMemberClashError{
+						Name:                  name,
+						RedeclaringType:       interfaceType,
+						OriginalDeclaringType: previousDeclaringInterfaceType,
+						Range:                 ast.NewRangeFromPositioned(restriction),
+					},
+				)
+			} else {
+				memberSet[name] = interfaceType
+			}
+		}
+	}
+
+	// If the restricted type is a concrete resource type,
+	// check that the restrictions are conformances
+
+	if resourceType != nil && resourceType.Kind == common.CompositeKindResource {
+
+		// Prepare a set of all the conformances of the resource
+
+		allConformances := resourceType.AllConformances()
+		conformancesSet := make(map[*InterfaceType]bool, len(allConformances))
+		for _, conformance := range allConformances {
+			conformancesSet[conformance] = true
+		}
+
+		for _, restriction := range restrictions {
+			// The restriction must be an explicit or implicit conformance
+			// of the resource (restricted type)
+
+			if !conformancesSet[restriction] {
+				checker.report(
+					&InvalidNonConformanceRestrictionError{
+						Type:  restriction,
+						Range: restrictionRanges[restriction],
+					},
+				)
+			}
+		}
+	}
+
+	return &RestrictedResourceType{
+		Type:         resourceType,
+		Restrictions: restrictions,
+	}
+}
+
+func (checker *Checker) convertReferenceType(t *ast.ReferenceType) Type {
+	ty := checker.ConvertType(t.Type)
+
+	if !ty.IsInvalidType() &&
+		!ty.IsResourceType() {
+
+		checker.report(
+			&NonResourceReferenceTypeError{
+				ActualType: ty,
+				Range:      ast.NewRangeFromPositioned(t),
+			},
+		)
+	}
+
+	return &ReferenceType{
+		Authorized: t.Authorized,
+		Storable:   t.Storable,
+		Type:       ty,
+	}
+}
+
+func (checker *Checker) convertDictionaryType(t *ast.DictionaryType) Type {
+	keyType := checker.ConvertType(t.KeyType)
+	valueType := checker.ConvertType(t.ValueType)
+
+	if !IsValidDictionaryKeyType(keyType) {
+		checker.report(
+			&InvalidDictionaryKeyTypeError{
+				Type:  keyType,
+				Range: ast.NewRangeFromPositioned(t.KeyType),
+			},
+		)
+	}
+
+	return &DictionaryType{
+		KeyType:   keyType,
+		ValueType: valueType,
+	}
+}
+
+func (checker *Checker) convertOptionalType(t *ast.OptionalType) Type {
+	ty := checker.ConvertType(t.Type)
+	return &OptionalType{
+		Type: ty,
+	}
+}
+
+func (checker *Checker) convertFunctionType(t *ast.FunctionType) Type {
+	var parameters []*Parameter
+	for _, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
+		parameterTypeAnnotation := checker.ConvertTypeAnnotation(parameterTypeAnnotation)
+		parameters = append(parameters,
+			&Parameter{
+				TypeAnnotation: parameterTypeAnnotation,
+			},
+		)
+	}
+
+	returnTypeAnnotation := checker.ConvertTypeAnnotation(t.ReturnTypeAnnotation)
+
+	return &FunctionType{
+		Parameters:           parameters,
+		ReturnTypeAnnotation: returnTypeAnnotation,
+	}
+}
+
+func (checker *Checker) convertConstantSizedType(t *ast.ConstantSizedType) Type {
+	elementType := checker.ConvertType(t.Type)
+	return &ConstantSizedType{
+		Type: elementType,
+		Size: t.Size,
+	}
+}
+
+func (checker *Checker) convertVariableSizedType(t *ast.VariableSizedType) Type {
+	elementType := checker.ConvertType(t.Type)
+	return &VariableSizedType{
+		Type: elementType,
+	}
+}
+
+func (checker *Checker) convertNominalType(t *ast.NominalType) Type {
+	identifier := t.Identifier.Identifier
+	result := checker.FindType(identifier)
+	if result == nil {
+		checker.report(
+			&NotDeclaredError{
+				ExpectedKind: common.DeclarationKindType,
+				Name:         identifier,
+				Pos:          t.StartPosition(),
+			},
+		)
+		return &InvalidType{}
+	}
+
+	var resolvedIdentifiers []ast.Identifier
+
+	for _, identifier := range t.NestedIdentifiers {
+		switch typedResult := result.(type) {
+		case *CompositeType:
+			result = typedResult.NestedTypes[identifier.Identifier]
+
+		case *InterfaceType:
+			result = typedResult.NestedTypes[identifier.Identifier]
+
+		default:
+			if !typedResult.IsInvalidType() {
+				checker.report(
+					&InvalidNestedTypeError{
+						Type: &ast.NominalType{
+							Identifier:        t.Identifier,
+							NestedIdentifiers: resolvedIdentifiers,
+						},
+					},
+				)
+			}
+
+			return &InvalidType{}
+		}
+
+		resolvedIdentifiers = append(resolvedIdentifiers, identifier)
+
 		if result == nil {
+			nonExistentType := &ast.NominalType{
+				Identifier:        t.Identifier,
+				NestedIdentifiers: resolvedIdentifiers,
+			}
 			checker.report(
 				&NotDeclaredError{
 					ExpectedKind: common.DeclarationKindType,
-					Name:         identifier,
+					Name:         nonExistentType.String(),
 					Pos:          t.StartPosition(),
 				},
 			)
 			return &InvalidType{}
 		}
-
-		var resolvedIdentifiers []ast.Identifier
-
-		for _, identifier := range t.NestedIdentifiers {
-			switch typedResult := result.(type) {
-			case *CompositeType:
-				result = typedResult.NestedTypes[identifier.Identifier]
-
-			case *InterfaceType:
-				result = typedResult.NestedTypes[identifier.Identifier]
-
-			default:
-				if !typedResult.IsInvalidType() {
-					checker.report(
-						&InvalidNestedTypeError{
-							Type: &ast.NominalType{
-								Identifier:        t.Identifier,
-								NestedIdentifiers: resolvedIdentifiers,
-							},
-						},
-					)
-				}
-
-				return &InvalidType{}
-			}
-
-			resolvedIdentifiers = append(resolvedIdentifiers, identifier)
-
-			if result == nil {
-				nonExistentType := &ast.NominalType{
-					Identifier:        t.Identifier,
-					NestedIdentifiers: resolvedIdentifiers,
-				}
-				checker.report(
-					&NotDeclaredError{
-						ExpectedKind: common.DeclarationKindType,
-						Name:         nonExistentType.String(),
-						Pos:          t.StartPosition(),
-					},
-				)
-				return &InvalidType{}
-			}
-		}
-
-		return result
-
-	case *ast.VariableSizedType:
-		elementType := checker.ConvertType(t.Type)
-		return &VariableSizedType{
-			Type: elementType,
-		}
-
-	case *ast.ConstantSizedType:
-		elementType := checker.ConvertType(t.Type)
-		return &ConstantSizedType{
-			Type: elementType,
-			Size: t.Size,
-		}
-
-	case *ast.FunctionType:
-		var parameters []*Parameter
-		for _, parameterTypeAnnotation := range t.ParameterTypeAnnotations {
-			parameterTypeAnnotation := checker.ConvertTypeAnnotation(parameterTypeAnnotation)
-			parameters = append(parameters,
-				&Parameter{
-					TypeAnnotation: parameterTypeAnnotation,
-				},
-			)
-		}
-
-		returnTypeAnnotation := checker.ConvertTypeAnnotation(t.ReturnTypeAnnotation)
-
-		return &FunctionType{
-			Parameters:           parameters,
-			ReturnTypeAnnotation: returnTypeAnnotation,
-		}
-
-	case *ast.OptionalType:
-		ty := checker.ConvertType(t.Type)
-		return &OptionalType{ty}
-
-	case *ast.DictionaryType:
-		keyType := checker.ConvertType(t.KeyType)
-		valueType := checker.ConvertType(t.ValueType)
-
-		if !IsValidDictionaryKeyType(keyType) {
-			checker.report(
-				&InvalidDictionaryKeyTypeError{
-					Type:  keyType,
-					Range: ast.NewRangeFromPositioned(t.KeyType),
-				},
-			)
-		}
-
-		return &DictionaryType{
-			KeyType:   keyType,
-			ValueType: valueType,
-		}
-
-	case *ast.ReferenceType:
-		ty := checker.ConvertType(t.Type)
-		return &ReferenceType{ty}
 	}
 
-	panic(&astTypeConversionError{invalidASTType: t})
+	return result
 }
 
 // ConvertTypeAnnotation converts an AST type annotation representation
