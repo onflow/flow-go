@@ -5056,7 +5056,7 @@
           followed by the storage location,the <code>as</code> keyword,
           and the type through which the stored location should be accessed.
         </p>
-        <pre><code class="language-cadence,file=reference-ex.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> nameRef: &#x26;</span><span style="color: #0000FF">Name</span><span style="color: #000000"> = &#x26;account.storage[Name] as Name</span><span>
+        <pre><code class="language-cadence,file=reference-ex.cdc"><span style="color: #0000FF">let</span><span style="color: #000000"> nameRef: &#x26;</span><span style="color: #0000FF">Name</span><span style="color: #000000"> = &#x26;account.storage[Name] as &#x26;Name</span><span>
 </span></code></pre>
         <p>The storage location must be a subtype of the type given after the <code>as</code> keyword.</p>
         <p>
@@ -5100,7 +5100,7 @@
 </span><span style="color: #008000">// Create a reference to the storage location `account.storage[Counter]`</span><span>
 </span><span style="color: #008000">// and allow access to it as the type `Counter`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> counterReference: &#x26;</span><span style="color: #0000FF">Counter</span><span style="color: #000000"> = &#x26;account.storage[Counter] as Counter</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> counterReference: &#x26;</span><span style="color: #0000FF">Counter</span><span style="color: #000000"> = &#x26;account.storage[Counter] as &#x26;Counter</span><span>
 </span><span>
 </span><span style="color: #000000">counterReference.count  </span><span style="color: #008000">// is `42`</span><span>
 </span><span>
@@ -5141,7 +5141,7 @@
 </span><span style="color: #008000">// Create another reference to the storage location `account.storage[Counter]`</span><span>
 </span><span style="color: #008000">// and only allow access to it as the type `HasCount`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> limitedReference: &#x26;</span><span style="color: #0000FF">HasCount</span><span style="color: #000000"> = &#x26;account.storage[Counter] as HasCount</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> limitedReference: &#x26;</span><span style="color: #0000FF">HasCount</span><span style="color: #000000"> = &#x26;account.storage[Counter] as &#x26;HasCount</span><span>
 </span><span>
 </span><span style="color: #008000">// Read the counter's current count through the limited reference.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -5181,7 +5181,7 @@
 </span><span style="color: #008000">// Create another reference to the storage location `account.storage[Counter]`</span><span>
 </span><span style="color: #008000">// and only allow access to it as the type `HasCount`.</span><span>
 </span><span style="color: #008000">//</span><span>
-</span><span style="color: #0000FF">let</span><span style="color: #000000"> limitedReference: &#x26;</span><span style="color: #0000FF">HasCount</span><span style="color: #000000"> = &#x26;account.storage[Counter] as HasCount</span><span>
+</span><span style="color: #0000FF">let</span><span style="color: #000000"> limitedReference: &#x26;</span><span style="color: #0000FF">HasCount</span><span style="color: #000000"> = &#x26;account.storage[Counter] as &#x26;HasCount</span><span>
 </span><span>
 </span><span style="color: #008000">// Store the reference in the `published` object.</span><span>
 </span><span style="color: #008000">//</span><span>
@@ -5867,12 +5867,12 @@
 </span><span style="color: #000000">        </span><span style="color: #008000">// because an account will usually want anyone to be able to read</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// their balance and call their deposit function</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">//</span><span>
-</span><span style="color: #000000">        signer.published[&#x26;Receiver] = &#x26;signer.storage[ExampleToken] as Receiver</span><span>
+</span><span style="color: #000000">        signer.published[&#x26;Receiver] = &#x26;signer.storage[ExampleToken] as &#x26;Receiver</span><span>
 </span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// The `Provider` reference is stored in account storage</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// because an account will not want to expose its withdraw method</span><span>
 </span><span style="color: #000000">        </span><span style="color: #008000">// to the public</span><span>
-</span><span style="color: #000000">        signer.storage[&#x26;Provider] = &#x26;signer.storage[ExampleToken] as Provider</span><span>
+</span><span style="color: #000000">        signer.storage[&#x26;Provider] = &#x26;signer.storage[ExampleToken] as &#x26;Provider</span><span>
 </span><span style="color: #000000">    }</span><span>
 </span><span style="color: #000000">}</span><span>
 </span></code></pre>

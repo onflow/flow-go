@@ -64,7 +64,7 @@ func (p *PubSubTestSuite) TestPubSub() {
 	defer p.cancel()
 	topic := "testtopic"
 	count := 4
-	golog.SetAllLoggers(gologging.DEBUG)
+	golog.SetAllLoggers(gologging.CRITICAL)
 
 	// Step 1: Creates nodes
 	d := &mockDiscovery{}

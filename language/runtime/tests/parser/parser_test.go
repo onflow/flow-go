@@ -4990,7 +4990,7 @@ func TestParseEvent(t *testing.T) {
         event Transfer(to: Address, from: Address)
 	`)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	transfer := &CompositeDeclaration{
 		CompositeKind: common.CompositeKindEvent,
@@ -6376,7 +6376,7 @@ func TestParseOptionalRestrictedResourceTypeOnlyRestrictions(t *testing.T) {
 func TestParseReference(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
-       let x = &account.storage[R] as R
+       let x = &account.storage[R] as &R
 	`)
 
 	require.NoError(t, err)
@@ -6415,11 +6415,14 @@ func TestParseReference(t *testing.T) {
 							EndPos:   Position{Offset: 34, Line: 2, Column: 33},
 						},
 					},
-					Type: &NominalType{
-						Identifier: Identifier{
-							Identifier: "R",
-							Pos:        Position{Offset: 39, Line: 2, Column: 38},
+					Type: &ReferenceType{
+						Type: &NominalType{
+							Identifier: Identifier{
+								Identifier: "R",
+								Pos:        Position{Offset: 40, Line: 2, Column: 39},
+							},
 						},
+						StartPos: Position{Offset: 39, Line: 2, Column: 38},
 					},
 					StartPos: Position{Offset: 16, Line: 2, Column: 15},
 				},
@@ -7324,4 +7327,55 @@ func TestParseTransactionDeclaration(t *testing.T) {
 
 		utils.AssertEqualWithDiff(t, expected, actual)
 	})
+}
+
+func TestParseAuthorizedReferenceType(t *testing.T) {
+
+	actual, _, err := parser.ParseProgram(`
+       let x: auth &R = 1
+	`)
+
+	assert.NoError(t, err)
+
+	expected := &Program{
+		Declarations: []Declaration{
+			&VariableDeclaration{
+				IsConstant: true,
+				Identifier: Identifier{
+					Identifier: "x",
+					Pos:        Position{Offset: 12, Line: 2, Column: 11},
+				},
+				TypeAnnotation: &TypeAnnotation{
+					IsResource: false,
+					Type: &ReferenceType{
+						Authorized: true,
+						Type: &NominalType{
+							Identifier: Identifier{
+								Identifier: "R", Pos: Position{Offset: 21, Line: 2, Column: 20}},
+						},
+						StartPos: Position{Offset: 15, Line: 2, Column: 14},
+					},
+					StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				},
+				Value: &IntExpression{
+					Value: big.NewInt(1),
+					Base:  10,
+					Range: Range{
+						StartPos: Position{Offset: 25, Line: 2, Column: 24},
+						EndPos:   Position{Offset: 25, Line: 2, Column: 24},
+					},
+				},
+				Transfer: &Transfer{
+					Operation: TransferOperationCopy,
+					Pos:       Position{Offset: 23, Line: 2, Column: 22},
+				},
+				StartPos:          Position{Offset: 8, Line: 2, Column: 7},
+				SecondTransfer:    nil,
+				SecondValue:       nil,
+				ParentIfStatement: nil,
+			},
+		},
+	}
+
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
