@@ -13,6 +13,8 @@ type NodeSignature struct {
 // AggregatedSignature represents an aggregated signature.
 type AggregatedSignature struct {
 	// Raw is the raw signature bytes.
+	// It might be a aggregated BLS signature or a combination of aggregated BLS signature
+	// and threshold signature.
 	Raw []byte
 	// Signers is a "bitmap" of signer indices. Tracking the identity list the
 	// indices correspond to is the responsibility of the user of the type.

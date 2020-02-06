@@ -18,5 +18,5 @@ type SigAggregator interface {
 	// to be added is invalid.
 	// sig - the vote signature to be aggregated
 	// pubkey - the public key of the signer
-	AddSig(sig *flow.PartialSignature, pubkey types.PubKey) (*types.AggregatedSignature, error)
+	AddSig(sig *flow.PartialSignature, pubkey types.PubKey) (*flow.AggregatedSignature, error)
 }

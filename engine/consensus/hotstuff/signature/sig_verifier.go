@@ -25,5 +25,5 @@ type SigVerifier interface {
 	// Note: blockID is needed when the aggregated signature contains threshold signature, in which case
 	// the blockID is needed to find the group public key.
 	// The group public key is needed to verify threshold signature.
-	VerifyAggregatedSig(aggsig *types.AggregatedSignature, message types.VoteBytes, blockID flow.Identifier) (bool, error)
+	VerifyAggregatedSig(aggsig *flow.AggregatedSignature, message types.VoteBytes, blockID flow.Identifier) (bool, error)
 }
