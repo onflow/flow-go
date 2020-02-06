@@ -69,7 +69,7 @@ func (v *Voter) produceVote(bp *types.BlockProposal) (*types.Vote, error) {
 		return nil, fmt.Errorf("can not find self index for block %v: %w", bp.BlockID(), err)
 	}
 	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.BlockID())
-	sig := v.signer.SignVote(unsignedVote, myIndexedPubKey.SignerIndex)
+	sig := v.signer.SignVote(unsignedVote, myIndexedPubKey.PubKey)
 	vote := unsignedVote.WithSignature(sig)
 	return vote, nil
 }

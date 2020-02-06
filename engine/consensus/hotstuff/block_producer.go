@@ -72,7 +72,7 @@ func (bp *BlockProducer) signBlockProposal(proposal *types.Block) (*types.BlockP
 	unsignedVote := proposal.ToVote()
 
 	// signing the proposal is equivalent of signing the vote
-	sig := bp.signer.SignVote(unsignedVote, myIndexedPubKey.SignerIndex)
+	sig := bp.signer.SignVote(unsignedVote, myIndexedPubKey.PubKey)
 
 	blockProposal := types.NewBlockProposal(proposal, sig)
 	return blockProposal, nil

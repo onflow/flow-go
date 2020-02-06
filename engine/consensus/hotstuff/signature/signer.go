@@ -12,5 +12,5 @@ type Signer interface {
 	// signerIndex - the index of the signer in its cluster. The signerIndex
 	// along with the BlockID field in the vote, determines the public key,
 	// of which the private key will be used to sign the vote.
-	SignVote(vote *types.UnsignedVote, signerIndex uint32) *flow.PartialSignature
+	SignVote(vote *types.UnsignedVote, pubkey types.PubKey) *flow.PartialSignature
 }
