@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
+
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
@@ -37,16 +38,16 @@ type NodeAddress struct {
 // P2PNode manages the the libp2p node.
 type P2PNode struct {
 	sync.Mutex
-	name       string                             // friendly human readable Name of the node
-	libP2PHost host.Host                          // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
-	logger     zerolog.Logger                     // for logging
-	ps         *pubsub.PubSub                     // the reference to the pubsub instance
-	topics     map[FlowTopic]*pubsub.Topic        // map of a topic string to an actual topic instance
-	subs       map[FlowTopic]*pubsub.Subscription // map of a topic string to an actual subscription
+	name       string                          // friendly human readable Name of the node
+	libP2PHost host.Host                       // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
+	logger     zerolog.Logger                  // for logging
+	ps         *pubsub.PubSub                  // the reference to the pubsub instance
+	topics     map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
+	subs       map[string]*pubsub.Subscription // map of a topic string to an actual subscription
 }
 
 // Start starts a libp2p node on the given address.
-func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, handler network.StreamHandler) error {
+func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, handler network.StreamHandler, psOption ...pubsub.Option) error {
 	p.Lock()
 	defer p.Unlock()
 	p.name = n.Name
@@ -75,19 +76,22 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	if err != nil {
 		return errors.Wrapf(err, "could not construct libp2p host for %s", p.name)
 	}
+
 	p.libP2PHost = host
 
 	host.SetStreamHandler(FlowLibP2PProtocolID, handler)
 
-	// Creating a new PubSub instance of the type GossipSub
-	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost)
+	// Creating a new PubSub instance of the type GossipSub with psOption
+	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost, psOption...)
+
+	// TODO: Adjust pubsub.GossipSubD, pubsub.GossipSubDLo and pubsub.GossipSubDHi as per fanout provided in the future
 
 	if err != nil {
 		return errors.Wrapf(err, "unable to start pubsub %s", p.name)
 	}
 
-	p.topics = make(map[FlowTopic]*pubsub.Topic)
-	p.subs = make(map[FlowTopic]*pubsub.Subscription)
+	p.topics = make(map[string]*pubsub.Topic)
+	p.subs = make(map[string]*pubsub.Subscription)
 
 	if err == nil {
 		ip, port := p.GetIPPort()
@@ -203,20 +207,21 @@ func (p *P2PNode) GetIPPort() (ip string, port string) {
 	return "", ""
 }
 
-// Subscribe subscribes the node to the given topic. When a message is received for the topic, the callback is called
-// with the message payload
+// Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
-// A node will receive its own published messages.
-func (p *P2PNode) Subscribe(ctx context.Context, topic FlowTopic, callback func([]byte)) error {
+// NOTE: A node will receive its own published messages.
+func (p *P2PNode) Subscribe(ctx context.Context, topic string) (*pubsub.Subscription, error) {
 	p.Lock()
 	defer p.Unlock()
+
 	// Check if the topic has been already created and is in the cache
+	p.ps.GetTopics()
 	tp, found := p.topics[topic]
 	var err error
 	if !found {
-		tp, err = p.ps.Join(string(topic))
+		tp, err = p.ps.Join(topic)
 		if err != nil {
-			return errors.Wrapf(err, "failed to register for topic %s", string(topic))
+			return nil, fmt.Errorf("failed to join topic %s: %w", topic, err)
 		}
 		p.topics[topic] = tp
 	}
@@ -224,31 +229,18 @@ func (p *P2PNode) Subscribe(ctx context.Context, topic FlowTopic, callback func(
 	// Create a new subscription
 	s, err := tp.Subscribe()
 	if err != nil {
-		return err
+		return s, fmt.Errorf("failed to create subscription for topic %s: %w", topic, err)
 	}
+
 	// Add the subscription to the cache
 	p.subs[topic] = s
-	go func() {
-		_ = pubSubHandler(ctx, s, callback, p.logger)
-	}()
 
-	p.logger.Debug().Str("topic", string(topic)).Str("name", p.name).Msg("subscribed to topic")
-	return err
-}
-
-// pubSubHandler receives the messages for a subscriber and calls the registered call back
-func pubSubHandler(c context.Context, s *pubsub.Subscription, callback func([]byte), l zerolog.Logger) error {
-	for {
-		msg, err := s.Next(c)
-		if err != nil {
-			return err
-		}
-		callback(msg.Data)
-	}
+	p.logger.Debug().Str("topic", topic).Str("name", p.name).Msg("subscribed to topic")
+	return s, err
 }
 
 // UnSubscribe cancels the subscriber and closes the topic.
-func (p *P2PNode) UnSubscribe(topic FlowTopic) error {
+func (p *P2PNode) UnSubscribe(topic string) error {
 	p.Lock()
 	defer p.Unlock()
 	// Remove the Subscriber from the cache
@@ -267,23 +259,29 @@ func (p *P2PNode) UnSubscribe(topic FlowTopic) error {
 
 	err := tp.Close()
 	if err != nil {
-		err = errors.Wrapf(err, "unable to close topic %s", string(topic))
+		err = errors.Wrapf(err, "unable to close topic %s", topic)
 		return err
 	}
 	p.topics[topic] = nil
 	delete(p.topics, topic)
 
-	p.logger.Debug().Str("topic", string(topic)).Str("name", p.name).Msg("unsubscribed from topic")
+	p.logger.Debug().Str("topic", topic).Str("name", p.name).Msg("unsubscribed from topic")
 	return err
 }
 
 // Publish publishes the given payload on the topic
-func (p *P2PNode) Publish(ctx context.Context, t FlowTopic, data []byte) error {
+// if the nodes doesn't has at least minPeers number of nodes as it peers,
+// then the publish will block until at least minSize number of have been found as peers.
+func (p *P2PNode) Publish(ctx context.Context, t string, data []byte, minPeers int) error {
 	ps, found := p.topics[t]
 	if !found {
-		return fmt.Errorf("topic not found")
+		return fmt.Errorf("topic not found:%s", t)
 	}
-	return ps.Publish(ctx, data)
+	err := ps.Publish(ctx, data, pubsub.WithReadiness(pubsub.MinTopicSize(minPeers)))
+	if err != nil {
+		return fmt.Errorf("failed to publish to topic %s: %w", t, err)
+	}
+	return nil
 }
 
 // multiaddressStr receives a node address and returns

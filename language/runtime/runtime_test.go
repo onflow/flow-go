@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/language/runtime/ast"
 	"github.com/dapperlabs/flow-go/language/runtime/common"
 	"github.com/dapperlabs/flow-go/language/runtime/interpreter"
+	"github.com/dapperlabs/flow-go/language/runtime/sema"
 	"github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
@@ -179,10 +180,9 @@ func TestRuntimeProgramWithNoTransaction(t *testing.T) {
 
 	err := runtime.ExecuteTransaction(script, runtimeInterface, utils.TestLocation)
 
-	if assert.IsType(t, Error{}, err) {
-		err := err.(Error)
-		assert.IsType(t, InvalidTransactionCountError{}, err.Unwrap())
-	}
+	require.IsType(t, Error{}, err)
+	err = err.(Error).Unwrap()
+	assert.IsType(t, InvalidTransactionCountError{}, err)
 }
 
 func TestRuntimeProgramWithMultipleTransaction(t *testing.T) {
@@ -201,10 +201,9 @@ func TestRuntimeProgramWithMultipleTransaction(t *testing.T) {
 
 	err := runtime.ExecuteTransaction(script, runtimeInterface, utils.TestLocation)
 
-	if assert.IsType(t, Error{}, err) {
-		err := err.(Error)
-		assert.IsType(t, InvalidTransactionCountError{}, err.Unwrap())
-	}
+	require.IsType(t, Error{}, err)
+	err = err.(Error).Unwrap()
+	assert.IsType(t, InvalidTransactionCountError{}, err)
 }
 
 func TestRuntimeStorage(t *testing.T) {
@@ -2218,4 +2217,52 @@ func TestRuntimeBlock(t *testing.T) {
 		},
 		loggedMessages,
 	)
+}
+
+func TestRuntimeTransactionTopLevelDeclarations(t *testing.T) {
+
+	t.Run("transaction with function", func(t *testing.T) {
+		runtime := NewInterpreterRuntime()
+
+		script := []byte(`
+          pub fun test() {}
+
+          transaction {}
+        `)
+
+		runtimeInterface := &testRuntimeInterface{
+			getSigningAccounts: func() []Address {
+				return nil
+			},
+		}
+
+		err := runtime.ExecuteTransaction(script, runtimeInterface, TransactionLocation{})
+		require.NoError(t, err)
+	})
+
+	t.Run("transaction with resource", func(t *testing.T) {
+		runtime := NewInterpreterRuntime()
+
+		script := []byte(`
+          pub resource R {}
+
+          transaction {}
+        `)
+
+		runtimeInterface := &testRuntimeInterface{
+			getSigningAccounts: func() []Address {
+				return nil
+			},
+		}
+
+		err := runtime.ExecuteTransaction(script, runtimeInterface, TransactionLocation{})
+		require.Error(t, err)
+
+		require.IsType(t, Error{}, err)
+		err = err.(Error).Unwrap()
+
+		errs := utils.ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidTopLevelDeclarationError{}, errs[0])
+	})
 }

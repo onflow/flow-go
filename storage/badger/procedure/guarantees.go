@@ -24,7 +24,9 @@ func IndexGuarantees(payloadHash flow.Identifier, guarantees []*flow.CollectionG
 			if !exists {
 				return fmt.Errorf("node guarantee missing in DB (%x)", guarantee.CollectionID)
 			}
-			err = operation.IndexGuarantee(payloadHash, guarantee.CollectionID)(tx)
+
+			// TODO: Revisit duplicate handling logic
+			err = operation.AllowDuplicates(operation.IndexGuarantee(payloadHash, guarantee.CollectionID))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index guarantee (%x): %w", guarantee.CollectionID, err)
 			}

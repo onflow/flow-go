@@ -11,6 +11,20 @@ type Middleware struct {
 	mock.Mock
 }
 
+// Publish provides a mock function with given fields: topic, msg
+func (_m *Middleware) Publish(topic string, msg interface{}) error {
+	ret := _m.Called(topic, msg)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, interface{}) error); ok {
+		r0 = rf(topic, msg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Send provides a mock function with given fields: nodeID, msg
 func (_m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 	ret := _m.Called(nodeID, msg)
@@ -26,11 +40,34 @@ func (_m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 }
 
 // Start provides a mock function with given fields: overlay
-func (_m *Middleware) Start(overlay middleware.Overlay) {
-	_m.Called(overlay)
+func (_m *Middleware) Start(overlay middleware.Overlay) error {
+	ret := _m.Called(overlay)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(middleware.Overlay) error); ok {
+		r0 = rf(overlay)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // Stop provides a mock function with given fields:
 func (_m *Middleware) Stop() {
 	_m.Called()
+}
+
+// Subscribe provides a mock function with given fields: channelID
+func (_m *Middleware) Subscribe(channelID uint8) error {
+	ret := _m.Called(channelID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint8) error); ok {
+		r0 = rf(channelID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
