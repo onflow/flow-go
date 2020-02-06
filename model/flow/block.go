@@ -5,7 +5,6 @@ package flow
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
@@ -15,7 +14,7 @@ func Genesis(ids IdentityList) *Block {
 	seal := Seal{
 		BlockID:       ZeroID,
 		PreviousState: nil,
-		FinalState:    trie.Hash(trie.EmptySlice),
+		FinalState:    trie.GetDefaultHashForHeight(255),
 	}
 
 	// create the raw content for the genesis block
@@ -59,30 +58,58 @@ func (b Block) Valid() bool {
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
-	Number      uint64
-	Timestamp   time.Time
-	ParentID    Identifier
+	// Number is the block number, a monotonically incrementing counter of
+	// finalized blocks.
+	// TODO should we rename this Height?
+	Number uint64
+	// View is the view number at which this block was proposed.
+	View uint64
+
+	// ChainID is a chain-specific value to prevent replay attacks.
+	ChainID string
+	// Timestamp is the time at which this block was proposed. The proposing
+	// node can choose any time, so this should not be trusted as accurate.
+	Timestamp time.Time
+
+	// ParentID is the ID of this block's parent.
+	ParentID Identifier
+	// PayloadHash is a hash of the payload of this block.
 	PayloadHash Identifier
-	ProposerID  Identifier
-	ParentSigs  []crypto.Signature // this will be the aggregated signature
+
+	// ParentView is the view number of the parent of this block.
+	ParentView uint64
+	// ParentSig is an aggregated signature for the parent block.
+	ParentSig *AggregatedSignature
+	// ProposerID is the ID of the node that proposed this block.
+	ProposerID Identifier
+
+	// ProposerSig is the signature of the proposer over the header body.
+	// NOTE: This is omitted from the ID.
+	ProposerSig *PartialSignature
 }
 
 // Body returns the immutable part of the block header.
 func (h Header) Body() interface{} {
 	return struct {
 		Number      uint64
+		View        uint64
+		ChainID     string
 		Timestamp   time.Time
 		ParentID    Identifier
 		PayloadHash Identifier
 		ProposerID  Identifier
-		ParentSigs  []crypto.Signature
+		ParentView  uint64
+		ParentSig   *AggregatedSignature
 	}{
 		Number:      h.Number,
+		ChainID:     h.ChainID,
+		View:        h.View,
 		Timestamp:   h.Timestamp,
 		ParentID:    h.ParentID,
 		PayloadHash: h.PayloadHash,
 		ProposerID:  h.ProposerID,
-		ParentSigs:  h.ParentSigs,
+		ParentView:  h.ParentView,
+		ParentSig:   h.ParentSig,
 	}
 }
 

@@ -2,6 +2,7 @@ package errors
 
 import (
 	"fmt"
+	"strings"
 )
 
 // InvalidEngineError indicates that a non-registered engine is referenced
@@ -19,4 +20,9 @@ func NewInvalidEngineError(id uint8, senderID string) *InvalidEngineError {
 		id:       id,
 		senderID: senderID,
 	}
+}
+
+// IsDialFailureError returns true if the input error contains a wrapped dial failure error
+func IsDialFailureError(err error) bool {
+	return strings.Contains(err.Error(), "failed to dial")
 }

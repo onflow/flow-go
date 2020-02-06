@@ -69,10 +69,27 @@ var typeDeclarations = append(
 
 type ImportResolver = func(location Location) (program *ast.Program, e error)
 
-var validTopLevelDeclarations = []common.DeclarationKind{
+var validTopLevelDeclarationsInTransaction = []common.DeclarationKind{
+	common.DeclarationKindImport,
+	common.DeclarationKindFunction,
+	common.DeclarationKindTransaction,
+}
+
+var validTopLevelDeclarationsInAccountCode = []common.DeclarationKind{
 	common.DeclarationKindImport,
 	common.DeclarationKindContract,
 	common.DeclarationKindContractInterface,
+}
+
+func validTopLevelDeclarations(location ast.Location) []common.DeclarationKind {
+	switch location.(type) {
+	case TransactionLocation:
+		return validTopLevelDeclarationsInTransaction
+	case AddressLocation:
+		return validTopLevelDeclarationsInAccountCode
+	}
+
+	return nil
 }
 
 const contractKey = "contract"
@@ -286,6 +303,7 @@ func (r *interpreterRuntime) parseAndCheckProgram(
 			[]sema.Option{
 				sema.WithPredeclaredValues(valueDeclarations),
 				sema.WithPredeclaredTypes(typeDeclarations),
+				sema.WithValidTopLevelDeclarationsHandler(validTopLevelDeclarations),
 			},
 			options...,
 		)...,
@@ -637,9 +655,7 @@ func (r *interpreterRuntime) updateAccountCode(
 		runtimeInterface,
 		location,
 		functions,
-		[]sema.Option{
-			sema.WithValidTopLevelDeclarations(validTopLevelDeclarations),
-		},
+		nil,
 	)
 	if err != nil {
 		panic(err)

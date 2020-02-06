@@ -1,7 +1,7 @@
 package trace
 
 import (
-	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 )

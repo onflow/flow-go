@@ -6,6 +6,8 @@ import (
 	"strconv"
 
 	"github.com/pkg/errors"
+
+	"github.com/dapperlabs/flow-go/crypto"
 )
 
 // rxid is the regex for parsing node identity entries.
@@ -17,6 +19,7 @@ type Identity struct {
 	Address string
 	Role    Role
 	Stake   uint64
+	PubKey  crypto.PublicKey
 }
 
 // ParseIdentity parses a string representation of an identity.
