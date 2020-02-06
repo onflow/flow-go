@@ -27,13 +27,13 @@ func (e *ErrorBlockHashCollision) Error() string {
 }
 
 // ErrorPruned3Chain sentinel error
-type ErrorPruned3Chain struct {
-	block *BlockContainer
+type ErrorPrunedAncestry struct {
+	block *types.BlockProposal
 }
 
-func (e *ErrorPruned3Chain) Error() string {
+func (e *ErrorPrunedAncestry) Error() string {
 	return fmt.Sprintf(
 		"Block with view %d and ID %s has pruned 3-chain history",
-		e.block.View(), e.block.ID(),
+		e.block.View(), e.block.BlockID(),
 	)
 }

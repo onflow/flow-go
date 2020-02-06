@@ -3,8 +3,8 @@ package forks
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/forkchoice"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -12,7 +12,7 @@ import (
 // Forks implements the hotstuff.Reactor API
 type Forks struct {
 	finalizer  *finalizer.Finalizer
-	forkchoice ForkChoice
+	forkchoice forkchoice.ForkChoice
 }
 
 func (f *Forks) GetBlocksForView(view uint64) []*types.BlockProposal {
@@ -65,7 +65,7 @@ func (f *Forks) AddQC(qc *types.QuorumCertificate) error {
 	return f.forkchoice.AddQC(qc) // forkchoice ensures that block referenced by qc is known
 }
 
-func New(finalizer *finalizer.Finalizer, forkchoice ForkChoice) hotstuff.Forks {
+func New(finalizer *finalizer.Finalizer, forkchoice forkchoice.ForkChoice) *Forks {
 	return &Forks{
 		finalizer:  finalizer,
 		forkchoice: forkchoice,

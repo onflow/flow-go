@@ -85,7 +85,6 @@ func Test_SkipIncreaseViewThroughQC(t *testing.T) {
 
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(13), pm.CurView())
-	//notifier.AssertNumberOfCalls(t, "OnEnteringView", 1)
 }
 
 // Test_IgnoreOldBlocks tests that PaceMaker ignores old blocks

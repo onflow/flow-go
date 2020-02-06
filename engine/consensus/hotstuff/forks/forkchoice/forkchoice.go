@@ -1,4 +1,4 @@
-package forks
+package forkchoice
 
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"

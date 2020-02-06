@@ -3,7 +3,6 @@ package forkchoice
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
@@ -20,7 +19,7 @@ type NewestForkChoice struct {
 	notifier        notifications.Distributor
 }
 
-func NewNewestForkChoice(finalizer *finalizer.Finalizer, notifier notifications.Distributor) (forks.ForkChoice, error) {
+func NewNewestForkChoice(finalizer *finalizer.Finalizer, notifier notifications.Distributor) (ForkChoice, error) {
 	fc := &NewestForkChoice{
 		finalizer: finalizer,
 		notifier:  notifier,
@@ -30,6 +29,7 @@ func NewNewestForkChoice(finalizer *finalizer.Finalizer, notifier notifications.
 	if err != nil {
 		return nil, fmt.Errorf("cannot create NewestForkChoice: %w", err)
 	}
+	notifier.OnQcIncorporated(finalizer.FinalizedBlockQC())
 	return fc, nil
 }
 
