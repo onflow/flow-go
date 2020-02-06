@@ -91,7 +91,7 @@ func (p *FlowPaceMaker) UpdateCurViewWithBlock(block *types.BlockProposal, isLea
 		// if we get a second block for the current View.
 		return nil, false
 	}
-	newViewOnBlock, newViewOccurredOnBlock := p.processBlockForCurView(block, isLeaderForNextView)
+	newViewOnBlock, newViewOccurredOnBlock := p.actOnBlockForCurView(isLeaderForNextView)
 	if !newViewOccurredOnBlock { // if processing current block didn't lead to NewView event,
 		// the initial processing of the block's QC still might have changes the view:
 		return newViewOnQc, newViewOccurredOnQc
@@ -100,7 +100,7 @@ func (p *FlowPaceMaker) UpdateCurViewWithBlock(block *types.BlockProposal, isLea
 	return newViewOnBlock, newViewOccurredOnBlock
 }
 
-func (p *FlowPaceMaker) processBlockForCurView(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
+func (p *FlowPaceMaker) actOnBlockForCurView(isLeaderForNextView bool) (*types.NewViewEvent, bool) {
 	if isLeaderForNextView {
 		timerInfo := p.timeoutControl.StartTimeout(types.VoteCollectionTimeout, p.currentView)
 		p.notifier.OnStartingTimeout(timerInfo)
