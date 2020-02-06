@@ -41,3 +41,20 @@ func NewBlock(view uint64, qc *QuorumCertificate, payloadHash []byte, height uin
 func (b *Block) ToVote() *UnsignedVote {
 	panic("TODO")
 }
+
+// BlockFromFlowHeader converts a flow header to the corresponding internal
+// HotStuff block
+func BlockFromFlowHeader(header *flow.Header) *Block {
+	return &Block{
+		View: header.View,
+		QC: &QuorumCertificate{
+			View:                header.ParentView,
+			BlockID:             header.ParentID,
+			AggregatedSignature: header.ParentSig,
+		},
+		PayloadHash: header.PayloadHash[:],
+		Height:      header.Number,
+		ChainID:     header.ChainID,
+		Timestamp:   header.Timestamp,
+	}
+}
