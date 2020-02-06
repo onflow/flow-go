@@ -27,8 +27,10 @@ type ViewState interface {
 	// the given signer index
 	GetIdentityForBlockIDAndSignerIndex(blockID flow.Identifier, signerIndex uint32) (flow.Identity, error)
 
-	// Combine Signer Indexes
-	CombineSignerIndexes(signerIndexes []uint32) []bool
+	// Combine a slice of signer indexes in to a compact form that represents multiple signer indexes
+	// blockID - the block that determines the range of the signer indexes.
+	// signerIndexes - the signer indexes to be combined
+	CombineSignerIndexes(blockID flow.Identifier, signerIndexes []uint32) ([]bool, error)
 
 	// GetQCStakeThresholdForBlockID returns the stack threshold for building QC at a given block
 	GetQCStakeThresholdForBlockID(blockID flow.Identifier) (uint64, error)
