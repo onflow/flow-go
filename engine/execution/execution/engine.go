@@ -11,8 +11,8 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
-	"github.com/dapperlabs/flow-go/language/runtime/encoding"
-	"github.com/dapperlabs/flow-go/language/runtime/values"
+	"github.com/dapperlabs/flow-go/language"
+	"github.com/dapperlabs/flow-go/language/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
@@ -138,7 +138,7 @@ func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to execute script: %w", result.Error)
 	}
 
-	value, err := values.Convert(result.Value)
+	value, err := language.ConvertValue(result.Value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to export runtime value: %w", err)
 	}

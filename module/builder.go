@@ -11,5 +11,8 @@ import (
 // within itself and can be wrapped with additional consensus information such
 // as QCs.
 type Builder interface {
+
+	// BuildOn generates a new payload that is valid with respect to the parent
+	// being built upon and returns the hash of the generated payload.
 	BuildOn(parentID flow.Identifier) (flow.Identifier, error)
 }
