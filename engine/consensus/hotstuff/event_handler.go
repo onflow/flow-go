@@ -102,12 +102,10 @@ func (e *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) error {
 	}
 
 	// if the block is not for the current view, try to build QC from votes for this block
-	qc, built := e.voteAggregator.BuildQCForBlockProposal(validBlock)
-	if !built {
-		// if cannot build QC for this block, process with block.qc instead
-		qc = validBlock.QC()
+	qc, err := e.voteAggregator.BuildQCOnReceivingBlock(validBlock)
+	if err != nil {
+		//	TODO: handle err
 	}
-
 	// process the QC
 	return e.processQC(qc)
 }
@@ -271,9 +269,9 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *types.
 // tryBuildQCForBlock checks whether there are enough votes to build a QC for the given block,
 // and process the QC if a QC was built.
 func (e *EventHandler) tryBuildQCForBlock(block *types.BlockProposal) error {
-	qc, built := e.voteAggregator.BuildQCForBlockProposal(block)
-	if !built {
-		return nil
+	qc, err := e.voteAggregator.BuildQCOnReceivingBlock(block)
+	if err != nil {
+		return err
 	}
 	return e.processQC(qc)
 }
@@ -300,9 +298,9 @@ func (e *EventHandler) processVote(vote *types.Vote) error {
 
 	// if the voting block can be found, we should be able to validate the vote
 	// and check if we can build a QC with it.
-	qc, built := e.voteAggregator.StoreVoteAndBuildQC(vote, block)
-	if !built {
-		return nil
+	qc, err := e.voteAggregator.StoreVoteAndBuildQC(vote, block)
+	if err != nil {
+		return err
 	}
 
 	return e.processQC(qc)
