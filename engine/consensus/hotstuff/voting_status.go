@@ -32,11 +32,11 @@ func NewVotingStatus(thresholdStake uint64, view uint64, signerCount uint32, vot
 // assume votes are valid
 // duplicate votes will not be accumulated again
 func (vs *VotingStatus) AddVote(vote *types.Vote) {
-	_, exists := vs.votes[string(vote.ID())]
+	_, exists := vs.votes[vote.ID().String()]
 	if exists {
 		return
 	}
-	vs.votes[string(vote.ID())] = vote
+	vs.votes[vote.ID().String()] = vote
 	vs.accumulatedStake += vs.voteSender.Stake
 }
 

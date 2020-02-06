@@ -20,6 +20,10 @@ type Vote struct {
 // 	}
 // }
 
+func (uv *Vote) ID() flow.Identifier {
+	panic("TODO")
+}
+
 func (uv *Vote) BytesForSig() []byte {
 	return voteBytesForSig(uv.View, uv.BlockID)
 }
