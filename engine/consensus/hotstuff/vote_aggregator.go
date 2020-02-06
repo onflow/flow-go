@@ -50,13 +50,33 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 			FinalizedView: va.lastPrunedView,
 		})
 	}
+	voter, err := va.voteValidator.ValidateVote(vote, nil)
+	if err != nil {
+		return fmt.Errorf("could not validate pending vote: %w", err)
+	}
+	err = va.checkDoubleVote(vote, voter)
+	if err != nil {
+		return fmt.Errorf("double voting detected: %w", err)
+	}
 	pendingStatus, exists := va.pendingVoteMap[vote.BlockID.String()]
-	if exists {
-		pendingStatus.AddVote(vote)
-	} else {
+	if !exists {
 		pendingStatus = NewPendingStatus()
-		pendingStatus.AddVote(vote)
 		va.pendingVoteMap[vote.BlockID.String()] = pendingStatus
+	}
+	pendingStatus.AddVote(vote)
+	idToVote, exists := va.viewToIDToVote[vote.View]
+	if exists {
+		idToVote[voter.ID()] = vote
+	} else {
+		va.viewToIDToVote[vote.View] = map[flow.Identifier]*types.Vote{}
+		va.viewToIDToVote[vote.View][voter.ID()] = vote
+	}
+	blockIDStrSet, exists := va.viewToBlockIDStrSet[vote.View]
+	if exists {
+		blockIDStrSet[vote.BlockID.String()] = true
+	} else {
+		va.viewToBlockIDStrSet[vote.View] = map[string]bool{}
+		va.viewToBlockIDStrSet[vote.View][vote.BlockID.String()] = true
 	}
 	return nil
 }
