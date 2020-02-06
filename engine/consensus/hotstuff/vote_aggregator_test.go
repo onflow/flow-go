@@ -128,7 +128,22 @@ func TestReceiveInsufficientVotesBeforeBlock(t *testing.T) {
 }
 
 // PENDING PATH (votes are valid and the block arrives after votes)
-// receive 4 votes first, a QC should be built when receiving the block
+// receive 6 votes only, votes should be stored correctly
+func TestReceivePendingVotesOnly(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	testView := uint64(5)
+	blockID := unittest.IdentifierFixture()
+	for i := 0; i < 6; i++ {
+		vote := newMockVote(testView, blockID, uint32(i))
+		err := va.StorePendingVote(vote)
+		require.Nil(t, err)
+		require.Equal(t, vote, va.pendingVoteMap[blockID.String()].orderedVotes[i])
+		require.Equal(t, vote, va.pendingVoteMap[blockID.String()].voteMap[string(vote.ID())])
+	}
+}
+
+// PENDING PATH (votes are valid and the block arrives after votes)
+// receive 6 votes first, a QC should be built when receiving the block
 func TestReceiveSufficientVotesBeforeBlock(t *testing.T) {
 	va := newMockVoteAggregator(t)
 	testView := uint64(5)
@@ -136,7 +151,7 @@ func TestReceiveSufficientVotesBeforeBlock(t *testing.T) {
 	qc, err := va.BuildQCOnReceivingBlock(block)
 	require.Nil(t, qc)
 	require.NotNil(t, err)
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 6; i++ {
 		vote := newMockVote(testView, block.BlockID(), uint32(i))
 		err = va.StorePendingVote(vote)
 		require.Nil(t, err)

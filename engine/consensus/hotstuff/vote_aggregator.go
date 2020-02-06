@@ -142,7 +142,7 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 	}
 	for i := va.lastPrunedView + 1; i <= view; i++ {
 		blockIDStrSet := va.viewToBlockIDStrSet[i]
-		for blockIDStr, _ := range blockIDStrSet {
+		for blockIDStr := range blockIDStrSet {
 			delete(va.pendingVoteMap, blockIDStr)
 			delete(va.blockHashToVotingStatus, blockIDStr)
 			delete(va.createdQC, blockIDStr)
