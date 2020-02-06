@@ -1,4 +1,4 @@
-package genericstuff
+package coldstuff
 
 import (
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -6,7 +6,7 @@ import (
 
 type Communicator interface {
 	SendVote(vote *Vote, to flow.Identifier) error
-	BroadcastProposal(proposal *Proposal) error
+	BroadcastProposal(proposal *flow.Header) error
 	BroadcastCommit(commit *Commit) error
 }
 
