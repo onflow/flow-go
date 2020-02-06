@@ -372,6 +372,33 @@ func TestDuplicateVotesBeforeBlock(t *testing.T) {
 	require.Equal(t, 2, len(va.blockHashToVotingStatus[block.BlockID().String()].votes))
 }
 
+// ORDER
+// receive 5 votes, and the block, the QC should contain leader's vote, and the first 4 votes.
+func TestVoteOrderAfterBlock(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	testView := uint64(5)
+	block := newMockBlock(testView)
+	var voteList []*types.Vote
+	voteList = append(voteList, block.ToVote())
+	for i := 0; i < 5; i++ {
+		vote := newMockVote(testView, block.BlockID(), uint32(i))
+		err := va.StorePendingVote(vote)
+		require.Nil(t, err)
+		voteList = append(voteList, vote)
+	}
+	qc, err := va.BuildQCOnReceivingBlock(block)
+	require.Nil(t, err)
+	require.NotNil(t, qc)
+
+	for i := 0; i < 6; i++ {
+		if i < 5 {
+			require.True(t, qc.AggregatedSignature.Signers[voteList[i].Signature.SignerIdx])
+		} else {
+			require.False(t, qc.AggregatedSignature.Signers[voteList[i].Signature.SignerIdx])
+		}
+	}
+}
+
 // store random votes and QCs from view 1 to 3
 // prune by view 3
 func TestPruneByView(t *testing.T) {
