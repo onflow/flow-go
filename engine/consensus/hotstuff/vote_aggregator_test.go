@@ -79,7 +79,7 @@ func TestReceiveBlockBeforeSufficientVotes(t *testing.T) {
 
 // HAPPY PATH (votes are valid and the block always arrives before votes)
 // assume there are 7 nodes, meaning that the threshold is 5
-// the same QC should be returned when receiving the 6th vote
+// the same QC should be returned when receiving the 4th vote
 func TestReceiveVoteAfterQCBuilt(t *testing.T) {
 	va := newMockVoteAggregator(t)
 	testView := uint64(5)
