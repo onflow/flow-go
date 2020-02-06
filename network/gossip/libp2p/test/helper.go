@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -11,6 +12,42 @@ import (
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
+
+func CreateSubnets(nodesNum, subnetNum int) (map[*libp2p.Network]int, error) {
+	// creates network instances
+	ids := CreateIDs(nodesNum)
+	mws, err := CreateMiddleware(ids)
+	if err != nil {
+		return nil, err
+	}
+
+	nets, err := CreateNetworks(mws, ids, nodesNum, false)
+	if err != nil {
+		return nil, err
+	}
+	// allows nodes to find each other
+	time.Sleep(5 * time.Second)
+	subnets := make(map[*libp2p.Network]int)
+
+	// size of subnets
+	size := len(nets) / subnetNum
+
+	// subnet index
+	sIndx := -1
+
+	for index, net := range nets {
+		// checks if we reach end of current subnet
+		if index%size == 0 {
+			// moves to next subnet
+			sIndx++
+		}
+
+		// assigns subnet index of the net
+		subnets[net] = sIndx
+	}
+
+	return subnets, nil
+}
 
 // helper offers a set of functions that are shared among different tests
 // CreateIDs creates and initializes count-many flow identifiers instances
