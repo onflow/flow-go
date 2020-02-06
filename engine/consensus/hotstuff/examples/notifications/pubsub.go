@@ -10,10 +10,10 @@ import (
 // PubSubDistributor implements notifications.Distributor
 // It allows thread-safe subscription of consumers to events
 type PubSubDistributor struct {
-	skippedAheadConsumers    []SkippedAheadConsumer
-	enteringViewConsumers    []EnteringViewConsumer
-	startingTimeoutConsumers []StartingTimeoutConsumer
-	reachedTimeoutConsumers  []ReachedTimeoutConsumer
+	skippedAheadConsumers          []SkippedAheadConsumer
+	enteringViewConsumers          []EnteringViewConsumer
+	startingTimeoutConsumers       []StartingTimeoutConsumer
+	reachedTimeoutConsumers        []ReachedTimeoutConsumer
 	qcIncorporatedConsumers        []QcIncorporatedConsumer
 	forkChoiceGeneratedConsumers   []ForkChoiceGeneratedConsumer
 	blockIncorporatedConsumers     []BlockIncorporatedConsumer

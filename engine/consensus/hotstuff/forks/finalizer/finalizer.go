@@ -21,10 +21,10 @@ type Finalizer struct {
 }
 
 type ancestryChain struct {
-	block           *BlockContainer
-	oneChain      *types.QCBlock
-	twoChain     *types.QCBlock
-	threeChain    *types.QCBlock
+	block      *BlockContainer
+	oneChain   *types.QCBlock
+	twoChain   *types.QCBlock
+	threeChain *types.QCBlock
 }
 
 func New(trustedRoot *types.QCBlock, notifier notifications.Distributor) (*Finalizer, error) {
@@ -33,22 +33,20 @@ func New(trustedRoot *types.QCBlock, notifier notifications.Distributor) (*Final
 	}
 
 	fnlzr := Finalizer{
-		notifier:             notifier,
-		forest:               *forest.NewLevelledForest(),
-		lastLocked:      trustedRoot,
-		lastFinalized:   trustedRoot,
+		notifier:      notifier,
+		forest:        *forest.NewLevelledForest(),
+		lastLocked:    trustedRoot,
+		lastFinalized: trustedRoot,
 	}
 
-	// If rootBlock has view > 0, we can already pre-prune the levelled forest to the view below it.
+	// We can already pre-prune the levelled forest to the view below it.
 	// Thereby, the levelled forest won't event store older (unnecessary) blocks
-	if trustedRoot.View() > 0 {
-		err := fnlzr.forest.PruneAtLevel(trustedRoot.View() - 1)
-		if err != nil {
-			return nil, fmt.Errorf("internal levelled forest error: %w", err)
-		}
+	err := fnlzr.forest.PruneUpToLevel(trustedRoot.View())
+	if err != nil {
+		return nil, fmt.Errorf("internal levelled forest error: %w", err)
 	}
 	// verify and add root block to levelled forest
-	err := fnlzr.VerifyBlock(trustedRoot.Block())
+	err = fnlzr.VerifyBlock(trustedRoot.Block())
 	if err != nil {
 		return nil, fmt.Errorf("invalid root block: %w", err)
 	}
@@ -301,12 +299,7 @@ func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) error {
 		}
 		return nil
 	}
-	// Have:
-	//   (1) blockQC.View > r.lastFinalizedBlockQC.View => finalizing new block
-	// Corollary
-	//   (2) blockContainer.View >= 1
-	// Explanation: We require that Forks is initialized with a _finalized_ rootBlock,
-	// which has view >= 0. Hence, r.lastFinalizedBlockQC.View >= 0, by which (1) implies (2)
+	// Have: blockQC.View > r.lastFinalizedBlockQC.View => finalizing new block
 
 	// get Block and finalize everything up to the block's parent
 	blockVertex, _ := r.forest.GetVertex(blockQC.BlockID) // require block to resolve parent
@@ -321,7 +314,7 @@ func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) error {
 	if err != nil {
 		return fmt.Errorf("creation of QCBlock for new finalized block failed: %w", err)
 	}
-	err = r.forest.PruneAtLevel(blockContainer.View() - 1) // cannot underflow as of (2) ... unless we have a bug
+	err = r.forest.PruneUpToLevel(blockContainer.View())
 	if err != nil {
 		return fmt.Errorf("pruning levelled forest failed: %w", err)
 	}

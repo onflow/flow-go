@@ -110,7 +110,7 @@ func TestLevelledForest_AcceptingGenesis(t *testing.T) {
 	assert.NotPanics(t, func() { F.AddVertex(v2) })
 
 	F = populateNewForest(t)
-	err := F.PruneAtLevel(7) // LevelledForest.LowestLevel on initial conditions
+	err := F.PruneUpToLevel(8) // LevelledForest.LowestLevel on initial conditions
 	assert.True(t, err == nil)
 	v3 := &mock.Vertex{}
 	v3.On("VertexID").Return(string2Identifyer("Root-Vertex-A_@Level8"))
@@ -260,7 +260,7 @@ func TestLevelledForest_GetVertex(t *testing.T) {
 // TestLevelledForest_GetVertex tests that Vertex blob is returned properly
 func TestLevelledForest_PruneAtLevel(t *testing.T) {
 	F := populateNewForest(t)
-	err := F.PruneAtLevel(0)
+	err := F.PruneUpToLevel(1)
 	assert.False(t, err != nil)
 	assert.False(t, F.HasVertex(string2Identifyer("Genesis")))
 	assert.True(t, F.HasVertex(string2Identifyer("A")))
@@ -271,7 +271,7 @@ func TestLevelledForest_PruneAtLevel(t *testing.T) {
 	assert.True(t, F.HasVertex(string2Identifyer("Y")))
 	assert.True(t, F.HasVertex(string2Identifyer("Z")))
 
-	err = F.PruneAtLevel(2)
+	err = F.PruneUpToLevel(3)
 	assert.False(t, err != nil)
 	assert.False(t, F.HasVertex(string2Identifyer("Genesis")))
 	assert.True(t, F.HasVertex(string2Identifyer("A")))
@@ -282,7 +282,7 @@ func TestLevelledForest_PruneAtLevel(t *testing.T) {
 	assert.True(t, F.HasVertex(string2Identifyer("Y")))
 	assert.True(t, F.HasVertex(string2Identifyer("Z")))
 
-	err = F.PruneAtLevel(5)
+	err = F.PruneUpToLevel(6)
 	assert.False(t, err != nil)
 	assert.False(t, F.HasVertex(string2Identifyer("Genesis")))
 	assert.False(t, F.HasVertex(string2Identifyer("A")))
@@ -294,13 +294,13 @@ func TestLevelledForest_PruneAtLevel(t *testing.T) {
 	assert.True(t, F.HasVertex(string2Identifyer("Z")))
 
 	// pruning at same level repeatedly should be fine
-	err = F.PruneAtLevel(5)
+	err = F.PruneUpToLevel(6)
 	assert.False(t, err != nil)
 	assert.True(t, F.HasVertex(string2Identifyer("Y")))
 	assert.True(t, F.HasVertex(string2Identifyer("Z")))
 
 	// checking that pruning at lower level than what is already pruned results in error
-	err = F.PruneAtLevel(4)
+	err = F.PruneUpToLevel(5)
 	assert.True(t, err != nil)
 }
 

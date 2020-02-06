@@ -46,18 +46,18 @@ func NewLevelledForest() *LevelledForest {
 	}
 }
 
-// pruneAtView prunes all blocks up to and INCLUDING `level`
-func (f *LevelledForest) PruneAtLevel(level uint64) error {
-	if level+1 < f.LowestLevel {
-		return fmt.Errorf("cannot prune tree slice up to level %d because we only save up to level %d", level, f.LowestLevel)
+// PruneUpToLevel prunes all blocks UP TO but NOT INCLUDING `level`
+func (f *LevelledForest) PruneUpToLevel(level uint64) error {
+	if level < f.LowestLevel {
+		return fmt.Errorf("new lowest level %d cannot be smaller than previous last retained level %d", level, f.LowestLevel)
 	}
-	for l := f.LowestLevel; l <= level; l++ {
+	for l := f.LowestLevel; l < level; l++ {
 		for _, v := range f.verticesAtLevel[l] { // nil map behaves like empty map when iterating over it
 			delete(f.vertices, v.id)
 		}
 		delete(f.verticesAtLevel, l)
 	}
-	f.LowestLevel = level + 1
+	f.LowestLevel = level
 	return nil
 }
 

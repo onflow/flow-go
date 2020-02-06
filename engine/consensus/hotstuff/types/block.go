@@ -73,4 +73,3 @@ func computeID(b *Block) flow.Identifier {
 	copy(identifier[:], hash)
 	return identifier
 }
-
