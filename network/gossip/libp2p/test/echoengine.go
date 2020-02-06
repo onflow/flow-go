@@ -11,6 +11,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p/errors"
 )
 
 // EchoEngine is a simple engine that is used for testing the correctness of
@@ -89,8 +90,13 @@ func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error
 	msg := &message.Echo{
 		Text: fmt.Sprintf("%s: %s", te.echomsg, strEvent),
 	}
-	err := te.con.Submit(msg, originID)
-	require.NoError(te.t, err, "could not submit echo back to network ")
 
+	err := te.con.Submit(msg, originID)
+	// we allow one dial failure on echo due to connection tear down
+	// specially when the test is for a single message and not echo
+	// the sender side may close the connection as it does not expect any echo
+	if err != nil && !errors.IsDialFailureError(err) {
+		require.Fail(te.t, fmt.Sprintf("could not submit echo back to network: %s", err))
+	}
 	return nil
 }

@@ -11,8 +11,8 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
-	"github.com/dapperlabs/flow-go/language/runtime/encoding"
-	"github.com/dapperlabs/flow-go/language/runtime/values"
+	"github.com/dapperlabs/flow-go/language"
+	"github.com/dapperlabs/flow-go/language/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
@@ -138,7 +138,7 @@ func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to execute script: %w", result.Error)
 	}
 
-	value, err := values.Convert(result.Value)
+	value, err := language.ConvertValue(result.Value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to export runtime value: %w", err)
 	}
@@ -227,6 +227,10 @@ func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages
 	if err != nil {
 		return fmt.Errorf("could not submit response for chunk state (id=%s): %w", chunkID, err)
 	}
+	e.log.Info().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("chunk_id", logging.ID(chunkID)).
+		Msg("responded to execution state request")
 
 	return nil
 }

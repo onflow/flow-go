@@ -195,7 +195,7 @@ fullType
     ;
 
 referenceType
-    : Ampersand {p.noWhitespace()}? innerType
+    : ((Auth? Storable?) | (Storable? Auth?)) Ampersand {p.noWhitespace()}? innerType
     ;
 
 nonReferenceType
@@ -463,6 +463,8 @@ Mul : '*' ;
 Div : '/' ;
 Mod : '%' ;
 
+Auth : 'auth' ;
+Storable : 'storable' ;
 Ampersand : '&';
 
 unaryOp
@@ -656,6 +658,8 @@ identifier
     | Access
     | Account
     | Self
+    | Auth
+    | Storable
     ;
 
 Identifier

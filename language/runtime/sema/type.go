@@ -2653,7 +2653,9 @@ func (t *ReferencesType) IsValidIndexingType(indexingType Type) (isValid bool, e
 
 // ReferenceType represents the reference to a value
 type ReferenceType struct {
-	Type Type
+	Authorized bool
+	Storable   bool
+	Type       Type
 }
 
 func (*ReferenceType) IsType() {}
@@ -2662,15 +2664,31 @@ func (t *ReferenceType) String() string {
 	if t.Type == nil {
 		return "reference"
 	}
-	return fmt.Sprintf("&%s", t.Type)
+	var builder strings.Builder
+	if t.Authorized {
+		builder.WriteString("auth ")
+	}
+	if t.Storable {
+		builder.WriteString("storable ")
+	}
+	builder.WriteRune('&')
+	builder.WriteString(t.Type.String())
+	return builder.String()
 }
 
 func (t *ReferenceType) ID() TypeID {
-	var id string
-	if t.Type != nil {
-		id = string(t.Type.ID())
+	var builder strings.Builder
+	if t.Authorized {
+		builder.WriteString("auth ")
 	}
-	return TypeID(fmt.Sprintf("&%s", id))
+	if t.Storable {
+		builder.WriteString("storable ")
+	}
+	builder.WriteRune('&')
+	if t.Type != nil {
+		builder.WriteString(string(t.Type.ID()))
+	}
+	return TypeID(builder.String())
 }
 
 func (t *ReferenceType) Equal(other Type) bool {
@@ -2678,7 +2696,10 @@ func (t *ReferenceType) Equal(other Type) bool {
 	if !ok {
 		return false
 	}
-	return t.Type.Equal(otherReference.Type)
+
+	return t.Authorized == otherReference.Authorized &&
+		t.Storable == otherReference.Storable &&
+		t.Type.Equal(otherReference.Type)
 }
 
 func (t *ReferenceType) IsResourceType() bool {
@@ -2886,6 +2907,18 @@ func IsSubType(subType Type, superType Type) bool {
 			return false
 		}
 
+		// Unauthorized references are *not* subtypes of authorized references.
+
+		if !typedSubType.Authorized && typedSuperType.Authorized {
+			return false
+		}
+
+		// Non-storable references are *not* subtypes of storable references.
+
+		if !typedSubType.Storable && typedSuperType.Storable {
+			return false
+		}
+
 		// References are covariant: &T <: &U if T <: U
 
 		return IsSubType(typedSubType.Type, typedSuperType.Type)
@@ -2930,6 +2963,26 @@ func IsSubType(subType Type, superType Type) bool {
 		}
 
 		return false
+
+	case *RestrictedResourceType:
+		switch typedSubType := subType.(type) {
+
+		case *CompositeType:
+			// A resource type `T` is a subtype of a restricted resource type `U{Vs}`, if `T == U`
+
+			return typedSubType == typedSuperType.Type
+
+		case *RestrictedResourceType:
+			// A restricted resource type `T{Us}` is a subtype of a restricted resource type `V{Ws}`,
+			// if `T == V` and `Ws` is a subset of `Us`
+
+			return typedSubType.Type == typedSuperType.Type &&
+				typedSuperType.RestrictionSet().
+					IsSubsetOf(typedSubType.RestrictionSet())
+
+		default:
+			return false
+		}
 	}
 
 	return false
@@ -3070,6 +3123,20 @@ func (t *TransactionType) GetMember(identifier string, _ ast.Range, _ func(error
 	return t.Members[identifier]
 }
 
+// RestrictionSet
+
+type RestrictionSet map[*InterfaceType]struct{}
+
+func (s RestrictionSet) IsSubsetOf(other RestrictionSet) bool {
+	for restriction := range s {
+		if _, ok := other[restriction]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
 // RestrictedResourceType
 //
 // No restrictions implies the type is fully restricted,
@@ -3078,6 +3145,18 @@ func (t *TransactionType) GetMember(identifier string, _ ast.Range, _ func(error
 type RestrictedResourceType struct {
 	Type         *CompositeType
 	Restrictions []*InterfaceType
+	// an internal set of `Restrictions`
+	restrictionSet RestrictionSet
+}
+
+func (t *RestrictedResourceType) RestrictionSet() RestrictionSet {
+	if t.restrictionSet == nil {
+		t.restrictionSet = make(RestrictionSet, len(t.Restrictions))
+		for _, restriction := range t.Restrictions {
+			t.restrictionSet[restriction] = struct{}{}
+		}
+	}
+	return t.restrictionSet
 }
 
 func (*RestrictedResourceType) IsType() {}
@@ -3085,7 +3164,7 @@ func (*RestrictedResourceType) IsType() {}
 func (t *RestrictedResourceType) String() string {
 	var result strings.Builder
 	if t.Type != nil {
-		result.WriteString(string(t.Type.String()))
+		result.WriteString(t.Type.String())
 	}
 	result.WriteRune('{')
 	for i, restriction := range t.Restrictions {
@@ -3126,27 +3205,15 @@ func (t *RestrictedResourceType) Equal(other Type) bool {
 
 	// Check that the set of restrictions are equal; order does not matter
 
-	restrictions := t.Restrictions
-	otherRestrictions := otherRestrictedResourceType.Restrictions
+	restrictionSet := t.RestrictionSet()
+	otherRestrictionSet := otherRestrictedResourceType.RestrictionSet()
 
-	count := len(restrictions)
-	if count != len(otherRestrictions) {
+	count := len(restrictionSet)
+	if count != len(otherRestrictionSet) {
 		return false
 	}
 
-	otherRestrictionsByID := make(map[TypeID]bool, count)
-
-	for _, otherRestriction := range otherRestrictions {
-		otherRestrictionsByID[otherRestriction.ID()] = true
-	}
-
-	for _, restriction := range restrictions {
-		if !otherRestrictionsByID[restriction.ID()] {
-			return false
-		}
-	}
-
-	return true
+	return restrictionSet.IsSubsetOf(otherRestrictionSet)
 }
 
 func (*RestrictedResourceType) IsResourceType() bool {

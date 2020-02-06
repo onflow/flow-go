@@ -53,7 +53,7 @@ func encode(v interface{}) (*Envelope, error) {
 	case *messages.ExecutionStateRequest:
 		code = CodeExecutionStateRequest
 	case *messages.ExecutionStateResponse:
-		code = CodeExecutionStateRequest
+		code = CodeExecutionStateResponse
 
 	default:
 		return nil, errors.Errorf("invalid encode type (%T)", v)
