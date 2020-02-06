@@ -253,12 +253,8 @@ func (r *Finalizer) getNextAncestryLevel(block *types.BlockProposal) (*types.QCB
 
 // updateLockedBlock updates `lastLockedBlockQC`
 // We use the locking rule from 'Event-driven HotStuff Protocol' where the condition is:
-//
-// * Consider the set S of all blocks that have a INDIRECT 2-chain on top of it
-//
-// * The 'Locked Block' is the block in S with the _highest view number_ (newest);
-//   lastLockedBlockQC should be a QC POINTING TO this block
-//
+//    * Consider the set S of all blocks that have a INDIRECT 2-chain on top of it
+//    * The 'Locked Block' is the block in S with the _highest view number_ (newest);
 // Calling this method with previously-processed blocks leaves consensus state invariant.
 func (r *Finalizer) updateLockedQc(ancestryChain *ancestryChain) {
 	if ancestryChain.twoChain.View() <= r.lastLocked.View() {
@@ -266,17 +262,12 @@ func (r *Finalizer) updateLockedQc(ancestryChain *ancestryChain) {
 	}
 	// update qc to newer block with any 2-chain on top of it:
 	r.lastLocked = ancestryChain.twoChain
-	r.lastFinalized = ancestryChain.twoChain
 }
 
 // updateFinalizedBlockQc updates `lastFinalizedBlockQC`
 // We use the locking rule from 'Event-driven HotStuff Protocol' where the condition is:
-//
-// * Consider the set S of all blocks that have a DIRECT 2-chain on top of it PLUS any 1-chain
-//
-// * The 'Last finalized Block' is the block in S with the _highest view number_ (newest);
-//   lastFinalizedBlockQC should a QC POINTING TO this block
-//
+//    * Consider the set S of all blocks that have a DIRECT 2-chain on top of it PLUS any 1-chain
+//    * The 'Last finalized Block' is the block in S with the _highest view number_ (newest);
 // Calling this method with previously-processed blocks leaves consensus state invariant.
 func (r *Finalizer) updateFinalizedBlockQc(ancestryChain *ancestryChain) error {
 	// Note: we assume that all stored blocks pass Finalizer.VerifyBlock(block);
@@ -293,8 +284,7 @@ func (r *Finalizer) updateFinalizedBlockQc(ancestryChain *ancestryChain) error {
 	if ancestryChain.oneChain.View() != b.View()+2 {
 		return nil
 	}
-	parentQc := b.Block().QC()
-	return r.finalizeUpToBlock(parentQc)
+	return r.finalizeUpToBlock(b.QC())
 }
 
 // finalizeUpToBlock finalizes all blocks up to (and including) the block pointed to by `blockQC`.
