@@ -168,6 +168,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	levelDB := unittest.TempLevelDB(t)
 
 	ls, err := ledger.NewTrieStorage(levelDB)
+	require.NoError(t, err)
+
 	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage)
 
 	receiptsEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState)
