@@ -1,4 +1,4 @@
-package execution
+package computation
 
 import (
 	"fmt"
@@ -6,14 +6,15 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
+
 	"github.com/dapperlabs/flow-go/language"
 	"github.com/dapperlabs/flow-go/language/encoding"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -21,7 +22,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-type ExecutionEngine interface {
+type ComputationEngine interface {
 	network.Engine
 	ExecuteScript([]byte, *flow.Header, *state.View) ([]byte, error)
 }
@@ -35,7 +36,7 @@ type Engine struct {
 	execStateConduit network.Conduit
 	provider         network.Engine
 	vm               virtualmachine.VirtualMachine
-	executor         executor.BlockExecutor
+	executor         computer.BlockComputer
 }
 
 func New(
@@ -48,7 +49,7 @@ func New(
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "execution").Logger()
 
-	executor := executor.NewBlockExecutor(vm)
+	executor := computer.NewBlockComputer(vm)
 
 	e := Engine{
 		unit:       engine.NewUnit(),

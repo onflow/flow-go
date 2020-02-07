@@ -1,4 +1,4 @@
-package executor_test
+package computer_test
 
 import (
 	"testing"
@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
-	vmmock "github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine/mock"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	vmmock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -21,7 +21,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(vmmock.VirtualMachine)
 		bc := new(vmmock.BlockContext)
 
-		exe := executor.NewBlockExecutor(vm)
+		exe := computer.NewBlockComputer(vm)
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
@@ -49,7 +49,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(vmmock.VirtualMachine)
 		bc := new(vmmock.BlockContext)
 
-		exe := executor.NewBlockExecutor(vm)
+		exe := computer.NewBlockComputer(vm)
 
 		collectionCount := 2
 		transactionsPerCollection := 2

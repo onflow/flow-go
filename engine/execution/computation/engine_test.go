@@ -1,4 +1,4 @@
-package execution
+package computation
 
 import (
 	"testing"
@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/executor/mocks"
-	realState "github.com/dapperlabs/flow-go/engine/execution/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/computer/mocks"
+	realState "github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -78,7 +78,7 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
-		exec := mocks.NewMockBlockExecutor(ctrl)
+		exec := mocks.NewMockBlockComputer(ctrl)
 
 		computationResult := unittest.ComputationResultFixture()
 

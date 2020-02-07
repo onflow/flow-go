@@ -1,34 +1,34 @@
-package executor
+package computer
 
 import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// A BlockExecutor executes the transactions in a block.
-type BlockExecutor interface {
+// A BlockComputer executes the transactions in a block.
+type BlockComputer interface {
 	ExecuteBlock(*execution.CompleteBlock, *state.View, flow.StateCommitment) (*execution.ComputationResult, error)
 }
 
-type blockExecutor struct {
+type blockComputer struct {
 	vm    virtualmachine.VirtualMachine
 	//state state.ExecutionState
 }
 
-// NewBlockExecutor creates a new block executor.
-func NewBlockExecutor(vm virtualmachine.VirtualMachine) BlockExecutor {
-	return &blockExecutor{
+// NewBlockComputer creates a new block executor.
+func NewBlockComputer(vm virtualmachine.VirtualMachine) BlockComputer {
+	return &blockComputer{
 		vm:    vm,
 		//state: state,
 	}
 }
 
 // ExecuteBlock executes a block and returns the resulting chunks.
-func (e *blockExecutor) ExecuteBlock(
+func (e *blockComputer) ExecuteBlock(
 	block *execution.CompleteBlock,
 	view *state.View,
 	startState flow.StateCommitment,
@@ -43,7 +43,7 @@ func (e *blockExecutor) ExecuteBlock(
 	return results, nil
 }
 
-func (e *blockExecutor) executeBlock(
+func (e *blockComputer) executeBlock(
 	block *execution.CompleteBlock,
 	view *state.View,
 	startState flow.StateCommitment,
@@ -76,7 +76,7 @@ func (e *blockExecutor) executeBlock(
 	}, nil
 }
 
-func (e *blockExecutor) executeCollection(
+func (e *blockComputer) executeCollection(
 	index int,
 	blockCtx virtualmachine.BlockContext,
 	//startState flow.StateCommitment,

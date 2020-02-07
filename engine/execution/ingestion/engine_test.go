@@ -10,8 +10,8 @@ import (
 
 	engineCommon "github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
-	executionmock "github.com/dapperlabs/flow-go/engine/execution/execution/mocks"
-	statemock "github.com/dapperlabs/flow-go/engine/execution/execution/state/mocks"
+	computation "github.com/dapperlabs/flow-go/engine/execution/computation/mocks"
+	statemock "github.com/dapperlabs/flow-go/engine/execution/state/mocks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	module "github.com/dapperlabs/flow-go/module/mocks"
@@ -34,7 +34,7 @@ type testingContext struct {
 	state *protocol.MockState
 	conduit *network.MockConduit
 	collectionConduit *network.MockConduit
-	executionEngine *executionmock.MockExecutionEngine
+	executionEngine *computation.MockComputationEngine
 	executionState *statemock.MockExecutionState
 }
 
@@ -58,7 +58,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 
 	blocks := storage.NewMockBlocks(ctrl)
 	collections := storage.NewMockCollections(ctrl)
-	executionEngine := executionmock.NewMockExecutionEngine(ctrl)
+	executionEngine := computation.NewMockComputationEngine(ctrl)
 	protocolState := protocol.NewMockState(ctrl)
 	executionState := statemock.NewMockExecutionState(ctrl)
 
