@@ -162,11 +162,12 @@ func TestReceiveSufficientVotesBeforeBlock(t *testing.T) {
 	require.Equal(t, block.BlockID(), qc.BlockID)
 }
 
-// UNHAPPY PATH (votes are invalid and the block arrives before votes)
-// ErrStaleVote should be raised when receiving stale votes (vote.view <= lastPruneView)
-func TestErrStaleVote(t *testing.T) {
+// UNHAPPY PATH
+// lastPruneView is 10, receive a vote with view 5 without the block
+func TestErrStaleVoteWithoutBlock(t *testing.T) {
 	va := newMockVoteAggregator(t)
-	testView := uint64(0)
+	va.lastPrunedView = 10
+	testView := uint64(5)
 	block := newMockBlock(testView)
 	vote := newMockVote(testView, block.BlockID(), uint32(1))
 	err := va.StorePendingVote(vote)
@@ -176,6 +177,52 @@ func TestErrStaleVote(t *testing.T) {
 		FinalizedView: va.lastPrunedView,
 	}))
 	require.Equal(t, 0, len(va.pendingVoteMap))
+	require.Equal(t, 0, len(va.viewToBlockIDStrSet))
+	require.Equal(t, 0, len(va.viewToIDToVote))
+}
+
+// UNHAPPY PATH
+// lastPruneView is 10, receive a vote with view 5 with the block
+func TestErrStaleVoteWithBlock(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	va.lastPrunedView = 10
+	testView := uint64(5)
+	block := newMockBlock(testView)
+	qc, err := va.BuildQCOnReceivingBlock(block)
+	require.Nil(t, qc)
+	require.NotNil(t, err)
+	require.Equal(t, 0, len(va.blockHashToVotingStatus))
+	require.Equal(t, 0, len(va.viewToIDToVote))
+	require.Equal(t, 0, len(va.viewToBlockIDStrSet))
+	vote := newMockVote(testView, block.BlockID(), uint32(1))
+	qc, err = va.StoreVoteAndBuildQC(vote, block)
+	require.NotNil(t, err)
+	require.True(t, errors.Is(err, types.ErrStaleVote{
+		Vote:          vote,
+		FinalizedView: va.lastPrunedView,
+	}))
+	require.Equal(t, 0, len(va.blockHashToVotingStatus))
+	require.Equal(t, 0, len(va.viewToIDToVote))
+	require.Equal(t, 0, len(va.viewToBlockIDStrSet))
+}
+
+// UNHAPPY PATH
+// lastPruneView is 10, receive a block with view 5
+func TestErrStaleBlock(t *testing.T) {
+	va := newMockVoteAggregator(t)
+	va.lastPrunedView = 10
+	testView := uint64(5)
+	block := newMockBlock(testView)
+	qc, err := va.BuildQCOnReceivingBlock(block)
+	require.Nil(t, qc)
+	require.NotNil(t, err)
+	require.Equal(t, 0, len(va.blockHashToVotingStatus))
+	require.Equal(t, 0, len(va.viewToIDToVote))
+	require.Equal(t, 0, len(va.viewToBlockIDStrSet))
+	require.True(t, errors.Is(err, types.ErrStaleBlock{
+		BlockProposal: block,
+		FinalizedView: va.lastPrunedView,
+	}))
 }
 
 // UNHAPPY PATH (double voting)
