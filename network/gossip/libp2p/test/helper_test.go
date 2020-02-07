@@ -60,13 +60,6 @@ func (s *SubNetGeneratorTestSuite) TestMultiNodesOneSubNet() {
 	s.SingleSubNetHelper(10)
 }
 
-// TestTwoNodeTwoSubnet evaluates CreateSubnets for dividing two nodes into two subnets
-// of size one
-func (s *SubNetGeneratorTestSuite) TestTwoNodeTwoSubNet() {
-	// two subnet of size 10 nodes
-	s.SingleSubNetHelper(10)
-}
-
 // SingleSubNetHelper creates single subnets of different sizes
 // nodesNum is the total number of nodes
 func (s *SubNetGeneratorTestSuite) SingleSubNetHelper(nodesNum int) {
@@ -83,23 +76,15 @@ func (s *SubNetGeneratorTestSuite) SingleSubNetHelper(nodesNum int) {
 Two Subnets tests
 */
 
-// TestOneNodeTwoSubnet evaluates CreateSubnets for creating dividing one node into two subnets
-// one of size zero and the other one of size 1
-func (s *SubNetGeneratorTestSuite) TestOneNodeTwoSubNet() {
-	// two subnet of size 1 nodes
-	s.TwoSubNetHelper(1)
+// TestTwoNodesTwoSubNet evaluates CreateSubnets for creating two subnets of two nodes
+func (s *SubNetGeneratorTestSuite) TestTwoNodesTwoSubNet() {
+	// 2 subsets of size 2
+	s.TwoSubNetHelper(2)
 }
 
-// TestOddNodesTwoSubNet evaluates CreateSubnets for creating two subnets of odd number of nodes
-// the size difference of the subsets should be one
-func (s *SubNetGeneratorTestSuite) TestOddNodesTwoSubNet() {
-	// two subnet of size 9 nodes
-	s.TwoSubNetHelper(9)
-}
-
-// TestEvenNodesTwoSubNet evaluates CreateSubnets for creating two subnets of even number of nodes
-func (s *SubNetGeneratorTestSuite) TestEvenNodesTwoSubNet() {
-	// two subnet of size 10 nodes
+// TestTenNodesTwoSubNet evaluates CreateSubnets for creating two subnets of 10 nodes
+func (s *SubNetGeneratorTestSuite) TestTenNodesTwoSubNet() {
+	// two subnet 10 nodes
 	s.TwoSubNetHelper(10)
 }
 
