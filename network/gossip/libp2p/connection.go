@@ -43,7 +43,7 @@ func (c *Connection) stop() {
 		close(c.done)
 		// Close the underlying libp2p stream
 		if err := c.stream.Reset(); err != nil {
-			c.log.Err(err).Msg("Error resetting connection stream")
+			c.log.Err(err).Msg("error resetting connection stream")
 		}
 	})
 }

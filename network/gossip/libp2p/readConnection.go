@@ -27,6 +27,8 @@ func NewReadConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *ReadCon
 // recv must be run in a goroutine and takes care of continuously receiving
 // messages from the peer connection until the connection fails.
 func (rc *ReadConnection) ReceiveLoop() {
+	// close and drain the inbound channel
+	defer close(rc.inbound)
 	r := ggio.NewDelimitedReader(rc.stream, 1<<20)
 RecvLoop:
 	for {
@@ -54,7 +56,4 @@ RecvLoop:
 		// stash the received message into the inbound queue for handling
 		rc.inbound <- &msg
 	}
-
-	// close and drain the inbound channel
-	close(rc.inbound)
 }

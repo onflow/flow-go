@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -84,8 +86,6 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	// Creating a new PubSub instance of the type GossipSub with psOption
 	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost, psOption...)
 
-	// TODO: Adjust pubsub.GossipSubD, pubsub.GossipSubDLo and pubsub.GossipSubDHi as per fanout provided in the future
-
 	if err != nil {
 		return errors.Wrapf(err, "unable to start pubsub %s", p.name)
 	}
@@ -104,15 +104,23 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 // Stop stops the libp2p node.
 func (p *P2PNode) Stop() error {
-	p.Lock()
-	defer p.Unlock()
-	err := p.libP2PHost.Close()
-	if err != nil {
-		err = fmt.Errorf("could not stop node: %w", err)
-	} else {
+	var result error
+	p.logger.Debug().Str("name", p.name).Msg("unsubscribing from all topics")
+	for t := range p.topics {
+		if err := p.UnSubscribe(t); err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+	p.logger.Debug().Str("name", p.name).Msg("stopping libp2p node")
+	if err := p.libP2PHost.Close(); err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	if result == nil {
 		p.logger.Debug().Str("name", p.name).Msg("libp2p node stopped successfully")
 	}
-	return err
+
+	return result
 }
 
 // AddPeers adds other nodes as peers to this node by adding them to the node's peerstore and connecting to them
@@ -172,7 +180,24 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 	}
 
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
-	return p.libP2PHost.NewStream(ctx, peerID, FlowLibP2PProtocolID)
+	const maxConnectAttempt = 2
+	var errs error
+	var s network.Stream
+	var retries = 0
+	for ; retries < maxConnectAttempt; retries++ {
+		s, err = p.libP2PHost.NewStream(ctx, peerID, FlowLibP2PProtocolID)
+		if err == nil {
+			break
+		}
+		p.logger.Error().Str("target", peerID.String()).Err(err).
+			Int("retry_attempt", retries).Msg(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>failed to create stream")
+		errs = multierror.Append(errs, err)
+		time.Sleep(5 * time.Millisecond)
+	}
+	if retries == maxConnectAttempt {
+		return s, errs
+	}
+	return s, nil
 }
 
 // GetPeerInfo generates the address of a Node/Peer given its address in a deterministic and consistent way.
@@ -244,8 +269,7 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 	p.Lock()
 	defer p.Unlock()
 	// Remove the Subscriber from the cache
-	s := p.subs[topic]
-	if s != nil {
+	if s, found := p.subs[topic]; found {
 		s.Cancel()
 		p.subs[topic] = nil
 		delete(p.subs, topic)
@@ -257,6 +281,7 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 		return err
 	}
 
+	// attempt to close the topic
 	err := tp.Close()
 	if err != nil {
 		err = errors.Wrapf(err, "unable to close topic %s", topic)
