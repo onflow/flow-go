@@ -4,6 +4,7 @@ package coldstuff
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -480,6 +481,7 @@ func (e *Engine) voteOnProposal() error {
 	// send vote for proposal to leader
 	vote := &coldstuff.BlockVote{
 		BlockID: candidate.ID(),
+		Nonce:   rand.Uint64(),
 	}
 	err := e.con.Submit(vote, e.round.Leader().NodeID)
 	if err != nil {

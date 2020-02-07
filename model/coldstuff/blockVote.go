@@ -9,4 +9,5 @@ import (
 // BlockVote is a coldstuff consensus event to vote for a block.
 type BlockVote struct {
 	BlockID flow.Identifier
+	Nonce   uint64
 }
