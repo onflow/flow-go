@@ -6,7 +6,7 @@ import "github.com/dapperlabs/flow-go/model/flow"
 // received from the outside network. Will be placed
 type BlockHeader struct {
 	Block     *Block
-	Signature *Signature // this is sign(Block)
+	Signature *Signature // this is sign(CompleteBlock)
 }
 
 func NewBlockHeader(block *Block, sig *Signature) *BlockProposal {

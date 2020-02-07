@@ -7,6 +7,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/execution"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -18,22 +20,24 @@ import (
 
 // An Engine provides means of accessing data about execution state. Also broadcasts execution receipts to nodes in the network and
 type Engine struct {
-	unit       *engine.Unit
-	log        zerolog.Logger
-	receiptCon network.Conduit
-	state      protocol.State
-	me         module.Local
+	unit         *engine.Unit
+	log          zerolog.Logger
+	receiptCon   network.Conduit
+	state        protocol.State
+	execState    state.ExecutionState
+	me           module.Local
 	execStateCon network.Conduit
 }
 
-func New(logger zerolog.Logger, net module.Network, state protocol.State, me module.Local, ) (*Engine, error) {
+func New(logger zerolog.Logger, net module.Network, state protocol.State, me module.Local, execState state.ExecutionState) (*Engine, error) {
 	log := logger.With().Str("engine", "receipts").Logger()
 
 	eng := Engine{
-		unit:  engine.NewUnit(),
-		log:   log,
-		state: state,
-		me:    me,
+		unit:      engine.NewUnit(),
+		log:       log,
+		state:     state,
+		me:        me,
+		execState: execState,
 	}
 
 	receiptCon, err := net.Register(engine.ReceiptProvider, &eng)
@@ -83,7 +87,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		var err error
 		switch v := event.(type) {
-		case *flow.ExecutionResult:
+		case *execution.ComputationResult:
 			err = e.onExecutionResult(originID, v)
 		case *messages.ExecutionStateRequest:
 			return e.onExecutionStateRequest(originID, v)
@@ -97,18 +101,47 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-func (e *Engine) onExecutionResult(originID flow.Identifier, result *flow.ExecutionResult) error {
+func (e *Engine) onExecutionResult(originID flow.Identifier, result *execution.ComputationResult) error {
+
 	e.log.Debug().
-		Hex("block_id", logging.ID(result.BlockID)).
-		Hex("result_id", logging.Entity(result)).
+		Hex("block_id", logging.ID(result.CompleteBlock.Block.ID())).
 		Msg("received execution result")
 
 	if originID != e.me.NodeID() {
-		return fmt.Errorf("invalid remote request to submit execution result [%x]", result.ID())
+		return fmt.Errorf("invalid remote request to submit execution result for block [%x]", result.CompleteBlock.Block.ID())
 	}
 
+	chunks := make([]*flow.Chunk, len(result.StateViews))
+
+	startState := result.StartState
+	var endState flow.StateCommitment
+
+	for i, view := range result.StateViews {
+		// TODO - Should the deltas be applied to a particular state?
+		// Not important now, but might become important once we produce proofs
+
+		endState, err := e.execState.CommitDelta(view.Delta())
+		if err != nil {
+			return fmt.Errorf("failed to apply chunk delta: %w", err)
+		}
+		//
+		chunk := generateChunk(i, startState, endState)
+		//
+		chunkHeader := generateChunkHeader(chunk, view.Reads())
+		//
+		err = e.execState.PersistChunkHeader(chunkHeader)
+		if err != nil {
+			return fmt.Errorf("failed to save chunk header: %w", err)
+		}
+		//
+		chunks[i] = chunk
+		startState = endState
+	}
+
+	executionResult := generateExecutionResultForBlock(result.CompleteBlock, chunks, endState)
+
 	receipt := &flow.ExecutionReceipt{
-		ExecutionResult: *result,
+		ExecutionResult: *executionResult,
 		// TODO: include SPoCKs
 		Spocks: nil,
 		// TODO: sign execution receipt
@@ -120,44 +153,48 @@ func (e *Engine) onExecutionResult(originID flow.Identifier, result *flow.Execut
 		return fmt.Errorf("could not broadcast receipt: %w", err)
 	}
 
+	err = e.execState.PersistStateCommitment(result.CompleteBlock.Block.ID(), endState)
+	if err != nil {
+		return fmt.Errorf("failed to store state commitment: %w", err)
+	}
+
 	return nil
 }
 
 func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages.ExecutionStateRequest) error {
-	//chunkID := req.ChunkID
-	//
-	//e.log.Info().
-	//	Hex("origin_id", logging.ID(originID)).
-	//	Hex("chunk_id", logging.ID(chunkID)).
-	//	Msg("received execution state request")
-	//
-	//id, err := e.state.Final().Identity(originID)
-	//if err != nil {
-	//	return fmt.Errorf("invalid origin id (%s): %w", id, err)
-	//}
-	//
-	//if id.Role != flow.RoleVerification {
-	//	return fmt.Errorf("invalid role for requesting execution state: %s", id.Role)
-	//}
-	//
-	//registers, err := e.execState.GetChunkRegisters(chunkID)
-	//if err != nil {
-	//	return fmt.Errorf("could not retrieve chunk state (id=%s): %w", chunkID, err)
-	//}
-	//
-	//msg := &messages.ExecutionStateResponse{State: flow.ChunkState{
-	//	ChunkID:   chunkID,
-	//	Registers: registers,
-	//}}
-	//
-	//err = e.execStateCon.Submit(msg, id.NodeID)
-	//if err != nil {
-	//	return fmt.Errorf("could not submit response for chunk state (id=%s): %w", chunkID, err)
-	//}
+	chunkID := req.ChunkID
+
+	e.log.Info().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("chunk_id", logging.ID(chunkID)).
+		Msg("received execution state request")
+
+	id, err := e.state.Final().Identity(originID)
+	if err != nil {
+		return fmt.Errorf("invalid origin id (%s): %w", id, err)
+	}
+
+	if id.Role != flow.RoleVerification {
+		return fmt.Errorf("invalid role for requesting execution state: %s", id.Role)
+	}
+
+	registers, err := e.execState.GetChunkRegisters(chunkID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve chunk state (id=%s): %w", chunkID, err)
+	}
+
+	msg := &messages.ExecutionStateResponse{State: flow.ChunkState{
+		ChunkID:   chunkID,
+		Registers: registers,
+	}}
+
+	err = e.execStateCon.Submit(msg, id.NodeID)
+	if err != nil {
+		return fmt.Errorf("could not submit response for chunk state (id=%s): %w", chunkID, err)
+	}
 
 	return nil
 }
-
 
 func (e *Engine) broadcastExecutionReceipt(receipt *flow.ExecutionReceipt) error {
 	e.log.Debug().
@@ -176,4 +213,58 @@ func (e *Engine) broadcastExecutionReceipt(receipt *flow.ExecutionReceipt) error
 	}
 
 	return nil
+}
+
+// generateExecutionResultForBlock creates a new execution result for a block from
+// the provided chunk results.
+func generateExecutionResultForBlock(
+	block *execution.CompleteBlock,
+	chunks []*flow.Chunk,
+	endState flow.StateCommitment,
+) *flow.ExecutionResult {
+	return &flow.ExecutionResult{
+		ExecutionResultBody: flow.ExecutionResultBody{
+			// TODO: populate with real value
+			PreviousResultID: flow.ZeroID,
+			BlockID:          block.Block.ID(),
+			FinalStateCommit: endState,
+			Chunks:           chunks,
+		},
+	}
+}
+
+// generateChunk creates a chunk from the provided execution data.
+func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flow.Chunk {
+	return &flow.Chunk{
+		ChunkBody: flow.ChunkBody{
+			CollectionIndex: uint(colIndex),
+			StartState:      startState,
+			// TODO: include event collection hash
+			EventCollection: flow.ZeroID,
+			// TODO: record gas used
+			TotalComputationUsed: 0,
+			// TODO: record first tx gas used
+			FirstTransactionComputationUsed: 0,
+		},
+		Index:    0,
+		EndState: endState,
+	}
+}
+
+// generateChunkHeader creates a chunk header from the provided chunk and register IDs.
+func generateChunkHeader(
+	chunk *flow.Chunk,
+	registerIDs []string,
+) *flow.ChunkHeader {
+	reads := make([]flow.RegisterID, len(registerIDs))
+
+	for i, registerID := range registerIDs {
+		reads[i] = flow.RegisterID(registerID)
+	}
+
+	return &flow.ChunkHeader{
+		ChunkID:     chunk.ID(),
+		StartState:  chunk.StartState,
+		RegisterIDs: reads,
+	}
 }

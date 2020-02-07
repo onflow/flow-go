@@ -239,7 +239,7 @@ func (e *Engine) sendExecutionOrder(completeBlock *execution.CompleteBlock) {
 
 	view := e.execState.NewView(startState)
 
-	e.execution.SubmitLocal(&execution.ExecutionOrder{
+	e.execution.SubmitLocal(&execution.ComputationOrder{
 		Block: completeBlock,
 		View:  view,
 	})

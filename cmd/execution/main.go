@@ -27,6 +27,7 @@ func main() {
 		executionEng     *execution.Engine
 		rpcConf          rpc.Config
 		err              error
+		executionState   state.ExecutionState
 	)
 
 	cmd.
@@ -46,11 +47,16 @@ func main() {
 		Component("receipts engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing receipts engine")
 
+		chunkHeaders := badger.NewChunkHeaders(node.DB)
+
+		executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
+
 			receiptsEng, err = provider.New(
 				node.Logger,
 				node.Network,
 				node.State,
 				node.Me,
+				executionState,
 			)
 			node.MustNot(err).Msg("could not initialize receipts engine")
 
@@ -80,11 +86,8 @@ func main() {
 			blocks := badger.NewBlocks(node.DB)
 			collections := badger.NewCollections(node.DB)
 
-		chunkHeaders := badger.NewChunkHeaders(node.DB)
 
-		execState := state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
-
-		ingestionEng, err := ingestion.New(
+			ingestionEng, err := ingestion.New(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -92,7 +95,7 @@ func main() {
 				blocks,
 				collections,
 				executionEng,
-				execState,
+				executionState,
 			)
 			node.MustNot(err).Msg("could not initialize ingestion engine")
 

@@ -165,18 +165,19 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
 
-	receiptsEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me)
+	levelDB := unittest.TempLevelDB(t)
+
+	ls, err := ledger.NewTrieStorage(levelDB)
+	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage)
+
+	receiptsEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState)
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()
 	vm := virtualmachine.New(rt)
 
-	levelDB := unittest.TempLevelDB(t)
 
-	ls, err := ledger.NewTrieStorage(levelDB)
 	require.NoError(t, err)
-
-	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage)
 
 	execEngine, err := execution.New(
 		node.Log,

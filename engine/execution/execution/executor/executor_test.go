@@ -9,7 +9,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
-	statemock "github.com/dapperlabs/flow-go/engine/execution/execution/state/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	vmmock "github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -21,7 +20,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("single collection", func(t *testing.T) {
 		vm := new(vmmock.VirtualMachine)
 		bc := new(vmmock.BlockContext)
-		es := new(statemock.ExecutionState)
 
 		exe := executor.NewBlockExecutor(vm)
 
@@ -34,34 +32,22 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(&virtualmachine.TransactionResult{}, nil).
 			Twice()
 
-		es.On("StateCommitmentByBlockID", block.Block.ParentID).
-			Return(unittest.StateCommitmentFixture(), nil)
-
-		es.On("CommitDelta", mock.Anything).Return(nil, nil)
-		es.On("PersistChunkHeader", mock.Anything, mock.Anything).Return(nil)
-		es.On("PersistStateCommitment", block.Block.ID(), mock.Anything).Return(nil)
-
 		view := state.NewView(func(key string) (bytes []byte, e error) {
 			return nil, nil
 		})
+		startState := unittest.StateCommitmentFixture()
 
-		_, err := exe.ExecuteBlock(block, view)
-		//result, err := exe.ExecuteBlock(block, view)
+		result, err := exe.ExecuteBlock(block, view, startState)
 		assert.NoError(t, err)
-		//assert.Len(t, result.Chunks, 1)
-
-		//chunk := result.Chunks[0]
-		//assert.EqualValues(t, 0, chunk.CollectionIndex)
+		assert.Len(t, result.StateViews, 1)
 
 		vm.AssertExpectations(t)
 		bc.AssertExpectations(t)
-		es.AssertExpectations(t)
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
 		vm := new(vmmock.VirtualMachine)
 		bc := new(vmmock.BlockContext)
-		es := new(statemock.ExecutionState)
 
 		exe := executor.NewBlockExecutor(vm)
 
@@ -78,39 +64,20 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(&virtualmachine.TransactionResult{}, nil).
 			Times(totalTransactionCount)
 
-		es.On("StateCommitmentByBlockID", block.Block.ParentID).
-			Return(unittest.StateCommitmentFixture(), nil)
-
 		view := state.NewView(func(key string) (bytes []byte, e error) {
 			return nil, nil
 		})
 
-		es.On("CommitDelta", mock.Anything).
-			Return(nil, nil).
-			Times(collectionCount)
+		startState := unittest.StateCommitmentFixture()
 
-		es.On("PersistChunkHeader", mock.Anything, mock.Anything).
-			Return(nil).
-			Times(collectionCount)
-
-		es.On("PersistStateCommitment", block.Block.ID(), mock.Anything).
-			Return(nil)
-
-		_, err := exe.ExecuteBlock(block, view)
-		//result, err := exe.ExecuteBlock(block, view)
+		result, err := exe.ExecuteBlock(block, view, startState)
 		assert.NoError(t, err)
 
-		// chunk count should match collection count
-		//assert.Len(t, result.Chunks, collectionCount)
-
-		// chunks should follow the same order as collections
-		//for i, chunk := range result.Chunks {
-		//	assert.EqualValues(t, i, chunk.CollectionIndex)
-		//}
+		//chunk count should match collection count
+		assert.Len(t, result.StateViews, collectionCount)
 
 		vm.AssertExpectations(t)
 		bc.AssertExpectations(t)
-		es.AssertExpectations(t)
 	})
 }
 

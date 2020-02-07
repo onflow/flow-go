@@ -146,8 +146,8 @@ func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
 // process processes events for the execution engine on the execution node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
-	case *execution.ExecutionOrder:
-		return e.onCompleteBlock(originID, ev.Block, ev.View)
+	case *execution.ComputationOrder:
+		return e.onCompleteBlock(originID, ev.Block, ev.View, ev.StartState)
 	default:
 		return errors.Errorf("invalid event type (%T)", event)
 	}
@@ -157,7 +157,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 //
 // This function passes the complete block to the block executor and
 // then submits the result to the provider engine.
-func (e *Engine) onCompleteBlock(originID flow.Identifier, block *execution.CompleteBlock, view *state.View) error {
+func (e *Engine) onCompleteBlock(originID flow.Identifier, block *execution.CompleteBlock, view *state.View, startState flow.StateCommitment) error {
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block.Block)).
 		Msg("received complete block")
@@ -166,7 +166,7 @@ func (e *Engine) onCompleteBlock(originID flow.Identifier, block *execution.Comp
 		return fmt.Errorf("invalid remote request to execute complete block [%x]", block.Block.ID())
 	}
 
-	result, err := e.executor.ExecuteBlock(block, view)
+	result, err := e.executor.ExecuteBlock(block, view, startState)
 	if err != nil {
 		e.log.Error().
 			Hex("block_id", logging.Entity(block.Block)).
@@ -175,10 +175,9 @@ func (e *Engine) onCompleteBlock(originID flow.Identifier, block *execution.Comp
 		return fmt.Errorf("failed to execute block: %w", err)
 	}
 
-	//e.log.Debug().
-	//	Hex("block_id", logging.Entity(block.Block)).
-	//	Hex("result_id", logging.Entity(result)).
-	//	Msg("computed block result")
+	e.log.Debug().
+		Hex("block_id", logging.Entity(result.CompleteBlock.Block)).
+		Msg("computed block result")
 
 	// submit execution result to receipt engine
 	e.provider.SubmitLocal(result)

@@ -58,7 +58,7 @@ func encode(v interface{}) (*Envelope, error) {
 
 	case *execution.CompleteBlock:
 		code = CodeExecutionCompleteBlock
-	case *execution.ExecutionOrder:
+	case *execution.ComputationOrder:
 		code = CodeExecutionExecutionOrder
 
 	default:

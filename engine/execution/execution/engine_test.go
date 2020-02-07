@@ -3,16 +3,18 @@ package execution
 import (
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
-	executor "github.com/dapperlabs/flow-go/engine/execution/execution/executor/mock"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/executor/mocks"
 	realState "github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
+	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
 func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
@@ -52,6 +54,8 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 		},
 	}
 
+	startState := unittest.StateCommitmentFixture()
+
 	t.Run("non-local engine", func(t *testing.T) {
 		me := new(module.Local)
 		me.On("NodeID").Return(flow.ZeroID)
@@ -63,15 +67,20 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 		})
 
 		// submit using origin ID that does not match node ID
-		err := e.onCompleteBlock(flow.Identifier{42}, completeBlock, view)
+		err := e.onCompleteBlock(flow.Identifier{42}, completeBlock, view, startState)
 		assert.Error(t, err)
 	})
 
 	t.Run("success", func(t *testing.T) {
-		exec := new(executor.BlockExecutor)
 		receipts := new(network.Engine)
 		me := new(module.Local)
 		me.On("NodeID").Return(flow.ZeroID)
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		exec := mocks.NewMockBlockExecutor(ctrl)
+
+		computationResult := unittest.ComputationResultFixture()
 
 		e := &Engine{
 			provider: receipts,
@@ -79,18 +88,27 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 			me:       me,
 		}
 
-		receipts.On("SubmitLocal", mock.Anything)
-		exec.On("ExecuteBlock", completeBlock, mock.AnythingOfType("*state.View")).Return(&flow.ExecutionResult{}, nil)
+		receipts.On(
+			"SubmitLocal",
+			mock.Anything,
+			mock.Anything,
+		).
+			Run(func(args mock.Arguments) {
+				receipt := args[0].(*execution.ComputationResult)
+
+				assert.Equal(t, computationResult, receipt)
+			}).
+			Return(nil)
+
+		exec.EXPECT().ExecuteBlock(gomock.Eq(completeBlock), gomock.AssignableToTypeOf(&realState.View{}), gomock.AssignableToTypeOf(flow.StateCommitment{})).Return(computationResult, nil)
 
 		view := realState.NewView(func(key string) (bytes []byte, e error) {
 			return nil, nil
 		})
 
-		err := e.onCompleteBlock(e.me.NodeID(), completeBlock, view)
+		err := e.onCompleteBlock(e.me.NodeID(), completeBlock, view, startState)
 		require.NoError(t, err)
 
 		receipts.AssertExpectations(t)
-		exec.AssertExpectations(t)
 	})
 }
-

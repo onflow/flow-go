@@ -11,7 +11,7 @@ import (
 
 // A BlockExecutor executes the transactions in a block.
 type BlockExecutor interface {
-	ExecuteBlock(*execution.CompleteBlock, *state.View) (*flow.ExecutionResult, error)
+	ExecuteBlock(*execution.CompleteBlock, *state.View, flow.StateCommitment) (*execution.ComputationResult, error)
 }
 
 type blockExecutor struct {
@@ -31,62 +31,49 @@ func NewBlockExecutor(vm virtualmachine.VirtualMachine) BlockExecutor {
 func (e *blockExecutor) ExecuteBlock(
 	block *execution.CompleteBlock,
 	view *state.View,
-) (*flow.ExecutionResult, error) {
-	_, _, err := e.executeBlock(block, view)
+	startState flow.StateCommitment,
+) (*execution.ComputationResult, error) {
+	results, err := e.executeBlock(block, view, startState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
 
 	// TODO: compute block fees & reward payments
 
-	//err = e.state.PersistStateCommitment(block.Block.ID(), endState)
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to store state commitment: %w", err)
-	//}
-	//
-	//result := generateExecutionResultForBlock(block, chunks, endState)
-
-	return nil, nil
+	return results, nil
 }
 
 func (e *blockExecutor) executeBlock(
 	block *execution.CompleteBlock,
 	view *state.View,
-) (chunk []*flow.Chunk, endState flow.StateCommitment, err error) {
+	startState flow.StateCommitment,
+) (*execution.ComputationResult, error) {
 
 	blockCtx := e.vm.NewBlockContext(&block.Block.Header)
 
-	//var startState flow.StateCommitment
-
-
-
 	collections := block.Collections()
 
-
-	chunks := make([]*flow.Chunk, len(collections))
-	deltas := make([]*state.Delta, len(collections))
-
-	//chunkView := e.state.NewView(startState)
-
-	blockView := view.NewChild()
+	views := make([]*state.View, len(collections))
 
 	for i, collection := range collections {
 
+		collectionView := view.NewChild()
 
-		_, err := e.executeCollection(i, blockCtx, blockView, collection)
+		err := e.executeCollection(i, blockCtx, collectionView, collection)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to execute collection: %w", err)
+			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
 
+		views[i] = collectionView
 
-		chunkDelta := blockView.Delta()
-		deltas[i] = &chunkDelta
-
-		blockView.ApplyDelta(chunkDelta)
-		//startState = endState
+		view.ApplyDelta(collectionView.Delta())
 	}
 
-	return chunks, endState, nil
+	return &execution.ComputationResult{
+		CompleteBlock: block,
+		StateViews:    views,
+		StartState:    startState,
+	}, nil
 }
 
 func (e *blockExecutor) executeCollection(
@@ -95,15 +82,14 @@ func (e *blockExecutor) executeCollection(
 	//startState flow.StateCommitment,
 	chunkView *state.View,
 	collection *execution.CompleteCollection,
-) (*state.View, error) {
-	//chunkView := e.state.NewView(startState)
+) error {
 
 	for _, tx := range collection.Transactions {
 		txView := chunkView.NewChild()
 
 		result, err := blockCtx.ExecuteTransaction(txView, tx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to execute transaction: %w", err)
+			return fmt.Errorf("failed to execute transaction: %w", err)
 		}
 
 		if result.Succeeded() {
@@ -111,75 +97,5 @@ func (e *blockExecutor) executeCollection(
 		}
 	}
 
-	return chunkView, nil
-
-	//endState, err = e.state.CommitDelta(chunkView.Delta())
-	//if err != nil {
-	//	return nil, nil, fmt.Errorf("failed to apply chunk delta: %w", err)
-	//}
-	//
-	//chunk = generateChunk(index, startState, endState)
-	//
-	//chunkHeader := generateChunkHeader(chunk, chunkView.Reads())
-	//
-	//err = e.state.PersistChunkHeader(chunkHeader)
-	//if err != nil {
-	//	return nil, nil, fmt.Errorf("failed to save chunk header: %w", err)
-	//}
-	//
-	//return chunk, endState, nil
-}
-
-// generateExecutionResultForBlock creates a new execution result for a block from
-// the provided chunk results.
-func generateExecutionResultForBlock(
-	block *execution.CompleteBlock,
-	chunks []*flow.Chunk,
-	endState flow.StateCommitment,
-) *flow.ExecutionResult {
-	return &flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			// TODO: populate with real value
-			PreviousResultID: flow.ZeroID,
-			BlockID:          block.Block.ID(),
-			FinalStateCommit: endState,
-			Chunks:           chunks,
-		},
-	}
-}
-
-// generateChunk creates a chunk from the provided execution data.
-func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flow.Chunk {
-	return &flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: uint(colIndex),
-			StartState:      startState,
-			// TODO: include event collection hash
-			EventCollection: flow.ZeroID,
-			// TODO: record gas used
-			TotalComputationUsed: 0,
-			// TODO: record first tx gas used
-			FirstTransactionComputationUsed: 0,
-		},
-		Index:    0,
-		EndState: endState,
-	}
-}
-
-// generateChunkHeader creates a chunk header from the provided chunk and register IDs.
-func generateChunkHeader(
-	chunk *flow.Chunk,
-	registerIDs []string,
-) *flow.ChunkHeader {
-	reads := make([]flow.RegisterID, len(registerIDs))
-
-	for i, registerID := range registerIDs {
-		reads[i] = flow.RegisterID(registerID)
-	}
-
-	return &flow.ChunkHeader{
-		ChunkID:     chunk.ID(),
-		StartState:  chunk.StartState,
-		RegisterIDs: reads,
-	}
+	return nil
 }

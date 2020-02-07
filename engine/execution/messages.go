@@ -13,14 +13,21 @@ type CompleteCollection struct {
 // TODO If the executor will be a separate process/machine we would need to rework
 // sending view as local data, but that would be much greater refactor of storage anyway
 
-type ExecutionOrder struct {
-	Block        *CompleteBlock
-	View *state.View
+type ComputationOrder struct {
+	Block *CompleteBlock
+	View  *state.View
+	StartState flow.StateCommitment
 }
 
 type CompleteBlock struct {
 	Block               *flow.Block
 	CompleteCollections map[flow.Identifier]*CompleteCollection
+}
+
+type ComputationResult struct {
+	CompleteBlock *CompleteBlock
+	StateViews    []*state.View
+	StartState    flow.StateCommitment
 }
 
 func (b *CompleteBlock) Collections() []*CompleteCollection {

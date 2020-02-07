@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	state "github.com/dapperlabs/flow-go/engine/execution/execution/state/mock"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/state/mocks"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -27,24 +28,33 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		}),
 	}
 
-	result := unittest.ExecutionResultFixture()
+	result := unittest.ComputationResultFixture()
 
 	t.Run("failed to load identities", func(t *testing.T) {
 		state := &protocol.State{}
 		ss := &protocol.Snapshot{}
 		con := &network.Conduit{}
 		me := &module.Local{}
+
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		execState := mocks.NewMockExecutionState(ctrl)
 		me.On("NodeID").Return(flow.ZeroID)
 
 		e := Engine{
 			state:      state,
 			receiptCon: con,
 			me:         me,
+			execState:  execState,
 		}
 
 		state.On("Final").Return(ss)
 		ss.On("Identities", mock.Anything, mock.Anything).
 			Return(nil, fmt.Errorf("identity error"))
+
+		execState.EXPECT().CommitDelta(gomock.Any()).Times(len(result.StateViews))
+		execState.EXPECT().PersistChunkHeader(gomock.Any()).Return(nil).Times(len(result.StateViews))
 
 		err := e.onExecutionResult(e.me.NodeID(), result)
 		assert.Error(t, err)
@@ -60,10 +70,17 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		me := &module.Local{}
 		me.On("NodeID").Return(flow.ZeroID)
 
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		execState := mocks.NewMockExecutionState(ctrl)
+		execState.EXPECT().CommitDelta(gomock.Any()).Times(len(result.StateViews))
+		execState.EXPECT().PersistChunkHeader(gomock.Any()).Return(nil).Times(len(result.StateViews))
+		//execState.EXPECT().PersistStateCommitment(gomock.Eq(result.CompleteBlock.Block.ID()), gomock.Any()).Return(nil)
 		e := Engine{
 			state:      state,
 			receiptCon: con,
 			me:         me,
+			execState:  execState,
 		}
 
 		state.On("Final").Return(ss)
@@ -102,10 +119,15 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		me := &module.Local{}
 		me.On("NodeID").Return(flow.ZeroID)
 
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		execState := mocks.NewMockExecutionState(ctrl)
+
 		e := Engine{
 			state:      state,
 			receiptCon: con,
 			me:         me,
+			execState:  execState,
 		}
 
 		state.On("Final").Return(ss)
@@ -115,13 +137,17 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 			mock.Anything,
 			targetIDs[0].NodeID,
 			targetIDs[1].NodeID,
-		).
-			Run(func(args mock.Arguments) {
-				// check the receipt is properly formed
-				receipt := args[0].(*flow.ExecutionReceipt)
-				assert.Equal(t, result, &receipt.ExecutionResult)
-			}).
+		).Run(func(args mock.Arguments) {
+			// check the receipt is properly formed
+			receipt := args[0].(*flow.ExecutionReceipt)
+
+			assert.Len(t, receipt.ExecutionResult.Chunks, len(result.StateViews))
+		}).
 			Return(nil)
+
+		execState.EXPECT().CommitDelta(gomock.Any()).Times(len(result.StateViews))
+		execState.EXPECT().PersistChunkHeader(gomock.Any()).Return(nil).Times(len(result.StateViews))
+		execState.EXPECT().PersistStateCommitment(gomock.Eq(result.CompleteBlock.Block.ID()), gomock.Any())
 
 		err := e.onExecutionResult(e.me.NodeID(), result)
 		assert.NoError(t, err)
@@ -137,7 +163,11 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 		ps := new(protocol.State)
 		ss := new(protocol.Snapshot)
 
-		e := Engine{state: ps}
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		execState := mocks.NewMockExecutionState(ctrl)
+
+		e := Engine{state: ps, execState: execState}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -159,9 +189,13 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 	t.Run("non-existent chunk", func(t *testing.T) {
 		ps := new(protocol.State)
 		ss := new(protocol.Snapshot)
-		es := new(state.ExecutionState)
+		//es := new(state.ExecutionState)
 
-		e := Engine{state: ps}
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		execState := mocks.NewMockExecutionState(ctrl)
+
+		e := Engine{state: ps, execState: execState}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
@@ -169,7 +203,8 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
-		es.On("GetChunkRegisters", chunkID).Return(nil, fmt.Errorf("state error"))
+		//es.On("GetChunkRegisters", chunkID).Return(nil, fmt.Errorf("state error"))
+		execState.EXPECT().GetChunkRegisters(gomock.Eq(chunkID)).Return(nil, fmt.Errorf("state error"))
 
 		req := &messages.ExecutionStateRequest{ChunkID: chunkID}
 
@@ -178,7 +213,7 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
-		es.AssertExpectations(t)
+		//es.AssertExpectations(t)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -186,7 +221,11 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 		ss := new(protocol.Snapshot)
 		con := new(network.Conduit)
 
-		e := Engine{state: ps, execStateCon: con}
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		execState := mocks.NewMockExecutionState(ctrl)
+
+		e := Engine{state: ps, execStateCon: con, execState: execState}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
@@ -217,6 +256,8 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 				assert.EqualValues(t, expectedRegisters, actualRegisters)
 			}).
 			Return(nil)
+
+		execState.EXPECT().GetChunkRegisters(gomock.Eq(chunkID)).Return(expectedRegisters, nil)
 
 		req := &messages.ExecutionStateRequest{ChunkID: chunkID}
 
