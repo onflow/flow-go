@@ -583,52 +583,6 @@ func TestNonePruneAfterBlock(t *testing.T) {
 	require.Equal(t, 3, len(va.blockHashToVotingStatus))
 }
 
-// store random votes and QCs from view 1 to 3
-// prune by view 3
-func TestPruneByView(t *testing.T) {
-	va := newMockVoteAggregator(t)
-	pruneByView := 3
-	for i := 1; i <= pruneByView; i++ {
-		view := uint64(i)
-		block := unittest.BlockHeaderFixture()
-		blockID := block.ID()
-		blockIDStr := blockID.String()
-		voter := unittest.IdentityFixture()
-		vote := newMockVote(view, blockID, 2)
-		pendingStatus := NewPendingStatus()
-		pendingStatus.AddVote(vote)
-		va.pendingVoteMap[blockIDStr] = pendingStatus
-		vs := NewVotingStatus(uint64(10), vote.View, uint32(7), voter, vote.BlockID)
-		vs.AddVote(vote)
-		va.blockHashToVotingStatus[blockIDStr] = vs
-		qc := &types.QuorumCertificate{
-			View:    view,
-			BlockID: blockID,
-		}
-		va.createdQC[blockIDStr] = qc
-		va.viewToBlockIDStrSet[view] = map[string]bool{}
-		va.viewToBlockIDStrSet[view][blockIDStr] = true
-		va.viewToIDToVote[view] = map[flow.Identifier]*types.Vote{}
-		va.viewToIDToVote[view][voter.ID()] = vote
-	}
-
-	// verify that all insertion is successful
-	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToIDToVote))
-	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToBlockIDStrSet))
-	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.createdQC))
-	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.pendingVoteMap))
-	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.blockHashToVotingStatus))
-
-	va.PruneByView(uint64(pruneByView))
-
-	// verify that all deletion is successful
-	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToIDToVote))
-	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.viewToBlockIDStrSet))
-	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.blockHashToVotingStatus))
-	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.createdQC))
-	require.Equal(t, pruneByView-int(va.lastPrunedView), len(va.pendingVoteMap))
-}
-
 func newMockBlock(view uint64) *types.BlockProposal {
 	blockHeader := unittest.BlockHeaderFixture()
 	blockHeader.Number = view
