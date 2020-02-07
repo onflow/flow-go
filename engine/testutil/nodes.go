@@ -176,7 +176,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	rt := runtime.NewInterpreterRuntime()
 	vm := virtualmachine.New(rt)
 
-
 	require.NoError(t, err)
 
 	execEngine, err := execution.New(

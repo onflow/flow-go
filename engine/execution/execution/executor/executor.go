@@ -15,15 +15,13 @@ type BlockExecutor interface {
 }
 
 type blockExecutor struct {
-	vm    virtualmachine.VirtualMachine
-	//state state.ExecutionState
+	vm virtualmachine.VirtualMachine
 }
 
 // NewBlockExecutor creates a new block executor.
 func NewBlockExecutor(vm virtualmachine.VirtualMachine) BlockExecutor {
 	return &blockExecutor{
-		vm:    vm,
-		//state: state,
+		vm: vm,
 	}
 }
 
@@ -79,7 +77,6 @@ func (e *blockExecutor) executeBlock(
 func (e *blockExecutor) executeCollection(
 	index int,
 	blockCtx virtualmachine.BlockContext,
-	//startState flow.StateCommitment,
 	chunkView *state.View,
 	collection *execution.CompleteCollection,
 ) error {

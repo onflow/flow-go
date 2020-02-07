@@ -28,14 +28,13 @@ type ExecutionEngine interface {
 
 // Engine manages execution of transactions.
 type Engine struct {
-	unit             *engine.Unit
-	log              zerolog.Logger
-	me               module.Local
-	protoState       protocol.State
-	execStateConduit network.Conduit
-	provider         network.Engine
-	vm               virtualmachine.VirtualMachine
-	executor         executor.BlockExecutor
+	unit       *engine.Unit
+	log        zerolog.Logger
+	me         module.Local
+	protoState protocol.State
+	provider   network.Engine
+	vm         virtualmachine.VirtualMachine
+	executor   executor.BlockExecutor
 }
 
 func New(

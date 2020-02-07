@@ -27,15 +27,15 @@ var (
 )
 
 type testingContext struct {
-	t *testing.T
-	engine *Engine
-	blocks *storage.MockBlocks
-	collections *storage.MockCollections
-	state *protocol.MockState
-	conduit *network.MockConduit
+	t                 *testing.T
+	engine            *Engine
+	blocks            *storage.MockBlocks
+	collections       *storage.MockCollections
+	state             *protocol.MockState
+	conduit           *network.MockConduit
 	collectionConduit *network.MockConduit
-	executionEngine *executionmock.MockExecutionEngine
-	executionState *statemock.MockExecutionState
+	executionEngine   *executionmock.MockExecutionEngine
+	executionState    *statemock.MockExecutionState
 }
 
 func runWithEngine(t *testing.T, f func(ctx testingContext)) {
@@ -80,7 +80,6 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
-
 
 	engine, err := New(log, net, me, protocolState, blocks, collections, executionEngine, executionState)
 	require.NoError(t, err)

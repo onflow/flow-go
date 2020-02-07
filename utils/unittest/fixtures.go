@@ -103,7 +103,7 @@ func CompleteBlockFixture() *execution.CompleteBlock {
 	block := BlockFixture()
 	return &execution.CompleteBlock{
 		Block:               &block,
-		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{ cc1.Guarantee.CollectionID: cc1, cc2.Guarantee.CollectionID: cc2 },
+		CompleteCollections: map[flow.Identifier]*execution.CompleteCollection{cc1.Guarantee.CollectionID: cc1, cc2.Guarantee.CollectionID: cc2},
 	}
 }
 
