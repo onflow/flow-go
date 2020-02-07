@@ -121,7 +121,7 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 		return oldQC, nil
 	}
 	if bp.View() <= va.lastPrunedView {
-		return nil, fmt.Errorf("could not build QC on receiving block: %w", types.ErrStaleBlock{BlockProposal: bp, FinalizedView: bp.View()})
+		return nil, fmt.Errorf("could not build QC on receiving block: %w", types.ErrStaleBlock{BlockProposal: bp, FinalizedView: va.lastPrunedView})
 	}
 	// accumulate primary vote first
 	primaryVote := bp.ToVote()
