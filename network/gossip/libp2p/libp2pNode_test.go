@@ -8,12 +8,16 @@ import (
 	"testing"
 	"time"
 
+	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	gologging "github.com/whyrusleeping/go-logging"
 )
 
 // Workaround for https://github.com/stretchr/testify/pull/808
@@ -215,9 +219,10 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 
 // TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
 func (l *LibP2PNodeTestSuite) TestOneToOneComm() {
+	golog.SetAllLoggers(gologging.DEBUG)
 	defer l.cancel()
 	count := 2
-	run := 100
+	run := 5
 	for run > 0 {
 		ch := make(chan string, count)
 
@@ -368,6 +373,8 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 		handlerFunc = func(network.Stream) {}
 	}
 
+	d := &mockDiscovery{}
+	psOption := pubsub.WithDiscovery(d)
 	// creating nodes
 	for i := 1; i <= count; i++ {
 		n := &P2PNode{}
@@ -377,7 +384,7 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 			Port: "0",       // random Port number
 		}
 
-		err := n.Start(l.ctx, nodeID, logger, handlerFunc)
+		err := n.Start(l.ctx, nodeID, logger, handlerFunc, psOption)
 		require.NoError(l.Suite.T(), err)
 		require.Eventuallyf(l.Suite.T(), func() bool {
 			ip, p := n.GetIPPort()
@@ -387,6 +394,16 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 		require.NoError(l.Suite.T(), err)
 		nodes = append(nodes, n)
 	}
+
+	var pInfos []peer.AddrInfo
+	for _, n := range nodes {
+		id := n.libP2PHost.ID()
+		addrs := n.libP2PHost.Addrs()
+		pInfos = append(pInfos, peer.AddrInfo{ID: id, Addrs: addrs})
+	}
+	// set the common discovery object shared by all nodes with the list of all peer.AddrInfos
+	d.SetPeers(pInfos)
+
 	return nodes
 }
 
