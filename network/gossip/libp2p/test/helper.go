@@ -34,7 +34,7 @@ func CreateSubnets(nodesNum, subnetNum int) (map[*libp2p.Network]int, error) {
 	if size == 0 {
 		// covers the cases where number of nodes is less than
 		// number of the subnets
-		size = 1
+		size = len(nets)
 	}
 
 	// subnet index
