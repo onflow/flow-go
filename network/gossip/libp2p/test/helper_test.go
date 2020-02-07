@@ -87,20 +87,20 @@ Two Subnets tests
 // one of size zero and the other one of size 1
 func (s *SubNetGeneratorTestSuite) TestOneNodeTwoSubNet() {
 	// two subnet of size 1 nodes
-	s.SingleSubNetHelper(1)
+	s.TwoSubNetHelper(1)
 }
 
 // TestOddNodesTwoSubNet evaluates CreateSubnets for creating two subnets of odd number of nodes
 // the size difference of the subsets should be one
 func (s *SubNetGeneratorTestSuite) TestOddNodesTwoSubNet() {
 	// two subnet of size 9 nodes
-	s.SingleSubNetHelper(9)
+	s.TwoSubNetHelper(9)
 }
 
 // TestEvenNodesTwoSubNet evaluates CreateSubnets for creating two subnets of even number of nodes
 func (s *SubNetGeneratorTestSuite) TestEvenNodesTwoSubNet() {
 	// two subnet of size 10 nodes
-	s.SingleSubNetHelper(10)
+	s.TwoSubNetHelper(10)
 }
 
 // TwoSubNetHelper creates two subnets of different sizes
@@ -131,6 +131,16 @@ func (s *SubNetGeneratorTestSuite) TwoSubNetHelper(nodesNum int) {
 	require.Equal(s.Suite.T(), sub2, nodesNum-nodesNum/2)
 }
 
+/*
+Multiple subnets
+*/
+// TestOneNodeMultiSubNets evaluates CreateSubnets for dividing a single node into multiple
+// subnets, the first subnet should have a single node and the rest should be empty
+func (s *SubNetGeneratorTestSuite) TestOneNodeMultiSubNet() {
+	// divides one node into 5 subnets
+	s.MultiSubNetHelper(1, 5)
+}
+
 // MultiSubNetHelper creates multiple subnets of different sizes
 // nodesNum is the total number of nodes
 // subnetNum is the total number of subnets
@@ -148,6 +158,9 @@ func (s *SubNetGeneratorTestSuite) MultiSubNetHelper(nodesNum int, subnetNum int
 			require.Fail(s.Suite.T(), fmt.Sprintf("unidentified subnet id: %d", subnets[net]))
 		} else {
 			// keeps record of size of each subnet
+			if len(subs) < subnetNum {
+				subs = append(subs, 0)
+			}
 			subs[subid]++
 		}
 	}
