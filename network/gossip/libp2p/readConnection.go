@@ -49,7 +49,7 @@ RecvLoop:
 		}
 
 		rc.log.Debug().Str("peer", rc.stream.Conn().RemotePeer().String()).
-			Bytes("sender", msg.OriginID).
+			Hex("sender", msg.OriginID).
 			Hex("eventID", msg.EventID).
 			Msg("received message")
 

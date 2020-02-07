@@ -157,14 +157,25 @@ func (t *FunctionType) String() string {
 // ReferenceType
 
 type ReferenceType struct {
-	Type     Type
-	StartPos Position
+	Authorized bool
+	Storable   bool
+	Type       Type
+	StartPos   Position
 }
 
 func (*ReferenceType) isType() {}
 
 func (t *ReferenceType) String() string {
-	return fmt.Sprintf("&%s", t.Type)
+	var builder strings.Builder
+	if t.Authorized {
+		builder.WriteString("auth ")
+	}
+	if t.Storable {
+		builder.WriteString("storable ")
+	}
+	builder.WriteRune('&')
+	builder.WriteString(t.Type.String())
+	return builder.String()
 }
 
 func (t *ReferenceType) StartPosition() Position {

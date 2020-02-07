@@ -358,7 +358,7 @@ func TestSetOwnerReference(t *testing.T) {
 	oldOwner := "1"
 	newOwner := "2"
 
-	reference := &ReferenceValue{
+	reference := &StorageReferenceValue{
 		TargetStorageIdentifier: "test-account",
 		TargetKey:               "Test",
 		Owner:                   oldOwner,
@@ -375,7 +375,7 @@ func TestSetOwnerReferenceCopy(t *testing.T) {
 	oldOwner := "1"
 	newOwner := "2"
 
-	reference := &ReferenceValue{
+	reference := &StorageReferenceValue{
 		TargetStorageIdentifier: "test-account",
 		TargetKey:               "Test",
 		Owner:                   oldOwner,
@@ -385,7 +385,7 @@ func TestSetOwnerReferenceCopy(t *testing.T) {
 
 	reference.SetOwner(newOwner)
 
-	referenceCopy := reference.Copy().(*ReferenceValue)
+	referenceCopy := reference.Copy().(*StorageReferenceValue)
 
 	assert.Equal(t, "", referenceCopy.GetOwner())
 	assert.Equal(t, newOwner, reference.GetOwner())

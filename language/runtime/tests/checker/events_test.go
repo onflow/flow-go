@@ -122,7 +122,7 @@ func TestCheckEmitEvent(t *testing.T) {
 		checker, err := ParseAndCheck(t, `
             pub event Transfer(to: Int, from: Int)
         `)
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		_, err = ParseAndCheckWithOptions(t, `
               import Transfer from "imported"
