@@ -137,6 +137,7 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	log.Level(lvl)
 
 	log.Info().Msg("initializing engine modules")
+	log.Info().Msgf("level: %s", lvl.String())
 
 	fnb.Logger = log
 }

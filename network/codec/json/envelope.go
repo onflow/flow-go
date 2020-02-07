@@ -15,6 +15,11 @@ const (
 	CodeResponse
 	CodeEcho
 
+	// ColdStuff
+	CodeColdStuffBlockProposal
+	CodeColdStuffBlockVote
+	CodeColdStuffBlockCommit
+
 	CodeCollectionGuarantee
 	CodeTransaction
 

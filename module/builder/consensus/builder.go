@@ -117,7 +117,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*fl
 
 		// get the finalized state commitment at the parent
 		var commit flow.StateCommitment
-		err = operation.RetrieveCommit(parentID, &commit)(tx)
+		err = operation.LookupCommit(parentID, &commit)(tx)
 		if err != nil {
 			return fmt.Errorf("could not get parent state commit: %w", err)
 		}

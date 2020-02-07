@@ -258,18 +258,20 @@ func checkGenesisPayload(tx *badger.Txn, payload *flow.Payload) error {
 	for _, identity := range payload.Identities {
 		roles[identity.Role]++
 	}
-	if roles[flow.RoleConsensus] < 1 {
-		return fmt.Errorf("need at least one consensus node")
-	}
-	if roles[flow.RoleCollection] < 1 {
-		return fmt.Errorf("need at least one collection node")
-	}
-	if roles[flow.RoleExecution] < 1 {
-		return fmt.Errorf("need at least one execution node")
-	}
-	if roles[flow.RoleVerification] < 1 {
-		return fmt.Errorf("need at least one verification node")
-	}
+
+	// TODO skipping for now
+	//if roles[flow.RoleConsensus] < 1 {
+	//	return fmt.Errorf("need at least one consensus node")
+	//}
+	//if roles[flow.RoleCollection] < 1 {
+	//	return fmt.Errorf("need at least one collection node")
+	//}
+	//if roles[flow.RoleExecution] < 1 {
+	//	return fmt.Errorf("need at least one execution node")
+	//}
+	//if roles[flow.RoleVerification] < 1 {
+	//	return fmt.Errorf("need at least one verification node")
+	//}
 
 	// check the one seal
 	seal := payload.Seals[0]

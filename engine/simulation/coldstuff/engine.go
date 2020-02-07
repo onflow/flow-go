@@ -58,7 +58,7 @@ func New(log zerolog.Logger, net module.Network, exp network.Engine, headers sto
 		builder:   builder,
 		cleaner:   cleaner,
 		round:     nil, // initialized for each consensus round
-		interval:  4 * time.Second,
+		interval:  5 * time.Second,
 		timeout:   1 * time.Second,
 		proposals: make(chan proposalWrap, 1),
 		votes:     make(chan voteWrap, 1),
@@ -156,6 +156,11 @@ ConsentLoop:
 			log.Error().Err(err).Msg("could not initialize round")
 			break
 		}
+
+		e.log.Info().
+			Hex("leader_id", logging.ID(e.round.Leader().NodeID)).
+			Hex("parent_id", logging.ID(e.round.Parent().ID())).
+			Msg("starting new round")
 
 		// calculate the time at which we can generate the next valid block
 		limit := e.round.Parent().Timestamp.Add(e.interval)
@@ -268,12 +273,6 @@ func (e *Engine) sendProposal() error {
 		Hex("candidate_id", logging.Entity(candidate)).
 		Logger()
 
-	// store the block proposal
-	err = e.headers.Store(candidate)
-	if err != nil {
-		return fmt.Errorf("could not store candidate: %w", err)
-	}
-
 	// cache the candidate block
 	e.round.Propose(candidate)
 
@@ -352,7 +351,11 @@ func (e *Engine) waitForVotes() error {
 			e.round.Tally(voterID, id.Stake)
 			votes := e.round.Votes()
 
-			log.Info().Uint64("vote_quorum", e.round.Quorum()).Uint64("vote_count", votes).Msg("block vote received")
+			log.Info().
+				Hex("voter_id", logging.ID(voterID)).
+				Uint64("vote_quorum", e.round.Quorum()).
+				Uint64("vote_count", votes).
+				Msg("block vote tallied")
 
 			// if we reached the quorum, continue to next step
 			if votes >= e.round.Quorum() {

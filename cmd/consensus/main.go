@@ -8,7 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
-	"github.com/dapperlabs/flow-go/engine/simulation/subzero"
+	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/builder/consensus"
 	"github.com/dapperlabs/flow-go/module/cleaner"
@@ -69,17 +69,28 @@ func main() {
 			node.MustNot(err).Msg("could not initialize propagation engine")
 			return prop
 		}).
-		Component("subzero engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing subzero consensus engine")
+		//Component("subzero engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+		//	node.Logger.Info().Msg("initializing subzero consensus engine")
+		//	headersDB := storage.NewHeaders(node.DB)
+		//	payloadsDB := storage.NewPayloads(node.DB)
+		//	guaranteesDB := storage.NewGuarantees(node.DB)
+		//	sealsDB := storage.NewSeals(node.DB)
+		//	build := consensus.NewBuilder(node.DB, node.State, guarantees, seals)
+		//	clean := cleaner.New(guaranteesDB, sealsDB, guarantees, seals)
+		//	sub, err := subzero.New(node.Logger, prov, headersDB, payloadsDB, node.State, node.Me, build, clean)
+		//	node.MustNot(err).Msg("could not initialize subzero engine")
+		//	return sub
+		//}).
+		Component("coldstuff engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
+			node.Logger.Info().Msg("initializing coldstuff")
 			headersDB := storage.NewHeaders(node.DB)
-			payloadsDB := storage.NewPayloads(node.DB)
 			guaranteesDB := storage.NewGuarantees(node.DB)
 			sealsDB := storage.NewSeals(node.DB)
 			build := consensus.NewBuilder(node.DB, node.State, guarantees, seals)
 			clean := cleaner.New(guaranteesDB, sealsDB, guarantees, seals)
-			sub, err := subzero.New(node.Logger, prov, headersDB, payloadsDB, node.State, node.Me, build, clean)
+			cold, err := coldstuff.New(node.Logger, node.Network, prop, headersDB, node.State, node.Me, build, clean)
 			node.MustNot(err).Msg("could not initialize subzero engine")
-			return sub
+			return cold
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Me)
