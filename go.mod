@@ -4,9 +4,9 @@ go 1.13
 
 require (
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
-	github.com/dapperlabs/flow-go/crypto v0.2.5-beta
-	github.com/dapperlabs/flow-go/language v0.2.5-beta
-	github.com/dapperlabs/flow-go/protobuf v0.2.5-beta
+	github.com/dapperlabs/flow-go/crypto v0.3.1
+	github.com/dapperlabs/flow-go/language v0.3.1
+	github.com/dapperlabs/flow-go/protobuf v0.3.1
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.0
 	github.com/ethereum/go-ethereum v1.9.9
@@ -43,7 +43,6 @@ require (
 	go.uber.org/atomic v1.5.1
 	golang.org/x/crypto v0.0.0-20200117160349-530e935923ad
 	golang.org/x/sys v0.0.0-20200107162124-548cf772de50 // indirect
-	golang.org/x/tools v0.0.0-20191029041327-9cc4af7d6b2c
 	google.golang.org/grpc v1.26.0
 	zombiezen.com/go/capnproto2 v2.18.0+incompatible
 )

@@ -25,7 +25,7 @@ func main() {
 		ledgerStorage    storage.Ledger
 		receiptsEng      *provider.Engine
 		executionEng     *computation.Engine
-		ingestionEng	*ingestion.Engine
+		ingestionEng     *ingestion.Engine
 		rpcConf          rpc.Config
 		err              error
 		executionState   state.ExecutionState
@@ -48,9 +48,9 @@ func main() {
 		Component("receipts engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing receipts engine")
 
-		chunkHeaders := badger.NewChunkHeaders(node.DB)
+			chunkHeaders := badger.NewChunkHeaders(node.DB)
 
-		executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
+			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
 
 			receiptsEng, err = provider.New(
 				node.Logger,
@@ -86,7 +86,6 @@ func main() {
 
 			blocks := badger.NewBlocks(node.DB)
 			collections := badger.NewCollections(node.DB)
-
 
 			ingestionEng, err = ingestion.New(
 				node.Logger,
