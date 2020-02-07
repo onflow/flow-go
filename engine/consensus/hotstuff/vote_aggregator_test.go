@@ -251,63 +251,6 @@ func TestErrDoubleVote(t *testing.T) {
 	}
 }
 
-// UNHAPPY PATH (votes with invalid view)
-// receive 7 votes in total
-// 3 of them are invalid and located every other valid vote
-// i.e., 1.valid, 2. invalid, ..., 6. valid, 7. invalid
-// no QC should be generated in the whole process
-func TestUnHappyPathForIncorporatedVotes(t *testing.T) {
-	va := newMockVoteAggregator(t)
-	testView := uint64(5)
-	block := newMockBlock(testView)
-	for i := 0; i < 7; i++ {
-		var vote *types.Vote
-		if i == 1 || i == 3 || i == 5 {
-			vote = newMockVote(testView-1, block.BlockID(), uint32(i))
-		} else {
-			vote = newMockVote(testView, block.BlockID(), uint32(i))
-		}
-		qc, err := va.StoreVoteAndBuildQC(vote, block)
-		require.NotNil(t, err)
-		require.Nil(t, qc)
-		fmt.Println(err.Error())
-	}
-}
-
-// UNHAPPY PATH
-// receive 7 votes in total
-// 1. all 7 votes are pending and invalid (cannot pass ValidatePendingVotes), no votes should be stored
-// 2. all 7 votes are pending and can pass ValidatePendingVotes, but cannot pass ValidateIncorporatedVotes
-//    when receiving the block, no vote should be moved to incorporatedVotes, and no QC should be generated
-func TestUnHappyPathForPendingVotes(t *testing.T) {
-	va := newMockVoteAggregator(t)
-	testView := uint64(5)
-	block := newMockBlock(testView)
-	// testing invalid pending votes
-	for i := 0; i < 7; i++ {
-		// signerIndex is invalid
-		vote := newMockVote(uint64(0), block.BlockID(), uint32(10))
-		err := va.StorePendingVote(vote)
-		require.NotNil(t, err)
-		fmt.Println(err.Error())
-		qc, err := va.BuildQCOnReceivingBlock(block)
-		require.Nil(t, qc)
-		require.NotNil(t, err)
-		fmt.Println(err.Error())
-	}
-	// testing valid pending votes with invalid view
-	for i := 0; i < 7; i++ {
-		// view is invalid
-		vote := newMockVote(testView-1, block.BlockID(), uint32(10))
-		err := va.StorePendingVote(vote)
-		require.Nil(t, err)
-		qc, err := va.BuildQCOnReceivingBlock(block)
-		require.Nil(t, qc)
-		require.NotNil(t, err)
-		fmt.Println(err.Error())
-	}
-}
-
 // INVALID VOTES
 // receive 4 invalid votes, and then the block, no QC should be built
 func TestInvalidVotesOnly(t *testing.T) {
