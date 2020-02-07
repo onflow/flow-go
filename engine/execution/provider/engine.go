@@ -91,6 +91,10 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 			err = e.onExecutionResult(originID, v)
 		case *messages.ExecutionStateRequest:
 			return e.onExecutionStateRequest(originID, v)
+		case *execution.ExecutionStateSyncRequest:
+			return e.onExecutionStateSyncRequest(originID, v)
+		case *execution.ExecutionStateDelta:
+			return e.onExecutionStateDelta(originID, v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
 		}
@@ -193,6 +197,37 @@ func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages
 		return fmt.Errorf("could not submit response for chunk state (id=%s): %w", chunkID, err)
 	}
 
+	return nil
+}
+
+func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *execution.ExecutionStateSyncRequest) error {
+	e.log.Info().
+		Hex("origin_id", logging.ID(originID)).
+		Hex("current_commit", req.CurrentCommit).
+		Hex("target_commit", req.TargetCommit).
+		Msg("received execution state synchronization request")
+
+	id, err := e.state.Final().Identity(originID)
+	if err != nil {
+		return fmt.Errorf("invalid origin id (%s): %w", id, err)
+	}
+
+	if id.Role != flow.RoleExecution {
+		return fmt.Errorf("invalid role for requesting state synchronization: %s", id.Role)
+	}
+
+	// TODO: load delta range from storage
+	// - case 1: we have complete range
+	// - case 2: we are missing start of range
+	// - case 3: we are missing end of range
+	// reply with each delta as separate message
+
+	return nil
+}
+
+func (e *Engine) onExecutionStateDelta(originID flow.Identifier, req *execution.ExecutionStateDelta) error {
+	// TODO: apply delta to store
+	// Does this belong in this engine? Does it matter if we are removing the engines anyways?
 	return nil
 }
 

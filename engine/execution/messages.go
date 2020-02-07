@@ -39,3 +39,13 @@ func (b *CompleteBlock) Collections() []*CompleteCollection {
 
 	return collections
 }
+
+type ExecutionStateSyncRequest struct {
+	CurrentCommit flow.StateCommitment
+	TargetCommit  flow.StateCommitment
+}
+
+type ExecutionStateDelta struct {
+	Commit flow.StateCommitment
+	Delta  state.Delta
+}
