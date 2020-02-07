@@ -37,19 +37,15 @@ func (sk *PrKeyECDSA) signHash(h Hash) (Signature, error) {
 	Nlen := bitsToBytes((sk.alg.curve.Params().N).BitLen())
 	signature := make([]byte, 2*Nlen)
 	// pad the signature with zeroes
-	i := 0
-	for ; i < Nlen-len(rBytes); i++ {
-		signature[i] = 0
-	}
-	i += copy(signature[i:], rBytes)
-	for ; i < 2*Nlen-len(sBytes); i++ {
-		signature[i] = 0
-	}
-	copy(signature[i:], sBytes)
+	copy(signature[Nlen-len(rBytes):], rBytes)
+	copy(signature[2*Nlen-len(sBytes):], sBytes)
 	return signature, nil
 }
 
 // Sign signs an array of bytes
+// This function does not modify the private key, even temporarily
+// For most of the hashers (including sha2 and sha3), the input alg
+// is modified temporarily
 func (sk *PrKeyECDSA) Sign(data []byte, alg Hasher) (Signature, error) {
 	if alg == nil {
 		return nil, cryptoError{"Sign requires a Hasher"}
@@ -69,6 +65,9 @@ func (pk *PubKeyECDSA) verifyHash(sig Signature, h Hash) (bool, error) {
 }
 
 // Verify verifies a signature of a byte array
+// This function does not modify the public key, even temporarily
+// For most of the hashers (including sha2 and sha3), the input alg
+// is modified temporarily
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg Hasher) (bool, error) {
 	if alg == nil {
 		return false, cryptoError{"Verify requires a Hasher"}
@@ -193,11 +192,7 @@ func (sk *PrKeyECDSA) rawEncode() ([]byte, error) {
 	Nlen := bitsToBytes((sk.alg.curve.Params().N).BitLen())
 	skEncoded := make([]byte, Nlen)
 	// pad sk with zeroes
-	i := 0
-	for ; i < Nlen-len(skBytes); i++ {
-		skEncoded[i] = 0
-	}
-	copy(skEncoded[i:], skBytes)
+	copy(skEncoded[Nlen-len(skBytes):], skBytes)
 	return skEncoded, nil
 }
 
@@ -241,15 +236,8 @@ func (pk *PubKeyECDSA) rawEncode() ([]byte, error) {
 	Plen := bitsToBytes((pk.alg.curve.Params().P).BitLen())
 	pkEncoded := make([]byte, 2*Plen)
 	// pad the public key coordinates with zeroes
-	i := 0
-	for ; i < Plen-len(xBytes); i++ {
-		pkEncoded[i] = 0
-	}
-	i += copy(pkEncoded[i:], xBytes)
-	for ; i < 2*Plen-len(yBytes); i++ {
-		pkEncoded[i] = 0
-	}
-	copy(pkEncoded[i:], yBytes)
+	copy(pkEncoded[Plen-len(xBytes):], xBytes)
+	copy(pkEncoded[2*Plen-len(yBytes):], yBytes)
 	return pkEncoded, nil
 }
 

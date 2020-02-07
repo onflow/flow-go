@@ -19,14 +19,22 @@ var storageValueDeclaration = stdlib.StandardLibraryValue{
 	IsConstant: true,
 }
 
+var storageValueDeclarations map[string]sema.ValueDeclaration
+
+func init() {
+	storageValueDeclarations = stdlib.StandardLibraryFunctions{
+		stdlib.PanicFunction,
+	}.ToValueDeclarations()
+
+	storageValueDeclarations["storage"] = storageValueDeclaration
+}
+
 func ParseAndCheckStorage(t *testing.T, code string) (*sema.Checker, error) {
 	return ParseAndCheckWithOptions(t,
 		code,
 		ParseAndCheckOptions{
 			Options: []sema.Option{
-				sema.WithPredeclaredValues(map[string]sema.ValueDeclaration{
-					"storage": storageValueDeclaration,
-				}),
+				sema.WithPredeclaredValues(storageValueDeclarations),
 			},
 		},
 	)
@@ -149,7 +157,7 @@ func TestCheckStorageIndexingAssignment(t *testing.T) {
               resource R {}
 
               fun test() {
-                  storage[&R] = &storage[R] as R
+                  storage[&R] = &storage[R] as &R
               }
             `,
 		)

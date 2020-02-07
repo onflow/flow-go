@@ -165,7 +165,7 @@ func (checker *Checker) EnsureLoaded(location ast.Location, loadProgram func() *
 			WithPredeclaredValues(checker.PredeclaredValues),
 			WithPredeclaredTypes(checker.PredeclaredTypes),
 			WithAccessCheckMode(checker.accessCheckMode),
-			WithValidTopLevelDeclarations(checker.validTopLevelDeclarations),
+			WithValidTopLevelDeclarationsHandler(checker.validTopLevelDeclarationsHandler),
 			WithAllCheckers(checker.allCheckers),
 		)
 		if err == nil {

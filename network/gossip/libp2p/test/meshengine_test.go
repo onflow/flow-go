@@ -8,33 +8,48 @@ import (
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	gologging "github.com/whyrusleeping/go-logging"
 
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 )
 
-// MesgNetTestSuite evaluates the message delivery functionality for the overlay
+// MeshNetTestSuite evaluates the message delivery functionality for the overlay
 // of engines over a complete graph
 type MeshNetTestSuite struct {
-	StubEngineTestSuite
+	suite.Suite
+	nets []*libp2p.Network    // used to keep track of the networks
+	mws  []*libp2p.Middleware // used to keep track of the middlewares associated with networks
+	ids  flow.IdentityList    // used to keep track of the identifiers associated with networks
 }
 
+// TestMeshNetTestSuite runs all tests in this test suit
 func TestMeshNetTestSuite(t *testing.T) {
 	suite.Run(t, new(MeshNetTestSuite))
 }
 
+// SetupTest is executed prior to each test in this test suit
+// it creates and initializes a set of network instances
 func (m *MeshNetTestSuite) SetupTest() {
-	const count = 10 // defines total number of nodes in our network
-	golog.SetAllLoggers(gologging.INFO)
-	m.ids = m.createIDs(count)
-	m.mws = m.createMiddleware(m.ids)
-	m.nets = m.createNetworks(m.mws, m.ids)
+	// defines total number of nodes in our network
+	const count = 25
+	const cashSize = 100
+	//golog.SetAllLoggers(gologging.INFO)
 
-	// waits for node to find each other
+	m.ids = CreateIDs(count)
+
+	mws, err := CreateMiddleware(m.ids)
+	require.NoError(m.Suite.T(), err)
+	m.mws = mws
+
+	nets, err := CreateNetworks(m.mws, m.ids, cashSize, false)
+	require.NoError(m.Suite.T(), err)
+	m.nets = nets
+
+	// allows nodes to find each other
 	time.Sleep(5 * time.Second)
 }
 
@@ -42,13 +57,10 @@ func (m *MeshNetTestSuite) SetupTest() {
 // each engine x then sends a "hello from node x" to other engines
 // it evaluates the correctness of message delivery as well as content of the message
 func (m *MeshNetTestSuite) TestAllToAll() {
-	m.Suite.T().Skip("skips the test due to inconsistent results. Requires peer discovery.")
 	// creating engines
 	count := len(m.nets)
 	engs := make([]*MeshEngine, 0)
 	wg := sync.WaitGroup{}
-
-	//time.Sleep(time.Second * 5)
 
 	// log[i][j] keeps the message that node i sends to node j
 	log := make(map[int][]string)
@@ -58,8 +70,6 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 		log[i] = make([]string, 0)
 	}
 
-	//time.Sleep(time.Second * 5)
-
 	// Each node broadcasting a message to all others
 	for i := range m.nets {
 		event := &message.Echo{
@@ -68,8 +78,6 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 		require.NoError(m.Suite.T(), engs[i].con.Submit(event, m.ids.NodeIDs()...))
 		wg.Add(count - 1)
 	}
-
-	//time.Sleep(time.Second * 5)
 
 	// fires a goroutine for each engine that listens to incoming messages
 	for i := range m.nets {
