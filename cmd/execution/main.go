@@ -25,6 +25,7 @@ func main() {
 		ledgerStorage    storage.Ledger
 		receiptsEng      *provider.Engine
 		executionEng     *execution.Engine
+		ingestionEng	*ingestion.Engine
 		rpcConf          rpc.Config
 		err              error
 		executionState   state.ExecutionState
@@ -87,7 +88,7 @@ func main() {
 			collections := badger.NewCollections(node.DB)
 
 
-			ingestionEng, err := ingestion.New(
+			ingestionEng, err = ingestion.New(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -104,7 +105,7 @@ func main() {
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing gRPC server")
 
-			rpcEng := rpc.New(node.Logger, rpcConf, executionEng)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng)
 			return rpcEng
 		}).Run()
 

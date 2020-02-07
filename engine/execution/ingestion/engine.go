@@ -8,6 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
+	executionexecution "github.com/dapperlabs/flow-go/engine/execution/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -30,12 +31,12 @@ type Engine struct {
 	collectionConduit network.Conduit
 	blocks            storage.Blocks
 	collections       storage.Collections
-	execution         network.Engine
+	execution         executionexecution.ExecutionEngine
 	mempool           *Mempool
-	execState 			state.ExecutionState
+	execState         state.ExecutionState
 }
 
-func New(logger zerolog.Logger, net module.Network, me module.Local, state protocol.State, blocks storage.Blocks, collections storage.Collections, executionEngine network.Engine, execState state.ExecutionState) (*Engine, error) {
+func New(logger zerolog.Logger, net module.Network, me module.Local, state protocol.State, blocks storage.Blocks, collections storage.Collections, executionEngine executionexecution.ExecutionEngine, execState state.ExecutionState) (*Engine, error) {
 	log := logger.With().Str("engine", "blocks").Logger()
 
 	mempool, err := newMempool()
@@ -52,7 +53,7 @@ func New(logger zerolog.Logger, net module.Network, me module.Local, state proto
 		collections: collections,
 		execution:   executionEngine,
 		mempool:     mempool,
-		execState: execState,
+		execState:   execState,
 	}
 
 	con, err := net.Register(engine.BlockProvider, &eng)
@@ -243,6 +244,24 @@ func (e *Engine) sendExecutionOrder(completeBlock *execution.CompleteBlock) {
 		Block: completeBlock,
 		View:  view,
 	})
+}
+
+func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
+
+	//TODO: replace with latest sealed block
+	block, err := e.state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest block: %w", err)
+	}
+
+	stateCommit, err := e.execState.StateCommitmentByBlockID(block.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get latest block state commitment: %w", err)
+	}
+
+	blockView := e.execState.NewView(stateCommit)
+
+	return e.execution.ExecuteScript(script, block, blockView)
 }
 
 func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse) error {

@@ -6,6 +6,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/language"
+	"github.com/dapperlabs/flow-go/language/encoding"
+
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
@@ -17,6 +20,11 @@ import (
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
+
+type ExecutionEngine interface {
+	network.Engine
+	ExecuteScript([]byte, *flow.Header, *state.View) ([]byte, error)
+}
 
 // Engine manages execution of transactions.
 type Engine struct {
@@ -58,7 +66,6 @@ func New(
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register execution engine")
 	}
-
 
 	return &e, nil
 }
@@ -105,42 +112,28 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
-func (e *Engine) ExecuteScript(script []byte) ([]byte, error) {
-	// TODO: replace with latest sealed block
-	//block, err := e.protoState.Final().Head()
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to get latest block: %w", err)
-	//}
-	//
-	//stateCommit, err := e.execState.StateCommitmentByBlockID(block.ID())
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to get latest block state commitment: %w", err)
-	//}
-	//
-	//blockView := e.execState.NewView(stateCommit)
-	//
-	//result, err := e.vm.NewBlockContext(block).ExecuteScript(blockView, script)
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
-	//}
-	//
-	//if !result.Succeeded() {
-	//	return nil, fmt.Errorf("failed to execute script: %w", result.Error)
-	//}
-	//
-	//value, err := values.ConvertValue(result.Value)
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to export runtime value: %w", err)
-	//}
-	//
-	//encodedValue, err := encoding.Encode(value)
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to encode runtime value: %w", err)
-	//}
-	//
-	//return encodedValue, nil
+func (e *Engine) ExecuteScript(script []byte, blockHeader *flow.Header, view *state.View) ([]byte, error) {
 
-	return nil, nil
+	result, err := e.vm.NewBlockContext(blockHeader).ExecuteScript(view, script)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute script (internal error): %w", err)
+	}
+
+	if !result.Succeeded() {
+		return nil, fmt.Errorf("failed to execute script: %w", result.Error)
+	}
+
+	value, err := language.ConvertValue(result.Value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to export runtime value: %w", err)
+	}
+
+	encodedValue, err := encoding.Encode(value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
+	}
+
+	return encodedValue, nil
 }
 
 // process processes events for the execution engine on the execution node.
@@ -184,4 +177,3 @@ func (e *Engine) onCompleteBlock(originID flow.Identifier, block *execution.Comp
 
 	return nil
 }
-
