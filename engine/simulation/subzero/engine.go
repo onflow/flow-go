@@ -175,22 +175,25 @@ func (e *Engine) createProposal() (*flow.Header, error) {
 		return nil, fmt.Errorf("could not get parent: %w", err)
 	}
 
+	// define the block header build function
+	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
+		header := flow.Header{
+			Number:      parent.Number + 1,
+			Timestamp:   time.Now().UTC(),
+			ParentID:    parent.ID(),
+			PayloadHash: payloadHash,
+			ProposerID:  e.me.NodeID(),
+		}
+		return &header, nil
+	}
+
 	// create the proposal payload on top of the parent
-	payloadHash, err := e.builder.BuildOn(parent.ID())
+	proposal, err := e.builder.BuildOn(parent.ID(), build)
 	if err != nil {
 		return nil, fmt.Errorf("could not create block: %w", err)
 	}
 
-	// create the proposal
-	proposal := flow.Header{
-		Number:      parent.Number + 1,
-		Timestamp:   time.Now().UTC(),
-		ParentID:    parent.ID(),
-		PayloadHash: payloadHash,
-		ProposerID:  e.me.NodeID(),
-	}
-
-	return &proposal, nil
+	return proposal, nil
 }
 
 // commitProposal will insert the block into our local block database, then it
