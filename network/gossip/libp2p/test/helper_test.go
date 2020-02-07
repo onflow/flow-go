@@ -138,25 +138,18 @@ func (s *SubNetGeneratorTestSuite) TwoSubNetHelper(nodesNum int) {
 /*
 Multiple subnets
 */
-// TestOneNodeMultiSubNets evaluates CreateSubnets for dividing a single node into multiple
-// subnets, the first subnet should have a single node and the rest should be empty
-func (s *SubNetGeneratorTestSuite) TestOneNodeMultiSubNet() {
-	// divides one node into 5 subnets
-	s.MultiSubNetHelper(1, 5)
-}
-
-// TestTwoNodesMultiSubNets evaluates CreateSubnets for dividing a two nodes into multiple
-// subnets, the first two subnet should have a single node and the rest should be empty
-func (s *SubNetGeneratorTestSuite) TestTwoNodeMultiSubNet() {
-	// divides two nodes into 5 subnets
-	s.MultiSubNetHelper(2, 5)
-}
 
 // TestMultiNodeMultiSubNet evaluates CreateSubnets for dividing some nodes into same
 // number of subnets, which should make all subnets receive at least one node
 func (s *SubNetGeneratorTestSuite) TestMultiNodeMultiSubNet() {
-	// divides two nodes into 5 subnets
+	// divides 5 nodes into 5 subnets
 	s.MultiSubNetHelper(5, 5)
+}
+
+// TestDoubleNodeMultiSubNet evaluates CreateSubnets for dividing double nodes into subnets
+func (s *SubNetGeneratorTestSuite) TestDoubleNodeMultiSubNet() {
+	// divides 10 nodes into 5 subnets
+	s.MultiSubNetHelper(10, 5)
 }
 
 // MultiSubNetHelper creates multiple subnets of different sizes
@@ -182,23 +175,6 @@ func (s *SubNetGeneratorTestSuite) MultiSubNetHelper(nodesNum int, subnetNum int
 
 	// evaluates size of each subnet
 	for i := range subs {
-		if nodesNum < subnetNum {
-			// nodes are less than subnets
-			if i == 0 {
-				// except the last subnet, all should have an equal number of the nodes
-				require.Equal(s.Suite.T(), subs[i], nodesNum)
-			} else {
-				// all other subnets should be empty
-				require.Equal(s.Suite.T(), subs[i], 0)
-			}
-		} else {
-			// nodes are more than subnets
-			if i < len(subs)-1 {
-				require.Equal(s.Suite.T(), subs[i], nodesNum/subnetNum)
-			} else {
-				// covers the odd number of nodes for last subnet
-				require.Equal(s.Suite.T(), subs[i], nodesNum-(nodesNum/subnetNum)*(len(subs)-1))
-			}
-		}
+		require.Equal(s.Suite.T(), subs[i], nodesNum/subnetNum)
 	}
 }

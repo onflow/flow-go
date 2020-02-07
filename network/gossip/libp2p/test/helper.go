@@ -14,6 +14,10 @@ import (
 )
 
 func CreateSubnets(nodesNum, subnetNum int) (map[*libp2p.Network]int, error) {
+	if nodesNum < subnetNum || nodesNum%subnetNum != 0 {
+		return nil, fmt.Errorf("number of subnets should divide number of nodes")
+	}
+
 	// creates network instances
 	ids := CreateIDs(nodesNum)
 	mws, err := CreateMiddleware(ids)
