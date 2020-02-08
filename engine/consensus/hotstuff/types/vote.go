@@ -7,9 +7,10 @@ import (
 )
 
 type Vote struct {
+	// TODO remove View from Vote
 	View      uint64
 	BlockID   flow.Identifier
-	Signature *flow.PartialSignature
+	Signature *Signature
 }
 
 func (uv *Vote) BytesForSig() []byte {

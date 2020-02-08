@@ -9,7 +9,7 @@ import (
 // TODO: type BlockHeader flow.Header
 type BlockHeader BlockProposal
 
-func NewBlockHeader(block *Block, sig *flow.PartialSignature) *BlockHeader {
+func NewBlockHeader(block *Block, sig *Signature) *BlockHeader {
 	return &BlockHeader{
 		Block:     block,
 		Signature: sig,

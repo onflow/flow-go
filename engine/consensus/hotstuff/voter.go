@@ -1,8 +1,6 @@
 package hotstuff
 
 import (
-	"fmt"
-
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
@@ -65,12 +63,8 @@ func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*
 }
 
 func (v *Voter) produceVote(bp *types.BlockProposal) (*types.Vote, error) {
-	myIndexedPubKey, err := v.viewState.GetSelfIndexPubKeyForBlockID(bp.BlockID())
-	if err != nil {
-		return nil, fmt.Errorf("can not find self index for block %v: %w", bp.BlockID(), err)
-	}
 	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.BlockID())
-	sig := v.signer.SignVote(unsignedVote, myIndexedPubKey.PubKey)
+	sig := v.signer.SignVote(unsignedVote)
 	vote := unsignedVote.WithSignature(sig)
 	return vote, nil
 }
