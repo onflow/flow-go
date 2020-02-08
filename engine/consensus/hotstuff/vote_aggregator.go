@@ -16,6 +16,9 @@ type VoteAggregator struct {
 // block is currently missing.
 // Note: Validations on these pending votes will be postponded until the block has been received.
 func (va *VoteAggregator) StorePendingVote(v *types.Vote) {
+	_ = va.pendingVotes // suppress warnings
+	_ = va.createdQC
+	_ = va.viewState
 	panic("TODO")
 }
 

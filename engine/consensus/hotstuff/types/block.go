@@ -8,6 +8,7 @@ import (
 
 type Block struct {
 	// specified
+	BlockID     flow.Identifier
 	View        uint64
 	QC          *QuorumCertificate
 	PayloadHash []byte
@@ -20,15 +21,12 @@ type Block struct {
 	Timestamp time.Time
 }
 
-func (b *Block) ID() flow.Identifier {
-	panic("TODO")
-}
-
-func NewBlock(view uint64, qc *QuorumCertificate, payloadHash []byte, height uint64, chainID string) *Block {
+func NewBlock(blockID flow.Identifier, view uint64, qc *QuorumCertificate, payloadHash []byte, height uint64, chainID string) *Block {
 
 	t := time.Now()
 
 	return &Block{
+		BlockID:     blockID,
 		View:        view,
 		QC:          qc,
 		PayloadHash: payloadHash,

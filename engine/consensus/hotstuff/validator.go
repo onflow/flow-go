@@ -16,6 +16,7 @@ type Validator struct {
 // ValidateQC validates the QC
 // It doesn't validate the block that this QC is pointing to
 func (v *Validator) ValidateQC(qc *types.QuorumCertificate) error {
+	_ = v.viewState // suppress unused warning
 	panic("TODO")
 }
 
