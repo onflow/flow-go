@@ -2,7 +2,7 @@ package hotstuff
 
 import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 
-// PendingStatus keeps track of pending votes
+// PendingStatus keeps track of pending votes for the same block
 type PendingStatus struct {
 	// When receiving missing block, first received votes will be accumulated
 	orderedVotes []*types.Vote

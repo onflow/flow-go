@@ -7,24 +7,25 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
+// VotingStatus keeps track of incorporated votes for the same block
 type VotingStatus struct {
-	blockMRH         flow.Identifier
+	blockID          flow.Identifier
 	signerCount      uint32
 	view             uint64
 	thresholdStake   uint64
 	accumulatedStake uint64
-	voteSender       *flow.Identity
+	voter            *flow.Identity
 	// assume votes are all valid to build QC
 	votes map[string]*types.Vote
 }
 
-func NewVotingStatus(thresholdStake uint64, view uint64, signerCount uint32, voteSender *flow.Identity, blockMRH flow.Identifier) *VotingStatus {
+func NewVotingStatus(thresholdStake uint64, view uint64, signerCount uint32, voter *flow.Identity, blockID flow.Identifier) *VotingStatus {
 	return &VotingStatus{
 		thresholdStake: thresholdStake,
 		view:           view,
 		signerCount:    signerCount,
-		voteSender:     voteSender,
-		blockMRH:       blockMRH,
+		voter:          voter,
+		blockID:        blockID,
 		votes:          map[string]*types.Vote{},
 	}
 }
@@ -37,7 +38,7 @@ func (vs *VotingStatus) AddVote(vote *types.Vote) {
 		return
 	}
 	vs.votes[vote.ID().String()] = vote
-	vs.accumulatedStake += vs.voteSender.Stake
+	vs.accumulatedStake += vs.voter.Stake
 }
 
 func (vs *VotingStatus) CanBuildQC() bool {
@@ -45,10 +46,10 @@ func (vs *VotingStatus) CanBuildQC() bool {
 }
 
 func (vs *VotingStatus) BlockID() flow.Identifier {
-	return vs.blockMRH
+	return vs.blockID
 }
 
-func (vs *VotingStatus) tryBuildQC() (*types.QuorumCertificate, error) {
+func (vs *VotingStatus) TryBuildQC() (*types.QuorumCertificate, error) {
 	sigs := vs.getSigsSliceFromVotes()
 	if !vs.CanBuildQC() {
 		return nil, fmt.Errorf("could not build QC: %w", types.ErrInsufficientVotes{})

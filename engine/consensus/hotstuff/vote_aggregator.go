@@ -148,12 +148,12 @@ func (va *VoteAggregator) convertPendingVotes(pendingVotes []*types.Vote, bp *ty
 			va.log.Warn().Msg("invalid vote found")
 			continue
 		}
-		// if threshold is reached, the rest of the votes can be deleted
+		// if threshold is reached, the rest of the votes can be ignored
 		if voteStatus.CanBuildQC() {
-			delete(va.pendingVoteMap, bp.BlockID().String())
-			return
+			break
 		}
 	}
+	delete(va.pendingVoteMap, bp.BlockID().String())
 }
 
 // PruneByView will delete all votes equal or below to the given view, as well as related indexes.
@@ -221,12 +221,12 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 }
 
 func (va *VoteAggregator) tryBuildQC(votingStatus *VotingStatus) (*types.QuorumCertificate, error) {
-	qc, err := votingStatus.tryBuildQC()
+	qc, err := votingStatus.TryBuildQC()
 	if err != nil {
 		return nil, err
 	}
 
-	va.createdQC[votingStatus.blockMRH.String()] = qc
+	va.createdQC[votingStatus.BlockID().String()] = qc
 	va.log.Info().Msg("new QC created")
 	return qc, nil
 }
