@@ -2,7 +2,6 @@ package signature
 
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // SigVerifier provides functions to verify single signature and aggregated signature.
@@ -14,7 +13,7 @@ type SigVerifier interface {
 	// The signer index in the signature and the blockID determines the public key, which will
 	// be used to verify the signature.
 	// blockID also determines the group public key to verify threshold signature.
-	VerifySig(sig *flow.PartialSignature, message types.VoteBytes, blockID flow.Identifier) (bool, error)
+	VerifySig(sig *types.Signature, message types.VoteBytes) (bool, error)
 
 	// VerifyAggregatedSig verifies the aggregated signature.
 	// VerifyAggregatedSig checks if the given aggregated signature is aggregated from signatures
@@ -25,5 +24,5 @@ type SigVerifier interface {
 	// Note: blockID is needed when the aggregated signature contains threshold signature, in which case
 	// the blockID is needed to find the group public key.
 	// The group public key is needed to verify threshold signature.
-	VerifyAggregatedSig(aggsig *flow.AggregatedSignature, message types.VoteBytes, blockID flow.Identifier) (bool, error)
+	VerifyAggregatedSig(aggsig *types.AggregatedSignature, message types.VoteBytes) (bool, error)
 }

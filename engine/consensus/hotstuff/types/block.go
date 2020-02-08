@@ -41,14 +41,17 @@ func (b *Block) ToVote() *UnsignedVote {
 }
 
 // BlockFromFlowHeader converts a flow header to the corresponding internal
-// HotStuff block
-func BlockFromFlowHeader(header *flow.Header) *Block {
+// HotStuff block.
+// header - the block header to convert from.
+// aggSig - the aggregated signature that contains the identities of all the signers.
+// it is looked up by the chain compliance layer
+func BlockFromFlowHeader(header *flow.Header, aggSig *AggregatedSignature) *Block {
 	return &Block{
 		View: header.View,
 		QC: &QuorumCertificate{
 			View:                header.ParentView,
 			BlockID:             header.ParentID,
-			AggregatedSignature: header.ParentSig,
+			AggregatedSignature: aggSig,
 		},
 		PayloadHash: header.PayloadHash[:],
 		Height:      header.Number,

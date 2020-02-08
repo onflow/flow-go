@@ -19,9 +19,11 @@ func NewBlockHeader(block *Block, sig *Signature) *BlockHeader {
 // BlockHeaderFromFlow converts a flow header to the corresponding internal
 // HotStuff block proposal.
 // header - the block header
-// sig - the signature and identity that queried by chain compliance layer
-func BlockHeaderFromFlow(header *flow.Header, sig *Signature) *BlockHeader {
-	block := BlockFromFlowHeader(header)
+// sig - the signature and identity of the signer, looked up by chain compliance layer
+// aggSig - the aggregated signature on the QC and the identities of all the signers, looked up by
+// chain compliance layer
+func BlockHeaderFromFlow(header *flow.Header, sig *Signature, aggSig *AggregatedSignature) *BlockHeader {
+	block := BlockFromFlowHeader(header, aggSig)
 	return NewBlockHeader(block, sig)
 }
 

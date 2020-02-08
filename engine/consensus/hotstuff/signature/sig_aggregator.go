@@ -2,7 +2,6 @@ package signature
 
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
-	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // SigAggregator is a stateful component to aggregate signatures into aggregated signatures.
@@ -18,5 +17,5 @@ type SigAggregator interface {
 	// to be added is invalid.
 	// sig - the vote signature to be aggregated
 	// pubkey - the public key of the signer
-	AddSig(sig *flow.PartialSignature, pubkey types.PubKey) (*flow.AggregatedSignature, error)
+	AddSig(sig *types.Signature) (*types.AggregatedSignature, error)
 }
