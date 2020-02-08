@@ -3,7 +3,6 @@ package test
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -25,18 +24,18 @@ func (s *SubNetGeneratorTestSuite) SetupTest() {
 
 }
 
-func (s *SubNetGeneratorTestSuite) TearDownTest() {
-	for _, net := range s.nets {
-		select {
-		// closes the network
-		case <-net.Done():
-			continue
-		case <-time.After(1 * time.Second):
-			s.Suite.Fail("could not stop the network")
-		}
-	}
-	fmt.Println("tests tear down")
-}
+//func (s *SubNetGeneratorTestSuite) TearDownTest() {
+//	for _, net := range s.nets {
+//		select {
+//		// closes the network
+//		case <-net.Done():
+//			continue
+//		case <-time.After(1 * time.Second):
+//			s.Suite.Fail("could not stop the network")
+//		}
+//	}
+//	fmt.Println("tests tear down")
+//}
 
 /*
 Single Subnet tests
@@ -45,31 +44,19 @@ Single Subnet tests
 // TestOneNodeOneSubNet evaluates CreateSubnets for creating a single subnet of one node
 func (s *SubNetGeneratorTestSuite) TestOneNodeOneSubNet() {
 	// single subnet of size 1 nodes
-	s.SingleSubNetHelper(1)
+	s.SubNetSizeTestHelper(1, 1)
 }
 
 // TestTwoNodeOneSubNet evaluates CreateSubnets for creating a single subnet of two nodes
 func (s *SubNetGeneratorTestSuite) TestTwoNodesOneSubNet() {
 	// single subnet of size 2 nodes
-	s.SingleSubNetHelper(2)
+	s.SubNetSizeTestHelper(2, 1)
 }
 
 // TestMultiNodeOneSubNet evaluates CreateSubnets for a single subnet of multiple nodes
 func (s *SubNetGeneratorTestSuite) TestMultiNodesOneSubNet() {
 	// single subnet of size 10 nodes
-	s.SingleSubNetHelper(10)
-}
-
-// SingleSubNetHelper creates single subnets of different sizes
-// nodesNum is the total number of nodes
-func (s *SubNetGeneratorTestSuite) SingleSubNetHelper(nodesNum int) {
-	subnets, err := CreateSubnets(nodesNum, 1)
-	require.NoError(s.Suite.T(), err)
-	require.Len(s.Suite.T(), subnets, nodesNum)
-	for net := range subnets {
-		// all net instances should belong to subnet zero
-		require.Equal(s.Suite.T(), subnets[net], 0)
-	}
+	s.SubNetSizeTestHelper(10, 1)
 }
 
 /*
@@ -79,45 +66,13 @@ Two Subnets tests
 // TestTwoNodesTwoSubNet evaluates CreateSubnets for creating two subnets of two nodes
 func (s *SubNetGeneratorTestSuite) TestTwoNodesTwoSubNet() {
 	// 2 subsets of size 2
-	s.TwoSubNetHelper(2)
+	s.SubNetSizeTestHelper(2, 2)
 }
 
 // TestTenNodesTwoSubNet evaluates CreateSubnets for creating two subnets of 10 nodes
 func (s *SubNetGeneratorTestSuite) TestTenNodesTwoSubNet() {
 	// two subnet 10 nodes
-	s.TwoSubNetHelper(10)
-}
-
-// TwoSubNetHelper creates two subnets of different sizes
-// nodesNum is the total number of nodes
-func (s *SubNetGeneratorTestSuite) TwoSubNetHelper(nodesNum int) {
-	subnets, err := CreateSubnets(nodesNum, 2)
-	require.NoError(s.Suite.T(), err)
-	require.Len(s.Suite.T(), subnets, nodesNum)
-
-	// keeps size of subnets
-	sub1 := 0
-	sub2 := 0
-
-	for net := range subnets {
-		// all net instances should belong to either subnet zero or one
-		if subnets[net] == 0 {
-			sub1++
-		} else if subnets[net] == 1 {
-			sub2++
-		} else {
-			require.Fail(s.Suite.T(), fmt.Sprintf("unidentified subnet id: %d", subnets[net]))
-		}
-	}
-
-	// evaluates size of each subnet
-	if nodesNum < 2 {
-		require.Equal(s.Suite.T(), sub1, nodesNum)
-	} else {
-		require.Equal(s.Suite.T(), sub1, nodesNum/2)
-		// to cover odd number of nodes
-		require.Equal(s.Suite.T(), sub2, nodesNum-nodesNum/2)
-	}
+	s.SubNetSizeTestHelper(10, 2)
 }
 
 /*
@@ -128,38 +83,26 @@ Multiple subnets
 // number of subnets, which should make all subnets receive at least one node
 func (s *SubNetGeneratorTestSuite) TestMultiNodeMultiSubNet() {
 	// divides 5 nodes into 5 subnets
-	s.MultiSubNetHelper(5, 5)
+	s.SubNetSizeTestHelper(5, 5)
 }
 
 // TestDoubleNodeMultiSubNet evaluates CreateSubnets for dividing double nodes into subnets
 func (s *SubNetGeneratorTestSuite) TestDoubleNodeMultiSubNet() {
 	// divides 10 nodes into 5 subnets
-	s.MultiSubNetHelper(10, 5)
+	s.SubNetSizeTestHelper(10, 5)
 }
 
-// MultiSubNetHelper creates multiple subnets of different sizes
-// nodesNum is the total number of nodes
-// subnetNum is the total number of subnets
-func (s *SubNetGeneratorTestSuite) MultiSubNetHelper(nodesNum int, subnetNum int) {
-	subnets, err := CreateSubnets(nodesNum, subnetNum)
+// SubNetSizeTestHelper creates subnets of different sizes
+// and validates their correct correction
+func (s *SubNetGeneratorTestSuite) SubNetSizeTestHelper(nodesNum, subsNum int) {
+	subnets, err := CreateSubnets(nodesNum, subsNum)
 	require.NoError(s.Suite.T(), err)
-	require.Len(s.Suite.T(), subnets, nodesNum)
 
-	// keeps size of subnets
-	subs := make([]int, subnetNum)
-
-	for net, subid := range subnets {
-		// all net should have a subnet id between 0 to subnetNum - 1
-		if subid < 0 || subid >= subnetNum {
-			require.Fail(s.Suite.T(), fmt.Sprintf("unidentified subnet id: %d", subnets[net]))
-		} else {
-			// keeps record of size of each subnets
-			subs[subid]++
+	for subnetID := range subnets {
+		// all net instances should belong to either subnet zero or one
+		if subnetID < 0 || subnetID >= nodesNum {
+			require.Fail(s.Suite.T(), fmt.Sprintf("unidentified subnet id: %d", subnetID))
 		}
-	}
-
-	// evaluates size of each subnet
-	for i := range subs {
-		require.Equal(s.Suite.T(), subs[i], nodesNum/subnetNum)
+		require.Equal(s.Suite.T(), len(subnets[subnetID]), nodesNum/subsNum)
 	}
 }

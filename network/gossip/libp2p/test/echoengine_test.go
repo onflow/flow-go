@@ -39,7 +39,7 @@ func (s *StubEngineTestSuite) SetupTest() {
 	require.NoError(s.Suite.T(), err)
 	s.mws = mws
 
-	nets, err := CreateNetworks(s.mws, s.ids, 100, false)
+	nets, _, err := CreateNetworks(s.mws, s.ids, 100, false)
 	require.NoError(s.Suite.T(), err)
 	s.nets = nets
 }

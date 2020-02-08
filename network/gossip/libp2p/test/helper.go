@@ -2,7 +2,6 @@ package test
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -13,49 +12,74 @@ import (
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
-func CreateSubnets(nodesNum, subnetNum int) (map[*libp2p.Network]int, error) {
+func CreateSubnets(nodesNum, subnetNum int) (map[int][]*flow.Identity, error) {
 	if nodesNum < subnetNum || nodesNum%subnetNum != 0 {
 		return nil, fmt.Errorf("number of subnets should divide number of nodes")
 	}
 
 	// creates network instances
 	ids := CreateIDs(nodesNum)
-	mws, err := CreateMiddleware(ids)
-	if err != nil {
-		return nil, err
-	}
-
-	nets, err := CreateNetworks(mws, ids, nodesNum, false)
-	if err != nil {
-		return nil, err
-	}
-	// allows nodes to find each other
-	time.Sleep(5 * time.Second)
-	subnets := make(map[*libp2p.Network]int)
 
 	// size of subnets
-	size := len(nets) / subnetNum
+	size := len(ids) / subnetNum
 	if size == 0 {
 		// covers the cases where number of nodes is less than
 		// number of the subnets
-		size = len(nets)
+		size = len(ids)
 	}
+	subnetIdList := groupIDs(ids, size)
 
-	// subnet index
+	return subnetIdList, nil
+
+	//netList := make(map[int][]*libp2p.Network, 0)
+	//// creates topology over the nodes of each subnet
+	//for subnetIndex, subnetIDs := range  {
+	//	mws, err := CreateMiddleware(ids)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//
+	//	subnet, _, err := CreateNetworks(mws, subnetIDs, nodesNum, false)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//
+	//	// adds subnet to the map of subnets
+	//	netList[subnetIndex] = subnet
+	//
+	//	// allows nodes to find each other
+	//	time.Sleep(5 * time.Second)
+	//}
+	//
+	//return subnets, nil
+}
+
+// groupIDs groups ids into sub-many groups
+func groupIDs(ids []*flow.Identity, sub int) map[int][]*flow.Identity {
 	sIndx := -1
+	subnets := make(map[*flow.Identity]int)
 
-	for index, net := range nets {
+	// keeps ids of the nodes in each subnet
+	subnetIdList := make(map[int][]*flow.Identity)
+	// clusters ids into subnets
+	for index, id := range ids {
 		// checks if we reach end of current subnet
-		if index%size == 0 {
+		if index%sub == 0 {
 			// moves to next subnet
 			sIndx++
 		}
 
 		// assigns subnet index of the net
-		subnets[net] = sIndx
-	}
+		subnets[id] = sIndx
+		if subnetIdList[sIndx] == nil {
+			// initializes list
+			subnetIdList[sIndx] = make([]*flow.Identity, 0)
+		}
 
-	return subnets, nil
+		// adding nodes' id to the current Identity
+		subnetIdList[sIndx] = append(subnetIdList[sIndx], id)
+	}
+	return subnetIdList
 }
 
 // helper offers a set of functions that are shared among different tests
@@ -81,7 +105,7 @@ func CreateIDs(count int) []*flow.Identity {
 // dryrun is a boolean for topology generation tests, in case it is switched to true, the ids is directly
 // mocked for every node as their state, otherwise, ids is only used to assign the ids of the nodes, and the
 // state is constructed based on the IPs collected from libp2p
-func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool) ([]*libp2p.Network, error) {
+func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool) ([]*libp2p.Network, flow.IdentityList, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
 
@@ -101,7 +125,7 @@ func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, 
 		me.On("NodeID").Return(ids[i].NodeID)
 		net, err := libp2p.NewNetwork(zerolog.Logger{}, json.NewCodec(), state, me, mws[i], csize)
 		if err != nil {
-			return nil, fmt.Errorf("could not create error %w", err)
+			return nil, nil, fmt.Errorf("could not create error %w", err)
 		}
 
 		nets = append(nets, net)
@@ -109,7 +133,7 @@ func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, 
 
 	// if dryrun then don't actually start the network just return the network objects
 	if dryrun {
-		return nets, nil
+		return nets, snapshot.ids, nil
 	}
 
 	for _, net := range nets {
@@ -130,7 +154,7 @@ func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, 
 		snapshot.ids = append(snapshot.ids, id)
 	}
 
-	return nets, nil
+	return nets, snapshot.ids, nil
 }
 
 // CreateMiddleware receives an ids slice and creates and initializes a middleware instances for each id

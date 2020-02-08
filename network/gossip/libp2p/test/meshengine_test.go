@@ -45,7 +45,7 @@ func (m *MeshNetTestSuite) SetupTest() {
 	require.NoError(m.Suite.T(), err)
 	m.mws = mws
 
-	nets, err := CreateNetworks(m.mws, m.ids, cashSize, false)
+	nets, _, err := CreateNetworks(m.mws, m.ids, cashSize, false)
 	require.NoError(m.Suite.T(), err)
 	m.nets = nets
 
