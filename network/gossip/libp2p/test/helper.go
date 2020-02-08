@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -12,46 +13,41 @@ import (
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
-func CreateSubnets(nodesNum, subnetNum int) (map[int][]*flow.Identity, error) {
+func CreateSubnets(nodesNum, subnetNum int) (map[int][]*libp2p.Network, error) {
 	if nodesNum < subnetNum || nodesNum%subnetNum != 0 {
 		return nil, fmt.Errorf("number of subnets should divide number of nodes")
 	}
 
-	// creates network instances
-	ids := CreateIDs(nodesNum)
-
 	// size of subnets
-	size := len(ids) / subnetNum
-	if size == 0 {
-		// covers the cases where number of nodes is less than
-		// number of the subnets
-		size = len(ids)
+	size := nodesNum / subnetNum
+
+	// map of subnet ids
+	subnetIdList := groupIDs(CreateIDs(nodesNum), size)
+
+	// nets keeps a map of subnets networks
+	nets := make(map[int][]*libp2p.Network)
+
+	// creates topology over the nodes of each subnet
+	for index, ids := range subnetIdList {
+		mws, err := CreateMiddleware(ids)
+		if err != nil {
+			return nil, err
+		}
+
+		// creates a network for that subnet of ids
+		subnet, _, err := CreateNetworks(mws, ids, nodesNum, false)
+		if err != nil {
+			return nil, err
+		}
+
+		// adds subnet to the map of subnets
+		nets[index] = subnet
 	}
-	subnetIdList := groupIDs(ids, size)
 
-	return subnetIdList, nil
+	// allows nodes to find each other
+	time.Sleep(5 * time.Second)
 
-	//netList := make(map[int][]*libp2p.Network, 0)
-	//// creates topology over the nodes of each subnet
-	//for subnetIndex, subnetIDs := range  {
-	//	mws, err := CreateMiddleware(ids)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//
-	//	subnet, _, err := CreateNetworks(mws, subnetIDs, nodesNum, false)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//
-	//	// adds subnet to the map of subnets
-	//	netList[subnetIndex] = subnet
-	//
-	//	// allows nodes to find each other
-	//	time.Sleep(5 * time.Second)
-	//}
-	//
-	//return subnets, nil
+	return nets, nil
 }
 
 // groupIDs groups ids into sub-many groups
