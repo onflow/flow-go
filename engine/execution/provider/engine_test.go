@@ -18,7 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
+func TestProviderEngine_ProcessExecutionResult(t *testing.T) {
 	targetIDs := flow.IdentityList{
 		unittest.IdentityFixture(func(id *flow.Identity) {
 			id.Role = flow.RoleConsensus
@@ -75,7 +75,6 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		execState := mocks.NewMockExecutionState(ctrl)
 		execState.EXPECT().CommitDelta(gomock.Any()).Times(len(result.StateViews))
 		execState.EXPECT().PersistChunkHeader(gomock.Any()).Return(nil).Times(len(result.StateViews))
-		//execState.EXPECT().PersistStateCommitment(gomock.Eq(result.CompleteBlock.Block.ID()), gomock.Any()).Return(nil)
 		e := Engine{
 			state:      state,
 			receiptCon: con,
@@ -158,7 +157,7 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 	})
 }
 
-func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
+func TestProviderEngine_OnExecutionStateRequest(t *testing.T) {
 	t.Run("non-verification engine", func(t *testing.T) {
 		ps := new(protocol.State)
 		ss := new(protocol.Snapshot)
@@ -189,7 +188,6 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 	t.Run("non-existent chunk", func(t *testing.T) {
 		ps := new(protocol.State)
 		ss := new(protocol.Snapshot)
-		//es := new(state.ExecutionState)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -203,7 +201,6 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
-		//es.On("GetChunkRegisters", chunkID).Return(nil, fmt.Errorf("state error"))
 		execState.EXPECT().GetChunkRegisters(gomock.Eq(chunkID)).Return(nil, fmt.Errorf("state error"))
 
 		req := &messages.ExecutionStateRequest{ChunkID: chunkID}
@@ -213,7 +210,6 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
-		//es.AssertExpectations(t)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -243,7 +239,6 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
-		//es.On("GetChunkRegisters", chunkID).Return(expectedRegisters, nil)
 		con.On("Submit", mock.Anything, originIdentity.NodeID).
 			Run(func(args mock.Arguments) {
 				res, ok := args[0].(*messages.ExecutionStateResponse)
@@ -266,7 +261,6 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
-		//es.AssertExpectations(t)
 		con.AssertExpectations(t)
 	})
 }
