@@ -5,6 +5,7 @@ package libp2p
 import (
 	"sync"
 
+	"github.com/libp2p/go-libp2p-core/helpers"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
 )
@@ -42,7 +43,7 @@ func (c *Connection) stop() {
 	c.once.Do(func() {
 		close(c.done)
 		// Close the underlying libp2p stream
-		if err := c.stream.Reset(); err != nil {
+		if err := helpers.FullClose(c.stream); err != nil {
 			c.log.Err(err).Msg("error resetting connection stream")
 		}
 	})

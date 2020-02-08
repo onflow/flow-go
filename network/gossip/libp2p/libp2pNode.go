@@ -29,6 +29,9 @@ const (
 	FlowLibP2PProtocolID protocol.ID = "/flow/push/0.0.1"
 )
 
+// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
+const maxConnectAttempt = 3
+
 // NodeAddress is used to define a libp2p node
 type NodeAddress struct {
 	// Name is the friendly node Name e.g. "node1" (not to be confused with the libp2p node id)
@@ -180,21 +183,32 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 	}
 
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
-	const maxConnectAttempt = 2
-	var errs error
+	stream, err = p.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
+	if err != nil {
+		return stream, fmt.Errorf("failed to create stream for %s: %w", peerID.String(), err)
+	}
+	return stream, nil
+}
+
+// tryCreateNewStream makes at most maxAttempts to create a stream with the target peer
+// This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
+// remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'
+// https://github.com/libp2p/go-yamux/blob/c7e96b999446162afa256908963dff8f5954037a/session.go#L629
+func (p *P2PNode) tryCreateNewStream(ctx context.Context, targetID peer.ID, maxAttempts int) (network.Stream, error) {
+	var errs, err error
 	var s network.Stream
 	var retries = 0
-	for ; retries < maxConnectAttempt; retries++ {
-		s, err = p.libP2PHost.NewStream(ctx, peerID, FlowLibP2PProtocolID)
+	for ; retries < maxAttempts; retries++ {
+		s, err = p.libP2PHost.NewStream(ctx, targetID, FlowLibP2PProtocolID)
 		if err == nil {
 			break
 		}
-		p.logger.Error().Str("target", peerID.String()).Err(err).
-			Int("retry_attempt", retries).Msg(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>failed to create stream")
+		p.logger.Error().Str("target", targetID.String()).Err(err).
+			Int("retry_attempt", retries).Msg("failed to create stream")
 		errs = multierror.Append(errs, err)
 		time.Sleep(5 * time.Millisecond)
 	}
-	if retries == maxConnectAttempt {
+	if retries == maxAttempts {
 		return s, errs
 	}
 	return s, nil
