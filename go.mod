@@ -4,9 +4,9 @@ go 1.13
 
 require (
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
-	github.com/dapperlabs/flow-go/crypto v0.2.5-beta
-	github.com/dapperlabs/flow-go/language v0.2.5-beta
-	github.com/dapperlabs/flow-go/protobuf v0.2.5-beta
+	github.com/dapperlabs/flow-go/crypto v0.3.1
+	github.com/dapperlabs/flow-go/language v0.3.1
+	github.com/dapperlabs/flow-go/protobuf v0.3.1
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.0
 	github.com/ethereum/go-ethereum v1.9.9
