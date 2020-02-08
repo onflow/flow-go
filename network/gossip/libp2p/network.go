@@ -88,8 +88,11 @@ func NewNetwork(
 // Ready returns a channel that will close when the network stack is ready.
 func (n *Network) Ready() <-chan struct{} {
 	ready := make(chan struct{})
-	n.mw.Start(n)
 	go func() {
+		err := n.mw.Start(n)
+		if err != nil {
+			n.logger.Err(err).Msg("failed to start middleware")
+		}
 		close(ready)
 	}()
 	return ready

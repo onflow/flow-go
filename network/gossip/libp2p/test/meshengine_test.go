@@ -8,11 +8,9 @@ import (
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	gologging "github.com/whyrusleeping/go-logging"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
@@ -39,7 +37,7 @@ func (m *MeshNetTestSuite) SetupTest() {
 	// defines total number of nodes in our network
 	const count = 25
 	const cashSize = 100
-	golog.SetAllLoggers(gologging.INFO)
+	//golog.SetAllLoggers(gologging.INFO)
 
 	m.ids = CreateIDs(count)
 
@@ -47,7 +45,7 @@ func (m *MeshNetTestSuite) SetupTest() {
 	require.NoError(m.Suite.T(), err)
 	m.mws = mws
 
-	nets, err := CreateNetworks(m.mws, m.ids, cashSize)
+	nets, err := CreateNetworks(m.mws, m.ids, cashSize, false)
 	require.NoError(m.Suite.T(), err)
 	m.nets = nets
 

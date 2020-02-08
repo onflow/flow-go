@@ -245,19 +245,22 @@ func (e *Engine) sendProposal() error {
 		return fmt.Errorf("could not get own current ID: %w", err)
 	}
 
-	// get the payload for the next hash
-	payloadHash, err := e.builder.BuildOn(e.round.Parent().ID())
-	if err != nil {
-		return fmt.Errorf("could not build on parent: %w", err)
+	// define the block header build function
+	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
+		header := flow.Header{
+			Number:      e.round.Parent().Number + 1,
+			Timestamp:   time.Now().UTC(),
+			ParentID:    e.round.Parent().ID(),
+			PayloadHash: payloadHash,
+			ProposerID:  e.me.NodeID(),
+		}
+		return &header, nil
 	}
 
-	// create the header
-	candidate := flow.Header{
-		Number:      e.round.Parent().Number + 1,
-		Timestamp:   time.Now().UTC(),
-		ParentID:    e.round.Parent().ID(),
-		PayloadHash: payloadHash,
-		ProposerID:  e.me.NodeID(),
+	// get the payload for the next hash
+	candidate, err := e.builder.BuildOn(e.round.Parent().ID(), build)
+	if err != nil {
+		return fmt.Errorf("could not build on parent: %w", err)
 	}
 
 	log = log.With().
@@ -266,17 +269,17 @@ func (e *Engine) sendProposal() error {
 		Logger()
 
 	// store the block proposal
-	err = e.headers.Store(&candidate)
+	err = e.headers.Store(candidate)
 	if err != nil {
 		return fmt.Errorf("could not store candidate: %w", err)
 	}
 
 	// cache the candidate block
-	e.round.Propose(&candidate)
+	e.round.Propose(candidate)
 
 	// send the block proposal
 	proposal := &coldstuff.BlockProposal{
-		Header: &candidate,
+		Header: candidate,
 	}
 	err = e.con.Submit(proposal, e.round.Participants().NodeIDs()...)
 	if err != nil {

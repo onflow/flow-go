@@ -10,7 +10,7 @@ import (
 // our direct neighbours on the network. It handles the creation & teardown of
 // connections, as well as reading & writing to/from the connections.
 type Middleware interface {
-	Start(overlay Overlay)
+	Start(overlay Overlay) error
 	Stop()
 	Send(nodeID flow.Identifier, msg interface{}) error
 	Publish(topic string, msg interface{}) error
