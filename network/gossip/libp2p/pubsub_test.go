@@ -53,7 +53,7 @@ func (s *mockDiscovery) Advertise(_ context.Context, _ string, _ ...discovery.Op
 
 func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option) (<-chan peer.AddrInfo, error) {
 	if s.done {
-		emptyCh := make(chan peer.AddrInfo, 0)
+		emptyCh := make(chan peer.AddrInfo)
 		return emptyCh, nil
 	}
 	//fmt.Println("find peers")
