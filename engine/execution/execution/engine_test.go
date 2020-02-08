@@ -10,7 +10,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/executor/mocks"
-	realState "github.com/dapperlabs/flow-go/engine/execution/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	module "github.com/dapperlabs/flow-go/module/mock"
 	network "github.com/dapperlabs/flow-go/network/mock"
@@ -62,7 +62,7 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 
 		e := Engine{me: me}
 
-		view := realState.NewView(func(key string) (bytes []byte, e error) {
+		view := state.NewView(func(key string) (bytes []byte, e error) {
 			return nil, nil
 		})
 
@@ -100,9 +100,9 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 			}).
 			Return(nil)
 
-		exec.EXPECT().ExecuteBlock(gomock.Eq(completeBlock), gomock.AssignableToTypeOf(&realState.View{}), gomock.AssignableToTypeOf(flow.StateCommitment{})).Return(computationResult, nil)
+		exec.EXPECT().ExecuteBlock(gomock.Eq(completeBlock), gomock.AssignableToTypeOf(&state.View{}), gomock.AssignableToTypeOf(flow.StateCommitment{})).Return(computationResult, nil)
 
-		view := realState.NewView(func(key string) (bytes []byte, e error) {
+		view := state.NewView(func(key string) (bytes []byte, e error) {
 			return nil, nil
 		})
 

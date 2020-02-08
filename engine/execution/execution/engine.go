@@ -171,7 +171,7 @@ func (e *Engine) onCompleteBlock(originID flow.Identifier, block *execution.Comp
 		Hex("block_id", logging.Entity(result.CompleteBlock.Block)).
 		Msg("computed block result")
 
-	// submit execution result to receipt engine
+	// submit execution result to provider engine
 	e.provider.SubmitLocal(result)
 
 	return nil

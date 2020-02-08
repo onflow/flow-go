@@ -1,6 +1,6 @@
 package types
 
-// QCBlock contains a QC and a CompleteBlock that the QC is pointing to
+// QCBlock contains a QC and a Block that the QC is pointing to
 type QCBlock struct {
 	QC    *QuorumCertificate
 	Block *BlockProposal
