@@ -19,6 +19,8 @@ func (sk *PrKeyBLS_BLS12381) signHash(h Hash) (Signature, error) {
 }
 
 // Sign signs an array of bytes
+// This function does not modify the private key, even temporarily
+// If the hasher used is KMAC128, it is not modified by the function, even temporarily
 func (sk *PrKeyBLS_BLS12381) Sign(data []byte, kmac Hasher) (Signature, error) {
 	if kmac == nil {
 		return nil, cryptoError{"Sign requires a Hasher"}
@@ -43,6 +45,8 @@ func (pk *PubKeyBLS_BLS12381) verifyHash(s Signature, h Hash) (bool, error) {
 }
 
 // Verify verifies a signature of a byte array
+// This function does not modify the public key, even temporarily
+// If the hasher used is KMAC128, it is not modified by the function, even temporarily
 func (pk *PubKeyBLS_BLS12381) Verify(s Signature, data []byte, kmac Hasher) (bool, error) {
 	if kmac == nil {
 		return false, cryptoError{"VerifyBytes requires a Hasher"}
