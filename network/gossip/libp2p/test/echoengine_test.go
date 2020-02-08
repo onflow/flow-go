@@ -13,9 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	golog "github.com/ipfs/go-log"
-	gologging "github.com/whyrusleeping/go-logging"
-
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
@@ -37,9 +34,8 @@ func TestStubEngineTestSuite(t *testing.T) {
 }
 
 func (s *StubEngineTestSuite) SetupTest() {
-	fmt.Println("----------------------Starting Setup---------------")
 	const count = 2
-	golog.SetAllLoggers(gologging.DEBUG)
+	//golog.SetAllLoggers(gologging.INFO)
 	s.ids = CreateIDs(count)
 
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -50,27 +46,23 @@ func (s *StubEngineTestSuite) SetupTest() {
 	nets, err := CreateNetworks(logger, s.mws, s.ids, 100, false)
 	require.NoError(s.Suite.T(), err)
 	s.nets = nets
-	fmt.Println("----------------Finished Setup --------------")
 }
 
 // TearDownTest closes the networks within a specified timeout
 func (s *StubEngineTestSuite) TearDownTest() {
-	fmt.Println("----------------------Starting teardown---------------")
 	for _, net := range s.nets {
 		select {
 		// closes the network
 		case <-net.Done():
 			continue
-		case <-time.After(5 * time.Second):
+		case <-time.After(1 * time.Second):
 			s.Suite.Fail("could not stop the network")
 		}
 	}
-	fmt.Println("----------------Finished Teardown --------------")
 }
 
 // TestSingleMessage tests sending a single message from sender to receiver
 func (s *StubEngineTestSuite) TestSingleMessage() {
-
 	// set to false for no echo expectation
 	s.singleMessage(false)
 }
@@ -78,7 +70,6 @@ func (s *StubEngineTestSuite) TestSingleMessage() {
 // TestSingleMessage tests sending a single message from sender to receiver
 // it also evaluates the correct reception of an echo message back
 func (s *StubEngineTestSuite) TestSingleEcho() {
-
 	// set to true for an echo expectation
 	s.singleMessage(true)
 }
@@ -86,7 +77,6 @@ func (s *StubEngineTestSuite) TestSingleEcho() {
 // TestMultiMsgSync tests sending multiple messages from sender to receiver
 // sender and receiver are synced over reception
 func (s *StubEngineTestSuite) TestMultiMsgSync() {
-
 	// set to false for no echo expectation
 	s.multiMessageSync(false, 10)
 }
@@ -95,7 +85,6 @@ func (s *StubEngineTestSuite) TestMultiMsgSync() {
 // it also evaluates the correct reception of an echo message back for each send
 // sender and receiver are synced over reception
 func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
-
 	// set to true for an echo expectation
 	s.multiMessageSync(true, 10)
 }
@@ -103,7 +92,6 @@ func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
 // TestMultiMsgAsync tests sending multiple messages from sender to receiver
 // sender and receiver are not synchronized
 func (s *StubEngineTestSuite) TestMultiMsgAsync() {
-
 	// set to false for no echo expectation
 	s.multiMessageAsync(false, 10)
 }
@@ -112,7 +100,6 @@ func (s *StubEngineTestSuite) TestMultiMsgAsync() {
 // it also evaluates the correct reception of an echo message back for each send
 // sender and receiver are not synchronized
 func (s *StubEngineTestSuite) TestEchoMultiMsgAsync() {
-
 	// set to true for an echo expectation
 	s.multiMessageAsync(true, 10)
 }
@@ -121,7 +108,6 @@ func (s *StubEngineTestSuite) TestEchoMultiMsgAsync() {
 // on deduplicating the received messages. Messages are delivered to the receiver
 // in a sequential manner.
 func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
-
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
@@ -153,7 +139,6 @@ func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
 // on deduplicating the received messages. Messages are delivered to the receiver
 // in parallel.
 func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
-
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
@@ -186,7 +171,6 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 // on deduplicating the received messages against different engine ids. In specific, the
 // desire behavior is that the deduplication should happen based on both eventID and channelID
 func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
-
 	const (
 		sndNode = iota
 		rcvNode

@@ -8,16 +8,12 @@ import (
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/network"
-	"github.com/libp2p/go-libp2p-core/peer"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	gologging "github.com/whyrusleeping/go-logging"
 )
 
 // Workaround for https://github.com/stretchr/testify/pull/808
@@ -42,7 +38,6 @@ func (l *LibP2PNodeTestSuite) SetupTest() {
 // TestMultiAddress evaluates correct translations from
 // dns and ip4 to libp2p multi-address
 func (l *LibP2PNodeTestSuite) TestMultiAddress() {
-	l.T().Skip()
 	defer l.cancel()
 	tt := []struct {
 		address      NodeAddress
@@ -82,7 +77,6 @@ func (l *LibP2PNodeTestSuite) TestMultiAddress() {
 }
 
 func (l *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
-	l.T().Skip()
 	defer l.cancel()
 
 	// creates a single
@@ -96,7 +90,6 @@ func (l *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 // their libp2p info. It generates an address, and checks whether repeated translations
 // yields the same info or not.
 func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
-	l.T().Skip()
 	for i := 0; i < 10; i++ {
 		// creates node-i address
 		address := NodeAddress{
@@ -120,7 +113,6 @@ func (l *LibP2PNodeTestSuite) TestGetPeerInfo() {
 
 // TestAddPeers checks if nodes can be added as peers to a given node
 func (l *LibP2PNodeTestSuite) TestAddPeers() {
-	l.T().Skip()
 	defer l.cancel()
 
 	// count value of 10 runs into this issue on localhost
@@ -160,7 +152,6 @@ func (l *LibP2PNodeTestSuite) TestAddPeers() {
 
 // TestCreateStreams checks if an existing stream is reused instead of creating a new streams each time when CreateStream is called
 func (l *LibP2PNodeTestSuite) TestCreateStream() {
-	l.T().Skip()
 	defer l.cancel()
 	count := 2
 
@@ -219,83 +210,74 @@ func (l *LibP2PNodeTestSuite) TestCreateStream() {
 
 // TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
 func (l *LibP2PNodeTestSuite) TestOneToOneComm() {
-	golog.SetAllLoggers(gologging.DEBUG)
 	defer l.cancel()
 	count := 2
-	run := 5
-	for run > 0 {
-		ch := make(chan string, count)
+	ch := make(chan string, count)
 
-		// Create the handler function
-
-		handler := func(s network.Stream) {
-			rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-			str, err := rw.ReadString('\n')
-			assert.NoError(l.T(), err)
-			ch <- str
-		}
-
-		// Creates peers
-		peers := l.CreateNodes(count, handler)
-		//defer l.StopNodes(peers)
-
-		// Create source NodeAddress
-		ip1, port1 := peers[0].GetIPPort()
-		addr1 := NodeAddress{IP: ip1, Port: port1, Name: peers[0].name}
-
-		// Create target NodeAddress
-		ip2, port2 := peers[1].GetIPPort()
-		addr2 := NodeAddress{IP: ip2, Port: port2, Name: peers[1].name}
-
-		// Create stream from node 1 to node 2
-		s1, err := peers[0].CreateStream(context.Background(), addr2)
+	// Create the handler function
+	handler := func(s network.Stream) {
+		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+		str, err := rw.ReadString('\n')
 		assert.NoError(l.T(), err)
-		rw := bufio.NewReadWriter(bufio.NewReader(s1), bufio.NewWriter(s1))
-
-		// Send message from node 1 to 2
-		msg := "hello\n"
-		_, err = rw.WriteString(msg)
-		assert.NoError(l.T(), err)
-
-		// Flush the stream
-		assert.NoError(l.T(), rw.Flush())
-
-		// Wait for the message to be received
-		select {
-		case rcv := <-ch:
-			require.Equal(l.T(), msg, rcv)
-		case <-time.After(1 * time.Second):
-			assert.Fail(l.T(), "message not received")
-		}
-
-		// Create stream from node 2 to node 1
-		s2, err := peers[1].CreateStream(context.Background(), addr1)
-		assert.NoError(l.T(), err)
-		rw = bufio.NewReadWriter(bufio.NewReader(s2), bufio.NewWriter(s2))
-
-		// Send message from node 2 to 1
-		msg = "hey\n"
-		_, err = rw.WriteString(msg)
-		assert.NoError(l.T(), err)
-
-		// Flush the stream
-		assert.NoError(l.T(), rw.Flush())
-
-		select {
-		case rcv := <-ch:
-			require.Equal(l.T(), msg, rcv)
-		case <-time.After(3 * time.Second):
-			assert.Fail(l.T(), "message not received")
-		}
-		l.StopNodes(peers)
-		run--
+		ch <- str
 	}
 
+	// Creates peers
+	peers := l.CreateNodes(count, handler)
+	defer l.StopNodes(peers)
+
+	// Create source NodeAddress
+	ip1, port1 := peers[0].GetIPPort()
+	addr1 := NodeAddress{IP: ip1, Port: port1, Name: peers[0].name}
+
+	// Create target NodeAddress
+	ip2, port2 := peers[1].GetIPPort()
+	addr2 := NodeAddress{IP: ip2, Port: port2, Name: peers[1].name}
+
+	// Create stream from node 1 to node 2
+	s1, err := peers[0].CreateStream(context.Background(), addr2)
+	assert.NoError(l.T(), err)
+	rw := bufio.NewReadWriter(bufio.NewReader(s1), bufio.NewWriter(s1))
+
+	// Send message from node 1 to 2
+	msg := "hello\n"
+	_, err = rw.WriteString(msg)
+	assert.NoError(l.T(), err)
+
+	// Flush the stream
+	assert.NoError(l.T(), rw.Flush())
+
+	// Wait for the message to be received
+	select {
+	case rcv := <-ch:
+		require.Equal(l.T(), msg, rcv)
+	case <-time.After(1 * time.Second):
+		assert.Fail(l.T(), "message not received")
+	}
+
+	// Create stream from node 2 to node 1
+	s2, err := peers[1].CreateStream(context.Background(), addr1)
+	assert.NoError(l.T(), err)
+	rw = bufio.NewReadWriter(bufio.NewReader(s2), bufio.NewWriter(s2))
+
+	// Send message from node 2 to 1
+	msg = "hey\n"
+	_, err = rw.WriteString(msg)
+	assert.NoError(l.T(), err)
+
+	// Flush the stream
+	assert.NoError(l.T(), rw.Flush())
+
+	select {
+	case rcv := <-ch:
+		require.Equal(l.T(), msg, rcv)
+	case <-time.After(3 * time.Second):
+		assert.Fail(l.T(), "message not received")
+	}
 }
 
 // libp2p.CreateStream() reuses an existing stream if it exists. This test checks if the reused stream works as expected
 func (l *LibP2PNodeTestSuite) TestStreamReuse() {
-	l.T().Skip()
 	defer l.cancel()
 	ch := make(chan string)
 	done := make(chan struct{})
@@ -373,8 +355,6 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 		handlerFunc = func(network.Stream) {}
 	}
 
-	d := &mockDiscovery{}
-	psOption := pubsub.WithDiscovery(d)
 	// creating nodes
 	for i := 1; i <= count; i++ {
 		n := &P2PNode{}
@@ -384,26 +364,14 @@ func (l *LibP2PNodeTestSuite) CreateNodes(count int, handler ...network.StreamHa
 			Port: "0",       // random Port number
 		}
 
-		err := n.Start(l.ctx, nodeID, logger, handlerFunc, psOption)
+		err := n.Start(l.ctx, nodeID, logger, handlerFunc)
 		require.NoError(l.Suite.T(), err)
 		require.Eventuallyf(l.Suite.T(), func() bool {
 			ip, p := n.GetIPPort()
 			return ip != "" && p != ""
 		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %d", i))
-		_, err = n.Subscribe(l.ctx, "dummytopic")
-		require.NoError(l.Suite.T(), err)
 		nodes = append(nodes, n)
 	}
-
-	var pInfos []peer.AddrInfo
-	for _, n := range nodes {
-		id := n.libP2PHost.ID()
-		addrs := n.libP2PHost.Addrs()
-		pInfos = append(pInfos, peer.AddrInfo{ID: id, Addrs: addrs})
-	}
-	// set the common discovery object shared by all nodes with the list of all peer.AddrInfos
-	d.SetPeers(pInfos)
-
 	return nodes
 }
 
