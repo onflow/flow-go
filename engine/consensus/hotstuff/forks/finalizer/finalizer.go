@@ -131,7 +131,7 @@ func (r *Finalizer) AddBlock(block *types.BlockProposal) error {
 		return nil
 	}
 	blockContainer := &BlockContainer{block: block}
-	if err := r.checkForByzantineQC(blockContainer.QC()); err != nil {
+	if err := r.checkForConflictingQCs(blockContainer.QC()); err != nil {
 		return err
 	}
 	r.checkForDoubleProposal(blockContainer)
@@ -144,7 +144,7 @@ func (r *Finalizer) AddBlock(block *types.BlockProposal) error {
 	return nil
 }
 
-// checkForByzantineQC checks if qc conflicts with a stored Quorum Certificate.
+// checkForConflictingQCs checks if qc conflicts with a stored Quorum Certificate.
 // In case a conflicting QC is found, an ErrorByzantineThresholdExceeded is returned.
 //
 // Two Quorum Certificates q1 and q2 are defined as conflicting iff:
@@ -153,7 +153,7 @@ func (r *Finalizer) AddBlock(block *types.BlockProposal) error {
 // This means there are two Quorums for conflicting blocks at the same view.
 // Per Lemma 1 from the HotStuff paper https://arxiv.org/abs/1803.05069v6, two
 // conflicting QCs can exists if and onluy of the Byzantine threshold is exceeded.
-func (r *Finalizer) checkForByzantineQC(qc *types.QuorumCertificate) error {
+func (r *Finalizer) checkForConflictingQCs(qc *types.QuorumCertificate) error {
 	it := r.forest.GetVerticesAtLevel(qc.View)
 	for it.HasNext() {
 		otherBlock := it.NextVertex() // by construction, must have same view as qc.View
@@ -194,14 +194,20 @@ func (r *Finalizer) checkForDoubleProposal(block *BlockContainer) {
 // UNVALIDATED: assumes that relevant block properties are consistent with previous blocks
 func (r *Finalizer) updateConsensusState(blockContainer *BlockContainer) error {
 	ancestryChain, err := r.getThreeChain(blockContainer)
+	// We expect that getThreeChain might error with a ErrorPrunedAncestry. This error indicates that the
+	// 3-chain of this block reaches _beyond_ the last finalized block. It is straight forward to show:
+	// Lemma: Let B be a block whose 3-chain reaches beyond the last finalized block
+	//        => B will not update the locked or finalized block
 	if err != nil {
 		switch err.(type) {
 		case *ErrorPrunedAncestry:
-			return nil // for finalization, we ignore all blocks which do not have a full un-pruned 3-chain
+			//   blockContainer's 3-chain reaches beyond the last finalized block
+			return nil // based on Lemma from above, we can skip attempting to update locked or finalized block
 		default:
 			return fmt.Errorf("retrieving 3-chain ancestry failed: %w", err)
 		}
 	}
+
 	r.updateLockedQc(ancestryChain)
 	err = r.updateFinalizedBlockQc(ancestryChain)
 	if err != nil {
