@@ -296,7 +296,13 @@ func (r *Finalizer) updateFinalizedBlockQc(ancestryChain *ancestryChain) error {
 // Finalization starts with the child of `lastFinalizedBlockQC` (explicitly checked);
 // and calls OnFinalizedBlock on the newly finalized blocks in the respective order
 func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) error {
-	if blockQC.View <= r.lastFinalized.View() {
+	if blockQC.View < r.lastFinalized.View() {
+		return &hotstuff.ErrorByzantineThresholdExceeded{Evidence: fmt.Sprintf(
+			"finalizing blocks with view %d which is lower than previously finalized block at view %d",
+			blockQC.View, r.lastFinalized.View(),
+		)}
+	}
+	if blockQC.View == r.lastFinalized.View() {
 		// Sanity check: the previously last Finalized Block must be an ancestor of `block`
 		if r.lastFinalized.BlockID() != blockQC.BlockID {
 			return &hotstuff.ErrorByzantineThresholdExceeded{Evidence: fmt.Sprintf(

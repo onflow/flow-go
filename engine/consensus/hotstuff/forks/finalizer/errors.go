@@ -26,7 +26,7 @@ func (e *ErrorBlockHashCollision) Error() string {
 	)
 }
 
-// ErrorPruned3Chain sentinel error
+// ErrorPrunedAncestry is a sentinel error
 type ErrorPrunedAncestry struct {
 	block *types.BlockProposal
 }
