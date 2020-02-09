@@ -216,7 +216,7 @@ func (r *Finalizer) updateConsensusState(blockContainer *BlockContainer) error {
 	return nil
 }
 
-// getThreeChain returns the three chain or a ErrorPruned3Chain sentinel error
+// getThreeChain returns the three chain or a ErrorPrunedAncestry sentinel error
 // to indicate that the 3-chain from blockContainer is (partially) pruned
 func (r *Finalizer) getThreeChain(blockContainer *BlockContainer) (*ancestryChain, error) {
 	ancestryChain := ancestryChain{block: blockContainer}
@@ -239,6 +239,7 @@ func (r *Finalizer) getThreeChain(blockContainer *BlockContainer) (*ancestryChai
 
 // getNextAncestryLevel parent from forest. Returns QCBlock for the parent,
 // i.e. the parent block itself and the qc pointing to the parent, i.e. block.QC().
+// If the block's parent is below the pruned view, it will error with an ErrorPrunedAncestry.
 // UNVALIDATED: expects block to pass Finalizer.VerifyBlock(block)
 func (r *Finalizer) getNextAncestryLevel(block *types.BlockProposal) (*types.QCBlock, error) {
 	if block.QC().View < r.lastFinalized.View() {
