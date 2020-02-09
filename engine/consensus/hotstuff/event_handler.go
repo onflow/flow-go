@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/rs/zerolog"
 )
 
 // EventHandler is the main handler for individual events that trigger state transition.
@@ -251,7 +250,13 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *types.
 
 	// send my vote if I should vote and I'm not the leader
 	if shouldVote {
-		e.network.SendVote(ownVote, nextLeader.NodeID)
+		err := e.network.SendVote(ownVote, nextLeader.NodeID)
+		if err != nil {
+			// TODO: should we error here? E.g.
+			//    return fmt.Errorf("failed to send vote: %w", err)
+			//    We probably want to continue in that case ...
+			e.log.Warn().Msg(fmt.Sprintf("failed to send vote: %w", err))
+		}
 	}
 
 	// inform pacemaker that we've done the work for the current view, it should increment the current view

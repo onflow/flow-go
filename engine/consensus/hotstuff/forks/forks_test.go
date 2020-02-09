@@ -1,9 +1,11 @@
 package forks
 
 import (
+	"encoding/binary"
 	"fmt"
 	"testing"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/forkchoice"
@@ -155,9 +157,11 @@ func qc(view uint64, id flow.Identifier) *types.QuorumCertificate {
 	return &types.QuorumCertificate{View: view, BlockID: id}
 }
 
-func makeChildBlock(blockView uint64, parent *types.BlockProposal, payloadHash []byte) *types.BlockProposal {
+func makeChildBlock(blockView uint64, payloadHash []byte, parent *types.BlockProposal) *types.BlockProposal {
+	qcForParent := qc(parent.View(), parent.BlockID())
+	id := computeID(blockView, qcForParent, payloadHash)
 	return &types.BlockProposal{
-		Block: types.NewBlock(blockView, qc(parent.View(), parent.BlockID()), payloadHash, 0, ""),
+		Block: types.NewBlock(id, blockView, qcForParent, payloadHash, 0, ""),
 	}
 }
 
@@ -165,13 +169,40 @@ func makeBlock(blockView uint64, blockQc *types.QuorumCertificate, payloadHash [
 	if blockQc == nil {
 		blockQc = qc(0, flow.Identifier{})
 	}
+	id := computeID(blockView, blockQc, payloadHash)
 	return &types.BlockProposal{
-		Block: types.NewBlock(blockView, blockQc, payloadHash, 0, ""),
+		Block: types.NewBlock(id, blockView, blockQc, payloadHash, 0, ""),
 	}
 }
 
 func string2Identifyer(s string) flow.Identifier {
 	var identifier flow.Identifier
 	copy(identifier[:], []byte(s))
+	return identifier
+}
+
+// computeID is an INCOMPLETE STUB needed so we can test Forks.
+// When computing the Block's ID, this implementation only considers
+// the fields used by Forks.
+// TODO need full implementation
+func computeID(view uint64, qc *types.QuorumCertificate, payloadHash []byte) flow.Identifier {
+	id := make([]byte, 0)
+
+	viewBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(viewBytes, view)
+	id = append(id, viewBytes...)
+
+	qcView := make([]byte, 8)
+	binary.BigEndian.PutUint64(qcView, qc.View)
+	id = append(id, qcView...)
+	id = append(id, qc.BlockID[:]...)
+
+	id = append(id, payloadHash...)
+
+	hasher := crypto.NewSHA3_256()
+	hash := hasher.ComputeHash(id)
+
+	var identifier flow.Identifier
+	copy(identifier[:], hash)
 	return identifier
 }

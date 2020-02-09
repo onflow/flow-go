@@ -23,5 +23,6 @@ func NewQcBlock(qc *QuorumCertificate, block *BlockProposal) (*QCBlock, error) {
 
 func (qcb *QCBlock) BlockID() flow.Identifier { return qcb.block.BlockID() }
 func (qcb *QCBlock) View() uint64             { return qcb.block.View() }
+func (qcb *QCBlock) Height() uint64           { return qcb.block.Height() }
 func (qcb *QCBlock) Block() *BlockProposal    { return qcb.block }
 func (qcb *QCBlock) QC() *QuorumCertificate   { return qcb.qc }

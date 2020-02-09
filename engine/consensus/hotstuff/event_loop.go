@@ -62,6 +62,7 @@ func (el *EventLoop) processEvent() error {
 		err = el.eventHandler.OnLocalTimeout()
 	default:
 	}
+
 	if err != nil {
 		return err
 	}
