@@ -6,10 +6,10 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-func InsertRegisterSet(commit flow.StateCommitment, set *flow.RegisterSet) func(*badger.Txn) error {
-	return insert(makePrefix(codeRegisterSet, commit), set)
+func InsertRegisterSet(blockID flow.Identifier, set *flow.RegisterSet) func(*badger.Txn) error {
+	return insert(makePrefix(codeRegisterSet, blockID), set)
 }
 
-func RetrieveRegisterSet(commit flow.StateCommitment, set *flow.RegisterSet) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeRegisterSet, commit), set)
+func RetrieveRegisterSet(blockID flow.Identifier, set *flow.RegisterSet) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeRegisterSet, blockID), set)
 }

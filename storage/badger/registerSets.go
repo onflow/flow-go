@@ -20,9 +20,9 @@ func NewRegisterSets(db *badger.DB) *RegisterSets {
 	}
 }
 
-func (r *RegisterSets) Store(commit flow.StateCommitment, set *flow.RegisterSet) error {
+func (r *RegisterSets) Store(blockID flow.Identifier, set *flow.RegisterSet) error {
 	return r.db.Update(func(btx *badger.Txn) error {
-		err := operation.InsertRegisterSet(commit, set)(btx)
+		err := operation.InsertRegisterSet(blockID, set)(btx)
 		if err != nil {
 			return fmt.Errorf("could not insert register set: %w", err)
 		}
@@ -30,11 +30,11 @@ func (r *RegisterSets) Store(commit flow.StateCommitment, set *flow.RegisterSet)
 	})
 }
 
-func (r *RegisterSets) ByCommit(commit flow.StateCommitment) (*flow.RegisterSet, error) {
+func (r *RegisterSets) ByBlockID(blockID flow.Identifier) (*flow.RegisterSet, error) {
 	var set flow.RegisterSet
 
 	err := r.db.View(func(btx *badger.Txn) error {
-		err := operation.RetrieveRegisterSet(commit, &set)(btx)
+		err := operation.RetrieveRegisterSet(blockID, &set)(btx)
 		if err != nil {
 			if err == storage.ErrNotFound {
 				return err

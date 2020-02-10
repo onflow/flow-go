@@ -8,8 +8,8 @@ import (
 type RegisterSets interface {
 
 	// Store will store a register set in the persistent storage.
-	Store(commit flow.StateCommitment, set *flow.RegisterSet) error
+	Store(blockID flow.Identifier, set *flow.RegisterSet) error
 
-	// ByCommit will retrieve a register set by its state commitment from persistent storage.
-	ByCommit(commit flow.StateCommitment) (*flow.RegisterSet, error)
+	// ByBlockID will retrieve a register set by block ID from persistent storage.
+	ByBlockID(blockID flow.Identifier) (*flow.RegisterSet, error)
 }
