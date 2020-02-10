@@ -89,7 +89,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 	return newQC, nil
 }
 
-// BuildQCForBlockProposal will extract a primary vote out of the block proposal and
+// BuildQCForBlockProposal will extract a leader vote out of the block proposal and
 // attempt to build a QC for the given block proposal when there are votes
 // with enough stakes.
 func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*types.QuorumCertificate, error) {
@@ -100,11 +100,11 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 	if bp.View() <= va.lastPrunedView {
 		return nil, fmt.Errorf("could not build QC on receiving block: %w", types.StaleBlockError{BlockProposal: bp, FinalizedView: va.lastPrunedView})
 	}
-	// accumulate primary vote first
-	primaryVote := bp.ToVote()
-	voteStatus, err := va.validateAndStoreIncorporatedVote(primaryVote, bp)
+	// accumulate leader vote first
+	leaderVote := bp.ToVote()
+	voteStatus, err := va.validateAndStoreIncorporatedVote(leaderVote, bp)
 	if err != nil {
-		return nil, fmt.Errorf("primary vote is invalid %w", err)
+		return nil, fmt.Errorf("leader vote is invalid %w", err)
 	}
 	// accumulate pending votes by order
 	pendingStatus, exists := va.pendingVotes.votes[bp.BlockID()]
