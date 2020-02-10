@@ -1611,12 +1611,21 @@ func (interpreter *Interpreter) convertToFixedPointBigInt(expression *ast.FixedP
 
 	// fractional = expression.Fractional * 10 ^ (scale - expression.Scale)
 
-	scaleDiff := big.NewInt(0).SetUint64(uint64(scale - expression.Scale))
-
-	fractional := big.NewInt(0).Mul(
-		expression.Fractional,
-		big.NewInt(0).Exp(ten, scaleDiff, nil),
-	)
+	var fractional *big.Int
+	if expression.Scale == scale {
+		fractional = expression.Fractional
+	} else if expression.Scale < scale {
+		scaleDiff := big.NewInt(0).SetUint64(uint64(scale - expression.Scale))
+		fractional = big.NewInt(0).Mul(
+			expression.Fractional,
+			big.NewInt(0).Exp(ten, scaleDiff, nil),
+		)
+	} else {
+		scaleDiff := big.NewInt(0).SetUint64(uint64(expression.Scale - scale))
+		fractional = big.NewInt(0).Div(expression.Fractional,
+			big.NewInt(0).Exp(ten, scaleDiff, nil),
+		)
+	}
 
 	// value = integer + fractional
 
