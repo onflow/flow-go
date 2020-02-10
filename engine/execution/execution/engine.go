@@ -24,7 +24,7 @@ import (
 // Engine manages execution of transactions.
 type Engine struct {
 	unit             *engine.Unit
-	log              engine.FlowLogger
+	log              *engine.FlowLogger
 	me               module.Local
 	protoState       protocol.State
 	execState        state.ExecutionState
@@ -43,7 +43,8 @@ func New(
 	receipts network.Engine,
 	vm virtualmachine.VirtualMachine,
 ) (*Engine, error) {
-	log := engine.FlowLogger{logger.With().Str("engine", "execution").Logger()}
+	l := logger.With().Str("engine", "execution").Logger()
+	log := engine.NewFlowLogger(&l)
 
 	executor := executor.NewBlockExecutor(vm, execState)
 
