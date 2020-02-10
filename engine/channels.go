@@ -22,6 +22,7 @@ const (
 	ReceiptProvider        = 100
 	ExecutionStateProvider = 101
 	ExecutionExecution     = 102
+	ExecutionSync          = 103
 
 	// Verification 150-199
 	ApprovalProvider = 150
