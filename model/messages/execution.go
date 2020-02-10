@@ -15,3 +15,13 @@ type ExecutionStateRequest struct {
 type ExecutionStateResponse struct {
 	State flow.ChunkState
 }
+
+type ExecutionStateSyncRequest struct {
+	CurrentBlockID flow.Identifier
+	TargetBlockID  flow.Identifier
+}
+
+type ExecutionStateDelta struct {
+	BlockID flow.Identifier
+	Delta   flow.RegisterDelta
+}

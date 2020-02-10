@@ -23,10 +23,11 @@ const (
 	CodeCollectionRequest
 	CodeCollectionResponse
 
-	CodeExecutionRecipt
-
+	CodeExecutionReceipt
 	CodeExecutionStateRequest
 	CodeExecutionStateResponse
+	CodeExecutionStateSyncRequest
+	CodeExecutionStateDelta
 	CodeExecutionCompleteBlock
 	CodeExecutionComputationOrder
 )
