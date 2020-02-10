@@ -95,7 +95,7 @@ func (s *SubNetGeneratorTestSuite) TestDoubleNodeMultiSubNet() {
 // SubNetSizeTestHelper creates subnets of different sizes
 // and validates their correct correction
 func (s *SubNetGeneratorTestSuite) SubNetSizeTestHelper(nodesNum, subsNum int) {
-	subnets, err := CreateSubnets(nodesNum, subsNum)
+	subnets, _, err := CreateSubnets(nodesNum, subsNum)
 	require.NoError(s.Suite.T(), err)
 
 	for subnetID := range subnets {

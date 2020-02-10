@@ -13,9 +13,9 @@ import (
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
-func CreateSubnets(nodesNum, subnetNum int) (map[int][]*libp2p.Network, error) {
+func CreateSubnets(nodesNum, subnetNum int) (map[int][]*libp2p.Network, map[int][]flow.Identifier, error) {
 	if nodesNum < subnetNum || nodesNum%subnetNum != 0 {
-		return nil, fmt.Errorf("number of subnets should divide number of nodes")
+		return nil, nil, fmt.Errorf("number of subnets should divide number of nodes")
 	}
 
 	// size of subnets
@@ -26,28 +26,30 @@ func CreateSubnets(nodesNum, subnetNum int) (map[int][]*libp2p.Network, error) {
 
 	// nets keeps a map of subnets networks
 	nets := make(map[int][]*libp2p.Network)
+	ids := make(map[int][]flow.Identifier)
 
 	// creates topology over the nodes of each subnet
-	for index, ids := range subnetIdList {
-		mws, err := CreateMiddleware(ids)
+	for index, subids := range subnetIdList {
+		mws, err := CreateMiddleware(subids)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// creates a network for that subnet of ids
-		subnet, _, err := CreateNetworks(mws, ids, nodesNum, false)
+		subnet, subidf, err := CreateNetworks(mws, subids, nodesNum, false)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		// adds subnet to the map of subnets
 		nets[index] = subnet
+		ids[index] = subidf
 	}
 
 	// allows nodes to find each other
 	time.Sleep(5 * time.Second)
 
-	return nets, nil
+	return nets, ids, nil
 }
 
 // groupIDs groups ids into sub-many groups
@@ -101,7 +103,7 @@ func CreateIDs(count int) []*flow.Identity {
 // dryrun is a boolean for topology generation tests, in case it is switched to true, the ids is directly
 // mocked for every node as their state, otherwise, ids is only used to assign the ids of the nodes, and the
 // state is constructed based on the IPs collected from libp2p
-func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool) ([]*libp2p.Network, flow.IdentityList, error) {
+func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool) ([]*libp2p.Network, []flow.Identifier, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
 
@@ -129,7 +131,7 @@ func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, 
 
 	// if dryrun then don't actually start the network just return the network objects
 	if dryrun {
-		return nets, snapshot.ids, nil
+		return nets, snapshot.ids.NodeIDs(), nil
 	}
 
 	for _, net := range nets {
@@ -150,7 +152,7 @@ func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, 
 		snapshot.ids = append(snapshot.ids, id)
 	}
 
-	return nets, snapshot.ids, nil
+	return nets, snapshot.ids.NodeIDs(), nil
 }
 
 // CreateMiddleware receives an ids slice and creates and initializes a middleware instances for each id
