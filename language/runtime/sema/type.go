@@ -3408,9 +3408,9 @@ func (*TransactionType) ID() TypeID {
 	return "Transaction"
 }
 
-func (*TransactionType) Equal(_ Type) bool {
-	// transaction types are not equatable
-	return false
+func (*TransactionType) Equal(other Type) bool {
+	_, ok := other.(*TransactionType)
+	return ok
 }
 
 func (*TransactionType) IsResourceType() bool {

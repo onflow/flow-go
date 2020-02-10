@@ -367,7 +367,8 @@ func TestCheckFixedPointLiteralScales(t *testing.T) {
 				_, err := ParseAndCheck(t,
 					fmt.Sprintf(
 						`
-			              let val: %[1]s = 1.%s
+			              let withType: %[1]s = 1.%[2]s
+                          let withoutType = 1.%[2]s
 			            `,
 						ty,
 						generateFraction(i),
@@ -377,9 +378,10 @@ func TestCheckFixedPointLiteralScales(t *testing.T) {
 				if i <= scale {
 					assert.NoError(t, err)
 				} else {
-					errs := ExpectCheckerErrors(t, err, 1)
+					errs := ExpectCheckerErrors(t, err, 2)
 
 					assert.IsType(t, &sema.InvalidFixedPointLiteralScaleError{}, errs[0])
+					assert.IsType(t, &sema.InvalidFixedPointLiteralScaleError{}, errs[1])
 				}
 			}
 		})
