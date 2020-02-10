@@ -30,6 +30,7 @@ const (
 	// codeReceipt     = 25
 	// codeApproval    = 26
 	codeChunkHeader = 27
+	codeRegisterSet = 28
 
 	codeIndexIdentity  = 100
 	codeIndexGuarantee = 101
