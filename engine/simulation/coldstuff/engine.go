@@ -34,7 +34,7 @@ type Engine struct {
 	state     protocol.State
 	me        module.Local
 	builder   module.Builder
-	cleaner   module.Cleaner
+	finalizer module.Finalizer
 	round     Round
 	interval  time.Duration
 	timeout   time.Duration
@@ -45,7 +45,7 @@ type Engine struct {
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, net module.Network, exp network.Engine, headers storage.Headers, state protocol.State, me module.Local, builder module.Builder, cleaner module.Cleaner) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, exp network.Engine, headers storage.Headers, state protocol.State, me module.Local, builder module.Builder, finalizer module.Finalizer) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{
@@ -56,7 +56,7 @@ func New(log zerolog.Logger, net module.Network, exp network.Engine, headers sto
 		state:     state,
 		me:        me,
 		builder:   builder,
-		cleaner:   cleaner,
+		finalizer: finalizer,
 		round:     nil, // initialized for each consensus round
 		interval:  4 * time.Second,
 		timeout:   1 * time.Second,
@@ -548,19 +548,13 @@ func (e *Engine) commitCandidate() error {
 	}
 
 	// finalize the state
-	err = e.state.Mutate().Finalize(candidate.ID())
+	err = e.finalizer.MakeFinal(candidate.ID())
 	if err != nil {
 		return fmt.Errorf("could not finalize state: %w", err)
 	}
 
 	// hand the finalized block to expulsion engine to spread to all nodes
 	e.exp.Submit(e.round.Leader().NodeID, e.round.Candidate())
-
-	// make sure all pending ambiguous state is now cleared up
-	err = e.cleaner.CleanAfter(candidate.ID())
-	if err != nil {
-		return fmt.Errorf("could not drop ambiguous state: %w", err)
-	}
 
 	log.Info().Msg("block candidate committed")
 
