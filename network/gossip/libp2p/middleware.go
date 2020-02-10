@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -32,6 +33,8 @@ type Middleware struct {
 	libP2PNode *P2PNode
 	stop       chan struct{}
 	me         flow.Identifier
+	host       string
+	port       string
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
@@ -42,7 +45,6 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		return nil, err
 	}
 
-	nodeAddress := NodeAddress{Name: flowID.String(), IP: ip, Port: port}
 	p2p := &P2PNode{}
 
 	// create the node entity and inject dependencies & config
@@ -54,10 +56,9 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 		wg:         &sync.WaitGroup{},
 		stop:       make(chan struct{}),
 		me:         flowID,
+		host:       ip,
+		port:       port,
 	}
-
-	// Start the libp2p node
-	err = p2p.Start(context.Background(), nodeAddress, log, m.handleIncomingStream)
 
 	return m, err
 }
@@ -73,31 +74,29 @@ func (m *Middleware) GetIPPort() (string, string) {
 }
 
 // Start will start the middleware.
-func (m *Middleware) Start(ov middleware.Overlay) {
+func (m *Middleware) Start(ov middleware.Overlay) error {
 
-	// TODO: Add only a subset of the total nodes in the network Issue#2244
-	// Add all the other nodes as peers
-	ids, err := ov.Identity()
-	if err != nil {
-		log.Error().Err(err).Msg("failed to get ids")
-	}
-
-	// remove self from list of nodes
-	delete(ids, m.me)
-
-	for _, id := range ids {
-		// Create a new NodeAddress
-		ip, port, err := net.SplitHostPort(id.Address)
-		if err != nil {
-			log.Error().Err(err).Msg(fmt.Sprintf("could not parse address %s", id.Address))
-		}
-		nodeAddress := NodeAddress{Name: id.NodeID.String(), IP: ip, Port: port}
-		err = m.libP2PNode.AddPeers(context.Background(), nodeAddress)
-		if err != nil {
-			log.Error().Err(err).Msg(fmt.Sprintf("could not add flow ID as peer %s", id.String()))
-		}
-	}
 	m.ov = ov
+
+	// create a discovery object to help libp2p discover peers
+	d := NewDiscovery(m.log, m.ov, m.me)
+
+	// create PubSub options for libp2p to use the discovery object
+	psOption := pubsub.WithDiscovery(d)
+
+	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
+
+	// start the libp2p node
+	err := m.libP2PNode.Start(context.Background(), nodeAddress, m.log, m.handleIncomingStream, psOption)
+
+	if err != nil {
+		return fmt.Errorf("failed to start libp2p node: %w", err)
+	}
+
+	// the ip,port may change after libp2p has been started. e.g. 0.0.0.0:0 would change to an actual IP and port
+	m.host, m.port = m.libP2PNode.GetIPPort()
+
+	return nil
 }
 
 // Stop will end the execution of the middleware and wait for it to end.
@@ -179,6 +178,7 @@ func (m *Middleware) Send(targetID flow.Identifier, msg interface{}) error {
 		switch msg := msg.(type) {
 		case *message.Message:
 			// Write message to outbound channel only if it is of the correct type
+			// TODO: check if outbound channel is already closed
 			conn.outbound <- msg
 		default:
 			err := errors.Errorf("middleware received invalid message type (%T)", msg)
@@ -227,7 +227,7 @@ func (m *Middleware) handleOutboundConnection(targetID flow.Identifier, conn *Wr
 	// make sure we close the stream once the handling is done
 	defer conn.stream.Close()
 	// kick off the send loop
-	conn.SendLoop()
+	conn.SendLoop(m.stop)
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
@@ -257,8 +257,11 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 ProcessLoop:
 	for {
 		select {
+		case <-m.stop:
+			m.log.Info().Msg("exiting process loop: middleware stops")
+			break ProcessLoop
 		case <-conn.done:
-			m.log.Info().Msg("middleware stopped reception of incoming messages")
+			m.log.Info().Msg("exiting process loop: connection stops")
 			break ProcessLoop
 		case msg := <-conn.inbound:
 			m.processMessage(msg)
@@ -292,8 +295,13 @@ func (m *Middleware) handleInboundSubscription(rs *ReadSubscription) {
 SubscriptionLoop:
 	for {
 		select {
+		case <-m.stop:
+			// middleware stops
+			m.log.Info().Msg("exiting subscription loop: middleware stops")
+			break SubscriptionLoop
 		case <-rs.done:
-			m.log.Info().Msg("middleware stopped reception of incoming messages")
+			// subscription stops
+			m.log.Info().Msg("exiting subscription loop: connection stops")
 			break SubscriptionLoop
 		case msg := <-rs.inbound:
 			m.processMessage(msg)
@@ -329,7 +337,10 @@ func (m *Middleware) Publish(topic string, msg interface{}) error {
 		}
 
 		// publish the bytes on the topic
-		err = m.libP2PNode.Publish(context.Background(), topic, data)
+		// pubsub.GossipSubDlo is the minimal number of peer connections that libp2p will maintain
+		// for this node.
+		// TODO: specify a minpeers that makes more sense for Flow (Currently, broadcast if there is at least one peer listening)
+		err = m.libP2PNode.Publish(context.Background(), topic, data, 1)
 		if err != nil {
 			return fmt.Errorf("failed to publish the message: %w", err)
 		}

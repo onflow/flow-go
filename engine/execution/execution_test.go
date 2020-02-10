@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/testutil"
@@ -14,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/messages"
 	network "github.com/dapperlabs/flow-go/network/mock"
 	"github.com/dapperlabs/flow-go/network/stub"
-	"github.com/dapperlabs/flow-go/storage/badger"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
@@ -127,15 +125,6 @@ func TestExecutionFlow(t *testing.T) {
 		}).
 		Return(nil).
 		Once()
-
-	// TODO: index guarantees when receiving a block
-	// this is a temporary patch to prevent a storage error
-	// https://github.com/dapperlabs/flow-go/issues/2355
-	guarantees := badger.NewGuarantees(exeNode.DB)
-	for _, g := range block.Guarantees {
-		err := guarantees.Store(g)
-		require.NoError(t, err)
-	}
 
 	// submit block from consensus node
 	exeNode.BlocksEngine.Submit(conID.NodeID, block)

@@ -40,8 +40,17 @@ func (_m *Middleware) Send(nodeID flow.Identifier, msg interface{}) error {
 }
 
 // Start provides a mock function with given fields: overlay
-func (_m *Middleware) Start(overlay middleware.Overlay) {
-	_m.Called(overlay)
+func (_m *Middleware) Start(overlay middleware.Overlay) error {
+	ret := _m.Called(overlay)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(middleware.Overlay) error); ok {
+		r0 = rf(overlay)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // Stop provides a mock function with given fields:

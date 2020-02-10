@@ -37,14 +37,14 @@ func expectedTimeoutInfo(view uint64, mode types.TimeoutMode) interface{} {
 		})
 }
 
-func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mockdist.Distributor) {
-	notifier := &mockdist.Distributor{}
+func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mockdist.Consumer) {
+	notifier := &mockdist.Consumer{}
 	tc, err := timeout.NewConfig(
-		time.Duration(startRepTimeout*1E6),
-		time.Duration(minRepTimeout*1E6),
+		time.Duration(startRepTimeout*1e6),
+		time.Duration(minRepTimeout*1e6),
 		voteTimeoutFraction,
 		multiplicativeIncrease,
-		time.Duration(additiveDecrease*1E6))
+		time.Duration(additiveDecrease*1e6))
 	if err != nil {
 		t.Fail()
 	}
@@ -85,7 +85,6 @@ func Test_SkipIncreaseViewThroughQC(t *testing.T) {
 
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(13), pm.CurView())
-	//notifier.AssertNumberOfCalls(t, "OnEnteringView", 1)
 }
 
 // Test_IgnoreOldBlocks tests that PaceMaker ignores old blocks

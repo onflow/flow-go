@@ -45,6 +45,7 @@ type Elaboration struct {
 	InterfaceNestedDeclarations            map[*ast.InterfaceDeclaration]map[string]ast.Declaration
 	PostConditionsRewrite                  map[*ast.Conditions]PostConditionsRewrite
 	EmitStatementEventTypes                map[*ast.EmitStatement]*CompositeType
+	IsReferenceIntoStorage                 map[*ast.ReferenceExpression]bool
 }
 
 func NewElaboration() *Elaboration {
@@ -83,5 +84,6 @@ func NewElaboration() *Elaboration {
 		InterfaceNestedDeclarations:            map[*ast.InterfaceDeclaration]map[string]ast.Declaration{},
 		PostConditionsRewrite:                  map[*ast.Conditions]PostConditionsRewrite{},
 		EmitStatementEventTypes:                map[*ast.EmitStatement]*CompositeType{},
+		IsReferenceIntoStorage:                 map[*ast.ReferenceExpression]bool{},
 	}
 }

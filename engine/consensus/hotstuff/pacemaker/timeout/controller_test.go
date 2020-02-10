@@ -18,11 +18,11 @@ const (
 
 func initTimeoutController(t *testing.T) *Controller {
 	tc, err := NewConfig(
-		time.Duration(startRepTimeout*1E6),
-		time.Duration(minRepTimeout*1E6),
+		time.Duration(startRepTimeout*1e6),
+		time.Duration(minRepTimeout*1e6),
 		voteTimeoutFraction,
 		multiplicativeIncrease,
-		time.Duration(additiveDecrease*1E6))
+		time.Duration(additiveDecrease*1e6))
 	if err != nil {
 		t.Fail()
 	}
@@ -101,11 +101,11 @@ func Test_MinCutoff(t *testing.T) {
 func Test_MaxCutoff(t *testing.T) {
 	// here we use a different timeout controller with a larger timeoutIncrease to avoid too many iterations
 	c, err := NewConfig(
-		time.Duration(200 * float64(time.Millisecond)),
-		time.Duration(minRepTimeout * float64(time.Millisecond)),
+		time.Duration(200*float64(time.Millisecond)),
+		time.Duration(minRepTimeout*float64(time.Millisecond)),
 		voteTimeoutFraction,
 		10,
-		time.Duration(additiveDecrease * float64(time.Millisecond)))
+		time.Duration(additiveDecrease*float64(time.Millisecond)))
 	if err != nil {
 		t.Fail()
 	}

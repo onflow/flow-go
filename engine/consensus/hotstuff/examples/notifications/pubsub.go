@@ -7,17 +7,24 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
-// PubSubDistributor implements notifications.Distributor
-// It allows thread-safe subscription of consumers to events
+// PubSubDistributor is an example implementation of notifications.Consumer
+// that distributes notifications to a list of subscribers.
+//
+// It allows thread-safe subscription of multiple consumers to events.
 type PubSubDistributor struct {
-	skippedAheadConsumers    []SkippedAheadConsumer
-	enteringViewConsumers    []EnteringViewConsumer
-	startingTimeoutConsumers []StartingTimeoutConsumer
-	reachedTimeoutConsumers  []ReachedTimeoutConsumer
-	lock                     sync.RWMutex
+	skippedAheadConsumers          []SkippedAheadConsumer
+	enteringViewConsumers          []EnteringViewConsumer
+	startingTimeoutConsumers       []StartingTimeoutConsumer
+	reachedTimeoutConsumers        []ReachedTimeoutConsumer
+	qcIncorporatedConsumers        []QcIncorporatedConsumer
+	forkChoiceGeneratedConsumers   []ForkChoiceGeneratedConsumer
+	blockIncorporatedConsumers     []BlockIncorporatedConsumer
+	finalizedBlockConsumers        []FinalizedBlockConsumer
+	doubleProposeDetectedConsumers []DoubleProposeDetectedConsumer
+	lock                           sync.RWMutex
 }
 
-func NewPubSubDistributor() notifications.Distributor {
+func NewPubSubDistributor() notifications.Consumer {
 	return &PubSubDistributor{}
 }
 
@@ -50,6 +57,46 @@ func (p *PubSubDistributor) OnReachedTimeout(timeout *types.TimerInfo) {
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.reachedTimeoutConsumers {
 		subscriber.OnReachedTimeout(timeout)
+	}
+}
+
+func (p *PubSubDistributor) OnQcIncorporated(qc *types.QuorumCertificate) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.qcIncorporatedConsumers {
+		subscriber.OnQcIncorporated(qc)
+	}
+}
+
+func (p *PubSubDistributor) OnForkChoiceGenerated(curView uint64, selectedQC *types.QuorumCertificate) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.forkChoiceGeneratedConsumers {
+		subscriber.OnForkChoiceGenerated(curView, selectedQC)
+	}
+}
+
+func (p *PubSubDistributor) OnBlockIncorporated(block *types.BlockProposal) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.blockIncorporatedConsumers {
+		subscriber.OnBlockIncorporated(block)
+	}
+}
+
+func (p *PubSubDistributor) OnFinalizedBlock(block *types.BlockProposal) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.finalizedBlockConsumers {
+		subscriber.OnFinalizedBlock(block)
+	}
+}
+
+func (p *PubSubDistributor) OnDoubleProposeDetected(block1, block2 *types.BlockProposal) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.doubleProposeDetectedConsumers {
+		subscriber.OnDoubleProposeDetected(block1, block2)
 	}
 }
 

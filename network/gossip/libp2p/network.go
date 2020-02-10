@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -34,6 +35,7 @@ type Network struct {
 	sip     hash.Hash
 	engines map[uint8]network.Engine
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
+	fanout  int             // used to determine number of nodes' neighbors on overlay
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -50,13 +52,22 @@ func NewNetwork(
 
 	top, err := topology.New()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not initialize topology")
+		return nil, fmt.Errorf("could not initialize topology: %w", err)
 	}
 
 	rcache, err := cache.NewRcvCache(csize)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not initialize cache")
+		return nil, fmt.Errorf("could not initialize cache: %w", err)
 	}
+
+	netSize, err := state.Final().Identities()
+	if err != nil {
+		return nil, fmt.Errorf("could not extract network size: %w", err)
+	}
+
+	// todo fanout optimization #2244
+	// fanout is set to half of the system size for connectivity assurance w.h.p
+	fanout := len(netSize) / 2
 
 	o := &Network{
 		logger:  log,
@@ -68,6 +79,7 @@ func NewNetwork(
 		sip:     siphash.New([]byte("daflowtrickleson")),
 		engines: make(map[uint8]network.Engine),
 		rcache:  rcache,
+		fanout:  fanout,
 	}
 
 	return o, nil
@@ -76,8 +88,11 @@ func NewNetwork(
 // Ready returns a channel that will close when the network stack is ready.
 func (n *Network) Ready() <-chan struct{} {
 	ready := make(chan struct{})
-	n.mw.Start(n)
 	go func() {
+		err := n.mw.Start(n)
+		if err != nil {
+			n.logger.Err(err).Msg("failed to start middleware")
+		}
 		close(ready)
 	}()
 	return ready
@@ -134,6 +149,53 @@ func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
 		identifierToID[id.NodeID] = *id
 	}
 	return identifierToID, nil
+}
+
+// Topology returns the identities of a uniform subset of nodes in protocol state
+// size indicates size of the subset
+func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
+	idMap, err := n.Identity()
+	if err != nil {
+		return nil, err
+	}
+
+	// extracts a list of ids out of the idList
+	idList := make([]flow.Identity, 0)
+	for _, id := range idMap {
+		idList = append(idList, id)
+	}
+
+	// uses hash of the node's identifier as the seed to generate randomized topology
+	// step-1: creating hasher
+	hasher, err := crypto.NewHasher(crypto.SHA3_256)
+	if err != nil {
+		return nil, err
+	}
+	// step-2: computing hash of node's identifier
+	hash := hasher.ComputeHash([]byte(n.me.NodeID().String()))
+	// step-3: converting hash to an uint64 slice
+	seed := make([]uint64, 0)
+	for _, b := range hash {
+		seed = append(seed, uint64(b+1))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse hash: %w", err)
+	}
+
+	// selects subset of the nodes in idMap as large as the size
+	topListInd, err := crypto.RandomPermutationSubset(len(idList), n.fanout, seed)
+	if err != nil {
+		return nil, fmt.Errorf("cannot sample topology: %w", err)
+	}
+
+	// creates a map of the selected ids
+	topMap := make(map[flow.Identifier]flow.Identity)
+	for _, v := range topListInd {
+		id := idList[v]
+		topMap[id.NodeID] = id
+	}
+
+	return topMap, nil
 }
 
 // Cleanup implements a callback to handle peers that have been dropped
@@ -264,8 +326,9 @@ func (n *Network) send(channelID uint8, msg *message.Message, nodeIDs ...flow.Id
 	default:
 		err = n.mw.Publish(strconv.Itoa(int(channelID)), msg)
 	}
+
 	if err != nil {
-		err = fmt.Errorf("failed to send message to %s:%w", nodeIDs, err)
+		return fmt.Errorf("failed to send message to %s:%w", nodeIDs, err)
 	}
-	return err
+	return nil
 }

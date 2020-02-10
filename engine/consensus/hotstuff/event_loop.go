@@ -74,7 +74,6 @@ func (el *EventLoop) processEvent() error {
 	case b := <-el.blockheaders:
 		err = el.eventHandler.OnReceiveBlockHeader(b)
 	case v := <-el.votes:
-		el.eventHandler.OnReceiveVote(v)
 		err = el.eventHandler.OnReceiveVote(v)
 	}
 	return err

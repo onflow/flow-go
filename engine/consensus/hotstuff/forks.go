@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // Forks encapsulated Finalization Logic and ForkChoice rule in one component.
@@ -21,7 +22,7 @@ type Forks interface {
 
 	// GetBlock returns (BlockProposal, true) if the block with the specified
 	// id was found (nil, false) otherwise.
-	GetBlock(id []byte) (*types.BlockProposal, bool)
+	GetBlock(id flow.Identifier) (*types.BlockProposal, bool)
 
 	// FinalizedView returns the largest view number where a finalized block is known
 	FinalizedView() uint64
@@ -49,7 +50,7 @@ type Forks interface {
 	AddBlock(block *types.BlockProposal) error
 
 	// AddQC adds a quorum certificate to Forks.
-	// Might error in case the block referenced by the qc is unknown.
+	// Will error in case the block referenced by the qc is unknown.
 	// Might error with ErrorByzantineThresholdExceeded (e.g. if two conflicting QCs for the
 	// same view are found)
 	AddQC(qc *types.QuorumCertificate) error
@@ -73,8 +74,9 @@ type Forks interface {
 }
 
 // ErrorByzantineThresholdExceeded is raised if HotStuff detects malicious conditions which
-// prove a Byzantine super-minority of consensus replicas. A 'Byzantine super-minority'
-// is defined as a group of byzantine consensus replicas with at least 1/3 stake.
+// prove a Byzantine threshold of consensus replicas has been exceeded.
+// Per definition, the byzantine threshold is exceeded is there are byzantine consensus
+// replicas with _at least_ 1/3 stake.
 type ErrorByzantineThresholdExceeded struct {
 	Evidence string
 }

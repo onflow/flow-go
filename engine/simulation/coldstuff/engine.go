@@ -34,7 +34,7 @@ type Engine struct {
 	state     protocol.State
 	me        module.Local
 	builder   module.Builder
-	cleaner   module.Cleaner
+	finalizer module.Finalizer
 	round     Round
 	interval  time.Duration
 	timeout   time.Duration
@@ -45,7 +45,7 @@ type Engine struct {
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, net module.Network, exp network.Engine, headers storage.Headers, state protocol.State, me module.Local, builder module.Builder, cleaner module.Cleaner) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, exp network.Engine, headers storage.Headers, state protocol.State, me module.Local, builder module.Builder, finalizer module.Finalizer) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{
@@ -56,7 +56,7 @@ func New(log zerolog.Logger, net module.Network, exp network.Engine, headers sto
 		state:     state,
 		me:        me,
 		builder:   builder,
-		cleaner:   cleaner,
+		finalizer: finalizer,
 		round:     nil, // initialized for each consensus round
 		interval:  4 * time.Second,
 		timeout:   1 * time.Second,
@@ -245,19 +245,22 @@ func (e *Engine) sendProposal() error {
 		return fmt.Errorf("could not get own current ID: %w", err)
 	}
 
-	// get the payload for the next hash
-	payloadHash, err := e.builder.BuildOn(e.round.Parent().ID())
-	if err != nil {
-		return fmt.Errorf("could not build on parent: %w", err)
+	// define the block header build function
+	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
+		header := flow.Header{
+			Number:      e.round.Parent().Number + 1,
+			Timestamp:   time.Now().UTC(),
+			ParentID:    e.round.Parent().ID(),
+			PayloadHash: payloadHash,
+			ProposerID:  e.me.NodeID(),
+		}
+		return &header, nil
 	}
 
-	// create the header
-	candidate := flow.Header{
-		Number:      e.round.Parent().Number + 1,
-		Timestamp:   time.Now().UTC(),
-		ParentID:    e.round.Parent().ID(),
-		PayloadHash: payloadHash,
-		ProposerID:  e.me.NodeID(),
+	// get the payload for the next hash
+	candidate, err := e.builder.BuildOn(e.round.Parent().ID(), build)
+	if err != nil {
+		return fmt.Errorf("could not build on parent: %w", err)
 	}
 
 	log = log.With().
@@ -266,17 +269,17 @@ func (e *Engine) sendProposal() error {
 		Logger()
 
 	// store the block proposal
-	err = e.headers.Store(&candidate)
+	err = e.headers.Store(candidate)
 	if err != nil {
 		return fmt.Errorf("could not store candidate: %w", err)
 	}
 
 	// cache the candidate block
-	e.round.Propose(&candidate)
+	e.round.Propose(candidate)
 
 	// send the block proposal
 	proposal := &coldstuff.BlockProposal{
-		Header: &candidate,
+		Header: candidate,
 	}
 	err = e.con.Submit(proposal, e.round.Participants().NodeIDs()...)
 	if err != nil {
@@ -545,19 +548,13 @@ func (e *Engine) commitCandidate() error {
 	}
 
 	// finalize the state
-	err = e.state.Mutate().Finalize(candidate.ID())
+	err = e.finalizer.MakeFinal(candidate.ID())
 	if err != nil {
 		return fmt.Errorf("could not finalize state: %w", err)
 	}
 
 	// hand the finalized block to expulsion engine to spread to all nodes
 	e.exp.Submit(e.round.Leader().NodeID, e.round.Candidate())
-
-	// make sure all pending ambiguous state is now cleared up
-	err = e.cleaner.CleanAfter(candidate.ID())
-	if err != nil {
-		return fmt.Errorf("could not drop ambiguous state: %w", err)
-	}
 
 	log.Info().Msg("block candidate committed")
 

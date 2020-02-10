@@ -80,7 +80,7 @@ RecvLoop:
 		}
 
 		r.log.Debug().
-			Bytes("sender", msg.OriginID).
+			Hex("sender", msg.OriginID).
 			Hex("eventID", msg.EventID).
 			Msg("received message")
 

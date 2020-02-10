@@ -1111,7 +1111,7 @@ func TestCheckInvalidCreateImportedResource(t *testing.T) {
       pub resource R {}
 	`)
 
-	require.Nil(t, err)
+	require.NoError(t, err)
 
 	_, err = ParseAndCheckWithOptions(t,
 		`

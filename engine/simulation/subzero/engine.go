@@ -22,32 +22,34 @@ import (
 // collecting the first quorum. In order to keep nodes in sync, the quorum is
 // set at the totality of the stake in the network.
 type Engine struct {
-	unit     *engine.Unit
-	log      zerolog.Logger
-	prov     network.Engine
-	headers  storage.Headers
-	state    protocol.State
-	me       module.Local
-	builder  module.Builder
-	cleaner  module.Cleaner
-	interval time.Duration
+	unit      *engine.Unit
+	log       zerolog.Logger
+	prov      network.Engine
+	headers   storage.Headers
+	payloads  storage.Payloads
+	state     protocol.State
+	me        module.Local
+	builder   module.Builder
+	finalizer module.Finalizer
+	interval  time.Duration
 }
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, prov network.Engine, headers storage.Headers, state protocol.State, me module.Local, builder module.Builder, cleaner module.Cleaner) (*Engine, error) {
+func New(log zerolog.Logger, prov network.Engine, headers storage.Headers, payloads storage.Payloads, state protocol.State, me module.Local, builder module.Builder, finalizer module.Finalizer) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "subzero").Logger(),
-		prov:     prov,
-		headers:  headers,
-		state:    state,
-		me:       me,
-		builder:  builder,
-		cleaner:  cleaner,
-		interval: 10 * time.Second,
+		unit:      engine.NewUnit(),
+		log:       log.With().Str("engine", "subzero").Logger(),
+		prov:      prov,
+		headers:   headers,
+		payloads:  payloads,
+		state:     state,
+		me:        me,
+		builder:   builder,
+		finalizer: finalizer,
+		interval:  10 * time.Second,
 	}
 
 	return e, nil
@@ -146,8 +148,18 @@ ConsentLoop:
 			}
 
 			log.Info().Msg("proposal committed")
+			payload, err := e.payloads.ByPayloadHash(proposal.PayloadHash)
+			if err != nil {
+				e.log.Error().Err(err).Msg("could retrieve payload hash")
+				continue ConsentLoop
+			}
+			block := flow.Block{
+				Header:  *proposal,
+				Payload: *payload,
+			}
 
-			e.prov.SubmitLocal(proposal)
+			// Broadcast block
+			e.prov.SubmitLocal(&block)
 		}
 	}
 }
@@ -163,22 +175,25 @@ func (e *Engine) createProposal() (*flow.Header, error) {
 		return nil, fmt.Errorf("could not get parent: %w", err)
 	}
 
+	// define the block header build function
+	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
+		header := flow.Header{
+			Number:      parent.Number + 1,
+			Timestamp:   time.Now().UTC(),
+			ParentID:    parent.ID(),
+			PayloadHash: payloadHash,
+			ProposerID:  e.me.NodeID(),
+		}
+		return &header, nil
+	}
+
 	// create the proposal payload on top of the parent
-	payloadHash, err := e.builder.BuildOn(parent.ID())
+	proposal, err := e.builder.BuildOn(parent.ID(), build)
 	if err != nil {
 		return nil, fmt.Errorf("could not create block: %w", err)
 	}
 
-	// create the proposal
-	proposal := flow.Header{
-		Number:      parent.Number + 1,
-		Timestamp:   time.Now().UTC(),
-		ParentID:    parent.ID(),
-		PayloadHash: payloadHash,
-		ProposerID:  e.me.NodeID(),
-	}
-
-	return &proposal, nil
+	return proposal, nil
 }
 
 // commitProposal will insert the block into our local block database, then it
@@ -198,15 +213,9 @@ func (e *Engine) commitProposal(proposal *flow.Header) error {
 	}
 
 	// finalize the blockchain state with the proposal
-	err = e.state.Mutate().Finalize(proposal.ID())
+	err = e.finalizer.MakeFinal(proposal.ID())
 	if err != nil {
 		return fmt.Errorf("could not finalize state: %w", err)
-	}
-
-	// remove the finalized entities from the memory pools
-	err = e.cleaner.CleanAfter(proposal.ID())
-	if err != nil {
-		return fmt.Errorf("could not clean up temporary state: %w", err)
 	}
 
 	return nil
