@@ -12,4 +12,4 @@ type StorageProof = []byte
 // StateCommitment holds the root hash of the tree (Snapshot)
 type StateCommitment = []byte
 
-type RegisterSet map[string][]byte
+type RegisterDelta map[string][]byte

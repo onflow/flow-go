@@ -29,8 +29,8 @@ const (
 	codeResult      = 24
 	// codeReceipt     = 25
 	// codeApproval    = 26
-	codeChunkHeader = 27
-	codeRegisterSet = 28
+	codeChunkHeader   = 27
+	codeRegisterDelta = 28
 
 	codeIndexIdentity  = 100
 	codeIndexGuarantee = 101
