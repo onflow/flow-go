@@ -2,12 +2,15 @@ package test
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -41,7 +44,8 @@ func (m *MeshNetTestSuite) SetupTest() {
 
 	m.ids = CreateIDs(count)
 
-	mws, err := CreateMiddleware(m.ids)
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	mws, err := CreateMiddleware(logger, m.ids)
 	require.NoError(m.Suite.T(), err)
 	m.mws = mws
 

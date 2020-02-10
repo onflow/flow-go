@@ -2654,6 +2654,7 @@ func (t *ReferencesType) IsValidIndexingType(indexingType Type) (isValid bool, e
 // ReferenceType represents the reference to a value
 type ReferenceType struct {
 	Authorized bool
+	Storable   bool
 	Type       Type
 }
 
@@ -2667,6 +2668,9 @@ func (t *ReferenceType) String() string {
 	if t.Authorized {
 		builder.WriteString("auth ")
 	}
+	if t.Storable {
+		builder.WriteString("storable ")
+	}
 	builder.WriteRune('&')
 	builder.WriteString(t.Type.String())
 	return builder.String()
@@ -2675,7 +2679,10 @@ func (t *ReferenceType) String() string {
 func (t *ReferenceType) ID() TypeID {
 	var builder strings.Builder
 	if t.Authorized {
-		builder.WriteString("auth")
+		builder.WriteString("auth ")
+	}
+	if t.Storable {
+		builder.WriteString("storable ")
 	}
 	builder.WriteRune('&')
 	if t.Type != nil {
@@ -2689,7 +2696,9 @@ func (t *ReferenceType) Equal(other Type) bool {
 	if !ok {
 		return false
 	}
+
 	return t.Authorized == otherReference.Authorized &&
+		t.Storable == otherReference.Storable &&
 		t.Type.Equal(otherReference.Type)
 }
 
@@ -2898,12 +2907,19 @@ func IsSubType(subType Type, superType Type) bool {
 			return false
 		}
 
-		// References are covariant: &T <: &U if T <: U
-		// Unauthorized references are *not* subtypes of authorized subtypes.
+		// Unauthorized references are *not* subtypes of authorized references.
 
 		if !typedSubType.Authorized && typedSuperType.Authorized {
 			return false
 		}
+
+		// Non-storable references are *not* subtypes of storable references.
+
+		if !typedSubType.Storable && typedSuperType.Storable {
+			return false
+		}
+
+		// References are covariant: &T <: &U if T <: U
 
 		return IsSubType(typedSubType.Type, typedSuperType.Type)
 

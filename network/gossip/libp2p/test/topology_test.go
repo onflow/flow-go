@@ -2,10 +2,12 @@ package test
 
 import (
 	gojson "encoding/json"
+	"os"
 	"sort"
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -38,8 +40,9 @@ func (n *TopologyTestSuite) SetupTest() {
 	// takes firs id as the current nodes id
 	me := n.ids[0]
 
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 	// creates a middleware instance
-	mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), "0.0.0.0:0", me.NodeID)
+	mw, err := libp2p.NewMiddleware(logger, json.NewCodec(), "0.0.0.0:0", me.NodeID)
 	require.NoError(n.Suite.T(), err)
 
 	// creates and mocks a network instance

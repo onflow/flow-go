@@ -28,6 +28,7 @@ type Engine struct {
 	conduit           network.Conduit
 	collectionConduit network.Conduit
 	blocks            storage.Blocks
+	payloads          storage.Payloads
 	collections       storage.Collections
 	execution         network.Engine
 	mempool           *Mempool
@@ -39,6 +40,7 @@ func New(
 	me module.Local,
 	state protocol.State,
 	blocks storage.Blocks,
+	payloads storage.Payloads,
 	collections storage.Collections,
 	executionEngine network.Engine,
 ) (*Engine, error) {
@@ -55,6 +57,7 @@ func New(
 		me:          me,
 		state:       state,
 		blocks:      blocks,
+		payloads:    payloads,
 		collections: collections,
 		execution:   executionEngine,
 		mempool:     mempool,
@@ -167,7 +170,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		Uint64("block_number", block.Number).
 		Msg("received block")
 
-	err := e.state.Mutate().StorePayload(&block.Payload)
+	err := e.payloads.Store(&block.Payload)
 	if err != nil {
 		return fmt.Errorf("could not save block payload: %w", err)
 	}

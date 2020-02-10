@@ -3,9 +3,10 @@ package hotstuff
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
 type Voter struct {

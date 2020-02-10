@@ -10,38 +10,6 @@ import (
 	. "github.com/dapperlabs/flow-go/language/runtime/tests/utils"
 )
 
-func TestCheckReferenceTypeSubTyping(t *testing.T) {
-
-	_, err := ParseAndCheckStorage(t, `
-          resource interface RI {}
-
-          resource R: RI {}
-
-          let ref = &storage[R] as &RI
-          let ref2: &RI = ref
-        `,
-	)
-
-	require.NoError(t, err)
-}
-
-func TestCheckInvalidReferenceTypeSubTyping(t *testing.T) {
-
-	_, err := ParseAndCheckStorage(t, `
-          resource interface RI {}
-
-          // NOTE: R does not conform to RI
-          resource R {}
-
-          let ref = &storage[R] as &RI
-        `,
-	)
-
-	errs := ExpectCheckerErrors(t, err, 1)
-
-	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
-}
-
 func TestCheckReferenceTypeOuter(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `
@@ -217,34 +185,76 @@ func TestCheckInvalidReferenceExpressionTypeMismatch(t *testing.T) {
 	assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
 }
 
-func TestCheckInvalidReferenceToNonIndex(t *testing.T) {
+func TestCheckReferenceToNonStorage(t *testing.T) {
 
-	_, err := ParseAndCheckStorage(t, `
+	t.Run("non-resource variable", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+          struct S {}
+
+          let s = S()
+          let ref = &s as &S
+        `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 2)
+
+		assert.IsType(t, &sema.NonResourceTypeReferenceError{}, errs[0])
+		assert.IsType(t, &sema.NonResourceReferenceTypeError{}, errs[1])
+	})
+
+	t.Run("resource variable, non-storable", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
           resource R {}
 
           let r <- create R()
           let ref = &r as &R
         `,
-	)
+		)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+		require.NoError(t, err)
+	})
 
-	assert.IsType(t, &sema.NonStorageReferenceError{}, errs[0])
-}
+	t.Run("resource array indexing", func(t *testing.T) {
 
-func TestCheckInvalidReferenceToNonStorage(t *testing.T) {
-
-	_, err := ParseAndCheckStorage(t, `
+		_, err := ParseAndCheckStorage(t, `
           resource R {}
 
           let rs <- [<-create R()]
           let ref = &rs[0] as &R
         `,
-	)
+		)
 
-	errs := ExpectCheckerErrors(t, err, 1)
+		require.NoError(t, err)
+	})
 
-	assert.IsType(t, &sema.NonStorageReferenceError{}, errs[0])
+	t.Run("resource variable, storable", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let r <- create R()
+          let ref = &r as storable &R
+        `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidNonStorageStorableReferenceError{}, errs[0])
+	})
+
+	t.Run("storage, storable", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let ref = &storage[R] as storable &R
+        `,
+		)
+
+		require.NoError(t, err)
+	})
 }
 
 func TestCheckReferenceUse(t *testing.T) {
@@ -433,16 +443,46 @@ func TestCheckInvalidResourceInterfaceReferenceFunctionCall(t *testing.T) {
 	assert.IsType(t, &sema.NotDeclaredMemberError{}, errs[0])
 }
 
-func TestCheckAuthReferenceTypeSubTyping(t *testing.T) {
+func TestCheckReferenceTypeSubTyping(t *testing.T) {
 
-	// TODO: replace panic with actual reference expression
-	// once it supports non-storage references
+	t.Run("resource interface conformance", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+          resource interface RI {}
+
+          resource R: RI {}
+
+          let ref = &storage[R] as &RI
+          let ref2: &RI = ref
+        `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("resource interface non-conformance", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+          resource interface RI {}
+
+          // NOTE: R does not conform to RI
+          resource R {}
+
+          let ref = &storage[R] as &RI
+        `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
 
 	t.Run("auth to non-auth", func(t *testing.T) {
+
 		_, err := ParseAndCheckStorage(t, `
           resource R {}
 
-          let ref: auth &R = panic("")
+          let ref: auth &R = &storage[R] as auth &R
           let ref2: &R = ref
         `,
 		)
@@ -451,11 +491,40 @@ func TestCheckAuthReferenceTypeSubTyping(t *testing.T) {
 	})
 
 	t.Run("non-auth to auth", func(t *testing.T) {
+
 		_, err := ParseAndCheckStorage(t, `
           resource R {}
 
-          let ref: &R = panic("")
+          let ref: &R = &storage[R] as &R
           let ref2: auth &R = ref
+        `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.TypeMismatchError{}, errs[0])
+	})
+
+	t.Run("storable to non-storable", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let ref: storable &R = &storage[R] as storable &R
+          let ref2: &R = ref
+        `,
+		)
+
+		require.NoError(t, err)
+	})
+
+	t.Run("non-storable to storable", func(t *testing.T) {
+
+		_, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let ref: &R = &storage[R] as &R
+          let ref2: storable &R = ref
         `,
 		)
 
@@ -493,7 +562,7 @@ func TestCheckReferenceExpressionReferenceType(t *testing.T) {
 		)
 
 		assert.False(t, referenceType.Authorized)
-
+		assert.False(t, referenceType.Storable)
 	})
 
 	t.Run("auth reference", func(t *testing.T) {
@@ -522,7 +591,94 @@ func TestCheckReferenceExpressionReferenceType(t *testing.T) {
 		)
 
 		assert.True(t, referenceType.Authorized)
+		assert.False(t, referenceType.Storable)
+	})
 
+	t.Run("storable reference", func(t *testing.T) {
+
+		checker, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let ref = &storage[R] as storable &R
+        `,
+		)
+
+		require.NoError(t, err)
+
+		refValueType := checker.GlobalValues["ref"].Type
+
+		require.IsType(t,
+			&sema.ReferenceType{},
+			refValueType,
+		)
+
+		referenceType := refValueType.(*sema.ReferenceType)
+
+		assert.IsType(t,
+			&sema.CompositeType{},
+			referenceType.Type,
+		)
+
+		assert.False(t, referenceType.Authorized)
+		assert.True(t, referenceType.Storable)
+	})
+
+	t.Run("storable auth reference", func(t *testing.T) {
+
+		checker, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let ref = &storage[R] as storable auth &R
+        `,
+		)
+
+		require.NoError(t, err)
+
+		refValueType := checker.GlobalValues["ref"].Type
+
+		require.IsType(t,
+			&sema.ReferenceType{},
+			refValueType,
+		)
+
+		referenceType := refValueType.(*sema.ReferenceType)
+
+		assert.IsType(t,
+			&sema.CompositeType{},
+			referenceType.Type,
+		)
+
+		assert.True(t, referenceType.Authorized)
+		assert.True(t, referenceType.Storable)
+	})
+
+	t.Run("storable auth reference", func(t *testing.T) {
+
+		checker, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let ref = &storage[R] as auth storable &R
+        `,
+		)
+
+		require.NoError(t, err)
+
+		refValueType := checker.GlobalValues["ref"].Type
+
+		require.IsType(t,
+			&sema.ReferenceType{},
+			refValueType,
+		)
+
+		referenceType := refValueType.(*sema.ReferenceType)
+
+		assert.IsType(t,
+			&sema.CompositeType{},
+			referenceType.Type,
+		)
+
+		assert.True(t, referenceType.Authorized)
+		assert.True(t, referenceType.Storable)
 	})
 
 }

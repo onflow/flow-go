@@ -32,3 +32,17 @@ func (_m *Payloads) ByPayloadHash(payloadHash flow.Identifier) (*flow.Payload, e
 
 	return r0, r1
 }
+
+// Store provides a mock function with given fields: payload
+func (_m *Payloads) Store(payload *flow.Payload) error {
+	ret := _m.Called(payload)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.Payload) error); ok {
+		r0 = rf(payload)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}

@@ -121,7 +121,7 @@ func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, 
 		// creates and mocks me
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
-		net, err := libp2p.NewNetwork(zerolog.Logger{}, json.NewCodec(), state, me, mws[i], csize)
+		net, err := libp2p.NewNetwork(log, json.NewCodec(), state, me, mws[i], csize)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not create error %w", err)
 		}
@@ -156,12 +156,12 @@ func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, 
 }
 
 // CreateMiddleware receives an ids slice and creates and initializes a middleware instances for each id
-func CreateMiddleware(identities []*flow.Identity) ([]*libp2p.Middleware, error) {
+func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2p.Middleware, error) {
 	count := len(identities)
 	mws := make([]*libp2p.Middleware, 0)
 	for i := 0; i < count; i++ {
 		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(zerolog.Logger{}, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID)
+		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID)
 		if err != nil {
 			return nil, err
 		}
