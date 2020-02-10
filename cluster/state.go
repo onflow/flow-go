@@ -14,11 +14,6 @@ type State interface {
 	// block. The returned snapshot is therefore immutable over time.
 	Final() Snapshot
 
-	// AtNumber returns the snapshot of the persistent cluster state at the
-	// given block number. It is only available for finalized blocks and the
-	// returned snapshot is therefore immutable over.
-	AtNumber(number uint64) Snapshot
-
 	// AtBlockID returns the snapshot of the persistent cluster at the given
 	// block ID. It is available for any block that was introduced into the
 	// the cluster state, and can thus represent an ambiguous state that was or
