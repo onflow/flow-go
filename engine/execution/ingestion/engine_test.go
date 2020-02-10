@@ -73,7 +73,6 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	})
 	mutator := protocol.NewMockMutator(ctrl)
 	protocolState.EXPECT().Mutate().Return(mutator).AnyTimes()
-	mutator.EXPECT().StorePayload(gomock.Any()).AnyTimes()
 	payloads.EXPECT().Store(gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
