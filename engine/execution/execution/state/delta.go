@@ -41,6 +41,10 @@ func (d Delta) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 	return ids, values
 }
 
+func (d Delta) RegisterSet() flow.RegisterSet {
+	return flow.RegisterSet(d)
+}
+
 // HasBeenDeleted returns true if the given key has been deleted in this delta.
 func (d Delta) HasBeenDeleted(key string) bool {
 	value, exists := d[key]
