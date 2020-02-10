@@ -3,14 +3,11 @@ package hotstuff
 import (
 	"fmt"
 
-	"github.com/rs/zerolog"
-
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 type VoteAggregator struct {
-	log            zerolog.Logger
 	viewState      ViewState
 	voteValidator  *Validator
 	lastPrunedView uint64
@@ -26,9 +23,8 @@ type VoteAggregator struct {
 	blockHashToVotingStatus map[flow.Identifier]*VotingStatus
 }
 
-func NewVoteAggregator(log zerolog.Logger, lastPruneView uint64, viewState ViewState, voteValidator *Validator) *VoteAggregator {
+func NewVoteAggregator(lastPruneView uint64, viewState ViewState, voteValidator *Validator) *VoteAggregator {
 	return &VoteAggregator{
-		log:                     log,
 		lastPrunedView:          lastPruneView,
 		viewState:               viewState,
 		voteValidator:           voteValidator,
@@ -82,7 +78,6 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 			FinalizedView: va.lastPrunedView,
 		})
 	}
-	va.log.Info().Msg("new incorporated vote added")
 	votingStatus, err := va.validateAndStoreIncorporatedVote(vote, bp)
 	if err != nil {
 		return nil, fmt.Errorf("could not store incorporated vote: %w", err)
@@ -109,7 +104,7 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 	primaryVote := bp.ToVote()
 	voteStatus, err := va.validateAndStoreIncorporatedVote(primaryVote, bp)
 	if err != nil {
-		va.log.Warn().Msg("primary vote is invalid")
+		return nil, fmt.Errorf("primary vote is invalid %w", err)
 	}
 	// accumulate pending votes by order
 	pendingStatus, exists := va.pendingVotes.votes[bp.BlockID()]
@@ -127,7 +122,6 @@ func (va *VoteAggregator) convertPendingVotes(pendingVotes []*types.Vote, bp *ty
 	for _, vote := range pendingVotes {
 		voteStatus, err := va.validateAndStoreIncorporatedVote(vote, bp)
 		if err != nil {
-			va.log.Warn().Msg("invalid vote found")
 			continue
 		}
 		// if threshold is reached, the rest of the votes can be ignored
@@ -154,8 +148,6 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 		delete(va.viewToIDToVote, i)
 	}
 	va.lastPrunedView = view
-
-	va.log.Info().Msg("successfully pruned")
 }
 
 // storeIncorporatedVote stores incorporated votes and accumulate stakes
@@ -212,7 +204,6 @@ func (va *VoteAggregator) tryBuildQC(votingStatus *VotingStatus) (*types.QuorumC
 	}
 
 	va.createdQC[votingStatus.blockID] = qc
-	va.log.Info().Msg("new QC created")
 	return qc, nil
 }
 
