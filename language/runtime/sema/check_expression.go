@@ -127,22 +127,27 @@ func (checker *Checker) VisitExpressionStatement(statement *ast.ExpressionStatem
 	return nil
 }
 
-func (checker *Checker) VisitBoolExpression(expression *ast.BoolExpression) ast.Repr {
+func (checker *Checker) VisitBoolExpression(_ *ast.BoolExpression) ast.Repr {
 	return &BoolType{}
 }
 
-func (checker *Checker) VisitNilExpression(expression *ast.NilExpression) ast.Repr {
+func (checker *Checker) VisitNilExpression(_ *ast.NilExpression) ast.Repr {
 	// TODO: verify
 	return &OptionalType{
 		Type: &NeverType{},
 	}
 }
 
-func (checker *Checker) VisitIntExpression(expression *ast.IntExpression) ast.Repr {
+func (checker *Checker) VisitIntegerExpression(_ *ast.IntegerExpression) ast.Repr {
 	return &IntType{}
 }
 
-func (checker *Checker) VisitStringExpression(expression *ast.StringExpression) ast.Repr {
+func (checker *Checker) VisitFixedPointExpression(_ *ast.FixedPointExpression) ast.Repr {
+	// TODO: adjust once/if we support more fixed point types
+	return &Fix64Type{}
+}
+
+func (checker *Checker) VisitStringExpression(_ *ast.StringExpression) ast.Repr {
 	return &StringType{}
 }
 
@@ -250,7 +255,6 @@ func (checker *Checker) visitIndexExpression(
 		}
 
 		elementType = checker.visitValueIndexingExpression(
-			targetExpression,
 			indexedType,
 			indexExpression.IndexingExpression,
 			isAssignment,
@@ -264,7 +268,6 @@ func (checker *Checker) visitIndexExpression(
 }
 
 func (checker *Checker) visitValueIndexingExpression(
-	indexedExpression ast.Expression,
 	indexedType ValueIndexableType,
 	indexingExpression ast.Expression,
 	isAssignment bool,

@@ -9,31 +9,31 @@ func (checker *Checker) VisitUnaryExpression(expression *ast.UnaryExpression) as
 
 	valueType := expression.Expression.Accept(checker).(Type)
 
+	reportInvalidUnaryOperator := func(expectedType Type) {
+		checker.report(
+			&InvalidUnaryOperandError{
+				Operation:    expression.Operation,
+				ExpectedType: expectedType,
+				ActualType:   valueType,
+				Range:        ast.NewRangeFromPositioned(expression.Expression),
+			},
+		)
+	}
+
 	switch expression.Operation {
 	case ast.OperationNegate:
-		if !IsSubType(valueType, &BoolType{}) {
-			checker.report(
-				&InvalidUnaryOperandError{
-					Operation:    expression.Operation,
-					ExpectedType: &BoolType{},
-					ActualType:   valueType,
-					Range:        ast.NewRangeFromPositioned(expression.Expression),
-				},
-			)
+		expectedType := &BoolType{}
+		if !IsSubType(valueType, expectedType) {
+			reportInvalidUnaryOperator(expectedType)
 		}
 		return valueType
 
 	case ast.OperationMinus:
-		if !IsSubType(valueType, &SignedIntegerType{}) {
-			checker.report(
-				&InvalidUnaryOperandError{
-					Operation:    expression.Operation,
-					ExpectedType: &SignedIntegerType{},
-					ActualType:   valueType,
-					Range:        ast.NewRangeFromPositioned(expression.Expression),
-				},
-			)
+		expectedType := &SignedNumberType{}
+		if !IsSubType(valueType, expectedType) {
+			reportInvalidUnaryOperator(expectedType)
 		}
+
 		return valueType
 
 	case ast.OperationMove:
