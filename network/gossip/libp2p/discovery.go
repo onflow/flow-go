@@ -32,7 +32,7 @@ func NewDiscovery(log zerolog.Logger, overlay middleware.Overlay, me flow.Identi
 func (d *Discovery) Advertise(_ context.Context, _ string, _ ...discovery.Option) (time.Duration, error) {
 	select {
 	case <-d.done:
-		return time.Hour, fmt.Errorf("middleware stopped")
+		return 0, fmt.Errorf("middleware stopped")
 	default:
 		return time.Hour, nil
 	}

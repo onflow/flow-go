@@ -116,12 +116,10 @@ func (p *P2PNode) Stop() error {
 	}
 	p.logger.Debug().Str("name", p.name).Msg("stopping libp2p node")
 	if err := p.libP2PHost.Close(); err != nil {
-		result = multierror.Append(result, err)
+		return multierror.Append(result, err)
 	}
 
-	if result == nil {
-		p.logger.Debug().Str("name", p.name).Msg("libp2p node stopped successfully")
-	}
+	p.logger.Debug().Str("name", p.name).Msg("libp2p node stopped successfully")
 
 	return result
 }
@@ -185,7 +183,7 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
 	stream, err = p.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
 	if err != nil {
-		return stream, fmt.Errorf("failed to create stream for %s: %w", peerID.String(), err)
+		return nil, fmt.Errorf("failed to create stream for %s: %w", peerID.String(), err)
 	}
 	return stream, nil
 }
@@ -194,19 +192,26 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 // This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
 // remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'
 // https://github.com/libp2p/go-yamux/blob/c7e96b999446162afa256908963dff8f5954037a/session.go#L629
+// TODO: Explore using context timeout instead of maxAttempts
 func (p *P2PNode) tryCreateNewStream(ctx context.Context, targetID peer.ID, maxAttempts int) (network.Stream, error) {
 	var errs, err error
 	var s network.Stream
 	var retries = 0
 	for ; retries < maxAttempts; retries++ {
-		s, err = p.libP2PHost.NewStream(ctx, targetID, FlowLibP2PProtocolID)
-		if err == nil {
-			break
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("context done before stream could be created (retry attempt: %d", retries)
+		default:
 		}
-		p.logger.Error().Str("target", targetID.String()).Err(err).
-			Int("retry_attempt", retries).Msg("failed to create stream")
-		errs = multierror.Append(errs, err)
-		time.Sleep(5 * time.Millisecond)
+		s, err = p.libP2PHost.NewStream(ctx, targetID, FlowLibP2PProtocolID)
+		if err != nil {
+			p.logger.Error().Str("target", targetID.String()).Err(err).
+				Int("retry_attempt", retries).Msg("failed to create stream")
+			errs = multierror.Append(errs, err)
+			time.Sleep(5 * time.Millisecond)
+			continue
+		}
+		break
 	}
 	if retries == maxAttempts {
 		return s, errs
