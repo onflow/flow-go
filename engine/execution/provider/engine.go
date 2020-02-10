@@ -9,6 +9,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -25,11 +26,21 @@ type Engine struct {
 	receiptCon   network.Conduit
 	state        protocol.State
 	execState    state.ExecutionState
+	stateSync    sync.StateSynchronizer
 	me           module.Local
 	execStateCon network.Conduit
+	execSyncCon  network.Conduit
 }
 
-func New(logger zerolog.Logger, net module.Network, state protocol.State, me module.Local, execState state.ExecutionState) (*Engine, error) {
+func New(
+	logger zerolog.Logger,
+	net module.Network,
+	state protocol.State,
+	me module.Local,
+	execState state.ExecutionState,
+	stateSync sync.StateSynchronizer,
+) (*Engine, error) {
+
 	log := logger.With().Str("engine", "receipts").Logger()
 
 	eng := Engine{
@@ -38,17 +49,24 @@ func New(logger zerolog.Logger, net module.Network, state protocol.State, me mod
 		state:     state,
 		me:        me,
 		execState: execState,
+		stateSync: stateSync,
 	}
 
-	receiptCon, err := net.Register(engine.ReceiptProvider, &eng)
+	var err error
+
+	eng.receiptCon, err = net.Register(engine.ReceiptProvider, &eng)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register receipt provider engine")
 	}
-	eng.receiptCon = receiptCon
 
 	eng.execStateCon, err = net.Register(engine.ExecutionStateProvider, &eng)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register execution state provider engine")
+	}
+
+	eng.execSyncCon, err = net.Register(engine.ExecutionSync, &eng)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not register execution sync engine")
 	}
 
 	return &eng, nil
@@ -91,9 +109,9 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 			err = e.onExecutionResult(originID, v)
 		case *messages.ExecutionStateRequest:
 			return e.onExecutionStateRequest(originID, v)
-		case *execution.ExecutionStateSyncRequest:
+		case *messages.ExecutionStateSyncRequest:
 			return e.onExecutionStateSyncRequest(originID, v)
-		case *execution.ExecutionStateDelta:
+		case *messages.ExecutionStateDelta:
 			return e.onExecutionStateDelta(originID, v)
 		default:
 			err = errors.Errorf("invalid event type (%T)", event)
@@ -107,8 +125,10 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 func (e *Engine) onExecutionResult(originID flow.Identifier, result *execution.ComputationResult) error {
 
+	blockID := result.CompleteBlock.Block.ID()
+
 	e.log.Debug().
-		Hex("block_id", logging.ID(result.CompleteBlock.Block.ID())).
+		Hex("block_id", logging.ID(blockID)).
 		Msg("received execution result")
 
 	if originID != e.me.NodeID() {
@@ -120,11 +140,17 @@ func (e *Engine) onExecutionResult(originID flow.Identifier, result *execution.C
 	startState := result.StartState
 	var endState flow.StateCommitment
 
+	blockDelta := state.NewDelta()
+
 	for i, view := range result.StateViews {
 		// TODO - Should the deltas be applied to a particular state?
 		// Not important now, but might become important once we produce proofs
 
-		endState, err := e.execState.CommitDelta(view.Delta())
+		chunkDelta := view.Delta()
+
+		blockDelta.MergeWith(chunkDelta)
+
+		endState, err := e.execState.CommitDelta(chunkDelta)
 		if err != nil {
 			return fmt.Errorf("failed to apply chunk delta: %w", err)
 		}
@@ -142,6 +168,11 @@ func (e *Engine) onExecutionResult(originID flow.Identifier, result *execution.C
 		startState = endState
 	}
 
+	err := e.stateSync.PersistDelta(blockID, blockDelta.RegisterDelta())
+	if err != nil {
+		return fmt.Errorf("failed to persist block delta: %w", err)
+	}
+
 	executionResult := generateExecutionResultForBlock(result.CompleteBlock, chunks, endState)
 
 	receipt := &flow.ExecutionReceipt{
@@ -152,7 +183,7 @@ func (e *Engine) onExecutionResult(originID flow.Identifier, result *execution.C
 		ExecutorSignature: nil,
 	}
 
-	err := e.broadcastExecutionReceipt(receipt)
+	err = e.broadcastExecutionReceipt(receipt)
 	if err != nil {
 		return fmt.Errorf("could not broadcast receipt: %w", err)
 	}
@@ -200,11 +231,11 @@ func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages
 	return nil
 }
 
-func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *execution.ExecutionStateSyncRequest) error {
+func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *messages.ExecutionStateSyncRequest) error {
 	e.log.Info().
 		Hex("origin_id", logging.ID(originID)).
-		Hex("current_commit", req.CurrentCommit).
-		Hex("target_commit", req.TargetCommit).
+		Hex("current_block_id", logging.ID(req.CurrentBlockID)).
+		Hex("target_block_id", logging.ID(req.TargetBlockID)).
 		Msg("received execution state synchronization request")
 
 	id, err := e.state.Final().Identity(originID)
@@ -216,16 +247,37 @@ func (e *Engine) onExecutionStateSyncRequest(originID flow.Identifier, req *exec
 		return fmt.Errorf("invalid role for requesting state synchronization: %s", id.Role)
 	}
 
-	// TODO: load delta range from storage
-	// - case 1: we have complete range
-	// - case 2: we are missing start of range
-	// - case 3: we are missing end of range
-	// reply with each delta as separate message
+	err = e.stateSync.DeltaRange(
+		req.CurrentBlockID,
+		req.TargetBlockID,
+		func(blockID flow.Identifier, delta flow.RegisterDelta) error {
+			e.log.Debug().
+				Hex("origin_id", logging.ID(originID)).
+				Hex("block_id", logging.ID(blockID)).
+				Msg("sending block delta")
+
+			// TODO: include full block (header + payload) in response?
+			msg := &messages.ExecutionStateDelta{
+				BlockID: blockID,
+				Delta:   delta,
+			}
+
+			err := e.execSyncCon.Submit(msg, originID)
+			if err != nil {
+				return fmt.Errorf("could not submit block delta: %w", err)
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to process block range: %w", err)
+	}
 
 	return nil
 }
 
-func (e *Engine) onExecutionStateDelta(originID flow.Identifier, req *execution.ExecutionStateDelta) error {
+func (e *Engine) onExecutionStateDelta(originID flow.Identifier, req *messages.ExecutionStateDelta) error {
 	// TODO: apply delta to store
 	// Does this belong in this engine? Does it matter if we are removing the engines anyways?
 	return nil

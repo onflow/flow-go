@@ -10,6 +10,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/rpc"
+	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage"
@@ -49,8 +50,11 @@ func main() {
 			node.Logger.Info().Msg("initializing receipts engine")
 
 			chunkHeaders := badger.NewChunkHeaders(node.DB)
+			registerDeltas := badger.NewRegisterDeltas(node.DB)
 
 			executionState = state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
+
+			stateSync := sync.NewStateSynchronizer(node.State, registerDeltas)
 
 			receiptsEng, err = provider.New(
 				node.Logger,
@@ -58,6 +62,7 @@ func main() {
 				node.State,
 				node.Me,
 				executionState,
+				stateSync,
 			)
 			node.MustNot(err).Msg("could not initialize receipts engine")
 

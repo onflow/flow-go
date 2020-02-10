@@ -17,6 +17,7 @@ import (
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
+	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
@@ -164,6 +165,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	collectionsStorage := storage.NewCollections(node.DB)
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
+	registerDeltasStorage := storage.NewRegisterDeltas(node.DB)
 
 	levelDB := unittest.TempLevelDB(t)
 
@@ -172,7 +174,16 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage)
 
-	receiptsEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState)
+	stateSync := sync.NewStateSynchronizer(node.State, registerDeltasStorage)
+
+	receiptsEngine, err := executionprovider.New(
+		node.Log,
+		node.Net,
+		node.State,
+		node.Me,
+		execState,
+		stateSync,
+	)
 	require.NoError(t, err)
 
 	rt := runtime.NewInterpreterRuntime()

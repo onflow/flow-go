@@ -102,6 +102,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=network -case=underscore -output="./network/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=protocol -case=underscore -output="./protocol/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=engine/execution/sync -case=underscore -output="./engine/execution/sync/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/execution/executor -case=underscore -output="./engine/execution/execution/executor/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/execution/state -case=underscore -output="./engine/execution/execution/state/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/execution/virtualmachine -case=underscore -output="./engine/execution/execution/virtualmachine/mock" -outpkg="mock"
@@ -245,7 +246,7 @@ update-deployment-image-name-staging:
 	for file in $$files; do \
 		patched=`openssl rand -hex 8`; \
 		node=`echo "$$file" | grep -oP 'flow-\K\w+(?=-node-deployment.yml)'`; \
- 		kubectl patch -f $$file -p '{"spec":{"template":{"spec":{"containers":[{"name":"${CONTAINER}","image":"gcr.io/dl-flow/'"$$node"':${IMAGE_TAG}"}]}}}}`' --local -o yaml > $$patched; \
+		kubectl patch -f $$file -p '{"spec":{"template":{"spec":{"containers":[{"name":"${CONTAINER}","image":"gcr.io/dl-flow/'"$$node"':${IMAGE_TAG}"}]}}}}`' --local -o yaml > $$patched; \
 		mv -f $$patched $$file; \
 	done
 

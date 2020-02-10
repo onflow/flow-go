@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state/mocks"
+	sync "github.com/dapperlabs/flow-go/engine/execution/sync/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -35,6 +36,7 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		ss := &protocol.Snapshot{}
 		con := &network.Conduit{}
 		me := &module.Local{}
+		stateSync := &sync.StateSynchronizer{}
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -47,11 +49,13 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 			receiptCon: con,
 			me:         me,
 			execState:  execState,
+			stateSync:  stateSync,
 		}
 
 		state.On("Final").Return(ss)
 		ss.On("Identities", mock.Anything, mock.Anything).
 			Return(nil, fmt.Errorf("identity error"))
+		stateSync.On("PersistDelta", mock.Anything, mock.Anything).Return(nil)
 
 		execState.EXPECT().CommitDelta(gomock.Any()).Times(len(result.StateViews))
 		execState.EXPECT().PersistChunkHeader(gomock.Any()).Return(nil).Times(len(result.StateViews))
@@ -68,19 +72,23 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		ss := &protocol.Snapshot{}
 		con := &network.Conduit{}
 		me := &module.Local{}
+		stateSync := &sync.StateSynchronizer{}
+
 		me.On("NodeID").Return(flow.ZeroID)
+		stateSync.On("PersistDelta", mock.Anything, mock.Anything).Return(nil)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		execState := mocks.NewMockExecutionState(ctrl)
 		execState.EXPECT().CommitDelta(gomock.Any()).Times(len(result.StateViews))
 		execState.EXPECT().PersistChunkHeader(gomock.Any()).Return(nil).Times(len(result.StateViews))
-		//execState.EXPECT().PersistStateCommitment(gomock.Eq(result.CompleteBlock.Block.ID()), gomock.Any()).Return(nil)
+
 		e := Engine{
 			state:      state,
 			receiptCon: con,
 			me:         me,
 			execState:  execState,
+			stateSync:  stateSync,
 		}
 
 		state.On("Final").Return(ss)
@@ -117,7 +125,10 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		ss := &protocol.Snapshot{}
 		con := &network.Conduit{}
 		me := &module.Local{}
+		stateSync := &sync.StateSynchronizer{}
+
 		me.On("NodeID").Return(flow.ZeroID)
+		stateSync.On("PersistDelta", mock.Anything, mock.Anything).Return(nil)
 
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
@@ -128,6 +139,7 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 			receiptCon: con,
 			me:         me,
 			execState:  execState,
+			stateSync:  stateSync,
 		}
 
 		state.On("Final").Return(ss)
