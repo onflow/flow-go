@@ -14,12 +14,12 @@ type VoteAggregator struct {
 	viewState      ViewState
 	voteValidator  *Validator
 	lastPrunedView uint64
+	// keeps track of votes whose blocks can not be found
+	pendingVotes *PendingVotes
 	// For pruning
 	viewToBlockIDSet map[uint64]map[flow.Identifier]struct{}
 	// For detecting double voting
 	viewToIDToVote map[uint64]map[flow.Identifier]*types.Vote
-	// keeps track of votes whose blocks can not be found
-	pendingVotes *PendingVotes
 	// keeps track of QCs that have been made for blocks
 	createdQC map[flow.Identifier]*types.QuorumCertificate
 	// keeps track of accumulated votes and stakes for blocks
@@ -32,9 +32,9 @@ func NewVoteAggregator(log zerolog.Logger, lastPruneView uint64, viewState ViewS
 		lastPrunedView:          lastPruneView,
 		viewState:               viewState,
 		voteValidator:           voteValidator,
+		pendingVotes:            NewPendingVotes(),
 		viewToBlockIDSet:        make(map[uint64]map[flow.Identifier]struct{}),
 		viewToIDToVote:          make(map[uint64]map[flow.Identifier]*types.Vote),
-		pendingVotes:            NewPendingVotes(),
 		blockHashToVotingStatus: make(map[flow.Identifier]*VotingStatus),
 		createdQC:               make(map[flow.Identifier]*types.QuorumCertificate),
 	}
@@ -183,7 +183,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 		votingStatus = NewVotingStatus(threshold, vote.View, uint32(len(identities)), voter, vote.BlockID)
 		va.blockHashToVotingStatus[vote.BlockID] = votingStatus
 	}
-	votingStatus.AddVote(vote)
+	votingStatus.AddVote(vote, voter)
 	va.updateState(vote, voter)
 	return votingStatus, nil
 }
@@ -196,9 +196,9 @@ func (va *VoteAggregator) updateState(vote *types.Vote, voter *flow.Identity) {
 		va.viewToIDToVote[vote.View] = map[flow.Identifier]*types.Vote{}
 		va.viewToIDToVote[vote.View][voter.ID()] = vote
 	}
-	blockIDStrSet, exists := va.viewToBlockIDSet[vote.View]
+	blockIDSet, exists := va.viewToBlockIDSet[vote.View]
 	if exists {
-		blockIDStrSet[vote.BlockID] = struct{}{}
+		blockIDSet[vote.BlockID] = struct{}{}
 	} else {
 		va.viewToBlockIDSet[vote.View] = make(map[flow.Identifier]struct{})
 		va.viewToBlockIDSet[vote.View][vote.BlockID] = struct{}{}
@@ -211,7 +211,7 @@ func (va *VoteAggregator) tryBuildQC(votingStatus *VotingStatus) (*types.QuorumC
 		return nil, err
 	}
 
-	va.createdQC[votingStatus.BlockID()] = qc
+	va.createdQC[votingStatus.blockID] = qc
 	va.log.Info().Msg("new QC created")
 	return qc, nil
 }

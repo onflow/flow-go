@@ -14,7 +14,6 @@ type VotingStatus struct {
 	view             uint64
 	thresholdStake   uint64
 	accumulatedStake uint64
-	voter            *flow.Identity
 	// assume votes are all valid to build QC
 	votes map[flow.Identifier]*types.Vote
 }
@@ -24,7 +23,6 @@ func NewVotingStatus(thresholdStake uint64, view uint64, signerCount uint32, vot
 		thresholdStake: thresholdStake,
 		view:           view,
 		signerCount:    signerCount,
-		voter:          voter,
 		blockID:        blockID,
 		votes:          make(map[flow.Identifier]*types.Vote),
 	}
@@ -32,21 +30,17 @@ func NewVotingStatus(thresholdStake uint64, view uint64, signerCount uint32, vot
 
 // assume votes are valid
 // duplicate votes will not be accumulated again
-func (vs *VotingStatus) AddVote(vote *types.Vote) {
+func (vs *VotingStatus) AddVote(vote *types.Vote, voter *flow.Identity) {
 	_, exists := vs.votes[vote.ID()]
 	if exists {
 		return
 	}
 	vs.votes[vote.ID()] = vote
-	vs.accumulatedStake += vs.voter.Stake
+	vs.accumulatedStake += voter.Stake
 }
 
 func (vs *VotingStatus) CanBuildQC() bool {
 	return vs.accumulatedStake >= vs.thresholdStake
-}
-
-func (vs *VotingStatus) BlockID() flow.Identifier {
-	return vs.blockID
 }
 
 func (vs *VotingStatus) TryBuildQC() (*types.QuorumCertificate, error) {
@@ -60,7 +54,7 @@ func (vs *VotingStatus) TryBuildQC() (*types.QuorumCertificate, error) {
 	}
 	qc := &types.QuorumCertificate{
 		View:                vs.view,
-		BlockID:             vs.BlockID(),
+		BlockID:             vs.blockID,
 		AggregatedSignature: aggregatedSig,
 	}
 
