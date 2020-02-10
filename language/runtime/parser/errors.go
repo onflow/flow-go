@@ -86,7 +86,7 @@ func (e *JuxtaposedUnaryOperatorsError) Error() string {
 type InvalidIntegerLiteralError struct {
 	Literal                   string
 	IntegerLiteralKind        IntegerLiteralKind
-	InvalidIntegerLiteralKind InvalidIntegerLiteralKind
+	InvalidIntegerLiteralKind InvalidNumberLiteralKind
 	ast.Range
 }
 
@@ -111,13 +111,13 @@ func (e *InvalidIntegerLiteralError) Error() string {
 
 func (e *InvalidIntegerLiteralError) SecondaryError() string {
 	switch e.InvalidIntegerLiteralKind {
-	case InvalidIntegerLiteralKindUnknown:
+	case InvalidNumberLiteralKindUnknown:
 		return ""
-	case InvalidIntegerLiteralKindLeadingUnderscore:
+	case InvalidNumberLiteralKindLeadingUnderscore:
 		return "remove the leading underscore"
-	case InvalidIntegerLiteralKindTrailingUnderscore:
+	case InvalidNumberLiteralKindTrailingUnderscore:
 		return "remove the trailing underscore"
-	case InvalidIntegerLiteralKindUnknownPrefix:
+	case InvalidNumberLiteralKindUnknownPrefix:
 		return "did you mean `0x` (hexadecimal), `0b` (binary), or `0o` (octal)?"
 	}
 

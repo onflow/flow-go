@@ -1584,7 +1584,7 @@ func (interpreter *Interpreter) VisitNilExpression(_ *ast.NilExpression) ast.Rep
 	return Done{Result: value}
 }
 
-func (interpreter *Interpreter) VisitIntExpression(expression *ast.IntExpression) ast.Repr {
+func (interpreter *Interpreter) VisitIntegerExpression(expression *ast.IntegerExpression) ast.Repr {
 	value := IntValue{expression.Value}
 
 	return Done{Result: value}

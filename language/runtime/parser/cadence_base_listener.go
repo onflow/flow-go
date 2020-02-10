@@ -581,6 +581,12 @@ func (s *BaseCadenceListener) EnterStringLiteral(ctx *StringLiteralContext) {}
 // ExitStringLiteral is called when production stringLiteral is exited.
 func (s *BaseCadenceListener) ExitStringLiteral(ctx *StringLiteralContext) {}
 
+// EnterFixedPointLiteral is called when production fixedPointLiteral is entered.
+func (s *BaseCadenceListener) EnterFixedPointLiteral(ctx *FixedPointLiteralContext) {}
+
+// ExitFixedPointLiteral is called when production fixedPointLiteral is exited.
+func (s *BaseCadenceListener) ExitFixedPointLiteral(ctx *FixedPointLiteralContext) {}
+
 // EnterIntegerLiteral is called when production integerLiteral is entered.
 func (s *BaseCadenceListener) EnterIntegerLiteral(ctx *IntegerLiteralContext) {}
 

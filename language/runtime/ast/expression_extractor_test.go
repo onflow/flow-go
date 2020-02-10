@@ -11,7 +11,7 @@ type testIntExtractor struct{}
 
 func (testIntExtractor) ExtractInt(
 	extractor *ExpressionExtractor,
-	expression *IntExpression,
+	expression *IntegerExpression,
 ) ExpressionExtraction {
 
 	newIdentifier := Identifier{
@@ -73,7 +73,7 @@ func TestExpressionExtractorBinaryExpressionIntegerExtracted(t *testing.T) {
 		Left: &IdentifierExpression{
 			Identifier{Identifier: "x"},
 		},
-		Right: &IntExpression{
+		Right: &IntegerExpression{
 			Value: big.NewInt(1),
 			Base:  10,
 		},
@@ -102,7 +102,7 @@ func TestExpressionExtractorBinaryExpressionIntegerExtracted(t *testing.T) {
 			ExtractedExpressions: []ExtractedExpression{
 				{
 					Identifier: Identifier{Identifier: newIdentifier},
-					Expression: &IntExpression{
+					Expression: &IntegerExpression{
 						Value: big.NewInt(1),
 						Base:  10,
 					},

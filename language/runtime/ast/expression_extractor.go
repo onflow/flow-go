@@ -15,7 +15,11 @@ type NilExtractor interface {
 }
 
 type IntExtractor interface {
-	ExtractInt(extractor *ExpressionExtractor, expression *IntExpression) ExpressionExtraction
+	ExtractInt(extractor *ExpressionExtractor, expression *IntegerExpression) ExpressionExtraction
+}
+
+type FixedPointExtractor interface {
+	ExtractFixedPoint(extractor *ExpressionExtractor, expression *FixedPointExpression) ExpressionExtraction
 }
 
 type StringExtractor interface {
@@ -83,6 +87,7 @@ type ExpressionExtractor struct {
 	BoolExtractor        BoolExtractor
 	NilExtractor         NilExtractor
 	IntExtractor         IntExtractor
+	FixedPointExtractor  FixedPointExtractor
 	StringExtractor      StringExtractor
 	ArrayExtractor       ArrayExtractor
 	DictionaryExtractor  DictionaryExtractor
@@ -172,7 +177,7 @@ func (extractor *ExpressionExtractor) ExtractNil(expression *NilExpression) Expr
 	}
 }
 
-func (extractor *ExpressionExtractor) VisitIntExpression(expression *IntExpression) Repr {
+func (extractor *ExpressionExtractor) VisitIntegerExpression(expression *IntegerExpression) Repr {
 
 	// delegate to child extractor, if any,
 	// or call default implementation
@@ -183,7 +188,28 @@ func (extractor *ExpressionExtractor) VisitIntExpression(expression *IntExpressi
 	return extractor.ExtractInt(expression)
 }
 
-func (extractor *ExpressionExtractor) ExtractInt(expression *IntExpression) ExpressionExtraction {
+func (extractor *ExpressionExtractor) ExtractInt(expression *IntegerExpression) ExpressionExtraction {
+
+	// nothing to rewrite, return as-is
+
+	return ExpressionExtraction{
+		RewrittenExpression:  expression,
+		ExtractedExpressions: nil,
+	}
+}
+
+func (extractor *ExpressionExtractor) VisitFixedPointExpression(expression *FixedPointExpression) Repr {
+
+	// delegate to child extractor, if any,
+	// or call default implementation
+
+	if extractor.FixedPointExtractor != nil {
+		return extractor.FixedPointExtractor.ExtractFixedPoint(extractor, expression)
+	}
+	return extractor.ExtractFixedPoint(expression)
+}
+
+func (extractor *ExpressionExtractor) ExtractFixedPoint(expression *FixedPointExpression) ExpressionExtraction {
 
 	// nothing to rewrite, return as-is
 
