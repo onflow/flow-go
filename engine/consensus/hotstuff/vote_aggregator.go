@@ -45,7 +45,7 @@ func NewVoteAggregator(log zerolog.Logger, lastPruneView uint64, viewState ViewS
 // Note: Validations on these pending votes will be postponed until the block has been received.
 func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 	if vote.View <= va.lastPrunedView {
-		return fmt.Errorf("the vote is stale: %w", types.ErrStaleVote{
+		return fmt.Errorf("the vote is stale: %w", types.StaleVoteError{
 			Vote:          vote,
 			FinalizedView: va.lastPrunedView,
 		})
@@ -94,7 +94,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 	}
 	// ignore stale votes
 	if vote.View <= va.lastPrunedView {
-		return nil, fmt.Errorf("the vote is stale: %w", types.ErrStaleVote{
+		return nil, fmt.Errorf("the vote is stale: %w", types.StaleVoteError{
 			Vote:          vote,
 			FinalizedView: va.lastPrunedView,
 		})
@@ -120,7 +120,7 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 		return oldQC, nil
 	}
 	if bp.View() <= va.lastPrunedView {
-		return nil, fmt.Errorf("could not build QC on receiving block: %w", types.ErrStaleBlock{BlockProposal: bp, FinalizedView: va.lastPrunedView})
+		return nil, fmt.Errorf("could not build QC on receiving block: %w", types.StaleBlockError{BlockProposal: bp, FinalizedView: va.lastPrunedView})
 	}
 	// accumulate primary vote first
 	primaryVote := bp.ToVote()
@@ -245,7 +245,7 @@ func (va *VoteAggregator) checkDoubleVote(vote *types.Vote, sender *flow.Identit
 		// voted and is the same vote as the vote received before
 		return nil
 	}
-	return types.ErrDoubleVote{
+	return types.DoubleVoteError{
 		OriginalVote: originalVote,
 		DoubleVote:   vote,
 	}

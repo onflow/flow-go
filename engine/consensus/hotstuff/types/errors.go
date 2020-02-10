@@ -12,34 +12,34 @@ type ErrorFinalizationFatal struct {
 
 func (e *ErrorFinalizationFatal) Error() string { return e.Msg }
 
-type ErrorMissingSigner struct {
+type MissingSignerError struct {
 	Vote *Vote
 }
 
-type ErrInvalidSignature struct {
+type InvalidSignatureError struct {
 	Vote *Vote
 }
 
-type ErrInvalidView struct {
+type InvalidViewError struct {
 	Vote *Vote
 }
 
-type ErrDoubleVote struct {
+type DoubleVoteError struct {
 	OriginalVote *Vote
 	DoubleVote   *Vote
 }
 
-type ErrStaleVote struct {
+type StaleVoteError struct {
 	Vote          *Vote
 	FinalizedView uint64
 }
 
-type ErrStaleBlock struct {
+type StaleBlockError struct {
 	BlockProposal *BlockProposal
 	FinalizedView uint64
 }
 
-type ErrExistingQC struct {
+type ExistingQCError struct {
 	Vote *Vote
 	QC   *QuorumCertificate
 }
@@ -47,31 +47,31 @@ type ErrExistingQC struct {
 type ErrInsufficientVotes struct {
 }
 
-func (e ErrorMissingSigner) Error() string {
+func (e MissingSignerError) Error() string {
 	return fmt.Sprintf("The signer of vote %v is missing", e.Vote)
 }
 
-func (e ErrInvalidSignature) Error() string {
+func (e InvalidSignatureError) Error() string {
 	return fmt.Sprintf("The signature of vote %v is invalid", e.Vote)
 }
 
-func (e ErrInvalidView) Error() string {
+func (e InvalidViewError) Error() string {
 	return fmt.Sprintf("The view of vote %v is invalid", e.Vote)
 }
 
-func (e ErrDoubleVote) Error() string {
+func (e DoubleVoteError) Error() string {
 	return fmt.Sprintf("Double voting detected (original vote: %v, double vote: %v)", e.OriginalVote, e.DoubleVote)
 }
 
-func (e ErrStaleVote) Error() string {
+func (e StaleVoteError) Error() string {
 	return fmt.Sprintf("Stale vote found (vote: %v, finalized view: %v)", e.Vote, e.FinalizedView)
 }
 
-func (e ErrStaleBlock) Error() string {
+func (e StaleBlockError) Error() string {
 	return fmt.Sprintf("Stale block found (block: %v, finalized view: %v)", e.BlockProposal, e.FinalizedView)
 }
 
-func (e ErrExistingQC) Error() string {
+func (e ExistingQCError) Error() string {
 	return fmt.Sprintf("QC already existed (vote: %v, qc: %v)", e.Vote, e.QC)
 }
 
