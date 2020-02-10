@@ -79,7 +79,7 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	m.ov = ov
 
 	// create a discovery object to help libp2p discover peers
-	d := NewDiscovery(m.log, m.ov, m.me)
+	d := NewDiscovery(m.log, m.ov, m.me, m.stop)
 
 	// create PubSub options for libp2p to use the discovery object
 	psOption := pubsub.WithDiscovery(d)
@@ -105,7 +105,7 @@ func (m *Middleware) Stop() {
 
 	// Stop all the connections
 	for _, conn := range m.cc.GetAll() {
-		conn.stop()
+		conn.Stop()
 	}
 
 	// Stop libp2p
@@ -178,7 +178,6 @@ func (m *Middleware) Send(targetID flow.Identifier, msg interface{}) error {
 		switch msg := msg.(type) {
 		case *message.Message:
 			// Write message to outbound channel only if it is of the correct type
-			// TODO: check if outbound channel is already closed
 			conn.outbound <- msg
 		default:
 			err := errors.Errorf("middleware received invalid message type (%T)", msg)
@@ -224,10 +223,8 @@ func (m *Middleware) handleOutboundConnection(targetID flow.Identifier, conn *Wr
 	defer m.wg.Done()
 	// Remove the conn from the cache when done
 	defer m.cc.Remove(targetID)
-	// make sure we close the stream once the handling is done
-	defer conn.stream.Close()
 	// kick off the send loop
-	conn.SendLoop(m.stop)
+	conn.SendLoop()
 }
 
 // handleIncomingStream handles an incoming stream from a remote peer
@@ -263,7 +260,11 @@ ProcessLoop:
 		case <-conn.done:
 			m.log.Info().Msg("exiting process loop: connection stops")
 			break ProcessLoop
-		case msg := <-conn.inbound:
+		case msg, ok := <-conn.inbound:
+			if !ok {
+				m.log.Info().Msg("exiting process loop: connection stops")
+				break ProcessLoop
+			}
 			m.processMessage(msg)
 			continue ProcessLoop
 		}
@@ -303,7 +304,11 @@ SubscriptionLoop:
 			// subscription stops
 			m.log.Info().Msg("exiting subscription loop: connection stops")
 			break SubscriptionLoop
-		case msg := <-rs.inbound:
+		case msg, ok := <-rs.inbound:
+			if !ok {
+				m.log.Info().Msg("exiting subscription loop: connection stops")
+				break SubscriptionLoop
+			}
 			m.processMessage(msg)
 			continue SubscriptionLoop
 		}
