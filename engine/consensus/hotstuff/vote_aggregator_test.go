@@ -137,8 +137,8 @@ func TestReceivePendingVotesOnly(t *testing.T) {
 		vote := newMockVote(testView, blockID, uint32(i))
 		err := va.StorePendingVote(vote)
 		require.Nil(t, err)
-		require.Equal(t, vote, va.pendingVoteMap[blockID.String()].orderedVotes[i])
-		require.Equal(t, vote, va.pendingVoteMap[blockID.String()].voteMap[string(vote.ID())])
+		require.Equal(t, vote, va.pendingVoteMap[blockID].orderedVotes[i])
+		require.Equal(t, vote, va.pendingVoteMap[blockID].voteMap[vote.ID()])
 	}
 }
 
@@ -270,7 +270,7 @@ func TestInvalidVotesOnly(t *testing.T) {
 	// no votes should be added to blockHashToVotingStatus since the view is invalid
 	require.Equal(t, 1, len(va.blockHashToVotingStatus))
 	// the only vote added should be the primary vote
-	primaryVote, exists := va.blockHashToVotingStatus[block.BlockID().String()].votes[string(block.ToVote().ID())]
+	primaryVote, exists := va.blockHashToVotingStatus[block.BlockID()].votes[block.ToVote().ID()]
 	require.True(t, exists)
 	require.Equal(t, block.ToVote(), primaryVote)
 }
@@ -338,7 +338,7 @@ func TestDuplicateVotesAfterBlock(t *testing.T) {
 		require.Nil(t, qc)
 		require.NotNil(t, err)
 		// only this vote and the primary vote are added
-		require.Equal(t, 2, len(va.blockHashToVotingStatus[block.BlockID().String()].votes))
+		require.Equal(t, 2, len(va.blockHashToVotingStatus[block.BlockID()].votes))
 	}
 }
 
@@ -353,13 +353,12 @@ func TestDuplicateVotesBeforeBlock(t *testing.T) {
 		err := va.StorePendingVote(vote)
 		require.Nil(t, err)
 	}
-	blockIDStr := block.BlockID().String()
-	require.Equal(t, 1, len(va.pendingVoteMap[blockIDStr].voteMap))
-	require.Equal(t, 1, len(va.pendingVoteMap[blockIDStr].orderedVotes))
+	require.Equal(t, 1, len(va.pendingVoteMap[block.BlockID()].voteMap))
+	require.Equal(t, 1, len(va.pendingVoteMap[block.BlockID()].orderedVotes))
 	qc, err := va.BuildQCOnReceivingBlock(block)
 	require.Nil(t, qc)
 	require.NotNil(t, err)
-	require.Equal(t, 2, len(va.blockHashToVotingStatus[block.BlockID().String()].votes))
+	require.Equal(t, 2, len(va.blockHashToVotingStatus[block.BlockID()].votes))
 }
 
 // ORDER
@@ -412,12 +411,12 @@ func TestPartialPruneBeforeBlock(t *testing.T) {
 	require.Equal(t, 1, len(va.viewToIDToVote))
 	require.Equal(t, 1, len(va.pendingVoteMap))
 	testVote := voteList[len(voteList)-1]
-	require.True(t, va.viewToBlockIDStrSet[uint64(5)][testVote.BlockID.String()])
+	require.NotNil(t, va.viewToBlockIDStrSet[uint64(5)][testVote.BlockID])
 	voter, err := va.voteValidator.ValidateVote(testVote, nil)
 	require.Nil(t, err)
 	require.NotNil(t, voter)
 	require.Equal(t, testVote, va.viewToIDToVote[uint64(5)][voter.ID()])
-	_, exists := va.pendingVoteMap[testVote.BlockID.String()]
+	_, exists := va.pendingVoteMap[testVote.BlockID]
 	require.True(t, exists)
 }
 
@@ -452,12 +451,12 @@ func TestPartialPruneAfterBlock(t *testing.T) {
 	require.Equal(t, 1, len(va.blockHashToVotingStatus))
 	testVote := voteList[len(voteList)-1]
 	testBlock := blockList[len(blockList)-1]
-	require.True(t, va.viewToBlockIDStrSet[uint64(5)][testVote.BlockID.String()])
+	require.NotNil(t, va.viewToBlockIDStrSet[uint64(5)][testVote.BlockID])
 	voter, err := va.voteValidator.ValidateVote(testVote, testBlock)
 	require.Nil(t, err)
 	require.NotNil(t, voter)
 	require.Equal(t, testVote, va.viewToIDToVote[uint64(5)][voter.ID()])
-	_, exists := va.blockHashToVotingStatus[testVote.BlockID.String()]
+	_, exists := va.blockHashToVotingStatus[testVote.BlockID]
 	require.True(t, exists)
 }
 
