@@ -38,7 +38,7 @@ type Snapshot interface {
 
 	// Collection returns the collection generated in this step of the cluster
 	// state history.
-	Collection() *flow.Collection
+	Collection() (*flow.Collection, error)
 }
 
 // Mutator represents an interface to modify the persistent cluster state in a
@@ -54,5 +54,5 @@ type Mutator interface {
 
 	// Extend introduces the block with the given ID into the persistent
 	// cluster state without modifying the current finalized state.
-	Extend(blockID flow.Identifier)
+	Extend(blockID flow.Identifier) error
 }
