@@ -25,12 +25,6 @@ type Mutator interface {
 	// state.
 	Extend(blockID flow.Identifier) error
 
-	// Finalize finalizes the block with the given hash, and all of its parents
-	// up to the finalized protocol state. It modifies the persistent immutable
-	// protocol state accordingly and forwards the pointer to the latest
-	// finalized state.
-	Finalize(blockID flow.Identifier) error
-
 	// StorePayload simply wraps procedures.InsertPayload
 	StorePayload(payload *flow.Payload) error
 }
