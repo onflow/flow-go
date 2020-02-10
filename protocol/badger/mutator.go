@@ -149,16 +149,6 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 	})
 }
 
-func (m *Mutator) StorePayload(payload *flow.Payload) error {
-	return m.state.db.Update(func(tx *badger.Txn) error {
-		err := procedure.InsertPayload(payload)(tx)
-		if err != nil {
-			return err
-		}
-		return procedure.IndexPayload(payload)(tx)
-	})
-}
-
 func checkGenesisHeader(header *flow.Header) error {
 
 	// the initial finalized boundary needs to be height zero

@@ -24,7 +24,4 @@ type Mutator interface {
 	// still checking that the given block is a valid extension of the protocol
 	// state.
 	Extend(blockID flow.Identifier) error
-
-	// StorePayload simply wraps procedures.InsertPayload
-	StorePayload(payload *flow.Payload) error
 }
