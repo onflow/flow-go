@@ -1,6 +1,7 @@
 package finalizer
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
@@ -199,9 +200,10 @@ func (r *Finalizer) updateConsensusState(blockContainer *BlockContainer) error {
 	// Lemma: Let B be a block whose 3-chain reaches beyond the last finalized block
 	//        => B will not update the locked or finalized block
 	if err != nil {
-		switch err.(type) {
-		case *ErrorPrunedAncestry:
-			//   blockContainer's 3-chain reaches beyond the last finalized block
+		var epa *ErrorPrunedAncestry
+		switch {
+		case errors.As(err, &epa):
+			//   blockConfftainer's 3-chain reaches beyond the last finalized block
 			return nil // based on Lemma from above, we can skip attempting to update locked or finalized block
 		default:
 			return fmt.Errorf("retrieving 3-chain ancestry failed: %w", err)
