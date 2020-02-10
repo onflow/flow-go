@@ -57,6 +57,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	me.EXPECT().NodeID().Return(myself).AnyTimes()
 
 	blocks := storage.NewMockBlocks(ctrl)
+	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	executionEngine := executionmock.NewMockExecutionEngine(ctrl)
 	protocolState := protocol.NewMockState(ctrl)
@@ -73,6 +74,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	mutator := protocol.NewMockMutator(ctrl)
 	protocolState.EXPECT().Mutate().Return(mutator).AnyTimes()
 	mutator.EXPECT().StorePayload(gomock.Any()).AnyTimes()
+	payloads.EXPECT().Store(gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
 
@@ -81,7 +83,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 
-	engine, err := New(log, net, me, protocolState, blocks, collections, executionEngine, executionState)
+	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, executionEngine, executionState)
 	require.NoError(t, err)
 
 	f(testingContext{

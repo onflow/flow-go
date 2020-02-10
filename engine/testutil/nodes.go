@@ -20,7 +20,6 @@ import (
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
-	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/local"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
@@ -161,6 +160,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	node := GenericNode(t, hub, identity, identities)
 
 	blocksStorage := storage.NewBlocks(node.DB)
+	payloadsStorage := storage.NewPayloads(node.DB)
 	collectionsStorage := storage.NewCollections(node.DB)
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
@@ -190,7 +190,16 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
-	blocksEngine, err := ingestion.New(node.Log, node.Net, node.Me, node.State, blocksStorage, collectionsStorage, execEngine, execState)
+	blocksEngine, err := ingestion.New(node.Log,
+		node.Net,
+		node.Me,
+		node.State,
+		blocksStorage,
+		payloadsStorage,
+		collectionsStorage,
+		execEngine,
+		execState,
+	)
 	require.NoError(t, err)
 
 	return mock.ExecutionNode{

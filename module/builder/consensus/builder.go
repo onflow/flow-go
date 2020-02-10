@@ -11,7 +11,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
 
@@ -19,16 +18,14 @@ import (
 // also memorizes which entities were included into the payload.
 type Builder struct {
 	db         *badger.DB
-	state      protocol.State
 	guarantees mempool.Guarantees
 	seals      mempool.Seals
 }
 
 // NewBuilder creates a new block builder.
-func NewBuilder(db *badger.DB, state protocol.State, guarantees mempool.Guarantees, seals mempool.Seals) *Builder {
+func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals) *Builder {
 	b := &Builder{
 		db:         db,
-		state:      state,
 		guarantees: guarantees,
 		seals:      seals,
 	}
