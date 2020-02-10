@@ -16,7 +16,7 @@ type VotingStatus struct {
 	accumulatedStake uint64
 	voter            *flow.Identity
 	// assume votes are all valid to build QC
-	votes map[string]*types.Vote
+	votes map[flow.Identifier]*types.Vote
 }
 
 func NewVotingStatus(thresholdStake uint64, view uint64, signerCount uint32, voter *flow.Identity, blockID flow.Identifier) *VotingStatus {
@@ -26,18 +26,18 @@ func NewVotingStatus(thresholdStake uint64, view uint64, signerCount uint32, vot
 		signerCount:    signerCount,
 		voter:          voter,
 		blockID:        blockID,
-		votes:          map[string]*types.Vote{},
+		votes:          make(map[flow.Identifier]*types.Vote),
 	}
 }
 
 // assume votes are valid
 // duplicate votes will not be accumulated again
 func (vs *VotingStatus) AddVote(vote *types.Vote) {
-	_, exists := vs.votes[vote.ID().String()]
+	_, exists := vs.votes[vote.ID()]
 	if exists {
 		return
 	}
-	vs.votes[vote.ID().String()] = vote
+	vs.votes[vote.ID()] = vote
 	vs.accumulatedStake += vs.voter.Stake
 }
 
