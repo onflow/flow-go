@@ -261,12 +261,12 @@ func (checker *Checker) isWriteableMember(member *Member) bool {
 //
 // The given type itself might be the result.
 //
-func containingContractKindedType(t Type) Type {
+func containingContractKindedType(t Type) CompositeKindedType {
 	for {
 		if compositeKindedType, ok := t.(CompositeKindedType); ok &&
 			compositeKindedType.GetCompositeKind() == common.CompositeKindContract {
 
-			return t
+			return compositeKindedType
 		}
 
 		if containedType, ok := t.(ContainedType); ok {

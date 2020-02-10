@@ -1739,18 +1739,18 @@ func (e *InvalidNonStorageStorableReferenceError) Error() string {
 
 func (*InvalidNonStorageStorableReferenceError) isSemanticError() {}
 
-// CreateImportedResourceError
+// InvalidResourceCreationError
 
-type CreateImportedResourceError struct {
+type InvalidResourceCreationError struct {
 	Type Type
 	ast.Range
 }
 
-func (e *CreateImportedResourceError) Error() string {
-	return fmt.Sprintf("cannot create imported resource type: `%s`", e.Type)
+func (e *InvalidResourceCreationError) Error() string {
+	return fmt.Sprintf("cannot create resource type outside of containing contract: `%s`", e.Type)
 }
 
-func (*CreateImportedResourceError) isSemanticError() {}
+func (*InvalidResourceCreationError) isSemanticError() {}
 
 // NonResourceTypeError
 
