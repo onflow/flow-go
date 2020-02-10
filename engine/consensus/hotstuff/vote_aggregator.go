@@ -15,11 +15,11 @@ type VoteAggregator struct {
 	voteValidator  *Validator
 	lastPrunedView uint64
 	// For pruning
-	viewToBlockIDStrSet map[uint64]map[flow.Identifier]struct{}
+	viewToBlockIDSet map[uint64]map[flow.Identifier]struct{}
 	// For detecting double voting
 	viewToIDToVote map[uint64]map[flow.Identifier]*types.Vote
 	// keeps track of votes whose blocks can not be found
-	pendingVoteMap map[flow.Identifier]*PendingStatus
+	blockIDToPendingStatus map[flow.Identifier]*PendingStatus
 	// keeps track of QCs that have been made for blocks
 	createdQC map[flow.Identifier]*types.QuorumCertificate
 	// keeps track of accumulated votes and stakes for blocks
@@ -32,9 +32,9 @@ func NewVoteAggregator(log zerolog.Logger, lastPruneView uint64, viewState ViewS
 		lastPrunedView:          lastPruneView,
 		viewState:               viewState,
 		voteValidator:           voteValidator,
-		viewToBlockIDStrSet:     make(map[uint64]map[flow.Identifier]struct{}),
+		viewToBlockIDSet:        make(map[uint64]map[flow.Identifier]struct{}),
 		viewToIDToVote:          make(map[uint64]map[flow.Identifier]*types.Vote),
-		pendingVoteMap:          make(map[flow.Identifier]*PendingStatus),
+		blockIDToPendingStatus:  make(map[flow.Identifier]*PendingStatus),
 		blockHashToVotingStatus: make(map[flow.Identifier]*VotingStatus),
 		createdQC:               make(map[flow.Identifier]*types.QuorumCertificate),
 	}
@@ -45,23 +45,23 @@ func NewVoteAggregator(log zerolog.Logger, lastPruneView uint64, viewState ViewS
 // Note: Validations on these pending votes will be postponed until the block has been received.
 func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 	if vote.View <= va.lastPrunedView {
-		return fmt.Errorf("the vote is stale: %w", types.StaleVoteError{
+		return fmt.Errorf("could not store pending vote: %w", types.StaleVoteError{
 			Vote:          vote,
 			FinalizedView: va.lastPrunedView,
 		})
 	}
 	voter, err := va.voteValidator.ValidateVote(vote, nil)
 	if err != nil {
-		return fmt.Errorf("could not validate pending vote: %w", err)
+		return fmt.Errorf("could not store pending vote: %w", err)
 	}
 	err = va.checkDoubleVote(vote, voter)
 	if err != nil {
-		return fmt.Errorf("double voting detected: %w", err)
+		return fmt.Errorf("could not store pending vote: %w", err)
 	}
-	pendingStatus, exists := va.pendingVoteMap[vote.BlockID]
+	pendingStatus, exists := va.blockIDToPendingStatus[vote.BlockID]
 	if !exists {
 		pendingStatus = NewPendingStatus()
-		va.pendingVoteMap[vote.BlockID] = pendingStatus
+		va.blockIDToPendingStatus[vote.BlockID] = pendingStatus
 	}
 	pendingStatus.AddVote(vote)
 	idToVote, exists := va.viewToIDToVote[vote.View]
@@ -71,12 +71,12 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 		va.viewToIDToVote[vote.View] = map[flow.Identifier]*types.Vote{}
 		va.viewToIDToVote[vote.View][voter.ID()] = vote
 	}
-	blockIDStrSet, exists := va.viewToBlockIDStrSet[vote.View]
+	blockIDStrSet, exists := va.viewToBlockIDSet[vote.View]
 	if exists {
 		blockIDStrSet[vote.BlockID] = struct{}{}
 	} else {
-		va.viewToBlockIDStrSet[vote.View] = make(map[flow.Identifier]struct{})
-		va.viewToBlockIDStrSet[vote.View][vote.BlockID] = struct{}{}
+		va.viewToBlockIDSet[vote.View] = make(map[flow.Identifier]struct{})
+		va.viewToBlockIDSet[vote.View][vote.BlockID] = struct{}{}
 	}
 	return nil
 }
@@ -94,7 +94,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 	}
 	// ignore stale votes
 	if vote.View <= va.lastPrunedView {
-		return nil, fmt.Errorf("the vote is stale: %w", types.StaleVoteError{
+		return nil, fmt.Errorf("could not store incorporated vote: %w", types.StaleVoteError{
 			Vote:          vote,
 			FinalizedView: va.lastPrunedView,
 		})
@@ -129,7 +129,7 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 		va.log.Warn().Msg("primary vote is invalid")
 	}
 	// accumulate pending votes by order
-	pendingStatus, exists := va.pendingVoteMap[bp.BlockID()]
+	pendingStatus, exists := va.blockIDToPendingStatus[bp.BlockID()]
 	if exists {
 		va.convertPendingVotes(pendingStatus.orderedVotes, bp)
 	}
@@ -152,7 +152,7 @@ func (va *VoteAggregator) convertPendingVotes(pendingVotes []*types.Vote, bp *ty
 			break
 		}
 	}
-	delete(va.pendingVoteMap, bp.BlockID())
+	delete(va.blockIDToPendingStatus, bp.BlockID())
 }
 
 // PruneByView will delete all votes equal or below to the given view, as well as related indexes.
@@ -161,13 +161,13 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 		return
 	}
 	for i := va.lastPrunedView + 1; i <= view; i++ {
-		blockIDStrSet := va.viewToBlockIDStrSet[i]
+		blockIDStrSet := va.viewToBlockIDSet[i]
 		for blockIDStr := range blockIDStrSet {
-			delete(va.pendingVoteMap, blockIDStr)
+			delete(va.blockIDToPendingStatus, blockIDStr)
 			delete(va.blockHashToVotingStatus, blockIDStr)
 			delete(va.createdQC, blockIDStr)
 		}
-		delete(va.viewToBlockIDStrSet, i)
+		delete(va.viewToBlockIDSet, i)
 		delete(va.viewToIDToVote, i)
 	}
 	va.lastPrunedView = view
@@ -184,7 +184,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 	}
 	err = va.checkDoubleVote(vote, voter)
 	if err != nil {
-		return nil, fmt.Errorf("double voting detected: %w", err)
+		return nil, fmt.Errorf("could not store vote: %w", err)
 	}
 	// update existing voting status or create a new one
 	votingStatus, exists := va.blockHashToVotingStatus[vote.BlockID]
@@ -208,12 +208,12 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 		va.viewToIDToVote[vote.View] = map[flow.Identifier]*types.Vote{}
 		va.viewToIDToVote[vote.View][voter.ID()] = vote
 	}
-	blockIDStrSet, exists := va.viewToBlockIDStrSet[vote.View]
+	blockIDStrSet, exists := va.viewToBlockIDSet[vote.View]
 	if exists {
 		blockIDStrSet[vote.BlockID] = struct{}{}
 	} else {
-		va.viewToBlockIDStrSet[vote.View] = map[flow.Identifier]struct{}{}
-		va.viewToBlockIDStrSet[vote.View][vote.BlockID] = struct{}{}
+		va.viewToBlockIDSet[vote.View] = map[flow.Identifier]struct{}{}
+		va.viewToBlockIDSet[vote.View][vote.BlockID] = struct{}{}
 	}
 	return votingStatus, nil
 }
