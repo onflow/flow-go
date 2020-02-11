@@ -2,9 +2,12 @@ package test
 
 import (
 	"fmt"
+	"os"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module/mock"
@@ -30,7 +33,8 @@ func CreateSubnets(nodesNum, subnetNum int) (map[int][]*libp2p.Network, map[int]
 
 	// creates topology over the nodes of each subnet
 	for index, subids := range subnetIdList {
-		mws, err := CreateMiddleware(subids)
+		logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+		mws, err := CreateMiddleware(logger, subids)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -121,7 +125,8 @@ func CreateNetworks(mws []*libp2p.Middleware, ids flow.IdentityList, csize int, 
 		// creates and mocks me
 		me := &mock.Local{}
 		me.On("NodeID").Return(ids[i].NodeID)
-		net, err := libp2p.NewNetwork(log, json.NewCodec(), state, me, mws[i], csize)
+		logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+		net, err := libp2p.NewNetwork(logger, json.NewCodec(), state, me, mws[i], csize)
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not create error %w", err)
 		}
@@ -193,4 +198,20 @@ func (s *SnapshotMock) Clusters() (*flow.ClusterList, error) {
 
 func (s *SnapshotMock) Head() (*flow.Header, error) {
 	return nil, fmt.Errorf(" not implemented")
+}
+
+// waitTimeout waits for the waitgroup for the specified max timeout.
+// Returns true if waiting timed out.
+func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
+	}
 }

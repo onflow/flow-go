@@ -2,8 +2,11 @@ package test
 
 import (
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -22,12 +25,15 @@ func TestOneToKTestSuite(t *testing.T) {
 }
 
 func (o *OneToKTestSuite) SetupTest() {
-	const nodes = 4
-	const groups = 2
-	//golog.SetAllLoggers(gologging.INFO)
+	// number of total engines
+	const engines = 50
+
+	// number of total subnets
+	const groups = 5
+
 	o.ee = make(map[int][]*EchoEngine)
 
-	subnets, ids, err := CreateSubnets(nodes, groups)
+	subnets, ids, err := CreateSubnets(engines, groups)
 	require.NoError(o.Suite.T(), err)
 
 	o.ids = ids
@@ -39,43 +45,127 @@ func (o *OneToKTestSuite) SetupTest() {
 			if o.ee[i] == nil {
 				o.ee[i] = make([]*EchoEngine, 0)
 			}
-			e := NewEchoEngine(o.Suite.T(), net, 100, 1)
+			e := NewEchoEngine(o.Suite.T(), net, 100, 1, false)
 			o.ee[i] = append(o.ee[i], e)
 		}
 	}
 }
 
 func (o *OneToKTestSuite) TestIntraSubNet() {
+	timeout := 2 * time.Second
+
 	// iterates over subnets
 	for i, ee := range o.ee {
-		// iterates over each engine of a subnet
-
-		// Sends a message from sender to receiver
+		// Sends a message from the first engine of each subnet to
+		// the entire engines in the SAME subnet
+		sender := ee[0]
 		event := &message.Echo{
 			Text: fmt.Sprintf("hello subnet %d", i),
 		}
-		require.NoError(o.Suite.T(), ee[0].con.Submit(event, o.ids[i]...))
+		require.NoError(o.Suite.T(), sender.con.Submit(event, o.ids[i]...))
 
 	}
 
-	//// evaluates reception of echo request
-	//select {
-	//case <-receiver.received:
-	//	// evaluates reception of message at the other side
-	//	// does not evaluate the content
-	//	require.NotNil(s.Suite.T(), receiver.originID)
-	//	require.NotNil(s.Suite.T(), receiver.event)
-	//	assert.Equal(s.Suite.T(), s.ids[sndID].NodeID, receiver.originID)
-	//
-	//	// evaluates proper reception of event
-	//	// casts the received event at the receiver side
-	//	rcvEvent, ok := (<-receiver.event).(*message.Echo)
-	//	// evaluates correctness of casting
-	//	require.True(s.Suite.T(), ok)
-	//	// evaluates content of received message
-	//	assert.Equal(s.Suite.T(), event, rcvEvent)
-	//
-	//case <-time.After(10 * time.Second):
-	//	assert.Fail(s.Suite.T(), "sender failed to send a message to receiver")
-	//}
+	// wg locks the main thread temporarily for go routines at each
+	// receiver engine
+	wg := &sync.WaitGroup{}
+
+	// evaluates correct reception of event at the cluster
+	for i, se := range o.ee {
+		// event keeps copy of event disseminated in this cluster
+		event := fmt.Sprintf("hello subnet %d", i)
+		// sender keeps id of the node that disseminated event in this cluster
+		sender := o.ids[i][0]
+
+		for index, e := range se {
+			if index == 0 {
+				continue
+			}
+			wg.Add(1)
+			go func(ec *EchoEngine) {
+				defer wg.Done()
+
+				select {
+				case <-ec.received:
+					// echo engine receives an event
+					// evaluates event has an origin id
+					require.NotNil(o.Suite.T(), ec.originID)
+					// evaluates event against nil value
+					require.NotNil(o.Suite.T(), ec.event)
+					// evaluates origin id of message against sender id
+					assert.Equal(o.Suite.T(), sender, ec.originID)
+					// evaluates number of events node received, should be 1
+					assert.Equal(o.Suite.T(), 1, len(ec.seen))
+					// evaluates content of event against correct content
+					// engine should seen the event of its subnet exactly once
+					assert.Equal(o.Suite.T(), 1, ec.seen[event])
+
+				case <-time.After(timeout):
+					// timeout happened with no reception of event at this receiver
+					assert.Fail(o.Suite.T(), fmt.Sprintf("timout exceeded on waiting for message"))
+				}
+			}(e)
+		}
+	}
+
+	// locks main thread temporarily upon a timeout
+	wg.Wait()
+}
+
+func (o *OneToKTestSuite) TestInterSubNet() {
+	timeout := 2 * time.Second
+
+	// making list of all nodes
+	all := make([]flow.Identifier, 0)
+	for subnet := range o.ids {
+		for _, id := range o.ids[subnet] {
+			all = append(all, id)
+		}
+	}
+
+	// iterates over subnets
+	event := &message.Echo{
+		Text: fmt.Sprintf("hello all"),
+	}
+
+	sender := o.ee[0][0]
+
+	// require.NoError(o.Suite.T(), sender.con.Submit(event, all...))
+
+	// wg locks the main thread temporarily for go routines at each
+	// receiver engine
+	wg := &sync.WaitGroup{}
+
+	// evaluates correct reception of event at the cluster
+	for _, se := range o.ee {
+		for _, e := range se {
+			go func(ec *EchoEngine) {
+				wg.Add(1)
+				defer wg.Done()
+
+				select {
+				case <-ec.received:
+					// echo engine receives an event
+					// evaluates event has an origin id
+					require.NotNil(o.Suite.T(), ec.originID)
+					// evaluates event against nil value
+					require.NotNil(o.Suite.T(), ec.event)
+					// evaluates origin id of message against sender id
+					assert.Equal(o.Suite.T(), sender, ec.originID)
+					// evaluates number of events node received, should be 1
+					assert.Equal(o.Suite.T(), len(ec.seen), 1)
+					// evaluates content of event against correct content
+					// engine should seen the event of its subnet exactly once
+					assert.Equal(o.Suite.T(), ec.seen[event.Text], 1)
+
+				case <-time.After(timeout):
+					// timeout happened with no reception of event at this receiver
+					require.Fail(o.Suite.T(), "timout exceeded on waiting for message")
+				}
+			}(e)
+		}
+	}
+
+	// locks main thread temporarily upon a timeout
+	wg.Wait()
 }
