@@ -11,5 +11,8 @@ type Snapshot struct {
 }
 
 func (s *Snapshot) Collection() (*flow.Collection, error) {
+	_ = s.state
+	_ = s.blockID
+	_ = s.final
 	panic("TODO")
 }
