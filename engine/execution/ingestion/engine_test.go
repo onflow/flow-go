@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	engineCommon "github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution"
 	computation "github.com/dapperlabs/flow-go/engine/execution/computation/mock"
 	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -60,7 +59,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	blocks := storage.NewMockBlocks(ctrl)
 	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
-	executionEngine := new(computation.ExecutionEngine)
+	computationEngine := new(computation.ComputationEngine)
 	protocolState := new(protocol.State)
 	executionState := new(state.ExecutionState)
 
@@ -84,7 +83,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 
-	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, executionEngine, executionState)
+	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, computationEngine, executionState)
 	require.NoError(t, err)
 
 	f(testingContext{
@@ -95,11 +94,11 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 		state:             protocolState,
 		conduit:           conduit,
 		collectionConduit: collectionConduit,
-		executionEngine:   executionEngine,
+		executionEngine:   computationEngine,
 		executionState:    executionState,
 	})
 
-	executionEngine.AssertExpectations(t)
+	computationEngine.AssertExpectations(t)
 	protocolState.AssertExpectations(t)
 	executionState.AssertExpectations(t)
 }
