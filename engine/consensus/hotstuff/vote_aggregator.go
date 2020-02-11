@@ -101,7 +101,7 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 		return nil, fmt.Errorf("could not build QC on receiving block: %w", types.StaleBlockError{BlockProposal: bp, FinalizedView: va.lastPrunedView})
 	}
 	// accumulate leader vote first
-	leaderVote := bp.ToVote()
+	leaderVote := bp.ProposersVote()
 	voteStatus, err := va.validateAndStoreIncorporatedVote(leaderVote, bp)
 	if err != nil {
 		return nil, fmt.Errorf("leader vote is invalid %w", err)
