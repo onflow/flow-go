@@ -6,7 +6,7 @@ import (
 )
 
 type Validator struct {
-	viewState ViewState
+	viewState *ViewState
 }
 
 // ValidateQC validates the QC

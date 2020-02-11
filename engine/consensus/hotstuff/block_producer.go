@@ -13,14 +13,15 @@ import (
 // BlockProducer is responsible for producing new block proposals
 type BlockProducer struct {
 	signer    Signer
-	viewState ViewState
+	viewState *ViewState
 	builder   module.Builder
 
 	// chainID is used for specifying the chainID field for new blocks
 	chainID string
 }
 
-func NewBlockProducer(signer Signer, viewState ViewState, builder module.Builder, chainID string) (*BlockProducer, error) {
+// NewBlockProducer creates a new BlockProducer
+func NewBlockProducer(signer Signer, viewState *ViewState, builder module.Builder, chainID string) (*BlockProducer, error) {
 	bp := &BlockProducer{
 		signer:    signer,
 		viewState: viewState,

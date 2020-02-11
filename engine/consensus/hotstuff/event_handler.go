@@ -23,7 +23,7 @@ type EventHandler struct {
 	forks          Forks
 	validator      *Validator
 	blockProducer  *BlockProducer
-	viewState      ViewState
+	viewState      *ViewState
 	network        Communicator
 }
 
@@ -36,7 +36,7 @@ func NewEventHandler(
 	forks Forks,
 	validator *Validator,
 	blockProducer *BlockProducer,
-	viewState ViewState,
+	viewState *ViewState,
 	network Communicator,
 ) (*EventHandler, error) {
 	e := &EventHandler{
@@ -210,7 +210,7 @@ func (e *EventHandler) processBlockForCurrentView(block *types.BlockProposal) er
 	}
 	// checking if I'm the next leader
 	nextLeader := e.viewState.LeaderForView(curView + 1)
-	isNextLeader := e.viewState.IsSelf(nextLeader)
+	isNextLeader := e.viewState.IsSelf(nextLeader.ID())
 
 	if isNextLeader {
 		return e.processBlockForCurrentViewIfIsNextLeader(block)
@@ -262,7 +262,7 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *types.
 			// TODO: should we error here? E.g.
 			//    return fmt.Errorf("failed to send vote: %w", err)
 			//    We probably want to continue in that case ...
-			e.log.Warn().Msg(fmt.Sprintf("failed to send vote: %w", err))
+			e.log.Warn().Msg(fmt.Sprintf("failed to send vote: %s", err))
 		}
 	}
 

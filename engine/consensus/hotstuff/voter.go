@@ -9,23 +9,22 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 )
 
+// Voter produces votes for the given block
 type Voter struct {
 	signer    Signer
-	viewState ViewState
+	viewState *ViewState
 	forks     Forks
-	// Flag to turn on/off consensus acts (voting, block production etc)
-	isConActor bool
 	// Need to keep track of the last view we voted for so we don't double vote accidentally
 	lastVotedView uint64
 	log           zerolog.Logger
 }
 
-func (v *Voter) NewVoter(signer Signer, viewState ViewState, forks Forks, isConActor bool, log zerolog.Logger) *Voter {
+// NewVoter creates a new Voter instance
+func (v *Voter) NewVoter(signer Signer, viewState *ViewState, forks Forks, log zerolog.Logger) *Voter {
 	return &Voter{
 		signer:        signer,
 		viewState:     viewState,
 		forks:         forks,
-		isConActor:    isConActor,
 		lastVotedView: 0,
 		log:           log,
 	}
@@ -39,11 +38,6 @@ func (v *Voter) NewVoter(signer Signer, viewState ViewState, forks Forks, isConA
 //  current view to vote for. Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
 // (including repeated calls with the initial block we voted for also return `nil, false`).
 func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*types.Vote, bool) {
-	if !v.isConActor {
-		log.Debug().Msg("we're not a consensus actor, don't vote")
-		return nil, false
-	}
-
 	if v.forks.IsSafeBlock(bp) {
 		log.Info().Msg("received block is not a safe node, don't vote")
 		return nil, false
