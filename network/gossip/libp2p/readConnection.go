@@ -48,11 +48,6 @@ RecvLoop:
 			return
 		}
 
-		rc.log.Debug().Str("peer", rc.stream.Conn().RemotePeer().String()).
-			Hex("sender", msg.OriginID).
-			Hex("eventID", msg.EventID).
-			Msg("received message")
-
 		// stash the received message into the inbound queue for handling
 		rc.inbound <- &msg
 	}

@@ -18,8 +18,8 @@ import (
 // network.
 type WriteConnection struct {
 	*Connection
-	*sync.Once                       // used to close write connection once
-	outbound   chan *message.Message // the channel to consumed by this writer
+	wcDone   *sync.Once            // used to close write connection once
+	outbound chan *message.Message // the channel to consumed by this writer
 }
 
 // NewConnection creates a new connection to a peer on the flow network, using
@@ -30,7 +30,7 @@ func NewWriteConnection(log zerolog.Logger, stream libp2pnetwork.Stream) *WriteC
 	wc := WriteConnection{
 		Connection: c,
 		outbound:   make(chan *message.Message),
-		Once:       &sync.Once{},
+		wcDone:     &sync.Once{},
 	}
 	return &wc
 }
@@ -64,11 +64,6 @@ SendLoop:
 
 			bufw.Flush()
 
-			wc.log.Debug().
-				Bytes("sender", msg.OriginID).
-				Hex("eventID", msg.EventID).
-				Msg("sent message")
-
 			if isClosedErr(err) {
 				wc.log.Error().Err(err).Msg("connection closed, stopping writes")
 				wc.stop()
@@ -84,7 +79,7 @@ SendLoop:
 }
 
 func (wc *WriteConnection) Stop() {
-	wc.Do(func() {
+	wc.wcDone.Do(func() {
 		close(wc.outbound)
 		wc.Connection.stop()
 	})
