@@ -68,7 +68,6 @@ func (e *EventHandler) OnReceiveVote(vote *types.Vote) error {
 // It is assumed that the block proposal is incorporated. (its parent can be found
 // in the forks)
 func (e *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) error {
-
 	e.log.Info().
 		Hex("block", logging.ID(block.BlockID())).
 		Uint64("qc_view", block.QC().View).
@@ -103,7 +102,7 @@ func (e *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) error {
 	// if the block is not for the current view, try to build QC from votes for this block
 	qc, err := e.voteAggregator.BuildQCOnReceivingBlock(validBlock)
 	if err != nil {
-		//	TODO: handle err
+		return err
 	}
 	// process the QC
 	return e.processQC(qc)
@@ -291,21 +290,21 @@ func (e *EventHandler) processVote(vote *types.Vote) error {
 		// store the pending vote if voting block is not found.
 		// We don't need to proactively fetch the missing voting block, because the chain compliance layer has acknowledged
 		// the missing block and requested it already.
-		e.voteAggregator.StorePendingVote(vote)
+		err := e.voteAggregator.StorePendingVote(vote)
 
 		e.log.Info().
 			Uint64("vote_view", vote.View).
 			Hex("voting_block", logging.ID(vote.BlockID)).
 			Msg("block for vote not found")
 
-		return nil
+		return fmt.Errorf("could not process pending vote: %w", err)
 	}
 
 	// if the voting block can be found, we should be able to validate the vote
 	// and check if we can build a QC with it.
 	qc, err := e.voteAggregator.StoreVoteAndBuildQC(vote, block)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not process incorporated vote: %w", err)
 	}
 
 	return e.processQC(qc)
