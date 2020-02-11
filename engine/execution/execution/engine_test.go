@@ -3,13 +3,12 @@ package execution
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/executor/mocks"
+	executor "github.com/dapperlabs/flow-go/engine/execution/execution/executor/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -76,15 +75,13 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 		me := new(module.Local)
 		me.On("NodeID").Return(flow.ZeroID)
 
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		exec := mocks.NewMockBlockExecutor(ctrl)
+		blockExecutor := new(executor.BlockExecutor)
 
 		computationResult := unittest.ComputationResultFixture()
 
 		e := &Engine{
 			provider: receipts,
-			executor: exec,
+			executor: blockExecutor,
 			me:       me,
 		}
 
@@ -100,7 +97,7 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 			}).
 			Return(nil)
 
-		exec.EXPECT().ExecuteBlock(gomock.Eq(completeBlock), gomock.AssignableToTypeOf(&state.View{}), gomock.AssignableToTypeOf(flow.StateCommitment{})).Return(computationResult, nil)
+		blockExecutor.On("ExecuteBlock", mock.Anything, mock.Anything, mock.Anything).Return(computationResult, nil)
 
 		view := state.NewView(func(key string) (bytes []byte, e error) {
 			return nil, nil

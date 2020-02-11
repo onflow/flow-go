@@ -93,9 +93,9 @@ generate-mocks:
 	GO111MODULE=on mockgen -destination=protocol/mocks/state.go -package=mocks github.com/dapperlabs/flow-go/protocol State
 	GO111MODULE=on mockgen -destination=protocol/mocks/snapshot.go -package=mocks github.com/dapperlabs/flow-go/protocol Snapshot
 	GO111MODULE=on mockgen -destination=protocol/mocks/mutator.go -package=mocks github.com/dapperlabs/flow-go/protocol Mutator
-	GO111MODULE=on mockgen -destination=engine/execution/execution/state/mocks/state.go -package=mocks github.com/dapperlabs/flow-go/engine/execution/execution/state ExecutionState
-	GO111MODULE=on mockgen -destination=engine/execution/execution/executor/mocks/executor.go -package=mocks github.com/dapperlabs/flow-go/engine/execution/execution/executor BlockExecutor
-	GO111MODULE=on mockgen -destination=engine/execution/execution/mocks/engine.go -package=mocks github.com/dapperlabs/flow-go/engine/execution/execution ExecutionEngine
+	GO111MODULE=on mockery -name 'ExecutionState' -dir=engine/execution/execution/state -case=underscore -output="engine/execution/execution/state/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'BlockExecutor' -dir=engine/execution/execution/executor -case=underscore -output="engine/execution/execution/executor/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'ExecutionEngine' -dir=engine/execution/execution -case=underscore -output="engine/execution/execution/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
 	GO111MODULE=on mockery -name '.*' -dir=module/trace -case=underscore -output="./module/trace/mock" -outpkg="mock"
