@@ -56,7 +56,7 @@ func (e InvalidSignatureError) Error() string {
 }
 
 func (e InvalidViewError) Error() string {
-	return fmt.Sprintf("invalid view for view %v", e.Vote)
+	return fmt.Sprintf("invalid view for vote %v", e.Vote)
 }
 
 func (e DoubleVoteError) Error() string {
