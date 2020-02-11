@@ -74,17 +74,3 @@ func (mr *MockMutatorMockRecorder) Finalize(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Finalize", reflect.TypeOf((*MockMutator)(nil).Finalize), arg0)
 }
-
-// StorePayload mocks base method
-func (m *MockMutator) StorePayload(arg0 *flow.Payload) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "StorePayload", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// StorePayload indicates an expected call of StorePayload
-func (mr *MockMutatorMockRecorder) StorePayload(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StorePayload", reflect.TypeOf((*MockMutator)(nil).StorePayload), arg0)
-}
