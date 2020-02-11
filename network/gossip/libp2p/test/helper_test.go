@@ -95,14 +95,24 @@ func (s *SubNetGeneratorTestSuite) TestDoubleNodeMultiSubNet() {
 // SubNetSizeTestHelper creates subnets of different sizes
 // and validates their correct correction
 func (s *SubNetGeneratorTestSuite) SubNetSizeTestHelper(nodesNum, subsNum int) {
-	subnets, _, err := CreateSubnets(nodesNum, subsNum)
+	subnets, idMap, err := CreateSubnets(nodesNum, subsNum, 0)
 	require.NoError(s.Suite.T(), err)
 
+	// iterates on the subnet ids (not nodes)
 	for subnetID := range subnets {
-		// all net instances should belong to either subnet zero or one
+		// all subnet ids should lay in range [0, subnetID-1]
 		if subnetID < 0 || subnetID >= nodesNum {
 			require.Fail(s.Suite.T(), fmt.Sprintf("unidentified subnet id: %d", subnetID))
 		}
 		require.Equal(s.Suite.T(), len(subnets[subnetID]), nodesNum/subsNum)
+	}
+
+	// iterates on the subnet ids (not nodes)
+	for subnetID := range idMap {
+		// all subnet ids should lay in range [0, subnetID-1]
+		if subnetID < 0 || subnetID >= nodesNum {
+			require.Fail(s.Suite.T(), fmt.Sprintf("unidentified subnet id: %d", subnetID))
+		}
+		require.Equal(s.Suite.T(), len(idMap[subnetID]), nodesNum/subsNum)
 	}
 }

@@ -16,16 +16,20 @@ import (
 	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 )
 
-func CreateSubnets(nodesNum, subnetNum int) (map[int][]*libp2p.Network, map[int][]flow.Identifier, error) {
+func CreateSubnets(nodesNum, subnetNum, linkNum int) (map[int][]*libp2p.Network, map[int][]flow.Identifier, error) {
 	if nodesNum < subnetNum || nodesNum%subnetNum != 0 {
 		return nil, nil, fmt.Errorf("number of subnets should divide number of nodes")
 	}
 
-	// size of subnets
-	size := nodesNum / subnetNum
+	// subSize of subnets
+	subSize := nodesNum / subnetNum
+	if subSize < linkNum {
+		return nil, nil,
+			fmt.Errorf("number of links (%d) greater than subnet size (%d)", subSize, linkNum)
+	}
 
 	// map of subnet ids
-	subnetIdList := groupIDs(CreateIDs(nodesNum), size)
+	subnetIdList := groupIDs(CreateIDs(nodesNum), subSize, linkNum)
 
 	// nets keeps a map of subnets networks
 	nets := make(map[int][]*libp2p.Network)
@@ -57,7 +61,7 @@ func CreateSubnets(nodesNum, subnetNum int) (map[int][]*libp2p.Network, map[int]
 }
 
 // groupIDs groups ids into sub-many groups
-func groupIDs(ids []*flow.Identity, sub int) map[int][]*flow.Identity {
+func groupIDs(ids []*flow.Identity, subNum, linkNum int) map[int][]*flow.Identity {
 	sIndx := -1
 	subnets := make(map[*flow.Identity]int)
 
@@ -66,7 +70,7 @@ func groupIDs(ids []*flow.Identity, sub int) map[int][]*flow.Identity {
 	// clusters ids into subnets
 	for index, id := range ids {
 		// checks if we reach end of current subnet
-		if index%sub == 0 {
+		if index%subNum == 0 {
 			// moves to next subnet
 			sIndx++
 		}
@@ -81,6 +85,23 @@ func groupIDs(ids []*flow.Identity, sub int) map[int][]*flow.Identity {
 		// adding nodes' id to the current Identity
 		subnetIdList[sIndx] = append(subnetIdList[sIndx], id)
 	}
+
+	// creates links between subnets
+	if linkNum > 0 {
+		for this := range subnetIdList {
+			for other := range subnetIdList {
+				if this == other {
+					continue
+				}
+
+				// adds links from this subnet to other subnet
+				for i := 0; i < linkNum; i++ {
+					subnetIdList[other] = append(subnetIdList[other], subnetIdList[this][i])
+				}
+			}
+		}
+	}
+
 	return subnetIdList
 }
 

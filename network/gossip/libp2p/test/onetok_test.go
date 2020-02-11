@@ -33,7 +33,7 @@ func (o *OneToKTestSuite) SetupTest() {
 
 	o.ee = make(map[int][]*EchoEngine)
 
-	subnets, ids, err := CreateSubnets(engines, groups)
+	subnets, ids, err := CreateSubnets(engines, groups, 0)
 	require.NoError(o.Suite.T(), err)
 
 	o.ids = ids
