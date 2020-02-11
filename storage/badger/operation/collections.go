@@ -16,6 +16,11 @@ func InsertCollection(collection *flow.LightCollection) func(*badger.Txn) error 
 	return insert(makePrefix(codeCollection, collection.ID()), collection)
 }
 
+// IndexCollection indexes the collection by payload hash.
+func IndexCollection(payloadHash flow.Identifier, collection *flow.LightCollection) func(*badger.Txn) error {
+	return insert(makePrefix(codeIndexCollection, payloadHash), collection.ID())
+}
+
 func RetrieveCollection(collID flow.Identifier, collection *flow.LightCollection) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeCollection, collID), collection)
 }
