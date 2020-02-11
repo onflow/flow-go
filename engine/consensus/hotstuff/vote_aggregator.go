@@ -41,10 +41,7 @@ func NewVoteAggregator(lastPruneView uint64, viewState ViewState, voteValidator 
 // Note: Validations on these pending votes will be postponed until the block has been received.
 func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 	if vote.View <= va.lastPrunedView {
-		return fmt.Errorf("could not store pending vote: %w", types.StaleVoteError{
-			Vote:          vote,
-			FinalizedView: va.lastPrunedView,
-		})
+		return types.StaleVoteError{Vote: vote, FinalizedView: va.lastPrunedView}
 	}
 	voter, err := va.voteValidator.ValidateVote(vote, nil)
 	if err != nil {
@@ -73,10 +70,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 	}
 	// ignore stale votes
 	if vote.View <= va.lastPrunedView {
-		return nil, fmt.Errorf("could not store incorporated vote: %w", types.StaleVoteError{
-			Vote:          vote,
-			FinalizedView: va.lastPrunedView,
-		})
+		return nil, types.StaleVoteError{Vote: vote, FinalizedView: va.lastPrunedView}
 	}
 	votingStatus, err := va.validateAndStoreIncorporatedVote(vote, bp)
 	if err != nil {
@@ -98,7 +92,7 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 		return oldQC, nil
 	}
 	if bp.View() <= va.lastPrunedView {
-		return nil, fmt.Errorf("could not build QC on receiving block: %w", types.StaleBlockError{BlockProposal: bp, FinalizedView: va.lastPrunedView})
+		return nil, types.StaleBlockError{BlockProposal: bp, FinalizedView: va.lastPrunedView}
 	}
 	// accumulate leader vote first
 	leaderVote := bp.ProposersVote()
@@ -185,15 +179,17 @@ func (va *VoteAggregator) updateState(vote *types.Vote, voter *flow.Identity) {
 	if exists {
 		idToVote[voter.ID()] = vote
 	} else {
-		va.viewToIDToVote[vote.View] = map[flow.Identifier]*types.Vote{}
-		va.viewToIDToVote[vote.View][voter.ID()] = vote
+		idToVote = make(map[flow.Identifier]*types.Vote)
+		idToVote[voter.ID()] = vote
+		va.viewToIDToVote[vote.View] = idToVote
 	}
 	blockIDSet, exists := va.viewToBlockIDSet[vote.View]
 	if exists {
 		blockIDSet[vote.BlockID] = struct{}{}
 	} else {
-		va.viewToBlockIDSet[vote.View] = make(map[flow.Identifier]struct{})
-		va.viewToBlockIDSet[vote.View][vote.BlockID] = struct{}{}
+		blockIDSet = make(map[flow.Identifier]struct{})
+		blockIDSet[vote.BlockID] = struct{}{}
+		va.viewToBlockIDSet[vote.View] = blockIDSet
 	}
 }
 
