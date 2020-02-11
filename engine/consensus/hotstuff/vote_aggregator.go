@@ -90,7 +90,7 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 	if built {
 		return oldQC, nil
 	}
-	if bp.View() <= va.lastPrunedView {  // cannot build QC for already pruned view
+	if bp.View() <= va.lastPrunedView { // cannot build QC for already pruned view
 		return nil, types.StaleBlockError{BlockProposal: bp, LowestStoredView: va.lastPrunedView}
 	}
 	// accumulate leader vote first
