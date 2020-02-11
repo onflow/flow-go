@@ -92,6 +92,8 @@ github.com/cpuguy83/go-md2man v1.0.10/go.mod h1:SmD6nW6nTyfqj6ABTjUi3V3JVMnlJmwc
 github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d/go.mod h1:maD7wRr/U5Z6m/iR4s+kqSMx2CaBsrgA7czyZG/E6dU=
 github.com/dapperlabs/flow-go-sdk v0.0.0-20200114214559-9ed2f832fcdc h1:LLCL2YmLQR0kVk73kcFIKfLwNL00FrlHuM4JyxL6/zU=
 github.com/dapperlabs/flow-go-sdk v0.0.0-20200114214559-9ed2f832fcdc/go.mod h1:wwWYsytMu06ZUTtOsIjQtZ3ro7K5EluSjTNJ6PqQ3kw=
+github.com/dapperlabs/flow-go-sdk v0.3.0 h1:1F9ihdt65EIBv21nBWP/P496B4WkqRYMGiL06gFdg+o=
+github.com/dapperlabs/flow-go-sdk v0.3.0/go.mod h1:XchiTVzs6Cb0o43xSYa3o8ePPV/yRk6U5vzqdvL+vhE=
 github.com/dapperlabs/flow-go/language v0.2.5-beta h1:eXN0zQwenKYrZXWt6glgvL6J6jjBmRVcClYVolwKKbE=
 github.com/dapperlabs/flow-go/language v0.2.5-beta/go.mod h1:RzkZ4AFbhD8svV+niFMxT2d9mwg6j0QO+nqQlFYhVuM=
 github.com/dapperlabs/flow-go/language v0.3.1 h1:/xLUg2+4mbDEWU3mrmBdctQ60ehZstlJAVdr5gg86K0=

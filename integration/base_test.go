@@ -11,11 +11,11 @@ import (
 	sdk "github.com/dapperlabs/flow-go-sdk"
 	"github.com/dapperlabs/flow-go-sdk/client"
 	"github.com/dapperlabs/flow-go-sdk/keys"
-	"github.com/dapperlabs/flow-go-sdk/language/encoding"
 	"github.com/m4ksio/testingdock"
 	"github.com/stretchr/testify/require"
 
 	. "github.com/dapperlabs/flow-go/integration/network"
+	"github.com/dapperlabs/flow-go/language/encoding"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -100,7 +100,6 @@ func runMVPTest(t *testing.T, collectionClient *FlowTestClient, executionClient 
 	counter, err := readCounter(executionClient)
 	require.Error(t, err)
 
-
 	err = deployCounter(collectionClient)
 	require.NoError(t, err)
 
@@ -124,7 +123,7 @@ func runMVPTest(t *testing.T, collectionClient *FlowTestClient, executionClient 
 
 func testClient(port string, key *sdk.AccountPrivateKey) (*FlowTestClient, error) {
 
-	c, err := client.New("localhost:"+port)
+	c, err := client.New("localhost:" + port)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +196,6 @@ func createCounter(testClient *FlowTestClient) error {
 		}})
 
 }
-
 
 func getEmulatorKey() (*sdk.AccountPrivateKey, error) {
 	prKeyBytes, err := hex.DecodeString("f87db87930770201010420ae2cc975dcbdd0ebc56f268b1d8a95834c2955970aea27042d35ec9f298b9e5aa00a06082a8648ce3d030107a1440342000417f5a527137785d2d773fee84b4c7ee40266a1dd1f36ddd46ecf25db6df6a499459629174de83256f2a44ebd4325b9def67d523b755a8926218c4efb7904f8ce0203")
