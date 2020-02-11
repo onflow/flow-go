@@ -3,6 +3,7 @@ package test
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -12,7 +13,7 @@ import (
 
 type SubNetGeneratorTestSuite struct {
 	suite.Suite
-	nets map[int]*libp2p.Network
+	subnets map[int][]*libp2p.Network
 }
 
 // TestSubNetGeneratorTestSuit runs all tests in this test suit
@@ -20,22 +21,21 @@ func TestSubNetGeneratorTestSuit(t *testing.T) {
 	suite.Run(t, new(SubNetGeneratorTestSuite))
 }
 
-func (s *SubNetGeneratorTestSuite) SetupTest() {
-
+// TearDownTest is invoked after each single test and shuts down the network
+// instances
+func (s *SubNetGeneratorTestSuite) TearDownTest() {
+	for _, subnet := range s.subnets {
+		for _, net := range subnet {
+			select {
+			// closes the network
+			case <-net.Done():
+				continue
+			case <-time.After(1 * time.Second):
+				s.Suite.Fail("could not stop the network")
+			}
+		}
+	}
 }
-
-//func (s *SubNetGeneratorTestSuite) TearDownTest() {
-//	for _, net := range s.nets {
-//		select {
-//		// closes the network
-//		case <-net.Done():
-//			continue
-//		case <-time.After(1 * time.Second):
-//			s.Suite.Fail("could not stop the network")
-//		}
-//	}
-//	fmt.Println("tests tear down")
-//}
 
 /*
 Single Subnet tests
@@ -102,11 +102,19 @@ func (s *SubNetGeneratorTestSuite) TestTenNodesTwoLinkedSubNet() {
 	s.SubNetSizeTestHelper(10, 2, 1)
 }
 
+// TestTenNodesTwoSubNet evaluates CreateSubnets for creating 4 subnets of 20 nodes linked with 2 nodes from
+// each one
+func (s *SubNetGeneratorTestSuite) TestTwentyNodesFourLinkedSubNet() {
+	// two subnet 10 nodes
+	s.SubNetSizeTestHelper(20, 4, 2)
+}
+
 // SubNetSizeTestHelper creates subnets of different sizes
 // and validates their correct correction
 func (s *SubNetGeneratorTestSuite) SubNetSizeTestHelper(nodeNum, subNum, linkNum int) {
 	subnets, idMap, err := CreateSubnets(nodeNum, subNum, linkNum)
 	require.NoError(s.Suite.T(), err)
+	s.subnets = subnets
 
 	// iterates on the subnet ids (not nodes) in the ids map
 	for subnetID := range subnets {
@@ -115,7 +123,7 @@ func (s *SubNetGeneratorTestSuite) SubNetSizeTestHelper(nodeNum, subNum, linkNum
 			require.Fail(s.Suite.T(), fmt.Sprintf("unidentified subnet id: %d", subnetID))
 		}
 		// size of each subnet should be equal to nodeNum/subNum + external links between subnets
-		require.Equal(s.Suite.T(), nodeNum/subNum+(linkNum), len(idMap[subnetID]))
+		require.Equal(s.Suite.T(), nodeNum/subNum+((subNum-1)*linkNum), len(idMap[subnetID]))
 	}
 
 	// iterates on the subnet ids (not nodes) in the nets map
@@ -125,6 +133,6 @@ func (s *SubNetGeneratorTestSuite) SubNetSizeTestHelper(nodeNum, subNum, linkNum
 			require.Fail(s.Suite.T(), fmt.Sprintf("unidentified subnet id: %d", subnetID))
 		}
 		// size of each subnet should be equal to nodeNum/subNum + external links between subnets
-		require.Equal(s.Suite.T(), (nodeNum/subNum)+(linkNum), len(idMap[subnetID]))
+		require.Equal(s.Suite.T(), (nodeNum/subNum)+((subNum-1)*linkNum), len(idMap[subnetID]))
 	}
 }
