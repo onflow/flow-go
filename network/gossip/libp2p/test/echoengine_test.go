@@ -65,7 +65,8 @@ func (s *StubEngineTestSuite) TearDownTest() {
 func (s *StubEngineTestSuite) TestSingleMessage() {
 	s.T().Skip()
 	// set to false for no echo expectation
-	s.singleMessage(false)
+	s.T().Skip()
+	//.singleMessage(false)
 }
 
 // TestSingleMessage tests sending a single message from sender to receiver

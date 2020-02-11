@@ -4,7 +4,7 @@ import "github.com/dapperlabs/flow-go/model/flow"
 
 type BlockProposal struct {
 	Block     *Block
-	Signature *flow.PartialSignature // this is sign(Block)
+	Signature *flow.PartialSignature
 }
 
 func NewBlockProposal(block *Block, sig *flow.PartialSignature) *BlockProposal {
