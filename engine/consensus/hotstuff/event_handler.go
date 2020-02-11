@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -55,12 +56,15 @@ func NewEventHandler(
 // OnReceiveVote processes the vote when a vote is received.
 // It is assumed that the voting block is not a missing block
 func (e *EventHandler) OnReceiveVote(vote *types.Vote) error {
-
 	e.log.Info().
 		Hex("vote_block", logging.ID(vote.BlockID)).
 		Uint64("vote_view", vote.View).
 		Msg("vote received")
 
+	// votes for finalized view or older should be dropped:
+	if vote.View <= e.forks.FinalizedView() {
+		return nil
+	}
 	return e.processVote(vote)
 }
 
@@ -68,7 +72,6 @@ func (e *EventHandler) OnReceiveVote(vote *types.Vote) error {
 // It is assumed that the block proposal is incorporated. (its parent can be found
 // in the forks)
 func (e *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) error {
-
 	e.log.Info().
 		Hex("block", logging.ID(block.BlockID())).
 		Uint64("qc_view", block.QC().View).
@@ -101,12 +104,16 @@ func (e *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) error {
 	}
 
 	// if the block is not for the current view, try to build QC from votes for this block
-	qc, built := e.voteAggregator.BuildQCForBlockProposal(validBlock)
-	if !built {
-		// if cannot build QC for this block, process with block.qc instead
-		qc = validBlock.QC()
+	qc, err := e.voteAggregator.BuildQCOnReceivingBlock(validBlock)
+	if err != nil {
+		switch {
+		case errors.Is(err, types.ErrInsufficientVotes):
+			// if we don't have enough votes to build QC for this block, proceed with block.qc instead
+			qc = validBlock.QC()
+		default:
+			return fmt.Errorf("building qc for block failed: %w", err)
+		}
 	}
-
 	// process the QC
 	return e.processQC(qc)
 }
@@ -276,9 +283,15 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *types.
 // tryBuildQCForBlock checks whether there are enough votes to build a QC for the given block,
 // and process the QC if a QC was built.
 func (e *EventHandler) tryBuildQCForBlock(block *types.BlockProposal) error {
-	qc, built := e.voteAggregator.BuildQCForBlockProposal(block)
-	if !built {
-		return nil
+	qc, err := e.voteAggregator.BuildQCOnReceivingBlock(block)
+	if err != nil {
+		switch {
+		case errors.Is(err, types.ErrInsufficientVotes):
+			// if we don't have enough votes to build QC for this block:
+			return nil // nothing more to do for processing block
+		default:
+			return fmt.Errorf("building qc for block failed: %w", err)
+		}
 	}
 	return e.processQC(qc)
 }
@@ -293,21 +306,27 @@ func (e *EventHandler) processVote(vote *types.Vote) error {
 		// store the pending vote if voting block is not found.
 		// We don't need to proactively fetch the missing voting block, because the chain compliance layer has acknowledged
 		// the missing block and requested it already.
-		e.voteAggregator.StorePendingVote(vote)
+		err := e.voteAggregator.StorePendingVote(vote)
 
 		e.log.Info().
 			Uint64("vote_view", vote.View).
 			Hex("voting_block", logging.ID(vote.BlockID)).
 			Msg("block for vote not found")
 
-		return nil
+		return fmt.Errorf("could not process pending vote: %w", err)
 	}
 
 	// if the voting block can be found, we should be able to validate the vote
 	// and check if we can build a QC with it.
-	qc, built := e.voteAggregator.StoreVoteAndBuildQC(vote, block)
-	if !built {
-		return nil
+	qc, err := e.voteAggregator.StoreVoteAndBuildQC(vote, block)
+	if err != nil {
+		switch {
+		case errors.Is(err, types.ErrInsufficientVotes):
+			// if we don't have enough votes to build QC for this block:
+			return nil // nothing more to do for processing vote
+		default:
+			return fmt.Errorf("building qc for block failed: %w", err)
+		}
 	}
 
 	return e.processQC(qc)
