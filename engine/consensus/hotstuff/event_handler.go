@@ -56,12 +56,15 @@ func NewEventHandler(
 // OnReceiveVote processes the vote when a vote is received.
 // It is assumed that the voting block is not a missing block
 func (e *EventHandler) OnReceiveVote(vote *types.Vote) error {
-
 	e.log.Info().
 		Hex("vote_block", logging.ID(vote.BlockID)).
 		Uint64("vote_view", vote.View).
 		Msg("vote received")
 
+	// votes for finalized view or older should be dropped:
+	if vote.View <= e.forks.FinalizedView() {
+		return nil
+	}
 	return e.processVote(vote)
 }
 

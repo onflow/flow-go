@@ -22,6 +22,7 @@ func (pv *PendingVotes) AddVote(vote *types.Vote) {
 	status, exists := pv.votes[vote.BlockID]
 	if !exists {
 		status = NewPendingStatus()
+		pv.votes[vote.BlockID] = status
 	}
 	status.AddVote(vote)
 }
