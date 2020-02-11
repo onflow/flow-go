@@ -39,3 +39,23 @@ func NewBlock(blockID flow.Identifier, view uint64, qc *QuorumCertificate, paylo
 func (b *Block) ToVote() *UnsignedVote {
 	panic("")
 }
+
+// BlockFromFlowHeader converts a flow header to the corresponding internal
+// HotStuff block.
+// header - the block header to convert from.
+// aggSig - the aggregated signature that contains the identities of all the signers.
+// it is looked up by the chain compliance layer
+func BlockFromFlowHeader(header *flow.Header, aggSig *flow.AggregatedSignature) *Block {
+	return &Block{
+		View: header.View,
+		QC: &QuorumCertificate{
+			View:                header.ParentView,
+			BlockID:             header.ParentID,
+			AggregatedSignature: header.ParentSig,
+		},
+		PayloadHash: header.PayloadHash[:],
+		Height:      header.Number,
+		ChainID:     header.ChainID,
+		Timestamp:   header.Timestamp,
+	}
+}

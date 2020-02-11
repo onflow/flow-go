@@ -2,10 +2,13 @@ package test
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -35,11 +38,12 @@ func (s *StubEngineTestSuite) SetupTest() {
 	//golog.SetAllLoggers(gologging.INFO)
 	s.ids = CreateIDs(count)
 
-	mws, err := CreateMiddleware(s.ids)
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	mws, err := CreateMiddleware(logger, s.ids)
 	require.NoError(s.Suite.T(), err)
 	s.mws = mws
 
-	nets, err := CreateNetworks(s.mws, s.ids, 100, false)
+	nets, err := CreateNetworks(logger, s.mws, s.ids, 100, false)
 	require.NoError(s.Suite.T(), err)
 	s.nets = nets
 }
@@ -61,7 +65,8 @@ func (s *StubEngineTestSuite) TearDownTest() {
 func (s *StubEngineTestSuite) TestSingleMessage() {
 	s.T().Skip()
 	// set to false for no echo expectation
-	s.singleMessage(false)
+	s.T().Skip()
+	//.singleMessage(false)
 }
 
 // TestSingleMessage tests sending a single message from sender to receiver

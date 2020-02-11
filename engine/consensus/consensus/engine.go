@@ -140,8 +140,8 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote)
 	// mapping between index and node / public key might not be known before the
 	// block is received.
 	sig := flow.PartialSignature{
-		Raw:         vote.Signature,
-		SignerIndex: vote.Index, // redundant
+		Raw:    vote.Signature,
+		Signer: vote.Signer,
 	}
 
 	// NOTE: The view number is not really be needed, as the hotstuff algorithm
@@ -149,7 +149,7 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote)
 	// the vote. No vote can be processed without having the related proposal
 	// with its included view number anyway.
 	hsVote := types.Vote{
-		View:      vote.View, // redundant
+		View:      vote.View,
 		BlockID:   vote.BlockID,
 		Signature: &sig,
 	}

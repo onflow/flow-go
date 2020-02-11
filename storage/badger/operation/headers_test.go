@@ -24,7 +24,7 @@ func TestHeaderInsertRetrieve(t *testing.T) {
 			ProposerID:  flow.Identifier{0x33},
 			ParentSig: &flow.AggregatedSignature{
 				Raw:     []byte{0x44},
-				Signers: []bool{true},
+				Signers: []flow.Identifier{flow.Identifier{0x44}},
 			},
 		}
 		blockID := expected.ID()

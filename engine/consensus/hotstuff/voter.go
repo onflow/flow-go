@@ -69,12 +69,10 @@ func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*
 }
 
 func (v *Voter) produceVote(bp *types.BlockProposal) (*types.Vote, error) {
-	myIdentity, err := v.viewState.GetSelfIdentityForBlockID(bp.BlockID())
-	if err != nil {
-		return nil, fmt.Errorf("can not find self index for block %v: %w", bp.BlockID(), err)
-	}
 	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.BlockID())
-	sig := v.signer.SignVote(unsignedVote, myIdentity.PubKey)
-	vote := unsignedVote.WithSignature(sig)
+	vote, err := v.signer.SignVote(unsignedVote)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign the vote (blockID: %v, view: %v): %w", unsignedVote.BlockID, unsignedVote.View, err)
+	}
 	return vote, nil
 }
