@@ -29,7 +29,7 @@ type ancestryChain struct {
 	threeChain *types.QCBlock
 }
 
-// ErrorPrunedAncestry is a sentinel error: cannot resolve ancestry of block due to pruning
+// ErrPrunedAncestry is a sentinel error: cannot resolve ancestry of block due to pruning
 var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestry")
 
 func New(trustedRoot *types.QCBlock, finalizationCallback module.Finalizer, notifier notifications.Consumer) (*Finalizer, error) {
@@ -335,7 +335,10 @@ func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) error {
 	if err != nil {
 		return fmt.Errorf("pruning levelled forest failed: %w", err)
 	}
-	r.finalizationCallback.MakeFinal(blockContainer.ID())
+	err = r.finalizationCallback.MakeFinal(blockContainer.ID())
+	if err != nil {
+		return fmt.Errorf("finalization error in other component: %w", err)
+	}
 	r.notifier.OnFinalizedBlock(blockContainer.Block())
 	return nil
 }
