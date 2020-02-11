@@ -203,8 +203,7 @@ func (e *EventHandler) startNewView() error {
 
 // pruneSubcomponents prunes sub-components
 func (e *EventHandler) pruneSubcomponents() error {
-	curView := e.paceMaker.CurView()
-	e.voteAggregator.PruneUpToView(curView)
+	e.voteAggregator.PruneUpToView(e.forks.FinalizedView())
 	return nil
 }
 

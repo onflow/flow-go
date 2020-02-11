@@ -8,9 +8,9 @@ import (
 )
 
 type VoteAggregator struct {
-	viewState     ViewState
-	voteValidator *Validator
-	lowestView    uint64
+	viewState      ViewState
+	voteValidator  *Validator
+	lastPrunedView uint64
 	// keeps track of votes whose blocks can not be found
 	pendingVotes *PendingVotes
 	// For pruning
@@ -23,9 +23,9 @@ type VoteAggregator struct {
 	blockIDToVotingStatus map[flow.Identifier]*VotingStatus
 }
 
-func NewVoteAggregator(lowestView uint64, viewState ViewState, voteValidator *Validator) *VoteAggregator {
+func NewVoteAggregator(lastPruneView uint64, viewState ViewState, voteValidator *Validator) *VoteAggregator {
 	return &VoteAggregator{
-		lowestView:            lowestView,
+		lastPrunedView:        lastPruneView,
 		viewState:             viewState,
 		voteValidator:         voteValidator,
 		pendingVotes:          NewPendingVotes(),
@@ -40,8 +40,8 @@ func NewVoteAggregator(lowestView uint64, viewState ViewState, voteValidator *Va
 // block is currently missing.
 // Note: Validations on these pending votes will be postponed until the block has been received.
 func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
-	if vote.View < va.lowestView { // cannot store vote for already pruned view
-		return types.StaleVoteError{Vote: vote, LowestStoredView: va.lowestView}
+	if vote.View <= va.lastPrunedView { // cannot store vote for already pruned view
+		return types.StaleVoteError{Vote: vote, LowestStoredView: va.lastPrunedView}
 	}
 	voter, err := va.voteValidator.ValidateVote(vote, nil)
 	if err != nil {
@@ -68,8 +68,8 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 	if built {
 		return oldQC, nil
 	}
-	if vote.View < va.lowestView { // cannot build QC for already pruned view
-		return nil, types.StaleVoteError{Vote: vote, LowestStoredView: va.lowestView}
+	if vote.View <= va.lastPrunedView { // cannot build QC for already pruned view
+		return nil, types.StaleVoteError{Vote: vote, LowestStoredView: va.lastPrunedView}
 	}
 	votingStatus, err := va.validateAndStoreIncorporatedVote(vote, bp)
 	if err != nil {
@@ -90,8 +90,8 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 	if built {
 		return oldQC, nil
 	}
-	if bp.View() < va.lowestView { // cannot build QC for already pruned view
-		return nil, types.StaleBlockError{BlockProposal: bp, LowestStoredView: va.lowestView}
+	if bp.View() <= va.lastPrunedView {  // cannot build QC for already pruned view
+		return nil, types.StaleBlockError{BlockProposal: bp, LowestStoredView: va.lastPrunedView}
 	}
 	// accumulate leader vote first
 	leaderVote := bp.ProposersVote()
@@ -125,12 +125,12 @@ func (va *VoteAggregator) convertPendingVotes(pendingVotes []*types.Vote, bp *ty
 	delete(va.pendingVotes.votes, bp.BlockID())
 }
 
-// PruneUpToView will delete all stored vote information equal UP TO but NOT INCLUDING `view`
-func (va *VoteAggregator) PruneUpToView(view uint64) {
-	if view < va.lowestView {
+// PruneByView will delete all votes equal or below to the given view, as well as related indexes.
+func (va *VoteAggregator) PruneByView(view uint64) {
+	if view <= va.lastPrunedView {
 		return
 	}
-	for i := va.lowestView; i < view; i++ {
+	for i := va.lastPrunedView + 1; i <= view; i++ {
 		blockIDStrSet := va.viewToBlockIDSet[i]
 		for blockID := range blockIDStrSet {
 			delete(va.pendingVotes.votes, blockID)
@@ -140,7 +140,7 @@ func (va *VoteAggregator) PruneUpToView(view uint64) {
 		delete(va.viewToBlockIDSet, i)
 		delete(va.viewToIDToVote, i)
 	}
-	va.lowestView = view
+	va.lastPrunedView = view
 }
 
 // storeIncorporatedVote stores incorporated votes and accumulate stakes
