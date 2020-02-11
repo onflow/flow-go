@@ -152,6 +152,10 @@ func (e *EventHandler) Start() error {
 // It reads the current view, and check if it needs to proposal or vote for block.
 func (e *EventHandler) startNewView() error {
 	curView := e.paceMaker.CurView()
+	err := e.pruneSubcomponents()
+	if err != nil {
+		return fmt.Errorf("pruning intrnal state failed: %w", err)
+	}
 
 	e.log.Info().
 		Uint64("curView", curView).
