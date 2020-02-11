@@ -19,6 +19,6 @@ func (b *BlockProposal) View() uint64             { return b.Block.View }
 func (b *BlockProposal) BlockID() flow.Identifier { return b.Block.BlockID }
 func (b *BlockProposal) Height() uint64           { return b.Block.Height }
 
-func (b *BlockProposal) ToVote() *Vote {
+func (b *BlockProposal) ProposersVote() *Vote {
 	panic("TODO")
 }

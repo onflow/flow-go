@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -102,7 +103,13 @@ func (e *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) error {
 	// if the block is not for the current view, try to build QC from votes for this block
 	qc, err := e.voteAggregator.BuildQCOnReceivingBlock(validBlock)
 	if err != nil {
-		return err
+		switch {
+		case errors.Is(err, types.ErrInsufficientVotes{}):
+			// if we don't have enough votes to build QC for this block, proceed with block.qc instead
+			qc = validBlock.QC()
+		default:
+			return fmt.Errorf("building qc for block failed: %w", err)
+		}
 	}
 	// process the QC
 	return e.processQC(qc)
@@ -275,7 +282,13 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *types.
 func (e *EventHandler) tryBuildQCForBlock(block *types.BlockProposal) error {
 	qc, err := e.voteAggregator.BuildQCOnReceivingBlock(block)
 	if err != nil {
-		return err
+		switch {
+		case errors.Is(err, types.ErrInsufficientVotes{}):
+			// if we don't have enough votes to build QC for this block:
+			return nil // nothing more to do for processing block
+		default:
+			return fmt.Errorf("building qc for block failed: %w", err)
+		}
 	}
 	return e.processQC(qc)
 }
@@ -304,7 +317,13 @@ func (e *EventHandler) processVote(vote *types.Vote) error {
 	// and check if we can build a QC with it.
 	qc, err := e.voteAggregator.StoreVoteAndBuildQC(vote, block)
 	if err != nil {
-		return fmt.Errorf("could not process incorporated vote: %w", err)
+		switch {
+		case errors.Is(err, types.ErrInsufficientVotes{}):
+			// if we don't have enough votes to build QC for this block:
+			return nil // nothing more to do for processing vote
+		default:
+			return fmt.Errorf("building qc for block failed: %w", err)
+		}
 	}
 
 	return e.processQC(qc)
