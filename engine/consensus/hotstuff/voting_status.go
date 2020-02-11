@@ -46,7 +46,7 @@ func (vs *VotingStatus) CanBuildQC() bool {
 func (vs *VotingStatus) TryBuildQC() (*types.QuorumCertificate, error) {
 	sigs := vs.getSigsSliceFromVotes()
 	if !vs.CanBuildQC() {
-		return nil, fmt.Errorf("could not build QC: %w", types.ErrInsufficientVotes{})
+		return nil, fmt.Errorf("could not build QC: %w", types.ErrInsufficientVotes)
 	}
 	aggregatedSig, err := FromSignatures(sigs, vs.signerCount)
 	if err != nil {
