@@ -25,6 +25,8 @@ import (
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
+	ctx        context.Context
+	cancel     context.CancelFunc
 	log        zerolog.Logger
 	codec      network.Codec
 	ov         middleware.Overlay
@@ -46,9 +48,12 @@ func NewMiddleware(log zerolog.Logger, codec network.Codec, address string, flow
 	}
 
 	p2p := &P2PNode{}
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// create the node entity and inject dependencies & config
 	m := &Middleware{
+		ctx:        ctx,
+		cancel:     cancel,
 		log:        log,
 		codec:      codec,
 		cc:         NewConnectionCache(),
@@ -87,7 +92,7 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 	nodeAddress := NodeAddress{Name: m.me.String(), IP: m.host, Port: m.port}
 
 	// start the libp2p node
-	err := m.libP2PNode.Start(context.Background(), nodeAddress, m.log, m.handleIncomingStream, psOption)
+	err := m.libP2PNode.Start(m.ctx, nodeAddress, m.log, m.handleIncomingStream, psOption)
 
 	if err != nil {
 		return fmt.Errorf("failed to start libp2p node: %w", err)
@@ -103,18 +108,23 @@ func (m *Middleware) Start(ov middleware.Overlay) error {
 func (m *Middleware) Stop() {
 	close(m.stop)
 
-	// Stop all the connections
+	// stop all the connections
 	for _, conn := range m.cc.GetAll() {
 		conn.Stop()
 	}
 
-	// Stop libp2p
+	// cancel the context (this also signals libp2p go routines to exit)
+	m.cancel()
+
+	// stop libp2p
 	err := m.libP2PNode.Stop()
 	if err != nil {
 		log.Error().Err(err).Msg("stopping failed")
 	} else {
 		log.Debug().Msg("node stopped successfully")
 	}
+
+	// wait for the go routines spawned by middleware to stop
 	m.wg.Wait()
 }
 
@@ -201,7 +211,7 @@ func (m *Middleware) connect(flowID string, address string) (*WriteConnection, e
 	nodeAddress := NodeAddress{Name: flowID, IP: ip, Port: port}
 
 	// Create a stream for it
-	stream, err := m.libP2PNode.CreateStream(context.Background(), nodeAddress)
+	stream, err := m.libP2PNode.CreateStream(m.ctx, nodeAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stream for %s:%v", nodeAddress.Name, err)
 	}
@@ -276,7 +286,7 @@ ProcessLoop:
 // Subscribe will subscribe the middleware for a topic with the same name as the channelID
 func (m *Middleware) Subscribe(channelID uint8) error {
 	// A Flow ChannelID becomes the topic ID in libp2p.
-	s, err := m.libP2PNode.Subscribe(context.Background(), strconv.Itoa(int(channelID)))
+	s, err := m.libP2PNode.Subscribe(m.ctx, strconv.Itoa(int(channelID)))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe for channel %d: %w", channelID, err)
 	}
@@ -345,7 +355,7 @@ func (m *Middleware) Publish(topic string, msg interface{}) error {
 		// pubsub.GossipSubDlo is the minimal number of peer connections that libp2p will maintain
 		// for this node.
 		// TODO: specify a minpeers that makes more sense for Flow (Currently, broadcast if there is at least one peer listening)
-		err = m.libP2PNode.Publish(context.Background(), topic, data, 1)
+		err = m.libP2PNode.Publish(m.ctx, topic, data, 1)
 		if err != nil {
 			return fmt.Errorf("failed to publish the message: %w", err)
 		}

@@ -112,10 +112,10 @@ func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, false)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, false)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -143,10 +143,10 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, false)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, false)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -182,18 +182,18 @@ func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
 	// registers engines in the network
 	// first type
 	// sender's engine
-	sender1 := NewEchoEngine(s.Suite.T(), s.nets[sndNode], 10, channel1)
+	sender1 := NewEchoEngine(s.Suite.T(), s.nets[sndNode], 10, channel1, false)
 
 	// receiver's engine
-	receiver1 := NewEchoEngine(s.Suite.T(), s.nets[rcvNode], 10, channel1)
+	receiver1 := NewEchoEngine(s.Suite.T(), s.nets[rcvNode], 10, channel1, false)
 
 	// second type
 	// registers engines in the network
 	// sender's engine
-	sender2 := NewEchoEngine(s.Suite.T(), s.nets[sndNode], 10, channel2)
+	sender2 := NewEchoEngine(s.Suite.T(), s.nets[sndNode], 10, channel2, false)
 
 	// receiver's engine
-	receiver2 := NewEchoEngine(s.Suite.T(), s.nets[rcvNode], 10, channel2)
+	receiver2 := NewEchoEngine(s.Suite.T(), s.nets[rcvNode], 10, channel2, false)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -230,10 +230,10 @@ func (s *StubEngineTestSuite) singleMessage(echo bool) {
 
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, echo)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, echo)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -300,10 +300,10 @@ func (s *StubEngineTestSuite) multiMessageSync(echo bool, count int) {
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, echo)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, echo)
 
 	for i := 0; i < count; i++ {
 		// Send the message to receiver
@@ -373,10 +373,10 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, echo)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, echo)
 
 	// keeps track of async received messages at receiver side
 	received := make(map[string]struct{})
