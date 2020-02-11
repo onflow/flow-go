@@ -33,6 +33,11 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 			return fmt.Errorf("genesis collection should contain no transactions (got %d)", collSize)
 		}
 
+		// check payload hash
+		if genesis.PayloadHash != genesis.Payload.Hash() {
+			return fmt.Errorf("genesis payload hash must match payload")
+		}
+
 		// insert payload
 		err := operation.InsertCollection(genesis.Collection)(tx)
 		if err != nil {
