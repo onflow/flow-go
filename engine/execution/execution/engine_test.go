@@ -71,7 +71,7 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		receipts := new(network.Engine)
+		provider := new(network.Engine)
 		me := new(module.Local)
 		me.On("NodeID").Return(flow.ZeroID)
 
@@ -80,12 +80,12 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 		computationResult := unittest.ComputationResultFixture()
 
 		e := &Engine{
-			provider: receipts,
+			provider: provider,
 			executor: blockExecutor,
 			me:       me,
 		}
 
-		receipts.On(
+		provider.On(
 			"SubmitLocal",
 			mock.Anything,
 			mock.Anything,
@@ -106,6 +106,6 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 		err := e.onCompleteBlock(e.me.NodeID(), completeBlock, view, startState)
 		require.NoError(t, err)
 
-		receipts.AssertExpectations(t)
+		provider.AssertExpectations(t)
 	})
 }

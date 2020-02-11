@@ -147,7 +147,7 @@ func (e *Engine) findCollectionNodes() ([]flow.Identifier, error) {
 	return identifiers, nil
 }
 
-func (e *Engine) checkForCompleteness(block *execution.CompleteBlock) bool {
+func (e *Engine) isComplete(block *execution.CompleteBlock) bool {
 
 	for _, collection := range block.Block.Guarantees {
 
@@ -162,7 +162,6 @@ func (e *Engine) checkForCompleteness(block *execution.CompleteBlock) bool {
 }
 
 func (e *Engine) removeCollections(block *execution.CompleteBlock, backdata *Backdata) {
-
 	for _, collection := range block.Block.Guarantees {
 		backdata.Rem(collection.ID())
 	}
@@ -288,19 +287,26 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 
 	return e.mempool.Run(func(backdata *Backdata) error {
 		completeBlock, err := backdata.ByID(collID)
-		if err == nil {
-			if completeCollection, ok := completeBlock.Block.CompleteCollections[collID]; ok {
-				if completeCollection.Transactions == nil {
-					completeCollection.Transactions = collection.Transactions
-					if e.checkForCompleteness(completeBlock.Block) {
-						e.removeCollections(completeBlock.Block, backdata)
-						e.sendExecutionOrder(completeBlock.Block)
-					}
-				}
-			} else {
-				return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
-			}
+		if err != nil {
+			return err
 		}
+		completeCollection, ok := completeBlock.Block.CompleteCollections[collID]
+		if !ok {
+			return fmt.Errorf("cannot handle collection: internal inconsistency - collection pointing to block which does not contain said collection")
+		}
+		// already received transactions for this collection
+		// TODO - check if data stored is the same
+		if completeCollection.Transactions != nil {
+			return nil
+		}
+
+		completeCollection.Transactions = collection.Transactions
+		if !e.isComplete(completeBlock.Block) {
+			return nil
+		}
+
+		e.removeCollections(completeBlock.Block, backdata)
+		e.sendExecutionOrder(completeBlock.Block)
 		return nil
 	})
 }
