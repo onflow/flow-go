@@ -247,7 +247,6 @@ func TestProviderEngine_OnExecutionStateRequest(t *testing.T) {
 
 		execState.On("GetChunkRegisters", chunkID).Return(expectedRegisters, nil)
 
-
 		req := &messages.ExecutionStateRequest{ChunkID: chunkID}
 
 		err := e.onExecutionStateRequest(originIdentity.NodeID, req)
