@@ -55,7 +55,7 @@ func CreateSubnets(nodesNum, subnetNum, linkNum int) (map[int][]*libp2p.Network,
 	}
 
 	// allows nodes to find each other
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	return nets, ids, nil
 }

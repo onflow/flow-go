@@ -332,6 +332,7 @@ func (m *Middleware) processMessage(msg *message.Message) {
 
 // Publish publishes the given payload on the topic
 func (m *Middleware) Publish(topic string, msg interface{}) error {
+	fmt.Println(m.libP2PNode.libP2PHost.Peerstore().Peers())
 	switch msg := msg.(type) {
 	case *message.Message:
 

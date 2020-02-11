@@ -67,7 +67,7 @@ func NewNetwork(
 
 	// todo fanout optimization #2244
 	// fanout is set to half of the system size for connectivity assurance w.h.p
-	fanout := len(netSize) / 2
+	fanout := len(netSize)
 
 	o := &Network{
 		logger:  log,

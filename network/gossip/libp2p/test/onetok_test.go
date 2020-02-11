@@ -33,7 +33,7 @@ func (o *OneToKTestSuite) SetupTest() {
 
 	o.ee = make(map[int][]*EchoEngine)
 
-	subnets, ids, err := CreateSubnets(engines, 2, 2)
+	subnets, ids, err := CreateSubnets(engines, 2, 1)
 	require.NoError(o.Suite.T(), err)
 
 	o.ids = ids
@@ -115,21 +115,28 @@ func (o *OneToKTestSuite) TestIntraSubNet() {
 func (o *OneToKTestSuite) TestInterSubNet() {
 	timeout := 10 * time.Second
 
-	// making list of all nodes
-	all := make([]flow.Identifier, 0)
+	// making list of all nodes without duplication of those shared
+	// between subsets
+	allset := make(map[flow.Identifier]struct{})
 	for subnet := range o.ids {
 		for _, id := range o.ids[subnet] {
-			all = append(all, id)
+			allset[id] = struct{}{}
 		}
+	}
+
+	sender := o.ee[0][0]
+	senderID := o.ids[0][0]
+	delete(allset, senderID)
+
+	all := make([]flow.Identifier, 0)
+	for id := range allset {
+		all = append(all, id)
 	}
 
 	// iterates over subnets
 	event := &message.Echo{
 		Text: fmt.Sprintf("hello all"),
 	}
-
-	sender := o.ee[0][0]
-	senderID := o.ids[0][0]
 
 	require.NoError(o.Suite.T(), sender.con.Submit(event, all...))
 
@@ -141,8 +148,16 @@ func (o *OneToKTestSuite) TestInterSubNet() {
 	for subIndex, se := range o.ee {
 		for eIndex, e := range se {
 			if e == sender {
+				// skips sender
 				continue
 			}
+
+			if _, ok := allset[o.ids[subIndex][eIndex]]; !ok {
+				// skips already processed nodes
+				continue
+			}
+			delete(allset, o.ids[subIndex][eIndex])
+
 			wg.Add(1)
 			go func(ec *EchoEngine, sub, eindex int) {
 				defer wg.Done()
