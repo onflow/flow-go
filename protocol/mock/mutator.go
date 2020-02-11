@@ -37,31 +37,3 @@ func (_m *Mutator) Extend(blockID flow.Identifier) error {
 
 	return r0
 }
-
-// Finalize provides a mock function with given fields: blockID
-func (_m *Mutator) Finalize(blockID flow.Identifier) error {
-	ret := _m.Called(blockID)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
-		r0 = rf(blockID)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// StorePayload provides a mock function with given fields: payload
-func (_m *Mutator) StorePayload(payload *flow.Payload) error {
-	ret := _m.Called(payload)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Payload) error); ok {
-		r0 = rf(payload)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}

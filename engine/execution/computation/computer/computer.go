@@ -28,10 +28,10 @@ func NewBlockComputer(vm virtualmachine.VirtualMachine) BlockComputer {
 // ExecuteBlock executes a block and returns the resulting chunks.
 func (e *blockComputer) ExecuteBlock(
 	block *execution.CompleteBlock,
-	view *state.View,
+	stateView *state.View,
 	startState flow.StateCommitment,
 ) (*execution.ComputationResult, error) {
-	results, err := e.executeBlock(block, view, startState)
+	results, err := e.executeBlock(block, stateView, startState)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transactions: %w", err)
 	}
@@ -43,7 +43,7 @@ func (e *blockComputer) ExecuteBlock(
 
 func (e *blockComputer) executeBlock(
 	block *execution.CompleteBlock,
-	view *state.View,
+	stateView *state.View,
 	startState flow.StateCommitment,
 ) (*execution.ComputationResult, error) {
 
@@ -55,7 +55,7 @@ func (e *blockComputer) executeBlock(
 
 	for i, collection := range collections {
 
-		collectionView := view.NewChild()
+		collectionView := stateView.NewChild()
 
 		err := e.executeCollection(i, blockCtx, collectionView, collection)
 		if err != nil {
@@ -64,7 +64,7 @@ func (e *blockComputer) executeBlock(
 
 		views[i] = collectionView
 
-		view.ApplyDelta(collectionView.Delta())
+		stateView.ApplyDelta(collectionView.Delta())
 	}
 
 	return &execution.ComputationResult{
@@ -77,12 +77,12 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeCollection(
 	index int,
 	blockCtx virtualmachine.BlockContext,
-	chunkView *state.View,
+	collectionView *state.View,
 	collection *execution.CompleteCollection,
 ) error {
 
 	for _, tx := range collection.Transactions {
-		txView := chunkView.NewChild()
+		txView := collectionView.NewChild()
 
 		result, err := blockCtx.ExecuteTransaction(txView, tx)
 		if err != nil {
@@ -90,7 +90,7 @@ func (e *blockComputer) executeCollection(
 		}
 
 		if result.Succeeded() {
-			chunkView.ApplyDelta(txView.Delta())
+			collectionView.ApplyDelta(txView.Delta())
 		}
 	}
 

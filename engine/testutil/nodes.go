@@ -161,6 +161,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	node := GenericNode(t, hub, identity, identities)
 
 	blocksStorage := storage.NewBlocks(node.DB)
+	payloadsStorage := storage.NewPayloads(node.DB)
 	collectionsStorage := storage.NewCollections(node.DB)
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
@@ -190,7 +191,16 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
-	blocksEngine, err := ingestion.New(node.Log, node.Net, node.Me, node.State, blocksStorage, collectionsStorage, execEngine, execState)
+	blocksEngine, err := ingestion.New(node.Log,
+		node.Net,
+		node.Me,
+		node.State,
+		blocksStorage,
+		payloadsStorage,
+		collectionsStorage,
+		execEngine,
+		execState,
+	)
 	require.NoError(t, err)
 
 	return mock.ExecutionNode{

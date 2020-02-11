@@ -3,13 +3,12 @@ package computation
 import (
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/computation/computer/mocks"
+	computer "github.com/dapperlabs/flow-go/engine/execution/computation/computer/mock"
 	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	module "github.com/dapperlabs/flow-go/module/mock"
@@ -72,23 +71,21 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		receipts := new(network.Engine)
+		provider := new(network.Engine)
 		me := new(module.Local)
 		me.On("NodeID").Return(flow.ZeroID)
 
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		exec := mocks.NewMockBlockComputer(ctrl)
+		blockExecutor := new(computer.BlockComputer)
 
 		computationResult := unittest.ComputationResultFixture()
 
 		e := &Engine{
-			provider: receipts,
-			executor: exec,
+			provider: provider,
+			executor: blockExecutor,
 			me:       me,
 		}
 
-		receipts.On(
+		provider.On(
 			"SubmitLocal",
 			mock.Anything,
 			mock.Anything,
@@ -100,7 +97,7 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 			}).
 			Return(nil)
 
-		exec.EXPECT().ExecuteBlock(gomock.Eq(completeBlock), gomock.AssignableToTypeOf(&state.View{}), gomock.AssignableToTypeOf(flow.StateCommitment{})).Return(computationResult, nil)
+		blockExecutor.On("ExecuteBlock", mock.Anything, mock.Anything, mock.Anything).Return(computationResult, nil)
 
 		view := state.NewView(func(key string) (bytes []byte, e error) {
 			return nil, nil
@@ -109,6 +106,6 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 		err := e.onCompleteBlock(e.me.NodeID(), completeBlock, view, startState)
 		require.NoError(t, err)
 
-		receipts.AssertExpectations(t)
+		provider.AssertExpectations(t)
 	})
 }
