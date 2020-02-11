@@ -13,7 +13,7 @@ import (
 
 type SubNetGeneratorTestSuite struct {
 	suite.Suite
-	subnets map[int][]*libp2p.Network
+	subnets map[int][]*libp2p.Network //used to keep track of subnets of network instances
 }
 
 // TestSubNetGeneratorTestSuit runs all tests in this test suit

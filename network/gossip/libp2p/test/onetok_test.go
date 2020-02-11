@@ -26,14 +26,14 @@ func TestOneToKTestSuite(t *testing.T) {
 
 func (o *OneToKTestSuite) SetupTest() {
 	// number of total engines
-	const engines = 50
+	const engines = 10
 
 	// number of total subnets
 	const groups = 5
 
 	o.ee = make(map[int][]*EchoEngine)
 
-	subnets, ids, err := CreateSubnets(engines, groups, 0)
+	subnets, ids, err := CreateSubnets(engines, 2, 2)
 	require.NoError(o.Suite.T(), err)
 
 	o.ids = ids
@@ -113,7 +113,7 @@ func (o *OneToKTestSuite) TestIntraSubNet() {
 }
 
 func (o *OneToKTestSuite) TestInterSubNet() {
-	timeout := 2 * time.Second
+	timeout := 10 * time.Second
 
 	// making list of all nodes
 	all := make([]flow.Identifier, 0)
@@ -129,18 +129,22 @@ func (o *OneToKTestSuite) TestInterSubNet() {
 	}
 
 	sender := o.ee[0][0]
+	senderID := o.ids[0][0]
 
-	// require.NoError(o.Suite.T(), sender.con.Submit(event, all...))
+	require.NoError(o.Suite.T(), sender.con.Submit(event, all...))
 
 	// wg locks the main thread temporarily for go routines at each
 	// receiver engine
 	wg := &sync.WaitGroup{}
 
 	// evaluates correct reception of event at the cluster
-	for _, se := range o.ee {
-		for _, e := range se {
-			go func(ec *EchoEngine) {
-				wg.Add(1)
+	for subIndex, se := range o.ee {
+		for eIndex, e := range se {
+			if e == sender {
+				continue
+			}
+			wg.Add(1)
+			go func(ec *EchoEngine, sub, eindex int) {
 				defer wg.Done()
 
 				select {
@@ -151,18 +155,19 @@ func (o *OneToKTestSuite) TestInterSubNet() {
 					// evaluates event against nil value
 					require.NotNil(o.Suite.T(), ec.event)
 					// evaluates origin id of message against sender id
-					assert.Equal(o.Suite.T(), sender, ec.originID)
+					assert.Equal(o.Suite.T(), senderID, ec.originID)
 					// evaluates number of events node received, should be 1
 					assert.Equal(o.Suite.T(), len(ec.seen), 1)
 					// evaluates content of event against correct content
 					// engine should seen the event of its subnet exactly once
 					assert.Equal(o.Suite.T(), ec.seen[event.Text], 1)
+					fmt.Println("received:", sub, o.ids[sub][eindex])
 
 				case <-time.After(timeout):
 					// timeout happened with no reception of event at this receiver
-					require.Fail(o.Suite.T(), "timout exceeded on waiting for message")
+					assert.Fail(o.Suite.T(), fmt.Sprintf("timout exceeded on waiting for message %d %s", sub, o.ids[sub][eindex]))
 				}
-			}(e)
+			}(e, subIndex, eIndex)
 		}
 	}
 
