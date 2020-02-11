@@ -104,7 +104,7 @@ func (e *EventHandler) OnReceiveBlockHeader(block *types.BlockHeader) error {
 	qc, err := e.voteAggregator.BuildQCOnReceivingBlock(validBlock)
 	if err != nil {
 		switch {
-		case errors.Is(err, types.ErrInsufficientVotes{}):
+		case errors.Is(err, types.ErrInsufficientVotes):
 			// if we don't have enough votes to build QC for this block, proceed with block.qc instead
 			qc = validBlock.QC()
 		default:
@@ -283,7 +283,7 @@ func (e *EventHandler) tryBuildQCForBlock(block *types.BlockProposal) error {
 	qc, err := e.voteAggregator.BuildQCOnReceivingBlock(block)
 	if err != nil {
 		switch {
-		case errors.Is(err, types.ErrInsufficientVotes{}):
+		case errors.Is(err, types.ErrInsufficientVotes):
 			// if we don't have enough votes to build QC for this block:
 			return nil // nothing more to do for processing block
 		default:
@@ -318,7 +318,7 @@ func (e *EventHandler) processVote(vote *types.Vote) error {
 	qc, err := e.voteAggregator.StoreVoteAndBuildQC(vote, block)
 	if err != nil {
 		switch {
-		case errors.Is(err, types.ErrInsufficientVotes{}):
+		case errors.Is(err, types.ErrInsufficientVotes):
 			// if we don't have enough votes to build QC for this block:
 			return nil // nothing more to do for processing vote
 		default:

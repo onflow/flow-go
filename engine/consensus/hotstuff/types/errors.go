@@ -1,6 +1,7 @@
 package types
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -44,8 +45,7 @@ type ExistingQCError struct {
 	QC   *QuorumCertificate
 }
 
-type ErrInsufficientVotes struct {
-}
+var ErrInsufficientVotes = errors.New("received insufficient votes")
 
 func (e MissingSignerError) Error() string {
 	return fmt.Sprintf("The signer of vote %v is missing", e.Vote)
@@ -73,10 +73,6 @@ func (e StaleBlockError) Error() string {
 
 func (e ExistingQCError) Error() string {
 	return fmt.Sprintf("QC already existed (vote: %v, qc: %v)", e.Vote, e.QC)
-}
-
-func (e ErrInsufficientVotes) Error() string {
-	return fmt.Sprintf("Not receiving enough votes")
 }
 
 type ErrorConfiguration struct {
