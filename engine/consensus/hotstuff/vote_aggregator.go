@@ -20,19 +20,19 @@ type VoteAggregator struct {
 	// keeps track of QCs that have been made for blocks
 	createdQC map[flow.Identifier]*types.QuorumCertificate
 	// keeps track of accumulated votes and stakes for blocks
-	blockHashToVotingStatus map[flow.Identifier]*VotingStatus
+	blockIDToVotingStatus map[flow.Identifier]*VotingStatus
 }
 
 func NewVoteAggregator(lastPruneView uint64, viewState ViewState, voteValidator *Validator) *VoteAggregator {
 	return &VoteAggregator{
-		lastPrunedView:          lastPruneView,
-		viewState:               viewState,
-		voteValidator:           voteValidator,
-		pendingVotes:            NewPendingVotes(),
-		viewToBlockIDSet:        make(map[uint64]map[flow.Identifier]struct{}),
-		viewToIDToVote:          make(map[uint64]map[flow.Identifier]*types.Vote),
-		blockHashToVotingStatus: make(map[flow.Identifier]*VotingStatus),
-		createdQC:               make(map[flow.Identifier]*types.QuorumCertificate),
+		lastPrunedView:        lastPruneView,
+		viewState:             viewState,
+		voteValidator:         voteValidator,
+		pendingVotes:          NewPendingVotes(),
+		viewToBlockIDSet:      make(map[uint64]map[flow.Identifier]struct{}),
+		viewToIDToVote:        make(map[uint64]map[flow.Identifier]*types.Vote),
+		blockIDToVotingStatus: make(map[flow.Identifier]*VotingStatus),
+		createdQC:             make(map[flow.Identifier]*types.QuorumCertificate),
 	}
 }
 
@@ -141,7 +141,7 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 		blockIDStrSet := va.viewToBlockIDSet[i]
 		for blockID := range blockIDStrSet {
 			delete(va.pendingVotes.votes, blockID)
-			delete(va.blockHashToVotingStatus, blockID)
+			delete(va.blockIDToVotingStatus, blockID)
 			delete(va.createdQC, blockID)
 		}
 		delete(va.viewToBlockIDSet, i)
@@ -162,7 +162,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 		return nil, fmt.Errorf("could not store vote: %w", err)
 	}
 	// update existing voting status or create a new one
-	votingStatus, exists := va.blockHashToVotingStatus[vote.BlockID]
+	votingStatus, exists := va.blockIDToVotingStatus[vote.BlockID]
 	if !exists {
 		threshold, err := va.viewState.GetQCStakeThresholdForBlockID(vote.BlockID)
 		if err != nil {
@@ -173,7 +173,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, bp 
 			return nil, fmt.Errorf("could not get identities: %w", err)
 		}
 		votingStatus = NewVotingStatus(threshold, vote.View, uint32(len(identities)), voter, vote.BlockID)
-		va.blockHashToVotingStatus[vote.BlockID] = votingStatus
+		va.blockIDToVotingStatus[vote.BlockID] = votingStatus
 	}
 	votingStatus.AddVote(vote, voter)
 	va.updateState(vote, voter)
