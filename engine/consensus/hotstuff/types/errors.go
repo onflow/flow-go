@@ -31,13 +31,13 @@ type DoubleVoteError struct {
 }
 
 type StaleVoteError struct {
-	Vote          *Vote
-	FinalizedView uint64
+	Vote             *Vote
+	LowestStoredView uint64
 }
 
 type StaleBlockError struct {
-	BlockProposal *BlockProposal
-	FinalizedView uint64
+	BlockProposal    *BlockProposal
+	LowestStoredView uint64
 }
 
 type ExistingQCError struct {
@@ -48,27 +48,27 @@ type ExistingQCError struct {
 var ErrInsufficientVotes = errors.New("received insufficient votes")
 
 func (e MissingSignerError) Error() string {
-	return fmt.Sprintf("The signer of vote %v is missing", e.Vote)
+	return fmt.Sprintf("missing signer of vote %v", e.Vote)
 }
 
 func (e InvalidSignatureError) Error() string {
-	return fmt.Sprintf("The signature of vote %v is invalid", e.Vote)
+	return fmt.Sprintf("invalid signature for vote %v", e.Vote)
 }
 
 func (e InvalidViewError) Error() string {
-	return fmt.Sprintf("The view of vote %v is invalid", e.Vote)
+	return fmt.Sprintf("invalid view for view %v", e.Vote)
 }
 
 func (e DoubleVoteError) Error() string {
-	return fmt.Sprintf("Double voting detected (original vote: %v, double vote: %v)", e.OriginalVote, e.DoubleVote)
+	return fmt.Sprintf("double voting detected (original vote: %v, double vote: %v)", e.OriginalVote, e.DoubleVote)
 }
 
 func (e StaleVoteError) Error() string {
-	return fmt.Sprintf("Stale vote found (vote: %v, finalized view: %v)", e.Vote, e.FinalizedView)
+	return fmt.Sprintf("stale vote below lowest stored view %d: %v", e.LowestStoredView, e.Vote)
 }
 
 func (e StaleBlockError) Error() string {
-	return fmt.Sprintf("Stale block found (block: %v, finalized view: %v)", e.BlockProposal, e.FinalizedView)
+	return fmt.Sprintf("stale block below lowest stored view %d: block: %v", e.LowestStoredView, e.BlockProposal)
 }
 
 func (e ExistingQCError) Error() string {

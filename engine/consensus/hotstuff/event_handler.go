@@ -197,6 +197,13 @@ func (e *EventHandler) startNewView() error {
 	return e.processBlockForCurrentView(block)
 }
 
+// pruneSubcomponents prunes sub-components
+func (e *EventHandler) pruneSubcomponents() error {
+	curView := e.paceMaker.CurView()
+	e.voteAggregator.PruneUpToView(curView)
+	return nil
+}
+
 // processBlockForCurrentView processes the block for the current view.
 // It is called AFTER the block has been stored or found in Forks
 // It checks whether to vote for this block.
