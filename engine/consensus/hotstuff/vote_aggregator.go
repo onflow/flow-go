@@ -41,7 +41,7 @@ func NewVoteAggregator(lastPruneView uint64, viewState ViewState, voteValidator 
 // Note: Validations on these pending votes will be postponed until the block has been received.
 func (va *VoteAggregator) StorePendingVote(vote *types.Vote) error {
 	if vote.View <= va.lastPrunedView { // cannot store vote for already pruned view
-		return types.StaleVoteError{Vote: vote, LowestStoredView: va.lastPrunedView}
+		return types.StaleVoteError{Vote: vote, HighestPrunedView: va.lastPrunedView}
 	}
 	voter, err := va.voteValidator.ValidateVote(vote, nil)
 	if err != nil {
@@ -69,7 +69,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, bp *types.BlockP
 		return oldQC, nil
 	}
 	if vote.View <= va.lastPrunedView { // cannot build QC for already pruned view
-		return nil, types.StaleVoteError{Vote: vote, LowestStoredView: va.lastPrunedView}
+		return nil, types.StaleVoteError{Vote: vote, HighestPrunedView: va.lastPrunedView}
 	}
 	votingStatus, err := va.validateAndStoreIncorporatedVote(vote, bp)
 	if err != nil {
@@ -91,7 +91,7 @@ func (va *VoteAggregator) BuildQCOnReceivingBlock(bp *types.BlockProposal) (*typ
 		return oldQC, nil
 	}
 	if bp.View() <= va.lastPrunedView { // cannot build QC for already pruned view
-		return nil, types.StaleBlockError{BlockProposal: bp, LowestStoredView: va.lastPrunedView}
+		return nil, types.StaleBlockError{BlockProposal: bp, HighestPrunedView: va.lastPrunedView}
 	}
 	// accumulate leader vote first
 	leaderVote := bp.ProposersVote()

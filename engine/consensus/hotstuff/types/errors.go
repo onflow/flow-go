@@ -31,13 +31,13 @@ type DoubleVoteError struct {
 }
 
 type StaleVoteError struct {
-	Vote             *Vote
-	LowestStoredView uint64
+	Vote              *Vote
+	HighestPrunedView uint64
 }
 
 type StaleBlockError struct {
-	BlockProposal    *BlockProposal
-	LowestStoredView uint64
+	BlockProposal     *BlockProposal
+	HighestPrunedView uint64
 }
 
 type ExistingQCError struct {
@@ -64,11 +64,11 @@ func (e DoubleVoteError) Error() string {
 }
 
 func (e StaleVoteError) Error() string {
-	return fmt.Sprintf("stale vote below lowest stored view %d: %v", e.LowestStoredView, e.Vote)
+	return fmt.Sprintf("stale vote (heightes pruned view %d): %v", e.HighestPrunedView, e.Vote)
 }
 
 func (e StaleBlockError) Error() string {
-	return fmt.Sprintf("stale block below lowest stored view %d: block: %v", e.LowestStoredView, e.BlockProposal)
+	return fmt.Sprintf("stale block (heightes pruned view %d): %v", e.HighestPrunedView, e.BlockProposal)
 }
 
 func (e ExistingQCError) Error() string {
