@@ -4,8 +4,6 @@ package main
 
 import (
 	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/engine/consensus/consensus"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
@@ -29,8 +27,6 @@ func main() {
 		seals      mempool.Seals
 		prop       *propagation.Engine
 		prov       *provider.Engine
-		cons       *consensus.Engine
-		hs         hotstuff.HotStuff
 	)
 
 	cmd.FlowNode("consensus").
@@ -54,11 +50,6 @@ func main() {
 			seals, err = stdmap.NewSeals()
 			node.MustNot(err).Msg("could not initialize seal mempool")
 		}).
-		Create(func(node *cmd.FlowNodeBuilder) {
-			node.Logger.Info().Msg("initializing hotstuff algorithm")
-			hs, err = hotstuff.New(nil, nil, nil, nil, nil)
-			node.MustNot(err).Msg("could not initialize hotstuff algorithm")
-		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing result matching engine")
 			results := storage.NewResults(node.DB)
@@ -77,13 +68,6 @@ func main() {
 			prop, err = propagation.New(node.Logger, node.Network, node.State, node.Me, guarantees)
 			node.MustNot(err).Msg("could not initialize propagation engine")
 			return prop
-		}).
-		Component("consensus engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
-			node.Logger.Info().Msg("initializing hotstuff consensus engine")
-			payloads := storage.NewPayloads(node.DB)
-			cons, err = consensus.New(node.Logger, node.Network, node.Me, node.State, payloads, hs)
-			node.MustNot(err).Msg("could not initialize hotstuff consensus engine")
-			return cons
 		}).
 		Component("subzero engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing subzero consensus engine")

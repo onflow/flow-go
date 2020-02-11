@@ -19,22 +19,37 @@ type Discovery struct {
 	log     zerolog.Logger
 	overlay middleware.Overlay
 	me      flow.Identifier
+	done    chan struct{}
 }
 
-func NewDiscovery(log zerolog.Logger, overlay middleware.Overlay, me flow.Identifier) *Discovery {
-	d := &Discovery{overlay: overlay, log: log, me: me}
+func NewDiscovery(log zerolog.Logger, overlay middleware.Overlay, me flow.Identifier, done chan struct{}) *Discovery {
+	d := &Discovery{overlay: overlay, log: log, me: me, done: done}
 	return d
 }
 
 // Advertise is suppose to advertise this node's interest in a topic to a discovery service. However, we are not using
 // a discovery service hence this function just returns a long duration to reduce the frequency with which libp2p calls it.
 func (d *Discovery) Advertise(_ context.Context, _ string, _ ...discovery.Option) (time.Duration, error) {
-	return time.Hour, nil
+	select {
+	case <-d.done:
+		return 0, fmt.Errorf("middleware stopped")
+	default:
+		return time.Hour, nil
+	}
 }
 
 // FindPeers returns a channel providing all peers of the node. No parameters are needed as of now since the overlay.Identity
 // provides all the information about the other nodes.
 func (d *Discovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option) (<-chan peer.AddrInfo, error) {
+
+	// if middleware has been stopped, don't return any peers
+	select {
+	case <-d.done:
+		emptyCh := make(chan peer.AddrInfo)
+		close(emptyCh)
+		return emptyCh, fmt.Errorf("middleware stopped")
+	default:
+	}
 
 	// query the overlay to get all the other nodes
 	ids, err := d.overlay.Identity()

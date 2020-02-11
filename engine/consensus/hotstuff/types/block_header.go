@@ -17,22 +17,13 @@ func NewBlockHeader(block *Block, sig *flow.PartialSignature) *BlockHeader {
 
 // BlockHeaderFromFlow converts a flow header to the corresponding internal
 // HotStuff block proposal.
-func BlockHeaderFromFlow(header *flow.Header) *BlockHeader {
-	return &BlockHeader{
-		Block: &Block{
-			View: header.View,
-			QC: &QuorumCertificate{
-				View:                header.ParentView,
-				BlockID:             header.ParentID,
-				AggregatedSignature: header.ParentSig,
-			},
-			PayloadHash: header.PayloadHash[:],
-			Height:      header.Number,
-			ChainID:     header.ChainID,
-			Timestamp:   header.Timestamp,
-		},
-		Signature: header.ProposerSig,
-	}
+// header - the block header
+// sig - the signature and identity of the signer, looked up by chain compliance layer
+// aggSig - the aggregated signature on the QC and the identities of all the signers, looked up by
+// chain compliance layer
+func BlockHeaderFromFlow(header *flow.Header, sig *flow.PartialSignature, aggSig *flow.AggregatedSignature) *BlockHeader {
+	block := BlockFromFlowHeader(header, aggSig)
+	return NewBlockHeader(block, sig)
 }
 
 func (b BlockHeader) QC() *QuorumCertificate   { return b.Block.QC }
