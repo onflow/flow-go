@@ -203,7 +203,7 @@ func (e *EventHandler) startNewView() error {
 
 // pruneSubcomponents prunes sub-components
 func (e *EventHandler) pruneSubcomponents() error {
-	e.voteAggregator.PruneUpToView(e.forks.FinalizedView())
+	e.voteAggregator.PruneByView(e.forks.FinalizedView())
 	return nil
 }
 
