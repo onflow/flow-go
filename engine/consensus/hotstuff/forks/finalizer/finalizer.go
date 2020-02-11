@@ -9,15 +9,16 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/module"
 )
 
 // Finalizer implements HotStuff finalization logic
 type Finalizer struct {
-	notifier notifications.Consumer
-	forest   forest.LevelledForest
+	notifier             notifications.Consumer
+	finalizationCallback module.Finalizer
+	forest               forest.LevelledForest
 
-	lastLocked *types.QCBlock // lastLockedBlockQC is the QC that POINTS TO the the most recently locked block
-
+	lastLocked    *types.QCBlock // lastLockedBlockQC is the QC that POINTS TO the the most recently locked block
 	lastFinalized *types.QCBlock // lastFinalizedBlockQC is the QC that POINTS TO the most recently finalized locked block
 }
 
@@ -28,16 +29,20 @@ type ancestryChain struct {
 	threeChain *types.QCBlock
 }
 
-func New(trustedRoot *types.QCBlock, notifier notifications.Consumer) (*Finalizer, error) {
+// ErrorPrunedAncestry is a sentinel error: cannot resolve ancestry of block due to pruning
+var ErrPrunedAncestry = errors.New("cannot resolve pruned ancestry")
+
+func New(trustedRoot *types.QCBlock, finalizationCallback module.Finalizer, notifier notifications.Consumer) (*Finalizer, error) {
 	if (trustedRoot.BlockID() != trustedRoot.QC().BlockID) || (trustedRoot.View() != trustedRoot.QC().View) {
 		return nil, &types.ErrorConfiguration{Msg: "invalid root: root qc is not pointing to root block"}
 	}
 
 	fnlzr := Finalizer{
-		notifier:      notifier,
-		forest:        *forest.NewLevelledForest(),
-		lastLocked:    trustedRoot,
-		lastFinalized: trustedRoot,
+		notifier:             notifier,
+		finalizationCallback: finalizationCallback,
+		forest:               *forest.NewLevelledForest(),
+		lastLocked:           trustedRoot,
+		lastFinalized:        trustedRoot,
 	}
 
 	// We can already pre-prune the levelled forest to the view below it.
@@ -200,14 +205,11 @@ func (r *Finalizer) updateConsensusState(blockContainer *BlockContainer) error {
 	// Lemma: Let B be a block whose 3-chain reaches beyond the last finalized block
 	//        => B will not update the locked or finalized block
 	if err != nil {
-		var epa *ErrorPrunedAncestry
-		switch {
-		case errors.As(err, &epa):
-			//   blockConfftainer's 3-chain reaches beyond the last finalized block
-			return nil // based on Lemma from above, we can skip attempting to update locked or finalized block
-		default:
+		if !errors.Is(err, ErrPrunedAncestry) {
 			return fmt.Errorf("retrieving 3-chain ancestry failed: %w", err)
 		}
+		// blockContainer's 3-chain reaches beyond the last finalized block
+		return nil // based on Lemma from above, we can skip attempting to update locked or finalized block
 	}
 
 	r.updateLockedQc(ancestryChain)
@@ -245,7 +247,7 @@ func (r *Finalizer) getThreeChain(blockContainer *BlockContainer) (*ancestryChai
 // UNVALIDATED: expects block to pass Finalizer.VerifyBlock(block)
 func (r *Finalizer) getNextAncestryLevel(block *types.BlockProposal) (*types.QCBlock, error) {
 	if block.QC().View < r.lastFinalized.View() {
-		return nil, &ErrorPrunedAncestry{block: block}
+		return nil, ErrPrunedAncestry
 	}
 	parentVertex, parentBlockKnown := r.forest.GetVertex(block.QC().BlockID)
 	if !parentBlockKnown {
@@ -333,6 +335,7 @@ func (r *Finalizer) finalizeUpToBlock(blockQC *types.QuorumCertificate) error {
 	if err != nil {
 		return fmt.Errorf("pruning levelled forest failed: %w", err)
 	}
+	r.finalizationCallback.MakeFinal(blockContainer.ID())
 	r.notifier.OnFinalizedBlock(blockContainer.Block())
 	return nil
 }
