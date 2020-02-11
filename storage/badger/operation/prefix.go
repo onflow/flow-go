@@ -53,6 +53,8 @@ func b(v interface{}) []byte {
 		b := make([]byte, 8)
 		binary.BigEndian.PutUint64(b, i)
 		return b
+	case string:
+		return []byte(i)
 	case flow.Role:
 		return []byte{byte(i)}
 	case flow.Identifier:
