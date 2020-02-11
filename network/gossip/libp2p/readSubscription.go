@@ -71,7 +71,7 @@ RecvLoop:
 			break RecvLoop
 		}
 
-		r.log.Debug().Str("topic_message", msg.String()).Msg("received message")
+		//r.log.Debug().Str("topic_message", msg.String()).Msg("received message")
 
 		err = msg.Unmarshal(rawMsg.Data)
 		if err != nil {
@@ -79,10 +79,10 @@ RecvLoop:
 			break RecvLoop
 		}
 
-		r.log.Debug().
-			Hex("sender", msg.OriginID).
-			Hex("eventID", msg.EventID).
-			Msg("received message")
+		//r.log.Debug().
+		//	Hex("sender", msg.OriginID).
+		//	Hex("eventID", msg.EventID).
+		//	Msg("received message")
 
 		// stash the received message into the inbound queue for handling
 		r.inbound <- &msg

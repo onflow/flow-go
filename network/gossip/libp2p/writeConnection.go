@@ -64,10 +64,10 @@ SendLoop:
 
 			bufw.Flush()
 
-			wc.log.Debug().
-				Bytes("sender", msg.OriginID).
-				Hex("eventID", msg.EventID).
-				Msg("sent message")
+			//wc.log.Debug().
+			//	Bytes("sender", msg.OriginID).
+			//	Hex("eventID", msg.EventID).
+			//	Msg("sent message")
 
 			if isClosedErr(err) {
 				wc.log.Error().Err(err).Msg("connection closed, stopping writes")
