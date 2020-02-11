@@ -2,12 +2,15 @@ package test
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -35,22 +38,36 @@ func TestMeshNetTestSuite(t *testing.T) {
 // it creates and initializes a set of network instances
 func (m *MeshNetTestSuite) SetupTest() {
 	// defines total number of nodes in our network
-	const count = 25
-	const cashSize = 100
+	const count = 10
+	const cacheSize = 100
 	//golog.SetAllLoggers(gologging.INFO)
 
 	m.ids = CreateIDs(count)
 
-	mws, err := CreateMiddleware(m.ids)
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	mws, err := CreateMiddleware(logger, m.ids)
 	require.NoError(m.Suite.T(), err)
 	m.mws = mws
 
-	nets, err := CreateNetworks(m.mws, m.ids, cashSize, false)
+	nets, err := CreateNetworks(logger, m.mws, m.ids, cacheSize, false)
 	require.NoError(m.Suite.T(), err)
 	m.nets = nets
 
 	// allows nodes to find each other
 	time.Sleep(5 * time.Second)
+}
+
+// TearDownTest closes the networks within a specified timeout
+func (s *MeshNetTestSuite) TearDownTest() {
+	for _, net := range s.nets {
+		select {
+		// closes the network
+		case <-net.Done():
+			continue
+		case <-time.After(3 * time.Second):
+			s.Suite.Fail("could not stop the network")
+		}
+	}
 }
 
 // TestAllToAll creates a complete mesh of the engines

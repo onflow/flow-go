@@ -12,13 +12,9 @@ type Vote struct {
 	Signature *flow.PartialSignature
 }
 
-// func NewVote(view uint64, blockID flow.Identifier, sig *Signature) *Vote {
-// 	return &Vote{
-// 		View:      view,
-// 		BlockID:   blockID,
-// 		Signature: sig,
-// 	}
-// }
+func (uv *Vote) ID() flow.Identifier {
+	panic("TODO")
+}
 
 func (uv *Vote) BytesForSig() []byte {
 	return voteBytesForSig(uv.View, uv.BlockID)

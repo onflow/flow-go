@@ -14,16 +14,14 @@ type NodeSignature struct {
 type AggregatedSignature struct {
 	// Raw is the raw signature bytes.
 	Raw []byte
-	// Signers is a "bitmap" of signer indices. Tracking the identity list the
-	// indices correspond to is the responsibility of the user of the type.
-	Signers []bool
+	// the Identifiers of all the signers
+	Signers []Identifier
 }
 
 // PartialSignature represents a partial signature.
 type PartialSignature struct {
 	// Raw is the raw signature bytes.
 	Raw []byte
-	// SignerIndex is the index of the signer. Tracking the identity list this
-	// index corresponds to is the responsibility of the user of this type.
-	SignerIndex uint32
+	// The identifier of the signer, which identifies signer's role, stake, etc.
+	Signer Identifier
 }
