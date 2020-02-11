@@ -64,11 +64,11 @@ func (e DoubleVoteError) Error() string {
 }
 
 func (e StaleVoteError) Error() string {
-	return fmt.Sprintf("stale vote (heightes pruned view %d): %v", e.HighestPrunedView, e.Vote)
+	return fmt.Sprintf("stale vote (highest pruned view %d): %v", e.HighestPrunedView, e.Vote)
 }
 
 func (e StaleBlockError) Error() string {
-	return fmt.Sprintf("stale block (heightes pruned view %d): %v", e.HighestPrunedView, e.BlockProposal)
+	return fmt.Sprintf("stale block (highest pruned view %d): %v", e.HighestPrunedView, e.BlockProposal)
 }
 
 func (e ExistingQCError) Error() string {
