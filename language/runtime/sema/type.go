@@ -2591,6 +2591,12 @@ func (t *StorageType) IsInvalidType() bool {
 func (t *StorageType) isTypeIndexableType() {}
 
 func (t *StorageType) IsValidIndexingType(indexingType Type) (isValid bool, expectedTypeDescription string) {
+	const expected = "non-optional resource or reference"
+
+	if _, ok := indexingType.(*OptionalType); ok {
+		return false, expected
+	}
+
 	if _, ok := indexingType.(*ReferenceType); ok {
 		return true, ""
 	}
@@ -2599,7 +2605,7 @@ func (t *StorageType) IsValidIndexingType(indexingType Type) (isValid bool, expe
 		return true, ""
 	}
 
-	return false, "resource or reference"
+	return false, expected
 }
 
 func (t *StorageType) IsAssignable() bool {
