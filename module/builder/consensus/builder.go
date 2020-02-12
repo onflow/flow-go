@@ -151,6 +151,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*fl
 
 		// index the guarantees for the payload
 		for _, guarantee := range guarantees {
+			err = operation.InsertGuarantee(guarantee)(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert guarantee (%x): %w", guarantee.ID(), err)
+			}
 			err = operation.IndexGuarantee(payloadHash, guarantee.ID())(tx)
 			if err != nil {
 				return fmt.Errorf("could not index guarantee (%x): %w", guarantee.ID(), err)
