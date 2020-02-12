@@ -204,12 +204,12 @@ func (r *Finalizer) updateConsensusState(blockContainer *BlockContainer) error {
 	// 3-chain of this block reaches _beyond_ the last finalized block. It is straight forward to show:
 	// Lemma: Let B be a block whose 3-chain reaches beyond the last finalized block
 	//        => B will not update the locked or finalized block
-	if err != nil {
-		if !errors.Is(err, ErrPrunedAncestry) {
-			return fmt.Errorf("retrieving 3-chain ancestry failed: %w", err)
-		}
-		// blockContainer's 3-chain reaches beyond the last finalized block
-		return nil // based on Lemma from above, we can skip attempting to update locked or finalized block
+	if errors.Is(err, ErrPrunedAncestry) { // blockContainer's 3-chain reaches beyond the last finalized block
+		// based on Lemma from above, we can skip attempting to update locked or finalized block
+		return nil
+	}
+	if err != nil { // otherwise, there is an unknown error that we need to escalate to the higher-level application logic
+		return fmt.Errorf("retrieving 3-chain ancestry failed: %w", err)
 	}
 
 	r.updateLockedQc(ancestryChain)
