@@ -22,9 +22,9 @@ import (
 // theory assumptions behind the schemes, e.g., random oracle model of hashes
 type TopologyTestSuite struct {
 	suite.Suite
-	ids   []flow.Identity // represents the identity list of all nodes in the system
-	nets  *libp2p.Network // represents the single network instance that creates topology
-	count int             // indicates size of system
+	ids   flow.IdentityList // represents the identity list of all nodes in the system
+	nets  *libp2p.Network   // represents the single network instance that creates topology
+	count int               // indicates size of system
 }
 
 // TestNetworkTestSuit starts all the tests in this test suite
@@ -46,7 +46,7 @@ func (n *TopologyTestSuite) SetupTest() {
 	require.NoError(n.Suite.T(), err)
 
 	// creates and mocks a network instance
-	netMap, err := CreateNetworks([]*libp2p.Middleware{mw}, n.ids, 1, true)
+	netMap, err := CreateNetworks(logger, []*libp2p.Middleware{mw}, n.ids, 1, true)
 	require.NoError(n.Suite.T(), err)
 	require.Len(n.Suite.T(), netMap, 1)
 
@@ -76,7 +76,7 @@ func (n *TopologyTestSuite) TestMembership() {
 
 	// every id in topology should be an id of the protocol
 	for id := range top {
-		require.Contains(n.Suite.T(), Identifiers(n.ids), id)
+		require.Contains(n.Suite.T(), n.ids.NodeIDs(), id)
 	}
 }
 

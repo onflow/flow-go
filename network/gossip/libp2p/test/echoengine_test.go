@@ -25,7 +25,7 @@ type StubEngineTestSuite struct {
 	suite.Suite
 	nets []*libp2p.Network    // used to keep track of the networks
 	mws  []*libp2p.Middleware // used to keep track of the middlewares associated with networks
-	ids  []flow.Identity      // used to keep track of the identifiers associated with networks
+	ids  flow.IdentityList    // used to keep track of the identifiers associated with networks
 }
 
 // TestStubEngineTestSuite runs all the test methods in this test suit
@@ -39,23 +39,12 @@ func (s *StubEngineTestSuite) SetupTest() {
 	s.ids = CreateIDs(count)
 
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mwMap, err := CreateMiddleware(logger, s.ids)
+	mws, err := CreateMiddleware(logger, s.ids)
 	require.NoError(s.Suite.T(), err)
-	mws := make([]*libp2p.Middleware, 0)
-	for _, mw := range mwMap {
-		mws = append(mws, mw)
-	}
-
 	s.mws = mws
 
-	netMap, err := CreateNetworks(s.mws, s.ids, 100, false)
+	nets, err := CreateNetworks(logger, s.mws, s.ids, 100, false)
 	require.NoError(s.Suite.T(), err)
-
-	// converts net map to slice
-	nets := make([]*libp2p.Network, 0)
-	for _, net := range netMap {
-		nets = append(nets, net)
-	}
 	s.nets = nets
 }
 
