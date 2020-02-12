@@ -26,7 +26,7 @@ type MeshNetTestSuite struct {
 	suite.Suite
 	nets []*libp2p.Network    // used to keep track of the networks
 	mws  []*libp2p.Middleware // used to keep track of the middlewares associated with networks
-	ids  flow.IdentityList    // used to keep track of the identifiers associated with networks
+	ids  []flow.Identity      // used to keep track of the identifiers associated with networks
 }
 
 // TestMeshNetTestSuite runs all tests in this test suit
@@ -49,8 +49,14 @@ func (m *MeshNetTestSuite) SetupTest() {
 	require.NoError(m.Suite.T(), err)
 	m.mws = mws
 
-	nets, _, err := CreateNetworks(m.mws, m.ids, cashSize, false)
+	netMap, err := CreateNetworks(m.mws, m.ids, cashSize, false)
 	require.NoError(m.Suite.T(), err)
+
+	// converts net map to slice
+	nets := make([]*libp2p.Network, 0)
+	for _, net := range netMap {
+		nets = append(nets, net)
+	}
 	m.nets = nets
 
 	// allows nodes to find each other
@@ -79,7 +85,7 @@ func (m *MeshNetTestSuite) TestAllToAll() {
 		event := &message.Echo{
 			Text: fmt.Sprintf("hello from node %v", i),
 		}
-		require.NoError(m.Suite.T(), engs[i].con.Submit(event, m.ids.NodeIDs()...))
+		require.NoError(m.Suite.T(), engs[i].con.Submit(event, Identifiers(m.ids)...))
 		wg.Add(count - 1)
 	}
 

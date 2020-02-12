@@ -12,6 +12,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/libp2p/message"
+	"github.com/dapperlabs/flow-go/network/gossip/libp2p"
 )
 
 type OneToKTestSuite struct {
@@ -26,27 +27,35 @@ func TestOneToKTestSuite(t *testing.T) {
 
 func (o *OneToKTestSuite) SetupTest() {
 	// number of total engines
-	const engines = 10
+	const engines = 50
 
 	// number of total subnets
 	const groups = 5
 
 	o.ee = make(map[int][]*EchoEngine)
 
-	subnets, ids, err := CreateSubnets(engines, 2, 1)
+	subnets, ids, err := CreateSubnets(engines, 5, 1)
 	require.NoError(o.Suite.T(), err)
 
 	o.ids = ids
 
 	// iterates over subnets
+	// registered makes sure that each engine is registered only once
+	// an engine may be shared between several subnets
+	registered := make(map[*libp2p.Network]struct{})
 	for i := range subnets {
 		// iterates over nets in each subnet
 		for _, net := range subnets[i] {
 			if o.ee[i] == nil {
 				o.ee[i] = make([]*EchoEngine, 0)
 			}
-			e := NewEchoEngine(o.Suite.T(), net, 100, 1, false)
-			o.ee[i] = append(o.ee[i], e)
+
+			// register the engine if it has not yet been registered
+			if _, ok := registered[net]; !ok {
+				e := NewEchoEngine(o.Suite.T(), net, 100, 1, false)
+				o.ee[i] = append(o.ee[i], e)
+				registered[net] = struct{}{}
+			}
 		}
 	}
 }
@@ -176,7 +185,6 @@ func (o *OneToKTestSuite) TestInterSubNet() {
 					// evaluates content of event against correct content
 					// engine should seen the event of its subnet exactly once
 					assert.Equal(o.Suite.T(), ec.seen[event.Text], 1)
-					fmt.Println("received:", sub, o.ids[sub][eindex])
 
 				case <-time.After(timeout):
 					// timeout happened with no reception of event at this receiver
