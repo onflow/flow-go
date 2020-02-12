@@ -60,18 +60,20 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		nets = append(nets, net)
 	}
 
-	// if dryrun then don't actually start the network just return the network objects
-	if dryrun {
-		return nets, nil
+	// if dryrun then don't actually start the network
+	if !dryrun {
+		for _, net := range nets {
+			<-net.Ready()
+		}
 	}
 
-	for _, net := range nets {
-		<-net.Ready()
-	}
-
-	for i, m := range mws {
+	for i := range ids {
 		// retrieves IP and port of the middleware
-		ip, port := m.GetIPPort()
+		var ip, port string
+		if !dryrun {
+			m := mws[i]
+			ip, port = m.GetIPPort()
+		}
 
 		// mocks an identity for the middleware
 		id := flow.Identity{
