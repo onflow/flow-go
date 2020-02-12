@@ -38,8 +38,8 @@ func TestMeshNetTestSuite(t *testing.T) {
 // it creates and initializes a set of network instances
 func (m *MeshNetTestSuite) SetupTest() {
 	// defines total number of nodes in our network
-	const count = 25
-	const cashSize = 100
+	const count = 10
+	const cacheSize = 100
 	//golog.SetAllLoggers(gologging.INFO)
 
 	m.ids = CreateIDs(count)
@@ -49,7 +49,7 @@ func (m *MeshNetTestSuite) SetupTest() {
 	require.NoError(m.Suite.T(), err)
 	m.mws = mws
 
-	netMap, err := CreateNetworks(m.mws, m.ids, cashSize, false)
+	nets, err := CreateNetworks(logger, m.mws, m.ids, cacheSize, false)
 	require.NoError(m.Suite.T(), err)
 
 	// converts net map to slice
@@ -61,6 +61,19 @@ func (m *MeshNetTestSuite) SetupTest() {
 
 	// allows nodes to find each other
 	time.Sleep(5 * time.Second)
+}
+
+// TearDownTest closes the networks within a specified timeout
+func (s *MeshNetTestSuite) TearDownTest() {
+	for _, net := range s.nets {
+		select {
+		// closes the network
+		case <-net.Done():
+			continue
+		case <-time.After(3 * time.Second):
+			s.Suite.Fail("could not stop the network")
+		}
+	}
 }
 
 // TestAllToAll creates a complete mesh of the engines
