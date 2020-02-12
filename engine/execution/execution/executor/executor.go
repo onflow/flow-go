@@ -98,10 +98,17 @@ func (e *blockExecutor) executeCollection(
 			return nil, nil, fmt.Errorf("failed to execute transaction: %w", err)
 		}
 
+		fmt.Println("TX", string(tx.Script))
+
 		if result.Succeeded() {
 			chunkView.ApplyDelta(txView.Delta())
+			fmt.Println("Applying Delta", tx.ID())
+		} else {
+			fmt.Println("err:", result.Error)
 		}
 	}
+
+	fmt.Println("Chunk Reads:", chunkView.Reads())
 
 	endState, err = e.state.CommitDelta(chunkView.Delta())
 	if err != nil {

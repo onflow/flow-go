@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -77,6 +78,9 @@ func Test_MVPNetwork(t *testing.T) {
 	executionClient, err := testClient(executionNodeApiPort, key)
 	require.NoError(t, err)
 
+	err = createRootAccount(collectionClient)
+	require.NoError(t, err)
+
 	runMVPTest(t, collectionClient, executionClient)
 }
 
@@ -106,9 +110,11 @@ func runMVPTest(t *testing.T, collectionClient *FlowTestClient, executionClient 
 	//script executes eventually, but no counter instance is created
 	require.Eventually(t, func() bool {
 		counter, err = readCounter(executionClient)
-
+		if err != nil {
+			fmt.Println("FIRST", err)
+		}
 		return err == nil && counter == -3
-	}, 30*time.Second, time.Second)
+	}, 60*time.Second, time.Second)
 
 	err = createCounter(collectionClient)
 	require.NoError(t, err)
@@ -118,7 +124,7 @@ func runMVPTest(t *testing.T, collectionClient *FlowTestClient, executionClient 
 		counter, err = readCounter(executionClient)
 
 		return err == nil && counter == 2
-	}, 30*time.Second, time.Second)
+	}, 60*time.Second, time.Second)
 }
 
 func testClient(port string, key *sdk.AccountPrivateKey) (*FlowTestClient, error) {
@@ -202,10 +208,20 @@ func getEmulatorKey() (*sdk.AccountPrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	key, err := sdk.DecodeAccountPrivateKey(prKeyBytes)
+	key, err := keys.DecodePrivateKey(prKeyBytes)
 	if err != nil {
 		return nil, err
 	}
 
 	return &key, nil
+}
+
+func createRootAccount(testClient *FlowTestClient) error {
+
+	return testClient.SendTransaction(Transaction{
+		Import{sdk.RootAddress},
+		Execute{
+			Code(`Account(publicKeys: [[248,98,184,91,48,89,48,19,6,7,42,134,72,206,61,2,1,6,8,42,134,72,206,61,3,1,7,3,66,0,4,114,176,116,164,82,208,167,100,161,218,52,49,143,68,203,22,116,13,241,207,171,30,107,80,229,228,20,93,192,110,93,21,28,156,37,36,79,18,62,83,201,182,254,35,117,4,163,126,119,121,144,10,173,83,202,38,227,181,124,92,61,112,48,196,2,3,130,3,232]], code: [])`),
+		}})
+
 }

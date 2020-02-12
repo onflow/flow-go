@@ -1,5 +1,7 @@
 package state
 
+import "fmt"
+
 // GetRegisterFunc is a function that returns the value for a register.
 type GetRegisterFunc func(key string) ([]byte, error)
 
@@ -39,7 +41,7 @@ func (r *View) Get(key string) ([]byte, error) {
 
 	value, err := r.readFunc(key)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting register from view: %w", err)
 	}
 
 	// record read

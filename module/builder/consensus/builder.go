@@ -109,6 +109,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*fl
 			if ok {
 				continue
 			}
+			fmt.Printf("GID %x\n", guarantee.ID())
 			guarantees = append(guarantees, guarantee)
 		}
 
@@ -148,34 +149,42 @@ func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*fl
 			Seals:      seals,
 		}
 		payloadHash := payload.Hash()
-
+		fmt.Println("1")
 		// index the guarantees for the payload
 		for _, guarantee := range guarantees {
+			err = operation.AllowDuplicates(operation.InsertGuarantee(guarantee))(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert guarantee (%s): %w", guarantee.ID(), err)
+			}
 			err = operation.IndexGuarantee(payloadHash, guarantee.ID())(tx)
 			if err != nil {
-				return fmt.Errorf("could not index guarantee (%x): %w", guarantee.ID(), err)
+				return fmt.Errorf("could not index guarantee (%s): %w", guarantee.ID(), err)
 			}
 		}
+		fmt.Println("2")
 
 		// index the seals for the payload
 		for _, seal := range seals {
 			err = operation.IndexSeal(payloadHash, seal.ID())(tx)
 			if err != nil {
-				return fmt.Errorf("could not index seal (%x): %w", seal.ID(), err)
+				return fmt.Errorf("could not index seal (%s): %w", seal.ID(), err)
 			}
 		}
+		fmt.Println("3")
 
 		// generate the block header using the hotstuff-provided function
 		header, err = build(payloadHash)
 		if err != nil {
 			return fmt.Errorf("could not build block: %w", err)
 		}
+		fmt.Println("4")
 
 		// insert the block header
 		err = operation.InsertHeader(header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert header: %w", err)
 		}
+		fmt.Println("5")
 
 		return nil
 	})

@@ -200,14 +200,8 @@ func (e *Engine) createProposal() (*flow.Header, error) {
 // will extend the current blockchain state with it and finalize it.
 func (e *Engine) commitProposal(proposal *flow.Header) error {
 
-	// store the proposal in our database
-	err := e.headers.Store(proposal)
-	if err != nil {
-		return fmt.Errorf("could not store proposal: %w", err)
-	}
-
 	// extend our blockchain state with the proposal
-	err = e.state.Mutate().Extend(proposal.ID())
+	err := e.state.Mutate().Extend(proposal.ID())
 	if err != nil {
 		return fmt.Errorf("could not extend state: %w", err)
 	}

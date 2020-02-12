@@ -217,7 +217,10 @@ func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages
 	if err != nil {
 		return fmt.Errorf("could not retrieve chunk state (id=%s): %w", chunkID, err)
 	}
-
+	fmt.Printf("Registers: %d\n", len(registers))
+	for k, v := range registers {
+		fmt.Printf("Key: %s\n Value: %s\n", k, v)
+	}
 	msg := &messages.ExecutionStateResponse{State: flow.ChunkState{
 		ChunkID:   chunkID,
 		Registers: registers,

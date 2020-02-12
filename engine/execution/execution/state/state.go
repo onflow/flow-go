@@ -51,11 +51,11 @@ func NewExecutionState(
 func (s *state) NewView(commitment flow.StateCommitment) *View {
 	return NewView(func(key string) ([]byte, error) {
 		values, err := s.ls.GetRegisters(
-			[]flow.RegisterID{[]byte(key)},
+			[]flow.RegisterID{flow.RegisterID(key)},
 			commitment,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
 
 		if len(values) == 0 {
@@ -68,6 +68,7 @@ func (s *state) NewView(commitment flow.StateCommitment) *View {
 
 func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
 	ids, values := delta.RegisterUpdates()
+	fmt.Println("CommitDelta", ids, values)
 	// TODO: update CommitDelta to also return proofs
 	commit, _, err := s.ls.UpdateRegistersWithProof(ids, values)
 	if err != nil {
