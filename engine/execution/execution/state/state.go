@@ -1,11 +1,14 @@
 package state
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // ExecutionState is an interface used to access and mutate the execution state of the blockchain.
@@ -55,7 +58,11 @@ func (s *state) NewView(commitment flow.StateCommitment) *View {
 			commitment,
 		)
 		if err != nil {
-			return nil, err
+			// TODO: Assumes leveldb, May want to be more flexible here
+			if errors.Is(err, leveldb.ErrNotFound) {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
 
 		if len(values) == 0 {
@@ -67,7 +74,14 @@ func (s *state) NewView(commitment flow.StateCommitment) *View {
 }
 
 func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
-	ids, values := delta.RegisterUpdates()
+	ids, _ := delta.RegisterUpdates()
+	sort.Slice(ids, func(i, j int) bool {
+		return bytes.Compare(ids[i], ids[j]) < 0
+	})
+	values := make([][]byte, 0, len(ids))
+	for _, id := range ids {
+		values = append(values, delta[string(id)])
+	}
 	// TODO: update CommitDelta to also return proofs
 	commit, _, err := s.ls.UpdateRegistersWithProof(ids, values)
 	if err != nil {
