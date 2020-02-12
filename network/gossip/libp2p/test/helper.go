@@ -219,7 +219,9 @@ type SnapshotMock struct {
 func (s *SnapshotMock) Identities(filters ...flow.IdentityFilter) (flow.IdentityList, error) {
 	ids := flow.IdentityList{}
 	for _, id := range s.ids {
-		ids = append(ids, &id)
+		// buffers the id to reference in isolation
+		buffer := id
+		ids = append(ids, &buffer)
 	}
 	return ids, nil
 }

@@ -49,7 +49,7 @@ func (m *MeshNetTestSuite) SetupTest() {
 	require.NoError(m.Suite.T(), err)
 	m.mws = mws
 
-	nets, err := CreateNetworks(logger, m.mws, m.ids, cacheSize, false)
+	netMap, err := CreateNetworks(m.mws, m.ids, cacheSize, false)
 	require.NoError(m.Suite.T(), err)
 
 	// converts net map to slice

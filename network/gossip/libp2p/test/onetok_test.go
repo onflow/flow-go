@@ -27,14 +27,14 @@ func TestOneToKTestSuite(t *testing.T) {
 
 func (o *OneToKTestSuite) SetupTest() {
 	// number of total engines
-	const engines = 50
+	const engines = 10
 
 	// number of total subnets
 	const groups = 5
 
 	o.ee = make(map[int][]*EchoEngine)
 
-	subnets, ids, err := CreateSubnets(engines, 5, 1)
+	subnets, ids, err := CreateSubnets(engines, 2, 1)
 	require.NoError(o.Suite.T(), err)
 
 	o.ids = ids

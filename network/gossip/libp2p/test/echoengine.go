@@ -91,11 +91,6 @@ func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error
 		return nil
 	}
 
-	// do not echo back if not needed
-	if !te.echo {
-		return nil
-	}
-
 	// sends a echo back
 	msg := &message.Echo{
 		Text: fmt.Sprintf("%s: %s", te.echomsg, strEvent),
