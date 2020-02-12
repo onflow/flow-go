@@ -9,9 +9,10 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/forkchoice"
-	mockdist "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications/mock"
+	mocknotifier "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications/mock"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+	mockfinalizer "github.com/dapperlabs/flow-go/module/mock"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +24,7 @@ func TestForks_ImplementsInterface(t *testing.T) {
 
 // TestForks_Initialization tests that Forks correctly reports trusted Root
 func TestForks_Initialization(t *testing.T) {
-	forks, _, root := initForks(t, 1)
+	forks, _, _, root := initForks(t, 1)
 
 	assert.Equal(t, forks.FinalizedView(), uint64(1))
 	assert.Equal(t, forks.FinalizedBlock(), root.Block())
@@ -39,7 +40,7 @@ func TestForks_Initialization(t *testing.T) {
 
 // TestForks_AddBlock verifies that Block can be added
 func TestForks_AddBlock(t *testing.T) {
-	forks, notifier, root := initForks(t, 1)
+	forks, _, notifier, root := initForks(t, 1)
 
 	block02 := makeBlock(2, root.QC(), nil)
 	notifier.On("OnBlockIncorporated", block02).Return().Once()
@@ -57,38 +58,45 @@ func TestForks_AddBlock(t *testing.T) {
 
 // TestForks_3ChainFinalization tests happy-path direct 3-chain finalization
 func TestForks_3ChainFinalization(t *testing.T) {
-	forks, notifier, root := initForks(t, 1)
+	forks, finCallback, notifier, root := initForks(t, 1) // includes genesis block (v1)
 
-	targetBlock := makeBlock(2, root.QC(), nil)
-	notifier.On("OnBlockIncorporated", targetBlock).Return().Once()
-	addBlock2Forks(t, targetBlock, forks)
+	block2 := makeBlock(2, root.QC(), nil)
+	notifier.On("OnBlockIncorporated", block2).Return().Once()
+	addBlock2Forks(t, block2, forks)
 	notifier.AssertExpectations(t)
 
-	targetBlockPlus1 := makeBlock(3, qc(targetBlock.View(), targetBlock.BlockID()), nil)
-	notifier.On("OnBlockIncorporated", targetBlockPlus1).Return().Once()
-	notifier.On("OnQcIncorporated", targetBlockPlus1.QC()).Return().Once()
-	addBlock2Forks(t, targetBlockPlus1, forks)
+	block3 := makeBlock(3, qc(block2.View(), block2.BlockID()), nil)
+	notifier.On("OnBlockIncorporated", block3).Return().Once()
+	notifier.On("OnQcIncorporated", block3.QC()).Return().Once()
+	addBlock2Forks(t, block3, forks)
 	notifier.AssertExpectations(t)
 
-	targetBlockPlus2 := makeBlock(4, qc(targetBlockPlus1.View(), targetBlockPlus1.BlockID()), nil)
-	notifier.On("OnBlockIncorporated", targetBlockPlus2).Return().Once()
-	notifier.On("OnQcIncorporated", targetBlockPlus2.QC()).Return().Once()
-	addBlock2Forks(t, targetBlockPlus2, forks)
+	// creates direct 3-chain on genesis block (1), which is already finalized  
+	block4 := makeBlock(4, qc(block3.View(), block3.BlockID()), nil)
+	notifier.On("OnBlockIncorporated", block4).Return().Once()
+	notifier.On("OnQcIncorporated", block4.QC()).Return().Once()
+	addBlock2Forks(t, block4, forks)
 	notifier.AssertExpectations(t)
 
-	targetBlockPlus3 := makeBlock(5, qc(targetBlockPlus2.View(), targetBlockPlus2.BlockID()), nil)
-	notifier.On("OnBlockIncorporated", targetBlockPlus3).Return().Once()
-	notifier.On("OnQcIncorporated", targetBlockPlus3.QC()).Return().Once()
-	notifier.On("OnFinalizedBlock", targetBlock).Return().Once()
-	addBlock2Forks(t, targetBlockPlus3, forks)
+	// creates direct 3-chain on block (2) => finalize (2)  
+	block5 := makeBlock(5, qc(block4.View(), block4.BlockID()), nil)
+	notifier.On("OnBlockIncorporated", block5).Return().Once()
+	notifier.On("OnQcIncorporated", block5.QC()).Return().Once()
+	notifier.On("OnFinalizedBlock", block2).Return().Once()
+	finCallback.On("MakeFinal", block2.BlockID()).Return(nil).Once()
+	addBlock2Forks(t, block5, forks)
 	notifier.AssertExpectations(t)
+	finCallback.AssertExpectations(t)
 
-	targetBlockPlus4 := makeBlock(6, qc(targetBlockPlus3.View(), targetBlockPlus3.BlockID()), nil)
-	notifier.On("OnBlockIncorporated", targetBlockPlus4).Return().Once()
-	notifier.On("OnQcIncorporated", targetBlockPlus4.QC()).Return().Once()
-	notifier.On("OnFinalizedBlock", targetBlockPlus1).Return().Once()
-	addBlock2Forks(t, targetBlockPlus4, forks)
+	// creates direct 3-chain on block (3) => finalize (3)  
+	block6 := makeBlock(6, qc(block5.View(), block5.BlockID()), nil)
+	notifier.On("OnBlockIncorporated", block6).Return().Once()
+	notifier.On("OnQcIncorporated", block6.QC()).Return().Once()
+	notifier.On("OnFinalizedBlock", block3).Return().Once()
+	finCallback.On("MakeFinal", block3.BlockID()).Return(nil).Once()
+	addBlock2Forks(t, block6, forks)
 	notifier.AssertExpectations(t)
+	finCallback.AssertExpectations(t)
 }
 
 func addBlock2Forks(t *testing.T, block *types.BlockProposal, forks hotstuff.Forks) {
@@ -120,13 +128,14 @@ func verifyStored(t *testing.T, block *types.BlockProposal, forks hotstuff.Forks
 	assert.True(t, found, fmt.Sprintf("Did not find block: %v", block.BlockID()))
 }
 
-func initForks(t *testing.T, view uint64) (*Forks, *mockdist.Consumer, *types.QCBlock) {
-	notifier := &mockdist.Consumer{}
+func initForks(t *testing.T, view uint64) (*Forks, *mockfinalizer.Finalizer, *mocknotifier.Consumer, *types.QCBlock) {
+	notifier := &mocknotifier.Consumer{}
+	finalizationCallback := &mockfinalizer.Finalizer{}
 
 	// construct Finalizer
 	root := makeRootBlock(t, view)
 	notifier.On("OnBlockIncorporated", root.Block()).Return().Once()
-	fnlzr, err := finalizer.New(root, notifier)
+	fnlzr, err := finalizer.New(root, finalizationCallback, notifier)
 	if err != nil {
 		assert.Fail(t, err.Error())
 	}
@@ -139,7 +148,7 @@ func initForks(t *testing.T, view uint64) (*Forks, *mockdist.Consumer, *types.QC
 	}
 
 	notifier.AssertExpectations(t)
-	return New(fnlzr, fc), notifier, root
+	return New(fnlzr, fc), finalizationCallback, notifier, root
 }
 
 func makeRootBlock(t *testing.T, view uint64) *types.QCBlock {

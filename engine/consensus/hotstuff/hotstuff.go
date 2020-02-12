@@ -45,7 +45,7 @@ func New(
 	signer Signer,
 	communicator Communicator,
 	consumer notifications.Consumer,
-	finalizer Finalizer,
+	finalizer module.Finalizer,
 	builder module.Builder,
 ) (HotStuff, error) {
 	panic("TODO")
