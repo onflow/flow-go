@@ -8,6 +8,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
 type Mutator struct {
@@ -38,22 +39,10 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 			return fmt.Errorf("genesis payload hash must match payload")
 		}
 
-		// insert payload
-		err := operation.InsertCollection(genesis.Collection)(tx)
+		// insert block
+		err := procedure.InsertClusterBlock(genesis)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert genesis collection: %w", err)
-		}
-
-		// index payload
-		err = operation.IndexCollection(genesis.Payload.Hash(), genesis.Collection)(tx)
-		if err != nil {
-			return fmt.Errorf("could not index genesis collection: %w", err)
-		}
-
-		// insert header
-		err = operation.InsertHeader(&genesis.Header)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis header: %w", err)
+			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 
 		// insert block number -> ID mapping
@@ -73,5 +62,8 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 }
 
 func (m *Mutator) Extend(blockID flow.Identifier) error {
-	panic("TODO")
+	return m.state.db.Update(func(tx *badger.Txn) error {
+
+		return nil
+	})
 }
