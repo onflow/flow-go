@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	engineCommon "github.com/dapperlabs/flow-go/engine"
-	executionmock "github.com/dapperlabs/flow-go/engine/execution/execution/mock"
-	statemock "github.com/dapperlabs/flow-go/engine/execution/execution/state/mock"
+	computation "github.com/dapperlabs/flow-go/engine/execution/computation/mock"
+	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	module "github.com/dapperlabs/flow-go/module/mocks"
 	network "github.com/dapperlabs/flow-go/network/mocks"
-	protocolmock "github.com/dapperlabs/flow-go/protocol/mock"
+	protocol "github.com/dapperlabs/flow-go/protocol/mock"
 	storage "github.com/dapperlabs/flow-go/storage/mocks"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -31,11 +31,11 @@ type testingContext struct {
 	engine            *Engine
 	blocks            *storage.MockBlocks
 	collections       *storage.MockCollections
-	state             *protocolmock.State
+	state             *protocol.State
 	conduit           *network.MockConduit
 	collectionConduit *network.MockConduit
-	executionEngine   *executionmock.ExecutionEngine
-	executionState    *statemock.ExecutionState
+	executionEngine   *computation.ComputationEngine
+	executionState    *state.ExecutionState
 }
 
 func runWithEngine(t *testing.T, f func(ctx testingContext)) {
@@ -59,11 +59,11 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	blocks := storage.NewMockBlocks(ctrl)
 	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
-	executionEngine := new(executionmock.ExecutionEngine)
-	protocolState := new(protocolmock.State)
-	executionState := new(statemock.ExecutionState)
+	computationEngine := new(computation.ComputationEngine)
+	protocolState := new(protocol.State)
+	executionState := new(state.ExecutionState)
 
-	snapshot := new(protocolmock.Snapshot)
+	snapshot := new(protocol.Snapshot)
 
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
 
@@ -72,7 +72,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 		return identityList.Filter(f[0])
 	}, nil)
 
-	mutator := new(protocolmock.Mutator)
+	mutator := new(protocol.Mutator)
 	mutator.On("Mutate").Return(mutator)
 	payloads.EXPECT().Store(gomock.Any()).AnyTimes()
 
@@ -83,7 +83,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 
-	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, executionEngine, executionState)
+	engine, err := New(log, net, me, protocolState, blocks, payloads, collections, computationEngine, executionState)
 	require.NoError(t, err)
 
 	f(testingContext{
@@ -94,11 +94,11 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 		state:             protocolState,
 		conduit:           conduit,
 		collectionConduit: collectionConduit,
-		executionEngine:   executionEngine,
+		executionEngine:   computationEngine,
 		executionState:    executionState,
 	})
 
-	executionEngine.AssertExpectations(t)
+	computationEngine.AssertExpectations(t)
 	protocolState.AssertExpectations(t)
 	executionState.AssertExpectations(t)
 }
