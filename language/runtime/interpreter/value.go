@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"math/big"
@@ -265,6 +266,26 @@ func (v *StringValue) GetMember(_ *Interpreter, _ LocationRange, name string) Va
 				from := invocation.Arguments[0].(IntValue)
 				to := invocation.Arguments[1].(IntValue)
 				result := v.Slice(from, to)
+				return trampoline.Done{Result: result}
+			},
+		)
+
+	case "decodeHex":
+		return NewHostFunctionValue(
+			func(invocation Invocation) trampoline.Trampoline {
+				str := v.Str
+
+				values := make([]Value, len(str)/2)
+
+				bs, err := hex.DecodeString(str)
+				if err != nil {
+					panic(err)
+				}
+				for i, b := range bs {
+					values[i] = NewIntValue(int64(b))
+				}
+
+				result := NewArrayValueUnownedNonCopying(values...)
 				return trampoline.Done{Result: result}
 			},
 		)
