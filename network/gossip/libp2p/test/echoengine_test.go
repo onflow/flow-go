@@ -39,8 +39,13 @@ func (s *StubEngineTestSuite) SetupTest() {
 	s.ids = CreateIDs(count)
 
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws, err := CreateMiddleware(logger, s.ids)
+	mwMap, err := CreateMiddleware(logger, s.ids)
 	require.NoError(s.Suite.T(), err)
+	mws := make([]*libp2p.Middleware, 0)
+	for _, mw := range mwMap {
+		mws = append(mws, mw)
+	}
+
 	s.mws = mws
 
 	netMap, err := CreateNetworks(s.mws, s.ids, 100, false)

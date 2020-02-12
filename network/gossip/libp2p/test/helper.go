@@ -38,10 +38,10 @@ func CreateSubnets(nodesNum, subnetNum, linkNum int) (map[int][]*libp2p.Network,
 	if err != nil {
 		return nil, nil, err
 	}
-	nets, err := CreateNetworks(mws, all, nodesNum, false)
-	if err != nil {
-		return nil, nil, err
-	}
+	// nets, err := CreateNetworks(mws, all, nodesNum, false)
+	//if err != nil {
+	//	return nil, nil, err
+	//}
 
 	// inventory of all networks in each subnet of the network
 	subnets := make(map[int][]*libp2p.Network)
@@ -52,8 +52,13 @@ func CreateSubnets(nodesNum, subnetNum, linkNum int) (map[int][]*libp2p.Network,
 	for index, subnetids := range subnetIdList {
 		subnets[index] = make([]*libp2p.Network, 0)
 		subids[index] = make([]flow.Identifier, 0)
+		// iterates over ids of a single subnet
 		for _, id := range subnetids {
-			subnets[index] = append(subnets[index], nets[id])
+			net, err := CreateNetworks([]*libp2p.Middleware{mws[id]}, []flow.Identity{id}, nodesNum, false)
+			if err != nil {
+				return nil, nil, err
+			}
+			subnets[index] = append(subnets[index], net[id])
 			subids[index] = append(subids[index], id.NodeID)
 		}
 	}
@@ -197,17 +202,18 @@ func CreateNetworks(mws []*libp2p.Middleware, ids []flow.Identity, csize int, dr
 }
 
 // CreateMiddleware receives an ids slice and creates and initializes a middleware instances for each id
-func CreateMiddleware(log zerolog.Logger, identities []flow.Identity) ([]*libp2p.Middleware, error) {
+func CreateMiddleware(log zerolog.Logger, identities []flow.Identity) (map[flow.Identity]*libp2p.Middleware, error) {
 	count := len(identities)
-	mws := make([]*libp2p.Middleware, 0)
+	mws := make(map[flow.Identity]*libp2p.Middleware)
 	for i := 0; i < count; i++ {
 		// creating middleware of nodes
-		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", identities[i].NodeID)
+		id := identities[i]
+		mw, err := libp2p.NewMiddleware(log, json.NewCodec(), "0.0.0.0:0", id.NodeID)
 		if err != nil {
 			return nil, err
 		}
 
-		mws = append(mws, mw)
+		mws[id] = mw
 	}
 	return mws, nil
 }

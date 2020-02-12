@@ -25,18 +25,13 @@ func TestOneToKTestSuite(t *testing.T) {
 	suite.Run(t, new(OneToKTestSuite))
 }
 
-func (o *OneToKTestSuite) SetupTest() {
-	// number of total engines
-	const engines = 10
-
-	// number of total subnets
-	const groups = 5
-
+// Setup creates subnets, establishes links between them, and run the engines
+func (o *OneToKTestSuite) Setup(engineNum, subnetNum, linkNum int) {
 	o.ee = make(map[int][]*EchoEngine)
 
-	subnets, ids, err := CreateSubnets(engines, 2, 1)
+	// creates subnets
+	subnets, ids, err := CreateSubnets(engineNum, subnetNum, linkNum)
 	require.NoError(o.Suite.T(), err)
-
 	o.ids = ids
 
 	// iterates over subnets
@@ -52,9 +47,12 @@ func (o *OneToKTestSuite) SetupTest() {
 
 			// register the engine if it has not yet been registered
 			if _, ok := registered[net]; !ok {
+				// each engine is registered with the id of 1 and cache capacity of 100
 				e := NewEchoEngine(o.Suite.T(), net, 100, 1, false)
 				o.ee[i] = append(o.ee[i], e)
 				registered[net] = struct{}{}
+			} else {
+				fmt.Println("already registered engine")
 			}
 		}
 	}
@@ -62,7 +60,7 @@ func (o *OneToKTestSuite) SetupTest() {
 
 func (o *OneToKTestSuite) TestIntraSubNet() {
 	timeout := 2 * time.Second
-
+	o.Setup(10, 2, 0)
 	// iterates over subnets
 	for i, ee := range o.ee {
 		// Sends a message from the first engine of each subnet to
@@ -91,7 +89,9 @@ func (o *OneToKTestSuite) TestIntraSubNet() {
 				continue
 			}
 			wg.Add(1)
-			go func(ec *EchoEngine) {
+			go func(ec *EchoEngine, id flow.Identifier) {
+				sid := id
+				fmt.Println("sender", sender, "sid", id)
 				defer wg.Done()
 
 				select {
@@ -102,7 +102,7 @@ func (o *OneToKTestSuite) TestIntraSubNet() {
 					// evaluates event against nil value
 					require.NotNil(o.Suite.T(), ec.event)
 					// evaluates origin id of message against sender id
-					assert.Equal(o.Suite.T(), sender, ec.originID)
+					assert.Equal(o.Suite.T(), sid, ec.originID)
 					// evaluates number of events node received, should be 1
 					assert.Equal(o.Suite.T(), 1, len(ec.seen))
 					// evaluates content of event against correct content
@@ -113,7 +113,7 @@ func (o *OneToKTestSuite) TestIntraSubNet() {
 					// timeout happened with no reception of event at this receiver
 					assert.Fail(o.Suite.T(), fmt.Sprintf("timout exceeded on waiting for message"))
 				}
-			}(e)
+			}(e, sender)
 		}
 	}
 

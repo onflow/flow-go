@@ -45,8 +45,12 @@ func (m *MeshNetTestSuite) SetupTest() {
 	m.ids = CreateIDs(count)
 
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
-	mws, err := CreateMiddleware(logger, m.ids)
+	mwMap, err := CreateMiddleware(logger, m.ids)
 	require.NoError(m.Suite.T(), err)
+	mws := make([]*libp2p.Middleware, 0)
+	for _, mw := range mwMap {
+		mws = append(mws, mw)
+	}
 	m.mws = mws
 
 	netMap, err := CreateNetworks(m.mws, m.ids, cacheSize, false)
