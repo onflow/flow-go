@@ -35,13 +35,15 @@ func CreateIDs(count int) []*flow.Identity {
 func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool) ([]*libp2p.Network, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
+	// create a slice of len ids to make sure the network fanout is set appropriately
+	identities := make([]flow.Identity, len(ids))
 
 	// creates and mocks the state
 	var snapshot *SnapshotMock
 	if dryrun {
-		snapshot = &SnapshotMock{ids: ids}
+		snapshot = &SnapshotMock{ids: identities}
 	} else {
-		snapshot = &SnapshotMock{ids: flow.IdentityList{}}
+		snapshot = &SnapshotMock{ids: identities}
 	}
 	state := &protocol.State{}
 	state.On("Final").Return(snapshot)
@@ -72,13 +74,13 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		ip, port := m.GetIPPort()
 
 		// mocks an identity for the middleware
-		id := &flow.Identity{
+		id := flow.Identity{
 			NodeID:  ids[i].NodeID,
 			Address: fmt.Sprintf("%s:%s", ip, port),
 			Role:    flow.RoleCollection,
 			Stake:   0,
 		}
-		snapshot.ids = append(snapshot.ids, id)
+		snapshot.ids[i] = id
 	}
 
 	return nets, nil
@@ -101,11 +103,16 @@ func CreateMiddleware(log zerolog.Logger, identities []*flow.Identity) ([]*libp2
 }
 
 type SnapshotMock struct {
-	ids flow.IdentityList
+	ids []flow.Identity
 }
 
 func (s *SnapshotMock) Identities(filters ...flow.IdentityFilter) (flow.IdentityList, error) {
-	return s.ids, nil
+	var idList flow.IdentityList
+	for _, id := range s.ids {
+		addr := id
+		idList = append(idList, &addr)
+	}
+	return idList, nil
 }
 
 func (s *SnapshotMock) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
