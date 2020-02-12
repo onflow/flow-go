@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/syndtr/goleveldb/leveldb"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 // ExecutionState is an interface used to access and mutate the execution state of the blockchain.

@@ -317,7 +317,7 @@ func fullKey(owner, controller, key string) string {
 }
 func fullKeyHash(owner, controller, key string) string {
 	h := sha256.New()
-	h.Write([]byte(fullKey(owner, controller, key)))
+	_, _ = h.Write([]byte(fullKey(owner, controller, key)))
 	return string(h.Sum(nil))
 }
 
