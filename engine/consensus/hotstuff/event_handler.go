@@ -152,10 +152,10 @@ func (e *EventHandler) Start() error {
 // It reads the current view, and check if it needs to proposal or vote for block.
 func (e *EventHandler) startNewView() error {
 	curView := e.paceMaker.CurView()
-
 	e.log.Info().
 		Uint64("curView", curView).
 		Msg("start new view")
+	e.pruneSubcomponents()
 
 	if e.viewState.IsSelfLeaderForView(curView) {
 		// as the leader of the current view,
@@ -195,6 +195,18 @@ func (e *EventHandler) startNewView() error {
 	block := blocks[0]
 
 	return e.processBlockForCurrentView(block)
+}
+
+// pruneSubcomponents prunes EventHandler's sub-components
+// Currently, the implementation follows the simplest design to prune once when we enter a
+// new view instead of immediately when a block is finalized.
+//
+// Technically, EventHandler (and all other components) could consume Forks' OnBlockFinalized
+// notifications and prune immediately. However, we have followed the design paradigm that all
+// events are only for HotStuff-External components. The interaction of the HotStuff-internal
+// components is directly handled by the EventHandler.
+func (e *EventHandler) pruneSubcomponents() {
+	e.voteAggregator.PruneByView(e.forks.FinalizedView())
 }
 
 // processBlockForCurrentView processes the block for the current view.
