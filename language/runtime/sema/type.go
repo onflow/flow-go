@@ -453,6 +453,18 @@ func (t *StringType) GetMember(identifier string, _ ast.Range, _ func(error)) *M
 			},
 		)
 
+	case "decodeHex":
+		return newFunction(
+			&FunctionType{
+				ReturnTypeAnnotation: NewTypeAnnotation(
+					&VariableSizedType{
+						// TODO: change to UInt8
+						Type: &IntType{},
+					},
+				),
+			},
+		)
+
 	case "length":
 		return NewPublicConstantFieldMember(t, identifier, &IntType{})
 
