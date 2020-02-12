@@ -275,17 +275,17 @@ func (v *StringValue) GetMember(_ *Interpreter, _ LocationRange, name string) Va
 			func(invocation Invocation) trampoline.Trampoline {
 				str := v.Str
 
-				values := make([]Value, len(str)/2)
-
 				bs, err := hex.DecodeString(str)
 				if err != nil {
 					panic(err)
 				}
+
+				values := make([]Value, len(str)/2)
 				for i, b := range bs {
 					values[i] = NewIntValue(int64(b))
 				}
-
 				result := NewArrayValueUnownedNonCopying(values...)
+
 				return trampoline.Done{Result: result}
 			},
 		)
