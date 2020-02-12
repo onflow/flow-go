@@ -102,3 +102,23 @@ func TestBootstrap(t *testing.T) {
 		})
 	})
 }
+
+func TestExtend(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		t.Run("without first bootstrapping", func(t *testing.T) {})
+
+		// bootstrap cluster state
+
+		t.Run("non-existent block", func(t *testing.T) {})
+
+		t.Run("invalid payload hash", func(t *testing.T) {})
+
+		t.Run("non-existent parent", func(t *testing.T) {})
+
+		t.Run("invalid block number", func(t *testing.T) {})
+
+		t.Run("building on parent of finalized block", func(t *testing.T) {})
+
+		t.Run("extend", func(t *testing.T) {})
+	})
+}
