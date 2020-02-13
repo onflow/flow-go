@@ -139,9 +139,9 @@ func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote)
 	// indices inside of hotstuff, we now have to send it along, because the
 	// mapping between index and node / public key might not be known before the
 	// block is received.
-	sig := flow.PartialSignature{
-		Raw:    vote.Signature,
-		Signer: vote.Signer,
+	sig := types.SingleSignature{
+		Raw:      vote.Signature,
+		SignerID: vote.Signer,
 	}
 
 	// NOTE: The view number is not really be needed, as the hotstuff algorithm

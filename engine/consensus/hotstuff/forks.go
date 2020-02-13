@@ -18,17 +18,17 @@ import (
 type Forks interface {
 
 	// GetBlocksForView returns all BlockProposals at the given view number.
-	GetBlocksForView(view uint64) []*types.BlockProposal
+	GetBlocksForView(view uint64) []*types.Block
 
 	// GetBlock returns (BlockProposal, true) if the block with the specified
 	// id was found (nil, false) otherwise.
-	GetBlock(id flow.Identifier) (*types.BlockProposal, bool)
+	GetBlock(id flow.Identifier) (*types.Block, bool)
 
 	// FinalizedView returns the largest view number where a finalized block is known
 	FinalizedView() uint64
 
 	// FinalizedBlock returns the finalized block with the largest view number
-	FinalizedBlock() *types.BlockProposal
+	FinalizedBlock() *types.Block
 
 	// IsSafeBlock returns true if block is safe to vote for
 	// (according to the definition in https://arxiv.org/abs/1803.05069v6).
@@ -37,7 +37,7 @@ type Forks interface {
 	// Consequently, IsSafeBlock accepts only known, valid blocks. Should a block be
 	// unknown (not previously added to Forks) or violate some consistency requirements,
 	// IsSafeBlock errors. All errors are fatal.
-	IsSafeBlock(block *types.BlockProposal) bool
+	IsSafeBlock(block *types.Block) bool
 
 	// AddBlock adds the block to Forks. This might cause an update of the finalized block
 	// and pruning of older blocks.
@@ -47,7 +47,7 @@ type Forks interface {
 	// (without missing interim ancestors). Otherwise, an error is raised.
 	// When the new block causes the conflicting finalized blocks, it will return
 	// Might error with ErrorByzantineThresholdExceeded (e.g. if finalizing conflicting forks)
-	AddBlock(block *types.BlockProposal) error
+	AddBlock(block *types.Block) error
 
 	// AddQC adds a quorum certificate to Forks.
 	// Will error in case the block referenced by the qc is unknown.
@@ -70,7 +70,7 @@ type Forks interface {
 	// is smaller than the view of any qc ForkChoice has seen.
 	// Note that tracking the view of the newest qc is for safety purposes
 	// and _independent_ of the fork-choice rule.
-	MakeForkChoice(curView uint64) (*types.QCBlock, error)
+	MakeForkChoice(curView uint64) (*types.Block, *types.QuorumCertificate, error)
 }
 
 // ErrorByzantineThresholdExceeded is raised if HotStuff detects malicious conditions which

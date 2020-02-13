@@ -76,7 +76,7 @@ func (p *PubSubDistributor) OnForkChoiceGenerated(curView uint64, selectedQC *ty
 	}
 }
 
-func (p *PubSubDistributor) OnBlockIncorporated(block *types.BlockProposal) {
+func (p *PubSubDistributor) OnBlockIncorporated(block *types.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.blockIncorporatedConsumers {
@@ -84,7 +84,7 @@ func (p *PubSubDistributor) OnBlockIncorporated(block *types.BlockProposal) {
 	}
 }
 
-func (p *PubSubDistributor) OnFinalizedBlock(block *types.BlockProposal) {
+func (p *PubSubDistributor) OnFinalizedBlock(block *types.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.finalizedBlockConsumers {
@@ -92,7 +92,7 @@ func (p *PubSubDistributor) OnFinalizedBlock(block *types.BlockProposal) {
 	}
 }
 
-func (p *PubSubDistributor) OnDoubleProposeDetected(block1, block2 *types.BlockProposal) {
+func (p *PubSubDistributor) OnDoubleProposeDetected(block1, block2 *types.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.doubleProposeDetectedConsumers {
