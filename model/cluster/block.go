@@ -17,7 +17,7 @@ func Genesis() *Block {
 	}
 
 	payload := Payload{
-		Collection: &flow.LightCollection{},
+		Collection: flow.LightCollection{},
 	}
 
 	header.PayloadHash = payload.Hash()
@@ -40,7 +40,7 @@ type Block struct {
 // Payload is the payload for blocks in collection node cluster consensus.
 // It contains only a single collection.
 type Payload struct {
-	Collection *flow.LightCollection
+	Collection flow.LightCollection
 }
 
 // Hash returns the hash of the payload, simply the ID of the collection.
