@@ -42,7 +42,7 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 		// insert block payload
 		err := operation.InsertCollection(&genesis.Payload.Collection)(tx)
 		if err != nil {
-			return fmt.Errorf("could not insert genesis block payload: ")
+			return fmt.Errorf("could not insert genesis block payload: %w", err)
 		}
 
 		// insert block
