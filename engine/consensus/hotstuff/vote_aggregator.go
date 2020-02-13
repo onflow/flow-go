@@ -88,7 +88,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, block *types.Blo
 // StoreProposerVote stores the vote for a block that was proposed.
 func (va *VoteAggregator) StoreProposerVote(vote *types.Vote) {
 	// check if the proposer vote is for a view that has already been pruned (and is thus stale)
-	if vote.View <= va.highestPrunedView { // cannot store vote for already pruned view
+	if va.isStale(vote) { // cannot store vote for already pruned view
 		return
 	}
 	va.proposerVotes[vote.BlockID] = vote
