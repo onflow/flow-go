@@ -93,15 +93,15 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		}
 
 		// get the hash of the latest finalized block
-		var headID flow.Identifier
-		err = operation.RetrieveNumberForCluster(chainID, boundary, &headID)(tx)
+		var lastFinalizedBlockID flow.Identifier
+		err = operation.RetrieveNumberForCluster(chainID, boundary, &lastFinalizedBlockID)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve latest finalized ID: %w", err)
 		}
 
 		// get the header of the parent of the new block
 		var parent flow.Header
-		err = operation.RetrieveHeader(headID, &parent)(tx)
+		err = operation.RetrieveHeader(block.ParentID, &parent)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve latest finalized header: %w", err)
 		}
@@ -113,7 +113,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 		// trace back from new block until we find a block that has the latest
 		// finalized block as its parent
-		for block.ParentID != headID {
+		for block.ParentID != lastFinalizedBlockID {
 
 			// get the parent of current block
 			err = operation.RetrieveHeader(block.ParentID, &block.Header)(tx)
