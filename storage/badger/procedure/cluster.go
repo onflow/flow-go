@@ -40,14 +40,13 @@ func RetrieveClusterBlock(blockID flow.Identifier, block *cluster.Block) func(*b
 		*block = cluster.Block{}
 
 		// retrieve the block header
-		var header flow.Header
-		err := operation.RetrieveHeader(blockID, &header)(tx)
+		err := operation.RetrieveHeader(blockID, &block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header: %w", err)
 		}
 
-		// look up payload
-		err = RetrieveClusterPayload(header.PayloadHash, &block.Payload)(tx)
+		// retrieve payload
+		err = RetrieveClusterPayload(block.PayloadHash, &block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve payload: %w", err)
 		}
@@ -108,8 +107,10 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 func IndexClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
+		// TODO check collection existence
+
 		// index the single collection
-		err := operation.IndexCollection(payload.Hash(), payload.Collection)(tx)
+		err := operation.IndexCollection(payload.Hash(), &payload.Collection)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
 		}
@@ -133,7 +134,7 @@ func RetrieveClusterPayload(payloadHash flow.Identifier, payload *cluster.Payloa
 		}
 
 		// lookup collection
-		err = operation.RetrieveCollection(collectionID, payload.Collection)(tx)
+		err = operation.RetrieveCollection(collectionID, &payload.Collection)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve collection (id=%x): %w", collectionID, err)
 		}
