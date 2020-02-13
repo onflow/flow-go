@@ -88,12 +88,6 @@ type CadenceListener interface {
 	// EnterFullType is called when entering the fullType production.
 	EnterFullType(c *FullTypeContext)
 
-	// EnterReferenceType is called when entering the referenceType production.
-	EnterReferenceType(c *ReferenceTypeContext)
-
-	// EnterNonReferenceType is called when entering the nonReferenceType production.
-	EnterNonReferenceType(c *NonReferenceTypeContext)
-
 	// EnterInnerType is called when entering the innerType production.
 	EnterInnerType(c *InnerTypeContext)
 
@@ -399,12 +393,6 @@ type CadenceListener interface {
 
 	// ExitFullType is called when exiting the fullType production.
 	ExitFullType(c *FullTypeContext)
-
-	// ExitReferenceType is called when exiting the referenceType production.
-	ExitReferenceType(c *ReferenceTypeContext)
-
-	// ExitNonReferenceType is called when exiting the nonReferenceType production.
-	ExitNonReferenceType(c *NonReferenceTypeContext)
 
 	// ExitInnerType is called when exiting the innerType production.
 	ExitInnerType(c *InnerTypeContext)

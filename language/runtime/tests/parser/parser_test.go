@@ -6138,15 +6138,56 @@ func TestParseReferenceType(t *testing.T) {
 	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
-func TestParseInvalidReferenceToOptionalType(t *testing.T) {
+func TestParseOptionalReference(t *testing.T) {
 
 	actual, _, err := parser.ParseProgram(`
        let x: &R? = 1
 	`)
 
-	assert.Nil(t, actual)
+	require.NoError(t, err)
 
-	assert.IsType(t, parser.Error{}, err)
+	expected := &Program{
+		Declarations: []Declaration{
+			&VariableDeclaration{
+				IsConstant: true,
+				Identifier: Identifier{
+					Identifier: "x",
+					Pos:        Position{Offset: 12, Line: 2, Column: 11},
+				},
+				TypeAnnotation: &TypeAnnotation{
+					IsResource: false,
+					Type: &OptionalType{
+						Type: &ReferenceType{
+							Type: &NominalType{
+								Identifier: Identifier{
+									Identifier: "R",
+									Pos:        Position{Offset: 16, Line: 2, Column: 15},
+								},
+							},
+							StartPos: Position{Offset: 15, Line: 2, Column: 14},
+						},
+						EndPos: Position{Offset: 17, Line: 2, Column: 16},
+					},
+					StartPos: Position{Offset: 15, Line: 2, Column: 14},
+				},
+				Transfer: &Transfer{
+					Operation: TransferOperationCopy,
+					Pos:       Position{Offset: 19, Line: 2, Column: 18},
+				},
+				Value: &IntExpression{
+					Value: big.NewInt(1),
+					Base:  10,
+					Range: Range{
+						StartPos: Position{Offset: 21, Line: 2, Column: 20},
+						EndPos:   Position{Offset: 21, Line: 2, Column: 20},
+					},
+				},
+				StartPos: Position{Offset: 8, Line: 2, Column: 7},
+			},
+		},
+	}
+
+	utils.AssertEqualWithDiff(t, expected, actual)
 }
 
 func TestParseRestrictedReferenceTypeWithBaseType(t *testing.T) {
