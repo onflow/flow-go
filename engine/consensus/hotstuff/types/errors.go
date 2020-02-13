@@ -36,7 +36,7 @@ type StaleVoteError struct {
 }
 
 type StaleBlockError struct {
-	BlockProposal     *BlockProposal
+	Block             *Block
 	HighestPrunedView uint64
 }
 
@@ -68,7 +68,7 @@ func (e StaleVoteError) Error() string {
 }
 
 func (e StaleBlockError) Error() string {
-	return fmt.Sprintf("stale block (highest pruned view %d): %v", e.HighestPrunedView, e.BlockProposal)
+	return fmt.Sprintf("stale block (highest pruned view %d): %v", e.HighestPrunedView, e.Block)
 }
 
 func (e ExistingQCError) Error() string {
@@ -83,11 +83,11 @@ func (e *ErrorConfiguration) Error() string { return e.Msg }
 
 type ErrorConflictingQCs struct {
 	View uint64
-	Qcs  []*QuorumCertificate
+	QCs  []*QuorumCertificate
 }
 
 func (e *ErrorConflictingQCs) Error() string {
-	return fmt.Sprintf("%d conflicting QCs at view %d", len(e.Qcs), e.View)
+	return fmt.Sprintf("%d conflicting QCs at view %d", len(e.QCs), e.View)
 }
 
 type ErrorMissingBlock struct {

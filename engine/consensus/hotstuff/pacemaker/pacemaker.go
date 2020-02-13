@@ -6,7 +6,6 @@ import (
 
 	"go.uber.org/atomic"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/pacemaker/timeout"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
@@ -20,7 +19,7 @@ type FlowPaceMaker struct {
 	started        *atomic.Bool
 }
 
-func NewFlowPaceMaker(startView uint64, timeoutController *timeout.Controller, notifier notifications.Consumer) (hotstuff.PaceMaker, error) {
+func NewFlowPaceMaker(startView uint64, timeoutController *timeout.Controller, notifier notifications.Consumer) (*FlowPaceMaker, error) {
 	if startView < 1 {
 		return nil, &types.ErrorConfiguration{Msg: "Please start PaceMaker with view > 0. (View 0 is reserved for genesis block, which has no proposer)"}
 	}
@@ -74,10 +73,10 @@ func (p *FlowPaceMaker) UpdateCurViewWithQC(qc *types.QuorumCertificate) (*types
 	return p.gotoView(qc.View + 1), true
 }
 
-func (p *FlowPaceMaker) UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
+func (p *FlowPaceMaker) UpdateCurViewWithBlock(block *types.Block, isLeaderForNextView bool) (*types.NewViewEvent, bool) {
 	// use block's QC to fast-forward if possible
-	newViewOnQc, newViewOccurredOnQc := p.UpdateCurViewWithQC(block.QC())
-	if block.View() != p.currentView {
+	newViewOnQc, newViewOccurredOnQc := p.UpdateCurViewWithQC(block.QC)
+	if block.View != p.currentView {
 		return newViewOnQc, newViewOccurredOnQc
 	}
 	// block is for current view

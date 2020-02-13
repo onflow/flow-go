@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
-	vmmock "github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine/mock"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -14,8 +14,6 @@ import (
 
 func TestBlockContext_ExecuteTransaction(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
-
-	ledger := &vmmock.Ledger{}
 
 	h := unittest.BlockHeaderFixture()
 
@@ -31,6 +29,8 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
                 }
             `),
 		}
+
+		ledger := make(virtualmachine.MapLedger)
 
 		result, err := bc.ExecuteTransaction(ledger, tx)
 
@@ -60,18 +60,63 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
             `),
 		}
 
+		ledger := make(virtualmachine.MapLedger)
+
 		result, err := bc.ExecuteTransaction(ledger, tx)
 
 		assert.NoError(t, err)
 		assert.False(t, result.Succeeded())
 		assert.Error(t, result.Error)
 	})
+
+	t.Run("transaction logs", func(t *testing.T) {
+		tx := &flow.TransactionBody{
+			Script: []byte(`
+                transaction {
+                  execute {
+				    log("foo")
+				    log("bar")
+				  }
+                }
+            `),
+		}
+
+		ledger := make(virtualmachine.MapLedger)
+
+		result, err := bc.ExecuteTransaction(ledger, tx)
+		assert.NoError(t, err)
+
+		require.Len(t, result.Logs, 2)
+		assert.Equal(t, "\"foo\"", result.Logs[0])
+		assert.Equal(t, "\"bar\"", result.Logs[1])
+	})
+
+	t.Run("transaction events", func(t *testing.T) {
+		tx := &flow.TransactionBody{
+			Script: []byte(`
+                transaction {
+                  execute {
+				    Account([], [])
+				  }
+                }
+            `),
+		}
+
+		ledger := make(virtualmachine.MapLedger)
+
+		result, err := bc.ExecuteTransaction(ledger, tx)
+		assert.NoError(t, err)
+
+		assert.True(t, result.Succeeded())
+		assert.NoError(t, result.Error)
+
+		require.Len(t, result.Events, 1)
+		assert.EqualValues(t, "flow.AccountCreated", result.Events[0].Type.ID())
+	})
 }
 
 func TestBlockContext_ExecuteScript(t *testing.T) {
 	rt := runtime.NewInterpreterRuntime()
-
-	ledger := &vmmock.Ledger{}
 
 	h := unittest.BlockHeaderFixture()
 
@@ -84,6 +129,8 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 				return 42
 			}
 		`)
+
+		ledger := make(virtualmachine.MapLedger)
 
 		result, err := bc.ExecuteScript(ledger, script)
 		assert.NoError(t, err)
@@ -98,10 +145,31 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 			}
 		`)
 
+		ledger := make(virtualmachine.MapLedger)
+
 		result, err := bc.ExecuteScript(ledger, script)
 
 		assert.NoError(t, err)
 		assert.False(t, result.Succeeded())
 		assert.Error(t, result.Error)
+	})
+
+	t.Run("script logs", func(t *testing.T) {
+		script := []byte(`
+			pub fun main(): Int {
+				log("foo")
+				log("bar")
+				return 42
+			}
+		`)
+
+		ledger := make(virtualmachine.MapLedger)
+
+		result, err := bc.ExecuteScript(ledger, script)
+		assert.NoError(t, err)
+
+		require.Len(t, result.Logs, 2)
+		assert.Equal(t, "\"foo\"", result.Logs[0])
+		assert.Equal(t, "\"bar\"", result.Logs[1])
 	})
 }

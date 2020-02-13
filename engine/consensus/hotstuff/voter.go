@@ -1,8 +1,6 @@
 package hotstuff
 
 import (
-	"fmt"
-
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -11,11 +9,10 @@ import (
 
 // Voter produces votes for the given block
 type Voter struct {
-	signer    Signer
-	viewState *ViewState
-	forks     Forks
-	// Need to keep track of the last view we voted for so we don't double vote accidentally
-	lastVotedView uint64
+	signer        Signer
+	viewState     *ViewState
+	forks         Forks
+	lastVotedView uint64 // need to keep track of the last view we voted for so we don't double vote accidentally
 	log           zerolog.Logger
 }
 
@@ -37,14 +34,14 @@ func (v *Voter) NewVoter(signer Signer, viewState *ViewState, forks Forks, log z
 // This method will only ever _once_ return a `non-nil, true` vote: the very first time it encounters a safe block of the
 //  current view to vote for. Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
 // (including repeated calls with the initial block we voted for also return `nil, false`).
-func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*types.Vote, bool) {
-	if v.forks.IsSafeBlock(bp) {
+func (v *Voter) ProduceVoteIfVotable(block *types.Block, curView uint64) (*types.Vote, bool) {
+	if v.forks.IsSafeBlock(block) {
 		log.Info().Msg("received block is not a safe node, don't vote")
 		return nil, false
 	}
 
-	if curView != bp.Block.View {
-		log.Info().Uint64("view", bp.Block.View).Uint64("curView", curView).
+	if curView != block.View {
+		log.Info().Uint64("view", block.View).Uint64("curView", curView).
 			Msg("received block's view is not our current view, don't vote")
 		return nil, false
 	}
@@ -55,18 +52,10 @@ func (v *Voter) ProduceVoteIfVotable(bp *types.BlockProposal, curView uint64) (*
 		return nil, false
 	}
 
-	vote, err := v.produceVote(bp)
+	vote, err := v.signer.VoteFor(block)
 	if err != nil {
 		return nil, false
 	}
-	return vote, true
-}
 
-func (v *Voter) produceVote(bp *types.BlockProposal) (*types.Vote, error) {
-	unsignedVote := types.NewUnsignedVote(bp.Block.View, bp.BlockID())
-	vote, err := v.signer.SignVote(unsignedVote)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign the vote (blockID: %v, view: %v): %w", unsignedVote.BlockID, unsignedVote.View, err)
-	}
-	return vote, nil
+	return vote, true
 }

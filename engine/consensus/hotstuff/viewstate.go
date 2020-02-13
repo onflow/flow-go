@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -14,6 +15,28 @@ type ViewState struct {
 	myID flow.Identifier
 	// identityFilter to find only the consensus members for the cluster
 	consensusMembersFilter flow.IdentityFilter
+	// the cached all consensus members for finding leaders for a certain view
+	allNodes flow.IdentityList
+}
+
+// NewViewState creates a new ViewState instance
+func NewViewState(protocolState protocol.State, myID flow.Identifier, consensusMembersFilter flow.IdentityFilter) (*ViewState, error) {
+	// finding all consensus members
+	allNodes, err := protocolState.Final().Identities(consensusMembersFilter)
+	if err != nil {
+		return nil, fmt.Errorf("cannot find all consensus member nodes when initializing ViewState: %w", err)
+	}
+
+	if len(allNodes) == 0 {
+		return nil, fmt.Errorf("require non-empty consensus member nodes to initialize ViewState")
+	}
+
+	return &ViewState{
+		protocolState:          protocolState,
+		myID:                   myID,
+		consensusMembersFilter: consensusMembersFilter,
+		allNodes:               allNodes,
+	}, nil
 }
 
 // IsSelf returns if the given nodeID is myself
@@ -47,7 +70,14 @@ func (v *ViewState) GetQCStakeThresholdAtBlock(blockID flow.Identifier) (uint64,
 
 // LeaderForView returns the identity of the leader at given view
 func (v *ViewState) LeaderForView(view uint64) *flow.Identity {
-	panic("TODO")
+	leader := roundRobin(v.allNodes, view)
+	return leader
+}
+
+// Selects Leader in Round-Robin fashion. NO support for Epochs.
+func roundRobin(nodes flow.IdentityList, view uint64) *flow.Identity {
+	leaderIndex := int(view) % int(nodes.Count())
+	return nodes.Get(uint(leaderIndex))
 }
 
 // ComputeStakeThresholdForBuildingQC returns the threshold to determine how much stake are needed for building a QC
