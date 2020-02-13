@@ -7,9 +7,11 @@ import (
 
 // A TransactionResult is the result of executing a transaction.
 type TransactionResult struct {
-	TxID    flow.Identifier
-	Error   error
-	GasUsed uint64
+	TransactionID flow.Identifier
+	Events        []runtime.Event
+	Logs          []string
+	Error         error
+	GasUsed       uint64
 }
 
 func (r TransactionResult) Succeeded() bool {
@@ -20,6 +22,8 @@ func (r TransactionResult) Succeeded() bool {
 type ScriptResult struct {
 	ScriptID flow.Identifier
 	Value    runtime.Value
+	Events   []runtime.Event
+	Logs     []string
 	Error    error
 }
 

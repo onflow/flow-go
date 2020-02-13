@@ -68,8 +68,9 @@ func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx *flow.TransactionBo
 		if errors.As(err, &runtime.Error{}) {
 			// runtime errors occur when the execution reverts
 			return &TransactionResult{
-				TxID:  txID,
-				Error: err,
+				TransactionID: txID,
+				Error:         err,
+				Logs:          ctx.Logs(),
 			}, nil
 		}
 
@@ -78,8 +79,10 @@ func (bc *blockContext) ExecuteTransaction(ledger Ledger, tx *flow.TransactionBo
 	}
 
 	return &TransactionResult{
-		TxID:  txID,
-		Error: nil,
+		TransactionID: txID,
+		Error:         nil,
+		Events:        ctx.Events(),
+		Logs:          ctx.Logs(),
 	}, nil
 }
 
@@ -97,6 +100,7 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 			return &ScriptResult{
 				ScriptID: flow.HashToID(scriptHash),
 				Error:    err,
+				Logs:     ctx.Logs(),
 			}, nil
 		}
 
@@ -106,5 +110,7 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 	return &ScriptResult{
 		ScriptID: flow.HashToID(scriptHash),
 		Value:    value,
+		Events:   ctx.Events(),
+		Logs:     ctx.Logs(),
 	}, nil
 }
