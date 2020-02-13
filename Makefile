@@ -139,23 +139,43 @@ docker-ci-team-city:
 
 .PHONY: docker-build-collection
 docker-build-collection:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=collection \
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=collection --target production \
 		-t gcr.io/dl-flow/collection:latest -t "gcr.io/dl-flow/collection:$(SHORT_COMMIT)" -t gcr.io/dl-flow/collection:$(IMAGE_TAG) .
+
+.PHONY: docker-build-collection-debug
+docker-build-collection-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=collection --target debug \
+		-t gcr.io/dl-flow/collection-debug:latest -t "gcr.io/dl-flow/collection-debug:$(SHORT_COMMIT)" -t gcr.io/dl-flow/collection-debug:$(IMAGE_TAG) .
 
 .PHONY: docker-build-consensus
 docker-build-consensus:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=consensus \
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=consensus --target production \
 		-t gcr.io/dl-flow/consensus:latest -t "gcr.io/dl-flow/consensus:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/consensus:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-consensus-debug
+docker-build-consensus-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=consensus --target debug \
+		-t gcr.io/dl-flow/consensus-debug:latest -t "gcr.io/dl-flow/consensus-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/consensus-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-execution
 docker-build-execution:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=execution \
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=execution --target production \
 		-t gcr.io/dl-flow/execution:latest -t "gcr.io/dl-flow/execution:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/execution:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-execution-debug
+docker-build-execution-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=execution --target debug \
+		-t gcr.io/dl-flow/execution-debug:latest -t "gcr.io/dl-flow/execution-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/execution-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-verification
 docker-build-verification:
-	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification \
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification --target production \
 		-t gcr.io/dl-flow/verification:latest -t "gcr.io/dl-flow/verification:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification:$(IMAGE_TAG)" .
+
+.PHONY: docker-build-verification-debug
+docker-build-verification-debug:
+	docker build --ssh default -f cmd/Dockerfile --build-arg TARGET=verification --target debug \
+		-t gcr.io/dl-flow/verification-debug:latest -t "gcr.io/dl-flow/verification-debug:$(SHORT_COMMIT)" -t "gcr.io/dl-flow/verification-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-flow
 docker-build-flow: docker-build-collection docker-build-consensus docker-build-execution docker-build-verification
