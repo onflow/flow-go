@@ -110,7 +110,6 @@ func (bc *blockContext) ExecuteScript(ledger Ledger, script []byte) (*ScriptResu
 	return &ScriptResult{
 		ScriptID: flow.HashToID(scriptHash),
 		Value:    value,
-		Events:   ctx.Events(),
 		Logs:     ctx.Logs(),
 	}, nil
 }

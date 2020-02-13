@@ -22,7 +22,6 @@ func (r TransactionResult) Succeeded() bool {
 type ScriptResult struct {
 	ScriptID flow.Identifier
 	Value    runtime.Value
-	Events   []runtime.Event
 	Logs     []string
 	Error    error
 }
