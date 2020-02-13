@@ -51,12 +51,15 @@ endif
 	GO111MODULE=on go get github.com/kevinburke/go-bindata/...@v3.11.0;
 
 .PHONY: test
-test: generate-mocks
+test:
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	$(MAKE) -C crypto test
 	$(MAKE) -C language test
 	$(MAKE) -C integration test
+
+.PHONY: test-safe
+test-safe: generate-mocks test
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -117,7 +120,7 @@ lint:
 	golangci-lint run -v ./...
 
 .PHONY: ci
-ci: install-tools tidy lint test coverage
+ci: install-tools tidy lint test-safe coverage
 
 .PHONY: docker-ci
 docker-ci:
