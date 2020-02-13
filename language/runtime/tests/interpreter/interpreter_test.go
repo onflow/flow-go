@@ -7354,3 +7354,116 @@ func TestInterpretNonStorageReferenceAfterDestruction(t *testing.T) {
 
 	assert.IsType(t, &interpreter.DestroyedCompositeError{}, err)
 }
+
+func TestInterpretHexDecode(t *testing.T) {
+
+	expected := interpreter.NewArrayValueUnownedNonCopying(
+		interpreter.NewIntValue(71),
+		interpreter.NewIntValue(111),
+		interpreter.NewIntValue(32),
+		interpreter.NewIntValue(87),
+		interpreter.NewIntValue(105),
+		interpreter.NewIntValue(116),
+		interpreter.NewIntValue(104),
+		interpreter.NewIntValue(32),
+		interpreter.NewIntValue(116),
+		interpreter.NewIntValue(104),
+		interpreter.NewIntValue(101),
+		interpreter.NewIntValue(32),
+		interpreter.NewIntValue(70),
+		interpreter.NewIntValue(108),
+		interpreter.NewIntValue(111),
+		interpreter.NewIntValue(119),
+	)
+
+	t.Run("in Cadence", func(t *testing.T) {
+
+		standardLibraryFunctions :=
+			stdlib.StandardLibraryFunctions{
+				stdlib.PanicFunction,
+			}
+
+		valueDeclarations := standardLibraryFunctions.ToValueDeclarations()
+		predefinedValues := standardLibraryFunctions.ToValues()
+
+		inter := parseCheckAndInterpretWithOptions(t,
+			`
+              fun hexDecode(_ s: String): [Int] {
+                  if s.length % 2 != 0 {
+                      panic("Input must have even number of characters")
+                  }
+                  let table = {
+                          "0" : 0,
+                          "1" : 1,
+                          "2" : 2,
+                          "3" : 3,
+                          "4" : 4,
+                          "5" : 5,
+                          "6" : 6,
+                          "7" : 7,
+                          "8" : 8,
+                          "9" : 9,
+                          "a" : 10,
+                          "A" : 10,
+                          "b" : 11,
+                          "B" : 11,
+                          "c" : 12,
+                          "C" : 12,
+                          "d" : 13,
+                          "D" : 13,
+                          "e" : 14,
+                          "E" : 14,
+                          "f" : 15,
+                          "F" : 15
+                      }
+                  let length = s.length / 2
+                  var i = 0
+                  var res: [Int] = []
+                  while i < length {
+                      let c = s.slice(from: i*2, upTo: i*2+1)
+                      let in = table[c] ?? panic("Invalid character ".concat(c))
+                      let c2 = s.slice(from: i*2+1, upTo: i*2+2)
+                      let in2 = table[c2] ?? panic("Invalid character ".concat(c2))
+                      res.append(16 * in + in2)
+                      i = i+1
+                  }
+                  return res
+              }
+
+              fun test(): [Int] {
+                  return hexDecode("476F20576974682074686520466C6F77")
+              }
+            `,
+			ParseCheckAndInterpretOptions{
+				CheckerOptions: []sema.Option{
+					sema.WithPredeclaredValues(valueDeclarations),
+				},
+				Options: []interpreter.Option{
+					interpreter.WithPredefinedValues(predefinedValues),
+				},
+			},
+		)
+
+		result, err := inter.Invoke("test")
+		require.NoError(t, err)
+
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("native", func(t *testing.T) {
+
+		inter := parseCheckAndInterpret(t,
+			`
+              fun test(): [Int] {
+                  return "476F20576974682074686520466C6F77".decodeHex()
+              }
+            `,
+		)
+
+		result, err := inter.Invoke("test")
+		require.NoError(t, err)
+
+		assert.Equal(t, expected, result)
+	})
+
+}

@@ -203,7 +203,7 @@ func (r *ReactorCore) updateFinalisedBlockQc(block *BlockContainer) {
 }
 
 // finalizeUpToBlock finalizes all block up to (and including) the block pointed to by `blockQC`.
-// Finalization starts with the child of `LastFinalizedBlockQC` (explicitly checked);
+// Finalization starts with the child of `lastFinalizedBlockQC` (explicitly checked);
 // and calls OnFinalizedBlock
 func (r *ReactorCore) finalizeUpToBlock(blockQC *def.QuorumCertificate) {
 	if blockQC.View <= r.LastFinalizedBlockQC.View {
