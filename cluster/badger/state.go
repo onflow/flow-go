@@ -8,11 +8,15 @@ import (
 )
 
 type State struct {
-	db *badger.DB
+	db      *badger.DB
+	chainID string
 }
 
-func NewState(db *badger.DB) (*State, error) {
-	state := &State{db: db}
+func NewState(db *badger.DB, chainID string) (*State, error) {
+	state := &State{
+		db:      db,
+		chainID: chainID,
+	}
 	return state, nil
 }
 
