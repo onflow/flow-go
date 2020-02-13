@@ -4,7 +4,7 @@ import "github.com/dapperlabs/flow-go/model/flow"
 
 type BlockProposal struct {
 	Block     *Block
-	Signature *flow.PartialSignature // this is sign(Block)
+	Signature *flow.PartialSignature
 }
 
 func NewBlockProposal(block *Block, sig *flow.PartialSignature) *BlockProposal {
@@ -18,3 +18,7 @@ func (b *BlockProposal) QC() *QuorumCertificate   { return b.Block.QC }
 func (b *BlockProposal) View() uint64             { return b.Block.View }
 func (b *BlockProposal) BlockID() flow.Identifier { return b.Block.BlockID }
 func (b *BlockProposal) Height() uint64           { return b.Block.Height }
+
+func (b *BlockProposal) ProposersVote() *Vote {
+	panic("TODO")
+}

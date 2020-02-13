@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state/mocks"
+	state "github.com/dapperlabs/flow-go/engine/execution/state/mock"
 	sync "github.com/dapperlabs/flow-go/engine/execution/sync/mock"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -19,7 +18,7 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
+func TestProviderEngine_ProcessExecutionResult(t *testing.T) {
 	targetIDs := flow.IdentityList{
 		unittest.IdentityFixture(func(id *flow.Identity) {
 			id.Role = flow.RoleConsensus
@@ -32,43 +31,41 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 	result := unittest.ComputationResultFixture()
 
 	t.Run("failed to load identities", func(t *testing.T) {
-		state := &protocol.State{}
+		protocolState := &protocol.State{}
 		ss := &protocol.Snapshot{}
 		con := &network.Conduit{}
 		me := &module.Local{}
 		stateSync := &sync.StateSynchronizer{}
 
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-
-		execState := mocks.NewMockExecutionState(ctrl)
+		execState := new(state.ExecutionState)
 		me.On("NodeID").Return(flow.ZeroID)
 
 		e := Engine{
-			state:      state,
+			state:      protocolState,
 			receiptCon: con,
 			me:         me,
 			execState:  execState,
 			stateSync:  stateSync,
 		}
 
-		state.On("Final").Return(ss)
+		protocolState.On("Final").Return(ss)
 		ss.On("Identities", mock.Anything, mock.Anything).
 			Return(nil, fmt.Errorf("identity error"))
 		stateSync.On("PersistDelta", mock.Anything, mock.Anything).Return(nil)
 
-		execState.EXPECT().CommitDelta(gomock.Any()).Times(len(result.StateViews))
-		execState.EXPECT().PersistChunkHeader(gomock.Any()).Return(nil).Times(len(result.StateViews))
+		execState.On("CommitDelta", mock.Anything).Return(nil, nil).Times(len(result.StateViews))
+		execState.On("PersistChunkHeader", mock.Anything).Return(nil).Times(len(result.StateViews))
 
 		err := e.onExecutionResult(e.me.NodeID(), result)
 		assert.Error(t, err)
 
-		state.AssertExpectations(t)
+		protocolState.AssertExpectations(t)
 		ss.AssertExpectations(t)
+		execState.AssertExpectations(t)
 	})
 
 	t.Run("failed to broadcast", func(t *testing.T) {
-		state := &protocol.State{}
+		protocolState := &protocol.State{}
 		ss := &protocol.Snapshot{}
 		con := &network.Conduit{}
 		me := &module.Local{}
@@ -77,21 +74,20 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		me.On("NodeID").Return(flow.ZeroID)
 		stateSync.On("PersistDelta", mock.Anything, mock.Anything).Return(nil)
 
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		execState := mocks.NewMockExecutionState(ctrl)
-		execState.EXPECT().CommitDelta(gomock.Any()).Times(len(result.StateViews))
-		execState.EXPECT().PersistChunkHeader(gomock.Any()).Return(nil).Times(len(result.StateViews))
+		execState := new(state.ExecutionState)
+
+		execState.On("CommitDelta", mock.Anything).Return(nil, nil).Times(len(result.StateViews))
+		execState.On("PersistChunkHeader", mock.Anything).Return(nil).Times(len(result.StateViews))
 
 		e := Engine{
-			state:      state,
+			state:      protocolState,
 			receiptCon: con,
 			me:         me,
 			execState:  execState,
 			stateSync:  stateSync,
 		}
 
-		state.On("Final").Return(ss)
+		protocolState.On("Final").Return(ss)
 		ss.On("Identities", mock.Anything, mock.Anything).Return(targetIDs, nil)
 		con.On(
 			"Submit",
@@ -104,9 +100,10 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		err := e.onExecutionResult(e.me.NodeID(), result)
 		assert.Error(t, err)
 
-		state.AssertExpectations(t)
+		protocolState.AssertExpectations(t)
 		ss.AssertExpectations(t)
 		con.AssertExpectations(t)
+		execState.AssertExpectations(t)
 	})
 
 	t.Run("non-local engine", func(t *testing.T) {
@@ -121,7 +118,7 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
-		state := &protocol.State{}
+		protocolState := &protocol.State{}
 		ss := &protocol.Snapshot{}
 		con := &network.Conduit{}
 		me := &module.Local{}
@@ -130,19 +127,17 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		me.On("NodeID").Return(flow.ZeroID)
 		stateSync.On("PersistDelta", mock.Anything, mock.Anything).Return(nil)
 
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		execState := mocks.NewMockExecutionState(ctrl)
+		execState := new(state.ExecutionState)
 
 		e := Engine{
-			state:      state,
+			state:      protocolState,
 			receiptCon: con,
 			me:         me,
 			execState:  execState,
 			stateSync:  stateSync,
 		}
 
-		state.On("Final").Return(ss)
+		protocolState.On("Final").Return(ss)
 		ss.On("Identities", mock.Anything, mock.Anything).Return(targetIDs, nil)
 		con.On(
 			"Submit",
@@ -157,27 +152,26 @@ func TestExecutionReceiptProviderEngine_ProcessExecutionResult(t *testing.T) {
 		}).
 			Return(nil)
 
-		execState.EXPECT().CommitDelta(gomock.Any()).Times(len(result.StateViews))
-		execState.EXPECT().PersistChunkHeader(gomock.Any()).Return(nil).Times(len(result.StateViews))
-		execState.EXPECT().PersistStateCommitment(gomock.Eq(result.CompleteBlock.Block.ID()), gomock.Any())
+		execState.On("CommitDelta", mock.Anything).Return(nil, nil).Times(len(result.StateViews))
+		execState.On("PersistChunkHeader", mock.Anything).Return(nil).Times(len(result.StateViews))
+		execState.On("PersistStateCommitment", result.CompleteBlock.Block.ID(), mock.Anything).Return(nil)
 
 		err := e.onExecutionResult(e.me.NodeID(), result)
 		assert.NoError(t, err)
 
-		state.AssertExpectations(t)
+		protocolState.AssertExpectations(t)
 		ss.AssertExpectations(t)
 		con.AssertExpectations(t)
+		execState.AssertExpectations(t)
 	})
 }
 
-func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
+func TestProviderEngine_OnExecutionStateRequest(t *testing.T) {
 	t.Run("non-verification engine", func(t *testing.T) {
 		ps := new(protocol.State)
 		ss := new(protocol.Snapshot)
 
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		execState := mocks.NewMockExecutionState(ctrl)
+		execState := new(state.ExecutionState)
 
 		e := Engine{state: ps, execState: execState}
 
@@ -196,16 +190,14 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
+		execState.AssertExpectations(t)
 	})
 
 	t.Run("non-existent chunk", func(t *testing.T) {
 		ps := new(protocol.State)
 		ss := new(protocol.Snapshot)
-		//es := new(state.ExecutionState)
 
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		execState := mocks.NewMockExecutionState(ctrl)
+		execState := new(state.ExecutionState)
 
 		e := Engine{state: ps, execState: execState}
 
@@ -215,8 +207,7 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
-		//es.On("GetChunkRegisters", chunkID).Return(nil, fmt.Errorf("state error"))
-		execState.EXPECT().GetChunkRegisters(gomock.Eq(chunkID)).Return(nil, fmt.Errorf("state error"))
+		execState.On("GetChunkRegisters", chunkID).Return(nil, fmt.Errorf("state error"))
 
 		req := &messages.ExecutionStateRequest{ChunkID: chunkID}
 
@@ -225,7 +216,7 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
-		//es.AssertExpectations(t)
+		execState.AssertExpectations(t)
 	})
 
 	t.Run("success", func(t *testing.T) {
@@ -233,9 +224,7 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 		ss := new(protocol.Snapshot)
 		con := new(network.Conduit)
 
-		ctrl := gomock.NewController(t)
-		defer ctrl.Finish()
-		execState := mocks.NewMockExecutionState(ctrl)
+		execState := new(state.ExecutionState)
 
 		e := Engine{state: ps, execStateCon: con, execState: execState}
 
@@ -255,7 +244,6 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
-		//es.On("GetChunkRegisters", chunkID).Return(expectedRegisters, nil)
 		con.On("Submit", mock.Anything, originIdentity.NodeID).
 			Run(func(args mock.Arguments) {
 				res, ok := args[0].(*messages.ExecutionStateResponse)
@@ -269,7 +257,7 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 			}).
 			Return(nil)
 
-		execState.EXPECT().GetChunkRegisters(gomock.Eq(chunkID)).Return(expectedRegisters, nil)
+		execState.On("GetChunkRegisters", chunkID).Return(expectedRegisters, nil)
 
 		req := &messages.ExecutionStateRequest{ChunkID: chunkID}
 
@@ -278,7 +266,7 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
-		//es.AssertExpectations(t)
 		con.AssertExpectations(t)
+		execState.AssertExpectations(t)
 	})
 }

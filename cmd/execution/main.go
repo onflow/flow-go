@@ -4,13 +4,13 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/engine/execution/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/computation"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	"github.com/dapperlabs/flow-go/engine/execution/provider"
 	"github.com/dapperlabs/flow-go/engine/execution/rpc"
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/language/runtime"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/storage"
@@ -25,7 +25,7 @@ func main() {
 		stateCommitments storage.Commits
 		ledgerStorage    storage.Ledger
 		receiptsEng      *provider.Engine
-		executionEng     *execution.Engine
+		executionEng     *computation.Engine
 		ingestionEng     *ingestion.Engine
 		rpcConf          rpc.Config
 		err              error
@@ -74,7 +74,7 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 
-			executionEng, err = execution.New(
+			executionEng, err = computation.New(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -91,6 +91,7 @@ func main() {
 
 			blocks := badger.NewBlocks(node.DB)
 			collections := badger.NewCollections(node.DB)
+			payloads := badger.NewPayloads(node.DB)
 
 			ingestionEng, err = ingestion.New(
 				node.Logger,
@@ -98,6 +99,7 @@ func main() {
 				node.Me,
 				node.State,
 				blocks,
+				payloads,
 				collections,
 				executionEng,
 				executionState,

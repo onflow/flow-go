@@ -11,12 +11,14 @@ const (
 	CollectionProvider = 10
 	CollectionIngest   = 11
 	CollectionProposal = 12
+	ClusterConsensus   = 20
 
 	// Observation 030-049
 
 	// Consensus 050-099
-	BlockProvider    = 50
-	BlockPropagation = 51
+	BlockProvider     = 50
+	BlockPropagation  = 51
+	ProtocolConsensus = 60
 
 	// Execution 100-199
 	ReceiptProvider        = 100

@@ -12,11 +12,11 @@ import (
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
-	"github.com/dapperlabs/flow-go/engine/execution/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/computation"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
@@ -162,6 +162,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	node := GenericNode(t, hub, identity, identities)
 
 	blocksStorage := storage.NewBlocks(node.DB)
+	payloadsStorage := storage.NewPayloads(node.DB)
 	collectionsStorage := storage.NewCollections(node.DB)
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
@@ -191,7 +192,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	require.NoError(t, err)
 
-	execEngine, err := execution.New(
+	execEngine, err := computation.New(
 		node.Log,
 		node.Net,
 		node.Me,
@@ -201,7 +202,16 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	)
 	require.NoError(t, err)
 
-	blocksEngine, err := ingestion.New(node.Log, node.Net, node.Me, node.State, blocksStorage, collectionsStorage, execEngine, execState)
+	blocksEngine, err := ingestion.New(node.Log,
+		node.Net,
+		node.Me,
+		node.State,
+		blocksStorage,
+		payloadsStorage,
+		collectionsStorage,
+		execEngine,
+		execState,
+	)
 	require.NoError(t, err)
 
 	return mock.ExecutionNode{

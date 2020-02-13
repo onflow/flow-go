@@ -24,7 +24,7 @@ func InsertPayload(payload *flow.Payload) func(*badger.Txn) error {
 
 		// insert the block guarantees
 		for _, guarantee := range payload.Guarantees {
-			err := operation.InsertGuarantee(guarantee)(tx)
+			err := operation.AllowDuplicates(operation.InsertGuarantee(guarantee))(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert guarantee (%x): %w", guarantee.CollectionID, err)
 			}
@@ -32,7 +32,7 @@ func InsertPayload(payload *flow.Payload) func(*badger.Txn) error {
 
 		// insert the block seals
 		for _, seal := range payload.Seals {
-			err := operation.InsertSeal(seal)(tx)
+			err := operation.AllowDuplicates(operation.InsertSeal(seal))(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert seal (%x): %w", seal.ID(), err)
 			}

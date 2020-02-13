@@ -8,7 +8,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/engine"
 	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/execution/sync"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -19,7 +19,8 @@ import (
 	"github.com/dapperlabs/flow-go/utils/logging"
 )
 
-// An Engine provides means of accessing data about execution state. Also broadcasts execution receipts to nodes in the network and
+// An Engine provides means of accessing data about execution state and broadcasts execution receipts to nodes in the network.
+// Also generates and saves execution receipts
 type Engine struct {
 	unit         *engine.Unit
 	log          zerolog.Logger
