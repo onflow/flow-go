@@ -254,7 +254,12 @@ func (r *Finalizer) getNextAncestryLevel(block *types.Block) (*forks.BlockQC, er
 	if !parentBlockKnown {
 		return nil, &types.ErrorMissingBlock{View: block.QC.View, BlockID: block.QC.BlockID}
 	}
-	blockQC := forks.BlockQC{Block: parentVertex.(*BlockContainer).Block, QC: block.QC}
+	newBlock := parentVertex.(*BlockContainer).Block
+	if newBlock.BlockID != block.QC.BlockID || newBlock.View != block.QC.View {
+		return nil, fmt.Errorf("mismatch between finalized block and QC")
+	}
+
+	blockQC := forks.BlockQC{Block: newBlock, QC: block.QC}
 
 	return &blockQC, nil
 }
