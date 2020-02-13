@@ -1,4 +1,4 @@
-package forkchoice
+package forks
 
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
@@ -20,5 +20,5 @@ type ForkChoice interface {
 	// Error return indicates incorrect usage. Processing a QC with view v
 	// should result in the PaceMaker being in view v+1 or larger. Hence, given
 	// that the current View is curView, all QCs should have view < curView
-	MakeForkChoice(curView uint64) (*types.QCBlock, error)
+	MakeForkChoice(curView uint64) (*types.Block, *types.QuorumCertificate, error)
 }
