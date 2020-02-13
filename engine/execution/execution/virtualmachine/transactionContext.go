@@ -78,7 +78,7 @@ func (r *transactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address
 		return runtime.Address{}, err
 	}
 
-	r.ledger.Set(keyLatestAccount, accountID)
+	r.ledger.Set(fullKeyHash("", "", keyLatestAccount), accountID)
 
 	r.Log("Creating new account\n")
 	r.Log(fmt.Sprintf("Address: %x", accountAddress))
@@ -315,10 +315,10 @@ const (
 func fullKey(owner, controller, key string) string {
 	return strings.Join([]string{owner, controller, key}, "__")
 }
-func fullKeyHash(owner, controller, key string) string {
+func fullKeyHash(owner, controller, key string) flow.RegisterID {
 	h := sha256.New()
 	_, _ = h.Write([]byte(fullKey(owner, controller, key)))
-	return string(h.Sum(nil))
+	return h.Sum(nil)
 }
 
 func keyPublicKey(index int) string {

@@ -10,16 +10,16 @@ type Ledger struct {
 }
 
 // Delete provides a mock function with given fields: key
-func (_m *Ledger) Delete(key string) {
+func (_m *Ledger) Delete(key []byte) {
 	_m.Called(key)
 }
 
 // Get provides a mock function with given fields: key
-func (_m *Ledger) Get(key string) ([]byte, error) {
+func (_m *Ledger) Get(key []byte) ([]byte, error) {
 	ret := _m.Called(key)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(string) []byte); ok {
+	if rf, ok := ret.Get(0).(func([]byte) []byte); ok {
 		r0 = rf(key)
 	} else {
 		if ret.Get(0) != nil {
@@ -28,7 +28,7 @@ func (_m *Ledger) Get(key string) ([]byte, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
+	if rf, ok := ret.Get(1).(func([]byte) error); ok {
 		r1 = rf(key)
 	} else {
 		r1 = ret.Error(1)
@@ -38,6 +38,6 @@ func (_m *Ledger) Get(key string) ([]byte, error) {
 }
 
 // Set provides a mock function with given fields: key, value
-func (_m *Ledger) Set(key string, value []byte) {
+func (_m *Ledger) Set(key []byte, value []byte) {
 	_m.Called(key, value)
 }
