@@ -43,14 +43,14 @@ func (vs *VotingStatus) CanBuildQC() bool {
 	return vs.accumulatedStake >= vs.thresholdStake
 }
 
-func (vs *VotingStatus) TryBuildQC() (*types.QuorumCertificate, error) {
+func (vs *VotingStatus) TryBuildQC() (*types.QuorumCertificate, bool, error) {
 	sigs := vs.getSigsSliceFromVotes()
-	if !vs.CanBuildQC() {
-		return nil, fmt.Errorf("could not build QC: %w", types.ErrInsufficientVotes)
-	}
 	aggregatedSig, err := FromSignatures(sigs, vs.signerCount)
 	if err != nil {
-		return nil, fmt.Errorf("could not build QC: %w", err)
+		return nil, false, fmt.Errorf("could not build QC: %w", err)
+	}
+	if !vs.CanBuildQC() {
+		return nil, false, nil
 	}
 	qc := &types.QuorumCertificate{
 		View:                vs.view,
@@ -58,7 +58,7 @@ func (vs *VotingStatus) TryBuildQC() (*types.QuorumCertificate, error) {
 		AggregatedSignature: aggregatedSig,
 	}
 
-	return qc, nil
+	return qc, true, nil
 }
 
 func (vs *VotingStatus) getSigsSliceFromVotes() []*types.SingleSignature {

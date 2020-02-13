@@ -26,6 +26,6 @@ func (v *Validator) ValidateProposal(proposal *types.Proposal) error {
 // ValidateVote validates the vote and returns the signer identity who signed the vote
 // vote - the vote to be validated
 // bp - the voting block
-func (v *Validator) ValidateVote(vote *types.Vote, block *types.Block) (*flow.Identity, error) {
+func (v *Validator) ValidateVote(vote *types.Vote, block *types.Block) (*flow.Identity, bool, error) {
 	panic("TODO")
 }
