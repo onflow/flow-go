@@ -132,12 +132,8 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *types.Block) (*types.Quo
 	if err != nil {
 		return nil, false, fmt.Errorf("could not build QC on receiving block: %w", err)
 	}
-	if !built {
-		return nil, false, nil
-	}
-
 	delete(va.proposerVotes, block.BlockID)
-	return qc, true, nil
+	return qc, built, nil
 }
 
 func (va *VoteAggregator) convertPendingVotes(pendingVotes []*types.Vote, block *types.Block) {
