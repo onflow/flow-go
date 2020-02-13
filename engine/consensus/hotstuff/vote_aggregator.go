@@ -103,7 +103,6 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *types.Block) (*types.Quo
 	if exists {
 		return oldQC, true, nil
 	}
-
 	proposerVote, ok := va.proposerVotes[block.BlockID]
 	if !ok {
 		return nil, false, fmt.Errorf("could not get proposer vote for block: %x", block.BlockID)
@@ -157,7 +156,6 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 	for i := va.highestPrunedView + 1; i <= view; i++ {
 		blockIDStrSet := va.viewToBlockIDSet[i]
 		for blockID := range blockIDStrSet {
-			delete(va.proposerVotes, blockID)
 			delete(va.pendingVotes.votes, blockID)
 			delete(va.blockIDToVotingStatus, blockID)
 			delete(va.createdQC, blockID)
@@ -180,7 +178,9 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, blo
 		va.notifier.OnInvalidVoteDetected(vote)
 		return false, nil
 	}
-	if va.isDoubleVote(vote, voter) {
+	firstVote, detected := va.detectDoubleVote(vote, voter)
+	if detected {
+		va.notifier.OnDoubleVotingDetected(firstVote, vote)
 		return false, nil
 	}
 	// update existing voting status or create a new one
@@ -243,23 +243,22 @@ func (va *VoteAggregator) tryBuildQC(blockID flow.Identifier) (*types.QuorumCert
 }
 
 // double voting is detected when the voter has voted a different block at the same view before
-func (va *VoteAggregator) isDoubleVote(vote *types.Vote, sender *flow.Identity) bool {
+func (va *VoteAggregator) detectDoubleVote(vote *types.Vote, sender *flow.Identity) (*types.Vote, bool) {
 	idToVotes, ok := va.viewToVoteID[vote.View]
 	if !ok {
 		// never voted by anyone
-		return false
+		return nil, false
 	}
 	originalVote, exists := idToVotes[sender.ID()]
 	if !exists {
 		// never voted by this sender
-		return false
+		return nil, false
 	}
 	if originalVote.BlockID == vote.BlockID {
 		// voted and is the same vote as the vote received before
-		return false
+		return nil, false
 	}
-	va.notifier.OnDoubleVotingDetected(originalVote, vote)
-	return true
+	return originalVote, true
 }
 
 func (va *VoteAggregator) canBuildQC(blockID flow.Identifier) bool {
