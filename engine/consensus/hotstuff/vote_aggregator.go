@@ -69,7 +69,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, block *types.Blo
 	}
 
 	// validate the vote and adding it to the accumulated voting status
-	votingStatus, valid, err := va.validateAndStoreIncorporatedVote(vote, block)
+	valid, err := va.validateAndStoreIncorporatedVote(vote, block)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not store incorporated vote: %w", err)
 	}
@@ -77,7 +77,7 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, block *types.Blo
 		return nil, false, nil
 	}
 	// try to build the QC with existing votes
-	newQC, built, err := va.tryBuildQC(votingStatus)
+	newQC, built, err := va.tryBuildQC(block.BlockID)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not build QC: %w", err)
 	}
@@ -114,7 +114,7 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *types.Block) (*types.Quo
 	}
 
 	// accumulate leader vote first to ensure leader's vote is always included in the QC
-	voteStatus, valid, err := va.validateAndStoreIncorporatedVote(proposerVote, block)
+	valid, err := va.validateAndStoreIncorporatedVote(proposerVote, block)
 	if err != nil {
 		return nil, false, fmt.Errorf("leader vote is invalid %w", err)
 	}
@@ -126,9 +126,8 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *types.Block) (*types.Quo
 	if exists {
 		va.convertPendingVotes(pendingStatus.orderedVotes, block)
 	}
-
 	// try building QC with existing valid votes
-	qc, built, err := va.tryBuildQC(voteStatus)
+	qc, built, err := va.tryBuildQC(block.BlockID)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not build QC on receiving block: %w", err)
 	}
@@ -138,12 +137,12 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *types.Block) (*types.Quo
 
 func (va *VoteAggregator) convertPendingVotes(pendingVotes []*types.Vote, block *types.Block) {
 	for _, vote := range pendingVotes {
-		voteStatus, _, err := va.validateAndStoreIncorporatedVote(vote, block)
-		if err != nil {
+		valid, err := va.validateAndStoreIncorporatedVote(vote, block)
+		if err != nil || !valid {
 			continue
 		}
 		// if threshold is reached, the rest of the votes can be ignored
-		if voteStatus.CanBuildQC() {
+		if va.canBuildQC(block.BlockID) {
 			break
 		}
 	}
@@ -172,35 +171,35 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 
 // storeIncorporatedVote stores incorporated votes and accumulate stakes
 // it drops invalid votes and duplicate votes
-func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, block *types.Block) (*VotingStatus, bool, error) {
+func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, block *types.Block) (bool, error) {
 	voter, valid, err := va.voteValidator.ValidateVote(vote, block)
 	if err != nil {
-		return nil, false, fmt.Errorf("could not validate incorporated vote: %w", err)
+		return false, fmt.Errorf("could not validate incorporated vote: %w", err)
 	}
 	if !valid {
 		va.notifier.OnInvalidVoteDetected(vote)
-		return nil, false, nil
+		return false, nil
 	}
 	if va.isDoubleVote(vote, voter) {
-		return nil, false, nil
+		return false, nil
 	}
 	// update existing voting status or create a new one
 	votingStatus, exists := va.blockIDToVotingStatus[vote.BlockID]
 	if !exists {
 		threshold, err := va.viewState.GetQCStakeThresholdAtBlock(vote.BlockID)
 		if err != nil {
-			return nil, false, fmt.Errorf("could not get stake threshold: %w", err)
+			return false, fmt.Errorf("could not get stake threshold: %w", err)
 		}
 		identities, err := va.viewState.GetStakedIdentitiesAtBlock(vote.BlockID)
 		if err != nil {
-			return nil, false, fmt.Errorf("could not get identities: %w", err)
+			return false, fmt.Errorf("could not get identities: %w", err)
 		}
 		votingStatus = NewVotingStatus(threshold, vote.View, uint32(len(identities)), voter, vote.BlockID)
 		va.blockIDToVotingStatus[vote.BlockID] = votingStatus
 	}
 	votingStatus.AddVote(vote, voter)
 	va.updateState(vote)
-	return votingStatus, true, nil
+	return true, nil
 }
 
 func (va *VoteAggregator) updateState(vote *types.Vote) {
@@ -227,7 +226,11 @@ func (va *VoteAggregator) updateState(vote *types.Vote) {
 	}
 }
 
-func (va *VoteAggregator) tryBuildQC(votingStatus *VotingStatus) (*types.QuorumCertificate, bool, error) {
+func (va *VoteAggregator) tryBuildQC(blockID flow.Identifier) (*types.QuorumCertificate, bool, error) {
+	votingStatus, exists := va.blockIDToVotingStatus[blockID]
+	if !exists {
+		return nil, false, nil
+	}
 	qc, built, err := votingStatus.TryBuildQC()
 	if err != nil {
 		return nil, false, err
@@ -257,6 +260,14 @@ func (va *VoteAggregator) isDoubleVote(vote *types.Vote, sender *flow.Identity) 
 	}
 	va.notifier.OnDoubleVotingDetected(originalVote, vote)
 	return true
+}
+
+func (va *VoteAggregator) canBuildQC(blockID flow.Identifier) bool {
+	votingStatus, exists := va.blockIDToVotingStatus[blockID]
+	if !exists {
+		return false
+	}
+	return votingStatus.CanBuildQC()
 }
 
 func (va *VoteAggregator) isStale(vote *types.Vote) bool {
