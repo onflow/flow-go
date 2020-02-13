@@ -175,7 +175,7 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, block *types.Block) (*VotingStatus, bool, error) {
 	voter, valid, err := va.voteValidator.ValidateVote(vote, block)
 	if err != nil {
-		return nil, valid, fmt.Errorf("could not validate incorporated vote: %w", err)
+		return nil, false, fmt.Errorf("could not validate incorporated vote: %w", err)
 	}
 	if !valid {
 		va.notifier.OnInvalidVoteDetected(vote)
