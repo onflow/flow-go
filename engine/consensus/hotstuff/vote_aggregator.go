@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"fmt"
+	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
@@ -9,6 +10,7 @@ import (
 )
 
 type VoteAggregator struct {
+	logger                zerolog.Logger
 	notifier              notifications.Consumer
 	viewState             *ViewState
 	voteValidator         *Validator
@@ -24,6 +26,7 @@ type VoteAggregator struct {
 // NewVoteAggregator creates an instance of vote aggregator
 func NewVoteAggregator(notifier notifications.Consumer, highestPrunedView uint64, viewState *ViewState, voteValidator *Validator) *VoteAggregator {
 	return &VoteAggregator{
+		logger:                zerolog.Logger{},
 		notifier:              notifier,
 		highestPrunedView:     highestPrunedView,
 		viewState:             viewState,
@@ -62,17 +65,16 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, block *types.Blo
 	if built {
 		return oldQC, true, nil
 	}
-
 	// ignore stale votes
-	if va.isStale(vote) { // cannot build QC for already pruned view
+	if va.isStale(vote) {
 		return nil, false, nil
 	}
-
 	// validate the vote and adding it to the accumulated voting status
 	valid, err := va.validateAndStoreIncorporatedVote(vote, block)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not store incorporated vote: %w", err)
 	}
+	// cannot build qc if vote is invalid
 	if !valid {
 		return nil, false, nil
 	}
@@ -103,11 +105,11 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *types.Block) (*types.Quo
 	if exists {
 		return oldQC, true, nil
 	}
-	proposerVote, ok := va.proposerVotes[block.BlockID]
-	if !ok {
+	// proposer vote is the first to be accumulated
+	proposerVote, exists := va.proposerVotes[block.BlockID]
+	if !exists { // cannot build qc if proposer vote does not exist
 		return nil, false, fmt.Errorf("could not get proposer vote for block: %x", block.BlockID)
 	}
-
 	if va.isStale(proposerVote) {
 		return nil, false, nil
 	}
@@ -170,14 +172,19 @@ func (va *VoteAggregator) PruneByView(view uint64) {
 // storeIncorporatedVote stores incorporated votes and accumulate stakes
 // it drops invalid votes and duplicate votes
 func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, block *types.Block) (bool, error) {
-	voter, valid, err := va.voteValidator.ValidateVote(vote, block)
+	voter, err := va.voteValidator.ValidateVote(vote, block)
+	// does not report invalid vote as an error, notify consumers instead
 	if err != nil {
-		return false, fmt.Errorf("could not validate incorporated vote: %w", err)
+		switch err := err.(type) {
+		case types.InvalidVoteError:
+			va.notifier.OnInvalidVoteDetected(vote)
+			va.logger.Warn().Msg(err.Msg)
+			return false, nil
+		default:
+			return false, fmt.Errorf("could not validate incorporated vote: %w", err)
+		}
 	}
-	if !valid {
-		va.notifier.OnInvalidVoteDetected(vote)
-		return false, nil
-	}
+	// does not report double vote as an error, notify consumers instead
 	firstVote, detected := va.detectDoubleVote(vote, voter)
 	if detected {
 		va.notifier.OnDoubleVotingDetected(firstVote, vote)
@@ -228,14 +235,14 @@ func (va *VoteAggregator) updateState(vote *types.Vote) {
 
 func (va *VoteAggregator) tryBuildQC(blockID flow.Identifier) (*types.QuorumCertificate, bool, error) {
 	votingStatus, exists := va.blockIDToVotingStatus[blockID]
-	if !exists {
+	if !exists { // can not build a qc if voting status doesn't exist
 		return nil, false, nil
 	}
 	qc, built, err := votingStatus.TryBuildQC()
-	if err != nil {
+	if err != nil { // can not build a qc if there is an error
 		return nil, false, err
 	}
-	if !built {
+	if !built { // votes are insufficient
 		return nil, false, nil
 	}
 	va.createdQC[votingStatus.blockID] = qc
