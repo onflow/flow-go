@@ -107,10 +107,19 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 func IndexClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		// TODO check collection existence
+		// only index a collection if it exists
+		var exists bool
+		err := operation.CheckCollection(payload.Collection.ID(), &exists)(tx)
+		if err != nil {
+			return fmt.Errorf("could not check collection: %w", err)
+		}
+
+		if !exists {
+			return fmt.Errorf("cannot index non-existent collection")
+		}
 
 		// index the single collection
-		err := operation.IndexCollection(payload.Hash(), &payload.Collection)(tx)
+		err = operation.IndexCollection(payload.Hash(), &payload.Collection)(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
 		}

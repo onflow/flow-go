@@ -39,16 +39,16 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 			return fmt.Errorf("genesis payload hash must match payload")
 		}
 
-		// insert block
-		err := procedure.InsertClusterBlock(genesis)(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert genesis block: %w", err)
-		}
-
 		// insert block payload
-		err = operation.InsertCollection(&genesis.Payload.Collection)(tx)
+		err := operation.InsertCollection(&genesis.Payload.Collection)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert genesis block payload: ")
+		}
+
+		// insert block
+		err = procedure.InsertClusterBlock(genesis)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert genesis block: %w", err)
 		}
 
 		// insert block number -> ID mapping

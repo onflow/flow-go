@@ -72,7 +72,7 @@ func TestBootstrap(t *testing.T) {
 				var collection flow.LightCollection
 				err = operation.RetrieveCollection(genesis.Collection.ID(), &collection)(tx)
 				assert.Nil(t, err)
-				assert.Equal(t, genesis.Collection, &collection)
+				assert.Equal(t, genesis.Collection, collection)
 
 				// should index collection
 				var collectionID flow.Identifier
