@@ -23,7 +23,7 @@ func TestView_Get(t *testing.T) {
 
 	t.Run("ValueNotInCache", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-			if bytes.Compare(key, flow.RegisterID("fruit")) == 0 {
+			if bytes.Equal(key, flow.RegisterID("fruit")) {
 				return flow.RegisterValue("orange"), nil
 			}
 
@@ -37,7 +37,7 @@ func TestView_Get(t *testing.T) {
 
 	t.Run("ValueInCache", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-			if bytes.Compare(key, flow.RegisterID("fruit")) == 0 {
+			if bytes.Equal(key, flow.RegisterID("fruit")) {
 				return flow.RegisterValue("orange"), nil
 			}
 
@@ -109,7 +109,7 @@ func TestView_Delete(t *testing.T) {
 
 	t.Run("ValueInCache", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-			if bytes.Compare(key, flow.RegisterID("fruit")) == 0 {
+			if bytes.Equal(key, flow.RegisterID("fruit")) {
 				return flow.RegisterValue("orange"), nil
 			}
 
@@ -277,11 +277,11 @@ func TestView_Reads(t *testing.T) {
 
 	t.Run("ValuesNotInCache", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-			if bytes.Compare(key, flow.RegisterID("fruit")) == 0 {
+			if bytes.Equal(key, flow.RegisterID("fruit")) {
 				return flow.RegisterValue("orange"), nil
 			}
 
-			if bytes.Compare(key, flow.RegisterID("vegetable")) == 0 {
+			if bytes.Equal(key, flow.RegisterID("vegetable")) {
 				return flow.RegisterValue("carrot"), nil
 			}
 

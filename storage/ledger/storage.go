@@ -4,11 +4,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/syndtr/goleveldb/leveldb"
+
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 var ErrNotFound = errors.New("ledger: not found")
