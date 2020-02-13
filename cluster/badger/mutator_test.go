@@ -18,11 +18,11 @@ import (
 func TestBootstrap(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		state, err := NewState(db)
+		chainID := cluster.Genesis().ChainID
+
+		state, err := NewState(db, chainID)
 		require.Nil(t, err)
-		mutator := Mutator{
-			state: state,
-		}
+		mutator := Mutator{state: state}
 
 		t.Run("invalid number", func(t *testing.T) {
 			genesis := cluster.Genesis()
@@ -108,6 +108,9 @@ func TestBootstrap(t *testing.T) {
 func TestExtend(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
+		genesis := cluster.Genesis()
+		chainID := genesis.ChainID
+
 		// a helper function to wipe the DB to clean up in between tests
 		cleanup := func() {
 			err := db.DropAll()
@@ -115,13 +118,9 @@ func TestExtend(t *testing.T) {
 		}
 
 		// set up state and mutator objects, these are safe to share between tests
-		state, err := NewState(db)
+		state, err := NewState(db, chainID)
 		require.Nil(t, err)
-		mutator := Mutator{
-			state: state,
-		}
-
-		genesis := cluster.Genesis()
+		mutator := Mutator{state: state}
 
 		// a helper function to bootstrap with the genesis block
 		bootstrap := func() {

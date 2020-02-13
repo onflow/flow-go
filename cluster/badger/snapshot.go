@@ -11,6 +11,11 @@ import (
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 )
 
+// Snapshot represents a snapshot of chain state anchored at a particular
+// reference block.
+//
+// If final is true, the reference is the latest finalized block. If final is
+// false and blockID is set, the reference is the block with the given ID.
 type Snapshot struct {
 	state   *State
 	blockID flow.Identifier
@@ -46,6 +51,14 @@ func (s *Snapshot) Collection() (*flow.LightCollection, error) {
 	}
 
 	return &collection, nil
+}
+
+func (s *Snapshot) Head() (*flow.Header, error) {
+	var head flow.Header
+	err := s.state.db.View(func(tx *badger.Txn) error {
+		return s.head(&head)(tx)
+	})
+	return &head, err
 }
 
 // head finds the header referenced by the snapshot.
