@@ -5,6 +5,7 @@ package flow
 import (
 	"time"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 )
 
@@ -79,37 +80,40 @@ type Header struct {
 	// ParentView is the view number of the parent of this block.
 	ParentView uint64
 	// ParentSig is an aggregated signature for the parent block.
-	ParentSig *AggregatedSignature
+	ParentSignature   crypto.Signature
+	ParentSignatories []Identifier
 	// ProposerID is the ID of the node that proposed this block.
 	ProposerID Identifier
+	Signature  crypto.Signature
 
 	// ProposerSig is the signature of the proposer over the header body.
 	// NOTE: This is omitted from the ID.
-	ProposerSig *PartialSignature
 }
 
 // Body returns the immutable part of the block header.
 func (h Header) Body() interface{} {
 	return struct {
-		Number      uint64
-		View        uint64
-		ChainID     string
-		Timestamp   time.Time
-		ParentID    Identifier
-		PayloadHash Identifier
-		ProposerID  Identifier
-		ParentView  uint64
-		ParentSig   *AggregatedSignature
+		Number            uint64
+		View              uint64
+		ChainID           string
+		Timestamp         time.Time
+		ParentID          Identifier
+		PayloadHash       Identifier
+		ProposerID        Identifier
+		ParentView        uint64
+		ParentSignature   crypto.Signature
+		ParentSignatories []Identifier
 	}{
-		Number:      h.Number,
-		ChainID:     h.ChainID,
-		View:        h.View,
-		Timestamp:   h.Timestamp,
-		ParentID:    h.ParentID,
-		PayloadHash: h.PayloadHash,
-		ProposerID:  h.ProposerID,
-		ParentView:  h.ParentView,
-		ParentSig:   h.ParentSig,
+		Number:            h.Number,
+		ChainID:           h.ChainID,
+		View:              h.View,
+		Timestamp:         h.Timestamp,
+		ParentID:          h.ParentID,
+		PayloadHash:       h.PayloadHash,
+		ProposerID:        h.ProposerID,
+		ParentView:        h.ParentView,
+		ParentSignature:   h.ParentSignature,
+		ParentSignatories: h.ParentSignatories,
 	}
 }
 

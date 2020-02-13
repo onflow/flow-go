@@ -73,7 +73,7 @@ type ForkChoiceGeneratedConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type BlockIncorporatedConsumer interface {
-	OnBlockIncorporated(*types.BlockProposal)
+	OnBlockIncorporated(*types.Block)
 }
 
 // FinalizedBlockConsumer consumes notifications of type `OnFinalizedBlock`,
@@ -83,7 +83,7 @@ type BlockIncorporatedConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type FinalizedBlockConsumer interface {
-	OnFinalizedBlock(*types.BlockProposal)
+	OnFinalizedBlock(*types.Block)
 }
 
 // DoubleProposeDetectedConsumer consumes notifications of type `OnDoubleProposeDetected`,
@@ -93,5 +93,5 @@ type FinalizedBlockConsumer interface {
 // Implementation must be concurrency safe; Non-blocking;
 // and must handle repetition of the same events (with some processing overhead).
 type DoubleProposeDetectedConsumer interface {
-	OnDoubleProposeDetected(*types.BlockProposal, *types.BlockProposal)
+	OnDoubleProposeDetected(*types.Block, *types.Block)
 }
