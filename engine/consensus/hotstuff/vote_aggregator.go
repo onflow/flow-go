@@ -106,7 +106,7 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *types.Block) (*types.Quo
 
 	proposerVote, ok := va.proposerVotes[block.BlockID]
 	if !ok {
-		return nil, false, fmt.Errorf("could not get proposer vote")
+		return nil, false, fmt.Errorf("could not get proposer vote for block: %x", block.BlockID)
 	}
 
 	if va.isStale(proposerVote) {
