@@ -3,9 +3,11 @@ package unittest
 import (
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/verification"
+	"github.com/dapperlabs/flow-go/model/cluster"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -38,6 +40,31 @@ func BlockHeaderFixture() flow.Header {
 		ParentID: IdentifierFixture(),
 		Number:   rand.Uint64(),
 	}
+}
+
+// ClusterBlockWithParent creates a new cluster consensus block that is valid
+// with respect to the given parent block.
+func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
+	payload := cluster.Payload{
+		Collection: flow.LightCollection{
+			Transactions: []flow.Identifier{IdentifierFixture()},
+		},
+	}
+
+	header := flow.Header{
+		Number:      parent.Number + 1,
+		ChainID:     parent.ChainID,
+		Timestamp:   time.Now(),
+		ParentID:    parent.ID(),
+		PayloadHash: payload.Hash(),
+	}
+
+	block := cluster.Block{
+		Header:  header,
+		Payload: payload,
+	}
+
+	return block
 }
 
 func CollectionGuaranteeFixture() *flow.CollectionGuarantee {
