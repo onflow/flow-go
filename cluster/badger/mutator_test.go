@@ -109,7 +109,7 @@ func TestExtend(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		// a helper function to wipe the DB to clean up in between tests
-		clearDB := func() {
+		cleanup := func() {
 			err := db.DropAll()
 			require.Nil(t, err)
 		}
@@ -140,7 +140,7 @@ func TestExtend(t *testing.T) {
 		}
 
 		t.Run("without first bootstrapping", func(t *testing.T) {
-			defer clearDB()
+			defer cleanup()
 
 			block := unittest.ClusterBlockWithParent(genesis)
 			insert(block)
@@ -150,7 +150,7 @@ func TestExtend(t *testing.T) {
 		})
 
 		t.Run("non-existent block", func(t *testing.T) {
-			defer clearDB()
+			defer cleanup()
 			bootstrap()
 
 			// ID of a non-existent block
@@ -161,7 +161,7 @@ func TestExtend(t *testing.T) {
 		})
 
 		t.Run("invalid payload hash", func(t *testing.T) {
-			defer clearDB()
+			defer cleanup()
 			bootstrap()
 
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -174,7 +174,7 @@ func TestExtend(t *testing.T) {
 		})
 
 		t.Run("non-existent parent", func(t *testing.T) {
-			defer clearDB()
+			defer cleanup()
 			bootstrap()
 
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -187,7 +187,7 @@ func TestExtend(t *testing.T) {
 		})
 
 		t.Run("wrong chain ID", func(t *testing.T) {
-			defer clearDB()
+			defer cleanup()
 			bootstrap()
 
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -200,7 +200,7 @@ func TestExtend(t *testing.T) {
 		})
 
 		t.Run("invalid block number", func(t *testing.T) {
-			defer clearDB()
+			defer cleanup()
 			bootstrap()
 
 			block := unittest.ClusterBlockWithParent(genesis)
@@ -213,7 +213,7 @@ func TestExtend(t *testing.T) {
 		})
 
 		t.Run("building on parent of finalized block", func(t *testing.T) {
-			defer clearDB()
+			defer cleanup()
 			bootstrap()
 
 			// build one block on top of genesis
@@ -237,7 +237,7 @@ func TestExtend(t *testing.T) {
 		})
 
 		t.Run("extend", func(t *testing.T) {
-			defer clearDB()
+			defer cleanup()
 			bootstrap()
 
 			block := unittest.ClusterBlockWithParent(genesis)
