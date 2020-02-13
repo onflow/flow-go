@@ -18,7 +18,6 @@ import (
 	libp2perrors "github.com/dapperlabs/flow-go/network/gossip/libp2p/errors"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/message"
 	"github.com/dapperlabs/flow-go/network/gossip/libp2p/middleware"
-	"github.com/dapperlabs/flow-go/network/gossip/libp2p/topology"
 	"github.com/dapperlabs/flow-go/protocol"
 )
 
@@ -31,7 +30,6 @@ type Network struct {
 	state   protocol.State
 	me      module.Local
 	mw      middleware.Middleware
-	top     *topology.Topology
 	sip     hash.Hash
 	engines map[uint8]network.Engine
 	rcache  *cache.RcvCache // used to deduplicate incoming messages
@@ -49,11 +47,6 @@ func NewNetwork(
 	me module.Local,
 	mw middleware.Middleware,
 	csize int) (*Network, error) {
-
-	top, err := topology.New()
-	if err != nil {
-		return nil, fmt.Errorf("could not initialize topology: %w", err)
-	}
 
 	rcache, err := cache.NewRcvCache(csize)
 	if err != nil {
@@ -75,7 +68,6 @@ func NewNetwork(
 		state:   state,
 		me:      me,
 		mw:      mw,
-		top:     top,
 		sip:     siphash.New([]byte("daflowtrickleson")),
 		engines: make(map[uint8]network.Engine),
 		rcache:  rcache,
@@ -196,14 +188,6 @@ func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
 	}
 
 	return topMap, nil
-}
-
-// Cleanup implements a callback to handle peers that have been dropped
-// by the middleware layer.
-func (n *Network) Cleanup(nodeID flow.Identifier) error {
-	// drop the peer state using the ID we registered
-	n.top.Down(nodeID)
-	return nil
 }
 
 func (n *Network) Receive(nodeID flow.Identifier, msg interface{}) error {
