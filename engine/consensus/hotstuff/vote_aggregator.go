@@ -99,8 +99,8 @@ func (va *VoteAggregator) StoreProposerVote(vote *types.Vote) {
 // It assumes that the proposer's vote has been stored by calling StoreProposerVote
 func (va *VoteAggregator) BuildQCOnReceivedBlock(block *types.Block) (*types.QuorumCertificate, bool, error) {
 	// return the QC that was built before if exists
-	oldQC, built := va.createdQC[block.BlockID]
-	if built {
+	oldQC, exists := va.createdQC[block.BlockID]
+	if exists {
 		return oldQC, true, nil
 	}
 
