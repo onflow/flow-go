@@ -190,15 +190,16 @@ func (checker *Checker) visitVariableDeclaration(declaration *ast.VariableDeclar
 
 	identifier := declaration.Identifier.Identifier
 
-	variable, err := checker.valueActivations.Declare(
-		identifier,
-		declarationType,
-		declaration.Access,
-		declaration.DeclarationKind(),
-		declaration.Identifier.Pos,
-		declaration.IsConstant,
-		nil,
-	)
+	variable, err := checker.valueActivations.Declare(variableDeclaration{
+		identifier:               identifier,
+		ty:                       declarationType,
+		access:                   declaration.Access,
+		kind:                     declaration.DeclarationKind(),
+		pos:                      declaration.Identifier.Pos,
+		isConstant:               declaration.IsConstant,
+		argumentLabels:           nil,
+		allowOuterScopeShadowing: true,
+	})
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(identifier, variable)
 }
