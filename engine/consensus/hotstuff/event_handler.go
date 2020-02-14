@@ -83,12 +83,14 @@ func (e *EventHandler) OnReceiveProposal(proposal *types.Proposal) error {
 		Uint64("block_view", proposal.Block.View).
 		Msg("proposal received")
 
-	// validate the block
-	// NOTE: the validator should retrieve the parent block; it already has to interact
-	// with the protocol state to get the identity anyway
+	// validate the block. exit if the proposal is invalid
 	err := e.validator.ValidateProposal(proposal)
+	if errors.Is(err, types.ErrorInvalidBlock{}) {
+		return nil
+	}
+
 	if err != nil {
-		return fmt.Errorf("invalid block header: %w", err)
+		return fmt.Errorf("cannot validate proposal: %w", err)
 	}
 
 	// store the block. the block will also be validated there

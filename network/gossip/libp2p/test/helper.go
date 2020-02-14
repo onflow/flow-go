@@ -35,14 +35,12 @@ func CreateIDs(count int) []*flow.Identity {
 func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.IdentityList, csize int, dryrun bool) ([]*libp2p.Network, error) {
 	count := len(mws)
 	nets := make([]*libp2p.Network, 0)
+	// create a identity list of size len(ids) to make sure the network fanout is set appropriately even before the nodes are started
+	identities := make(flow.IdentityList, len(ids))
 
 	// creates and mocks the state
-	var snapshot *SnapshotMock
-	if dryrun {
-		snapshot = &SnapshotMock{ids: ids}
-	} else {
-		snapshot = &SnapshotMock{ids: flow.IdentityList{}}
-	}
+	snapshot := &SnapshotMock{ids: identities}
+
 	state := &protocol.State{}
 	state.On("Final").Return(snapshot)
 
@@ -58,27 +56,29 @@ func CreateNetworks(log zerolog.Logger, mws []*libp2p.Middleware, ids flow.Ident
 		nets = append(nets, net)
 	}
 
-	// if dryrun then don't actually start the network just return the network objects
-	if dryrun {
-		return nets, nil
+	// if dryrun then don't actually start the network
+	if !dryrun {
+		for _, net := range nets {
+			<-net.Ready()
+		}
 	}
 
-	for _, net := range nets {
-		<-net.Ready()
-	}
-
-	for i, m := range mws {
+	for i := range ids {
 		// retrieves IP and port of the middleware
-		ip, port := m.GetIPPort()
+		var ip, port string
+		if !dryrun {
+			m := mws[i]
+			ip, port = m.GetIPPort()
+		}
 
 		// mocks an identity for the middleware
-		id := &flow.Identity{
+		id := flow.Identity{
 			NodeID:  ids[i].NodeID,
 			Address: fmt.Sprintf("%s:%s", ip, port),
 			Role:    flow.RoleCollection,
 			Stake:   0,
 		}
-		snapshot.ids = append(snapshot.ids, id)
+		snapshot.ids[i] = &id
 	}
 
 	return nets, nil
