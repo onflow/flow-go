@@ -65,10 +65,8 @@ func (s *Snapshot) Head() (*flow.Header, error) {
 func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
-		blockID := s.blockID
-
-		// if final is set, set block ID to last finalized
-		if s.final {
+		// if final is set and block ID is empty, set block ID to last finalized
+		if s.final && s.blockID == flow.ZeroID {
 
 			// get the boundary
 			var boundary uint64
@@ -78,17 +76,16 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 			}
 
 			// get the ID of the last finalized block
-			var blockID flow.Identifier
-			err = operation.RetrieveNumberForCluster(s.state.chainID, boundary, &blockID)(tx)
+			err = operation.RetrieveNumberForCluster(s.state.chainID, boundary, &s.blockID)(tx)
 			if err != nil {
 				return fmt.Errorf("could not retrieve block ID: %w", err)
 			}
 		}
 
 		// get the snap shot header
-		err := operation.RetrieveHeader(blockID, head)(tx)
+		err := operation.RetrieveHeader(s.blockID, head)(tx)
 		if err != nil {
-			return fmt.Errorf("could not retrieve header for block (%x): %w", blockID, err)
+			return fmt.Errorf("could not retrieve header for block (%x): %w", s.blockID, err)
 		}
 
 		return nil

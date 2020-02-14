@@ -22,6 +22,7 @@ func NewState(db *badger.DB, chainID string) (*State, error) {
 
 func (s *State) Final() cluster.Snapshot {
 	snapshot := &Snapshot{
+		state: s,
 		final: true,
 	}
 	return snapshot
@@ -29,6 +30,7 @@ func (s *State) Final() cluster.Snapshot {
 
 func (s *State) AtBlockID(blockID flow.Identifier) cluster.Snapshot {
 	snapshot := &Snapshot{
+		state:   s,
 		blockID: blockID,
 	}
 	return snapshot
