@@ -1,12 +1,10 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
 // ExecutionState is an interface used to access and mutate the execution state of the blockchain.
@@ -56,9 +54,6 @@ func (s *state) NewView(commitment flow.StateCommitment) *View {
 			commitment,
 		)
 		if err != nil {
-			if errors.Is(err, ledger.ErrNotFound) {
-				return nil, nil
-			}
 			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
 

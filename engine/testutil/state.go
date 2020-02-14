@@ -32,7 +32,7 @@ func UncheckedState(db *badger.DB, identities flow.IdentityList) (*protocol.Stat
 		seal := genesis.Seals[0]
 
 		// insert the block seal commit
-		err = operation.InsertCommit(seal.BlockID, seal.FinalState)(tx)
+		err = operation.InsertCommit(genesis.ID(), seal.FinalState)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert state commit: %w", err)
 		}

@@ -63,20 +63,6 @@ func (mr *MockBlocksMockRecorder) ByNumber(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ByNumber", reflect.TypeOf((*MockBlocks)(nil).ByNumber), arg0)
 }
 
-// Finalize mocks base method
-func (m *MockBlocks) Finalize(arg0 flow.Identifier) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Finalize", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Finalize indicates an expected call of Finalize
-func (mr *MockBlocksMockRecorder) Finalize(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Finalize", reflect.TypeOf((*MockBlocks)(nil).Finalize), arg0)
-}
-
 // Store mocks base method
 func (m *MockBlocks) Store(arg0 *flow.Block) error {
 	m.ctrl.T.Helper()

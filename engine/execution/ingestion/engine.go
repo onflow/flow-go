@@ -183,9 +183,9 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	blockID := block.ID()
 
 	// TODO: for MVP assume we're only receiving finalized blocks
-	err = e.blocks.Finalize(blockID)
+	err = e.state.Mutate().Finalize(blockID)
 	if err != nil {
-		return fmt.Errorf("could not save block: %w", err)
+		return fmt.Errorf("could not finalize block: %w", err)
 	}
 
 	collectionIdentifiers, err := e.findCollectionNodes()

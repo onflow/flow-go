@@ -30,7 +30,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 			stateCommitment := unittest.StateCommitmentFixture()
 
-			stateCommitments.EXPECT().ByFinalID(gomock.Any()).Return(stateCommitment, nil)
+			stateCommitments.EXPECT().ByID(gomock.Any()).Return(stateCommitment, nil)
 
 			chunkHeaders := new(storage.ChunkHeaders)
 
