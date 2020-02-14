@@ -184,6 +184,8 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		return fmt.Errorf("could not save block: %w", err)
 	}
 
+
+
 	blockID := block.ID()
 
 	collectionIdentifiers, err := e.findCollectionNodes()
@@ -237,15 +239,24 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	return err
 }
 
-func (e *Engine) sendExecutionOrder(completeBlock *execution.CompleteBlock) {
+func (e *Engine) handleOrphanedCompleteBlock(completeBlock *execution.CompleteBlock) {
+
+}
+
+func (e *Engine) handleCompleteBlock(completeBlock *execution.CompleteBlock) {
 
 	//get initial start state from parent block
 	startState, err := e.execState.StateCommitmentByBlockID(completeBlock.Block.ParentID)
 
+	if err == storage.ErrNotFound {
+		e.handleOrphanedCompleteBlock(completeBlock)
+		return
+	}
+
 	if err != nil {
-		e.log.Warn().
-			Hex("block_id", logging.Entity(completeBlock.Block)).
-			Msg("received complete block")
+		e.log.Err(err).
+			Hex("parent_block_id", logging.ID(completeBlock.Block.ParentID)).
+			Msg("error while fetching state commitment")
 		return
 	}
 
@@ -306,7 +317,7 @@ func (e *Engine) handleCollectionResponse(response *messages.CollectionResponse)
 		}
 
 		e.removeCollections(completeBlock.Block, backdata)
-		e.sendExecutionOrder(completeBlock.Block)
+		e.handleCompleteBlock(completeBlock.Block)
 		return nil
 	})
 }
