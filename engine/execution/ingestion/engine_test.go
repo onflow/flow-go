@@ -62,7 +62,7 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 	computationEngine := new(computation.ComputationEngine)
 	protocolState := new(protocol.State)
 	executionState := new(state.ExecutionState)
-
+	mutator := protocol.NewMockMutator(ctrl)
 	snapshot := new(protocol.Snapshot)
 
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
@@ -74,6 +74,8 @@ func runWithEngine(t *testing.T, f func(ctx testingContext)) {
 
 	mutator := new(protocol.Mutator)
 	mutator.On("Mutate").Return(mutator)
+	state.EXPECT().Mutate().Return(mutator).AnyTimes()
+	mutator.EXPECT().Finalize(gomock.Any()).AnyTimes()
 	payloads.EXPECT().Store(gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}

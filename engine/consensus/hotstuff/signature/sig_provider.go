@@ -1,6 +1,8 @@
 package signature
 
 import (
+	"fmt"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -8,7 +10,9 @@ import (
 
 // SigProvider provides symmetry functions to generate and verify signatures
 type SigProvider struct {
+	sk     crypto.PrivateKey
 	hasher crypto.Hasher
+	myID   flow.Identifier
 }
 
 // VerifySig verifies a single signature for a block using the given public key
@@ -47,6 +51,46 @@ func (s *SigProvider) VerifyAggregatedSignature(aggsig *types.AggregatedSignatur
 		}
 	}
 	return true, nil
+}
+
+// VoteFor signs a Block and returns the Vote for that Block
+func (s *SigProvider) VoteFor(block *types.Block) (*types.Vote, error) {
+	// convert to bytes to be signed
+	msg := BlockToBytesForSign(block)
+
+	// generate signature
+	signature, err := s.sk.Sign(msg[:], s.hasher)
+
+	if err != nil {
+		return nil, fmt.Errorf("fail to sign block (%x) to vote: %w", block.BlockID, err)
+	}
+
+	return &types.Vote{
+		BlockID: block.BlockID,
+		View:    block.View,
+		Signature: &types.SingleSignature{
+			Raw:      signature,
+			SignerID: s.myID,
+		},
+	}, nil
+}
+
+// Propose signs a Block and returns the Proposal
+func (s *SigProvider) Propose(block *types.Block) (*types.Proposal, error) {
+	// convert to bytes to be signed
+	msg := BlockToBytesForSign(block)
+
+	// generate signature
+	signature, err := s.sk.Sign(msg[:], s.hasher)
+
+	if err != nil {
+		return nil, fmt.Errorf("fail to sign block (%x): %w", block.BlockID, err)
+	}
+
+	return &types.Proposal{
+		Block:     block,
+		Signature: signature,
+	}, nil
 }
 
 // BlockToBytesForSign generates the bytes that was signed for a block

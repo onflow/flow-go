@@ -1,18 +1,13 @@
 package ledger
 
 import (
-	"errors"
 	"fmt"
-
-	"github.com/syndtr/goleveldb/leveldb"
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/ledger/databases"
 	"github.com/dapperlabs/flow-go/storage/ledger/trie"
 	"github.com/dapperlabs/flow-go/storage/ledger/utils"
 )
-
-var ErrNotFound = errors.New("ledger: not found")
 
 type TrieStorage struct {
 	tree *trie.SMT
@@ -51,10 +46,6 @@ func (f *TrieStorage) GetRegisters(
 	err error,
 ) {
 	values, _, err = f.tree.Read(registerIDs, true, stateCommitment)
-	// TODO: Assumes leveldb, May want to be more flexible here
-	if errors.Is(err, leveldb.ErrNotFound) {
-		return values, ErrNotFound
-	}
 	return values, err
 }
 
