@@ -13,20 +13,20 @@ import (
 type EventLoop struct {
 	log          zerolog.Logger
 	eventHandler *EventHandler
-	blockheaders chan *types.BlockHeader
+	proposals    chan *types.Proposal
 	votes        chan *types.Vote
 	started      *atomic.Bool
 }
 
 // NewEventLoop creates an instance of EventLoop
 func NewEventLoop(log zerolog.Logger, eventHandler *EventHandler) (*EventLoop, error) {
-	blockheaders := make(chan *types.BlockHeader)
+	proposals := make(chan *types.Proposal)
 	votes := make(chan *types.Vote)
 
 	el := &EventLoop{
 		log:          log,
 		eventHandler: eventHandler,
-		blockheaders: blockheaders,
+		proposals:    proposals,
 		votes:        votes,
 		started:      atomic.NewBool(false),
 	}
@@ -71,17 +71,17 @@ func (el *EventLoop) processEvent() error {
 	select {
 	case <-timeoutChannel:
 		err = el.eventHandler.OnLocalTimeout()
-	case b := <-el.blockheaders:
-		err = el.eventHandler.OnReceiveBlockHeader(b)
+	case p := <-el.proposals:
+		err = el.eventHandler.OnReceiveProposal(p)
 	case v := <-el.votes:
 		err = el.eventHandler.OnReceiveVote(v)
 	}
 	return err
 }
 
-// OnReceiveBlockHeader pushes the received block to the blockheader channel
-func (el *EventLoop) OnReceiveBlockHeader(block *types.BlockHeader) {
-	el.blockheaders <- block
+// OnReceiveProposal pushes the received block to the blockheader channel
+func (el *EventLoop) OnReceiveProposal(proposal *types.Proposal) {
+	el.proposals <- proposal
 }
 
 // OnReceiveVote pushes the received vote to the votes channel

@@ -49,7 +49,7 @@ type PaceMaker interface {
 	// The parameter `nextPrimary` indicates to the PaceMaker whether or not this replica is the
 	// primary for the NEXT view taking block.view as reference.
 	// True corresponds to this replica being the next primary.
-	UpdateCurViewWithBlock(block *types.BlockProposal, isLeaderForNextView bool) (*types.NewViewEvent, bool)
+	UpdateCurViewWithBlock(block *types.Block, isLeaderForNextView bool) (*types.NewViewEvent, bool)
 
 	// TimeoutChannel returns the timeout channel for the CURRENTLY ACTIVE timeout.
 	// Each time the pace maker starts a new timeout, this channel is replaced.

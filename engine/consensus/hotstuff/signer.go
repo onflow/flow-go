@@ -8,6 +8,6 @@ import (
 // HotStuff algorithm. This component must have use the private key used to
 // stake.
 type Signer interface {
-	SignVote(*types.UnsignedVote) (*types.Vote, error)
-	SignBlock(*types.Block) (*types.BlockProposal, error)
+	VoteFor(*types.Block) (*types.Vote, error)
+	Propose(*types.Block) (*types.Proposal, error)
 }
