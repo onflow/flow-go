@@ -16,6 +16,11 @@ import (
 func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
+		// check payload integrity
+		if block.PayloadHash != block.Payload.Hash() {
+			return fmt.Errorf("computed payload hash does not match header")
+		}
+
 		// store the block header
 		err := operation.InsertHeader(&block.Header)(tx)
 		if err != nil {
@@ -88,6 +93,12 @@ func FinalizeClusterBlock(blockID flow.Identifier) func(*badger.Txn) error {
 			return fmt.Errorf("can't finalize non-child of chain head")
 		}
 
+		// insert block number -> ID mapping
+		err = operation.InsertNumberForCluster(chainID, header.Number, header.ID())(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert number->ID mapping: %w", err)
+		}
+
 		// update the finalized boundary
 		err = operation.UpdateBoundaryForCluster(chainID, header.Number)(tx)
 		if err != nil {
@@ -119,7 +130,9 @@ func IndexClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
 		}
 
 		// index the single collection
-		err = operation.IndexCollection(payload.Hash(), &payload.Collection)(tx)
+		// we allow duplicate indexing because we anticipate blocks will often
+		// contain empty collections (which will be indexed by the same key)
+		err = operation.AllowDuplicates(operation.IndexCollection(payload.Hash(), &payload.Collection))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
 		}

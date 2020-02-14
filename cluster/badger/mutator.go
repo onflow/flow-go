@@ -18,6 +18,11 @@ type Mutator struct {
 func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 	return m.state.db.Update(func(tx *badger.Txn) error {
 
+		// check chain ID
+		if genesis.ChainID != m.state.chainID {
+			return fmt.Errorf("genesis chain ID (%s) does not match configured (%s)", genesis.ChainID, m.state.chainID)
+		}
+
 		// check header number
 		if genesis.Number != 0 {
 			return fmt.Errorf("genesis number should be 0 (got %d)", genesis.Number)
@@ -32,11 +37,6 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 		collSize := len(genesis.Collection.Transactions)
 		if collSize != 0 {
 			return fmt.Errorf("genesis collection should contain no transactions (got %d)", collSize)
-		}
-
-		// check payload hash
-		if genesis.PayloadHash != genesis.Payload.Hash() {
-			return fmt.Errorf("genesis payload hash must match payload")
 		}
 
 		// insert block payload
@@ -77,9 +77,9 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		// check block integrity
-		if block.Payload.Hash() != block.PayloadHash {
-			return fmt.Errorf("block payload does not match payload hash")
+		// check chain ID
+		if block.ChainID != m.state.chainID {
+			return fmt.Errorf("new block chain ID (%s) does not match configured (%s)", block.ChainID, m.state.chainID)
 		}
 
 		// get the chain ID, which determines which cluster state to query
