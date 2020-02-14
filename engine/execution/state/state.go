@@ -5,6 +5,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage"
+	"github.com/dapperlabs/flow-go/storage/ledger"
 )
 
 // ExecutionState is an interface used to access and mutate the execution state of the blockchain.
@@ -48,13 +49,16 @@ func NewExecutionState(
 }
 
 func (s *state) NewView(commitment flow.StateCommitment) *View {
-	return NewView(func(key string) ([]byte, error) {
+	return NewView(func(key flow.RegisterID) ([]byte, error) {
 		values, err := s.ls.GetRegisters(
-			[]flow.RegisterID{[]byte(key)},
+			[]flow.RegisterID{key},
 			commitment,
 		)
 		if err != nil {
-			return nil, err
+			if errors.Is(err, ledger.ErrNotFound) {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
 
 		if len(values) == 0 {
@@ -67,6 +71,7 @@ func (s *state) NewView(commitment flow.StateCommitment) *View {
 
 func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
 	ids, values := delta.RegisterUpdates()
+
 	// TODO: update CommitDelta to also return proofs
 	commit, _, err := s.ls.UpdateRegistersWithProof(ids, values)
 	if err != nil {

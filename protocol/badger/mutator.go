@@ -250,14 +250,14 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 		return fmt.Errorf("could not retrieve header: %w", err)
 	}
 
-	// if new block number has a lower number, we can't finalize it
+	// if new block number has a lower number, we can't add it
 	if header.Number <= parent.Number {
-		return fmt.Errorf("block needs higher nummber (%d <= %d)", header.Number, parent.Number)
+		return fmt.Errorf("block needs higher number (%d <= %d)", header.Number, parent.Number)
 	}
 
 	// NOTE: in the default case, the first parent is the boundary, so we don't
 	// load the first parent twice almost ever; even in cases where we do, we
-	// badger has efficietn caching, so no reason to complicate the algorithm
+	// badger has efficient caching, so no reason to complicate the algorithm
 	// here to try avoiding one extra header loading
 
 	// trace back from new block until we find a block that has the latest

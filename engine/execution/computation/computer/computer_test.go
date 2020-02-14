@@ -32,7 +32,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(&virtualmachine.TransactionResult{}, nil).
 			Twice()
 
-		view := state.NewView(func(key string) (bytes []byte, e error) {
+		view := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 		startState := unittest.StateCommitmentFixture()
@@ -64,7 +64,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(&virtualmachine.TransactionResult{}, nil).
 			Times(totalTransactionCount)
 
-		view := state.NewView(func(key string) (bytes []byte, e error) {
+		view := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
 		})
 

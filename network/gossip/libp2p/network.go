@@ -3,6 +3,7 @@ package libp2p
 import (
 	"fmt"
 	"hash"
+	"math"
 	"strconv"
 	"sync"
 
@@ -67,7 +68,7 @@ func NewNetwork(
 
 	// todo fanout optimization #2244
 	// fanout is set to half of the system size for connectivity assurance w.h.p
-	fanout := len(netSize) / 2
+	fanout := int(math.Round(float64(len(netSize)) / 2.0))
 
 	o := &Network{
 		logger:  log,
@@ -183,6 +184,9 @@ func (n *Network) Topology() (map[flow.Identifier]flow.Identity, error) {
 	}
 
 	// selects subset of the nodes in idMap as large as the size
+	if len(idList) < n.fanout {
+		return nil, fmt.Errorf("cannot sample topology idList %d smaller than fanout %d", len(idList), n.fanout)
+	}
 	topListInd, err := crypto.RandomPermutationSubset(len(idList), n.fanout, seed)
 	if err != nil {
 		return nil, fmt.Errorf("cannot sample topology: %w", err)

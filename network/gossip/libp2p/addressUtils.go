@@ -1,7 +1,7 @@
 package libp2p
 
 import (
-	"crypto/md5"
+	"crypto/sha512"
 	"encoding/binary"
 	"io"
 	"math/rand"
@@ -41,7 +41,7 @@ func GetPublicKey(seed string) (crypto.PrivKey, error) {
 // Generates an int64 seed given a string in a deterministic and consistent manner (the same seed string will always
 // return the same int64 seed)
 func generateSeed(seed string) (int64, error) {
-	h := md5.New()
+	h := sha512.New()
 	// Generate the MD5 hash of the given string
 	_, err := io.WriteString(h, seed)
 	if err != nil {
