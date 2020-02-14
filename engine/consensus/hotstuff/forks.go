@@ -16,19 +16,7 @@ import (
 // (without missing interim ancestors). If this condition is violated, Forks will raise an error
 // and ignore the block.
 type Forks interface {
-
-	// GetBlocksForView returns all BlockProposals at the given view number.
-	GetBlocksForView(view uint64) []*types.Block
-
-	// GetBlock returns (BlockProposal, true) if the block with the specified
-	// id was found (nil, false) otherwise.
-	GetBlock(id flow.Identifier) (*types.Block, bool)
-
-	// FinalizedView returns the largest view number where a finalized block is known
-	FinalizedView() uint64
-
-	// FinalizedBlock returns the finalized block with the largest view number
-	FinalizedBlock() *types.Block
+	ForksReader
 
 	// IsSafeBlock returns true if block is safe to vote for
 	// (according to the definition in https://arxiv.org/abs/1803.05069v6).
@@ -71,6 +59,21 @@ type Forks interface {
 	// Note that tracking the view of the newest qc is for safety purposes
 	// and _independent_ of the fork-choice rule.
 	MakeForkChoice(curView uint64) (*types.Block, *types.QuorumCertificate, error)
+}
+
+type ForksReader interface {
+	// GetBlocksForView returns all BlockProposals at the given view number.
+	GetBlocksForView(view uint64) []*types.Block
+
+	// GetBlock returns (BlockProposal, true) if the block with the specified
+	// id was found (nil, false) otherwise.
+	GetBlock(id flow.Identifier) (*types.Block, bool)
+
+	// FinalizedView returns the largest view number where a finalized block is known
+	FinalizedView() uint64
+
+	// FinalizedBlock returns the finalized block with the largest view number
+	FinalizedBlock() *types.Block
 }
 
 // ErrorByzantineThresholdExceeded is raised if HotStuff detects malicious conditions which
