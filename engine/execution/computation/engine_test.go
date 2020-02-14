@@ -61,7 +61,7 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 
 		e := Engine{me: me}
 
-		view := state.NewView(func(key string) (bytes []byte, e error) {
+		view := state.NewView(func(key flow.RegisterID) (bytes []byte, e error) {
 			return nil, nil
 		})
 
@@ -99,7 +99,7 @@ func TestExecutionEngine_OnExecutableBlock(t *testing.T) {
 
 		blockExecutor.On("ExecuteBlock", mock.Anything, mock.Anything, mock.Anything).Return(computationResult, nil)
 
-		view := state.NewView(func(key string) (bytes []byte, e error) {
+		view := state.NewView(func(key flow.RegisterID) (bytes []byte, e error) {
 			return nil, nil
 		})
 

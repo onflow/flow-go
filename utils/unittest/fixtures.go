@@ -109,7 +109,7 @@ func ExecutionReceiptFixture() *flow.ExecutionReceipt {
 }
 
 func StateViewFixture() *state.View {
-	return state.NewView(func(key string) (bytes []byte, err error) {
+	return state.NewView(func(key flow.RegisterID) (bytes []byte, err error) {
 		return nil, nil
 	})
 }

@@ -255,17 +255,17 @@ func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flo
 // generateChunkHeader creates a chunk header from the provided chunk and register IDs.
 func generateChunkHeader(
 	chunk *flow.Chunk,
-	registerIDs []string,
+	registerIDs []flow.RegisterID,
 ) *flow.ChunkHeader {
-	reads := make([]flow.RegisterID, len(registerIDs))
-
-	for i, registerID := range registerIDs {
-		reads[i] = flow.RegisterID(registerID)
-	}
+	//reads := make([]flow.RegisterID, len(registerIDs))
+	//
+	//for i, registerID := range registerIDs {
+	//	reads[i] = flow.RegisterID(registerID)
+	//}
 
 	return &flow.ChunkHeader{
 		ChunkID:     chunk.ID(),
 		StartState:  chunk.StartState,
-		RegisterIDs: reads,
+		RegisterIDs: registerIDs,
 	}
 }

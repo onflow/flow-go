@@ -1,6 +1,7 @@
 package state
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
