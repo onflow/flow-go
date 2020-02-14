@@ -226,9 +226,10 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root []byte) ([][]byte, *proofHo
 	values := make([][]byte, len(keys))
 	// the case where we are reading from current state
 	if bytes.Equal(root, currRoot) {
+
 		for i, key := range keys {
 			res, err := s.database.GetKVDB(key)
-			if err != nil {
+			if err != nil && !errors.Is(err, databases.ErrNotFound) {
 				return nil, nil, err
 			}
 			values[i] = res
@@ -255,7 +256,7 @@ func (s *SMT) Read(keys [][]byte, trusted bool, root []byte) ([][]byte, *proofHo
 					}
 				}
 
-				if res == nil {
+				if res == nil && !errors.Is(err, databases.ErrNotFound) {
 					return nil, nil, err
 				}
 			}

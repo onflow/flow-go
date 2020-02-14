@@ -232,7 +232,7 @@ func (r *transactionContext) UpdateAccountCode(address runtime.Address, code []b
 	accountID := address[:]
 
 	if checkPermission && !r.isValidSigningAccount(address) {
-		return fmt.Errorf("not permitted to update account with ID %x", accountID)
+		return fmt.Errorf("not permitted to update account with ID %s", address)
 	}
 
 	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
@@ -240,7 +240,7 @@ func (r *transactionContext) UpdateAccountCode(address runtime.Address, code []b
 		return err
 	}
 	if bal == nil {
-		return fmt.Errorf("account with ID %s does not exist", accountID)
+		return fmt.Errorf("account with ID %s does not exist", address)
 	}
 
 	r.ledger.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
