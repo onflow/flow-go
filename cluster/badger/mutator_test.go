@@ -22,9 +22,25 @@ func TestBootstrap(t *testing.T) {
 
 		state, err := NewState(db, chainID)
 		require.Nil(t, err)
-		mutator := Mutator{state: state}
+		mutator := state.Mutate()
+
+		// a helper function to wipe the DB to clean up in between tests
+		cleanup := func() {
+			err := db.DropAll()
+			require.Nil(t, err)
+		}
+
+		t.Run("invalid chain ID", func(t *testing.T) {
+			defer cleanup()
+			genesis := cluster.Genesis()
+			genesis.ChainID = fmt.Sprintf("%s-invalid", genesis.ChainID)
+
+			err := mutator.Bootstrap(genesis)
+			assert.Error(t, err)
+		})
 
 		t.Run("invalid number", func(t *testing.T) {
+			defer cleanup()
 			genesis := cluster.Genesis()
 			genesis.Number = 1
 
@@ -33,6 +49,7 @@ func TestBootstrap(t *testing.T) {
 		})
 
 		t.Run("invalid parent hash", func(t *testing.T) {
+			defer cleanup()
 			genesis := cluster.Genesis()
 			genesis.ParentID = unittest.IdentifierFixture()
 
@@ -41,6 +58,7 @@ func TestBootstrap(t *testing.T) {
 		})
 
 		t.Run("payload hash does not match payload", func(t *testing.T) {
+			defer cleanup()
 			genesis := cluster.Genesis()
 			genesis.PayloadHash = unittest.IdentifierFixture()
 
@@ -49,6 +67,7 @@ func TestBootstrap(t *testing.T) {
 		})
 
 		t.Run("invalid payload", func(t *testing.T) {
+			defer cleanup()
 			genesis := cluster.Genesis()
 			genesis.Payload = cluster.Payload{
 				Collection: flow.LightCollection{
@@ -61,6 +80,7 @@ func TestBootstrap(t *testing.T) {
 		})
 
 		t.Run("bootstrap", func(t *testing.T) {
+			defer cleanup()
 			genesis := cluster.Genesis()
 
 			err := mutator.Bootstrap(genesis)
@@ -120,7 +140,7 @@ func TestExtend(t *testing.T) {
 		// set up state and mutator objects, these are safe to share between tests
 		state, err := NewState(db, chainID)
 		require.Nil(t, err)
-		mutator := Mutator{state: state}
+		mutator := state.Mutate()
 
 		// a helper function to bootstrap with the genesis block
 		bootstrap := func() {

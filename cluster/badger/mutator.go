@@ -18,6 +18,11 @@ type Mutator struct {
 func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 	return m.state.db.Update(func(tx *badger.Txn) error {
 
+		// check chain ID
+		if genesis.ChainID != m.state.chainID {
+			return fmt.Errorf("genesis chain ID (%s) does not configured (%s)", genesis.ChainID, m.state.chainID)
+		}
+
 		// check header number
 		if genesis.Number != 0 {
 			return fmt.Errorf("genesis number should be 0 (got %d)", genesis.Number)
@@ -75,6 +80,11 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		err := procedure.RetrieveClusterBlock(blockID, &block)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)
+		}
+
+		// check chain ID
+		if block.ChainID != m.state.chainID {
+			return fmt.Errorf("new block chain ID (%s) does not configured (%s)", block.ChainID, m.state.chainID)
 		}
 
 		// check block integrity
