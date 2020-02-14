@@ -82,7 +82,7 @@ func (s *Snapshot) head(head *flow.Header) func(*badger.Txn) error {
 			}
 		}
 
-		// get the snap shot header
+		// get the snapshot header
 		err := operation.RetrieveHeader(s.blockID, head)(tx)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header for block (%x): %w", s.blockID, err)
