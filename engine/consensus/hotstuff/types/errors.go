@@ -31,13 +31,13 @@ type DoubleVoteError struct {
 }
 
 type StaleVoteError struct {
-	Vote          *Vote
-	FinalizedView uint64
+	Vote              *Vote
+	HighestPrunedView uint64
 }
 
 type StaleBlockError struct {
-	BlockProposal *BlockProposal
-	FinalizedView uint64
+	Block             *Block
+	HighestPrunedView uint64
 }
 
 type ExistingQCError struct {
@@ -48,27 +48,27 @@ type ExistingQCError struct {
 var ErrInsufficientVotes = errors.New("received insufficient votes")
 
 func (e MissingSignerError) Error() string {
-	return fmt.Sprintf("The signer of vote %v is missing", e.Vote)
+	return fmt.Sprintf("missing signer of vote %v", e.Vote)
 }
 
 func (e InvalidSignatureError) Error() string {
-	return fmt.Sprintf("The signature of vote %v is invalid", e.Vote)
+	return fmt.Sprintf("invalid signature for vote %v", e.Vote)
 }
 
 func (e InvalidViewError) Error() string {
-	return fmt.Sprintf("The view of vote %v is invalid", e.Vote)
+	return fmt.Sprintf("invalid view for vote %v", e.Vote)
 }
 
 func (e DoubleVoteError) Error() string {
-	return fmt.Sprintf("Double voting detected (original vote: %v, double vote: %v)", e.OriginalVote, e.DoubleVote)
+	return fmt.Sprintf("double voting detected (original vote: %v, double vote: %v)", e.OriginalVote, e.DoubleVote)
 }
 
 func (e StaleVoteError) Error() string {
-	return fmt.Sprintf("Stale vote found (vote: %v, finalized view: %v)", e.Vote, e.FinalizedView)
+	return fmt.Sprintf("stale vote (highest pruned view %d): %v", e.HighestPrunedView, e.Vote)
 }
 
 func (e StaleBlockError) Error() string {
-	return fmt.Sprintf("Stale block found (block: %v, finalized view: %v)", e.BlockProposal, e.FinalizedView)
+	return fmt.Sprintf("stale block (highest pruned view %d): %v", e.HighestPrunedView, e.Block)
 }
 
 func (e ExistingQCError) Error() string {
@@ -83,11 +83,11 @@ func (e *ErrorConfiguration) Error() string { return e.Msg }
 
 type ErrorConflictingQCs struct {
 	View uint64
-	Qcs  []*QuorumCertificate
+	QCs  []*QuorumCertificate
 }
 
 func (e *ErrorConflictingQCs) Error() string {
-	return fmt.Sprintf("%d conflicting QCs at view %d", len(e.Qcs), e.View)
+	return fmt.Sprintf("%d conflicting QCs at view %d", len(e.QCs), e.View)
 }
 
 type ErrorMissingBlock struct {
@@ -105,6 +105,26 @@ type ErrorInvalidBlock struct {
 	Msg     string
 }
 
-func (e *ErrorInvalidBlock) Error() string {
-	return fmt.Sprintf("invalid block (view %d; ID %v): %s", e.View, e.BlockID, e.Msg)
+func (e ErrorInvalidBlock) Error() string {
+	return fmt.Sprintf("invalid block (view %d; ID %x): %s", e.View, e.BlockID, e.Msg)
+}
+
+func (e ErrorInvalidBlock) Is(other error) bool {
+	_, ok := other.(ErrorInvalidBlock)
+	return ok
+}
+
+type ErrorInvalidVote struct {
+	VoteID flow.Identifier
+	View   uint64
+	Msg    string
+}
+
+func (e ErrorInvalidVote) Error() string {
+	return fmt.Sprintf("invalid vote (view %d; ID %x): %s", e.View, e.VoteID, e.Msg)
+}
+
+func (e ErrorInvalidVote) Is(other error) bool {
+	_, ok := other.(ErrorInvalidVote)
+	return ok
 }

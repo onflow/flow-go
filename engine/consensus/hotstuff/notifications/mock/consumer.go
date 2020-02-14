@@ -12,12 +12,12 @@ type Consumer struct {
 }
 
 // OnBlockIncorporated provides a mock function with given fields: _a0
-func (_m *Consumer) OnBlockIncorporated(_a0 *types.BlockProposal) {
+func (_m *Consumer) OnBlockIncorporated(_a0 *types.Block) {
 	_m.Called(_a0)
 }
 
 // OnDoubleProposeDetected provides a mock function with given fields: _a0, _a1
-func (_m *Consumer) OnDoubleProposeDetected(_a0 *types.BlockProposal, _a1 *types.BlockProposal) {
+func (_m *Consumer) OnDoubleProposeDetected(_a0 *types.Block, _a1 *types.Block) {
 	_m.Called(_a0, _a1)
 }
 
@@ -27,7 +27,7 @@ func (_m *Consumer) OnEnteringView(viewNumber uint64) {
 }
 
 // OnFinalizedBlock provides a mock function with given fields: _a0
-func (_m *Consumer) OnFinalizedBlock(_a0 *types.BlockProposal) {
+func (_m *Consumer) OnFinalizedBlock(_a0 *types.Block) {
 	_m.Called(_a0)
 }
 

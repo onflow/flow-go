@@ -1,6 +1,7 @@
 package virtualmachine
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 	"strings"
@@ -44,13 +45,13 @@ func (r *transactionContext) Logs() []string {
 
 // GetValue gets a register value from the world state.
 func (r *transactionContext) GetValue(owner, controller, key []byte) ([]byte, error) {
-	v, _ := r.ledger.Get(fullKey(string(owner), string(controller), string(key)))
+	v, _ := r.ledger.Get(fullKeyHash(string(owner), string(controller), string(key)))
 	return v, nil
 }
 
 // SetValue sets a register value in the world state.
 func (r *transactionContext) SetValue(owner, controller, key, value []byte) error {
-	r.ledger.Set(fullKey(string(owner), string(controller), string(key)), value)
+	r.ledger.Set(fullKeyHash(string(owner), string(controller), string(key)), value)
 	return nil
 }
 
@@ -61,7 +62,7 @@ func (r *transactionContext) SetValue(owner, controller, key, value []byte) erro
 // After creating the account, this function calls the onAccountCreated callback registered
 // with this context.
 func (r *transactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address, error) {
-	latestAccountID, _ := r.ledger.Get(keyLatestAccount)
+	latestAccountID, _ := r.ledger.Get(fullKeyHash("", "", keyLatestAccount))
 
 	accountIDInt := big.NewInt(0).SetBytes(latestAccountID)
 	accountIDBytes := accountIDInt.Add(accountIDInt, big.NewInt(1)).Bytes()
@@ -70,14 +71,14 @@ func (r *transactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address
 
 	accountID := accountAddress[:]
 
-	r.ledger.Set(fullKey(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
+	r.ledger.Set(fullKeyHash(string(accountID), "", keyBalance), big.NewInt(0).Bytes())
 
 	err := r.setAccountPublicKeys(accountID, publicKeys)
 	if err != nil {
 		return runtime.Address{}, err
 	}
 
-	r.ledger.Set(keyLatestAccount, accountID)
+	r.ledger.Set(fullKeyHash("", "", keyLatestAccount), accountID)
 
 	r.Log("Creating new account\n")
 	r.Log(fmt.Sprintf("Address: %x", accountAddress))
@@ -92,7 +93,7 @@ func (r *transactionContext) CreateAccount(publicKeys [][]byte) (runtime.Address
 func (r *transactionContext) AddAccountKey(address runtime.Address, publicKey []byte) error {
 	accountID := address[:]
 
-	bal, err := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
+	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
 	if err != nil {
 		return err
 	}
@@ -117,7 +118,7 @@ func (r *transactionContext) AddAccountKey(address runtime.Address, publicKey []
 func (r *transactionContext) RemoveAccountKey(address runtime.Address, index int) (publicKey []byte, err error) {
 	accountID := address[:]
 
-	bal, err := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
+	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +149,7 @@ func (r *transactionContext) RemoveAccountKey(address runtime.Address, index int
 
 func (r *transactionContext) getAccountPublicKeys(accountID []byte) (publicKeys [][]byte, err error) {
 	countBytes, err := r.ledger.Get(
-		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
+		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
 	)
 	if err != nil {
 		return nil, err
@@ -164,7 +165,7 @@ func (r *transactionContext) getAccountPublicKeys(accountID []byte) (publicKeys 
 
 	for i := 0; i < count; i++ {
 		publicKey, err := r.ledger.Get(
-			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
+			fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)),
 		)
 		if err != nil {
 			return nil, err
@@ -184,7 +185,7 @@ func (r *transactionContext) setAccountPublicKeys(accountID []byte, publicKeys [
 	var existingCount int
 
 	countBytes, err := r.ledger.Get(
-		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
+		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
 	)
 	if err != nil {
 		return err
@@ -199,20 +200,20 @@ func (r *transactionContext) setAccountPublicKeys(accountID []byte, publicKeys [
 	newCount := len(publicKeys)
 
 	r.ledger.Set(
-		fullKey(string(accountID), string(accountID), keyPublicKeyCount),
+		fullKeyHash(string(accountID), string(accountID), keyPublicKeyCount),
 		big.NewInt(int64(newCount)).Bytes(),
 	)
 
 	for i, publicKey := range publicKeys {
 		r.ledger.Set(
-			fullKey(string(accountID), string(accountID), keyPublicKey(i)),
+			fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)),
 			publicKey,
 		)
 	}
 
 	// delete leftover keys
 	for i := newCount; i < existingCount; i++ {
-		r.ledger.Delete(fullKey(string(accountID), string(accountID), keyPublicKey(i)))
+		r.ledger.Delete(fullKeyHash(string(accountID), string(accountID), keyPublicKey(i)))
 	}
 
 	return nil
@@ -234,7 +235,7 @@ func (r *transactionContext) UpdateAccountCode(address runtime.Address, code []b
 		return fmt.Errorf("not permitted to update account with ID %x", accountID)
 	}
 
-	bal, err := r.ledger.Get(fullKey(string(accountID), "", keyBalance))
+	bal, err := r.ledger.Get(fullKeyHash(string(accountID), "", keyBalance))
 	if err != nil {
 		return err
 	}
@@ -242,7 +243,7 @@ func (r *transactionContext) UpdateAccountCode(address runtime.Address, code []b
 		return fmt.Errorf("account with ID %s does not exist", accountID)
 	}
 
-	r.ledger.Set(fullKey(string(accountID), string(accountID), keyCode), code)
+	r.ledger.Set(fullKeyHash(string(accountID), string(accountID), keyCode), code)
 
 	return nil
 }
@@ -261,7 +262,7 @@ func (r *transactionContext) ResolveImport(location runtime.Location) ([]byte, e
 
 	accountID := address.Bytes()
 
-	code, err := r.ledger.Get(fullKey(string(accountID), string(accountID), keyCode))
+	code, err := r.ledger.Get(fullKeyHash(string(accountID), string(accountID), keyCode))
 	if err != nil {
 		return nil, err
 	}
@@ -313,6 +314,11 @@ const (
 
 func fullKey(owner, controller, key string) string {
 	return strings.Join([]string{owner, controller, key}, "__")
+}
+func fullKeyHash(owner, controller, key string) flow.RegisterID {
+	h := sha256.New()
+	_, _ = h.Write([]byte(fullKey(owner, controller, key)))
+	return h.Sum(nil)
 }
 
 func keyPublicKey(index int) string {
