@@ -16,6 +16,11 @@ import (
 func InsertClusterBlock(block *cluster.Block) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 
+		// check payload integrity
+		if block.PayloadHash != block.Payload.Hash() {
+			return fmt.Errorf("computed payload hash does not match header")
+		}
+
 		// store the block header
 		err := operation.InsertHeader(&block.Header)(tx)
 		if err != nil {
@@ -125,7 +130,9 @@ func IndexClusterPayload(payload *cluster.Payload) func(*badger.Txn) error {
 		}
 
 		// index the single collection
-		err = operation.IndexCollection(payload.Hash(), &payload.Collection)(tx)
+		// we allow duplicate indexing because we anticipate blocks will often
+		// contain empty collections (which will be indexed by the same key)
+		err = operation.AllowDuplicates(operation.IndexCollection(payload.Hash(), &payload.Collection))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index collection: %w", err)
 		}

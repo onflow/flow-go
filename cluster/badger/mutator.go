@@ -39,11 +39,6 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 			return fmt.Errorf("genesis collection should contain no transactions (got %d)", collSize)
 		}
 
-		// check payload hash
-		if genesis.PayloadHash != genesis.Payload.Hash() {
-			return fmt.Errorf("genesis payload hash must match payload")
-		}
-
 		// insert block payload
 		err := operation.InsertCollection(&genesis.Payload.Collection)(tx)
 		if err != nil {
@@ -85,11 +80,6 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 		// check chain ID
 		if block.ChainID != m.state.chainID {
 			return fmt.Errorf("new block chain ID (%s) does not match configured (%s)", block.ChainID, m.state.chainID)
-		}
-
-		// check block integrity
-		if block.Payload.Hash() != block.PayloadHash {
-			return fmt.Errorf("block payload does not match payload hash")
 		}
 
 		// get the chain ID, which determines which cluster state to query

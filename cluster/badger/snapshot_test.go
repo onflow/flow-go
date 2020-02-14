@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dapperlabs/flow-go/model/cluster"
+	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 	"github.com/dapperlabs/flow-go/storage/badger/procedure"
 	"github.com/dapperlabs/flow-go/utils/unittest"
@@ -38,7 +39,7 @@ func TestSnapshot(t *testing.T) {
 		// a helper function to insert a block
 		insert := func(block cluster.Block) {
 			// first insert the payload
-			err = db.Update(operation.InsertCollection(&block.Collection))
+			err = db.Update(operation.AllowDuplicates(operation.InsertCollection(&block.Collection)))
 			assert.Nil(t, err)
 			// then insert the block
 			err = db.Update(procedure.InsertClusterBlock(&block))
@@ -74,6 +75,24 @@ func TestSnapshot(t *testing.T) {
 			head, err := snapshot.Head()
 			assert.Nil(t, err)
 			assert.Equal(t, genesis.ID(), head.ID())
+		})
+
+		t.Run("with empty collection", func(t *testing.T) {
+			defer cleanup()
+			bootstrap()
+
+			// create a block with an empty collection
+			block := unittest.ClusterBlockWithParent(genesis)
+			block.Collection = flow.LightCollection{}
+			block.PayloadHash = block.Payload.Hash()
+			insert(block)
+
+			snapshot := state.AtBlockID(block.ID())
+
+			// ensure collection is correct
+			coll, err := snapshot.Collection()
+			assert.Nil(t, err)
+			assert.Equal(t, &block.Collection, coll)
 		})
 
 		t.Run("finalized block", func(t *testing.T) {

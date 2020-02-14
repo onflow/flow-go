@@ -151,7 +151,7 @@ func TestExtend(t *testing.T) {
 		// a helper function to insert a block
 		insert := func(block cluster.Block) {
 			// first insert the payload
-			err = db.Update(operation.InsertCollection(&block.Collection))
+			err = db.Update(operation.AllowDuplicates(operation.InsertCollection(&block.Collection)))
 			assert.Nil(t, err)
 			// then insert the block
 			err = db.Update(procedure.InsertClusterBlock(&block))
@@ -176,19 +176,6 @@ func TestExtend(t *testing.T) {
 			blockID := unittest.IdentifierFixture()
 
 			err = mutator.Extend(blockID)
-			assert.Error(t, err)
-		})
-
-		t.Run("invalid payload hash", func(t *testing.T) {
-			defer cleanup()
-			bootstrap()
-
-			block := unittest.ClusterBlockWithParent(genesis)
-			// invalidate the payload hash
-			block.PayloadHash = unittest.IdentifierFixture()
-			insert(block)
-
-			err = mutator.Extend(block.ID())
 			assert.Error(t, err)
 		})
 
@@ -260,6 +247,20 @@ func TestExtend(t *testing.T) {
 			bootstrap()
 
 			block := unittest.ClusterBlockWithParent(genesis)
+			insert(block)
+
+			err = mutator.Extend(block.ID())
+			assert.Nil(t, err)
+		})
+
+		t.Run("extend with empty collection", func(t *testing.T) {
+			defer cleanup()
+			bootstrap()
+
+			block := unittest.ClusterBlockWithParent(genesis)
+			// set an empty collection as the payload
+			block.Collection = flow.LightCollection{}
+			block.PayloadHash = block.Payload.Hash()
 			insert(block)
 
 			err = mutator.Extend(block.ID())
