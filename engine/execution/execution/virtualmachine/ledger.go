@@ -12,16 +12,16 @@ type Ledger interface {
 // A MapLedger is a naive ledger storage implementation backed by a simple map.
 //
 // This implementation is designed for testing purposes.
-type MapLedger map[string][]byte
+type MapLedger map[string]flow.RegisterValue
 
-func (m MapLedger) Set(key string, value []byte) {
-	m[key] = value
+func (m MapLedger) Set(key flow.RegisterID, value flow.RegisterValue) {
+	m[string(key)] = value
 }
 
-func (m MapLedger) Get(key string) ([]byte, error) {
-	return m[key], nil
+func (m MapLedger) Get(key flow.RegisterID) (flow.RegisterValue, error) {
+	return m[string(key)], nil
 }
 
-func (m MapLedger) Delete(key string) {
-	delete(m, key)
+func (m MapLedger) Delete(key flow.RegisterID) {
+	delete(m, string(key))
 }
