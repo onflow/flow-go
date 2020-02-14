@@ -49,8 +49,8 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		view1 := es.NewView(sc1)
 
-		view1.Set(flow.RegisterID("fruit"), []byte("apple"))
-		view1.Set(flow.RegisterID("vegetable"), []byte("carrot"))
+		view1.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
+		view1.Set(flow.RegisterID("vegetable"), flow.RegisterValue("carrot"))
 
 		sc2, err := es.CommitDelta(view1.Delta())
 		assert.NoError(t, err)
@@ -62,8 +62,8 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		b2, err := view2.Get(flow.RegisterID("vegetable"))
 		assert.NoError(t, err)
 
-		assert.Equal(t, []byte("apple"), b1)
-		assert.Equal(t, []byte("carrot"), b2)
+		assert.Equal(t, flow.RegisterValue("apple"), b1)
+		assert.Equal(t, flow.RegisterValue("carrot"), b2)
 	}))
 
 	t.Run("commit write and read previous state", prepareTest(func(t *testing.T, es state.ExecutionState) {
@@ -73,14 +73,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		view1 := es.NewView(sc1)
 
-		view1.Set(flow.RegisterID("fruit"), []byte("apple"))
+		view1.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 
 		sc2, err := es.CommitDelta(view1.Delta())
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
-		view2.Set(flow.RegisterID("fruit"), []byte("orange"))
+		view2.Set(flow.RegisterID("fruit"), flow.RegisterValue("orange"))
 
 		sc3, err := es.CommitDelta(view2.Delta())
 		assert.NoError(t, err)
@@ -98,8 +98,8 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		b2, err := view4.Get(flow.RegisterID("fruit"))
 		assert.NoError(t, err)
 
-		assert.Equal(t, []byte("apple"), b1)
-		assert.Equal(t, []byte("orange"), b2)
+		assert.Equal(t, flow.RegisterValue("apple"), b1)
+		assert.Equal(t, flow.RegisterValue("orange"), b2)
 	}))
 
 	t.Run("commit delete and read new state", prepareTest(func(t *testing.T, es state.ExecutionState) {
@@ -109,7 +109,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		// set initial value
 		view1 := es.NewView(sc1)
-		view1.Set(flow.RegisterID("fruit"), []byte("apple"))
+		view1.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 
 		sc2, err := es.CommitDelta(view1.Delta())
 		assert.NoError(t, err)
@@ -134,7 +134,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		b2, err := view4.Get(flow.RegisterID("fruit"))
 		assert.NoError(t, err)
 
-		assert.Equal(t, []byte("apple"), b1)
+		assert.Equal(t, flow.RegisterValue("apple"), b1)
 		assert.Empty(t, b2)
 	}))
 }

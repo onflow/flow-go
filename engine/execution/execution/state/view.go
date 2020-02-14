@@ -25,6 +25,7 @@ func NewView(readFunc GetRegisterFunc) *View {
 	}
 }
 
+// NewChild generates a new child view, with the current view as the base, sharing the Get function
 func (r *View) NewChild() *View {
 	return NewView(r.Get)
 }
