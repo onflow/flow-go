@@ -120,7 +120,7 @@ lint:
 	golangci-lint run -v ./...
 
 .PHONY: ci
-ci: install-tools tidy lint test-safe coverage
+ci: install-tools tidy lint test coverage
 
 .PHONY: docker-ci
 docker-ci:
