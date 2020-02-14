@@ -31,6 +31,13 @@ func (b *Blocks) Store(block *flow.Block) error {
 	return err
 }
 
+func (b *Blocks) Finalize(blockID flow.Identifier) error {
+	err := b.db.Update(func(tx *badger.Txn) error {
+		return procedure.FinalizeBlock(blockID)(tx)
+	})
+	return err
+}
+
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	var block flow.Block
 	err := b.db.View(func(tx *badger.Txn) error {

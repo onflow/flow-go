@@ -112,16 +112,17 @@ func (s *state) GetChunkRegisters(chunkID flow.Identifier) (flow.Ledger, error) 
 }
 
 func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
-	commit, err := s.commits.ByFinalID(blockID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			//TODO ? Shouldn't happen in MVP, in multi-node should query a state from other nodes
-			panic(fmt.Sprintf("storage commitment for id %v does not exist", blockID))
-		} else {
-			return nil, err
-		}
-	}
-	return commit, nil
+	return s.commits.ByID(blockID)
+	// commit, err := s.commits.ByID(blockID)
+	// if err != nil {
+	// 	if errors.Is(err, storage.ErrNotFound) {
+	// 		//TODO ? Shouldn't happen in MVP, in multi-node should query a state from other nodes
+	// 		panic(fmt.Sprintf("storage commitment for id %v does not exist", blockID))
+	// 	} else {
+	// 		return nil, err
+	// 	}
+	// }
+	// return commit, nil
 }
 
 func (s *state) PersistStateCommitment(blockID flow.Identifier, commit flow.StateCommitment) error {

@@ -19,4 +19,7 @@ type Blocks interface {
 	// ByNumber returns the block with the given number. It is only available
 	// for finalized blocks.
 	ByNumber(number uint64) (*flow.Block, error)
+
+	// Finalize Updates the protocol state, indiciating that this block is considered finalized
+	Finalize(blockID flow.Identifier) error
 }
