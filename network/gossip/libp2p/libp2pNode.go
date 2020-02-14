@@ -114,19 +114,20 @@ func (p *P2PNode) Stop() error {
 			result = multierror.Append(result, err)
 		}
 	}
+
+	if result != nil {
+		// TODO: Till #2485 - graceful shutdown is implemented, swallow all unsusbscribe errors and only log it
+		p.logger.Debug().Err(result)
+	}
+
 	p.logger.Debug().Str("name", p.name).Msg("stopping libp2p node")
 	if err := p.libP2PHost.Close(); err != nil {
 		return multierror.Append(result, err)
 	}
 
-	if result != nil {
-		// TODO: Till #2485 - graceful shutdown is implemented, swallow all unsusbscribe errors and only log it
-		p.logger.Debug().Err(result)
-		result = nil
-	}
 	p.logger.Debug().Str("name", p.name).Msg("libp2p node stopped successfully")
 
-	return result
+	return nil
 }
 
 // AddPeers adds other nodes as peers to this node by adding them to the node's peerstore and connecting to them
