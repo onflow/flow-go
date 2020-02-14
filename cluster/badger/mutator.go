@@ -20,7 +20,7 @@ func (m *Mutator) Bootstrap(genesis *cluster.Block) error {
 
 		// check chain ID
 		if genesis.ChainID != m.state.chainID {
-			return fmt.Errorf("genesis chain ID (%s) does not configured (%s)", genesis.ChainID, m.state.chainID)
+			return fmt.Errorf("genesis chain ID (%s) does not match configured (%s)", genesis.ChainID, m.state.chainID)
 		}
 
 		// check header number
@@ -84,7 +84,7 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 
 		// check chain ID
 		if block.ChainID != m.state.chainID {
-			return fmt.Errorf("new block chain ID (%s) does not configured (%s)", block.ChainID, m.state.chainID)
+			return fmt.Errorf("new block chain ID (%s) does not match configured (%s)", block.ChainID, m.state.chainID)
 		}
 
 		// check block integrity
