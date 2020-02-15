@@ -25,7 +25,6 @@ type DoubleVoteError struct {
 type InvalidVoteError struct {
 	VoteID flow.Identifier
 	View   uint64
-	Msg    string
 }
 
 type StaleVoteError struct {
@@ -50,7 +49,7 @@ func (e MissingSignerError) Error() string {
 }
 
 func (e InvalidVoteError) Error() string {
-	return e.Msg
+	return fmt.Sprintf("invalid vote found (vote: %x)", e.VoteID)
 }
 
 func (e DoubleVoteError) Error() string {

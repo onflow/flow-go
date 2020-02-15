@@ -1,6 +1,7 @@
 package hotstuff
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -99,7 +100,7 @@ func (e *EventHandler) OnReceiveProposal(proposal *types.Proposal) error {
 	}
 
 	// store the proposer's vote in voteAggregator
-	e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
+	_ = e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
 
 	// if the block is for the current view, then process the current block
 	curView := e.paceMaker.CurView()
@@ -319,7 +320,7 @@ func (e *EventHandler) processVote(vote *types.Vote) error {
 		// store the pending vote if voting block is not found.
 		// We don't need to proactively fetch the missing voting block, because the chain compliance layer has acknowledged
 		// the missing block and requested it already.
-		e.voteAggregator.StorePendingVote(vote)
+		_ = e.voteAggregator.StorePendingVote(vote)
 
 		e.log.Info().
 			Uint64("vote_view", vote.View).

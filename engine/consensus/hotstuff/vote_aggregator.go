@@ -28,6 +28,7 @@ type VoteAggregator struct {
 // NewVoteAggregator creates an instance of vote aggregator
 func NewVoteAggregator(notifier notifications.Consumer, highestPrunedView uint64, viewState *ViewState, voteValidator *Validator, sigAggregator SigAggregator) *VoteAggregator {
 	return &VoteAggregator{
+		// TODO: implement logger in the future
 		logger:                zerolog.Logger{},
 		notifier:              notifier,
 		highestPrunedView:     highestPrunedView,
@@ -46,15 +47,17 @@ func NewVoteAggregator(notifier notifications.Consumer, highestPrunedView uint64
 // StorePendingVote stores the vote as a pending vote assuming the caller has checked that the voting
 // block is currently missing.
 // Note: Validations on these pending votes will be postponed until the block has been received.
-func (va *VoteAggregator) StorePendingVote(vote *types.Vote) {
+func (va *VoteAggregator) StorePendingVote(vote *types.Vote) bool {
 	// check if the vote is for a view that has already been pruned (and is thus stale)
 	// cannot store vote for already pruned view
 	if va.isStale(vote) {
-		return
+		return false
 	}
 	// process the vote
 	va.pendingVotes.AddVote(vote)
 	va.updateState(vote)
+
+	return true
 }
 
 // StoreVoteAndBuildQC stores the vote assuming the caller has checked that the voting block is incorporated,
@@ -91,12 +94,13 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, block *types.Blo
 }
 
 // StoreProposerVote stores the vote for a block that was proposed.
-func (va *VoteAggregator) StoreProposerVote(vote *types.Vote) {
+func (va *VoteAggregator) StoreProposerVote(vote *types.Vote) bool {
 	// check if the proposer vote is for a view that has already been pruned (and is thus stale)
 	if va.isStale(vote) { // cannot store vote for already pruned view
-		return
+		return false
 	}
 	va.proposerVotes[vote.BlockID] = vote
+	return true
 }
 
 // BuildQCOnReceivedBlock will attempt to build a QC for the given block when there are votes
@@ -181,7 +185,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, blo
 		switch err := err.(type) {
 		case types.InvalidVoteError:
 			va.notifier.OnInvalidVoteDetected(vote)
-			va.logger.Warn().Msg(err.Msg)
+			va.logger.Warn().Msg(err.Error())
 			return false, nil
 		default:
 			return false, fmt.Errorf("could not validate incorporated vote: %w", err)
