@@ -10,6 +10,7 @@ import (
 type VoteAggregator struct {
 	viewState             *ViewState
 	voteValidator         *Validator
+	sigAggregator         SigAggregator
 	highestPrunedView     uint64
 	pendingVotes          *PendingVotes                                // keeps track of votes whose blocks can not be found
 	viewToBlockIDSet      map[uint64]map[flow.Identifier]struct{}      // for pruning
@@ -19,11 +20,12 @@ type VoteAggregator struct {
 	proposerVotes         map[flow.Identifier]*types.Vote              // holds the votes of block proposers, so we can avoid passing around proposals everywhere
 }
 
-func NewVoteAggregator(highestPrunedView uint64, viewState *ViewState, voteValidator *Validator) *VoteAggregator {
+func NewVoteAggregator(highestPrunedView uint64, viewState *ViewState, voteValidator *Validator, sigAggregator SigAggregator) *VoteAggregator {
 	return &VoteAggregator{
 		highestPrunedView:     highestPrunedView,
 		viewState:             viewState,
 		voteValidator:         voteValidator,
+		sigAggregator:         sigAggregator,
 		pendingVotes:          NewPendingVotes(),
 		viewToBlockIDSet:      make(map[uint64]map[flow.Identifier]struct{}),
 		viewToVoteID:          make(map[uint64]map[flow.Identifier]*types.Vote),
@@ -182,7 +184,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, blo
 		if err != nil {
 			return nil, fmt.Errorf("could not get identities: %w", err)
 		}
-		votingStatus = NewVotingStatus(threshold, vote.View, uint32(len(identities)), voter, vote.BlockID)
+		votingStatus = NewVotingStatus(va.sigAggregator, threshold, vote.View, uint32(len(identities)), voter, vote.BlockID)
 		va.blockIDToVotingStatus[vote.BlockID] = votingStatus
 	}
 	votingStatus.AddVote(vote, voter)

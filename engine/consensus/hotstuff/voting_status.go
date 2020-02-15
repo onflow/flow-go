@@ -9,6 +9,7 @@ import (
 
 // VotingStatus keeps track of incorporated votes for the same block
 type VotingStatus struct {
+	sigAggregator    SigAggregator
 	blockID          flow.Identifier
 	signerCount      uint32
 	view             uint64
@@ -18,8 +19,9 @@ type VotingStatus struct {
 	votes map[flow.Identifier]*types.Vote
 }
 
-func NewVotingStatus(thresholdStake uint64, view uint64, signerCount uint32, voter *flow.Identity, blockID flow.Identifier) *VotingStatus {
+func NewVotingStatus(sigAggregator SigAggregator, thresholdStake uint64, view uint64, signerCount uint32, voter *flow.Identity, blockID flow.Identifier) *VotingStatus {
 	return &VotingStatus{
+		sigAggregator:  sigAggregator,
 		thresholdStake: thresholdStake,
 		view:           view,
 		signerCount:    signerCount,
@@ -43,15 +45,21 @@ func (vs *VotingStatus) CanBuildQC() bool {
 	return vs.accumulatedStake >= vs.thresholdStake
 }
 
+// TryBuildQC returns a QC if the existing votes are enought to build a QC, otherwise
+// an error will be returned.
 func (vs *VotingStatus) TryBuildQC() (*types.QuorumCertificate, error) {
-	sigs := vs.getSigsSliceFromVotes()
+	// check if there are enough votes to build QC
 	if !vs.CanBuildQC() {
 		return nil, fmt.Errorf("could not build QC: %w", types.ErrInsufficientVotes)
 	}
-	aggregatedSig, err := FromSignatures(sigs, vs.signerCount)
+
+	// build the aggregated signature
+	aggregatedSig, err := vs.aggregateSig()
 	if err != nil {
-		return nil, fmt.Errorf("could not build QC: %w", err)
+		return nil, fmt.Errorf("could not build aggregate signatures for building QC: %w", err)
 	}
+
+	// build the QC
 	qc := &types.QuorumCertificate{
 		View:                vs.view,
 		BlockID:             vs.blockID,
@@ -61,12 +69,16 @@ func (vs *VotingStatus) TryBuildQC() (*types.QuorumCertificate, error) {
 	return qc, nil
 }
 
-func (vs *VotingStatus) getSigsSliceFromVotes() []*types.SingleSignature {
-	var signatures = make([]*types.SingleSignature, len(vs.votes))
-	i := 0
-	for _, vote := range vs.votes {
-		signatures[i] = vote.Signature
-		i++
+func (vs *VotingStatus) aggregateSig() (*types.AggregatedSignature, error) {
+	sigs := getSigsSliceFromVotes(vs.votes)
+	return vs.sigAggregator.Aggregate(sigs)
+}
+
+func getSigsSliceFromVotes(votes map[flow.Identifier]*types.Vote) []*types.SingleSignature {
+	var signatures = make([]*types.SingleSignature, 0, len(votes))
+
+	for _, vote := range votes {
+		signatures = append(signatures, vote.Signature)
 	}
 
 	return signatures

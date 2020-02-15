@@ -53,6 +53,30 @@ func (s *SigProvider) VerifyAggregatedSignature(aggsig *types.AggregatedSignatur
 	return true, nil
 }
 
+// Aggregate aggregates signatures into an aggregated signature
+func (s *SigProvider) Aggregate(sigs []*types.SingleSignature) (*types.AggregatedSignature, error) {
+	// check if sigs is empty
+	if len(sigs) == 0 {
+		return nil, fmt.Errorf("no signature to be aggregated")
+	}
+
+	// This implementation is a naive way of aggregation the signatures. It will work, with
+	// the downside of costing more bandwidth.
+	// The more optimal way, which is the real aggregation, will be implemented when the crypto
+	// API is available.
+	aggsig := make([]crypto.Signature, len(sigs))
+	signerIDs := make([]flow.Identifier, len(sigs))
+	for i, sig := range sigs {
+		aggsig[i] = sig.Raw
+		signerIDs[i] = sig.SignerID
+	}
+
+	return &types.AggregatedSignature{
+		Raw:       aggsig,
+		SignerIDs: signerIDs,
+	}, nil
+}
+
 // VoteFor signs a Block and returns the Vote for that Block
 func (s *SigProvider) VoteFor(block *types.Block) (*types.Vote, error) {
 	// convert to bytes to be signed
