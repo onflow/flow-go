@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -13,11 +12,11 @@ import (
 type Validator struct {
 	viewState   *ViewState
 	forks       ForksReader
-	sigVerifier *signature.SigProvider
+	sigVerifier SigVerifier
 }
 
 // NewValidator creates a new Validator instance
-func NewValidator(viewState *ViewState, forks ForksReader, sigVerifier *signature.SigProvider) *Validator {
+func NewValidator(viewState *ViewState, forks ForksReader, sigVerifier SigVerifier) *Validator {
 	return &Validator{
 		viewState:   viewState,
 		sigVerifier: sigVerifier,
@@ -85,7 +84,7 @@ func (v *Validator) ValidateQC(qc *types.QuorumCertificate, block *types.Block) 
 	}
 
 	// validate qc's aggregated signature.
-	valid, err := v.sigVerifier.VerifySig(qc.AggregatedSignature.Raw, block, pubkeys...)
+	valid, err := v.sigVerifier.VerifyAggregatedSignature(qc.AggregatedSignature, block, pubkeys)
 	if err != nil {
 		return fmt.Errorf("cannot verify qc's aggregated signature, qc.BlockID: %x", qc.BlockID)
 	}
