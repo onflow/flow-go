@@ -1524,10 +1524,13 @@ func (checker *Checker) checkCompositeResourceInvalidated(containerType Type, co
 //
 func (checker *Checker) checkResourceFieldsInvalidated(containerTypeIdentifier string, members map[string]*Member) {
 	for _, member := range members {
-		// NOTE: check type, not resource annotation:
-		// the field could have a wrong annotation
+
+		// NOTE: check the of the type annotation, not the type annotation's
+		// resource marker: the field could have an incorrect type annotation
+		// that is missing the resource marker even though it is required
+
 		if !member.TypeAnnotation.Type.IsResourceType() {
-			return
+			continue
 		}
 
 		info := checker.resources.Get(member)
