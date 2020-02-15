@@ -99,6 +99,26 @@ type ErrorInvalidBlock struct {
 	Msg     string
 }
 
-func (e *ErrorInvalidBlock) Error() string {
-	return fmt.Sprintf("invalid block (view %d; ID %v): %s", e.View, e.BlockID, e.Msg)
+func (e ErrorInvalidBlock) Error() string {
+	return fmt.Sprintf("invalid block (view %d; ID %x): %s", e.View, e.BlockID, e.Msg)
+}
+
+func (e ErrorInvalidBlock) Is(other error) bool {
+	_, ok := other.(ErrorInvalidBlock)
+	return ok
+}
+
+type ErrorInvalidVote struct {
+	VoteID flow.Identifier
+	View   uint64
+	Msg    string
+}
+
+func (e ErrorInvalidVote) Error() string {
+	return fmt.Sprintf("invalid vote (view %d; ID %x): %s", e.View, e.VoteID, e.Msg)
+}
+
+func (e ErrorInvalidVote) Is(other error) bool {
+	_, ok := other.(ErrorInvalidVote)
+	return ok
 }

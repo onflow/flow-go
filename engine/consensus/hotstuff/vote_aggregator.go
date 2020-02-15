@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
@@ -14,6 +15,7 @@ type VoteAggregator struct {
 	notifier              notifications.Consumer
 	viewState             *ViewState
 	voteValidator         *Validator
+	sigAggregator         SigAggregator
 	highestPrunedView     uint64
 	pendingVotes          *PendingVotes                                // keeps track of votes whose blocks can not be found
 	viewToBlockIDSet      map[uint64]map[flow.Identifier]struct{}      // for pruning
@@ -24,13 +26,14 @@ type VoteAggregator struct {
 }
 
 // NewVoteAggregator creates an instance of vote aggregator
-func NewVoteAggregator(notifier notifications.Consumer, highestPrunedView uint64, viewState *ViewState, voteValidator *Validator) *VoteAggregator {
+func NewVoteAggregator(notifier notifications.Consumer, highestPrunedView uint64, viewState *ViewState, voteValidator *Validator, sigAggregator SigAggregator) *VoteAggregator {
 	return &VoteAggregator{
 		logger:                zerolog.Logger{},
 		notifier:              notifier,
 		highestPrunedView:     highestPrunedView,
 		viewState:             viewState,
 		voteValidator:         voteValidator,
+		sigAggregator:         sigAggregator,
 		pendingVotes:          NewPendingVotes(),
 		viewToBlockIDSet:      make(map[uint64]map[flow.Identifier]struct{}),
 		viewToVoteID:          make(map[uint64]map[flow.Identifier]*types.Vote),
@@ -201,7 +204,7 @@ func (va *VoteAggregator) validateAndStoreIncorporatedVote(vote *types.Vote, blo
 		if err != nil {
 			return false, fmt.Errorf("could not get identities: %w", err)
 		}
-		votingStatus = NewVotingStatus(threshold, vote.View, uint32(len(identities)), voter, vote.BlockID)
+		votingStatus = NewVotingStatus(va.sigAggregator, threshold, vote.View, uint32(len(identities)), voter, vote.BlockID)
 		va.blockIDToVotingStatus[vote.BlockID] = votingStatus
 	}
 	votingStatus.AddVote(vote, voter)

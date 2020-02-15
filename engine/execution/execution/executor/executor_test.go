@@ -39,7 +39,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		es.On("NewView", mock.Anything).
 			Return(
-				state.NewView(func(key string) (bytes []byte, e error) {
+				state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 					return nil, nil
 				}))
 
@@ -84,7 +84,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		es.On("NewView", mock.Anything).
 			Return(
-				state.NewView(func(key string) (bytes []byte, e error) {
+				state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 					return nil, nil
 				})).
 			Times(collectionCount)

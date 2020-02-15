@@ -16,6 +16,10 @@ func InsertCollection(collection *flow.LightCollection) func(*badger.Txn) error 
 	return insert(makePrefix(codeCollection, collection.ID()), collection)
 }
 
+func CheckCollection(collID flow.Identifier, exists *bool) func(*badger.Txn) error {
+	return check(makePrefix(codeCollection, collID), exists)
+}
+
 // IndexCollection indexes the collection by payload hash.
 func IndexCollection(payloadHash flow.Identifier, collection *flow.LightCollection) func(*badger.Txn) error {
 	return insert(makePrefix(codeIndexCollection, payloadHash), collection.ID())
