@@ -14,6 +14,7 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -27,6 +28,7 @@ type Engine struct {
 	state    protocol.State
 	payloads storage.Payloads
 	hotstuff hotstuff.HotStuff
+	con      network.Conduit
 }
 
 // New creates a new consensus propagation engine.
@@ -43,10 +45,11 @@ func New(log zerolog.Logger, net module.Network, me module.Local, state protocol
 	}
 
 	// register the engine with the network layer and store the conduit
-	_, err := net.Register(engine.ProtocolConsensus, e)
+	con, err := net.Register(engine.ProtocolConsensus, e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
+	e.con = con
 
 	return e, nil
 }
@@ -93,6 +96,36 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
+// SendVote will send a vote to the desired node.
+func (e *Engine) SendVote(vote *types.Vote, recipientID flow.Identifier) error {
+
+	// check that we are sending our own vote
+	if vote.Signature.SignerID != e.me.NodeID() {
+		return fmt.Errorf("can only send votes signed locally")
+	}
+
+	// NOTE: the signer ID will be conveyed through the message origin ID;
+	// we can thus leave it out of the message to conserve bandwidth
+
+	// NOTE: the view is redundant because we can deduce it from the block ID
+	// on the receiver end in the CCL; however, we can optimize processing by
+	// including it, so that we can check the signature before having the block
+
+	// convert the vote to a vote message
+	msg := messages.BlockVote{
+		View:      vote.View,
+		Signature: vote.Signature.Raw,
+	}
+
+	// send the vote the desired recipient
+	err := e.con.Submit(&msg, recipientID)
+	if err != nil {
+		return fmt.Errorf("could not send vote: %w", err)
+	}
+
+	return nil
+}
+
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch entity := event.(type) {
@@ -131,31 +164,27 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, block *messages.Block
 }
 
 // onBlockVote handles incoming block votes.
-func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
+func (e *Engine) onBlockVote(originID flow.Identifier, msg *messages.BlockVote) error {
 
-	// NOTE: The signer index here is not necessary, as we always know the origin
-	// of any message on the network, including votes, so we already can look up
-	// the public key upon reception. However, as we decided to work with signer
-	// indices inside of hotstuff, we now have to send it along, because the
-	// mapping between index and node / public key might not be known before the
-	// block is received.
+	// rebuild the signature using the origin ID and the transmitted signature
 	sig := types.SingleSignature{
-		Raw:      vote.Signature,
-		SignerID: vote.Signer,
+		Raw:      msg.Signature,
+		SignerID: originID,
 	}
 
-	// NOTE: The view number is not really be needed, as the hotstuff algorithm
-	// is able to look up the view number by block ID at the moment it processes
-	// the vote. No vote can be processed without having the related proposal
-	// with its included view number anyway.
-	hsVote := types.Vote{
-		View:      vote.View,
-		BlockID:   vote.BlockID,
+	// rebuild the vote in the type prefered by hotstuff
+	// NOTE: the view number is somewhat redundant, as we can locally check the view
+	// of the referenced block ID; however, we might not have the block yet, so sending
+	// the view along will allow us to validate the signature immediately and cache votes
+	// appropriately within hotstuff
+	vote := types.Vote{
+		BlockID:   msg.BlockID,
+		View:      msg.View,
 		Signature: &sig,
 	}
 
-	// ideally, this call could just be: blockID, voterID, signature
-	e.hotstuff.SubmitVote(&hsVote)
+	// forward the vote to hotstuff for processing
+	e.hotstuff.SubmitVote(&vote)
 
 	return nil
 }

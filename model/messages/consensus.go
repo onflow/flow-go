@@ -13,6 +13,5 @@ type BlockProposal struct {
 type BlockVote struct {
 	View      uint64
 	BlockID   flow.Identifier
-	Signer    flow.Identifier
 	Signature crypto.Signature
 }
