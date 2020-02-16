@@ -131,7 +131,7 @@ func generateBlock(collectionCount, transactionCount int) *execution.CompleteBlo
 
 	block := flow.Block{
 		Header: flow.Header{
-			Number: 42,
+			View: 42,
 		},
 		Payload: flow.Payload{
 			Guarantees: guarantees,

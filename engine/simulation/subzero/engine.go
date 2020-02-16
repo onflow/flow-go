@@ -135,7 +135,7 @@ ConsentLoop:
 			proposalID := proposal.ID()
 
 			log = log.With().
-				Uint64("proposal_number", proposal.Number).
+				Uint64("proposal_number", proposal.View).
 				Hex("proposal_id", proposalID[:]).
 				Logger()
 
@@ -178,7 +178,7 @@ func (e *Engine) createProposal() (*flow.Header, error) {
 	// define the block header build function
 	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
 		header := flow.Header{
-			Number:      parent.Number + 1,
+			View:        parent.View + 1,
 			Timestamp:   time.Now().UTC(),
 			ParentID:    parent.ID(),
 			PayloadHash: payloadHash,
