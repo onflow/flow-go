@@ -1,4 +1,4 @@
-package types
+package hotstuff
 
 import (
 	"errors"
@@ -127,4 +127,16 @@ func (e ErrorInvalidVote) Error() string {
 func (e ErrorInvalidVote) Is(other error) bool {
 	_, ok := other.(ErrorInvalidVote)
 	return ok
+}
+
+// ErrorByzantineThresholdExceeded is raised if HotStuff detects malicious conditions which
+// prove a Byzantine threshold of consensus replicas has been exceeded.
+// Per definition, the byzantine threshold is exceeded is there are byzantine consensus
+// replicas with _at least_ 1/3 stake.
+type ErrorByzantineThresholdExceeded struct {
+	Evidence string
+}
+
+func (e *ErrorByzantineThresholdExceeded) Error() string {
+	return e.Evidence
 }

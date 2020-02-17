@@ -3,6 +3,8 @@
 package main
 
 import (
+	"github.com/spf13/pflag"
+
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
@@ -21,6 +23,7 @@ func main() {
 
 	var (
 		err        error
+		chainID    string
 		guarantees mempool.Guarantees
 		receipts   mempool.Receipts
 		approvals  mempool.Approvals
@@ -30,6 +33,9 @@ func main() {
 	)
 
 	cmd.FlowNode("consensus").
+		ExtraFlags(func(flags *pflag.FlagSet) {
+			flags.StringVarP(&chainID, "chain-id", "c", "flow", "the chain ID for the protocol chain")
+		}).
 		Create(func(node *cmd.FlowNodeBuilder) {
 			node.Logger.Info().Msg("initializing guarantee mempool")
 			guarantees, err = stdmap.NewGuarantees()
@@ -73,7 +79,7 @@ func main() {
 			node.Logger.Info().Msg("initializing subzero consensus engine")
 			headersDB := storage.NewHeaders(node.DB)
 			payloadsDB := storage.NewPayloads(node.DB)
-			build := builder.NewBuilder(node.DB, guarantees, seals)
+			build := builder.NewBuilder(node.DB, guarantees, seals, chainID)
 			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
 			sub, err := subzero.New(node.Logger, prov, headersDB, payloadsDB, node.State, node.Me, build, final)
 			node.MustNot(err).Msg("could not initialize subzero engine")

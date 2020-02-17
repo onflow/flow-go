@@ -1,7 +1,7 @@
 package notifications
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // Consumer consumes outbound notification events produced by HotStuff and its
@@ -34,7 +34,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnStartingTimeout(*types.TimerInfo)
+	OnStartingTimeout(*hotstuff.TimerInfo)
 
 	// OnReachedTimeout notifications are produced by PaceMaker. Such a notification indicates that the
 	// PaceMaker's timeout was processed by the system.
@@ -42,14 +42,14 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnReachedTimeout(*types.TimerInfo)
+	OnReachedTimeout(*hotstuff.TimerInfo)
 
 	// OnQcIncorporated consumes the notifications are produced by ForkChoice
 	// whenever a quorum certificate is incorporated into the consensus state.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnQcIncorporated(*types.QuorumCertificate)
+	OnQcIncorporated(*hotstuff.QuorumCertificate)
 
 	// OnForkChoiceGenerated notifications are produced by ForkChoice whenever a fork choice is generated.
 	// The arguments specify the view (first argument) of the block which is to be built and the
@@ -57,26 +57,26 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnForkChoiceGenerated(uint64, *types.QuorumCertificate)
+	OnForkChoiceGenerated(uint64, *hotstuff.QuorumCertificate)
 
 	// OnBlockIncorporated notifications are produced by the Finalization Logic
 	// whenever a block is incorporated into the consensus state.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnBlockIncorporated(*types.Block)
+	OnBlockIncorporated(*hotstuff.Block)
 
 	// OnFinalizedBlock notifications are produced by the Finalization Logic whenever a block has been finalized.
 	// They are emitted in the order the blocks are finalized.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnFinalizedBlock(*types.Block)
+	OnFinalizedBlock(*hotstuff.Block)
 
 	// OnDoubleProposeDetected notifications are produced by the Finalization Logic
 	// whenever a double block proposal (equivocation) was detected.
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnDoubleProposeDetected(*types.Block, *types.Block)
+	OnDoubleProposeDetected(*hotstuff.Block, *hotstuff.Block)
 }

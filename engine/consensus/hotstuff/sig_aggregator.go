@@ -1,8 +1,10 @@
 package hotstuff
 
-import "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+import (
+	"github.com/dapperlabs/flow-go/model/hotstuff"
+)
 
 // SigAggregator aggregates signatures into an aggregated signature
 type SigAggregator interface {
-	Aggregate([]*types.SingleSignature) (*types.AggregatedSignature, error)
+	Aggregate([]*hotstuff.SingleSignature) (*hotstuff.AggregatedSignature, error)
 }

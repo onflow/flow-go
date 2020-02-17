@@ -1,9 +1,8 @@
-package hotstuff
+package consensus
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/model/flow"
 )
 
 // HotStuff defines the interface to the core HotStuff algorithm. It includes
@@ -29,23 +28,11 @@ type HotStuff interface {
 	//
 	// Block proposals must be submitted in order and only if they extend a
 	// block already known to HotStuff core.
-	SubmitProposal(*types.Proposal)
+	SubmitProposal(proposal *flow.Header, parentView uint64)
 
 	// SubmitVote submits a new vote to the HotStuff event loop.
 	// This method blocks until the vote is accepted to the event queue.
 	//
 	// Votes may be submitted in any order.
-	SubmitVote(*types.Vote)
-}
-
-// New sets up and instantiates an instance of the HotStuff core algorithm.
-// TODO
-func New(
-	signer Signer,
-	communicator Communicator,
-	consumer notifications.Consumer,
-	finalizer module.Finalizer,
-	builder module.Builder,
-) (HotStuff, error) {
-	panic("TODO")
+	SubmitVote(originID flow.Identifier, blockID flow.Identifier, view uint64, sig crypto.Signature)
 }
