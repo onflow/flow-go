@@ -172,6 +172,12 @@ func (e *EventHandler) startNewView() error {
 			return fmt.Errorf("can not make block proposal for curView %v: %w", curView, err)
 		}
 
+		// store the proposer's vote in voteAggregator
+		// note: duplicate here to account for an edge case
+		// where we are the leader of current view as well
+		// as the next view
+		_ = e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
+
 		err = e.forks.AddBlock(proposal.Block)
 		if err != nil {
 			return fmt.Errorf("cannot store block for curProposal: %w", err)
@@ -304,7 +310,6 @@ func (e *EventHandler) tryBuildQCForBlock(block *types.Block) error {
 		return fmt.Errorf("building qc for block failed: %w", err)
 	}
 	if !built {
-		// if the qc isn't built, use block.QC instead
 		return nil
 	}
 	return e.processQC(qc)

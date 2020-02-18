@@ -131,10 +131,11 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *types.Block) (*types.Quo
 	// accumulate leader vote first to ensure leader's vote is always included in the QC
 	valid, err := va.validateAndStoreIncorporatedVote(proposerVote, block)
 	if err != nil {
-		return nil, false, fmt.Errorf("leader vote is invalid %w", err)
+		return nil, false, fmt.Errorf("could not validate proposer vote: %w", err)
 	}
 	if !valid {
-		return nil, false, nil
+		// proposer vote should not be invalid unless validating block has failed
+		return nil, false, fmt.Errorf("validating block failed: %x", block.BlockID)
 	}
 	// accumulate pending votes by order
 	pendingStatus, exists := va.pendingVotes.votes[block.BlockID]
