@@ -3553,3 +3553,103 @@ func TestCheckResourceCreationAndInvalidationInLoop(t *testing.T) {
 
 	require.NoError(t, err)
 }
+
+func TestCheckInvalidResourceOwnerField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+      resource Test {
+          let owner: PublicAccount
+
+          init(owner: PublicAccount) {
+              self.owner = owner
+          }
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceInterfaceOwnerField(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource interface Test {
+         let owner: PublicAccount
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceOwnerFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource Test {
+         fun owner() {}
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckInvalidResourceInterfaceOwnerFunction(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource interface Test {
+         fun owner()
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidDeclarationError{}, errs[0])
+}
+
+func TestCheckResourceOwnerFieldUse(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource Test {
+
+         fun test(): PublicAccount? {
+             return self.owner
+         }
+     }
+   `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckResourceInterfaceOwnerFieldUse(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource interface Test {
+
+         fun test() {
+             pre { self.owner != nil }
+         }
+     }
+   `)
+
+	require.NoError(t, err)
+}
+
+func TestCheckInvalidResourceOwnerFieldInitialization(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+     resource Test {
+
+         init(owner: PublicAccount) {
+             self.owner = owner
+         }
+     }
+   `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.AssignmentToConstantMemberError{}, errs[0])
+}
