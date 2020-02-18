@@ -7,12 +7,9 @@ import (
 type ResultApprovalBody struct {
 	// CorrectnessAttestation
 	ExecutionResultID    Identifier       // hash of approved execution result
-	AttestationSignature crypto.Signature // signature over ExecutionResultHash
-
-	// Verification Proof
-	ChunkIndexList []uint32 // list of chunk indices assigned to the verifier
-	Proof          []byte   // proof of correctness of the chunk assignment
-	Spocks         []Spock  // proof of re-computation, one per each chunk
+	ChunkNumber          uint64           // chunk number
+	AttestationSignature crypto.Signature // signature over ExecutionResultID and ChunkNumber, this has been separated for BLS aggregation
+	Spock                Spock            // proof of re-computation, one per each chunk
 }
 
 type ResultApproval struct {
