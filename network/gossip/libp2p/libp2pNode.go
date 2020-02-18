@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -26,6 +28,9 @@ import (
 const (
 	FlowLibP2PProtocolID protocol.ID = "/flow/push/0.0.1"
 )
+
+// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
+const maxConnectAttempt = 3
 
 // NodeAddress is used to define a libp2p node
 type NodeAddress struct {
@@ -84,8 +89,6 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 	// Creating a new PubSub instance of the type GossipSub with psOption
 	p.ps, err = pubsub.NewGossipSub(ctx, p.libP2PHost, psOption...)
 
-	// TODO: Adjust pubsub.GossipSubD, pubsub.GossipSubDLo and pubsub.GossipSubDHi as per fanout provided in the future
-
 	if err != nil {
 		return errors.Wrapf(err, "unable to start pubsub %s", p.name)
 	}
@@ -104,15 +107,27 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 
 // Stop stops the libp2p node.
 func (p *P2PNode) Stop() error {
-	p.Lock()
-	defer p.Unlock()
-	err := p.libP2PHost.Close()
-	if err != nil {
-		err = fmt.Errorf("could not stop node: %w", err)
-	} else {
-		p.logger.Debug().Str("name", p.name).Msg("libp2p node stopped successfully")
+	var result error
+	p.logger.Debug().Str("name", p.name).Msg("unsubscribing from all topics")
+	for t := range p.topics {
+		if err := p.UnSubscribe(t); err != nil {
+			result = multierror.Append(result, err)
+		}
 	}
-	return err
+
+	if result != nil {
+		// TODO: Till #2485 - graceful shutdown is implemented, swallow all unsusbscribe errors and only log it
+		p.logger.Debug().Err(result)
+	}
+
+	p.logger.Debug().Str("name", p.name).Msg("stopping libp2p node")
+	if err := p.libP2PHost.Close(); err != nil {
+		return multierror.Append(result, err)
+	}
+
+	p.logger.Debug().Str("name", p.name).Msg("libp2p node stopped successfully")
+
+	return nil
 }
 
 // AddPeers adds other nodes as peers to this node by adding them to the node's peerstore and connecting to them
@@ -172,7 +187,42 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 	}
 
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
-	return p.libP2PHost.NewStream(ctx, peerID, FlowLibP2PProtocolID)
+	stream, err = p.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stream for %s: %w", peerID.String(), err)
+	}
+	return stream, nil
+}
+
+// tryCreateNewStream makes at most maxAttempts to create a stream with the target peer
+// This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
+// remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'
+// https://github.com/libp2p/go-yamux/blob/c7e96b999446162afa256908963dff8f5954037a/session.go#L629
+// TODO: Explore using context timeout instead of maxAttempts
+func (p *P2PNode) tryCreateNewStream(ctx context.Context, targetID peer.ID, maxAttempts int) (network.Stream, error) {
+	var errs, err error
+	var s network.Stream
+	var retries = 0
+	for ; retries < maxAttempts; retries++ {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("context done before stream could be created (retry attempt: %d", retries)
+		default:
+		}
+		s, err = p.libP2PHost.NewStream(ctx, targetID, FlowLibP2PProtocolID)
+		if err != nil {
+			p.logger.Error().Str("target", targetID.String()).Err(err).
+				Int("retry_attempt", retries).Msg("failed to create stream")
+			errs = multierror.Append(errs, err)
+			time.Sleep(5 * time.Millisecond)
+			continue
+		}
+		break
+	}
+	if retries == maxAttempts {
+		return s, errs
+	}
+	return s, nil
 }
 
 // GetPeerInfo generates the address of a Node/Peer given its address in a deterministic and consistent way.
@@ -244,8 +294,7 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 	p.Lock()
 	defer p.Unlock()
 	// Remove the Subscriber from the cache
-	s := p.subs[topic]
-	if s != nil {
+	if s, found := p.subs[topic]; found {
 		s.Cancel()
 		p.subs[topic] = nil
 		delete(p.subs, topic)
@@ -257,6 +306,7 @@ func (p *P2PNode) UnSubscribe(topic string) error {
 		return err
 	}
 
+	// attempt to close the topic
 	err := tp.Close()
 	if err != nil {
 		err = errors.Wrapf(err, "unable to close topic %s", topic)

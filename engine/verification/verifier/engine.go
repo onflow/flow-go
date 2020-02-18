@@ -161,10 +161,10 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 func (e *Engine) executeChunk(res *verification.CompleteExecutionResult) (flow.StateCommitment, error) {
 	blockCtx := virtualmachine.NewBlockContext(e.runtime, &res.Block.Header)
 
-	getRegister := func(key string) ([]byte, error) {
+	getRegister := func(key flow.RegisterID) (flow.RegisterValue, error) {
 		registers := res.ChunkStates[0].Registers
 
-		val, ok := registers[key]
+		val, ok := registers[string(key)]
 		if !ok {
 			return nil, fmt.Errorf("missing register")
 		}

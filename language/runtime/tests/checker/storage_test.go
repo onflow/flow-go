@@ -315,5 +315,38 @@ func TestCheckInvalidResourceMoveOutOfStorage(t *testing.T) {
     `)
 
 	errs := ExpectCheckerErrors(t, err, 1)
+
 	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
+}
+
+func TestCheckInvalidDestroyStorageValue(t *testing.T) {
+
+	_, err := ParseAndCheckStorage(t, `
+      resource R {}
+
+      fun test() {
+          destroy storage[R]
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.InvalidNestedResourceMoveError{}, errs[0])
+}
+
+func TestCheckInvalidOptionalStorageKeyType(t *testing.T) {
+
+	_, err := ParseAndCheckStorage(t, `
+      resource R {}
+
+      fun test() {
+          let r <- storage[R?] <- nil
+          destroy r
+      }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.TypeMismatchWithDescriptionError{}, errs[0])
+	assert.IsType(t, &sema.TypeMismatchWithDescriptionError{}, errs[1])
 }

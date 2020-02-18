@@ -1,5 +1,9 @@
 package databases
 
+import "errors"
+
+var ErrNotFound = errors.New("trie kv: not found")
+
 type DAL interface {
 	// PutIntoBatcher puts key-value pairs into a batcher.
 	PutIntoBatcher(key []byte, value []byte)

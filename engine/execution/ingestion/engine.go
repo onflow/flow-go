@@ -28,6 +28,7 @@ type Engine struct {
 	conduit           network.Conduit
 	collectionConduit network.Conduit
 	blocks            storage.Blocks
+	payloads          storage.Payloads
 	collections       storage.Collections
 	execution         network.Engine
 	mempool           *Mempool
@@ -39,6 +40,7 @@ func New(
 	me module.Local,
 	state protocol.State,
 	blocks storage.Blocks,
+	payloads storage.Payloads,
 	collections storage.Collections,
 	executionEngine network.Engine,
 ) (*Engine, error) {
@@ -55,6 +57,7 @@ func New(
 		me:          me,
 		state:       state,
 		blocks:      blocks,
+		payloads:    payloads,
 		collections: collections,
 		execution:   executionEngine,
 		mempool:     mempool,
@@ -164,10 +167,10 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(block)).
-		Uint64("block_number", block.Number).
+		Uint64("block_view", block.View).
 		Msg("received block")
 
-	err := e.state.Mutate().StorePayload(&block.Payload)
+	err := e.payloads.Store(&block.Payload)
 	if err != nil {
 		return fmt.Errorf("could not save block payload: %w", err)
 	}
@@ -178,6 +181,12 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 	}
 
 	blockID := block.ID()
+
+	// TODO: for MVP assume we're only receiving finalized blocks
+	err = e.state.Mutate().Finalize(blockID)
+	if err != nil {
+		return fmt.Errorf("could not finalize block: %w", err)
+	}
 
 	collectionIdentifiers, err := e.findCollectionNodes()
 	if err != nil {

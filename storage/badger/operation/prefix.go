@@ -31,10 +31,11 @@ const (
 	// codeApproval    = 26
 	codeChunkHeader = 27
 
-	codeIndexIdentity  = 100
-	codeIndexGuarantee = 101
-	codeIndexSeal      = 102
-	codeIndexCommit    = 103
+	codeIndexIdentity   = 100
+	codeIndexGuarantee  = 101
+	codeIndexSeal       = 102
+	codeIndexCommit     = 103
+	codeIndexCollection = 104
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {
@@ -52,6 +53,8 @@ func b(v interface{}) []byte {
 		b := make([]byte, 8)
 		binary.BigEndian.PutUint64(b, i)
 		return b
+	case string:
+		return []byte(i)
 	case flow.Role:
 		return []byte{byte(i)}
 	case flow.Identifier:

@@ -50,13 +50,11 @@ func (e *blockExecutor) ExecuteBlock(
 
 func (e *blockExecutor) executeBlock(
 	block *execution.CompleteBlock,
-) (chunk []*flow.Chunk, endState flow.StateCommitment, err error) {
+) ([]*flow.Chunk, flow.StateCommitment, error) {
 	blockCtx := e.vm.NewBlockContext(&block.Block.Header)
 
-	var startState flow.StateCommitment
-
 	// get initial start state from parent block
-	startState, err = e.state.StateCommitmentByBlockID(block.Block.ParentID)
+	currentState, err := e.state.StateCommitmentByBlockID(block.Block.ParentID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch starting state commitment: %w", err)
 	}
@@ -66,16 +64,16 @@ func (e *blockExecutor) executeBlock(
 	chunks := make([]*flow.Chunk, len(collections))
 
 	for i, collection := range collections {
-		chunk, endState, err := e.executeCollection(i, blockCtx, startState, collection)
+		chunk, chunkEndState, err := e.executeCollection(i, blockCtx, currentState, collection)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
 
 		chunks[i] = chunk
-		startState = endState
+		currentState = chunkEndState
 	}
 
-	return chunks, endState, nil
+	return chunks, currentState, nil
 }
 
 func (e *blockExecutor) executeCollection(
@@ -159,17 +157,11 @@ func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flo
 // generateChunkHeader creates a chunk header from the provided chunk and register IDs.
 func generateChunkHeader(
 	chunk *flow.Chunk,
-	registerIDs []string,
+	registerIDs []flow.RegisterID,
 ) *flow.ChunkHeader {
-	reads := make([]flow.RegisterID, len(registerIDs))
-
-	for i, registerID := range registerIDs {
-		reads[i] = flow.RegisterID(registerID)
-	}
-
 	return &flow.ChunkHeader{
 		ChunkID:     chunk.ID(),
 		StartState:  chunk.StartState,
-		RegisterIDs: reads,
+		RegisterIDs: registerIDs,
 	}
 }

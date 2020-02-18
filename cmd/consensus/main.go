@@ -10,8 +10,8 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
 	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/builder/consensus"
-	"github.com/dapperlabs/flow-go/module/cleaner"
+	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
+	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -20,13 +20,13 @@ import (
 func main() {
 
 	var (
+		err        error
 		guarantees mempool.Guarantees
 		receipts   mempool.Receipts
 		approvals  mempool.Approvals
 		seals      mempool.Seals
 		prop       *propagation.Engine
 		prov       *provider.Engine
-		err        error
 	)
 
 	cmd.FlowNode("consensus").
@@ -72,11 +72,9 @@ func main() {
 		Component("coldstuff engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing coldstuff engine")
 			headersDB := storage.NewHeaders(node.DB)
-			guaranteesDB := storage.NewGuarantees(node.DB)
-			sealsDB := storage.NewSeals(node.DB)
-			build := consensus.NewBuilder(node.DB, node.State, guarantees, seals)
-			clean := cleaner.New(guaranteesDB, sealsDB, guarantees, seals)
-			cold, err := coldstuff.New(node.Logger, node.Network, prop, headersDB, node.State, node.Me, build, clean)
+			build := builder.NewBuilder(node.DB, guarantees, seals)
+			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
+			cold, err := coldstuff.New(node.Logger, node.Network, prop, headersDB, node.State, node.Me, build, final)
 			node.MustNot(err).Msg("could not initialize coldstuff engine")
 			return cold
 		}).

@@ -50,13 +50,16 @@ endif
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master; \
 	GO111MODULE=on go get github.com/kevinburke/go-bindata/...@v3.11.0;
 
-.PHONY: test
-test: generate-mocks
+.PHONY: unittest
+unittest:
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	$(MAKE) -C crypto test
 	$(MAKE) -C language test
 	$(MAKE) -C integration test
+
+.PHONY: test
+test: generate-mocks unittest
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -86,7 +89,7 @@ generate-capnp:
 
 .PHONY: generate-mocks
 generate-mocks:
-	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/dapperlabs/flow-go/storage Blocks,Collections,Commits
+	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/dapperlabs/flow-go/storage Blocks,Payloads,Collections,Commits
 	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/dapperlabs/flow-go/module Network,Local
 	GO111MODULE=on mockgen -destination=network/mocks/conduit.go -package=mocks github.com/dapperlabs/flow-go/network Conduit
 	GO111MODULE=on mockgen -destination=network/mocks/engine.go -package=mocks github.com/dapperlabs/flow-go/network Engine
@@ -104,6 +107,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/execution/virtualmachine -case=underscore -output="./engine/execution/execution/virtualmachine/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=network/gossip/libp2p/middleware -case=underscore -output="./network/gossip/libp2p/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'Consumer' -dir="./engine/consensus/hotstuff/notifications/" -case=underscore -output="./engine/consensus/hotstuff/notifications/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name 'Vertex' -dir="./engine/consensus/hotstuff/forks/finalizer/forest" -case=underscore -output="./engine/consensus/hotstuff/forks/finalizer/forest/mock" -outpkg="mock"
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy

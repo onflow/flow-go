@@ -25,16 +25,17 @@ type EchoEngine struct {
 	received chan struct{}    // used as an indicator on reception of messages for testing
 	echomsg  string           // used as a fix string to be included in the reply echos
 	seen     map[string]int   // used to track the seen events
-
+	echo     bool             // used to enable or disable echoing back the recvd message
 }
 
-func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID uint8) *EchoEngine {
+func NewEchoEngine(t *testing.T, net module.Network, cap int, engineID uint8, echo bool) *EchoEngine {
 	te := &EchoEngine{
 		t:        t,
 		echomsg:  "this is an echo",
 		event:    make(chan interface{}, cap),
 		received: make(chan struct{}, cap),
 		seen:     make(map[string]int),
+		echo:     echo,
 	}
 
 	c2, err := net.Register(engineID, te)
@@ -83,6 +84,11 @@ func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error
 
 	// avoids endless circulation of echos by filtering echoing back the echo messages
 	if strings.HasPrefix(strEvent, te.echomsg) {
+		return nil
+	}
+
+	// do not echo back if not needed
+	if !te.echo {
 		return nil
 	}
 

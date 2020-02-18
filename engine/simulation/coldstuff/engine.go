@@ -35,7 +35,7 @@ type Engine struct {
 	state     protocol.State
 	me        module.Local
 	builder   module.Builder
-	cleaner   module.Cleaner
+	finalizer module.Finalizer
 	round     Round
 	interval  time.Duration
 	timeout   time.Duration
@@ -46,7 +46,7 @@ type Engine struct {
 
 // New initializes a new coldstuff consensus engine, using the injected network
 // and the injected memory pool to forward the injected protocol state.
-func New(log zerolog.Logger, net module.Network, exp network.Engine, headers storage.Headers, state protocol.State, me module.Local, builder module.Builder, cleaner module.Cleaner) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, exp network.Engine, headers storage.Headers, state protocol.State, me module.Local, builder module.Builder, finalizer module.Finalizer) (*Engine, error) {
 
 	// initialize the engine with dependencies
 	e := &Engine{
@@ -57,7 +57,7 @@ func New(log zerolog.Logger, net module.Network, exp network.Engine, headers sto
 		state:     state,
 		me:        me,
 		builder:   builder,
-		cleaner:   cleaner,
+		finalizer: finalizer,
 		round:     nil, // initialized for each consensus round
 		interval:  5 * time.Second,
 		timeout:   1 * time.Second,
@@ -254,7 +254,7 @@ func (e *Engine) sendProposal() error {
 	// define the block header build function
 	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
 		header := flow.Header{
-			Number:      e.round.Parent().Number + 1,
+			View:        e.round.Parent().View + 1,
 			Timestamp:   time.Now().UTC(),
 			ParentID:    e.round.Parent().ID(),
 			PayloadHash: payloadHash,
@@ -270,7 +270,7 @@ func (e *Engine) sendProposal() error {
 	}
 
 	log = log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.View).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Logger()
 
@@ -302,7 +302,7 @@ func (e *Engine) waitForVotes() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.View).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "wait_votes").
 		Logger()
@@ -378,7 +378,7 @@ func (e *Engine) sendCommit() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.View).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "send_commit").
 		Logger()
@@ -429,9 +429,9 @@ func (e *Engine) waitForProposal() error {
 			}
 
 			// discard proposals with the wrong height
-			number := e.round.Parent().Number + 1
-			if candidate.Number != e.round.Parent().Number+1 {
-				log.Warn().Uint64("candidate_height", candidate.Number).Uint64("expected_height", number).Msg("invalid height")
+			number := e.round.Parent().View + 1
+			if candidate.View != e.round.Parent().View+1 {
+				log.Warn().Uint64("candidate_height", candidate.View).Uint64("expected_height", number).Msg("invalid height")
 				continue
 			}
 
@@ -453,7 +453,7 @@ func (e *Engine) waitForProposal() error {
 			e.round.Propose(candidate)
 
 			log.Info().
-				Uint64("number", candidate.Number).
+				Uint64("number", candidate.View).
 				Hex("candidate_id", logging.Entity(candidate)).
 				Msg("block proposal received")
 
@@ -473,7 +473,7 @@ func (e *Engine) voteOnProposal() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.View).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "send_vote").
 		Logger()
@@ -501,7 +501,7 @@ func (e *Engine) waitForCommit() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.View).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "wait_commit").
 		Logger()
@@ -541,7 +541,7 @@ func (e *Engine) commitCandidate() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.View).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "exec_commit").
 		Logger()
@@ -553,19 +553,13 @@ func (e *Engine) commitCandidate() error {
 	}
 
 	// finalize the state
-	err = e.state.Mutate().Finalize(candidate.ID())
+	err = e.finalizer.MakeFinal(candidate.ID())
 	if err != nil {
 		return fmt.Errorf("could not finalize state: %w", err)
 	}
 
 	// hand the finalized block to expulsion engine to spread to all nodes
 	e.exp.Submit(e.round.Leader().NodeID, e.round.Candidate())
-
-	// make sure all pending ambiguous state is now cleared up
-	err = e.cleaner.CleanAfter(candidate.ID())
-	if err != nil {
-		return fmt.Errorf("could not drop ambiguous state: %w", err)
-	}
 
 	log.Info().Msg("block candidate committed")
 
