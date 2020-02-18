@@ -9,7 +9,7 @@ import (
 
 type testIntExtractor struct{}
 
-func (testIntExtractor) ExtractInt(
+func (testIntExtractor) ExtractInteger(
 	extractor *ExpressionExtractor,
 	expression *IntegerExpression,
 ) ExpressionExtraction {

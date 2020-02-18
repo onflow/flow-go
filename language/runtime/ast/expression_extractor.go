@@ -15,7 +15,7 @@ type NilExtractor interface {
 }
 
 type IntExtractor interface {
-	ExtractInt(extractor *ExpressionExtractor, expression *IntegerExpression) ExpressionExtraction
+	ExtractInteger(extractor *ExpressionExtractor, expression *IntegerExpression) ExpressionExtraction
 }
 
 type FixedPointExtractor interface {
@@ -183,12 +183,12 @@ func (extractor *ExpressionExtractor) VisitIntegerExpression(expression *Integer
 	// or call default implementation
 
 	if extractor.IntExtractor != nil {
-		return extractor.IntExtractor.ExtractInt(extractor, expression)
+		return extractor.IntExtractor.ExtractInteger(extractor, expression)
 	}
-	return extractor.ExtractInt(expression)
+	return extractor.ExtractInteger(expression)
 }
 
-func (extractor *ExpressionExtractor) ExtractInt(expression *IntegerExpression) ExpressionExtraction {
+func (extractor *ExpressionExtractor) ExtractInteger(expression *IntegerExpression) ExpressionExtraction {
 
 	// nothing to rewrite, return as-is
 
