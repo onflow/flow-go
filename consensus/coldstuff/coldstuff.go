@@ -1,11 +1,11 @@
 package coldstuff
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/coldstuff/round"
@@ -181,25 +181,18 @@ func (e *coldStuff) sendProposal() error {
 		Logger()
 
 	// get our own ID to tally our stake
-	id, err := e.state.Final().Identity(e.me.NodeID())
+	myIdentity, err := e.state.Final().Identity(e.me.NodeID())
 	if err != nil {
 		return fmt.Errorf("could not get own current ID: %w", err)
 	}
 
 	// define the block header build function
-	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
-		header := flow.Header{
-			Height:      e.round.Parent().Height + 1,
-			Timestamp:   time.Now().UTC(),
-			ParentID:    e.round.Parent().ID(),
-			PayloadHash: payloadHash,
-			ProposerID:  e.me.NodeID(),
-		}
-		return &header, nil
+	setProposer := func(header *flow.Header) {
+		header.ProposerID = myIdentity.NodeID
 	}
 
 	// get the payload for the next hash
-	candidate, err := e.builder.BuildOn(e.round.Parent().ID(), build)
+	candidate, err := e.builder.BuildOn(e.round.Parent().ID(), setProposer)
 	if err != nil {
 		return fmt.Errorf("could not build on parent: %w", err)
 	}
@@ -226,7 +219,7 @@ func (e *coldStuff) sendProposal() error {
 	}
 
 	// add our own vote to the engine
-	e.round.Tally(id.NodeID, id.Stake)
+	e.round.Tally(myIdentity.NodeID, myIdentity.Stake)
 
 	log.Info().Msg("block proposal sent")
 
@@ -269,7 +262,7 @@ func (e *coldStuff) waitForVotes() error {
 
 			// discard votes that are not by staked consensus nodes
 			id, err := e.state.Final().Identity(voterID)
-			if errors.Cause(err) == badger.ErrKeyNotFound {
+			if errors.Is(err, badger.ErrKeyNotFound) {
 				log.Warn().Hex("voter_id", voterID[:]).Msg("vote by unknown node")
 				continue
 			}

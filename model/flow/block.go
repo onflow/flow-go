@@ -64,26 +64,16 @@ func (b Block) Valid() bool {
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
-	// ChainID is a chain-specific value to prevent replay attacks.
-	ChainID string
-	// ParentID is the ID of this block's parent.
-	ParentID Identifier
-	// ProposerID is the ID of the node that proposed this block.
-	ProposerID Identifier
-	// View is the view number at which this block was proposed.
-	View uint64
-	// Height is the height of the block in the blockchain
-	Height uint64
-	// PayloadHash is a hash of the payload of this block.
-	PayloadHash Identifier
-	// Timestamp is the time at which this block was proposed. The proposing
-	// node can choose any time, so this should not be trusted as accurate.
-	Timestamp time.Time
-	// ParentSig is an aggregated signature for the parent block.
-	ParentSigs    []crypto.Signature
+	ChainID       string     // ChainID is a chain-specific value to prevent replay attacks.
+	ParentID      Identifier // ParentID is the ID of this block's parent.
+	Height        uint64
+	PayloadHash   Identifier // PayloadHash is a hash of the payload of this block.
+	Timestamp     time.Time  // Timestamp is the time at which this block was proposed. The proposing node can choose any time, so this should not be trusted as accurate.
+	View          uint64     // View is the view number at which this block was proposed.
 	ParentSigners []Identifier
-	// ProposerSig is the signature of the proposer over the header body.
-	ProposerSig crypto.Signature
+	ParentSigs    []crypto.Signature // ParentSigs is an aggregated signature for the parent block.
+	ProposerID    Identifier
+	ProposerSig   crypto.Signature // ProposerSig is the signature of the proposer over the header body.
 }
 
 // Body returns the immutable part of the block header.
@@ -91,23 +81,23 @@ func (h Header) Body() interface{} {
 	return struct {
 		ChainID       string
 		ParentID      Identifier
-		ProposerID    Identifier
-		View          uint64
 		Height        uint64
 		PayloadHash   Identifier
 		Timestamp     time.Time
-		ParentSigs    []crypto.Signature
+		View          uint64
+		ProposerID    Identifier
 		ParentSigners []Identifier
+		ParentSigs    []crypto.Signature
 	}{
 		ChainID:       h.ChainID,
 		ParentID:      h.ParentID,
-		ProposerID:    h.ProposerID,
-		View:          h.View,
 		Height:        h.Height,
 		PayloadHash:   h.PayloadHash,
 		Timestamp:     h.Timestamp,
-		ParentSigs:    h.ParentSigs,
+		View:          h.View,
+		ProposerID:    h.ProposerID,
 		ParentSigners: h.ParentSigners,
+		ParentSigs:    h.ParentSigs,
 	}
 }
 

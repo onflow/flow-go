@@ -5,6 +5,8 @@ package main
 import (
 	"time"
 
+	"github.com/spf13/pflag"
+
 	"github.com/dapperlabs/flow-go/cmd"
 	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/consensus"
@@ -24,6 +26,7 @@ func main() {
 
 	var (
 		err        error
+		chainID    string
 		guarantees mempool.Guarantees
 		receipts   mempool.Receipts
 		approvals  mempool.Approvals
@@ -33,6 +36,9 @@ func main() {
 	)
 
 	cmd.FlowNode("consensus").
+		ExtraFlags(func(flags *pflag.FlagSet) {
+			flags.StringVarP(&chainID, "chain-id", "c", "flow", "the chain ID for the protocol chain")
+		}).
 		Create(func(node *cmd.FlowNodeBuilder) {
 			node.Logger.Info().Msg("initializing guarantee mempool")
 			guarantees, err = stdmap.NewGuarantees()
@@ -75,11 +81,14 @@ func main() {
 			node.Logger.Info().Msg("initializing coldstuff engine")
 			headersDB := storage.NewHeaders(node.DB)
 			payloadsDB := storage.NewPayloads(node.DB)
-			build := builder.NewBuilder(node.DB, guarantees, seals)
+			build := builder.NewBuilder(node.DB, guarantees, seals, chainID)
 			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
+
 			cold, err := coldstuff.New(node.Logger, node.State, node.Me, build, prop, final, time.Second*3, time.Second*10)
-			cons, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB)
-			node.MustNot(err).Msg("could not initialize coldstuff engine")
+			node.MustNot(err).Msg("could not initialize coldstuff module")
+
+			cons, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, cold)
+			node.MustNot(err).Msg("could not initialize consensus engine")
 			return cons
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
