@@ -12,8 +12,10 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
+	"github.com/dapperlabs/flow-go/network"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/storage"
 )
@@ -25,12 +27,14 @@ type Engine struct {
 	log      zerolog.Logger // used to log relevant actions with context
 	me       module.Local
 	state    protocol.State
+	headers  storage.Headers
 	payloads storage.Payloads
 	hotstuff hotstuff.HotStuff
+	con      network.Conduit
 }
 
 // New creates a new consensus propagation engine.
-func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, payloads storage.Payloads, hotstuff hotstuff.HotStuff) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, headers storage.Headers, payloads storage.Payloads, hotstuff hotstuff.HotStuff) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -38,15 +42,17 @@ func New(log zerolog.Logger, net module.Network, me module.Local, state protocol
 		log:      log.With().Str("engine", "consensus").Logger(),
 		me:       me,
 		state:    state,
+		headers:  headers,
 		payloads: payloads,
 		hotstuff: hotstuff,
 	}
 
 	// register the engine with the network layer and store the conduit
-	_, err := net.Register(engine.ProtocolConsensus, e)
+	con, err := net.Register(engine.ProtocolConsensus, e)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not register engine")
 	}
+	e.con = con
 
 	return e, nil
 }
@@ -93,6 +99,110 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
+// SendVote will send a vote to the desired node.
+func (e *Engine) SendVote(vote *types.Vote, recipientID flow.Identifier) error {
+
+	// check that we are sending our own vote
+	if vote.Signature.SignerID != e.me.NodeID() {
+		return fmt.Errorf("can only send votes signed locally")
+	}
+
+	// NOTE: the signer ID will be conveyed through the message origin ID;
+	// we can thus leave it out of the message to conserve bandwidth
+
+	// NOTE: the view is redundant because we can deduce it from the block ID
+	// on the receiver end in the CCL; however, we can optimize processing by
+	// including it, so that we can check the signature before having the block
+
+	// convert the vote to a vote message
+	msg := messages.BlockVote{
+		View:      vote.View,
+		Signature: vote.Signature.Raw,
+	}
+
+	// send the vote the desired recipient
+	err := e.con.Submit(&msg, recipientID)
+	if err != nil {
+		return fmt.Errorf("could not send vote: %w", err)
+	}
+
+	return nil
+}
+
+// BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
+func (e *Engine) BroadcastProposal(proposal *types.Proposal) error {
+
+	// first, check that we are the proposer of the block
+	if proposal.Block.ProposerID != e.me.NodeID() {
+		return fmt.Errorf("can only propagate locally generated proposals")
+	}
+
+	// NOTE: a number of fields are redundant and can be omitted in the flow model
+	// (- height can be deduced from the parent) -> not used for now
+	// - parent view can be deduced from the parent
+
+	// convert the proposal into a flat header model
+	header := flow.Header{
+		ChainID:       proposal.Block.ChainID,
+		ParentID:      proposal.Block.QC.BlockID,
+		ProposerID:    proposal.Block.ProposerID,
+		View:          proposal.Block.View,
+		Height:        proposal.Block.Height,
+		PayloadHash:   proposal.Block.PayloadHash,
+		Timestamp:     proposal.Block.Timestamp,
+		ParentSigs:    proposal.Block.QC.AggregatedSignature.Raw,
+		ParentSigners: proposal.Block.QC.AggregatedSignature.SignerIDs,
+		ProposerSig:   proposal.Signature,
+	}
+
+	// check that the header ID corresponds to the proposal value
+	if proposal.Block.BlockID != header.ID() {
+		return fmt.Errorf("mismatch between proposal & reconstructed header block ID")
+	}
+
+	// retrieve the payload for the block
+	payload, err := e.payloads.ByPayloadHash(proposal.Block.PayloadHash)
+	if err != nil {
+		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
+	}
+
+	// check that the payload matches the payload hash
+	if proposal.Block.PayloadHash != payload.Hash() {
+		return fmt.Errorf("mismatch between proposal & reconstructed payload hash")
+	}
+
+	// retrieve all consensus nodes without our ID
+	recipients, err := e.state.AtBlockID(proposal.Block.QC.BlockID).Identities(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	)
+	if err != nil {
+		return fmt.Errorf("could not get consensus recipients: %w", err)
+	}
+
+	// NOTE: some fields are not needed for the message
+	// - proposer ID is conveyed over the network message
+	// - the payload hash is deduced from the payload
+	msg := messages.BlockProposal{
+		ChainID:       header.ChainID,
+		ParentID:      header.ParentID,
+		View:          header.View,
+		Timestamp:     header.Timestamp,
+		ParentSigs:    header.ParentSigs,
+		ParentSigners: header.ParentSigners,
+		ProposerSig:   header.ProposerSig,
+		Payload:       payload,
+	}
+
+	// broadcast the proposal to consensus nodes
+	err = e.con.Submit(&msg, recipients.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not send proposal message: %w", err)
+	}
+
+	return nil
+}
+
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch entity := event.(type) {
@@ -106,56 +216,100 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 // onBlockProposal handles incoming block proposals.
-func (e *Engine) onBlockProposal(originID flow.Identifier, block *messages.BlockProposal) error {
+func (e *Engine) onBlockProposal(originID flow.Identifier, msg *messages.BlockProposal) error {
 
-	// check if the payload in itself is consistent with the header payload hash
-	if block.Payload.Hash() != block.Header.PayloadHash {
-		return fmt.Errorf("block proposal has invalid payload hash")
+	// retrieve the parent for the block for parent view
+	// TODO: instead of erroring when missing, simply cache
+	parent, err := e.headers.ByBlockID(msg.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
 	// store all of the block contents
-	err := e.payloads.Store(block.Payload)
+	err = e.payloads.Store(msg.Payload)
 	if err != nil {
 		return fmt.Errorf("could not store block payload: %w", err)
 	}
 
+	// reconstruct the block proposal to know block ID
+	header := flow.Header{
+		ChainID:       msg.ChainID,
+		ParentID:      msg.ParentID,
+		ProposerID:    originID,
+		View:          msg.View,
+		Height:        parent.Height + 1,
+		PayloadHash:   msg.Payload.Hash(),
+		Timestamp:     msg.Timestamp,
+		ParentSigs:    msg.ParentSigs,
+		ParentSigners: msg.ParentSigners,
+		ProposerSig:   msg.ProposerSig,
+	}
+
+	// insert the header into the database
+	err = e.headers.Store(&header)
+	if err != nil {
+		return fmt.Errorf("could not store header: %w", err)
+	}
+
 	// see if the block is a valid extension of the protocol state
-	err = e.state.Mutate().Extend(block.Header.ID())
+	blockID := header.ID()
+	err = e.state.Mutate().Extend(blockID)
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}
 
-	e.hotstuff.SubmitProposal(block.Header)
+	// reconstruct the hotstuff models
+	sig := types.AggregatedSignature{
+		Raw:       header.ParentSigs,
+		SignerIDs: header.ParentSigners,
+	}
+	qc := types.QuorumCertificate{
+		View:                parent.View,
+		BlockID:             header.ParentID,
+		AggregatedSignature: &sig,
+	}
+	block := types.Block{
+		ChainID:     header.ChainID,
+		BlockID:     blockID,
+		View:        header.View,
+		ProposerID:  header.ProposerID,
+		QC:          &qc,
+		PayloadHash: header.PayloadHash,
+		Timestamp:   header.Timestamp,
+	}
+	proposal := types.Proposal{
+		Block:     &block,
+		Signature: header.ProposerSig,
+	}
+
+	// submit the model to hotstuff for processing
+	e.hotstuff.SubmitProposal(&proposal)
 
 	return nil
 }
 
 // onBlockVote handles incoming block votes.
-func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
+func (e *Engine) onBlockVote(originID flow.Identifier, msg *messages.BlockVote) error {
 
-	// NOTE: The signer index here is not necessary, as we always know the origin
-	// of any message on the network, including votes, so we already can look up
-	// the public key upon reception. However, as we decided to work with signer
-	// indices inside of hotstuff, we now have to send it along, because the
-	// mapping between index and node / public key might not be known before the
-	// block is received.
+	// rebuild the signature using the origin ID and the transmitted signature
 	sig := types.SingleSignature{
-		Raw:      vote.Signature,
-		SignerID: vote.Signer,
+		Raw:      msg.Signature,
+		SignerID: originID,
 	}
 
-	// NOTE: The view number is not really be needed, as the hotstuff algorithm
-	// is able to look up the view number by block ID at the moment it processes
-	// the vote. No vote can be processed without having the related proposal
-	// with its included view number anyway.
-	hsVote := types.Vote{
-		View:      vote.View,
-		BlockID:   vote.BlockID,
+	// rebuild the vote in the type prefered by hotstuff
+	// NOTE: the view number is somewhat redundant, as we can locally check the view
+	// of the referenced block ID; however, we might not have the block yet, so sending
+	// the view along will allow us to validate the signature immediately and cache votes
+	// appropriately within hotstuff
+	vote := types.Vote{
+		BlockID:   msg.BlockID,
+		View:      msg.View,
 		Signature: &sig,
 	}
 
-	// ideally, this call could just be: blockID, voterID, signature
-	e.hotstuff.SubmitVote(&hsVote)
+	// forward the vote to hotstuff for processing
+	e.hotstuff.SubmitVote(&vote)
 
 	return nil
 }

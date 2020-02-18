@@ -27,11 +27,16 @@ func Genesis(ids IdentityList) *Block {
 
 	// create the header
 	header := Header{
-		Number:      0,
-		Timestamp:   time.Unix(1575244800, 0).UTC(),
-		ParentID:    ZeroID,
-		PayloadHash: payload.Hash(),
-		ProposerID:  ZeroID,
+		ChainID:       "flow",
+		ParentID:      ZeroID,
+		ProposerID:    ZeroID,
+		View:          0,
+		Height:        0,
+		PayloadHash:   payload.Hash(),
+		Timestamp:     time.Unix(1575244800, 0).UTC(),
+		ParentSigs:    nil,
+		ParentSigners: nil,
+		ProposerSig:   nil,
 	}
 
 	// combine to block
@@ -59,61 +64,50 @@ func (b Block) Valid() bool {
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
-	// Number is the block number, a monotonically incrementing counter of
-	// finalized blocks.
-	// TODO should we rename this Height?
-	Number uint64
-	// View is the view number at which this block was proposed.
-	View uint64
-
 	// ChainID is a chain-specific value to prevent replay attacks.
 	ChainID string
+	// ParentID is the ID of this block's parent.
+	ParentID Identifier
+	// ProposerID is the ID of the node that proposed this block.
+	ProposerID Identifier
+	// View is the view number at which this block was proposed.
+	View uint64
+	// Height is the height of the block in the blockchain
+	Height uint64
+	// PayloadHash is a hash of the payload of this block.
+	PayloadHash Identifier
 	// Timestamp is the time at which this block was proposed. The proposing
 	// node can choose any time, so this should not be trusted as accurate.
 	Timestamp time.Time
-
-	// ParentID is the ID of this block's parent.
-	ParentID Identifier
-	// PayloadHash is a hash of the payload of this block.
-	PayloadHash Identifier
-
-	// ParentView is the view number of the parent of this block.
-	ParentView uint64
 	// ParentSig is an aggregated signature for the parent block.
-	ParentSignature   crypto.Signature
-	ParentSignatories []Identifier
-	// ProposerID is the ID of the node that proposed this block.
-	ProposerID Identifier
-	Signature  crypto.Signature
-
+	ParentSigs    []crypto.Signature
+	ParentSigners []Identifier
 	// ProposerSig is the signature of the proposer over the header body.
-	// NOTE: This is omitted from the ID.
+	ProposerSig crypto.Signature
 }
 
 // Body returns the immutable part of the block header.
 func (h Header) Body() interface{} {
 	return struct {
-		Number            uint64
-		View              uint64
-		ChainID           string
-		Timestamp         time.Time
-		ParentID          Identifier
-		PayloadHash       Identifier
-		ProposerID        Identifier
-		ParentView        uint64
-		ParentSignature   crypto.Signature
-		ParentSignatories []Identifier
+		ChainID       string
+		ParentID      Identifier
+		ProposerID    Identifier
+		View          uint64
+		Height        uint64
+		PayloadHash   Identifier
+		Timestamp     time.Time
+		ParentSigs    []crypto.Signature
+		ParentSigners []Identifier
 	}{
-		Number:            h.Number,
-		ChainID:           h.ChainID,
-		View:              h.View,
-		Timestamp:         h.Timestamp,
-		ParentID:          h.ParentID,
-		PayloadHash:       h.PayloadHash,
-		ProposerID:        h.ProposerID,
-		ParentView:        h.ParentView,
-		ParentSignature:   h.ParentSignature,
-		ParentSignatories: h.ParentSignatories,
+		ChainID:       h.ChainID,
+		ParentID:      h.ParentID,
+		ProposerID:    h.ProposerID,
+		View:          h.View,
+		Height:        h.Height,
+		PayloadHash:   h.PayloadHash,
+		Timestamp:     h.Timestamp,
+		ParentSigs:    h.ParentSigs,
+		ParentSigners: h.ParentSigners,
 	}
 }
 

@@ -42,7 +42,7 @@ func TestBootstrap(t *testing.T) {
 		t.Run("invalid number", func(t *testing.T) {
 			defer cleanup()
 			genesis := cluster.Genesis()
-			genesis.Number = 1
+			genesis.View = 1
 
 			err := mutator.Bootstrap(genesis)
 			assert.Error(t, err)
@@ -108,7 +108,7 @@ func TestBootstrap(t *testing.T) {
 
 				// should insert block number -> ID lookup
 				var blockID flow.Identifier
-				err = operation.RetrieveNumberForCluster(genesis.ChainID, genesis.Number, &blockID)(tx)
+				err = operation.RetrieveNumberForCluster(genesis.ChainID, genesis.View, &blockID)(tx)
 				assert.Nil(t, err)
 				assert.Equal(t, genesis.ID(), blockID)
 
@@ -116,7 +116,7 @@ func TestBootstrap(t *testing.T) {
 				var boundary uint64
 				err = operation.RetrieveBoundaryForCluster(genesis.ChainID, &boundary)(tx)
 				assert.Nil(t, err)
-				assert.Equal(t, genesis.Number, boundary)
+				assert.Equal(t, genesis.View, boundary)
 
 				return nil
 			})
@@ -211,7 +211,7 @@ func TestExtend(t *testing.T) {
 
 			block := unittest.ClusterBlockWithParent(genesis)
 			// change the block number
-			block.Number = block.Number - 1
+			block.View = block.View - 1
 			insert(block)
 
 			err = mutator.Extend(block.ID())

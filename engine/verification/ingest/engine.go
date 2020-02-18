@@ -185,7 +185,7 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 
 	e.log.Info().
 		Hex("block_id", logging.Entity(block)).
-		Uint64("block_number", block.Number).
+		Uint64("block_view", block.View).
 		Msg("received block")
 
 	err := e.blocks.Add(block)

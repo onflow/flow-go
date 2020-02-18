@@ -38,7 +38,7 @@ func BlockFixture() flow.Block {
 func BlockHeaderFixture() flow.Header {
 	return flow.Header{
 		ParentID: IdentifierFixture(),
-		Number:   rand.Uint64(),
+		View:     rand.Uint64(),
 	}
 }
 
@@ -52,7 +52,7 @@ func ClusterBlockWithParent(parent *cluster.Block) cluster.Block {
 	}
 
 	header := flow.Header{
-		Number:      parent.Number + 1,
+		View:        parent.View + 1,
 		ChainID:     parent.ChainID,
 		Timestamp:   time.Now(),
 		ParentID:    parent.ID(),

@@ -65,7 +65,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*fl
 			}
 
 			// if we have reached the finalized boundary, stop indexing
-			if ancestor.Number <= boundary {
+			if ancestor.View <= boundary {
 				break
 			}
 

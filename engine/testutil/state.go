@@ -23,7 +23,7 @@ func UncheckedState(db *badger.DB, identities flow.IdentityList) (*protocol.Stat
 		}
 
 		// apply the stake deltas
-		err = procedure.ApplyDeltas(genesis.Number, genesis.Identities)(tx)
+		err = procedure.ApplyDeltas(genesis.View, genesis.Identities)(tx)
 		if err != nil {
 			return fmt.Errorf("could not apply stake deltas: %w", err)
 		}
@@ -56,7 +56,7 @@ func UncheckedState(db *badger.DB, identities flow.IdentityList) (*protocol.Stat
 		}
 
 		// insert the finalized boundary
-		err = operation.InsertBoundary(genesis.Number)(tx)
+		err = operation.InsertBoundary(genesis.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update boundary: %w", err)
 		}

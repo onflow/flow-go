@@ -53,16 +53,18 @@ func (bp *BlockProducer) MakeBlockProposal(block *types.Block, qc *types.QuorumC
 func (bp *BlockProducer) makeBlockForView(parent *types.Block, qc *types.QuorumCertificate, view uint64) (*types.Block, error) {
 
 	// define the block header build function
+	// TODO: change this to return a *types.Block instead
 	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
 		header := flow.Header{
-			ChainID:     bp.chainID,
-			View:        view,
-			Number:      parent.Height + 1,
-			Timestamp:   time.Now().UTC(),
-			ParentID:    parent.BlockID,
-			ParentView:  parent.View,
-			PayloadHash: payloadHash,
-			ProposerID:  flow.ZeroID, // TODO: fill in our own ID here
+			ChainID:       bp.chainID,
+			ParentID:      parent.BlockID,
+			ProposerID:    flow.ZeroID, // TODO: fill in our own ID here
+			View:          view,
+			Height:        parent.Height + 1,
+			PayloadHash:   payloadHash,
+			Timestamp:     time.Now().UTC(),
+			ParentSigs:    qc.AggregatedSignature.Raw,
+			ParentSigners: qc.AggregatedSignature.SignerIDs,
 		}
 		return &header, nil
 	}
@@ -82,7 +84,7 @@ func (bp *BlockProducer) makeBlockForView(parent *types.Block, qc *types.QuorumC
 		View:        view,
 		QC:          qc,
 		PayloadHash: header.PayloadHash,
-		Height:      header.Number,
+		Height:      header.Height,
 		ChainID:     header.ChainID,
 		Timestamp:   header.Timestamp,
 	}
