@@ -7,12 +7,6 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-type ErrorFinalizationFatal struct {
-	Msg string
-}
-
-func (e *ErrorFinalizationFatal) Error() string { return e.Msg }
-
 type MissingSignerError struct {
 	Vote *Vote
 }
