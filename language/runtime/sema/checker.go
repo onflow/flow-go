@@ -1492,22 +1492,34 @@ func (checker *Checker) withSelfResourceInvalidationAllowed(f func()) {
 func (checker *Checker) predeclaredMembers(containerType Type) []*Member {
 	var predeclaredMembers []*Member
 
-	// Contracts have a predeclared `account: Account` field
+	addPredeclaredMember := func(member *Member) {
+		member.Predeclared = true
+		predeclaredMembers = append(predeclaredMembers, member)
+	}
 
-	if compositeType, ok := containerType.(*CompositeType); ok &&
-		compositeType.Kind == common.CompositeKindContract {
+	if compositeKindedType, ok := containerType.(CompositeKindedType); ok {
 
-		predeclaredMembers = append(predeclaredMembers,
-			&Member{
-				Predeclared:     true,
-				ContainerType:   compositeType,
-				Access:          ast.AccessPrivate,
-				Identifier:      ast.Identifier{Identifier: "account"},
-				TypeAnnotation:  &TypeAnnotation{Type: &AccountType{}},
-				DeclarationKind: common.DeclarationKindField,
-				VariableKind:    ast.VariableKindConstant,
-			},
-		)
+		switch compositeKindedType.GetCompositeKind() {
+		case common.CompositeKindContract:
+			// Contracts have a predeclared private field `priv let account: Account`
+
+			member := NewPublicConstantFieldMember(
+				containerType,
+				"account",
+				&AccountType{},
+			)
+			member.Access = ast.AccessPrivate
+			addPredeclaredMember(member)
+
+		case common.CompositeKindResource:
+			// Resources have a predeclared field `pub let owner: PublicAccount?`
+
+			addPredeclaredMember(NewPublicConstantFieldMember(
+				containerType,
+				"owner",
+				&OptionalType{&PublicAccountType{}},
+			))
+		}
 	}
 
 	return predeclaredMembers
