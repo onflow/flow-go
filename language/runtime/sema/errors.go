@@ -1326,12 +1326,17 @@ func (e *ResourceCapturingError) EndPosition() ast.Position {
 // InvalidResourceFieldError
 
 type InvalidResourceFieldError struct {
-	Name string
-	Pos  ast.Position
+	Name          string
+	CompositeKind common.CompositeKind
+	Pos           ast.Position
 }
 
 func (e *InvalidResourceFieldError) Error() string {
-	return fmt.Sprintf("invalid resource field in non-resource: `%s`", e.Name)
+	return fmt.Sprintf(
+		"invalid resource field in %s: `%s`",
+		e.CompositeKind.Name(),
+		e.Name,
+	)
 }
 
 func (*InvalidResourceFieldError) isSemanticError() {}
