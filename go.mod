@@ -4,9 +4,9 @@ go 1.13
 
 require (
 	github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd // indirect
-	github.com/dapperlabs/flow-go/crypto v0.2.5-beta
-	github.com/dapperlabs/flow-go/language v0.2.5-beta
-	github.com/dapperlabs/flow-go/protobuf v0.2.5-beta
+	github.com/dapperlabs/flow-go/crypto v0.3.1
+	github.com/dapperlabs/flow-go/language v0.3.1
+	github.com/dapperlabs/flow-go/protobuf v0.3.1
 	github.com/dchest/siphash v1.2.1
 	github.com/dgraph-io/badger/v2 v2.0.0
 	github.com/ethereum/go-ethereum v1.9.9
@@ -15,12 +15,13 @@ require (
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.2
 	github.com/google/go-cmp v0.4.0 // indirect
+	github.com/hashicorp/go-multierror v1.0.0
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/ipfs/go-log v0.0.1
 	github.com/jrick/bitset v1.0.0
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
-	github.com/libp2p/go-libp2p v0.4.2
-	github.com/libp2p/go-libp2p-core v0.2.5
+	github.com/libp2p/go-libp2p v0.5.1
+	github.com/libp2p/go-libp2p-core v0.3.0
 	github.com/libp2p/go-libp2p-pubsub v0.2.5
 	github.com/libp2p/go-tcp-transport v0.1.1
 	github.com/logrusorgru/aurora v0.0.0-20200102142835-e9ef32dff381 // indirect

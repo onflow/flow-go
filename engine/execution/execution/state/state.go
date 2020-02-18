@@ -1,7 +1,6 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/model/flow"
@@ -49,13 +48,13 @@ func NewExecutionState(
 }
 
 func (s *state) NewView(commitment flow.StateCommitment) *View {
-	return NewView(func(key string) ([]byte, error) {
+	return NewView(func(key flow.RegisterID) ([]byte, error) {
 		values, err := s.ls.GetRegisters(
-			[]flow.RegisterID{[]byte(key)},
+			[]flow.RegisterID{key},
 			commitment,
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error getting register (%s) value at %x: %w", key, commitment, err)
 		}
 
 		if len(values) == 0 {
@@ -68,6 +67,7 @@ func (s *state) NewView(commitment flow.StateCommitment) *View {
 
 func (s *state) CommitDelta(delta Delta) (flow.StateCommitment, error) {
 	ids, values := delta.RegisterUpdates()
+
 	// TODO: update CommitDelta to also return proofs
 	commit, _, err := s.ls.UpdateRegistersWithProof(ids, values)
 	if err != nil {
@@ -107,16 +107,17 @@ func (s *state) GetChunkRegisters(chunkID flow.Identifier) (flow.Ledger, error) 
 }
 
 func (s *state) StateCommitmentByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
-	commit, err := s.commits.ByFinalID(blockID)
-	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
-			//TODO ? Shouldn't happen in MVP, in multi-node should query a state from other nodes
-			panic(fmt.Sprintf("storage commitment for id %v does not exist", blockID))
-		} else {
-			return nil, err
-		}
-	}
-	return commit, nil
+	return s.commits.ByID(blockID)
+	// commit, err := s.commits.ByID(blockID)
+	// if err != nil {
+	// 	if errors.Is(err, storage.ErrNotFound) {
+	// 		//TODO ? Shouldn't happen in MVP, in multi-node should query a state from other nodes
+	// 		panic(fmt.Sprintf("storage commitment for id %v does not exist", blockID))
+	// 	} else {
+	// 		return nil, err
+	// 	}
+	// }
+	// return commit, nil
 }
 
 func (s *state) PersistStateCommitment(blockID flow.Identifier, commit flow.StateCommitment) error {

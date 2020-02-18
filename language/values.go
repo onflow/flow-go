@@ -214,7 +214,7 @@ func NewIntFromBig(i *big.Int) Int {
 func (Int) isValue() {}
 
 func (Int) Type() Type {
-	return nil
+	return IntType{}
 }
 
 func (v Int) WithType(_ Type) Value {
@@ -339,7 +339,7 @@ func NewInt128FromBig(i *big.Int) Int128 {
 func (Int128) isValue() {}
 
 func (Int128) Type() Type {
-	return nil
+	return Int128Type{}
 }
 
 func (v Int128) WithType(_ Type) Value {
@@ -376,7 +376,7 @@ func NewInt256FromBig(i *big.Int) Int256 {
 func (Int256) isValue() {}
 
 func (Int256) Type() Type {
-	return nil
+	return Int256Type{}
 }
 
 func (v Int256) WithType(_ Type) Value {
@@ -415,7 +415,7 @@ func NewUIntFromBig(i *big.Int) UInt {
 func (UInt) isValue() {}
 
 func (UInt) Type() Type {
-	return nil
+	return UIntType{}
 }
 
 func (v UInt) WithType(_ Type) Value {
@@ -543,7 +543,7 @@ func NewUInt128FromBig(i *big.Int) UInt128 {
 func (UInt128) isValue() {}
 
 func (UInt128) Type() Type {
-	return nil
+	return UInt128Type{}
 }
 
 func (v UInt128) WithType(_ Type) Value {
@@ -583,7 +583,7 @@ func NewUInt256FromBig(i *big.Int) UInt256 {
 func (UInt256) isValue() {}
 
 func (UInt256) Type() Type {
-	return nil
+	return UInt256Type{}
 }
 
 func (v UInt256) WithType(_ Type) Value {

@@ -2,10 +2,13 @@ package test
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -35,11 +38,12 @@ func (s *StubEngineTestSuite) SetupTest() {
 	//golog.SetAllLoggers(gologging.INFO)
 	s.ids = CreateIDs(count)
 
-	mws, err := CreateMiddleware(s.ids)
+	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
+	mws, err := CreateMiddleware(logger, s.ids)
 	require.NoError(s.Suite.T(), err)
 	s.mws = mws
 
-	nets, err := CreateNetworks(s.mws, s.ids, 100, false)
+	nets, err := CreateNetworks(logger, s.mws, s.ids, 100, false)
 	require.NoError(s.Suite.T(), err)
 	s.nets = nets
 }
@@ -51,7 +55,7 @@ func (s *StubEngineTestSuite) TearDownTest() {
 		// closes the network
 		case <-net.Done():
 			continue
-		case <-time.After(1 * time.Second):
+		case <-time.After(3 * time.Second):
 			s.Suite.Fail("could not stop the network")
 		}
 	}
@@ -59,7 +63,6 @@ func (s *StubEngineTestSuite) TearDownTest() {
 
 // TestSingleMessage tests sending a single message from sender to receiver
 func (s *StubEngineTestSuite) TestSingleMessage() {
-	s.T().Skip()
 	// set to false for no echo expectation
 	s.singleMessage(false)
 }
@@ -67,7 +70,6 @@ func (s *StubEngineTestSuite) TestSingleMessage() {
 // TestSingleMessage tests sending a single message from sender to receiver
 // it also evaluates the correct reception of an echo message back
 func (s *StubEngineTestSuite) TestSingleEcho() {
-	s.T().Skip()
 	// set to true for an echo expectation
 	s.singleMessage(true)
 }
@@ -75,7 +77,6 @@ func (s *StubEngineTestSuite) TestSingleEcho() {
 // TestMultiMsgSync tests sending multiple messages from sender to receiver
 // sender and receiver are synced over reception
 func (s *StubEngineTestSuite) TestMultiMsgSync() {
-	s.T().Skip()
 	// set to false for no echo expectation
 	s.multiMessageSync(false, 10)
 }
@@ -84,7 +85,6 @@ func (s *StubEngineTestSuite) TestMultiMsgSync() {
 // it also evaluates the correct reception of an echo message back for each send
 // sender and receiver are synced over reception
 func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
-	s.T().Skip()
 	// set to true for an echo expectation
 	s.multiMessageSync(true, 10)
 }
@@ -92,7 +92,6 @@ func (s *StubEngineTestSuite) TestEchoMultiMsgSync() {
 // TestMultiMsgAsync tests sending multiple messages from sender to receiver
 // sender and receiver are not synchronized
 func (s *StubEngineTestSuite) TestMultiMsgAsync() {
-	s.T().Skip()
 	// set to false for no echo expectation
 	s.multiMessageAsync(false, 10)
 }
@@ -101,7 +100,6 @@ func (s *StubEngineTestSuite) TestMultiMsgAsync() {
 // it also evaluates the correct reception of an echo message back for each send
 // sender and receiver are not synchronized
 func (s *StubEngineTestSuite) TestEchoMultiMsgAsync() {
-	s.T().Skip()
 	// set to true for an echo expectation
 	s.multiMessageAsync(true, 10)
 }
@@ -110,15 +108,14 @@ func (s *StubEngineTestSuite) TestEchoMultiMsgAsync() {
 // on deduplicating the received messages. Messages are delivered to the receiver
 // in a sequential manner.
 func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
-	s.T().Skip()
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, false)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, false)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -142,15 +139,14 @@ func (s *StubEngineTestSuite) TestDuplicateMessageSequential() {
 // on deduplicating the received messages. Messages are delivered to the receiver
 // in parallel.
 func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
-	s.T().Skip()
 	sndID := 0
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, false)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, false)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -175,7 +171,6 @@ func (s *StubEngineTestSuite) TestDuplicateMessageParallel() {
 // on deduplicating the received messages against different engine ids. In specific, the
 // desire behavior is that the deduplication should happen based on both eventID and channelID
 func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
-	s.T().Skip()
 	const (
 		sndNode = iota
 		rcvNode
@@ -187,18 +182,18 @@ func (s *StubEngineTestSuite) TestDuplicateMessageDifferentChan() {
 	// registers engines in the network
 	// first type
 	// sender's engine
-	sender1 := NewEchoEngine(s.Suite.T(), s.nets[sndNode], 10, channel1)
+	sender1 := NewEchoEngine(s.Suite.T(), s.nets[sndNode], 10, channel1, false)
 
 	// receiver's engine
-	receiver1 := NewEchoEngine(s.Suite.T(), s.nets[rcvNode], 10, channel1)
+	receiver1 := NewEchoEngine(s.Suite.T(), s.nets[rcvNode], 10, channel1, false)
 
 	// second type
 	// registers engines in the network
 	// sender's engine
-	sender2 := NewEchoEngine(s.Suite.T(), s.nets[sndNode], 10, channel2)
+	sender2 := NewEchoEngine(s.Suite.T(), s.nets[sndNode], 10, channel2, false)
 
 	// receiver's engine
-	receiver2 := NewEchoEngine(s.Suite.T(), s.nets[rcvNode], 10, channel2)
+	receiver2 := NewEchoEngine(s.Suite.T(), s.nets[rcvNode], 10, channel2, false)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -235,10 +230,10 @@ func (s *StubEngineTestSuite) singleMessage(echo bool) {
 
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, echo)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, echo)
 
 	// Sends a message from sender to receiver
 	event := &message.Echo{
@@ -305,10 +300,10 @@ func (s *StubEngineTestSuite) multiMessageSync(echo bool, count int) {
 	rcvID := 1
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, echo)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, echo)
 
 	for i := 0; i < count; i++ {
 		// Send the message to receiver
@@ -378,10 +373,10 @@ func (s *StubEngineTestSuite) multiMessageAsync(echo bool, count int) {
 
 	// registers engines in the network
 	// sender's engine
-	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1)
+	sender := NewEchoEngine(s.Suite.T(), s.nets[sndID], 10, 1, echo)
 
 	// receiver's engine
-	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1)
+	receiver := NewEchoEngine(s.Suite.T(), s.nets[rcvID], 10, 1, echo)
 
 	// keeps track of async received messages at receiver side
 	received := make(map[string]struct{})

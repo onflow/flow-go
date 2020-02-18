@@ -10,8 +10,8 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
 	"github.com/dapperlabs/flow-go/engine/simulation/subzero"
 	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/builder"
-	"github.com/dapperlabs/flow-go/module/cleaner"
+	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
+	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
 	storage "github.com/dapperlabs/flow-go/storage/badger"
@@ -20,13 +20,13 @@ import (
 func main() {
 
 	var (
+		err        error
 		guarantees mempool.Guarantees
 		receipts   mempool.Receipts
 		approvals  mempool.Approvals
 		seals      mempool.Seals
 		prop       *propagation.Engine
 		prov       *provider.Engine
-		err        error
 	)
 
 	cmd.FlowNode("consensus").
@@ -73,11 +73,9 @@ func main() {
 			node.Logger.Info().Msg("initializing subzero consensus engine")
 			headersDB := storage.NewHeaders(node.DB)
 			payloadsDB := storage.NewPayloads(node.DB)
-			guaranteesDB := storage.NewGuarantees(node.DB)
-			sealsDB := storage.NewSeals(node.DB)
-			build := builder.New(node.State, guarantees, seals)
-			clean := cleaner.New(guaranteesDB, sealsDB, guarantees, seals)
-			sub, err := subzero.New(node.Logger, prov, headersDB, payloadsDB, node.State, node.Me, build, clean)
+			build := builder.NewBuilder(node.DB, guarantees, seals)
+			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
+			sub, err := subzero.New(node.Logger, prov, headersDB, payloadsDB, node.State, node.Me, build, final)
 			node.MustNot(err).Msg("could not initialize subzero engine")
 			return sub
 		}).

@@ -37,8 +37,8 @@ func expectedTimeoutInfo(view uint64, mode types.TimeoutMode) interface{} {
 		})
 }
 
-func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mockdist.Distributor) {
-	notifier := &mockdist.Distributor{}
+func initPaceMaker(t *testing.T, view uint64) (hotstuff.PaceMaker, *mockdist.Consumer) {
+	notifier := &mockdist.Consumer{}
 	tc, err := timeout.NewConfig(
 		time.Duration(startRepTimeout*1e6),
 		time.Duration(minRepTimeout*1e6),
@@ -61,10 +61,8 @@ func qc(view uint64) *types.QuorumCertificate {
 	return &types.QuorumCertificate{View: view}
 }
 
-func makeBlockProposal(qcView, blockView uint64) *types.BlockProposal {
-	return &types.BlockProposal{
-		Block: &types.Block{View: blockView, QC: qc(qcView)},
-	}
+func makeBlock(qcView, blockView uint64) *types.Block {
+	return &types.Block{View: blockView, QC: qc(qcView)}
 }
 
 // Test_SkipIncreaseViewThroughQC tests that PaceMaker increases View when receiving QC,
@@ -85,7 +83,6 @@ func Test_SkipIncreaseViewThroughQC(t *testing.T) {
 
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(13), pm.CurView())
-	//notifier.AssertNumberOfCalls(t, "OnEnteringView", 1)
 }
 
 // Test_IgnoreOldBlocks tests that PaceMaker ignores old blocks
@@ -103,14 +100,14 @@ func Test_SkipViewThroughBlock(t *testing.T) {
 
 	notifier.On("OnSkippedAhead", uint64(6)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(6, types.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlockProposal(5, 9), true)
+	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(5, 9), true)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(6), pm.CurView())
 	assert.True(t, nveOccurred && nve.View == 6)
 
 	notifier.On("OnSkippedAhead", uint64(23)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(23, types.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlockProposal(22, 25), false)
+	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(22, 25), false)
 	assert.True(t, nveOccurred && nve.View == 23)
 
 	notifier.AssertExpectations(t)
@@ -124,14 +121,14 @@ func Test_HandlesSkipViewAttack(t *testing.T) {
 
 	notifier.On("OnSkippedAhead", uint64(6)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(6, types.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlockProposal(5, 9), true)
+	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(5, 9), true)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(6), pm.CurView())
 	assert.True(t, nveOccurred && nve.View == 6)
 
 	notifier.On("OnSkippedAhead", uint64(15)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(15, types.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlockProposal(14, 23), false)
+	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(14, 23), false)
 	assert.True(t, nveOccurred && nve.View == 15)
 
 	notifier.AssertExpectations(t)
@@ -141,8 +138,8 @@ func Test_HandlesSkipViewAttack(t *testing.T) {
 // Test_IgnoreOldBlocks tests that PaceMaker ignores old blocks
 func Test_IgnoreOldBlocks(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3)
-	pm.UpdateCurViewWithBlock(makeBlockProposal(1, 2), false)
-	pm.UpdateCurViewWithBlock(makeBlockProposal(1, 2), true)
+	pm.UpdateCurViewWithBlock(makeBlock(1, 2), false)
+	pm.UpdateCurViewWithBlock(makeBlock(1, 2), true)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(3), pm.CurView())
 }
@@ -151,14 +148,14 @@ func Test_IgnoreOldBlocks(t *testing.T) {
 func Test_ProcessBlockForCurrentView(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3)
 	notifier.On("OnStartingTimeout", expectedTimerInfo(3, types.VoteCollectionTimeout)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlockProposal(1, 3), true)
+	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(1, 3), true)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(3), pm.CurView())
 	assert.True(t, !nveOccurred && nve == nil)
 
 	pm, notifier = initPaceMaker(t, 3)
 	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlockProposal(1, 3), false)
+	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(1, 3), false)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(4), pm.CurView())
 	assert.True(t, nveOccurred && nve.View == 4)
@@ -174,7 +171,7 @@ func Test_FutureBlockWithQcForCurrentView(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3)
 	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.ReplicaTimeout)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(5, types.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlockProposal(3, 4), false)
+	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(3, 4), false)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(5), pm.CurView())
 	assert.True(t, nveOccurred && nve.View == 5)
@@ -183,7 +180,7 @@ func Test_FutureBlockWithQcForCurrentView(t *testing.T) {
 	pm, notifier = initPaceMaker(t, 3)
 	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.ReplicaTimeout)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.VoteCollectionTimeout)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlockProposal(3, 4), true)
+	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(3, 4), true)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(4), pm.CurView())
 	assert.True(t, nveOccurred && nve.View == 4)
@@ -199,7 +196,7 @@ func Test_FutureBlockWithQcForFutureView(t *testing.T) {
 	notifier.On("OnSkippedAhead", uint64(14)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(14, types.ReplicaTimeout)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(15, types.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlockProposal(13, 14), false)
+	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(13, 14), false)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(15), pm.CurView())
 	assert.True(t, nveOccurred && nve.View == 15)
@@ -208,7 +205,7 @@ func Test_FutureBlockWithQcForFutureView(t *testing.T) {
 	notifier.On("OnSkippedAhead", uint64(14)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(14, types.ReplicaTimeout)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(14, types.VoteCollectionTimeout)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlockProposal(13, 14), true)
+	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(13, 14), true)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(14), pm.CurView())
 	assert.True(t, nveOccurred && nve.View == 14)
@@ -224,7 +221,7 @@ func Test_FutureBlockWithQcForFutureFutureView(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3)
 	notifier.On("OnSkippedAhead", uint64(14)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(14, types.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlockProposal(13, 17), false)
+	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(13, 17), false)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(14), pm.CurView())
 	assert.True(t, nveOccurred && nve.View == 14)
@@ -232,7 +229,7 @@ func Test_FutureBlockWithQcForFutureFutureView(t *testing.T) {
 	pm, notifier = initPaceMaker(t, 3)
 	notifier.On("OnSkippedAhead", uint64(14)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(14, types.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlockProposal(13, 17), true)
+	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(13, 17), true)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(14), pm.CurView())
 	assert.True(t, nveOccurred && nve.View == 14)
@@ -244,11 +241,11 @@ func Test_IgnoreBlockDuplicates(t *testing.T) {
 	pm, notifier := initPaceMaker(t, 3)
 	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.ReplicaTimeout)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(5, types.ReplicaTimeout)).Return().Once()
-	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlockProposal(3, 4), false)
+	nve, nveOccurred := pm.UpdateCurViewWithBlock(makeBlock(3, 4), false)
 	assert.True(t, nveOccurred && nve.View == 5)
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlockProposal(3, 4), false)
+	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(3, 4), false)
 	assert.True(t, !nveOccurred && nve == nil)
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlockProposal(3, 4), false)
+	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(3, 4), false)
 	assert.True(t, !nveOccurred && nve == nil)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(5), pm.CurView())
@@ -257,11 +254,11 @@ func Test_IgnoreBlockDuplicates(t *testing.T) {
 	pm, notifier = initPaceMaker(t, 3)
 	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.ReplicaTimeout)).Return().Once()
 	notifier.On("OnStartingTimeout", expectedTimerInfo(4, types.VoteCollectionTimeout)).Return().Once()
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlockProposal(3, 4), true)
+	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(3, 4), true)
 	assert.True(t, nveOccurred && nve.View == 4)
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlockProposal(3, 4), true)
+	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(3, 4), true)
 	assert.True(t, !nveOccurred && nve == nil)
-	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlockProposal(3, 4), true)
+	nve, nveOccurred = pm.UpdateCurViewWithBlock(makeBlock(3, 4), true)
 	assert.True(t, !nveOccurred && nve == nil)
 	notifier.AssertExpectations(t)
 	assert.Equal(t, uint64(4), pm.CurView())
@@ -303,7 +300,7 @@ func Test_VoteTimeout(t *testing.T) {
 	start := time.Now()
 
 	notifier.On("OnStartingTimeout", expectedTimerInfo(3, types.VoteCollectionTimeout)).Return().Once()
-	pm.UpdateCurViewWithBlock(makeBlockProposal(2, 3), true)
+	pm.UpdateCurViewWithBlock(makeBlock(2, 3), true)
 	notifier.AssertExpectations(t)
 
 	expectedTimeout := startRepTimeout * voteTimeoutFraction

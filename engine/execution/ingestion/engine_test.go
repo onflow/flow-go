@@ -43,10 +43,11 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 	me.EXPECT().NodeID().Return(myself).AnyTimes()
 
 	blocks := storage.NewMockBlocks(ctrl)
+	payloads := storage.NewMockPayloads(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	executionEngine := network.NewMockEngine(ctrl)
 	state := protocol.NewMockState(ctrl)
-
+	mutator := protocol.NewMockMutator(ctrl)
 	snapshot := protocol.NewMockSnapshot(ctrl)
 
 	identityList := flow.IdentityList{myIdentity, collectionIdentity}
@@ -55,9 +56,10 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 	snapshot.EXPECT().Identities(gomock.Any()).DoAndReturn(func(f flow.IdentityFilter) (flow.IdentityList, error) {
 		return identityList.Filter(f), nil
 	})
-	mutator := protocol.NewMockMutator(ctrl)
 	state.EXPECT().Mutate().Return(mutator).AnyTimes()
-	mutator.EXPECT().StorePayload(gomock.Any()).AnyTimes()
+	mutator.EXPECT().Finalize(gomock.Any()).AnyTimes()
+
+	payloads.EXPECT().Store(gomock.Any()).AnyTimes()
 
 	log := zerolog.Logger{}
 
@@ -66,7 +68,7 @@ func runWithEngine(t *testing.T, f func(t *testing.T, engine *Engine, blocks *st
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.BlockProvider)), gomock.AssignableToTypeOf(engine)).Return(conduit, nil)
 	net.EXPECT().Register(gomock.Eq(uint8(engineCommon.CollectionProvider)), gomock.AssignableToTypeOf(engine)).Return(collectionConduit, nil)
 
-	engine, err := New(log, net, me, state, blocks, collections, executionEngine)
+	engine, err := New(log, net, me, state, blocks, payloads, collections, executionEngine)
 	require.NoError(t, err)
 
 	f(t, engine, blocks, collections, state, conduit, collectionConduit, executionEngine)

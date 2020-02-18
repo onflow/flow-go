@@ -1,7 +1,9 @@
 package state
 
+import "github.com/dapperlabs/flow-go/model/flow"
+
 // GetRegisterFunc is a function that returns the value for a register.
-type GetRegisterFunc func(key string) ([]byte, error)
+type GetRegisterFunc func(key flow.RegisterID) (flow.RegisterValue, error)
 
 // A View is a read-only view into a ledger stored in an underlying data source.
 //
@@ -10,7 +12,7 @@ type GetRegisterFunc func(key string) ([]byte, error)
 type View struct {
 	delta Delta
 	// TODO: store reads as set
-	reads    []string
+	reads    []flow.RegisterID
 	readFunc GetRegisterFunc
 }
 
@@ -18,11 +20,12 @@ type View struct {
 func NewView(readFunc GetRegisterFunc) *View {
 	return &View{
 		delta:    NewDelta(),
-		reads:    make([]string, 0),
+		reads:    make([]flow.RegisterID, 0),
 		readFunc: readFunc,
 	}
 }
 
+// NewChild generates a new child view, with the current view as the base, sharing the Get function
 func (r *View) NewChild() *View {
 	return NewView(r.Get)
 }
@@ -31,7 +34,7 @@ func (r *View) NewChild() *View {
 //
 // This function will return an error if it fails to read from the underlying
 // data source for this view.
-func (r *View) Get(key string) ([]byte, error) {
+func (r *View) Get(key flow.RegisterID) (flow.RegisterValue, error) {
 	value, exists := r.delta.Get(key)
 	if exists {
 		return value, nil
@@ -49,12 +52,12 @@ func (r *View) Get(key string) ([]byte, error) {
 }
 
 // Set sets a register value in this view.
-func (r *View) Set(key string, value []byte) {
+func (r *View) Set(key flow.RegisterID, value flow.RegisterValue) {
 	r.delta.Set(key, value)
 }
 
 // Delete removes a register in this view.
-func (r *View) Delete(key string) {
+func (r *View) Delete(key flow.RegisterID) {
 	r.delta.Delete(key)
 }
 
@@ -69,6 +72,6 @@ func (r *View) ApplyDelta(delta Delta) {
 }
 
 // Reads returns the register IDs read by this view.
-func (r *View) Reads() []string {
+func (r *View) Reads() []flow.RegisterID {
 	return r.reads
 }
