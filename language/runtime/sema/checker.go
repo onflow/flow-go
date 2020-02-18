@@ -735,14 +735,25 @@ func (checker *Checker) convertRestrictedType(t *ast.RestrictedType) Type {
 
 		for name := range interfaceType.Members {
 			if previousDeclaringInterfaceType, ok := memberSet[name]; ok {
-				checker.report(
-					&RestrictionMemberClashError{
-						Name:                  name,
-						RedeclaringType:       interfaceType,
-						OriginalDeclaringType: previousDeclaringInterfaceType,
-						Range:                 ast.NewRangeFromPositioned(restriction),
-					},
-				)
+
+				// If there is an overlap in members, ensure the members have the same type
+
+				memberType := interfaceType.Members[name].TypeAnnotation.Type
+				previousMemberType := previousDeclaringInterfaceType.Members[name].TypeAnnotation.Type
+
+				if !memberType.IsInvalidType() &&
+					!previousMemberType.IsInvalidType() &&
+					!memberType.Equal(previousMemberType) {
+
+					checker.report(
+						&RestrictionMemberClashError{
+							Name:                  name,
+							RedeclaringType:       interfaceType,
+							OriginalDeclaringType: previousDeclaringInterfaceType,
+							Range:                 ast.NewRangeFromPositioned(restriction),
+						},
+					)
+				}
 			} else {
 				memberSet[name] = interfaceType
 			}
