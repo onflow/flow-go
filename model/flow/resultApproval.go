@@ -7,7 +7,7 @@ import (
 type ResultApprovalBody struct {
 	// CorrectnessAttestation
 	ExecutionResultID    Identifier       // hash of approved execution result
-	ChunkNumber          uint64           // chunk number
+	ChunkIndex          uint64        
 	AttestationSignature crypto.Signature // signature over ExecutionResultID and ChunkNumber, this has been separated for BLS aggregation
 	Spock                Spock            // proof of re-computation, one per each chunk
 }
