@@ -629,6 +629,9 @@ func (s *SMT) GetRoot() *node {
 }
 
 func (s *SMT) insertIntoKeys(insert []byte, keys [][]byte, values [][]byte) ([][]byte, [][]byte, error) {
+	newkeys := make([][]byte, 0)
+	newvalues := make([][]byte, 0)
+
 	for i, key := range keys {
 		if bytes.Equal(insert, key) {
 			return keys, values, nil
@@ -636,14 +639,12 @@ func (s *SMT) insertIntoKeys(insert []byte, keys [][]byte, values [][]byte) ([][
 
 		if bytes.Compare(insert, key) < 0 {
 			// Insert the key into the keys
-			newkeys := make([][]byte, 0)
-			newkeys = append(newkeys, keys[:i]...)
+			// newkeys = append(newkeys, keys[:i]...)
 			newkeys = append(newkeys, insert)
 			newkeys = append(newkeys, keys[i:]...)
 
 			// Insert the old value into values
-			newvalues := make([][]byte, 0)
-			newvalues = append(newvalues, values[:i]...)
+			// newvalues = append(newvalues, values[:i]...)
 			oldVal, err := s.database.GetKVDB(insert)
 			if err != nil {
 				return nil, nil, err
@@ -653,13 +654,15 @@ func (s *SMT) insertIntoKeys(insert []byte, keys [][]byte, values [][]byte) ([][
 
 			return newkeys, newvalues, nil
 		}
+		newkeys = append(newkeys, key)
+		newvalues = append(newvalues, values[i])
 	}
 
 	oldVal, err := s.database.GetKVDB(insert)
 	if err != nil {
 		return nil, nil, err
 	}
-	return append(keys, insert), append(values, oldVal), nil
+	return append(newkeys, insert), append(newvalues, oldVal), nil
 }
 
 // UpdateAtomically updates the trie atomically and returns the state root
