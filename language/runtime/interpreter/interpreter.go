@@ -75,7 +75,7 @@ type OnStatementFunc func(
 //
 type StorageReadHandlerFunc func(
 	inter *Interpreter,
-	storageIdentifier string,
+	storageAddress common.Address,
 	key string,
 ) OptionalValue
 
@@ -83,7 +83,7 @@ type StorageReadHandlerFunc func(
 //
 type StorageWriteHandlerFunc func(
 	inter *Interpreter,
-	storageIdentifier string,
+	storageAddress common.Address,
 	key string,
 	value OptionalValue,
 )
@@ -92,7 +92,7 @@ type StorageWriteHandlerFunc func(
 //
 type StorageKeyHandlerFunc func(
 	inter *Interpreter,
-	storageIdentifier string,
+	storageAddress common.Address,
 	indexingType sema.Type,
 ) string
 
@@ -1231,10 +1231,10 @@ func (interpreter *Interpreter) indexExpressionGetterSetter(indexExpression *ast
 					})
 
 			case StorageValue:
-				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Identifier, AccessLevelPrivate)
+				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Address, AccessLevelPrivate)
 
 			case PublishedValue:
-				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Identifier, AccessLevelPublic)
+				return interpreter.visitStorageIndexExpression(indexExpression, typedResult.Address, AccessLevelPublic)
 
 			default:
 				panic(errors.NewUnreachableError())
@@ -1244,19 +1244,19 @@ func (interpreter *Interpreter) indexExpressionGetterSetter(indexExpression *ast
 
 func (interpreter *Interpreter) visitStorageIndexExpression(
 	indexExpression *ast.IndexExpression,
-	storageIdentifier string,
+	storageAddress common.Address,
 	accessLevel AccessLevel,
 ) Trampoline {
 	indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
-	rawKey := interpreter.storageKeyHandler(interpreter, storageIdentifier, indexingType)
+	rawKey := interpreter.storageKeyHandler(interpreter, storageAddress, indexingType)
 	key := PrefixedStorageKey(rawKey, accessLevel)
 	return Done{
 		Result: getterSetter{
 			get: func() Value {
-				return interpreter.readStored(storageIdentifier, key)
+				return interpreter.readStored(storageAddress, key)
 			},
 			set: func(value Value) {
-				interpreter.writeStored(storageIdentifier, key, value.(OptionalValue))
+				interpreter.writeStored(storageAddress, key, value.(OptionalValue))
 			},
 		},
 	}
@@ -1264,10 +1264,10 @@ func (interpreter *Interpreter) visitStorageIndexExpression(
 
 func (interpreter *Interpreter) visitReadStorageIndexExpression(
 	expression *ast.IndexExpression,
-	storageIdentifier string,
+	storageAddress common.Address,
 	accessLevel AccessLevel,
 ) Trampoline {
-	return interpreter.visitStorageIndexExpression(expression, storageIdentifier, accessLevel).
+	return interpreter.visitStorageIndexExpression(expression, storageAddress, accessLevel).
 		Map(func(result interface{}) interface{} {
 			getterSetter := result.(getterSetter)
 			return getterSetter.get()
@@ -1706,14 +1706,14 @@ func (interpreter *Interpreter) VisitIndexExpression(expression *ast.IndexExpres
 			case StorageValue:
 				return interpreter.visitReadStorageIndexExpression(
 					expression,
-					typedResult.Identifier,
+					typedResult.Address,
 					AccessLevelPrivate,
 				)
 
 			case PublishedValue:
 				return interpreter.visitReadStorageIndexExpression(
 					expression,
-					typedResult.Identifier,
+					typedResult.Address,
 					AccessLevelPublic,
 				)
 
@@ -2197,7 +2197,7 @@ func (interpreter *Interpreter) declareCompositeValue(
 				Functions:      functions,
 				Destructor:     destructorFunction,
 				// NOTE: new value has no owner
-				Owner: "",
+				Owner: nil,
 			}
 
 			invocation.Self = value
@@ -3036,13 +3036,13 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 				storage := result.(StorageValue)
 
 				indexingType := interpreter.Checker.Elaboration.IndexExpressionIndexingTypes[indexExpression]
-				key := interpreter.storageKeyHandler(interpreter, storage.Identifier, indexingType)
+				key := interpreter.storageKeyHandler(interpreter, storage.Address, indexingType)
 
 				referenceValue := &StorageReferenceValue{
-					TargetStorageIdentifier: storage.Identifier,
-					TargetKey:               key,
+					TargetStorageAddress: storage.Address,
+					TargetKey:            key,
 					// NOTE: new value has no owner
-					Owner: "",
+					Owner: nil,
 				}
 
 				return Done{Result: referenceValue}
@@ -3057,14 +3057,14 @@ func (interpreter *Interpreter) VisitReferenceExpression(referenceExpression *as
 	}
 }
 
-func (interpreter *Interpreter) readStored(storageIdentifier string, key string) OptionalValue {
-	return interpreter.storageReadHandler(interpreter, storageIdentifier, key)
+func (interpreter *Interpreter) readStored(storageAddress common.Address, key string) OptionalValue {
+	return interpreter.storageReadHandler(interpreter, storageAddress, key)
 }
 
-func (interpreter *Interpreter) writeStored(storageIdentifier string, key string, value OptionalValue) {
-	value.SetOwner(storageIdentifier)
+func (interpreter *Interpreter) writeStored(storageAddress common.Address, key string, value OptionalValue) {
+	value.SetOwner(&storageAddress)
 
-	interpreter.storageWriteHandler(interpreter, storageIdentifier, key, value)
+	interpreter.storageWriteHandler(interpreter, storageAddress, key, value)
 }
 
 var converters = map[string]func(Value) Value{
