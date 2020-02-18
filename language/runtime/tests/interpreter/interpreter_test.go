@@ -7509,3 +7509,79 @@ func TestInterpretOptionalChainingOptionalFieldRead(t *testing.T) {
 	)
 }
 
+func TestInterpretResourceOwnerFieldUse(t *testing.T) {
+
+	storedValues := map[string]interpreter.OptionalValue{}
+
+	// NOTE: Getter and Setter are very naive for testing purposes and don't remove nil values
+	//
+
+	getter := func(_ *interpreter.Interpreter, _ common.Address, key string) interpreter.OptionalValue {
+		value, ok := storedValues[key]
+		if !ok {
+			return interpreter.NilValue{}
+		}
+		return value
+	}
+
+	setter := func(_ *interpreter.Interpreter, _ common.Address, key string, value interpreter.OptionalValue) {
+		storedValues[key] = value
+	}
+
+	interpreter.AddressValue{}.Hex()
+
+	storageValue := interpreter.StorageValue{
+		Address: common.Address{
+			0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1,
+		},
+	}
+
+	code := `
+      pub resource R {}
+
+      pub fun test(): [Address?] {
+          let addresses: [Address?] = []
+
+          let r <- create R()
+          addresses.append(r.owner?.address)
+
+          let oldR <- storage[R] <- r
+          destroy oldR
+          addresses.append(storage[R]?.owner?.address)
+
+          return addresses
+      }
+    `
+
+	inter := parseCheckAndInterpretWithOptions(t,
+		code,
+		ParseCheckAndInterpretOptions{
+			CheckerOptions: []sema.Option{
+				sema.WithPredeclaredValues(storageValueDeclaration),
+			},
+			Options: []interpreter.Option{
+				interpreter.WithPredefinedValues(map[string]interpreter.Value{
+					"storage": storageValue,
+				}),
+				interpreter.WithStorageReadHandler(getter),
+				interpreter.WithStorageWriteHandler(setter),
+				interpreter.WithStorageKeyHandler(
+					func(_ *interpreter.Interpreter, _ common.Address, indexingType sema.Type) string {
+						return string(indexingType.ID())
+					},
+				),
+			},
+		},
+	)
+
+	result, err := inter.Invoke("test")
+	require.NoError(t, err)
+
+	assert.Equal(t,
+		interpreter.NewArrayValueUnownedNonCopying(
+			interpreter.NilValue{},
+			interpreter.NewSomeValueOwningNonCopying(interpreter.AddressValue(storageValue.Address)),
+		),
+		result,
+	)
+}

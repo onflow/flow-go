@@ -2957,6 +2957,18 @@ func (v *CompositeValue) SetOwner(owner *common.Address) {
 func (v *CompositeValue) GetMember(interpreter *Interpreter, locationRange LocationRange, name string) Value {
 	v.checkStatus(locationRange)
 
+	if v.Kind == common.CompositeKindResource &&
+		name == "owner" {
+
+		if v.Owner == nil {
+			return NilValue{}
+		}
+
+		address := AddressValue(*v.Owner)
+
+		return NewSomeValueOwningNonCopying(NewPublicAccountValue(address))
+	}
+
 	value, ok := v.Fields[name]
 	if ok {
 		return value
