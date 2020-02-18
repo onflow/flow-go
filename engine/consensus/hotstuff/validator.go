@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/signature"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
@@ -13,11 +12,11 @@ import (
 type Validator struct {
 	viewState   *ViewState
 	forks       ForksReader
-	sigVerifier *signature.SigProvider
+	sigVerifier SigVerifier
 }
 
 // NewValidator creates a new Validator instance
-func NewValidator(viewState *ViewState, forks ForksReader, sigVerifier *signature.SigProvider) *Validator {
+func NewValidator(viewState *ViewState, forks ForksReader, sigVerifier SigVerifier) *Validator {
 	return &Validator{
 		viewState:   viewState,
 		sigVerifier: sigVerifier,

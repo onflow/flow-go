@@ -39,7 +39,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 		}
 
 		// apply the stake deltas
-		err = procedure.ApplyDeltas(genesis.Number, genesis.Identities)(tx)
+		err = procedure.ApplyDeltas(genesis.View, genesis.Identities)(tx)
 		if err != nil {
 			return fmt.Errorf("could not apply stake deltas: %w", err)
 		}
@@ -72,7 +72,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 		}
 
 		// insert the finalized boundary
-		err = operation.InsertBoundary(genesis.Number)(tx)
+		err = operation.InsertBoundary(genesis.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update boundary: %w", err)
 		}
@@ -205,8 +205,8 @@ func (m *Mutator) Finalize(blockID flow.Identifier) error {
 func checkGenesisHeader(header *flow.Header) error {
 
 	// the initial finalized boundary needs to be height zero
-	if header.Number != 0 {
-		return fmt.Errorf("invalid initial finalized boundary (%d != 0)", header.Number)
+	if header.View != 0 {
+		return fmt.Errorf("invalid initial finalized boundary (%d != 0)", header.View)
 	}
 
 	// the parent must be zero hash
@@ -304,8 +304,8 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 	}
 
 	// if new block number has a lower number, we can't add it
-	if header.Number <= parent.Number {
-		return fmt.Errorf("block needs higher number (%d <= %d)", header.Number, parent.Number)
+	if header.View <= parent.View {
+		return fmt.Errorf("block needs higher number (%d <= %d)", header.View, parent.View)
 	}
 
 	// NOTE: in the default case, the first parent is the boundary, so we don't
@@ -325,7 +325,7 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 
 		// if its number is below current boundary, the block does not connect
 		// to the finalized protocol state and would break database consistency
-		if header.Number < boundary {
+		if header.View < boundary {
 			return fmt.Errorf("block doesn't connect to finalized state")
 		}
 

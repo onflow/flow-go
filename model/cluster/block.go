@@ -10,7 +10,7 @@ import (
 
 func Genesis() *Block {
 	header := flow.Header{
-		Number:    0,
+		View:      0,
 		ChainID:   "",
 		Timestamp: time.Now(),
 		ParentID:  flow.ZeroID,
