@@ -7422,32 +7422,62 @@ func TestParseFixedPointExpression(t *testing.T) {
 
 func BenchmarkParseDeploy(b *testing.B) {
 
-	var builder strings.Builder
-	for i := 0; i < 15000; i++ {
-		if i > 0 {
-			builder.WriteString(", ")
+	b.Run("byte array", func(b *testing.B) {
+
+		var builder strings.Builder
+		for i := 0; i < 15000; i++ {
+			if i > 0 {
+				builder.WriteString(", ")
+			}
+			builder.WriteString(strconv.Itoa(rand.Intn(math.MaxUint8)))
 		}
-		builder.WriteString(strconv.Itoa(rand.Intn(math.MaxUint8)))
-	}
 
-	transaction := fmt.Sprintf(`
-          transaction {
-            execute {
-              Account(publicKeys: [], code: [%s])
-            }
-          }
-        `,
-		builder.String(),
-	)
+		transaction := fmt.Sprintf(`
+              transaction {
+                execute {
+                  Account(publicKeys: [], code: [%s])
+                }
+              }
+            `,
+			builder.String(),
+		)
 
-	b.ResetTimer()
+		b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
-		_, _, err := parser.ParseProgram(transaction)
-		if err != nil {
-			b.FailNow()
+		for i := 0; i < b.N; i++ {
+			_, _, err := parser.ParseProgram(transaction)
+			if err != nil {
+				b.FailNow()
+			}
 		}
-	}
+	})
+
+	b.Run("decode hex", func(b *testing.B) {
+
+		var builder strings.Builder
+		for i := 0; i < 15000; i++ {
+			builder.WriteString(fmt.Sprintf("%02x", i))
+		}
+
+		transaction := fmt.Sprintf(`
+              transaction {
+                execute {
+                  Account(publicKeys: [], code: "%s".decodeHex())
+                }
+              }
+            `,
+			builder.String(),
+		)
+
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			_, _, err := parser.ParseProgram(transaction)
+			if err != nil {
+				b.FailNow()
+			}
+		}
+	})
 }
 
 const fungibleTokenContract = `
