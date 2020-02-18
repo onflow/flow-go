@@ -8,8 +8,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
@@ -29,22 +29,23 @@ type Engine struct {
 	state    protocol.State
 	headers  storage.Headers
 	payloads storage.Payloads
-	hotstuff hotstuff.HotStuff
-	con      network.Conduit
+	//hotstuff hotstuff.HotStuff
+	coldstuff coldstuff.ColdStuff
+	con       network.Conduit
 }
 
 // New creates a new consensus propagation engine.
-func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, headers storage.Headers, payloads storage.Payloads, hotstuff hotstuff.HotStuff) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, headers storage.Headers, payloads storage.Payloads, coldstuff coldstuff.ColdStuff) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "consensus").Logger(),
-		me:       me,
-		state:    state,
-		headers:  headers,
-		payloads: payloads,
-		hotstuff: hotstuff,
+		unit:      engine.NewUnit(),
+		log:       log.With().Str("engine", "consensus").Logger(),
+		me:        me,
+		state:     state,
+		headers:   headers,
+		payloads:  payloads,
+		coldstuff: coldstuff,
 	}
 
 	// register the engine with the network layer and store the conduit

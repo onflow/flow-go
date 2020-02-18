@@ -50,9 +50,9 @@ func New(
 	log zerolog.Logger,
 	state protocol.State,
 	me module.Local,
-	builder module.Builder,
 	comms Communicator,
-	finalizer Finalizer,
+	builder module.Builder,
+	finalizer module.Finalizer,
 	interval time.Duration,
 	timeout time.Duration,
 ) (ColdStuff, error) {
@@ -189,7 +189,7 @@ func (e *coldStuff) sendProposal() error {
 	// define the block header build function
 	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
 		header := flow.Header{
-			Number:      e.round.Parent().Number + 1,
+			Height:      e.round.Parent().Height + 1,
 			Timestamp:   time.Now().UTC(),
 			ParentID:    e.round.Parent().ID(),
 			PayloadHash: payloadHash,
@@ -205,7 +205,7 @@ func (e *coldStuff) sendProposal() error {
 	}
 
 	log = log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.Height).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Logger()
 
@@ -242,7 +242,7 @@ func (e *coldStuff) waitForVotes() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.Height).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "wait_votes").
 		Logger()
@@ -314,7 +314,7 @@ func (e *coldStuff) sendCommit() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.Height).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "send_commit").
 		Logger()
@@ -365,9 +365,9 @@ func (e *coldStuff) waitForProposal() error {
 			}
 
 			// discard proposals with the wrong height
-			number := e.round.Parent().Number + 1
-			if candidate.Number != e.round.Parent().Number+1 {
-				log.Warn().Uint64("candidate_height", candidate.Number).Uint64("expected_height", number).Msg("invalid height")
+			number := e.round.Parent().Height + 1
+			if candidate.Height != e.round.Parent().Height+1 {
+				log.Warn().Uint64("candidate_height", candidate.Height).Uint64("expected_height", number).Msg("invalid height")
 				continue
 			}
 
@@ -389,7 +389,7 @@ func (e *coldStuff) waitForProposal() error {
 			e.round.Propose(candidate)
 
 			log.Info().
-				Uint64("number", candidate.Number).
+				Uint64("number", candidate.Height).
 				Hex("candidate_id", logging.Entity(candidate)).
 				Msg("block proposal received")
 
@@ -409,7 +409,7 @@ func (e *coldStuff) voteOnProposal() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.Height).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "send_vote").
 		Logger()
@@ -436,7 +436,7 @@ func (e *coldStuff) waitForCommit() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.Height).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "wait_commit").
 		Logger()
@@ -476,7 +476,7 @@ func (e *coldStuff) commitCandidate() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.Height).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "exec_commit").
 		Logger()

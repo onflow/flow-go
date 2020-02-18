@@ -3,12 +3,15 @@
 package main
 
 import (
+	"time"
+
 	"github.com/dapperlabs/flow-go/cmd"
+	"github.com/dapperlabs/flow-go/consensus/coldstuff"
+	"github.com/dapperlabs/flow-go/engine/consensus/consensus"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
 	"github.com/dapperlabs/flow-go/engine/consensus/provider"
-	"github.com/dapperlabs/flow-go/engine/simulation/coldstuff"
 	"github.com/dapperlabs/flow-go/module"
 	builder "github.com/dapperlabs/flow-go/module/builder/consensus"
 	finalizer "github.com/dapperlabs/flow-go/module/finalizer/consensus"
@@ -43,7 +46,6 @@ func main() {
 		Create(func(node *cmd.FlowNodeBuilder) {
 			node.Logger.Info().Msg("initializing approval mempool")
 			approvals, err = stdmap.NewApprovals()
-			node.MustNot(err).Msg("could not initialize approval mempool")
 		}).
 		Create(func(node *cmd.FlowNodeBuilder) {
 			node.Logger.Info().Msg("initializing seal mempool")
@@ -72,11 +74,13 @@ func main() {
 		Component("coldstuff engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			node.Logger.Info().Msg("initializing coldstuff engine")
 			headersDB := storage.NewHeaders(node.DB)
+			payloadsDB := storage.NewPayloads(node.DB)
 			build := builder.NewBuilder(node.DB, guarantees, seals)
 			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
-			cold, err := coldstuff.New(node.Logger, node.Network, prop, headersDB, node.State, node.Me, build, final)
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, build, prop, final, time.Second*3, time.Second*10)
+			cons, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB)
 			node.MustNot(err).Msg("could not initialize coldstuff engine")
-			return cold
+			return cons
 		}).
 		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) module.ReadyDoneAware {
 			ing, err := ingestion.New(node.Logger, node.Network, prop, node.State, node.Me)
