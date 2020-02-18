@@ -53,10 +53,12 @@ func (va *VoteAggregator) StorePendingVote(vote *types.Vote) bool {
 	if va.isStale(vote) {
 		return false
 	}
-	// process the vote
-	va.pendingVotes.AddVote(vote)
+	// add vote, return false if the vote exists
+	exists := va.pendingVotes.AddVote(vote)
+	if exists {
+		return false
+	}
 	va.updateState(vote)
-
 	return true
 }
 
@@ -97,6 +99,11 @@ func (va *VoteAggregator) StoreVoteAndBuildQC(vote *types.Vote, block *types.Blo
 func (va *VoteAggregator) StoreProposerVote(vote *types.Vote) bool {
 	// check if the proposer vote is for a view that has already been pruned (and is thus stale)
 	if va.isStale(vote) { // cannot store vote for already pruned view
+		return false
+	}
+	// add proposer vote, return false if it exists
+	_, exists := va.proposerVotes[vote.BlockID]
+	if exists {
 		return false
 	}
 	va.proposerVotes[vote.BlockID] = vote
