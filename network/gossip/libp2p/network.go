@@ -3,7 +3,6 @@ package libp2p
 import (
 	"fmt"
 	"hash"
-	"math"
 	"strconv"
 	"sync"
 
@@ -68,7 +67,7 @@ func NewNetwork(
 
 	// todo fanout optimization #2244
 	// fanout is set to half of the system size for connectivity assurance w.h.p
-	fanout := int(math.Round(float64(len(netSize)) / 2.0))
+	fanout := (len(netSize) + 1) / 2
 
 	o := &Network{
 		logger:  log,
