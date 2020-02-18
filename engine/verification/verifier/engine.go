@@ -135,7 +135,7 @@ func (e *Engine) verify(originID flow.Identifier, res *verification.CompleteExec
 		approval := &flow.ResultApproval{
 			ResultApprovalBody: flow.ResultApprovalBody{
 				ExecutionResultID: res.Receipt.ExecutionResult.ID(),
-				ChunkNumber:       uint64(i),
+				ChunkIndex:        uint64(i),
 			},
 		}
 		// broadcast result approval to consensus nodes
