@@ -1825,6 +1825,7 @@ func init() {
 		&Word64Type{},
 		&AddressType{},
 		&AccountType{},
+		&PublicAccountType{},
 	}
 
 	for _, ty := range types {
