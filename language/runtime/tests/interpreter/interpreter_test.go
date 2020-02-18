@@ -7467,3 +7467,27 @@ func TestInterpretHexDecode(t *testing.T) {
 	})
 
 }
+
+func TestInterpretOptionalChainingOptionalFieldRead(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      struct Test {
+          let x: Int?
+
+          init(x: Int?) {
+              self.x = x
+          }
+      }
+
+      let test: Test? = Test(x: 1)
+      let x = test?.x
+    `)
+
+	assert.Equal(t,
+		&interpreter.SomeValue{
+			Value: interpreter.NewIntValue(1),
+		},
+		inter.Globals["x"].Value,
+	)
+}
+
