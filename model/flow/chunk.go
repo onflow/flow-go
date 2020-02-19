@@ -30,11 +30,31 @@ func (ch *Chunk) Checksum() Identifier {
 	return MakeID(ch)
 }
 
-type ChunkHeader struct {
+type StateRead struct {
+	RegisterID RegisterID
+	Value      RegisterValue
+	Proof      Proof
+}
+type StateWrite struct {
+	RegisterID RegisterID
+	Value      RegisterValue
+	Proof      Proof
+}
+
+// ChunkDataPack holds all read and write data needed to verify a chunk
+type ChunkDataPack struct {
 	ChunkID     Identifier
 	StartState  StateCommitment
-	RegisterIDs []RegisterID
+	StateReads  []StateRead
+	StateWrites []StateWrite
 }
+
+// type ChunkHeader struct {
+// 	ChunkID    Identifier
+// 	StartState StateCommitment
+// 	Reads      []StateRead
+// 	Writes     []StateWrite
+// }
 
 // ChunkState represents the state registers used by a particular chunk.
 type ChunkState struct {
