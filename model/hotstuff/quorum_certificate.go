@@ -1,4 +1,4 @@
-package types
+package hotstuff
 
 import "github.com/dapperlabs/flow-go/model/flow"
 

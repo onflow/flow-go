@@ -1,8 +1,8 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // Forks encapsulated Finalization Logic and ForkChoice rule in one component.
@@ -25,7 +25,7 @@ type Forks interface {
 	// Consequently, IsSafeBlock accepts only known, valid blocks. Should a block be
 	// unknown (not previously added to Forks) or violate some consistency requirements,
 	// IsSafeBlock errors. All errors are fatal.
-	IsSafeBlock(block *types.Block) bool
+	IsSafeBlock(block *hotstuff.Block) bool
 
 	// AddBlock adds the block to Forks. This might cause an update of the finalized block
 	// and pruning of older blocks.
@@ -35,13 +35,13 @@ type Forks interface {
 	// (without missing interim ancestors). Otherwise, an error is raised.
 	// When the new block causes the conflicting finalized blocks, it will return
 	// Might error with ErrorByzantineThresholdExceeded (e.g. if finalizing conflicting forks)
-	AddBlock(block *types.Block) error
+	AddBlock(block *hotstuff.Block) error
 
 	// AddQC adds a quorum certificate to Forks.
 	// Will error in case the block referenced by the qc is unknown.
 	// Might error with ErrorByzantineThresholdExceeded (e.g. if two conflicting QCs for the
 	// same view are found)
-	AddQC(qc *types.QuorumCertificate) error
+	AddQC(qc *hotstuff.QuorumCertificate) error
 
 	// MakeForkChoice prompts the ForkChoice to generate a fork choice for the
 	// current view `curView`. The fork choice is a qc that should be used for
@@ -58,32 +58,20 @@ type Forks interface {
 	// is smaller than the view of any qc ForkChoice has seen.
 	// Note that tracking the view of the newest qc is for safety purposes
 	// and _independent_ of the fork-choice rule.
-	MakeForkChoice(curView uint64) (*types.Block, *types.QuorumCertificate, error)
+	MakeForkChoice(curView uint64) (*hotstuff.Block, *hotstuff.QuorumCertificate, error)
 }
 
 type ForksReader interface {
 	// GetBlocksForView returns all BlockProposals at the given view number.
-	GetBlocksForView(view uint64) []*types.Block
+	GetBlocksForView(view uint64) []*hotstuff.Block
 
 	// GetBlock returns (BlockProposal, true) if the block with the specified
 	// id was found (nil, false) otherwise.
-	GetBlock(id flow.Identifier) (*types.Block, bool)
+	GetBlock(id flow.Identifier) (*hotstuff.Block, bool)
 
 	// FinalizedView returns the largest view number where a finalized block is known
 	FinalizedView() uint64
 
 	// FinalizedBlock returns the finalized block with the largest view number
-	FinalizedBlock() *types.Block
-}
-
-// ErrorByzantineThresholdExceeded is raised if HotStuff detects malicious conditions which
-// prove a Byzantine threshold of consensus replicas has been exceeded.
-// Per definition, the byzantine threshold is exceeded is there are byzantine consensus
-// replicas with _at least_ 1/3 stake.
-type ErrorByzantineThresholdExceeded struct {
-	Evidence string
-}
-
-func (e *ErrorByzantineThresholdExceeded) Error() string {
-	return e.Evidence
+	FinalizedBlock() *hotstuff.Block
 }

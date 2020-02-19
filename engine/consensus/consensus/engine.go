@@ -10,9 +10,8 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -31,7 +30,7 @@ type Engine struct {
 	state    protocol.State
 	headers  storage.Headers
 	payloads storage.Payloads
-	hotstuff hotstuff.HotStuff
+	hotstuff module.HotStuff
 	con      network.Conduit
 	cache    map[flow.Identifier][]cacheItem
 }
@@ -42,7 +41,7 @@ type cacheItem struct {
 }
 
 // New creates a new consensus propagation engine.
-func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, headers storage.Headers, payloads storage.Payloads, hotstuff hotstuff.HotStuff) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, headers storage.Headers, payloads storage.Payloads, hotstuff module.HotStuff) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -109,29 +108,17 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // SendVote will send a vote to the desired node.
-func (e *Engine) SendVote(vote *types.Vote, recipientID flow.Identifier) error {
+func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signature, recipientID flow.Identifier) error {
 
-	// check that we are sending our own vote
-	if vote.Signature.SignerID != e.me.NodeID() {
-		return fmt.Errorf("can only send votes signed locally")
-	}
-
-	// NOTE: the signer ID will be conveyed through the message origin ID;
-	// we can thus leave it out of the message to conserve bandwidth
-
-	// NOTE: the view is redundant because we can deduce it from the block ID
-	// on the receiver end in the CCL; however, we can optimize processing by
-	// including it, so that we can check the signature before having the block
-
-	// convert the vote to a vote message
-	msg := messages.BlockVote{
-		BlockID:   vote.BlockID,
-		View:      vote.View,
-		Signature: vote.Signature.Raw,
+	// build the vote message
+	vote := messages.BlockVote{
+		BlockID:   blockID,
+		View:      view,
+		Signature: sig,
 	}
 
 	// send the vote the desired recipient
-	err := e.con.Submit(&msg, recipientID)
+	err := e.con.Submit(vote, recipientID)
 	if err != nil {
 		return fmt.Errorf("could not send vote: %w", err)
 	}
@@ -140,49 +127,16 @@ func (e *Engine) SendVote(vote *types.Vote, recipientID flow.Identifier) error {
 }
 
 // BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
-func (e *Engine) BroadcastProposal(proposal *types.Proposal) error {
-
-	// first, check that we are the proposer of the block
-	if proposal.Block.ProposerID != e.me.NodeID() {
-		return fmt.Errorf("can only propagate locally generated proposals")
-	}
-
-	// NOTE: a number of fields are redundant and can be omitted in the flow model
-	// (- height can be deduced from the parent) -> not used for now
-	// - parent view can be deduced from the parent
-
-	// convert the proposal into a flat header model
-	header := flow.Header{
-		ChainID:       proposal.Block.ChainID,
-		ParentID:      proposal.Block.QC.BlockID,
-		ProposerID:    proposal.Block.ProposerID,
-		View:          proposal.Block.View,
-		Height:        proposal.Block.Height,
-		PayloadHash:   proposal.Block.PayloadHash,
-		Timestamp:     proposal.Block.Timestamp,
-		ParentSigs:    proposal.Block.QC.AggregatedSignature.Raw,
-		ParentSigners: proposal.Block.QC.AggregatedSignature.SignerIDs,
-		ProposerSig:   proposal.Signature,
-	}
-
-	// check that the header ID corresponds to the proposal value
-	if proposal.Block.BlockID != header.ID() {
-		return fmt.Errorf("mismatch between proposal & reconstructed header block ID")
-	}
+func (e *Engine) BroadcastProposal(header *flow.Header) error {
 
 	// retrieve the payload for the block
-	payload, err := e.payloads.ByPayloadHash(proposal.Block.PayloadHash)
+	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
 	if err != nil {
 		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
 	}
 
-	// check that the payload matches the payload hash
-	if proposal.Block.PayloadHash != payload.Hash() {
-		return fmt.Errorf("mismatch between proposal & reconstructed payload hash")
-	}
-
 	// retrieve all consensus nodes without our ID
-	recipients, err := e.state.AtBlockID(proposal.Block.QC.BlockID).Identities(
+	recipients, err := e.state.AtBlockID(header.ParentID).Identities(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	)
@@ -194,14 +148,8 @@ func (e *Engine) BroadcastProposal(proposal *types.Proposal) error {
 	// - proposer ID is conveyed over the network message
 	// - the payload hash is deduced from the payload
 	msg := messages.BlockProposal{
-		ChainID:       header.ChainID,
-		ParentID:      header.ParentID,
-		View:          header.View,
-		Timestamp:     header.Timestamp,
-		ParentSigs:    header.ParentSigs,
-		ParentSigners: header.ParentSigners,
-		ProposerSig:   header.ProposerSig,
-		Payload:       payload,
+		Header:  header,
+		Payload: payload,
 	}
 
 	// broadcast the proposal to consensus nodes
@@ -233,7 +181,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
 	// retrieve the parent for the block for parent view; if not found, cache for later
-	parent, err := e.headers.ByBlockID(proposal.ParentID)
+	parent, err := e.headers.ByBlockID(proposal.Header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
 		return e.processPendingProposal(originID, proposal)
 	}
@@ -247,59 +195,21 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return fmt.Errorf("could not store block payload: %w", err)
 	}
 
-	// reconstruct the block proposal to know block ID
-	header := flow.Header{
-		ChainID:       proposal.ChainID,
-		ParentID:      proposal.ParentID,
-		ProposerID:    originID,
-		View:          proposal.View,
-		Height:        parent.Height + 1,
-		PayloadHash:   proposal.Payload.Hash(),
-		Timestamp:     proposal.Timestamp,
-		ParentSigs:    proposal.ParentSigs,
-		ParentSigners: proposal.ParentSigners,
-		ProposerSig:   proposal.ProposerSig,
-	}
-
 	// insert the header into the database
-	err = e.headers.Store(&header)
+	err = e.headers.Store(proposal.Header)
 	if err != nil {
 		return fmt.Errorf("could not store header: %w", err)
 	}
 
 	// see if the block is a valid extension of the protocol state
-	blockID := header.ID()
+	blockID := proposal.Header.ID()
 	err = e.state.Mutate().Extend(blockID)
 	if err != nil {
 		return fmt.Errorf("could not extend protocol state: %w", err)
 	}
 
-	// reconstruct the hotstuff models
-	hsSig := types.AggregatedSignature{
-		Raw:       header.ParentSigs,
-		SignerIDs: header.ParentSigners,
-	}
-	hsQC := types.QuorumCertificate{
-		View:                parent.View,
-		BlockID:             header.ParentID,
-		AggregatedSignature: &hsSig,
-	}
-	hsBlock := types.Block{
-		ChainID:     header.ChainID,
-		BlockID:     blockID,
-		View:        header.View,
-		ProposerID:  header.ProposerID,
-		QC:          &hsQC,
-		PayloadHash: header.PayloadHash,
-		Timestamp:   header.Timestamp,
-	}
-	hsProposal := types.Proposal{
-		Block:     &hsBlock,
-		Signature: header.ProposerSig,
-	}
-
 	// submit the model to hotstuff for processing
-	e.hotstuff.SubmitProposal(&hsProposal)
+	e.hotstuff.SubmitProposal(proposal.Header, parent.View)
 
 	// check for any descendants of the block to process
 	children, ok := e.cache[blockID]
@@ -325,25 +235,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // onBlockVote handles incoming block votes.
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
 
-	// rebuild the signature using the origin ID and the transmitted signature
-	hsSig := types.SingleSignature{
-		Raw:      vote.Signature,
-		SignerID: originID,
-	}
-
-	// rebuild the vote in the type prefered by hotstuff
-	// NOTE: the view number is somewhat redundant, as we can locally check the view
-	// of the referenced block ID; however, we might not have the block yet, so sending
-	// the view along will allow us to validate the signature immediately and cache votes
-	// appropriately within hotstuff
-	hsVote := types.Vote{
-		BlockID:   vote.BlockID,
-		View:      vote.View,
-		Signature: &hsSig,
-	}
-
 	// forward the vote to hotstuff for processing
-	e.hotstuff.SubmitVote(&hsVote)
+	e.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature)
 
 	return nil
 }
@@ -369,14 +262,8 @@ func (e *Engine) onBlockRequest(originID flow.Identifier, request *messages.Bloc
 
 	// construct the block proposal
 	proposal := messages.BlockProposal{
-		ChainID:       header.ChainID,
-		ParentID:      header.ParentID,
-		View:          header.View,
-		Timestamp:     header.Timestamp,
-		ParentSigs:    header.ParentSigs,
-		ParentSigners: header.ParentSigners,
-		ProposerSig:   header.ProposerSig,
-		Payload:       payload,
+		Header:  header,
+		Payload: payload,
 	}
 
 	// construct the block response
@@ -416,11 +303,11 @@ func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *mess
 		OriginID: originID,
 		Proposal: proposal,
 	}
-	e.cache[proposal.ParentID] = append(e.cache[proposal.ParentID], item)
+	e.cache[proposal.Header.ParentID] = append(e.cache[proposal.Header.ParentID], item)
 
 	// send the block request
 	request := messages.BlockRequest{
-		BlockID: proposal.ParentID,
+		BlockID: proposal.Header.ParentID,
 		Nonce:   rand.Uint64(),
 	}
 	err := e.con.Submit(&request, originID)
