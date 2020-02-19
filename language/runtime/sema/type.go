@@ -485,11 +485,87 @@ func (t *StringType) IndexingType() Type {
 	return &IntegerType{}
 }
 
-// Ranged
+// NumberType represents the super-type of all signed number types
+type NumberType struct{}
 
-type Ranged interface {
-	Min() *big.Int
-	Max() *big.Int
+func (*NumberType) IsType() {}
+
+func (*NumberType) String() string {
+	return "Number"
+}
+
+func (*NumberType) ID() TypeID {
+	return "Number"
+}
+
+func (*NumberType) Equal(other Type) bool {
+	_, ok := other.(*NumberType)
+	return ok
+}
+
+func (*NumberType) IsResourceType() bool {
+	return false
+}
+
+func (*NumberType) IsInvalidType() bool {
+	return false
+}
+
+func (*NumberType) MinInt() *big.Int {
+	return nil
+}
+
+func (*NumberType) MaxInt() *big.Int {
+	return nil
+}
+
+// SignedNumberType represents the super-type of all signed number types
+type SignedNumberType struct{}
+
+func (*SignedNumberType) IsType() {}
+
+func (*SignedNumberType) String() string {
+	return "SignedNumber"
+}
+
+func (*SignedNumberType) ID() TypeID {
+	return "SignedNumber"
+}
+
+func (*SignedNumberType) Equal(other Type) bool {
+	_, ok := other.(*SignedNumberType)
+	return ok
+}
+
+func (*SignedNumberType) IsResourceType() bool {
+	return false
+}
+
+func (*SignedNumberType) IsInvalidType() bool {
+	return false
+}
+
+func (*SignedNumberType) MinInt() *big.Int {
+	return nil
+}
+
+func (*SignedNumberType) MaxInt() *big.Int {
+	return nil
+}
+
+// IntegerRangedType
+
+type IntegerRangedType interface {
+	Type
+	MinInt() *big.Int
+	MaxInt() *big.Int
+}
+
+type FractionalRangedType interface {
+	IntegerRangedType
+	Scale() uint
+	MinFractional() *big.Int
+	MaxFractional() *big.Int
 }
 
 // IntegerType represents the super-type of all integer types
@@ -518,11 +594,11 @@ func (*IntegerType) IsInvalidType() bool {
 	return false
 }
 
-func (*IntegerType) Min() *big.Int {
+func (*IntegerType) MinInt() *big.Int {
 	return nil
 }
 
-func (*IntegerType) Max() *big.Int {
+func (*IntegerType) MaxInt() *big.Int {
 	return nil
 }
 
@@ -552,11 +628,11 @@ func (*SignedIntegerType) IsInvalidType() bool {
 	return false
 }
 
-func (*SignedIntegerType) Min() *big.Int {
+func (*SignedIntegerType) MinInt() *big.Int {
 	return nil
 }
 
-func (*SignedIntegerType) Max() *big.Int {
+func (*SignedIntegerType) MaxInt() *big.Int {
 	return nil
 }
 
@@ -586,11 +662,11 @@ func (*IntType) IsInvalidType() bool {
 	return false
 }
 
-func (*IntType) Min() *big.Int {
+func (*IntType) MinInt() *big.Int {
 	return nil
 }
 
-func (*IntType) Max() *big.Int {
+func (*IntType) MaxInt() *big.Int {
 	return nil
 }
 
@@ -621,15 +697,15 @@ func (*Int8Type) IsInvalidType() bool {
 	return false
 }
 
-var Int8TypeMin = big.NewInt(0).SetInt64(math.MinInt8)
-var Int8TypeMax = big.NewInt(0).SetInt64(math.MaxInt8)
+var Int8TypeMinInt = big.NewInt(0).SetInt64(math.MinInt8)
+var Int8TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt8)
 
-func (*Int8Type) Min() *big.Int {
-	return Int8TypeMin
+func (*Int8Type) MinInt() *big.Int {
+	return Int8TypeMinInt
 }
 
-func (*Int8Type) Max() *big.Int {
-	return Int8TypeMax
+func (*Int8Type) MaxInt() *big.Int {
+	return Int8TypeMaxInt
 }
 
 // Int16Type represents the 16-bit signed integer type `Int16`
@@ -658,15 +734,15 @@ func (*Int16Type) IsInvalidType() bool {
 	return false
 }
 
-var Int16TypeMin = big.NewInt(0).SetInt64(math.MinInt16)
-var Int16TypeMax = big.NewInt(0).SetInt64(math.MaxInt16)
+var Int16TypeMinInt = big.NewInt(0).SetInt64(math.MinInt16)
+var Int16TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt16)
 
-func (*Int16Type) Min() *big.Int {
-	return Int16TypeMin
+func (*Int16Type) MinInt() *big.Int {
+	return Int16TypeMinInt
 }
 
-func (*Int16Type) Max() *big.Int {
-	return Int16TypeMax
+func (*Int16Type) MaxInt() *big.Int {
+	return Int16TypeMaxInt
 }
 
 // Int32Type represents the 32-bit signed integer type `Int32`
@@ -695,15 +771,15 @@ func (*Int32Type) IsInvalidType() bool {
 	return false
 }
 
-var Int32TypeMin = big.NewInt(0).SetInt64(math.MinInt32)
-var Int32TypeMax = big.NewInt(0).SetInt64(math.MaxInt32)
+var Int32TypeMinInt = big.NewInt(0).SetInt64(math.MinInt32)
+var Int32TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt32)
 
-func (*Int32Type) Min() *big.Int {
-	return Int32TypeMin
+func (*Int32Type) MinInt() *big.Int {
+	return Int32TypeMinInt
 }
 
-func (*Int32Type) Max() *big.Int {
-	return Int32TypeMax
+func (*Int32Type) MaxInt() *big.Int {
+	return Int32TypeMaxInt
 }
 
 // Int64Type represents the 64-bit signed integer type `Int64`
@@ -732,15 +808,15 @@ func (*Int64Type) IsInvalidType() bool {
 	return false
 }
 
-var Int64TypeMin = big.NewInt(0).SetInt64(math.MinInt64)
-var Int64TypeMax = big.NewInt(0).SetInt64(math.MaxInt64)
+var Int64TypeMinInt = big.NewInt(0).SetInt64(math.MinInt64)
+var Int64TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt64)
 
-func (*Int64Type) Min() *big.Int {
-	return Int64TypeMin
+func (*Int64Type) MinInt() *big.Int {
+	return Int64TypeMinInt
 }
 
-func (*Int64Type) Max() *big.Int {
-	return Int64TypeMax
+func (*Int64Type) MaxInt() *big.Int {
+	return Int64TypeMaxInt
 }
 
 // Int128Type represents the 128-bit signed integer type `Int128`
@@ -769,27 +845,27 @@ func (*Int128Type) IsInvalidType() bool {
 	return false
 }
 
-var Int128TypeMin *big.Int
+var Int128TypeMinInt *big.Int
 
 func init() {
-	Int128TypeMin = big.NewInt(-1)
-	Int128TypeMin.Lsh(Int128TypeMin, 127)
+	Int128TypeMinInt = big.NewInt(-1)
+	Int128TypeMinInt.Lsh(Int128TypeMinInt, 127)
 }
 
-var Int128TypeMax *big.Int
+var Int128TypeMaxInt *big.Int
 
 func init() {
-	Int128TypeMax = big.NewInt(1)
-	Int128TypeMax.Lsh(Int128TypeMax, 127)
-	Int128TypeMax.Sub(Int128TypeMax, big.NewInt(1))
+	Int128TypeMaxInt = big.NewInt(1)
+	Int128TypeMaxInt.Lsh(Int128TypeMaxInt, 127)
+	Int128TypeMaxInt.Sub(Int128TypeMaxInt, big.NewInt(1))
 }
 
-func (*Int128Type) Min() *big.Int {
-	return Int128TypeMin
+func (*Int128Type) MinInt() *big.Int {
+	return Int128TypeMinInt
 }
 
-func (*Int128Type) Max() *big.Int {
-	return Int128TypeMax
+func (*Int128Type) MaxInt() *big.Int {
+	return Int128TypeMaxInt
 }
 
 // Int256Type represents the 256-bit signed integer type `Int256`
@@ -818,27 +894,27 @@ func (*Int256Type) IsInvalidType() bool {
 	return false
 }
 
-var Int256TypeMin *big.Int
+var Int256TypeMinInt *big.Int
 
 func init() {
-	Int256TypeMin = big.NewInt(-1)
-	Int256TypeMin.Lsh(Int256TypeMin, 255)
+	Int256TypeMinInt = big.NewInt(-1)
+	Int256TypeMinInt.Lsh(Int256TypeMinInt, 255)
 }
 
-var Int256TypeMax *big.Int
+var Int256TypeMaxInt *big.Int
 
 func init() {
-	Int256TypeMax = big.NewInt(1)
-	Int256TypeMax.Lsh(Int256TypeMax, 255)
-	Int256TypeMax.Sub(Int256TypeMax, big.NewInt(1))
+	Int256TypeMaxInt = big.NewInt(1)
+	Int256TypeMaxInt.Lsh(Int256TypeMaxInt, 255)
+	Int256TypeMaxInt.Sub(Int256TypeMaxInt, big.NewInt(1))
 }
 
-func (*Int256Type) Min() *big.Int {
-	return Int256TypeMin
+func (*Int256Type) MinInt() *big.Int {
+	return Int256TypeMinInt
 }
 
-func (*Int256Type) Max() *big.Int {
-	return Int256TypeMax
+func (*Int256Type) MaxInt() *big.Int {
+	return Int256TypeMaxInt
 }
 
 // UIntType represents the arbitrary-precision unsigned integer type `UInt`
@@ -869,11 +945,11 @@ func (*UIntType) IsInvalidType() bool {
 
 var UIntTypeMin = big.NewInt(0)
 
-func (*UIntType) Min() *big.Int {
+func (*UIntType) MinInt() *big.Int {
 	return UIntTypeMin
 }
 
-func (*UIntType) Max() *big.Int {
+func (*UIntType) MaxInt() *big.Int {
 	return nil
 }
 
@@ -904,15 +980,15 @@ func (*UInt8Type) IsInvalidType() bool {
 	return false
 }
 
-var UInt8TypeMin = big.NewInt(0)
-var UInt8TypeMax = big.NewInt(0).SetUint64(math.MaxUint8)
+var UInt8TypeMinInt = big.NewInt(0)
+var UInt8TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint8)
 
-func (*UInt8Type) Min() *big.Int {
-	return UInt8TypeMin
+func (*UInt8Type) MinInt() *big.Int {
+	return UInt8TypeMinInt
 }
 
-func (*UInt8Type) Max() *big.Int {
-	return UInt8TypeMax
+func (*UInt8Type) MaxInt() *big.Int {
+	return UInt8TypeMaxInt
 }
 
 // UInt16Type represents the 16-bit unsigned integer type `UInt16`
@@ -942,15 +1018,15 @@ func (*UInt16Type) IsInvalidType() bool {
 	return false
 }
 
-var UInt16TypeMin = big.NewInt(0)
-var UInt16TypeMax = big.NewInt(0).SetUint64(math.MaxUint16)
+var UInt16TypeMinInt = big.NewInt(0)
+var UInt16TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint16)
 
-func (*UInt16Type) Min() *big.Int {
-	return UInt16TypeMin
+func (*UInt16Type) MinInt() *big.Int {
+	return UInt16TypeMinInt
 }
 
-func (*UInt16Type) Max() *big.Int {
-	return UInt16TypeMax
+func (*UInt16Type) MaxInt() *big.Int {
+	return UInt16TypeMaxInt
 }
 
 // UInt32Type represents the 32-bit unsigned integer type `UInt32`
@@ -980,15 +1056,15 @@ func (*UInt32Type) IsInvalidType() bool {
 	return false
 }
 
-var UInt32TypeMin = big.NewInt(0)
-var UInt32TypeMax = big.NewInt(0).SetUint64(math.MaxUint32)
+var UInt32TypeMinInt = big.NewInt(0)
+var UInt32TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint32)
 
-func (*UInt32Type) Min() *big.Int {
-	return UInt32TypeMin
+func (*UInt32Type) MinInt() *big.Int {
+	return UInt32TypeMinInt
 }
 
-func (*UInt32Type) Max() *big.Int {
-	return UInt32TypeMax
+func (*UInt32Type) MaxInt() *big.Int {
+	return UInt32TypeMaxInt
 }
 
 // UInt64Type represents the 64-bit unsigned integer type `UInt64`
@@ -1018,15 +1094,15 @@ func (*UInt64Type) IsInvalidType() bool {
 	return false
 }
 
-var UInt64TypeMin = big.NewInt(0)
-var UInt64TypeMax = big.NewInt(0).SetUint64(math.MaxUint64)
+var UInt64TypeMinInt = big.NewInt(0)
+var UInt64TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint64)
 
-func (*UInt64Type) Min() *big.Int {
-	return UInt64TypeMin
+func (*UInt64Type) MinInt() *big.Int {
+	return UInt64TypeMinInt
 }
 
-func (*UInt64Type) Max() *big.Int {
-	return UInt64TypeMax
+func (*UInt64Type) MaxInt() *big.Int {
+	return UInt64TypeMaxInt
 }
 
 // UInt128Type represents the 128-bit unsigned integer type `UInt128`
@@ -1056,21 +1132,21 @@ func (*UInt128Type) IsInvalidType() bool {
 	return false
 }
 
-var UInt128TypeMin = big.NewInt(0)
-var UInt128TypeMax *big.Int
+var UInt128TypeMinInt = big.NewInt(0)
+var UInt128TypeMaxInt *big.Int
 
 func init() {
-	UInt128TypeMax = big.NewInt(1)
-	UInt128TypeMax.Lsh(UInt128TypeMax, 128)
-	UInt128TypeMax.Sub(UInt128TypeMax, big.NewInt(1))
+	UInt128TypeMaxInt = big.NewInt(1)
+	UInt128TypeMaxInt.Lsh(UInt128TypeMaxInt, 128)
+	UInt128TypeMaxInt.Sub(UInt128TypeMaxInt, big.NewInt(1))
 }
 
-func (*UInt128Type) Min() *big.Int {
-	return UInt128TypeMin
+func (*UInt128Type) MinInt() *big.Int {
+	return UInt128TypeMinInt
 }
 
-func (*UInt128Type) Max() *big.Int {
-	return UInt128TypeMax
+func (*UInt128Type) MaxInt() *big.Int {
+	return UInt128TypeMaxInt
 }
 
 // UInt256Type represents the 256-bit unsigned integer type `UInt256`
@@ -1100,21 +1176,21 @@ func (*UInt256Type) IsInvalidType() bool {
 	return false
 }
 
-var UInt256TypeMin = big.NewInt(0)
-var UInt256TypeMax *big.Int
+var UInt256TypeMinInt = big.NewInt(0)
+var UInt256TypeMaxInt *big.Int
 
 func init() {
-	UInt256TypeMax = big.NewInt(1)
-	UInt256TypeMax.Lsh(UInt256TypeMax, 256)
-	UInt256TypeMax.Sub(UInt256TypeMax, big.NewInt(1))
+	UInt256TypeMaxInt = big.NewInt(1)
+	UInt256TypeMaxInt.Lsh(UInt256TypeMaxInt, 256)
+	UInt256TypeMaxInt.Sub(UInt256TypeMaxInt, big.NewInt(1))
 }
 
-func (*UInt256Type) Min() *big.Int {
-	return UInt256TypeMin
+func (*UInt256Type) MinInt() *big.Int {
+	return UInt256TypeMinInt
 }
 
-func (*UInt256Type) Max() *big.Int {
-	return UInt256TypeMax
+func (*UInt256Type) MaxInt() *big.Int {
+	return UInt256TypeMaxInt
 }
 
 // Word8Type represents the 8-bit unsigned integer type `Word8`
@@ -1144,15 +1220,15 @@ func (*Word8Type) IsInvalidType() bool {
 	return false
 }
 
-var Word8TypeMin = big.NewInt(0)
-var Word8TypeMax = big.NewInt(0).SetUint64(math.MaxUint8)
+var Word8TypeMinInt = big.NewInt(0)
+var Word8TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint8)
 
-func (*Word8Type) Min() *big.Int {
-	return Word8TypeMin
+func (*Word8Type) MinInt() *big.Int {
+	return Word8TypeMinInt
 }
 
-func (*Word8Type) Max() *big.Int {
-	return Word8TypeMax
+func (*Word8Type) MaxInt() *big.Int {
+	return Word8TypeMaxInt
 }
 
 // Word16Type represents the 16-bit unsigned integer type `Word16`
@@ -1182,15 +1258,15 @@ func (*Word16Type) IsInvalidType() bool {
 	return false
 }
 
-var Word16TypeMin = big.NewInt(0)
-var Word16TypeMax = big.NewInt(0).SetUint64(math.MaxUint16)
+var Word16TypeMinInt = big.NewInt(0)
+var Word16TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint16)
 
-func (*Word16Type) Min() *big.Int {
-	return Word16TypeMin
+func (*Word16Type) MinInt() *big.Int {
+	return Word16TypeMinInt
 }
 
-func (*Word16Type) Max() *big.Int {
-	return Word16TypeMax
+func (*Word16Type) MaxInt() *big.Int {
+	return Word16TypeMaxInt
 }
 
 // Word32Type represents the 32-bit unsigned integer type `Word32`
@@ -1220,15 +1296,15 @@ func (*Word32Type) IsInvalidType() bool {
 	return false
 }
 
-var Word32TypeMin = big.NewInt(0)
-var Word32TypeMax = big.NewInt(0).SetUint64(math.MaxUint32)
+var Word32TypeMinInt = big.NewInt(0)
+var Word32TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint32)
 
-func (*Word32Type) Min() *big.Int {
-	return Word32TypeMin
+func (*Word32Type) MinInt() *big.Int {
+	return Word32TypeMinInt
 }
 
-func (*Word32Type) Max() *big.Int {
-	return Word32TypeMax
+func (*Word32Type) MaxInt() *big.Int {
+	return Word32TypeMaxInt
 }
 
 // Word64Type represents the 64-bit unsigned integer type `Word64`
@@ -1258,15 +1334,194 @@ func (*Word64Type) IsInvalidType() bool {
 	return false
 }
 
-var Word64TypeMin = big.NewInt(0)
-var Word64TypeMax = big.NewInt(0).SetUint64(math.MaxUint64)
+var Word64TypeMinInt = big.NewInt(0)
+var Word64TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint64)
 
-func (*Word64Type) Min() *big.Int {
-	return Word64TypeMin
+func (*Word64Type) MinInt() *big.Int {
+	return Word64TypeMinInt
 }
 
-func (*Word64Type) Max() *big.Int {
-	return Word64TypeMax
+func (*Word64Type) MaxInt() *big.Int {
+	return Word64TypeMaxInt
+}
+
+// FixedPointType represents the super-type of all fixed-point types
+type FixedPointType struct{}
+
+func (*FixedPointType) IsType() {}
+
+func (*FixedPointType) String() string {
+	return "FixedPoint"
+}
+
+func (*FixedPointType) ID() TypeID {
+	return "FixedPoint"
+}
+
+func (*FixedPointType) Equal(other Type) bool {
+	_, ok := other.(*FixedPointType)
+	return ok
+}
+
+func (*FixedPointType) IsResourceType() bool {
+	return false
+}
+
+func (*FixedPointType) IsInvalidType() bool {
+	return false
+}
+
+func (*FixedPointType) MinInt() *big.Int {
+	return nil
+}
+
+func (*FixedPointType) MaxInt() *big.Int {
+	return nil
+}
+
+// SignedFixedPointType represents the super-type of all signed fixed-point types
+type SignedFixedPointType struct{}
+
+func (*SignedFixedPointType) IsType() {}
+
+func (*SignedFixedPointType) String() string {
+	return "SignedFixedPoint"
+}
+
+func (*SignedFixedPointType) ID() TypeID {
+	return "SignedFixedPoint"
+}
+
+func (*SignedFixedPointType) Equal(other Type) bool {
+	_, ok := other.(*SignedFixedPointType)
+	return ok
+}
+
+func (*SignedFixedPointType) IsResourceType() bool {
+	return false
+}
+
+func (*SignedFixedPointType) IsInvalidType() bool {
+	return false
+}
+
+func (*SignedFixedPointType) MinInt() *big.Int {
+	return nil
+}
+
+func (*SignedFixedPointType) MaxInt() *big.Int {
+	return nil
+}
+
+const Fix64Scale uint = 8
+const Fix64Factor = 100_000_000
+
+// Fix64Type represents the 64-bit signed decimal fixed-point type `Fix64`
+// which has a scale of Fix64Scale, and checks for overflow and underflow
+type Fix64Type struct{}
+
+func (*Fix64Type) IsType() {}
+
+func (*Fix64Type) String() string {
+	return "Fix64"
+}
+
+func (*Fix64Type) ID() TypeID {
+	return "Fix64"
+}
+
+func (*Fix64Type) Equal(other Type) bool {
+	_, ok := other.(*Fix64Type)
+	return ok
+}
+
+func (*Fix64Type) IsResourceType() bool {
+	return false
+}
+
+func (*Fix64Type) IsInvalidType() bool {
+	return false
+}
+
+var Fix64TypeMinInt = big.NewInt(0).SetInt64(math.MinInt64 / Fix64Factor)
+var Fix64TypeMaxInt = big.NewInt(0).SetInt64(math.MaxInt64 / Fix64Factor)
+var Fix64TypeMinFractional = big.NewInt(0).SetInt64(math.MinInt64 % Fix64Factor)
+var Fix64TypeMaxFractional = big.NewInt(0).SetInt64(math.MaxInt64 % Fix64Factor)
+
+func init() {
+	Fix64TypeMinFractional.Abs(Fix64TypeMinFractional)
+}
+
+func (*Fix64Type) MinInt() *big.Int {
+	return Fix64TypeMinInt
+}
+
+func (*Fix64Type) MaxInt() *big.Int {
+	return Fix64TypeMaxInt
+}
+
+func (*Fix64Type) Scale() uint {
+	return Fix64Scale
+}
+
+func (*Fix64Type) MinFractional() *big.Int {
+	return Fix64TypeMinFractional
+}
+
+func (*Fix64Type) MaxFractional() *big.Int {
+	return Fix64TypeMaxFractional
+}
+
+// UFix64Type represents the 64-bit unsigned decimal fixed-point type `UFix64`
+// which has a scale of 1E9, and checks for overflow and underflow
+type UFix64Type struct{}
+
+func (*UFix64Type) IsType() {}
+
+func (*UFix64Type) String() string {
+	return "UFix64"
+}
+
+func (*UFix64Type) ID() TypeID {
+	return "UFix64"
+}
+
+func (*UFix64Type) Equal(other Type) bool {
+	_, ok := other.(*UFix64Type)
+	return ok
+}
+
+func (*UFix64Type) IsResourceType() bool {
+	return false
+}
+
+func (*UFix64Type) IsInvalidType() bool {
+	return false
+}
+
+var UFix64TypeMinInt = big.NewInt(0)
+var UFix64TypeMaxInt = big.NewInt(0).SetUint64(math.MaxUint64 / uint64(Fix64Factor))
+var UFix64TypeMinFractional = big.NewInt(0)
+var UFix64TypeMaxFractional = big.NewInt(0).SetUint64(math.MaxUint64 % uint64(Fix64Factor))
+
+func (*UFix64Type) MinInt() *big.Int {
+	return UFix64TypeMinInt
+}
+
+func (*UFix64Type) MaxInt() *big.Int {
+	return UFix64TypeMaxInt
+}
+
+func (*UFix64Type) Scale() uint {
+	return Fix64Scale
+}
+
+func (*UFix64Type) MinFractional() *big.Int {
+	return UFix64TypeMinFractional
+}
+
+func (*UFix64Type) MaxFractional() *big.Int {
+	return UFix64TypeMaxFractional
 }
 
 // ArrayType
@@ -1797,35 +2052,25 @@ func init() {
 		"": &VoidType{},
 	}
 
-	types := []Type{
+	otherTypes := []Type{
 		&VoidType{},
 		&AnyStructType{},
 		&AnyResourceType{},
 		&NeverType{},
 		&BoolType{},
 		&CharacterType{},
-		&IntType{},
-		&UIntType{},
 		&StringType{},
-		&Int8Type{},
-		&Int16Type{},
-		&Int32Type{},
-		&Int64Type{},
-		&Int128Type{},
-		&Int256Type{},
-		&UInt8Type{},
-		&UInt16Type{},
-		&UInt32Type{},
-		&UInt64Type{},
-		&UInt128Type{},
-		&UInt256Type{},
-		&Word8Type{},
-		&Word16Type{},
-		&Word32Type{},
-		&Word64Type{},
 		&AddressType{},
 		&AccountType{},
 	}
+
+	types := append(
+		append(
+			AllIntegerTypes,
+			AllFixedPointTypes...,
+		),
+		otherTypes...,
+	)
 
 	for _, ty := range types {
 		typeName := ty.String()
@@ -1875,32 +2120,53 @@ func init() {
 	initAddressFunction()
 }
 
-func initIntegerFunctions() {
-	integerTypes := []Type{
-		&IntType{},
-		&UIntType{},
-		// Int*
-		&Int8Type{},
-		&Int16Type{},
-		&Int32Type{},
-		&Int64Type{},
-		&Int128Type{},
-		&Int256Type{},
-		// UInt*
-		&UInt8Type{},
-		&UInt16Type{},
-		&UInt32Type{},
-		&UInt64Type{},
-		&UInt128Type{},
-		&UInt256Type{},
-		// Word*
-		&Word8Type{},
-		&Word16Type{},
-		&Word32Type{},
-		&Word64Type{},
-	}
+var AllSignedFixedPointTypes = []Type{
+	&Fix64Type{},
+}
 
-	for _, integerType := range integerTypes {
+var AllUnsignedFixedPointTypes = []Type{
+	&UFix64Type{},
+}
+
+var AllFixedPointTypes = append(
+	AllUnsignedFixedPointTypes,
+	AllSignedFixedPointTypes...,
+)
+
+var AllSignedIntegerTypes = []Type{
+	&IntType{},
+	&Int8Type{},
+	&Int16Type{},
+	&Int32Type{},
+	&Int64Type{},
+	&Int128Type{},
+	&Int256Type{},
+}
+
+var AllUnsignedIntegerTypes = []Type{
+	// UInt*
+	&UIntType{},
+	&UInt8Type{},
+	&UInt16Type{},
+	&UInt32Type{},
+	&UInt64Type{},
+	&UInt128Type{},
+	&UInt256Type{},
+	// Word*
+	&Word8Type{},
+	&Word16Type{},
+	&Word32Type{},
+	&Word64Type{},
+}
+
+var AllIntegerTypes = append(
+	AllUnsignedIntegerTypes,
+	AllSignedIntegerTypes...,
+)
+
+func initIntegerFunctions() {
+
+	for _, integerType := range AllIntegerTypes {
 		typeName := integerType.String()
 
 		// check type is not accidentally redeclared
@@ -1950,7 +2216,7 @@ func initAddressFunction() {
 				ReturnTypeAnnotation: &TypeAnnotation{Type: addressType},
 			},
 			ArgumentExpressionsCheck: func(checker *Checker, argumentExpressions []ast.Expression) {
-				intExpression, ok := argumentExpressions[0].(*ast.IntExpression)
+				intExpression, ok := argumentExpressions[0].(*ast.IntegerExpression)
 				if !ok {
 					return
 				}
@@ -1962,7 +2228,7 @@ func initAddressFunction() {
 
 func integerFunctionArgumentExpressionsChecker(integerType Type) func(*Checker, []ast.Expression) {
 	return func(checker *Checker, argumentExpressions []ast.Expression) {
-		intExpression, ok := argumentExpressions[0].(*ast.IntExpression)
+		intExpression, ok := argumentExpressions[0].(*ast.IntegerExpression)
 		if !ok {
 			return
 		}
@@ -2795,21 +3061,21 @@ func (*AddressType) IsInvalidType() bool {
 	return false
 }
 
-var AddressTypeMin = big.NewInt(0)
-var AddressTypeMax *big.Int
+var AddressTypeMinInt = big.NewInt(0)
+var AddressTypeMaxInt *big.Int
 
 func init() {
-	AddressTypeMax = big.NewInt(2)
-	AddressTypeMax.Exp(AddressTypeMax, big.NewInt(160), nil)
-	AddressTypeMax.Sub(AddressTypeMax, big.NewInt(1))
+	AddressTypeMaxInt = big.NewInt(2)
+	AddressTypeMaxInt.Exp(AddressTypeMaxInt, big.NewInt(160), nil)
+	AddressTypeMaxInt.Sub(AddressTypeMaxInt, big.NewInt(1))
 }
 
-func (*AddressType) Min() *big.Int {
-	return AddressTypeMin
+func (*AddressType) MinInt() *big.Int {
+	return AddressTypeMinInt
 }
 
-func (*AddressType) Max() *big.Int {
-	return AddressTypeMax
+func (*AddressType) MaxInt() *big.Int {
+	return AddressTypeMaxInt
 }
 
 // IsSubType determines if the given subtype is a subtype
@@ -2838,9 +3104,27 @@ func IsSubType(subType Type, superType Type) bool {
 	}
 
 	switch typedSuperType := superType.(type) {
+
+	case *NumberType:
+		if _, ok := subType.(*NumberType); ok {
+			return true
+		}
+
+		return IsSubType(subType, &IntegerType{}) ||
+			IsSubType(subType, &FixedPointType{})
+
+	case *SignedNumberType:
+		if _, ok := subType.(*SignedNumberType); ok {
+			return true
+		}
+
+		return IsSubType(subType, &SignedIntegerType{}) ||
+			IsSubType(subType, &SignedFixedPointType{})
+
 	case *IntegerType:
 		switch subType.(type) {
-		case *IntegerType, *SignedIntegerType, *IntType, *UIntType,
+		case *IntegerType, *SignedIntegerType,
+			*IntType, *UIntType,
 			*Int8Type, *Int16Type, *Int32Type, *Int64Type, *Int128Type, *Int256Type,
 			*UInt8Type, *UInt16Type, *UInt32Type, *UInt64Type, *UInt128Type, *UInt256Type,
 			*Word8Type, *Word16Type, *Word32Type, *Word64Type:
@@ -2853,8 +3137,30 @@ func IsSubType(subType Type, superType Type) bool {
 
 	case *SignedIntegerType:
 		switch subType.(type) {
-		case *SignedIntegerType, *IntType,
+		case *SignedIntegerType,
+			*IntType,
 			*Int8Type, *Int16Type, *Int32Type, *Int64Type, *Int128Type, *Int256Type:
+
+			return true
+
+		default:
+			return false
+		}
+
+	case *FixedPointType:
+		switch subType.(type) {
+		case *FixedPointType, *SignedFixedPointType,
+			*Fix64Type, *UFix64Type:
+
+			return true
+
+		default:
+			return false
+		}
+
+	case *SignedFixedPointType:
+		switch subType.(type) {
+		case *SignedNumberType, *Fix64Type:
 
 			return true
 
@@ -2931,7 +3237,7 @@ func IsSubType(subType Type, superType Type) bool {
 		// A non-storable reference type is not a (static) subtype of a storable reference.
 		// However, a dynamic cast is valid, if the reference is authorized.
 		//
-		// The holder of the may not gain more permissions without having authorization.
+		// The holder of the reference may not gain more permissions without having authorization.
 
 		if typedSuperType.Storable {
 			return false
@@ -2948,7 +3254,7 @@ func IsSubType(subType Type, superType Type) bool {
 		// An unauthorized reference type is not a subtype of an authorized reference type.
 		// Not even dynamically.
 		//
-		// The holder of the may not gain more permissions.
+		// The holder of the reference may not gain more permissions.
 
 		if typedSuperType.Authorized {
 			return false
@@ -3179,7 +3485,7 @@ func IsEquatableType(ty Type) bool {
 
 	if IsSubType(ty, &StringType{}) ||
 		IsSubType(ty, &BoolType{}) ||
-		IsSubType(ty, &IntegerType{}) ||
+		IsSubType(ty, &NumberType{}) ||
 		IsSubType(ty, &ReferenceType{}) ||
 		IsSubType(ty, &AddressType{}) {
 
@@ -3281,9 +3587,9 @@ func (*TransactionType) ID() TypeID {
 	return "Transaction"
 }
 
-func (*TransactionType) Equal(_ Type) bool {
-	// transaction types are not equatable
-	return false
+func (*TransactionType) Equal(other Type) bool {
+	_, ok := other.(*TransactionType)
+	return ok
 }
 
 func (*TransactionType) IsResourceType() bool {

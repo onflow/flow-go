@@ -59,6 +59,10 @@ func ConvertType(typ runtime.Type, prog *ast.Program, variable *sema.Variable) (
 		return wrapVariable(Word32Type{}, variable), nil
 	case *sema.Word64Type:
 		return wrapVariable(Word64Type{}, variable), nil
+	case *sema.Fix64Type:
+		return wrapVariable(Fix64Type{}, variable), nil
+	case *sema.UFix64Type:
+		return wrapVariable(UFix64Type{}, variable), nil
 	case *sema.VariableSizedType:
 		return convertVariableSizedType(t, prog, variable)
 	case *sema.ConstantSizedType:

@@ -1,8 +1,8 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 type PendingVotes struct {
@@ -13,27 +13,28 @@ type PendingVotes struct {
 // PendingStatus keeps track of pending votes for the same block
 type PendingStatus struct {
 	// When receiving missing block, first received votes will be accumulated
-	orderedVotes []*types.Vote
+	orderedVotes []*hotstuff.Vote
 	// For avoiding duplicate votes
 	voteMap map[flow.Identifier]struct{}
 }
 
-func (pv *PendingVotes) AddVote(vote *types.Vote) {
+func (pv *PendingVotes) AddVote(vote *hotstuff.Vote) bool {
 	status, exists := pv.votes[vote.BlockID]
 	if !exists {
 		status = NewPendingStatus()
 		pv.votes[vote.BlockID] = status
 	}
-	status.AddVote(vote)
+	return status.AddVote(vote)
 }
 
-func (ps *PendingStatus) AddVote(vote *types.Vote) {
+func (ps *PendingStatus) AddVote(vote *hotstuff.Vote) bool {
 	_, exists := ps.voteMap[vote.ID()]
 	if exists {
-		return
+		return false
 	}
 	ps.voteMap[vote.ID()] = struct{}{}
 	ps.orderedVotes = append(ps.orderedVotes, vote)
+	return true
 }
 
 func NewPendingVotes() *PendingVotes {

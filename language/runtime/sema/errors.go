@@ -949,9 +949,9 @@ func (e *CompositeKindMismatchError) SecondaryError() string {
 // InvalidIntegerLiteralRangeError
 
 type InvalidIntegerLiteralRangeError struct {
-	ExpectedType     Type
-	ExpectedRangeMin *big.Int
-	ExpectedRangeMax *big.Int
+	ExpectedType   Type
+	ExpectedMinInt *big.Int
+	ExpectedMaxInt *big.Int
 	ast.Range
 }
 
@@ -959,8 +959,8 @@ func (e *InvalidIntegerLiteralRangeError) Error() string {
 	return fmt.Sprintf(
 		"integer literal out of range: expected `%s`, in range [%s, %s]",
 		e.ExpectedType,
-		e.ExpectedRangeMin,
-		e.ExpectedRangeMax,
+		e.ExpectedMinInt,
+		e.ExpectedMaxInt,
 	)
 }
 
@@ -977,6 +977,48 @@ func (e *InvalidAddressLiteralError) Error() string {
 }
 
 func (*InvalidAddressLiteralError) isSemanticError() {}
+
+// InvalidFixedPointLiteralRangeError
+
+type InvalidFixedPointLiteralRangeError struct {
+	ExpectedType          Type
+	ExpectedMinInt        *big.Int
+	ExpectedMinFractional *big.Int
+	ExpectedMaxInt        *big.Int
+	ExpectedMaxFractional *big.Int
+	ast.Range
+}
+
+func (e *InvalidFixedPointLiteralRangeError) Error() string {
+	return fmt.Sprintf(
+		"fixed-point literal out of range: expected `%s`, in range [%s.%s, %s.%s]",
+		e.ExpectedType,
+		e.ExpectedMinInt,
+		e.ExpectedMinFractional,
+		e.ExpectedMaxInt,
+		e.ExpectedMaxFractional,
+	)
+}
+
+func (*InvalidFixedPointLiteralRangeError) isSemanticError() {}
+
+// InvalidFixedPointLiteralScaleError
+
+type InvalidFixedPointLiteralScaleError struct {
+	ExpectedType  Type
+	ExpectedScale uint
+	ast.Range
+}
+
+func (e *InvalidFixedPointLiteralScaleError) Error() string {
+	return fmt.Sprintf(
+		"fixed-point literal scale out of range: expected `%s`, with maximum scale %d",
+		e.ExpectedType,
+		e.ExpectedScale,
+	)
+}
+
+func (*InvalidFixedPointLiteralScaleError) isSemanticError() {}
 
 // MissingReturnStatementError
 
@@ -1713,18 +1755,18 @@ func (e *InvalidNonStorageStorableReferenceError) Error() string {
 
 func (*InvalidNonStorageStorableReferenceError) isSemanticError() {}
 
-// CreateImportedResourceError
+// InvalidResourceCreationError
 
-type CreateImportedResourceError struct {
+type InvalidResourceCreationError struct {
 	Type Type
 	ast.Range
 }
 
-func (e *CreateImportedResourceError) Error() string {
-	return fmt.Sprintf("cannot create imported resource type: `%s`", e.Type)
+func (e *InvalidResourceCreationError) Error() string {
+	return fmt.Sprintf("cannot create resource type outside of containing contract: `%s`", e.Type)
 }
 
-func (*CreateImportedResourceError) isSemanticError() {}
+func (*InvalidResourceCreationError) isSemanticError() {}
 
 // NonResourceTypeError
 

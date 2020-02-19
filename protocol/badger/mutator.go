@@ -39,7 +39,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 		}
 
 		// apply the stake deltas
-		err = procedure.ApplyDeltas(genesis.Number, genesis.Identities)(tx)
+		err = procedure.ApplyDeltas(genesis.View, genesis.Identities)(tx)
 		if err != nil {
 			return fmt.Errorf("could not apply stake deltas: %w", err)
 		}
@@ -48,7 +48,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 		seal := genesis.Seals[0]
 
 		// insert the block seal commit
-		err = operation.InsertCommit(seal.BlockID, seal.FinalState)(tx)
+		err = operation.InsertCommit(genesis.ID(), seal.FinalState)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert state commit: %w", err)
 		}
@@ -72,7 +72,7 @@ func (m *Mutator) Bootstrap(genesis *flow.Block) error {
 		}
 
 		// insert the finalized boundary
-		err = operation.InsertBoundary(genesis.Number)(tx)
+		err = operation.InsertBoundary(genesis.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not update boundary: %w", err)
 		}
@@ -149,11 +149,64 @@ func (m *Mutator) Extend(blockID flow.Identifier) error {
 	})
 }
 
+func (m *Mutator) Finalize(blockID flow.Identifier) error {
+	return m.state.db.Update(func(tx *badger.Txn) error {
+
+		// retrieve the block to make sure we have it
+		var header flow.Header
+		err := operation.RetrieveHeader(blockID, &header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve block: %w", err)
+		}
+
+		// retrieve the current finalized state boundary
+		var boundary uint64
+		err = operation.RetrieveBoundary(&boundary)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve boundary: %w", err)
+		}
+
+		// retrieve the hash of the boundary
+		var headID flow.Identifier
+		err = operation.RetrieveNumber(boundary, &headID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not retrieve head: %w", err)
+		}
+
+		// in order to validate the validity of all changes, we need to iterate
+		// through the blocks that need to be finalized from oldest to youngest;
+		// we thus start at the youngest remember all of the intermediary steps
+		// while tracing back until we reach the finalized state
+		headers := []*flow.Header{&header}
+		for header.ParentID != headID {
+			err = operation.RetrieveHeader(header.ParentID, &header)(tx)
+			if err != nil {
+				return fmt.Errorf("could not retrieve parent (%x): %w", header.ParentID, err)
+			}
+			headers = append(headers, &header)
+		}
+
+		// now we can step backwards in order to go from oldest to youngest; for
+		// each header, we reconstruct the block and then apply the related
+		// changes to the protocol state
+		for i := len(headers) - 1; i >= 0; i-- {
+
+			// Finalize the block
+			err = procedure.FinalizeBlock(headers[i].ID())(tx)
+			if err != nil {
+				return fmt.Errorf("could not finalize block (%s): %w", header.ID(), err)
+			}
+		}
+
+		return nil
+	})
+}
+
 func checkGenesisHeader(header *flow.Header) error {
 
 	// the initial finalized boundary needs to be height zero
-	if header.Number != 0 {
-		return fmt.Errorf("invalid initial finalized boundary (%d != 0)", header.Number)
+	if header.View != 0 {
+		return fmt.Errorf("invalid initial finalized boundary (%d != 0)", header.View)
 	}
 
 	// the parent must be zero hash
@@ -250,14 +303,14 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 		return fmt.Errorf("could not retrieve header: %w", err)
 	}
 
-	// if new block number has a lower number, we can't finalize it
-	if header.Number <= parent.Number {
-		return fmt.Errorf("block needs higher nummber (%d <= %d)", header.Number, parent.Number)
+	// if new block number has a lower number, we can't add it
+	if header.View <= parent.View {
+		return fmt.Errorf("block needs higher number (%d <= %d)", header.View, parent.View)
 	}
 
 	// NOTE: in the default case, the first parent is the boundary, so we don't
 	// load the first parent twice almost ever; even in cases where we do, we
-	// badger has efficietn caching, so no reason to complicate the algorithm
+	// badger has efficient caching, so no reason to complicate the algorithm
 	// here to try avoiding one extra header loading
 
 	// trace back from new block until we find a block that has the latest
@@ -272,7 +325,7 @@ func checkExtendHeader(tx *badger.Txn, header *flow.Header) error {
 
 		// if its number is below current boundary, the block does not connect
 		// to the finalized protocol state and would break database consistency
-		if header.Number < boundary {
+		if header.View < boundary {
 			return fmt.Errorf("block doesn't connect to finalized state")
 		}
 

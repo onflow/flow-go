@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/protocol"
 )
 
@@ -53,9 +54,11 @@ func (v *ViewState) IsSelfLeaderForView(view uint64) bool {
 // blockID - specifies the block to be queried.
 // nodeIDs - optional arguments to only return identities that matches the given nodeIDs.
 func (v *ViewState) GetStakedIdentitiesAtBlock(blockID flow.Identifier, nodeIDs ...flow.Identifier) (flow.IdentityList, error) {
-	// filter only the given nodes
-	nodeFilter := toNodeFilter(nodeIDs...)
-	return v.protocolState.AtBlockID(blockID).Identities(v.consensusMembersFilter, stakedFilter, nodeFilter)
+	return v.protocolState.AtBlockID(blockID).Identities(
+		v.consensusMembersFilter,     // nodes must be belong to the same consensus group
+		filter.HasStake,              // nodes must be staked
+		filter.HasNodeID(nodeIDs...), // filter only the given nodes
+	)
 }
 
 // GetQCStakeThresholdAtBlock returns the stack threshold for building QC at a given block
@@ -90,22 +93,4 @@ func ComputeStakeThresholdForBuildingQC(totalStake uint64) uint64 {
 	return new(big.Int).Div(
 		new(big.Int).Mul(total, two),
 		three).Uint64()
-}
-
-// filter only nodes that have stake
-func stakedFilter(node *flow.Identity) bool {
-	return node.Stake > 0
-}
-
-// builds a map from nodeIDs for filter nodes
-func toNodeFilter(nodeIDs ...flow.Identifier) flow.IdentityFilter {
-	nodeMap := make(map[flow.Identifier]struct{}, len(nodeIDs))
-	for _, nodeID := range nodeIDs {
-		nodeMap[nodeID] = struct{}{}
-	}
-
-	return func(node *flow.Identity) bool {
-		_, found := nodeMap[node.NodeID]
-		return found
-	}
 }

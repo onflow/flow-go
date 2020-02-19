@@ -136,7 +136,7 @@ var ArrayFunction = NewStandardLibraryFunction(
 		},
 	},
 	func(invocation interpreter.Invocation) trampoline.Trampoline {
-		count := invocation.Arguments[0].(interpreter.IntegerValue).IntValue()
+		count := invocation.Arguments[0].(interpreter.NumberValue).IntValue()
 		generate := invocation.Arguments[1].(interpreter.FunctionValue)
 
 		var elements []interpreter.Value

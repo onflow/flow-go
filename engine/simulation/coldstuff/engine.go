@@ -240,31 +240,24 @@ func (e *Engine) sendProposal() error {
 		Logger()
 
 	// get our own ID to tally our stake
-	id, err := e.state.Final().Identity(e.me.NodeID())
+	myIdentity, err := e.state.Final().Identity(e.me.NodeID())
 	if err != nil {
 		return fmt.Errorf("could not get own current ID: %w", err)
 	}
 
 	// define the block header build function
-	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
-		header := flow.Header{
-			Number:      e.round.Parent().Number + 1,
-			Timestamp:   time.Now().UTC(),
-			ParentID:    e.round.Parent().ID(),
-			PayloadHash: payloadHash,
-			ProposerID:  e.me.NodeID(),
-		}
-		return &header, nil
+	setProposer := func(header *flow.Header) {
+		header.ProposerID = myIdentity.NodeID
 	}
 
 	// get the payload for the next hash
-	candidate, err := e.builder.BuildOn(e.round.Parent().ID(), build)
+	candidate, err := e.builder.BuildOn(e.round.Parent().ID(), setProposer)
 	if err != nil {
 		return fmt.Errorf("could not build on parent: %w", err)
 	}
 
 	log = log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.View).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Logger()
 
@@ -287,7 +280,7 @@ func (e *Engine) sendProposal() error {
 	}
 
 	// add our own vote to the engine
-	e.round.Tally(id.NodeID, id.Stake)
+	e.round.Tally(myIdentity.NodeID, myIdentity.Stake)
 
 	log.Info().Msg("block proposal sent")
 
@@ -302,7 +295,7 @@ func (e *Engine) waitForVotes() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.View).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "wait_votes").
 		Logger()
@@ -374,7 +367,7 @@ func (e *Engine) sendCommit() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.View).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "send_commit").
 		Logger()
@@ -425,9 +418,9 @@ func (e *Engine) waitForProposal() error {
 			}
 
 			// discard proposals with the wrong height
-			number := e.round.Parent().Number + 1
-			if candidate.Number != e.round.Parent().Number+1 {
-				log.Warn().Uint64("candidate_height", candidate.Number).Uint64("expected_height", number).Msg("invalid height")
+			number := e.round.Parent().View + 1
+			if candidate.View != e.round.Parent().View+1 {
+				log.Warn().Uint64("candidate_height", candidate.View).Uint64("expected_height", number).Msg("invalid height")
 				continue
 			}
 
@@ -449,7 +442,7 @@ func (e *Engine) waitForProposal() error {
 			e.round.Propose(candidate)
 
 			log.Info().
-				Uint64("number", candidate.Number).
+				Uint64("number", candidate.View).
 				Hex("candidate_id", logging.Entity(candidate)).
 				Msg("block proposal received")
 
@@ -469,7 +462,7 @@ func (e *Engine) voteOnProposal() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.View).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "send_vote").
 		Logger()
@@ -496,7 +489,7 @@ func (e *Engine) waitForCommit() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.View).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "wait_commit").
 		Logger()
@@ -536,7 +529,7 @@ func (e *Engine) commitCandidate() error {
 	candidate := e.round.Candidate()
 
 	log := e.log.With().
-		Uint64("number", candidate.Number).
+		Uint64("number", candidate.View).
 		Hex("candidate_id", logging.Entity(candidate)).
 		Str("action", "exec_commit").
 		Logger()

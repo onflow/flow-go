@@ -2,11 +2,9 @@ package hotstuff
 
 import (
 	"fmt"
-	"time"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
-
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/module"
 )
 
@@ -15,27 +13,23 @@ type BlockProducer struct {
 	signer    Signer
 	viewState *ViewState
 	builder   module.Builder
-
-	// chainID is used for specifying the chainID field for new blocks
-	chainID string
 }
 
 // NewBlockProducer creates a new BlockProducer
-func NewBlockProducer(signer Signer, viewState *ViewState, builder module.Builder, chainID string) (*BlockProducer, error) {
+func NewBlockProducer(signer Signer, viewState *ViewState, builder module.Builder) (*BlockProducer, error) {
 	bp := &BlockProducer{
 		signer:    signer,
 		viewState: viewState,
 		builder:   builder,
-		chainID:   chainID,
 	}
 	return bp, nil
 }
 
 // MakeBlockProposal will build a proposal for the given view with the given QC
-func (bp *BlockProducer) MakeBlockProposal(block *types.Block, qc *types.QuorumCertificate, view uint64) (*types.Proposal, error) {
+func (bp *BlockProducer) MakeBlockProposal(qc *hotstuff.QuorumCertificate, view uint64) (*hotstuff.Proposal, error) {
 
 	// create the block for the view
-	block, err := bp.makeBlockForView(block, qc, view)
+	block, err := bp.makeBlockForView(qc, view)
 	if err != nil {
 		return nil, fmt.Errorf("could not create block for view: %w", err)
 	}
@@ -50,40 +44,29 @@ func (bp *BlockProducer) MakeBlockProposal(block *types.Block, qc *types.QuorumC
 }
 
 // makeBlockForView gets the payload hash from mempool and build a block on top of the given qc for the given view.
-func (bp *BlockProducer) makeBlockForView(parent *types.Block, qc *types.QuorumCertificate, view uint64) (*types.Block, error) {
+func (bp *BlockProducer) makeBlockForView(qc *hotstuff.QuorumCertificate, view uint64) (*hotstuff.Block, error) {
 
-	// define the block header build function
-	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
-		header := flow.Header{
-			ChainID:     bp.chainID,
-			View:        view,
-			Number:      parent.Height + 1,
-			Timestamp:   time.Now().UTC(),
-			ParentID:    parent.BlockID,
-			ParentView:  parent.View,
-			PayloadHash: payloadHash,
-			ProposerID:  flow.ZeroID, // TODO: fill in our own ID here
-		}
-		return &header, nil
+	// the custom functions allows us to set some custom fields on the block;
+	// in hotstuff, we use this for view number and signature-related fields
+	setHotstuffFields := func(header *flow.Header) {
+		header.View = view
+		header.ProposerID = bp.viewState.myID
+		header.ParentSigs = qc.AggregatedSignature.Raw
+		header.ParentSigners = qc.AggregatedSignature.SignerIDs
 	}
 
-	// let the builder create the payload and store relevant stuff
-	header, err := bp.builder.BuildOn(parent.BlockID, build)
+	// retrieve a fully built block header from the builder
+	header, err := bp.builder.BuildOn(qc.BlockID, setHotstuffFields)
 	if err != nil {
 		return nil, fmt.Errorf("could not build header: %w", err)
-
 	}
 
 	// turn the header into a block header proposal as known by hotstuff
-	// TODO: probably need to populate a few more fields
-	// TODO: use NewBlock to create block
-	block := types.Block{
+	block := hotstuff.Block{
 		BlockID:     header.ID(),
 		View:        view,
 		QC:          qc,
 		PayloadHash: header.PayloadHash,
-		Height:      header.Number,
-		ChainID:     header.ChainID,
 		Timestamp:   header.Timestamp,
 	}
 

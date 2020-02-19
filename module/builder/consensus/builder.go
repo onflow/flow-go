@@ -5,11 +5,11 @@ package consensus
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/module/mempool"
 	"github.com/dapperlabs/flow-go/storage/badger/operation"
 )
@@ -20,20 +20,23 @@ type Builder struct {
 	db         *badger.DB
 	guarantees mempool.Guarantees
 	seals      mempool.Seals
+	chainID    string
 }
 
 // NewBuilder creates a new block builder.
-func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals) *Builder {
+func NewBuilder(db *badger.DB, guarantees mempool.Guarantees, seals mempool.Seals, chainID string) *Builder {
 	b := &Builder{
 		db:         db,
 		guarantees: guarantees,
 		seals:      seals,
+		chainID:    chainID,
 	}
 	return b
 }
 
-// BuildOn creates a new block payload on top of the provided parent.
-func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*flow.Header, error) {
+// BuildOn creates a new block header build on the provided parent, using the given view and applying the
+// custom setter function to allow the caller to make changes to the header before storing it.
+func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (*flow.Header, error) {
 	var header *flow.Header
 	err := b.db.Update(func(tx *badger.Txn) error {
 
@@ -65,7 +68,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*fl
 			}
 
 			// if we have reached the finalized boundary, stop indexing
-			if ancestor.Number <= boundary {
+			if ancestor.View <= boundary {
 				break
 			}
 
@@ -169,11 +172,33 @@ func (b *Builder) BuildOn(parentID flow.Identifier, build module.BuildFunc) (*fl
 			}
 		}
 
-		// generate the block header using the hotstuff-provided function
-		header, err = build(payloadHash)
+		// retrieve the parent to set the height
+		var parent flow.Header
+		err = operation.RetrieveHeader(parentID, &parent)(tx)
 		if err != nil {
-			return fmt.Errorf("could not build block: %w", err)
+			return fmt.Errorf("could not retrieve parent: %w", err)
 		}
+
+		// construct default block on top of the provided parent
+		header = &flow.Header{
+			ChainID:     b.chainID,
+			ParentID:    parentID,
+			Height:      parent.Height + 1,
+			Timestamp:   time.Now().UTC(),
+			PayloadHash: payloadHash,
+
+			// the following fields should be set by the custom function as needed
+			// NOTE: we could abstract all of this away into an interface{} field,
+			// but that would be over the top as we will probably always use hotstuff
+			View:          0,
+			ParentSigners: nil,
+			ParentSigs:    nil,
+			ProposerID:    flow.ZeroID,
+			ProposerSig:   nil,
+		}
+
+		// apply the custom fields setter of the consensus algorithm
+		setter(header)
 
 		// insert the block header
 		err = operation.InsertHeader(header)(tx)

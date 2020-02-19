@@ -25,7 +25,6 @@ type Overlay interface {
 	// Identity returns a map of all identifier to flow identity
 	Identity() (map[flow.Identifier]flow.Identity, error)
 	Receive(nodeID flow.Identifier, msg interface{}) error
-	Cleanup(nodeID flow.Identifier) error
 }
 
 // Connection represents an interface to read from & write to a connection.

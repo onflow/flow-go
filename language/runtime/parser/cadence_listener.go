@@ -280,6 +280,9 @@ type CadenceListener interface {
 	// EnterStringLiteral is called when entering the stringLiteral production.
 	EnterStringLiteral(c *StringLiteralContext)
 
+	// EnterFixedPointLiteral is called when entering the fixedPointLiteral production.
+	EnterFixedPointLiteral(c *FixedPointLiteralContext)
+
 	// EnterIntegerLiteral is called when entering the integerLiteral production.
 	EnterIntegerLiteral(c *IntegerLiteralContext)
 
@@ -585,6 +588,9 @@ type CadenceListener interface {
 
 	// ExitStringLiteral is called when exiting the stringLiteral production.
 	ExitStringLiteral(c *StringLiteralContext)
+
+	// ExitFixedPointLiteral is called when exiting the fixedPointLiteral production.
+	ExitFixedPointLiteral(c *FixedPointLiteralContext)
 
 	// ExitIntegerLiteral is called when exiting the integerLiteral production.
 	ExitIntegerLiteral(c *IntegerLiteralContext)

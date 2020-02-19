@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks"
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/forks/finalizer"
 	mockdist "github.com/dapperlabs/flow-go/engine/consensus/hotstuff/notifications/mock"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+	model "github.com/dapperlabs/flow-go/model/hotstuff"
 	mockfinalizer "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/stretchr/testify/assert"
 )
 
 // TestForks_ImplementsInterface tests that forks.Forks implements hotstuff.Forks
@@ -29,9 +30,9 @@ func TestForks_Initialization(t *testing.T) {
 	assert.Equal(t, forks.FinalizedView(), uint64(1))
 	assert.Equal(t, forks.FinalizedBlock(), root.Block)
 
-	assert.Equal(t, forks.GetBlocksForView(0), []*types.Block{})
-	assert.Equal(t, forks.GetBlocksForView(1), []*types.Block{root.Block})
-	assert.Equal(t, forks.GetBlocksForView(2), []*types.Block{})
+	assert.Equal(t, forks.GetBlocksForView(0), []*model.Block{})
+	assert.Equal(t, forks.GetBlocksForView(1), []*model.Block{root.Block})
+	assert.Equal(t, forks.GetBlocksForView(2), []*model.Block{})
 
 	b, found := forks.GetBlock(root.Block.BlockID)
 	assert.True(t, found, "Missing trusted Root ")
@@ -50,7 +51,7 @@ func TestForks_AddBlock(t *testing.T) {
 	}
 	notifier.AssertExpectations(t)
 
-	assert.Equal(t, forks.GetBlocksForView(2), []*types.Block{block02})
+	assert.Equal(t, forks.GetBlocksForView(2), []*model.Block{block02})
 	b, found := forks.GetBlock(block02.BlockID)
 	assert.True(t, found)
 	assert.Equal(t, block02, b)
@@ -99,7 +100,7 @@ func TestForks_3ChainFinalization(t *testing.T) {
 	finCallback.AssertExpectations(t)
 }
 
-func addBlock2Forks(t *testing.T, block *types.Block, forks hotstuff.Forks) {
+func addBlock2Forks(t *testing.T, block *model.Block, forks hotstuff.Forks) {
 	err := forks.AddBlock(block)
 	if err != nil {
 		assert.Fail(t, err.Error())
@@ -108,7 +109,7 @@ func addBlock2Forks(t *testing.T, block *types.Block, forks hotstuff.Forks) {
 }
 
 // verifyStored verifies that block is stored in forks
-func verifyStored(t *testing.T, block *types.Block, forks hotstuff.Forks) {
+func verifyStored(t *testing.T, block *model.Block, forks hotstuff.Forks) {
 	b, found := forks.GetBlock(block.BlockID)
 	assert.True(t, found)
 	assert.Equal(t, block, b)
@@ -156,35 +157,31 @@ func makeRootBlock(t *testing.T, view uint64) *forks.BlockQC {
 	return &root
 }
 
-func qc(view uint64, id flow.Identifier) *types.QuorumCertificate {
-	return &types.QuorumCertificate{View: view, BlockID: id}
+func qc(view uint64, id flow.Identifier) *model.QuorumCertificate {
+	return &model.QuorumCertificate{View: view, BlockID: id}
 }
 
-func makeChildBlock(blockView uint64, payloadHash flow.Identifier, parent *types.Block) *types.Block {
+func makeChildBlock(blockView uint64, payloadHash flow.Identifier, parent *model.Block) *model.Block {
 	qcForParent := qc(parent.View, parent.BlockID)
 	id := computeID(blockView, qcForParent, payloadHash)
-	return &types.Block{
+	return &model.Block{
 		BlockID:     id,
 		View:        blockView,
 		QC:          qcForParent,
 		PayloadHash: payloadHash,
-		Height:      0,
-		ChainID:     "",
 	}
 }
 
-func makeBlock(blockView uint64, blockQC *types.QuorumCertificate, payloadHash flow.Identifier) *types.Block {
+func makeBlock(blockView uint64, blockQC *model.QuorumCertificate, payloadHash flow.Identifier) *model.Block {
 	if blockQC == nil {
 		blockQC = qc(0, flow.Identifier{})
 	}
 	id := computeID(blockView, blockQC, payloadHash)
-	return &types.Block{
+	return &model.Block{
 		BlockID:     id,
 		View:        blockView,
 		QC:          blockQC,
 		PayloadHash: payloadHash,
-		Height:      0,
-		ChainID:     "",
 	}
 }
 
@@ -198,7 +195,7 @@ func string2Identifyer(s string) flow.Identifier {
 // When computing the Block's ID, this implementation only considers
 // the fields used by Forks.
 // TODO need full implementation
-func computeID(view uint64, qc *types.QuorumCertificate, payloadHash flow.Identifier) flow.Identifier {
+func computeID(view uint64, qc *model.QuorumCertificate, payloadHash flow.Identifier) flow.Identifier {
 	id := make([]byte, 0)
 
 	viewBytes := make([]byte, 8)

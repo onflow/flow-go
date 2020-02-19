@@ -1,6 +1,7 @@
-package types
+package hotstuff
 
 import (
+	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
@@ -19,7 +20,7 @@ type AggregatedSignature struct {
 	// Raw is the raw signature bytes.
 	// It might be a aggregated BLS signature or a combination of aggregated BLS signature
 	// and threshold signature.
-	Raw []byte
+	Raw []crypto.Signature
 
 	// the Identifiers of all the signers
 	SignerIDs []flow.Identifier
