@@ -21,6 +21,8 @@ type PubSubDistributor struct {
 	blockIncorporatedConsumers     []BlockIncorporatedConsumer
 	finalizedBlockConsumers        []FinalizedBlockConsumer
 	doubleProposeDetectedConsumers []DoubleProposeDetectedConsumer
+	doubleVotingDetectedConsumers  []DoubleVotingDetectedConsumer
+	invalidVoteDetectedConsumers   []InvalidVoteDetectedConsumer
 	lock                           sync.RWMutex
 }
 
@@ -97,6 +99,22 @@ func (p *PubSubDistributor) OnDoubleProposeDetected(block1, block2 *types.Block)
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.doubleProposeDetectedConsumers {
 		subscriber.OnDoubleProposeDetected(block1, block2)
+	}
+}
+
+func (p *PubSubDistributor) OnDoubleVotingDetected(vote1, vote2 *types.Vote) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.doubleVotingDetectedConsumers {
+		subscriber.OnDoubleVotingDetected(vote1, vote2)
+	}
+}
+
+func (p *PubSubDistributor) OnInvalidVoteDetected(vote *types.Vote) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.invalidVoteDetectedConsumers {
+		subscriber.OnInvalidVoteDetected(vote)
 	}
 }
 

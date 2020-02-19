@@ -45,18 +45,18 @@ func (vs *VotingStatus) CanBuildQC() bool {
 	return vs.accumulatedStake >= vs.thresholdStake
 }
 
-// TryBuildQC returns a QC if the existing votes are enought to build a QC, otherwise
-// an error will be returned.
-func (vs *VotingStatus) TryBuildQC() (*types.QuorumCertificate, error) {
+// TryBuildQC returns a QC if the existing votes are enough to build a QC
+// returns false if the votes are insufficient
+func (vs *VotingStatus) TryBuildQC() (*types.QuorumCertificate, bool, error) {
 	// check if there are enough votes to build QC
 	if !vs.CanBuildQC() {
-		return nil, fmt.Errorf("could not build QC: %w", types.ErrInsufficientVotes)
+		return nil, false, nil
 	}
 
 	// build the aggregated signature
 	aggregatedSig, err := vs.aggregateSig()
 	if err != nil {
-		return nil, fmt.Errorf("could not build aggregate signatures for building QC: %w", err)
+		return nil, false, fmt.Errorf("could not build aggregate signatures for building QC: %w", err)
 	}
 
 	// build the QC
@@ -66,7 +66,7 @@ func (vs *VotingStatus) TryBuildQC() (*types.QuorumCertificate, error) {
 		AggregatedSignature: aggregatedSig,
 	}
 
-	return qc, nil
+	return qc, true, nil
 }
 
 func (vs *VotingStatus) aggregateSig() (*types.AggregatedSignature, error) {
@@ -82,11 +82,4 @@ func getSigsSliceFromVotes(votes map[flow.Identifier]*types.Vote) []*types.Singl
 	}
 
 	return signatures
-}
-
-// FromSignatures builds an aggregated signature from a slice of signature and a signerCount
-// sigs is the slice of signatures from all the signers
-// signers is the flag from the entire identity list for who signed it and who didn't.
-func FromSignatures(sigs []*types.SingleSignature, signerCount uint32) (*types.AggregatedSignature, error) {
-	panic("TODO")
 }
