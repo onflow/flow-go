@@ -200,6 +200,17 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header)) (
 		// apply the custom fields setter of the consensus algorithm
 		setter(header)
 
+		// TODO insert and index state commitments properly
+		// I don't know how these are meant to be inserted or indexed. For now
+		// I am indexing the initial genesis commit for every block so that the
+		// LookupCommit on line 120 doesn't error. This needs to be revisited
+		// and implemented, at the moment it appears that state commitments are
+		// never inserted except for the genesis block.
+		err = operation.IndexCommit(header.ID(), commit)(tx)
+		if err != nil {
+			return fmt.Errorf("could not index commit: %w", err)
+		}
+
 		// insert the block header
 		err = operation.InsertHeader(header)(tx)
 		if err != nil {
