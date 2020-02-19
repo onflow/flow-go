@@ -11,33 +11,33 @@ import (
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
 
-func TestChunkHeaders(t *testing.T) {
+func TestChunkDataPacks(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.ChunkHeaderFixture()
+		expected := unittest.ChunkDataPackFixture()
 
 		t.Run("Retrieve non-existent", func(t *testing.T) {
-			var actual flow.ChunkHeader
-			err := db.View(RetrieveChunkHeader(expected.ChunkID, &actual))
+			var actual flow.ChunkDataPack
+			err := db.View(RetrieveChunkDataPack(expected.ChunkID, &actual))
 			assert.Error(t, err)
 		})
 
 		t.Run("Save", func(t *testing.T) {
-			err := db.Update(InsertChunkHeader(&expected))
+			err := db.Update(InsertChunkDataPack(&expected))
 			require.NoError(t, err)
 
-			var actual flow.ChunkHeader
-			err = db.View(RetrieveChunkHeader(expected.ChunkID, &actual))
+			var actual flow.ChunkDataPack
+			err = db.View(RetrieveChunkDataPack(expected.ChunkID, &actual))
 			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
 		})
 
 		t.Run("Remove", func(t *testing.T) {
-			err := db.Update(RemoveChunkHeader(expected.ChunkID))
+			err := db.Update(RemoveChunkDataPack(expected.ChunkID))
 			require.NoError(t, err)
 
-			var actual flow.ChunkHeader
-			err = db.View(RetrieveChunkHeader(expected.ChunkID, &actual))
+			var actual flow.ChunkDataPack
+			err = db.View(RetrieveChunkDataPack(expected.ChunkID, &actual))
 			assert.Error(t, err)
 		})
 	})

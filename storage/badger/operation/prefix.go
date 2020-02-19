@@ -29,7 +29,7 @@ const (
 	codeResult      = 24
 	// codeReceipt     = 25
 	// codeApproval    = 26
-	codeChunkHeader = 27
+	codeChunkDataPack = 27
 
 	codeIndexIdentity   = 100
 	codeIndexGuarantee  = 101
