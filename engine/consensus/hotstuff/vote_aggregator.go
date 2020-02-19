@@ -119,6 +119,7 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *hotstuff.Block) (*hotstu
 	if exists {
 		return oldQC, true, nil
 	}
+
 	// proposer vote is the first to be accumulated
 	proposerVote, exists := va.proposerVotes[block.BlockID]
 	if !exists { // cannot build qc if proposer vote does not exist

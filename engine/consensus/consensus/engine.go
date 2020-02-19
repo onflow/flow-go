@@ -6,12 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
+	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/crypto"
 	"github.com/dapperlabs/flow-go/engine"
+	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -30,9 +33,13 @@ type Engine struct {
 	state    protocol.State
 	headers  storage.Headers
 	payloads storage.Payloads
-	hotstuff module.HotStuff
 	con      network.Conduit
 	cache    map[flow.Identifier][]cacheItem
+
+	coldstuff module.ColdStuff
+	// TODO this is pretty awkward, should change the interface
+	stopColdStuff func()
+	coldStuffDone <-chan struct{}
 }
 
 type cacheItem struct {
@@ -41,7 +48,16 @@ type cacheItem struct {
 }
 
 // New creates a new consensus propagation engine.
-func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, headers storage.Headers, payloads storage.Payloads, hotstuff module.HotStuff) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	net module.Network,
+	me module.Local,
+	state protocol.State,
+	headers storage.Headers,
+	payloads storage.Payloads,
+	build module.Builder,
+	finalizer module.Finalizer,
+) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -51,9 +67,15 @@ func New(log zerolog.Logger, net module.Network, me module.Local, state protocol
 		state:    state,
 		headers:  headers,
 		payloads: payloads,
-		hotstuff: hotstuff,
 		cache:    make(map[flow.Identifier][]cacheItem),
 	}
+
+	cold, err := coldstuff.New(log, state, me, e, build, finalizer, 3*time.Second, 8*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize coldstuff: %w", err)
+	}
+
+	e.coldstuff = cold
 
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.ProtocolConsensus, e)
@@ -68,13 +90,18 @@ func New(log zerolog.Logger, net module.Network, me module.Local, state protocol
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For the consensus, we consider it ready right away.
 func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
+	return e.unit.Ready(func() {
+		e.stopColdStuff, e.coldStuffDone = e.coldstuff.Start()
+	})
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		e.stopColdStuff()
+		<-e.coldStuffDone
+	})
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -129,6 +156,11 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signa
 // BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
 
+	// first, check that we are the proposer of the block
+	if header.ProposerID != e.me.NodeID() {
+		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
+	}
+
 	// retrieve the payload for the block
 	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
 	if err != nil {
@@ -159,6 +191,25 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	}
 
 	return nil
+}
+
+func (e *Engine) BroadcastCommit(commit *model.Commit) error {
+
+	// retrieve all consensus nodes without our ID
+	recipients, err := e.state.Final().Identities(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	)
+	if err != nil {
+		return fmt.Errorf("could not get consensus recipients: %w", err)
+	}
+
+	err = e.con.Submit(commit, recipients.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not send commit message: %w", err)
+	}
+
+	return err
 }
 
 // process processes events for the propagation engine on the consensus node.
@@ -209,7 +260,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 	}
 
 	// submit the model to hotstuff for processing
-	e.hotstuff.SubmitProposal(proposal.Header, parent.View)
+	e.coldstuff.SubmitProposal(proposal.Header, parent.View)
 
 	// check for any descendants of the block to process
 	children, ok := e.cache[blockID]
@@ -235,8 +286,8 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // onBlockVote handles incoming block votes.
 func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
 
-	// forward the vote to hotstuff for processing
-	e.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature)
+	// forward the vote to coldstuff for processing
+	e.coldstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.Signature)
 
 	return nil
 }
