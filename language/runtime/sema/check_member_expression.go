@@ -48,8 +48,13 @@ func (checker *Checker) VisitMemberExpression(expression *ast.MemberExpression) 
 
 	memberType := member.TypeAnnotation.Type
 
+	// If the member access is optional chaining, only wrap the result value
+	// in an optional, if it is not already an optional value
+
 	if isOptional {
-		return &OptionalType{Type: memberType}
+		if _, ok := memberType.(*OptionalType); !ok {
+			return &OptionalType{Type: memberType}
+		}
 	}
 	return memberType
 }
