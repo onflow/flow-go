@@ -127,7 +127,7 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
-		es.On("GetChunkRegisters", chunkID).Return(nil, fmt.Errorf("state error"))
+		es.On("ChunkDataPackByChunkID", chunkID).Return(nil, fmt.Errorf("state error"))
 
 		req := &messages.ExecutionStateRequest{ChunkID: chunkID}
 
@@ -149,31 +149,28 @@ func TestExecutionEngine_OnExecutionStateRequest(t *testing.T) {
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
-		chunkHeader := unittest.ChunkHeaderFixture()
-		chunkID := chunkHeader.ChunkID
+		chunkDataPack := unittest.ChunkDataPackFixture()
+		chunkID := chunkDataPack.ChunkID
 
-		registerIDs := chunkHeader.RegisterIDs
-		registerValues := []flow.RegisterValue{{1}, {2}, {3}}
+		// registerIDs := chunkHeader.RegisterIDs
+		// registerValues := []flow.RegisterValue{{1}, {2}, {3}}
 
-		expectedRegisters := flow.Ledger{
-			string(registerIDs[0]): registerValues[0],
-			string(registerIDs[1]): registerValues[1],
-			string(registerIDs[2]): registerValues[2],
-		}
+		// expectedRegisters := flow.Ledger{
+		// 	string(registerIDs[0]): registerValues[0],
+		// 	string(registerIDs[1]): registerValues[1],
+		// 	string(registerIDs[2]): registerValues[2],
+		// }
 
 		ps.On("Final").Return(ss)
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil)
-		es.On("GetChunkRegisters", chunkID).Return(expectedRegisters, nil)
+		es.On("ChunkDataPackByChunkID", chunkID).Return(chunkDataPack, nil)
 		con.On("Submit", mock.Anything, originIdentity.NodeID).
 			Run(func(args mock.Arguments) {
 				res, ok := args[0].(*messages.ExecutionStateResponse)
 				require.True(t, ok)
-
-				actualChunkID := res.State.ChunkID
-				actualRegisters := res.State.Registers
-
-				assert.Equal(t, chunkID, actualChunkID)
-				assert.EqualValues(t, expectedRegisters, actualRegisters)
+				assert.Equal(t, chunkID, res.Data.ChunkID)
+				// actualRegisters := res.State.Registers
+				// assert.EqualValues(t, expectedRegisters, actualRegisters)
 			}).
 			Return(nil)
 

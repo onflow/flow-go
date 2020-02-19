@@ -41,10 +41,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(
 				state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 					return nil, nil
-				}))
+				}, unittest.StateCommitmentFixture()))
 
 		es.On("CommitDelta", mock.Anything).Return(nil, nil)
-		es.On("PersistChunkHeader", mock.Anything, mock.Anything).Return(nil)
+		es.On("PersistChunkDataPack", mock.Anything, mock.Anything).Return(nil)
 		es.On("PersistStateCommitment", block.Block.ID(), mock.Anything).Return(nil)
 
 		result, err := exe.ExecuteBlock(block)
@@ -86,7 +86,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(
 				state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 					return nil, nil
-				})).
+				}, unittest.StateCommitmentFixture())).
 			Times(collectionCount)
 
 		es.On("CommitDelta", mock.Anything).

@@ -213,7 +213,6 @@ func (e *Engine) onExecutionStateRequest(originID flow.Identifier, req *messages
 		return fmt.Errorf("invalid role for requesting execution state: %s", id.Role)
 	}
 
-	// TODO (RAMTIN) - change this to retrun chunk data pack
 	chunkdata, err := e.execState.ChunkDataPackByChunkID(chunkID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve chunk state (id=%s): %w", chunkID, err)
