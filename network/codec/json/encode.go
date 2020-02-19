@@ -36,7 +36,7 @@ func encode(v interface{}) (*Envelope, error) {
 	case *message.Echo:
 		code = CodeEcho
 
-	// ColdStuff
+	// Consensus
 	case *messages.BlockProposal:
 		code = CodeBlockProposal
 	case *messages.BlockVote:
