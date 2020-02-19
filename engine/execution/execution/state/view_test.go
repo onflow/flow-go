@@ -14,7 +14,7 @@ func TestView_Get(t *testing.T) {
 	t.Run("ValueNotSet", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
-		})
+		}, nil)
 
 		b, err := v.Get(flow.RegisterID("fruit"))
 		assert.NoError(t, err)
@@ -28,7 +28,7 @@ func TestView_Get(t *testing.T) {
 			}
 
 			return nil, nil
-		})
+		}, nil)
 
 		b, err := v.Get(flow.RegisterID("fruit"))
 		assert.NoError(t, err)
@@ -42,7 +42,7 @@ func TestView_Get(t *testing.T) {
 			}
 
 			return nil, nil
-		})
+		}, nil)
 
 		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 
@@ -55,7 +55,7 @@ func TestView_Get(t *testing.T) {
 func TestView_Set(t *testing.T) {
 	v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 		return nil, nil
-	})
+	}, nil)
 
 	v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 
@@ -72,7 +72,7 @@ func TestView_Set(t *testing.T) {
 	t.Run("AfterDelete", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
-		})
+		}, nil)
 
 		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 		v.Delete(flow.RegisterID("fruit"))
@@ -91,7 +91,7 @@ func TestView_Delete(t *testing.T) {
 	t.Run("ValueNotSet", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
-		})
+		}, nil)
 
 		b1, err := v.Get(flow.RegisterID("fruit"))
 		assert.NoError(t, err)
@@ -114,7 +114,7 @@ func TestView_Delete(t *testing.T) {
 			}
 
 			return nil, nil
-		})
+		}, nil)
 
 		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 
@@ -137,7 +137,7 @@ func TestView_ApplyDelta(t *testing.T) {
 	t.Run("EmptyView", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
-		})
+		}, nil)
 
 		d := state.NewDelta()
 		d.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
@@ -157,7 +157,7 @@ func TestView_ApplyDelta(t *testing.T) {
 	t.Run("EmptyDelta", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
-		})
+		}, nil)
 
 		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 		v.Set(flow.RegisterID("vegetable"), flow.RegisterValue("carrot"))
@@ -178,7 +178,7 @@ func TestView_ApplyDelta(t *testing.T) {
 	t.Run("NoCollisions", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
-		})
+		}, nil)
 
 		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 
@@ -199,7 +199,7 @@ func TestView_ApplyDelta(t *testing.T) {
 	t.Run("OverwriteSetValue", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
-		})
+		}, nil)
 
 		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 
@@ -216,7 +216,7 @@ func TestView_ApplyDelta(t *testing.T) {
 	t.Run("OverwriteDeletedValue", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
-		})
+		}, nil)
 
 		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 		v.Delete(flow.RegisterID("fruit"))
@@ -234,7 +234,7 @@ func TestView_ApplyDelta(t *testing.T) {
 	t.Run("DeleteSetValue", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
-		})
+		}, nil)
 
 		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 
@@ -252,7 +252,7 @@ func TestView_ApplyDelta(t *testing.T) {
 func TestView_Reads(t *testing.T) {
 	v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 		return nil, nil
-	})
+	}, nil)
 
 	t.Run("Empty", func(t *testing.T) {
 		reads := v.Reads()
@@ -262,7 +262,7 @@ func TestView_Reads(t *testing.T) {
 	t.Run("ValueInCache", func(t *testing.T) {
 		v := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
 			return nil, nil
-		})
+		}, nil)
 
 		v.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 
@@ -286,7 +286,7 @@ func TestView_Reads(t *testing.T) {
 			}
 
 			return nil, nil
-		})
+		}, nil)
 
 		_, err := v.Get(flow.RegisterID("fruit"))
 		assert.NoError(t, err)

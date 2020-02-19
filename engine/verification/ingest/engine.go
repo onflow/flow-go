@@ -39,6 +39,7 @@ type Engine struct {
 	checkReceiptsMu sync.Mutex
 }
 
+// TODO (RAMTIN) change chunkStates to reflect changes to Views
 // New creates and returns a new instance of the ingest engine.
 func New(
 	log zerolog.Logger,
@@ -281,6 +282,7 @@ func (e *Engine) requestCollection(collID flow.Identifier) error {
 // given chunk to execution nodes.
 func (e *Engine) requestExecutionState(chunkID flow.Identifier) error {
 
+	// TODO we need to filter to only the ones who submited the ER
 	exeNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleExecution))
 	if err != nil {
 		return fmt.Errorf("could not load execution node identities: %w", err)

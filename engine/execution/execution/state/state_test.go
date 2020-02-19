@@ -32,9 +32,9 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 
 			stateCommitments.EXPECT().ByID(gomock.Any()).Return(stateCommitment, nil)
 
-			chunkHeaders := new(storage.ChunkHeaders)
+			chunkDataPacks := new(storage.ChunkDataPacks)
 
-			es := state.NewExecutionState(ls, stateCommitments, chunkHeaders)
+			es := state.NewExecutionState(ls, stateCommitments, chunkDataPacks)
 
 			f(t, es)
 		})
@@ -52,7 +52,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		view1.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 		view1.Set(flow.RegisterID("vegetable"), flow.RegisterValue("carrot"))
 
-		sc2, err := es.CommitDelta(view1.Delta())
+		sc2, _, _, err := es.CommitDelta(view1)
 		assert.NoError(t, err)
 
 		view2 := es.NewView(sc2)
@@ -75,14 +75,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		view1.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 
-		sc2, err := es.CommitDelta(view1.Delta())
+		sc2, _, _, err := es.CommitDelta(view1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
 		view2.Set(flow.RegisterID("fruit"), flow.RegisterValue("orange"))
 
-		sc3, err := es.CommitDelta(view2.Delta())
+		sc3, _, _, err := es.CommitDelta(view2)
 		assert.NoError(t, err)
 
 		// create a view for previous state version
@@ -111,14 +111,14 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		view1 := es.NewView(sc1)
 		view1.Set(flow.RegisterID("fruit"), flow.RegisterValue("apple"))
 
-		sc2, err := es.CommitDelta(view1.Delta())
+		sc2, _, _, err := es.CommitDelta(view1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
 		view2 := es.NewView(sc2)
 		view2.Delete(flow.RegisterID("fruit"))
 
-		sc3, err := es.CommitDelta(view2.Delta())
+		sc3, _, _, err := es.CommitDelta(view2)
 		assert.NoError(t, err)
 
 		// create a view for previous state version
@@ -143,7 +143,7 @@ func TestState_GetChunkRegisters(t *testing.T) {
 	t.Run("non-existent chunk", func(t *testing.T) {
 		ls := new(storage.Ledger)
 		sc := new(storage.Commits)
-		ch := new(storage.ChunkHeaders)
+		ch := new(storage.ChunkDataPacks)
 
 		chunkID := unittest.IdentifierFixture()
 
@@ -151,63 +151,25 @@ func TestState_GetChunkRegisters(t *testing.T) {
 
 		es := state.NewExecutionState(ls, sc, ch)
 
-		ledger, err := es.GetChunkRegisters(chunkID)
+		ledger, err := es.ChunkDataPackByChunkID(chunkID)
 		assert.Nil(t, ledger)
 		assert.Error(t, err)
 	})
 
-	t.Run("ledger storage error", func(t *testing.T) {
-		ls := new(storage.Ledger)
-		sc := new(storage.Commits)
-		ch := new(storage.ChunkHeaders)
+	// t.Run("ledger storage error", func(t *testing.T) {
+	// 	ls := new(storage.Ledger)
+	// 	sc := new(storage.Commits)
+	// 	ch := new(storage.ChunkDataPacks)
 
-		chunkHeader := unittest.ChunkHeaderFixture()
-		chunkID := chunkHeader.ChunkID
+	// 	chunkDataPack := unittest.ChunkDataPackFixture()
+	// 	chunkID := chunkDataPack.ChunkID
 
-		registerIDs := chunkHeader.RegisterIDs
+	// 	ch.On("ByID", chunkID).Return(&chunkDataPack, nil)
 
-		ch.On("ByID", chunkID).Return(&chunkHeader, nil)
-		ls.On("GetRegisters", registerIDs, chunkHeader.StartState).
-			Return(nil, fmt.Errorf("storage error"))
+	// 	es := state.NewExecutionState(ls, sc, ch)
 
-		es := state.NewExecutionState(ls, sc, ch)
+	// 	ch.AssertExpectations(t)
+	// 	ls.AssertExpectations(t)
+	// })
 
-		registers, err := es.GetChunkRegisters(chunkID)
-		assert.Error(t, err)
-		assert.Nil(t, registers)
-
-		ch.AssertExpectations(t)
-		ls.AssertExpectations(t)
-	})
-
-	t.Run("existing chunk", func(t *testing.T) {
-		ls := new(storage.Ledger)
-		sc := new(storage.Commits)
-		ch := new(storage.ChunkHeaders)
-
-		chunkHeader := unittest.ChunkHeaderFixture()
-		chunkID := chunkHeader.ChunkID
-
-		registerIDs := chunkHeader.RegisterIDs
-		registerValues := []flow.RegisterValue{{1}, {2}, {3}}
-
-		ch.On("ByID", chunkID).Return(&chunkHeader, nil)
-		ls.On("GetRegisters", registerIDs, chunkHeader.StartState).Return(registerValues, nil)
-
-		es := state.NewExecutionState(ls, sc, ch)
-
-		actualRegisters, err := es.GetChunkRegisters(chunkID)
-		assert.NoError(t, err)
-
-		expectedRegisters := flow.Ledger{
-			string(registerIDs[0]): registerValues[0],
-			string(registerIDs[1]): registerValues[1],
-			string(registerIDs[2]): registerValues[2],
-		}
-
-		assert.Equal(t, expectedRegisters, actualRegisters)
-
-		ch.AssertExpectations(t)
-		ls.AssertExpectations(t)
-	})
 }

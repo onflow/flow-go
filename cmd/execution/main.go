@@ -62,9 +62,9 @@ func main() {
 			rt := runtime.NewInterpreterRuntime()
 			vm := virtualmachine.New(rt)
 
-			chunkHeaders := badger.NewChunkHeaders(node.DB)
+			chunkDataPacks := badger.NewChunkDataPacks(node.DB)
 
-			execState := state.NewExecutionState(ledgerStorage, stateCommitments, chunkHeaders)
+			execState := state.NewExecutionState(ledgerStorage, stateCommitments, chunkDataPacks)
 
 			executionEng, err = execution.New(
 				node.Logger,

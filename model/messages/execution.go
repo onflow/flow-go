@@ -13,5 +13,5 @@ type ExecutionStateRequest struct {
 // ExecutionStateResponse is the response to a state request. It includes all the
 // registers required for the requested chunk in a concrete view.
 type ExecutionStateResponse struct {
-	State flow.ChunkState
+	Data flow.ChunkDataPack
 }

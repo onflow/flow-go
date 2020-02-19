@@ -101,18 +101,22 @@ func (e *blockExecutor) executeCollection(
 		}
 	}
 
-	endState, err = e.state.CommitDelta(chunkView.Delta())
+	endState, stateReads, stateWrites, err := e.state.CommitDelta(chunkView)
+
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to apply chunk delta: %w", err)
 	}
 
 	chunk = generateChunk(index, startState, endState)
 
-	chunkHeader := generateChunkHeader(chunk, chunkView.Reads())
+	chunkDataPack := flow.ChunkDataPack{ChunkID: chunk.ID(),
+		StartState:  startState,
+		StateReads:  stateReads,
+		StateWrites: stateWrites}
 
-	err = e.state.PersistChunkHeader(chunkHeader)
+	err = e.state.PersistChunkDataPack(&chunkDataPack)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to save chunk header: %w", err)
+		return nil, nil, fmt.Errorf("failed to save chunk data pack: %w", err)
 	}
 
 	return chunk, endState, nil
@@ -151,17 +155,5 @@ func generateChunk(colIndex int, startState, endState flow.StateCommitment) *flo
 		},
 		Index:    0,
 		EndState: endState,
-	}
-}
-
-// generateChunkHeader creates a chunk header from the provided chunk and register IDs.
-func generateChunkHeader(
-	chunk *flow.Chunk,
-	registerIDs []flow.RegisterID,
-) *flow.ChunkHeader {
-	return &flow.ChunkHeader{
-		ChunkID:     chunk.ID(),
-		StartState:  chunk.StartState,
-		RegisterIDs: registerIDs,
 	}
 }

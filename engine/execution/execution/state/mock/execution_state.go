@@ -11,16 +11,16 @@ type ExecutionState struct {
 	mock.Mock
 }
 
-// ChunkHeaderByChunkID provides a mock function with given fields: _a0
-func (_m *ExecutionState) ChunkHeaderByChunkID(_a0 flow.Identifier) (*flow.ChunkHeader, error) {
+// ChunkDataPackByChunkID provides a mock function with given fields: _a0
+func (_m *ExecutionState) ChunkDataPackByChunkID(_a0 flow.Identifier) (*flow.ChunkDataPack, error) {
 	ret := _m.Called(_a0)
 
-	var r0 *flow.ChunkHeader
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ChunkHeader); ok {
+	var r0 *flow.ChunkDataPack
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *flow.ChunkDataPack); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.ChunkHeader)
+			r0 = ret.Get(0).(*flow.ChunkDataPack)
 		}
 	}
 
@@ -35,11 +35,11 @@ func (_m *ExecutionState) ChunkHeaderByChunkID(_a0 flow.Identifier) (*flow.Chunk
 }
 
 // CommitDelta provides a mock function with given fields: _a0
-func (_m *ExecutionState) CommitDelta(_a0 state.Delta) ([]byte, error) {
+func (_m *ExecutionState) CommitDelta(_a0 *state.View) ([]byte, []flow.StateRead, []flow.StateWrite, error) {
 	ret := _m.Called(_a0)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(state.Delta) []byte); ok {
+	if rf, ok := ret.Get(0).(func(*state.View) []byte); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
@@ -47,37 +47,32 @@ func (_m *ExecutionState) CommitDelta(_a0 state.Delta) ([]byte, error) {
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(state.Delta) error); ok {
+	var r1 []flow.StateRead
+	if rf, ok := ret.Get(1).(func(*state.View) []flow.StateRead); ok {
 		r1 = rf(_a0)
 	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetChunkRegisters provides a mock function with given fields: _a0
-func (_m *ExecutionState) GetChunkRegisters(_a0 flow.Identifier) (flow.Ledger, error) {
-	ret := _m.Called(_a0)
-
-	var r0 flow.Ledger
-	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.Ledger); ok {
-		r0 = rf(_a0)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.Ledger)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).([]flow.StateRead)
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
-		r1 = rf(_a0)
+	var r2 []flow.StateWrite
+	if rf, ok := ret.Get(2).(func(*state.View) []flow.StateWrite); ok {
+		r2 = rf(_a0)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(2) != nil {
+			r2 = ret.Get(2).([]flow.StateWrite)
+		}
 	}
 
-	return r0, r1
+	var r3 error
+	if rf, ok := ret.Get(3).(func(*state.View) error); ok {
+		r3 = rf(_a0)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
 }
 
 // GetRegisters provides a mock function with given fields: _a0, _a1
@@ -119,12 +114,12 @@ func (_m *ExecutionState) NewView(_a0 []byte) *state.View {
 	return r0
 }
 
-// PersistChunkHeader provides a mock function with given fields: _a0
-func (_m *ExecutionState) PersistChunkHeader(_a0 *flow.ChunkHeader) error {
+// PersistChunkDataPack provides a mock function with given fields: _a0
+func (_m *ExecutionState) PersistChunkDataPack(_a0 *flow.ChunkDataPack) error {
 	ret := _m.Called(_a0)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.ChunkHeader) error); ok {
+	if rf, ok := ret.Get(0).(func(*flow.ChunkDataPack) error); ok {
 		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)

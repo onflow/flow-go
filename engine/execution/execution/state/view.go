@@ -11,15 +11,17 @@ type GetRegisterFunc func(key flow.RegisterID) (flow.RegisterValue, error)
 // underlying data source.
 type View struct {
 	delta Delta
+	state flow.StateCommitment
 	// TODO: store reads as set
 	reads    []flow.RegisterID
 	readFunc GetRegisterFunc
 }
 
 // NewView instantiates a new ledger view with the provided read function.
-func NewView(readFunc GetRegisterFunc) *View {
+func NewView(readFunc GetRegisterFunc, state flow.StateCommitment) *View {
 	return &View{
 		delta:    NewDelta(),
+		state:    state,
 		reads:    make([]flow.RegisterID, 0),
 		readFunc: readFunc,
 	}
@@ -27,7 +29,7 @@ func NewView(readFunc GetRegisterFunc) *View {
 
 // NewChild generates a new child view, with the current view as the base, sharing the Get function
 func (r *View) NewChild() *View {
-	return NewView(r.Get)
+	return NewView(r.Get, r.state)
 }
 
 // Get gets a register value from this view.
