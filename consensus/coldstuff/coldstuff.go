@@ -10,7 +10,7 @@ import (
 
 	"github.com/dapperlabs/flow-go/consensus/coldstuff/round"
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine/consensus/consensus"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -18,7 +18,7 @@ import (
 )
 
 type ColdStuff interface {
-	consensus.HotStuff
+	hotstuff.HotStuff
 
 	SubmitCommit(commit *Commit)
 }
