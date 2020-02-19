@@ -231,13 +231,6 @@ func (e *coldStuff) sendProposal() error {
 		Hex("candidate_id", logging.Entity(candidate)).
 		Logger()
 
-	// TODO this should be done by builder
-	// store the block proposal
-	//err = e.headers.Store(candidate)
-	//if err != nil {
-	//	return fmt.Errorf("could not store candidate: %w", err)
-	//}
-
 	// cache the candidate block
 	e.round.Propose(candidate)
 
@@ -371,14 +364,6 @@ func (e *coldStuff) waitForProposal() error {
 		case candidate := <-e.proposals:
 			proposerID := candidate.ProposerID
 
-			// TODO this should be done automatically by CCL
-			// store every proposal
-			//err := e.headers.Store(candidate)
-			//if err != nil {
-			//	log.Error().Err(err).Msg("could not store candidate")
-			//	continue
-			//}
-
 			// discard proposals by non-leaders
 			leaderID := e.round.Leader().NodeID
 			if proposerID != leaderID {
@@ -500,28 +485,10 @@ func (e *coldStuff) commitCandidate() error {
 		Str("action", "exec_commit").
 		Logger()
 
-	// TODO extend should be done automatically in CCL
-	// TODO finalize+clean+expulse should be done in Finalizer callback
-	//// commit the block to our chain state
-	//err := e.state.Mutate().Extend(candidate.ID())
-	//if err != nil {
-	//	return fmt.Errorf("could not extend state: %w", err)
-	//}
-	//
-	//// finalize the state
-	//err = e.state.Mutate().Finalize(candidate.ID())
-	//if err != nil {
-	//	return fmt.Errorf("could not finalize state: %w", err)
-	//}
-	//
-	//// hand the finalized block to expulsion engine to spread to all nodes
-	//e.exp.Submit(e.round.Leader().NodeID, e.round.Candidate())
-	//
-	//// make sure all pending ambiguous state is now cleared up
-	//err = e.cleaner.CleanAfter(candidate.ID())
-	//if err != nil {
-	//	return fmt.Errorf("could not drop ambiguous state: %w", err)
-	//}
+	err := e.finalizer.MakeFinal(candidate.ID())
+	if err != nil {
+		return fmt.Errorf("could not finalize committed block: %w", err)
+	}
 
 	log.Info().Msg("block candidate committed")
 
