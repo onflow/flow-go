@@ -21,6 +21,7 @@ type Snapshot struct {
 	state   *State
 	number  uint64
 	blockID flow.Identifier
+	sealed bool
 }
 
 // Identities retrieves all active ids at the given snapshot and

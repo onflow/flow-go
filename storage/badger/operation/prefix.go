@@ -12,9 +12,10 @@ import (
 const (
 
 	// special database markers
-	codeBoundary = 1 // latest finalized block number
-	codeNumber   = 2 // lookup for block by number
-	codeDelta    = 3 // history of stake changes
+	codeBoundary     = 1 // latest finalized block number
+	codeNumber       = 2 // lookup for block by number
+	codeDelta        = 3 // history of stake changes
+	codeSealBoundary = 4 // latest sealed block number
 
 	// block header and entities included in block contents
 	codeHeader    = 10

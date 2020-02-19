@@ -38,6 +38,15 @@ func (s *State) Final() protocol.Snapshot {
 	return sn
 }
 
+func (s *State) Sealed() protocol.Snapshot {
+	sn := &Snapshot{
+		state:   s,
+		number:  0,
+		blockID: flow.ZeroID,
+	}
+	return sn
+}
+
 func (s *State) AtNumber(number uint64) protocol.Snapshot {
 	sn := &Snapshot{
 		state:   s,
