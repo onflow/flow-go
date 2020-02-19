@@ -15,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-tcp-transport"
@@ -49,6 +50,7 @@ type P2PNode struct {
 	ps         *pubsub.PubSub                  // the reference to the pubsub instance
 	topics     map[string]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs       map[string]*pubsub.Subscription // map of a topic string to an actual subscription
+	conMgr     ConnManager                     // the connection manager passed in to libp2p
 }
 
 // Start starts a libp2p node on the given address.
@@ -69,15 +71,30 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 		return err
 	}
 
+	p.conMgr = NewConnManager(logger)
+
+	// create a transport which disables port reuse and web socket.
+	// Port reuse enables listening and dialing from the same TCP port (https://github.com/libp2p/go-reuseport)
+	// While this sounds great, it intermittently causes a 'broken pipe' error
+	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
+	// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
+	transport := libp2p.Transport(func(u *tptu.Upgrader) *tcp.TcpTransport {
+		tpt := tcp.NewTCPTransport(u)
+		tpt.DisableReuseport = true
+		return tpt
+	})
+
 	// libp2p.New constructs a new libp2p Host.
 	// Other options can be added here.
 	host, err := libp2p.New(
 		ctx,
 		libp2p.ListenAddrs(sourceMultiAddr),
+		libp2p.ConnectionManager(p.conMgr),
 		//libp2p.NoSecurity,
 		libp2p.Identity(key),
-		libp2p.Transport(tcp.NewTCPTransport), // the default transport unnecessarily brings in a websocket listener
+		transport,
 	)
+
 	if err != nil {
 		return errors.Wrapf(err, "could not construct libp2p host for %s", p.name)
 	}
@@ -106,8 +123,9 @@ func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logge
 }
 
 // Stop stops the libp2p node.
-func (p *P2PNode) Stop() error {
+func (p *P2PNode) Stop() (chan struct{}, error) {
 	var result error
+	done := make(chan struct{})
 	p.logger.Debug().Str("name", p.name).Msg("unsubscribing from all topics")
 	for t := range p.topics {
 		if err := p.UnSubscribe(t); err != nil {
@@ -122,12 +140,30 @@ func (p *P2PNode) Stop() error {
 
 	p.logger.Debug().Str("name", p.name).Msg("stopping libp2p node")
 	if err := p.libP2PHost.Close(); err != nil {
-		return multierror.Append(result, err)
+		close(done)
+		return done, multierror.Append(result, err)
 	}
 
-	p.logger.Debug().Str("name", p.name).Msg("libp2p node stopped successfully")
+	go func(done chan struct{}) {
+		defer close(done)
+		addrs := len(p.libP2PHost.Network().ListenAddresses())
+		ticker := time.NewTicker(time.Millisecond * 2)
+		defer ticker.Stop()
+		timeout := time.After(time.Second)
+		for addrs > 0 {
+			// wait for all listen addresses to have been removed
+			select {
+			case <-timeout:
+				p.logger.Error().Int("port", addrs).Msg("listen addresses still open")
+				return
+			case <-ticker.C:
+				addrs = len(p.libP2PHost.Network().ListenAddresses())
+			}
+		}
+		p.logger.Debug().Str("name", p.name).Msg("libp2p node stopped successfully")
+	}(done)
 
-	return nil
+	return done, nil
 }
 
 // AddPeers adds other nodes as peers to this node by adding them to the node's peerstore and connecting to them
@@ -180,14 +216,8 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 		return stream, nil
 	}
 
-	// Add node address as a peer
-	err = p.AddPeers(ctx, n)
-	if err != nil {
-		return nil, fmt.Errorf("could not add peer: %w", err)
-	}
-
-	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath)
-	stream, err = p.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
+	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
+	stream, err = p.tryCreateNewStream(ctx, n, peerID, maxConnectAttempt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stream for %s: %w", peerID.String(), err)
 	}
@@ -197,9 +227,7 @@ func (p *P2PNode) CreateStream(ctx context.Context, n NodeAddress) (network.Stre
 // tryCreateNewStream makes at most maxAttempts to create a stream with the target peer
 // This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
 // remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'
-// https://github.com/libp2p/go-yamux/blob/c7e96b999446162afa256908963dff8f5954037a/session.go#L629
-// TODO: Explore using context timeout instead of maxAttempts
-func (p *P2PNode) tryCreateNewStream(ctx context.Context, targetID peer.ID, maxAttempts int) (network.Stream, error) {
+func (p *P2PNode) tryCreateNewStream(ctx context.Context, n NodeAddress, targetID peer.ID, maxAttempts int) (network.Stream, error) {
 	var errs, err error
 	var s network.Stream
 	var retries = 0
@@ -209,14 +237,29 @@ func (p *P2PNode) tryCreateNewStream(ctx context.Context, targetID peer.ID, maxA
 			return nil, fmt.Errorf("context done before stream could be created (retry attempt: %d", retries)
 		default:
 		}
+
+		// if this is a retry attempt, wait for some time before retrying
+		if err != nil {
+			time.Sleep(5 * time.Millisecond)
+		}
+
+		// Add node address as a peer
+		err = p.AddPeers(ctx, n)
+		if err != nil {
+			p.logger.Error().Str("target", targetID.String()).Err(err).
+				Int("retry_attempt", retries).Msg("could not create connection")
+			errs = multierror.Append(errs, err)
+			continue
+		}
+
 		s, err = p.libP2PHost.NewStream(ctx, targetID, FlowLibP2PProtocolID)
 		if err != nil {
 			p.logger.Error().Str("target", targetID.String()).Err(err).
 				Int("retry_attempt", retries).Msg("failed to create stream")
 			errs = multierror.Append(errs, err)
-			time.Sleep(5 * time.Millisecond)
 			continue
 		}
+
 		break
 	}
 	if retries == maxAttempts {
