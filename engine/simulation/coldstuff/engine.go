@@ -240,25 +240,18 @@ func (e *Engine) sendProposal() error {
 		Logger()
 
 	// get our own ID to tally our stake
-	id, err := e.state.Final().Identity(e.me.NodeID())
+	myIdentity, err := e.state.Final().Identity(e.me.NodeID())
 	if err != nil {
 		return fmt.Errorf("could not get own current ID: %w", err)
 	}
 
 	// define the block header build function
-	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
-		header := flow.Header{
-			View:        e.round.Parent().View + 1,
-			Timestamp:   time.Now().UTC(),
-			ParentID:    e.round.Parent().ID(),
-			PayloadHash: payloadHash,
-			ProposerID:  e.me.NodeID(),
-		}
-		return &header, nil
+	setProposer := func(header *flow.Header) {
+		header.ProposerID = myIdentity.NodeID
 	}
 
 	// get the payload for the next hash
-	candidate, err := e.builder.BuildOn(e.round.Parent().ID(), build)
+	candidate, err := e.builder.BuildOn(e.round.Parent().ID(), setProposer)
 	if err != nil {
 		return fmt.Errorf("could not build on parent: %w", err)
 	}
@@ -287,7 +280,7 @@ func (e *Engine) sendProposal() error {
 	}
 
 	// add our own vote to the engine
-	e.round.Tally(id.NodeID, id.Stake)
+	e.round.Tally(myIdentity.NodeID, myIdentity.Stake)
 
 	log.Info().Msg("block proposal sent")
 

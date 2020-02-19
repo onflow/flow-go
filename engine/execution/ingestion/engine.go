@@ -195,22 +195,28 @@ func (e *Engine) handleBlock(block *flow.Block) error {
 		return err
 	}
 
-	emptyCompleteBlock := &execution.CompleteBlock{
+	maybeCompleteBlock := &execution.CompleteBlock{
 		Block:               block,
 		CompleteCollections: make(map[flow.Identifier]*execution.CompleteCollection),
 	}
 
 	err = e.mempool.Run(func(backdata *Backdata) error {
+		// Incase we have all the collections, or the block is empty
+		if e.checkForCompleteness(maybeCompleteBlock) {
+			e.removeCollections(maybeCompleteBlock, backdata)
+			e.execution.SubmitLocal(maybeCompleteBlock)
+			return nil
+		}
 		for _, guarantee := range block.Guarantees {
 			completeBlock, err := backdata.ByID(guarantee.ID())
 			if err == mempool.ErrEntityNotFound {
-				emptyCompleteBlock.CompleteCollections[guarantee.ID()] = &execution.CompleteCollection{
+				maybeCompleteBlock.CompleteCollections[guarantee.ID()] = &execution.CompleteCollection{
 					Guarantee:    guarantee,
 					Transactions: nil,
 				}
 				err := backdata.Add(&blockByCollection{
 					CollectionID: guarantee.ID(),
-					Block:        emptyCompleteBlock,
+					Block:        maybeCompleteBlock,
 				})
 				if err != nil {
 					return fmt.Errorf("cannot save collection-block mapping: %w", err)

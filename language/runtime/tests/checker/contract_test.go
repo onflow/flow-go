@@ -487,3 +487,73 @@ func TestCheckContractNestedDeclarationsComplex(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckInvalidContractNestedTypeShadowing(t *testing.T) {
+
+	type test struct {
+		name        string
+		code        string
+		isInterface bool
+	}
+
+	tests := []test{
+		{name: "event", code: `event Test()`, isInterface: false},
+	}
+
+	for _, kind := range common.CompositeKindsWithBody {
+
+		// Contracts can not be nested
+		if kind == common.CompositeKindContract {
+			continue
+		}
+
+		for _, isInterface := range []bool{true, false} {
+			keywords := kind.Keyword()
+
+			if isInterface {
+				keywords += " interface"
+			}
+
+			code := fmt.Sprintf(`%s Test {}`, keywords)
+
+			tests = append(tests, test{
+				name:        keywords,
+				code:        code,
+				isInterface: isInterface,
+			})
+		}
+	}
+
+	for _, test := range tests {
+
+		t.Run(test.name, func(t *testing.T) {
+
+			_, err := ParseAndCheck(t,
+				fmt.Sprintf(`
+                      contract Test {
+                          %s
+                      }
+                    `,
+					test.code,
+				),
+			)
+
+			// If the nested element is an interface, there will only be an error
+			// for the redeclared type.
+			//
+			// If the nested element is a concrete type, there will also be an error
+			// for the redeclared value (constructor).
+
+			expectedErrors := 1
+			if !test.isInterface {
+				expectedErrors += 1
+			}
+
+			errs := ExpectCheckerErrors(t, err, expectedErrors)
+
+			for i := 0; i < expectedErrors; i++ {
+				assert.IsType(t, &sema.RedeclarationError{}, errs[i])
+			}
+		})
+	}
+}

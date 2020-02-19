@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // SigProvider provides symmetry functions to generate and verify signatures
@@ -19,7 +19,7 @@ type SigProvider struct {
 // sig - the signature to be verified
 // block - the block that the signature was signed for.
 // signerKey - the public key of the signer who signed the block.
-func (s *SigProvider) VerifySig(sig crypto.Signature, block *types.Block, signerKey crypto.PublicKey) (bool, error) {
+func (s *SigProvider) VerifySig(sig crypto.Signature, block *hotstuff.Block, signerKey crypto.PublicKey) (bool, error) {
 	msg := BlockToBytesForSign(block)
 	return signerKey.Verify(sig, msg[:], s.hasher)
 }
@@ -28,7 +28,7 @@ func (s *SigProvider) VerifySig(sig crypto.Signature, block *types.Block, signer
 // aggsig - the aggregated signature to be verified
 // block - the block that the signature was signed for.
 // signerKeys - the public keys of all the signers who signed the block.
-func (s *SigProvider) VerifyAggregatedSignature(aggsig *types.AggregatedSignature, block *types.Block, signerKeys []crypto.PublicKey) (bool, error) {
+func (s *SigProvider) VerifyAggregatedSignature(aggsig *hotstuff.AggregatedSignature, block *hotstuff.Block, signerKeys []crypto.PublicKey) (bool, error) {
 
 	// for now the aggregated signature for BLS signatures is implemented as a slice of all the signatures.
 	// to verifiy it, we basically verify every single signature
@@ -54,7 +54,7 @@ func (s *SigProvider) VerifyAggregatedSignature(aggsig *types.AggregatedSignatur
 }
 
 // Aggregate aggregates signatures into an aggregated signature
-func (s *SigProvider) Aggregate(sigs []*types.SingleSignature) (*types.AggregatedSignature, error) {
+func (s *SigProvider) Aggregate(sigs []*hotstuff.SingleSignature) (*hotstuff.AggregatedSignature, error) {
 	// check if sigs is empty
 	if len(sigs) == 0 {
 		return nil, fmt.Errorf("no signature to be aggregated")
@@ -71,14 +71,14 @@ func (s *SigProvider) Aggregate(sigs []*types.SingleSignature) (*types.Aggregate
 		signerIDs[i] = sig.SignerID
 	}
 
-	return &types.AggregatedSignature{
+	return &hotstuff.AggregatedSignature{
 		Raw:       aggsig,
 		SignerIDs: signerIDs,
 	}, nil
 }
 
 // VoteFor signs a Block and returns the Vote for that Block
-func (s *SigProvider) VoteFor(block *types.Block) (*types.Vote, error) {
+func (s *SigProvider) VoteFor(block *hotstuff.Block) (*hotstuff.Vote, error) {
 	// convert to bytes to be signed
 	msg := BlockToBytesForSign(block)
 
@@ -89,10 +89,10 @@ func (s *SigProvider) VoteFor(block *types.Block) (*types.Vote, error) {
 		return nil, fmt.Errorf("fail to sign block (%x) to vote: %w", block.BlockID, err)
 	}
 
-	return &types.Vote{
+	return &hotstuff.Vote{
 		BlockID: block.BlockID,
 		View:    block.View,
-		Signature: &types.SingleSignature{
+		Signature: &hotstuff.SingleSignature{
 			Raw:      signature,
 			SignerID: s.myID,
 		},
@@ -100,7 +100,7 @@ func (s *SigProvider) VoteFor(block *types.Block) (*types.Vote, error) {
 }
 
 // Propose signs a Block and returns the Proposal
-func (s *SigProvider) Propose(block *types.Block) (*types.Proposal, error) {
+func (s *SigProvider) Propose(block *hotstuff.Block) (*hotstuff.Proposal, error) {
 	// convert to bytes to be signed
 	msg := BlockToBytesForSign(block)
 
@@ -111,7 +111,7 @@ func (s *SigProvider) Propose(block *types.Block) (*types.Proposal, error) {
 		return nil, fmt.Errorf("fail to sign block (%x): %w", block.BlockID, err)
 	}
 
-	return &types.Proposal{
+	return &hotstuff.Proposal{
 		Block:     block,
 		Signature: signature,
 	}, nil
@@ -119,7 +119,7 @@ func (s *SigProvider) Propose(block *types.Block) (*types.Proposal, error) {
 
 // BlockToBytesForSign generates the bytes that was signed for a block
 // Note: this function should be reused when signing a block or a vote
-func BlockToBytesForSign(block *types.Block) flow.Identifier {
+func BlockToBytesForSign(block *hotstuff.Block) flow.Identifier {
 	return flow.MakeID(struct {
 		BlockID flow.Identifier
 		View    uint64

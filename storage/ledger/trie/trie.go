@@ -629,37 +629,42 @@ func (s *SMT) GetRoot() *node {
 }
 
 func (s *SMT) insertIntoKeys(insert []byte, keys [][]byte, values [][]byte) ([][]byte, [][]byte, error) {
+	// Initialize new slices, with capacity accounting for the inserted value
+	newKeys := make([][]byte, 0, len(keys)+1)
+	newValues := make([][]byte, 0, len(values)+1)
+
 	for i, key := range keys {
 		if bytes.Equal(insert, key) {
 			return keys, values, nil
 		}
 
+		// Assuming the keys are presorted, this means we've found the spot in the slice to insert
 		if bytes.Compare(insert, key) < 0 {
-			// Insert the key into the keys
-			newkeys := make([][]byte, 0)
-			newkeys = append(newkeys, keys[:i]...)
-			newkeys = append(newkeys, insert)
-			newkeys = append(newkeys, keys[i:]...)
+			// Insert the new key and remaining keys into the newKeys
+			newKeys = append(newKeys, insert)
+			newKeys = append(newKeys, keys[i:]...)
 
-			// Insert the old value into values
-			newvalues := make([][]byte, 0)
-			newvalues = append(newvalues, values[:i]...)
+			// Insert the old value and remaining values into newValues
 			oldVal, err := s.database.GetKVDB(insert)
 			if err != nil {
 				return nil, nil, err
 			}
-			newvalues = append(newvalues, oldVal)
-			newvalues = append(newvalues, values[i:]...)
+			newValues = append(newValues, oldVal)
+			newValues = append(newValues, values[i:]...)
 
-			return newkeys, newvalues, nil
+			return newKeys, newValues, nil
 		}
+		// Otherwise, append the key + value pair and loop
+		newKeys = append(newKeys, keys[i])
+		newValues = append(newValues, values[i])
 	}
 
+	// Did not find a spot for it in the slice, means it's place is at the end
 	oldVal, err := s.database.GetKVDB(insert)
 	if err != nil {
 		return nil, nil, err
 	}
-	return append(keys, insert), append(values, oldVal), nil
+	return append(newKeys, insert), append(newValues, oldVal), nil
 }
 
 // UpdateAtomically updates the trie atomically and returns the state root

@@ -3,8 +3,8 @@ package forks
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
 	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // Forks implements the hotstuff.Reactor API
@@ -20,15 +20,15 @@ func New(finalizer Finalizer, forkchoice ForkChoice) *Forks {
 	}
 }
 
-func (f *Forks) GetBlocksForView(view uint64) []*types.Block {
+func (f *Forks) GetBlocksForView(view uint64) []*hotstuff.Block {
 	return f.finalizer.GetBlocksForView(view)
 }
 
-func (f *Forks) GetBlock(id flow.Identifier) (*types.Block, bool) {
+func (f *Forks) GetBlock(id flow.Identifier) (*hotstuff.Block, bool) {
 	return f.finalizer.GetBlock(id)
 }
 
-func (f *Forks) FinalizedBlock() *types.Block {
+func (f *Forks) FinalizedBlock() *hotstuff.Block {
 	return f.finalizer.FinalizedBlock()
 }
 
@@ -36,14 +36,14 @@ func (f *Forks) FinalizedView() uint64 {
 	return f.FinalizedBlock().View
 }
 
-func (f *Forks) IsSafeBlock(block *types.Block) bool {
+func (f *Forks) IsSafeBlock(block *hotstuff.Block) bool {
 	if err := f.finalizer.VerifyBlock(block); err != nil {
 		return false
 	}
 	return f.finalizer.IsSafeBlock(block)
 }
 
-func (f *Forks) AddBlock(block *types.Block) error {
+func (f *Forks) AddBlock(block *hotstuff.Block) error {
 	if err := f.finalizer.VerifyBlock(block); err != nil {
 		// technically, this not strictly required. However, we leave this as a sanity check for now
 		return fmt.Errorf("cannot add invalid block to Forks: %w", err)
@@ -62,10 +62,10 @@ func (f *Forks) AddBlock(block *types.Block) error {
 	return f.AddQC(block.QC)
 }
 
-func (f *Forks) MakeForkChoice(curView uint64) (*types.Block, *types.QuorumCertificate, error) {
+func (f *Forks) MakeForkChoice(curView uint64) (*hotstuff.Block, *hotstuff.QuorumCertificate, error) {
 	return f.forkchoice.MakeForkChoice(curView)
 }
 
-func (f *Forks) AddQC(qc *types.QuorumCertificate) error {
+func (f *Forks) AddQC(qc *hotstuff.QuorumCertificate) error {
 	return f.forkchoice.AddQC(qc) // forkchoice ensures that block referenced by qc is known
 }

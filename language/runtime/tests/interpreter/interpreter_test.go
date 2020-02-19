@@ -6719,7 +6719,7 @@ const fungibleTokenContract = `
 
       pub fun absorb(vault: @Vault)
 
-      pub fun sprout(): @Vault
+      pub fun sprout(balance: Int): @Vault
   }
 
   pub contract ExampleToken: FungibleToken {
@@ -6747,8 +6747,8 @@ const fungibleTokenContract = `
          destroy vault
      }
 
-     pub fun sprout(): @Vault {
-         return <-create Vault(balance: 0)
+     pub fun sprout(balance: Int): @Vault {
+         return <-create Vault(balance: balance)
      }
   }
 `
@@ -6759,10 +6759,8 @@ func TestInterpretFungibleTokenContract(t *testing.T) {
 
       pub fun test(): [Int; 2] {
 
-          // valid, because code is in the same location
-          let publisher <- create ExampleToken.Vault(balance: 100)
-
-          let receiver <- ExampleToken.sprout()
+          let publisher <- ExampleToken.sprout(balance: 100)
+          let receiver <- ExampleToken.sprout(balance: 0)
 
           let withdrawn <- publisher.withdraw(amount: 60)
           receiver.deposit(vault: <-withdrawn)
@@ -7193,11 +7191,15 @@ func TestInterpretResourceTypeRequirementInitializerAndDestructorPreConditions(t
                       self.x = x
                   }
               }
+
+              pub fun test(_ x: Int) {
+                  let r <- create C.R(x)
+                  destroy r
+              }
           }
 
-          pub fun test(_ x: Int) {
-              let r <- create C.R(x)
-              destroy r
+          fun test(_ x: Int) {
+              C.test(x)
           }
         `,
 		ParseCheckAndInterpretOptions{
@@ -7355,6 +7357,46 @@ func TestInterpretNonStorageReferenceAfterDestruction(t *testing.T) {
 	assert.IsType(t, &interpreter.DestroyedCompositeError{}, err)
 }
 
+func TestInterpretFix64(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          let a = 789.00123010
+          let b = 1234.056
+          let c = -12345.006789
+        `,
+	)
+
+	assert.Equal(t,
+		interpreter.Fix64Value(78_900_123_010),
+		inter.Globals["a"].Value,
+	)
+
+	assert.Equal(t,
+		interpreter.Fix64Value(123_405_600_000),
+		inter.Globals["b"].Value,
+	)
+
+	assert.Equal(t,
+		interpreter.Fix64Value(-1_234_500_678_900),
+		inter.Globals["c"].Value,
+	)
+}
+
+func TestInterpretFix64Mul(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          let a = 1.1 * -1.1
+        `,
+	)
+
+	assert.Equal(t,
+		interpreter.Fix64Value(-121000000),
+		inter.Globals["a"].Value,
+	)
+}
+
 func TestInterpretHexDecode(t *testing.T) {
 
 	expected := interpreter.NewArrayValueUnownedNonCopying(
@@ -7466,4 +7508,27 @@ func TestInterpretHexDecode(t *testing.T) {
 		assert.Equal(t, expected, result)
 	})
 
+}
+
+func TestInterpretOptionalChainingOptionalFieldRead(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t, `
+      struct Test {
+          let x: Int?
+
+          init(x: Int?) {
+              self.x = x
+          }
+      }
+
+      let test: Test? = Test(x: 1)
+      let x = test?.x
+    `)
+
+	assert.Equal(t,
+		&interpreter.SomeValue{
+			Value: interpreter.NewIntValue(1),
+		},
+		inter.Globals["x"].Value,
+	)
 }

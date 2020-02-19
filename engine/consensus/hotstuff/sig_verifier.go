@@ -2,14 +2,14 @@ package hotstuff
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff/types"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 )
 
 // SigVerifier verifies signatures
 type SigVerifier interface {
 	// VerifySig verifies a single signature
-	VerifySig(sig crypto.Signature, block *types.Block, signerKey crypto.PublicKey) (bool, error)
+	VerifySig(sig crypto.Signature, block *hotstuff.Block, signerKey crypto.PublicKey) (bool, error)
 
 	// VerifyAggregatedSignature verifies an aggregated signature
-	VerifyAggregatedSignature(aggsig *types.AggregatedSignature, block *types.Block, signerKeys []crypto.PublicKey) (bool, error)
+	VerifyAggregatedSignature(aggsig *hotstuff.AggregatedSignature, block *hotstuff.Block, signerKeys []crypto.PublicKey) (bool, error)
 }

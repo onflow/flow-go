@@ -176,19 +176,12 @@ func (e *Engine) createProposal() (*flow.Header, error) {
 	}
 
 	// define the block header build function
-	build := func(payloadHash flow.Identifier) (*flow.Header, error) {
-		header := flow.Header{
-			View:        parent.View + 1,
-			Timestamp:   time.Now().UTC(),
-			ParentID:    parent.ID(),
-			PayloadHash: payloadHash,
-			ProposerID:  e.me.NodeID(),
-		}
-		return &header, nil
+	setProposer := func(header *flow.Header) {
+		header.ProposerID = e.me.NodeID()
 	}
 
 	// create the proposal payload on top of the parent
-	proposal, err := e.builder.BuildOn(parent.ID(), build)
+	proposal, err := e.builder.BuildOn(parent.ID(), setProposer)
 	if err != nil {
 		return nil, fmt.Errorf("could not create block: %w", err)
 	}

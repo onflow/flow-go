@@ -298,6 +298,26 @@ func (Word64Type) ID() string {
 	return "Word64"
 }
 
+// Fix64Type
+
+type Fix64Type struct{}
+
+func (Fix64Type) isType() {}
+
+func (Fix64Type) ID() string {
+	return "Fix64"
+}
+
+// UFix64Type
+
+type UFix64Type struct{}
+
+func (UFix64Type) isType() {}
+
+func (UFix64Type) ID() string {
+	return "UFix64"
+}
+
 // VariableSizedArrayType
 
 type VariableSizedArrayType struct {
