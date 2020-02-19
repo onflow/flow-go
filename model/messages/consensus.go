@@ -23,3 +23,14 @@ type BlockVote struct {
 	View      uint64
 	Signature crypto.Signature
 }
+
+type BlockRequest struct {
+	BlockID flow.Identifier
+	Nonce   uint64
+}
+
+type BlockResponse struct {
+	OriginID flow.Identifier
+	Proposal *BlockProposal
+	Nonce    uint64
+}

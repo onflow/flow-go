@@ -3,9 +3,11 @@
 package consensus
 
 import (
+	"errors"
 	"fmt"
+	"math/rand"
 
-	"github.com/pkg/errors"
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
@@ -31,6 +33,12 @@ type Engine struct {
 	payloads storage.Payloads
 	hotstuff hotstuff.HotStuff
 	con      network.Conduit
+	cache    map[flow.Identifier][]cacheItem
+}
+
+type cacheItem struct {
+	OriginID flow.Identifier
+	Proposal *messages.BlockProposal
 }
 
 // New creates a new consensus propagation engine.
@@ -45,12 +53,13 @@ func New(log zerolog.Logger, net module.Network, me module.Local, state protocol
 		headers:  headers,
 		payloads: payloads,
 		hotstuff: hotstuff,
+		cache:    make(map[flow.Identifier][]cacheItem),
 	}
 
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.ProtocolConsensus, e)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register engine")
+		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
 
@@ -116,6 +125,7 @@ func (e *Engine) SendVote(vote *types.Vote, recipientID flow.Identifier) error {
 
 	// convert the vote to a vote message
 	msg := messages.BlockVote{
+		BlockID:   vote.BlockID,
 		View:      vote.View,
 		Signature: vote.Signature.Raw,
 	}
@@ -205,44 +215,50 @@ func (e *Engine) BroadcastProposal(proposal *types.Proposal) error {
 
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch entity := event.(type) {
+	switch ev := event.(type) {
 	case *messages.BlockProposal:
-		return e.onBlockProposal(originID, entity)
+		return e.onBlockProposal(originID, ev)
 	case *messages.BlockVote:
-		return e.onBlockVote(originID, entity)
+		return e.onBlockVote(originID, ev)
+	case *messages.BlockRequest:
+		return e.onBlockRequest(originID, ev)
+	case *messages.BlockResponse:
+		return e.onBlockResponse(originID, ev)
 	default:
-		return errors.Errorf("invalid event type (%T)", event)
+		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
 // onBlockProposal handles incoming block proposals.
-func (e *Engine) onBlockProposal(originID flow.Identifier, msg *messages.BlockProposal) error {
+func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
-	// retrieve the parent for the block for parent view
-	// TODO: instead of erroring when missing, simply cache
-	parent, err := e.headers.ByBlockID(msg.ParentID)
+	// retrieve the parent for the block for parent view; if not found, cache for later
+	parent, err := e.headers.ByBlockID(proposal.ParentID)
+	if errors.Is(err, storage.ErrNotFound) {
+		return e.processPendingProposal(originID, proposal)
+	}
 	if err != nil {
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
 	// store all of the block contents
-	err = e.payloads.Store(msg.Payload)
+	err = e.payloads.Store(proposal.Payload)
 	if err != nil {
 		return fmt.Errorf("could not store block payload: %w", err)
 	}
 
 	// reconstruct the block proposal to know block ID
 	header := flow.Header{
-		ChainID:       msg.ChainID,
-		ParentID:      msg.ParentID,
+		ChainID:       proposal.ChainID,
+		ParentID:      proposal.ParentID,
 		ProposerID:    originID,
-		View:          msg.View,
+		View:          proposal.View,
 		Height:        parent.Height + 1,
-		PayloadHash:   msg.Payload.Hash(),
-		Timestamp:     msg.Timestamp,
-		ParentSigs:    msg.ParentSigs,
-		ParentSigners: msg.ParentSigners,
-		ProposerSig:   msg.ProposerSig,
+		PayloadHash:   proposal.Payload.Hash(),
+		Timestamp:     proposal.Timestamp,
+		ParentSigs:    proposal.ParentSigs,
+		ParentSigners: proposal.ParentSigners,
+		ProposerSig:   proposal.ProposerSig,
 	}
 
 	// insert the header into the database
@@ -259,41 +275,59 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, msg *messages.BlockPr
 	}
 
 	// reconstruct the hotstuff models
-	sig := types.AggregatedSignature{
+	hsSig := types.AggregatedSignature{
 		Raw:       header.ParentSigs,
 		SignerIDs: header.ParentSigners,
 	}
-	qc := types.QuorumCertificate{
+	hsQC := types.QuorumCertificate{
 		View:                parent.View,
 		BlockID:             header.ParentID,
-		AggregatedSignature: &sig,
+		AggregatedSignature: &hsSig,
 	}
-	block := types.Block{
+	hsBlock := types.Block{
 		ChainID:     header.ChainID,
 		BlockID:     blockID,
 		View:        header.View,
 		ProposerID:  header.ProposerID,
-		QC:          &qc,
+		QC:          &hsQC,
 		PayloadHash: header.PayloadHash,
 		Timestamp:   header.Timestamp,
 	}
-	proposal := types.Proposal{
-		Block:     &block,
+	hsProposal := types.Proposal{
+		Block:     &hsBlock,
 		Signature: header.ProposerSig,
 	}
 
 	// submit the model to hotstuff for processing
-	e.hotstuff.SubmitProposal(&proposal)
+	e.hotstuff.SubmitProposal(&hsProposal)
 
-	return nil
+	// check for any descendants of the block to process
+	children, ok := e.cache[blockID]
+	if !ok {
+		return nil
+	}
+
+	// then try to process children only this once
+	var result *multierror.Error
+	for _, child := range children {
+		err := e.onBlockProposal(child.OriginID, child.Proposal)
+		if err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+
+	// remove the children from cache
+	delete(e.cache, blockID)
+
+	return result.ErrorOrNil()
 }
 
 // onBlockVote handles incoming block votes.
-func (e *Engine) onBlockVote(originID flow.Identifier, msg *messages.BlockVote) error {
+func (e *Engine) onBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
 
 	// rebuild the signature using the origin ID and the transmitted signature
-	sig := types.SingleSignature{
-		Raw:      msg.Signature,
+	hsSig := types.SingleSignature{
+		Raw:      vote.Signature,
 		SignerID: originID,
 	}
 
@@ -302,14 +336,102 @@ func (e *Engine) onBlockVote(originID flow.Identifier, msg *messages.BlockVote) 
 	// of the referenced block ID; however, we might not have the block yet, so sending
 	// the view along will allow us to validate the signature immediately and cache votes
 	// appropriately within hotstuff
-	vote := types.Vote{
-		BlockID:   msg.BlockID,
-		View:      msg.View,
-		Signature: &sig,
+	hsVote := types.Vote{
+		BlockID:   vote.BlockID,
+		View:      vote.View,
+		Signature: &hsSig,
 	}
 
 	// forward the vote to hotstuff for processing
-	e.hotstuff.SubmitVote(&vote)
+	e.hotstuff.SubmitVote(&hsVote)
+
+	return nil
+}
+
+// onBlockRequest is how we handle when blocks are requested from us.
+func (e *Engine) onBlockRequest(originID flow.Identifier, request *messages.BlockRequest) error {
+
+	// try to retrieve the block header from storage
+	header, err := e.headers.ByBlockID(request.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not find requested block: %w", err)
+	}
+
+	// try to retrieve the block payload from storage
+	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
+	if err != nil {
+		return fmt.Errorf("could not find requested payload: %w", err)
+	}
+
+	// NOTE: there is a bunch of redundant block proposal construction code here;
+	// this is already refactored in another PR and can be replaced once that is
+	// merged and I rebase this PR
+
+	// construct the block proposal
+	proposal := messages.BlockProposal{
+		ChainID:       header.ChainID,
+		ParentID:      header.ParentID,
+		View:          header.View,
+		Timestamp:     header.Timestamp,
+		ParentSigs:    header.ParentSigs,
+		ParentSigners: header.ParentSigners,
+		ProposerSig:   header.ProposerSig,
+		Payload:       payload,
+	}
+
+	// construct the block response
+	response := messages.BlockResponse{
+		OriginID: header.ProposerID,
+		Proposal: &proposal,
+		Nonce:    request.Nonce,
+	}
+	err = e.con.Submit(&response, originID)
+	if err != nil {
+		return fmt.Errorf("could not send block response: %w", err)
+	}
+
+	return nil
+}
+
+// onBlockResponse is how we process responses to our block requests; we could simply use
+// the same function as new proposals (onBlockProposal), but separating it allows us more
+// flexibility; for one, we can explicitly convey the original origin ID. We could also do
+// additional robustness stuff by matching requests & responses.
+func (e *Engine) onBlockResponse(originID flow.Identifier, response *messages.BlockResponse) error {
+
+	// for now, we simply process the block response like a normal proposal
+	err := e.onBlockProposal(response.OriginID, response.Proposal)
+	if err != nil {
+		return fmt.Errorf("could not process block response: %w", err)
+	}
+
+	return nil
+}
+
+// processPendingProposal will deal with proposals where the parent is missing.
+func (e *Engine) processPendingProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
+
+	// first, we cache the proposal with its origin ID, so we can process it once possible
+	item := cacheItem{
+		OriginID: originID,
+		Proposal: proposal,
+	}
+	e.cache[proposal.ParentID] = append(e.cache[proposal.ParentID], item)
+
+	// send the block request
+	request := messages.BlockRequest{
+		BlockID: proposal.ParentID,
+		Nonce:   rand.Uint64(),
+	}
+	err := e.con.Submit(&request, originID)
+	if err != nil {
+		return fmt.Errorf("could not send block request: %w", err)
+	}
+
+	// NOTE: at this point, if he doesn't send us the parent, we should probably think about a way
+	// to blacklist him, as this can be exploited by sending us lots of children without parent;
+	// a second mitigation strategy is to put a strict limit on children we cache, and possibly a
+	// limit on children we cache coming from a single other node
 
 	return nil
 }
