@@ -34,7 +34,7 @@ func main() {
 
 	cmd.FlowNode("consensus").
 		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.StringVarP(&chainID, "chain-id", "c", "flow", "the chain ID for the protocol chain")
+			flags.StringVarP(&chainID, "chain-id", "C", "flow", "the chain ID for the protocol chain")
 		}).
 		Create(func(node *cmd.FlowNodeBuilder) {
 			node.Logger.Info().Msg("initializing guarantee mempool")
