@@ -196,12 +196,16 @@ func (checker *Checker) declareCompositeNestedTypes(
 			panic(errors.NewUnreachableError())
 		}
 
-		_, err := checker.typeActivations.DeclareType(
-			*identifier,
-			nestedType,
-			nestedDeclaration.DeclarationKind(),
-			nestedDeclaration.DeclarationAccess(),
-		)
+		// NOTE: We allow the shadowing of types here, because the type was already previously
+		// declared without allowing shadowing before. This avoids a duplicate error message.
+
+		_, err := checker.typeActivations.DeclareType(typeDeclaration{
+			identifier:               *identifier,
+			ty:                       nestedType,
+			declarationKind:          nestedDeclaration.DeclarationKind(),
+			access:                   nestedDeclaration.DeclarationAccess(),
+			allowOuterScopeShadowing: true,
+		})
 		checker.report(err)
 
 		if declareConstructors && kind == ContainerKindComposite {
@@ -219,15 +223,16 @@ func (checker *Checker) declareCompositeNestedTypes(
 				nestedConstructorType, nestedConstructorArgumentLabels :=
 					checker.compositeConstructorType(nestedCompositeDeclaration, nestedCompositeType)
 
-				_, err := checker.valueActivations.Declare(
-					nestedCompositeDeclaration.Identifier.Identifier,
-					nestedConstructorType,
-					nestedCompositeDeclaration.Access,
-					nestedCompositeDeclaration.DeclarationKind(),
-					nestedCompositeDeclaration.Identifier.Pos,
-					true,
-					nestedConstructorArgumentLabels,
-				)
+				_, err := checker.valueActivations.Declare(variableDeclaration{
+					identifier:               nestedCompositeDeclaration.Identifier.Identifier,
+					ty:                       nestedConstructorType,
+					access:                   nestedCompositeDeclaration.Access,
+					kind:                     nestedCompositeDeclaration.DeclarationKind(),
+					pos:                      nestedCompositeDeclaration.Identifier.Pos,
+					isConstant:               true,
+					argumentLabels:           nestedConstructorArgumentLabels,
+					allowOuterScopeShadowing: false,
+				})
 				checker.report(err)
 			}
 		}
@@ -371,12 +376,13 @@ func (checker *Checker) declareCompositeType(declaration *ast.CompositeDeclarati
 		NestedTypes: map[string]Type{},
 	}
 
-	variable, err := checker.typeActivations.DeclareType(
-		identifier,
-		compositeType,
-		declaration.DeclarationKind(),
-		declaration.Access,
-	)
+	variable, err := checker.typeActivations.DeclareType(typeDeclaration{
+		identifier:               identifier,
+		ty:                       compositeType,
+		declarationKind:          declaration.DeclarationKind(),
+		access:                   declaration.Access,
+		allowOuterScopeShadowing: false,
+	})
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(
 		identifier.Identifier,
@@ -521,16 +527,17 @@ func (checker *Checker) declareCompositeMembersAndValue(
 	// NOTE: perform declarations after the nested scope, so they are visible after the declaration
 
 	if compositeType.Kind == common.CompositeKindContract {
-		_, err := checker.valueActivations.Declare(
-			declaration.Identifier.Identifier,
-			compositeType,
+		_, err := checker.valueActivations.Declare(variableDeclaration{
+			identifier: declaration.Identifier.Identifier,
+			ty:         compositeType,
 			// NOTE: contracts are always public
-			ast.AccessPublic,
-			common.DeclarationKindContract,
-			declaration.Identifier.Pos,
-			true,
-			nil,
-		)
+			access:                   ast.AccessPublic,
+			kind:                     common.DeclarationKindContract,
+			pos:                      declaration.Identifier.Pos,
+			isConstant:               true,
+			argumentLabels:           nil,
+			allowOuterScopeShadowing: false,
+		})
 		checker.report(err)
 
 		for name, declarationMember := range declarationMembers {
@@ -553,15 +560,16 @@ func (checker *Checker) declareCompositeMembersAndValue(
 		// If the access would be enforced as private, an import of the composite
 		// would fail with an "not declared" error.
 
-		_, err := checker.valueActivations.Declare(
-			declaration.Identifier.Identifier,
-			constructorType,
-			declaration.Access,
-			declaration.DeclarationKind(),
-			declaration.Identifier.Pos,
-			true,
-			constructorArgumentLabels,
-		)
+		_, err := checker.valueActivations.Declare(variableDeclaration{
+			identifier:               declaration.Identifier.Identifier,
+			ty:                       constructorType,
+			access:                   declaration.Access,
+			kind:                     declaration.DeclarationKind(),
+			pos:                      declaration.Identifier.Pos,
+			isConstant:               true,
+			argumentLabels:           constructorArgumentLabels,
+			allowOuterScopeShadowing: false,
+		})
 		checker.report(err)
 	}
 }

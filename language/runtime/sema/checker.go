@@ -138,12 +138,13 @@ func NewChecker(program *ast.Program, location ast.Location, options ...Option) 
 
 	typeActivations := NewValueActivations()
 	for name, baseType := range baseTypes {
-		_, err := typeActivations.DeclareType(
-			ast.Identifier{Identifier: name},
-			baseType,
-			common.DeclarationKindType,
-			ast.AccessPublic,
-		)
+		_, err := typeActivations.DeclareType(typeDeclaration{
+			identifier:               ast.Identifier{Identifier: name},
+			ty:                       baseType,
+			declarationKind:          common.DeclarationKindType,
+			access:                   ast.AccessPublic,
+			allowOuterScopeShadowing: false,
+		})
 		if err != nil {
 			panic(err)
 		}
@@ -207,16 +208,17 @@ func (checker *Checker) declareBaseValues() {
 }
 
 func (checker *Checker) declareValue(name string, declaration ValueDeclaration) *Variable {
-	variable, err := checker.valueActivations.Declare(
-		name,
-		declaration.ValueDeclarationType(),
+	variable, err := checker.valueActivations.Declare(variableDeclaration{
+		identifier: name,
+		ty:         declaration.ValueDeclarationType(),
 		// TODO: add access to ValueDeclaration and use declaration's access instead here
-		ast.AccessPublic,
-		declaration.ValueDeclarationKind(),
-		declaration.ValueDeclarationPosition(),
-		declaration.ValueDeclarationIsConstant(),
-		declaration.ValueDeclarationArgumentLabels(),
-	)
+		access:                   ast.AccessPublic,
+		kind:                     declaration.ValueDeclarationKind(),
+		pos:                      declaration.ValueDeclarationPosition(),
+		isConstant:               declaration.ValueDeclarationIsConstant(),
+		argumentLabels:           declaration.ValueDeclarationArgumentLabels(),
+		allowOuterScopeShadowing: false,
+	})
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(name, variable)
 	return variable
@@ -232,12 +234,13 @@ func (checker *Checker) declareTypeDeclaration(name string, declaration TypeDecl
 	// TODO: add access to TypeDeclaration and use declaration's access instead here
 	const access = ast.AccessPublic
 
-	variable, err := checker.typeActivations.DeclareType(
-		identifier,
-		ty,
-		declaration.TypeDeclarationKind(),
-		access,
-	)
+	variable, err := checker.typeActivations.DeclareType(typeDeclaration{
+		identifier:               identifier,
+		ty:                       ty,
+		declarationKind:          declaration.TypeDeclarationKind(),
+		access:                   access,
+		allowOuterScopeShadowing: false,
+	})
 	checker.report(err)
 	checker.recordVariableDeclarationOccurrence(identifier.Identifier, variable)
 }
