@@ -716,43 +716,42 @@ func (v *ProgramVisitor) VisitTypeAnnotation(ctx *TypeAnnotationContext) interfa
 }
 
 func (v *ProgramVisitor) VisitFullType(ctx *FullTypeContext) interface{} {
-	return v.VisitChildren(ctx.BaseParserRuleContext)
-}
 
-func (v *ProgramVisitor) VisitReferenceType(ctx *ReferenceTypeContext) interface{} {
+	// First, parse the inner type.
+	// Second, parse as a reference.
+	// Finally, parse as optional.
 
-	// A type line `&R` is parsed as `ReferenceType{NominalType{}}`.
-	// A type like `&R{I}` is parsed as `ReferenceType{RestrictedType{NominalType{}}}`.
-	// A type like `&{I}` is parsed as `ReferenceType{RestrictedType{}}`.
-
-	authorized := ctx.Auth() != nil
-
-	storable := ctx.Storable() != nil
+	// For example:
+	//  - `T` = `NominalType{}`
+	//  - `R{I}` = `RestrictedType{NominalType{}}`
+	//  - `R{I}?` = `OptionalType{RestrictedType{NominalType{}}}`
+	//  - `{I}` = `RestrictedType{NominalType{}}`
+	//  - `&R` = `ReferenceType{NominalType{}}`
+	//  - `&R{I}` = `ReferenceType{RestrictedType{NominalType{}}}`
+	//  - `&{I}` = `ReferenceType{RestrictedType{}}`
+	//  - `T?` = `OptionalType{NominalType{}}`
+	//  - `&T?` = `OptionalType{ReferenceType{NominalType{}}}`
 
 	result := ctx.InnerType().Accept(v).(ast.Type)
 
 	startPos := PositionFromToken(ctx.GetStart())
 
-	result = &ast.ReferenceType{
-		Authorized: authorized,
-		Storable:   storable,
-		Type:       result,
-		StartPos:   startPos,
+	// Reference?
+
+	if ctx.Ampersand() != nil {
+		authorized := ctx.Auth() != nil
+		storable := ctx.Storable() != nil
+
+		result = &ast.ReferenceType{
+			Authorized: authorized,
+			Storable:   storable,
+			Type:       result,
+			StartPos:   startPos,
+		}
 	}
 
-	return result
-}
+	// Optionals
 
-func (v *ProgramVisitor) VisitNonReferenceType(ctx *NonReferenceTypeContext) interface{} {
-
-	// A type line `R` is parsed as `NominalType{}`.
-	// A type like `R{I}` is parsed as `RestrictedType{NominalType{}}`.
-	// A type like `R{I}?` is parsed as `OptionalType{RestrictedType{NominalType{}}}`.
-	// A type like `{I}` is parsed as `RestrictedType{NominalType{}}`.
-
-	result := ctx.InnerType().Accept(v).(ast.Type)
-
-	// optionals
 	for _, optional := range ctx.optionals {
 		endPos := PositionFromToken(optional)
 		result = &ast.OptionalType{

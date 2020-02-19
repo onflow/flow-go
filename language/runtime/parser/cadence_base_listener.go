@@ -185,18 +185,6 @@ func (s *BaseCadenceListener) EnterFullType(ctx *FullTypeContext) {}
 // ExitFullType is called when production fullType is exited.
 func (s *BaseCadenceListener) ExitFullType(ctx *FullTypeContext) {}
 
-// EnterReferenceType is called when production referenceType is entered.
-func (s *BaseCadenceListener) EnterReferenceType(ctx *ReferenceTypeContext) {}
-
-// ExitReferenceType is called when production referenceType is exited.
-func (s *BaseCadenceListener) ExitReferenceType(ctx *ReferenceTypeContext) {}
-
-// EnterNonReferenceType is called when production nonReferenceType is entered.
-func (s *BaseCadenceListener) EnterNonReferenceType(ctx *NonReferenceTypeContext) {}
-
-// ExitNonReferenceType is called when production nonReferenceType is exited.
-func (s *BaseCadenceListener) ExitNonReferenceType(ctx *NonReferenceTypeContext) {}
-
 // EnterInnerType is called when production innerType is entered.
 func (s *BaseCadenceListener) EnterInnerType(ctx *InnerTypeContext) {}
 

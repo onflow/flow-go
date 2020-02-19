@@ -591,3 +591,19 @@ func TestCheckReferenceExpressionReferenceType(t *testing.T) {
 	})
 
 }
+
+func TestCheckReferenceExpressionOfOptional(t *testing.T) {
+
+	_, err := ParseAndCheckStorage(t, `
+          resource R {}
+
+          let r: @R? <- create R()
+          let ref = &r as &R
+        `,
+	)
+
+	errs := ExpectCheckerErrors(t, err, 2)
+
+	assert.IsType(t, &sema.OptionalTypeReferenceError{}, errs[0])
+	assert.IsType(t, &sema.TypeMismatchError{}, errs[1])
+}

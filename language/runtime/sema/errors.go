@@ -1727,6 +1727,22 @@ func (e *NonResourceTypeReferenceError) Error() string {
 
 func (*NonResourceTypeReferenceError) isSemanticError() {}
 
+// OptionalTypeReferenceError
+
+type OptionalTypeReferenceError struct {
+	ActualType Type
+	ast.Range
+}
+
+func (e *OptionalTypeReferenceError) Error() string {
+	return fmt.Sprintf(
+		"cannot create reference to optional type, got `%s`",
+		e.ActualType,
+	)
+}
+
+func (*OptionalTypeReferenceError) isSemanticError() {}
+
 // InvalidNonStorageStorableReferenceError
 
 type InvalidNonStorageStorableReferenceError struct {

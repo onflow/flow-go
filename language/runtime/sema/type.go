@@ -3237,7 +3237,7 @@ func IsSubType(subType Type, superType Type) bool {
 		// A non-storable reference type is not a (static) subtype of a storable reference.
 		// However, a dynamic cast is valid, if the reference is authorized.
 		//
-		// The holder of the may not gain more permissions without having authorization.
+		// The holder of the reference may not gain more permissions without having authorization.
 
 		if typedSuperType.Storable {
 			return false
@@ -3254,7 +3254,7 @@ func IsSubType(subType Type, superType Type) bool {
 		// An unauthorized reference type is not a subtype of an authorized reference type.
 		// Not even dynamically.
 		//
-		// The holder of the may not gain more permissions.
+		// The holder of the reference may not gain more permissions.
 
 		if typedSuperType.Authorized {
 			return false
