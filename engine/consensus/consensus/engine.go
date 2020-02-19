@@ -25,14 +25,18 @@ import (
 // Engine is the consensus engine, responsible for handling communication for
 // the embedded consensus algorithm.
 type Engine struct {
-	unit      *engine.Unit   // used to control startup/shutdown
-	log       zerolog.Logger // used to log relevant actions with context
-	me        module.Local
-	state     protocol.State
-	headers   storage.Headers
-	payloads  storage.Payloads
+	unit     *engine.Unit   // used to control startup/shutdown
+	log      zerolog.Logger // used to log relevant actions with context
+	me       module.Local
+	state    protocol.State
+	headers  storage.Headers
+	payloads storage.Payloads
+	con      network.Conduit
+
 	coldstuff coldstuff.ColdStuff
-	con       network.Conduit
+	// TODO this is pretty awkward, should change the interface
+	stopColdStuff func()
+	coldStuffDone <-chan struct{}
 }
 
 // New creates a new consensus propagation engine.
@@ -77,13 +81,18 @@ func New(
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For the consensus, we consider it ready right away.
 func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
+	return e.unit.Ready(func() {
+		e.stopColdStuff, e.coldStuffDone = e.coldstuff.Start()
+	})
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		e.stopColdStuff()
+		<-e.coldStuffDone
+	})
 }
 
 // SubmitLocal submits an event originating on the local node.

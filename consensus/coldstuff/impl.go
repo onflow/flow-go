@@ -3,6 +3,7 @@ package coldstuff
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -68,10 +69,23 @@ func New(
 }
 
 func (e *coldStuff) Start() (exit func(), done <-chan struct{}) {
+	e.done = make(chan struct{})
 	done = e.done
+
+	var once sync.Once
 	exit = func() {
-		close(e.done)
+		once.Do(func() {
+			close(e.done)
+		})
 	}
+
+	go func() {
+		err := e.loop()
+		if err != nil {
+			e.log.Error().Err(err).Msg("coldstuff loop exited with error")
+		}
+		exit()
+	}()
 
 	return
 }
@@ -125,18 +139,21 @@ ConsentLoop:
 				// 2) wait for sufficient block votes
 				// 3) send a block commit
 
+				e.log.Debug().Msg("sending proposal")
 				err = e.sendProposal()
 				if err != nil {
 					log.Error().Err(err).Msg("could not send proposal")
 					continue ConsentLoop
 				}
 
+				e.log.Debug().Msg("waiting for votes")
 				err = e.waitForVotes()
 				if err != nil {
 					log.Error().Err(err).Msg("could not receive votes")
 					continue ConsentLoop
 				}
 
+				e.log.Debug().Msg("sending commit")
 				err = e.sendCommit()
 				if err != nil {
 					log.Error().Err(err).Msg("could not send commit")
@@ -149,18 +166,21 @@ ConsentLoop:
 				// 2) vote on the block proposal
 				// 3) wait for a block commit
 
+				e.log.Debug().Msg("waiting for proposal")
 				err = e.waitForProposal()
 				if err != nil {
 					log.Error().Err(err).Msg("could not receive proposal")
 					continue ConsentLoop
 				}
 
+				e.log.Debug().Msg("voting for proposal")
 				err = e.voteOnProposal()
 				if err != nil {
 					log.Error().Err(err).Msg("could not vote on proposal")
 					continue ConsentLoop
 				}
 
+				e.log.Debug().Msg("waiting for commit")
 				err = e.waitForCommit()
 				if err != nil {
 					log.Error().Err(err).Msg("could not receive commit")
@@ -171,6 +191,7 @@ ConsentLoop:
 			// regardless of path, if we successfully reach here, we finished a
 			// full successful consensus round and can commit the current
 			// block candidate
+			e.log.Debug().Msg("committing candidate")
 			err = e.commitCandidate()
 			if err != nil {
 				log.Error().Err(err).Msg("could not commit candidate")
@@ -224,6 +245,9 @@ func (e *coldStuff) sendProposal() error {
 			ProposerID:  flow.Identifier{},
 			PayloadHash: candidate.PayloadHash,
 			Timestamp:   candidate.Timestamp,
+			QC: &hotstuff.QuorumCertificate{
+				BlockID: candidate.ParentID,
+			},
 		},
 		Signature: nil,
 	}
