@@ -145,6 +145,10 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	return nil
 }
 
+func (e *Engine) BroadcastCommit(commit *coldstuff.Commit) error {
+	panic("TODO")
+}
+
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch entity := event.(type) {

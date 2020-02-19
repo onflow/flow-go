@@ -9,6 +9,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/coldstuff/round"
+	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/dapperlabs/flow-go/engine/consensus/consensus"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/protocol"
@@ -16,10 +18,8 @@ import (
 )
 
 type ColdStuff interface {
-	Start() (exit func(), done chan struct{})
+	consensus.HotStuff
 
-	SubmitProposal(proposal *flow.Header)
-	SubmitVote(vote *Vote)
 	SubmitCommit(commit *Commit)
 }
 
@@ -29,9 +29,9 @@ type coldStuff struct {
 	state     protocol.State
 	me        module.Local
 	round     *round.Round
-	builder   module.Builder
 	comms     Communicator
-	finalizer Finalizer
+	builder   module.Builder
+	finalizer module.Finalizer
 
 	// round config
 	interval time.Duration
@@ -72,7 +72,7 @@ func New(
 	return &cold, nil
 }
 
-func (e *coldStuff) Start() (exit func(), done chan struct{}) {
+func (e *coldStuff) Start() (exit func(), done <-chan struct{}) {
 	done = e.done
 	exit = func() {
 		close(e.done)
@@ -81,12 +81,22 @@ func (e *coldStuff) Start() (exit func(), done chan struct{}) {
 	return
 }
 
-func (e *coldStuff) SubmitProposal(proposal *flow.Header) {
+func (e *coldStuff) SubmitProposal(proposal *flow.Header, parentView uint64) {
+	// Ignore HotStuff-only values
+	_ = parentView
+
 	e.proposals <- proposal
 }
 
-func (e *coldStuff) SubmitVote(vote *Vote) {
-	e.votes <- vote
+func (e *coldStuff) SubmitVote(originID, blockID flow.Identifier, view uint64, sig crypto.Signature) {
+	// Ignore HotStuff-only values
+	_ = view
+	_ = sig
+
+	e.votes <- &Vote{
+		OriginID: originID,
+		BlockID:  blockID,
+	}
 }
 
 func (e *coldStuff) SubmitCommit(commit *Commit) {

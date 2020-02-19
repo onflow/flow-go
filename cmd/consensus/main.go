@@ -84,7 +84,9 @@ func main() {
 			build := builder.NewBuilder(node.DB, guarantees, seals, chainID)
 			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
 
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, build, prop, final, time.Second*3, time.Second*10)
+			// TODO hook up a real version of this
+			var comms coldstuff.Communicator
+			cold, err := coldstuff.New(node.Logger, node.State, node.Me, comms, build, final, time.Second*3, time.Second*10)
 			node.MustNot(err).Msg("could not initialize coldstuff module")
 
 			cons, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, cold)
