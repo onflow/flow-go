@@ -4,7 +4,8 @@ import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 )
 
-// Communicator is the interface for communication between nodes within Coldstuff.
+// Communicator is the interface for sending messages to other nodes within
+// a ColdStuff consensus.
 //
 // NOTE: It re-uses as much of the HotStuff interface and models as possible to
 // simplify swapping between the two.
