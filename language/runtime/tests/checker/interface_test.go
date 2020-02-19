@@ -1654,7 +1654,7 @@ const fungibleTokenContractInterface = `
 
 	  pub fun absorb(vault: @Vault)
 
-	  pub fun sprout(): @Vault
+	  pub fun sprout(balance: Int): @Vault
   }
 `
 
@@ -1691,8 +1691,8 @@ const validExampleFungibleTokenContract = `
          destroy vault
      }
 
-     pub fun sprout(): @Vault {
-         return <-create Vault(balance: 0)
+     pub fun sprout(balance: Int): @Vault {
+         return <-create Vault(balance: balance)
      }
   }
 `
@@ -1712,10 +1712,8 @@ func TestCheckContractInterfaceFungibleTokenUse(t *testing.T) {
 		validExampleFungibleTokenContract + "\n" + `
 
       fun test(): Int {
-          // valid, because code is in the same location
-          let publisher <- create ExampleToken.Vault(balance: 100)
-
-          let receiver <- ExampleToken.sprout()
+          let publisher <- ExampleToken.sprout(balance: 100)
+          let receiver <- ExampleToken.sprout(balance: 0)
 
           let withdrawn <- publisher.withdraw(amount: 60)
           receiver.deposit(vault: <-withdrawn)

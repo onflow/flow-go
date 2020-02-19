@@ -11,17 +11,14 @@ type MissingSignerError struct {
 	Vote *Vote
 }
 
-type InvalidSignatureError struct {
-	Vote *Vote
-}
-
-type InvalidViewError struct {
-	Vote *Vote
-}
-
 type DoubleVoteError struct {
 	OriginalVote *Vote
 	DoubleVote   *Vote
+}
+
+type InvalidVoteError struct {
+	VoteID flow.Identifier
+	View   uint64
 }
 
 type StaleVoteError struct {
@@ -45,12 +42,8 @@ func (e MissingSignerError) Error() string {
 	return fmt.Sprintf("missing signer of vote %v", e.Vote)
 }
 
-func (e InvalidSignatureError) Error() string {
-	return fmt.Sprintf("invalid signature for vote %v", e.Vote)
-}
-
-func (e InvalidViewError) Error() string {
-	return fmt.Sprintf("invalid view for vote %v", e.Vote)
+func (e InvalidVoteError) Error() string {
+	return fmt.Sprintf("invalid vote found (vote: %x)", e.VoteID)
 }
 
 func (e DoubleVoteError) Error() string {

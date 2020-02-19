@@ -1751,6 +1751,34 @@ func TestCheckInvalidResourceWithDestructorMissingFieldInvalidation(t *testing.T
 	assert.IsType(t, &sema.ResourceFieldNotInvalidatedError{}, errs[0])
 }
 
+// This tests prevents a potential regression in `checkResourceFieldsInvalidated`:
+// See https://github.com/dapperlabs/flow-go/issues/2533
+//
+// The function contained a bug in which field invalidation was skipped for all remaining members
+// once a non-resource member was encountered, instead of just skipping the non-resource member
+// and continuing the check for the remaining members.
+
+func TestCheckInvalidResourceWithDestructorMissingFieldInvalidationFirstFieldNonResource(t *testing.T) {
+
+	_, err := ParseAndCheck(t, `
+       resource Test {
+           let a: Int
+           let b: @Test
+
+           init(b: @Test) {
+               self.a = 1
+               self.b <- b
+           }
+
+           destroy() {}
+       }
+    `)
+
+	errs := ExpectCheckerErrors(t, err, 1)
+
+	assert.IsType(t, &sema.ResourceFieldNotInvalidatedError{}, errs[0])
+}
+
 func TestCheckInvalidResourceWithDestructorMissingDefinitiveFieldInvalidation(t *testing.T) {
 
 	_, err := ParseAndCheck(t, `

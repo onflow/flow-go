@@ -1,4 +1,4 @@
-package hotstuff
+package module
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"

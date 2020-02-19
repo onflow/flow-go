@@ -1130,7 +1130,49 @@ func TestCheckInvalidCreateImportedResource(t *testing.T) {
 
 	errs := ExpectCheckerErrors(t, err, 1)
 
-	assert.IsType(t, &sema.CreateImportedResourceError{}, errs[0])
+	assert.IsType(t, &sema.InvalidResourceCreationError{}, errs[0])
+}
+
+func TestCheckResourceCreationInContracts(t *testing.T) {
+
+	t.Run("in sibling contract", func(t *testing.T) {
+
+		_, err := ParseAndCheck(t,
+			`
+              contract A {
+                  resource R {}
+              }
+
+              contract B {
+
+                  pub fun test() {
+                      destroy create A.R()
+                  }
+              }
+            `,
+		)
+
+		errs := ExpectCheckerErrors(t, err, 1)
+
+		assert.IsType(t, &sema.InvalidResourceCreationError{}, errs[0])
+	})
+
+	t.Run("in same contract", func(t *testing.T) {
+
+		_, err := ParseAndCheck(t,
+			`
+              contract A {
+                  resource R {}
+
+                  pub fun test() {
+                      destroy create R()
+                  }
+              }
+            `,
+		)
+
+		require.NoError(t, err)
+	})
 }
 
 func TestCheckInvalidResourceLoss(t *testing.T) {

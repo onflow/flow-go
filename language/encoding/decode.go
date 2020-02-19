@@ -93,6 +93,10 @@ func (d *Decoder) Decode(t language.Type) (language.Value, error) {
 		return d.DecodeWord32()
 	case language.Word64Type:
 		return d.DecodeWord64()
+	case language.Fix64Type:
+		return d.DecodeFix64()
+	case language.UFix64Type:
+		return d.DecodeUFix64()
 	case language.VariableSizedArrayType:
 		return d.DecodeVariableSizedArray(x)
 	case language.ConstantSizedArrayType:
@@ -509,6 +513,34 @@ func (d *Decoder) DecodeWord64() (v language.Word64, err error) {
 	}
 
 	return language.NewWord64(i), nil
+}
+
+// DecodeFix64 reads the XDR-encoded representation of an int-64 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.5
+//  RFC Section 4.5 - Hyper Integer
+//  64-bit big-endian signed integer in range [-9223372036854775808, 9223372036854775807]
+func (d *Decoder) DecodeFix64() (v language.Fix64, err error) {
+	i, _, err := d.dec.DecodeHyper()
+	if err != nil {
+		return v, err
+	}
+
+	return language.NewFix64(i), nil
+}
+
+// DecodeUFix64 reads the XDR-encoded representation of a uint-64 value.
+//
+// Reference: https://tools.ietf.org/html/rfc4506#section-4.5
+//  RFC Section 4.5 - Unsigned Hyper Integer
+//  64-bit big-endian unsigned integer in range [0, 18446744073709551615]
+func (d *Decoder) DecodeUFix64() (v language.UFix64, err error) {
+	i, _, err := d.dec.DecodeUhyper()
+	if err != nil {
+		return v, err
+	}
+
+	return language.NewUFix64(i), nil
 }
 
 // DecodeVariableSizedArray reads the XDR-encoded representation of a

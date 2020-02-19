@@ -690,6 +690,50 @@ func (v Word64) ToGoValue() interface{} {
 	return uint64(v)
 }
 
+// Fix64
+
+type Fix64 int64
+
+func NewFix64(i int64) Fix64 {
+	return Fix64(i)
+}
+
+func (Fix64) isValue() {}
+
+func (Fix64) Type() Type {
+	return Fix64Type{}
+}
+
+func (v Fix64) WithType(_ Type) Value {
+	return v
+}
+
+func (v Fix64) ToGoValue() interface{} {
+	return int64(v)
+}
+
+// UFix64
+
+type UFix64 uint64
+
+func NewUFix64(i uint64) UFix64 {
+	return UFix64(i)
+}
+
+func (UFix64) isValue() {}
+
+func (UFix64) Type() Type {
+	return UFix64Type{}
+}
+
+func (v UFix64) WithType(_ Type) Value {
+	return v
+}
+
+func (v UFix64) ToGoValue() interface{} {
+	return uint64(v)
+}
+
 // VariableSizedArray
 
 type VariableSizedArray struct {

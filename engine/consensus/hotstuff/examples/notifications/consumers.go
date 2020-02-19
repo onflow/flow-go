@@ -95,3 +95,21 @@ type FinalizedBlockConsumer interface {
 type DoubleProposeDetectedConsumer interface {
 	OnDoubleProposeDetected(*hotstuff.Block, *hotstuff.Block)
 }
+
+// OnDoubleVotingDetected notifications are produced by the Vote Aggregation logic
+// whenever a double voting (same voter voting for different blocks at the same view) was detected.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+type DoubleVotingDetectedConsumer interface {
+	OnDoubleVotingDetected(*hotstuff.Vote, *hotstuff.Vote)
+}
+
+// OnInvalidVoteDetected notifications are produced by the Vote Aggregation logic
+// whenever an invalid vote was detected.
+// Prerequisites:
+// Implementation must be concurrency safe; Non-blocking;
+// and must handle repetition of the same events (with some processing overhead).
+type InvalidVoteDetectedConsumer interface {
+	OnInvalidVoteDetected(*hotstuff.Vote)
+}
