@@ -156,6 +156,11 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signa
 // BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
 func (e *Engine) BroadcastProposal(header *flow.Header) error {
 
+	// first, check that we are the proposer of the block
+	if header.ProposerID != e.me.NodeID() {
+		return fmt.Errorf("cannot broadcast proposal with non-local proposer (%x)", header.ProposerID)
+	}
+
 	// retrieve the payload for the block
 	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
 	if err != nil {
