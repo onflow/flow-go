@@ -2,6 +2,7 @@ package coldstuff
 
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
+	model "github.com/dapperlabs/flow-go/model/coldstuff"
 )
 
 // ColdStuff is the interface for accepting proposals, votes, and commits to
@@ -12,5 +13,5 @@ import (
 type ColdStuff interface {
 	hotstuff.HotStuff
 
-	SubmitCommit(commit *Commit)
+	SubmitCommit(commit *model.Commit)
 }

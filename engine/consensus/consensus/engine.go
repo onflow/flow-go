@@ -4,14 +4,17 @@ package consensus
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/engine"
+	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/model/messages"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/network"
@@ -33,23 +36,38 @@ type Engine struct {
 }
 
 // New creates a new consensus propagation engine.
-func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, headers storage.Headers, payloads storage.Payloads, coldstuff coldstuff.ColdStuff) (*Engine, error) {
+func New(
+	log zerolog.Logger,
+	net module.Network,
+	me module.Local,
+	state protocol.State,
+	headers storage.Headers,
+	payloads storage.Payloads,
+	build module.Builder,
+	finalizer module.Finalizer,
+) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:      engine.NewUnit(),
-		log:       log.With().Str("engine", "consensus").Logger(),
-		me:        me,
-		state:     state,
-		headers:   headers,
-		payloads:  payloads,
-		coldstuff: coldstuff,
+		unit:     engine.NewUnit(),
+		log:      log.With().Str("engine", "consensus").Logger(),
+		me:       me,
+		state:    state,
+		headers:  headers,
+		payloads: payloads,
 	}
+
+	cold, err := coldstuff.New(log, state, me, e, build, finalizer, 3*time.Second, 8*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize coldstuff: %w", err)
+	}
+
+	e.coldstuff = cold
 
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.ProtocolConsensus, e)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not register engine")
+		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
 
@@ -99,10 +117,16 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 // SendVote will send a vote to the desired node.
-func (e *Engine) SendVote(vote *messages.BlockVote, recipientID flow.Identifier) error {
+func (e *Engine) SendVote(vote *hotstuff.Vote, recipientID flow.Identifier) error {
+
+	msg := &messages.BlockVote{
+		BlockID:   vote.BlockID,
+		View:      vote.View,
+		Signature: vote.Signature.Raw,
+	}
 
 	// send the vote the desired recipient
-	err := e.con.Submit(vote, recipientID)
+	err := e.con.Submit(msg, recipientID)
 	if err != nil {
 		return fmt.Errorf("could not send vote: %w", err)
 	}
@@ -111,16 +135,22 @@ func (e *Engine) SendVote(vote *messages.BlockVote, recipientID flow.Identifier)
 }
 
 // BroadcastProposal will propagate a block proposal to all non-local consensus nodes.
-func (e *Engine) BroadcastProposal(header *flow.Header) error {
+func (e *Engine) BroadcastProposal(proposal *hotstuff.Proposal) error {
 
 	// retrieve the payload for the block
-	payload, err := e.payloads.ByPayloadHash(header.PayloadHash)
+	payload, err := e.payloads.ByPayloadHash(proposal.Block.PayloadHash)
 	if err != nil {
 		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
 	}
 
+	// retrieve the header for the block
+	header, err := e.headers.ByBlockID(proposal.Block.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve header for proposal: %w", err)
+	}
+
 	// retrieve all consensus nodes without our ID
-	recipients, err := e.state.AtBlockID(header.ParentID).Identities(
+	recipients, err := e.state.AtBlockID(proposal.Block.QC.BlockID).Identities(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	)
@@ -145,7 +175,7 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	return nil
 }
 
-func (e *Engine) BroadcastCommit(commit *coldstuff.Commit) error {
+func (e *Engine) BroadcastCommit(commit *model.Commit) error {
 	panic("TODO")
 }
 

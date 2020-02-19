@@ -2,6 +2,7 @@ package coldstuff
 
 import (
 	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
+	model "github.com/dapperlabs/flow-go/model/coldstuff"
 )
 
 // Communicator is the interface for sending messages to other nodes within
@@ -12,5 +13,5 @@ import (
 type Communicator interface {
 	hotstuff.Communicator
 
-	BroadcastCommit(commit *Commit) error
+	BroadcastCommit(commit *model.Commit) error
 }

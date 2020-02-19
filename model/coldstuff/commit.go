@@ -6,7 +6,8 @@ import (
 	"github.com/dapperlabs/flow-go/model/flow"
 )
 
-// BlockCommit is a coldstuff consensus event to commit a block.
-type BlockCommit struct {
-	BlockID flow.Identifier
+// Commit is a coldstuff consensus event to commit a block.
+type Commit struct {
+	BlockID     flow.Identifier
+	CommitterID flow.Identifier
 }

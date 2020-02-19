@@ -3,12 +3,9 @@
 package main
 
 import (
-	"time"
-
 	"github.com/spf13/pflag"
 
 	"github.com/dapperlabs/flow-go/cmd"
-	"github.com/dapperlabs/flow-go/consensus/coldstuff"
 	"github.com/dapperlabs/flow-go/engine/consensus/consensus"
 	"github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
@@ -84,12 +81,7 @@ func main() {
 			build := builder.NewBuilder(node.DB, guarantees, seals, chainID)
 			final := finalizer.NewFinalizer(node.DB, guarantees, seals)
 
-			// TODO hook up a real version of this
-			var comms coldstuff.Communicator
-			cold, err := coldstuff.New(node.Logger, node.State, node.Me, comms, build, final, time.Second*3, time.Second*10)
-			node.MustNot(err).Msg("could not initialize coldstuff module")
-
-			cons, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, cold)
+			cons, err := consensus.New(node.Logger, node.Network, node.Me, node.State, headersDB, payloadsDB, build, final)
 			node.MustNot(err).Msg("could not initialize consensus engine")
 			return cons
 		}).

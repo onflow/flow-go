@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dgraph-io/badger"
+	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/consensus/coldstuff/round"
 	"github.com/dapperlabs/flow-go/crypto"
+	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/module"
@@ -33,8 +34,8 @@ type coldStuff struct {
 
 	// incoming consensus entities
 	proposals chan *flow.Header
-	votes     chan *Vote
-	commits   chan *Commit
+	votes     chan *model.Vote
+	commits   chan *model.Commit
 
 	// stops the consent loop
 	done chan struct{}
@@ -59,8 +60,8 @@ func New(
 		interval:  interval,
 		timeout:   timeout,
 		proposals: make(chan *flow.Header, 1),
-		votes:     make(chan *Vote, 1),
-		commits:   make(chan *Commit, 1),
+		votes:     make(chan *model.Vote, 1),
+		commits:   make(chan *model.Commit, 1),
 	}
 
 	return &cold, nil
@@ -87,13 +88,13 @@ func (e *coldStuff) SubmitVote(originID, blockID flow.Identifier, view uint64, s
 	_ = view
 	_ = sig
 
-	e.votes <- &Vote{
-		OriginID: originID,
-		BlockID:  blockID,
+	e.votes <- &model.Vote{
+		VoterID: originID,
+		BlockID: blockID,
 	}
 }
 
-func (e *coldStuff) SubmitCommit(commit *Commit) {
+func (e *coldStuff) SubmitCommit(commit *model.Commit) {
 	e.commits <- commit
 }
 
@@ -259,8 +260,8 @@ func (e *coldStuff) waitForVotes() error {
 		select {
 
 		// process each vote that we receive
-		case w := <-e.votes:
-			voterID, voteID := w.OriginID, w.BlockID
+		case vote := <-e.votes:
+			voterID, voteID := vote.VoterID, vote.BlockID
 
 			// discard votes by double voters
 			voted := e.round.Voted(voterID)
@@ -328,7 +329,7 @@ func (e *coldStuff) sendCommit() error {
 		Logger()
 
 	// send a commit for the cached block hash
-	commit := &Commit{
+	commit := &model.Commit{
 		BlockID: candidate.ID(),
 	}
 	err := e.comms.BroadcastCommit(commit)
@@ -454,7 +455,7 @@ func (e *coldStuff) waitForCommit() error {
 	for {
 		select {
 		case w := <-e.commits:
-			committerID, commitID := w.OriginID, w.BlockID
+			committerID, commitID := w.CommitterID, w.BlockID
 
 			// discard commits not from leader
 			leaderID := e.round.Leader().NodeID
