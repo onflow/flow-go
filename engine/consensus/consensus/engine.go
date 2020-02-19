@@ -138,7 +138,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sig crypto.Signature, recipientID flow.Identifier) error {
 
 	// build the vote message
-	vote := messages.BlockVote{
+	vote := &messages.BlockVote{
 		BlockID:   blockID,
 		View:      view,
 		Signature: sig,
@@ -179,13 +179,13 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 	// NOTE: some fields are not needed for the message
 	// - proposer ID is conveyed over the network message
 	// - the payload hash is deduced from the payload
-	msg := messages.BlockProposal{
+	msg := &messages.BlockProposal{
 		Header:  header,
 		Payload: payload,
 	}
 
 	// broadcast the proposal to consensus nodes
-	err = e.con.Submit(&msg, recipients.NodeIDs()...)
+	err = e.con.Submit(msg, recipients.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not send proposal message: %w", err)
 	}
@@ -223,6 +223,8 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 		return e.onBlockRequest(originID, ev)
 	case *messages.BlockResponse:
 		return e.onBlockResponse(originID, ev)
+	case *model.Commit:
+		return e.onBlockCommit(originID, ev)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -343,6 +345,16 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, response *messages.Bl
 		return fmt.Errorf("could not process block response: %w", err)
 	}
 
+	return nil
+}
+
+// onBlockCommit handles incoming block commits by passing them to the core
+// consensus algorithm.
+//
+// NOTE: This is only necessary for ColdStuff and can be removed when we switch
+// to HotStuff.
+func (e *Engine) onBlockCommit(originID flow.Identifier, commit *model.Commit) error {
+	e.coldstuff.SubmitCommit(commit)
 	return nil
 }
 

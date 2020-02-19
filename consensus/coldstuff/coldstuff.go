@@ -1,6 +1,7 @@
 package coldstuff
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"sync"
@@ -218,6 +219,7 @@ func (e *coldStuff) sendProposal() error {
 	// define the block header build function
 	setProposer := func(header *flow.Header) {
 		header.ProposerID = myIdentity.NodeID
+		header.View = e.round.Parent().View + 1
 	}
 
 	// define payload and build next block
@@ -336,7 +338,8 @@ func (e *coldStuff) sendCommit() error {
 
 	// send a commit for the cached block hash
 	commit := &model.Commit{
-		BlockID: candidate.ID(),
+		BlockID:     candidate.ID(),
+		CommitterID: e.me.NodeID(),
 	}
 	err := e.comms.BroadcastCommit(commit)
 	if err != nil {
@@ -421,8 +424,15 @@ func (e *coldStuff) voteOnProposal() error {
 		Str("action", "send_vote").
 		Logger()
 
+	// create a fake signature to avoid network message de-duplication
+	sig := make([]byte, 32)
+	_, err := rand.Read(sig)
+	if err != nil {
+		return fmt.Errorf("could not create fake signature: %w", err)
+	}
+
 	// send vote for proposal to leader
-	err := e.comms.SendVote(candidate.ID(), candidate.View, nil, e.round.Leader().NodeID)
+	err = e.comms.SendVote(candidate.ID(), candidate.View, sig, e.round.Leader().NodeID)
 	if err != nil {
 		return fmt.Errorf("could not submit vote: %w", err)
 	}
