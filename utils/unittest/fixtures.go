@@ -301,10 +301,15 @@ func CompleteExecutionResultFixture() verification.CompleteExecutionResult {
 	}
 }
 
-func ChunkHeaderFixture() flow.ChunkHeader {
-	return flow.ChunkHeader{
-		ChunkID:     IdentifierFixture(),
-		StartState:  StateCommitmentFixture(),
-		RegisterIDs: []flow.RegisterID{{1}, {2}, {3}},
+// ChunkDataPackFixture returns a chunk data pack example
+func ChunkDataPackFixture() flow.ChunkDataPack {
+	return flow.ChunkDataPack{
+		ChunkID:    IdentifierFixture(),
+		StartState: StateCommitmentFixture(),
+		StateReads: []flow.StateRead{{RegisterID: []byte{1}, Value: []byte{0}, Proof: nil},
+			{RegisterID: []byte{2}, Value: []byte{0}, Proof: nil},
+			{RegisterID: []byte{3}, Value: []byte{0}, Proof: nil}},
+		StateWrites: []flow.StateWrite{{RegisterID: []byte{1}, Value: []byte{1}, Proof: nil},
+			{RegisterID: []byte{2}, Value: []byte{2}, Proof: nil}},
 	}
 }
