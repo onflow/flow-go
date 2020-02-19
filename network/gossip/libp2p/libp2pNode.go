@@ -9,12 +9,14 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	gologging "github.com/whyrusleeping/go-logging"
 
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-tcp-transport"
@@ -55,6 +57,7 @@ type P2PNode struct {
 func (p *P2PNode) Start(ctx context.Context, n NodeAddress, logger zerolog.Logger, handler network.StreamHandler, psOption ...pubsub.Option) error {
 	p.Lock()
 	defer p.Unlock()
+	golog.SetAllLoggers(gologging.DEBUG)
 	p.name = n.Name
 	p.logger = logger
 	addr := multiaddressStr(n)
