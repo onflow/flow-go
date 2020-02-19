@@ -13,7 +13,6 @@ import (
 	"github.com/dapperlabs/flow-go/crypto"
 	model "github.com/dapperlabs/flow-go/model/coldstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/hotstuff"
 	"github.com/dapperlabs/flow-go/module"
 	"github.com/dapperlabs/flow-go/protocol"
 	"github.com/dapperlabs/flow-go/utils/logging"
@@ -221,7 +220,7 @@ func (e *coldStuff) sendProposal() error {
 		header.ProposerID = myIdentity.NodeID
 	}
 
-	// get the payload for the next hash
+	// define payload and build next block
 	candidate, err := e.builder.BuildOn(e.round.Parent().ID(), setProposer)
 	if err != nil {
 		return fmt.Errorf("could not build on parent: %w", err)
@@ -242,22 +241,8 @@ func (e *coldStuff) sendProposal() error {
 	// cache the candidate block
 	e.round.Propose(candidate)
 
-	// create a HotStuff-conformant proposal
-	proposal := hotstuff.Proposal{
-		Block: &hotstuff.Block{
-			BlockID:     candidate.ID(),
-			ProposerID:  flow.Identifier{},
-			PayloadHash: candidate.PayloadHash,
-			Timestamp:   candidate.Timestamp,
-			QC: &hotstuff.QuorumCertificate{
-				BlockID: candidate.ParentID,
-			},
-		},
-		Signature: nil,
-	}
-
 	// send the block proposal
-	err = e.comms.BroadcastProposal(&proposal)
+	err = e.comms.BroadcastProposal(candidate)
 	if err != nil {
 		return fmt.Errorf("could not submit proposal: %w", err)
 	}
@@ -451,13 +436,8 @@ func (e *coldStuff) voteOnProposal() error {
 		Str("action", "send_vote").
 		Logger()
 
-	// create a HotStuff-conformant vote
-	vote := hotstuff.Vote{
-		BlockID: candidate.ID(),
-	}
-
 	// send vote for proposal to leader
-	err := e.comms.SendVote(&vote, e.round.Leader().NodeID)
+	err := e.comms.SendVote(candidate.ID(), candidate.View, nil, e.round.Leader().NodeID)
 	if err != nil {
 		return fmt.Errorf("could not submit vote: %w", err)
 	}

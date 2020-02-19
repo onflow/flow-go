@@ -36,7 +36,7 @@ type Engine struct {
 	con      network.Conduit
 	cache    map[flow.Identifier][]cacheItem
 
-	coldstuff coldstuff.ColdStuff
+	coldstuff module.ColdStuff
 	// TODO this is pretty awkward, should change the interface
 	stopColdStuff func()
 	coldStuffDone <-chan struct{}
