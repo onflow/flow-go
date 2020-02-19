@@ -6174,7 +6174,7 @@ func TestParseOptionalReference(t *testing.T) {
 					Operation: TransferOperationCopy,
 					Pos:       Position{Offset: 19, Line: 2, Column: 18},
 				},
-				Value: &IntExpression{
+				Value: &IntegerExpression{
 					Value: big.NewInt(1),
 					Base:  10,
 					Range: Range{
