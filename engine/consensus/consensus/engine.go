@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/dapperlabs/flow-go/engine"
+	"github.com/dapperlabs/flow-go/engine/consensus/hotstuff"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/model/flow/filter"
 	"github.com/dapperlabs/flow-go/model/messages"
@@ -27,12 +28,12 @@ type Engine struct {
 	state    protocol.State
 	headers  storage.Headers
 	payloads storage.Payloads
-	hotstuff HotStuff
+	hotstuff hotstuff.HotStuff
 	con      network.Conduit
 }
 
 // New creates a new consensus propagation engine.
-func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, headers storage.Headers, payloads storage.Payloads, hotstuff HotStuff) (*Engine, error) {
+func New(log zerolog.Logger, net module.Network, me module.Local, state protocol.State, headers storage.Headers, payloads storage.Payloads, hotstuff hotstuff.HotStuff) (*Engine, error) {
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{

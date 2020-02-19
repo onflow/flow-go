@@ -1,4 +1,4 @@
-package consensus
+package hotstuff
 
 import (
 	"github.com/dapperlabs/flow-go/crypto"
