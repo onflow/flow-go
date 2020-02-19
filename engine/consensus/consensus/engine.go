@@ -176,7 +176,22 @@ func (e *Engine) BroadcastProposal(proposal *hotstuff.Proposal) error {
 }
 
 func (e *Engine) BroadcastCommit(commit *model.Commit) error {
-	panic("TODO")
+
+	// retrieve all consensus nodes without our ID
+	recipients, err := e.state.Final().Identities(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	)
+	if err != nil {
+		return fmt.Errorf("could not get consensus recipients: %w", err)
+	}
+
+	err = e.con.Submit(commit, recipients.NodeIDs()...)
+	if err != nil {
+		return fmt.Errorf("could not send commit message: %w", err)
+	}
+
+	return err
 }
 
 // process processes events for the propagation engine on the consensus node.
