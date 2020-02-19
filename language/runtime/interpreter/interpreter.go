@@ -2,6 +2,7 @@ package interpreter
 
 import (
 	"fmt"
+	"math/big"
 	goRuntime "runtime"
 
 	"github.com/raviqqe/hamt"
@@ -1333,8 +1334,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Plus(right)
 			})
 
@@ -1342,8 +1343,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Minus(right)
 			})
 
@@ -1351,8 +1352,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Mod(right)
 			})
 
@@ -1360,8 +1361,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Mul(right)
 			})
 
@@ -1369,8 +1370,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Div(right)
 			})
 
@@ -1378,8 +1379,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Less(right)
 			})
 
@@ -1387,8 +1388,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.LessEqual(right)
 			})
 
@@ -1396,8 +1397,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.Greater(right)
 			})
 
@@ -1405,8 +1406,8 @@ func (interpreter *Interpreter) VisitBinaryExpression(expression *ast.BinaryExpr
 		return interpreter.visitBinaryOperation(expression).
 			Map(func(result interface{}) interface{} {
 				tuple := result.(valueTuple)
-				left := tuple.left.(IntegerValue)
-				right := tuple.right.(IntegerValue)
+				left := tuple.left.(NumberValue)
+				right := tuple.right.(NumberValue)
 				return left.GreaterEqual(right)
 			})
 
@@ -1542,7 +1543,7 @@ func (interpreter *Interpreter) VisitUnaryExpression(expression *ast.UnaryExpres
 				return boolValue.Negate()
 
 			case ast.OperationMinus:
-				integerValue := value.(IntegerValue)
+				integerValue := value.(NumberValue)
 				return integerValue.Negate()
 
 			case ast.OperationMove:
@@ -1584,10 +1585,55 @@ func (interpreter *Interpreter) VisitNilExpression(_ *ast.NilExpression) ast.Rep
 	return Done{Result: value}
 }
 
-func (interpreter *Interpreter) VisitIntExpression(expression *ast.IntExpression) ast.Repr {
+func (interpreter *Interpreter) VisitIntegerExpression(expression *ast.IntegerExpression) ast.Repr {
 	value := IntValue{expression.Value}
 
 	return Done{Result: value}
+}
+
+func (interpreter *Interpreter) VisitFixedPointExpression(expression *ast.FixedPointExpression) ast.Repr {
+	// TODO: adjust once/if we support more fixed point types
+	value := interpreter.convertToFixedPointBigInt(expression, sema.Fix64Scale)
+	return Done{Result: Fix64Value(value.Int64())}
+}
+
+func (interpreter *Interpreter) convertToFixedPointBigInt(expression *ast.FixedPointExpression, scale uint) *big.Int {
+	ten := big.NewInt(10)
+
+	// integer = expression.Integer * 10 ^ scale
+
+	targetScale := big.NewInt(0).SetUint64(uint64(scale))
+
+	integer := big.NewInt(0).Mul(
+		expression.Integer,
+		big.NewInt(0).Exp(ten, targetScale, nil),
+	)
+
+	// fractional = expression.Fractional * 10 ^ (scale - expression.Scale)
+
+	var fractional *big.Int
+	if expression.Scale == scale {
+		fractional = expression.Fractional
+	} else if expression.Scale < scale {
+		scaleDiff := big.NewInt(0).SetUint64(uint64(scale - expression.Scale))
+		fractional = big.NewInt(0).Mul(
+			expression.Fractional,
+			big.NewInt(0).Exp(ten, scaleDiff, nil),
+		)
+	} else {
+		scaleDiff := big.NewInt(0).SetUint64(uint64(expression.Scale - scale))
+		fractional = big.NewInt(0).Div(expression.Fractional,
+			big.NewInt(0).Exp(ten, scaleDiff, nil),
+		)
+	}
+
+	// value = integer + fractional
+
+	if integer.Sign() < 0 {
+		fractional.Neg(fractional)
+	}
+
+	return integer.Add(integer, fractional)
 }
 
 func (interpreter *Interpreter) VisitStringExpression(expression *ast.StringExpression) ast.Repr {
@@ -2507,6 +2553,9 @@ func (interpreter *Interpreter) convert(value Value, valueType, targetType sema.
 
 	case *sema.Word64Type:
 		return ConvertWord64(value)
+
+	case *sema.UFix64Type:
+		return ConvertUFix64(value)
 
 	default:
 		return value

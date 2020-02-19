@@ -7355,6 +7355,46 @@ func TestInterpretNonStorageReferenceAfterDestruction(t *testing.T) {
 	assert.IsType(t, &interpreter.DestroyedCompositeError{}, err)
 }
 
+func TestInterpretFix64(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          let a = 789.00123010
+          let b = 1234.056
+          let c = -12345.006789
+        `,
+	)
+
+	assert.Equal(t,
+		interpreter.Fix64Value(78_900_123_010),
+		inter.Globals["a"].Value,
+	)
+
+	assert.Equal(t,
+		interpreter.Fix64Value(123_405_600_000),
+		inter.Globals["b"].Value,
+	)
+
+	assert.Equal(t,
+		interpreter.Fix64Value(-1_234_500_678_900),
+		inter.Globals["c"].Value,
+	)
+}
+
+func TestInterpretFix64Mul(t *testing.T) {
+
+	inter := parseCheckAndInterpret(t,
+		`
+          let a = 1.1 * -1.1
+        `,
+	)
+
+	assert.Equal(t,
+		interpreter.Fix64Value(-121000000),
+		inter.Globals["a"].Value,
+	)
+}
+
 func TestInterpretHexDecode(t *testing.T) {
 
 	expected := interpreter.NewArrayValueUnownedNonCopying(
@@ -7490,4 +7530,3 @@ func TestInterpretOptionalChainingOptionalFieldRead(t *testing.T) {
 		inter.Globals["x"].Value,
 	)
 }
-

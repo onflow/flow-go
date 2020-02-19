@@ -290,6 +290,9 @@ type CadenceVisitor interface {
 	// Visit a parse tree produced by CadenceParser#stringLiteral.
 	VisitStringLiteral(ctx *StringLiteralContext) interface{}
 
+	// Visit a parse tree produced by CadenceParser#fixedPointLiteral.
+	VisitFixedPointLiteral(ctx *FixedPointLiteralContext) interface{}
+
 	// Visit a parse tree produced by CadenceParser#integerLiteral.
 	VisitIntegerLiteral(ctx *IntegerLiteralContext) interface{}
 

@@ -379,6 +379,10 @@ func (v *BaseCadenceVisitor) VisitStringLiteral(ctx *StringLiteralContext) inter
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCadenceVisitor) VisitFixedPointLiteral(ctx *FixedPointLiteralContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCadenceVisitor) VisitIntegerLiteral(ctx *IntegerLiteralContext) interface{} {
 	return v.VisitChildren(ctx)
 }

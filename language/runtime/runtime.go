@@ -909,7 +909,7 @@ func toBytes(value interpreter.Value) ([]byte, error) {
 
 	result := make([]byte, len(array.Values))
 	for i, arrayValue := range array.Values {
-		intValue, ok := arrayValue.(interpreter.IntegerValue)
+		intValue, ok := arrayValue.(interpreter.NumberValue)
 		if !ok {
 			return nil, errors.New("array value is not an integer")
 		}
