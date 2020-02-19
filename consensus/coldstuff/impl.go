@@ -57,6 +57,7 @@ func New(
 		me:        me,
 		state:     state,
 		builder:   builder,
+		finalizer: finalizer,
 		comms:     comms,
 		interval:  interval,
 		timeout:   timeout,
@@ -64,6 +65,9 @@ func New(
 		votes:     make(chan *model.Vote, 1),
 		commits:   make(chan *model.Commit, 1),
 	}
+
+	// TODO incorporate this later
+	_ = cold.finalizer
 
 	return &cold, nil
 }
