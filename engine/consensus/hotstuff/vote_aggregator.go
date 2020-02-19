@@ -140,7 +140,10 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *types.Block) (*types.Quo
 	// accumulate pending votes by order
 	pendingStatus, exists := va.pendingVotes.votes[block.BlockID]
 	if exists {
-		va.convertPendingVotes(pendingStatus.orderedVotes, block)
+		err = va.convertPendingVotes(pendingStatus.orderedVotes, block)
+		if err != nil {
+			return nil, false, fmt.Errorf("could not build QC on receiving block: %w", err)
+		}
 	}
 	// try building QC with existing valid votes
 	qc, built, err := va.tryBuildQC(block.BlockID)
@@ -151,10 +154,13 @@ func (va *VoteAggregator) BuildQCOnReceivedBlock(block *types.Block) (*types.Quo
 	return qc, built, nil
 }
 
-func (va *VoteAggregator) convertPendingVotes(pendingVotes []*types.Vote, block *types.Block) {
+func (va *VoteAggregator) convertPendingVotes(pendingVotes []*types.Vote, block *types.Block) error {
 	for _, vote := range pendingVotes {
 		valid, err := va.validateAndStoreIncorporatedVote(vote, block)
-		if err != nil || !valid {
+		if err != nil {
+			return fmt.Errorf("processing pending votes failed: %w", err)
+		}
+		if !valid {
 			continue
 		}
 		// if threshold is reached, the rest of the votes can be ignored
@@ -163,6 +169,8 @@ func (va *VoteAggregator) convertPendingVotes(pendingVotes []*types.Vote, block 
 		}
 	}
 	delete(va.pendingVotes.votes, block.BlockID)
+
+	return nil
 }
 
 // PruneByView will delete all votes equal or below to the given view, as well as related indexes.

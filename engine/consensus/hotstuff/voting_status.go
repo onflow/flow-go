@@ -45,12 +45,12 @@ func (vs *VotingStatus) CanBuildQC() bool {
 	return vs.accumulatedStake >= vs.thresholdStake
 }
 
-// TryBuildQC returns a QC if the existing votes are enough to build a QC, otherwise
-// an error will be returned.
+// TryBuildQC returns a QC if the existing votes are enough to build a QC
+// returns false if the votes are insufficient
 func (vs *VotingStatus) TryBuildQC() (*types.QuorumCertificate, bool, error) {
 	// check if there are enough votes to build QC
 	if !vs.CanBuildQC() {
-		return nil, false, fmt.Errorf("could not build QC: %w", types.ErrInsufficientVotes)
+		return nil, false, nil
 	}
 
 	// build the aggregated signature
