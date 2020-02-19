@@ -1,4 +1,4 @@
-package executor_test
+package computer_test
 
 import (
 	"testing"
@@ -7,11 +7,10 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/dapperlabs/flow-go/engine/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/executor"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
-	statemock "github.com/dapperlabs/flow-go/engine/execution/execution/state/mock"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
-	vmmock "github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine/mock"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/computer"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
+	vmmock "github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine/mock"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/model/flow"
 	"github.com/dapperlabs/flow-go/utils/unittest"
 )
@@ -21,9 +20,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	t.Run("single collection", func(t *testing.T) {
 		vm := new(vmmock.VirtualMachine)
 		bc := new(vmmock.BlockContext)
-		es := new(statemock.ExecutionState)
 
-		exe := executor.NewBlockExecutor(vm, es)
+		exe := computer.NewBlockComputer(vm)
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2)
@@ -34,8 +32,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(&virtualmachine.TransactionResult{}, nil).
 			Twice()
 
-		es.On("StateCommitmentByBlockID", block.Block.ParentID).
-			Return(unittest.StateCommitmentFixture(), nil)
+		view := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+		startState := unittest.StateCommitmentFixture()
 
 		es.On("NewView", mock.Anything).
 			Return(
@@ -47,24 +47,19 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		es.On("PersistChunkDataPack", mock.Anything, mock.Anything).Return(nil)
 		es.On("PersistStateCommitment", block.Block.ID(), mock.Anything).Return(nil)
 
-		result, err := exe.ExecuteBlock(block)
+		result, err := exe.ExecuteBlock(block, view, startState)
 		assert.NoError(t, err)
-		assert.Len(t, result.Chunks, 1)
-
-		chunk := result.Chunks[0]
-		assert.EqualValues(t, 0, chunk.CollectionIndex)
+		assert.Len(t, result.StateViews, 1)
 
 		vm.AssertExpectations(t)
 		bc.AssertExpectations(t)
-		es.AssertExpectations(t)
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
 		vm := new(vmmock.VirtualMachine)
 		bc := new(vmmock.BlockContext)
-		es := new(statemock.ExecutionState)
 
-		exe := executor.NewBlockExecutor(vm, es)
+		exe := computer.NewBlockComputer(vm)
 
 		collectionCount := 2
 		transactionsPerCollection := 2
@@ -79,41 +74,20 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(&virtualmachine.TransactionResult{}, nil).
 			Times(totalTransactionCount)
 
-		es.On("StateCommitmentByBlockID", block.Block.ParentID).
-			Return(unittest.StateCommitmentFixture(), nil)
+		view := state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
+			return nil, nil
+		})
 
-		es.On("NewView", mock.Anything).
-			Return(
-				state.NewView(func(key flow.RegisterID) (flow.RegisterValue, error) {
-					return nil, nil
-				}, unittest.StateCommitmentFixture())).
-			Times(collectionCount)
+		startState := unittest.StateCommitmentFixture()
 
-		es.On("CommitDelta", mock.Anything).
-			Return(nil, nil).
-			Times(collectionCount)
-
-		es.On("PersistChunkHeader", mock.Anything, mock.Anything).
-			Return(nil).
-			Times(collectionCount)
-
-		es.On("PersistStateCommitment", block.Block.ID(), mock.Anything).
-			Return(nil)
-
-		result, err := exe.ExecuteBlock(block)
+		result, err := exe.ExecuteBlock(block, view, startState)
 		assert.NoError(t, err)
 
-		// chunk count should match collection count
-		assert.Len(t, result.Chunks, collectionCount)
-
-		// chunks should follow the same order as collections
-		for i, chunk := range result.Chunks {
-			assert.EqualValues(t, i, chunk.CollectionIndex)
-		}
+		//chunk count should match collection count
+		assert.Len(t, result.StateViews, collectionCount)
 
 		vm.AssertExpectations(t)
 		bc.AssertExpectations(t)
-		es.AssertExpectations(t)
 	})
 }
 

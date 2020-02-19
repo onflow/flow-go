@@ -12,11 +12,11 @@ import (
 	consensusingest "github.com/dapperlabs/flow-go/engine/consensus/ingestion"
 	"github.com/dapperlabs/flow-go/engine/consensus/matching"
 	"github.com/dapperlabs/flow-go/engine/consensus/propagation"
-	"github.com/dapperlabs/flow-go/engine/execution/execution"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/execution/virtualmachine"
+	"github.com/dapperlabs/flow-go/engine/execution/computation"
+	"github.com/dapperlabs/flow-go/engine/execution/computation/virtualmachine"
 	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	"github.com/dapperlabs/flow-go/engine/execution/receipts"
+	executionprovider "github.com/dapperlabs/flow-go/engine/execution/provider"
+	"github.com/dapperlabs/flow-go/engine/execution/state"
 	"github.com/dapperlabs/flow-go/engine/testutil/mock"
 	"github.com/dapperlabs/flow-go/engine/verification/ingest"
 	"github.com/dapperlabs/flow-go/engine/verification/verifier"
@@ -166,12 +166,6 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	commitsStorage := storage.NewCommits(node.DB)
 	chunkHeadersStorage := storage.NewChunkHeaders(node.DB)
 
-	receiptsEngine, err := receipts.New(node.Log, node.Net, node.State, node.Me)
-	require.NoError(t, err)
-
-	rt := runtime.NewInterpreterRuntime()
-	vm := virtualmachine.New(rt)
-
 	levelDB := unittest.TempLevelDB(t)
 
 	ls, err := ledger.NewTrieStorage(levelDB)
@@ -179,19 +173,25 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	execState := state.NewExecutionState(ls, commitsStorage, chunkHeadersStorage)
 
-	execEngine, err := execution.New(
+	receiptsEngine, err := executionprovider.New(node.Log, node.Net, node.State, node.Me, execState)
+	require.NoError(t, err)
+
+	rt := runtime.NewInterpreterRuntime()
+	vm := virtualmachine.New(rt)
+
+	require.NoError(t, err)
+
+	execEngine, err := computation.New(
 		node.Log,
 		node.Net,
 		node.Me,
 		node.State,
-		execState,
 		receiptsEngine,
 		vm,
 	)
 	require.NoError(t, err)
 
-	blocksEngine, err := ingestion.New(
-		node.Log,
+	blocksEngine, err := ingestion.New(node.Log,
 		node.Net,
 		node.Me,
 		node.State,
@@ -199,6 +199,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		payloadsStorage,
 		collectionsStorage,
 		execEngine,
+		execState,
 	)
 	require.NoError(t, err)
 
