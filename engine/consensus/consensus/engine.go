@@ -184,6 +184,8 @@ func (e *Engine) BroadcastProposal(header *flow.Header) error {
 		Payload: payload,
 	}
 
+	e.log.Debug().Msgf("broadcast proposal recipients: %v", recipients.NodeIDs())
+
 	// broadcast the proposal to consensus nodes
 	err = e.con.Submit(&msg, recipients.NodeIDs()...)
 	if err != nil {

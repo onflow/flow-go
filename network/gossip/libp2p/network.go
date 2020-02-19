@@ -287,6 +287,8 @@ func (n *Network) submit(channelID uint8, event interface{}, targetIDs ...flow.I
 		return errors.Wrap(err, "could not cast the event into network message")
 	}
 
+	n.logger.Debug().Msg("submitted msg")
+
 	// TODO: debup the message here
 
 	err = n.send(channelID, msg, targetIDs...)
