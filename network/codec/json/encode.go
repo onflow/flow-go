@@ -37,12 +37,12 @@ func encode(v interface{}) (*Envelope, error) {
 		code = CodeEcho
 
 	// ColdStuff
-	case *coldstuff.BlockProposal:
-		code = CodeColdStuffBlockProposal
-	case *coldstuff.BlockVote:
-		code = CodeColdStuffBlockVote
-	case *coldstuff.BlockCommit:
-		code = CodeColdStuffBlockCommit
+	case *messages.BlockProposal:
+		code = CodeBlockProposal
+	case *messages.BlockVote:
+		code = CodeBlockVote
+	case *coldstuff.Commit:
+		code = CodeBlockCommit
 
 	case *flow.CollectionGuarantee:
 		code = CodeCollectionGuarantee
