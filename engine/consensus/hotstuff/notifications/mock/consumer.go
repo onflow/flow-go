@@ -17,14 +17,11 @@ func (_m *Consumer) OnBlockIncorporated(_a0 *hotstuff.Block) {
 
 // OnDoubleProposeDetected provides a mock function with given fields: _a0, _a1
 func (_m *Consumer) OnDoubleProposeDetected(_a0 *hotstuff.Block, _a1 *hotstuff.Block) {
-<<<<<<< HEAD
-=======
 	_m.Called(_a0, _a1)
 }
 
 // OnDoubleVotingDetected provides a mock function with given fields: _a0, _a1
 func (_m *Consumer) OnDoubleVotingDetected(_a0 *hotstuff.Vote, _a1 *hotstuff.Vote) {
->>>>>>> master
 	_m.Called(_a0, _a1)
 }
 
